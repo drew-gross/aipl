@@ -49,7 +49,8 @@ const INSTANTIATION_LIMIT: usize = 10_000;
 /// type arguments it's called with.
 pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Error> {
     // Field types per struct (for typing `Field`/`Construct`).
-    let mut structs: HashMap<String, Vec<(String, Type)>> = HashMap::new();
+    // struct name → [(field_name, field_type, default_expr)]
+    let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();
     // Variant (sum) types: name → ordered cases `(ctor, payload)`; and the
     // reverse ctor → variant map for typing `Ctor(..)` and nullary `Ctor`.
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
@@ -71,7 +72,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
                     s.name.clone(),
                     s.fields
                         .iter()
-                        .map(|f| (f.name.clone(), f.ty.clone()))
+                        .map(|f| (f.name.clone(), f.ty.clone(), f.default.clone()))
                         .collect(),
                 );
                 passthrough.push(item.clone());
@@ -516,7 +517,7 @@ struct Mono<'a> {
     fn_returns: &'a HashMap<String, Type>,
     /// Names of mutating functions (`mut self` receiver), generic or not.
     mutating: &'a HashSet<String>,
-    structs: &'a HashMap<String, Vec<(String, Type)>>,
+    structs: &'a HashMap<String, Vec<(String, Type, Option<Expr>)>>,
     /// Variant types (name → cases) and the ctor → variant reverse map.
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     ctors: &'a HashMap<String, String>,
@@ -2408,8 +2409,8 @@ impl Mono<'_> {
                     Type::Named(sn) => self
                         .structs
                         .get(sn)
-                        .and_then(|fs| fs.iter().find(|(n, _)| n == fname))
-                        .map(|(_, t)| t.clone())
+                        .and_then(|fs| fs.iter().find(|(n, _, _)| n == fname))
+                        .map(|(_, t, _)| t.clone())
                         .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
                     _ => Type::Primitive(Primitive::I64),
                 };
@@ -2537,12 +2538,26 @@ impl Mono<'_> {
                     merged.unwrap_or_else(|| Type::Primitive(Primitive::I64)),
                 )
             }
-            ExprKind::Construct(name, fields) => {
-                let mut rfields = Vec::with_capacity(fields.len());
-                for fi in fields {
-                    let (rv, _) = self.infer(&fi.value, env)?;
+            ExprKind::Construct(name, inits) => {
+                // Expand to a complete field list in struct-definition order,
+                // filling missing fields from their declared defaults.
+                let field_defs = self.structs.get(name.as_str()).cloned().unwrap_or_default();
+                let mut rfields = Vec::with_capacity(field_defs.len());
+                for (fname, _, fdefault) in &field_defs {
+                    let src = if let Some(fi) = inits.iter().find(|i| &i.name == fname) {
+                        fi.value.clone()
+                    } else if let Some(def) = fdefault {
+                        def.clone()
+                    } else {
+                        // Checker already caught this; surface a clean error just in case.
+                        return Err(Error::at(
+                            format!("struct {name:?} field {fname:?} has no default and was not provided"),
+                            span,
+                        ));
+                    };
+                    let (rv, _) = self.infer(&src, env)?;
                     rfields.push(aipl_syntax::ast::FieldInit {
-                        name: fi.name.clone(),
+                        name: fname.clone(),
                         value: rv,
                     });
                 }

@@ -271,6 +271,7 @@ pub mod ast {
     pub struct FieldDecl {
         pub name: String,
         pub ty: Type,
+        pub default: Option<Expr>,
     }
 
     /// `variant Shape = Circle(i64) | Rect(i64, i64) | Empty;` — a tagged sum

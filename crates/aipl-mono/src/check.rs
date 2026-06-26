@@ -58,7 +58,7 @@ struct Binding {
 type Env = HashMap<String, Binding>;
 
 struct Cx<'a> {
-    structs: &'a HashMap<String, Vec<(String, Type)>>,
+    structs: &'a HashMap<String, Vec<(String, Type, bool)>>,
     /// Variant (sum) types: name → ordered cases `(ctor, payload types)`.
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     /// Constructor name → the variant it belongs to (for typing `Ctor(..)`).
@@ -73,7 +73,8 @@ struct Cx<'a> {
 /// Type-check `program`. Returns the first error found, or `Ok` if every
 /// function is well-formed.
 pub fn check(program: &Program) -> Result<(), Error> {
-    let mut structs: HashMap<String, Vec<(String, Type)>> = HashMap::new();
+    // struct name → [(field_name, field_type, has_default)]
+    let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
     let mut ctors: HashMap<String, String> = HashMap::new();
     let mut sigs: HashMap<String, FnSig> = HashMap::new();
@@ -84,7 +85,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
                     s.name.clone(),
                     s.fields
                         .iter()
-                        .map(|f| (f.name.clone(), f.ty.clone()))
+                        .map(|f| (f.name.clone(), f.ty.clone(), f.default.is_some()))
                         .collect(),
                 );
             }
@@ -131,6 +132,23 @@ pub fn check(program: &Program) -> Result<(), Error> {
         sigs: &sigs,
         current_ret: std::cell::RefCell::new(unit_ty()),
     };
+    // Type-check struct field defaults in an empty environment (defaults are
+    // evaluated at construction time with no local variables in scope).
+    for item in &program.items {
+        if let Item::Struct(s) = item {
+            for f in &s.fields {
+                if let Some(default) = &f.default {
+                    let dt = cx.check_expr(default, &HashMap::new(), &[])?;
+                    expect(
+                        &dt,
+                        &f.ty,
+                        &format!("default for struct {:?} field {:?}", s.name, f.name),
+                        default.span,
+                    )?;
+                }
+            }
+        }
+    }
     for item in &program.items {
         if let Item::Fn(f) = item {
             cx.check_fn(f)?;
@@ -1002,8 +1020,8 @@ impl Cx<'_> {
                 })?;
                 fields
                     .iter()
-                    .find(|(n, _)| n == fname)
-                    .map(|(_, t)| t.clone())
+                    .find(|(n, _, _)| n == fname)
+                    .map(|(_, t, _)| t.clone())
                     .ok_or_else(|| {
                         Error::at(format!("struct {sn:?} has no field {fname:?}"), span)
                     })?
@@ -1014,21 +1032,11 @@ impl Cx<'_> {
                     .get(name)
                     .cloned()
                     .ok_or_else(|| Error::at(format!("unknown struct {name:?}"), span))?;
-                if inits.len() != fields.len() {
-                    return Err(Error::at(
-                        format!(
-                            "struct {name:?} expects {} field(s), got {}",
-                            fields.len(),
-                            inits.len()
-                        ),
-                        span,
-                    ));
-                }
+                // Each provided init must name a real field with a compatible type.
                 for fi in inits {
-                    let expected = fields
+                    let (_, expected, _) = fields
                         .iter()
-                        .find(|(n, _)| *n == fi.name)
-                        .map(|(_, t)| t.clone())
+                        .find(|(n, _, _)| *n == fi.name)
                         .ok_or_else(|| {
                             Error::at(
                                 format!("struct {name:?} has no field {:?}", fi.name),
@@ -1038,10 +1046,21 @@ impl Cx<'_> {
                     let vt = self.check_expr(&fi.value, env, effects)?;
                     expect(
                         &vt,
-                        &expected,
+                        expected,
                         &format!("struct {name:?} field {:?}", fi.name),
                         fi.value.span,
                     )?;
+                }
+                // Every field without a default must be provided.
+                for (fname, _, has_default) in &fields {
+                    if !has_default && !inits.iter().any(|i| &i.name == fname) {
+                        return Err(Error::at(
+                            format!(
+                                "struct {name:?} field {fname:?} has no default and was not provided"
+                            ),
+                            span,
+                        ));
+                    }
                 }
                 Type::Named(name.clone())
             }

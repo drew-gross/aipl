@@ -138,7 +138,8 @@ gazelle! {
                | field_decl_list COMMA => present_trailing
                | _ => empty;
         field_decl_list = field_decl => first | field_decl_list COMMA field_decl => rest;
-        field_decl = IDENT COLON ty => field_decl;
+        field_decl = IDENT COLON ty => field_decl
+                   | IDENT COLON ty EQ expr => with_default;
 
         params = param_list => present
                | param_list COMMA => present_trailing
@@ -695,8 +696,18 @@ impl gazelle::Action<aipl::FieldDeclList<Self>> for Build {
 
 impl gazelle::Action<aipl::FieldDecl<Self>> for Build {
     fn build(&mut self, node: aipl::FieldDecl<Self>) -> Result<FieldDecl, Self::Error> {
-        let aipl::FieldDecl::FieldDecl((name, _), ty) = node;
-        Ok(FieldDecl { name, ty })
+        match node {
+            aipl::FieldDecl::FieldDecl((name, _), ty) => Ok(FieldDecl {
+                name,
+                ty,
+                default: None,
+            }),
+            aipl::FieldDecl::WithDefault((name, _), ty, default) => Ok(FieldDecl {
+                name,
+                ty,
+                default: Some(default),
+            }),
+        }
     }
 }
 

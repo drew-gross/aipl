@@ -279,11 +279,13 @@ fn struct_with_fields() {
         vec![
             FieldDecl {
                 name: "x".into(),
-                ty: i64_ty()
+                ty: i64_ty(),
+                default: None,
             },
             FieldDecl {
                 name: "y".into(),
-                ty: i64_ty()
+                ty: i64_ty(),
+                default: None,
             },
         ]
     );

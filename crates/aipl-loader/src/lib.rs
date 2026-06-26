@@ -617,6 +617,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>) -> Result<Item, Err
                 .map(|fd| aipl_syntax::ast::FieldDecl {
                     name: fd.name.clone(),
                     ty: rewrite_type(&fd.ty, view, &[]),
+                    default: fd.default.clone(),
                 })
                 .collect(),
         }),

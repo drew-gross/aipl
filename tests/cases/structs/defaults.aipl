@@ -1,0 +1,49 @@
+import { == } from builtins;
+
+struct Point { x: i64 = 0, y: i64 = 0 }
+struct Config { retries: i64 = 3, label: str = "default" }
+
+fn all_defaults() -> Point { Point {} }.test({
+    assert(all_defaults().x == 0);
+    assert(all_defaults().y == 0);
+})
+
+fn partial_x() -> Point { Point { x: 5 } }.test({
+    assert(partial_x().x == 5);
+    assert(partial_x().y == 0);
+})
+
+fn partial_y() -> Point { Point { y: 7 } }.test({
+    assert(partial_y().x == 0);
+    assert(partial_y().y == 7);
+})
+
+fn all_explicit() -> Point { Point { x: 3, y: 4 } }.test({
+    assert(all_explicit().x == 3);
+    assert(all_explicit().y == 4);
+})
+
+fn config_defaults() -> Config { Config {} }.test({
+    assert(config_defaults().retries == 3);
+    assert(config_defaults().label == "default");
+})
+
+fn config_override() -> Config { Config { label: "custom" } }.test({
+    assert(config_override().retries == 3);
+    assert(config_override().label == "custom");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 355
+binary size: 6344
+--- monomorphizations ---
+all_defaults
+all_explicit
+config_defaults
+config_override
+main
+partial_x
+partial_y
