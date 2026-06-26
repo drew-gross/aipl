@@ -1,0 +1,9 @@
+fn outer() -> i64 { inner() }
+fn inner() !prints -> i64 { print("hi") }
+fn main() -> i64 { outer() }
+--- errors ---
+error: fn "inner" has effect "!prints" but the calling function does not declare it
+ --> input:1:21
+  |
+1 | fn outer() -> i64 { inner() }
+  |                     ^^^^^

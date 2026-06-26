@@ -1,0 +1,134 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AIPL",
+  "scopeName": "source.aipl",
+  "fileTypes": ["aipl"],
+  "patterns": [
+    { "include": "#section-tail" },
+    { "include": "#main" }
+  ],
+  "repository": {
+    "main": {
+      "patterns": [
+        { "include": "#comment-line" },
+        { "include": "#comment-block" },
+        { "include": "#string" },
+        { "include": "#char" },
+        { "include": "#number" },
+        { "include": "#fn-declaration" },
+        { "include": "#struct-declaration" },
+        { "include": "#import-statement" },
+        { "include": "#effect" },
+        { "include": "#keyword" },
+        { "include": "#constant" },
+        { "include": "#builtin-type" },
+        { "include": "#operator" },
+        { "include": "#punctuation" },
+        { "include": "#identifier" }
+      ]
+    },
+    "section-tail": {
+      "comment": "Test-case files end with `--- name ---` markers introducing expected stdout/stderr/exit code/errors. Once the first marker appears, the remainder of the file is plain text (not AIPL source), with later markers themselves highlighted as comments.",
+      "begin": "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$",
+      "end": "\\z",
+      "beginCaptures": {
+        "0": { "name": "comment.line.section-marker.aipl" }
+      },
+      "contentName": "meta.section-content.aipl",
+      "patterns": [
+        {
+          "match": "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$",
+          "name": "comment.line.section-marker.aipl"
+        }
+      ]
+    },
+    "comment-line": {
+      "match": "//.*$",
+      "name": "comment.line.double-slash.aipl"
+    },
+    "comment-block": {
+      "begin": "/\\*",
+      "end": "\\*/",
+      "name": "comment.block.aipl",
+      "patterns": [
+        { "include": "#comment-block" }
+      ]
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.aipl",
+      "patterns": [
+        {
+          "match": "\\\\[ntr\\\\\"']",
+          "name": "constant.character.escape.aipl"
+        }
+      ]
+    },
+    "char": {
+      "begin": "'",
+      "end": "'",
+      "name": "string.quoted.single.aipl",
+      "patterns": [
+        {
+          "match": "\\\\[ntr\\\\\"']",
+          "name": "constant.character.escape.aipl"
+        }
+      ]
+    },
+    "number": {
+      "match": "\\b[0-9]+\\b",
+      "name": "constant.numeric.integer.aipl"
+    },
+    "keyword": {
+      "match": "\\b(fn|if|else|struct|variant|import|from|as|pub|let|for|while|mut|set|match|return|builtins)\\b",
+      "name": "keyword.control.aipl"
+    },
+    "constant": {
+      "match": "\\b(true|false|none)\\b",
+      "name": "constant.language.aipl"
+    },
+    "builtin-type": {
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|bool|char|str|any)\\b",
+      "name": "support.type.builtin.aipl"
+    },
+    "fn-declaration": {
+      "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.declaration.function.aipl" },
+        "2": { "name": "entity.name.function.aipl" }
+      }
+    },
+    "struct-declaration": {
+      "match": "\\b(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.declaration.struct.aipl" },
+        "2": { "name": "entity.name.type.struct.aipl" }
+      }
+    },
+    "import-statement": {
+      "match": "\\b(import|from|as)\\b",
+      "name": "keyword.control.import.aipl"
+    },
+    "effect": {
+      "comment": "An effect declaration like `!prints` in a fn signature. The effect names listed here must stay in sync with KNOWN_EFFECTS in src/codegen.rs — keeping the list explicit avoids the alternative (matching any `!ident`), which would mis-scope unary `!true` / `!some_bool`.",
+      "match": "(!)(prints)\\b",
+      "captures": {
+        "1": { "name": "keyword.operator.effect.aipl" },
+        "2": { "name": "entity.name.tag.effect.aipl" }
+      }
+    },
+    "operator": {
+      "match": "==|!=|<=|>=|&&|\\|\\||->|=>|\\.\\.|[+\\-*/%<>!=|]",
+      "name": "keyword.operator.aipl"
+    },
+    "punctuation": {
+      "match": "[(){}\\[\\],;:.?#]",
+      "name": "punctuation.aipl"
+    },
+    "identifier": {
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+      "name": "variable.other.aipl"
+    }
+  }
+}

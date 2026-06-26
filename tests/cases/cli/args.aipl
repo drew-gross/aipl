@@ -1,0 +1,29 @@
+import { print, len, to_str } from builtins;
+
+// `main` may take the CLI arguments as a `str[]` (argv without the program
+// name). Each `--- cli ---` line below is one argument; the program echoes
+// them and prints the count.
+fn main(args: str[]) !prints {
+    for (let a : args) {
+        print(a);
+    }
+    print(to_str(len(args)));
+}
+--- cli ---
+alpha
+two words
+gamma
+--- stdout ---
+alpha
+two words
+gamma
+3
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 82
+instructions executed: 89
+binary size: 1637
+--- monomorphizations ---
+main

@@ -1,0 +1,40 @@
+import { ==, print, to_str, write_string_to_file } from builtins;
+
+// `write_string_to_file(path, contents) -> !str` writes `contents` to `path`,
+// returning `ok()` on success and `err(message)` on any failure. It carries the
+// `!write_files` effect (distinct from `!read_files`). The harness runs in a
+// temp dir, so writes land beside the program — the `expect file:` section below
+// validates what was actually written, directly (no read-back needed).
+fn write_to(path: str, contents: str) !write_files -> !str {
+    write_string_to_file(path, contents)
+}.test({
+    // ok() on a writable path.
+    match (write_to("rt.txt", "ok")) {
+        ok => assert(true),
+        err(e) => assert(false),
+    };
+    // err(message) when the directory doesn't exist.
+    match (write_to("no_such_dir/x.txt", "data")) {
+        ok => assert(false),
+        err(e) => assert(e == "could not write file"),
+    };
+})
+
+fn main() !prints !write_files {
+    print(to_str(write_string_to_file("out.txt", "round trip")));   // ok()
+    print(to_str(write_string_to_file("nope/out.txt", "x")));       // err("...")
+}
+--- stdout ---
+ok()
+err("could not write file")
+--- expect file: out.txt ---
+round trip
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 44
+instructions executed: 133
+binary size: 3616
+--- monomorphizations ---
+main

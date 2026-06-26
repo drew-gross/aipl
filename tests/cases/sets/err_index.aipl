@@ -1,0 +1,13 @@
+import { print, to_str } from builtins;
+
+// A set is not indexable (no positional access).
+fn main() !prints {
+    let s = #{1, 2, 3};
+    print(to_str(s[0]));
+}
+--- errors ---
+error: cannot index a value of type #{i64}
+ --> input:6:18
+  |
+6 |     print(to_str(s[0]));
+  |                  ^

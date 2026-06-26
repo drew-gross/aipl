@@ -1,0 +1,9 @@
+struct Pair { a: i64, b: i64 }
+
+fn main() -> i64 { Pair { a: 1 }.a }
+--- errors ---
+error: struct "Pair" expects 2 field(s), got 1
+ --> input:3:20
+  |
+3 | fn main() -> i64 { Pair { a: 1 }.a }
+  |                    ^^^^^^^^^^^

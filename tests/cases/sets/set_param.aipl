@@ -1,0 +1,32 @@
+import { ==, !, len, contains } from builtins;
+
+// The `#{T}` set type as a parameter and return type, plus passing a set across
+// calls (exercises set ownership/refcounting).
+fn count(xs: #{i64}) -> i64 {
+    len(xs)
+}.test({
+    assert(count(#{10, 20, 30, 10}) == 3);
+})
+
+fn has(xs: #{i64}, x: i64) -> bool {
+    xs.contains(x)
+}.test({
+    assert(has(#{10, 20, 30}, 20));
+    assert(!has(#{10, 20, 30}, 25));
+})
+
+fn build() -> #{i64} {
+    #{10, 20, 30, 10}
+}.test({
+    assert(build() == #{10, 20, 30});
+})
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 296
+instructions executed: 237
+binary size: 4814
+--- monomorphizations ---
+has
+main

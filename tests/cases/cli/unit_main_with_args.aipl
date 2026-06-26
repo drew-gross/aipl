@@ -1,0 +1,26 @@
+import { print } from builtins;
+
+// `main` can both take the CLI arguments and return nothing — it runs for its
+// effects and exits 0.
+fn main(args: str[]) !prints {
+    for (let a : args) {
+        print(a);
+    }
+}
+--- cli ---
+one
+two
+--- stdout ---
+one
+two
+--- exit code ---
+0
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 48
+instructions executed: 46
+binary size: 935
+--- monomorphizations ---
+main

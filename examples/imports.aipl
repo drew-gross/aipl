@@ -1,0 +1,14 @@
+// Demonstrates `import { ... } from "..."`. The path is relative to
+// this file; only the listed names come into scope.
+
+import { Rect, double_area } from "./math/geometry.aipl";
+
+fn main() -> i64 {
+    // `double_area` calls `area` and `double` internally; we don't
+    // import them, but the loader keeps those within-file references
+    // wired up after the rewrite.
+    double_area(Rect { width: 3, height: 7 })
+}
+
+--- exit code ---
+42

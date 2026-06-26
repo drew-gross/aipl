@@ -1,0 +1,18 @@
+import { print, to_str, map } from builtins;
+
+// A named function whose parameter type doesn't match the array element type
+// can't be passed to `map`.
+fn takes_str(s: str) -> str {
+    s
+}
+
+fn main() !prints {
+    let xs = [1, 2, 3];
+    print(to_str(xs.map(takes_str)));
+}
+--- errors ---
+error: fn "takes_str" expects a str argument, but will be called with i64 here
+  --> input:11:25
+   |
+11 |     print(to_str(xs.map(takes_str)));
+   |                         ^^^^^^^^^

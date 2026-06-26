@@ -1,0 +1,37 @@
+import { ==, >, !, len, push, map, filter } from builtins;
+
+// `push`, `map`, and `filter` on bit-packed `bool[]`, including growth across a
+// byte boundary.
+
+// Start with 7 elements (one byte), then push past the 8-element boundary so
+// the packed buffer grows into a second byte.
+fn grown() -> bool[] {
+    mut ys = [true, false, true, true, false, true, false];
+    ys.push(true);   // 8th element fills byte 0
+    ys.push(false);  // 9th element starts byte 1
+    ys
+}.test({
+    let ys = grown();
+    assert(ys == [true, false, true, true, false, true, false, true, false]);
+    assert(len(ys) == 9);
+
+    // map producing a bool[] (i64 -> bool) packs the results.
+    assert([1, 2, 3, 4, 5].map(|x| x > 2) == [false, false, true, true, true]);
+
+    // map transforming bool -> bool, and filter keeping a subset.
+    let bs = [true, false, true, false, true];
+    assert(bs.map(|b| !b) == [false, true, false, true, false]);
+    assert(bs.filter(|b| b) == [true, true, true]);
+})
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 4
+bytes allocated: 367
+instructions executed: 1280
+binary size: 6227
+--- monomorphizations ---
+__filter5
+__map1
+__map3
+main

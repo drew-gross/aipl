@@ -1,0 +1,17 @@
+import { wrapping_add as +, -, *, == } from builtins;
+fn fact(n: i64) -> i64 {
+    if (n == 0) { 1 } else { n * fact(n - 1) }
+}.test({
+    assert(fact(0) == 1);
+    assert(fact(5) == 120);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 96
+binary size: 1926
+--- monomorphizations ---
+fact
+main

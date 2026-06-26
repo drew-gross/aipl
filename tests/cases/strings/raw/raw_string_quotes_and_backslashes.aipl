@@ -1,0 +1,27 @@
+import { print } from builtins;
+
+// Raw strings are verbatim: embedded quotes (`"`, `""`) and backslashes are
+// ordinary characters (no escapes), and a single-line raw string isn't
+// de-dented. Both lines print exactly as written.
+fn main() !prints -> i64 {
+    print("""path C:\dir\new "quoted" and ""doubled"" end""");
+    let multi = """
+        line "with" quotes
+        and a \backslash
+    """;
+    print(multi);
+    0
+}
+--- stdout ---
+path C:\dir\new "quoted" and ""doubled"" end
+line "with" quotes
+and a \backslash
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 15
+binary size: 1335
+--- monomorphizations ---
+main

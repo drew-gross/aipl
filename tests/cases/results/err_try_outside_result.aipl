@@ -1,0 +1,15 @@
+// `?` can only appear in a function whose return type is a result — there's
+// nowhere to propagate an err otherwise.
+fn bad(x: i64!str) -> i64 {
+    x?
+}
+
+fn main() {
+    bad(ok(1));
+}
+--- errors ---
+error: "?" can only be used in a function that returns a result
+ --> input:4:5
+  |
+4 |     x?
+  |     ^

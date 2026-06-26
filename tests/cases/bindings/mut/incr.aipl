@@ -1,0 +1,26 @@
+import { ++, <, == } from builtins;
+
+// `set n++;` increments a mut binding by one. `++` is its own operator, imported
+// separately from `+` (it lowers to a `wrapping_add` internally, but a file that
+// uses `set n++;` imports `++`, not `+`).
+fn count_to(limit: i64) -> i64 {
+    mut n = 0;
+    while (n < limit) {
+        set n++;
+    }
+    n
+}.test({
+    assert(count_to(5) == 5);
+    assert(count_to(0) == 0);
+    assert(count_to(1) == 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 135
+binary size: 2404
+--- monomorphizations ---
+count_to
+main

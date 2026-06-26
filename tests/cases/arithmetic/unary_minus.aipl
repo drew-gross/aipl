@@ -1,0 +1,17 @@
+import { wrapping_add as +, -, == } from builtins;
+fn neg(x: i64) -> i64 { -x }.test({
+    assert(neg(5) == -5);
+    assert(neg(-7) == 7);
+    // neg(5) - (-5) + neg(-7) - 7 == 0
+    assert(neg(5) + 5 + neg(-7) - 7 == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 61
+binary size: 2201
+--- monomorphizations ---
+main
+neg

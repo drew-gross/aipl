@@ -1,0 +1,17 @@
+import { print } from builtins;
+
+fn main() !prints -> i64 {
+    print("ok");
+    0
+}
+--- stdout ---
+ok
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 7
+binary size: 730
+--- monomorphizations ---
+main

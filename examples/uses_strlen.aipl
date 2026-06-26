@@ -1,0 +1,16 @@
+import { wrapping_add as + } from builtins;
+// Pulls `len` out of the strlen library and uses it like any builtin.
+// Validates the chain: import resolution → mangling of non-root items →
+// for-loop + mutation inside an imported function all the way through
+// to a binary executable.
+
+import { len } from "./lib/strlen.aipl";
+
+fn main() -> i64 {
+    let total = len("hello") + len("") + len("a few words here");
+    // 5 + 0 + 16 = 21
+    total
+}
+
+--- exit code ---
+21

@@ -1,0 +1,18 @@
+import { wrapping_add as +, *, == } from builtins;
+fn f() -> i64 {
+    mut x = 10;
+    set x = x + 5;
+    set x = x * 2;
+    x
+}.test({
+    assert(f() == 30);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 30
+binary size: 1542
+--- monomorphizations ---
+main

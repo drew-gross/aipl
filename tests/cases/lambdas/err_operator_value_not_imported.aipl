@@ -1,0 +1,15 @@
+// Passing an operator as a value still requires importing it (the desugared
+// `|lhs, rhs| lhs + rhs` uses `+`), and the error points at the operator.
+fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 {
+    f(a, b)
+}
+
+fn main() -> i64 {
+    apply(2, 3, +)
+}
+--- errors ---
+error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
+ --> input:8:17
+  |
+8 |     apply(2, 3, +)
+  |                 ^

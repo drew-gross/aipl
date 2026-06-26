@@ -1,0 +1,36 @@
+import { wrapping_add as +, ==, !=, !, len, contains } from builtins;
+
+// Sets of strings: deduplicated and tested for membership by *content* (not
+// pointer identity), and freed/retained like a `str[]`.
+fn distinct(xs: #{str}) -> i64 {
+    len(xs)
+}.test({
+    assert(distinct(#{"apple", "banana", "apple", "cherry"}) == 3);
+})
+
+fn build() -> #{str} {
+    #{"apple", "banana", "apple", "cherry"} // -> {"apple", "banana", "cherry"}
+}.test({
+    let s = build();
+    assert(s == #{"apple", "banana", "cherry"});
+    assert(len(s) == 3);
+    assert(s.contains("banana"));
+    assert(!s.contains("grape"));
+
+    // Membership is by content: a freshly built "banana" still matches.
+    let key = "ba" + "nana";
+    assert(s.contains(key));
+
+    // Equality is order-independent and by content.
+    assert(#{"a", "b"} == #{"b", "a"});
+    assert(#{"a", "b"} != #{"a", "c"});
+})
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 416
+instructions executed: 374
+binary size: 7485
+--- monomorphizations ---
+main

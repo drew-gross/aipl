@@ -1,0 +1,31 @@
+import { ==, >, minimum, maximum, filter, value_or } from builtins;
+
+// `arr.minimum()` / `arr.maximum()` return the smallest / largest element as
+// `T?` — `none` for an empty array. (Distinct from the two-argument scalar
+// `min(a, b)` / `max(a, b)`, which have a different signature.) Works for any
+// comparable element type (integers, chars).
+fn smallest(xs: i64[]) -> i64 {
+    xs.minimum().value_or(0)
+}.test({
+    assert([3, 1, 2].minimum() == some(1));
+    assert([3, 1, 2].maximum() == some(3));
+    assert([42].minimum() == some(42));         // single element
+    assert(['c', 'a', 'b'].minimum() == some('a')); // chars are comparable too
+    assert(['c', 'a', 'b'].maximum() == some('c'));
+    assert(minimum([5, 2, 9]) == some(2));      // free-call form
+    // An empty array has no minimum: `none`.
+    assert([1, 2].filter(|x| x > 100).minimum() == none);
+    // Drives the method-chain + `value_or` path.
+    assert(smallest([5, 2, 9]) == 2);
+})
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 424
+instructions executed: 707
+binary size: 7290
+--- monomorphizations ---
+__filter1$own0
+__test$smallest
+main

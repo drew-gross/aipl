@@ -1,0 +1,17 @@
+import { wrapping_add as +, == } from builtins;
+fn classify(s: str) -> i64 {
+    if (s == "hello") { 1 } else { 0 }
+}.test({
+    assert(classify("hello") == 1);
+    assert(classify("world") == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 54
+binary size: 2404
+--- monomorphizations ---
+classify
+main

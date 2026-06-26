@@ -1,0 +1,25 @@
+import { wrapping_add as +, -, ==, <= } from builtins;
+// `rec` forwards its function parameter to itself recursively, then calls it at
+// the base case. Specialization is memoized by (callee, synthesized function),
+// so the recursive forward reuses `rec`'s specialization instead of spawning a
+// new one forever.
+fn rec(n: i64, f: (i64) -> i64) -> i64 {
+    if (n <= 0) {
+        f(0)
+    } else {
+        rec(n - 1, f)
+    }
+}.test({
+    let bump = 7;
+    assert(rec(3, |x| x + bump) == 7);   // f(0) = 0 + 7 = 7
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 57
+binary size: 1594
+--- monomorphizations ---
+main
+rec$lam2

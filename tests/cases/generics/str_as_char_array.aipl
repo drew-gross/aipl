@@ -1,0 +1,29 @@
+import { ==, ++ } from builtins;
+
+// A `str` is implicitly usable as `char[]`: passing a string to a generic `T[]`
+// parameter infers `T = char` and materializes the string's bytes into a real
+// char array, so one generic serves both arrays and strings. (The two have
+// different runtime reps, so the conversion happens at the call boundary.)
+fn count_eq<T: any>(self: T[], target: T) -> i64 {
+    mut n = 0;
+    for (let x : self) {
+        if (x == target) { set n++; };
+    }
+    n
+}.test({
+    assert(count_eq([1, 2, 2, 3], 2) == 2);      // i64[] — unaffected
+    assert(count_eq(['a', 'b', 'a'], 'a') == 2); // char[] directly
+    assert(count_eq("banana", 'a') == 3);        // str used as char[]
+    assert(count_eq("  x ", ' ') == 3);          // byte values preserved
+    assert(count_eq("", 'z') == 0);              // empty string
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 120
+instructions executed: 460
+binary size: 4186
+--- monomorphizations ---
+count_eq$char$s0
+main

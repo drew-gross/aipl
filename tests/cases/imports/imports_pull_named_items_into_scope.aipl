@@ -1,0 +1,20 @@
+import { add } from "./util.aipl";
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    print(to_str(add(3, 4)));
+}
+--- stdout ---
+7
+--- file: util.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn add(x: i64, y: i64) -> i64 { x + y }
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 32
+binary size: 1511
+--- monomorphizations ---
+main

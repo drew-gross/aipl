@@ -1,0 +1,28 @@
+import { wrapping_add as +, -, == } from builtins;
+// `match` on an optional struct field reads the inline {tag, value} storage
+// directly — here through a struct passed by reference as a parameter.
+struct Cell { v: i64? }
+
+fn describe(c: Cell) -> i64 {
+    match (c.v) {
+        some(x) => x,
+        none => 0 - 1
+    }
+}.test({
+    let full = Cell { v: some(99) };
+    let empty = Cell { v: none };
+    assert(describe(full) == 99);
+    assert(describe(empty) == 0 - 1);
+    assert(describe(full) + describe(empty) == 98);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 96
+binary size: 2632
+--- monomorphizations ---
+__test$describe
+describe
+main

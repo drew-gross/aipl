@@ -1,0 +1,22 @@
+import { len, == } from builtins;
+
+// `len` on a string is its *byte* length. It works for every representation —
+// inline (<= 7 bytes), heap (>= 8), and a buffer-sharing view — and counts bytes,
+// not code points, for multibyte UTF-8. Callable free (`len(s)`) or as a method
+// (`s.len()`); a `str` has no stored length field, so it's computed.
+fn byte_count(s: str) -> i64 { s.len() }.test({
+    assert("".len() == 0);
+    assert("hi".len() == 2); // inline
+    assert("a longer heap string".len() == 20); // heap
+    assert(len("café") == 5); // multibyte: é is two bytes (free-call form)
+    assert(byte_count("hello") == 5); // method form inside a function body
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 69
+binary size: 3277
+--- monomorphizations ---
+main

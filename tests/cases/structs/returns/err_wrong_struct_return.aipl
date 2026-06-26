@@ -1,0 +1,18 @@
+// A function's body must produce its declared return type. Returning a
+// different struct is a compile error — without the check the sret copy
+// would read `Point`'s fields out of a `Color`-shaped value.
+struct Point { x: i64, y: i64 }
+struct Color { r: i64, g: i64, b: i64 }
+
+fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
+
+fn main() -> i64 {
+    let p = make();
+    p.x
+}
+--- errors ---
+error: fn "make": body returns Color, but the declared return type is Point
+ --> input:7:22
+  |
+7 | fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^

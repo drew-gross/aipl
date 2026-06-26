@@ -1,0 +1,11 @@
+// Declaring an effect you don't actually use should still compile/run.
+fn main() !prints -> i64 { 0 }
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 426
+--- monomorphizations ---
+main

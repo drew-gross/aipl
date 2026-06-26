@@ -1,0 +1,23 @@
+import { wrapping_add as +, print, to_str } from builtins;
+
+// `to_str(n)` renders an i64 as its decimal string. It composes with
+// `+` (string concat) just like any other str.
+fn main() !prints -> i64 {
+    print(to_str(0));
+    print(to_str(42));
+    print("count: " + to_str(7));
+    0
+}
+--- stdout ---
+0
+42
+count: 7
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 86
+binary size: 1938
+--- monomorphizations ---
+main

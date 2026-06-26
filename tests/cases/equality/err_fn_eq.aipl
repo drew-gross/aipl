@@ -1,0 +1,16 @@
+import { ==, print } from builtins;
+
+// Function values have no runtime identity — equality on them is rejected.
+fn apply(f: (i64) -> i64) -> bool {
+    f == f
+}
+
+fn main() {
+    print("unreachable");
+}
+--- errors ---
+error: "==" is not supported for function values
+ --> input:5:5
+  |
+5 |     f == f
+  |     ^^^^^^

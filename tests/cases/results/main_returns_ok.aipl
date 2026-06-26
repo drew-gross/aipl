@@ -1,0 +1,20 @@
+// The success path of an `!Error` main: returning `ok()` exits 0 with no output.
+import { print } from builtins;
+
+fn main() !prints -> !Error {
+    print("working");
+    ok()
+}
+--- stdout ---
+working
+--- exit code ---
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 15
+binary size: 897
+--- monomorphizations ---
+main

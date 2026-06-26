@@ -1,0 +1,12 @@
+import { value_or } from builtins;
+
+fn main() -> i64 {
+    let x = 5;
+    x[0].value_or(0)
+}
+--- errors ---
+error: cannot index a value of type i64
+ --> input:5:5
+  |
+5 |     x[0].value_or(0)
+  |     ^

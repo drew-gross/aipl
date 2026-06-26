@@ -1,0 +1,15 @@
+// A trailing expression after a statement in a for body is also rejected.
+fn f(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        set n = n + 1;
+        0
+    }
+    n
+}
+--- errors ---
+error: unexpected '}'; expected '.', ';', '?', '[', or operator
+ --> input:7:5
+  |
+7 |     }
+  |     ^

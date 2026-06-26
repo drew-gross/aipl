@@ -1,0 +1,94 @@
+// The parser's trailing-whitespace locator: the compiler calls this through the
+// FFI (see `install_parser_hooks`) from `reject_trailing_whitespace` on every
+// parse, and `aipl check` exercises it via the `.test` block below. It returns a
+// `Span?` — an optional user-defined struct returned over the FFI — locating the
+// first offending run, or `none` when there is none; `aipl_str_iter_next` walks
+// `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
+// error rendering.
+import { wrapping_add as +, ==, ||, &&, -, >, is_some } from builtins;
+
+// A half-open byte range `[start, end)`.
+struct Span { start: i64, end: i64 }
+
+// The span of a line's trailing space/tab run, given the bytes around its ending,
+// or `none` if the line has none. `boundary` is the index of the line-ending '\n'
+// (or the input length, at EOF); `prev`/`prev2` are the two bytes before it;
+// `ws_start` is where the current run of spaces/tabs began; `line_start` is the
+// line's first byte. A single '\r' right before the boundary is part of a CRLF
+// (or lone-CR) ending, so the last content byte is the one before it.
+fn line_end_span(prev: char, prev2: char, boundary: i64, ws_start: i64, line_start: i64) -> Span? {
+    let cr = prev == '\r';
+    let end = if (cr) { boundary - 1 } else { boundary };
+    let last = if (cr) { prev2 } else { prev };
+    if (end > line_start && (last == ' ' || last == '\t')) {
+        some(Span { start: ws_start, end: end })
+    } else {
+        none
+    }
+}
+
+pub fn find_trailing_whitespace(src: str) -> Span? {
+    mut i = 0;             // index of the current byte `c`
+    mut prev = '\n';       // byte at i-1 (sentinel '\n': line start, not ws/CR)
+    mut prev2 = '\n';      // byte at i-2
+    mut ws_start = 0;      // start of the space/tab run ending at the last ws byte
+    mut line_start = 0;    // index of the current line's first byte
+    for (let c : src) {
+        if (c == '\n') {
+            // End of a line: return its trailing run if any. Returning on the first
+            // match is the parser's "report the first" rule.
+            let s = line_end_span(prev, prev2, i, ws_start, line_start);
+            if (is_some(s)) {
+                return s;
+            };
+            set line_start = i + 1;
+        } else {
+            // Extend the current whitespace run, or start a new one. A non-ws byte
+            // doesn't reset `ws_start`: it's only read when the last content byte
+            // is ws, and the next ws byte restarts the run anyway.
+            if (c == ' ' || c == '\t') {
+                set ws_start = if (prev == ' ' || prev == '\t') { ws_start } else { i };
+            };
+        };
+        set prev2 = prev;
+        set prev = c;
+        set i = i + 1;
+    }
+    // The final line may have no trailing '\n'; its boundary is the input length.
+    line_end_span(prev, prev2, i, ws_start, line_start)
+}.doc("The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.").test({
+    // A clean line yields `none`.
+    assert(find_trailing_whitespace("") == none);
+    assert(find_trailing_whitespace("clean") == none);
+    assert(find_trailing_whitespace("a\nb\nc") == none);
+    assert(find_trailing_whitespace("a\n") == none);      // a newline alone isn't trailing ws
+
+    // A trailing space/tab at end of input spans the run.
+    assert(find_trailing_whitespace("oops ") == some(Span { start: 4, end: 5 }));
+    assert(find_trailing_whitespace("tab\t") == some(Span { start: 3, end: 4 }));
+
+    // Space before a LF, and a middle offending line (first one wins).
+    assert(find_trailing_whitespace("bad \nok") == some(Span { start: 3, end: 4 }));
+    assert(find_trailing_whitespace("a\nb \nc") == some(Span { start: 3, end: 4 }));
+
+    // A space before a CRLF is flagged (the CR is part of the ending); a clean
+    // CRLF is not.
+    assert(find_trailing_whitespace("crlf \r\nx") == some(Span { start: 4, end: 5 }));
+    assert(find_trailing_whitespace("crlf\r\nx") == none);
+
+    // A trailing space before a lone CR at EOF, and on a final otherwise-empty line.
+    assert(find_trailing_whitespace("end \r") == some(Span { start: 3, end: 4 }));
+    assert(find_trailing_whitespace("bad\n ") == some(Span { start: 4, end: 5 }));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3283
+binary size: 10056
+--- monomorphizations ---
+__test$find_trailing_whitespace
+find_trailing_whitespace
+line_end_span
+main

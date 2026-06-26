@@ -1,0 +1,13 @@
+import { wrapping_add as +, map, to_str, print } from builtins;
+
+// `map`'s receiver must be an array.
+fn main() !prints {
+    let n = 5;
+    print(to_str(n.map(|x| x + 1)));
+}
+--- errors ---
+error: map expects an array, got i64
+ --> input:6:18
+  |
+6 |     print(to_str(n.map(|x| x + 1)));
+  |                  ^

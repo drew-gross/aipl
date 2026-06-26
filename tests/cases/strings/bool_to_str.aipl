@@ -1,0 +1,34 @@
+import { wrapping_add as +, ==, print, push, to_str } from builtins;
+
+// `to_str` renders a scalar bool; `to_str` renders a bool[] as
+// `[true, false]` (and `[]` when empty). Both return fresh refcounted strings.
+fn main() !prints {
+    print(to_str(true));                        // true
+    print(to_str(false));                       // false
+    // A bool expression, not just a literal.
+    print(to_str(1 + 1 == 2));                  // true
+    print(to_str([true, false, true]));   // [true, false, true]
+    print(to_str([]));                    // []
+    // Concatenation of two rendered strings.
+    print("flags: " + to_str([false, true]));  // flags: [false, true]
+    mut bs = [true];
+    bs.push(false);
+    print(to_str(bs));                    // [true, false]
+}
+--- stdout ---
+true
+false
+true
+[true, false, true]
+[]
+flags: [false, true]
+[true, false]
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 267
+instructions executed: 831
+binary size: 5184
+--- monomorphizations ---
+main

@@ -1,0 +1,7 @@
+fn f() -> str { "\q" }
+--- errors ---
+error: unknown escape sequence \q
+ --> input:1:18
+  |
+1 | fn f() -> str { "\q" }
+  |                  ^^

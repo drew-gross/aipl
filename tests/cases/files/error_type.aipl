@@ -1,0 +1,58 @@
+import { wrapping_add as +, ==, print, to_str, read_file_to_string, write_string_to_file } from builtins;
+
+// The file builtins return the builtin `Error` type as their error side
+// (`read_file_to_string -> str!Error`, `write_string_to_file -> !Error`).
+// `Error` is a distinct named type, but for now it's a string under the hood:
+// it renders, compares, and concatenates like one, and coerces to/from `str`.
+
+// A user function can make an `Error` from a string and propagate builtin ones.
+fn nonempty(s: str) -> str!Error {
+    if (s == "") { err("empty input") } else { ok(s) }
+}
+
+fn first(path: str) !read_files -> str!Error {
+    let contents = read_file_to_string(path)?;   // propagates a builtin Error
+    let checked = nonempty(contents)?;            // propagates a user-made Error
+    ok(checked)
+}
+
+fn describe(path: str) !read_files -> str {
+    match (first(path)) {
+        ok(c) => "read: " + c,
+        err(e) => "error: " + e,                  // e: Error concatenated as a str
+    }
+}.test({
+    assert(describe("data.txt") == "read: hi");
+    assert(describe("missing.txt") == "error: could not read file");
+    assert(describe("empty.txt") == "error: empty input");
+
+    // An Error compares equal to the string it carries (Error == str).
+    match (write_string_to_file("nope/x", "y")) {
+        ok => assert(false),
+        err(e) => assert(e == "could not write file"),
+    };
+})
+
+fn main() !prints !read_files {
+    print(describe("data.txt"));     // read: hi
+    print(describe("missing.txt"));  // error: could not read file
+    print(describe("empty.txt"));    // error: empty input
+}
+--- file: data.txt ---
+hi
+--- file: empty.txt ---
+--- stdout ---
+read: hi
+error: could not read file
+error: empty input
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 156
+instructions executed: 325
+binary size: 4751
+--- monomorphizations ---
+describe
+first
+main

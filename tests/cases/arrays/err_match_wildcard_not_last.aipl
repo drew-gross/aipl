@@ -1,0 +1,20 @@
+import { print, to_str } from builtins;
+
+// The `_` arm must be last — anything after it is unreachable.
+fn code(xs: i64[]) -> i64 {
+    match (xs) {
+        [1, 2] => 1,
+        _ => 0,
+        [3, 4] => 2,
+    }
+}
+
+fn main() !prints {
+    print(to_str(code([1, 2])));
+}
+--- errors ---
+error: the `_` arm must be last (arms after it are unreachable)
+ --> input:7:9
+  |
+7 |         _ => 0,
+  |         ^

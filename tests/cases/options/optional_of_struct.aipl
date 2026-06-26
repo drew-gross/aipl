@@ -1,0 +1,32 @@
+import { -, == } from builtins;
+struct Point { x: i64, y: i64 }
+struct Named { id: i64, label: str }
+
+// `Point?` returned from a function — built and handed back via sret.
+fn wrap(p: Point) -> Point? {
+    some(p)
+}.test({
+    // Construct and match-unwrap a struct optional.
+    let op = some(Point { x: 7, y: 8 });
+    assert(op == some(Point { x: 7, y: 8 }));
+    let x = match (op) { some(p) => p.x, none => -1 };
+    assert(x == 7);
+
+    // As a function return (sret), round-tripped.
+    assert(wrap(Point { x: 5, y: 6 }) == some(Point { x: 5, y: 6 }));
+
+    // Optional of a heap-field struct (alloc balance through some/match).
+    let on = some(Named { id: 9, label: "z" });
+    assert(on == some(Named { id: 9, label: "z" }));
+    let lbl = match (on) { some(n) => n.label, none => "?" };
+    assert(lbl == "z");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 268
+binary size: 4312
+--- monomorphizations ---
+main

@@ -1,0 +1,22 @@
+import { == } from builtins;
+fn code(c: char?) -> i64 {
+    match (c) {
+        some(v) => if (v == 'A') { 65 } else { 0 },
+        none => 0
+    }
+}.test({
+    assert(code(some('A')) == 65);
+    assert(code(some('B')) == 0);
+    assert(code(none) == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 85
+binary size: 2320
+--- monomorphizations ---
+__test$code
+code
+main

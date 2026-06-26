@@ -1,0 +1,30 @@
+import { wrapping_add as +, *, ==, push } from builtins;
+
+// A higher-order function: `f` is a function-typed parameter, called per
+// element. At the call site, the lambda `|x| x + hi` captures `hi` from the
+// enclosing scope. Monomorphization lifts the lambda to a synthesized function
+// (taking `x` plus the captured `hi`), specializes `map` for it, and forwards
+// `hi` at the call.
+fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
+    mut out = [];
+    for (let x : xs) {
+        out.push(f(x));
+    }
+    out
+}.test({
+    let hi = 10;
+    assert(map([1, 2, 3], |x| x + hi) == [11, 12, 13]);
+    // A non-capturing lambda too.
+    assert(map([1, 2, 3], |x| x * x) == [1, 4, 9]);
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 6
+bytes allocated: 288
+instructions executed: 393
+binary size: 3557
+--- monomorphizations ---
+main
+map$lam2
+map$lam4

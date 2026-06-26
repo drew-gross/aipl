@@ -1,0 +1,39 @@
+import { ++, ==, <=, ! } from builtins;
+
+pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> i64 {
+    mut n = 0;
+    for (let x : self) {
+        if (!pred(x)) { return n; };
+        set n++;
+    }
+    n
+}.doc("""
+Counts elements from the front while `pred` holds, stopping at the first element
+that fails it (or at the end). Generic over the element type and callable as a
+method: `xs.count_while(pred)`.
+""").test({
+    assert([1, 2, 3].count_while(|x| x <= 2) == 2); // stops at 3
+    assert([1, 2, 3].count_while(|x| x <= 9) == 3); // whole array passes
+    assert([1, 2, 3].count_while(|x| x <= 0) == 0); // first element fails
+    assert([5, 1, 5].count_while(|x| x <= 2) == 0); // only a leading run counts
+    assert(count_while([2, 2], |x| x <= 2) == 2); // function-call form too
+    // Generic over the element type — the same definition serves char and str:
+    assert(['a', 'a', 'b'].count_while(|c| c == 'a') == 2);
+    assert(["go", "go", "stop"].count_while(|s| s == "go") == 2);
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 384
+instructions executed: 587
+binary size: 7036
+--- monomorphizations ---
+count_while$char$lam11
+count_while$i64$lam1
+count_while$i64$lam3
+count_while$i64$lam5
+count_while$i64$lam7
+count_while$i64$lam9
+count_while$str$lam13
+main

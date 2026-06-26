@@ -1,0 +1,12 @@
+[package]
+name = "aipl-mono"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL monomorphization pass"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+
+[lib]
+path = "src/lib.rs"

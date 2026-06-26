@@ -1,0 +1,27 @@
+// a and b form a cycle (a imports from b, b imports back from a).
+// The entry only imports from a; the cycle is internal. The loader
+// must terminate rather than walking the cycle forever.
+import { a_fn } from "./a.aipl";
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    print(to_str(a_fn()));
+}
+--- stdout ---
+42
+--- file: a.aipl ---
+import { b_fn } from "./b.aipl";
+import { wrapping_add as + } from builtins;
+pub fn a_fn() -> i64 { 10 + b_fn() }
+--- file: b.aipl ---
+import { a_fn } from "./a.aipl";
+pub fn b_fn() -> i64 { 32 }
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 32
+binary size: 1511
+--- monomorphizations ---
+main

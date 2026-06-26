@@ -1,0 +1,31 @@
+import { ==, push } from builtins;
+
+// A uniquely-owned array (never aliased — only pushed) grows with amortized
+// doubling: `push` mutates it in place when there's spare capacity,
+// reallocating only when full. So eight pushes from empty cost far fewer than
+// eight allocations. Capacity grows 0→1→2→4→8, so the reallocations happen at
+// pushes 1,2,3,5 (4 of them); pushes 4,6,7,8 land in spare capacity for free.
+fn grown() -> i64[] {
+    mut a = [];
+    a.push(1);
+    a.push(2);
+    a.push(3);
+    a.push(4);
+    a.push(5);
+    a.push(6);
+    a.push(7);
+    a.push(8);
+    a
+}.test({
+    assert(grown() == [1, 2, 3, 4, 5, 6, 7, 8]);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 4
+bytes allocated: 128
+instructions executed: 290
+binary size: 2783
+--- monomorphizations ---
+grown
+main

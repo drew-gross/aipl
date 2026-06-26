@@ -1,0 +1,29 @@
+import { wrapping_add as +, *, ==, len, map } from builtins;
+
+// A local binding may share a name with a global function or imported builtin.
+// The local shadows the global, so a bare reference resolves to the value, not
+// the function — only an *unshadowed* name is treated as a function reference.
+fn double(x: i64) -> i64 {
+    x * 2
+}.test({
+    // `len` is an imported builtin, but here it's a plain local i64.
+    let len = 42;
+    assert(len == 42);
+
+    // `double` shadowed by a local i64: it's the value, not the function.
+    let double = 7;
+    assert(double == 7);
+
+    // A parameter-style shadow inside a lambda: `x` is the lambda param.
+    let xs = [1, 2, 3];
+    assert(xs.map(|len| len + 100) == [101, 102, 103]);
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 168
+instructions executed: 214
+binary size: 2987
+--- monomorphizations ---
+main

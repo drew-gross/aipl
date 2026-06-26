@@ -1,0 +1,36 @@
+import { wrapping_add as +, ==, push, value_or, len } from builtins;
+
+// `str[][]` — an array whose elements are themselves `str[]`. Both levels
+// are refcounted heap pointers (8-byte elements), so the outer array's
+// drop releases each inner array, which in turn releases its strings.
+fn grid3() -> str[][] {
+    let grid = [["a", "b"], ["c"]];
+    mut g2 = grid;
+    g2.push(["d", "e", "f"]);
+    g2
+}.test({
+    let g2 = grid3();
+    assert(g2 == [["a", "b"], ["c"], ["d", "e", "f"]]);
+    // index the outer array -> str[]?, then index the inner -> str?
+    let row = g2[2].value_or([]);
+    assert(row[0] == some("d"));
+    mut cells = 0;
+    for (let r : g2) {
+        for (let c : r) {
+            set cells = cells + 1;
+        }
+    }
+    // 2 + 1 + 3 elements iterated; len(g2) == 3
+    assert(cells == 6);
+    assert(len(g2) == 3);
+})
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 480
+instructions executed: 667
+binary size: 6196
+--- monomorphizations ---
+__test$grid3
+main

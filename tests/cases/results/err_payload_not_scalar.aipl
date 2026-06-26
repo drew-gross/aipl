@@ -1,0 +1,9 @@
+// A result payload (either side) must be a scalar or `str` in v1 — composite
+// payloads like arrays aren't supported yet.
+fn bad() -> i64[]!str {
+    ok([1, 2])
+}
+
+fn main() {}
+--- errors ---
+error: fn "bad": a result Ok payload must be i64, bool, char, str, or unit ("!E"), got i64[]

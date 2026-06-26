@@ -1,0 +1,17 @@
+import { *, print, to_str, filter } from builtins;
+
+// A named function passed to `filter` must return bool.
+fn twice(x: i64) -> i64 {
+    x * 2
+}
+
+fn main() !prints {
+    let xs = [1, 2, 3];
+    print(to_str(xs.filter(twice)));
+}
+--- errors ---
+error: fn "twice" returns i64, but bool is expected here
+  --> input:10:28
+   |
+10 |     print(to_str(xs.filter(twice)));
+   |                            ^^^^^

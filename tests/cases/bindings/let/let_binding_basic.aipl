@@ -1,0 +1,16 @@
+import { wrapping_add as +, == } from builtins;
+fn f() -> i64 {
+    let x = 41;
+    x + 1
+}.test({
+    assert(f() == 42);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 22
+binary size: 1488
+--- monomorphizations ---
+main

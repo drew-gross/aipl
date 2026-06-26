@@ -1,0 +1,26 @@
+import { ==, !=, ! } from builtins;
+// Arrays compare elementwise, in order, with length first. Nested arrays and
+// str elements recurse.
+fn eq_arrays(a: i64[], b: i64[]) -> bool { a == b }.test({
+    assert([1, 2, 3] == [1, 2, 3]);
+    assert(!([1, 2, 3] == [1, 2, 4]));
+    assert(!([1, 2, 3] == [1, 2]));      // length differs
+    assert(!([1, 2] != [1, 2]));
+    assert([] == []);
+
+    assert(["a", "b"] == ["a", "b"]);
+    assert(!(["a", "b"] == ["a", "c"]));
+
+    assert([[1, 2], [3]] == [[1, 2], [3]]);
+    assert(!([[1, 2], [3]] == [[1, 2], [4]]));
+})
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 0
+bytes allocated: 1224
+instructions executed: 916
+binary size: 9472
+--- monomorphizations ---
+__test$eq_arrays
+main

@@ -1,0 +1,82 @@
+import { -, print, to_str } from builtins;
+
+// `none` at every level of a nested optional. Each chain is built from a
+// concrete-core piece (the `wrap`/`none` functions) so the core type is known —
+// only then can a partial chain like `some(none)` render its (unreached) core
+// branch. With the flattened representation `none` at level k is just tag k, and
+// the core value is read only at the full tag, so a `none` at any level touches
+// no heap.
+
+fn wrap2(x: i64?) -> i64?? {
+    some(x)
+}
+fn wrap3(x: i64??) -> i64??? {
+    some(x)
+}
+fn none2() -> i64?? {
+    none
+}
+fn none3() -> i64??? {
+    none
+}
+
+// str core, to confirm `none` at a level never dereferences the heap value.
+fn swrap2(x: str?) -> str?? {
+    some(x)
+}
+fn snone2() -> str?? {
+    none
+}
+
+fn main() !prints {
+    // i64?? — `none` at each of the 3 tag levels.
+    print(to_str(none2()));                // none
+    print(to_str(wrap2(none)));            // some(none)
+    print(to_str(wrap2(some(5))));         // some(some(5))
+
+    // i64??? — `none` at each of the 4 tag levels.
+    print(to_str(none3()));                // none
+    print(to_str(wrap3(none)));            // some(none)
+    print(to_str(wrap3(wrap2(none))));     // some(some(none))
+    print(to_str(wrap3(wrap2(some(8)))));  // some(some(some(8)))
+
+    // Matching peels one `some` per level; a `none` at a level stops the peel.
+    print(to_str(match (none2()) { some(i) => match (i) { some(v) => v, none => -1 }, none => -2 }));    // -2
+    print(to_str(match (wrap2(none)) { some(i) => match (i) { some(v) => v, none => -1 }, none => -2 })); // -1
+    print(to_str(match (wrap2(some(5))) { some(i) => match (i) { some(v) => v, none => -1 }, none => -2 })); // 5
+
+    // str?? — `none` at each level allocates nothing and stays balanced; the
+    // heap core is touched only at the full tag.
+    print(to_str(snone2()));               // none
+    print(to_str(swrap2(none)));           // some(none)
+    print(to_str(swrap2(some("hi"))));     // some(some("hi"))
+}
+--- stdout ---
+none
+some(none)
+some(some(5))
+none
+some(none)
+some(some(none))
+some(some(some(8)))
+-2
+-1
+5
+none
+some(none)
+some(some("hi"))
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 213
+instructions executed: 1028
+binary size: 10575
+--- monomorphizations ---
+main
+none2
+none3
+snone2
+swrap2
+wrap2
+wrap3

@@ -1,0 +1,61 @@
+import { ==, !, split, is_all_whitespace, minimum, value_or, map, join, filter } from builtins;
+import { count_while } from "./count_while.aipl";
+
+pub fn dedent(self: str) -> str {
+    let lines = self.split("\n");
+    // The common indent `n` is the smallest leading-space run over the non-blank
+    // lines: count each non-blank line's leading spaces, then take the minimum.
+    // With no non-blank lines there's nothing to strip, so `value_or(0)`.
+    let n = lines.filter(|l| !l.is_all_whitespace()).map(|l| l.count_while(|c| c == ' ')).minimum().value_or(0);
+    // Rebuild: strip the first `n` bytes from each non-blank line (blank lines
+    // become empty), rejoined with `\n` so the original line count is preserved.
+    lines.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
+}.doc("""
+Strips the common leading-space indentation shared by every non-blank line — the
+de-denting the parser applies to raw-string contents. Blank lines (empty or
+all-whitespace) don't constrain the common indent and are emitted empty; the
+original line count is preserved.
+""").test({
+    // No common indent: unchanged.
+    assert(dedent("a\nb") == "a\nb");
+    // A uniform 4-space indent is stripped from every line.
+    assert(dedent("    a\n    b") == "a\nb");
+    // The smallest indent wins; deeper lines keep the extra.
+    assert(dedent("  a\n    b") == "a\n  b");
+    // Blank lines don't constrain the indent and are emitted empty (here the
+    // middle line is all spaces).
+    assert(dedent("    a\n  \n    b") == "a\n\nb");
+    // A truly empty middle line is preserved.
+    assert(dedent("    a\n\n    b") == "a\n\nb");
+    // A leading tab is not a space, so it bounds the common indent at 0.
+    assert(dedent("\ta\n\tb") == "\ta\n\tb");
+    // Spaces before a tab count; the tab and beyond are kept.
+    assert(dedent("  \tx\n   y") == "\tx\n y");
+    // Trailing newline (an empty final line) is preserved.
+    assert(dedent("    a\n") == "a\n");
+    // Empty input.
+    assert(dedent("") == "");
+    // Long (heap) lines exercise the view/concat paths.
+    assert(dedent("        first long line\n        second long line")
+        == "first long line\nsecond long line");
+})
+--- performance ---
+allocations: 42
+deallocations: 42
+reallocations: 0
+bytes allocated: 2025
+instructions executed: 4832
+binary size: 17153
+--- monomorphizations ---
+__m1__count_while$char$lam11
+__m1__count_while$char$s0$lam17
+__m1__count_while$char$s0$lam24
+__m1__count_while$i64$lam1
+__m1__count_while$i64$lam3
+__m1__count_while$i64$lam5
+__m1__count_while$i64$lam7
+__m1__count_while$i64$lam9
+__m1__count_while$str$lam13
+__map19$own0
+dedent
+main

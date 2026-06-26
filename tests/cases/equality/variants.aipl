@@ -1,0 +1,22 @@
+import { ==, !=, ! } from builtins;
+// Variants compare by tag, then the active case's payload fields.
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+fn eq_shape(a: Shape, b: Shape) -> bool { a == b }.test({
+    assert(Circle(3) == Circle(3));
+    assert(!(Circle(3) == Circle(4)));
+    assert(!(Circle(3) == Rect(3, 0)));   // different case
+    assert(Rect(2, 3) == Rect(2, 3));
+    assert(!(Rect(2, 3) == Rect(2, 4)));
+    assert(Empty == Empty);
+    assert(Empty != Circle(0));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 270
+binary size: 5094
+--- monomorphizations ---
+main

@@ -1,0 +1,19 @@
+import { wrapping_add as +, == } from builtins;
+// A function can return a struct by value. The result is materialized in a
+// caller-provided slot (sret), so reading its fields afterwards is valid.
+struct Point { x: i64, y: i64 }
+
+fn make(a: i64, b: i64) -> Point { Point { x: a, y: b } }.test({
+    let p = make(10, 32);
+    assert(p == Point { x: 10, y: 32 });
+    assert(p.x + p.y == 42);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 55
+binary size: 1922
+--- monomorphizations ---
+main

@@ -1,0 +1,8 @@
+// A function can't return a function value: there's no first-class function
+// value in the language (lambdas are monomorphized away).
+fn make() -> (i64) -> i64 {
+    0
+}
+fn main() -> i64 { 0 }
+--- errors ---
+error: fn "make": cannot return a function value ((i64) -> i64)

@@ -1,0 +1,13 @@
+import { wrapping_add as +, map, to_str, print } from builtins;
+
+// `map`'s lambda must take exactly one parameter.
+fn main() !prints {
+    let xs = [1, 2, 3];
+    print(to_str(xs.map(|x, y| x + y)));
+}
+--- errors ---
+error: lambda has 2 parameter(s), but (i64) -> _ was expected
+ --> input:6:25
+  |
+6 |     print(to_str(xs.map(|x, y| x + y)));
+  |                         ^^^^^^^^^^^^

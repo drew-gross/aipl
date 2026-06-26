@@ -1,0 +1,43 @@
+import { -, *, /, ==, !=, <, >, filter, map } from builtins;
+
+// A named predicate.
+fn is_even(x: i64) -> bool {
+    x - (x / 2) * 2 == 0
+}.test({
+    let xs = [1, 2, 3, 4, 5, 6];
+
+    // Method form and function form with a lambda predicate.
+    assert(xs.filter(|x| x > 3) == [4, 5, 6]);
+    assert(filter(xs, |x| x < 3) == [1, 2]);
+
+    // A captured variable in the predicate.
+    let lo = 2;
+    let hi = 5;
+    assert(xs.filter(|x| x > lo).filter(|x| x < hi) == [3, 4]);
+
+    // A named function as the predicate.
+    assert(xs.filter(is_even) == [2, 4, 6]);
+
+    // Compose with map: keep evens, then double them.
+    assert(xs.filter(is_even).map(|x| x * 2) == [4, 8, 12]);
+
+    // Filtering down to nothing yields an empty array.
+    assert(xs.filter(|x| x > 100) == []);
+
+    // Works over other element types (str).
+    let words = ["hi", "", "yo", ""];
+    assert(words.filter(|w| w != "") == ["hi", "yo"]);
+})
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 1032
+instructions executed: 1787
+binary size: 9216
+--- monomorphizations ---
+__filter9$own0
+__map13$own0
+__test$is_even
+is_even
+main

@@ -1,0 +1,39 @@
+import { wrapping_add as +, ==, to_str, push, trim } from builtins;
+
+// `reduce` folds an array with a binary function and a seed.
+fn reduce(xs: i64[], seed: i64, f: (i64, i64) -> i64) -> i64 {
+    mut acc = seed;
+    for (let x : xs) {
+        set acc = f(acc, x);
+    }
+    acc
+}.test({
+    // Capture `base` (i64) in a fold.
+    let base = 100;
+    assert(reduce([1, 2, 3, 4], base, |acc, x| acc + x) == 110);
+})
+
+// `tag` maps each element through a function that builds a string, capturing a
+// heap value (`label`, a str) and using it on every element — exercising
+// refcounting of a captured heap value used many times.
+fn tag(xs: i64[], f: (i64) -> str) -> str[] {
+    mut out = [];
+    for (let x : xs) {
+        out.push(f(x));
+    }
+    out
+}.test({
+    // Capture `label` (a heap str) used once per element.
+    let label = trim("  n=  ");   // "n=" on the heap
+    assert(tag([1, 2], |x| label + to_str(x)) == ["n=1", "n=2"]);
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 2
+bytes allocated: 272
+instructions executed: 321
+binary size: 4846
+--- monomorphizations ---
+main
+tag$lam4

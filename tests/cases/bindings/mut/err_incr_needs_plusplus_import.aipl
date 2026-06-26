@@ -1,0 +1,18 @@
+import { < } from builtins;
+
+// `set n++;` uses the `++` operator, which must be imported on its own spelling
+// (`import { ++ } from builtins;`) — importing `+` does not enable it. Here `++`
+// is not imported, so the operator gate rejects it, pointing at the `++`.
+fn bump(limit: i64) -> i64 {
+    mut n = 0;
+    while (n < limit) {
+        set n++;
+    }
+    n
+}
+--- errors ---
+error: operator "++" must be imported: add `import { ++ } from builtins;`
+ --> input:9:13
+  |
+9 |         set n++;
+  |             ^^^

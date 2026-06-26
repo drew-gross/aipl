@@ -1,0 +1,25 @@
+import { == } from builtins;
+// A named type parameter `<T: any>` ties several occurrences of `T` to the
+// same concrete type and lets `T` appear in the return type. `value_or`
+// monomorphizes per `T`; the type can be pinned by either argument.
+fn value_or<T: any>(self: T?, default: T) -> T {
+    match (self) {
+        some(v) => v,
+        none => default,
+    }
+}.test({
+    assert(value_or(some(7), 0) == 7);       // i64 -> 7
+    assert(value_or(none, 35) == 35);        // i64 (pinned by default) -> 35
+    assert(value_or(some('a'), 'z') == 'a'); // char -> 'a'
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 75
+binary size: 2535
+--- monomorphizations ---
+__test$value_or
+main
+value_or$i64

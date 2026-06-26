@@ -1,0 +1,25 @@
+import { wrapping_add as +, print } from builtins;
+
+// Brackets make the exact boundaries visible. An empty raw string and one
+// holding only the trimmed surrounding newline are both ""; trailing spaces
+// inside a line are kept verbatim.
+fn main() !prints -> i64 {
+    print("[" + """""" + "]");
+    print("[" + """
+""" + "]");
+    print("[" + """kept  """ + "]");
+    0
+}
+--- stdout ---
+[]
+[]
+[kept  ]
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 240
+instructions executed: 45
+binary size: 1744
+--- monomorphizations ---
+main

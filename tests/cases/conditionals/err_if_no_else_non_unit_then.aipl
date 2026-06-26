@@ -1,0 +1,10 @@
+// An else-less `if` is unit-valued, so its `then` block must be unit too. A
+// non-unit `then` (here `2`, an `i64`) is a type error — the usual "branches must
+// agree" rule, now against the implicit unit `else`.
+fn f() { if (true) { 2 } }
+--- errors ---
+error: if branches have mismatched types: i64 vs ()
+ --> input:4:14
+  |
+4 | fn f() { if (true) { 2 } }
+  |              ^^^^^^^^^

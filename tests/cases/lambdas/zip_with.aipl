@@ -1,0 +1,62 @@
+// `zip_with(a, b, f)` pairs two arrays positionally and applies `f`, like
+// Haskell's zipWith / Python's `map(f, zip(a, b))`. The pairing function can be
+// an operator passed as a value (`+`), a lambda, or a named function. The
+// result runs to the shorter input (Python `zip` semantics).
+import { print, to_str, zip_with, wrapping_add as +, * } from builtins;
+
+fn tagged(x: i64, y: i64) -> i64 {
+    x + y + 1000
+}
+
+fn show(label: str, xs: i64[]) !prints {
+    print(label);
+    for (let x : xs) {
+        print(to_str(x));
+    }
+}
+
+fn main() !prints {
+    let a = [1, 2, 3];
+    let b = [10, 20, 30];
+    show("plus", zip_with(a, b, +)); // [11, 22, 33]
+    show("times", zip_with(a, b, *)); // [10, 40, 90]
+    show("lambda", zip_with(a, b, |x, y| x * y + y)); // [20, 60, 120]
+    show("named", zip_with(a, b, tagged)); // [1011, 1022, 1033]
+    show("shorter", zip_with([1, 2, 3, 4], [100, 200], +)); // [101, 202]
+}
+--- stdout ---
+plus
+11
+22
+33
+times
+10
+40
+90
+lambda
+20
+60
+120
+named
+1011
+1022
+1033
+shorter
+101
+202
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 12
+bytes allocated: 352
+instructions executed: 1550
+binary size: 6094
+--- monomorphizations ---
+__lambda_7
+__zip1
+__zip3
+__zip5
+__zip6
+__zip8$own0$own1
+main
+show

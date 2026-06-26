@@ -1,0 +1,17 @@
+import { == } from builtins;
+fn f() -> i64 {
+    mut x = 1;
+    set x = 99;
+    x
+}.test({
+    assert(f() == 99);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 24
+binary size: 1500
+--- monomorphizations ---
+main

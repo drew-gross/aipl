@@ -1,0 +1,25 @@
+import { wrapping_add as +, *, ==, push, value_or, len } from builtins;
+
+// A struct field may be an array (`str[]`), an 8-byte heap pointer. The
+// field is retained on construction and released when the struct drops.
+struct Tags { id: i64, names: str[] }
+
+fn make() -> Tags {
+    mut ns = ["a"];
+    ns.push("b");
+    Tags { id: 7, names: ns }
+}.test({
+    let t = make();
+    assert(t.names[0].value_or("?") == "a");
+    assert(t.names[1].value_or("?") == "b");
+    assert(t.id * 10 + len(t.names) == 72);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 88
+instructions executed: 152
+binary size: 3939
+--- monomorphizations ---
+main

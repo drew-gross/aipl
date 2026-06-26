@@ -1,0 +1,35 @@
+// String-only: it slices, and array slicing isn't a thing. A dogfooded helper,
+// no longer wired into the raw-string processor (kept as a tested example).
+import { == } from builtins;
+import { count_while } from "./count_while.aipl";
+
+pub fn trim_while(self: str, pred: (char) -> bool) -> str {
+    self[self.count_while(pred)..]
+}.doc("Drops the leading run of characters satisfying `pred` (the complement of `count_while`).").test({
+    assert("   abc".trim_while(|c| c == ' ') == "abc"); // leading spaces dropped
+    assert("abc".trim_while(|c| c == ' ') == "abc");    // nothing to trim
+    assert("   ".trim_while(|c| c == ' ') == "");       // all trimmed
+    assert("".trim_while(|c| c == ' ') == "");          // empty source
+    assert("xxy".trim_while(|c| c == 'x') == "y");      // stops at first non-match
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 384
+instructions executed: 915
+binary size: 12150
+--- monomorphizations ---
+__m1__count_while$char$lam11
+__m1__count_while$char$s0$lam24
+__m1__count_while$char$s0$lam25
+__m1__count_while$char$s0$lam26
+__m1__count_while$char$s0$lam27
+__m1__count_while$char$s0$lam28
+__m1__count_while$i64$lam1
+__m1__count_while$i64$lam3
+__m1__count_while$i64$lam5
+__m1__count_while$i64$lam7
+__m1__count_while$i64$lam9
+__m1__count_while$str$lam13
+main

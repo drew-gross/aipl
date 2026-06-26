@@ -1,0 +1,17 @@
+import { -, *, == } from builtins;
+fn fact(n: i64) -> i64 {
+    if (n == 0) { 1 } else { n * fact(n - 1) }
+}.test({
+    // 10! = 3628800 (well beyond what an exit code could carry).
+    assert(fact(10) == 3628800);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 128
+binary size: 1636
+--- monomorphizations ---
+fact
+main

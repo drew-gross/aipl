@@ -1,0 +1,24 @@
+import { wrapping_add as +, ==, value_or, len } from builtins;
+
+// An optional may carry an array payload (`str[]?`), since an array is an
+// 8-byte heap pointer that fits the optional slot. The `some` arm owns the
+// array; the `none` arm falls back to an empty one.
+fn pick(b: bool) -> str[]? {
+    if (b) { some(["x", "y", "z"]) } else { none }
+}.test({
+    let present = pick(true).value_or([]);
+    assert(present[1].value_or("?") == "y");
+    let absent = pick(false).value_or([]);
+    assert(len(present) + len(absent) == 3);  // 3 + 0
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 120
+instructions executed: 182
+binary size: 3535
+--- monomorphizations ---
+__test$pick
+main
+pick

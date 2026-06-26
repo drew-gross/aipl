@@ -1,0 +1,38 @@
+import { print, to_str } from builtins;
+
+struct Point { x: i64, y: i64 }
+struct Person { name: str, age: i64, active: bool }
+
+fn main() !prints {
+    // Structs render as `Name { field: value, ... }` (fields Debug-formatted).
+    print(to_str(Point { x: 1, y: 2 }));                    // Point { x: 1, y: 2 }
+    print(to_str(Person { name: "al", age: 30, active: true }));
+    // -> Person { name: "al", age: 30, active: true }
+
+    // Optionals render as `some(<inner>)` / `none`.
+    print(to_str(some(7)));            // some(7)
+    print(to_str(some("hi")));         // some("hi")
+    print(to_str(some('z')));          // some('z')
+    print(to_str(""[0]));              // none
+
+    // Nesting: an optional inside a struct field, an array of structs is not
+    // allowed, but an array inside `to_str` and a struct holding a str work.
+    print(to_str(some([1, 2])));       // some([1, 2])
+}
+--- stdout ---
+Point { x: 1, y: 2 }
+Person { name: "al", age: 30, active: true }
+some(7)
+some("hi")
+some('z')
+none
+some([1, 2])
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 228
+instructions executed: 696
+binary size: 11573
+--- monomorphizations ---
+main

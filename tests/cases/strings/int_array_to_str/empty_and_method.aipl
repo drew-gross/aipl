@@ -1,0 +1,26 @@
+import { print, to_str, push } from builtins;
+
+// An empty array renders as "[]". Like the other `_to_str` builtins it can
+// also be called as a method, and it reflects elements added via `push`.
+fn empty() -> i64[] { [] }
+
+fn main() !prints {
+    print(empty().to_str());
+    mut xs = [10];
+    xs.push(20);
+    xs.push(30);
+    print(xs.to_str());
+}
+--- stdout ---
+[]
+[10, 20, 30]
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 2
+bytes allocated: 101
+instructions executed: 313
+binary size: 3281
+--- monomorphizations ---
+empty
+main

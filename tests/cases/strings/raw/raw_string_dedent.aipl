@@ -1,0 +1,32 @@
+import { print } from builtins;
+
+// De-denting removes the *common* leading whitespace of the non-blank lines,
+// so a more-indented line keeps its extra indent, while a line flush at
+// column 0 makes the common indent empty (nothing is stripped).
+fn main() !prints -> i64 {
+    print("""
+        four spaces
+      two spaces
+    """);
+    print("----");
+    print("""
+flush left
+    indented under it
+    """);
+    0
+}
+--- stdout ---
+  four spaces
+two spaces
+----
+flush left
+    indented under it
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 19
+binary size: 1349
+--- monomorphizations ---
+main

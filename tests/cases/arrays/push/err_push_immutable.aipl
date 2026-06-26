@@ -1,0 +1,14 @@
+import { push } from builtins;
+
+// `push` needs a mutable receiver; a `let` binding can't be pushed to.
+fn main() -> i64 {
+    let xs = [1];
+    xs.push(2);
+    0
+}
+--- errors ---
+error: cannot call mutating method "push" on immutable binding "xs"; declare it with "mut"
+ --> input:6:5
+  |
+6 |     xs.push(2);
+  |     ^^^^^^^^^

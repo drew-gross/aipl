@@ -1,0 +1,11 @@
+import { frobnicate } from builtins;
+
+fn main() -> i64 {
+    0
+}
+--- errors ---
+error: "frobnicate" is not a builtin
+ --> input:1:10
+  |
+1 | import { frobnicate } from builtins;
+  |          ^^^^^^^^^^

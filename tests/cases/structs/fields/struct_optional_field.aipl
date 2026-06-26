@@ -1,0 +1,31 @@
+import { wrapping_add as +, ==, value_or } from builtins;
+
+// A struct may hold optional fields (`T?`), stored inline as 16-byte
+// {tag, value} composites. They're built with `some`/`none`, read back with
+// `value_or`, and the whole struct (optionals and all) is returned by value.
+// The `str?` field holds a freshly allocated string to exercise refcounting.
+struct Box { item: str?, count: i64? }
+
+fn make(present: bool) -> Box {
+    if (present) {
+        Box { item: some("he" + "re"), count: some(7) }
+    } else {
+        Box { item: none, count: none }
+    }
+}.test({
+    let b = make(true);
+    assert(b.item.value_or("(none)") == "here");
+    let e = make(false);
+    assert(e.item.value_or("(none)") == "(none)");
+    assert(b.count.value_or(0) + e.count.value_or(35) == 42);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 227
+binary size: 3853
+--- monomorphizations ---
+main
+make

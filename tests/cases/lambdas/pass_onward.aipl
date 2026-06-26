@@ -1,0 +1,33 @@
+import { wrapping_add as +, *, ==, push } from builtins;
+
+fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
+    mut out = [];
+    for (let x : xs) {
+        out.push(f(x));
+    }
+    out
+}
+
+// `pipe` forwards its function parameter `g` onward to `map` rather than
+// calling it directly. Monomorphization specializes `pipe` for the lambda,
+// then — seeing `g` forwarded to `map` — specializes `map` for the same
+// synthesized function, threading any captures through both.
+fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] {
+    map(xs, g)
+}.test({
+    assert(pipe([1, 2, 3], |x| x + 1) == [2, 3, 4]);
+    // A captured variable is forwarded through `pipe` into `map`'s call.
+    let k = 10;
+    assert(pipe([1, 2], |x| x * k) == [10, 20]);
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 5
+bytes allocated: 272
+instructions executed: 351
+binary size: 3533
+--- monomorphizations ---
+main
+map$lam5
+map$lam7

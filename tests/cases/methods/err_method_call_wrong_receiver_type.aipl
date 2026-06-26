@@ -1,0 +1,9 @@
+fn greet(self: str) -> i64 { 0 }
+
+fn main() -> i64 { 5.greet() }
+--- errors ---
+error: fn "greet" arg 0: expected str, got i64
+ --> input:3:20
+  |
+3 | fn main() -> i64 { 5.greet() }
+  |                    ^

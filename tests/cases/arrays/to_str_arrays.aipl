@@ -1,0 +1,34 @@
+import { print, push, to_str } from builtins;
+
+// `to_str` on arrays of any element type, rendered `[e, e]` with the elements
+// themselves Debug-formatted (strings quoted, chars quoted).
+fn main() !prints {
+    print(to_str([1, 2, 3]));            // [1, 2, 3]
+    print(to_str([true, false]));        // [true, false]
+    print(to_str(['a', 'b', 'c']));      // ['a', 'b', 'c']
+    print(to_str(["hi", "yo"]));         // ["hi", "yo"]
+    print(to_str([10]));                 // [10]
+    let empty = [];
+    print(to_str(empty));                // []
+    mut xs = [7];
+    xs.push(8);
+    xs.push(9);
+    print(to_str(xs));                   // [7, 8, 9]
+}
+--- stdout ---
+[1, 2, 3]
+[true, false]
+['a', 'b', 'c']
+["hi", "yo"]
+[10]
+[]
+[7, 8, 9]
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 2
+bytes allocated: 448
+instructions executed: 1232
+binary size: 9049
+--- monomorphizations ---
+main

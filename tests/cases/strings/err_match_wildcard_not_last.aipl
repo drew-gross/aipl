@@ -1,0 +1,19 @@
+import { ==, print } from builtins;
+
+// The `_` arm must be last — arms after it can never run.
+fn label(s: str) -> str {
+    match (s) {
+        _ => "default",
+        "a" => "x",
+    }
+}
+
+fn main() !prints {
+    print(label("a"));
+}
+--- errors ---
+error: the `_` arm must be last (arms after it are unreachable)
+ --> input:6:9
+  |
+6 |         _ => "default",
+  |         ^

@@ -1,0 +1,11 @@
+import { not_here } from "./util.aipl";
+
+fn main() -> i64 { not_here() }
+--- file: util.aipl ---
+fn a() -> i64 { 1 }
+--- errors ---
+error: "not_here" is not exported by util.aipl
+ --> input:1:10
+  |
+1 | import { not_here } from "./util.aipl";
+  |          ^^^^^^^^

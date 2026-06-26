@@ -1,0 +1,14 @@
+import { print, to_str } from builtins;
+
+fn main() !prints { print(to_str(42)); }
+--- stdout ---
+42
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 30
+binary size: 1497
+--- monomorphizations ---
+main

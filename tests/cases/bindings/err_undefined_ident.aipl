@@ -1,0 +1,9 @@
+fn main() -> i64 {
+    bogus
+}
+--- errors ---
+error: unknown identifier "bogus"
+ --> input:2:5
+  |
+2 |     bogus
+  |     ^^^^^

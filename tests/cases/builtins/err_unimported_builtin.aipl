@@ -1,0 +1,11 @@
+// Using a builtin (`is_all_whitespace`) without importing it: the "undefined fn"
+// error reminds you it's a builtin and how to import it.
+fn blank(s: str) -> bool {
+    s.is_all_whitespace()
+}
+--- errors ---
+error: call to undefined fn "is_all_whitespace" — "is_all_whitespace" is a builtin; import it with `import { is_all_whitespace } from builtins;`
+ --> input:4:5
+  |
+4 |     s.is_all_whitespace()
+  |     ^^^^^^^^^^^^^^^^^^^

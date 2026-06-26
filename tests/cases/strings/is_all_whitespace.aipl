@@ -1,0 +1,24 @@
+import { ==, !, is_all_whitespace } from builtins;
+
+// `s.is_all_whitespace()` is true when every byte of `s` is ASCII whitespace
+// (space, tab, newline, CR, vertical tab, form feed), or `s` is empty.
+fn blank(s: str) -> bool {
+    s.is_all_whitespace()
+}.test({
+    assert("".is_all_whitespace());            // empty -> true
+    assert("   ".is_all_whitespace());         // spaces
+    assert(" \t\n\r".is_all_whitespace());     // mixed whitespace
+    assert(!"a".is_all_whitespace());          // a non-space byte
+    assert(!"  x  ".is_all_whitespace());      // whitespace around content
+    assert(!"\tx".is_all_whitespace());
+    assert(blank("\n\n"));                      // free helper / method chain
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 76
+binary size: 3631
+--- monomorphizations ---
+main

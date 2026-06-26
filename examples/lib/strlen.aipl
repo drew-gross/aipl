@@ -1,0 +1,15 @@
+import { wrapping_add as + } from builtins;
+// `len` implemented in AIPL itself rather than as a builtin: walk the
+// string char-by-char with a `for` loop, incrementing a mutable counter.
+//
+// Demonstrates: `mut`, `set`, `for (let c : str)`, and the fact that
+// mutation in a block body cleanly punches through into the enclosing
+// scope.
+
+pub fn len(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        set n = n + 1;
+    }
+    n
+}

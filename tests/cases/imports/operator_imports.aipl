@@ -1,0 +1,24 @@
+import { print, to_str, wrapping_add as +, *, ==, < } from builtins;
+// Operators are imported individually by spelling, like any other builtin.
+
+fn compute(a: i64, b: i64) -> i64 {
+    a * b + a
+}.test({
+    assert(compute(3, 4) == 15);
+    assert(2 < 3);
+})
+
+fn main() !prints {
+    print(to_str(compute(3, 4))); // 15
+}
+--- stdout ---
+15
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 33
+binary size: 1505
+--- monomorphizations ---
+main

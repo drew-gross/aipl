@@ -1,0 +1,26 @@
+import { wrapping_add as +, ==, len } from builtins;
+
+// Array literal, passing an array to a function, for-each iteration,
+// and len().
+fn sum(xs: i64[]) -> i64 {
+    mut total = 0;
+    for (let x : xs) {
+        set total = total + x;
+    }
+    total
+}.test({
+    let xs = [10, 20, 30];
+    assert(sum(xs) == 60);
+    assert(len(xs) == 3);
+    assert(sum(xs) + len(xs) == 63);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 175
+binary size: 2501
+--- monomorphizations ---
+main
+sum

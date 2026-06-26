@@ -1,0 +1,51 @@
+import { wrapping_add as +, ==, print, to_str } from builtins;
+// `match` on a `str`: each arm is a string literal, with a required `_` default
+// as the last arm. Arms compare by content (string equality), so a rope (a
+// `str + str` value) scrutinee matches the same as a flat one.
+fn classify(s: str) -> str {
+    match (s) {
+        "foo" => "got foo",
+        "bar" => "got bar",
+        "" => "empty", // the empty string matches only "" (exact equality)
+        _ => "other",
+    }
+}
+
+fn code(s: str) -> i64 {
+    match (s) {
+        "a" => 1,
+        "bb" => 2,
+        _ => 0,
+    }
+}
+
+fn main() !prints {
+    print(classify("foo")); // got foo
+    print(classify("bar")); // got bar
+    print(classify("")); // empty
+    print(classify("baz")); // other
+    print(classify("f" + "oo")); // got foo  (a rope scrutinee compares by content)
+    print(to_str(code("a"))); // 1
+    print(to_str(code("bb"))); // 2
+    print(to_str(code("zzz"))); // 0
+}
+--- stdout ---
+got foo
+got bar
+empty
+other
+got foo
+1
+2
+0
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 246
+binary size: 4014
+--- monomorphizations ---
+classify
+code
+main

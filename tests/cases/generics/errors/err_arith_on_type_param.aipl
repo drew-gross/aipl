@@ -1,0 +1,16 @@
+import { wrapping_add as + } from builtins;
+// `T: any` guarantees only that T is an array-element type, not that it
+// supports arithmetic: `a + b` is meaningless for e.g. T = bool. The generic
+// body must be valid for *every* possible T, so the abstract checker rejects it
+// even though an i64-only instantiation would have compiled on its own.
+fn add_them<T: any>(a: T, b: T) -> T {
+    a + b
+}
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: arithmetic operand: expected i64, got a type parameter
+ --> input:7:5
+  |
+7 |     a + b
+  |     ^

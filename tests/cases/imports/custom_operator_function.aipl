@@ -1,0 +1,24 @@
+// An operator can be aliased to one of your own functions, not just a builtin:
+// `import { my_fn as + } from "./file"` makes `a + b` desugar to `my_fn(a, b)`.
+// Here the "custom +" tags its result with +1000 so the output proves the
+// dispatch reached the user function rather than the primitive add.
+import { print, to_str } from builtins;
+import { my_custom_add as + } from "./mymath.aipl";
+
+fn main() !prints {
+    print(to_str(2 + 3)); // == my_custom_add(2, 3) == 2 + 3 + 1000 == 1005
+}
+--- file: mymath.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
+--- stdout ---
+1005
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 34
+binary size: 1515
+--- monomorphizations ---
+main

@@ -1,0 +1,8 @@
+fn g(a: i64, b: i64) -> i64 { a }
+fn main() -> i64 { g(1 2) }
+--- errors ---
+error: unexpected '2'; expected ')', ',', '.', '?', '[', or operator
+ --> input:2:24
+  |
+2 | fn main() -> i64 { g(1 2) }
+  |                        ^

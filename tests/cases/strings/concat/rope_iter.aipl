@@ -1,0 +1,28 @@
+import { wrapping_add as +, ==, print, to_str } from builtins;
+// Iterating a rope's chars (`for c in s`) streams its leaves via a small
+// stack-allocated cursor — no flattened buffer. Building this 18-byte rope and
+// walking every char allocates only the concat node (1), never a materialized
+// 18-byte buffer. The cursor itself lives on the stack (zero heap allocation).
+fn main() !prints {
+    let r = "Hello, " + "rope world!"; // 18-byte rope (two leaves)
+    mut n = 0;
+    mut last_is_bang = false;
+    for (let c : r) {
+        set n = n + 1;
+        set last_is_bang = c == '!'; // exercises the char binding each step
+    }
+    print(to_str(n)); // 18
+    print(to_str(last_is_bang)); // true
+}
+--- stdout ---
+18
+true
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 375
+binary size: 3180
+--- monomorphizations ---
+main

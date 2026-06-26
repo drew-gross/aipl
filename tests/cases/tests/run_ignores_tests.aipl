@@ -1,0 +1,25 @@
+import { *, ==, print, to_str } from builtins;
+
+// A `.test({ .. })` block is compiled and run only by `aipl check`; `run` and
+// `build` (this harness) ignore it entirely. This fixture just confirms a
+// program carrying a test block still builds and runs normally.
+
+fn double(x: i64) -> i64 { x * 2 }.test({
+    assert(double(2) == 4);
+    assert(double(0) == 0);
+})
+
+fn main() !prints {
+    print(to_str(double(21))); // 42
+}
+--- stdout ---
+42
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 32
+binary size: 1513
+--- monomorphizations ---
+main

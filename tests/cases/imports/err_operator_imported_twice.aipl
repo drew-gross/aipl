@@ -1,0 +1,23 @@
+// An operator can be backed by a builtin (`wrapping_add as +`) or by one of
+// your own functions (`my_custom_add as +`), but not both at once in the same
+// file — the dispatch would be ambiguous.
+import { wrapping_add as + } from builtins;
+import { my_custom_add as + } from "./mymath.aipl";
+
+fn main() -> i64 {
+    2 + 3
+}
+--- file: mymath.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
+--- errors ---
+error: err_operator_imported_twice.aipl: builtin import "+" conflicts with another import
+ --> input:5:10
+  |
+5 | import { my_custom_add as + } from "./mymath.aipl";
+  |          ^^^^^^^^^^^^^
+note: "+" first imported here
+ --> input:4:10
+  |
+4 | import { wrapping_add as + } from builtins;
+  |          ^^^^^^^^^^^^

@@ -1,0 +1,17 @@
+import { wrapping_add as +, -, /, == } from builtins;
+fn d(x: i64, y: i64) -> i64 { x / y }.test({
+    // Truncating division (rounds toward zero): 20/4 = 5, -10/3 = -3.
+    assert(d(20, 4) == 5);
+    assert(d(-10, 3) == -3);
+    assert(d(20, 4) + d(-10, 3) == 2);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 61
+binary size: 2234
+--- monomorphizations ---
+d
+main

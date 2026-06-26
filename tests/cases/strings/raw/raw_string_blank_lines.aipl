@@ -1,0 +1,24 @@
+import { print } from builtins;
+
+// Interior blank lines are preserved (and don't affect the common indent).
+fn main() !prints -> i64 {
+    print("""
+      first
+
+      second
+    """);
+    0
+}
+--- stdout ---
+first
+
+second
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 9
+binary size: 1029
+--- monomorphizations ---
+main

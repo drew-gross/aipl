@@ -1,0 +1,11 @@
+// Slice bounds must be `i64`.
+fn main() {
+    let s = "hello";
+    let x = s[0..'z'];
+}
+--- errors ---
+error: slice end: expected i64, got char
+ --> input:4:18
+  |
+4 |     let x = s[0..'z'];
+  |                  ^^^

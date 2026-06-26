@@ -1,0 +1,91 @@
+// Like `map`, `zip_with` consumes a *fresh* input (an array literal or call
+// result) and reuses its buffer for the result instead of allocating a new one.
+// One fresh input is reused regardless of which side it's on; with both fresh,
+// the longer one (only known at runtime) is reused and the shorter freed. The
+// reused array's surplus elements are dropped and its length truncated, so the
+// balanced allocation counters below double as a leak check.
+import { print, to_str, zip_with, map, wrapping_add as + } from builtins;
+
+fn show(label: str, xs: i64[]) !prints {
+    print(label);
+    for (let x : xs) {
+        print(to_str(x));
+    }
+}
+
+fn show_strs(label: str, xs: str[]) !prints {
+    print(label);
+    for (let x : xs) {
+        print(x);
+    }
+}
+
+fn main() !prints {
+    // Both fresh, first longer: the first buffer is reused, its surplus
+    // elements dropped, and the second input freed.
+    show("a longer", zip_with([1, 2, 3, 4], [10, 20], +));
+    // Both fresh, second longer: the second buffer is reused.
+    show("b longer", zip_with([1, 2], [10, 20, 30, 40], +));
+    let b = [5, 5, 5];
+    // Only the first input is fresh: its buffer is reused even when it's the
+    // shorter side (the borrowed one is only indexed).
+    show("a fresh", zip_with([1, 2], b, +));
+    // Only the second input is fresh: reused, truncated from 4 to len(b).
+    show("b fresh", zip_with(b, [100, 200, 300, 400], +));
+    // A call result is as fresh as a literal.
+    show("call result", zip_with(b.map(|x| x + 1), [10, 10, 10], +));
+    // The result type may differ from the reused element type (each slot's
+    // element drop-fn is patched as it's overwritten): i64 slots, str results.
+    show_strs("strs", zip_with([1, 2, 3], [4, 5, 6], |x, y| to_str(x + y)));
+    // Heap elements: the overwritten slots and the dropped tail ("c") are
+    // released exactly once.
+    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s + t));
+}
+--- stdout ---
+a longer
+11
+22
+b longer
+11
+22
+a fresh
+6
+7
+b fresh
+105
+205
+305
+call result
+16
+16
+16
+strs
+5
+7
+9
+concat
+ax
+by
+--- performance ---
+allocations: 15
+deallocations: 13
+reallocations: 0
+bytes allocated: 800
+instructions executed: 2368
+binary size: 13023
+--- monomorphizations ---
+__lambda_0
+__lambda_10
+__lambda_12
+__lambda_14
+__lambda_2
+__zip1$own0$own1
+__zip11$own0$own1
+__zip13$own0$own1
+__zip15$own0$own1
+__zip3$own0$own1
+__zip5$own0
+__zip7$own1
+main
+show
+show_strs

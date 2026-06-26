@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// Set elements must share one type.
+fn main() {
+    let s = #{1, true};
+    print("unreachable");
+}
+--- errors ---
+error: set element: expected i64, got bool
+ --> input:5:18
+  |
+5 |     let s = #{1, true};
+  |                  ^^^^

@@ -1,0 +1,39 @@
+import { *, ==, !=, >, filter, map } from builtins;
+
+// When `filter` receives a freshly-allocated, uniquely-owned array (an array
+// literal, or a call result like `xs.map(..)`), it filters in place: kept
+// elements are compacted toward the front of the same allocation and the
+// filtered-out ones are dropped, so no separate output array is allocated.
+fn keep_gt3(xs: i64[]) -> i64[] {
+    xs.filter(|x| x > 3)
+}.test({
+    // Array literal → owned → filtered in place.
+    assert([1, 2, 3, 4, 5, 6].filter(|x| x > 3) == [4, 5, 6]);
+
+    // Keep none / keep all (boundary cases for the compaction cursor).
+    assert([1, 2, 3].filter(|x| x > 100) == []);
+    assert([1, 2, 3].filter(|x| x > 0) == [1, 2, 3]);
+
+    // Heap (str) elements: exercises the move-kept / drop-filtered refcounting.
+    // A leak or double-free would show up as an allocation/deallocation imbalance.
+    assert(["a", "", "b", "", "c"].filter(|w| w != "") == ["a", "b", "c"]);
+
+    // Chained: `map` allocates a fresh array, `filter` consumes it in place.
+    assert([1, 2, 3, 4].map(|x| x * 10).filter(|x| x > 15) == [20, 30, 40]);
+})
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 584
+instructions executed: 1241
+binary size: 7563
+--- monomorphizations ---
+__filter1$own0
+__filter11$own0
+__filter3$own0
+__filter5$own0
+__filter7$own0
+__map9$own0
+__test$keep_gt3
+main

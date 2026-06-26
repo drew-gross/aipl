@@ -1,0 +1,13 @@
+fn f(x: i64?) -> i64 {
+    match (x) {
+        some(v) v,
+        none => 0,
+    }
+}
+fn main() -> i64 { 0 }
+--- errors ---
+error: unexpected 'v'; expected '=>'
+ --> input:3:17
+  |
+3 |         some(v) v,
+  |                 ^

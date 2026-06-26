@@ -1,0 +1,11 @@
+import { == } from builtins;
+fn main() -> i64 {
+    for (let c : "x") { let _ = c == 5; }
+    0
+}
+--- errors ---
+error: "==" between char and i64: both sides must be the same type
+ --> input:3:33
+  |
+3 |     for (let c : "x") { let _ = c == 5; }
+  |                                 ^^^^^^

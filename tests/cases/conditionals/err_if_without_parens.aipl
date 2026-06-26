@@ -1,0 +1,7 @@
+fn f() { if 1 { 2 } else { 3 } }
+--- errors ---
+error: unexpected '1'; expected '('
+ --> input:1:13
+  |
+1 | fn f() { if 1 { 2 } else { 3 } }
+  |             ^

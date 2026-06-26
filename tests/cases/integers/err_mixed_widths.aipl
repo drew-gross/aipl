@@ -1,0 +1,16 @@
+import { wrapping_add as + } from builtins;
+// Only bare *literals* flex to a narrow type — two different-width integer
+// *values* still need an explicit conversion to combine.
+fn combine(a: i32, b: i8) -> i32 {
+    a + b
+}
+
+fn main() -> i64 {
+    0
+}
+--- errors ---
+error: arithmetic operand: expected i64, got i32
+ --> input:5:5
+  |
+5 |     a + b
+  |     ^

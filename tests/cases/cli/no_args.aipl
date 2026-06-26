@@ -1,0 +1,18 @@
+import { print, value_or } from builtins;
+
+// With no `--- cli ---` section the argument array is empty, so indexing it
+// yields `none` and `value_or` supplies the fallback.
+fn main(args: str[]) !prints {
+    print(args[0].value_or("no arguments"));
+}
+--- stdout ---
+no arguments
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 32
+instructions executed: 28
+binary size: 1251
+--- monomorphizations ---
+main

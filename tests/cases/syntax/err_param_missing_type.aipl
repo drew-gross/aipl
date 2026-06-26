@@ -1,0 +1,7 @@
+fn f(x) -> i64 { 0 }
+--- errors ---
+error: unexpected ')'; expected ':'
+ --> input:1:7
+  |
+1 | fn f(x) -> i64 { 0 }
+  |       ^

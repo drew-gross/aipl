@@ -1,0 +1,12 @@
+// A `main` with no return type returns nothing, so a trailing expression — an
+// attempt to produce a value/exit code — is a compile error. Declare
+// `-> i64` to return an exit code.
+fn main() {
+    5
+}
+--- errors ---
+error: fn "main": body returns i64, but the declared return type is ()
+ --> input:5:5
+  |
+5 |     5
+  |     ^

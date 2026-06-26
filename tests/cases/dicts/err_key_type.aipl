@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// A dict key must be a scalar/str, not a container.
+fn main() -> i64 {
+    let d = #{[1]: "a"};
+    0
+}
+--- errors ---
+error: dict keys must be i64, bool, char, or str, got i64[]
+ --> input:5:13
+  |
+5 |     let d = #{[1]: "a"};
+  |             ^^^^^^^^^^

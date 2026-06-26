@@ -1,0 +1,7 @@
+fn f() -> char { 'ab' }
+--- errors ---
+error: char literal must contain exactly one character
+ --> input:1:18
+  |
+1 | fn f() -> char { 'ab' }
+  |                  ^^

@@ -1,0 +1,28 @@
+[package]
+name = "aipl-codegen"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL cranelift codegen (JIT and object emission)"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+aipl-mono = { workspace = true }
+# Used to parse the embedded `add.aipl` the compiler dogfoods via the FFI.
+aipl-parser = { workspace = true }
+# Used to *load* (parse + canonicalize builtin imports, resolve the
+# `count_while` module import) the embedded `dedent.aipl` the compiler dogfoods
+# via the FFI to de-dent raw strings.
+aipl-loader = { workspace = true }
+cranelift = { workspace = true }
+cranelift-jit = { workspace = true }
+cranelift-module = { workspace = true }
+cranelift-native = { workspace = true }
+# Parses checked-in CLIF (the dogfood IR) back into `Function`s to re-link into a
+# fresh JITModule, so the compiler dogfoods AIPL without recompiling it from source.
+cranelift-reader = { workspace = true }
+cranelift-object = { workspace = true }
+target-lexicon = { workspace = true }
+
+[lib]
+path = "src/lib.rs"

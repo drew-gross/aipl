@@ -1,0 +1,23 @@
+import { ==, push } from builtins;
+
+// A generic mutating function (`mut self: any[]`) used in copy-and-modify call
+// form. Monomorphization desugars the call to `.append(..)` on a copy and
+// mangles the instance, so value semantics and specialization both hold.
+fn append<T: any>(mut self: T[], x: T) {
+    self.push(x);
+}.test({
+    let xs = [10, 20];
+    let grown = append(xs, 30);   // copies xs, appends to the copy
+    assert(xs == [10, 20]);       // xs is still [10, 20]
+    assert(grown == [10, 20, 30]); // grown is [10, 20, 30]
+})
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 208
+instructions executed: 202
+binary size: 2978
+--- monomorphizations ---
+append$i64
+main

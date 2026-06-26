@@ -1,0 +1,10 @@
+fn main() -> i64 {
+    for (let c : "x") { }
+    c
+}
+--- errors ---
+error: unknown identifier "c"
+ --> input:3:5
+  |
+3 |     c
+  |     ^

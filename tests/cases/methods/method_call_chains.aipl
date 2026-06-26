@@ -1,0 +1,15 @@
+import { wrapping_add as +, == } from builtins;
+fn double(self: i64) -> i64 { self + self }
+fn plus(self: i64, n: i64) -> i64 { self + n }.test({
+    // (10.plus(5)).double() = 15 * 2 = 30
+    assert(10.plus(5).double() == 30);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 23
+binary size: 1512
+--- monomorphizations ---
+main

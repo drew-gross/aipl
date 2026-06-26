@@ -1,0 +1,14 @@
+// The conflict check is on the *local* (alias) name: importing `helper as dup`
+// clashes with a local `dup`, even though the exported name differs.
+import { helper as dup } from "./util.aipl";
+
+fn dup() -> i64 { 2 }
+fn main() -> i64 { dup() }
+--- file: util.aipl ---
+pub fn helper() -> i64 { 1 }
+--- errors ---
+error: err_alias_collides_with_local.aipl: import "dup" conflicts with a local item
+ --> input:3:10
+  |
+3 | import { helper as dup } from "./util.aipl";
+  |          ^^^^^^

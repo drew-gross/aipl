@@ -1,0 +1,22 @@
+import { wrapping_add as +, == } from builtins;
+// Marquee use case: len(s) implemented in AIPL.
+fn len(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        set n = n + 1;
+    }
+    n
+}.test({
+    // 12 + 0 + 1 = 13
+    assert(len("hello, world") + len("") + len("a") == 13);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 233
+binary size: 2388
+--- monomorphizations ---
+len
+main

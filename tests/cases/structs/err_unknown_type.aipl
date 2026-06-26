@@ -1,0 +1,5 @@
+fn f(x: Widget) -> i64 { 0 }
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: fn "f": unknown type "Widget"

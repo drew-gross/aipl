@@ -1,0 +1,26 @@
+// Used by the raw-string processor to drop the newline (and CR) that end a blank
+// closing line.
+import { ==, -, len } from builtins;
+
+pub fn trim_suffix(self: str, c: char) -> str {
+    if (self[self.len() - 1] == some(c)) {
+        self[0..self.len() - 1]
+    } else {
+        self
+    }
+}.doc("Drops a single trailing `c` if present, else returns `self` unchanged.").test({
+    assert("rest\n".trim_suffix('\n') == "rest"); // trailing char dropped
+    assert("rest".trim_suffix('\n') == "rest");   // absent -> unchanged
+    assert("".trim_suffix('\n') == "");           // empty source (index -1 is none)
+    assert("yxx".trim_suffix('x') == "yx");       // only the last is dropped
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 224
+binary size: 4191
+--- monomorphizations ---
+main
+trim_suffix

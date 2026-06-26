@@ -1,0 +1,55 @@
+import { wrapping_add as +, -, ==, <=, print, to_str } from builtins;
+
+// `return value;` early-exits the enclosing function. It's a statement (like
+// `set`), so it appears followed by `;`; control never falls through it, and the
+// function still ends with a trailing value for the no-early-return path.
+fn clamp_low(x: i64) -> i64 {
+    if (x <= 0) {
+        return 0;
+    };
+    x
+}
+
+// Early return out of a loop with a heap local (`log`) live at the return point —
+// the `--- performance ---` allocation/deallocation balance below confirms it's
+// released on the early-return path (no leak, no double free).
+fn first_index_reaching(xs: i64[], limit: i64) -> str {
+    mut log = "";
+    mut i = 0;
+    for (let x : xs) {
+        set log = log + "s";
+        if (limit <= x) {
+            return to_str(i);
+        };
+        set i = i + 1;
+    }
+    log
+}
+
+fn main() !prints {
+    print(to_str(clamp_low(-3))); // 0
+    print(to_str(clamp_low(5))); // 5
+    print(first_index_reaching([1, 5, 9], 4)); // 1  (5 is the first >= 4)
+    print(first_index_reaching([1, 2], 9)); // ss  (limit never reached)
+}.test({
+    assert(clamp_low(-3) == 0);
+    assert(clamp_low(5) == 5);
+    assert(first_index_reaching([1, 5, 9], 4) == "1");
+    assert(first_index_reaching([1, 2], 9) == "ss");
+})
+--- stdout ---
+0
+5
+1
+ss
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 104
+instructions executed: 262
+binary size: 2951
+--- monomorphizations ---
+clamp_low
+first_index_reaching
+main

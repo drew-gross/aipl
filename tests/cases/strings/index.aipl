@@ -1,0 +1,24 @@
+import { == } from builtins;
+
+// `s[i]` indexes a string: the byte at `i` as a `char?` — `some(byte)` in
+// bounds, `none` out of bounds.
+fn at(s: str, i: i64) -> char? {
+    s[i]
+}.test({
+    assert(at("abc", 0) == some('a'));
+    assert(at("abc", 1) == some('b'));
+    assert(at("abc", 2) == some('c'));
+    assert(at("abc", 3) == none); // out of bounds
+    assert(at("", 0) == none);    // empty string
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 226
+binary size: 3859
+--- monomorphizations ---
+__test$at
+at
+main

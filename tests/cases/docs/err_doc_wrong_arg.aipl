@@ -1,0 +1,11 @@
+import { wrapping_add as + } from builtins;
+
+pub fn add(a: i64, b: i64) -> i64 {
+    a + b
+}.doc({ a + b })
+--- errors ---
+error: `.doc` takes a string argument, not a `{ .. }` block
+ --> input:5:3
+  |
+5 | }.doc({ a + b })
+  |   ^^^

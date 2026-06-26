@@ -1,0 +1,37 @@
+import { wrapping_add as +, ==, push, value_or, len } from builtins;
+
+// A `str[]` is an array whose elements are heap-allocated strings. Build,
+// index (yields `str?`), push, and iterate — each operation retains/releases
+// the element strings so nothing leaks or double-frees. `ys` snapshots `xs`
+// before pushing, so `xs` stays length 2 (value semantics).
+fn appended(xs: str[], s: str) -> str[] {
+    mut ys = xs;
+    ys.push(s);
+    ys
+}.test({
+    let xs = ["foo", "bar"];
+    mut ys = xs;
+    ys.push("baz");
+    // index yields str?
+    assert(ys[0] == some("foo"));
+    assert(ys == ["foo", "bar", "baz"]);
+    mut count = 0;
+    for (let s : ys) {
+        set count = count + 1;
+    }
+    assert(count == 3);
+    // xs is unchanged (len 2)
+    assert(xs == ["foo", "bar"]);
+    assert(len(xs) == 2);
+    assert(len(ys) == 3);
+    assert(appended(xs, "baz") == ["foo", "bar", "baz"]);
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 320
+instructions executed: 476
+binary size: 6511
+--- monomorphizations ---
+main

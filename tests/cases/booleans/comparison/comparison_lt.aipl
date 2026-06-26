@@ -1,0 +1,15 @@
+import { ==, < } from builtins;
+fn lt(x: i64, y: i64) -> i64 { if (x < y) { 1 } else { 0 } }.test({
+    assert(lt(1, 2) == 1);
+    assert(lt(2, 2) == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 46
+binary size: 1856
+--- monomorphizations ---
+lt
+main

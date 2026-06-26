@@ -1,0 +1,12 @@
+import { print } from builtins;
+
+fn main() -> i64 {
+    let _ = print("forbidden");
+    0
+}
+--- errors ---
+error: fn "print" has effect "!prints" but the calling function does not declare it
+ --> input:4:13
+  |
+4 |     let _ = print("forbidden");
+  |             ^^^^^^^^^^^^^^^^^

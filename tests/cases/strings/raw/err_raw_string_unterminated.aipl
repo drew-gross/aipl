@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// A raw string with no closing `"""` runs to end of input — a lex error.
+fn main() !prints -> i64 {
+    print("""oops, never closed);
+    0
+}
+--- errors ---
+error: unterminated raw string literal
+ --> input:5:11
+  |
+5 |     print("""oops, never closed);
+  |           ^^^^^^^^^^^^^^^^^^^^^^^

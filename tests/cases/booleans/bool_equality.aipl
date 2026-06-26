@@ -1,0 +1,18 @@
+import { ==, != } from builtins;
+fn beq(x: bool, y: bool) -> bool { x == y }.test({
+    assert(beq(true, true) == true);
+    assert(beq(true, false) == false);
+})
+fn bne(x: bool, y: bool) -> bool { x != y }.test({
+    assert(bne(false, true) == true);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 61
+binary size: 2253
+--- monomorphizations ---
+beq
+main

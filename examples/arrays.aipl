@@ -1,0 +1,45 @@
+import { wrapping_add as +, -, >, len, push, value_or } from builtins;
+
+// Arrays: a growable, refcounted sequence of primitives written `T[]`
+// (e.g. `i64[]`, `char[]`, `bool[]`).
+//
+//   - `[a, b, c]`     constructs an array literal (`[]` is the empty one)
+//   - `xs[i]`         indexes, yielding `T?` — `some(elem)` in bounds,
+//                     `none` when `i` is out of range
+//   - `len(xs)`       returns the element count
+//   - `xs.push(x)`    appends `x` to the array variable `xs` in place
+//                     (`xs` must be `mut`); copies of `xs` are unaffected
+//   - `for (let x : xs) { ... }` iterates the elements in order
+
+fn sum(xs: i64[]) -> i64 {
+    mut total = 0;
+    for (let x : xs) {
+        set total = total + x;
+    }
+    total
+}
+
+// Build `[1, 2, ..., n]` by repeated push, starting from the empty
+// array. Recurses since the only loop form iterates an existing
+// sequence.
+fn range(n: i64) -> i64[] {
+    fill([], 1, n)
+}
+
+fn fill(acc: i64[], i: i64, n: i64) -> i64[] {
+    if (i > n) {
+        acc
+    } else {
+        mut next = acc;
+        next.push(i);
+        fill(next, i + 1, n)
+    }
+}
+
+fn main() -> i64 {
+    let xs = range(5); // [1, 2, 3, 4, 5]
+    // sum(xs) = 15, len(xs) = 5; out-of-bounds index is `none`.
+    let missing = xs[99].value_or(0);
+    // 15 + 5 + 0 - 20 = 0
+    sum(xs) + len(xs) + missing - 20
+}

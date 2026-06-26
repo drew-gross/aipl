@@ -1,0 +1,24 @@
+import { wrapping_add as +, ==, trim } from builtins;
+
+// `trim` on a uniquely-owned (never-aliased) string reuses its buffer: it
+// shifts the content to the front and reallocs down in place, rather than
+// allocating a fresh string. Here `s` is built on the heap by an in-place
+// concat (off the static ""), then trimmed in place — so the trim shows up as
+// a realloc, not an allocation.
+fn build() -> str {
+    mut s = "";
+    set s = s + "  padded  ";   // heap buffer via concat
+    set s = trim(s);            // trimmed in place (realloc, not a fresh alloc)
+    s
+}.test({
+    assert(build() == "padded");
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 27
+instructions executed: 36
+binary size: 2284
+--- monomorphizations ---
+main

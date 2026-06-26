@@ -1,0 +1,33 @@
+// SSO through CLI args: argv strings of <= 7 bytes are stored inline in the str
+// value (no heap allocation); >= 8 bytes allocate. The two args below straddle
+// that boundary — "hi" is inline, "longerword" is heap — and we exercise SSO
+// consumers on them: equality against an inline literal, and concatenation (an
+// inline arg + inline literal stays inline). So the only heap allocations the
+// counters report are the `str[]` block plus the single long arg; the short arg,
+// the literal, and the "hi!" concat are all inline (zero allocations).
+import { print, ==, wrapping_add as + } from builtins;
+
+fn main(args: str[]) !prints {
+    for (let a : args) {
+        if (a == "hi") {
+            print(a + "!"); // inline arg + inline literal -> inline "hi!"
+        } else {
+            print(a);
+        };
+    }
+}
+--- cli ---
+hi
+longerword
+--- stdout ---
+hi!
+longerword
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 115
+instructions executed: 65
+binary size: 1414
+--- monomorphizations ---
+main

@@ -1,0 +1,28 @@
+import { ==, !=, ! } from builtins;
+// Structs compare field by field (recursing into heap fields like str).
+struct Point { x: i64, y: i64 }
+struct Named { id: i64, name: str }
+
+fn eq_point(a: Point, b: Point) -> bool { a == b }.test({
+    let a = Point { x: 1, y: 2 };
+    let b = Point { x: 1, y: 2 };
+    let c = Point { x: 1, y: 3 };
+    assert(a == b);
+    assert(!(a == c));
+    assert(a != c);
+
+    let p = Named { id: 1, name: "ann" };
+    let q = Named { id: 1, name: "ann" };
+    let r = Named { id: 1, name: "bob" };
+    assert(p == q);
+    assert(!(p == r));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 171
+binary size: 3726
+--- monomorphizations ---
+main

@@ -1,0 +1,53 @@
+import { print, to_str } from builtins;
+
+// Deep `none` coercion: a chain like `some(some(none))` has a `__none__` core
+// (no concrete element). That core now coerces through the `some` layers to a
+// concrete one, so a deep partial chain fits a concrete nested-optional type as
+// a return value, a function argument, an `if`/`else` branch, and a `match` arm.
+
+// Return-type coercion: __none__??? -> i64???.
+fn ret_deep() -> i64??? {
+    some(some(none))
+}
+
+fn show(x: i64???) -> str {
+    to_str(x)
+}
+
+fn main() !prints {
+    // Return type.
+    print(to_str(ret_deep()));            // some(some(none))
+
+    // Argument: the literal deep-none fits the i64??? parameter.
+    print(show(some(some(none))));        // some(some(none))
+
+    // if/else merge — a deep none in one branch, a concrete chain in the other.
+    let cond = true;
+    print(to_str(if (cond) { some(some(some(7))) } else { some(some(none)) }));  // some(some(some(7)))
+    print(to_str(if (cond) { some(some(none)) } else { some(some(some(7))) }));  // some(some(none))
+
+    // match arm merge — the none arm's deep none takes the some arm's concrete
+    // type. (`xs[0]` is `i64???`; unwrapping once binds `inner : i64??`.)
+    let xs = [some(some(9))];
+    print(to_str(match (xs[0]) {
+        some(inner) => inner,
+        none => some(none),
+    }));                                   // some(some(9))
+}
+--- stdout ---
+some(some(none))
+some(some(none))
+some(some(some(7)))
+some(some(none))
+some(some(9))
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 213
+instructions executed: 573
+binary size: 6979
+--- monomorphizations ---
+main
+ret_deep
+show

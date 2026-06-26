@@ -1,0 +1,34 @@
+import { ==, push, value_or, len } from builtins;
+
+// Explicitly-written nested type annotations: `str[][]` as a parameter and
+// return type, `str[]` as the element. The recursive type grammar parses
+// `T[]`, `T[][]`, `T[]?`, etc.
+fn add_row(grid: str[][], row: str[]) -> str[][] {
+    mut g = grid;
+    g.push(row);
+    g
+}.test({
+    let g = add_row([["a"]], ["b", "c"]);
+    assert(g == [["a"], ["b", "c"]]);
+    assert(len(g) == 2);
+})
+
+fn first(grid: str[][]) -> str[]? {
+    grid[0]
+}.test({
+    let g = add_row([["a"]], ["b", "c"]);
+    let row0 = first(g).value_or([]);
+    assert(row0[0] == some("a"));
+    assert(len(row0) == 1);
+})
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 520
+instructions executed: 426
+binary size: 6172
+--- monomorphizations ---
+__test$first
+add_row
+main

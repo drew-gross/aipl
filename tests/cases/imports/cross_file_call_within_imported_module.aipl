@@ -1,0 +1,23 @@
+// `helper` isn't imported by main, but `entry` calls it internally —
+// the loader must keep within-file references wired up post-rewrite.
+import { entry } from "./util.aipl";
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    print(to_str(entry(5)));
+}
+--- stdout ---
+51
+--- file: util.aipl ---
+import { *, wrapping_add as + } from builtins;
+fn helper(n: i64) -> i64 { n * 10 }
+pub fn entry(n: i64) -> i64 { helper(n) + 1 }
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 34
+binary size: 1541
+--- monomorphizations ---
+main

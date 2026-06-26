@@ -1,0 +1,20 @@
+import { ==, print } from builtins;
+
+// A repeated string-literal arm is dead code.
+fn label(s: str) -> str {
+    match (s) {
+        "a" => "x",
+        "a" => "y",
+        _ => "z",
+    }
+}
+
+fn main() !prints {
+    print(label("a"));
+}
+--- errors ---
+error: duplicate "a" arm
+ --> input:7:9
+  |
+7 |         "a" => "y",
+  |         ^^^

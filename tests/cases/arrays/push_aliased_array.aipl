@@ -1,0 +1,36 @@
+import { ==, push } from builtins;
+
+// Pushing the *same* array `a` into `b` twice: `b` ends up holding two
+// references to the one `[1, 2, 3]` block (plus `a`'s own binding), so it has
+// refcount 3. `push` retains each heap element it stores, and `a` stays usable
+// afterward (value semantics — push doesn't consume it).
+//
+// Then we mutate `a`: because `a` is aliased (its block is shared with `b`), the
+// push can't mutate in place — it copies `a` into a fresh block, leaving `b`'s
+// two references to the original block untouched. So `b` is the same before and
+// after, and at scope exit every block is released exactly once.
+fn appended(xs: i64[], x: i64) -> i64[] {
+    mut ys = xs;
+    ys.push(x);
+    ys
+}.test({
+    mut a = [1, 2, 3];
+    mut b = [[4, 5, 6]];
+    b.push(a);
+    b.push(a);
+    assert(b == [[4, 5, 6], [1, 2, 3], [1, 2, 3]]);
+    assert(a == [1, 2, 3]);   // still owned and usable
+
+    a.push(99);
+    assert(a == [1, 2, 3, 99]);   // a's own copy grew
+    assert(b == [[4, 5, 6], [1, 2, 3], [1, 2, 3]]);   // b unaffected
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 2
+bytes allocated: 784
+instructions executed: 932
+binary size: 6075
+--- monomorphizations ---
+main

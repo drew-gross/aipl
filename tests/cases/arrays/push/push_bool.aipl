@@ -1,0 +1,31 @@
+import { ==, push, len } from builtins;
+
+// Growable bool[]: start empty and push. `bs.push(x)` grows the variable in
+// place; a snapshot taken first (`let snap = bs`) keeps its own value, so a
+// later push to `bs` doesn't disturb it (value semantics).
+fn appended(xs: bool[], x: bool) -> bool[] {
+    mut ys = xs;
+    ys.push(x);
+    ys
+}.test({
+    mut bs = [];
+    bs.push(true);
+    bs.push(false);
+    let snap = bs;        // snapshot of [true, false]
+    bs.push(true);        // grows bs only
+    assert(bs == [true, false, true]);
+    assert(snap == [true, false]);  // snapshot unchanged
+    assert(len(snap) == 2);
+    assert(appended(snap, true) == [true, false, true]);
+    assert(snap == [true, false]);
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 296
+instructions executed: 484
+binary size: 5007
+--- monomorphizations ---
+__test$appended
+main

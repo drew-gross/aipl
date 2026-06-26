@@ -1,0 +1,7 @@
+// A struct stored inline cannot contain itself: the layout would have infinite
+// size. (Indirection through a heap type would be needed, which isn't offered.)
+struct Node { v: i64, next: Node }
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: struct Node: recursive structs have infinite size (a struct cannot contain itself, directly or transitively)

@@ -1,0 +1,24 @@
+import { wrapping_add as +, == } from builtins;
+// Building a string by repeated `set s = s + ..` on a never-aliased binding:
+// `s` grows in place via realloc, so only the first append (off the static "")
+// allocates a heap buffer; the rest reuse it. Without the optimization each of
+// the four concats would allocate a fresh string.
+fn build() -> str {
+    mut s = "";
+    set s = s + "a";
+    set s = s + "b";
+    set s = s + "c";
+    set s = s + "d";
+    s
+}.test({
+    assert(build() == "abcd");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 46
+binary size: 2120
+--- monomorphizations ---
+main

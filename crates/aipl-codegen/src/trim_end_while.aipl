@@ -1,0 +1,28 @@
+// String-only; walks once, tracking the position just past the last
+// *non*-matching char.
+import { ==, !, ++ } from builtins;
+
+pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
+    mut k = 0;
+    mut i = 0;
+    for (let c : self) {
+        set i++;
+        if (!pred(c)) { set k = i; }; // k = end of the last non-matching run
+    }
+    self[0..k]
+}.doc("Drops the trailing run of characters satisfying `pred` (the trailing counterpart of `trim_while`).").test({
+    assert("abc   ".trim_end_while(|c| c == ' ') == "abc"); // trailing spaces dropped
+    assert("abc".trim_end_while(|c| c == ' ') == "abc");    // nothing to trim
+    assert("   ".trim_end_while(|c| c == ' ') == "");        // all trimmed
+    assert("".trim_end_while(|c| c == ' ') == "");           // empty source
+    assert("axxbxx".trim_end_while(|c| c == 'x') == "axxb"); // only the trailing run
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 515
+binary size: 5307
+--- monomorphizations ---
+main

@@ -1,0 +1,23 @@
+import { print, to_str, len } from builtins;
+
+// Converting doesn't consume the array: the refcount protocol (caller incs,
+// callee decs) leaves `xs` usable afterward — no double-free or leak.
+fn main() !prints {
+    let xs = [7, 8, 9];
+    print(to_str(xs));
+    print(to_str(xs));
+    print(to_str(len(xs)));
+}
+--- stdout ---
+[7, 8, 9]
+[7, 8, 9]
+3
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 108
+instructions executed: 447
+binary size: 3262
+--- monomorphizations ---
+main

@@ -1,0 +1,8 @@
+import { wrapping_add as + } from builtins;
+fn main() -> i64 { if (true + false) { 1 } else { 2 } }
+--- errors ---
+error: arithmetic operand: expected i64, got bool
+ --> input:2:24
+  |
+2 | fn main() -> i64 { if (true + false) { 1 } else { 2 } }
+  |                        ^^^^

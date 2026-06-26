@@ -1,0 +1,16 @@
+// Matching a result must be exhaustive: both `ok` and `err` arms are required.
+fn miss(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+    }
+}
+
+fn main() {
+    miss(ok(1));
+}
+--- errors ---
+error: non-exhaustive match: missing err
+ --> input:3:12
+  |
+3 |     match (r) {
+  |            ^^^^

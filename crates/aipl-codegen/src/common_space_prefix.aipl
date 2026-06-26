@@ -1,0 +1,54 @@
+// A dogfooded helper, no longer wired in (the raw-string de-denter moved to the
+// dogfooded `dedent`); kept as a well-tested example. Returns a *length* rather
+// than a slice deliberately — AIPL has no substring operator.
+import { wrapping_add as +, ==, && } from builtins;
+
+pub fn common_space_prefix(a: str, b: str) -> i64 {
+    // Walk forward while both strings still have a space at index `i`. `s[i]`
+    // yields `some(c)` for the byte there and `none` past the end, so comparing
+    // it to `some(' ')` is true only when that index is a space on both sides —
+    // the loop stops at the first index where either isn't a leading space, and
+    // that index is the prefix length.
+    mut i = 0;
+    while (a[i] == some(' ') && b[i] == some(' ')) {
+        set i = i + 1;
+    }
+    i
+}.doc("""
+Returns the length of the longest common prefix of `a` and `b` made up entirely
+of space characters — their shared space-only indentation. Stops at the first
+index where the strings differ or the (matching) byte isn't a space (a tab or
+letter ends the count).
+""").test({
+    // Identical space runs: the whole (shorter-or-equal) run is the prefix.
+    assert(common_space_prefix("", "") == 0);
+    assert(common_space_prefix("    ", "    ") == 4);
+    // The shorter run bounds the prefix.
+    assert(common_space_prefix("  ", "      ") == 2);
+    assert(common_space_prefix("      ", "  ") == 2);
+    // A non-space byte ends the count, even when the bytes match: tabs and
+    // letters are not spaces, so a leading tab or a shared word yields 0.
+    assert(common_space_prefix("\t\t", "\t\t") == 0);
+    assert(common_space_prefix("\t ", "\t\t") == 0);
+    assert(common_space_prefix("abc", "abd") == 0);
+    // Spaces up to the first non-space (or mismatch) are counted.
+    assert(common_space_prefix("  \t", "  ") == 2);
+    assert(common_space_prefix(" a", " b") == 1);
+    // Space vs tab at index 0: no common space prefix.
+    assert(common_space_prefix(" ", "\t") == 0);
+    // One side empty: no common prefix.
+    assert(common_space_prefix("", "  ") == 0);
+    assert(common_space_prefix("  ", "") == 0);
+    // General (non-whitespace) sanity: the prefix ends at the first differing byte.
+    assert(common_space_prefix("abc", "abd") == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1732
+binary size: 7081
+--- monomorphizations ---
+common_space_prefix
+main

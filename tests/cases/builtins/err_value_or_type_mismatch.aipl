@@ -1,0 +1,12 @@
+// The default passed to `value_or` must match the optional's element type.
+import { value_or } from builtins;
+
+fn main() -> i64 {
+    some(1).value_or('z')
+}
+--- errors ---
+error: value_or default: expected i64, got char
+ --> input:5:22
+  |
+5 |     some(1).value_or('z')
+  |                      ^^^

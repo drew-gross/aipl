@@ -1,0 +1,11 @@
+// The `+` operator is provided by the `wrapping_add` builtin, so using it
+// without importing `wrapping_add as +` is a compile error.
+fn main() -> i64 {
+    1 + 2
+}
+--- errors ---
+error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
+ --> input:4:5
+  |
+4 |     1 + 2
+  |     ^^^^^

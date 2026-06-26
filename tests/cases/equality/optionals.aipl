@@ -1,0 +1,27 @@
+import { ==, !=, ! } from builtins;
+// Structural equality of optionals (including nesting and comparison to `none`).
+fn eq_opt(a: i64?, b: i64?) -> bool { a == b }.test({
+    let a = some(5);
+    let b = some(5);
+    let c = some(6);
+    assert(a == b);
+    assert(!(a == c));
+    assert(a != c);
+    assert(!(a == none));
+
+    let d = some(some(7));
+    let e = some(some(7));
+    let g = some(some(8));
+    assert(d == e);
+    assert(!(d == g));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 195
+binary size: 3710
+--- monomorphizations ---
+__test$eq_opt
+main

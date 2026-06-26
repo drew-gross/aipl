@@ -1,0 +1,27 @@
+import { wrapping_add as +, ==, print } from builtins;
+
+// Strings: literal comparison, concatenation, and the `print` builtin.
+// `print` carries the `!prints` effect, so any caller has to declare it.
+
+fn classify(s: str) -> str {
+    if (s == "hello") {
+        "greeting"
+    } else {
+        // `+` on two `str` operands is concat (allocates a new string).
+        "unknown: " + s
+    }
+}
+
+fn main() !prints -> i64 {
+    // `print` returns nothing — it's called purely for its `!prints` effect,
+    // so each call is its own statement. `main` returns its own exit code.
+    print(classify("hello"));
+    print(classify("xyz"));
+    0
+}
+
+--- stdout ---
+greeting
+unknown: xyz
+--- exit code ---
+0

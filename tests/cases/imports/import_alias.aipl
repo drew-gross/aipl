@@ -1,0 +1,26 @@
+// `import { name as local }` binds an imported item under a different local
+// name — for both path imports and builtins. The alias is what the importing
+// file uses; the original name is what the source exports.
+import { print, to_str as show } from builtins;
+import { helper as double, greeting } from "./util.aipl";
+
+fn main() !prints {
+    print(show(double(21)));   // double = util's `helper`; show = to_str
+    print(greeting());         // imported under its own name, alongside aliases
+}
+--- file: util.aipl ---
+import { * } from builtins;
+pub fn helper(n: i64) -> i64 { n * 2 }
+pub fn greeting() -> str { "hi" }
+--- stdout ---
+42
+hi
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 36
+binary size: 1557
+--- monomorphizations ---
+main

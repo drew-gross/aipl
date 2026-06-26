@@ -1,0 +1,50 @@
+import { wrapping_add as +, == } from builtins;
+
+// A variadic ("zero or more") parameter is written `T*`. Inside the body it is
+// the *sequence* type — `i64[]` here — so it iterates like any array. At a call
+// site it also accepts a single element (wrapped to a one-item sequence) or an
+// optional element (`none` → empty, `some(v)` → one item).
+fn sum(self: i64, others: i64*) -> i64 {
+    mut total = self;
+    for (let i : others) {
+        set total = total + i;
+    }
+    total
+}.test({
+    assert(1.sum([2, 3, 4]) == 10); // an array, as-is
+    assert(1.sum(2) == 3);          // a single element -> [2]
+    assert(1.sum(some(5)) == 6);    // some(v) -> [v]
+    assert(1.sum(none) == 1);       // none -> []
+    assert(1.sum([]) == 1);         // an explicit empty array
+    assert(sum(10, [1, 1]) == 12);  // the plain (non-method) call form
+})
+
+// `str*` is `str[]` — a variadic of heap elements, so the single-element call
+// (`"b"` -> `["b"]`) must retain/release the string correctly. The balanced
+// allocation counts below confirm it.
+fn joined(self: str, parts: str*) -> str {
+    mut s = self;
+    for (let p : parts) {
+        set s = s + p;
+    }
+    s
+}.test({
+    assert(joined("a", "b") == "ab");         // single str -> ["b"]
+    assert(joined("a", ["b", "c"]) == "abc"); // a str[], as-is
+    assert(joined("x", some("y")) == "xy");   // some("y") -> ["y"]
+    assert(joined("x", none) == "x");         // none -> []
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 568
+instructions executed: 605
+binary size: 8138
+--- monomorphizations ---
+__test$joined
+__test$sum
+joined$vo1
+main
+sum
+sum$vo1

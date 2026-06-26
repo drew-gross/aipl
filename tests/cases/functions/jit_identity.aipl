@@ -1,0 +1,15 @@
+import { wrapping_add as +, -, == } from builtins;
+fn id(x: i64) -> i64 { x }.test({
+    assert(id(7) == 7);
+    assert(id(-3) == -3);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 36
+binary size: 1839
+--- monomorphizations ---
+id
+main

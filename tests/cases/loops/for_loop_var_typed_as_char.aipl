@@ -1,0 +1,16 @@
+import { == } from builtins;
+// `c == 'a'` only type-checks if `c` is char.
+fn main() {
+    for (let c : "abc") {
+        let _ = c == 'a';
+    }
+}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 48
+binary size: 804
+--- monomorphizations ---
+main

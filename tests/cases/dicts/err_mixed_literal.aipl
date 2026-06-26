@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// A `#{ .. }` literal must be all set elements or all `key: value` pairs.
+fn main() -> i64 {
+    let d = #{1, 2: "a"};
+    0
+}
+--- errors ---
+error: a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)
+ --> input:5:13
+  |
+5 |     let d = #{1, 2: "a"};
+  |             ^

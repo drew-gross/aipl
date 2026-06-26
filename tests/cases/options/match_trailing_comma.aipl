@@ -1,0 +1,21 @@
+import { == } from builtins;
+fn unwrap(x: i64?) -> i64 {
+    match (x) {
+        some(v) => v,
+        none => 0,
+    }
+}.test({
+    assert(unwrap(some(42)) == 42);
+    assert(unwrap(none) == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 52
+binary size: 1986
+--- monomorphizations ---
+__test$unwrap
+main
+unwrap

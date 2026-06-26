@@ -1,0 +1,52 @@
+import { ==, len, contains, union } from builtins;
+
+// `a.union(b)` is the set of all distinct elements of both (overlap deduped).
+// `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
+// other uses build a fresh set. (Split across small functions to keep each
+// one's codegen modest.)
+
+fn basic() -> #{i64} {
+    let a = #{1, 2, 3};
+    let b = #{3, 4, 5};
+    a.union(b)                       // {1, 2, 3, 4, 5} (3 deduped)
+}.test({
+    let a = #{1, 2, 3};
+    let b = #{3, 4, 5};
+    let c = a.union(b);
+    assert(c == #{1, 2, 3, 4, 5});
+    assert(len(c) == 5);
+    assert(c.contains(4));
+    assert(len(a) == 3);             // operands unchanged
+})
+
+fn in_place() -> #{i64} {
+    // `set acc = acc.union(..)` reuses acc's buffer in place.
+    mut acc = #{1, 2};
+    set acc = acc.union(#{2, 3, 4}); // 2 deduped
+    set acc = acc.union(#{5});
+    acc
+}.test({
+    assert(in_place() == #{1, 2, 3, 4, 5});
+})
+
+fn empty_set() -> #{i64} {
+    #{}
+}
+fn empty_union() -> #{i64} {
+    empty_set().union(empty_set())
+}.test({
+    // String elements (heap): content dedup, freed cleanly.
+    assert(#{"a", "b"}.union(#{"b", "c"}) == #{"a", "b", "c"});
+    // Union of two empty sets is empty.
+    assert(len(empty_union()) == 0);
+})
+--- performance ---
+allocations: 17
+deallocations: 17
+reallocations: 0
+bytes allocated: 936
+instructions executed: 585
+binary size: 8851
+--- monomorphizations ---
+empty_set
+main

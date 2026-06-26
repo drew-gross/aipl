@@ -1,0 +1,62 @@
+import { wrapping_add as +, ==, len, get, value_or } from builtins;
+
+// Dict values may be any value type: arrays, optionals, structs — and heap
+// strings the dict must free. Keys may be any scalar/str. Exercises the
+// per-pair drop/retain over composite values.
+
+struct Point { x: i64, y: i64 }
+
+fn array_values() -> #{i64: i64[]} {
+    #{1: [10, 20], 2: [30]}
+}.test({
+    let d = array_values();
+    assert(d == #{1: [10, 20], 2: [30]});
+    assert(len(d.get(1).value_or([])) == 2);
+    assert(d.get(1) == some([10, 20]));
+})
+
+fn optional_values() -> #{i64: i64?} {
+    #{1: some(5), 2: none}
+}.test({
+    let d = optional_values();
+    assert(d == #{1: some(5), 2: none});
+    assert(d.get(1) == some(some(5)));
+    assert(d.get(2) == some(none));
+})
+
+fn struct_values() -> #{str: Point} {
+    #{"o": Point { x: 1, y: 2 }}
+}.test({
+    let d = struct_values();
+    assert(d == #{"o": Point { x: 1, y: 2 }});
+    assert(d.get("o") == some(Point { x: 1, y: 2 }));
+})
+
+fn heap_str_values() -> #{str: str} {
+    // Non-static (heap) string keys and values: the dict co-owns and frees them.
+    #{"k" + "1": "a" + "b", "k" + "2": "c" + "d"}
+}.test({
+    let d = heap_str_values();
+    assert(d.get("k1").value_or("?") == "ab");
+    assert(len(d) == 2);
+})
+
+fn char_keys() -> #{char: i64} {
+    #{'a': 1, 'b': 2}
+}.test({
+    assert(char_keys().get('b').value_or(0) == 2);
+    let b = #{true: "yes", false: "no"};
+    assert(b.get(true).value_or("?") == "yes");
+})
+--- performance ---
+allocations: 19
+deallocations: 19
+reallocations: 0
+bytes allocated: 1008
+instructions executed: 1071
+binary size: 15948
+--- monomorphizations ---
+__test$array_values
+__test$optional_values
+main
+optional_values

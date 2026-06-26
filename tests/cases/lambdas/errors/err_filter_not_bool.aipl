@@ -1,0 +1,13 @@
+import { wrapping_add as +, print, to_str, filter } from builtins;
+
+// `filter`'s predicate must return bool.
+fn main() !prints {
+    let xs = [1, 2, 3];
+    print(to_str(xs.filter(|x| x + 1)));
+}
+--- errors ---
+error: lambda body returns i64, but bool was expected
+ --> input:6:32
+  |
+6 |     print(to_str(xs.filter(|x| x + 1)));
+  |                                ^^^^^

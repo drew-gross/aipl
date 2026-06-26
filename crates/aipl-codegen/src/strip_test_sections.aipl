@@ -1,0 +1,61 @@
+import { ==, !=, <, wrapping_add as +, ++, len } from builtins;
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+
+pub fn strip_test_sections(src: str) -> str {
+    // Walk byte-by-byte (`s[i]` / slicing / len are all byte-indexed), tracking
+    // the start of the current line. At each line break, test the line just ended
+    // for a `--- name ---` marker; the first marker line is the cutoff, and we
+    // return everything before it. A trailing `\r` (CRLF) needs no special
+    // handling — `parse_test_section_header` trims it before matching.
+    mut line_start = 0;
+    mut i = 0;
+    while (i < src.len()) {
+        if (src[i] == some('\n')) {
+            if (parse_test_section_header(src[line_start..i]) != none) {
+                return src[..line_start];
+            };
+            set line_start = i + 1;
+        };
+        set i++;
+    }
+    // The final line has no trailing newline. (When `src` ends in `\n`,
+    // `line_start == len` and the trailing empty line is never a marker, so this
+    // returns all of `src`.)
+    if (parse_test_section_header(src[line_start..]) != none) {
+        src[..line_start]
+    } else {
+        src
+    }
+}.doc("""
+Returns the portion of `src` before the first `--- name ---` test-section marker
+line, or all of `src` if there is none. The cases test harness appends
+expected-output sections after the AIPL code with these markers; the compiler
+strips them so `aipl run/ir/build` can be pointed at a fixture directly.
+(`parse_test_section_header` classifies each line.)
+""").test({
+    // No marker: keep everything.
+    assert(strip_test_sections("fn main() {}\n") == "fn main() {}\n");
+    assert(strip_test_sections("") == "");
+    // A marker line cuts there; keep everything before it.
+    assert(strip_test_sections("code\n--- stdout ---\nfoo") == "code\n");
+    assert(strip_test_sections("a\nb\n--- c ---\nd") == "a\nb\n");
+    // A marker as the very first line keeps nothing.
+    assert(strip_test_sections("--- x ---") == "");
+    assert(strip_test_sections("--- x ---\nbody") == "");
+    // CRLF: the `\r` before the newline is trimmed by the marker check.
+    assert(strip_test_sections("a\r\n--- c ---\r\n") == "a\r\n");
+    // A non-marker dashed line (only two dashes) doesn't cut — keep it all.
+    assert(strip_test_sections("-- not a marker --\ncode") == "-- not a marker --\ncode");
+})
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 0
+bytes allocated: 791
+instructions executed: 6931
+binary size: 19436
+--- monomorphizations ---
+__m1__parse_test_section_header
+__test$__m1__parse_test_section_header
+main
+strip_test_sections

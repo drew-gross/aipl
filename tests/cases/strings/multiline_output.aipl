@@ -1,0 +1,19 @@
+import { == } from builtins;
+fn first() -> str { "first" }.test({
+    assert(first() == "first");
+})
+fn second() -> str { "second" }.test({
+    assert(second() == "second");
+})
+fn third() -> str { "third" }.test({
+    assert(third() == "third");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 57
+binary size: 2582
+--- monomorphizations ---
+main

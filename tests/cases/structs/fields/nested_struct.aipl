@@ -1,0 +1,38 @@
+import { wrapping_add as +, -, == } from builtins;
+// A struct field may be another struct, stored inline (no heap pointer). This
+// also exercises a forward reference: `Line` names `Point` before `Point` is
+// declared, so layouts resolve in dependency order, not source order.
+struct Line { start: Point, end: Point }
+struct Point { x: i64, y: i64 }
+
+// Passing a nested struct by value, then reading through the field chain.
+fn dx(l: Line) -> i64 {
+    l.end.x - l.start.x
+}.test({
+    let l = Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 } };
+    assert(l.start.y == 2);        // chained field access
+    assert(dx(l) == 9);            // pass by value
+})
+
+// Returning a nested struct (built from another's fields) via the sret ABI.
+fn shift(l: Line, by: i64) -> Line {
+    Line {
+        start: Point { x: l.start.x + by, y: l.start.y },
+        end: Point { x: l.end.x + by, y: l.end.y },
+    }
+}.test({
+    let l = Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 } };
+    let m = shift(l, 100);
+    assert(m.start.x == 101);      // returned nested struct
+    assert(dx(m) == 9);            // shift preserves width
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 135
+binary size: 2836
+--- monomorphizations ---
+dx
+main

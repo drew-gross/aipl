@@ -1,0 +1,37 @@
+import { split, == } from builtins;
+
+// Regression test for a use-after-free in `mut str` reassignment.
+//
+// `acc` is a non-exclusive string binding (it's initialized from a parameter, so
+// the analysis treats it as aliased) that is reassigned, on each loop iteration,
+// to a slice of *itself* — a buffer-sharing heap view (>7 bytes) — and then read
+// again to compute the next slice. The reassignment goes through the general
+// `set` path (not the in-place `s + r` form).
+//
+// The bug: that path stored the new value into the binding's slot without the
+// slot taking ownership of it, so the value's drop was tracked in the
+// loop-iteration scope. At the iteration's scope exit the value was freed while
+// the slot still pointed at it — a use-after-free read on the next iteration and
+// a double-free at teardown. The fix makes the slot own exactly one reference,
+// released once when the binding goes out of scope. (The fault reliably trips a
+// memory-checking allocator; here we also lock in the correct result.)
+fn shrink(s: str) -> str {
+    mut acc = s;
+    for (let part : s.split(",")) {
+        set acc = acc[0..8]; // self-referential slice -> heap view, reassigned
+    }
+    acc
+}.test({
+    // Three parts -> three iterations; `acc` stays 8 bytes (a heap view) the whole
+    // way, so it never collapses to an inline (non-heap) string.
+    assert(shrink("0123456789,abcdefghij,ABCDEFGHIJ") == "01234567");
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 248
+instructions executed: 106
+binary size: 2742
+--- monomorphizations ---
+main

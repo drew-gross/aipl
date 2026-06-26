@@ -1,0 +1,53 @@
+// `split(s, sep) -> str[]`: the parts of `s` between non-overlapping occurrences
+// of `sep`. Each part is a slice of `s` — a buffer-sharing *view* for a long part
+// (>= 8 bytes), an inline/SSO copy for a short one. Empty parts are kept
+// (leading/trailing/consecutive separators); a missing separator yields one part
+// (the whole string); an empty separator yields `[s]`. Callable free or as a
+// method (`s.split(sep)`).
+import { print, to_str, split, ==, wrapping_add as + } from builtins;
+
+fn main() !prints {
+    print(to_str(split("a,bb,ccc", ",")));            // ["a", "bb", "ccc"]
+    print(to_str(split("a,,b", ",")));                // ["a", "", "b"]  (empty middle)
+    print(to_str(split("a,b,", ",")));                // ["a", "b", ""]  (trailing sep)
+    print(to_str(split("abc", ",")));                 // ["abc"]         (no separator)
+    print(to_str(split("", ",")));                    // [""]            (empty source)
+    print(to_str(split("xyz", "")));                  // ["xyz"]         (empty separator)
+    print(to_str(split("a::b::cee", "::")));          // ["a", "b", "cee"] (multi-char sep)
+    print(to_str(split("name=longvaluehere", "=")));  // ["name", "longvaluehere"] (view part)
+}
+
+// A long part (>= 8 bytes) is a buffer-sharing view, yet still compares equal to a
+// literal by content (str equality materializes views). Counts matching parts.
+fn count_eq(s: str, sep: str, target: str) -> i64 {
+    mut n = 0;
+    for (let p : split(s, sep)) {
+        if (p == target) {
+            set n = n + 1;
+        } else {
+        };
+    }
+    n
+}.test({
+    assert(count_eq("x longpartword y", " ", "longpartword") == 1);
+    assert(count_eq("a,b,c,d,e", ",", "z") == 0);
+    assert(count_eq("k=v=longpartword", "=", "longpartword") == 1);
+})
+--- stdout ---
+["a", "bb", "ccc"]
+["a", "", "b"]
+["a", "b", ""]
+["abc"]
+[""]
+["xyz"]
+["a", "b", "cee"]
+["name", "longvaluehere"]
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 597
+instructions executed: 1536
+binary size: 4992
+--- monomorphizations ---
+main

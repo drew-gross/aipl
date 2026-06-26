@@ -1,0 +1,30 @@
+import { wrapping_add as +, print } from builtins;
+
+// A function with no `-> ty` returns nothing (unit). Its body can be a pure
+// list of statements with no trailing expression — there's no value to yield.
+// Such a function is called for its effects alone.
+fn banner(title: str) !prints {
+    print("== " + title + " ==");
+    print("ready");
+}
+
+fn main() !prints -> i64 {
+    banner("start");
+    banner("again");
+    0
+}
+--- stdout ---
+== start ==
+ready
+== again ==
+ready
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 160
+instructions executed: 51
+binary size: 1408
+--- monomorphizations ---
+banner
+main

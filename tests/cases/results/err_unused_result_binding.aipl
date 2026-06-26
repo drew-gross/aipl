@@ -1,0 +1,17 @@
+import { < } from builtins;
+// Capturing a result in a binding that is then never read still ignores its
+// possible error — also a compile error. The binding must actually be inspected
+// (matched on, propagated with `?`, or otherwise read).
+fn might_fail(n: i64) -> i64!str {
+    if (n < 0) { err("negative") } else { ok(n) }
+}
+
+fn main() {
+    let r = might_fail(5);
+}
+--- errors ---
+error: the result bound to "r" is never used, ignoring its possible error; inspect it with `match` or `?`
+  --> input:10:13
+   |
+10 |     let r = might_fail(5);
+   |             ^^^^^^^^^^^^

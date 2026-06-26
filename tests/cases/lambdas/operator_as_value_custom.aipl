@@ -1,0 +1,28 @@
+// Passing an operator that's aliased to a *user function* (`my_add as +`) as a
+// value works too: the desugared `|lhs, rhs| lhs + rhs` has its `+` dispatched
+// to a call to `my_add`, so `apply(2, 3, +)` runs the custom function (here
+// tagged with +1000 to prove it).
+import { print, to_str } from builtins;
+import { my_custom_add as + } from "./mymath.aipl";
+
+fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 {
+    f(a, b)
+}
+
+fn main() !prints {
+    print(to_str(apply(2, 3, +))); // my_custom_add(2, 3) == 2 + 3 + 1000 == 1005
+}
+--- file: mymath.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
+--- stdout ---
+1005
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 34
+binary size: 1515
+--- monomorphizations ---
+main

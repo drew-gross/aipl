@@ -1,0 +1,11 @@
+import { wrapping_add as + } from builtins;
+
+pub fn add(a: i64, b: i64) -> i64 {
+    a + b
+}.test("should be a block, not a string")
+--- errors ---
+error: `.test` takes a `{ .. }` block, not a string argument
+ --> input:5:3
+  |
+5 | }.test("should be a block, not a string")
+  |   ^^^^

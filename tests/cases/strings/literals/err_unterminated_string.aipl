@@ -1,0 +1,7 @@
+fn f() { "abc }
+--- errors ---
+error: unterminated string literal
+ --> input:1:10
+  |
+1 | fn f() { "abc }
+  |          ^^^^^^

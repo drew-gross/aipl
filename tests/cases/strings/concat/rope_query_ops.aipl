@@ -1,0 +1,30 @@
+import { wrapping_add as +, ==, print, len, to_str, starts_with, ends_with } from builtins;
+// Query operations stream a rope's leaves instead of flattening it: equality,
+// prefix/suffix tests, indexing, and length all run without materializing. So
+// building this 18-byte rope and querying it every which way allocates only the
+// concat node (1) — never a flattened 18-byte buffer (which would be a 2nd).
+fn main() !prints {
+    let r = "Hello, " + "rope world!"; // 18-byte rope; never flattened below
+    print(to_str(r == "Hello, rope world!")); // true  (streamed vs the literal)
+    print(to_str(r == "nope")); // false (length differs — O(1), no scan)
+    print(to_str(r.starts_with("Hello"))); // true
+    print(to_str(r.ends_with("world!"))); // true
+    print(to_str(len(r))); // 18  (stored at the root)
+    print(to_str(r[0] == some('H'))); // true  (indexing walks to the index)
+}
+--- stdout ---
+true
+false
+true
+true
+18
+true
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 255
+binary size: 4470
+--- monomorphizations ---
+main

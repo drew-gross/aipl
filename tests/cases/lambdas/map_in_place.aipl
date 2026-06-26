@@ -1,0 +1,52 @@
+import { wrapping_add as +, *, ==, to_str, map } from builtins;
+
+// When `map` receives a freshly-allocated, uniquely-owned array, it overwrites
+// each slot in place and reuses the same allocation instead of building a new
+// array — provided each mapped `U` fits where a `T` was (`size(U) <= size(T)`)
+// and neither is a composite (optional/struct). For non-composite types that
+// means both are 8-byte (scalars, `str`, arrays), so `T` and `U` may DIFFER;
+// the per-slot element drop-fn is patched from `T`'s to `U`'s as it goes.
+fn doubled(xs: i64[]) -> i64[] {
+    xs.map(|x| x * 2)
+}.test({
+    // T == U (i64): mapped in place.
+    assert([1, 2, 3, 4].map(|x| x * 2) == [2, 4, 6, 8]);
+
+    // Chained: each stage's input is a fresh array, so each maps in place.
+    assert([1, 2, 3].map(|x| x + 1).map(|x| x * x) == [4, 9, 16]);
+
+    // Heap (str) elements, T == U: the old string in each slot is dropped and
+    // the new one stored in place. A leak or double-free would unbalance the
+    // allocation/deallocation counts.
+    assert(["a", "b", "c"].map(|s| s + "!") == ["a!", "b!", "c!"]);
+
+    // A captured variable, in place.
+    let k = 100;
+    assert([1, 2, 3].map(|x| x + k) == [101, 102, 103]);
+
+    // T != U, both 8-byte — also in place. i64 -> str: each scalar slot is
+    // overwritten with a fresh string and the array's element drop-fn is patched
+    // from null (i64) to `str`'s, so the result strings are freed exactly once.
+    assert([1, 2, 3].map(|x| to_str(x)) == ["1", "2", "3"]);
+
+    // str -> bool is NOT in place: a `bool[]` is bit-packed (8 per byte), so it
+    // can't reuse the 8-byte-per-element `str` buffer. Built fresh via the
+    // copying path; still correct, just not in-place.
+    assert(["a", "bb", "a"].map(|s| s == "a") == [true, false, true]);
+})
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 1
+bytes allocated: 817
+instructions executed: 1491
+binary size: 9776
+--- monomorphizations ---
+__map1$own0
+__map10$own0
+__map12$own0
+__map14
+__map3$own0
+__map5$own0
+__map7$own0
+main

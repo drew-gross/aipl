@@ -1,0 +1,24 @@
+import { print, to_str, push } from builtins;
+
+// Allocation accounting doubles as a leak/double-free check: a refcount-correct
+// program frees everything it allocates, so allocations == deallocations. The
+// counts are pinned, so a regression in the refcount protocol (an extra alloc,
+// a missing free, a double-free) shows up here as a mismatch.
+fn main() !prints {
+    mut xs = [];
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+    print(to_str(xs));
+}
+--- stdout ---
+[1, 2, 3]
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 3
+bytes allocated: 58
+instructions executed: 244
+binary size: 3023
+--- monomorphizations ---
+main

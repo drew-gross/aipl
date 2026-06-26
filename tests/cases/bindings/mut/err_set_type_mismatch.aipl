@@ -1,0 +1,11 @@
+fn main() -> i64 {
+    mut s = "hello";
+    set s = 42;
+    0
+}
+--- errors ---
+error: set: expected str, got i64
+ --> input:3:13
+  |
+3 |     set s = 42;
+  |             ^^

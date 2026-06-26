@@ -1,0 +1,8 @@
+// The FFI root file: the API surface a Rust host calls. Its functions are
+// callable by name; they reach helpers in other files through normal `import`s.
+import { square } from "./mathlib.aipl";
+import { wrapping_add as + } from builtins;
+
+pub fn sum_of_squares(a: i64, b: i64) -> i64 {
+    square(a) + square(b)
+}

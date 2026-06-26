@@ -1,0 +1,16 @@
+import { wrapping_add as +, == } from builtins;
+fn lead_empty() -> str { "" + "lone" }.test({
+    assert(lead_empty() == "lone");
+})
+fn trail_empty() -> str { "lone" + "" }.test({
+    assert(trail_empty() == "lone");
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 80
+instructions executed: 53
+binary size: 2881
+--- monomorphizations ---
+main

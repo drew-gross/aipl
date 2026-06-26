@@ -1,0 +1,19 @@
+import { ==, print } from builtins;
+
+// A `str` match is open-domain, so it must end with a `_` default arm.
+fn label(s: str) -> str {
+    match (s) {
+        "a" => "x",
+        "b" => "y",
+    }
+}
+
+fn main() !prints {
+    print(label("a"));
+}
+--- errors ---
+error: non-exhaustive match on a str: add a `_` arm
+ --> input:5:12
+  |
+5 |     match (s) {
+  |            ^^^^

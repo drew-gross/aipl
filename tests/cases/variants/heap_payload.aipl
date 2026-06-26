@@ -1,0 +1,30 @@
+import { wrapping_add as +, ==, to_str } from builtins;
+
+// Variant cases with heap payloads (`str`): construction retains them and the
+// per-variant drop releases only the active case's fields. Used in an array, so
+// a leak or double-free would unbalance the allocation counts.
+variant Json = Null | Num(i64) | Text(str) | Pair(str, i64)
+
+fn describe(j: Json) -> str {
+    match (j) {
+        Null => "null",
+        Num(n) => to_str(n),
+        Text(s) => s,
+        Pair(k, v) => k + "=" + to_str(v),
+    }
+}.test({
+    assert(describe(Num(1)) == "1");
+    assert(describe(Text("hi")) == "hi");
+    assert(describe(Null) == "null");
+    assert(describe(Pair("key", 5)) == "key=5");
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 80
+instructions executed: 217
+binary size: 5115
+--- monomorphizations ---
+describe
+main

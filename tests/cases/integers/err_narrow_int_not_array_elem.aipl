@@ -1,0 +1,11 @@
+// Stage 1: the narrow integer types work as scalar values, but aren't stored in
+// composites (arrays/structs/optionals) yet — that's a later stage.
+fn f(xs: i32[]) -> i64 {
+    0
+}
+
+fn main() {
+    f([]);
+}
+--- errors ---
+error: fn "f": i32 is not yet supported as an array/optional element (only as a scalar value)

@@ -1,0 +1,19 @@
+import { wrapping_add as +, == } from builtins;
+fn count_a(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        let _ = if (c == 'a') { set n = n + 1; 0 } else { 0 };
+    }
+    n
+}.test({
+    assert(count_a("banana") == 3);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 129
+binary size: 1932
+--- monomorphizations ---
+main

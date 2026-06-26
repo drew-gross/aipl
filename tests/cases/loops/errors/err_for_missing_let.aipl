@@ -1,0 +1,7 @@
+fn f() -> i64 { for (c : "x") { 0 } 0 }
+--- errors ---
+error: unexpected 'c'; expected 'let'
+ --> input:1:22
+  |
+1 | fn f() -> i64 { for (c : "x") { 0 } 0 }
+  |                      ^

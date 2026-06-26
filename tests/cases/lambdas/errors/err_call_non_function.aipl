@@ -1,0 +1,11 @@
+// Only a function-typed binding can be called.
+fn main() -> i64 {
+    let x = 5;
+    x(3)
+}
+--- errors ---
+error: "x" is not a function and cannot be called
+ --> input:4:5
+  |
+4 |     x(3)
+  |     ^^^

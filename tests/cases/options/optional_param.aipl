@@ -1,0 +1,19 @@
+import { wrapping_add as +, -, ==, value_or } from builtins;
+// Unwrap optionals with the `value_or` builtin (present → value, else default).
+
+fn pick(x: i64?) -> i64 { x.value_or(-1) }.test({
+    assert(pick(some(42)) == 42);
+    assert(pick(none) == -1);
+    assert(pick(some(42)) + pick(none) == 41);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 88
+binary size: 2360
+--- monomorphizations ---
+__test$pick
+main
+pick

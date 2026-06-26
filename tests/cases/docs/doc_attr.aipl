@@ -1,0 +1,27 @@
+import { wrapping_add as +, ==, - } from builtins;
+
+// `.doc("...")` attaches documentation; it's ignored by run/check/build (only
+// surfaced by `aipl doc`), and composes with `.test({ .. })` in any order.
+pub fn add(a: i64, b: i64) -> i64 {
+    a + b
+}.doc("""
+Adds two integers and returns the sum.
+""").test({
+    assert(add(2, 3) == 5);
+    assert(add(-1, 1) == 0);
+})
+
+// A documented function needs no test.
+pub fn doubled(n: i64) -> i64 {
+    n + n
+}.doc("Returns n + n.")
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 39
+binary size: 1856
+--- monomorphizations ---
+add
+main

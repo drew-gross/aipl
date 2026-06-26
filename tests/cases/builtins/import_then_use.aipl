@@ -1,0 +1,20 @@
+import { ==, len, push } from builtins;
+// Builtins are usable once imported, with the same `import { .. }`
+// syntax as files — just `from builtins` instead of a path.
+
+fn pushed_len() -> i64 {
+    mut xs = [1, 2];
+    xs.push(3);
+    len(xs)
+}.test({
+    assert(pushed_len() == 3);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 1
+bytes allocated: 48
+instructions executed: 47
+binary size: 2097
+--- monomorphizations ---
+main

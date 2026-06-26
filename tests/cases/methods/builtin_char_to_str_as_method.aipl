@@ -1,0 +1,17 @@
+import { print, to_str } from builtins;
+
+fn main() !prints -> i64 {
+    'X'.to_str().print();
+    0
+}
+--- stdout ---
+'X'
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 39
+binary size: 1275
+--- monomorphizations ---
+main

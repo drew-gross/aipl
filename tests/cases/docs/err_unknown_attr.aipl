@@ -1,0 +1,11 @@
+import { wrapping_add as + } from builtins;
+
+pub fn add(a: i64, b: i64) -> i64 {
+    a + b
+}.note("not a real attribute")
+--- errors ---
+error: unknown function attribute "note"; only `.test({ .. })` and `.doc("..")` are supported
+ --> input:5:3
+  |
+5 | }.note("not a real attribute")
+  |   ^^^^

@@ -1,0 +1,14 @@
+import { len } from builtins;
+
+fn len(x: i64) -> i64 {
+    x
+}
+fn main() -> i64 {
+    0
+}
+--- errors ---
+error: err_import_conflicts_with_local.aipl: builtin import "len" conflicts with a local item
+ --> input:1:10
+  |
+1 | import { len } from builtins;
+  |          ^^^

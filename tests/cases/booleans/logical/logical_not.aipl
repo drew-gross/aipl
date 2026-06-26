@@ -1,0 +1,15 @@
+import { ==, ! } from builtins;
+fn not(x: bool) -> bool { !x }.test({
+    assert(not(true) == false);
+    assert(not(false) == true);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 36
+binary size: 1846
+--- monomorphizations ---
+main
+not

@@ -1,0 +1,22 @@
+import { == } from builtins;
+// A triple-quoted raw string trims one surrounding newline and de-dents its
+// contents, so this is exactly equal to "This is\na raw\nstring". The closing
+// `"""` is indented; its line contributes no trailing newline.
+fn raw() -> str {
+    """
+       This is
+       a raw
+       string
+    """
+}.test({
+    assert(raw() == "This is\na raw\nstring");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 25
+binary size: 2116
+--- monomorphizations ---
+main

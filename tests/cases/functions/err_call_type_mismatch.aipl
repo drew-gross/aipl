@@ -1,0 +1,11 @@
+struct Point { x: i64, y: i64 }
+
+fn use_point(p: Point) -> i64 { p.x }
+
+fn main() -> i64 { use_point(5) }
+--- errors ---
+error: fn "use_point" arg 0: expected Point, got i64
+ --> input:5:30
+  |
+5 | fn main() -> i64 { use_point(5) }
+  |                              ^

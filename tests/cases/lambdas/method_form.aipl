@@ -1,0 +1,31 @@
+import { wrapping_add as +, ==, to_str, push } from builtins;
+
+// A higher-order *method*: its first parameter is `self`, so it's callable as
+// `xs.tag(..)`. Method-call form is specialized for the lambda just like the
+// function-call form (the receiver becomes the leading `self` argument).
+fn tag(self: i64[], f: (i64) -> str) -> str[] {
+    mut out = [];
+    for (let x : self) {
+        out.push(f(x));
+    }
+    out
+}.test({
+    let xs = [1, 2, 3];
+    assert(tag(xs, |x| to_str(x)) == ["1", "2", "3"]);  // function-call form
+    assert(xs.tag(|x| to_str(x)) == ["1", "2", "3"]);   // method-call form
+    // A capture works in method form too.
+    let suffix = 100;
+    assert(xs.tag(|x| to_str(x + suffix)) == ["101", "102", "103"]);
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 9
+bytes allocated: 320
+instructions executed: 764
+binary size: 6279
+--- monomorphizations ---
+main
+tag$lam1
+tag$lam3
+tag$lam6

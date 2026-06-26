@@ -1,0 +1,20 @@
+import { print, to_str } from builtins;
+
+// A duplicate array-literal arm is dead code under exact matching.
+fn code(xs: i64[]) -> i64 {
+    match (xs) {
+        [1, 2] => 1,
+        [1, 2] => 2,
+        _ => 0,
+    }
+}
+
+fn main() !prints {
+    print(to_str(code([1, 2])));
+}
+--- errors ---
+error: duplicate match arm
+ --> input:7:9
+  |
+7 |         [1, 2] => 2,
+  |         ^

@@ -1,0 +1,16 @@
+import { wrapping_add as +, -, == } from builtins;
+fn add(x: i64, y: i64) -> i64 { x + y }.test({
+    assert(add(1, 2) == 3);
+    assert(add(-5, 10) == 5);
+    assert(add(1, 2) + add(-5, 10) == 8);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 60
+binary size: 2214
+--- monomorphizations ---
+add
+main

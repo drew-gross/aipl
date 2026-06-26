@@ -1,0 +1,2649 @@
+//! AIPL lexer and parser: the gazelle grammar, the tokenizer, and the
+//! human-friendly rendering of syntax errors. Produces an [`aipl_syntax::ast`]
+//! tree from source text.
+
+use gazelle::lexer::Scanner;
+use gazelle::Precedence;
+use gazelle_macros::gazelle;
+
+use aipl_syntax::{unit_ty, Error, Span};
+
+use aipl_syntax::ast::{
+    Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item,
+    LambdaParam, MatchArm, Param, Pattern, Primitive, Program, StructDecl, Type, VariantCase,
+    VariantDecl,
+};
+
+gazelle! {
+    grammar aipl {
+        start program;
+        terminals {
+            // Identifiers and literals carry source spans alongside their values.
+            IDENT: _,
+            NUM: _,
+            STR: _,
+            CHAR: _,
+            TRUE: _,
+            FALSE: _,
+            // Keywords (no value)
+            FN, IF, ELSE, STRUCT, VARIANT, IMPORT, FROM, AS, PUB, LET, FOR, WHILE, MUT, SET, MATCH,
+            RETURN,
+            // `builtins` keyword for `from builtins` imports; carries a
+            // span so the loader can point errors at it.
+            BUILTINS: _,
+            // `none` carries a span so we can point at it on type errors.
+            NONE: _,
+            // Punctuation
+            LPAREN, RPAREN,
+            LBRACE, RBRACE,
+            // `[` carries a span (see lexer) so empty array literals can
+            // still be located in diagnostics; `]` carries nothing.
+            LBRACKET: _,
+            RBRACKET,
+            // `#` leads a set literal `#{ .. }`; carries a span so an empty
+            // `#{}` still has a location for diagnostics (like `[`).
+            HASH: _,
+            COMMA, COLON, ARROW, DOT, DOTDOT, SEMI, EQ, QUESTION, FATARROW,
+            BANG,
+            // `++` — the increment statement `set n++;`. Carries a span so the
+            // `+ 1` it desugars to (and the `+` import error it can raise) point
+            // at the operator.
+            PLUSPLUS: _,
+            // `|` — surrounds a lambda's parameter list (`|x| body`). Carries a
+            // span for the lambda's start. (`||` is logical-or, lexed separately.)
+            PIPE: _,
+            // Operators with runtime precedence
+            prec MINUS,
+            prec OP: _,
+            // `<` / `>` serve double duty: comparison operators (with
+            // precedence) and the brackets around generic type params
+            // (`fn f<T: any>`). The grammar position disambiguates.
+            prec LANGLE,
+            prec RANGLE,
+            // `||` serves double duty too: infix logical-or inside an
+            // expression, and the lead of a no-argument lambda (`|| body`) in
+            // argument position, where infix-or is impossible. Position
+            // disambiguates — exactly like `<`.
+            prec OROR
+        }
+
+        program = item* => program;
+
+        item = function => function | struct_decl => struct_decl
+             | variant_decl => variant_decl | import_decl => import_decl;
+
+        import_decl = IMPORT LBRACE import_names RBRACE FROM STR SEMI => import
+                    | IMPORT LBRACE import_names RBRACE FROM BUILTINS SEMI => import_builtins;
+        // A name, an aliased name, or an operator spelling (operators must be
+        // imported from builtins to be used — see the loader's gating).
+        import_name = IDENT => plain
+                    | IDENT AS IDENT => aliased
+                    // A named builtin aliased to an operator: `wrapping_add as +`.
+                    | IDENT AS OP => aliased_op
+                    | IDENT AS MINUS => aliased_minus
+                    | IDENT AS LANGLE => aliased_lt
+                    | IDENT AS RANGLE => aliased_gt
+                    | IDENT AS OROR => aliased_or
+                    | IDENT AS BANG => aliased_bang
+                    | OP => op
+                    | MINUS => op_minus
+                    | LANGLE => op_lt
+                    | RANGLE => op_gt
+                    | OROR => op_or
+                    | BANG => op_bang
+                    | PLUSPLUS => op_plusplus;
+        import_names = import_name_list => present
+                     | import_name_list COMMA => present_trailing
+                     | _ => empty;
+        import_name_list = import_name => first | import_name_list COMMA import_name => rest;
+
+        // An optional `pub` marks the function importable by other files; its
+        // absence makes it file-private (importing it is a loader error).
+        vis = PUB => public | _ => private;
+        function = vis FN IDENT type_params LPAREN params RPAREN effects return_ty block fn_attrs => function;
+        // Zero or more attributes attached to a function, in any order:
+        // `.test({ .. })` (a test block the `check` command runs) and
+        // `.doc("...")` (documentation surfaced by the `doc` command). The two
+        // forms are distinguished by their argument — a `block` (`{ .. }`) vs a
+        // `STR` — and the IDENT (`test`/`doc`) is validated in the build action.
+        // `FOLLOW(function)` is item-leading keywords or EOF, none of which is
+        // `.`, so the (repeatable) suffix is unambiguous.
+        fn_attrs = fn_attr_list => present | _ => empty;
+        fn_attr_list = fn_attr => first | fn_attr_list fn_attr => rest;
+        fn_attr = DOT IDENT LPAREN block RPAREN => test
+                | DOT IDENT LPAREN STR RPAREN => doc;
+        // Optional `<T: any, U: any>` generic parameter list. The bound is
+        // required syntactically (only `any` is meaningful).
+        type_params = LANGLE type_param_list RANGLE => present | _ => empty;
+        type_param_list = type_param => first | type_param_list COMMA type_param => rest;
+        type_param = IDENT COLON IDENT => type_param;
+
+        effects = effect_list => present | _ => empty;
+        effect_list = effect => first | effect_list effect => rest;
+        effect = BANG IDENT => effect;
+
+        struct_decl = STRUCT IDENT LBRACE fields RBRACE => struct_decl;
+
+        // `variant Shape = Circle(i64) | Rect(i64, i64) | Empty` — a sum type.
+        // Cases are `|`-separated; each is a bare name (nullary) or a name with
+        // a parenthesized positional payload. No terminator: the next item's
+        // leading keyword ends the case list (only `|` continues it).
+        variant_decl = VARIANT IDENT EQ variant_cases => variant_decl;
+        variant_cases = variant_case => first
+                      | variant_cases PIPE variant_case => rest;
+        variant_case = IDENT => nullary
+                     | IDENT LPAREN ty_arg_list RPAREN => with_payload;
+
+        fields = field_decl_list => present
+               | field_decl_list COMMA => present_trailing
+               | _ => empty;
+        field_decl_list = field_decl => first | field_decl_list COMMA field_decl => rest;
+        field_decl = IDENT COLON ty => field_decl;
+
+        params = param_list => present
+               | param_list COMMA => present_trailing
+               | _ => empty;
+        param_list = param => first | param_list COMMA param => rest;
+
+        // `mut self: T` marks a mutating receiver (see codegen): the function
+        // mutates its first parameter and returns nothing.
+        // `x: T*` marks a variadic ("zero or more") parameter — the trailing
+        // `OP` must be `*` (validated in the build action). The only operator
+        // that can follow a complete `ty` in parameter position is this marker,
+        // so there's no conflict with expression operators.
+        param = IDENT COLON ty => param
+              | MUT IDENT COLON ty => mut_param
+              | IDENT COLON ty OP => variadic_param;
+
+        return_ty = ARROW ty => present | _ => absent;
+
+        // Recursive so types nest arbitrarily: `str[]?`, `str[][]`,
+        // `i64?[]`, etc. Left-recursive postfix `?`/`[]` (LR handles it).
+        // A function type `(A, B) -> R` (a lambda-parameter type) or a base
+        // type. Postfix `?`/`[]` apply only to base types — a function type
+        // can't be made optional or arrayed — so they live on `base_ty`, which
+        // keeps the two from conflicting. The return `ty` is recursive, so
+        // `(A) -> (B) -> C` curries (right-associative).
+        ty = base_ty => base
+           // `T!E` — a result type. `!` is unused in type position (it's
+           // `!expr`/`!=`/`!effect` only elsewhere), and both operands are a
+           // `base_ty`, so there's no chaining/recursion ambiguity: after a
+           // `base_ty`, one token of lookahead (`!` vs FOLLOW(ty)) decides.
+           | base_ty BANG base_ty => result
+           // `!E` — a "void with result" type: a result whose Ok side is unit
+           // (success carries no value). A leading `!` only starts this in type
+           // position, so it doesn't conflict with the `base_ty BANG` form.
+           | BANG base_ty => result_void
+           | LPAREN ty_args RPAREN ARROW ty => fn_ty;
+        base_ty = IDENT => named
+                | base_ty QUESTION => optional
+                | base_ty LBRACKET RBRACKET => array
+                // `#{T}` — a set type. The leading `#` (same sigil as the
+                // `#{..}` set literal) keeps it from colliding with a brace
+                // block (e.g. a function body after `-> #{i64}`).
+                | HASH LBRACE ty RBRACE => set
+                // `#{K: V}` — a dict type. After `HASH LBRACE ty`, a single
+                // token of lookahead (`RBRACE` → set, `COLON` → dict) picks the
+                // production, so the two never conflict.
+                | HASH LBRACE ty COLON ty RBRACE => dict;
+        // Argument types of a function type. Empty for `() -> R`.
+        ty_args = ty_arg_list => present | _ => empty;
+        ty_arg_list = ty => first | ty_arg_list COMMA ty => rest;
+
+        // A value block: a run of statements followed by an optional trailing
+        // expression (its value; absent → unit). Written right-recursively so
+        // `expr` appears *exactly once* in the block grammar (`block_body`):
+        // the parser parses one expression and only then — via the tiny
+        // `block_tail` — decides whether a `;` made it a discarded statement or
+        // its absence made it the block's value. Having `expr` reachable from
+        // two productions (a trailing value *and* a separate `expr;` statement)
+        // is what made gazelle's LR tables explode.
+        block = LBRACE block_body RBRACE => block;
+        block_body = _ => empty
+                   | expr block_tail => head_expr
+                   | kw_stmt block_body => head_stmt;
+        // What follows a leading expression in a block: nothing (the expr is
+        // the block's value) or `; rest` (discard the expr, continue).
+        block_tail = _ => value
+                   | SEMI block_body => discard;
+        // A loop body is statements only — a bare trailing expression is a
+        // parse error (its value could never be observed) — so every
+        // expression in it must be an `expr;` statement.
+        loop_body = LBRACE loop_inner RBRACE => loop_body;
+        loop_inner = _ => empty
+                   | expr SEMI loop_inner => expr_seq
+                   | kw_stmt loop_inner => stmt_seq;
+        // Statements that don't begin with an expression — keyword- or
+        // `for`-led, so their FIRST sets stay disjoint from `expr` and the
+        // block/loop choice is a single-token decision.
+        kw_stmt = let_stmt => let_stmt
+                | mut_stmt => mut_stmt
+                | assign_stmt => assign_stmt
+                | for_stmt => for_stmt
+                | while_stmt => while_stmt
+                | return_stmt => return_stmt;
+        let_stmt = LET IDENT EQ expr SEMI => let_stmt;
+        // `return value;` — early-return. A statement (keyword-led, so its FIRST
+        // set stays disjoint from `expr`); control never falls through it.
+        return_stmt = RETURN expr SEMI => return_stmt;
+        mut_stmt = MUT IDENT EQ expr SEMI => mut_stmt;
+        // `set n = expr;` stores to a mut binding; `set n++;` is sugar for
+        // `set n = n + 1;` (so it desugars to a `+`/`wrapping_add` use and is
+        // gated on importing `+` like any other operator).
+        assign_stmt = SET IDENT EQ expr SEMI => assign_stmt
+                    | SET IDENT PLUSPLUS SEMI => incr_stmt;
+        for_stmt = FOR LPAREN LET IDENT COLON expr RPAREN loop_body => for_stmt;
+        while_stmt = WHILE LPAREN expr RPAREN loop_body => while_stmt;
+
+        expr = term => term | expr binop expr => binop;
+        binop = OP => op | MINUS => minus | LANGLE => lt | RANGLE => gt | OROR => or;
+
+        term = unary => unary;
+
+        unary = MINUS unary => neg | BANG unary => not | postfix => postfix;
+
+        postfix = atom => atom
+                | postfix DOT IDENT => field_access
+                | postfix DOT IDENT LPAREN args RPAREN => method_call
+                | postfix LBRACKET expr RBRACKET => index
+                // `recv[start..end]` — string slice. The `..` (DOTDOT) after the
+                // first `expr` distinguishes it from a plain index on one token.
+                | postfix LBRACKET expr DOTDOT expr RBRACKET => slice
+                // `recv[start..]` — open-ended slice (to the receiver's length).
+                | postfix LBRACKET expr DOTDOT RBRACKET => slice_open
+                // `recv[..end]` — open *start* (from 0 to `end`). The `..`
+                // immediately after `[` distinguishes it from the other forms.
+                | postfix LBRACKET DOTDOT expr RBRACKET => slice_to
+                // `expr?` — error propagation. `?` (QUESTION) is the optional
+                // *type* postfix elsewhere, but that's type position; here in
+                // expression position it's the try operator.
+                | postfix QUESTION => try_op;
+
+        atom = NUM => num
+             | TRUE => true_lit
+             | FALSE => false_lit
+             | STR => string_lit
+             | CHAR => char_lit
+             | IDENT => ident
+             | IDENT LPAREN args RPAREN => call
+             | IDENT LBRACE field_inits RBRACE => construct
+             | LPAREN expr RPAREN => paren
+             | IF LPAREN expr RPAREN block ELSE block => if_else
+             // Else-less `if` (statement position): yields unit, so its `then`
+             // block must be unit-typed. Desugars to `if .. {} else {}`.
+             | IF LPAREN expr RPAREN block => if_no_else
+             | NONE => none_lit
+             | MATCH LPAREN expr RPAREN LBRACE match_arms RBRACE => match_expr
+             | LBRACKET args RBRACKET => array_lit
+             | HASH LBRACE brace_body RBRACE => brace_lit;
+
+        // `#{ .. }` is a set literal (`#{a, b}`), a dict literal (`#{k: v}`), or
+        // an empty of either (`#{}` set, `#{:}` dict). One production handles
+        // all four so `expr` is reachable from a *single* place under the
+        // brace — having `expr` reachable two ways is what blew up the LR tables
+        // for the block grammar. Each entry is a key with an optional `: value`;
+        // the builder rejects a set/dict mix and chooses the literal kind.
+        brace_body = entry_list => entries
+                   | entry_list COMMA => entries_trailing
+                   | COLON => empty_dict
+                   | _ => empty_set;
+        entry_list = entry => first | entry_list COMMA entry => rest;
+        // `expr COLON expr` vs `expr` diverge on a single lookahead token
+        // (`COLON` → key/value, else → key-only), an LR(1) shift-reduce choice.
+        entry = expr => key_only | expr COLON expr => key_value;
+
+        // A trailing comma after the last arm is optional.
+        match_arms = match_arm_list => present
+                   | match_arm_list COMMA => present_trailing
+                   | _ => empty;
+        match_arm_list = match_arm => first | match_arm_list COMMA match_arm => rest;
+        // Uniform constructor patterns: `Ctor(b0, b1, ...) => body`, a nullary
+        // `Ctor => body`, or `none => body`. The scrutinee's type (optional vs
+        // variant) decides which `ctor` names are legal (checked downstream). A
+        // string-literal arm `"foo" => body` matches a `str` scrutinee; the
+        // wildcard `_ => body` arrives as a `nullary_arm` (since `_` lexes as an
+        // identifier) and is recognized downstream.
+        match_arm = IDENT LPAREN match_bindings RPAREN FATARROW expr => ctor_arm
+                  | IDENT FATARROW expr => nullary_arm
+                  | NONE FATARROW expr => none_arm
+                  | STR FATARROW expr => str_arm
+                  | LBRACKET args RBRACKET FATARROW expr => array_arm;
+        match_bindings = binding_list => present;
+        binding_list = IDENT => first | binding_list COMMA IDENT => rest;
+
+        args = arg_list => present
+             | arg_list COMMA => present_trailing
+             | _ => empty;
+        arg_list = arg => first | arg_list COMMA arg => rest;
+        // An argument is an ordinary expression, a lambda, or a bare operator
+        // passed as a value (`apply(2, 3, +)`). All three are confined to
+        // argument position (a lambda's/operator-value's only valid use), which
+        // keeps the expression grammar — and its operator precedence —
+        // untouched. An `OP`-token operator can't begin any other arg form, so
+        // it's unambiguous here; it desugars to a binary lambda.
+        arg = expr => expr | lambda => lambda | OP => op_value;
+        lambda = PIPE lambda_params PIPE expr => lambda_expr
+               | PIPE lambda_params PIPE block => lambda_block
+               | OROR expr => lambda_noargs
+               | OROR block => lambda_noargs_block;
+        lambda_params = lambda_param_list => present | _ => empty;
+        lambda_param_list = lambda_param => first
+                          | lambda_param_list COMMA lambda_param => rest;
+        lambda_param = IDENT => untyped | IDENT COLON ty => typed;
+
+        field_inits = field_init_list => present
+                    | field_init_list COMMA => present_trailing
+                    | _ => empty;
+        field_init_list = field_init => first | field_init_list COMMA field_init => rest;
+        field_init = IDENT COLON expr => field_init;
+    }
+}
+
+pub struct Build;
+
+impl gazelle::ErrorType for Build {
+    // A few productions are intentionally permissive (e.g. `#{ .. }` accepts a
+    // mix of set elements and `key: value` pairs) and reject the bad shape in
+    // the build action, so build is fallible.
+    type Error = Error;
+}
+
+/// One `#{ .. }` entry as parsed: a bare key (a set element) or a `key: value`
+/// (a dict pair). The builder collects these, rejects a set/dict mix, and emits
+/// a `SetLit` or `DictLit`.
+pub enum BraceEntry {
+    KeyOnly(Expr),
+    KeyValue(Expr, Expr),
+}
+
+/// The parsed body of a `#{ .. }`: a list of entries (set or dict, decided by
+/// their kind), or one of the two empties (`#{}` set, `#{:}` dict).
+pub enum BraceLit {
+    Entries(Vec<BraceEntry>),
+    EmptyDict,
+    EmptySet,
+}
+
+impl aipl::Types for Build {
+    type Ident = (String, Span);
+    type Num = (i64, Span);
+    type Str = (String, Span);
+    type Char = (u8, Span);
+    type True = Span;
+    type False = Span;
+    type None = Span;
+    type Lbracket = Span;
+    type Plusplus = Span;
+    type Hash = Span;
+    type Builtins = Span;
+    type Op = (char, Span);
+    type Binop = char;
+    type Term = Expr;
+    type Expr = Expr;
+    type Ty = Type;
+    type Param = Param;
+    type ParamList = Vec<Param>;
+    type Params = Vec<Param>;
+    type BaseTy = Type;
+    type ReturnTy = Option<Type>;
+    type FnAttr = ParsedAttr;
+    type FnAttrList = Vec<ParsedAttr>;
+    type FnAttrs = Vec<ParsedAttr>;
+    type TypeParams = Vec<String>;
+    type TypeParamList = Vec<String>;
+    type TypeParam = String;
+    type Block = Expr;
+    type LoopBody = Expr;
+    type Function = Function;
+    type Item = Item;
+    type Program = Program;
+    type Args = Vec<Expr>;
+    type ArgList = Vec<Expr>;
+    type Arg = Expr;
+    type BraceBody = BraceLit;
+    type EntryList = Vec<BraceEntry>;
+    type Entry = BraceEntry;
+    type Lambda = Expr;
+    type LambdaParams = Vec<LambdaParam>;
+    type LambdaParamList = Vec<LambdaParam>;
+    type LambdaParam = LambdaParam;
+    type Pipe = Span;
+    type TyArgs = Vec<Type>;
+    type TyArgList = Vec<Type>;
+    type Unary = Expr;
+    type Postfix = Expr;
+    type Atom = Expr;
+    type StructDecl = StructDecl;
+    type VariantDecl = VariantDecl;
+    type VariantCases = Vec<VariantCase>;
+    type VariantCase = VariantCase;
+    type MatchBindings = Vec<String>;
+    type BindingList = Vec<String>;
+    type FieldDecl = FieldDecl;
+    type FieldDeclList = Vec<FieldDecl>;
+    type Fields = Vec<FieldDecl>;
+    type FieldInit = FieldInit;
+    type FieldInitList = Vec<FieldInit>;
+    type FieldInits = Vec<FieldInit>;
+    type Effect = String;
+    type EffectList = Vec<String>;
+    type Effects = Vec<String>;
+    type Vis = bool;
+    type ImportDecl = ImportDecl;
+    type ImportName = ImportName;
+    type ImportNameList = Vec<ImportName>;
+    type ImportNames = Vec<ImportName>;
+    type MatchArm = MatchArm;
+    type MatchArmList = Vec<MatchArm>;
+    type MatchArms = Vec<MatchArm>;
+    type BlockBody = Expr;
+    type BlockTail = BlockTail;
+    type LoopInner = Expr;
+    type KwStmt = StmtSpec;
+    type LetStmt = StmtSpec;
+    type MutStmt = StmtSpec;
+    type AssignStmt = StmtSpec;
+    type ForStmt = StmtSpec;
+    type WhileStmt = StmtSpec;
+    type ReturnStmt = StmtSpec;
+}
+
+/// A block-body statement, in the form the block-builder needs to fold
+/// it into the enclosing expression chain.
+pub enum StmtSpec {
+    Let {
+        name: String,
+        name_span: Span,
+        value: Expr,
+        span: Span,
+    },
+    Mut {
+        name: String,
+        name_span: Span,
+        value: Expr,
+        span: Span,
+    },
+    Assign {
+        name: String,
+        name_span: Span,
+        value: Expr,
+        span: Span,
+    },
+    For {
+        var: String,
+        var_span: Span,
+        iterable: Expr,
+        body: Expr,
+        span: Span,
+    },
+    While {
+        cond: Expr,
+        body: Expr,
+        span: Span,
+    },
+    Return {
+        value: Expr,
+        span: Span,
+    },
+}
+
+/// What follows the leading expression of a `block_body`: either the
+/// expression *is* the block's trailing value, or a `;` discards it and the
+/// rest of the block follows.
+pub enum BlockTail {
+    /// No `;` — the preceding expression is the block's value.
+    Value,
+    /// `; <rest>` — discard the preceding expression; `rest` is the folded
+    /// remainder of the block.
+    Discard(Expr),
+}
+
+impl gazelle::Action<aipl::Program<Self>> for Build {
+    fn build(&mut self, node: aipl::Program<Self>) -> Result<Program, Self::Error> {
+        let aipl::Program::Program(items) = node;
+        Ok(Program { items })
+    }
+}
+
+impl gazelle::Action<aipl::Item<Self>> for Build {
+    fn build(&mut self, node: aipl::Item<Self>) -> Result<Item, Self::Error> {
+        Ok(match node {
+            aipl::Item::Function(f) => Item::Fn(f),
+            aipl::Item::StructDecl(s) => Item::Struct(s),
+            aipl::Item::VariantDecl(v) => Item::Variant(v),
+            aipl::Item::ImportDecl(i) => Item::Import(i),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ImportDecl<Self>> for Build {
+    fn build(&mut self, node: aipl::ImportDecl<Self>) -> Result<ImportDecl, Self::Error> {
+        Ok(match node {
+            aipl::ImportDecl::Import(names, (from, from_span)) => ImportDecl {
+                names,
+                source: ImportSource::Path {
+                    path: from,
+                    span: from_span,
+                },
+            },
+            aipl::ImportDecl::ImportBuiltins(names, builtins_span) => ImportDecl {
+                names,
+                source: ImportSource::Builtins {
+                    span: builtins_span,
+                },
+            },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ImportName<Self>> for Build {
+    fn build(&mut self, node: aipl::ImportName<Self>) -> Result<ImportName, Self::Error> {
+        Ok(match node {
+            aipl::ImportName::Plain((name, span)) => ImportName {
+                name,
+                alias: None,
+                span,
+            },
+            // `name as alias`: the span covers the exported name (where an
+            // "is not exported" error should point).
+            aipl::ImportName::Aliased((name, span), (alias, _)) => ImportName {
+                name,
+                alias: Some(alias),
+                span,
+            },
+            // A named builtin aliased to an operator (`wrapping_add as +`): the
+            // name carries the span; the operator is the local alias.
+            aipl::ImportName::AliasedOp((name, span), (c, _)) => {
+                name_as_op(name, span, op_spelling(c))
+            }
+            aipl::ImportName::AliasedMinus((name, span)) => name_as_op(name, span, "-"),
+            aipl::ImportName::AliasedLt((name, span)) => name_as_op(name, span, "<"),
+            aipl::ImportName::AliasedGt((name, span)) => name_as_op(name, span, ">"),
+            aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
+            aipl::ImportName::AliasedBang((name, span)) => name_as_op(name, span, "!"),
+            // Operator imports (`import { ==, < } from builtins`). The `OP`
+            // span isn't needed here — operator imports rarely conflict, and the
+            // "not imported" error points at the use site — so a dummy keeps all
+            // operator-import variants (the spanless `-`/`<`/… below) uniform.
+            aipl::ImportName::Op((c, _)) => op_import(op_spelling(c)),
+            aipl::ImportName::OpMinus => op_import("-"),
+            aipl::ImportName::OpLt => op_import("<"),
+            aipl::ImportName::OpGt => op_import(">"),
+            aipl::ImportName::OpOr => op_import("||"),
+            aipl::ImportName::OpBang => op_import("!"),
+            // `import { ++ } from builtins;` — the increment operator. Imported
+            // on its own spelling (not via `+`); the span is unused like the
+            // other bare operators.
+            aipl::ImportName::OpPlusplus(_) => op_import("++"),
+        })
+    }
+}
+
+/// An `ImportName` for an operator (no source span — operator tokens carry none).
+fn op_import(spelling: &str) -> ImportName {
+    ImportName {
+        name: spelling.to_string(),
+        alias: None,
+        span: Span::new(0, 0),
+    }
+}
+
+/// An `ImportName` binding builtin `name` to operator `op` (`name as op`).
+fn name_as_op(name: String, span: Span, op: &str) -> ImportName {
+    ImportName {
+        name,
+        alias: Some(op.to_string()),
+        span,
+    }
+}
+
+/// The spelling of an `OP`-token operator char (e.g. `'E'` → `"=="`).
+fn op_spelling(c: char) -> &'static str {
+    match c {
+        '+' => "+",
+        '*' => "*",
+        '/' => "/",
+        '%' => "%",
+        'E' => "==",
+        'N' => "!=",
+        'L' => "<=",
+        'G' => ">=",
+        'A' => "&&",
+        other => unreachable!("unexpected OP char {other:?} in import"),
+    }
+}
+
+impl gazelle::Action<aipl::ImportNames<Self>> for Build {
+    fn build(&mut self, node: aipl::ImportNames<Self>) -> Result<Vec<ImportName>, Self::Error> {
+        Ok(match node {
+            aipl::ImportNames::Present(list) | aipl::ImportNames::PresentTrailing(list) => list,
+            aipl::ImportNames::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ImportNameList<Self>> for Build {
+    fn build(&mut self, node: aipl::ImportNameList<Self>) -> Result<Vec<ImportName>, Self::Error> {
+        Ok(match node {
+            aipl::ImportNameList::First(name) => vec![name],
+            aipl::ImportNameList::Rest(mut prev, name) => {
+                prev.push(name);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::StructDecl<Self>> for Build {
+    fn build(&mut self, node: aipl::StructDecl<Self>) -> Result<StructDecl, Self::Error> {
+        let aipl::StructDecl::StructDecl((name, _), fields) = node;
+        Ok(StructDecl { name, fields })
+    }
+}
+
+impl gazelle::Action<aipl::VariantDecl<Self>> for Build {
+    fn build(&mut self, node: aipl::VariantDecl<Self>) -> Result<VariantDecl, Self::Error> {
+        let aipl::VariantDecl::VariantDecl((name, _), cases) = node;
+        Ok(VariantDecl { name, cases })
+    }
+}
+
+impl gazelle::Action<aipl::VariantCases<Self>> for Build {
+    fn build(&mut self, node: aipl::VariantCases<Self>) -> Result<Vec<VariantCase>, Self::Error> {
+        Ok(match node {
+            aipl::VariantCases::First(c) => vec![c],
+            aipl::VariantCases::Rest(mut prev, _pipe, c) => {
+                prev.push(c);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::VariantCase<Self>> for Build {
+    fn build(&mut self, node: aipl::VariantCase<Self>) -> Result<VariantCase, Self::Error> {
+        Ok(match node {
+            aipl::VariantCase::Nullary((name, _)) => VariantCase {
+                name,
+                payload: Vec::new(),
+            },
+            aipl::VariantCase::WithPayload((name, _), payload) => VariantCase { name, payload },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Fields<Self>> for Build {
+    fn build(&mut self, node: aipl::Fields<Self>) -> Result<Vec<FieldDecl>, Self::Error> {
+        Ok(match node {
+            aipl::Fields::Present(list) | aipl::Fields::PresentTrailing(list) => list,
+            aipl::Fields::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FieldDeclList<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldDeclList<Self>) -> Result<Vec<FieldDecl>, Self::Error> {
+        Ok(match node {
+            aipl::FieldDeclList::First(f) => vec![f],
+            aipl::FieldDeclList::Rest(mut prev, f) => {
+                prev.push(f);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FieldDecl<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldDecl<Self>) -> Result<FieldDecl, Self::Error> {
+        let aipl::FieldDecl::FieldDecl((name, _), ty) = node;
+        Ok(FieldDecl { name, ty })
+    }
+}
+
+impl gazelle::Action<aipl::FieldInits<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldInits<Self>) -> Result<Vec<FieldInit>, Self::Error> {
+        Ok(match node {
+            aipl::FieldInits::Present(list) | aipl::FieldInits::PresentTrailing(list) => list,
+            aipl::FieldInits::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FieldInitList<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldInitList<Self>) -> Result<Vec<FieldInit>, Self::Error> {
+        Ok(match node {
+            aipl::FieldInitList::First(fi) => vec![fi],
+            aipl::FieldInitList::Rest(mut prev, fi) => {
+                prev.push(fi);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FieldInit<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldInit<Self>) -> Result<FieldInit, Self::Error> {
+        let aipl::FieldInit::FieldInit((name, _), value) = node;
+        Ok(FieldInit { name, value })
+    }
+}
+
+/// A parsed function attribute (`.test({ .. })` or `.doc("...")`), carrying the
+/// attribute name's span for duplicate-attribute diagnostics. Folded into the
+/// `Function`'s `test_body` / `doc` by the `Function` build action. `pub` only
+/// because it surfaces as a gazelle `Action` associated type; not part of the
+/// crate's intended API.
+pub enum ParsedAttr {
+    Test(Expr, Span),
+    Doc(String, Span),
+}
+
+impl gazelle::Action<aipl::Function<Self>> for Build {
+    fn build(&mut self, node: aipl::Function<Self>) -> Result<Function, Self::Error> {
+        let aipl::Function::Function(
+            is_pub,
+            (name, _),
+            type_params,
+            params,
+            effects,
+            return_ty,
+            body,
+            attrs,
+        ) = node;
+        // Fold the attribute list into the single `test_body` / `doc` slots,
+        // rejecting a repeated attribute (which slot would silently win?).
+        let mut test_body = None;
+        let mut doc = None;
+        for attr in attrs {
+            match attr {
+                ParsedAttr::Test(block, span) => {
+                    if test_body.is_some() {
+                        return Err(Error::at("duplicate `.test` attribute", span));
+                    }
+                    test_body = Some(block);
+                }
+                ParsedAttr::Doc(text, span) => {
+                    if doc.is_some() {
+                        return Err(Error::at("duplicate `.doc` attribute", span));
+                    }
+                    doc = Some(text);
+                }
+            }
+        }
+        Ok(Function {
+            name,
+            is_pub,
+            type_params,
+            params,
+            effects,
+            return_ty,
+            body,
+            owned_params: Vec::new(),
+            concat_params: Vec::new(),
+            test_body,
+            doc,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Vis<Self>> for Build {
+    fn build(&mut self, node: aipl::Vis<Self>) -> Result<bool, Self::Error> {
+        Ok(matches!(node, aipl::Vis::Public))
+    }
+}
+
+impl gazelle::Action<aipl::FnAttr<Self>> for Build {
+    fn build(&mut self, node: aipl::FnAttr<Self>) -> Result<ParsedAttr, Self::Error> {
+        // The argument shape (`{ .. }` block vs string) is fixed by the grammar
+        // production; here we only validate the attribute name matches it.
+        let unknown = |name: &str, name_span| {
+            Error::at(
+                format!(
+                    "unknown function attribute {name:?}; only `.test({{ .. }})` and \
+                     `.doc(\"..\")` are supported"
+                ),
+                name_span,
+            )
+        };
+        Ok(match node {
+            aipl::FnAttr::Test((name, name_span), block) => match name.as_str() {
+                "test" => ParsedAttr::Test(block, name_span),
+                "doc" => {
+                    return Err(Error::at(
+                        "`.doc` takes a string argument, not a `{ .. }` block",
+                        name_span,
+                    ))
+                }
+                _ => return Err(unknown(&name, name_span)),
+            },
+            aipl::FnAttr::Doc((name, name_span), (text, _)) => match name.as_str() {
+                "doc" => ParsedAttr::Doc(text, name_span),
+                "test" => {
+                    return Err(Error::at(
+                        "`.test` takes a `{ .. }` block, not a string argument",
+                        name_span,
+                    ))
+                }
+                _ => return Err(unknown(&name, name_span)),
+            },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FnAttrList<Self>> for Build {
+    fn build(&mut self, node: aipl::FnAttrList<Self>) -> Result<Vec<ParsedAttr>, Self::Error> {
+        Ok(match node {
+            aipl::FnAttrList::First(a) => vec![a],
+            aipl::FnAttrList::Rest(mut prev, a) => {
+                prev.push(a);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::FnAttrs<Self>> for Build {
+    fn build(&mut self, node: aipl::FnAttrs<Self>) -> Result<Vec<ParsedAttr>, Self::Error> {
+        Ok(match node {
+            aipl::FnAttrs::Present(list) => list,
+            aipl::FnAttrs::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Effects<Self>> for Build {
+    fn build(&mut self, node: aipl::Effects<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::Effects::Present(list) => list,
+            aipl::Effects::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::EffectList<Self>> for Build {
+    fn build(&mut self, node: aipl::EffectList<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::EffectList::First(e) => vec![e],
+            aipl::EffectList::Rest(mut prev, e) => {
+                prev.push(e);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Effect<Self>> for Build {
+    fn build(&mut self, node: aipl::Effect<Self>) -> Result<String, Self::Error> {
+        let aipl::Effect::Effect((name, _)) = node;
+        Ok(name)
+    }
+}
+
+impl gazelle::Action<aipl::Params<Self>> for Build {
+    fn build(&mut self, node: aipl::Params<Self>) -> Result<Vec<Param>, Self::Error> {
+        Ok(match node {
+            aipl::Params::Present(list) | aipl::Params::PresentTrailing(list) => list,
+            aipl::Params::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ParamList<Self>> for Build {
+    fn build(&mut self, node: aipl::ParamList<Self>) -> Result<Vec<Param>, Self::Error> {
+        Ok(match node {
+            aipl::ParamList::First(p) => vec![p],
+            aipl::ParamList::Rest(mut prev, p) => {
+                prev.push(p);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Param<Self>> for Build {
+    fn build(&mut self, node: aipl::Param<Self>) -> Result<Param, Self::Error> {
+        Ok(match node {
+            aipl::Param::Param((name, _), ty) => Param {
+                name,
+                ty,
+                mutable: false,
+                variadic: false,
+            },
+            aipl::Param::MutParam((name, _), ty) => Param {
+                name,
+                ty,
+                mutable: true,
+                variadic: false,
+            },
+            // `x: T*` — a variadic parameter. The trailing operator must be `*`.
+            // The stored type is the *sequence type* the body sees: `str` when
+            // the element is `char` (an AIPL string is the char sequence),
+            // otherwise `T[]`. The element type stays recoverable from it.
+            aipl::Param::VariadicParam((name, _), elem, (op, op_span)) => {
+                if op != '*' {
+                    return Err(Error::at(
+                        format!("expected \"*\" after a variadic parameter type, found {op:?}"),
+                        op_span,
+                    ));
+                }
+                // The element's sequence type: a `char` sequence is an AIPL
+                // string (`char*` → `str`); every other element `T` uses `T[]`
+                // (so `str*` is `str[]`, `i64*` is `i64[]`, etc.).
+                let ty = if elem == Type::Primitive(Primitive::Char) {
+                    Type::Primitive(Primitive::Str)
+                } else {
+                    Type::Array(Box::new(elem))
+                };
+                Param {
+                    name,
+                    ty,
+                    mutable: false,
+                    variadic: true,
+                }
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TypeParams<Self>> for Build {
+    fn build(&mut self, node: aipl::TypeParams<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::TypeParams::Present(list) => list,
+            aipl::TypeParams::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TypeParamList<Self>> for Build {
+    fn build(&mut self, node: aipl::TypeParamList<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::TypeParamList::First(p) => vec![p],
+            aipl::TypeParamList::Rest(mut prev, p) => {
+                prev.push(p);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TypeParam<Self>> for Build {
+    fn build(&mut self, node: aipl::TypeParam<Self>) -> Result<String, Self::Error> {
+        // `name : bound` — only the name matters; the bound (`any`) is the
+        // single supported constraint and is checked during monomorphization.
+        let aipl::TypeParam::TypeParam((name, _), (_bound, _)) = node;
+        Ok(name)
+    }
+}
+
+impl gazelle::Action<aipl::ReturnTy<Self>> for Build {
+    fn build(&mut self, node: aipl::ReturnTy<Self>) -> Result<Option<Type>, Self::Error> {
+        Ok(match node {
+            aipl::ReturnTy::Present(t) => Some(t),
+            aipl::ReturnTy::Absent => None,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Ty<Self>> for Build {
+    fn build(&mut self, node: aipl::Ty<Self>) -> Result<Type, Self::Error> {
+        Ok(match node {
+            aipl::Ty::Base(t) => t,
+            aipl::Ty::Result(ok, err) => Type::Result(Box::new(ok), Box::new(err)),
+            aipl::Ty::ResultVoid(err) => Type::Result(Box::new(unit_ty()), Box::new(err)),
+            aipl::Ty::FnTy(params, ret) => Type::Fn(params, Box::new(ret)),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::BaseTy<Self>> for Build {
+    fn build(&mut self, node: aipl::BaseTy<Self>) -> Result<Type, Self::Error> {
+        Ok(match node {
+            // A base-type identifier is a primitive (`i64`, `bool`, `str`, …) or
+            // a non-primitive name (struct/variant/generic-param/`Error`).
+            aipl::BaseTy::Named((name, _)) => match aipl_syntax::ast::Primitive::from_name(&name) {
+                Some(p) => Type::Primitive(p),
+                None => Type::Named(name),
+            },
+            aipl::BaseTy::Optional(inner) => Type::Optional(Box::new(inner)),
+            aipl::BaseTy::Array(inner, _rbracket) => Type::Array(Box::new(inner)),
+            aipl::BaseTy::Set(_hash, inner) => Type::Set(Box::new(inner)),
+            aipl::BaseTy::Dict(_hash, k, v) => Type::Dict(Box::new(k), Box::new(v)),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TyArgs<Self>> for Build {
+    fn build(&mut self, node: aipl::TyArgs<Self>) -> Result<Vec<Type>, Self::Error> {
+        Ok(match node {
+            aipl::TyArgs::Present(list) => list,
+            aipl::TyArgs::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TyArgList<Self>> for Build {
+    fn build(&mut self, node: aipl::TyArgList<Self>) -> Result<Vec<Type>, Self::Error> {
+        Ok(match node {
+            aipl::TyArgList::First(t) => vec![t],
+            aipl::TyArgList::Rest(mut prev, t) => {
+                prev.push(t);
+                prev
+            }
+        })
+    }
+}
+
+/// Fold a statement list and a tail expression into a single nested
+/// expression chain (the tail being the block's value).
+///
+/// Fold right: each stmt wraps the accumulated tail in the appropriate
+/// ExprKind, so the final expression is the tail of the body chain.
+///
+/// for-stmts have no "tail value" — they're folded as
+/// `Let("_", For(...), acc)` so the loop's iconst-0 result is discarded
+/// into a phantom binding while the after-loop chain continues unchanged.
+fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
+    match stmt {
+        StmtSpec::Let {
+            name,
+            name_span,
+            value,
+            ..
+        } => {
+            let span = name_span.join(acc.span);
+            Expr::new(ExprKind::Let(name, Box::new(value), Box::new(acc)), span)
+        }
+        StmtSpec::Mut {
+            name,
+            name_span,
+            value,
+            ..
+        } => {
+            let span = name_span.join(acc.span);
+            Expr::new(ExprKind::LetMut(name, Box::new(value), Box::new(acc)), span)
+        }
+        StmtSpec::Assign {
+            name,
+            name_span,
+            value,
+            ..
+        } => {
+            let span = name_span.join(acc.span);
+            Expr::new(ExprKind::Assign(name, Box::new(value), Box::new(acc)), span)
+        }
+        StmtSpec::For {
+            var,
+            var_span,
+            iterable,
+            body,
+            span: for_span,
+        } => {
+            let for_expr = Expr::new(
+                ExprKind::For(var, Box::new(iterable), Box::new(body)),
+                for_span,
+            );
+            let span = var_span.join(acc.span);
+            Expr::new(ExprKind::Seq(Box::new(for_expr), Box::new(acc)), span)
+        }
+        StmtSpec::While {
+            cond,
+            body,
+            span: while_span,
+        } => {
+            let while_expr = Expr::new(ExprKind::While(Box::new(cond), Box::new(body)), while_span);
+            let span = while_span.join(acc.span);
+            Expr::new(ExprKind::Seq(Box::new(while_expr), Box::new(acc)), span)
+        }
+        StmtSpec::Return {
+            value,
+            span: ret_span,
+        } => {
+            let ret_expr = Expr::new(ExprKind::Return(Box::new(value)), ret_span);
+            let span = ret_span.join(acc.span);
+            // `acc` (the rest of the block) is unreachable after a return, but it's
+            // kept in the tree so the checker/codegen see a well-formed block.
+            Expr::new(ExprKind::Seq(Box::new(ret_expr), Box::new(acc)), span)
+        }
+    }
+}
+
+impl gazelle::Action<aipl::Block<Self>> for Build {
+    fn build(&mut self, node: aipl::Block<Self>) -> Result<Expr, Self::Error> {
+        let aipl::Block::Block(body) = node;
+        Ok(body)
+    }
+}
+
+impl gazelle::Action<aipl::BlockBody<Self>> for Build {
+    fn build(&mut self, node: aipl::BlockBody<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            // Empty / nothing left → the block's value is unit.
+            aipl::BlockBody::Empty => Expr::new(ExprKind::Unit, Span::DUMMY),
+            // A leading expression: either the block's trailing value, or
+            // `expr;` (discard via `Seq`) followed by the rest of the block.
+            aipl::BlockBody::HeadExpr(expr, tail) => match tail {
+                BlockTail::Value => expr,
+                BlockTail::Discard(rest) => {
+                    let span = expr.span.join(rest.span);
+                    Expr::new(ExprKind::Seq(Box::new(expr), Box::new(rest)), span)
+                }
+            },
+            aipl::BlockBody::HeadStmt(stmt, rest) => wrap_stmt(stmt, rest),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::BlockTail<Self>> for Build {
+    fn build(&mut self, node: aipl::BlockTail<Self>) -> Result<BlockTail, Self::Error> {
+        Ok(match node {
+            aipl::BlockTail::Value => BlockTail::Value,
+            aipl::BlockTail::Discard(rest) => BlockTail::Discard(rest),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::LoopBody<Self>> for Build {
+    fn build(&mut self, node: aipl::LoopBody<Self>) -> Result<Expr, Self::Error> {
+        let aipl::LoopBody::LoopBody(inner) = node;
+        Ok(inner)
+    }
+}
+
+impl gazelle::Action<aipl::LoopInner<Self>> for Build {
+    fn build(&mut self, node: aipl::LoopInner<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            // The loop discards its body value, so an at-end body is a
+            // synthetic `0` (matching the loop expression's own i64 0 result).
+            aipl::LoopInner::Empty => Expr::new(ExprKind::Num(0), Span::DUMMY),
+            aipl::LoopInner::ExprSeq(expr, rest) => {
+                let span = expr.span.join(rest.span);
+                Expr::new(ExprKind::Seq(Box::new(expr), Box::new(rest)), span)
+            }
+            aipl::LoopInner::StmtSeq(stmt, rest) => wrap_stmt(stmt, rest),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::KwStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::KwStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        Ok(match node {
+            aipl::KwStmt::LetStmt(s) => s,
+            aipl::KwStmt::MutStmt(s) => s,
+            aipl::KwStmt::AssignStmt(s) => s,
+            aipl::KwStmt::ForStmt(s) => s,
+            aipl::KwStmt::WhileStmt(s) => s,
+            aipl::KwStmt::ReturnStmt(s) => s,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::LetStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::LetStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::LetStmt::LetStmt((name, name_span), value) = node;
+        let span = name_span.join(value.span);
+        Ok(StmtSpec::Let {
+            name,
+            name_span,
+            value,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MutStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::MutStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::MutStmt::MutStmt((name, name_span), value) = node;
+        let span = name_span.join(value.span);
+        Ok(StmtSpec::Mut {
+            name,
+            name_span,
+            value,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::AssignStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let (name, name_span, value, span) = match node {
+            aipl::AssignStmt::AssignStmt((name, name_span), value) => {
+                let span = name_span.join(value.span);
+                (name, name_span, value, span)
+            }
+            // `set n++;` is `set n = n ++ 1;`, where `++` is its own operator
+            // (encoded `'P'`, gated on importing `++`). The loader collapses it
+            // to a plain `+`/`wrapping_add` after gating, so codegen never sees
+            // `'P'`. The `1` and operator carry the `++` span so diagnostics
+            // (a missing `++` import, or a non-integer `n`) point at the operator.
+            aipl::AssignStmt::IncrStmt((name, name_span), pp_span) => {
+                let recv = Expr::new(ExprKind::Ident(name.clone()), name_span);
+                let one = Expr::new(ExprKind::Num(1), pp_span);
+                let value = Expr::new(
+                    ExprKind::Binop(Box::new(recv), 'P', Box::new(one)),
+                    name_span.join(pp_span),
+                );
+                (name, name_span, value, name_span.join(pp_span))
+            }
+        };
+        Ok(StmtSpec::Assign {
+            name,
+            name_span,
+            value,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ForStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::ForStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::ForStmt::ForStmt((var, var_span), iterable, body) = node;
+        let span = var_span.join(body.span);
+        Ok(StmtSpec::For {
+            var,
+            var_span,
+            iterable,
+            body,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::WhileStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::WhileStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::WhileStmt::WhileStmt(cond, body) = node;
+        // No `while`/paren tokens carry spans, so span the condition through the
+        // body (mirrors `for`, whose span starts at its loop variable).
+        let span = cond.span.join(body.span);
+        Ok(StmtSpec::While { cond, body, span })
+    }
+}
+
+impl gazelle::Action<aipl::ReturnStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::ReturnStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::ReturnStmt::ReturnStmt(value) = node;
+        let span = value.span;
+        Ok(StmtSpec::Return { value, span })
+    }
+}
+
+impl gazelle::Action<aipl::Binop<Self>> for Build {
+    fn build(&mut self, node: aipl::Binop<Self>) -> Result<char, Self::Error> {
+        Ok(match node {
+            aipl::Binop::Op((c, _span)) => c,
+            aipl::Binop::Minus => '-',
+            aipl::Binop::Lt => '<',
+            aipl::Binop::Gt => '>',
+            aipl::Binop::Or => 'O',
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Term<Self>> for Build {
+    fn build(&mut self, node: aipl::Term<Self>) -> Result<Expr, Self::Error> {
+        let aipl::Term::Unary(e) = node;
+        Ok(e)
+    }
+}
+
+impl gazelle::Action<aipl::Unary<Self>> for Build {
+    fn build(&mut self, node: aipl::Unary<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::Unary::Neg(e) => {
+                let span = e.span;
+                Expr::new(ExprKind::Neg(Box::new(e)), span)
+            }
+            aipl::Unary::Not(e) => {
+                let span = e.span;
+                Expr::new(ExprKind::Not(Box::new(e)), span)
+            }
+            aipl::Unary::Postfix(e) => e,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Postfix<Self>> for Build {
+    fn build(&mut self, node: aipl::Postfix<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::Postfix::Atom(e) => e,
+            aipl::Postfix::FieldAccess(obj, (name, name_span)) => {
+                let span = obj.span.join(name_span);
+                Expr::new(ExprKind::Field(Box::new(obj), name), span)
+            }
+            aipl::Postfix::MethodCall(obj, (name, name_span), args) => {
+                let span = obj
+                    .span
+                    .join(args.last().map(|a| a.span).unwrap_or(name_span));
+                // Method call: fold the receiver in as `args[0]` and flag the
+                // method form. `recv.f(a, b)` is stored as `f(recv, a, b)`.
+                let mut all = Vec::with_capacity(args.len() + 1);
+                all.push(obj);
+                all.extend(args);
+                Expr::new(ExprKind::Call(name, all, true), span)
+            }
+            aipl::Postfix::Index(obj, _lbracket, index) => {
+                let span = obj.span.join(index.span);
+                Expr::new(ExprKind::Index(Box::new(obj), Box::new(index)), span)
+            }
+            aipl::Postfix::Slice(obj, _lbracket, start, end) => {
+                let span = obj.span.join(end.span);
+                Expr::new(
+                    ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
+                    span,
+                )
+            }
+            // `recv[start..]` — open end (runs to the receiver's length).
+            aipl::Postfix::SliceOpen(obj, _lbracket, start) => {
+                let span = obj.span.join(start.span);
+                Expr::new(ExprKind::Slice(Box::new(obj), Box::new(start), None), span)
+            }
+            // `recv[..end]` — open start. Semantically `recv[0..end]`, so we
+            // synthesize a `0` start literal; it flows through check/codegen
+            // unchanged (the start clamps to `[0, len]` regardless).
+            aipl::Postfix::SliceTo(obj, _lbracket, end) => {
+                let span = obj.span.join(end.span);
+                let start = Expr::new(ExprKind::Num(0), Span::DUMMY);
+                Expr::new(
+                    ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
+                    span,
+                )
+            }
+            aipl::Postfix::TryOp(obj) => {
+                let span = obj.span;
+                Expr::new(ExprKind::Try(Box::new(obj)), span)
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Atom<Self>> for Build {
+    fn build(&mut self, node: aipl::Atom<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::Atom::Num((n, span)) => Expr::new(ExprKind::Num(n), span),
+            aipl::Atom::TrueLit(span) => Expr::new(ExprKind::Bool(true), span),
+            aipl::Atom::FalseLit(span) => Expr::new(ExprKind::Bool(false), span),
+            aipl::Atom::StringLit((s, span)) => Expr::new(ExprKind::Str(s), span),
+            aipl::Atom::CharLit((b, span)) => Expr::new(ExprKind::Char(b), span),
+            aipl::Atom::Ident((s, span)) => Expr::new(ExprKind::Ident(s), span),
+            aipl::Atom::Call((name, name_span), args) => {
+                let span = args
+                    .last()
+                    .map(|a| name_span.join(a.span))
+                    .unwrap_or(name_span);
+                Expr::new(ExprKind::Call(name, args, false), span)
+            }
+            aipl::Atom::Construct((name, name_span), fields) => {
+                let span = fields
+                    .last()
+                    .map(|f| name_span.join(f.value.span))
+                    .unwrap_or(name_span);
+                Expr::new(ExprKind::Construct(name, fields), span)
+            }
+            aipl::Atom::Paren(e) => e,
+            aipl::Atom::IfElse(cond, then_b, else_b) => {
+                let span = cond.span.join(else_b.span);
+                Expr::new(
+                    ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+            // Else-less `if`: a synthetic unit `else`, so it's typed (and lowered)
+            // exactly like `if (..) { .. } else {}` — unit-valued, used in
+            // statement position.
+            aipl::Atom::IfNoElse(cond, then_b) => {
+                let span = cond.span.join(then_b.span);
+                let else_b = Expr::new(ExprKind::Unit, span);
+                Expr::new(
+                    ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+            aipl::Atom::NoneLit(span) => Expr::new(ExprKind::None, span),
+            aipl::Atom::MatchExpr(scrutinee, arms) => {
+                let last_span = arms.last().map(|a| a.span).unwrap_or(scrutinee.span);
+                let span = scrutinee.span.join(last_span);
+                Expr::new(ExprKind::Match(Box::new(scrutinee), arms), span)
+            }
+            aipl::Atom::ArrayLit(lbracket_span, elems) => {
+                // Span runs from `[` to the last element (or just the
+                // `[` for an empty literal).
+                let span = elems
+                    .last()
+                    .map(|e| lbracket_span.join(e.span))
+                    .unwrap_or(lbracket_span);
+                Expr::new(ExprKind::ArrayLit(elems), span)
+            }
+            // `#{ .. }` — a set or dict literal (or an empty of either). Span
+            // runs from `#` to the last element/value (or just `#` for an
+            // empty), like an array literal.
+            aipl::Atom::BraceLit(hash_span, brace) => match brace {
+                BraceLit::EmptySet => Expr::new(ExprKind::SetLit(Vec::new()), hash_span),
+                BraceLit::EmptyDict => Expr::new(ExprKind::DictLit(Vec::new()), hash_span),
+                BraceLit::Entries(entries) => {
+                    let has_pair = entries
+                        .iter()
+                        .any(|e| matches!(e, BraceEntry::KeyValue(..)));
+                    let has_bare = entries.iter().any(|e| matches!(e, BraceEntry::KeyOnly(..)));
+                    if has_pair && has_bare {
+                        return Err(Error::at(
+                            "a \"#{ .. }\" literal can't mix set elements and \"key: value\" \
+                             pairs \u{2014} use either all bare elements (a set) or all pairs (a dict)"
+                                .to_string(),
+                            hash_span,
+                        ));
+                    }
+                    if has_pair {
+                        let pairs: Vec<(Expr, Expr)> = entries
+                            .into_iter()
+                            .map(|e| match e {
+                                BraceEntry::KeyValue(k, v) => (k, v),
+                                BraceEntry::KeyOnly(_) => unreachable!("checked above"),
+                            })
+                            .collect();
+                        let last = pairs.last().map(|(_, v)| v.span).unwrap_or(hash_span);
+                        Expr::new(ExprKind::DictLit(pairs), hash_span.join(last))
+                    } else {
+                        let elems: Vec<Expr> = entries
+                            .into_iter()
+                            .map(|e| match e {
+                                BraceEntry::KeyOnly(k) => k,
+                                BraceEntry::KeyValue(..) => unreachable!("checked above"),
+                            })
+                            .collect();
+                        let last = elems.last().map(|e| e.span).unwrap_or(hash_span);
+                        Expr::new(ExprKind::SetLit(elems), hash_span.join(last))
+                    }
+                }
+            },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MatchArms<Self>> for Build {
+    fn build(&mut self, node: aipl::MatchArms<Self>) -> Result<Vec<MatchArm>, Self::Error> {
+        Ok(match node {
+            aipl::MatchArms::Present(list) | aipl::MatchArms::PresentTrailing(list) => list,
+            aipl::MatchArms::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MatchArmList<Self>> for Build {
+    fn build(&mut self, node: aipl::MatchArmList<Self>) -> Result<Vec<MatchArm>, Self::Error> {
+        Ok(match node {
+            aipl::MatchArmList::First(a) => vec![a],
+            aipl::MatchArmList::Rest(mut prev, a) => {
+                prev.push(a);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MatchArm<Self>> for Build {
+    fn build(&mut self, node: aipl::MatchArm<Self>) -> Result<MatchArm, Self::Error> {
+        Ok(match node {
+            aipl::MatchArm::CtorArm((name, span), bindings, body) => MatchArm {
+                pattern: Pattern::Ctor { name, bindings },
+                body,
+                span,
+            },
+            // A bare identifier is a nullary constructor — except `_`, which is
+            // the wildcard (it lexes as an identifier, so it arrives here).
+            aipl::MatchArm::NullaryArm((name, span), body) => MatchArm {
+                pattern: if name == "_" {
+                    Pattern::Wildcard
+                } else {
+                    Pattern::Ctor {
+                        name,
+                        bindings: Vec::new(),
+                    }
+                },
+                body,
+                span,
+            },
+            aipl::MatchArm::NoneArm(span, body) => MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "none".to_string(),
+                    bindings: Vec::new(),
+                },
+                body,
+                span,
+            },
+            // `"foo" => body`: a string-literal pattern (for a `str` scrutinee).
+            aipl::MatchArm::StrArm((lit, span), body) => MatchArm {
+                pattern: Pattern::Str(lit),
+                body,
+                span,
+            },
+            // `[e0, e1, ...] => body`: an array-literal pattern (for an array
+            // scrutinee). The elements are validated as literals by the checker.
+            aipl::MatchArm::ArrayArm(span, elems, body) => MatchArm {
+                pattern: Pattern::Array(elems),
+                body,
+                span,
+            },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MatchBindings<Self>> for Build {
+    fn build(&mut self, node: aipl::MatchBindings<Self>) -> Result<Vec<String>, Self::Error> {
+        let aipl::MatchBindings::Present(list) = node;
+        Ok(list)
+    }
+}
+
+impl gazelle::Action<aipl::BindingList<Self>> for Build {
+    fn build(&mut self, node: aipl::BindingList<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::BindingList::First((s, _)) => vec![s],
+            aipl::BindingList::Rest(mut prev, (s, _)) => {
+                prev.push(s);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Args<Self>> for Build {
+    fn build(&mut self, node: aipl::Args<Self>) -> Result<Vec<Expr>, Self::Error> {
+        Ok(match node {
+            aipl::Args::Present(list) | aipl::Args::PresentTrailing(list) => list,
+            aipl::Args::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::BraceBody<Self>> for Build {
+    fn build(&mut self, node: aipl::BraceBody<Self>) -> Result<BraceLit, Self::Error> {
+        Ok(match node {
+            aipl::BraceBody::Entries(list) | aipl::BraceBody::EntriesTrailing(list) => {
+                BraceLit::Entries(list)
+            }
+            aipl::BraceBody::EmptyDict => BraceLit::EmptyDict,
+            aipl::BraceBody::EmptySet => BraceLit::EmptySet,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::EntryList<Self>> for Build {
+    fn build(&mut self, node: aipl::EntryList<Self>) -> Result<Vec<BraceEntry>, Self::Error> {
+        Ok(match node {
+            aipl::EntryList::First(e) => vec![e],
+            aipl::EntryList::Rest(mut prev, e) => {
+                prev.push(e);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Entry<Self>> for Build {
+    fn build(&mut self, node: aipl::Entry<Self>) -> Result<BraceEntry, Self::Error> {
+        Ok(match node {
+            aipl::Entry::KeyOnly(k) => BraceEntry::KeyOnly(k),
+            aipl::Entry::KeyValue(k, v) => BraceEntry::KeyValue(k, v),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ArgList<Self>> for Build {
+    fn build(&mut self, node: aipl::ArgList<Self>) -> Result<Vec<Expr>, Self::Error> {
+        Ok(match node {
+            aipl::ArgList::First(e) => vec![e],
+            aipl::ArgList::Rest(mut prev, e) => {
+                prev.push(e);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Arg<Self>> for Build {
+    fn build(&mut self, node: aipl::Arg<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::Arg::Expr(e) | aipl::Arg::Lambda(e) => e,
+            aipl::Arg::OpValue((c, span)) => op_value_lambda(c, span),
+        })
+    }
+}
+
+/// An `OP`-token operator passed as a value (`apply(2, 3, +)`) desugars to a
+/// binary lambda `|lhs, rhs| lhs <op> rhs`, reusing every lambda mechanism
+/// (capture analysis — there are none — lifting, and codegen). The operator is
+/// still gated like any operator use: the body's `Binop` makes the loader
+/// require it to be imported, and a function-aliased operator (`my_add as +`)
+/// is dispatched to a call there just as in infix position. The synthesized
+/// nodes carry the operator's own span, so a "not imported" error points at it.
+fn op_value_lambda(op: char, sp: Span) -> Expr {
+    let param = |name: &str| LambdaParam {
+        name: name.to_string(),
+        ty: None,
+        span: sp,
+    };
+    let ident = |name: &str| Expr::new(ExprKind::Ident(name.to_string()), sp);
+    let body = Expr::new(
+        ExprKind::Binop(Box::new(ident("lhs")), op, Box::new(ident("rhs"))),
+        sp,
+    );
+    Expr::new(
+        ExprKind::Lambda(vec![param("lhs"), param("rhs")], Box::new(body)),
+        sp,
+    )
+}
+
+impl gazelle::Action<aipl::Lambda<Self>> for Build {
+    fn build(&mut self, node: aipl::Lambda<Self>) -> Result<Expr, Self::Error> {
+        let (span, params, body) = match node {
+            aipl::Lambda::LambdaExpr(pipe_span, params, _pipe2, body)
+            | aipl::Lambda::LambdaBlock(pipe_span, params, _pipe2, body) => {
+                (pipe_span.join(body.span), params, body)
+            }
+            // `|| body` — no parameters; the `||` token carries no span, so the
+            // body's span stands in for the lambda's.
+            aipl::Lambda::LambdaNoargs(body) | aipl::Lambda::LambdaNoargsBlock(body) => {
+                (body.span, Vec::new(), body)
+            }
+        };
+        Ok(Expr::new(ExprKind::Lambda(params, Box::new(body)), span))
+    }
+}
+
+impl gazelle::Action<aipl::LambdaParams<Self>> for Build {
+    fn build(&mut self, node: aipl::LambdaParams<Self>) -> Result<Vec<LambdaParam>, Self::Error> {
+        Ok(match node {
+            aipl::LambdaParams::Present(list) => list,
+            aipl::LambdaParams::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::LambdaParamList<Self>> for Build {
+    fn build(
+        &mut self,
+        node: aipl::LambdaParamList<Self>,
+    ) -> Result<Vec<LambdaParam>, Self::Error> {
+        Ok(match node {
+            aipl::LambdaParamList::First(p) => vec![p],
+            aipl::LambdaParamList::Rest(mut prev, p) => {
+                prev.push(p);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::LambdaParam<Self>> for Build {
+    fn build(&mut self, node: aipl::LambdaParam<Self>) -> Result<LambdaParam, Self::Error> {
+        Ok(match node {
+            aipl::LambdaParam::Untyped((name, span)) => LambdaParam {
+                name,
+                ty: None,
+                span,
+            },
+            aipl::LambdaParam::Typed((name, span), ty) => LambdaParam {
+                name,
+                ty: Some(ty),
+                span,
+            },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::Expr<Self>> for Build {
+    fn build(&mut self, node: aipl::Expr<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::Expr::Term(t) => t,
+            aipl::Expr::Binop(l, op, r) => {
+                let span = l.span.join(r.span);
+                Expr::new(ExprKind::Binop(Box::new(l), op, Box::new(r)), span)
+            }
+        })
+    }
+}
+
+// Op encoding: arithmetic + logical ops use distinct codes so the binop
+// reducer can pass them through as `char`.
+//   '||' / '&&'   => 'O' / 'A'
+//   '==' / '!='   => 'E' / 'N'
+//   '<=' / '>='   => 'L' / 'G'
+//   '<' / '>' / '+' / '*' / '/' keep their literal chars
+fn op_precedence(c: char) -> Precedence {
+    match c {
+        'O' => Precedence::Left(2),
+        'A' => Precedence::Left(3),
+        'E' | 'N' => Precedence::Left(4),
+        '<' | '>' | 'L' | 'G' => Precedence::Left(5),
+        '+' => Precedence::Left(6),
+        '*' | '/' | '%' => Precedence::Left(7),
+        _ => unreachable!("unknown op code {c:?}"),
+    }
+}
+
+/// Skip whitespace plus `// line comments` and `/* block comments */`.
+/// Block comments nest, matching Rust's behavior. Returns an error on an
+/// unterminated block comment so the EOF doesn't silently swallow code.
+fn skip_whitespace_and_comments<I: Iterator<Item = char>>(
+    src: &mut Scanner<I>,
+) -> Result<(), Error> {
+    loop {
+        src.skip_whitespace();
+        match (src.peek(), src.peek_n(1)) {
+            (Some('/'), Some('/')) => {
+                src.advance();
+                src.advance();
+                while let Some(c) = src.peek() {
+                    src.advance();
+                    if c == '\n' {
+                        break;
+                    }
+                }
+            }
+            (Some('/'), Some('*')) => {
+                let start = src.offset();
+                src.advance();
+                src.advance();
+                let mut depth = 1usize;
+                while depth > 0 {
+                    match (src.peek(), src.peek_n(1)) {
+                        (Some('/'), Some('*')) => {
+                            src.advance();
+                            src.advance();
+                            depth += 1;
+                        }
+                        (Some('*'), Some('/')) => {
+                            src.advance();
+                            src.advance();
+                            depth -= 1;
+                        }
+                        (Some(_), _) => {
+                            src.advance();
+                        }
+                        (None, _) => {
+                            return Err(Error::at(
+                                "unterminated block comment",
+                                Span::new(start, src.offset()),
+                            ));
+                        }
+                    }
+                }
+            }
+            _ => return Ok(()),
+        }
+    }
+}
+
+/// Tokenize, pairing each terminal with its source span so the parser can
+/// point a caret at the offending token on a syntax error.
+/// Process the verbatim contents of a `"""..."""` raw string: trim the
+/// surrounding line breaks (the one right after the opening `"""` and the one
+/// right before the closing `"""`), then de-dent by stripping the common
+/// leading-*space* prefix shared by every non-blank line. Raw strings do no
+/// escape processing — their contents are otherwise taken literally.
+///
+/// The whole transform runs through the installed hook (the dogfooded AIPL
+/// `process_raw_string`, via the embedding FFI). There is no native fallback —
+/// the hook must be installed before any `"""` raw string is parsed.
+fn process_raw_string(content: &str) -> String {
+    let hook = RAW_STRING_HOOK
+        .get()
+        .expect("process_raw_string hook not installed before parsing a raw string");
+    assert!(
+        !IN_RAW_STRING_HOOK.with(std::cell::Cell::get),
+        "process_raw_string hook recursed — its compilation must not contain a raw string",
+    );
+    IN_RAW_STRING_HOOK.with(|f| f.set(true));
+    let _reset = RawStringHookGuard;
+    hook(content)
+}
+
+/// The raw-string processor, installed by the compiler (via
+/// [`set_process_raw_string_hook`]).
+static RAW_STRING_HOOK: std::sync::OnceLock<fn(&str) -> String> = std::sync::OnceLock::new();
+
+thread_local! {
+    /// Set while the hook runs, so a re-entrant call — which would mean the
+    /// hook's *own* compilation contained a raw string — aborts loudly instead
+    /// of recursing forever.
+    static IN_RAW_STRING_HOOK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Install the raw-string processor. The compiler points this at the dogfooded
+/// AIPL `process_raw_string`, run through the embedding FFI. First install wins
+/// (the hook is process-global).
+pub fn set_process_raw_string_hook(f: fn(&str) -> String) {
+    let _ = RAW_STRING_HOOK.set(f);
+}
+
+/// Resets the re-entrancy flag even if the hook panics.
+struct RawStringHookGuard;
+impl Drop for RawStringHookGuard {
+    fn drop(&mut self) {
+        IN_RAW_STRING_HOOK.with(|f| f.set(false));
+    }
+}
+
+fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
+    let mut src = Scanner::new(input);
+    let mut tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
+
+    loop {
+        skip_whitespace_and_comments(&mut src)?;
+        if src.at_end() {
+            break;
+        }
+
+        let start = src.offset();
+        let c = src.peek().unwrap();
+
+        // Raw string: `"""..."""`. Contents are taken verbatim (no escapes);
+        // a `"` or `""` may appear inside, only `"""` closes. One surrounding
+        // line break is trimmed and the contents de-dented (see
+        // `process_raw_string`). A normal `"..."` literal is handled below.
+        if c == '"' && src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') {
+            src.advance();
+            src.advance();
+            src.advance(); // opening """
+            let mut raw = String::new();
+            loop {
+                match src.peek() {
+                    Some('"') if src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') => {
+                        src.advance();
+                        src.advance();
+                        src.advance(); // closing """
+                        break;
+                    }
+                    Some(ch) => {
+                        raw.push(ch);
+                        src.advance();
+                    }
+                    None => {
+                        return Err(Error::at(
+                            "unterminated raw string literal",
+                            Span::new(start, src.offset()),
+                        ));
+                    }
+                }
+            }
+            let span = Span::new(start, src.offset());
+            tokens.push((aipl::Terminal::Str((process_raw_string(&raw), span)), span));
+            continue;
+        }
+
+        // String literal: `"..."`. Supports the escapes:
+        //   \n  newline    \t  tab      \r  carriage return
+        //   \\  backslash  \"  quote
+        // (no \0: strings are null-terminated at the runtime level)
+        if c == '"' {
+            src.advance(); // opening "
+            let mut s = String::new();
+            loop {
+                match src.peek() {
+                    Some('"') => break,
+                    Some('\\') => {
+                        let esc_start = src.offset();
+                        src.advance();
+                        match src.peek() {
+                            Some('n') => {
+                                s.push('\n');
+                                src.advance();
+                            }
+                            Some('t') => {
+                                s.push('\t');
+                                src.advance();
+                            }
+                            Some('r') => {
+                                s.push('\r');
+                                src.advance();
+                            }
+                            Some('\\') => {
+                                s.push('\\');
+                                src.advance();
+                            }
+                            Some('"') => {
+                                s.push('"');
+                                src.advance();
+                            }
+                            Some(other) => {
+                                return Err(Error::at(
+                                    format!("unknown escape sequence \\{other}"),
+                                    Span::new(esc_start, src.offset() + other.len_utf8()),
+                                ));
+                            }
+                            None => {
+                                return Err(Error::at(
+                                    "unterminated string literal",
+                                    Span::new(start, src.offset()),
+                                ));
+                            }
+                        }
+                    }
+                    Some(ch) => {
+                        s.push(ch);
+                        src.advance();
+                    }
+                    None => {
+                        return Err(Error::at(
+                            "unterminated string literal",
+                            Span::new(start, src.offset()),
+                        ));
+                    }
+                }
+            }
+            src.advance(); // closing "
+            let span = Span::new(start, src.offset());
+            tokens.push((aipl::Terminal::Str((s, span)), span));
+            continue;
+        }
+
+        // Char literal: `'x'` or `'\n'`. One byte (ASCII); the same escape
+        // set as strings. Non-ASCII characters (UTF-8 multi-byte) are
+        // rejected so `char` stays a byte-deterministic primitive.
+        if c == '\'' {
+            src.advance(); // opening '
+            let byte = match src.peek() {
+                Some('\\') => {
+                    src.advance();
+                    let esc_at = src.offset() - 1;
+                    let b = match src.peek() {
+                        Some('n') => b'\n',
+                        Some('t') => b'\t',
+                        Some('r') => b'\r',
+                        Some('\\') => b'\\',
+                        Some('\'') => b'\'',
+                        Some('"') => b'"',
+                        Some(other) => {
+                            return Err(Error::at(
+                                format!("unknown escape sequence \\{other}"),
+                                Span::new(esc_at, src.offset() + other.len_utf8()),
+                            ));
+                        }
+                        None => {
+                            return Err(Error::at(
+                                "unterminated char literal",
+                                Span::new(start, src.offset()),
+                            ));
+                        }
+                    };
+                    src.advance();
+                    b
+                }
+                Some('\'') => {
+                    return Err(Error::at(
+                        "empty char literal",
+                        Span::new(start, src.offset() + 1),
+                    ));
+                }
+                Some(ch) => {
+                    if !ch.is_ascii() {
+                        return Err(Error::at(
+                            format!("non-ASCII character in char literal: {ch:?}"),
+                            Span::new(start, src.offset() + ch.len_utf8()),
+                        ));
+                    }
+                    src.advance();
+                    ch as u8
+                }
+                None => {
+                    return Err(Error::at(
+                        "unterminated char literal",
+                        Span::new(start, src.offset()),
+                    ));
+                }
+            };
+            match src.peek() {
+                Some('\'') => {
+                    src.advance();
+                }
+                _ => {
+                    return Err(Error::at(
+                        "char literal must contain exactly one character",
+                        Span::new(start, src.offset()),
+                    ));
+                }
+            }
+            let span = Span::new(start, src.offset());
+            tokens.push((aipl::Terminal::Char((byte, span)), span));
+            continue;
+        }
+
+        // Identifier or keyword
+        if c.is_alphabetic() || c == '_' {
+            let mut s = String::new();
+            while let Some(ch) = src.peek() {
+                if ch.is_alphanumeric() || ch == '_' {
+                    s.push(ch);
+                    src.advance();
+                } else {
+                    break;
+                }
+            }
+            let span = Span::new(start, src.offset());
+            let kw = match s.as_str() {
+                "fn" => aipl::Terminal::Fn,
+                "if" => aipl::Terminal::If,
+                "else" => aipl::Terminal::Else,
+                "struct" => aipl::Terminal::Struct,
+                "variant" => aipl::Terminal::Variant,
+                "import" => aipl::Terminal::Import,
+                "from" => aipl::Terminal::From,
+                "as" => aipl::Terminal::As,
+                "pub" => aipl::Terminal::Pub,
+                "let" => aipl::Terminal::Let,
+                "for" => aipl::Terminal::For,
+                "while" => aipl::Terminal::While,
+                "mut" => aipl::Terminal::Mut,
+                "set" => aipl::Terminal::Set,
+                "match" => aipl::Terminal::Match,
+                "return" => aipl::Terminal::Return,
+                "builtins" => aipl::Terminal::Builtins(span),
+                "none" => aipl::Terminal::None(span),
+                "true" => aipl::Terminal::True(span),
+                "false" => aipl::Terminal::False(span),
+                _ => aipl::Terminal::Ident((s, span)),
+            };
+            tokens.push((kw, span));
+            continue;
+        }
+
+        // Number
+        if c.is_ascii_digit() {
+            let mut s = String::new();
+            while let Some(ch) = src.peek() {
+                if ch.is_ascii_digit() {
+                    s.push(ch);
+                    src.advance();
+                } else {
+                    break;
+                }
+            }
+            let span = Span::new(start, src.offset());
+            let n: i64 = s
+                .parse()
+                .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span))?;
+            tokens.push((aipl::Terminal::Num((n, span)), span));
+            continue;
+        }
+
+        // Two-char operators (must beat their single-char counterparts). An
+        // `OP` carries its own span (`(char, Span)`) so it can be used as a
+        // value (`apply(2, 3, +)`) and still point diagnostics at the operator.
+        if let Some(next) = src.peek_n(1) {
+            let op_span = Span::new(start, start + 2);
+            let pair_tok = match (c, next) {
+                ('-', '>') => Some(aipl::Terminal::Arrow),
+                // `..` — the range separator in a slice `s[a..b]`. Must beat the
+                // single-char `.` (field/method access).
+                ('.', '.') => Some(aipl::Terminal::Dotdot),
+                ('=', '>') => Some(aipl::Terminal::Fatarrow),
+                // `++` — increment statement; must beat the single-char `+`.
+                ('+', '+') => Some(aipl::Terminal::Plusplus(op_span)),
+                ('=', '=') => Some(aipl::Terminal::Op(('E', op_span), op_precedence('E'))),
+                ('!', '=') => Some(aipl::Terminal::Op(('N', op_span), op_precedence('N'))),
+                ('<', '=') => Some(aipl::Terminal::Op(('L', op_span), op_precedence('L'))),
+                ('>', '=') => Some(aipl::Terminal::Op(('G', op_span), op_precedence('G'))),
+                ('&', '&') => Some(aipl::Terminal::Op(('A', op_span), op_precedence('A'))),
+                ('|', '|') => Some(aipl::Terminal::Oror(op_precedence('O'))),
+                _ => None,
+            };
+            if let Some(t) = pair_tok {
+                src.advance();
+                src.advance();
+                tokens.push((t, Span::new(start, src.offset())));
+                continue;
+            }
+        }
+
+        // Single-char punctuation and operators
+        let tok = match c {
+            '(' => aipl::Terminal::Lparen,
+            ')' => aipl::Terminal::Rparen,
+            '{' => aipl::Terminal::Lbrace,
+            '}' => aipl::Terminal::Rbrace,
+            // `[` carries a span so array-literal expressions (which may
+            // be empty, `[]`, and thus have no element span) can still
+            // point somewhere sensible in errors.
+            '[' => aipl::Terminal::Lbracket(Span::new(start, start + 1)),
+            ']' => aipl::Terminal::Rbracket,
+            '#' => aipl::Terminal::Hash(Span::new(start, start + 1)),
+            ',' => aipl::Terminal::Comma,
+            ':' => aipl::Terminal::Colon,
+            '.' => aipl::Terminal::Dot,
+            ';' => aipl::Terminal::Semi,
+            '=' => aipl::Terminal::Eq,
+            '!' => aipl::Terminal::Bang,
+            '?' => aipl::Terminal::Question,
+            // Single `|` opens/closes a lambda parameter list (`||` for
+            // logical-or is handled by the two-char pass above).
+            '|' => aipl::Terminal::Pipe(Span::new(start, start + 1)),
+            '-' => aipl::Terminal::Minus(Precedence::Left(6)),
+            '+' | '*' | '/' | '%' => aipl::Terminal::Op(
+                (c, Span::new(start, start + c.len_utf8())),
+                op_precedence(c),
+            ),
+            // `<` / `>` are both comparison operators and generic-param
+            // brackets; they carry comparison precedence either way.
+            '<' => aipl::Terminal::Langle(op_precedence('<')),
+            '>' => aipl::Terminal::Rangle(op_precedence('>')),
+            other => {
+                return Err(Error::at(
+                    format!("unexpected character {other:?}"),
+                    Span::new(start, start + other.len_utf8()),
+                ));
+            }
+        };
+        src.advance();
+        tokens.push((tok, Span::new(start, src.offset())));
+    }
+
+    Ok(tokens)
+}
+
+/// If `line` is a `--- name ---` test-section marker, return the trimmed
+/// inner name. Used by the cases test harness to delimit sections; the
+/// compiler treats any such marker as a hard cutoff (see
+/// [`strip_test_sections`]).
+///
+/// A line is a marker iff it starts and ends with `---` (whitespace
+/// trimmed) and the inner segment is non-empty.
+///
+/// The marker logic is dogfooded — the AIPL `parse_test_section_header`, run
+/// through the embedding FFI via the installed hook. There is **no native
+/// fallback**: it panics if the hook isn't installed, so install it (via
+/// `install_parser_hooks`) before parsing. (`strip_test_sections` runs this on
+/// every line of every parse, so any in-process parse needs the hook.)
+pub fn parse_test_section_header(line: &str) -> Option<String> {
+    let hook = TEST_SECTION_HEADER_HOOK.get().expect(
+        "test-section-header hook not installed before parsing (call install_parser_hooks)",
+    );
+    hook(line)
+}
+
+/// The test-section-header parser, installed by the compiler (via
+/// [`set_test_section_header_hook`]) to dogfood the AIPL
+/// `parse_test_section_header`. Required — see [`parse_test_section_header`].
+static TEST_SECTION_HEADER_HOOK: std::sync::OnceLock<fn(&str) -> Option<String>> =
+    std::sync::OnceLock::new();
+
+/// Install the test-section-header parser. The compiler points this at the
+/// dogfooded AIPL `parse_test_section_header`, run through the embedding FFI.
+/// First install wins (the hook is process-global).
+pub fn set_test_section_header_hook(f: fn(&str) -> Option<String>) {
+    let _ = TEST_SECTION_HEADER_HOOK.set(f);
+}
+
+/// Return the portion of `src` before the first `--- section ---` test
+/// marker. The cases test harness uses these markers to bundle expected
+/// stdout/stderr/exit/errors after the AIPL code in a single file; the
+/// compiler ignores them so `aipl run/ir/build` can be pointed at a test
+/// fixture directly without any prep step.
+///
+/// The marker scan is dogfooded — the AIPL `strip_test_sections` (`str -> str`,
+/// like this function), run through the embedding FFI via the installed hook,
+/// returns the kept prefix; since that's a byte-prefix of `src` we re-borrow it
+/// as `&src[..kept.len()]`. There is **no native fallback**: it panics if the
+/// hook isn't installed, so install it (via `install_parser_hooks`) before
+/// parsing. (`parse` and `lex_tokens` call this on every parse — see
+/// [`set_strip_test_sections_hook`].)
+pub fn strip_test_sections(src: &str) -> &str {
+    let hook = STRIP_TEST_SECTIONS_HOOK.get().expect(
+        "strip-test-sections hook not installed before parsing (call install_parser_hooks)",
+    );
+    // The returned prefix ends on a line boundary (after a `\n`, or all of `src`),
+    // so its byte length is a valid char boundary to re-borrow from `src`.
+    &src[..hook(src).len().min(src.len())]
+}
+
+/// The section stripper, installed by the compiler (via
+/// [`set_strip_test_sections_hook`]) to dogfood the AIPL `strip_test_sections`.
+/// Required — see [`strip_test_sections`]. Returns the kept prefix (a byte-prefix
+/// of its input).
+static STRIP_TEST_SECTIONS_HOOK: std::sync::OnceLock<fn(&str) -> String> =
+    std::sync::OnceLock::new();
+
+/// Install the section stripper. The compiler points this at the dogfooded AIPL
+/// `strip_test_sections`, run through the embedding FFI. First install wins (the
+/// hook is process-global).
+pub fn set_strip_test_sections_hook(f: fn(&str) -> String) {
+    let _ = STRIP_TEST_SECTIONS_HOOK.set(f);
+}
+
+/// The [`Span`] of the first line's trailing space/tab run in `src`, or `None`
+/// if no line has any — the locator for [`reject_trailing_whitespace`].
+/// Dogfooded: the AIPL `find_trailing_whitespace`, run through the embedding FFI
+/// via the installed hook. There is **no native fallback**: it panics if the hook
+/// isn't installed, so install it (via `install_parser_hooks`) before parsing.
+fn find_trailing_whitespace(src: &str) -> Option<Span> {
+    let hook = FIND_TRAILING_WHITESPACE_HOOK.get().expect(
+        "trailing-whitespace hook not installed before parsing (call install_parser_hooks)",
+    );
+    hook(src)
+}
+
+/// The trailing-whitespace locator, installed by the compiler (via
+/// [`set_find_trailing_whitespace_hook`]) to dogfood the AIPL
+/// `find_trailing_whitespace`. Required — see [`find_trailing_whitespace`].
+static FIND_TRAILING_WHITESPACE_HOOK: std::sync::OnceLock<fn(&str) -> Option<Span>> =
+    std::sync::OnceLock::new();
+
+/// Install the trailing-whitespace locator. The compiler points this at the
+/// dogfooded AIPL `find_trailing_whitespace`, run through the embedding FFI. First
+/// install wins (the hook is process-global).
+pub fn set_find_trailing_whitespace_hook(f: fn(&str) -> Option<Span>) {
+    let _ = FIND_TRAILING_WHITESPACE_HOOK.set(f);
+}
+
+/// Coarse classification of a lexed token, used by the syntax-highlighting
+/// test to verify the TextMate grammar at `assets/aipl.tmLanguage.json`
+/// assigns sensible scopes. Comments and whitespace are not represented —
+/// the lexer skips them — and are verified separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
+    /// Reserved word: `fn`, `if`, `else`, `struct`, `import`, `from`,
+    /// `let`, `for`, `mut`, `set`, `match`, `builtins`.
+    Keyword,
+    /// `true`, `false`, `none`.
+    Constant,
+    /// Built-in type names — lexically identifiers (`i64`, `bool`, `char`,
+    /// `str`, `any`) but the highlighter scopes them as types.
+    BuiltinType,
+    /// User-defined identifier (function/struct/var/etc.).
+    Identifier,
+    /// Integer literal.
+    Number,
+    /// `"..."` literal.
+    Str,
+    /// `'.'` literal.
+    Char,
+    /// Operators: `+ - * / % == != < > <= >= && || ! -> =>`.
+    Operator,
+    /// Brackets, separators, sigils: `( ) { } [ ] , ; : . ? =`.
+    Punctuation,
+}
+
+/// Tokenize `input` and classify each token for syntax-highlighter
+/// verification. Strips test-section markers first (the lexer doesn't
+/// understand them), so the caller only sees AIPL source tokens.
+pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
+    let input = strip_test_sections(input);
+    let raw = tokenize(input)?;
+    Ok(raw.into_iter().map(|(t, sp)| (classify(&t), sp)).collect())
+}
+
+fn classify(t: &aipl::Terminal<Build>) -> TokenKind {
+    // `aipl` as a bare path is ambiguous here: rustc has to choose between
+    // the crate (this is the aipl crate) and the gazelle-generated module
+    // of the same name. `self::aipl` pins it to the local module.
+    use self::aipl::Terminal as T;
+    match t {
+        T::Fn | T::If | T::Else | T::Struct | T::Variant | T::Import | T::From | T::As | T::Pub
+        | T::Let | T::For | T::While | T::Mut | T::Set | T::Match | T::Return | T::Builtins(_) => {
+            TokenKind::Keyword
+        }
+        T::True(_) | T::False(_) | T::None(_) => TokenKind::Constant,
+        T::Ident((s, _)) => match s.as_str() {
+            "bool" | "char" | "str" | "any" => TokenKind::BuiltinType,
+            _ if aipl_syntax::int_bits(s).is_some() => TokenKind::BuiltinType,
+            _ => TokenKind::Identifier,
+        },
+        T::Num(_) => TokenKind::Number,
+        T::Str(_) => TokenKind::Str,
+        T::Char(_) => TokenKind::Char,
+        T::Op(_, _)
+        | T::Minus(_)
+        | T::Langle(_)
+        | T::Rangle(_)
+        | T::Oror(_)
+        | T::Pipe(_)
+        | T::Bang
+        | T::Plusplus(_)
+        | T::Arrow
+        | T::Fatarrow
+        // `..` — the slice range separator.
+        | T::Dotdot
+        // `=` (assignment in `let`/`mut`/`set`) is conventionally
+        // `keyword.operator.assignment` in TextMate scopes — group it
+        // with the other operators rather than with bracket punctuation.
+        | T::Eq => TokenKind::Operator,
+        T::Lparen | T::Rparen | T::Lbrace | T::Rbrace | T::Lbracket(_) | T::Rbracket
+        | T::Hash(_) | T::Comma | T::Colon | T::Dot | T::Semi | T::Question => {
+            TokenKind::Punctuation
+        }
+        // gazelle generates a private `__Phantom` variant for its internal
+        // type-parameter use; it's unreachable from real input.
+        _ => unreachable!("gazelle phantom terminal"),
+    }
+}
+
+/// Reject trailing whitespace — a space or tab at the end of any line, including
+/// inside a (multi-line) string literal (string contents aren't exempt). Reports
+/// the first offending run, caret under the whitespace. A `\r` before the newline
+/// is treated as part of the line ending (`\r\n`), so the whitespace it follows
+/// is still flagged.
+///
+/// The locating is dogfooded: the AIPL [`find_trailing_whitespace`] returns the
+/// byte [`Span`] of the first offending run (or `None`) via the FFI — AIPL's
+/// `for (let c : src)` iterates `src` byte-by-byte, so its offsets are byte
+/// offsets, matching the error rendering. There is **no native fallback**.
+fn reject_trailing_whitespace(src: &str) -> Result<(), Error> {
+    match find_trailing_whitespace(src) {
+        None => Ok(()),
+        Some(span) => Err(Error::at(
+            "trailing whitespace is not allowed".to_string(),
+            span,
+        )),
+    }
+}
+
+pub fn parse(input: &str) -> Result<Program, Error> {
+    let input = strip_test_sections(input);
+    reject_trailing_whitespace(input)?;
+    let mut parser = aipl::Parser::<Build>::new();
+    let mut actions = Build;
+
+    let pairs = tokenize(input)?;
+    // The exact source text of each token, so the error can name the actual
+    // token (`+`, `foo`, `0`) rather than its kind. Index matches push order,
+    // which is what `format_error` expects for the offending token.
+    let texts: Vec<&str> = pairs
+        .iter()
+        .map(|(_, sp)| input.get(sp.start..sp.end).unwrap_or(""))
+        .collect();
+
+    for (tok, span) in pairs {
+        match parser.push(tok, &mut actions) {
+            Ok(()) => {}
+            Err(gazelle::ParseError::Syntax { terminal }) => {
+                return Err(Error::at(
+                    friendly_syntax_error(&parser, terminal, &texts),
+                    span,
+                ));
+            }
+            // A build action rejected the shape (e.g. a mixed `#{ .. }`); its
+            // error already carries the right span and message.
+            Err(gazelle::ParseError::Action(e)) => return Err(e),
+        }
+    }
+
+    let mut program = parser.finish(&mut actions).map_err(|(p, err)| match err {
+        gazelle::ParseError::Syntax { terminal } => {
+            // Unexpected end of input: point the caret just past the source.
+            let eof = Span::new(input.len(), input.len());
+            Error::at(friendly_syntax_error(&p, terminal, &texts), eof)
+        }
+        gazelle::ParseError::Action(e) => e,
+    })?;
+
+    // Bake `assert(cond)` calls inside `.test({ .. })` bodies into
+    // `__assert(cond, "input:LINE: TEXT")`, capturing each assertion's source
+    // location now (while the source is in hand) for the `check` failure report.
+    // Only test bodies are rewritten, so a bare `assert(..)` elsewhere stays an
+    // unknown call — `assert` is effectively test-only.
+    for item in &mut program.items {
+        if let Item::Fn(f) = item {
+            if let Some(test_body) = &mut f.test_body {
+                bake_asserts(test_body, input);
+            }
+        }
+    }
+    Ok(program)
+}
+
+/// Rewrite each `assert(cond)` within `e` into `__assert(cond, "input:LINE:
+/// TEXT")`, where the location string is computed from `src` and the condition's
+/// span. Recurses through the whole expression so nested asserts are caught.
+fn bake_asserts(e: &mut Expr, src: &str) {
+    // Rewrite an `assert(cond)` in place, then recurse into the condition.
+    if let ExprKind::Call(name, args, _) = &e.kind {
+        if name == "assert" && args.len() == 1 {
+            let ExprKind::Call(_, mut args, _) = std::mem::replace(&mut e.kind, ExprKind::Unit)
+            else {
+                unreachable!()
+            };
+            let mut cond = args.pop().expect("one arg");
+            bake_asserts(&mut cond, src);
+            let loc = Expr::new(ExprKind::Str(assert_loc(src, cond.span)), cond.span);
+            e.kind = ExprKind::Call("__assert".to_string(), vec![cond, loc], false);
+            return;
+        }
+    }
+    match &mut e.kind {
+        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
+            for a in args {
+                bake_asserts(a, src);
+            }
+        }
+        ExprKind::DictLit(pairs) => {
+            for (k, v) in pairs {
+                bake_asserts(k, src);
+                bake_asserts(v, src);
+            }
+        }
+        ExprKind::Binop(a, _, b)
+        | ExprKind::Seq(a, b)
+        | ExprKind::Let(_, a, b)
+        | ExprKind::LetMut(_, a, b)
+        | ExprKind::Assign(_, a, b)
+        | ExprKind::Index(a, b)
+        | ExprKind::For(_, a, b)
+        | ExprKind::While(a, b) => {
+            bake_asserts(a, src);
+            bake_asserts(b, src);
+        }
+        ExprKind::If(a, b, c) => {
+            bake_asserts(a, src);
+            bake_asserts(b, src);
+            bake_asserts(c, src);
+        }
+        ExprKind::Slice(a, b, c) => {
+            bake_asserts(a, src);
+            bake_asserts(b, src);
+            if let Some(c) = c {
+                bake_asserts(c, src);
+            }
+        }
+        ExprKind::Neg(x)
+        | ExprKind::Not(x)
+        | ExprKind::Field(x, _)
+        | ExprKind::Try(x)
+        | ExprKind::Return(x) => bake_asserts(x, src),
+        ExprKind::Construct(_, inits) => {
+            for fi in inits {
+                bake_asserts(&mut fi.value, src);
+            }
+        }
+        ExprKind::Match(scrut, arms) => {
+            bake_asserts(scrut, src);
+            for arm in arms {
+                bake_asserts(&mut arm.body, src);
+            }
+        }
+        ExprKind::Lambda(_, body) => bake_asserts(body, src),
+        ExprKind::Num(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Char(_)
+        | ExprKind::Ident(_)
+        | ExprKind::None
+        | ExprKind::Unit => {}
+    }
+}
+
+/// Format an assertion's source location as `input:LINE: TEXT` (1-based line,
+/// the condition's trimmed source text), matching the `input:` filename the rest
+/// of the compiler's diagnostics use.
+fn assert_loc(src: &str, span: Span) -> String {
+    let upto = span.start.min(src.len());
+    let line = src[..upto].bytes().filter(|&b| b == b'\n').count() + 1;
+    let text = src.get(span.start..span.end).unwrap_or("").trim();
+    format!("input:{line}: {text}")
+}
+
+/// Friendly names for grammar symbols, used to turn the parser's internal
+/// token/rule names into something a user recognizes (e.g. `RBRACE` → `}`,
+/// `IDENT` → `identifier`). Nonterminals that can appear in an "expected" set
+/// map to a short noun (e.g. `expr` → `expression`). Anything not listed falls
+/// back to its raw grammar name.
+const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
+    // Literals / identifiers.
+    ("IDENT", "identifier"),
+    ("NUM", "number"),
+    ("STR", "string"),
+    ("CHAR", "character"),
+    ("TRUE", "true"),
+    ("FALSE", "false"),
+    ("NONE", "none"),
+    ("BUILTINS", "builtins"),
+    // Keywords.
+    ("FN", "fn"),
+    ("IF", "if"),
+    ("ELSE", "else"),
+    ("STRUCT", "struct"),
+    ("VARIANT", "variant"),
+    ("IMPORT", "import"),
+    ("FROM", "from"),
+    ("AS", "as"),
+    ("PUB", "pub"),
+    ("LET", "let"),
+    ("FOR", "for"),
+    ("WHILE", "while"),
+    ("MUT", "mut"),
+    ("SET", "set"),
+    ("MATCH", "match"),
+    ("RETURN", "return"),
+    // Punctuation / operators.
+    ("LPAREN", "("),
+    ("RPAREN", ")"),
+    ("LBRACE", "{"),
+    ("RBRACE", "}"),
+    ("LBRACKET", "["),
+    ("RBRACKET", "]"),
+    ("HASH", "#"),
+    ("COMMA", ","),
+    ("COLON", ":"),
+    ("ARROW", "->"),
+    ("DOT", "."),
+    ("DOTDOT", ".."),
+    ("SEMI", ";"),
+    ("EQ", "="),
+    ("QUESTION", "?"),
+    ("FATARROW", "=>"),
+    ("BANG", "!"),
+    ("PLUSPLUS", "++"),
+    ("MINUS", "-"),
+    ("OP", "operator"),
+    ("LANGLE", "<"),
+    ("RANGLE", ">"),
+    // Nonterminals that surface in "expected" sets.
+    ("expr", "expression"),
+    ("term", "expression"),
+    ("unary", "expression"),
+    ("postfix", "expression"),
+    ("atom", "expression"),
+    ("binop", "operator"),
+    ("kw_stmt", "statement"),
+    ("block_body", "statement"),
+    ("loop_inner", "statement"),
+    ("block", "{"),
+    ("loop_body", "{"),
+    ("ty", "type"),
+    ("return_ty", "->"),
+    ("param", "parameter"),
+    ("params", "parameter"),
+    ("param_list", "parameter"),
+    ("type_param", "type parameter"),
+    ("type_params", "<"),
+    ("type_param_list", "type parameter"),
+    ("field_decl", "field"),
+    ("field_init", "field"),
+    ("arg_list", "expression"),
+    ("effect", "effect"),
+    ("effects", "effect"),
+    ("effect_list", "effect"),
+    ("import_name_list", "name"),
+    ("item", "definition"),
+    // End-of-input is spelled `$` internally.
+    ("$", "end of input"),
+];
+
+/// Build a clear one-line syntax error from gazelle's diagnostic: keep only the
+/// `unexpected X, expected …` summary (dropping the internal parse-stack /
+/// item dump), with symbol names humanized and the expected set de-duplicated.
+fn friendly_syntax_error(
+    parser: &aipl::Parser<Build>,
+    terminal: gazelle::SymbolId,
+    texts: &[&str],
+) -> String {
+    let raw = parser.format_error(terminal, Some(SYMBOL_DISPLAY_NAMES), Some(texts));
+    let first = raw.lines().next().unwrap_or("syntax error");
+    // `first` is `unexpected 'X'` or `unexpected 'X', expected: a, b, c`.
+    let (found_part, expected_part) = match first.split_once(", expected: ") {
+        Some((f, l)) => (f, Some(l)),
+        None => (first, None),
+    };
+    let found = found_part
+        .strip_prefix("unexpected '")
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(found_part);
+    let found_msg = if found == "end of input" {
+        // Multi-word token reads badly inside quotes.
+        "unexpected end of input".to_string()
+    } else if found.starts_with('\'') || found.starts_with('"') {
+        // Char/string literals are already delimited — don't double-quote
+        // (`'a'` not `''a''`).
+        format!("unexpected {found}")
+    } else {
+        format!("unexpected '{found}'")
+    };
+    match expected_part {
+        // Humanized names can collide (e.g. `block` and `LBRACE` both → `{`);
+        // de-duplicate (BTreeSet also sorts) for a stable, readable list.
+        // Quote literal tokens (`'}'`, `'else'`) so punctuation doesn't blur
+        // into the list separators; leave category words (`expression`) bare.
+        Some(list) => {
+            let items: std::collections::BTreeSet<String> =
+                list.split(", ").map(quote_expected).collect();
+            let items: Vec<&str> = items.iter().map(String::as_str).collect();
+            format!("{found_msg}; expected {}", human_join(&items))
+        }
+        None => found_msg,
+    }
+}
+
+/// Category words name a *kind* of thing the user can't type literally and
+/// read fine bare; everything else is a concrete token and is quoted.
+const CATEGORY_WORDS: &[&str] = &[
+    "expression",
+    "statement",
+    "identifier",
+    "number",
+    "string",
+    "character",
+    "type",
+    "type parameter",
+    "operator",
+    "parameter",
+    "field",
+    "effect",
+    "name",
+    "definition",
+    "end of input",
+];
+
+fn quote_expected(item: &str) -> String {
+    if CATEGORY_WORDS.contains(&item) {
+        item.to_string()
+    } else {
+        format!("'{item}'")
+    }
+}
+
+/// Join items as `a`, `a or b`, or `a, b, or c`.
+fn human_join(items: &[&str]) -> String {
+    match items {
+        [] => String::new(),
+        [a] => a.to_string(),
+        [a, b] => format!("{a} or {b}"),
+        [rest @ .., last] => format!("{}, or {last}", rest.join(", ")),
+    }
+}

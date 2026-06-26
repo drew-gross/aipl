@@ -1,0 +1,59 @@
+import { wrapping_add as +, *, ==, to_str, map, push } from builtins;
+
+// Plain named functions — no captures, just regular `fn`s.
+fn double(x: i64) -> i64 {
+    x * 2
+}.test({
+    let xs = [1, 2, 3];
+    // Pass a named function to a builtin HOF (method form).
+    assert(xs.map(double) == [2, 4, 6]);
+    // A named function and a lambda are interchangeable as the map function.
+    assert(xs.map(double).map(inc) == [3, 5, 7]);
+    // A builtin (`to_str`) passed by name as the mapping function.
+    assert(xs.map(to_str) == ["1", "2", "3"]);
+})
+
+fn inc(x: i64) -> i64 {
+    x + 1
+}.test({
+    let xs = [1, 2, 3];
+    // Pass a named function to a builtin HOF (function form).
+    assert(map(xs, inc) == [2, 3, 4]);
+})
+
+// A user-defined higher-order function taking a function-typed parameter.
+fn apply(f: (i64) -> i64, x: i64) -> i64 {
+    f(x)
+}.test({
+    // Pass a named function to a user-defined HOF (function-call form).
+    assert(apply(double, 20) == 40);
+    // A lambda is interchangeable with a named function here.
+    assert(apply(|x| x + 1, 5) == 6);
+})
+
+// A higher-order *method* (first parameter is `self`), so it's also callable as
+// `xs.each(f)`. Applies `f` to every element.
+fn each(self: i64[], f: (i64) -> i64) -> i64[] {
+    mut out = [];
+    for (let x : self) {
+        out.push(f(x));
+    }
+    out
+}.test({
+    let xs = [1, 2, 3];
+    // Pass a named function to a user-defined HOF (method-call form).
+    assert(xs.each(inc) == [2, 3, 4]);
+})
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 3
+bytes allocated: 704
+instructions executed: 1154
+binary size: 8547
+--- monomorphizations ---
+__map2$own0
+double
+each$lam8
+inc
+main

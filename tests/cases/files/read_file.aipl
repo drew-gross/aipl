@@ -1,0 +1,24 @@
+import { print, to_str, read_file_to_string } from builtins;
+
+// `read_file_to_string` reads a file's bytes into a `str!str`: `ok(contents)` on
+// success, `err(message)` on any failure (here, a missing file). It carries the
+// `!read_files` effect, so `main` must declare it. The file is staged next to
+// the program (see the `file:` section), and the harness runs in that dir.
+fn main() !prints !read_files {
+    print(to_str(read_file_to_string("data.txt")));    // ok("hello world")
+    print(to_str(read_file_to_string("missing.txt"))); // err("could not read file")
+}
+--- file: data.txt ---
+hello world
+--- stdout ---
+ok("hello world")
+err("could not read file")
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 105
+instructions executed: 174
+binary size: 4074
+--- monomorphizations ---
+main

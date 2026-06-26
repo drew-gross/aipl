@@ -1,0 +1,13 @@
+[package]
+name = "aipl-loader"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL import resolution and source-tree flattening"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+aipl-parser = { workspace = true }
+
+[lib]
+path = "src/lib.rs"

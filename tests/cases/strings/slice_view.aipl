@@ -1,0 +1,36 @@
+import { wrapping_add as +, ==, print, to_str } from builtins;
+// A slice of a long (heap) string whose result is > 7 bytes shares the source's
+// buffer as a *view*. A view is still a plain `str`: it prints, renders with
+// `to_str`, iterates with `for`, concatenates, compares, and re-slices — and its
+// refcounts balance at scope exit (the `allocations`/`deallocations` counts below
+// stay equal).
+fn main() !prints {
+    let s = "hello, world!"; // 13 bytes (heap)
+    let v = s[1..11]; // "ello, worl" (10 bytes -> a view sharing s)
+    print(v); // ello, worl
+    print(to_str(v)); // "ello, worl"
+    mut n = 0;
+    for (let c : v) {
+        set n = n + 1;
+    }
+    print(to_str(n)); // 10
+    print(v + "!"); // ello, worl!
+    print(to_str(v == "ello, worl")); // true
+    print(v[2..4]); // lo  (slice of a view)
+}
+--- stdout ---
+ello, worl
+"ello, worl"
+10
+ello, worl!
+true
+lo
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 101
+instructions executed: 263
+binary size: 4621
+--- monomorphizations ---
+main

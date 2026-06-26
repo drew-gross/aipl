@@ -1,0 +1,7 @@
+fn main() -> i64 { 5.nope() }
+--- errors ---
+error: call to undefined fn "nope"
+ --> input:1:20
+  |
+1 | fn main() -> i64 { 5.nope() }
+  |                    ^^^^^^

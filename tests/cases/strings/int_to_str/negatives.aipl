@@ -1,0 +1,24 @@
+import { -, print, to_str } from builtins;
+
+// Negative numbers get a leading `-`. i64::MIN has no positive counterpart, so
+// it exercises the magnitude-via-wrapping path; it's built by `MIN+1 - 1` since
+// the literal `9223372036854775808` itself overflows i64.
+fn main() !prints -> i64 {
+    print(to_str(-1));
+    print(to_str(-9223372036854775807 - 1));
+    print(to_str(9223372036854775807));
+    0
+}
+--- stdout ---
+-1
+-9223372036854775808
+9223372036854775807
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 73
+instructions executed: 81
+binary size: 1721
+--- monomorphizations ---
+main

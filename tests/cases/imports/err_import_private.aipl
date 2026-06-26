@@ -1,0 +1,15 @@
+// Only `pub` functions may be imported. `secret` isn't `pub`, so importing it
+// is a compile error even though it exists in the source file. (`shared` is
+// `pub`, hence importable — `secret` is its private helper.)
+import { secret } from "./util.aipl";
+
+fn main() -> i64 { secret(3) }
+--- file: util.aipl ---
+fn secret(n: i64) -> i64 { n * 2 }
+pub fn shared(n: i64) -> i64 { secret(n) + 1 }
+--- errors ---
+error: "secret" is private; mark it `pub` in util.aipl to import it
+ --> input:4:10
+  |
+4 | import { secret } from "./util.aipl";
+  |          ^^^^^^

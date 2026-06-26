@@ -1,0 +1,14 @@
+// A `return value;` must match the enclosing function's declared return type,
+// just like the trailing body value does.
+fn f(b: bool) -> i64 {
+    if (b) {
+        return "nope";
+    };
+    0
+}
+--- errors ---
+error: return value is str, but the function returns i64
+ --> input:5:16
+  |
+5 |         return "nope";
+  |                ^^^^^^

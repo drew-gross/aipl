@@ -1,0 +1,13 @@
+import { wrapping_add as +, == } from builtins;
+fn joined() -> str { "hello, " + "world" }.test({
+    assert(joined() == "hello, world");
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 28
+binary size: 2127
+--- monomorphizations ---
+main

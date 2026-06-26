@@ -1,0 +1,33 @@
+import { wrapping_add as +, print } from builtins;
+// String slicing `s[start..end]` yields the bytes in `[start, end)`. Both
+// bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
+// `start >= end` gives `""`.
+fn main() !prints {
+    let s = "hello, world";
+    print(s[0..5]); // hello
+    print(s[7..12]); // world
+    print("hello"[1..100]); // ello  (end clamped to len)
+    print("hello"[1..3]); // el
+    print("hello"[3..3]); // "" (empty range)
+    print("hello"[4..2]); // "" (start > end)
+    print("hi"[0..2]); // hi  (SSO source copies)
+    print(("ab" + "cdefgh")[2..7]); // cdefg  (slice of a fresh heap string)
+}
+--- stdout ---
+hello
+world
+ello
+el
+
+
+hi
+cdefg
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 65
+instructions executed: 74
+binary size: 2271
+--- monomorphizations ---
+main

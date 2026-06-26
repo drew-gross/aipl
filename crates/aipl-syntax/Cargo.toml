@@ -1,0 +1,11 @@
+[package]
+name = "aipl-syntax"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL core types — spans, errors, AST, and shared type/builtin helpers"
+license = "MIT"
+
+[dependencies]
+
+[lib]
+path = "src/lib.rs"

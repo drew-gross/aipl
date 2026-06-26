@@ -1,0 +1,14 @@
+import { == } from builtins;
+fn a(s: str) -> str { s }
+fn b(s: str) -> str { a(s) }.test({
+    assert(b("threaded") == "threaded");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 25
+binary size: 2110
+--- monomorphizations ---
+main

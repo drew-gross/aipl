@@ -1,0 +1,46 @@
+import { wrapping_add as +, -, ==, >, print, to_str } from builtins;
+
+// A bare integer literal flexes to a narrow integer type by context — no
+// explicit conversion needed — as long as it fits. It works against the other
+// operand of a binop, a function parameter, and a return type.
+fn inc(x: u8) -> u8 {
+    x + 1 // literal `1` flexes to u8
+}
+
+fn make() -> i16 {
+    1000 // literal return flexes to i16
+}.test({
+    // Compare a narrow int to a literal (either side).
+    assert(i8(5) == 5);
+    assert(5 == i8(5));
+    assert(u8(255) > 1);
+    assert(i8(-1) == -1); // negative literal flexes to i8
+
+    // Arithmetic with a literal operand stays at the narrow width (wraps).
+    assert(i8(127) + 1 == -128);
+    assert(u8(250) + 10 == u8(4));
+    assert(inc(u8(9)) == 10);
+
+    // Literal flexes through a parameter and a return type.
+    assert(inc(200) == 201);
+    assert(make() == 1000);
+})
+
+fn main() !prints {
+    print(to_str(i8(127) + 1)); // -128
+    print(to_str(inc(200)));    // 201
+    print(to_str(make()));      // 1000
+}
+--- stdout ---
+-128
+201
+1000
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 90
+binary size: 1986
+--- monomorphizations ---
+main

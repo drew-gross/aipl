@@ -1,0 +1,14 @@
+import { print } from builtins;
+
+// A function that returns nothing (here `print`) can't have its result
+// bound to a name — call it as a statement instead: `print("hi");`.
+fn main() !prints -> i64 {
+    let _ = print("hi");
+    0
+}
+--- errors ---
+error: cannot bind "_" to a value of type ()
+ --> input:6:13
+  |
+6 |     let _ = print("hi");
+  |             ^^^^^^^^^^

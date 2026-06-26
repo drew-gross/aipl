@@ -1,0 +1,26 @@
+import { wrapping_add as +, print } from builtins;
+// Printing a rope streams its leaves straight to stdout without materializing,
+// so no flattened buffer is allocated even when the result exceeds the inline
+// (<= 7 byte) limit. The only heap here is the concat node itself: `allocations`
+// stays at 1 (the node), not 2 (node + a materialized buffer). A nested rope
+// streams its sub-ropes the same way, still without flattening.
+fn main() !prints {
+    // 18 bytes: materializing would heap-allocate a flattened buffer.
+    let greeting = "Hello, " + "rope world!";
+    print(greeting); // Hello, rope world!
+
+    // A rope of ropes — printed leaf-by-leaf, no node flattened.
+    print(("aaaa" + "bbbb") + ("cccc" + "dddd")); // aaaabbbbccccdddd
+}
+--- stdout ---
+Hello, rope world!
+aaaabbbbccccdddd
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 160
+instructions executed: 34
+binary size: 1652
+--- monomorphizations ---
+main

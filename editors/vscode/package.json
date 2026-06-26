@@ -1,0 +1,36 @@
+{
+  "name": "aipl",
+  "displayName": "AIPL",
+  "description": "Syntax highlighting and language configuration for AIPL.",
+  "version": "0.1.0",
+  "publisher": "aipl",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "aipl",
+        "aliases": [
+          "AIPL",
+          "aipl"
+        ],
+        "extensions": [
+          ".aipl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "aipl",
+        "scopeName": "source.aipl",
+        "path": "./syntaxes/aipl.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+import { ==, !, is_some } from builtins;
+
+// Indexing past the end returns None; .is_some() is false.
+fn past_end_is_some() -> i64 {
+    let c = "hi"[99];
+    if (c.is_some()) { 1 } else { 0 }
+}.test({
+    assert(past_end_is_some() == 0);
+    assert(!"hi"[99].is_some());
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 55
+binary size: 2335
+--- monomorphizations ---
+main

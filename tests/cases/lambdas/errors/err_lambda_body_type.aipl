@@ -1,0 +1,13 @@
+// The lambda's body must produce the function type's return type.
+fn apply(f: (i64) -> i64, x: i64) -> i64 {
+    f(x)
+}
+fn main() -> i64 {
+    apply(|x| true, 3)
+}
+--- errors ---
+error: lambda body returns bool, but i64 was expected
+ --> input:6:15
+  |
+6 |     apply(|x| true, 3)
+  |               ^^^^

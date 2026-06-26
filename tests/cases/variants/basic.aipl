@@ -1,0 +1,48 @@
+import { *, ==, is_some } from builtins;
+
+// A sum type (Haskell-style `data`, paren'd payloads): an inline `{tag, payload}`
+// value sized to the widest case. Constructed and matched positionally.
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+fn area(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r * r,
+        Rect(w, h) => w * h,
+        Empty => 0,
+    }
+}
+
+// Returned by value (variants are composites, handed back via sret).
+fn unit_square() -> Shape {
+    Rect(1, 1)
+}.test({
+    // Construct + match.
+    assert(area(Rect(3, 4)) == 12);
+    assert(area(Circle(5)) == 25);
+    assert(area(Empty) == 0);
+
+    // Compare constructed variants structurally.
+    assert(Rect(3, 4) == Rect(3, 4));
+    assert(Circle(5) == Circle(5));
+    assert(Empty == Empty);
+
+    // Round-trip through a function return.
+    assert(unit_square() == Rect(1, 1));
+    assert(area(unit_square()) == 1);
+
+    // An optional of a variant works like any composite element.
+    let o = some(Circle(2));
+    assert(o == some(Circle(2)));
+    assert(o.is_some());
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 379
+binary size: 6052
+--- monomorphizations ---
+area
+main
+unit_square

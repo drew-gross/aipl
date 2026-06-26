@@ -1,0 +1,17 @@
+import { wrapping_add as +, == } from builtins;
+fn pick(c: bool) -> i64 { if (c) { 1 } else { 2 } }.test({
+    assert(pick(true) == 1);
+    assert(pick(false) == 2);
+    // pick(true)=1, pick(false)=2 → 1 + 2 = 3
+    assert(pick(true) + pick(false) == 3);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 62
+binary size: 2222
+--- monomorphizations ---
+main
+pick

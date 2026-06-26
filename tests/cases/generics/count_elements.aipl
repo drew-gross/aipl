@@ -1,0 +1,27 @@
+import { wrapping_add as +, ==, push } from builtins;
+// A generic that iterates the array elements (binding each as the concrete
+// element type per instance) and counts them. Exercises element-level body
+// operations across i64[], char[], and bool[] instances.
+
+fn count(v: any[]) -> i64 {
+    mut n = 0;
+    for (let x : v) {
+        set n = n + 1;
+    }
+    n
+}.test({
+    assert(count([10, 20, 30, 40]) == 4);
+    assert(count(['x', 'y']) == 2);
+    mut bs = [true];
+    bs.push(false);
+    assert(count(bs) == 2);
+})
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 178
+instructions executed: 262
+binary size: 3083
+--- monomorphizations ---
+main

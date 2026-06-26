@@ -1,0 +1,18 @@
+import { == } from builtins;
+// An empty array literal passed to an `any[]` parameter pins the type
+// variable to the `EmptyArray` pseudo-type and produces a monomorphized
+// instance accepting the empty array; no element type needs to be inferred.
+fn g(v: any[]) -> i64 { 0 }.test({
+    assert(g([]) == 0);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 32
+instructions executed: 33
+binary size: 1864
+--- monomorphizations ---
+__test$g
+g$EmptyArray
+main

@@ -1,0 +1,24 @@
+import { join, split, == } from builtins;
+
+// `join(parts, sep)` concatenates the parts with `sep` *between* consecutive
+// elements — none before the first or after the last. `[]` -> `""`, `[x]` -> `x`.
+// Callable free (`join(xs, sep)`) or as a method (`xs.join(sep)`).
+fn rejoin(s: str, sep: str) -> str { s.split(sep).join(sep) }.test({
+    assert(["a", "b", "c"].join("hi") == "ahibhic");
+    assert(["a", "b", "c"].join("") == "abc"); // empty separator
+    assert(["solo"].join(", ") == "solo"); // single element: no separator
+    assert(join([], ", ") == ""); // empty array
+    assert(["", "x", ""].join("-") == "-x-"); // empty parts are kept
+    assert(["one", "two"].join(" big sep ") == "one big sep two"); // heap result
+    assert(rejoin("a,bb,ccc", ",") == "a,bb,ccc"); // split then join round-trips
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 401
+instructions executed: 215
+binary size: 7238
+--- monomorphizations ---
+__test$rejoin
+main

@@ -1,0 +1,13 @@
+[package]
+name = "aipl-linker"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL AOT binary linking and embedded runtime staticlib"
+license = "MIT"
+build = "build.rs"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,22 @@
+import { ==, !=, ! } from builtins;
+// `==`/`!=` on dicts is structural and order-independent: equal iff the same
+// set of keys maps to equal values (insertion order doesn't matter).
+fn eq() -> bool {
+    #{1: "a", 2: "b"} == #{2: "b", 1: "a"}
+}.test({
+    assert(#{1: "a", 2: "b"} == #{2: "b", 1: "a"}); // order-independent
+    assert(!(#{1: "a"} == #{1: "b"}));              // value differs
+    assert(!(#{1: "a"} == #{1: "a", 2: "b"}));      // length differs
+    assert(#{1: "a"} != #{1: "b"});
+    assert(#{1: [1, 2]} == #{1: [1, 2]});           // array values compared
+    assert(!(#{1: [1, 2]} == #{1: [1, 9]}));
+})
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 816
+instructions executed: 579
+binary size: 9372
+--- monomorphizations ---
+main

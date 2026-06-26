@@ -1,0 +1,19 @@
+import { print } from builtins;
+
+// A `main` with no return type returns nothing; the exit code is implicitly 0.
+fn main() !prints {
+    print("done");
+}
+--- stdout ---
+done
+--- exit code ---
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 8
+binary size: 738
+--- monomorphizations ---
+main

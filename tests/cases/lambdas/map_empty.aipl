@@ -1,0 +1,32 @@
+import { wrapping_add as +, *, ==, to_str, map, len } from builtins;
+
+// Mapping an empty array yields an empty array: the lambda never runs, so the
+// (possibly unknown) element type is never observed — only the empty result is.
+fn empty_ints() -> i64[] {
+    []
+}.test({
+    // A bare empty literal (`[]` has the placeholder element type).
+    assert([].map(|x| x * 2) == []);
+    assert(len([].map(|x| x * 2)) == 0);
+
+    // A typed empty array (element type i64) from a function return.
+    assert(empty_ints().map(|x| x + 1) == []);
+
+    // A type-changing map (i64 -> str) over an empty array is still empty.
+    assert(empty_ints().map(|x| to_str(x)) == []);
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 224
+instructions executed: 210
+binary size: 5875
+--- monomorphizations ---
+__map1$own0
+__map3$own0
+__map5$own0
+__map7$own0
+__test$empty_ints
+empty_ints
+main

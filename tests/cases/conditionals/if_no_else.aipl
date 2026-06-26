@@ -1,0 +1,36 @@
+import { ==, <, - } from builtins;
+
+// An `if` in statement position (its value discarded) may omit `else`. Its
+// `then` block must be unit-typed and the `if` itself yields unit, so it reads
+// as a plain conditional statement. Several run in sequence here.
+fn sign(n: i64) -> i64 {
+    mut r = 0;
+    if (n < 0) {
+        set r = -1;
+    };
+    if (0 < n) {
+        set r = 1;
+    };
+    r
+}.test({
+    assert(sign(-5) == -1);
+    assert(sign(0) == 0);
+    assert(sign(9) == 1);
+    // An `else` after a nested `if` binds to that inner `if`, not the else-less
+    // outer one (dangling-else resolves to the nearest `if`).
+    mut s = 0;
+    if (1 < 2) {
+        if (3 < 4) { set s = 1; } else { set s = 2; };
+    };
+    assert(s == 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 126
+binary size: 2576
+--- monomorphizations ---
+main
+sign

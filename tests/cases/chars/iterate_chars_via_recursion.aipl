@@ -1,0 +1,22 @@
+import { wrapping_add as +, == } from builtins;
+
+// Count 'a's by walking with `s[i]`; stop when indexing returns none
+// (past end of string).
+fn count_a(s: str, i: i64) -> i64 {
+    match (s[i]) {
+        some(c) => if (c == 'a') { 1 + count_a(s, i + 1) } else { count_a(s, i + 1) },
+        none => 0
+    }
+}.test({
+    assert(count_a("banana", 0) == 3);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 174
+binary size: 2025
+--- monomorphizations ---
+count_a
+main

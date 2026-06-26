@@ -1,0 +1,20 @@
+import { wrapping_add as +, == } from builtins;
+// `len` written in AIPL using the for-each-char loop + mutation.
+fn len(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        set n = n + 1;
+    }
+    n
+}.test({
+    assert(len("hello, world") == 12);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 179
+binary size: 2100
+--- monomorphizations ---
+main

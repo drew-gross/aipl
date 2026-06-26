@@ -1,0 +1,21 @@
+import { ==, trim } from builtins;
+
+// `trim(s)` returns a new string with leading and trailing ASCII whitespace
+// (space, tab, newline, carriage return, ...) removed; interior whitespace is
+// preserved. It's callable as a method too, and an all-whitespace (or empty)
+// string trims to "".
+fn trim_spaces() -> str { trim("  hello  ") }.test({
+    assert(trim_spaces() == "hello");
+    assert("\t a b \n".trim() == "a b");   // tabs/newline stripped, inner space kept
+    assert(trim("   ") == "");             // all-whitespace -> empty
+    assert(trim("none") == "none");        // unchanged
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 70
+binary size: 3604
+--- monomorphizations ---
+main

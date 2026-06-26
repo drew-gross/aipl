@@ -1,0 +1,14 @@
+import { write_string_to_file } from builtins;
+
+// `write_string_to_file` has the `!write_files` effect; a caller that doesn't
+// declare it is rejected (declaring `!read_files` is not enough — it's a
+// distinct effect).
+fn main() !read_files {
+    write_string_to_file("x.txt", "data");
+}
+--- errors ---
+error: fn "write_string_to_file" has effect "!write_files" but the calling function does not declare it
+ --> input:7:5
+  |
+7 |     write_string_to_file("x.txt", "data");
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

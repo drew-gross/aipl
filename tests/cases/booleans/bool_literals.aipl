@@ -1,0 +1,16 @@
+import { == } from builtins;
+fn t() -> bool { true }.test({
+    assert(t() == true);
+})
+fn f() -> bool { false }.test({
+    assert(f() == false);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 37
+binary size: 1836
+--- monomorphizations ---
+main

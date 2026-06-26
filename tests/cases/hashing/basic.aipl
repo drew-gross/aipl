@@ -1,0 +1,57 @@
+import { wrapping_add as +, ==, !=, hash } from builtins;
+
+// `hash(x) -> i64` is a deterministic structural hash, consistent with `==`:
+// equal values hash equal. It recurses over every type. Set/dict hashing is
+// order-INDEPENDENT (matching their `==`); array hashing is order-sensitive.
+
+fn h(x: i64) -> i64 { hash(x) }.test({
+    assert(h(42) == hash(42)); // deterministic: same value, same hash
+    assert(h(1) != h(2)); // distinct scalars
+    assert(hash(true) != hash(false));
+    assert(hash('a') != hash('b'));
+})
+
+fn hs(s: str) -> i64 { hash(s) }.test({
+    // By content — a heap-built string hashes like its literal.
+    assert(hs("hello") == hash("hel" + "lo"));
+    assert(hs("hello") != hs("world"));
+})
+
+fn arr() -> i64[] { [1, 2, 3] }.test({
+    assert(hash(arr()) == hash([1, 2, 3])); // consistent with array ==
+    assert(hash([1, 2, 3]) != hash([3, 2, 1])); // order-sensitive
+})
+
+fn triple() -> #{i64} { #{1, 2, 3} }.test({
+    assert(hash(triple()) == hash(#{3, 2, 1})); // order-INDEPENDENT (matches set ==)
+    assert(hash(#{1, 2}) != hash(#{1, 2, 3}));
+})
+
+fn dict() -> #{i64: str} { #{1: "a", 2: "b"} }.test({
+    assert(hash(dict()) == hash(#{2: "b", 1: "a"})); // order-independent (matches dict ==)
+    assert(hash(#{1: "a"}) != hash(#{1: "b"})); // value matters
+})
+
+struct Point { x: i64, y: i64 }
+
+fn pt() -> Point { Point { x: 1, y: 2 } }.test({
+    assert(hash(pt()) == hash(Point { x: 1, y: 2 })); // consistent with struct ==
+    assert(hash(Point { x: 1, y: 2 }) != hash(Point { x: 2, y: 1 }));
+})
+
+fn opt(b: bool) -> i64? { if (b) { some(5) } else { none } }.test({
+    assert(hash(opt(true)) == hash(some(5)));
+    assert(hash(opt(true)) != hash(opt(false))); // some(5) vs none
+})
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 704
+instructions executed: 1808
+binary size: 15023
+--- monomorphizations ---
+h
+hs
+main
+opt

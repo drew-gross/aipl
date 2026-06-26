@@ -1,0 +1,17 @@
+// A generic function's body is type-checked abstractly (type variables become
+// a permissive wildcard), so a *structural* body error is caught even when the
+// function is never called — i.e. never monomorphized into a concrete instance
+// codegen would otherwise check. Here `len` yields i64 but `bad` declares bool.
+import { len } from builtins;
+
+fn bad(v: any[]) -> bool {
+    len(v)
+}
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: fn "bad": body returns i64, but the declared return type is bool
+ --> input:8:5
+  |
+8 |     len(v)
+  |     ^^^^^

@@ -1,0 +1,34 @@
+import { wrapping_add as +, ==, len } from builtins;
+
+// `bool[]` is bit-packed — 8 elements per byte (like `std::vector<bool>`) — but
+// presents exactly the ordinary array interface. This literal spans two bytes
+// (9 elements), exercising the cross-byte addressing.
+fn packed() -> bool[] {
+    [true, false, true, true, false, false, true, false, true]
+}.test({
+    let xs = packed();
+    assert(xs == [true, false, true, true, false, false, true, false, true]);
+    assert(len(xs) == 9);
+
+    // Indexing yields `bool?` in bounds, `none` out of bounds.
+    assert(xs[0] == some(true));
+    assert(xs[8] == some(true));   // in the second byte
+    assert(xs[9] == none);
+
+    // Iteration reads each packed bit in order.
+    mut trues = 0;
+    for (let b : xs) {
+        set trues = trues + (if (b) { 1 } else { 0 });
+    }
+    assert(trues == 5);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 68
+instructions executed: 690
+binary size: 4589
+--- monomorphizations ---
+__test$packed
+main

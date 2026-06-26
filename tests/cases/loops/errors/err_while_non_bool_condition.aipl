@@ -1,0 +1,14 @@
+import { wrapping_add as + } from builtins;
+// A `while` condition must be a bool, like an `if` condition.
+fn main() {
+    mut i = 0;
+    while (i + 1) {
+        set i = i + 1;
+    }
+}
+--- errors ---
+error: while condition: expected bool, got i64
+ --> input:5:12
+  |
+5 |     while (i + 1) {
+  |            ^^^^^

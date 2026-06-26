@@ -1,0 +1,13 @@
+import { %, == } from builtins;
+fn m(x: i64, y: i64) -> i64 { x % y }.test({
+    assert(m(17, 5) == 2);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 22
+binary size: 1495
+--- monomorphizations ---
+main

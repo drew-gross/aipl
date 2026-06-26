@@ -1,0 +1,20 @@
+import { wrapping_add as +, print, len, to_str } from builtins;
+// A rope stores its total length at its root (summed once at construction from
+// its children's stored lengths), so `len` is O(1) and never materializes the
+// rope. Building an 18-byte rope and only measuring it allocates just the concat
+// node (1 allocation) — not a flattened 18-byte buffer (which would be a 2nd).
+fn main() !prints {
+    let r = "Hello, " + "rope world!"; // 18 bytes; never read as bytes
+    print(to_str(len(r))); // 18
+}
+--- stdout ---
+18
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 38
+binary size: 2065
+--- monomorphizations ---
+main

@@ -1,0 +1,22 @@
+import { ==, value_or } from builtins;
+
+// `str?` is an optional holding a heap string. Both arms round-trip: the
+// `some` arm carries an owned string, the `none` arm falls back via
+// `value_or`. Returning a `str?` extends the optional ABI.
+fn pick(b: bool) -> str? {
+    if (b) { some("present") } else { none }
+}.test({
+    assert(pick(true) == some("present"));
+    assert(pick(true).value_or("fallback") == "present");
+    assert(pick(false).value_or("fallback") == "fallback");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 214
+binary size: 3924
+--- monomorphizations ---
+main
+pick

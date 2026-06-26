@@ -1,0 +1,13 @@
+import { *, == } from builtins;
+fn times(self: i64, factor: i64) -> i64 { self * factor }.test({
+    assert(7.times(6) == 42);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 22
+binary size: 1530
+--- monomorphizations ---
+main

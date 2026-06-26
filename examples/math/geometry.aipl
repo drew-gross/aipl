@@ -1,0 +1,22 @@
+import { wrapping_add as +, * } from builtins;
+// Imported by examples/imports.aipl. Only the names listed in that
+// file's `import { ... }` clause are visible from the importer;
+// `area` and `double` stay private to this module even though they're
+// called by the exported `double_area`.
+
+struct Rect {
+    width: i64,
+    height: i64
+}
+
+fn area(r: Rect) -> i64 {
+    r.width * r.height
+}
+
+fn double(n: i64) -> i64 {
+    n + n
+}
+
+pub fn double_area(r: Rect) -> i64 {
+    double(area(r))
+}

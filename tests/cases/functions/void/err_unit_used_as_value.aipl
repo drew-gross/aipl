@@ -1,0 +1,12 @@
+import { wrapping_add as +, print } from builtins;
+
+// `print` returns nothing, so its result can't be used as a value.
+fn main() !prints -> i64 {
+    print("hi") + 1
+}
+--- errors ---
+error: arithmetic operand: expected i64, got ()
+ --> input:5:5
+  |
+5 |     print("hi") + 1
+  |     ^^^^^^^^^^

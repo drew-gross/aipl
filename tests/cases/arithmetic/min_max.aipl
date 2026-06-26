@@ -1,0 +1,28 @@
+import { min, max, ==, - } from builtins;
+
+// `min`/`max` return the smaller / larger of two `i64`s. Callable free
+// (`min(a, b)`) or as a method (`a.max(b)`); a bare literal operand flexes to
+// `i64`. Equal operands return that value; negatives compare by value.
+fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
+    assert(min(3, 7) == 3);
+    assert(max(3, 7) == 7);
+    assert(min(7, 3) == 3); // order-independent
+    assert(max(7, 3) == 7);
+    assert(min(4, 4) == 4); // equal operands
+    assert(min(-5, 2) == -5); // negatives compare by value, not magnitude
+    assert(max(-9, -2) == -2);
+    assert((10).min(3) == 3); // method form
+    assert((-5).max(0) == 0);
+    assert(clamp_low(-3, 0) == 0); // used inside a function body
+    assert(clamp_low(8, 0) == 8);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 166
+binary size: 4782
+--- monomorphizations ---
+clamp_low
+main

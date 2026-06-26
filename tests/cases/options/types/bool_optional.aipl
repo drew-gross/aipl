@@ -1,0 +1,22 @@
+import { == } from builtins;
+fn flag(b: bool?) -> i64 {
+    match (b) {
+        some(v) => if (v) { 1 } else { 0 },
+        none => 0
+    }
+}.test({
+    assert(flag(some(true)) == 1);
+    assert(flag(some(false)) == 0);
+    assert(flag(none) == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 79
+binary size: 2320
+--- monomorphizations ---
+__test$flag
+flag
+main

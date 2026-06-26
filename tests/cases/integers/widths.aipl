@@ -1,0 +1,49 @@
+import { wrapping_add as +, -, *, /, ==, >, print, to_str } from builtins;
+
+// Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.
+// Values are created/converted with `i8(x)`/`u32(x)`/… (wrapping). Arithmetic
+// and comparison happen at the type's width and signedness; results wrap.
+fn add8(a: i8, b: i8) -> i8 {
+    a + b
+}.test({
+    // Signed addition wraps two's-complement.
+    assert(i8(127) + i8(1) == i8(-128));
+    assert(add8(i8(100), i8(50)) == i8(-106));
+
+    // Unsigned addition wraps mod 2^width.
+    assert(u8(200) + u8(100) == u8(44));
+
+    // Multiplication / division at the width; division is signedness-aware.
+    assert(i8(20) * i8(7) == i8(-116)); // 140 wraps to -116
+    assert(u8(255) / u8(2) == u8(127));
+
+    // Wider widths hold larger values.
+    assert(i32(70000) == i32(70000));
+    assert(u32(4000000000) > u32(1));
+
+    // Unsigned comparison treats the top bit as magnitude (255 > 1, not -1 < 1).
+    assert(u8(255) > u8(1));
+    assert(i8(255) == i8(-1)); // 255 truncated to i8 is -1
+
+    // Rendering: signed shows the sign; unsigned shows the magnitude.
+    assert(to_str(i8(127) + i8(1)) == "-128");
+    assert(to_str(u32(4000000000)) == "4000000000");
+    assert(to_str(u8(255)) == "255");
+})
+
+fn main() !prints {
+    print(to_str(add8(i8(100), i8(50)))); // -106
+    print(to_str(u32(4000000000)));       // 4000000000
+}
+--- stdout ---
+-106
+4000000000
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 27
+instructions executed: 63
+binary size: 2150
+--- monomorphizations ---
+main

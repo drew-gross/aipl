@@ -1,0 +1,29 @@
+import { wrapping_add as +, ==, len } from builtins;
+
+// bool[] as a first-class array: literals, `len`, indexing (an optional
+// element), and for-each iteration.
+fn count_true(bs: bool[]) -> i64 {
+    mut n = 0;
+    for (let b : bs) {
+        set n = if (b) { n + 1 } else { n };
+    }
+    n
+}.test({
+    let bs = [true, false, true, true];
+    assert(bs == [true, false, true, true]);
+    assert(count_true(bs) == 3);
+    assert(len(bs) == 4);
+    // Indexing yields an optional element.
+    assert(bs[1] == some(false));
+    assert(bs[9] == none);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 66
+instructions executed: 372
+binary size: 4033
+--- monomorphizations ---
+__test$count_true
+main

@@ -1,0 +1,13 @@
+import { == } from builtins;
+fn greet() -> str { "hello" }.test({
+    assert(greet() == "hello");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 21
+binary size: 1716
+--- monomorphizations ---
+main

@@ -1,0 +1,23 @@
+import { == } from builtins;
+// A struct may hold a `str` field. The field is retained when the struct
+// is constructed and released when the struct goes out of scope; reading
+// the field yields an owned string. Passing the struct to a function
+// borrows it (no inc/dec by the callee).
+struct Person { age: i64, name: str }
+
+fn greet(p: Person) -> i64 {
+    p.age
+}.test({
+    let p = Person { age: 30, name: "claude" };
+    assert(p.name == "claude");
+    assert(greet(p) == 30);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 41
+binary size: 2116
+--- monomorphizations ---
+main

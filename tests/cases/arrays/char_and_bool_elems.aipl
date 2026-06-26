@@ -1,0 +1,35 @@
+import { wrapping_add as +, -, == } from builtins;
+// char[] iteration and bool[] indexing.
+fn count_h(cs: char[]) -> i64 {
+    mut n = 0;
+    for (let c : cs) {
+        set n = if (c == 'h') { n + 1 } else { n };
+    }
+    n
+}.test({
+    assert(count_h(['h', 'i', 'h', 'o', 'h']) == 3);
+    assert(count_h([]) == 0);
+})
+fn first_true(bs: bool[]) -> i64 {
+    match (bs[0]) {
+        some(v) => if (v) { 1 } else { 0 },
+        none => -1,
+    }
+}.test({
+    assert(first_true([true, false]) == 1);
+    assert(first_true([false, true]) == 0);
+    assert(first_true([]) == -1);
+})
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 202
+instructions executed: 346
+binary size: 4344
+--- monomorphizations ---
+__test$count_h
+__test$first_true
+count_h
+first_true
+main

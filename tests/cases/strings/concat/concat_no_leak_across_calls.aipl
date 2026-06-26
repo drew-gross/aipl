@@ -1,0 +1,15 @@
+import { wrapping_add as +, == } from builtins;
+// Allocate many short-lived concat results; if refcounts are right,
+// no leak, no double free.
+fn build(n: i64) -> str { "x" + "y" }.test({
+    assert(build(0) == "xy");
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 27
+binary size: 1927
+--- monomorphizations ---
+main

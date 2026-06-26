@@ -1,0 +1,30 @@
+import { ==, trim } from builtins;
+
+// Aliasing disables the in-place trim: once `s` is captured by `t`, `s` is
+// non-exclusive, so `set s = trim(s)` builds a fresh string and the snapshot
+// `t` keeps its original (untrimmed) value.
+fn trimmed() -> str {
+    mut s = "  hi  ";
+    let t = s;            // snapshot "  hi  "
+    set s = trim(s);      // copy (s is aliased) -> s = "hi"
+    s
+}.test({
+    assert(trimmed() == "hi");
+})
+fn snapshot() -> str {
+    mut s = "  hi  ";
+    let t = s;            // snapshot "  hi  "
+    set s = trim(s);      // copy (s is aliased)
+    t                     // unchanged
+}.test({
+    assert(snapshot() == "  hi  ");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 64
+binary size: 2748
+--- monomorphizations ---
+main

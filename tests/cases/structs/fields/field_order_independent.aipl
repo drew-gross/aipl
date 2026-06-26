@@ -1,0 +1,15 @@
+import { -, == } from builtins;
+// Field init order differs from declaration order; behavior should match.
+struct Point { x: i64, y: i64 }
+fn sub(p: Point) -> i64 { p.x - p.y }.test({
+    assert(sub(Point { y: 5, x: 100 }) == 95);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 27
+binary size: 1562
+--- monomorphizations ---
+main

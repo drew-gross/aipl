@@ -1,0 +1,13 @@
+import { == } from builtins;
+fn passthrough(s: str) -> str { s }.test({
+    assert(passthrough("hi") == "hi");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 23
+binary size: 1889
+--- monomorphizations ---
+main

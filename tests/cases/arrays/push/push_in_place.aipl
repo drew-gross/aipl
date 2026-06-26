@@ -1,0 +1,21 @@
+import { ==, push } from builtins;
+
+// `xs.push(x)` appends to `xs` in place: the same variable holds the longer
+// array afterward (no reassignment needed).
+fn grown() -> i64[] {
+    mut xs = [5];
+    xs.push(6);
+    xs.push(7);
+    xs
+}.test({
+    assert(grown() == [5, 6, 7]);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 2
+bytes allocated: 96
+instructions executed: 129
+binary size: 2175
+--- monomorphizations ---
+main

@@ -1,0 +1,19 @@
+import { print, to_str } from builtins;
+
+// A pattern element's type must match the scrutinee's element type.
+fn code(xs: i64[]) -> i64 {
+    match (xs) {
+        ["a", "b"] => 1,
+        _ => 0,
+    }
+}
+
+fn main() !prints {
+    print(to_str(code([1, 2])));
+}
+--- errors ---
+error: array-pattern element: expected i64, got str
+ --> input:6:10
+  |
+6 |         ["a", "b"] => 1,
+  |          ^^^

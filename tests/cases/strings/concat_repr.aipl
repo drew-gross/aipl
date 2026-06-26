@@ -1,0 +1,58 @@
+import { wrapping_add as +, ==, print, len, to_str } from builtins;
+// Every `str + str` builds the *concatenated-string* representation — a lazy
+// rope of two str pointers, materialized (and memoized) only when its bytes are
+// first read. To the source it is just a `str`: it prints, measures with `len`,
+// compares with `==`, indexes, slices, iterates with `for`, nests, and passes to
+// a `str` parameter. Passing a concat value to a `str` parameter also selects a
+// distinct, concat-specialized monomorphization of the callee (here `label`).
+
+fn label(s: str) -> str {
+    "[" + s + "]"
+}
+
+fn main() !prints {
+    let g = "foo" + "bar"; // a concat node ("foobar")
+    print(g); // foobar
+    print(to_str(len(g))); // 6
+    print(to_str(g == "foobar")); // true
+    print(to_str(g == "nope")); // false
+
+    // Nested: a rope of ropes.
+    let h = ("a" + "b") + ("c" + "d");
+    print(h); // abcd
+
+    // Index and slice transparently materialize.
+    print(to_str(g[0])); // some('f')
+    print(g[0..3]); // foo
+
+    // Iterate the materialized bytes.
+    mut n = 0;
+    for (let c : g) {
+        set n = n + 1;
+    }
+    print(to_str(n)); // 6
+
+    // Pass a concat (and a plain str) to a `str` parameter — distinct instances.
+    print(label(g)); // [foobar]
+    print(label("plain")); // [plain]
+}
+--- stdout ---
+foobar
+6
+true
+false
+abcd
+some('f')
+foo
+6
+[foobar]
+[plain]
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 346
+instructions executed: 347
+binary size: 6086
+--- monomorphizations ---
+main

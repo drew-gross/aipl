@@ -1,0 +1,27 @@
+import { wrapping_add as +, <, == } from builtins;
+// `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
+// it before each pass. The counter is a `mut` declared before the loop; the
+// body reassigns it with `set`, and the change persists across iterations.
+fn sum_below(n: i64) -> i64 {
+    mut i = 0;
+    mut total = 0;
+    while (i < n) {
+        set total = total + i;
+        set i = i + 1;
+    }
+    total
+}.test({
+    assert(sum_below(5) == 10); // 0+1+2+3+4
+    assert(sum_below(1) == 0);
+    assert(sum_below(0) == 0); // condition false up front: body never runs
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 165
+binary size: 2434
+--- monomorphizations ---
+main
+sum_below

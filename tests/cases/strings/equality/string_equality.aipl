@@ -1,0 +1,15 @@
+import { ==, != } from builtins;
+fn eq_same() -> i64 { if ("hi" == "hi") { 1 } else { 0 } }.test({
+    assert("hi" == "hi");
+    assert("hi" != "bye");
+    assert(eq_same() == 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 50
+binary size: 2424
+--- monomorphizations ---
+main

@@ -1,0 +1,22 @@
+import { -, == } from builtins;
+// none in else branch picks up the type from the some branch.
+fn maybe(want: bool) -> i64 {
+    let x = if (want) { some(42) } else { none };
+    match (x) {
+        some(v) => v,
+        none => -1
+    }
+}.test({
+    assert(maybe(true) == 42);
+    assert(maybe(false) == -1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 57
+binary size: 1958
+--- monomorphizations ---
+main
+maybe

@@ -1,0 +1,7 @@
+// Only the first parameter (the receiver) may be `mut`.
+fn bad(self: i64, mut x: i64) {
+    set x = 0;
+}
+fn main() -> i64 { 0 }
+--- errors ---
+error: fn "bad": only the first parameter may be "mut"

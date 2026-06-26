@@ -1,0 +1,13 @@
+import { == } from builtins;
+fn lit() -> str { "hello" }.test({
+    assert(lit() == "hello");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 21
+binary size: 1708
+--- monomorphizations ---
+main

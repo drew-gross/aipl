@@ -1,0 +1,14 @@
+import { wrapping_add as +, *, == } from builtins;
+// 3 + 4 * 2 = 11, not (3 + 4) * 2 = 14
+fn f(x: i64, y: i64) -> i64 { x + y * 2 }.test({
+    assert(f(3, 4) == 11);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 24
+binary size: 1508
+--- monomorphizations ---
+main

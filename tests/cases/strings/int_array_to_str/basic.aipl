@@ -1,0 +1,22 @@
+import { -, print, to_str } from builtins;
+
+// `to_str(xs)` renders an i64[] as a bracketed, comma-separated
+// list. Negatives and zero render via the same decimal logic as to_str.
+fn main() !prints {
+    print(to_str([1, 2, 3]));
+    print(to_str([42]));
+    print(to_str([-5, 0, 100]));
+}
+--- stdout ---
+[1, 2, 3]
+[42]
+[-5, 0, 100]
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 207
+instructions executed: 547
+binary size: 3175
+--- monomorphizations ---
+main

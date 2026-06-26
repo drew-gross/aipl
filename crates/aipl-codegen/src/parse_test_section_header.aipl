@@ -1,0 +1,43 @@
+import { ==, &&, >=, -, trim, starts_with, ends_with, len } from builtins;
+
+pub fn parse_test_section_header(line: str) -> str? {
+    let trimmed = line.trim();
+    if (trimmed.starts_with("---") && trimmed.ends_with("---") && trimmed.len() >= 6) {
+        let inner = trimmed[3..trimmed.len() - 3].trim();
+        if (inner == "") { none } else { some(inner) }
+    } else {
+        none
+    }
+}.doc("""
+If `line` is a `--- name ---` test-section marker, returns `some(name)` with the
+trimmed inner name; otherwise — or when the inner name is empty — returns `none`.
+A line is a marker iff, once trimmed, it starts and ends with `---` and is at
+least 6 bytes long. The cases test harness uses these markers to delimit
+sections; the compiler treats any such marker as a hard cutoff (see
+`strip_test_sections`).
+""").test({
+    // Markers: some(trimmed inner name).
+    assert(parse_test_section_header("--- performance ---") == some("performance"));
+    assert(parse_test_section_header("---errors---") == some("errors"));
+    assert(parse_test_section_header("   --- stdout ---   ") == some("stdout"));
+    assert(parse_test_section_header("--- multi word ---") == some("multi word"));
+    assert(parse_test_section_header("---x---") == some("x"));
+    // Not markers (or empty inner) -> none.
+    assert(parse_test_section_header("") == none);
+    assert(parse_test_section_header("fn main() {") == none);
+    assert(parse_test_section_header("-- two --") == none);  // only two dashes
+    assert(parse_test_section_header("-----") == none);      // five dashes (< 6 bytes)
+    assert(parse_test_section_header("------") == none);      // six dashes, empty inner
+    assert(parse_test_section_header("--- ---") == none);     // inner is all spaces
+})
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 336
+instructions executed: 1130
+binary size: 11857
+--- monomorphizations ---
+__test$parse_test_section_header
+main
+parse_test_section_header

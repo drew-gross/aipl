@@ -1,0 +1,28 @@
+import { ==, push } from builtins;
+
+// Ownership-as-monomorphization on bool[]: `extended` takes an array, appends,
+// and returns it. A call on a *fresh* (uniquely-owned) literal is sent to the
+// owned instance and reuses the buffer in place (the push is a realloc); a call
+// on a *named* (shared) array borrows and copies, leaving the original intact.
+fn extended(xs: bool[]) -> bool[] {
+    mut ys = xs;
+    ys.push(true);
+    ys
+}.test({
+    // Fresh literal → moved into the owned instance, mutated in place.
+    assert(extended([true, false]) == [true, false, true]);
+
+    // Named binding → borrowed (copy); `base` is left unchanged.
+    let base = [true, true];
+    assert(extended(base) == [true, true, true]);
+    assert(base == [true, true]);
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 231
+instructions executed: 384
+binary size: 3941
+--- monomorphizations ---
+main

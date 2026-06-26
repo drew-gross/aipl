@@ -1,0 +1,27 @@
+import { wrapping_add as +, == } from builtins;
+// A user-defined mutating method: `mut self` makes `bump` mutate its receiver
+// in place. It returns nothing and is called `c.bump(n)`. Value semantics
+// hold — a `let` snapshot taken mid-way is unaffected by later mutations.
+struct Counter { n: i64 }
+
+fn bump(mut self: Counter, by: i64) {
+    set self = Counter { n: self.n + by };
+}.test({
+    mut c = Counter { n: 0 };
+    c.bump(5);
+    c.bump(10);
+    let snapshot = c;     // Counter { n: 15 }
+    c.bump(100);          // only c changes; c.n == 115, snapshot.n stays 15
+    assert(snapshot.n == 15);
+    assert(c.n == 115);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 90
+binary size: 2024
+--- monomorphizations ---
+bump
+main

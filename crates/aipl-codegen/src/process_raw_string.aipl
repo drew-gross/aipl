@@ -1,0 +1,72 @@
+// The parser's raw-string hook: the compiler calls this through the FFI (see
+// `install_parser_hooks`) for every `"""..."""` literal, and `aipl check`
+// exercises it via the `.test` block below.
+import { ==, ||, ends_with } from builtins;
+import { trim_prefix } from "./trim_prefix.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+import { trim_suffix } from "./trim_suffix.aipl";
+import { dedent } from "./dedent.aipl";
+
+pub fn process_raw_string(s: str) -> str {
+    // Drop a blank opening line. Trailing whitespace is a compile error (even
+    // inside a string), so the opening `"""` line can carry no spaces/tabs before
+    // its newline — a blank opening line is therefore exactly a leading `\n`, or
+    // `\r\n` on CRLF. Strip those directly. `trim_prefix` is a no-op when the
+    // char is absent, so a first line with real content keeps both its `\r`-less
+    // start and its indentation for `dedent`.
+    let opened = s.trim_prefix('\r').trim_prefix('\n');
+    // Drop a blank closing line: skip the closing line's leading indentation
+    // (genuine whitespace — *not* trailing, since `"""` follows it on that line)
+    // with `trim_end_while`. A blank closing line then leaves `tail` ending in the
+    // newline that closed the previous line, so `tail.ends_with('\n')` detects it
+    // directly (no full-string compare); drop that newline, plus a CR before it on
+    // CRLF. When the last line has content, `tail` ends in that content, so
+    // `opened` is kept and the line's trailing spaces stay verbatim (a single-line
+    // `"""  hi  """` keeps its surrounding spaces).
+    let tail = opened.trim_end_while(|c| c == ' ' || c == '\t');
+    let trimmed = if (tail.ends_with('\n')) {
+        tail.trim_suffix('\n').trim_suffix('\r')
+    } else {
+        opened
+    };
+    trimmed.dedent()
+}.doc("Processes a raw string's verbatim contents: trims a blank opening line and a blank closing line (with a CR before it on CRLF), then strips the common leading-space indentation via `dedent`.").test({
+    // Blank opening + closing lines are dropped, then the common indent is
+    // stripped — the usual `"""` shape.
+    assert(process_raw_string("\n    a\n    b\n    ") == "a\nb");
+    // Single line, no surrounding breaks: just de-dented.
+    assert(process_raw_string("  hi") == "hi");
+    // Smallest indent wins; deeper lines keep the extra.
+    assert(process_raw_string("\n  a\n    b\n  ") == "a\n  b");
+    // A blank middle line is preserved.
+    assert(process_raw_string("\n    a\n\n    b\n    ") == "a\n\nb");
+    // CRLF line endings: the CR before the closing newline is dropped too.
+    assert(process_raw_string("\r\n    a\r\n    ") == "a");
+    // No trailing blank line to drop (no newline before the close).
+    assert(process_raw_string("\n    a") == "a");
+    // Empty contents.
+    assert(process_raw_string("") == "");
+})
+--- performance ---
+allocations: 74
+deallocations: 74
+reallocations: 0
+bytes allocated: 3313
+instructions executed: 10916
+binary size: 32043
+--- monomorphizations ---
+__m1__trim_prefix
+__m3__trim_suffix
+__m4__dedent
+__m5__count_while$char$lam11
+__m5__count_while$char$s0$lam27
+__m5__count_while$char$s0$lam36
+__m5__count_while$i64$lam1
+__m5__count_while$i64$lam3
+__m5__count_while$i64$lam5
+__m5__count_while$i64$lam7
+__m5__count_while$i64$lam9
+__m5__count_while$str$lam13
+__map29$own0
+main
+process_raw_string

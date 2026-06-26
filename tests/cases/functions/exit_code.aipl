@@ -1,0 +1,14 @@
+fn main() -> i64 {
+    42
+}
+--- exit code ---
+42
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 408
+--- monomorphizations ---
+main

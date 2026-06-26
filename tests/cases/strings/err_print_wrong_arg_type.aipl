@@ -1,0 +1,12 @@
+import { print } from builtins;
+
+fn main() !prints -> i64 {
+    let _ = print(42);
+    0
+}
+--- errors ---
+error: fn "print" arg 0: expected str, got i64
+ --> input:4:19
+  |
+4 |     let _ = print(42);
+  |                   ^^

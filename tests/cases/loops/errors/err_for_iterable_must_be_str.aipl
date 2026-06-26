@@ -1,0 +1,10 @@
+fn main() -> i64 {
+    for (let c : 42) { }
+    0
+}
+--- errors ---
+error: for-loop iterable must be a str or array, got i64
+ --> input:2:18
+  |
+2 |     for (let c : 42) { }
+  |                  ^^

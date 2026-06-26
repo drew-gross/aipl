@@ -1,0 +1,13 @@
+import { == } from builtins;
+fn eq_in_if() -> i64 { if (true == true) { 1 } else { 0 } }.test({
+    assert(eq_in_if() == 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 28
+binary size: 1732
+--- monomorphizations ---
+main

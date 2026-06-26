@@ -1,0 +1,16 @@
+import { == } from builtins;
+fn f() -> str {
+    let s = "hello";
+    s
+}.test({
+    assert(f() == "hello");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 21
+binary size: 1691
+--- monomorphizations ---
+main

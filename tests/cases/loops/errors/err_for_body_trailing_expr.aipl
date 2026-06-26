@@ -1,0 +1,13 @@
+// A for body is a statement list with no trailing expression — a bare
+// expression like `0` at the end is a parse error (its value could never
+// be observed; evaluate-for-effect via `expr;`).
+fn f(s: str) -> i64 {
+    for (let c : s) { 0 }
+    0
+}
+--- errors ---
+error: unexpected '}'; expected '.', ';', '?', '[', or operator
+ --> input:5:25
+  |
+5 |     for (let c : s) { 0 }
+  |                         ^

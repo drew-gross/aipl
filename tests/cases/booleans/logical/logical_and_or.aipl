@@ -1,0 +1,20 @@
+import { ==, &&, || } from builtins;
+fn and(x: bool, y: bool) -> bool { x && y }.test({
+    assert(and(true, false) == false);
+    assert(and(true, true) == true);
+})
+fn or(x: bool, y: bool) -> bool { x || y }.test({
+    assert(or(false, true) == true);
+    assert(or(false, false) == false);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 73
+binary size: 2593
+--- monomorphizations ---
+and
+main
+or

@@ -1,0 +1,24 @@
+import { ==, >, len } from builtins;
+// A generic function over `any[]`: written once, monomorphized per element
+// type at each call site.
+
+fn is_len_greater_than_5(v: any[]) -> bool {
+    len(v) > 5
+}.test({
+    let ints = [1, 2, 3];
+    let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    let bools = [true, false];
+    // only `chars` has length > 5
+    assert(is_len_greater_than_5(ints) == false);
+    assert(is_len_greater_than_5(chars) == true);
+    assert(is_len_greater_than_5(bools) == false);
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 177
+instructions executed: 108
+binary size: 2843
+--- monomorphizations ---
+main

@@ -1,0 +1,33 @@
+import { wrapping_add as +, print, to_str } from builtins;
+
+// Exercises the "instructions executed" performance counter. The metric is the
+// sum, over every basic-block entry at runtime, of that block's (compile-time
+// fixed) CLIF instruction count — so it reflects *executed* instructions (a
+// loop body counts once per iteration), and it's deterministic for a fixed
+// program. That determinism is what lets the count be asserted in the
+// `--- performance ---` section below.
+fn triangle() -> i64 {
+    mut sum = 0;
+    mut i = 1;
+    // Ten iterations (one per byte of the string).
+    for (let _c : "0123456789") {
+        set sum = sum + i;
+        set i = i + 1;
+    }
+    sum
+}
+
+fn main() !prints {
+    print(to_str(triangle()));   // 1+2+...+10 = 55
+}
+--- stdout ---
+55
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 207
+binary size: 2123
+--- monomorphizations ---
+main
