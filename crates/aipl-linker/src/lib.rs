@@ -60,6 +60,11 @@ fn link_with(obj_bytes: &[u8], output: &Path, rt_bytes: &[u8], rt_name: &str) ->
 
     let mut cmd = Command::new(&clang);
     cmd.arg(&obj_path).arg(&rt_path).arg("-o").arg(output);
+    // Cranelift-emitted objects lack an LC_BUILD_VERSION load command, which
+    // triggers a harmless ld warning on macOS. Suppress all ld warnings so
+    // the test output stays clean; real errors are still errors (exit ≠ 0).
+    #[cfg(target_os = "macos")]
+    cmd.arg("-Wl,-w");
     let status = cmd
         .status()
         .map_err(|e| Error::msg(format!("spawn {}: {e}", clang.display())))?;
