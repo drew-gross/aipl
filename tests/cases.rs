@@ -77,9 +77,10 @@
 //!
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
-//!   - `cargo test --test cases -- --ignored fill_expected` — fill every `?`
-//!     placeholder (`performance`/`errors`/`check`/`expect file`) from the
-//!     actual output. Combine with `AIPL_CASE` to target a subset.
+//!   - `cargo test --test cases -- --ignored fill_expected` — overwrite every
+//!     `performance`/`check` section with actual output, and fill `?`
+//!     placeholders in `errors`/`expect file` sections. Combine with
+//!     `AIPL_CASE` to target a subset.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
 //! Each diverges (fails) when done so its summary is visible. The relevant
@@ -509,7 +510,7 @@ fn run_shard(shard: usize) {
     // run is never mistaken for a normal green suite.
     if fill_mode() {
         panic!(
-            "section refresh complete: {skipped} `?`/refreshed section(s), {passed} \
+            "section refresh complete: {skipped} refreshed section(s), {passed} \
              already-current, {matched} case(s) seen. Failing intentionally so the \
              summary above is visible — this is not a normal test run (`{FILL_CMD}`).",
         );
@@ -1295,23 +1296,18 @@ fn run_performance_check(
     };
     let expected = parse_perf_stats(expected_body);
 
-    // Capture the measured counts when there's nothing valid to compare against:
-    // an explicit `?` placeholder, or — in fill mode only — a body that doesn't
-    // parse (e.g. a section predating a metric, missing the now-required
-    // `instructions executed:` line). A *valid* body is always compared, even in
-    // fill mode, so a real regression is never masked; to recapture changed
-    // counts, reset the body to `?` and fill.
     let placeholder = expected_body.trim() == "?";
-    if placeholder || (fill_mode() && expected.is_none()) {
-        if fill_mode() {
-            fill_performance(orig_path, &actual);
-            eprintln!("[{}]: filled performance counts", orig_path.display());
-        } else {
-            eprintln!(
-                "=== ACTUAL PERFORMANCE for {ctx} ===\n{}\n===",
-                actual.render()
-            );
-        }
+    // In fill mode always overwrite — no `?` required.
+    if fill_mode() {
+        fill_performance(orig_path, &actual);
+        eprintln!("[{}]: filled performance counts", orig_path.display());
+        return Outcome::Skip;
+    }
+    if placeholder {
+        eprintln!(
+            "=== ACTUAL PERFORMANCE for {ctx} ===\n{}\n===",
+            actual.render()
+        );
         return Outcome::Skip;
     }
 
@@ -1329,7 +1325,7 @@ fn run_performance_check(
     if actual != expected {
         return Outcome::Fail(format!(
             "{ctx}: performance mismatch\n--- expected ---\n{}\n--- actual ---\n{}\n\
-             If this change is intended, reset this section's body to `?` and run `{FILL_CMD}`.",
+             If this change is intended, run `{FILL_CMD}`.",
             expected.render(),
             actual.render(),
         ));

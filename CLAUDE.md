@@ -50,6 +50,9 @@ normal `cargo test` skips them; opt in by name with `-- --ignored <name>`. The
 relevant failure messages (a missing/stale `--- performance ---` section, a
 perf mismatch, a stale perfmon table) print the exact command to run.
 
+`fill_expected` always overwrites every `--- performance ---` section with the
+current measured values — no need to reset bodies to `?` first.
+
 ## Prefer the cases framework for tests
 Default to the `tests/cases/**/*.aipl` framework over Rust unit tests in
 `tests/*.rs`. A case file is just real AIPL source plus the expected
