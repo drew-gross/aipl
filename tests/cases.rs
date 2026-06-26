@@ -1105,9 +1105,12 @@ fn run_success_case(
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
         if fill_mode() {
-            fill_section(orig_path, "monomorphizations", &actual);
-            eprintln!("[{}]: filled monomorphizations list", orig_path.display());
-            return Outcome::Skip;
+            if actual != *expected {
+                fill_section(orig_path, "monomorphizations", &actual);
+                eprintln!("[{}]: filled monomorphizations list", orig_path.display());
+                return Outcome::Skip;
+            }
+            // Already correct — fall through so subsequent fill targets (e.g. performance) get reached.
         }
         if actual != *expected {
             return Outcome::Fail(format!(

@@ -723,6 +723,60 @@ extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
     result
 }
 
+/// `s.reverse() -> str` — returns a new string with the bytes in reverse order.
+/// Consumes `s` per the refcount protocol (callers pre-inc).
+extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
+    let mut sb = [0u8; 8];
+    let bytes = unsafe { str_bytes(s, &mut sb) };
+    let mut reversed: Vec<u8> = bytes.to_vec();
+    reversed.reverse();
+    let result = make_str(&reversed);
+    aipl_dec(s);
+    result
+}
+
+/// `xs.reverse() -> T[]` — returns a new array with elements in reverse order.
+/// Consumes `xs` (decs) and retains each element once for the new array.
+/// `drop_fn`, `retain_fn`, `elem_size` describe the element type.
+extern "C" fn aipl_arr_reverse(
+    a: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    if a.is_null() {
+        return a;
+    }
+    let len = unsafe { array_len_of(a) };
+    if elem_size == ELEM_BITPACKED {
+        let raw = alloc_array(len, len, drop_fn, ELEM_BITPACKED);
+        unsafe {
+            let src = a.add(ARR_ELEMS_OFFSET);
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                let bit = (*src.add(j >> 3) >> (j & 7)) & 1 != 0;
+                write_packed_bit(dst, i, bit);
+            }
+        }
+        aipl_array_dec(a);
+        return raw;
+    }
+    let es = elem_size.max(8) as usize;
+    let raw = alloc_array(len, len, drop_fn, elem_size);
+    unsafe {
+        let src_base = a.add(ARR_ELEMS_OFFSET);
+        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        for i in 0..len {
+            let j = len - 1 - i;
+            std::ptr::copy_nonoverlapping(src_base.add(j * es), dst_base.add(i * es), es);
+        }
+        elem_rc(retain_fn, dst_base, len);
+    }
+    aipl_array_dec(a);
+    raw
+}
+
 /// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter string; `start >= end` yields `""`).
 /// *Borrows* `s` (does not drop it) and returns a fresh `str`. Stage 1 always
@@ -2114,6 +2168,8 @@ fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 fn __builtin_all<T: any>(self: T[], pred: (T) -> bool) -> bool { false }
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
+// Reverse the elements of an array or the bytes of a string.
+fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 fn some<T: any>(x: T) -> T? { none }
 
 // Test-runner hooks. `__assert(cond, loc)` is what `assert(cond)` lowers to
@@ -2796,6 +2852,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
+    jit_builder.symbol("aipl_str_reverse", aipl_str_reverse as *const u8);
+    jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_str_slice", aipl_str_slice as *const u8);
     jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
     jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
@@ -4188,7 +4246,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_trim_mut"
         | "aipl_str_hash"
         | "aipl_str_iter_next"
-        | "aipl_read_file_to_string" => sig(1, true),
+        | "aipl_read_file_to_string"
+        | "aipl_str_reverse" => sig(1, true),
         "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
@@ -4205,7 +4264,9 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" | "aipl_str_slice" => {
             sig(3, true)
         }
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => sig(4, true),
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
+            sig(4, true)
+        }
         "aipl_array_push" | "aipl_array_push_mut" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert" => {
             sig(6, true)
@@ -8354,6 +8415,42 @@ fn compile_expr<M: Module>(
                 ));
             };
             (len, Type::Primitive(Primitive::I64))
+        }
+        ExprKind::Call(name, args, _) if name == "__builtin_reverse" => {
+            // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
+            // elements (or bytes) in reverse order. Consumes `self` (callers pre-inc).
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"reverse\" expects 1 argument, got {}", args.len()),
+                    span,
+                ));
+            }
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if is_str_repr(&t) {
+                emit_inc(builder, module, builtins, ptr);
+                let f = builtins.import(module, builder.func, "aipl_str_reverse");
+                let inst = builder.ins().call(f, &[ptr]);
+                (
+                    builder.inst_results(inst)[0],
+                    Type::Primitive(Primitive::Str),
+                )
+            } else if let Type::Array(elem) = &t {
+                let elem = (**elem).clone();
+                emit_inc(builder, module, builtins, ptr);
+                let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+                let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+                let esz = builder
+                    .ins()
+                    .iconst(types::I64, runtime_elem_size(&elem, structs));
+                let f = builtins.import(module, builder.func, "aipl_arr_reverse");
+                let inst = builder.ins().call(f, &[ptr, drop_fn, retain_fn, esz]);
+                (builder.inst_results(inst)[0], Type::Array(Box::new(elem)))
+            } else {
+                return Err(Error::at(
+                    format!("\"reverse\" expects a str or array, got {}", type_name(&t)),
+                    args[0].span,
+                ));
+            }
         }
         ExprKind::Call(name, args, _) if starts_ends_variant(name).is_some() => {
             // `s.starts_with(p)` / `s.ends_with(p) -> bool` over a `str` (byte

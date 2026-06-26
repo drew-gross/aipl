@@ -1419,6 +1419,14 @@ impl Cx<'_> {
                 .into_iter()
                 .next()
                 .unwrap_or_else(|| Type::Primitive(Primitive::I64)))
+        } else if name == "__builtin_reverse" {
+            // `str.reverse()` returns `str`, not `char[]` (the generic
+            // substitution would give `char[]` since str → T[] pins T=char).
+            if atys.first().is_some_and(is_str_repr) {
+                Ok(Type::Primitive(Primitive::Str))
+            } else {
+                Ok(subst_vars(&return_ty, &map, &vars))
+            }
         } else {
             Ok(subst_vars(&return_ty, &map, &vars))
         }

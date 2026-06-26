@@ -3001,6 +3001,12 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             Some(Type::Dict(_, v)) => Type::Optional(v.clone()),
             _ => Type::Optional(Box::new(Type::Primitive(Primitive::I64))),
         },
+        // `xs.reverse() -> T[]` / `s.reverse() -> str` — same type as the input.
+        "__builtin_reverse" => match arg_tys.first() {
+            Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
+            Some(Type::Array(inner)) => Type::Array(inner.clone()),
+            _ => Type::Array(Box::new(none_inner_ty())),
+        },
         // push returns the array it was given (first effective arg).
         "__builtin_push" => arg_tys
             .first()

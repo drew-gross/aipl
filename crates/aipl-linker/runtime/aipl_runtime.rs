@@ -895,6 +895,88 @@ pub extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
     }
 }
 
+/// `s.reverse() -> str` — new string with the bytes in reverse order.
+/// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_reverse`.
+#[no_mangle]
+pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
+    unsafe {
+        let mut sbuf = [0u8; 8];
+        let bytes = str_bytes(s, &mut sbuf);
+        let n = bytes.len();
+        // Build reversed copy in a stack-local or heap buffer, then make_str.
+        // For short strings (<=7 bytes) make_str packs inline; longer ones heap.
+        let result = if n == 0 {
+            make_str(&[])
+        } else {
+            // Allocate a temporary reversed buffer: use a fixed stack buf for
+            // short strings (<=128 bytes) to avoid a heap allocation.
+            let mut tmp = [0u8; 128];
+            if n <= 128 {
+                for (i, &b) in bytes.iter().rev().enumerate() {
+                    tmp[i] = b;
+                }
+                make_str(&tmp[..n])
+            } else {
+                // Allocate a fresh heap string and write the reversed bytes in.
+                let raw = rt_str_buf(n);
+                let dst = raw.add(STR_HEADER_SIZE) as *mut u8;
+                for (i, &b) in bytes.iter().rev().enumerate() {
+                    *dst.add(i) = b;
+                }
+                raw.add(STR_HEADER_SIZE)
+            }
+        };
+        aipl_dec(s);
+        result
+    }
+}
+
+/// `xs.reverse() -> T[]` — new array with elements in reverse order.
+/// Consumes `xs` (callers pre-inc) and retains each element for the output.
+/// Mirrors the JIT runtime's `aipl_arr_reverse`.
+#[no_mangle]
+pub extern "C" fn aipl_arr_reverse(
+    a: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    if a.is_null() {
+        return a;
+    }
+    unsafe {
+        let len = array_len(a);
+        let raw = if elem_size == ELEM_BITPACKED {
+            let raw = array_alloc(len, len, drop_fn, ELEM_BITPACKED) as *const u8;
+            let src = a.add(ARR_ELEMS_OFFSET);
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                let bit = (*src.add(j >> 3) >> (j & 7)) & 1 != 0;
+                write_packed_bit(dst, i, bit);
+            }
+            raw
+        } else {
+            let es = if elem_size < 8 { 8 } else { elem_size as usize };
+            let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
+            let src_base = a.add(ARR_ELEMS_OFFSET);
+            let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                memcpy(
+                    dst_base.add(i * es) as *mut c_void,
+                    src_base.add(j * es) as *const c_void,
+                    es,
+                );
+            }
+            elem_rc(retain_fn, dst_base, len);
+            raw
+        };
+        aipl_array_dec(a);
+        raw
+    }
+}
+
 /// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter string; `start >= end` yields `""`).
 /// *Borrows* `s` (does not drop it) and returns a fresh `str`. Mirrors the JIT

@@ -1,0 +1,30 @@
+import { reverse, ==, print, len } from builtins;
+
+fn str_rev(s: str) -> str { s.reverse() }.test({
+    assert(str_rev("abc") == "cba");
+    assert(str_rev("") == "");
+    assert(str_rev("a") == "a");
+    assert(str_rev("hello world") == "dlrow olleh");
+    assert(reverse("xyz") == "zyx"); // free-call form
+})
+
+fn arr_rev(xs: i64[]) -> i64[] { xs.reverse() }.test({
+    assert(arr_rev([1, 2, 3]) == [3, 2, 1]);
+    assert(arr_rev([42]) == [42]);
+    assert(arr_rev([1, 2, 3]).len() == 3);
+})
+
+fn str_arr_rev(xs: str[]) -> str[] { xs.reverse() }.test({
+    assert(str_arr_rev(["a", "b", "c"]) == ["c", "b", "a"]);
+})
+--- performance ---
+allocations: 12
+deallocations: 7
+reallocations: 0
+bytes allocated: 596
+instructions executed: 451
+binary size: 6800
+--- monomorphizations ---
+arr_rev
+main
+str_rev
