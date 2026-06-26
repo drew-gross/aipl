@@ -9,7 +9,7 @@ pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
         set i++;
         if (!pred(c)) { set k = i; }; // k = end of the last non-matching run
     }
-    self[0..k]
+    self[..k]
 }.doc("Drops the trailing run of characters satisfying `pred` (the trailing counterpart of `trim_while`).").test({
     assert("abc   ".trim_end_while(|c| c == ' ') == "abc"); // trailing spaces dropped
     assert("abc".trim_end_while(|c| c == ' ') == "abc");    // nothing to trim
