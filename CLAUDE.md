@@ -50,8 +50,8 @@ normal `cargo test` skips them; opt in by name with `-- --ignored <name>`. The
 relevant failure messages (a missing/stale `--- performance ---` section, a
 perf mismatch, a stale perfmon table) print the exact command to run.
 
-`fill_expected` always overwrites every `--- performance ---` section with the
-current measured values — no need to reset bodies to `?` first.
+`fill_expected` always overwrites every section with current values — no need
+to set bodies to `?` first.
 
 ## Prefer the cases framework for tests
 Default to the `tests/cases/**/*.aipl` framework over Rust unit tests in
@@ -147,8 +147,8 @@ the failure list.
 Never hand-write the expected error block in a `tests/cases/` error fixture.
 The expected text must match the compiler's `Error::render` byte-for-byte —
 caret columns, and even a trailing space on an empty source line — so
-transcribing it by hand is error-prone. Instead set the `--- errors ---`
-section body to a single `?` and run the `fill_expected` helper, scoped to the
+transcribing it by hand is error-prone. Instead write a `--- errors ---`
+section (any body is fine) and run the `fill_expected` helper, scoped to the
 fixture with `AIPL_CASE`:
 `AIPL_CASE='structs/err_foo' cargo test --test cases -- --ignored fill_expected`.
 The harness writes the actual rendered error back into the fixture (and fails

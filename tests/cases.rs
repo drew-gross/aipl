@@ -78,9 +78,9 @@
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
 //!   - `cargo test --test cases -- --ignored fill_expected` — overwrite every
-//!     `performance`/`check` section with actual output, and fill `?`
-//!     placeholders in `errors`/`expect file` sections. Combine with
-//!     `AIPL_CASE` to target a subset.
+//!     `performance`/`monomorphizations`/`check`/`errors`/`expect file`
+//!     section with actual output. Combine with `AIPL_CASE` to target a
+//!     subset.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
 //! Each diverges (fails) when done so its summary is visible. The relevant
@@ -535,11 +535,9 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool) -> Ou
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
     let ctx = format!("[{}]", rel.display());
 
-    // Authoring helper: if the case's errors section is a single `?`,
-    // run the compile and write the actual rendered error back into the
-    // file so authors don't have to copy/paste. Test then fails so it
-    // gets attention; once the actual is committed the test passes.
-    if fill_mode() && spec.errors.as_deref().map(str::trim) == Some("?") {
+    // Authoring helper: if the case has an errors section, re-compile and
+    // write the rendered error back into the file in fill mode.
+    if fill_mode() && spec.errors.is_some() {
         try_fill_expected(path, &contents, &spec);
         return Outcome::Skip;
     }
@@ -1106,7 +1104,7 @@ fn run_success_case(
     // `--- monomorphizations ---` section. Read before `emit` consumes `obj_comp`.
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
-        if fill_mode() && expected.trim() == "?" {
+        if fill_mode() {
             fill_section(orig_path, "monomorphizations", &actual);
             eprintln!("[{}]: filled monomorphizations list", orig_path.display());
             return Outcome::Skip;
@@ -1114,8 +1112,7 @@ fn run_success_case(
         if actual != *expected {
             return Outcome::Fail(format!(
                 "{ctx}: monomorphizations mismatch\n--- expected ---\n{expected}\n\
-                 --- actual ---\n{actual}\nIf this change is intended, reset this section's \
-                 body to `?` and run `{FILL_CMD}`."
+                 --- actual ---\n{actual}\nIf this change is intended, run `{FILL_CMD}`."
             ));
         }
     }
@@ -1185,7 +1182,7 @@ fn run_success_case(
                     ))
                 }
             };
-            if fill_mode() && expected.trim() == "?" {
+            if fill_mode() {
                 fill_section(orig_path, &format!("expect file: {rel}"), &actual);
                 eprintln!("[{}]: filled expect file {rel}", orig_path.display());
                 filled_file = true;
@@ -1221,10 +1218,9 @@ fn run_success_case(
         let report = normalize_output(&String::from_utf8_lossy(&output.stdout));
         match &spec.check {
             // A `--- check ---` section pins the expected report exactly (this is
-            // how a *failing* test is documented). Authoring helper: a `?` body
-            // captures the actual report in fill mode.
+            // how a *failing* test is documented).
             Some(expected) => {
-                if fill_mode() && expected.trim() == "?" {
+                if fill_mode() {
                     fill_section(orig_path, "check", &report);
                     eprintln!("[{}]: filled check report", orig_path.display());
                     return Outcome::Skip;
