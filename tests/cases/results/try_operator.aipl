@@ -37,7 +37,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 340
-binary size: 4543
+binary size: 3752
 --- monomorphizations ---
 main
 parse_pos

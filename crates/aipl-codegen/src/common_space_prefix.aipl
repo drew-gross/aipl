@@ -48,7 +48,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1732
-binary size: 7081
+binary size: 6128
 --- monomorphizations ---
 common_space_prefix
 main

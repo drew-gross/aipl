@@ -6,20 +6,16 @@ myself. Finish a task at the green-and-formatted state (see the pre-handoff
 sequence below) and stop there; leave the working tree uncommitted.
 
 ## Shell
-Use the **PowerShell** tool — never Bash — for everything terminal-side:
-`cargo build`, `cargo test`, `cargo fmt`, `git`, env-var-prefixed runs
-(`$env:AIPL_CASE='x'; cargo test ...`), file operations. The Bash tool
-here goes through a WSL shim and is noticeably slower per invocation, and
-mixing the two within a task is a recipe for confusion. Reserve Bash only
-for tasks that genuinely need POSIX shell semantics that PowerShell can't
-express.
+Use the **Bash** tool for everything terminal-side: `cargo build`,
+`cargo test`, `cargo fmt`, `git`, env-var-prefixed runs
+(`AIPL_CASE='x' cargo test ...`), file operations.
 
 ## Test cadence
 Avoid running the full test suite during development — it is the slowest part
 of the dev loop. Prefer:
 - A single test by file: `cargo test --test mono`
 - A single test by name: `cargo test -- name_substring`
-- A filtered case run: `$env:AIPL_CASE='generics/'; cargo test --test cases`
+- A filtered case run: `AIPL_CASE='generics/' cargo test --test cases`
   (the cases harness intentionally fails when `AIPL_CASE` is set so a stray
   filter can't be mistaken for a green full suite)
 
@@ -151,7 +147,7 @@ caret columns, and even a trailing space on an empty source line — so
 transcribing it by hand is error-prone. Instead set the `--- errors ---`
 section body to a single `?` and run the `fill_expected` helper, scoped to the
 fixture with `AIPL_CASE`:
-`$env:AIPL_CASE='structs/err_foo'; cargo test --test cases -- --ignored fill_expected`.
+`AIPL_CASE='structs/err_foo' cargo test --test cases -- --ignored fill_expected`.
 The harness writes the actual rendered error back into the fixture (and fails
 that run intentionally); review it, then re-run normally to confirm it passes.
 This also avoids a rendering mismatch: the harness renders against

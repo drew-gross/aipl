@@ -14,7 +14,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 52
-binary size: 1986
+binary size: 1504
 --- monomorphizations ---
 __test$unwrap
 main

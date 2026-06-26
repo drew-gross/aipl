@@ -20,7 +20,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 212
-binary size: 4171
+binary size: 3416
 --- monomorphizations ---
 main
 trim_prefix

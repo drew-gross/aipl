@@ -54,7 +54,7 @@ deallocations: 19
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1071
-binary size: 15948
+binary size: 13024
 --- monomorphizations ---
 __test$array_values
 __test$optional_values

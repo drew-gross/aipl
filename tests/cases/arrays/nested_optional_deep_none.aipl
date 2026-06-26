@@ -46,7 +46,7 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 213
 instructions executed: 573
-binary size: 6979
+binary size: 4976
 --- monomorphizations ---
 main
 ret_deep

@@ -11,7 +11,7 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 32
 instructions executed: 33
-binary size: 1864
+binary size: 1392
 --- monomorphizations ---
 __test$g
 g$EmptyArray

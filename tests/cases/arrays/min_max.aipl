@@ -24,7 +24,7 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 424
 instructions executed: 707
-binary size: 7290
+binary size: 5784
 --- monomorphizations ---
 __filter1$own0
 __test$smallest

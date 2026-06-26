@@ -23,7 +23,7 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 194
-binary size: 3645
+binary size: 2904
 --- monomorphizations ---
 __test$at
 at

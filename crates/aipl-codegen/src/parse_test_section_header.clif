@@ -13,37 +13,37 @@
 ; import 8 aipl_dec
 
 ; parse_test_section_header
-function u0:0(i64, i64) windows_fastcall {
+function u0:0(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 16, align = 8
     ss2 = explicit_slot 16, align = 8
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64, i64) -> i64 windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64, i64) -> i64 windows_fastcall
-    sig8 = (i64) -> i64 windows_fastcall
-    sig9 = (i64) -> i64 windows_fastcall
-    sig10 = (i64, i64, i64) -> i64 windows_fastcall
-    sig11 = (i64) windows_fastcall
-    sig12 = (i64) -> i64 windows_fastcall
-    sig13 = (i64) windows_fastcall
-    sig14 = (i64) windows_fastcall
-    sig15 = (i64, i64) -> i64 windows_fastcall
-    sig16 = (i64) windows_fastcall
-    sig17 = (i64) windows_fastcall
-    sig18 = (i64) windows_fastcall
-    sig19 = (i64) windows_fastcall
-    sig20 = (i64) windows_fastcall
-    sig21 = (i64) windows_fastcall
-    sig22 = (i64) windows_fastcall
-    sig23 = (i64) windows_fastcall
-    sig24 = (i64) windows_fastcall
-    sig25 = (i64) windows_fastcall
-    sig26 = (i64) windows_fastcall
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64, i64) -> i64 apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64, i64) -> i64 apple_aarch64
+    sig8 = (i64) -> i64 apple_aarch64
+    sig9 = (i64) -> i64 apple_aarch64
+    sig10 = (i64, i64, i64) -> i64 apple_aarch64
+    sig11 = (i64) apple_aarch64
+    sig12 = (i64) -> i64 apple_aarch64
+    sig13 = (i64) apple_aarch64
+    sig14 = (i64) apple_aarch64
+    sig15 = (i64, i64) -> i64 apple_aarch64
+    sig16 = (i64) apple_aarch64
+    sig17 = (i64) apple_aarch64
+    sig18 = (i64) apple_aarch64
+    sig19 = (i64) apple_aarch64
+    sig20 = (i64) apple_aarch64
+    sig21 = (i64) apple_aarch64
+    sig22 = (i64) apple_aarch64
+    sig23 = (i64) apple_aarch64
+    sig24 = (i64) apple_aarch64
+    sig25 = (i64) apple_aarch64
+    sig26 = (i64) apple_aarch64
     fn0 = u0:1 sig0  ; aipl_inc
     fn1 = u0:2 sig1  ; aipl_trim
     fn2 = u0:1 sig2  ; aipl_inc

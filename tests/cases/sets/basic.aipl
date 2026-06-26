@@ -22,7 +22,7 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 160
 instructions executed: 209
-binary size: 4919
+binary size: 3784
 --- monomorphizations ---
 __test$build
 main

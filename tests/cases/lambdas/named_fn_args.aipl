@@ -50,7 +50,7 @@ deallocations: 13
 reallocations: 3
 bytes allocated: 704
 instructions executed: 1154
-binary size: 8547
+binary size: 6856
 --- monomorphizations ---
 __map2$own0
 double

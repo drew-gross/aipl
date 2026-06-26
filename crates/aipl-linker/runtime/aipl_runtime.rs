@@ -56,6 +56,16 @@ fn panic(_info: &PanicInfo) -> ! {
     unsafe { abort() }
 }
 
+// The macOS static linker requires all undefined symbols to be resolved at
+// link time, even if they're unreachable.  With panic=abort the personality
+// function is never called, but core's exception tables still reference the
+// symbol.  Provide a stub so `ld` is satisfied.
+#[cfg(target_os = "macos")]
+#[no_mangle]
+pub unsafe extern "C" fn rust_eh_personality() -> ! {
+    unsafe { abort() }
+}
+
 // ---------- Allocation instrumentation ----------
 //
 // Every heap allocation/free the runtime makes goes through `rt_alloc`/

@@ -9,7 +9,7 @@
 ; import 4 aipl_dec
 
 ; line_end_span
-function u0:0(i64, i64, i64, i64, i64, i64) windows_fastcall {
+function u0:0(i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 24, align = 8
     ss2 = explicit_slot 16, align = 8
@@ -90,7 +90,7 @@ block9(v23: i64):
 ;   v9 = end
 ;   v12 = last
 ; find_trailing_whitespace
-function u0:1(i64, i64) windows_fastcall {
+function u0:1(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -100,12 +100,12 @@ function u0:1(i64, i64) windows_fastcall {
     ss6 = explicit_slot 8, align = 8
     ss7 = explicit_slot 24, align = 8
     ss8 = explicit_slot 24, align = 8
-    sig0 = (i64, i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64, i64, i64, i64, i64, i64) windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64, i64, i64, i64, i64, i64) windows_fastcall
-    sig5 = (i64) windows_fastcall
+    sig0 = (i64, i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64, i64, i64, i64, i64, i64) apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64, i64, i64, i64, i64, i64) apple_aarch64
+    sig5 = (i64) apple_aarch64
     fn0 = u0:2 sig0  ; aipl_str_iter_init
     fn1 = u0:3 sig1  ; aipl_str_iter_next
     fn2 = colocated u0:0 sig2  ; line_end_span

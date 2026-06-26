@@ -9,7 +9,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 46
-binary size: 1856
+binary size: 1384
 --- monomorphizations ---
 lt
 main

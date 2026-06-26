@@ -46,7 +46,7 @@ deallocations: 17
 reallocations: 0
 bytes allocated: 936
 instructions executed: 585
-binary size: 8851
+binary size: 7312
 --- monomorphizations ---
 empty_set
 main

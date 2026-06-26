@@ -21,27 +21,27 @@
 ; import 31 aipl_str_iter_next
 
 ; __m1__dedent
-function u0:0(i64) -> i64 windows_fastcall {
+function u0:0(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) windows_fastcall
-    sig2 = (i64, i64) -> i64 windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64) -> i64 windows_fastcall
-    sig5 = (i64) -> i64 windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64, i64) -> i64 windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
-    sig10 = (i64, i64) -> i64 windows_fastcall
-    sig11 = (i64) windows_fastcall
-    sig12 = (i64) windows_fastcall
-    sig13 = (i64) windows_fastcall
-    sig14 = (i64) windows_fastcall
-    sig15 = (i64) windows_fastcall
-    sig16 = (i64) windows_fastcall
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64) -> i64 apple_aarch64
+    sig5 = (i64) -> i64 apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64, i64) -> i64 apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64, i64) -> i64 apple_aarch64
+    sig11 = (i64) apple_aarch64
+    sig12 = (i64) apple_aarch64
+    sig13 = (i64) apple_aarch64
+    sig14 = (i64) apple_aarch64
+    sig15 = (i64) apple_aarch64
+    sig16 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:17 sig2  ; aipl_str_split
@@ -139,33 +139,33 @@ block3:
 ;   v2 = lines
 ;   v30 = n
 ; process_raw_string
-function u0:1(i64) -> i64 windows_fastcall {
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64, i64) -> i64 windows_fastcall
-    sig2 = (i64) windows_fastcall
-    sig3 = (i64, i64) -> i64 windows_fastcall
-    sig4 = (i64) windows_fastcall
-    sig5 = (i64) -> i64 windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64, i64) -> i64 windows_fastcall
-    sig9 = (i64) windows_fastcall
-    sig10 = (i64, i64) -> i64 windows_fastcall
-    sig11 = (i64) windows_fastcall
-    sig12 = (i64, i64) -> i64 windows_fastcall
-    sig13 = (i64) windows_fastcall
-    sig14 = (i64) windows_fastcall
-    sig15 = (i64) windows_fastcall
-    sig16 = (i64) windows_fastcall
-    sig17 = (i64) windows_fastcall
-    sig18 = (i64) -> i64 windows_fastcall
-    sig19 = (i64) windows_fastcall
-    sig20 = (i64) windows_fastcall
-    sig21 = (i64) windows_fastcall
-    sig22 = (i64) windows_fastcall
-    sig23 = (i64) windows_fastcall
-    sig24 = (i64) windows_fastcall
-    sig25 = (i64) windows_fastcall
+function u0:1(i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64, i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64) -> i64 apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64, i64) -> i64 apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64, i64) -> i64 apple_aarch64
+    sig11 = (i64) apple_aarch64
+    sig12 = (i64, i64) -> i64 apple_aarch64
+    sig13 = (i64) apple_aarch64
+    sig14 = (i64) apple_aarch64
+    sig15 = (i64) apple_aarch64
+    sig16 = (i64) apple_aarch64
+    sig17 = (i64) apple_aarch64
+    sig18 = (i64) -> i64 apple_aarch64
+    sig19 = (i64) apple_aarch64
+    sig20 = (i64) apple_aarch64
+    sig21 = (i64) apple_aarch64
+    sig22 = (i64) apple_aarch64
+    sig23 = (i64) apple_aarch64
+    sig24 = (i64) apple_aarch64
+    sig25 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = colocated u0:2 sig1  ; __m4__trim_prefix
     fn2 = u0:16 sig2  ; aipl_inc
@@ -245,20 +245,20 @@ block3(v10: i64):
 ;   v5 = tail
 ;   v10 = trimmed
 ; __m4__trim_prefix
-function u0:2(i64, i64) -> i64 windows_fastcall {
+function u0:2(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 16, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64, i64) -> i64 windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64, i64, i64) -> i64 windows_fastcall
-    sig4 = (i64) windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64, i64) -> i64 apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64, i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:22 sig1  ; aipl_char_at
     fn2 = u0:23 sig2  ; aipl_str_len
@@ -335,21 +335,21 @@ block7(v21: i64):
 ;   v0 = self
 ;   v1 = c
 ; __m6__trim_suffix
-function u0:3(i64, i64) -> i64 windows_fastcall {
+function u0:3(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 16, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64) -> i64 windows_fastcall
-    sig1 = (i64) windows_fastcall
-    sig2 = (i64, i64) -> i64 windows_fastcall
-    sig3 = (i64) -> i64 windows_fastcall
-    sig4 = (i64, i64, i64) -> i64 windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
-    sig10 = (i64) windows_fastcall
+    sig0 = (i64) -> i64 apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64) -> i64 apple_aarch64
+    sig4 = (i64, i64, i64) -> i64 apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64) apple_aarch64
     fn0 = u0:23 sig0  ; aipl_str_len
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:22 sig2  ; aipl_char_at
@@ -431,10 +431,10 @@ block7(v23: i64):
 ;   v0 = self
 ;   v1 = c
 ; __lambda_0
-function u0:4(i64) -> i64 windows_fastcall {
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) windows_fastcall
+function u0:4(i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:25 sig1  ; aipl_str_is_all_whitespace
     fn2 = u0:19 sig2  ; aipl_dec
@@ -450,21 +450,21 @@ block0(v0: i64):
 ; source variables:
 ;   v0 = l
 ; __filter1
-function u0:5(i64) -> i64 windows_fastcall {
+function u0:5(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64, i64) -> i64 windows_fastcall
-    sig1 = (i64) windows_fastcall
-    sig2 = (i64) windows_fastcall
-    sig3 = (i64) -> i64 windows_fastcall
-    sig4 = (i64, i64) windows_fastcall
-    sig5 = (i64, i64) windows_fastcall
-    sig6 = (i64, i64, i64, i64, i64) -> i64 windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
-    sig10 = (i64) windows_fastcall
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64) -> i64 apple_aarch64
+    sig4 = (i64, i64) apple_aarch64
+    sig5 = (i64, i64) apple_aarch64
+    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64) apple_aarch64
     fn0 = u0:26 sig0  ; aipl_array_with_cap
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:16 sig2  ; aipl_inc
@@ -540,7 +540,7 @@ block3:
 ;   ss0 = $out
 ;   v12 = $e
 ; __lambda_2
-function u0:6(i64) -> i64 windows_fastcall {
+function u0:6(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 32
     v2 = icmp eq v0, v1  ; v1 = 32
@@ -551,15 +551,15 @@ block0(v0: i64):
 ; source variables:
 ;   v0 = c
 ; __m2__count_while$char$s0$lam3
-function u0:7(i64) -> i64 windows_fastcall {
+function u0:7(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64) windows_fastcall
+    sig0 = (i64, i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64) apple_aarch64
     fn0 = u0:30 sig0  ; aipl_str_iter_init
     fn1 = u0:31 sig1  ; aipl_str_iter_next
     fn2 = colocated u0:6 sig2  ; __lambda_2
@@ -622,10 +622,10 @@ block3:
 ;   ss0 = n
 ;   v5 = x
 ; __lambda_4
-function u0:8(i64) -> i64 windows_fastcall {
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) windows_fastcall
+function u0:8(i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = colocated u0:15 sig1  ; __m2__count_while$char$s0$lam12
     fn2 = u0:19 sig2  ; aipl_dec
@@ -640,17 +640,17 @@ block0(v0: i64):
 ; source variables:
 ;   v0 = l
 ; __map5$own0
-function u0:9(i64) -> i64 windows_fastcall {
+function u0:9(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64) windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = colocated u0:8 sig2  ; __lambda_4
@@ -717,17 +717,17 @@ block3:
 ;   ss1 = $i
 ;   v10 = $e
 ; __lambda_6
-function u0:10(i64, i64) -> i64 windows_fastcall {
-    sig0 = (i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64, i64, i64) -> i64 windows_fastcall
-    sig4 = (i64) windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
+function u0:10(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64, i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:25 sig1  ; aipl_str_is_all_whitespace
     fn2 = u0:23 sig2  ; aipl_str_len
@@ -768,22 +768,22 @@ block3(v4: i64):
 ;   v0 = line
 ;   v1 = n
 ; __map8
-function u0:11(i64, i64) -> i64 windows_fastcall {
+function u0:11(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64, i64) -> i64 windows_fastcall
-    sig1 = (i64) windows_fastcall
-    sig2 = (i64) windows_fastcall
-    sig3 = (i64, i64) -> i64 windows_fastcall
-    sig4 = (i64, i64) windows_fastcall
-    sig5 = (i64, i64) windows_fastcall
-    sig6 = (i64, i64, i64, i64, i64) -> i64 windows_fastcall
-    sig7 = (i64) windows_fastcall
-    sig8 = (i64) windows_fastcall
-    sig9 = (i64) windows_fastcall
-    sig10 = (i64) windows_fastcall
-    sig11 = (i64) windows_fastcall
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64, i64) -> i64 apple_aarch64
+    sig4 = (i64, i64) apple_aarch64
+    sig5 = (i64, i64) apple_aarch64
+    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64) apple_aarch64
+    sig11 = (i64) apple_aarch64
     fn0 = u0:26 sig0  ; aipl_array_with_cap
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:16 sig2  ; aipl_inc
@@ -852,7 +852,7 @@ block3:
 ;   ss0 = $out
 ;   v13 = $e
 ; __lambda_9
-function u0:12(i64) -> i64 windows_fastcall {
+function u0:12(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 32
     v2 = icmp eq v0, v1  ; v1 = 32
@@ -867,18 +867,18 @@ block0(v0: i64):
 ; source variables:
 ;   v0 = c
 ; __m5__trim_end_while$lam10
-function u0:13(i64) -> i64 windows_fastcall {
+function u0:13(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 56, align = 8
     ss3 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64, i64, i64) -> i64 windows_fastcall
-    sig4 = (i64) windows_fastcall
-    sig5 = (i64) windows_fastcall
-    sig6 = (i64) windows_fastcall
+    sig0 = (i64, i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64, i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64) apple_aarch64
+    sig6 = (i64) apple_aarch64
     fn0 = u0:30 sig0  ; aipl_str_iter_init
     fn1 = u0:31 sig1  ; aipl_str_iter_next
     fn2 = colocated u0:12 sig2  ; __lambda_9
@@ -946,7 +946,7 @@ block3:
 ;   ss1 = i
 ;   v6 = c
 ; __lambda_11
-function u0:14(i64) -> i64 windows_fastcall {
+function u0:14(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 32
     v2 = icmp eq v0, v1  ; v1 = 32
@@ -957,15 +957,15 @@ block0(v0: i64):
 ; source variables:
 ;   v0 = c
 ; __m2__count_while$char$s0$lam12
-function u0:15(i64) -> i64 windows_fastcall {
+function u0:15(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) windows_fastcall
-    sig1 = (i64) -> i64 windows_fastcall
-    sig2 = (i64) -> i64 windows_fastcall
-    sig3 = (i64) windows_fastcall
-    sig4 = (i64) windows_fastcall
+    sig0 = (i64, i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64) apple_aarch64
     fn0 = u0:30 sig0  ; aipl_str_iter_init
     fn1 = u0:31 sig1  ; aipl_str_iter_next
     fn2 = colocated u0:14 sig2  ; __lambda_11

@@ -18,7 +18,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 75
-binary size: 2535
+binary size: 1920
 --- monomorphizations ---
 __test$value_or
 main

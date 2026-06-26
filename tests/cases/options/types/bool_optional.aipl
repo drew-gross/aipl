@@ -15,7 +15,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 79
-binary size: 2320
+binary size: 1768
 --- monomorphizations ---
 __test$flag
 flag

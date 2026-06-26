@@ -25,7 +25,7 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 544
 instructions executed: 474
-binary size: 4745
+binary size: 3744
 --- monomorphizations ---
 __test$appended
 main

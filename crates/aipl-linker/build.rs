@@ -71,12 +71,7 @@ fn build_runtime(
         panic!("rustc failed to build runtime staticlib {crate_name} (exit {status})");
     }
 
-    // rustc emits `libNAME.a` on Unix-ish targets and `NAME.lib` on MSVC.
-    let lib_name = if target.contains("msvc") {
-        format!("{crate_name}.lib")
-    } else {
-        format!("lib{crate_name}.a")
-    };
+    let lib_name = format!("lib{crate_name}.a");
     let lib_path = out_dir.join(&lib_name);
     if !lib_path.exists() {
         panic!(

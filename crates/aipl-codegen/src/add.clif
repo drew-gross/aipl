@@ -5,7 +5,7 @@
 ; entry add 0 i64 i64 -> i64
 
 ; add
-function u0:0(i64, i64) -> i64 windows_fastcall {
+function u0:0(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
     v2 = iadd v0, v1
     return v2

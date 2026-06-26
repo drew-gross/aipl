@@ -60,10 +60,6 @@ fn link_with(obj_bytes: &[u8], output: &Path, rt_bytes: &[u8], rt_name: &str) ->
 
     let mut cmd = Command::new(&clang);
     cmd.arg(&obj_path).arg(&rt_path).arg("-o").arg(output);
-    // Console subsystem on Windows so stdout/stderr are connected.
-    if cfg!(target_os = "windows") {
-        cmd.arg("-Wl,/subsystem:console");
-    }
     let status = cmd
         .status()
         .map_err(|e| Error::msg(format!("spawn {}: {e}", clang.display())))?;
@@ -75,22 +71,13 @@ fn link_with(obj_bytes: &[u8], output: &Path, rt_bytes: &[u8], rt_name: &str) ->
     Ok(())
 }
 
-/// Default executable name for a given source stem on the current OS
-/// (`.exe` suffix on Windows).
+/// Default executable name for a given source stem.
 pub fn default_exe_name(stem: &str) -> String {
-    if cfg!(target_os = "windows") {
-        format!("{stem}.exe")
-    } else {
-        stem.to_string()
-    }
+    stem.to_string()
 }
 
 fn object_ext() -> &'static str {
-    if cfg!(target_env = "msvc") {
-        "obj"
-    } else {
-        "o"
-    }
+    "o"
 }
 
 fn staging_dir() -> Result<PathBuf, Error> {
@@ -105,14 +92,9 @@ fn staging_dir() -> Result<PathBuf, Error> {
 }
 
 fn which(prog: &str) -> Option<PathBuf> {
-    let exe = if cfg!(target_os = "windows") {
-        format!("{prog}.exe")
-    } else {
-        prog.to_string()
-    };
     let path = env::var_os("PATH")?;
     for dir in env::split_paths(&path) {
-        let candidate = dir.join(&exe);
+        let candidate = dir.join(prog);
         if candidate.is_file() {
             return Some(candidate);
         }
