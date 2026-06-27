@@ -226,12 +226,16 @@ gazelle! {
         // `for`-led, so their FIRST sets stay disjoint from `expr` and the
         // block/loop choice is a single-token decision.
         kw_stmt = let_stmt => let_stmt
+                | let_tuple_stmt => let_tuple_stmt
                 | mut_stmt => mut_stmt
                 | assign_stmt => assign_stmt
                 | for_stmt => for_stmt
                 | while_stmt => while_stmt
                 | return_stmt => return_stmt;
         let_stmt = LET IDENT EQ expr SEMI => let_stmt;
+        // `let (a, b, c) = expr;` — tuple destructuring. Reuses `match_bindings`
+        // (existing left-recursive ident list) to avoid adding new LR states.
+        let_tuple_stmt = LET LPAREN match_bindings RPAREN EQ expr SEMI => let_tuple_stmt;
         // `return value;` — early-return. A statement (keyword-led, so its FIRST
         // set stays disjoint from `expr`); control never falls through it.
         return_stmt = RETURN expr SEMI => return_stmt;
@@ -458,6 +462,7 @@ impl aipl::Types for Build {
     type LoopInner = Expr;
     type KwStmt = StmtSpec;
     type LetStmt = StmtSpec;
+    type LetTupleStmt = StmtSpec;
     type MutStmt = StmtSpec;
     type AssignStmt = StmtSpec;
     type ForStmt = StmtSpec;
@@ -471,6 +476,11 @@ pub enum StmtSpec {
     Let {
         name: String,
         name_span: Span,
+        value: Expr,
+        span: Span,
+    },
+    LetTuple {
+        names: Vec<String>,
         value: Expr,
         span: Span,
     },
@@ -1137,6 +1147,32 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             let span = while_span.join(acc.span);
             Expr::new(ExprKind::Seq(Box::new(while_expr), Box::new(acc)), span)
         }
+        StmtSpec::LetTuple {
+            names,
+            value,
+            span: tup_span,
+        } => {
+            let tmp = format!("__tpat${}", tup_span.start);
+            // Wrap the rest of the block with field-access bindings (innermost last).
+            let mut result = acc;
+            for (i, name) in names.iter().enumerate().rev() {
+                let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tup_span);
+                let field = Expr::new(
+                    ExprKind::Field(Box::new(tmp_ident), format!("_{i}")),
+                    tup_span,
+                );
+                let inner_span = tup_span.join(result.span);
+                result = Expr::new(
+                    ExprKind::Let(name.clone(), Box::new(field), Box::new(result)),
+                    inner_span,
+                );
+            }
+            let outer_span = tup_span.join(result.span);
+            Expr::new(
+                ExprKind::Let(tmp, Box::new(value), Box::new(result)),
+                outer_span,
+            )
+        }
         StmtSpec::Return {
             value,
             span: ret_span,
@@ -1211,6 +1247,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
     fn build(&mut self, node: aipl::KwStmt<Self>) -> Result<StmtSpec, Self::Error> {
         Ok(match node {
             aipl::KwStmt::LetStmt(s) => s,
+            aipl::KwStmt::LetTupleStmt(s) => s,
             aipl::KwStmt::MutStmt(s) => s,
             aipl::KwStmt::AssignStmt(s) => s,
             aipl::KwStmt::ForStmt(s) => s,
@@ -1230,6 +1267,19 @@ impl gazelle::Action<aipl::LetStmt<Self>> for Build {
             value,
             span,
         })
+    }
+}
+
+impl gazelle::Action<aipl::LetTupleStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::LetTupleStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::LetTupleStmt::LetTupleStmt(names, value) = node;
+        if names.len() < 2 {
+            return Err(Error::msg(
+                "a tuple pattern needs at least 2 names, e.g. let (a, b) = expr;".to_string(),
+            ));
+        }
+        let span = value.span;
+        Ok(StmtSpec::LetTuple { names, value, span })
     }
 }
 

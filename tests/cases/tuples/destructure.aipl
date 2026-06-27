@@ -1,0 +1,25 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+fn main() !prints {
+    let my_tuple = (1, "two", 3);
+    let (a, b, c) = my_tuple;
+    print(to_str(a));
+    print(b);
+    print(to_str(c));
+    let (x, y) = (10, 20);
+    print(to_str(x + y));
+}
+--- stdout ---
+1
+two
+3
+30
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 105
+binary size: 1616
+--- monomorphizations ---
+main
