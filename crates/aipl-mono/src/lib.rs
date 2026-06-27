@@ -26,8 +26,8 @@ mod check;
 pub use check::check;
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern, Primitive,
-    Program, Type,
+    Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern,
+    Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{
     concat_str_ty, empty_array_arg_ty, error_ty, is_array_elem, is_concat_str, is_empty_array_arg,
@@ -43,6 +43,248 @@ use aipl_syntax::{DebugOptions, Error, Span};
 /// Turning that into an error rather than hanging is what makes the bug
 /// findable; `--debug` then prints the exact chain of growing instances.
 const INSTANTIATION_LIMIT: usize = 10_000;
+
+/// Lower all `Type::Tuple` annotations in `program` to synthetic named structs.
+///
+/// Every `(A, B, C)` type annotation is replaced by `Type::Named("__tuple$A$B$C")` and
+/// a corresponding `struct __tuple$A$B$C { _0: A; _1: B; _2: C; }` declaration is
+/// prepended to the program. This runs before `check` so the checker and codegen
+/// only ever see named struct types, never raw tuples. Expression-level `TupleLit`
+/// nodes are left for mono's `infer()` to lower.
+pub fn lower_tuples(program: &Program) -> Program {
+    let mut fields_map: HashMap<String, Vec<FieldDecl>> = HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+
+    let mut new_items: Vec<Item> = program
+        .items
+        .iter()
+        .map(|item| match item {
+            Item::Fn(f) => {
+                let new_params: Vec<Param> = f
+                    .params
+                    .iter()
+                    .map(|p| Param {
+                        ty: lt_ty(&p.ty, &mut fields_map, &mut order),
+                        ..p.clone()
+                    })
+                    .collect();
+                let new_ret = f
+                    .return_ty
+                    .as_ref()
+                    .map(|t| lt_ty(t, &mut fields_map, &mut order));
+                let new_body = lt_expr(&f.body, &mut fields_map, &mut order);
+                let new_test = f
+                    .test_body
+                    .as_ref()
+                    .map(|tb| lt_expr(tb, &mut fields_map, &mut order));
+                Item::Fn(Function {
+                    params: new_params,
+                    return_ty: new_ret,
+                    body: new_body,
+                    test_body: new_test,
+                    ..f.clone()
+                })
+            }
+            Item::Struct(s) => Item::Struct(StructDecl {
+                name: s.name.clone(),
+                fields: s
+                    .fields
+                    .iter()
+                    .map(|fd| FieldDecl {
+                        ty: lt_ty(&fd.ty, &mut fields_map, &mut order),
+                        ..fd.clone()
+                    })
+                    .collect(),
+            }),
+            Item::Variant(v) => Item::Variant(VariantDecl {
+                name: v.name.clone(),
+                cases: v
+                    .cases
+                    .iter()
+                    .map(|c| VariantCase {
+                        name: c.name.clone(),
+                        payload: c
+                            .payload
+                            .iter()
+                            .map(|t| lt_ty(t, &mut fields_map, &mut order))
+                            .collect(),
+                    })
+                    .collect(),
+            }),
+            Item::Import(_) => item.clone(),
+        })
+        .collect();
+
+    let mut synth: Vec<Item> = order
+        .into_iter()
+        .map(|name| {
+            Item::Struct(StructDecl {
+                fields: fields_map.remove(&name).unwrap(),
+                name,
+            })
+        })
+        .collect();
+    synth.append(&mut new_items);
+    Program { items: synth }
+}
+
+/// Lower a type, registering any new synthetic tuple-struct in `fields_map`/`order`.
+fn lt_ty(
+    t: &Type,
+    fields_map: &mut HashMap<String, Vec<FieldDecl>>,
+    order: &mut Vec<String>,
+) -> Type {
+    match t {
+        Type::Tuple(elems) => {
+            let lowered: Vec<Type> = elems.iter().map(|e| lt_ty(e, fields_map, order)).collect();
+            let name = check::tuple_struct_name(&lowered);
+            if !fields_map.contains_key(&name) {
+                order.push(name.clone());
+                let fs: Vec<FieldDecl> = lowered
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ty)| FieldDecl {
+                        name: format!("_{i}"),
+                        ty: ty.clone(),
+                        default: None,
+                    })
+                    .collect();
+                fields_map.insert(name.clone(), fs);
+            }
+            Type::Named(name)
+        }
+        Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
+        Type::Set(inner) => Type::Set(Box::new(lt_ty(inner, fields_map, order))),
+        Type::Optional(inner) => Type::Optional(Box::new(lt_ty(inner, fields_map, order))),
+        Type::Dict(k, v) => Type::Dict(
+            Box::new(lt_ty(k, fields_map, order)),
+            Box::new(lt_ty(v, fields_map, order)),
+        ),
+        Type::Result(ok, err) => Type::Result(
+            Box::new(lt_ty(ok, fields_map, order)),
+            Box::new(lt_ty(err, fields_map, order)),
+        ),
+        Type::Fn(params, ret) => Type::Fn(
+            params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
+            Box::new(lt_ty(ret, fields_map, order)),
+        ),
+        Type::Named(_) | Type::Primitive(_) => t.clone(),
+    }
+}
+
+/// Walk an expression, lowering any `Type::Tuple` that appears in lambda-param
+/// type annotations. All other expression structure is preserved unchanged.
+fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<String>) -> Expr {
+    let kind = match &e.kind {
+        ExprKind::Lambda(params, body) => {
+            let new_params: Vec<LambdaParam> = params
+                .iter()
+                .map(|p| LambdaParam {
+                    ty: p.ty.as_ref().map(|t| lt_ty(t, fm, ord)),
+                    ..p.clone()
+                })
+                .collect();
+            ExprKind::Lambda(new_params, Box::new(lt_expr(body, fm, ord)))
+        }
+        ExprKind::Num(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Char(_)
+        | ExprKind::None
+        | ExprKind::Unit
+        | ExprKind::Ident(_) => e.kind.clone(),
+        ExprKind::Neg(x) => ExprKind::Neg(Box::new(lt_expr(x, fm, ord))),
+        ExprKind::Not(x) => ExprKind::Not(Box::new(lt_expr(x, fm, ord))),
+        ExprKind::Field(x, f) => ExprKind::Field(Box::new(lt_expr(x, fm, ord)), f.clone()),
+        ExprKind::Try(x) => ExprKind::Try(Box::new(lt_expr(x, fm, ord))),
+        ExprKind::Return(x) => ExprKind::Return(Box::new(lt_expr(x, fm, ord))),
+        ExprKind::Binop(a, op, b) => ExprKind::Binop(
+            Box::new(lt_expr(a, fm, ord)),
+            *op,
+            Box::new(lt_expr(b, fm, ord)),
+        ),
+        ExprKind::Seq(a, b) => {
+            ExprKind::Seq(Box::new(lt_expr(a, fm, ord)), Box::new(lt_expr(b, fm, ord)))
+        }
+        ExprKind::Index(a, b) => {
+            ExprKind::Index(Box::new(lt_expr(a, fm, ord)), Box::new(lt_expr(b, fm, ord)))
+        }
+        ExprKind::While(a, b) => {
+            ExprKind::While(Box::new(lt_expr(a, fm, ord)), Box::new(lt_expr(b, fm, ord)))
+        }
+        ExprKind::If(a, b, c) => ExprKind::If(
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+            Box::new(lt_expr(c, fm, ord)),
+        ),
+        ExprKind::Slice(a, b, c) => ExprKind::Slice(
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+            c.as_ref().map(|c| Box::new(lt_expr(c, fm, ord))),
+        ),
+        ExprKind::Let(n, a, b) => ExprKind::Let(
+            n.clone(),
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+        ),
+        ExprKind::LetMut(n, a, b) => ExprKind::LetMut(
+            n.clone(),
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+        ),
+        ExprKind::Assign(n, a, b) => ExprKind::Assign(
+            n.clone(),
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+        ),
+        ExprKind::For(v, iter, body) => ExprKind::For(
+            v.clone(),
+            Box::new(lt_expr(iter, fm, ord)),
+            Box::new(lt_expr(body, fm, ord)),
+        ),
+        ExprKind::Call(name, args, ms) => ExprKind::Call(
+            name.clone(),
+            args.iter().map(|a| lt_expr(a, fm, ord)).collect(),
+            *ms,
+        ),
+        ExprKind::ArrayLit(elems) => {
+            ExprKind::ArrayLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
+        }
+        ExprKind::SetLit(elems) => {
+            ExprKind::SetLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
+        }
+        ExprKind::TupleLit(elems) => {
+            ExprKind::TupleLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
+        }
+        ExprKind::DictLit(pairs) => ExprKind::DictLit(
+            pairs
+                .iter()
+                .map(|(k, v)| (lt_expr(k, fm, ord), lt_expr(v, fm, ord)))
+                .collect(),
+        ),
+        ExprKind::Construct(name, inits) => ExprKind::Construct(
+            name.clone(),
+            inits
+                .iter()
+                .map(|fi| FieldInit {
+                    name: fi.name.clone(),
+                    value: lt_expr(&fi.value, fm, ord),
+                })
+                .collect(),
+        ),
+        ExprKind::Match(s, arms) => ExprKind::Match(
+            Box::new(lt_expr(s, fm, ord)),
+            arms.iter()
+                .map(|arm| MatchArm {
+                    pattern: arm.pattern.clone(),
+                    body: lt_expr(&arm.body, fm, ord),
+                    span: arm.span,
+                })
+                .collect(),
+        ),
+    };
+    Expr::new(kind, e.span)
+}
 
 /// Rewrite `program` so it contains no type variables: every generic function
 /// is replaced by zero or more concrete instances, one per distinct tuple of
@@ -2360,7 +2602,8 @@ impl Mono<'_> {
                     relems.push(re);
                 }
                 let name = check::tuple_struct_name(&elem_tys);
-                if !self.syn_structs.contains_key(&name) {
+                // Only add to syn_structs if not already injected by lower_tuples.
+                if !self.structs.contains_key(&name) && !self.syn_structs.contains_key(&name) {
                     let fields: Vec<(String, Type, Option<Expr>)> = elem_tys
                         .iter()
                         .enumerate()

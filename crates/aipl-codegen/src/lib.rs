@@ -2778,6 +2778,10 @@ fn compile_program<M: Module>(
     // through these signatures exactly as it would a user function, with no
     // notion that they're builtin. They're for the checker only — monomorphization
     // and codegen lower the real implementations.
+    // Lower tuple type annotations to named synthetic structs before checking
+    // and monomorphization so the rest of the pipeline only sees named types.
+    let program = &aipl_mono::lower_tuples(program);
+
     let check_program = Program {
         items: builtin_decls()
             .into_iter()

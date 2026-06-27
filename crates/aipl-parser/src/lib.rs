@@ -179,7 +179,11 @@ gazelle! {
            // `(A, B)` — a tuple type (2+ elements). Validated in the build
            // action. With `ARROW` as lookahead the parser shifts instead of
            // reducing here, so `(A, B) -> R` still parses as fn_ty.
-           | LPAREN ty_args RPAREN => tuple_ty;
+           // With `LBRACKET` as lookahead, shifts to `tuple_array_ty`.
+           | LPAREN ty_args RPAREN => tuple_ty
+           // `(A, B)[]` — an array of tuples. Shifts over `tuple_ty` when
+           // the lookahead is `LBRACKET`.
+           | LPAREN ty_args RPAREN LBRACKET RBRACKET => tuple_array_ty;
         base_ty = IDENT => named
                 | base_ty QUESTION => optional
                 | base_ty LBRACKET RBRACKET => array
@@ -1021,6 +1025,14 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
                     ));
                 }
                 Type::Tuple(args)
+            }
+            aipl::Ty::TupleArrayTy(args, _rbracket) => {
+                if args.len() < 2 {
+                    return Err(Error::msg(
+                        "a tuple type needs at least 2 elements, e.g. (i64, str)[]".to_string(),
+                    ));
+                }
+                Type::Array(Box::new(Type::Tuple(args)))
             }
         })
     }
