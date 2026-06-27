@@ -1,0 +1,18 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+fn main() !prints {
+    let pair = (10, 20);
+    let sum = pair.0 + pair.1;
+    print(to_str(sum));
+}
+--- stdout ---
+30
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 37
+binary size: 1152
+--- monomorphizations ---
+main

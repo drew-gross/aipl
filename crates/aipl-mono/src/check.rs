@@ -28,6 +28,36 @@ use aipl_syntax::{
     unit_ty, Error, Span,
 };
 
+/// Generate the canonical synthetic-struct name for a tuple with the given
+/// element types. Matches the name produced by mono's `lower_tuples`.
+pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
+    fn mangle(ty: &Type) -> String {
+        match ty {
+            Type::Primitive(p) => p.name().into(),
+            Type::Named(n) => n.replace('$', "_").replace('!', "_"),
+            Type::Array(e) => format!("arr_{}", mangle(e)),
+            Type::Optional(e) => format!("opt_{}", mangle(e)),
+            Type::Set(e) => format!("set_{}", mangle(e)),
+            Type::Dict(k, v) => format!("dict_{}_{}", mangle(k), mangle(v)),
+            Type::Result(ok, err) => format!("res_{}_{}", mangle(ok), mangle(err)),
+            Type::Fn(ps, ret) => {
+                let args = ps.iter().map(mangle).collect::<Vec<_>>().join("_");
+                format!("fn_{}_{}", args, mangle(ret))
+            }
+            Type::Tuple(es) => {
+                format!(
+                    "tuple_{}",
+                    es.iter().map(mangle).collect::<Vec<_>>().join("_")
+                )
+            }
+        }
+    }
+    format!(
+        "__tuple${}",
+        elems.iter().map(mangle).collect::<Vec<_>>().join("$")
+    )
+}
+
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `write_files` = writes to the filesystem.
 const KNOWN_EFFECTS: &[&str] = &["prints", "read_files", "write_files"];
@@ -59,6 +89,9 @@ type Env = HashMap<String, Binding>;
 
 struct Cx<'a> {
     structs: &'a HashMap<String, Vec<(String, Type, bool)>>,
+    /// Synthetic struct layouts created on-the-fly when a `TupleLit` is seen
+    /// during checking. Looked up alongside `structs` by `struct_fields`.
+    syn_structs: std::cell::RefCell<HashMap<String, Vec<(String, Type, bool)>>>,
     /// Variant (sum) types: name → ordered cases `(ctor, payload types)`.
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     /// Constructor name → the variant it belongs to (for typing `Ctor(..)`).
@@ -68,6 +101,21 @@ struct Cx<'a> {
     /// type-vars substituted), so a `return value;` can be checked against it.
     /// Functions are top-level (never nested), so a single slot suffices.
     current_ret: std::cell::RefCell<Type>,
+}
+
+impl<'a> Cx<'a> {
+    fn struct_fields(&self, name: &str) -> Option<Vec<(String, Type, bool)>> {
+        self.structs
+            .get(name)
+            .cloned()
+            .or_else(|| self.syn_structs.borrow().get(name).cloned())
+    }
+    fn has_struct(&self, name: &str) -> bool {
+        self.structs.contains_key(name) || self.syn_structs.borrow().contains_key(name)
+    }
+    fn add_syn_struct(&self, name: String, fields: Vec<(String, Type, bool)>) {
+        self.syn_structs.borrow_mut().insert(name, fields);
+    }
 }
 
 /// Type-check `program`. Returns the first error found, or `Ok` if every
@@ -127,6 +175,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
 
     let cx = Cx {
         structs: &structs,
+        syn_structs: std::cell::RefCell::new(HashMap::new()),
         variants: &variants,
         ctors: &ctors,
         sigs: &sigs,
@@ -169,6 +218,7 @@ fn ty_mentions_any(t: &Type) -> bool {
         Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
         Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
         Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
+        Type::Tuple(elems) => elems.iter().any(ty_mentions_any),
     }
 }
 
@@ -279,7 +329,7 @@ impl Cx<'_> {
             Type::Primitive(_) => Ok(()),
             Type::Named(n) => {
                 let ok = matches!(n.as_str(), "any" | "Error")
-                    || self.structs.contains_key(n)
+                    || self.has_struct(n)
                     || self.variants.contains_key(n)
                     || type_params.iter().any(|tp| tp == n);
                 if ok {
@@ -354,6 +404,14 @@ impl Cx<'_> {
                 }
                 self.check_ty(ret, type_params, fname)
             }
+            // Tuple types are lowered to Named by lower_tuples before check
+            // runs, but handle them permissively in case one arrives.
+            Type::Tuple(elems) => {
+                for e in elems {
+                    self.check_ty(e, type_params, fname)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -379,7 +437,7 @@ impl Cx<'_> {
             Type::Named(n) => {
                 if is_abstract_scalar_name(n, type_params) {
                     Ok(())
-                } else if self.structs.contains_key(n) || self.variants.contains_key(n) {
+                } else if self.has_struct(n) || self.variants.contains_key(n) {
                     Ok(()) // arrays and optionals of structs/variants are supported
                 } else {
                     Err(Error::msg(format!("fn {fname:?}: unknown type {n:?}")))
@@ -396,6 +454,9 @@ impl Cx<'_> {
             ))),
             Type::Fn(_, _) => Err(Error::msg(format!(
                 "fn {fname:?}: arrays and optionals cannot contain function types"
+            ))),
+            Type::Tuple(_) => Err(Error::msg(format!(
+                "fn {fname:?}: tuple types cannot be array or optional elements"
             ))),
         }
     }
@@ -758,6 +819,22 @@ impl Cx<'_> {
                     span,
                 ));
             }
+            ExprKind::TupleLit(elems) => {
+                let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());
+                for e in elems {
+                    elem_tys.push(self.check_expr(e, env, effects)?);
+                }
+                let name = tuple_struct_name(&elem_tys);
+                if !self.has_struct(&name) {
+                    let fields: Vec<(String, Type, bool)> = elem_tys
+                        .iter()
+                        .enumerate()
+                        .map(|(i, t)| (format!("_{i}"), t.clone(), false))
+                        .collect();
+                    self.add_syn_struct(name.clone(), fields);
+                }
+                Type::Named(name)
+            }
             ExprKind::Let(name, val, body) => {
                 let vt = self.check_expr(val, env, effects)?;
                 if is_unit(&vt) {
@@ -863,7 +940,7 @@ impl Cx<'_> {
                 // A struct or variant element is valid too (must be declared).
                 let elem_ok = is_valid_elem(&elem_ty)
                     || matches!(&elem_ty, Type::Named(n)
-                        if self.structs.contains_key(n) || self.variants.contains_key(n));
+                        if self.has_struct(n) || self.variants.contains_key(n));
                 if !elems.is_empty() && !elem_ok {
                     return Err(Error::at(
                         format!(
@@ -928,7 +1005,7 @@ impl Cx<'_> {
                     }
                     let val_ok = is_valid_elem(&val_ty)
                         || matches!(&val_ty, Type::Named(n)
-                            if self.structs.contains_key(n) || self.variants.contains_key(n));
+                            if self.has_struct(n) || self.variants.contains_key(n));
                     if !val_ok {
                         return Err(Error::at(
                             format!(
@@ -1012,7 +1089,7 @@ impl Cx<'_> {
                         obj.span,
                     ));
                 };
-                let fields = self.structs.get(sn).ok_or_else(|| {
+                let fields = self.struct_fields(sn).ok_or_else(|| {
                     Error::at(
                         format!("field access on non-struct value of type {sn}"),
                         obj.span,
@@ -1913,6 +1990,12 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
                 .collect(),
             Box::new(subst_typevars(ret, type_params)),
         ),
+        Type::Tuple(elems) => Type::Tuple(
+            elems
+                .iter()
+                .map(|e| subst_typevars(e, type_params))
+                .collect(),
+        ),
     }
 }
 
@@ -2156,5 +2239,6 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
             ps.iter().map(|p| subst_vars(p, map, vars)).collect(),
             Box::new(subst_vars(r, map, vars)),
         ),
+        Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| subst_vars(e, map, vars)).collect()),
     }
 }

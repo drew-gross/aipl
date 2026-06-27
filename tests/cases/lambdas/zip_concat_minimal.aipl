@@ -1,0 +1,27 @@
+import { print, zip_with, wrapping_add as + } from builtins;
+
+fn show_strs(label: str, xs: str[]) !prints {
+    print(label);
+    for (let x : xs) {
+        print(x);
+    }
+}
+
+fn main() !prints {
+    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s + t));
+}
+--- stdout ---
+concat
+ax
+by
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 184
+instructions executed: 373
+binary size: 4368
+--- monomorphizations ---
+__lambda_0
+__zip1$own0$own1
+main

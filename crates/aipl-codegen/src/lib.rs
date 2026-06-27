@@ -5052,6 +5052,8 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         Type::Result(ok, err) => needs_drop(ok, structs) || needs_drop(err, structs),
         // Function types are erased by monomorphization; never a runtime value.
         Type::Fn(_, _) => false,
+        // Tuple type annotations are lowered to Named by lower_tuples before codegen.
+        Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
     }
 }
 
@@ -5376,6 +5378,8 @@ fn emit_rc<M: Module>(
         // Unreachable: `needs_drop` returns false for function types (erased by
         // monomorphization), so this arm is guarded out above.
         Type::Fn(_, _) => {}
+        // Tuple type annotations are lowered to Named by lower_tuples before codegen.
+        Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
     }
 }
 
@@ -9929,6 +9933,8 @@ fn compile_expr<M: Module>(
         // Monomorphization lifts lambdas into synthesized functions before
         // codegen; the checker rejects them otherwise. So none reach here.
         ExprKind::Lambda(_, _) => unreachable!("lambda reached codegen"),
+        // Monomorphization lowers TupleLit to Construct before codegen.
+        ExprKind::TupleLit(_) => unreachable!("TupleLit must be lowered before codegen"),
         ExprKind::Let(name, value, body) => {
             // Evaluate the binding's value in the current scope (so any
             // string refcounts allocated by the value are already tracked

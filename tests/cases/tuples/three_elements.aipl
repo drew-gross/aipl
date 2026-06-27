@@ -1,0 +1,21 @@
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    let t = (1, "two", 3);
+    print(to_str(t.0));
+    print(t.1);
+    print(to_str(t.2));
+}
+--- stdout ---
+1
+two
+3
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 72
+binary size: 1472
+--- monomorphizations ---
+main

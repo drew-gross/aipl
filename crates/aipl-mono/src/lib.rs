@@ -131,6 +131,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
         fn_returns: &fn_returns,
         mutating: &mutating,
         structs: &structs,
+        syn_structs: HashMap::new(),
         variants: &variants,
         ctors: &ctors,
         emitted: HashSet::new(),
@@ -284,7 +285,25 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
         out_fns.push(out);
     }
 
+    let syn_struct_items: Vec<Item> = mono
+        .syn_structs
+        .drain()
+        .map(|(name, fields)| {
+            Item::Struct(aipl_syntax::ast::StructDecl {
+                name,
+                fields: fields
+                    .into_iter()
+                    .map(|(fname, ty, _)| aipl_syntax::ast::FieldDecl {
+                        name: fname,
+                        ty,
+                        default: None,
+                    })
+                    .collect(),
+            })
+        })
+        .collect();
     let mut items = passthrough;
+    items.extend(syn_struct_items);
     items.extend(out_fns.into_iter().map(Item::Fn));
     Ok(Program { items })
 }
@@ -518,6 +537,8 @@ struct Mono<'a> {
     /// Names of mutating functions (`mut self` receiver), generic or not.
     mutating: &'a HashSet<String>,
     structs: &'a HashMap<String, Vec<(String, Type, Option<Expr>)>>,
+    /// Synthetic struct definitions created on the fly for tuple literals.
+    syn_structs: HashMap<String, Vec<(String, Type, Option<Expr>)>>,
     /// Variant types (name → cases) and the ctor → variant reverse map.
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     ctors: &'a HashMap<String, String>,
@@ -979,7 +1000,7 @@ impl Mono<'_> {
         let reusable = |t: &Type| {
             !matches!(t, Type::Optional(_))
                 && !matches!(t, Type::Primitive(Primitive::Bool))
-                && !matches!(t, Type::Named(n) if self.structs.contains_key(n))
+                && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
         };
         let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
 
@@ -1265,7 +1286,7 @@ impl Mono<'_> {
         let reusable = |t: &Type| {
             !matches!(t, Type::Optional(_))
                 && !matches!(t, Type::Primitive(Primitive::Bool))
-                && !matches!(t, Type::Named(n) if self.structs.contains_key(n))
+                && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
         };
         let own_a = is_fresh_heap(&rarr_a, &ty_a) && reusable(&elem_a) && reusable(&r);
         let own_b = is_fresh_heap(&rarr_b, &ty_b) && reusable(&elem_b) && reusable(&r);
@@ -2330,6 +2351,36 @@ impl Mono<'_> {
                     Type::Array(Box::new(decay_concat(elem_ty))),
                 )
             }
+            ExprKind::TupleLit(elems) => {
+                let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());
+                let mut relems: Vec<Expr> = Vec::with_capacity(elems.len());
+                for e in elems {
+                    let (re, t) = self.infer(e, env)?;
+                    elem_tys.push(decay_concat(t));
+                    relems.push(re);
+                }
+                let name = check::tuple_struct_name(&elem_tys);
+                if !self.syn_structs.contains_key(&name) {
+                    let fields: Vec<(String, Type, Option<Expr>)> = elem_tys
+                        .iter()
+                        .enumerate()
+                        .map(|(i, t)| (format!("_{i}"), t.clone(), None))
+                        .collect();
+                    self.syn_structs.insert(name.clone(), fields);
+                }
+                let inits: Vec<aipl_syntax::ast::FieldInit> = relems
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, v)| aipl_syntax::ast::FieldInit {
+                        name: format!("_{i}"),
+                        value: v,
+                    })
+                    .collect();
+                (
+                    node(ExprKind::Construct(name.clone(), inits)),
+                    Type::Named(name),
+                )
+            }
             ExprKind::SetLit(elems) => {
                 let mut relems = Vec::with_capacity(elems.len());
                 let mut elem_ty = none_inner_ty();
@@ -2409,6 +2460,7 @@ impl Mono<'_> {
                     Type::Named(sn) => self
                         .structs
                         .get(sn)
+                        .or_else(|| self.syn_structs.get(sn))
                         .and_then(|fs| fs.iter().find(|(n, _, _)| n == fname))
                         .map(|(_, t, _)| t.clone())
                         .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
@@ -2541,7 +2593,12 @@ impl Mono<'_> {
             ExprKind::Construct(name, inits) => {
                 // Expand to a complete field list in struct-definition order,
                 // filling missing fields from their declared defaults.
-                let field_defs = self.structs.get(name.as_str()).cloned().unwrap_or_default();
+                let field_defs = self
+                    .structs
+                    .get(name.as_str())
+                    .or_else(|| self.syn_structs.get(name.as_str()))
+                    .cloned()
+                    .unwrap_or_default();
                 let mut rfields = Vec::with_capacity(field_defs.len());
                 for (fname, _, fdefault) in &field_defs {
                     let src = if let Some(fi) = inits.iter().find(|i| &i.name == fname) {
@@ -3245,6 +3302,13 @@ fn normalize_param_ty(
             let r = normalize_param_ty(ret, type_vars, counter, fname)?;
             Ok(Type::Fn(ps, Box::new(r)))
         }
+        Type::Tuple(elems) => {
+            let es = elems
+                .iter()
+                .map(|e| normalize_param_ty(e, type_vars, counter, fname))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Type::Tuple(es))
+        }
     }
 }
 
@@ -3279,6 +3343,12 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
                 .map(|p| normalize_inner(p, type_vars, counter))
                 .collect(),
             Box::new(normalize_inner(ret, type_vars, counter)),
+        ),
+        Type::Tuple(elems) => Type::Tuple(
+            elems
+                .iter()
+                .map(|e| normalize_inner(e, type_vars, counter))
+                .collect(),
         ),
     }
 }
@@ -3332,6 +3402,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
             params.iter().map(|p| subst_vars(p, map)).collect(),
             Box::new(subst_vars(ret, map)),
         ),
+        Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| subst_vars(e, map)).collect()),
     }
 }
 
@@ -3344,6 +3415,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
         Type::Fn(ps, ret) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
+        Type::Tuple(elems) => elems.iter().any(|e| ty_mentions(e, name)),
     }
 }
 
@@ -3360,6 +3432,7 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         Type::Fn(ps, ret) => {
             ps.iter().any(|p| ty_contains_var(p, vars)) || ty_contains_var(ret, vars)
         }
+        Type::Tuple(elems) => elems.iter().any(|e| ty_contains_var(e, vars)),
     }
 }
 
@@ -3430,7 +3503,10 @@ fn collect_free(
                 collect_free(c, bound, env, out, seen);
             }
         }
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => {
             for a in args {
                 collect_free(a, bound, env, out, seen);
             }
@@ -3589,7 +3665,7 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
                 count_uses(c, bound, counts);
             }
         }
-        ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
+        ExprKind::ArrayLit(args) | ExprKind::SetLit(args) | ExprKind::TupleLit(args) => {
             for a in args {
                 count_uses(a, bound, counts);
             }
@@ -3855,9 +3931,10 @@ fn children(e: &Expr) -> Vec<&Expr> {
             }
             v
         }
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
-            args.iter().collect()
-        }
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => args.iter().collect(),
         ExprKind::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
         ExprKind::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
         ExprKind::Match(s, arms) => {
@@ -4014,6 +4091,9 @@ fn replace_call(e: &Expr, f: &Function, counter: &mut usize, replaced: &mut bool
         ExprKind::SetLit(xs) => {
             ExprKind::SetLit(xs.iter().map(|x| rc(x, counter, replaced)).collect())
         }
+        ExprKind::TupleLit(xs) => {
+            ExprKind::TupleLit(xs.iter().map(|x| rc(x, counter, replaced)).collect())
+        }
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
                 .iter()
@@ -4142,6 +4222,9 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         }
         ExprKind::SetLit(xs) => {
             ExprKind::SetLit(xs.iter().map(|x| rename_params(x, map)).collect())
+        }
+        ExprKind::TupleLit(xs) => {
+            ExprKind::TupleLit(xs.iter().map(|x| rename_params(x, map)).collect())
         }
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
@@ -4330,7 +4413,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     .any(|a| if is_n(a) { !consuming } else { rec(a) })
             }
         }
-        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems) => {
+        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems) | ExprKind::TupleLit(elems) => {
             elems.iter().any(|x| is_n(x) || rec(x))
         }
         ExprKind::DictLit(pairs) => pairs
@@ -4419,9 +4502,10 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         | ExprKind::While(a, b) => c(a) + c(b),
         ExprKind::If(a, b, d) => c(a) + c(b) + c(d),
         ExprKind::Slice(a, b, d) => c(a) + c(b) + d.as_ref().map_or(0, |d| c(d)),
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
-            args.iter().map(c).sum()
-        }
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => args.iter().map(c).sum(),
         ExprKind::DictLit(pairs) => pairs.iter().map(|(k, v)| c(k) + c(v)).sum(),
         ExprKind::Construct(_, inits) => inits.iter().map(|i| c(&i.value)).sum(),
         ExprKind::Match(s, arms) => c(s) + arms.iter().map(|a| c(&a.body)).sum::<usize>(),
@@ -4455,9 +4539,10 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         | ExprKind::Field(x, _)
         | ExprKind::Try(x)
         | ExprKind::Return(x) => find_move_into(param, x),
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
-            args.iter().find_map(|a| find_move_into(param, a))
-        }
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => args.iter().find_map(|a| find_move_into(param, a)),
         ExprKind::DictLit(pairs) => pairs
             .iter()
             .find_map(|(k, v)| find_move_into(param, k).or_else(|| find_move_into(param, v))),

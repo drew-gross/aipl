@@ -442,6 +442,11 @@ pub mod ast {
         /// runtime function value. Valid only as a parameter type; a value of
         /// this type can be called or passed on, never stored or returned.
         Fn(Vec<Type>, Box<Type>),
+        /// `(A, B, C)` — a tuple of 2+ types, stored inline like a struct,
+        /// addressed by pointer (sret). Lowered to a synthetic named struct
+        /// `__tuple$A$B$C` before type-checking, so only the parser and the
+        /// `lower_tuples` pre-pass ever see this variant.
+        Tuple(Vec<Type>),
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -577,6 +582,10 @@ pub mod ast {
         /// Parameter types are usually inferred from the receiving function's
         /// signature, so they're optional.
         Lambda(Vec<LambdaParam>, Box<Expr>),
+        /// `(a, b, c)` — a tuple literal of 2+ values. Lowered to
+        /// `Construct(synth_struct_name, ..)` by mono's `infer` after element
+        /// types are known; only the parser through the mono pass see this.
+        TupleLit(Vec<Expr>),
     }
 
     /// A lambda parameter: a name and an optional type annotation (inferred
@@ -833,6 +842,11 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             }
         }
         K::Lambda(_, body) => collect_operators(body, out),
+        K::TupleLit(elems) => {
+            for e in elems {
+                collect_operators(e, out);
+            }
+        }
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit | K::Ident(_) => {}
     }
 }
@@ -911,6 +925,10 @@ pub fn type_name(t: &Type) -> String {
         Type::Fn(params, ret) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({ps}) -> {}", type_name(ret))
+        }
+        Type::Tuple(elems) => {
+            let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
+            format!("({es})")
         }
     }
 }

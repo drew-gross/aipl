@@ -175,7 +175,11 @@ gazelle! {
            // (success carries no value). A leading `!` only starts this in type
            // position, so it doesn't conflict with the `base_ty BANG` form.
            | BANG base_ty => result_void
-           | LPAREN ty_args RPAREN ARROW ty => fn_ty;
+           | LPAREN ty_args RPAREN ARROW ty => fn_ty
+           // `(A, B)` — a tuple type (2+ elements). Validated in the build
+           // action. With `ARROW` as lookahead the parser shifts instead of
+           // reducing here, so `(A, B) -> R` still parses as fn_ty.
+           | LPAREN ty_args RPAREN => tuple_ty;
         base_ty = IDENT => named
                 | base_ty QUESTION => optional
                 | base_ty LBRACKET RBRACKET => array
@@ -245,6 +249,7 @@ gazelle! {
 
         postfix = atom => atom
                 | postfix DOT IDENT => field_access
+                | postfix DOT NUM => tuple_index
                 | postfix DOT IDENT LPAREN args RPAREN => method_call
                 | postfix LBRACKET expr RBRACKET => index
                 // `recv[start..end]` — string slice. The `..` (DOTDOT) after the
@@ -260,6 +265,9 @@ gazelle! {
                 // expression position it's the try operator.
                 | postfix QUESTION => try_op;
 
+        // 1+ extra elements after the first in a tuple literal.
+        tuple_more = expr => single | tuple_more COMMA expr => more;
+
         atom = NUM => num
              | TRUE => true_lit
              | FALSE => false_lit
@@ -269,6 +277,9 @@ gazelle! {
              | IDENT LPAREN args RPAREN => call
              | IDENT LBRACE field_inits RBRACE => construct
              | LPAREN expr RPAREN => paren
+             // `(a, b, ...)` — a tuple literal (2+ elements). The COMMA after
+             // the first expr unambiguously selects this over `paren`.
+             | LPAREN expr COMMA tuple_more RPAREN => tuple_lit
              | IF LPAREN expr RPAREN block ELSE block => if_else
              // Else-less `if` (statement position): yields unit, so its `then`
              // block must be unit-typed. Desugars to `if .. {} else {}`.
@@ -437,6 +448,7 @@ impl aipl::Types for Build {
     type MatchArm = MatchArm;
     type MatchArmList = Vec<MatchArm>;
     type MatchArms = Vec<MatchArm>;
+    type TupleMore = Vec<Expr>;
     type BlockBody = Expr;
     type BlockTail = BlockTail;
     type LoopInner = Expr;
@@ -1002,6 +1014,14 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
             aipl::Ty::Result(ok, err) => Type::Result(Box::new(ok), Box::new(err)),
             aipl::Ty::ResultVoid(err) => Type::Result(Box::new(unit_ty()), Box::new(err)),
             aipl::Ty::FnTy(params, ret) => Type::Fn(params, Box::new(ret)),
+            aipl::Ty::TupleTy(args) => {
+                if args.len() < 2 {
+                    return Err(Error::msg(
+                        "a tuple type needs at least 2 elements, e.g. (i64, str)".to_string(),
+                    ));
+                }
+                Type::Tuple(args)
+            }
         })
     }
 }
@@ -1320,6 +1340,16 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
                 let span = obj.span.join(name_span);
                 Expr::new(ExprKind::Field(Box::new(obj), name), span)
             }
+            aipl::Postfix::TupleIndex(obj, (n, n_span)) => {
+                let span = obj.span.join(n_span);
+                if n < 0 {
+                    return Err(Error::at(
+                        "tuple index must be a non-negative integer".to_string(),
+                        n_span,
+                    ));
+                }
+                Expr::new(ExprKind::Field(Box::new(obj), format!("_{n}")), span)
+            }
             aipl::Postfix::MethodCall(obj, (name, name_span), args) => {
                 let span = obj
                     .span
@@ -1390,6 +1420,14 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 Expr::new(ExprKind::Construct(name, fields), span)
             }
             aipl::Atom::Paren(e) => e,
+            aipl::Atom::TupleLit(first, rest) => {
+                let last_span = rest.last().map(|e| e.span).unwrap_or(first.span);
+                let span = first.span.join(last_span);
+                let mut elems = Vec::with_capacity(1 + rest.len());
+                elems.push(first);
+                elems.extend(rest);
+                Expr::new(ExprKind::TupleLit(elems), span)
+            }
             aipl::Atom::IfElse(cond, then_b, else_b) => {
                 let span = cond.span.join(else_b.span);
                 Expr::new(
@@ -1465,6 +1503,18 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                     }
                 }
             },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::TupleMore<Self>> for Build {
+    fn build(&mut self, node: aipl::TupleMore<Self>) -> Result<Vec<Expr>, Self::Error> {
+        Ok(match node {
+            aipl::TupleMore::Single(e) => vec![e],
+            aipl::TupleMore::More(mut prev, e) => {
+                prev.push(e);
+                prev
+            }
         })
     }
 }
@@ -2419,7 +2469,10 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         }
     }
     match &mut e.kind {
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => {
             for a in args {
                 bake_asserts(a, src);
             }

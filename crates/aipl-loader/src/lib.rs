@@ -525,7 +525,10 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
                 check_operators(c, view)?;
             }
         }
-        ExprKind::Call(_, args, _) | ExprKind::ArrayLit(args) | ExprKind::SetLit(args) => {
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => {
             for a in args {
                 check_operators(a, view)?;
             }
@@ -673,6 +676,12 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[String]) 
                 .collect(),
             Box::new(rewrite_type(ret, view, type_vars)),
         ),
+        Type::Tuple(elems) => Type::Tuple(
+            elems
+                .iter()
+                .map(|e| rewrite_type(e, view, type_vars))
+                .collect(),
+        ),
     }
 }
 
@@ -817,6 +826,12 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                 .collect(),
         ),
         ExprKind::SetLit(elems) => ExprKind::SetLit(
+            elems
+                .iter()
+                .map(|e| rewrite_expr(e, view, locals))
+                .collect(),
+        ),
+        ExprKind::TupleLit(elems) => ExprKind::TupleLit(
             elems
                 .iter()
                 .map(|e| rewrite_expr(e, view, locals))
