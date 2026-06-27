@@ -1293,6 +1293,17 @@ fn run_performance_check(
         Ok(v) => v,
         Err(msg) => return Outcome::Fail(msg),
     };
+
+    // Memory-leak gate: every heap allocation must be paired with a free.
+    // Catch this before fill_mode so `fill_expected` cannot bake in a leak.
+    if actual.allocations != actual.deallocations {
+        return Outcome::Fail(format!(
+            "{ctx}: memory leak — allocations ({}) != deallocations ({})\n\
+             Fix the leak, then re-run `{FILL_CMD}` to refresh the expected counts.",
+            actual.allocations, actual.deallocations,
+        ));
+    }
+
     let expected = parse_perf_stats(expected_body);
 
     let placeholder = expected_body.trim() == "?";

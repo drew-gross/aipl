@@ -68,11 +68,11 @@ ax
 by
 --- performance ---
 allocations: 15
-deallocations: 13
+deallocations: 15
 reallocations: 0
 bytes allocated: 800
 instructions executed: 2880
-binary size: 14680
+binary size: 14688
 --- monomorphizations ---
 __lambda_0
 __lambda_10

@@ -6628,7 +6628,8 @@ fn define_elem_rc_fn<M: Module>(
         builder.seal_block(body);
         let off = builder.ins().imul_imm(i, esz);
         let addr = builder.ins().iadd(elems, off);
-        emit_rc(&mut builder, module, builtins, structs, addr, elem, op);
+        let elem_val = component(&mut builder, addr, 0, elem, structs);
+        emit_rc(&mut builder, module, builtins, structs, elem_val, elem, op);
         let next = builder.ins().iadd_imm(i, 1);
         builder.ins().stack_store(next, slot, 0);
         builder.ins().jump(header, &[]);

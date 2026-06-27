@@ -1,0 +1,48 @@
+import { wrapping_add as +, ==, len, reverse } from builtins;
+
+// .reverse() returns an O(1) reversed view; iterating or comparing it
+// produces the same result as a fully-copied reversed array.
+
+fn sum_reversed(xs: i64[]) -> i64 {
+    mut total = 0;
+    for (let x : xs.reverse()) {
+        set total = total + x;
+    }
+    total
+}.test({
+    // sum is commutative so it doesn't actually test reversal, but it
+    // exercises the iterator path on a reversed view.
+    assert(sum_reversed([1, 2, 3, 4, 5]) == 15);
+    assert(sum_reversed([]) == 0);
+})
+
+fn reversed_eq(xs: i64[], ys: i64[]) -> i64 {
+    if (xs.reverse() == ys) { 1 } else { 0 }
+}.test({
+    assert(reversed_eq([1, 2, 3], [3, 2, 1]) == 1);
+    assert(reversed_eq([1, 2, 3], [1, 2, 3]) == 0);
+    assert(reversed_eq([], []) == 1);
+    assert(reversed_eq([42], [42]) == 1);
+})
+
+fn reversed_len(xs: i64[]) -> i64 {
+    len(xs.reverse())
+}.test({
+    assert(reversed_len([1, 2, 3]) == 3);
+    assert(reversed_len([]) == 0);
+})
+--- performance ---
+allocations: 20
+deallocations: 20
+reallocations: 0
+bytes allocated: 944
+instructions executed: 691
+binary size: 6600
+--- monomorphizations ---
+__test$reversed_eq
+__test$reversed_len
+__test$sum_reversed
+main
+reversed_eq
+reversed_len
+sum_reversed
