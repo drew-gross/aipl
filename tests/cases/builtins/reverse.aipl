@@ -19,11 +19,11 @@ fn str_arr_rev(xs: str[]) -> str[] { xs.reverse() }.test({
 })
 --- performance ---
 allocations: 12
-deallocations: 7
+deallocations: 3
 reallocations: 0
-bytes allocated: 596
-instructions executed: 451
-binary size: 6800
+bytes allocated: 580
+instructions executed: 542
+binary size: 7368
 --- monomorphizations ---
 arr_rev
 main

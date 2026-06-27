@@ -19,8 +19,8 @@ allocations: 26
 deallocations: 26
 reallocations: 0
 bytes allocated: 1224
-instructions executed: 916
-binary size: 7800
+instructions executed: 1250
+binary size: 9552
 --- monomorphizations ---
 __test$eq_arrays
 main

@@ -33,8 +33,8 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 1787
-binary size: 7512
+instructions executed: 2403
+binary size: 9528
 --- monomorphizations ---
 __filter9$own0
 __map13$own0

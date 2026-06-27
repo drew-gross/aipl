@@ -735,8 +735,8 @@ extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
     result
 }
 
-/// `xs.reverse() -> T[]` — returns a new array with elements in reverse order.
-/// Consumes `xs` (decs) and retains each element once for the new array.
+/// `xs.reverse() -> T[]` — O(1): returns a reversed-view repr wrapping `xs`.
+/// Transfers ownership of `xs` into the view (no drop, no retain).
 /// `drop_fn`, `retain_fn`, `elem_size` describe the element type.
 extern "C" fn aipl_arr_reverse(
     a: *const u8,
@@ -748,33 +748,7 @@ extern "C" fn aipl_arr_reverse(
         return a;
     }
     let len = unsafe { array_len_of(a) };
-    if elem_size == ELEM_BITPACKED {
-        let raw = alloc_array(len, len, drop_fn, ELEM_BITPACKED);
-        unsafe {
-            let src = a.add(ARR_ELEMS_OFFSET);
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                let bit = (*src.add(j >> 3) >> (j & 7)) & 1 != 0;
-                write_packed_bit(dst, i, bit);
-            }
-        }
-        aipl_array_dec(a);
-        return raw;
-    }
-    let es = elem_size.max(8) as usize;
-    let raw = alloc_array(len, len, drop_fn, elem_size);
-    unsafe {
-        let src_base = a.add(ARR_ELEMS_OFFSET);
-        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        for i in 0..len {
-            let j = len - 1 - i;
-            std::ptr::copy_nonoverlapping(src_base.add(j * es), dst_base.add(i * es), es);
-        }
-        elem_rc(retain_fn, dst_base, len);
-    }
-    aipl_array_dec(a);
-    raw
+    alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size)
 }
 
 /// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
@@ -1146,6 +1120,183 @@ fn array_block_size(cap_bytes: usize) -> usize {
     HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes
 }
 
+// ---------- Array representation tags ----------
+//
+// Arrays are 8-byte aligned, so the two low bits of every array pointer are
+// always 0 for a heap array.  We steal those bits (exactly as the string system
+// does) to encode the runtime representation:
+//
+//   0b00  Heap  — the existing heap-allocated array block
+//   0b01  Rev   — a thin reversed-view wrapper around an inner array
+//
+// Every place that uses an array pointer as a memory base must strip the tag
+// first (`arr_untag`).  The classify-once / match-everywhere pattern mirrors
+// `str_repr` / `StrRepr` in the string system.
+const ARR_TAG_MASK: usize = 0b11;
+const ARR_HEAP_TAG: usize = 0b00;
+const ARR_REV_TAG: usize = 0b01;
+
+// Reversed-view block layout (data ptr is the block base + HEADER_SIZE, tagged
+// with ARR_REV_TAG).  Stores everything needed to iterate and to materialize:
+//   [ARR_LEN_OFFSET  = 0] len       — element count (same field as heap array)
+//   [REV_INNER_OFFSET= 8] inner_ptr — tagged pointer to the wrapped inner array
+//   [REV_DROP_OFFSET =16] drop_fn   — element drop fn (for materialization)
+//   [REV_RETAIN_OFFSET=24] retain_fn — element retain fn
+//   [REV_ELEMSIZE_OFFSET=32] elem_size — runtime elem size
+// Block size: HEADER_SIZE + 40 = 48 bytes.
+const REV_INNER_OFFSET: usize = 8;
+const REV_DROP_OFFSET: usize = 16;
+const REV_RETAIN_OFFSET: usize = 24;
+const REV_ELEMSIZE_OFFSET: usize = 32;
+const REV_BLOCK_DATA_SIZE: usize = 40; // bytes after the refcount header
+
+#[derive(Clone, Copy)]
+enum ArrRepr {
+    Heap,
+    Reversed,
+}
+
+fn arr_repr(ptr: *const u8) -> ArrRepr {
+    match ptr as usize & ARR_TAG_MASK {
+        ARR_HEAP_TAG => ArrRepr::Heap,
+        ARR_REV_TAG => ArrRepr::Reversed,
+        tag => unreachable!("unknown array repr tag {tag}"),
+    }
+}
+
+/// Strip the representation tag from an array pointer, returning the actual
+/// block base address.
+fn arr_untag(ptr: *const u8) -> *const u8 {
+    (ptr as usize & !ARR_TAG_MASK) as *const u8
+}
+
+/// Allocate a reversed-view block wrapping `inner` (tagged).  Steals the
+/// caller's reference to `inner` (does not retain it separately).
+fn alloc_reversed_view(
+    inner: *const u8,
+    len: usize,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let layout = std::alloc::Layout::from_size_align(
+        HEADER_SIZE + REV_BLOCK_DATA_SIZE,
+        std::mem::align_of::<i64>(),
+    )
+    .expect("rev-view layout");
+    let raw = unsafe { std::alloc::alloc(layout) };
+    if raw.is_null() {
+        std::alloc::handle_alloc_error(layout);
+    }
+    unsafe {
+        std::ptr::write(raw as *mut i64, 1); // refcount = 1
+        let data = raw.add(HEADER_SIZE);
+        std::ptr::write(data as *mut i64, len as i64);
+        std::ptr::write(data.add(REV_INNER_OFFSET) as *mut *const u8, inner);
+        std::ptr::write(data.add(REV_DROP_OFFSET) as *mut i64, drop_fn);
+        std::ptr::write(data.add(REV_RETAIN_OFFSET) as *mut i64, retain_fn);
+        std::ptr::write(data.add(REV_ELEMSIZE_OFFSET) as *mut i64, elem_size);
+        (data as usize | ARR_REV_TAG) as *const u8
+    }
+}
+
+/// Materialize a reversed view (or return the input unchanged for a heap array).
+/// Consumes the input pointer's reference.
+fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
+    match arr_repr(a) {
+        ArrRepr::Heap => a,
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let drop_fn = unsafe { std::ptr::read(u.add(REV_DROP_OFFSET) as *const i64) };
+            let retain_fn = unsafe { std::ptr::read(u.add(REV_RETAIN_OFFSET) as *const i64) };
+            let elem_size = unsafe { std::ptr::read(u.add(REV_ELEMSIZE_OFFSET) as *const i64) };
+            let heap = do_arr_reverse(inner, drop_fn, retain_fn, elem_size);
+            aipl_array_dec(a);
+            heap
+        }
+    }
+}
+
+/// Core reversal logic: build a new heap array whose elements are those of `a`
+/// (heap or reversed) in reverse order.  Does NOT drop `a`.
+fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+    let len = unsafe { array_len_of(arr_untag(a)) };
+    if elem_size == ELEM_BITPACKED {
+        let raw = alloc_array(len, len, drop_fn, ELEM_BITPACKED);
+        unsafe {
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                let bit = arr_load_bit(a, j);
+                write_packed_bit(dst, i, bit);
+            }
+        }
+        return raw;
+    }
+    let es = elem_size.max(8) as usize;
+    let raw = alloc_array(len, len, drop_fn, elem_size);
+    unsafe {
+        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        for i in 0..len {
+            let j = len - 1 - i;
+            let src = arr_elem_ptr(a, j, es);
+            std::ptr::copy_nonoverlapping(src, dst_base.add(i * es), es);
+        }
+        elem_rc(retain_fn, dst_base, len);
+    }
+    raw
+}
+
+/// Return a pointer to element `idx` in a heap array (assumes tag already stripped
+/// by `arr_elem_ptr`).
+unsafe fn heap_elem_ptr(base: *const u8, idx: usize, elem_size: usize) -> *const u8 {
+    unsafe { base.add(ARR_ELEMS_OFFSET).add(idx * elem_size) }
+}
+
+/// Repr-aware element pointer for use from JIT-compiled code (non-heap fast
+/// path). Returns a pointer to element `idx` in any array representation.
+/// `elem_size` is the stride in bytes (0 = bit-packed, NOT valid here — use
+/// `aipl_arr_load_bit` for bit-packed arrays).
+extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
+    unsafe { arr_elem_ptr(a, idx as usize, elem_size as usize) }
+}
+
+/// Repr-aware bit load for JIT-compiled code. Returns 0 or 1.
+extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
+    i64::from(unsafe { arr_load_bit(a, idx as usize) })
+}
+
+/// Compute the address of element `idx`, dispatching on representation.
+unsafe fn arr_elem_ptr(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
+    match arr_repr(a) {
+        ArrRepr::Heap => unsafe { heap_elem_ptr(arr_untag(a), idx, elem_size) },
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let len = unsafe { std::ptr::read(u as *const i64) as usize };
+            let j = len - 1 - idx;
+            unsafe { arr_elem_ptr(inner, j, elem_size) }
+        }
+    }
+}
+
+/// Read bit `idx` from an array (any repr).
+unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
+    match arr_repr(a) {
+        ArrRepr::Heap => {
+            let base = arr_untag(a).add(ARR_ELEMS_OFFSET);
+            unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
+        }
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let inner = unsafe { std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let len = unsafe { std::ptr::read(u as *const i64) as usize };
+            unsafe { arr_load_bit(inner, len - 1 - idx) }
+        }
+    }
+}
+
 // `bool[]` is bit-packed (8 elements per byte, like `std::vector<bool>` but with
 // the ordinary array interface). It's signalled by an `elem_size` of 0 passed
 // from codegen — the one sentinel that means "bit-packed" rather than a byte
@@ -1177,11 +1328,12 @@ unsafe fn write_packed_bit(data: *mut u8, idx: usize, val: bool) {
 }
 
 unsafe fn array_len_of(ptr: *const u8) -> usize {
-    unsafe { std::ptr::read(ptr.add(ARR_LEN_OFFSET) as *const i64) as usize }
+    unsafe { std::ptr::read(arr_untag(ptr).add(ARR_LEN_OFFSET) as *const i64) as usize }
 }
 
 unsafe fn array_cap_bytes_of(ptr: *const u8) -> usize {
-    unsafe { std::ptr::read(ptr.add(ARR_CAP_OFFSET) as *const i64) as usize }
+    // Only valid for heap arrays; callers must ensure the ptr is untagged/Heap.
+    unsafe { std::ptr::read(arr_untag(ptr).add(ARR_CAP_OFFSET) as *const i64) as usize }
 }
 
 /// Retain (`inc`) or drop one element via a retain/drop helper-fn pointer, if
@@ -1245,26 +1397,57 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
     if ptr.is_null() {
         return;
     }
+    let u = arr_untag(ptr);
     unsafe {
-        let h = header_of(ptr);
+        let h = header_of(u);
         if *h == STATIC_REFCOUNT {
             return;
         }
         *h -= 1;
         if *h == 0 {
-            let len = array_len_of(ptr);
-            let cap_bytes = array_cap_bytes_of(ptr);
-            let drop_fn = std::ptr::read(ptr.add(ARR_DROPFN_OFFSET) as *const i64);
-            if drop_fn != 0 {
-                let f: ArrDropFn = std::mem::transmute(drop_fn);
-                f(ptr.add(ARR_ELEMS_OFFSET), len as i64);
+            match arr_repr(ptr) {
+                ArrRepr::Heap => {
+                    let len = array_len_of(u);
+                    let cap_bytes = array_cap_bytes_of(u);
+                    let drop_fn = std::ptr::read(u.add(ARR_DROPFN_OFFSET) as *const i64);
+                    if drop_fn != 0 {
+                        let f: ArrDropFn = std::mem::transmute(drop_fn);
+                        f(u.add(ARR_ELEMS_OFFSET), len as i64);
+                    }
+                    let layout = std::alloc::Layout::from_size_align(
+                        array_block_size(cap_bytes),
+                        std::mem::align_of::<i64>(),
+                    )
+                    .expect("array layout");
+                    std::alloc::dealloc(h as *mut u8, layout);
+                }
+                ArrRepr::Reversed => {
+                    let inner = std::ptr::read(u.add(REV_INNER_OFFSET) as *const *const u8);
+                    aipl_array_dec(inner);
+                    let layout = std::alloc::Layout::from_size_align(
+                        HEADER_SIZE + REV_BLOCK_DATA_SIZE,
+                        std::mem::align_of::<i64>(),
+                    )
+                    .expect("rev-view layout");
+                    std::alloc::dealloc(h as *mut u8, layout);
+                }
             }
-            let layout = std::alloc::Layout::from_size_align(
-                array_block_size(cap_bytes),
-                std::mem::align_of::<i64>(),
-            )
-            .expect("array layout");
-            std::alloc::dealloc(h as *mut u8, layout);
+        }
+    }
+}
+
+/// Retain an array value (any representation).  Arrays use this instead of
+/// `aipl_inc` because `aipl_inc` dispatches on the *string* tag scheme, which
+/// would misinterpret an array's representation tag.
+extern "C" fn aipl_arr_inc(ptr: *const u8) {
+    if ptr.is_null() {
+        return;
+    }
+    let u = arr_untag(ptr);
+    unsafe {
+        let h = header_of(u);
+        if *h != STATIC_REFCOUNT {
+            *h += 1;
         }
     }
 }
@@ -1280,6 +1463,7 @@ extern "C" fn aipl_array_push(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
     if elem_size == ELEM_BITPACKED {
         // Bit-packed `bool[]`: fresh block of old_len+1 bits, copy the old bits,
         // set the new one, drop the input. No element refcounting (bools).
@@ -1333,6 +1517,7 @@ extern "C" fn aipl_array_push_mut(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
     if elem_size == ELEM_BITPACKED {
         // Bit-packed `bool[]`, in place: set bit `old_len`, growing the byte
         // capacity (doubling) only when the next bit needs a new byte.
@@ -1668,11 +1853,11 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
         return 0;
     }
     let len = unsafe { array_len_of(a) };
-    let elems = unsafe { a.add(ARR_ELEMS_OFFSET) };
     if str_cmp != 0 {
         let target = unsafe { std::ptr::read(x as *const i64) } as *const u8;
         for i in 0..len {
-            let s = unsafe { std::ptr::read(elems.add(i * 8) as *const i64) } as *const u8;
+            let sp = unsafe { arr_elem_ptr(a, i, 8) };
+            let s = unsafe { std::ptr::read(sp as *const i64) } as *const u8;
             if unsafe { rt_str_eq(s, target) } {
                 return 1;
             }
@@ -1681,8 +1866,7 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
     } else if elem_size == ELEM_BITPACKED {
         let target = unsafe { std::ptr::read(x as *const i64) } != 0;
         for i in 0..len {
-            let byte = unsafe { *elems.add(i >> 3) };
-            if ((byte >> (i & 7)) & 1 != 0) == target {
+            if unsafe { arr_load_bit(a, i) } == target {
                 return 1;
             }
         }
@@ -1691,7 +1875,8 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
         let stride = elem_size.max(8) as usize;
         let target = unsafe { std::ptr::read(x as *const i64) };
         for i in 0..len {
-            let v = unsafe { std::ptr::read(elems.add(i * stride) as *const i64) };
+            let ep = unsafe { arr_elem_ptr(a, i, stride) };
+            let v = unsafe { std::ptr::read(ep as *const i64) };
             if v == target {
                 return 1;
             }
@@ -1724,13 +1909,12 @@ extern "C" fn aipl_set_insert(
 /// value is passed by-address to `aipl_set_insert`, so this normalizes the
 /// bit-packed case into a plain i64 the inserter can spill and read.
 unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {
-    let elems = unsafe { src.add(ARR_ELEMS_OFFSET) };
     if elem_size == ELEM_BITPACKED {
-        let byte = unsafe { *elems.add(i >> 3) };
-        i64::from((byte >> (i & 7)) & 1)
+        i64::from(unsafe { arr_load_bit(src, i) })
     } else {
         let stride = elem_size.max(8) as usize;
-        unsafe { std::ptr::read(elems.add(i * stride) as *const i64) }
+        let ep = unsafe { arr_elem_ptr(src, i, stride) };
+        unsafe { std::ptr::read(ep as *const i64) }
     }
 }
 
@@ -1806,11 +1990,11 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
         return -1;
     }
     let len = unsafe { array_len_of(a) };
-    let elems = unsafe { a.add(ARR_ELEMS_OFFSET) };
     let stride = pair_size as usize;
     let want = unsafe { std::ptr::read(pair_ptr as *const i64) };
     for i in 0..len {
-        let k = unsafe { std::ptr::read(elems.add(i * stride) as *const i64) };
+        let ep = unsafe { arr_elem_ptr(a, i, stride) };
+        let k = unsafe { std::ptr::read(ep as *const i64) };
         let eq = if str_cmp != 0 {
             unsafe { rt_str_eq(k as *const u8, want as *const u8) }
         } else {
@@ -1842,7 +2026,7 @@ extern "C" fn aipl_dict_insert(
     if idx >= 0 {
         let stride = pair_size as usize;
         unsafe {
-            let slot = a.add(ARR_ELEMS_OFFSET).add(idx as usize * stride) as *mut u8;
+            let slot = arr_elem_ptr(a, idx as usize, stride) as *mut u8;
             elem_rc(drop_fn, slot, 1); // release the old key+value
             std::ptr::copy_nonoverlapping(pair_ptr, slot, stride);
             elem_rc(retain_fn, slot, 1); // co-own the new key+value
@@ -1866,10 +2050,7 @@ extern "C" fn aipl_dict_get(
         return std::ptr::null();
     }
     // The key occupies the first 8 bytes of the pair; the value follows.
-    unsafe {
-        a.add(ARR_ELEMS_OFFSET)
-            .add(idx as usize * pair_size as usize + 8)
-    }
+    unsafe { arr_elem_ptr(a, idx as usize, pair_size as usize).add(8) }
 }
 
 /// `d.contains_key(k)`: whether `key_ptr` is a key of dict `a`. Borrows `a`.
@@ -2867,6 +3048,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_array_push", aipl_array_push as *const u8);
     jit_builder.symbol("aipl_array_push_mut", aipl_array_push_mut as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
+    jit_builder.symbol("aipl_arr_inc", aipl_arr_inc as *const u8);
+    jit_builder.symbol("aipl_arr_elem_ptr", aipl_arr_elem_ptr as *const u8);
+    jit_builder.symbol("aipl_arr_load_bit", aipl_arr_load_bit as *const u8);
     jit_builder.symbol("aipl_set_contains", aipl_set_contains as *const u8);
     jit_builder.symbol("aipl_set_insert", aipl_set_insert as *const u8);
     jit_builder.symbol("aipl_set_union", aipl_set_union as *const u8);
@@ -4224,7 +4408,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
     };
     match sym {
         "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_array_dec"
-        | "aipl_count_insns" | "aipl_test_begin" => sig(1, false),
+        | "aipl_arr_inc" | "aipl_count_insns" | "aipl_test_begin" => sig(1, false),
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
         // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
         "aipl_test_end" => sig(0, false),
@@ -4237,6 +4421,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_drop_opt_arr"
         | "aipl_arr_retain_opt"
         | "aipl_str_iter_init" => sig(2, false),
+        "aipl_arr_load_bit" => sig(2, true),
+        "aipl_arr_elem_ptr" => sig(3, true),
         "aipl_str_alloc"
         | "aipl_i64_len"
         | "aipl_u64_len"
@@ -4977,16 +5163,51 @@ fn runtime_elem_size(elem: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
 /// `arr_ptr + ARR_ELEMS_OFFSET`. Returns a bit-unpacked `bool` (0/1), a loaded
 /// scalar/pointer, or the address of an inline composite. Used by indexing and
 /// `for`-loops so both honor the element type's representation.
-fn load_array_elem(
+/// Strip array representation tag bits from a pointer in Cranelift IR.
+/// This is the IR equivalent of `arr_untag` in the runtime.
+fn arr_base(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
+    builder.ins().band_imm(arr_ptr, !(ARR_TAG_MASK as i64))
+}
+
+/// Load the length of an array (any repr) in Cranelift IR.  Strips the tag
+/// before reading, because tagged pointers are not valid addresses.
+fn load_arr_len(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
+    let u = arr_base(builder, arr_ptr);
+    builder
+        .ins()
+        .load(types::I64, MemFlags::trusted(), u, ARR_LEN_OFFSET as i32)
+}
+
+fn load_array_elem<M: Module>(
+    module: &mut M,
     builder: &mut FunctionBuilder,
+    builtins: &Builtins,
     arr_ptr: Value,
     idx: Value,
     elem: &Type,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
-    let base = builder.ins().iadd_imm(arr_ptr, ARR_ELEMS_OFFSET as i64);
-    if is_bit_packed(elem) {
-        // bool: byte `idx >> 3`, bit `idx & 7`.
+    // Inline tag check: fast heap path, slow extern path for non-heap reprs.
+    // Values are passed through a stack slot (not block params) so that the
+    // two-path merge stays compatible with Cranelift's block-arg API.
+    let val_slot = i64_slot(builder);
+    let tag = builder.ins().band_imm(arr_ptr, ARR_TAG_MASK as i64);
+    let is_heap = builder
+        .ins()
+        .icmp_imm(IntCC::Equal, tag, ARR_HEAP_TAG as i64);
+    let heap_block = builder.create_block();
+    let slow_block = builder.create_block();
+    let merge = builder.create_block();
+    builder
+        .ins()
+        .brif(is_heap, heap_block, &[], slow_block, &[]);
+
+    // Fast path: heap array — untag and use inline arithmetic.
+    builder.switch_to_block(heap_block);
+    builder.seal_block(heap_block);
+    let untagged = arr_base(builder, arr_ptr);
+    let base = builder.ins().iadd_imm(untagged, ARR_ELEMS_OFFSET as i64);
+    let heap_val = if is_bit_packed(elem) {
         let byte_off = builder.ins().ushr_imm(idx, 3);
         let byte_addr = builder.ins().iadd(base, byte_off);
         let byte = builder
@@ -4997,14 +5218,44 @@ fn load_array_elem(
         let shifted = builder.ins().ushr(byte, bit_idx);
         builder.ins().band_imm(shifted, 1)
     } else {
-        let off = builder.ins().imul_imm(idx, elem_size_of(elem, structs));
+        let stride = elem_size_of(elem, structs);
+        let off = builder.ins().imul_imm(idx, stride);
         let addr = builder.ins().iadd(base, off);
         if is_composite(elem, structs) {
             addr
         } else {
             builder.ins().load(types::I64, MemFlags::trusted(), addr, 0)
         }
-    }
+    };
+    builder.ins().stack_store(heap_val, val_slot, 0);
+    builder.ins().jump(merge, &[]);
+
+    // Slow path: non-heap repr — call runtime dispatch.
+    builder.switch_to_block(slow_block);
+    builder.seal_block(slow_block);
+    let slow_val = if is_bit_packed(elem) {
+        let f = builtins.import(module, builder.func, "aipl_arr_load_bit");
+        let call = builder.ins().call(f, &[arr_ptr, idx]);
+        builder.inst_results(call)[0]
+    } else {
+        let stride_v = builder
+            .ins()
+            .iconst(types::I64, elem_size_of(elem, structs));
+        let f = builtins.import(module, builder.func, "aipl_arr_elem_ptr");
+        let call = builder.ins().call(f, &[arr_ptr, idx, stride_v]);
+        let addr = builder.inst_results(call)[0];
+        if is_composite(elem, structs) {
+            addr
+        } else {
+            builder.ins().load(types::I64, MemFlags::trusted(), addr, 0)
+        }
+    };
+    builder.ins().stack_store(slow_val, val_slot, 0);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.ins().stack_load(types::I64, val_slot, 0)
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -5047,9 +5298,11 @@ fn emit_rc<M: Module>(
             // whole array — elements are untouched). Drop routes through
             // `aipl_array_dec`, which releases the elements via the drop-fn
             // stored in the array header before freeing (for a dict that drop-fn
-            // releases each pair's key and value).
+            // releases each pair's key and value). Arrays use `aipl_arr_inc`
+            // (not `aipl_inc`) because `aipl_inc` uses string tag dispatch and
+            // would misread the array repr tag bits.
             let sym = match op {
-                RcOp::Retain => "aipl_inc",
+                RcOp::Retain => "aipl_arr_inc",
                 RcOp::Drop => "aipl_array_dec",
             };
             let local = builtins.import(module, builder.func, sym);
@@ -5207,18 +5460,8 @@ fn emit_arr_starts_ends<M: Module>(
     let Cx {
         structs, builtins, ..
     } = cx;
-    let la = builder.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        self_ptr,
-        ARR_LEN_OFFSET as i32,
-    );
-    let lb = builder.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        other_ptr,
-        ARR_LEN_OFFSET as i32,
-    );
+    let la = load_arr_len(builder, self_ptr);
+    let lb = load_arr_len(builder, other_ptr);
     // A pattern longer than the source can't be a prefix/suffix.
     let fits = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lb, la);
     // Both arrays are the untyped empty literal (`[].starts_with([])`): there's
@@ -5261,8 +5504,8 @@ fn emit_arr_starts_ends<M: Module>(
     builder.switch_to_block(body);
     builder.seal_block(body);
     let si = builder.ins().iadd(offset, i);
-    let el = load_array_elem(builder, self_ptr, si, elem, structs);
-    let er = load_array_elem(builder, other_ptr, i, elem, structs);
+    let el = load_array_elem(module, builder, builtins, self_ptr, si, elem, structs);
+    let er = load_array_elem(module, builder, builtins, other_ptr, i, elem, structs);
     let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
     let cont = builder.create_block();
     let neq = builder.create_block();
@@ -5362,12 +5605,8 @@ fn emit_eq<M: Module>(
             builder.ins().stack_load(types::I64, res, 0)
         }
         Type::Array(elem) => {
-            let ll = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), lv, ARR_LEN_OFFSET as i32);
-            let rl = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), rv, ARR_LEN_OFFSET as i32);
+            let ll = load_arr_len(builder, lv);
+            let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             // Both empty (untyped element) → length equality is the whole answer,
             // and there's no element type to recurse into.
@@ -5396,8 +5635,8 @@ fn emit_eq<M: Module>(
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
                 builder.seal_block(body);
-                let el = load_array_elem(builder, lv, i, elem, structs);
-                let er = load_array_elem(builder, rv, i, elem, structs);
+                let el = load_array_elem(module, builder, builtins, lv, i, elem, structs);
+                let er = load_array_elem(module, builder, builtins, rv, i, elem, structs);
                 let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
                 let cont = builder.create_block();
                 let neq = builder.create_block();
@@ -5423,12 +5662,8 @@ fn emit_eq<M: Module>(
         Type::Set(elem) => {
             // Order-independent: same length and every element of the left set is
             // a member of the right (distinct elements + equal sizes ⇒ equal sets).
-            let ll = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), lv, ARR_LEN_OFFSET as i32);
-            let rl = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), rv, ARR_LEN_OFFSET as i32);
+            let ll = load_arr_len(builder, lv);
+            let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             if is_none_inner(elem) {
                 builder.ins().uextend(types::I64, len_eq)
@@ -5458,7 +5693,7 @@ fn emit_eq<M: Module>(
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
                 builder.seal_block(body);
-                let el = load_array_elem(builder, lv, i, elem, structs);
+                let el = load_array_elem(module, builder, builtins, lv, i, elem, structs);
                 let xslot = i64_slot(builder);
                 builder.ins().stack_store(el, xslot, 0);
                 let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
@@ -5573,12 +5808,8 @@ fn emit_eq<M: Module>(
         Type::Dict(k, v) => {
             // Equal iff same length and every left pair's key is bound in the
             // right to an equal value (distinct keys + equal sizes ⇒ equal maps).
-            let ll = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), lv, ARR_LEN_OFFSET as i32);
-            let rl = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), rv, ARR_LEN_OFFSET as i32);
+            let ll = load_arr_len(builder, lv);
+            let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             if is_none_inner(k) {
                 builder.ins().uextend(types::I64, len_eq)
@@ -5612,7 +5843,8 @@ fn emit_eq<M: Module>(
                 builder.switch_to_block(body);
                 builder.seal_block(body);
                 // Address of left pair `i`, its key (offset 0) and value (8).
-                let lelems = builder.ins().iadd_imm(lv, ARR_ELEMS_OFFSET as i64);
+                let lv_base = arr_base(builder, lv);
+                let lelems = builder.ins().iadd_imm(lv_base, ARR_ELEMS_OFFSET as i64);
                 let off = builder.ins().imul_imm(i, pair_size);
                 let lpair = builder.ins().iadd(lelems, off);
                 let key = component(builder, lpair, 0, k, structs);
@@ -5764,9 +5996,7 @@ fn emit_seq_hash<M: Module>(
     seed: Value,
     commutative: bool,
 ) -> Result<Value, Error> {
-    let len = builder
-        .ins()
-        .load(types::I64, MemFlags::trusted(), arr, ARR_LEN_OFFSET as i32);
+    let len = load_arr_len(builder, arr);
     let acc = i64_slot(builder);
     builder.ins().stack_store(seed, acc, 0);
     let idx = i64_slot(builder);
@@ -5782,7 +6012,7 @@ fn emit_seq_hash<M: Module>(
     builder.ins().brif(more, body, &[], exit, &[]);
     builder.switch_to_block(body);
     builder.seal_block(body);
-    let el = load_array_elem(builder, arr, i, elem, structs);
+    let el = load_array_elem(module, builder, builtins, arr, i, elem, structs);
     let h = emit_hash(module, builder, builtins, structs, el, elem)?;
     let cur = builder.ins().stack_load(types::I64, acc, 0);
     let new = if commutative {
@@ -5847,9 +6077,7 @@ fn emit_hash<M: Module>(
             builder.ins().stack_load(types::I64, acc, 0)
         }
         Type::Array(elem) => {
-            let len = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), v, ARR_LEN_OFFSET as i32);
+            let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
                 seed
@@ -5858,9 +6086,7 @@ fn emit_hash<M: Module>(
             }
         }
         Type::Set(elem) => {
-            let len = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), v, ARR_LEN_OFFSET as i32);
+            let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
                 seed
@@ -5936,9 +6162,7 @@ fn emit_hash<M: Module>(
             // Order-independent over pairs (matching dict `==`): fold each pair's
             // (key, value) combine commutatively. Within a pair the combine is
             // order-sensitive so `{1: 2}` and `{2: 1}` differ.
-            let len = builder
-                .ins()
-                .load(types::I64, MemFlags::trusted(), v, ARR_LEN_OFFSET as i32);
+            let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(key_ty) {
                 seed
@@ -5949,7 +6173,8 @@ fn emit_hash<M: Module>(
                 let idx = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
                 builder.ins().stack_store(zero, idx, 0);
-                let elems = builder.ins().iadd_imm(v, ARR_ELEMS_OFFSET as i64);
+                let v_base = arr_base(builder, v);
+                let elems = builder.ins().iadd_imm(v_base, ARR_ELEMS_OFFSET as i64);
                 let header = builder.create_block();
                 let body = builder.create_block();
                 let exit = builder.create_block();
@@ -7014,9 +7239,7 @@ fn emit_render_seq<M: Module>(
     let idx =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     builder.ins().stack_store(zero, idx, 0);
-    let count = builder
-        .ins()
-        .load(types::I64, MemFlags::trusted(), arr, ARR_LEN_OFFSET as i32);
+    let count = load_arr_len(builder, arr);
 
     let header = builder.create_block();
     let body = builder.create_block();
@@ -7045,7 +7268,7 @@ fn emit_render_seq<M: Module>(
 
     // Read element i (honoring the element representation — a bit-unpacked
     // `bool`, a loaded scalar/pointer, or a composite's address) and render it.
-    let elem_val = load_array_elem(builder, arr, i, elem_ty, cx.structs);
+    let elem_val = load_array_elem(module, builder, cx.builtins, arr, i, elem_ty, cx.structs);
     let elem_len = emit_render(module, builder, cx, elem_val, elem_ty, sink)?;
     add_len(builder, len_slot, elem_len);
 
@@ -7088,10 +7311,9 @@ fn emit_render_dict<M: Module>(
     let idx =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     builder.ins().stack_store(zero, idx, 0);
-    let count = builder
-        .ins()
-        .load(types::I64, MemFlags::trusted(), dict, ARR_LEN_OFFSET as i32);
-    let elems = builder.ins().iadd_imm(dict, ARR_ELEMS_OFFSET as i64);
+    let count = load_arr_len(builder, dict);
+    let dict_base = arr_base(builder, dict);
+    let elems = builder.ins().iadd_imm(dict_base, ARR_ELEMS_OFFSET as i64);
 
     let header = builder.create_block();
     let body = builder.create_block();
@@ -7697,9 +7919,7 @@ fn emit_arr_starts_ends_elem<M: Module>(
     let Cx {
         structs, builtins, ..
     } = cx;
-    let len = builder
-        .ins()
-        .load(types::I64, MemFlags::trusted(), arr, ARR_LEN_OFFSET as i32);
+    let len = load_arr_len(builder, arr);
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().stack_store(zero, res, 0);
@@ -7714,7 +7934,7 @@ fn emit_arr_starts_ends_elem<M: Module>(
     } else {
         zero
     };
-    let e = load_array_elem(builder, arr, idx, elem, structs);
+    let e = load_array_elem(module, builder, builtins, arr, idx, elem, structs);
     let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
     builder.ins().stack_store(eq, res, 0);
     builder.ins().jump(merge, &[]);
@@ -8061,12 +8281,7 @@ fn compile_expr<M: Module>(
                 3,
             ));
             let result_ptr = builder.ins().stack_addr(types::I64, rslot, 0);
-            let len = builder.ins().load(
-                types::I64,
-                MemFlags::trusted(),
-                arr_ptr,
-                ARR_LEN_OFFSET as i32,
-            );
+            let len = load_arr_len(builder, arr_ptr);
             let zero = builder.ins().iconst(types::I64, 0);
             let is_empty = builder.ins().icmp(IntCC::Equal, len, zero);
             let empty_b = builder.create_block();
@@ -8096,7 +8311,7 @@ fn compile_expr<M: Module>(
                 8,
                 3,
             ));
-            let acc0 = load_array_elem(builder, arr_ptr, zero, &elem, structs);
+            let acc0 = load_array_elem(module, builder, builtins, arr_ptr, zero, &elem, structs);
             builder.ins().stack_store(acc0, acc_slot, 0);
             let one = builder.ins().iconst(types::I64, 1);
             builder.ins().stack_store(one, i_slot, 0);
@@ -8112,7 +8327,7 @@ fn compile_expr<M: Module>(
 
             builder.switch_to_block(body);
             builder.seal_block(body);
-            let e = load_array_elem(builder, arr_ptr, i, &elem, structs);
+            let e = load_array_elem(module, builder, builtins, arr_ptr, i, &elem, structs);
             let acc = builder.ins().stack_load(types::I64, acc_slot, 0);
             let cc = if is_min {
                 IntCC::SignedLessThan
@@ -8402,9 +8617,7 @@ fn compile_expr<M: Module>(
             } else if matches!(t, Type::Array(_) | Type::Set(_) | Type::Dict(_, _)) {
                 // A set/dict shares the array layout, so its element/pair count is
                 // the same `len` field.
-                builder
-                    .ins()
-                    .load(types::I64, MemFlags::trusted(), ptr, ARR_LEN_OFFSET as i32)
+                load_arr_len(builder, ptr)
             } else {
                 return Err(Error::at(
                     format!(
@@ -10028,19 +10241,22 @@ fn compile_expr<M: Module>(
                 }
                 Type::Array(inner) => {
                     let elem_ty = (**inner).clone();
-                    let len = builder.ins().load(
-                        types::I64,
-                        MemFlags::trusted(),
-                        it_ptr,
-                        ARR_LEN_OFFSET as i32,
-                    );
+                    let len = load_arr_len(builder, it_ptr);
                     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
                     builder.ins().brif(more, body_block, &[], exit, &[]);
                     // Fetch element i in the body block (it's only valid there).
                     // Switch now; the element read (a bit-unpack for `bool`, a
                     // load or composite address otherwise) happens here.
                     builder.switch_to_block(body_block);
-                    let elem = load_array_elem(builder, it_ptr, i, &elem_ty, cx.structs);
+                    let elem = load_array_elem(
+                        module,
+                        builder,
+                        cx.builtins,
+                        it_ptr,
+                        i,
+                        &elem_ty,
+                        cx.structs,
+                    );
                     (elem, elem_ty)
                 }
                 _ => {
@@ -10225,10 +10441,7 @@ fn compile_expr<M: Module>(
                         Ok(vals)
                     })
                     .collect::<Result<_, Error>>()?;
-                let scrut_len =
-                    builder
-                        .ins()
-                        .load(types::I64, MemFlags::trusted(), ptr, ARR_LEN_OFFSET as i32);
+                let scrut_len = load_arr_len(builder, ptr);
                 for (i, arm) in arms.iter().enumerate() {
                     let Pattern::Array(elems) = &arm.pattern else {
                         continue;
@@ -10249,7 +10462,8 @@ fn compile_expr<M: Module>(
                     let mut matched = builder.ins().iconst(types::I64, 1);
                     for j in 0..elems.len() {
                         let idx = builder.ins().iconst(types::I64, j as i64);
-                        let scrut_elem = load_array_elem(builder, ptr, idx, elem, structs);
+                        let scrut_elem =
+                            load_array_elem(module, builder, builtins, ptr, idx, elem, structs);
                         let eq = emit_eq(
                             module,
                             builder,
@@ -10621,12 +10835,7 @@ fn compile_expr<M: Module>(
             let result_ty = Type::Optional(Box::new(elem_ty.clone()));
             // Guard the load behind a branch so an out-of-bounds index
             // never dereferences past the allocation.
-            let len = builder.ins().load(
-                types::I64,
-                MemFlags::trusted(),
-                arr_ptr,
-                ARR_LEN_OFFSET as i32,
-            );
+            let len = load_arr_len(builder, arr_ptr);
             let ge0 = builder
                 .ins()
                 .icmp_imm(IntCC::SignedGreaterThanOrEqual, idx_v, 0);
@@ -10650,7 +10859,8 @@ fn compile_expr<M: Module>(
             // composite address), then build `some(element)` into the result
             // slot and retain its core heap (`emit_retain` incs only when the
             // result is fully `some`).
-            let elem_val = load_array_elem(builder, arr_ptr, idx_v, &elem_ty, structs);
+            let elem_val =
+                load_array_elem(module, builder, builtins, arr_ptr, idx_v, &elem_ty, structs);
             emit_build_some(builder, sbase, elem_val, &elem_ty, structs);
             emit_retain(builder, module, builtins, structs, sbase, &result_ty);
             builder.ins().jump(merge_block, &[]);

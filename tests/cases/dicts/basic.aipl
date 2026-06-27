@@ -50,8 +50,8 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 384
-instructions executed: 729
-binary size: 11104
+instructions executed: 741
+binary size: 11168
 --- monomorphizations ---
 __test$ints
 __test$make_empty

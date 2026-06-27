@@ -932,7 +932,8 @@ pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
 }
 
 /// `xs.reverse() -> T[]` — new array with elements in reverse order.
-/// Consumes `xs` (callers pre-inc) and retains each element for the output.
+/// O(1): returns a reversed-view repr wrapping `a`.
+/// Transfers ownership of `a` into the view (no drop, no retain on `a`).
 /// Mirrors the JIT runtime's `aipl_arr_reverse`.
 #[no_mangle]
 pub extern "C" fn aipl_arr_reverse(
@@ -944,37 +945,8 @@ pub extern "C" fn aipl_arr_reverse(
     if a.is_null() {
         return a;
     }
-    unsafe {
-        let len = array_len(a);
-        let raw = if elem_size == ELEM_BITPACKED {
-            let raw = array_alloc(len, len, drop_fn, ELEM_BITPACKED) as *const u8;
-            let src = a.add(ARR_ELEMS_OFFSET);
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                let bit = (*src.add(j >> 3) >> (j & 7)) & 1 != 0;
-                write_packed_bit(dst, i, bit);
-            }
-            raw
-        } else {
-            let es = if elem_size < 8 { 8 } else { elem_size as usize };
-            let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
-            let src_base = a.add(ARR_ELEMS_OFFSET);
-            let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..len {
-                let j = len - 1 - i;
-                memcpy(
-                    dst_base.add(i * es) as *mut c_void,
-                    src_base.add(j * es) as *const c_void,
-                    es,
-                );
-            }
-            elem_rc(retain_fn, dst_base, len);
-            raw
-        };
-        aipl_array_dec(a);
-        raw
-    }
+    let len = unsafe { array_len(a) };
+    unsafe { alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size) }
 }
 
 /// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
@@ -1343,16 +1315,162 @@ const ARR_CAP_OFFSET: usize = 8; // capacity of the element region, in *bytes*
 const ARR_DROPFN_OFFSET: usize = 16; // element drop-fn pointer (null = scalars)
 const ARR_ELEMS_OFFSET: usize = 24; // first element, relative to data ptr
 
+// Array representation tag bits (stored in the low 2 bits of the data pointer,
+// which are free since arrays are 8-byte aligned). Mirrors the JIT runtime.
+const ARR_TAG_MASK: usize = 0b11;
+const ARR_HEAP_TAG: usize = 0b00;
+const ARR_REV_TAG: usize = 0b01;
+
+// Reversed-view block layout (relative to the data pointer, after HEADER_SIZE).
+// The block is `REV_BLOCK_DATA_SIZE` bytes; its pointer is tagged with ARR_REV_TAG.
+const REV_LEN_OFFSET: usize = 0; // mirrors ARR_LEN_OFFSET; len of the view
+const REV_INNER_OFFSET: usize = 8; // pointer to the inner (heap) array
+const REV_DROP_OFFSET: usize = 16; // element drop_fn (i64)
+const REV_RETAIN_OFFSET: usize = 24; // element retain_fn (i64)
+const REV_ELEMSIZE_OFFSET: usize = 32; // element stride (i64); 0 = bit-packed
+const REV_BLOCK_DATA_SIZE: usize = 40;
+
+#[derive(Clone, Copy)]
+enum ArrRepr {
+    Heap,
+    Reversed,
+}
+
+fn arr_repr(ptr: *const u8) -> ArrRepr {
+    match ptr as usize & ARR_TAG_MASK {
+        ARR_HEAP_TAG => ArrRepr::Heap,
+        ARR_REV_TAG => ArrRepr::Reversed,
+        tag => panic!("unknown array repr tag {tag}"),
+    }
+}
+
+fn arr_untag(ptr: *const u8) -> *const u8 {
+    (ptr as usize & !ARR_TAG_MASK) as *const u8
+}
+
+/// Allocate a reversed-view block.  Transfers ownership of `inner` into
+/// the view (no drop, no retain on `inner`).  Returns data_ptr | ARR_REV_TAG.
+unsafe fn alloc_reversed_view(
+    inner: *const u8,
+    len: usize,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    unsafe {
+        let raw = rt_alloc(HEADER_SIZE + REV_BLOCK_DATA_SIZE) as *mut u8;
+        if raw.is_null() {
+            abort();
+        }
+        *(raw as *mut i64) = 1; // refcount
+        let data = raw.add(HEADER_SIZE);
+        *(data.add(REV_LEN_OFFSET) as *mut i64) = len as i64;
+        *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
+        *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
+        *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
+        *(data.add(REV_ELEMSIZE_OFFSET) as *mut i64) = elem_size;
+        (data as usize | ARR_REV_TAG) as *const u8
+    }
+}
+
+/// Materialize a reversed view into a fresh heap array, consuming the view
+/// (dec + free the view block).  The inner array is dec'd too.
+unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
+    unsafe {
+        let u = arr_untag(a);
+        let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
+        let len = *(u as *const i64) as usize;
+        if elem_size == ELEM_BITPACKED {
+            let raw = array_alloc(len, len, drop_fn, ELEM_BITPACKED) as *const u8;
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                write_packed_bit(dst, i, arr_load_bit_rt(inner, j));
+            }
+            raw
+        } else {
+            let es = (elem_size.max(8)) as usize;
+            let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
+            let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..len {
+                let j = len - 1 - i;
+                let src = arr_elem_ptr_rt(inner, j, es);
+                memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
+            }
+            elem_rc(retain_fn, dst_base, len);
+            raw
+        }
+    }
+}
+
+/// Ensure `a` is a heap array, materializing it if it's a reversed view.
+/// Consumes `a` (it's dec'd / freed if a view was materialized).
+fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
+    if a.is_null() {
+        return a;
+    }
+    match arr_repr(a) {
+        ArrRepr::Heap => a,
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let (inner, drop_fn, retain_fn, elem_size) = unsafe {
+                (
+                    *(u.add(REV_INNER_OFFSET) as *const *const u8),
+                    *(u.add(REV_DROP_OFFSET) as *const i64),
+                    *(u.add(REV_RETAIN_OFFSET) as *const i64),
+                    *(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
+                )
+            };
+            let heap = unsafe { do_arr_reverse(a, drop_fn, retain_fn, elem_size) };
+            aipl_array_dec(a);
+            // dec the inner (do_arr_reverse didn't)
+            aipl_array_dec(inner);
+            heap
+        }
+    }
+}
+
+unsafe fn heap_elem_ptr_rt(base: *const u8, idx: usize, elem_size: usize) -> *const u8 {
+    unsafe { base.add(ARR_ELEMS_OFFSET).add(idx * elem_size) }
+}
+
+unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const u8 {
+    match arr_repr(a) {
+        ArrRepr::Heap => unsafe { heap_elem_ptr_rt(arr_untag(a), idx, elem_size) },
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let len = unsafe { *(u as *const i64) as usize };
+            unsafe { arr_elem_ptr_rt(inner, len - 1 - idx, elem_size) }
+        }
+    }
+}
+
+unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
+    match arr_repr(a) {
+        ArrRepr::Heap => {
+            let base = unsafe { arr_untag(a).add(ARR_ELEMS_OFFSET) };
+            unsafe { (*base.add(idx >> 3) >> (idx & 7)) & 1 != 0 }
+        }
+        ArrRepr::Reversed => {
+            let u = arr_untag(a);
+            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let len = unsafe { *(u as *const i64) as usize };
+            unsafe { arr_load_bit_rt(inner, len - 1 - idx) }
+        }
+    }
+}
+
 // Element size is known at compile time, so codegen passes it to these fns as a
 // constant rather than storing it in the header. The header keeps the element-
 // region capacity in *bytes* so `aipl_array_dec` can free without it.
 
 unsafe fn array_len(ptr: *const u8) -> usize {
-    unsafe { *(ptr as *const i64) as usize }
+    unsafe { *(arr_untag(ptr) as *const i64) as usize }
 }
 
 unsafe fn array_cap_bytes(ptr: *const u8) -> usize {
-    unsafe { *(ptr.add(ARR_CAP_OFFSET) as *const i64) as usize }
+    unsafe { *(arr_untag(ptr).add(ARR_CAP_OFFSET) as *const i64) as usize }
 }
 
 /// Retain/drop `count` elements at `at` via a helper-fn pointer, if non-null.
@@ -1429,26 +1547,66 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
     if ptr.is_null() {
         return;
     }
+    let u = arr_untag(ptr);
     unsafe {
-        let h = header_of(ptr);
+        let h = header_of(u);
         if *h == STATIC_REFCOUNT {
             return;
         }
         *h -= 1;
         if *h == 0 {
-            let len = array_len(ptr);
-            let drop_fn = *(ptr.add(ARR_DROPFN_OFFSET) as *const i64);
-            if drop_fn != 0 {
-                let f: ArrDropFn = core::mem::transmute(drop_fn);
-                f(ptr.add(ARR_ELEMS_OFFSET), len as i64);
+            match arr_repr(ptr) {
+                ArrRepr::Heap => {
+                    let len = array_len(u);
+                    let drop_fn = *(u.add(ARR_DROPFN_OFFSET) as *const i64);
+                    if drop_fn != 0 {
+                        let f: ArrDropFn = core::mem::transmute(drop_fn);
+                        f(u.add(ARR_ELEMS_OFFSET), len as i64);
+                    }
+                    rt_free(h as *mut c_void);
+                }
+                ArrRepr::Reversed => {
+                    let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
+                    aipl_array_dec(inner);
+                    rt_free(h as *mut c_void);
+                }
             }
-            rt_free(h as *mut c_void);
+        }
+    }
+}
+
+/// Retain an array value (any representation). Uses `arr_untag` to strip the
+/// representation tag before touching the refcount.
+#[no_mangle]
+pub extern "C" fn aipl_arr_inc(ptr: *const u8) {
+    if ptr.is_null() {
+        return;
+    }
+    let u = arr_untag(ptr);
+    unsafe {
+        let h = header_of(u);
+        if *h != STATIC_REFCOUNT {
+            *h += 1;
         }
     }
 }
 
 /// Copy-and-grow push (value semantics): returns a fresh array holding `a`'s
 /// elements followed by the `elem_size`-byte element at `x`, then drops `a`.
+/// Repr-aware element pointer for use from AOT-compiled code.
+/// Returns a pointer to element `idx`, handling reversed views via recursion.
+/// `elem_size` must be > 0 (not bit-packed — use `aipl_arr_load_bit` for bools).
+#[no_mangle]
+pub extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
+    unsafe { arr_elem_ptr_rt(a, idx as usize, elem_size as usize) }
+}
+
+/// Repr-aware bit load for AOT-compiled code. Returns 0 or 1 as i64.
+#[no_mangle]
+pub extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
+    i64::from(unsafe { arr_load_bit_rt(a, idx as usize) })
+}
+
 /// `retain_fn` retains the copied elements (the new array co-owns them).
 #[no_mangle]
 pub extern "C" fn aipl_array_push(
@@ -1458,6 +1616,7 @@ pub extern "C" fn aipl_array_push(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
     unsafe {
         let old_len = if a.is_null() { 0 } else { array_len(a) };
         if elem_size == ELEM_BITPACKED {
@@ -1507,6 +1666,7 @@ pub extern "C" fn aipl_array_push_mut(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
     unsafe {
         let old_len = if a.is_null() { 0 } else { array_len(a) };
         let cap_bytes = if a.is_null() { 0 } else { array_cap_bytes(a) };
@@ -1749,11 +1909,11 @@ pub extern "C" fn aipl_set_contains(
     }
     unsafe {
         let len = array_len(a);
-        let elems = a.add(ARR_ELEMS_OFFSET);
         if str_cmp != 0 {
             let target = *(x as *const i64) as *const u8;
             for i in 0..len {
-                let s = *(elems.add(i * 8) as *const i64) as *const u8;
+                let ep = arr_elem_ptr_rt(a, i, 8);
+                let s = *(ep as *const i64) as *const u8;
                 if rt_str_eq(s, target) {
                     return 1;
                 }
@@ -1762,17 +1922,17 @@ pub extern "C" fn aipl_set_contains(
         } else if elem_size == ELEM_BITPACKED {
             let target = *(x as *const i64) != 0;
             for i in 0..len {
-                let byte = *elems.add(i >> 3);
-                if ((byte >> (i & 7)) & 1 != 0) == target {
+                if arr_load_bit_rt(a, i) == target {
                     return 1;
                 }
             }
             0
         } else {
-            let stride = if elem_size < 8 { 8 } else { elem_size as usize };
+            let stride = (elem_size.max(8)) as usize;
             let target = *(x as *const i64);
             for i in 0..len {
-                if *(elems.add(i * stride) as *const i64) == target {
+                let ep = arr_elem_ptr_rt(a, i, stride);
+                if *(ep as *const i64) == target {
                     return 1;
                 }
             }
@@ -1800,17 +1960,14 @@ pub extern "C" fn aipl_set_insert(
 }
 
 /// Read element `i` of set/array `src` as an i64 (bit-unpacked `bool` when
-/// `elem_size == 0`, else the 8-byte value). Mirrors codegen's `read_set_elem`.
+/// `elem_size == 0`, else the 8-byte value). Repr-aware. Mirrors codegen's `read_set_elem`.
 unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {
-    unsafe {
-        let elems = src.add(ARR_ELEMS_OFFSET);
-        if elem_size == ELEM_BITPACKED {
-            let byte = *elems.add(i >> 3);
-            i64::from((byte >> (i & 7)) & 1)
-        } else {
-            let stride = if elem_size < 8 { 8 } else { elem_size as usize };
-            *(elems.add(i * stride) as *const i64)
-        }
+    if elem_size == ELEM_BITPACKED {
+        i64::from(unsafe { arr_load_bit_rt(src, i) })
+    } else {
+        let stride = (elem_size.max(8)) as usize;
+        let ep = unsafe { arr_elem_ptr_rt(src, i, stride) };
+        unsafe { *(ep as *const i64) }
     }
 }
 
@@ -1896,11 +2053,11 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
     }
     unsafe {
         let len = array_len(a);
-        let elems = a.add(ARR_ELEMS_OFFSET);
         let stride = pair_size as usize;
         let want = *(pair_ptr as *const i64);
         for i in 0..len {
-            let k = *(elems.add(i * stride) as *const i64);
+            let ep = arr_elem_ptr_rt(a, i, stride);
+            let k = *(ep as *const i64);
             let eq = if str_cmp != 0 {
                 rt_str_eq(k as *const u8, want as *const u8)
             } else {
@@ -1930,7 +2087,7 @@ pub extern "C" fn aipl_dict_insert(
         let idx = dict_find(a, pair_ptr, pair_size, str_cmp);
         if idx >= 0 {
             let stride = pair_size as usize;
-            let slot = a.add(ARR_ELEMS_OFFSET).add(idx as usize * stride) as *mut u8;
+            let slot = arr_elem_ptr_rt(a, idx as usize, stride) as *mut u8;
             elem_rc(drop_fn, slot, 1);
             core::ptr::copy_nonoverlapping(pair_ptr, slot, stride);
             elem_rc(retain_fn, slot, 1);
@@ -1954,8 +2111,7 @@ pub extern "C" fn aipl_dict_get(
         if idx < 0 {
             return core::ptr::null();
         }
-        a.add(ARR_ELEMS_OFFSET)
-            .add(idx as usize * pair_size as usize + 8)
+        arr_elem_ptr_rt(a, idx as usize, pair_size as usize).add(8)
     }
 }
 

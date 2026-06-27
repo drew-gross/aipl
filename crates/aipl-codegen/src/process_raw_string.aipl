@@ -52,8 +52,8 @@ allocations: 74
 deallocations: 74
 reallocations: 0
 bytes allocated: 3313
-instructions executed: 10916
-binary size: 27920
+instructions executed: 12050
+binary size: 29152
 --- monomorphizations ---
 __m1__trim_prefix
 __m3__trim_suffix
