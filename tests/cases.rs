@@ -4,7 +4,9 @@
 //! the program (via the same pipeline as `aipl build`) and compares.
 //!
 //! Section format (all lines like `--- name ---` on their own line):
-//!   `--- stdout ---`     — expected stdout (default: empty)
+//!   `--- stdout ---`     — expected stdout (default: empty). A body of `?`
+//!                          fills in the actual output (see the `fill_expected`
+//!                          helper below).
 //!   `--- stderr ---`     — expected stderr (default: empty)
 //!   `--- exit code ---`  — expected exit code (default: 0)
 //!   `--- cli ---`        — CLI arguments for the built binary, one per
@@ -78,7 +80,7 @@
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
 //!   - `cargo test --test cases -- --ignored fill_expected` — overwrite every
-//!     `performance`/`monomorphizations`/`check`/`errors`/`expect file`
+//!     `stdout`/`performance`/`monomorphizations`/`check`/`errors`/`expect file`
 //!     section with actual output. Combine with `AIPL_CASE` to target a
 //!     subset.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
@@ -103,8 +105,7 @@ use aipl::loader;
 use aipl::DebugOptions;
 
 /// Author "fill" mode, set by the ignored [`fill_expected`] test and read by
-/// [`fill_mode`]. (Formerly the `AIPL_FILL_EXPECTED` env var — now an ignored
-/// test so the interaction is `cargo test --test cases -- --ignored ...`.)
+/// [`fill_mode`].
 static FILL_MODE: AtomicBool = AtomicBool::new(false);
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
@@ -246,8 +247,8 @@ enum Outcome {
 // `NUM_SHARDS` independent `#[test]` functions that libtest runs in parallel
 // (one per worker thread). Each shard handles the cases whose index is
 // `≡ shard (mod NUM_SHARDS)` — a round-robin partition that balances well
-// regardless of per-directory size. A filtered (`AIPL_CASE`) or fill
-// (`AIPL_FILL_EXPECTED`) run is consolidated into shard 0 alone, preserving the
+// regardless of per-directory size. A filtered (`AIPL_CASE`) or fill-mode
+// run is consolidated into shard 0 alone, preserving the
 // single-shot dev-iteration semantics (one summary, one intentional failure).
 macro_rules! case_shards {
     ($($name:ident = $idx:literal),+ $(,)?) => {
@@ -301,9 +302,10 @@ case_shards! {
 // normal green run. The `#[ignore]` reason repeats the command for `cargo test
 // -- --list`/`--ignored` output.
 
-/// Author helper: refresh every `?`-bodied `--- performance ---` / `--- errors
-/// ---` / `--- check ---` / `--- expect file ---` section from the actual
-/// measured/rendered output. Set `AIPL_CASE` to target a subset. Run with:
+/// Author helper: refresh every `--- stdout ---` section whose actual output
+/// differs, and every `?`-bodied `--- performance ---` / `--- errors ---` /
+/// `--- check ---` / `--- expect file ---` section. Set `AIPL_CASE` to target
+/// a subset. Run with:
 ///   cargo test --test cases -- --ignored fill_expected
 #[test]
 #[ignore = "author helper — run: cargo test --test cases -- --ignored fill_expected"]
@@ -404,9 +406,8 @@ fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path
     out
 }
 
-/// Author-helper "fill" mode: write measured errors/perf back into `?`
-/// placeholders. Toggled by the ignored [`fill_expected`] test (was the
-/// `AIPL_FILL_EXPECTED` env var).
+/// Author-helper "fill" mode: overwrite `?`-bodied sections and stdout/errors
+/// with actual output. Toggled by the ignored [`fill_expected`] test.
 fn fill_mode() -> bool {
     FILL_MODE.load(Ordering::Relaxed)
 }
@@ -1155,6 +1156,16 @@ fn run_success_case(
         let exp_stderr = spec.stderr.as_deref().unwrap_or("");
         let exp_exit = spec.exit_code.unwrap_or(0) & 0xff;
 
+        let stdout_placeholder = spec.stdout.as_deref() == Some("?");
+        if fill_mode() && stdout != exp_stdout {
+            fill_or_add_section(orig_path, "stdout", &stdout);
+            eprintln!("[{}]: filled stdout", orig_path.display());
+            return Outcome::Skip;
+        }
+        if stdout_placeholder {
+            eprintln!("=== ACTUAL STDOUT for {ctx} ===\n{stdout}\n===");
+            return Outcome::Skip;
+        }
         if stdout != exp_stdout {
             return Outcome::Fail(format!(
             "{ctx}: stdout mismatch\n--- expected ---\n{exp_stdout}\n--- actual ---\n{stdout}\n",
@@ -1472,9 +1483,9 @@ fn fill_performance(path: &Path, stats: &PerfStats) {
 }
 
 /// Replace the body of the `--- <section> ---` block in the case file with
-/// `body` (dropping the old body up to the next header or EOF). Used by the
-/// `AIPL_FILL_EXPECTED` authoring flow for the `performance` and `check`
-/// sections.
+/// `body` (dropping the old body up to the next header or EOF). The section
+/// must already exist in the file; to add a missing section use
+/// [`fill_or_add_section`].
 fn fill_section(path: &Path, section: &str, body: &str) {
     let contents = fs::read_to_string(path).expect("read case for fill");
     let mut out = String::new();
@@ -1494,6 +1505,23 @@ fn fill_section(path: &Path, section: &str, body: &str) {
         }
     }
     fs::write(path, out).expect("rewrite case file with filled section");
+}
+
+/// Like [`fill_section`], but appends `--- <section> ---\n<body>\n` when the
+/// section doesn't already exist in the file. Used for `stdout`, which many
+/// cases omit (they rely on the default-empty behavior).
+fn fill_or_add_section(path: &Path, section: &str, body: &str) {
+    let contents = fs::read_to_string(path).expect("read case for fill");
+    if contents
+        .lines()
+        .any(|l| aipl::parse_test_section_header(l).as_deref() == Some(section))
+    {
+        fill_section(path, section, body);
+    } else {
+        let trimmed = strip_trailing_newlines(contents);
+        let new_contents = format!("{trimmed}\n--- {section} ---\n{body}\n");
+        fs::write(path, new_contents).expect("rewrite case file adding section");
+    }
 }
 
 fn normalize_output(s: &str) -> String {
