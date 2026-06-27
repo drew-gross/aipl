@@ -8643,10 +8643,12 @@ fn compile_expr<M: Module>(
                 emit_inc(builder, module, builtins, ptr);
                 let f = builtins.import(module, builder.func, "aipl_str_reverse");
                 let inst = builder.ins().call(f, &[ptr]);
-                (
-                    builder.inst_results(inst)[0],
-                    Type::Primitive(Primitive::Str),
-                )
+                let result = builder.inst_results(inst)[0];
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
+                (result, Type::Primitive(Primitive::Str))
             } else if let Type::Array(elem) = &t {
                 let elem = (**elem).clone();
                 emit_inc(builder, module, builtins, ptr);
@@ -8657,7 +8659,13 @@ fn compile_expr<M: Module>(
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
                 let f = builtins.import(module, builder.func, "aipl_arr_reverse");
                 let inst = builder.ins().call(f, &[ptr, drop_fn, retain_fn, esz]);
-                (builder.inst_results(inst)[0], Type::Array(Box::new(elem)))
+                let view = builder.inst_results(inst)[0];
+                let arr_ty = Type::Array(Box::new(elem));
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(view, &arr_ty));
+                (view, arr_ty)
             } else {
                 return Err(Error::at(
                     format!("\"reverse\" expects a str or array, got {}", type_name(&t)),
