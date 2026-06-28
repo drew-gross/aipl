@@ -2283,13 +2283,19 @@ impl Mono<'_> {
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let (rarr, arr_ty) = self.infer(arr, env)?;
-        let Type::Array(elem) = &arr_ty else {
-            return Err(Error::at(
-                format!("enumerate expects an array, got {}", type_name(&arr_ty)),
-                arr.span,
-            ));
+        let (elem, param_ty) = match &arr_ty {
+            Type::Array(inner) => ((**inner).clone(), arr_ty.clone()),
+            Type::Primitive(Primitive::Str) => (Type::Primitive(Primitive::Char), arr_ty.clone()),
+            _ => {
+                return Err(Error::at(
+                    format!(
+                        "enumerate expects an array or str, got {}",
+                        type_name(&arr_ty)
+                    ),
+                    arr.span,
+                ))
+            }
         };
-        let elem = (**elem).clone();
         let effects = self.cur_effects.clone();
 
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
@@ -2357,7 +2363,7 @@ impl Mono<'_> {
                 type_params: Vec::new(),
                 params: vec![Param {
                     name: "$arr".to_string(),
-                    ty: Type::Array(Box::new(elem)),
+                    ty: param_ty,
                     mutable: false,
                     variadic: false,
                 }],

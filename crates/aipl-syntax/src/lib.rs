@@ -145,19 +145,24 @@ impl DebugOptions {
     }
 }
 
+/// The hook called by [`caret_block`] to locate a byte offset's line. Installed
+/// by the compiler via [`set_line_at_hook`] (the dogfooded AIPL `line_at`, run
+/// through the embedding FFI). No native fallback — panics if not installed.
+static LINE_AT_HOOK: std::sync::OnceLock<fn(&str, usize) -> (usize, usize)> =
+    std::sync::OnceLock::new();
+
+/// Install the line-locator hook (the dogfooded AIPL `line_at`, run through the
+/// embedding FFI). Idempotent — first install wins. Must be called before any
+/// [`Error::render`] with a span (i.e. before `install_parser_hooks` returns).
+pub fn set_line_at_hook(f: fn(&str, usize) -> (usize, usize)) {
+    let _ = LINE_AT_HOOK.set(f);
+}
+
 fn line_at(source: &str, offset: usize) -> (usize, usize) {
-    let mut line = 0;
-    let mut line_start = 0;
-    for (i, ch) in source.char_indices() {
-        if i >= offset {
-            break;
-        }
-        if ch == '\n' {
-            line += 1;
-            line_start = i + 1;
-        }
-    }
-    (line, line_start)
+    LINE_AT_HOOK.get().expect(
+        "line_at hook not installed before rendering an error \
+             (call install_parser_hooks first)",
+    )(source, offset)
 }
 
 pub mod ast {

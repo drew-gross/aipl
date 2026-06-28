@@ -1,0 +1,44 @@
+// The error renderer's line locator: the compiler calls this through the FFI
+// (see `install_parser_hooks`) when rendering an error with a span. Given
+// `source` and a byte `offset`, it returns the 0-based line index and the byte
+// offset of that line's first byte.
+import { wrapping_add as +, ==, >=, enumerate } from builtins;
+
+struct LineAt { line: i64, line_start: i64 }
+
+pub fn line_at(source: str, offset: i64) -> LineAt {
+    mut line = 0;
+    mut line_start = 0;
+    for (let (i, c) : source.enumerate()) {
+        if (i >= offset) {
+            return LineAt { line: line, line_start: line_start };
+        };
+        if (c == '\n') {
+            set line = line + 1;
+            set line_start = i + 1;
+        };
+    }
+    LineAt { line: line, line_start: line_start }
+}.test({
+    assert(line_at("hello", 0).line == 0);
+    assert(line_at("hello", 0).line_start == 0);
+    assert(line_at("hello\nworld", 3).line == 0);
+    assert(line_at("hello\nworld", 3).line_start == 0);
+    assert(line_at("hello\nworld", 5).line == 0);
+    assert(line_at("hello\nworld", 5).line_start == 0);
+    assert(line_at("hello\nworld", 6).line == 1);
+    assert(line_at("hello\nworld", 6).line_start == 6);
+    assert(line_at("a\nb", 10).line == 1);
+    assert(line_at("a\nb", 10).line_start == 2);
+    assert(line_at("", 0).line == 0);
+    assert(line_at("", 0).line_start == 0);
+    assert(line_at("a\nb\nc", 4).line == 2);
+    assert(line_at("a\nb\nc", 4).line_start == 4);
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 52
+bytes allocated: 448
+instructions executed: 4602
+binary size: 7192

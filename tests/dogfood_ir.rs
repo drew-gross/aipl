@@ -127,6 +127,37 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 .unwrap();
             assert_eq!(clean, FfiValue::Opt(None));
         }
+        "line_at.clif" => {
+            // Returns `LineAt { line, line_start }`: the 0-based line index and
+            // byte offset of the line's first byte for a given source + offset.
+            let result = comp
+                .call_values(
+                    "line_at",
+                    &[FfiValue::Str("hello\nworld".to_string()), FfiValue::Int(6)],
+                )
+                .unwrap();
+            assert_eq!(
+                result,
+                FfiValue::Struct(vec![
+                    ("line".to_string(), FfiValue::Int(1)),
+                    ("line_start".to_string(), FfiValue::Int(6)),
+                ])
+            );
+            // Offset 0 always returns line 0, line_start 0.
+            let first = comp
+                .call_values(
+                    "line_at",
+                    &[FfiValue::Str("abc".to_string()), FfiValue::Int(0)],
+                )
+                .unwrap();
+            assert_eq!(
+                first,
+                FfiValue::Struct(vec![
+                    ("line".to_string(), FfiValue::Int(0)),
+                    ("line_start".to_string(), FfiValue::Int(0)),
+                ])
+            );
+        }
         other => panic!("no sanity check defined for dogfood engine {other}"),
     }
 }

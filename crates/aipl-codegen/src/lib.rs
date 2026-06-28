@@ -2540,6 +2540,14 @@ const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespac
 /// The checked-in dogfood IR for `find_trailing_whitespace`.
 const FIND_TRAILING_WHITESPACE_CLIF: &str = include_str!("find_trailing_whitespace.clif");
 
+/// The dogfooded AIPL `line_at` (`str, i64 -> LineAt`) the *error renderer*
+/// calls (through the hook installed by [`install_parser_hooks`]) when rendering
+/// a spanned error — it locates the line index and line-start offset for the
+/// caret block.
+const LINE_AT_SRC: &str = include_str!("line_at.aipl");
+/// The checked-in dogfood IR for `line_at`.
+const LINE_AT_CLIF: &str = include_str!("line_at.clif");
+
 thread_local! {
     /// The `process_raw_string` engine, re-linked from the checked-in IR lazily
     /// on first use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`.
@@ -2667,19 +2675,54 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
     })
 }
 
+thread_local! {
+    /// The `line_at` engine, re-linked from the checked-in IR lazily on first use
+    /// per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`. Re-linking
+    /// runs no AIPL frontend, so building it never recurses into error rendering.
+    static LINE_AT_ENGINE: Compilation =
+        Compilation::from_artifact(LINE_AT_CLIF)
+            .expect("dogfooded `line_at` engine builds");
+}
+
+/// The error renderer's line-locator hook (see [`install_parser_hooks`]): given
+/// `source` and a byte `offset`, returns `(line_index, line_start_offset)` —
+/// computed by the dogfooded AIPL `line_at` via the FFI. The AIPL returns a
+/// `LineAt { line, line_start }` struct, marshaled back as [`FfiValue::Struct`].
+/// No native fallback; panics if it can't be built or called.
+fn line_at(source: &str, offset: usize) -> (usize, usize) {
+    LINE_AT_ENGINE.with(|comp| {
+        match comp.call_values(
+            "line_at",
+            &[
+                FfiValue::Str(source.to_string()),
+                FfiValue::Int(offset as i64),
+            ],
+        ) {
+            Ok(FfiValue::Struct(fields)) => {
+                let field = |k: &str| match fields.iter().find(|(n, _)| n == k) {
+                    Some((_, FfiValue::Int(v))) => *v as usize,
+                    other => panic!("dogfooded line_at() LineAt.{k}: {other:?}"),
+                };
+                (field("line"), field("line_start"))
+            }
+            other => panic!("dogfooded line_at() call: {other:?}"),
+        }
+    })
+}
+
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
-/// [`parse_test_section_header`], and the section stripper at
-/// [`strip_test_sections`]. Idempotent (first install wins). The compiler's entry
-/// points (the CLI and the embedding [`Compilation`] API's callers) install them;
-/// there are **no native fallbacks**, so any in-process parse must install them
-/// first (the section hooks run on every parse; the raw-string hook on every
-/// `"""`).
+/// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
+/// and the error-renderer's line locator at [`line_at`]. Idempotent (first install
+/// wins). The compiler's entry points (the CLI and the embedding [`Compilation`]
+/// API's callers) install them; there are **no native fallbacks**, so any
+/// in-process parse (or error render) must install them first.
 pub fn install_parser_hooks() {
     aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
+    aipl_syntax::set_line_at_hook(line_at);
 }
 
 /// A dogfood engine: AIPL the compiler runs from *checked-in IR* rather than by
@@ -2748,6 +2791,11 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
                 "find_trailing_whitespace.aipl",
                 FIND_TRAILING_WHITESPACE_SRC,
             )],
+        },
+        DogfoodEngine {
+            clif_file: "line_at.clif",
+            entries: &["line_at"],
+            sources: &[("line_at.aipl", LINE_AT_SRC)],
         },
     ]
 }
