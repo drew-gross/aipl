@@ -3429,7 +3429,9 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         "__builtin_print" => Type::Primitive(Primitive::I64),
         // `hash(x): i64` — structural hash, consistent with `==`.
         "__builtin_hash" => Type::Primitive(Primitive::I64),
-        "__builtin_to_str" | "__builtin_trim" | "__aipl_concat" => Type::Primitive(Primitive::Str),
+        "__builtin_to_str" | "__builtin_trim" | "__aipl_concat" | "__template_interp" => {
+            Type::Primitive(Primitive::Str)
+        }
         // Internal: a single `char` to a one-char `str`, emitted by variadic
         // `char*` specialization (see `specialize_variadic`).
         "__char_to_str" => Type::Primitive(Primitive::Str),

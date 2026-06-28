@@ -12,6 +12,7 @@
       "patterns": [
         { "include": "#comment-line" },
         { "include": "#comment-block" },
+        { "include": "#template-string" },
         { "include": "#string" },
         { "include": "#char" },
         { "include": "#number" },
@@ -52,6 +53,23 @@
       "name": "comment.block.aipl",
       "patterns": [
         { "include": "#comment-block" }
+      ]
+    },
+    "template-string": {
+      "comment": "Template literal: `text {expr} text`. The entire region is string.quoted.double; interpolations include main patterns so expressions keep their normal scopes.",
+      "begin": "`",
+      "end": "`",
+      "name": "string.quoted.double.aipl",
+      "patterns": [
+        {
+          "match": "\\\\[`{\\\\ntr]",
+          "name": "constant.character.escape.aipl"
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#main" }]
+        }
       ]
     },
     "string": {

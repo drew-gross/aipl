@@ -52,6 +52,13 @@ gazelle! {
             // `|` — surrounds a lambda's parameter list (`|x| body`). Carries a
             // span for the lambda's start. (`||` is logical-or, lexed separately.)
             PIPE: _,
+            // Template literals: `` `text {expr} text` ``
+            // HEAD carries the text from `` ` `` to the first `{`.
+            // MIDDLE carries the text between a `}` and the next `{`.
+            // TAIL carries the text from the last `}` to the closing `` ` ``.
+            TEMPLATE_HEAD: _,
+            TEMPLATE_MIDDLE: _,
+            TEMPLATE_TAIL: _,
             // Operators with runtime precedence
             prec MINUS,
             prec OP: _,
@@ -301,7 +308,16 @@ gazelle! {
              | NONE => none_lit
              | MATCH LPAREN expr RPAREN LBRACE match_arms RBRACE => match_expr
              | LBRACKET args RBRACKET => array_lit
-             | HASH LBRACE brace_body RBRACE => brace_lit;
+             | HASH LBRACE brace_body RBRACE => brace_lit
+             // Template literal: `` `text {expr} text` `` with 1+ interpolations.
+             // The no-interpolation case is emitted as a plain STR by the lexer.
+             | TEMPLATE_HEAD expr template_rest => template_lit;
+
+        // The portion of a template literal after the first interpolation.
+        // Either the closing tail (`TEMPLATE_TAIL`) or another interpolation
+        // followed by more template_rest.
+        template_rest = TEMPLATE_TAIL => tail
+                      | TEMPLATE_MIDDLE expr template_rest => middle;
 
         // `#{ .. }` is a set literal (`#{a, b}`), a dict literal (`#{k: v}`), or
         // an empty of either (`#{}` set, `#{:}` dict). One production handles
@@ -463,6 +479,12 @@ impl aipl::Types for Build {
     type MatchArmList = Vec<MatchArm>;
     type MatchArms = Vec<MatchArm>;
     type TupleMore = Vec<Expr>;
+    type TemplateHead = (String, Span);
+    type TemplateMiddle = (String, Span);
+    type TemplateTail = (String, Span);
+    // Represents the right-hand portion of a template literal (after the first
+    // `{expr}`) already folded into a single Expr via __aipl_concat chains.
+    type TemplateRest = Expr;
     type BlockBody = Expr;
     type BlockTail = BlockTail;
     type LoopInner = Expr;
@@ -1623,8 +1645,52 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                     }
                 }
             },
+            // `` `text {e1} text {e2} text` `` desugars to a chain of
+            // `__aipl_concat` / `__builtin_to_str` calls (left-folded, but
+            // LALR reduces right-to-left so `rest` is already built).
+            aipl::Atom::TemplateLit((head_text, head_span), first_expr, rest) => {
+                let head_node = Expr::new(ExprKind::Str(head_text), head_span.clone());
+                let e1_str = to_str_call(first_expr);
+                let left = concat_call(head_node, e1_str);
+                let full_span = join_spans(&head_span, &rest.span);
+                let result = concat_call(left, rest);
+                Expr::new(result.kind, full_span)
+            }
         })
     }
+}
+
+impl gazelle::Action<aipl::TemplateRest<Self>> for Build {
+    fn build(&mut self, node: aipl::TemplateRest<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            aipl::TemplateRest::Tail((text, span)) => Expr::new(ExprKind::Str(text), span),
+            aipl::TemplateRest::Middle((text, span), e, rest) => {
+                let text_node = Expr::new(ExprKind::Str(text), span.clone());
+                let e_str = to_str_call(e);
+                let left = concat_call(text_node, e_str);
+                concat_call(left, rest)
+            }
+        })
+    }
+}
+
+/// Wrap `e` in a `__template_interp` call: passes `str` through unchanged,
+/// converts any other type via `to_str` (without adding surrounding quotes).
+fn to_str_call(e: Expr) -> Expr {
+    let span = e.span.clone();
+    Expr::new(
+        ExprKind::Call("__template_interp".to_string(), vec![e], false),
+        span,
+    )
+}
+
+/// Concatenate two `str` expressions via `__aipl_concat`.
+fn concat_call(a: Expr, b: Expr) -> Expr {
+    let span = join_spans(&a.span, &b.span);
+    Expr::new(
+        ExprKind::Call("__aipl_concat".to_string(), vec![a, b], false),
+        span,
+    )
 }
 
 impl gazelle::Action<aipl::TupleMore<Self>> for Build {
@@ -2013,313 +2079,542 @@ impl Drop for RawStringHookGuard {
 fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
     let mut src = Scanner::new(input);
     let mut tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
-
     loop {
         skip_whitespace_and_comments(&mut src)?;
         if src.at_end() {
             break;
         }
+        tokenize_one(&mut src, &mut tokens)?;
+    }
+    Ok(tokens)
+}
 
-        let start = src.offset();
-        let c = src.peek().unwrap();
+/// Tokenize one token from `src` (whitespace already skipped) and push it
+/// onto `tokens`. Handles all token types including template literals.
+fn tokenize_one<I: Iterator<Item = char>>(
+    src: &mut Scanner<I>,
+    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
+) -> Result<(), Error> {
+    let start = src.offset();
+    let c = src.peek().unwrap();
 
-        // Raw string: `"""..."""`. Contents are taken verbatim (no escapes);
-        // a `"` or `""` may appear inside, only `"""` closes. One surrounding
-        // line break is trimmed and the contents de-dented (see
-        // `process_raw_string`). A normal `"..."` literal is handled below.
-        if c == '"' && src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') {
-            src.advance();
-            src.advance();
-            src.advance(); // opening """
-            let mut raw = String::new();
-            loop {
-                match src.peek() {
-                    Some('"') if src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') => {
-                        src.advance();
-                        src.advance();
-                        src.advance(); // closing """
-                        break;
-                    }
-                    Some(ch) => {
-                        raw.push(ch);
-                        src.advance();
-                    }
-                    None => {
-                        return Err(Error::at(
-                            "unterminated raw string literal",
-                            start..src.offset(),
-                        ));
-                    }
-                }
-            }
-            let span = start..src.offset();
-            tokens.push((
-                aipl::Terminal::Str((process_raw_string(&raw), span.clone())),
-                span,
-            ));
-            continue;
-        }
-
-        // String literal: `"..."`. Supports the escapes:
-        //   \n  newline    \t  tab      \r  carriage return
-        //   \\  backslash  \"  quote
-        // (no \0: strings are null-terminated at the runtime level)
-        if c == '"' {
-            src.advance(); // opening "
-            let mut s = String::new();
-            loop {
-                match src.peek() {
-                    Some('"') => break,
-                    Some('\\') => {
-                        let esc_start = src.offset();
-                        src.advance();
-                        match src.peek() {
-                            Some('n') => {
-                                s.push('\n');
-                                src.advance();
-                            }
-                            Some('t') => {
-                                s.push('\t');
-                                src.advance();
-                            }
-                            Some('r') => {
-                                s.push('\r');
-                                src.advance();
-                            }
-                            Some('\\') => {
-                                s.push('\\');
-                                src.advance();
-                            }
-                            Some('"') => {
-                                s.push('"');
-                                src.advance();
-                            }
-                            Some(other) => {
-                                return Err(Error::at(
-                                    format!("unknown escape sequence \\{other}"),
-                                    esc_start..src.offset() + other.len_utf8(),
-                                ));
-                            }
-                            None => {
-                                return Err(Error::at(
-                                    "unterminated string literal",
-                                    start..src.offset(),
-                                ));
-                            }
-                        }
-                    }
-                    Some(ch) => {
-                        s.push(ch);
-                        src.advance();
-                    }
-                    None => {
-                        return Err(Error::at(
-                            "unterminated string literal",
-                            start..src.offset(),
-                        ));
-                    }
-                }
-            }
-            src.advance(); // closing "
-            let span = start..src.offset();
-            tokens.push((aipl::Terminal::Str((s, span.clone())), span));
-            continue;
-        }
-
-        // Char literal: `'x'` or `'\n'`. One byte (ASCII); the same escape
-        // set as strings. Non-ASCII characters (UTF-8 multi-byte) are
-        // rejected so `char` stays a byte-deterministic primitive.
-        if c == '\'' {
-            src.advance(); // opening '
-            let byte = match src.peek() {
-                Some('\\') => {
+    // Raw string: `"""..."""`. Contents are taken verbatim (no escapes);
+    // a `"` or `""` may appear inside, only `"""` closes. One surrounding
+    // line break is trimmed and the contents de-dented (see
+    // `process_raw_string`). A normal `"..."` literal is handled below.
+    if c == '"' && src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') {
+        src.advance();
+        src.advance();
+        src.advance(); // opening """
+        let mut raw = String::new();
+        loop {
+            match src.peek() {
+                Some('"') if src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') => {
                     src.advance();
-                    let esc_at = src.offset() - 1;
-                    let b = match src.peek() {
-                        Some('n') => b'\n',
-                        Some('t') => b'\t',
-                        Some('r') => b'\r',
-                        Some('\\') => b'\\',
-                        Some('\'') => b'\'',
-                        Some('"') => b'"',
-                        Some(other) => {
-                            return Err(Error::at(
-                                format!("unknown escape sequence \\{other}"),
-                                esc_at..src.offset() + other.len_utf8(),
-                            ));
-                        }
-                        None => {
-                            return Err(Error::at(
-                                "unterminated char literal",
-                                start..src.offset(),
-                            ));
-                        }
-                    };
                     src.advance();
-                    b
-                }
-                Some('\'') => {
-                    return Err(Error::at("empty char literal", start..src.offset() + 1));
+                    src.advance(); // closing """
+                    break;
                 }
                 Some(ch) => {
-                    if !ch.is_ascii() {
-                        return Err(Error::at(
-                            format!("non-ASCII character in char literal: {ch:?}"),
-                            start..src.offset() + ch.len_utf8(),
-                        ));
-                    }
+                    raw.push(ch);
                     src.advance();
-                    ch as u8
                 }
                 None => {
-                    return Err(Error::at("unterminated char literal", start..src.offset()));
-                }
-            };
-            match src.peek() {
-                Some('\'') => {
-                    src.advance();
-                }
-                _ => {
                     return Err(Error::at(
-                        "char literal must contain exactly one character",
+                        "unterminated raw string literal",
                         start..src.offset(),
                     ));
                 }
             }
-            let span = start..src.offset();
-            tokens.push((aipl::Terminal::Char((byte, span.clone())), span));
-            continue;
         }
-
-        // Identifier or keyword
-        if c.is_alphabetic() || c == '_' {
-            let mut s = String::new();
-            while let Some(ch) = src.peek() {
-                if ch.is_alphanumeric() || ch == '_' {
-                    s.push(ch);
-                    src.advance();
-                } else {
-                    break;
-                }
-            }
-            let span = start..src.offset();
-            let kw = match s.as_str() {
-                "fn" => aipl::Terminal::Fn,
-                "if" => aipl::Terminal::If,
-                "else" => aipl::Terminal::Else,
-                "struct" => aipl::Terminal::Struct,
-                "variant" => aipl::Terminal::Variant,
-                "import" => aipl::Terminal::Import,
-                "from" => aipl::Terminal::From,
-                "as" => aipl::Terminal::As,
-                "pub" => aipl::Terminal::Pub,
-                "let" => aipl::Terminal::Let,
-                "for" => aipl::Terminal::For,
-                "while" => aipl::Terminal::While,
-                "mut" => aipl::Terminal::Mut,
-                "set" => aipl::Terminal::Set,
-                "match" => aipl::Terminal::Match,
-                "return" => aipl::Terminal::Return,
-                "builtins" => aipl::Terminal::Builtins(span.clone()),
-                "none" => aipl::Terminal::None(span.clone()),
-                "true" => aipl::Terminal::True(span.clone()),
-                "false" => aipl::Terminal::False(span.clone()),
-                _ => aipl::Terminal::Ident((s, span.clone())),
-            };
-            tokens.push((kw, span));
-            continue;
-        }
-
-        // Number
-        if c.is_ascii_digit() {
-            let mut s = String::new();
-            while let Some(ch) = src.peek() {
-                if ch.is_ascii_digit() {
-                    s.push(ch);
-                    src.advance();
-                } else {
-                    break;
-                }
-            }
-            let span = start..src.offset();
-            let n: i64 = s
-                .parse()
-                .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span.clone()))?;
-            tokens.push((aipl::Terminal::Num((n, span.clone())), span));
-            continue;
-        }
-
-        // Two-char operators (must beat their single-char counterparts). An
-        // `OP` carries its own span (`(char, Span)`) so it can be used as a
-        // value (`apply(2, 3, +)`) and still point diagnostics at the operator.
-        if let Some(next) = src.peek_n(1) {
-            let op_span = start..start + 2;
-            let pair_tok = match (c, next) {
-                ('-', '>') => Some(aipl::Terminal::Arrow),
-                // `..` — the range separator in a slice `s[a..b]`. Must beat the
-                // single-char `.` (field/method access).
-                ('.', '.') => Some(aipl::Terminal::Dotdot),
-                ('=', '>') => Some(aipl::Terminal::Fatarrow),
-                // `++` — increment statement; must beat the single-char `+`.
-                ('+', '+') => Some(aipl::Terminal::Plusplus(op_span)),
-                ('=', '=') => Some(aipl::Terminal::Op(('E', op_span), op_precedence('E'))),
-                ('!', '=') => Some(aipl::Terminal::Op(('N', op_span), op_precedence('N'))),
-                ('<', '=') => Some(aipl::Terminal::Op(('L', op_span), op_precedence('L'))),
-                ('>', '=') => Some(aipl::Terminal::Op(('G', op_span), op_precedence('G'))),
-                ('&', '&') => Some(aipl::Terminal::Op(('A', op_span), op_precedence('A'))),
-                ('|', '|') => Some(aipl::Terminal::Oror(op_precedence('O'))),
-                _ => None,
-            };
-            if let Some(t) = pair_tok {
-                src.advance();
-                src.advance();
-                tokens.push((t, start..src.offset()));
-                continue;
-            }
-        }
-
-        // Single-char punctuation and operators
-        let tok = match c {
-            '(' => aipl::Terminal::Lparen,
-            ')' => aipl::Terminal::Rparen,
-            '{' => aipl::Terminal::Lbrace,
-            '}' => aipl::Terminal::Rbrace,
-            // `[` carries a span so array-literal expressions (which may
-            // be empty, `[]`, and thus have no element span) can still
-            // point somewhere sensible in errors.
-            '[' => aipl::Terminal::Lbracket(start..start + 1),
-            ']' => aipl::Terminal::Rbracket,
-            '#' => aipl::Terminal::Hash(start..start + 1),
-            ',' => aipl::Terminal::Comma,
-            ':' => aipl::Terminal::Colon,
-            '.' => aipl::Terminal::Dot,
-            ';' => aipl::Terminal::Semi,
-            '=' => aipl::Terminal::Eq,
-            '!' => aipl::Terminal::Bang,
-            '?' => aipl::Terminal::Question,
-            // Single `|` opens/closes a lambda parameter list (`||` for
-            // logical-or is handled by the two-char pass above).
-            '|' => aipl::Terminal::Pipe(start..start + 1),
-            '-' => aipl::Terminal::Minus(Precedence::Left(6)),
-            '+' | '*' | '/' | '%' => {
-                aipl::Terminal::Op((c, start..start + c.len_utf8()), op_precedence(c))
-            }
-            // `<` / `>` are both comparison operators and generic-param
-            // brackets; they carry comparison precedence either way.
-            '<' => aipl::Terminal::Langle(op_precedence('<')),
-            '>' => aipl::Terminal::Rangle(op_precedence('>')),
-            other => {
-                return Err(Error::at(
-                    format!("unexpected character {other:?}"),
-                    start..start + other.len_utf8(),
-                ));
-            }
-        };
-        src.advance();
-        tokens.push((tok, start..src.offset()));
+        let span = start..src.offset();
+        tokens.push((
+            aipl::Terminal::Str((process_raw_string(&raw), span.clone())),
+            span,
+        ));
+        return Ok(());
     }
 
-    Ok(tokens)
+    // String literal: `"..."`. Supports the escapes:
+    //   \n  newline    \t  tab      \r  carriage return
+    //   \\  backslash  \"  quote
+    // (no \0: strings are null-terminated at the runtime level)
+    if c == '"' {
+        src.advance(); // opening "
+        let mut s = String::new();
+        loop {
+            match src.peek() {
+                Some('"') => break,
+                Some('\\') => {
+                    let esc_start = src.offset();
+                    src.advance();
+                    match src.peek() {
+                        Some('n') => {
+                            s.push('\n');
+                            src.advance();
+                        }
+                        Some('t') => {
+                            s.push('\t');
+                            src.advance();
+                        }
+                        Some('r') => {
+                            s.push('\r');
+                            src.advance();
+                        }
+                        Some('\\') => {
+                            s.push('\\');
+                            src.advance();
+                        }
+                        Some('"') => {
+                            s.push('"');
+                            src.advance();
+                        }
+                        Some(other) => {
+                            return Err(Error::at(
+                                format!("unknown escape sequence \\{other}"),
+                                esc_start..src.offset() + other.len_utf8(),
+                            ));
+                        }
+                        None => {
+                            return Err(Error::at(
+                                "unterminated string literal",
+                                start..src.offset(),
+                            ));
+                        }
+                    }
+                }
+                Some(ch) => {
+                    s.push(ch);
+                    src.advance();
+                }
+                None => {
+                    return Err(Error::at(
+                        "unterminated string literal",
+                        start..src.offset(),
+                    ));
+                }
+            }
+        }
+        src.advance(); // closing "
+        let span = start..src.offset();
+        tokens.push((aipl::Terminal::Str((s, span.clone())), span));
+        return Ok(());
+    }
+
+    // Char literal: `'x'` or `'\n'`. One byte (ASCII); the same escape
+    // set as strings. Non-ASCII characters (UTF-8 multi-byte) are
+    // rejected so `char` stays a byte-deterministic primitive.
+    if c == '\'' {
+        src.advance(); // opening '
+        let byte = match src.peek() {
+            Some('\\') => {
+                src.advance();
+                let esc_at = src.offset() - 1;
+                let b = match src.peek() {
+                    Some('n') => b'\n',
+                    Some('t') => b'\t',
+                    Some('r') => b'\r',
+                    Some('\\') => b'\\',
+                    Some('\'') => b'\'',
+                    Some('"') => b'"',
+                    Some(other) => {
+                        return Err(Error::at(
+                            format!("unknown escape sequence \\{other}"),
+                            esc_at..src.offset() + other.len_utf8(),
+                        ));
+                    }
+                    None => {
+                        return Err(Error::at("unterminated char literal", start..src.offset()));
+                    }
+                };
+                src.advance();
+                b
+            }
+            Some('\'') => {
+                return Err(Error::at("empty char literal", start..src.offset() + 1));
+            }
+            Some(ch) => {
+                if !ch.is_ascii() {
+                    return Err(Error::at(
+                        format!("non-ASCII character in char literal: {ch:?}"),
+                        start..src.offset() + ch.len_utf8(),
+                    ));
+                }
+                src.advance();
+                ch as u8
+            }
+            None => {
+                return Err(Error::at("unterminated char literal", start..src.offset()));
+            }
+        };
+        match src.peek() {
+            Some('\'') => {
+                src.advance();
+            }
+            _ => {
+                return Err(Error::at(
+                    "char literal must contain exactly one character",
+                    start..src.offset(),
+                ));
+            }
+        }
+        let span = start..src.offset();
+        tokens.push((aipl::Terminal::Char((byte, span.clone())), span));
+        return Ok(());
+    }
+
+    // Template literal: `` `text {expr} text` ``.
+    // A no-interpolation template (no `{`) is emitted as a plain STR.
+    // Otherwise: TEMPLATE_HEAD, then expression tokens (brace-depth tracked),
+    // then TEMPLATE_MIDDLE / TEMPLATE_TAIL until the closing `` ` ``.
+    if c == '`' {
+        return tokenize_template(src, start, tokens);
+    }
+
+    // Identifier or keyword
+    if c.is_alphabetic() || c == '_' {
+        let mut s = String::new();
+        while let Some(ch) = src.peek() {
+            if ch.is_alphanumeric() || ch == '_' {
+                s.push(ch);
+                src.advance();
+            } else {
+                break;
+            }
+        }
+        let span = start..src.offset();
+        let kw = match s.as_str() {
+            "fn" => aipl::Terminal::Fn,
+            "if" => aipl::Terminal::If,
+            "else" => aipl::Terminal::Else,
+            "struct" => aipl::Terminal::Struct,
+            "variant" => aipl::Terminal::Variant,
+            "import" => aipl::Terminal::Import,
+            "from" => aipl::Terminal::From,
+            "as" => aipl::Terminal::As,
+            "pub" => aipl::Terminal::Pub,
+            "let" => aipl::Terminal::Let,
+            "for" => aipl::Terminal::For,
+            "while" => aipl::Terminal::While,
+            "mut" => aipl::Terminal::Mut,
+            "set" => aipl::Terminal::Set,
+            "match" => aipl::Terminal::Match,
+            "return" => aipl::Terminal::Return,
+            "builtins" => aipl::Terminal::Builtins(span.clone()),
+            "none" => aipl::Terminal::None(span.clone()),
+            "true" => aipl::Terminal::True(span.clone()),
+            "false" => aipl::Terminal::False(span.clone()),
+            _ => aipl::Terminal::Ident((s, span.clone())),
+        };
+        tokens.push((kw, span));
+        return Ok(());
+    }
+
+    // Number
+    if c.is_ascii_digit() {
+        let mut s = String::new();
+        while let Some(ch) = src.peek() {
+            if ch.is_ascii_digit() {
+                s.push(ch);
+                src.advance();
+            } else {
+                break;
+            }
+        }
+        let span = start..src.offset();
+        let n: i64 = s
+            .parse()
+            .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span.clone()))?;
+        tokens.push((aipl::Terminal::Num((n, span.clone())), span));
+        return Ok(());
+    }
+
+    // Two-char operators (must beat their single-char counterparts). An
+    // `OP` carries its own span (`(char, Span)`) so it can be used as a
+    // value (`apply(2, 3, +)`) and still point diagnostics at the operator.
+    if let Some(next) = src.peek_n(1) {
+        let op_span = start..start + 2;
+        let pair_tok = match (c, next) {
+            ('-', '>') => Some(aipl::Terminal::Arrow),
+            // `..` — the range separator in a slice `s[a..b]`. Must beat the
+            // single-char `.` (field/method access).
+            ('.', '.') => Some(aipl::Terminal::Dotdot),
+            ('=', '>') => Some(aipl::Terminal::Fatarrow),
+            // `++` — increment statement; must beat the single-char `+`.
+            ('+', '+') => Some(aipl::Terminal::Plusplus(op_span)),
+            ('=', '=') => Some(aipl::Terminal::Op(('E', op_span), op_precedence('E'))),
+            ('!', '=') => Some(aipl::Terminal::Op(('N', op_span), op_precedence('N'))),
+            ('<', '=') => Some(aipl::Terminal::Op(('L', op_span), op_precedence('L'))),
+            ('>', '=') => Some(aipl::Terminal::Op(('G', op_span), op_precedence('G'))),
+            ('&', '&') => Some(aipl::Terminal::Op(('A', op_span), op_precedence('A'))),
+            ('|', '|') => Some(aipl::Terminal::Oror(op_precedence('O'))),
+            _ => None,
+        };
+        if let Some(t) = pair_tok {
+            src.advance();
+            src.advance();
+            tokens.push((t, start..src.offset()));
+            return Ok(());
+        }
+    }
+
+    // Single-char punctuation and operators
+    let tok = match c {
+        '(' => aipl::Terminal::Lparen,
+        ')' => aipl::Terminal::Rparen,
+        '{' => aipl::Terminal::Lbrace,
+        '}' => aipl::Terminal::Rbrace,
+        // `[` carries a span so array-literal expressions (which may
+        // be empty, `[]`, and thus have no element span) can still
+        // point somewhere sensible in errors.
+        '[' => aipl::Terminal::Lbracket(start..start + 1),
+        ']' => aipl::Terminal::Rbracket,
+        '#' => aipl::Terminal::Hash(start..start + 1),
+        ',' => aipl::Terminal::Comma,
+        ':' => aipl::Terminal::Colon,
+        '.' => aipl::Terminal::Dot,
+        ';' => aipl::Terminal::Semi,
+        '=' => aipl::Terminal::Eq,
+        '!' => aipl::Terminal::Bang,
+        '?' => aipl::Terminal::Question,
+        // Single `|` opens/closes a lambda parameter list (`||` for
+        // logical-or is handled by the two-char pass above).
+        '|' => aipl::Terminal::Pipe(start..start + 1),
+        '-' => aipl::Terminal::Minus(Precedence::Left(6)),
+        '+' | '*' | '/' | '%' => {
+            aipl::Terminal::Op((c, start..start + c.len_utf8()), op_precedence(c))
+        }
+        // `<` / `>` are both comparison operators and generic-param
+        // brackets; they carry comparison precedence either way.
+        '<' => aipl::Terminal::Langle(op_precedence('<')),
+        '>' => aipl::Terminal::Rangle(op_precedence('>')),
+        other => {
+            return Err(Error::at(
+                format!("unexpected character {other:?}"),
+                start..start + other.len_utf8(),
+            ));
+        }
+    };
+    src.advance();
+    tokens.push((tok, start..src.offset()));
+    Ok(())
+}
+
+/// Scan a template literal starting at `template_start` (the position of the
+/// opening `` ` ``).  Emits either a plain STR (no interpolations) or a
+/// sequence of TEMPLATE_HEAD, expression tokens, TEMPLATE_MIDDLE/TAIL pairs.
+///
+/// Escapes inside text segments: `\\` `\`` `\{` `\n` `\t` `\r`.
+fn tokenize_template<I: Iterator<Item = char>>(
+    src: &mut Scanner<I>,
+    template_start: usize,
+    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
+) -> Result<(), Error> {
+    src.advance(); // consume opening `
+
+    // Scan the first text segment (before the first `{` or closing `` ` ``).
+    let mut text = String::new();
+    loop {
+        match src.peek() {
+            None => {
+                return Err(Error::at(
+                    "unterminated template literal",
+                    template_start..src.offset(),
+                ));
+            }
+            Some('`') => {
+                // No interpolations: emit as a plain STR.
+                src.advance();
+                let span = template_start..src.offset();
+                tokens.push((aipl::Terminal::Str((text, span.clone())), span));
+                return Ok(());
+            }
+            Some('{') => {
+                // First interpolation: emit TEMPLATE_HEAD.
+                let head_end = src.offset() + 1;
+                src.advance(); // consume {
+                let head_span = template_start..head_end;
+                tokens.push((
+                    aipl::Terminal::TemplateHead((text, head_span.clone())),
+                    head_span,
+                ));
+                break;
+            }
+            Some('\\') => {
+                src.advance();
+                match src.peek() {
+                    Some('`') => {
+                        text.push('`');
+                        src.advance();
+                    }
+                    Some('{') => {
+                        text.push('{');
+                        src.advance();
+                    }
+                    Some('n') => {
+                        text.push('\n');
+                        src.advance();
+                    }
+                    Some('t') => {
+                        text.push('\t');
+                        src.advance();
+                    }
+                    Some('r') => {
+                        text.push('\r');
+                        src.advance();
+                    }
+                    Some('\\') => {
+                        text.push('\\');
+                        src.advance();
+                    }
+                    Some(other) => {
+                        let esc = src.offset() - 1;
+                        return Err(Error::at(
+                            format!("unknown escape sequence \\{other}"),
+                            esc..esc + 1 + other.len_utf8(),
+                        ));
+                    }
+                    None => {
+                        return Err(Error::at(
+                            "unterminated template literal",
+                            template_start..src.offset(),
+                        ));
+                    }
+                }
+            }
+            Some(ch) => {
+                text.push(ch);
+                src.advance();
+            }
+        }
+    }
+
+    // HEAD was emitted. Alternate: scan expression tokens, then a text
+    // segment ending in MIDDLE or TAIL.
+    loop {
+        tokenize_template_expr(src, template_start, tokens)?;
+
+        let seg_start = src.offset();
+        let mut seg = String::new();
+        loop {
+            match src.peek() {
+                None => {
+                    return Err(Error::at(
+                        "unterminated template literal",
+                        template_start..src.offset(),
+                    ));
+                }
+                Some('`') => {
+                    src.advance(); // consume closing `
+                    let tail_span = seg_start..src.offset();
+                    tokens.push((
+                        aipl::Terminal::TemplateTail((seg, tail_span.clone())),
+                        tail_span,
+                    ));
+                    return Ok(());
+                }
+                Some('{') => {
+                    let mid_end = src.offset() + 1;
+                    src.advance(); // consume {
+                    let mid_span = seg_start..mid_end;
+                    tokens.push((
+                        aipl::Terminal::TemplateMiddle((seg, mid_span.clone())),
+                        mid_span,
+                    ));
+                    break; // continue outer loop: scan next expression
+                }
+                Some('\\') => {
+                    src.advance();
+                    match src.peek() {
+                        Some('`') => {
+                            seg.push('`');
+                            src.advance();
+                        }
+                        Some('{') => {
+                            seg.push('{');
+                            src.advance();
+                        }
+                        Some('n') => {
+                            seg.push('\n');
+                            src.advance();
+                        }
+                        Some('t') => {
+                            seg.push('\t');
+                            src.advance();
+                        }
+                        Some('r') => {
+                            seg.push('\r');
+                            src.advance();
+                        }
+                        Some('\\') => {
+                            seg.push('\\');
+                            src.advance();
+                        }
+                        Some(other) => {
+                            let esc = src.offset() - 1;
+                            return Err(Error::at(
+                                format!("unknown escape sequence \\{other}"),
+                                esc..esc + 1 + other.len_utf8(),
+                            ));
+                        }
+                        None => {
+                            return Err(Error::at(
+                                "unterminated template literal",
+                                template_start..src.offset(),
+                            ));
+                        }
+                    }
+                }
+                Some(ch) => {
+                    seg.push(ch);
+                    src.advance();
+                }
+            }
+        }
+    }
+}
+
+/// Scan the expression tokens inside a `{ .. }` interpolation. The opening
+/// `{` has already been consumed. Emits tokens until the matching `}` is
+/// reached; that closing `}` is consumed but NOT emitted (it is the template
+/// delimiter, not an `RBRACE`). Nested `{` / `}` pairs (e.g. from set/dict
+/// literals, blocks, or nested template literals) are depth-tracked so their
+/// `LBRACE`/`RBRACE` tokens are emitted normally.
+fn tokenize_template_expr<I: Iterator<Item = char>>(
+    src: &mut Scanner<I>,
+    template_start: usize,
+    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
+) -> Result<(), Error> {
+    let mut depth = 1usize;
+    while depth > 0 {
+        skip_whitespace_and_comments(src)?;
+        if src.at_end() {
+            return Err(Error::at(
+                "unterminated template literal interpolation",
+                template_start..src.offset(),
+            ));
+        }
+        let pos = src.offset();
+        match src.peek().unwrap() {
+            '{' => {
+                depth += 1;
+                src.advance();
+                tokens.push((aipl::Terminal::Lbrace, pos..src.offset()));
+            }
+            '}' => {
+                depth -= 1;
+                src.advance();
+                if depth > 0 {
+                    tokens.push((aipl::Terminal::Rbrace, pos..src.offset()));
+                }
+                // depth == 0: closing } of the interpolation; don't emit it.
+            }
+            _ => {
+                tokenize_one(src, tokens)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// If `line` is a `--- name ---` test-section marker, return the trimmed
@@ -2470,7 +2765,9 @@ fn classify(t: &aipl::Terminal<Build>) -> TokenKind {
             _ => TokenKind::Identifier,
         },
         T::Num(_) => TokenKind::Number,
-        T::Str(_) => TokenKind::Str,
+        T::Str(_) | T::TemplateHead(_) | T::TemplateMiddle(_) | T::TemplateTail(_) => {
+            TokenKind::Str
+        }
         T::Char(_) => TokenKind::Char,
         T::Op(_, _)
         | T::Minus(_)

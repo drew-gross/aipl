@@ -2363,6 +2363,11 @@ fn __assert(cond: bool, loc: str) {}
 fn __test_begin(name: str) {}
 fn __test_end() {}
 fn __test_summary() -> i64 { 0 }
+// Internal: emitted by the compiler for template-literal concatenation.
+fn __aipl_concat(a: str, b: str) -> str { "" }
+// Internal: emitted for each interpolation in a template literal.
+// Passes a `str` through unchanged; converts any other type via `to_str`.
+fn __template_interp<T: any>(self: T) -> str { "" }
 "#;
 
 /// Parse [`BUILTIN_SIGNATURES`] into the checker's builtin declarations. The
@@ -8320,6 +8325,27 @@ fn compile_expr<M: Module>(
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
             (s, Type::Primitive(Primitive::Str))
+        }
+        ExprKind::Call(name, args, _) if name == "__template_interp" => {
+            // Template-literal interpolation: pass `str` through as-is; convert
+            // any other type via `to_str`. This avoids wrapping string values in
+            // quotes (which `to_str` would do).
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!(
+                        "\"__template_interp\" expects 1 argument, got {}",
+                        args.len()
+                    ),
+                    span.clone(),
+                ));
+            }
+            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if is_str_repr(&t) {
+                (v, Type::Primitive(Primitive::Str))
+            } else {
+                let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
+                (s, Type::Primitive(Primitive::Str))
+            }
         }
         ExprKind::Call(name, args, _) if name == "__builtin_hash" => {
             // Generic `hash(x) -> i64`: structural hash by the argument's static

@@ -1,0 +1,26 @@
+import { print } from builtins;
+
+fn main() !prints {
+    let name = "world";
+    let n = 42;
+    print(`hello {name}`);
+    print(`value is {n}`);
+    print(`{name} and {n}`);
+    print(`no interpolation`);
+    print(`prefix {name} middle {n} suffix`);
+}
+--- stdout ---
+hello world
+value is 42
+world and 42
+no interpolation
+prefix world middle 42 suffix
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 277
+instructions executed: 152
+binary size: 3616
+--- monomorphizations ---
+main
