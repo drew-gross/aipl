@@ -31,14 +31,12 @@ fn repeat_str(s: str, n: i64) -> str {
 }
 
 pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
-    let la = line_at(source, span_start);
-    let line_start = la.line_start;
-    let line_idx = la.line;
+    let LineAt { line_start, line } = line_at(source, span_start);
     let line_end = find_line_end(source, line_start);
     let line_text = source[line_start..line_end];
     let col = span_start - line_start;
     let underline_len = max(min(span_end, line_end) - span_start, 1);
-    let line_no = line_idx + 1;
+    let line_no = line + 1;
     let blank = repeat_str(" ", len(`{line_no}`));
     let caret_pad = repeat_str(" ", col);
     let carets = repeat_str("^", underline_len);

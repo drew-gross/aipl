@@ -19,7 +19,7 @@
 ; import 20 aipl_i64_len
 ; import 21 aipl_str_alloc
 ; import 22 aipl_write_i64
-; data 0 __str_1544_1555 0a00000000000000ffffffffffffff7f2d2d3e20696e7075743a00
+; data 0 __str_1501_1512 0a00000000000000ffffffffffffff7f2d2d3e20696e7075743a00
 
 ; find_line_end
 function u0:0(i64, i64) -> i64 apple_aarch64 {
@@ -554,9 +554,9 @@ block0(v0: i64, v1: i64, v2: i64):
 ;   v0 = source
 ;   v1 = span_start
 ;   v2 = span_end
-;   v3 = la
+;   v3 = __spat$1044
 ;   v4 = line_start
-;   v5 = line_idx
+;   v5 = line
 ;   v6 = line_end
 ;   v7 = line_text
 ;   v8 = col
