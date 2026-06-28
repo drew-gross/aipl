@@ -1037,6 +1037,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "minimum",
     "maximum",
     "reverse",
+    "enumerate",
 ];
 
 /// Canonical internal name for an importable builtin, or `None` if `name`

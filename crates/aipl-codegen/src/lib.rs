@@ -2351,6 +2351,8 @@ fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
+// Pair each element with its index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
+fn __builtin_enumerate<T: any>(self: T[]) -> (i64, T)[] { [] }
 fn some<T: any>(x: T) -> T? { none }
 
 // Test-runner hooks. `__assert(cond, loc)` is what `assert(cond)` lowers to
@@ -2782,8 +2784,16 @@ fn compile_program<M: Module>(
     // and monomorphization so the rest of the pipeline only sees named types.
     let program = &aipl_mono::lower_tuples(program);
 
+    // Builtin signatures may contain tuple types (e.g. `enumerate`'s `(i64, T)[]`
+    // return), so lower them the same way the user's program was lowered. The
+    // resulting synthetic struct definitions are prepended; the checker overwrites
+    // on duplicate names, which is fine since identical structs are always produced.
+    let lowered_builtins = aipl_mono::lower_tuples(&Program {
+        items: builtin_decls(),
+    });
     let check_program = Program {
-        items: builtin_decls()
+        items: lowered_builtins
+            .items
             .into_iter()
             .chain(program.items.iter().cloned())
             .collect(),

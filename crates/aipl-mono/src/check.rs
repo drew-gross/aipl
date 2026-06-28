@@ -1523,6 +1523,27 @@ impl Cx<'_> {
             } else {
                 Ok(subst_vars(&return_ty, &map, &vars))
             }
+        } else if name == "__builtin_enumerate" {
+            // The return type `(i64, T)[]` is lowered to `Named("__tuple$i64$T")[]` by
+            // lower_tuples. `subst_vars` can't substitute `T` inside a mangled struct name,
+            // so we compute the concrete tuple name directly from the element type.
+            let elem_ty = match atys.first() {
+                Some(Type::Array(inner)) => *inner.clone(),
+                Some(Type::Primitive(Primitive::Str)) => Type::Primitive(Primitive::Char),
+                _ => map.get("T").cloned().unwrap_or_else(unknown_ty),
+            };
+            let tuple_name = tuple_struct_name(&[Type::Primitive(Primitive::I64), elem_ty.clone()]);
+            // Register the concrete struct so field access on the return value type-checks.
+            if !self.has_struct(&tuple_name) {
+                self.add_syn_struct(
+                    tuple_name.clone(),
+                    vec![
+                        ("_0".to_string(), Type::Primitive(Primitive::I64), false),
+                        ("_1".to_string(), elem_ty, false),
+                    ],
+                );
+            }
+            Ok(Type::Array(Box::new(Type::Named(tuple_name))))
         } else {
             Ok(subst_vars(&return_ty, &map, &vars))
         }

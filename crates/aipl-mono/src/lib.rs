@@ -2273,6 +2273,110 @@ impl Mono<'_> {
         ))
     }
 
+    /// Expand the builtin `arr.enumerate()` into a synthesized function
+    /// `($arr: T[]) -> (i64, T)[]` that pairs each element with its 0-based
+    /// index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
+    fn expand_enumerate(
+        &mut self,
+        arr: &Expr,
+        env: &Env,
+        span: Span,
+    ) -> Result<(Expr, Type), Error> {
+        let (rarr, arr_ty) = self.infer(arr, env)?;
+        let Type::Array(elem) = &arr_ty else {
+            return Err(Error::at(
+                format!("enumerate expects an array, got {}", type_name(&arr_ty)),
+                arr.span,
+            ));
+        };
+        let elem = (**elem).clone();
+        let effects = self.cur_effects.clone();
+
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+
+        // Body:
+        //   mut $i = 0;
+        //   mut $out = [];
+        //   for (let $e : $arr) { $out.push(($i, $e)); set $i = $i + 1; }
+        //   $out
+        let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span);
+        let push = Expr::new(
+            ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), tuple], true),
+            span,
+        );
+        let incr = Expr::new(
+            ExprKind::Assign(
+                "$i".to_string(),
+                Box::new(Expr::new(
+                    ExprKind::Binop(
+                        Box::new(id("$i")),
+                        '+',
+                        Box::new(Expr::new(ExprKind::Num(1), span)),
+                    ),
+                    span,
+                )),
+                Box::new(Expr::new(ExprKind::Unit, span)),
+            ),
+            span,
+        );
+        let for_body = Expr::new(ExprKind::Seq(Box::new(push), Box::new(incr)), span);
+        let loop_ = Expr::new(
+            ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(for_body)),
+            span,
+        );
+        let enumerate_body = Expr::new(
+            ExprKind::LetMut(
+                "$i".to_string(),
+                Box::new(Expr::new(ExprKind::Num(0), span)),
+                Box::new(Expr::new(
+                    ExprKind::LetMut(
+                        "$out".to_string(),
+                        Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span)),
+                        Box::new(Expr::new(
+                            ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
+                            span,
+                        )),
+                    ),
+                    span,
+                )),
+            ),
+            span,
+        );
+
+        let enumerate_name = format!("__enumerate{}", self.synth);
+        self.synth += 1;
+        // Return type: (i64, T)[]. The tuple struct is registered by TupleLit
+        // inference when the synthesized body is compiled.
+        let tuple_name = check::tuple_struct_name(&[Type::Primitive(Primitive::I64), elem.clone()]);
+        let ret = Type::Array(Box::new(Type::Named(tuple_name)));
+        self.concrete.insert(
+            enumerate_name.clone(),
+            Function {
+                name: enumerate_name.clone(),
+                is_pub: true,
+                type_params: Vec::new(),
+                params: vec![Param {
+                    name: "$arr".to_string(),
+                    ty: Type::Array(Box::new(elem)),
+                    mutable: false,
+                    variadic: false,
+                }],
+                effects,
+                return_ty: Some(ret.clone()),
+                body: enumerate_body,
+                owned_params: Vec::new(),
+                concat_params: Vec::new(),
+                test_body: None,
+                doc: None,
+            },
+        );
+        self.enqueue_concrete(&enumerate_name);
+        Ok((
+            Expr::new(ExprKind::Call(enumerate_name, vec![rarr], false), span),
+            ret,
+        ))
+    }
+
     /// Mark a concrete function reachable in its plain borrow form, queueing it
     /// the first time it's seen. A non-concrete name (builtin, generic,
     /// undeclared) is ignored — generics go through `instantiate_types`, and
@@ -2918,6 +3022,15 @@ impl Mono<'_> {
                         ));
                     }
                     return self.expand_zip_with(&args[0], &args[1], &args[2], env, span);
+                }
+                if name == "__builtin_enumerate" {
+                    if args.len() != 1 {
+                        return Err(Error::at(
+                            format!("enumerate takes an array, got {} argument(s)", args.len()),
+                            span,
+                        ));
+                    }
+                    return self.expand_enumerate(&args[0], env, span);
                 }
                 // A direct call through a function-typed binding: `f(x)` where
                 // `f` is a lambda parameter of this (specialized) function.

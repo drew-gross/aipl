@@ -1,0 +1,26 @@
+import { print, to_str, enumerate } from builtins;
+
+fn main() !prints {
+    let words = ["zero", "one", "two"];
+    for (let (i, w) : words.enumerate()) {
+        print(to_str(i));
+        print(w);
+    }
+}
+--- stdout ---
+0
+zero
+1
+one
+2
+two
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 3
+bytes allocated: 88
+instructions executed: 342
+binary size: 2976
+--- monomorphizations ---
+__enumerate0
+main
