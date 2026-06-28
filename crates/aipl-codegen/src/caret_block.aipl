@@ -51,17 +51,42 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
     ```
 }.test({
     assert(caret_block("hello world", 0, 5) ==
-        " --> input:1:1\n  |\n1 | hello world\n  | ^^^^^");
+        """
+             --> input:1:1
+              |
+            1 | hello world
+              | ^^^^^
+        """);
     assert(caret_block("hello\nworld", 6, 11) ==
-        " --> input:2:1\n  |\n2 | world\n  | ^^^^^");
+        """
+             --> input:2:1
+              |
+            2 | world
+              | ^^^^^
+        """);
     assert(caret_block("hello world", 6, 11) ==
-        " --> input:1:7\n  |\n1 | hello world\n  |       ^^^^^");
+        """
+             --> input:1:7
+              |
+            1 | hello world
+              |       ^^^^^
+        """);
     // Zero-width span at col 0 gets at least one caret.
     assert(caret_block("hi", 0, 0) ==
-        " --> input:1:1\n  |\n1 | hi\n  | ^");
+        """
+             --> input:1:1
+              |
+            1 | hi
+              | ^
+        """);
     // Span extending past line end is clamped to the line.
     assert(caret_block("hi\nthere", 0, 10) ==
-        " --> input:1:1\n  |\n1 | hi\n  | ^^");
+        """
+             --> input:1:1
+              |
+            1 | hi
+              | ^^
+        """);
 })
 --- performance ---
 allocations: 74
@@ -69,4 +94,4 @@ deallocations: 74
 reallocations: 93
 bytes allocated: 2714
 instructions executed: 10080
-binary size: 16976
+binary size: 17272
