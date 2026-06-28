@@ -12,6 +12,7 @@
       "patterns": [
         { "include": "#comment-line" },
         { "include": "#comment-block" },
+        { "include": "#triple-template-string" },
         { "include": "#template-string" },
         { "include": "#string" },
         { "include": "#char" },
@@ -53,6 +54,19 @@
       "name": "comment.block.aipl",
       "patterns": [
         { "include": "#comment-block" }
+      ]
+    },
+    "triple-template-string": {
+      "comment": "Triple-backtick template literal: ```text {expr} text```. Verbatim content (no escapes), de-indented like triple-quote strings. Must be checked before single-backtick.",
+      "begin": "```",
+      "end": "```",
+      "name": "string.quoted.double.aipl",
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#main" }]
+        }
       ]
     },
     "template-string": {

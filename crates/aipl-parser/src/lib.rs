@@ -2263,6 +2263,14 @@ fn tokenize_one<I: Iterator<Item = char>>(
         return Ok(());
     }
 
+    // Triple-backtick template literal: ```text {expr} text```.
+    // Like single-backtick but verbatim (no escape sequences) and with
+    // process_raw_string applied to the combined text segments (de-indent +
+    // surrounding-blank-line strip). Must be checked before single-backtick.
+    if c == '`' && src.peek_n(1) == Some('`') && src.peek_n(2) == Some('`') {
+        return tokenize_triple_template(src, start, tokens);
+    }
+
     // Template literal: `` `text {expr} text` ``.
     // A no-interpolation template (no `{`) is emitted as a plain STR.
     // Otherwise: TEMPLATE_HEAD, then expression tokens (brace-depth tracked),
@@ -2614,6 +2622,131 @@ fn tokenize_template_expr<I: Iterator<Item = char>>(
             }
         }
     }
+    Ok(())
+}
+
+/// Triple-backtick template literal: ` ```text {expr} text``` `.
+/// Like single-backtick but verbatim content (no escape sequences) and with
+/// `process_raw_string` applied to the combined text segments so that the
+/// leading/trailing blank line is stripped and the common indent is removed —
+/// the same treatment as a `"""..."""` raw string.
+///
+/// Implementation: two phases.
+/// Phase 1 — scan all text segments verbatim, tokenizing each `{...}`
+///   expression into a local sub-buffer.
+/// Phase 2 — join the text segments with `\x00` (a character that cannot
+///   appear in AIPL source), run `process_raw_string` on the joined string,
+///   split back on `\x00` to recover the processed segments, then emit all
+///   tokens (same TEMPLATE_HEAD / TEMPLATE_MIDDLE / TEMPLATE_TAIL terminals
+///   as the single-backtick variant).
+fn tokenize_triple_template<I: Iterator<Item = char>>(
+    src: &mut Scanner<I>,
+    template_start: usize,
+    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
+) -> Result<(), Error> {
+    src.advance();
+    src.advance();
+    src.advance(); // opening ```
+
+    // Phase 1: collect text segments and per-expression token buffers.
+    // text_segs[i] = (raw_text, span_start, span_end)
+    // expr_bufs[i] = tokens for the i-th interpolation expression
+    let mut text_segs: Vec<(String, usize, usize)> = Vec::new();
+    let mut expr_bufs: Vec<Vec<(aipl::Terminal<Build>, Span)>> = Vec::new();
+
+    let mut cur_text = String::new();
+    let mut seg_start = src.offset();
+
+    loop {
+        match src.peek() {
+            None => {
+                return Err(Error::at(
+                    "unterminated triple-backtick template literal",
+                    template_start..src.offset(),
+                ));
+            }
+            Some('`') if src.peek_n(1) == Some('`') && src.peek_n(2) == Some('`') => {
+                let seg_end = src.offset();
+                src.advance();
+                src.advance();
+                src.advance(); // consume closing ```
+                text_segs.push((cur_text, seg_start, src.offset()));
+                let _ = seg_end; // span_end is after the closing ```, computed above
+                break;
+            }
+            Some('{') => {
+                let seg_end = src.offset() + 1; // include the {
+                src.advance(); // consume {
+                text_segs.push((cur_text.clone(), seg_start, seg_end));
+                cur_text = String::new();
+
+                let mut expr_tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
+                tokenize_template_expr(src, template_start, &mut expr_tokens)?;
+                expr_bufs.push(expr_tokens);
+                seg_start = src.offset();
+            }
+            Some(ch) => {
+                cur_text.push(ch);
+                src.advance();
+            }
+        }
+    }
+
+    // Phase 2: apply process_raw_string to the combined text.
+    // Join with \x00 as a separator that can't appear in source.
+    let combined: String = text_segs
+        .iter()
+        .map(|(t, _, _)| t.as_str())
+        .collect::<Vec<_>>()
+        .join("\x00");
+    let processed = process_raw_string(&combined);
+    let processed_segs: Vec<String> = processed.split('\x00').map(|s| s.to_string()).collect();
+
+    // Defensive: split count must match text_segs count.
+    debug_assert_eq!(
+        processed_segs.len(),
+        text_segs.len(),
+        "process_raw_string must not remove the \\x00 separators"
+    );
+
+    // Phase 3: emit tokens.
+    if expr_bufs.is_empty() {
+        // No interpolations: emit as a plain STR (same as a raw string).
+        let (_, _, span_end) = text_segs[0];
+        let span = template_start..span_end;
+        let s = processed_segs.into_iter().next().unwrap_or_default();
+        tokens.push((aipl::Terminal::Str((s, span.clone())), span));
+        return Ok(());
+    }
+
+    // Emit TEMPLATE_HEAD (first text segment).
+    let (_, _, head_end) = text_segs[0];
+    let head_span = template_start..head_end;
+    tokens.push((
+        aipl::Terminal::TemplateHead((processed_segs[0].clone(), head_span.clone())),
+        head_span,
+    ));
+
+    // Emit alternating expression tokens + MIDDLE / TAIL.
+    let n_exprs = expr_bufs.len();
+    for (i, expr_buf) in expr_bufs.into_iter().enumerate() {
+        tokens.extend(expr_buf);
+
+        let (_, seg_s, seg_e) = text_segs[i + 1];
+        let seg_span = seg_s..seg_e;
+        if i + 1 < n_exprs {
+            tokens.push((
+                aipl::Terminal::TemplateMiddle((processed_segs[i + 1].clone(), seg_span.clone())),
+                seg_span,
+            ));
+        } else {
+            tokens.push((
+                aipl::Terminal::TemplateTail((processed_segs[i + 1].clone(), seg_span.clone())),
+                seg_span,
+            ));
+        }
+    }
+
     Ok(())
 }
 
