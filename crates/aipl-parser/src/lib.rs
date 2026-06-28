@@ -230,6 +230,7 @@ gazelle! {
                 | mut_stmt => mut_stmt
                 | assign_stmt => assign_stmt
                 | for_stmt => for_stmt
+                | for_tuple_stmt => for_tuple_stmt
                 | while_stmt => while_stmt
                 | return_stmt => return_stmt;
         let_stmt = LET IDENT EQ expr SEMI => let_stmt;
@@ -246,6 +247,11 @@ gazelle! {
         assign_stmt = SET IDENT EQ expr SEMI => assign_stmt
                     | SET IDENT PLUSPLUS SEMI => incr_stmt;
         for_stmt = FOR LPAREN LET IDENT COLON expr RPAREN loop_body => for_stmt;
+        // `for (let (a, b) : expr) { ... }` — destructuring for loop. Desugars to
+        // a plain for loop with a synthetic temp var and field-access let bindings
+        // prepended to the body; after `FOR LPAREN LET`, the next token (`LPAREN`
+        // vs `IDENT`) unambiguously distinguishes this from `for_stmt`.
+        for_tuple_stmt = FOR LPAREN LET LPAREN match_bindings RPAREN COLON expr RPAREN loop_body => for_tuple_stmt;
         while_stmt = WHILE LPAREN expr RPAREN loop_body => while_stmt;
 
         expr = term => term | expr binop expr => binop;
@@ -466,6 +472,7 @@ impl aipl::Types for Build {
     type MutStmt = StmtSpec;
     type AssignStmt = StmtSpec;
     type ForStmt = StmtSpec;
+    type ForTupleStmt = StmtSpec;
     type WhileStmt = StmtSpec;
     type ReturnStmt = StmtSpec;
 }
@@ -1251,6 +1258,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
             aipl::KwStmt::MutStmt(s) => s,
             aipl::KwStmt::AssignStmt(s) => s,
             aipl::KwStmt::ForStmt(s) => s,
+            aipl::KwStmt::ForTupleStmt(s) => s,
             aipl::KwStmt::WhileStmt(s) => s,
             aipl::KwStmt::ReturnStmt(s) => s,
         })
@@ -1336,6 +1344,44 @@ impl gazelle::Action<aipl::ForStmt<Self>> for Build {
             var_span,
             iterable,
             body,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ForTupleStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::ForTupleStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::ForTupleStmt::ForTupleStmt(names, iterable, body) = node;
+        if names.len() < 2 {
+            return Err(Error::msg(
+                "a tuple pattern needs at least 2 names, e.g. for (let (a, b) : expr) { ... }"
+                    .to_string(),
+            ));
+        }
+        // Desugar `for (let (a, b) : iter) { body }` into a plain for loop with a
+        // synthetic temp var and field-access bindings prepended to the body:
+        //   for (let __fpat$N : iter) { let a = __fpat$N._0; let b = __fpat$N._1; body }
+        let tmp = format!("__fpat${}", iterable.span.start);
+        let tmp_span = iterable.span;
+        let mut new_body = body;
+        for (i, name) in names.iter().enumerate().rev() {
+            let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tmp_span);
+            let field = Expr::new(
+                ExprKind::Field(Box::new(tmp_ident), format!("_{i}")),
+                tmp_span,
+            );
+            let inner_span = tmp_span.join(new_body.span);
+            new_body = Expr::new(
+                ExprKind::Let(name.clone(), Box::new(field), Box::new(new_body)),
+                inner_span,
+            );
+        }
+        let span = tmp_span.join(new_body.span);
+        Ok(StmtSpec::For {
+            var: tmp,
+            var_span: tmp_span,
+            iterable,
+            body: new_body,
             span,
         })
     }

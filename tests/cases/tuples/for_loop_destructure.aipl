@@ -1,0 +1,25 @@
+import { print, to_str } from builtins;
+
+fn main() !prints {
+    let pairs = [(1, "one"), (2, "two"), (3, "three")];
+    for (let (n, s) : pairs) {
+        print(to_str(n));
+        print(s);
+    }
+}
+--- stdout ---
+1
+one
+2
+two
+3
+three
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 80
+instructions executed: 229
+binary size: 2400
+--- monomorphizations ---
+main
