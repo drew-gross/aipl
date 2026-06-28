@@ -278,12 +278,12 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
                 .map(|arm| MatchArm {
                     pattern: arm.pattern.clone(),
                     body: lt_expr(&arm.body, fm, ord),
-                    span: arm.span,
+                    span: arm.span.clone(),
                 })
                 .collect(),
         ),
     };
-    Expr::new(kind, e.span)
+    Expr::new(kind, e.span.clone())
 }
 
 /// Rewrite `program` so it contains no type variables: every generic function
@@ -608,7 +608,7 @@ fn specialize_variadic(
     variadic_elem: &[usize],
     variadic_opt: &[usize],
 ) -> (Vec<Param>, Expr) {
-    let span = body.span;
+    let span = body.span.clone();
     // (original name, expression rebuilding the sequence) in parameter order.
     let mut prologues: Vec<(String, Expr)> = Vec::new();
     for (i, p) in params.iter_mut().enumerate() {
@@ -621,14 +621,14 @@ fn specialize_variadic(
         let orig = p.name.clone();
         if variadic_elem.contains(&i) {
             let pv = format!("{orig}$v");
-            let pv_id = Expr::new(ExprKind::Ident(pv.clone()), span);
+            let pv_id = Expr::new(ExprKind::Ident(pv.clone()), span.clone());
             let convert = if is_char {
                 Expr::new(
                     ExprKind::Call("__char_to_str".into(), vec![pv_id], false),
-                    span,
+                    span.clone(),
                 )
             } else {
-                Expr::new(ExprKind::ArrayLit(vec![pv_id]), span)
+                Expr::new(ExprKind::ArrayLit(vec![pv_id]), span.clone())
             };
             p.name = pv;
             p.ty = elem;
@@ -636,23 +636,23 @@ fn specialize_variadic(
         } else if variadic_opt.contains(&i) {
             let pv = format!("{orig}$v");
             let xn = format!("{orig}$x");
-            let x_id = Expr::new(ExprKind::Ident(xn.clone()), span);
+            let x_id = Expr::new(ExprKind::Ident(xn.clone()), span.clone());
             let some_body = if is_char {
                 Expr::new(
                     ExprKind::Call("__char_to_str".into(), vec![x_id], false),
-                    span,
+                    span.clone(),
                 )
             } else {
-                Expr::new(ExprKind::ArrayLit(vec![x_id]), span)
+                Expr::new(ExprKind::ArrayLit(vec![x_id]), span.clone())
             };
             let none_body = if is_char {
-                Expr::new(ExprKind::Str(String::new()), span)
+                Expr::new(ExprKind::Str(String::new()), span.clone())
             } else {
-                Expr::new(ExprKind::ArrayLit(Vec::new()), span)
+                Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
             };
             let m = Expr::new(
                 ExprKind::Match(
-                    Box::new(Expr::new(ExprKind::Ident(pv.clone()), span)),
+                    Box::new(Expr::new(ExprKind::Ident(pv.clone()), span.clone())),
                     vec![
                         MatchArm {
                             pattern: Pattern::Ctor {
@@ -660,7 +660,7 @@ fn specialize_variadic(
                                 bindings: vec![xn],
                             },
                             body: some_body,
-                            span,
+                            span: span.clone(),
                         },
                         MatchArm {
                             pattern: Pattern::Ctor {
@@ -668,11 +668,11 @@ fn specialize_variadic(
                                 bindings: Vec::new(),
                             },
                             body: none_body,
-                            span,
+                            span: span.clone(),
                         },
                     ],
                 ),
-                span,
+                span.clone(),
             );
             p.name = pv;
             p.ty = Type::Optional(Box::new(elem));
@@ -684,7 +684,7 @@ fn specialize_variadic(
     for (orig, convert) in prologues.into_iter().rev() {
         new_body = Expr::new(
             ExprKind::Let(orig, Box::new(convert), Box::new(new_body)),
-            span,
+            span.clone(),
         );
     }
     (params, new_body)
@@ -899,7 +899,7 @@ impl Mono<'_> {
                             self.synth_lambda(lparams, lbody, ptys, lret, &captures, &effects);
                         let forwards = captures
                             .iter()
-                            .map(|(cn, _)| Expr::new(ExprKind::Ident(cn.clone()), arg.span))
+                            .map(|(cn, _)| Expr::new(ExprKind::Ident(cn.clone()), arg.span.clone()))
                             .collect();
                         (fn_name, forwards)
                     }
@@ -920,7 +920,7 @@ impl Mono<'_> {
                                 "argument to a function parameter of \"{name}\" must be a lambda, \
                                  a named function, or a forwarded function parameter"
                             ),
-                            arg.span,
+                            arg.span.clone(),
                         ));
                     }
                 };
@@ -948,7 +948,7 @@ impl Mono<'_> {
         );
         if let Some(spec) = self.spec_memo.get(&key) {
             return Ok((
-                Expr::new(ExprKind::Call(spec.clone(), new_args, false), span),
+                Expr::new(ExprKind::Call(spec.clone(), new_args, false), span.clone()),
                 ret,
             ));
         }
@@ -970,7 +970,7 @@ impl Mono<'_> {
                             mutable: false,
                             variadic: false,
                         });
-                        cap_idents.push(Expr::new(ExprKind::Ident(cap), span));
+                        cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
                     }
                     lenv.insert(
                         param.name.clone(),
@@ -1006,7 +1006,7 @@ impl Mono<'_> {
         self.spec_memo.insert(key, spec_name.clone());
         self.enqueue_concrete(&spec_name);
         Ok((
-            Expr::new(ExprKind::Call(spec_name, new_args, false), span),
+            Expr::new(ExprKind::Call(spec_name, new_args, false), span.clone()),
             ret,
         ))
     }
@@ -1039,7 +1039,7 @@ impl Mono<'_> {
                 continue;
             }
             let (_, aty) = self.infer(arg, env)?;
-            collect_bindings(&param.ty, &aty, &var_set, &mut map, gname, span)?;
+            collect_bindings(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
         }
         let mut type_args = Vec::with_capacity(g.type_vars.len());
@@ -1051,7 +1051,7 @@ impl Mono<'_> {
                          in a function-typed parameter, so it can't be pinned by a lambda argument",
                         display_var(v)
                     ),
-                    span,
+                    span.clone(),
                 )
             })?;
             type_args.push(t);
@@ -1111,7 +1111,7 @@ impl Mono<'_> {
                 base.push_str(&format!("$s{i}"));
             }
         }
-        self.specialize_call_with(&base, &template, ret, args, env, span)
+        self.specialize_call_with(&base, &template, ret, args, env, span.clone())
     }
 
     /// Synthesize a top-level function from a lambda: its parameters (typed from
@@ -1182,7 +1182,7 @@ impl Mono<'_> {
         let Type::Array(elem) = &arr_ty else {
             return Err(Error::at(
                 format!("map expects an array, got {}", type_name(&arr_ty)),
-                arr.span,
+                arr.span.clone(),
             ));
         };
         let elem = (**elem).clone();
@@ -1197,7 +1197,7 @@ impl Mono<'_> {
                 if params.len() != 1 {
                     return Err(Error::at(
                         format!("map's lambda takes 1 parameter, got {}", params.len()),
-                        lambda.span,
+                        lambda.span.clone(),
                     ));
                 }
                 let captures = free_vars(body, params, env);
@@ -1222,7 +1222,7 @@ impl Mono<'_> {
                     "map expects a lambda or a function name, e.g. \"xs.map(|x| ..)\" or \
                      \"xs.map(f)\""
                         .to_string(),
-                    lambda.span,
+                    lambda.span.clone(),
                 ));
             }
         };
@@ -1264,16 +1264,16 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
             });
-            cap_idents.push(Expr::new(ExprKind::Ident(cap), span));
+            cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
-                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span), env)?
+                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
                     .0,
             );
         }
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut lam_args = vec![id("$e")];
         lam_args.extend(cap_idents);
-        let call = Expr::new(ExprKind::Call(map_fn, lam_args, false), span);
+        let call = Expr::new(ExprKind::Call(map_fn, lam_args, false), span.clone());
 
         let map_body = if in_place {
             // In-place: overwrite each slot with its mapped value and reuse the
@@ -1292,7 +1292,7 @@ impl Mono<'_> {
                     vec![id("$a"), id("$i"), call, id("$e")],
                     false,
                 ),
-                span,
+                span.clone(),
             );
             let incr = Expr::new(
                 ExprKind::Assign(
@@ -1301,40 +1301,43 @@ impl Mono<'_> {
                         ExprKind::Binop(
                             Box::new(id("$i")),
                             '+',
-                            Box::new(Expr::new(ExprKind::Num(1), span)),
+                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
-                        span,
+                        span.clone(),
                     )),
-                    Box::new(Expr::new(ExprKind::Unit, span)),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
                 ),
-                span,
+                span.clone(),
             );
-            let for_body = Expr::new(ExprKind::Seq(Box::new(map_set), Box::new(incr)), span);
+            let for_body = Expr::new(
+                ExprKind::Seq(Box::new(map_set), Box::new(incr)),
+                span.clone(),
+            );
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(for_body)),
-                span,
+                span.clone(),
             );
             // The reused buffer now holds `U` elements, but `$a`'s static type is
             // `T[]`. `__map_result` hands it back reinterpreted as the function's
             // declared return type (`U[]`) — a no-op at runtime (same pointer).
             let result = Expr::new(
                 ExprKind::Call("__map_result".to_string(), vec![id("$a")], false),
-                span,
+                span.clone(),
             );
             let inner = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
-                    Box::new(Expr::new(ExprKind::Num(0), span)),
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(result)),
-                        span,
+                        span.clone(),
                     )),
                 ),
-                span,
+                span.clone(),
             );
             Expr::new(
                 ExprKind::LetMut("$a".to_string(), Box::new(id("$arr")), Box::new(inner)),
-                span,
+                span.clone(),
             )
         } else {
             // Copying path: `mut $out = with_capacity(len($arr));
@@ -1344,11 +1347,11 @@ impl Mono<'_> {
             // loop's doubling reallocations into plain stores into spare capacity.
             let push = Expr::new(
                 ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), call], true),
-                span,
+                span.clone(),
             );
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(push)),
-                span,
+                span.clone(),
             );
             // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
             // (16-byte) or bit-packed `bool` output starts from an empty `[]`
@@ -1356,18 +1359,18 @@ impl Mono<'_> {
             let out_init = if matches!(&u, Type::Optional(_))
                 || matches!(&u, Type::Primitive(Primitive::Bool))
             {
-                Expr::new(ExprKind::ArrayLit(Vec::new()), span)
+                Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
             } else {
                 Expr::new(
                     ExprKind::Call(
                         "__builtin_with_capacity".to_string(),
                         vec![Expr::new(
                             ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
-                            span,
+                            span.clone(),
                         )],
                         false,
                     ),
-                    span,
+                    span.clone(),
                 )
             };
             Expr::new(
@@ -1376,10 +1379,10 @@ impl Mono<'_> {
                     Box::new(out_init),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
-                        span,
+                        span.clone(),
                     )),
                 ),
-                span,
+                span.clone(),
             )
         };
         let map_name = format!("__map{}", self.synth);
@@ -1411,7 +1414,7 @@ impl Mono<'_> {
             map_name
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span),
+            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
             ret,
         ))
     }
@@ -1460,13 +1463,13 @@ impl Mono<'_> {
         let Type::Array(elem_a) = &ty_a else {
             return Err(Error::at(
                 format!("zip_with expects an array, got {}", type_name(&ty_a)),
-                arr_a.span,
+                arr_a.span.clone(),
             ));
         };
         let Type::Array(elem_b) = &ty_b else {
             return Err(Error::at(
                 format!("zip_with expects an array, got {}", type_name(&ty_b)),
-                arr_b.span,
+                arr_b.span.clone(),
             ));
         };
         let elem_a = (**elem_a).clone();
@@ -1485,7 +1488,7 @@ impl Mono<'_> {
                             "zip_with's function takes 2 parameters, got {}",
                             params.len()
                         ),
-                        f.span,
+                        f.span.clone(),
                     ));
                 }
                 let captures = free_vars(body, params, env);
@@ -1514,7 +1517,7 @@ impl Mono<'_> {
                     "zip_with expects a binary function or operator, e.g. \
                      \"zip_with(xs, ys, +)\" or \"zip_with(xs, ys, |x, y| ..)\""
                         .to_string(),
-                    f.span,
+                    f.span.clone(),
                 ));
             }
         };
@@ -1559,19 +1562,19 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
             });
-            cap_idents.push(Expr::new(ExprKind::Ident(cap), span));
+            cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
-                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span), env)?
+                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
                     .0,
             );
         }
 
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         // f($e, $v, captures..) — `$e` is always the `$a`-element and `$v` the
         // `$b`-element, whichever of the two arrays the loop iterates.
         let mut lam_args = vec![id("$e"), id("$v")];
         lam_args.extend(cap_idents);
-        let call = Expr::new(ExprKind::Call(zip_fn, lam_args, false), span);
+        let call = Expr::new(ExprKind::Call(zip_fn, lam_args, false), span.clone());
         // set <n> = <n> + 1;
         let incr = |n: &str| {
             Expr::new(
@@ -1581,13 +1584,13 @@ impl Mono<'_> {
                         ExprKind::Binop(
                             Box::new(id(n)),
                             '+',
-                            Box::new(Expr::new(ExprKind::Num(1), span)),
+                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
-                        span,
+                        span.clone(),
                     )),
-                    Box::new(Expr::new(ExprKind::Unit, span)),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
                 ),
-                span,
+                span.clone(),
             )
         };
 
@@ -1629,16 +1632,19 @@ impl Mono<'_> {
                     vec![id("$z"), id("$i"), call, id(reused_el)],
                     false,
                 ),
-                span,
+                span.clone(),
             );
-            let some_body = Expr::new(ExprKind::Seq(Box::new(map_set), Box::new(incr("$w"))), span);
+            let some_body = Expr::new(
+                ExprKind::Seq(Box::new(map_set), Box::new(incr("$w"))),
+                span.clone(),
+            );
             let none_body = Expr::new(
                 ExprKind::Call("__filter_drop".to_string(), vec![id(reused_el)], false),
-                span,
+                span.clone(),
             );
             let index = Expr::new(
                 ExprKind::Index(Box::new(id(other)), Box::new(id("$i"))),
-                span,
+                span.clone(),
             );
             let match_expr = Expr::new(
                 ExprKind::Match(
@@ -1650,7 +1656,7 @@ impl Mono<'_> {
                                 bindings: vec![other_el.to_string()],
                             },
                             body: some_body,
-                            span,
+                            span: span.clone(),
                         },
                         MatchArm {
                             pattern: Pattern::Ctor {
@@ -1658,15 +1664,15 @@ impl Mono<'_> {
                                 bindings: Vec::new(),
                             },
                             body: none_body,
-                            span,
+                            span: span.clone(),
                         },
                     ],
                 ),
-                span,
+                span.clone(),
             );
             let for_body = Expr::new(
                 ExprKind::Seq(Box::new(match_expr), Box::new(incr("$i"))),
-                span,
+                span.clone(),
             );
             let loop_ = Expr::new(
                 ExprKind::For(
@@ -1674,7 +1680,7 @@ impl Mono<'_> {
                     Box::new(id("$z")),
                     Box::new(for_body),
                 ),
-                span,
+                span.clone(),
             );
             let trunc = Expr::new(
                 ExprKind::Call(
@@ -1682,42 +1688,51 @@ impl Mono<'_> {
                     vec![id("$z"), id("$w")],
                     false,
                 ),
-                span,
+                span.clone(),
             );
             let result = Expr::new(
                 ExprKind::Call("__map_result".to_string(), vec![id("$z")], false),
-                span,
+                span.clone(),
             );
-            let mut after = Expr::new(ExprKind::Seq(Box::new(trunc), Box::new(result)), span);
+            let mut after = Expr::new(
+                ExprKind::Seq(Box::new(trunc), Box::new(result)),
+                span.clone(),
+            );
             if drop_other {
                 // Both inputs were moved in: release the one not reused (its
                 // elements were only borrowed by `f`).
                 let drop_o = Expr::new(
                     ExprKind::Call("__filter_drop".to_string(), vec![id(other)], false),
-                    span,
+                    span.clone(),
                 );
-                after = Expr::new(ExprKind::Seq(Box::new(drop_o), Box::new(after)), span);
+                after = Expr::new(
+                    ExprKind::Seq(Box::new(drop_o), Box::new(after)),
+                    span.clone(),
+                );
             }
-            let inner = Expr::new(ExprKind::Seq(Box::new(loop_), Box::new(after)), span);
+            let inner = Expr::new(
+                ExprKind::Seq(Box::new(loop_), Box::new(after)),
+                span.clone(),
+            );
             let with_w = Expr::new(
                 ExprKind::LetMut(
                     "$w".to_string(),
-                    Box::new(Expr::new(ExprKind::Num(0), span)),
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(inner),
                 ),
-                span,
+                span.clone(),
             );
             let with_i = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
-                    Box::new(Expr::new(ExprKind::Num(0), span)),
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(with_w),
                 ),
-                span,
+                span.clone(),
             );
             Expr::new(
                 ExprKind::LetMut("$z".to_string(), Box::new(id(reused)), Box::new(with_i)),
-                span,
+                span.clone(),
             )
         };
 
@@ -1729,12 +1744,12 @@ impl Mono<'_> {
             let len_of = |n: &str| {
                 Expr::new(
                     ExprKind::Call("__builtin_len".to_string(), vec![id(n)], false),
-                    span,
+                    span.clone(),
                 )
             };
             let cond = Expr::new(
                 ExprKind::Binop(Box::new(len_of("$a")), '<', Box::new(len_of("$b"))),
-                span,
+                span.clone(),
             );
             Expr::new(
                 ExprKind::If(
@@ -1742,7 +1757,7 @@ impl Mono<'_> {
                     Box::new(in_place_body(false, true, call.clone())),
                     Box::new(in_place_body(true, true, call.clone())),
                 ),
-                span,
+                span.clone(),
             )
         } else if own_a {
             in_place_body(true, false, call)
@@ -1759,11 +1774,11 @@ impl Mono<'_> {
             //   $out
             let push = Expr::new(
                 ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), call], true),
-                span,
+                span.clone(),
             );
             let index = Expr::new(
                 ExprKind::Index(Box::new(id("$b")), Box::new(id("$i"))),
-                span,
+                span.clone(),
             );
             let match_expr = Expr::new(
                 ExprKind::Match(
@@ -1775,48 +1790,48 @@ impl Mono<'_> {
                                 bindings: vec!["$v".to_string()],
                             },
                             body: push,
-                            span,
+                            span: span.clone(),
                         },
                         MatchArm {
                             pattern: Pattern::Ctor {
                                 name: "none".to_string(),
                                 bindings: Vec::new(),
                             },
-                            body: Expr::new(ExprKind::Unit, span),
-                            span,
+                            body: Expr::new(ExprKind::Unit, span.clone()),
+                            span: span.clone(),
                         },
                     ],
                 ),
-                span,
+                span.clone(),
             );
             let for_body = Expr::new(
                 ExprKind::Seq(Box::new(match_expr), Box::new(incr("$i"))),
-                span,
+                span.clone(),
             );
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(for_body)),
-                span,
+                span.clone(),
             );
             // mut $i = 0; { loop; $out }
             let with_i = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
-                    Box::new(Expr::new(ExprKind::Num(0), span)),
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
-                        span,
+                        span.clone(),
                     )),
                 ),
-                span,
+                span.clone(),
             );
             // mut $out = []; <with_i>
             Expr::new(
                 ExprKind::LetMut(
                     "$out".to_string(),
-                    Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span)),
+                    Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())),
                     Box::new(with_i),
                 ),
-                span,
+                span.clone(),
             )
         };
 
@@ -1854,7 +1869,7 @@ impl Mono<'_> {
             self.enqueue(&zip_name, &[], &owned)
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span),
+            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
             ret,
         ))
     }
@@ -1886,7 +1901,7 @@ impl Mono<'_> {
             _ => {
                 return Err(Error::at(
                     format!("all expects an array or string, got {}", type_name(&arr_ty)),
-                    arr.span,
+                    arr.span.clone(),
                 ))
             }
         };
@@ -1898,7 +1913,7 @@ impl Mono<'_> {
                 if params.len() != 1 {
                     return Err(Error::at(
                         format!("all's lambda takes 1 parameter, got {}", params.len()),
-                        pred.span,
+                        pred.span.clone(),
                     ));
                 }
                 let captures = free_vars(body, params, env);
@@ -1921,14 +1936,14 @@ impl Mono<'_> {
                     "all expects a lambda or a function name, e.g. \"xs.all(|x| ..)\" or \
                      \"xs.all(f)\""
                         .to_string(),
-                    pred.span,
+                    pred.span.clone(),
                 ));
             }
         };
 
         // The `all` function: `(xs: T[], captures..) -> bool`. Params/args mirror
         // `expand_filter`: the array, then one parameter per capture.
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut all_params = vec![Param {
             name: "$arr".to_string(),
             ty: arr_param_ty,
@@ -1953,32 +1968,32 @@ impl Mono<'_> {
         let cond = Expr::new(
             ExprKind::Not(Box::new(Expr::new(
                 ExprKind::Call(pred_fn, pred_args, false),
-                span,
+                span.clone(),
             ))),
-            span,
+            span.clone(),
         );
         let ret_false = Expr::new(
-            ExprKind::Return(Box::new(Expr::new(ExprKind::Bool(false), span))),
-            span,
+            ExprKind::Return(Box::new(Expr::new(ExprKind::Bool(false), span.clone()))),
+            span.clone(),
         );
         let guarded = Expr::new(
             ExprKind::If(
                 Box::new(cond),
                 Box::new(ret_false),
-                Box::new(Expr::new(ExprKind::Unit, span)),
+                Box::new(Expr::new(ExprKind::Unit, span.clone())),
             ),
-            span,
+            span.clone(),
         );
         let loop_ = Expr::new(
             ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
-            span,
+            span.clone(),
         );
         let body = Expr::new(
             ExprKind::Seq(
                 Box::new(loop_),
-                Box::new(Expr::new(ExprKind::Bool(true), span)),
+                Box::new(Expr::new(ExprKind::Bool(true), span.clone())),
             ),
-            span,
+            span.clone(),
         );
 
         let all_name = format!("__all{}", self.synth);
@@ -2002,7 +2017,7 @@ impl Mono<'_> {
         );
         self.enqueue_concrete(&all_name);
         Ok((
-            Expr::new(ExprKind::Call(all_name, call_args, false), span),
+            Expr::new(ExprKind::Call(all_name, call_args, false), span.clone()),
             ret,
         ))
     }
@@ -2023,7 +2038,7 @@ impl Mono<'_> {
         let Type::Array(elem) = &arr_ty else {
             return Err(Error::at(
                 format!("filter expects an array, got {}", type_name(&arr_ty)),
-                arr.span,
+                arr.span.clone(),
             ));
         };
         let elem = (**elem).clone();
@@ -2045,7 +2060,7 @@ impl Mono<'_> {
                 if params.len() != 1 {
                     return Err(Error::at(
                         format!("filter's lambda takes 1 parameter, got {}", params.len()),
-                        pred.span,
+                        pred.span.clone(),
                     ));
                 }
                 let captures = free_vars(body, params, env);
@@ -2069,7 +2084,7 @@ impl Mono<'_> {
                     "filter expects a lambda or a function name, e.g. \"xs.filter(|x| ..)\" or \
                      \"xs.filter(f)\""
                         .to_string(),
-                    pred.span,
+                    pred.span.clone(),
                 ));
             }
         };
@@ -2092,16 +2107,16 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
             });
-            cap_idents.push(Expr::new(ExprKind::Ident(cap), span));
+            cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
-                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span), env)?
+                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
                     .0,
             );
         }
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut pred_args = vec![id("$e")];
         pred_args.extend(cap_idents);
-        let cond = Expr::new(ExprKind::Call(pred_fn, pred_args, false), span);
+        let cond = Expr::new(ExprKind::Call(pred_fn, pred_args, false), span.clone());
 
         let filter_body = if in_place {
             // body: `mut $a = $arr;
@@ -2125,7 +2140,7 @@ impl Mono<'_> {
                     vec![id("$a"), id("$w"), id("$e")],
                     false,
                 ),
-                span,
+                span.clone(),
             );
             let incr = Expr::new(
                 ExprKind::Assign(
@@ -2134,26 +2149,27 @@ impl Mono<'_> {
                         ExprKind::Binop(
                             Box::new(id("$w")),
                             '+',
-                            Box::new(Expr::new(ExprKind::Num(1), span)),
+                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
-                        span,
+                        span.clone(),
                     )),
-                    Box::new(Expr::new(ExprKind::Unit, span)),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
                 ),
-                span,
+                span.clone(),
             );
-            let then_branch = Expr::new(ExprKind::Seq(Box::new(keep), Box::new(incr)), span);
+            let then_branch =
+                Expr::new(ExprKind::Seq(Box::new(keep), Box::new(incr)), span.clone());
             let drop_e = Expr::new(
                 ExprKind::Call("__filter_drop".to_string(), vec![id("$e")], false),
-                span,
+                span.clone(),
             );
             let guarded = Expr::new(
                 ExprKind::If(Box::new(cond), Box::new(then_branch), Box::new(drop_e)),
-                span,
+                span.clone(),
             );
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(guarded)),
-                span,
+                span.clone(),
             );
             let trunc = Expr::new(
                 ExprKind::Call(
@@ -2161,23 +2177,26 @@ impl Mono<'_> {
                     vec![id("$a"), id("$w")],
                     false,
                 ),
-                span,
+                span.clone(),
             );
-            let after = Expr::new(ExprKind::Seq(Box::new(trunc), Box::new(id("$a"))), span);
+            let after = Expr::new(
+                ExprKind::Seq(Box::new(trunc), Box::new(id("$a"))),
+                span.clone(),
+            );
             let inner = Expr::new(
                 ExprKind::LetMut(
                     "$w".to_string(),
-                    Box::new(Expr::new(ExprKind::Num(0), span)),
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(after)),
-                        span,
+                        span.clone(),
                     )),
                 ),
-                span,
+                span.clone(),
             );
             Expr::new(
                 ExprKind::LetMut("$a".to_string(), Box::new(id("$arr")), Box::new(inner)),
-                span,
+                span.clone(),
             )
         } else {
             // Copying path: `mut $out = with_capacity(len($arr));
@@ -2192,19 +2211,19 @@ impl Mono<'_> {
                     vec![id("$out"), id("$e")],
                     true,
                 ),
-                span,
+                span.clone(),
             );
             let guarded = Expr::new(
                 ExprKind::If(
                     Box::new(cond),
                     Box::new(push),
-                    Box::new(Expr::new(ExprKind::Unit, span)),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
                 ),
-                span,
+                span.clone(),
             );
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
-                span,
+                span.clone(),
             );
             // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
             // (16-byte) or bit-packed `bool` output starts from an empty `[]`
@@ -2212,18 +2231,18 @@ impl Mono<'_> {
             let out_init = if matches!(&elem, Type::Optional(_))
                 || matches!(&elem, Type::Primitive(Primitive::Bool))
             {
-                Expr::new(ExprKind::ArrayLit(Vec::new()), span)
+                Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
             } else {
                 Expr::new(
                     ExprKind::Call(
                         "__builtin_with_capacity".to_string(),
                         vec![Expr::new(
                             ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
-                            span,
+                            span.clone(),
                         )],
                         false,
                     ),
-                    span,
+                    span.clone(),
                 )
             };
             Expr::new(
@@ -2232,10 +2251,10 @@ impl Mono<'_> {
                     Box::new(out_init),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
-                        span,
+                        span.clone(),
                     )),
                 ),
-                span,
+                span.clone(),
             )
         };
 
@@ -2268,7 +2287,7 @@ impl Mono<'_> {
             filter_name
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span),
+            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
             ret,
         ))
     }
@@ -2292,23 +2311,23 @@ impl Mono<'_> {
                         "enumerate expects an array or str, got {}",
                         type_name(&arr_ty)
                     ),
-                    arr.span,
+                    arr.span.clone(),
                 ))
             }
         };
         let effects = self.cur_effects.clone();
 
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span);
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
 
         // Body:
         //   mut $i = 0;
         //   mut $out = [];
         //   for (let $e : $arr) { $out.push(($i, $e)); set $i = $i + 1; }
         //   $out
-        let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span);
+        let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span.clone());
         let push = Expr::new(
             ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), tuple], true),
-            span,
+            span.clone(),
         );
         let incr = Expr::new(
             ExprKind::Assign(
@@ -2317,36 +2336,36 @@ impl Mono<'_> {
                     ExprKind::Binop(
                         Box::new(id("$i")),
                         '+',
-                        Box::new(Expr::new(ExprKind::Num(1), span)),
+                        Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                     ),
-                    span,
+                    span.clone(),
                 )),
-                Box::new(Expr::new(ExprKind::Unit, span)),
+                Box::new(Expr::new(ExprKind::Unit, span.clone())),
             ),
-            span,
+            span.clone(),
         );
-        let for_body = Expr::new(ExprKind::Seq(Box::new(push), Box::new(incr)), span);
+        let for_body = Expr::new(ExprKind::Seq(Box::new(push), Box::new(incr)), span.clone());
         let loop_ = Expr::new(
             ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(for_body)),
-            span,
+            span.clone(),
         );
         let enumerate_body = Expr::new(
             ExprKind::LetMut(
                 "$i".to_string(),
-                Box::new(Expr::new(ExprKind::Num(0), span)),
+                Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                 Box::new(Expr::new(
                     ExprKind::LetMut(
                         "$out".to_string(),
-                        Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span)),
+                        Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())),
                         Box::new(Expr::new(
                             ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
-                            span,
+                            span.clone(),
                         )),
                     ),
-                    span,
+                    span.clone(),
                 )),
             ),
-            span,
+            span.clone(),
         );
 
         let enumerate_name = format!("__enumerate{}", self.synth);
@@ -2378,7 +2397,10 @@ impl Mono<'_> {
         );
         self.enqueue_concrete(&enumerate_name);
         Ok((
-            Expr::new(ExprKind::Call(enumerate_name, vec![rarr], false), span),
+            Expr::new(
+                ExprKind::Call(enumerate_name, vec![rarr], false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -2475,7 +2497,7 @@ impl Mono<'_> {
         let var_set: HashSet<&str> = type_vars.iter().map(String::as_str).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
         for (pty, aty) in param_tys.iter().zip(arg_tys) {
-            collect_bindings(pty, aty, &var_set, &mut map, gname, span)?;
+            collect_bindings(pty, aty, &var_set, &mut map, gname, span.clone())?;
         }
         // Fallback pass: any type variable that no concrete arg pinned can
         // still be inferred from an empty-array or bare-`none` argument — the
@@ -2501,7 +2523,7 @@ impl Mono<'_> {
                         "cannot infer a type for \"{}\" in generic \"{gname}\"",
                         display_var(v)
                     ),
-                    span,
+                    span.clone(),
                 )
             })?;
             targs.push(t.clone());
@@ -2562,11 +2584,7 @@ impl Mono<'_> {
             (f.params.clone(), f.return_ty.clone(), f.body.clone())
         } else {
             // Not a user function (e.g. a builtin) — never owned-eligible.
-            (
-                Vec::new(),
-                None,
-                Expr::new(ExprKind::Unit, Span { start: 0, end: 0 }),
-            )
+            (Vec::new(), None, Expr::new(ExprKind::Unit, 0..0))
         }
     }
 
@@ -2630,8 +2648,8 @@ impl Mono<'_> {
     /// Infer `expr`'s concrete type while rewriting any generic call names to
     /// their mangled instances. Returns the rewritten expression and its type.
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
-        let span = expr.span;
-        let node = |kind| Expr::new(kind, span);
+        let span = expr.span.clone();
+        let node = |kind| Expr::new(kind, span.clone());
         Ok(match &expr.kind {
             ExprKind::Unit => (expr.clone(), unit_ty()),
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
@@ -2851,7 +2869,7 @@ impl Mono<'_> {
                     "a lambda is only supported as an argument to a plain higher-order function \
                      call, e.g. `map(xs, |x| ..)`"
                         .to_string(),
-                    span,
+                    span.clone(),
                 ));
             }
             ExprKind::Let(name, val, body) => {
@@ -2931,7 +2949,7 @@ impl Mono<'_> {
                     rarms.push(MatchArm {
                         pattern: arm.pattern.clone(),
                         body: rb,
-                        span: arm.span,
+                        span: arm.span.clone(),
                     });
                     merged = Some(match merged {
                         None => t,
@@ -2962,7 +2980,7 @@ impl Mono<'_> {
                         // Checker already caught this; surface a clean error just in case.
                         return Err(Error::at(
                             format!("struct {name:?} field {fname:?} has no default and was not provided"),
-                            span,
+                            span.clone(),
                         ));
                     };
                     let (rv, _) = self.infer(&src, env)?;
@@ -2987,10 +3005,10 @@ impl Mono<'_> {
                                 "map takes an array and a lambda, got {} argument(s)",
                                 args.len()
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
-                    return self.expand_map(&args[0], &args[1], env, span);
+                    return self.expand_map(&args[0], &args[1], env, span.clone());
                 }
                 if name == "__builtin_filter" {
                     if args.len() != 2 {
@@ -2999,10 +3017,10 @@ impl Mono<'_> {
                                 "filter takes an array and a predicate, got {} argument(s)",
                                 args.len()
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
-                    return self.expand_filter(&args[0], &args[1], env, span);
+                    return self.expand_filter(&args[0], &args[1], env, span.clone());
                 }
                 if name == "__builtin_all" {
                     if args.len() != 2 {
@@ -3011,10 +3029,10 @@ impl Mono<'_> {
                                 "all takes an array and a predicate, got {} argument(s)",
                                 args.len()
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
-                    return self.expand_all(&args[0], &args[1], env, span);
+                    return self.expand_all(&args[0], &args[1], env, span.clone());
                 }
                 if name == "__builtin_zip_with" {
                     if args.len() != 3 {
@@ -3024,19 +3042,19 @@ impl Mono<'_> {
                                  argument(s)",
                                 args.len()
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
-                    return self.expand_zip_with(&args[0], &args[1], &args[2], env, span);
+                    return self.expand_zip_with(&args[0], &args[1], &args[2], env, span.clone());
                 }
                 if name == "__builtin_enumerate" {
                     if args.len() != 1 {
                         return Err(Error::at(
                             format!("enumerate takes an array, got {} argument(s)", args.len()),
-                            span,
+                            span.clone(),
                         ));
                     }
-                    return self.expand_enumerate(&args[0], env, span);
+                    return self.expand_enumerate(&args[0], env, span.clone());
                 }
                 // A direct call through a function-typed binding: `f(x)` where
                 // `f` is a lambda parameter of this (specialized) function.
@@ -3068,7 +3086,7 @@ impl Mono<'_> {
                 // mutates `b` in place.
                 if !method_style && self.mutating.contains(name) && !args.is_empty() {
                     let tmp = "__mut_copy".to_string();
-                    let recv = || Expr::new(ExprKind::Ident(tmp.clone()), span);
+                    let recv = || Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
                     let mut margs = Vec::with_capacity(args.len());
                     margs.push(recv());
                     margs.extend(args[1..].iter().cloned());
@@ -3095,7 +3113,14 @@ impl Mono<'_> {
                 if self.concrete.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
                     let template = self.concrete[name].clone();
                     let ret = self.fn_returns.get(name).cloned().unwrap_or_else(unit_ty);
-                    return self.specialize_call_with(name, &template, ret, args, env, span);
+                    return self.specialize_call_with(
+                        name,
+                        &template,
+                        ret,
+                        args,
+                        env,
+                        span.clone(),
+                    );
                 }
                 // A *generic* higher-order call (e.g. `xs.count_while(|x| ..)` over
                 // `T[]`): infer the type variables from the non-lambda arguments,
@@ -3103,7 +3128,7 @@ impl Mono<'_> {
                 // the lambdas — the union of generic monomorphization and lambda
                 // lifting.
                 if self.generics.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
-                    return self.specialize_generic_call(name, args, env, span);
+                    return self.specialize_generic_call(name, args, env, span.clone());
                 }
                 let mut rargs = Vec::with_capacity(args.len());
                 let mut atys = Vec::with_capacity(args.len());
@@ -3116,7 +3141,7 @@ impl Mono<'_> {
                 // store-back path owns the receiver); only free calls compute the
                 // owned-parameter set used for the move optimization.
                 if self.generics.contains_key(name) {
-                    let (type_args, ret) = self.instantiate_types(name, &atys, span)?;
+                    let (type_args, ret) = self.instantiate_types(name, &atys, span.clone())?;
                     let owned = if method_style {
                         Vec::new()
                     } else {
@@ -3165,7 +3190,7 @@ impl Mono<'_> {
                                 "fn \"{name}\" takes a function parameter; pass a lambda or a \
                                  function by name"
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
                     // Variadic (`T*`) parameters specialize per argument shape: a
@@ -3266,16 +3291,16 @@ fn collect_bindings(
     span: Span,
 ) -> Result<(), Error> {
     match param_ty {
-        Type::Named(v) if vars.contains(v.as_str()) => bind(v, arg_ty, map, gname, span),
+        Type::Named(v) if vars.contains(v.as_str()) => bind(v, arg_ty, map, gname, span.clone()),
         Type::Optional(inner) if ty_contains_var(inner, vars) => match arg_ty {
             Type::Optional(a) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span)
+                collect_bindings(inner, a, vars, map, gname, span.clone())
             }
             _ => Ok(()),
         },
         Type::Array(inner) if ty_contains_var(inner, vars) => match arg_ty {
             Type::Array(a) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span)
+                collect_bindings(inner, a, vars, map, gname, span.clone())
             }
             // `str` is usable as `char[]` — pin the element variable to `char`.
             Type::Primitive(Primitive::Str) => collect_bindings(
@@ -3284,22 +3309,24 @@ fn collect_bindings(
                 vars,
                 map,
                 gname,
-                span,
+                span.clone(),
             ),
             _ => Ok(()),
         },
         Type::Set(inner) if ty_contains_var(inner, vars) => match arg_ty {
-            Type::Set(a) if !is_none_inner(a) => collect_bindings(inner, a, vars, map, gname, span),
+            Type::Set(a) if !is_none_inner(a) => {
+                collect_bindings(inner, a, vars, map, gname, span.clone())
+            }
             _ => Ok(()),
         },
         Type::Dict(pk, pv) if ty_contains_var(pk, vars) || ty_contains_var(pv, vars) => {
             match arg_ty {
                 Type::Dict(ak, av) => {
                     if !is_none_inner(ak) {
-                        collect_bindings(pk, ak, vars, map, gname, span)?;
+                        collect_bindings(pk, ak, vars, map, gname, span.clone())?;
                     }
                     if !is_none_inner(av) {
-                        collect_bindings(pv, av, vars, map, gname, span)?;
+                        collect_bindings(pv, av, vars, map, gname, span.clone())?;
                     }
                     Ok(())
                 }
@@ -3310,10 +3337,10 @@ fn collect_bindings(
             match arg_ty {
                 Type::Result(ao, ae) => {
                     if !is_none_inner(ao) {
-                        collect_bindings(po, ao, vars, map, gname, span)?;
+                        collect_bindings(po, ao, vars, map, gname, span.clone())?;
                     }
                     if !is_none_inner(ae) {
-                        collect_bindings(pe, ae, vars, map, gname, span)?;
+                        collect_bindings(pe, ae, vars, map, gname, span.clone())?;
                     }
                     Ok(())
                 }
@@ -3341,7 +3368,7 @@ fn bind(
                 display_var(v),
                 type_name(ty)
             ),
-            span,
+            span.clone(),
         ));
     }
     match map.get(v) {
@@ -3357,7 +3384,7 @@ fn bind(
                 type_name(prev),
                 type_name(ty)
             ),
-            span,
+            span.clone(),
         )),
     }
 }
@@ -4376,7 +4403,7 @@ fn replace_call(e: &Expr, f: &Function, counter: &mut usize, replaced: &mut bool
                 && !args.iter().any(contains_context_literal)
             {
                 *replaced = true;
-                return build_inlined(f, args, e.span, counter);
+                return build_inlined(f, args, e.span.clone(), counter);
             }
         }
     }
@@ -4478,13 +4505,13 @@ fn replace_call(e: &Expr, f: &Function, counter: &mut usize, replaced: &mut bool
                 .map(|a| MatchArm {
                     pattern: a.pattern.clone(),
                     body: rc(&a.body, counter, replaced),
-                    span: a.span,
+                    span: a.span.clone(),
                 })
                 .collect(),
         ),
         ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, counter, replaced))),
     };
-    Expr::new(kind, e.span)
+    Expr::new(kind, e.span.clone())
 }
 
 /// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
@@ -4509,7 +4536,7 @@ fn build_inlined(f: &Function, args: &[Expr], span: Span, counter: &mut usize) -
     for (fp, arg) in fresh.iter().zip(args).rev() {
         expr = Expr::new(
             ExprKind::Let(fp.clone(), Box::new(arg.clone()), Box::new(expr)),
-            span,
+            span.clone(),
         );
     }
     expr
@@ -4632,7 +4659,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                 .map(|a| MatchArm {
                     pattern: a.pattern.clone(),
                     body: rename_params(&a.body, &without_all(a.pattern.bindings())),
-                    span: a.span,
+                    span: a.span.clone(),
                 })
                 .collect(),
         ),
@@ -4641,7 +4668,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             ExprKind::Lambda(ps.clone(), Box::new(rename_params(b, &without_all(&names))))
         }
     };
-    Expr::new(kind, e.span)
+    Expr::new(kind, e.span.clone())
 }
 
 // ---- Ownership analysis -----------------------------------------------------

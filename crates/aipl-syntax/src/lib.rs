@@ -5,26 +5,11 @@
 //! fast-to-compile base of the workspace.
 
 /// Byte-offset range in the source string.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
+pub type Span = std::ops::Range<usize>;
 
-impl Span {
-    pub const DUMMY: Span = Span { start: 0, end: 0 };
-
-    pub fn new(start: usize, end: usize) -> Self {
-        Self { start, end }
-    }
-
-    /// Smallest span covering both `self` and `other`.
-    pub fn join(self, other: Span) -> Span {
-        Span {
-            start: self.start.min(other.start),
-            end: self.end.max(other.end),
-        }
-    }
+/// Smallest span covering both `a` and `b`.
+pub fn join_spans(a: &Span, b: &Span) -> Span {
+    a.start.min(b.start)..a.end.max(b.end)
 }
 
 /// Error returned by parsing or codegen. Use [`Error::render`] for the
@@ -40,7 +25,7 @@ pub struct Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.span {
+        match &self.span {
             Some(s) => write!(f, "{} (at bytes {}..{})", self.message, s.start, s.end),
             None => f.write_str(&self.message),
         }
@@ -75,12 +60,12 @@ impl Error {
     /// when a span is present (plus a `note:` block per secondary span), or a
     /// plain `error: ...` otherwise.
     pub fn render(&self, source: &str) -> String {
-        let Some(span) = self.span else {
+        let Some(span) = self.span.as_ref() else {
             return format!("error: {}", self.message);
         };
         let mut out = format!("error: {}\n{}", self.message, caret_block(source, span));
         for (note, nspan) in &self.notes {
-            out.push_str(&format!("\nnote: {note}\n{}", caret_block(source, *nspan)));
+            out.push_str(&format!("\nnote: {note}\n{}", caret_block(source, nspan)));
         }
         out
     }
@@ -92,7 +77,7 @@ impl Error {
 ///   {pad} |
 ///   {line_no} | <source line>
 ///   {pad} | <indent>^^^
-fn caret_block(source: &str, span: Span) -> String {
+fn caret_block(source: &str, span: &Span) -> String {
     let (line_idx, line_start) = line_at(source, span.start);
     let line_end = source[line_start..]
         .find('\n')

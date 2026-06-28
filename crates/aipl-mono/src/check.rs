@@ -192,7 +192,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
                         &dt,
                         &f.ty,
                         &format!("default for struct {:?} field {:?}", s.name, f.name),
-                        default.span,
+                        default.span.clone(),
                     )?;
                 }
             }
@@ -316,7 +316,7 @@ impl Cx<'_> {
                     tyname(&body_ty),
                     tyname(&declared)
                 ),
-                f.body.span,
+                f.body.span.clone(),
             )
         })
     }
@@ -479,9 +479,12 @@ impl Cx<'_> {
                     "constructor {ctor:?} takes {} argument(s); write {ctor}(..)",
                     p.len()
                 ),
-                span,
+                span.clone(),
             )),
-            None => Err(Error::at(format!("unknown constructor {ctor:?}"), span)),
+            None => Err(Error::at(
+                format!("unknown constructor {ctor:?}"),
+                span.clone(),
+            )),
         }
     }
 
@@ -502,7 +505,7 @@ impl Cx<'_> {
                 Pattern::Str(_) | Pattern::Wildcard => Ok(vec![]),
                 Pattern::Ctor { .. } | Pattern::Array(_) => Err(Error::at(
                     "\"match\" on a str expects string literals or `_`".to_string(),
-                    arm.span,
+                    arm.span.clone(),
                 )),
             };
         }
@@ -516,18 +519,18 @@ impl Cx<'_> {
                         if !is_pattern_literal(e) {
                             return Err(Error::at(
                                 "array-pattern elements must be literals".to_string(),
-                                e.span,
+                                e.span.clone(),
                             ));
                         }
                         let et = self.check_expr(e, env, effects)?;
-                        expect(&et, elem, "array-pattern element", e.span)?;
+                        expect(&et, elem, "array-pattern element", e.span.clone())?;
                     }
                     Ok(vec![])
                 }
                 Pattern::Wildcard => Ok(vec![]),
                 Pattern::Ctor { .. } | Pattern::Str(_) => Err(Error::at(
                     "\"match\" on an array expects array literals or `_`".to_string(),
-                    arm.span,
+                    arm.span.clone(),
                 )),
             };
         }
@@ -537,13 +540,13 @@ impl Cx<'_> {
             Pattern::Str(_) => {
                 return Err(Error::at(
                     format!("string-literal pattern matches a str, not {}", tyname(st)),
-                    arm.span,
+                    arm.span.clone(),
                 ))
             }
             Pattern::Array(_) => {
                 return Err(Error::at(
                     format!("array-literal pattern matches an array, not {}", tyname(st)),
-                    arm.span,
+                    arm.span.clone(),
                 ))
             }
             Pattern::Wildcard => {
@@ -553,7 +556,7 @@ impl Cx<'_> {
                          every case",
                         tyname(st)
                     ),
-                    arm.span,
+                    arm.span.clone(),
                 ))
             }
         };
@@ -566,7 +569,7 @@ impl Cx<'_> {
                         format!(
                             "\"match\" on an optional expects \"some\"/\"none\", got {other:?}"
                         ),
-                        arm.span,
+                        arm.span.clone(),
                     ))
                 }
             },
@@ -578,7 +581,7 @@ impl Cx<'_> {
                 other => {
                     return Err(Error::at(
                         format!("\"match\" on a result expects \"ok\"/\"err\", got {other:?}"),
-                        arm.span,
+                        arm.span.clone(),
                     ))
                 }
             },
@@ -587,7 +590,7 @@ impl Cx<'_> {
                 None => {
                     return Err(Error::at(
                         format!("{n} has no constructor {name:?}"),
-                        arm.span,
+                        arm.span.clone(),
                     ))
                 }
             },
@@ -608,7 +611,7 @@ impl Cx<'_> {
                     payload.len(),
                     bindings.len()
                 ),
-                arm.span,
+                arm.span.clone(),
             ));
         }
         Ok(payload)
@@ -634,7 +637,7 @@ impl Cx<'_> {
                 if matches!(arm.pattern, Pattern::Wildcard) && idx != arms.len() - 1 {
                     return Err(Error::at(
                         "the `_` arm must be last (arms after it are unreachable)".to_string(),
-                        arm.span,
+                        arm.span.clone(),
                     ));
                 }
                 // A duplicate literal pattern is dead code. (`Pattern: Eq`, so this
@@ -646,13 +649,13 @@ impl Cx<'_> {
                         Pattern::Str(lit) => format!("duplicate {lit:?} arm"),
                         _ => "duplicate match arm".to_string(),
                     };
-                    return Err(Error::at(what, arm.span));
+                    return Err(Error::at(what, arm.span.clone()));
                 }
             }
             if !matches!(arms.last(), Some(a) if matches!(a.pattern, Pattern::Wildcard)) {
                 return Err(Error::at(
                     format!("non-exhaustive match on {noun}: add a `_` arm"),
-                    span,
+                    span.clone(),
                 ));
             }
             return Ok(());
@@ -673,7 +676,10 @@ impl Cx<'_> {
                 continue;
             };
             if !seen.insert(name.as_str()) {
-                return Err(Error::at(format!("duplicate \"{name}\" arm"), arm.span));
+                return Err(Error::at(
+                    format!("duplicate \"{name}\" arm"),
+                    arm.span.clone(),
+                ));
             }
         }
         let missing: Vec<&str> = required
@@ -684,7 +690,7 @@ impl Cx<'_> {
         if !missing.is_empty() {
             return Err(Error::at(
                 format!("non-exhaustive match: missing {}", missing.join(", ")),
-                span,
+                span.clone(),
             ));
         }
         Ok(())
@@ -703,7 +709,7 @@ impl Cx<'_> {
     /// Check `expr` and return its type. `effects` is the enclosing function's
     /// declared effect set (callees must not exceed it).
     fn check_expr(&self, expr: &Expr, env: &Env, effects: &[String]) -> Result<Type, Error> {
-        let span = expr.span;
+        let span = expr.span.clone();
         Ok(match &expr.kind {
             ExprKind::Unit => unit_ty(),
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
@@ -717,10 +723,13 @@ impl Cx<'_> {
                 if let Some(b) = env.get(name) {
                     b.ty.clone()
                 } else if let Some(vn) = self.ctors.get(name) {
-                    self.expect_nullary_ctor(name, vn, span)?;
+                    self.expect_nullary_ctor(name, vn, span.clone())?;
                     Type::Named(vn.clone())
                 } else {
-                    return Err(Error::at(format!("unknown identifier {name:?}"), span));
+                    return Err(Error::at(
+                        format!("unknown identifier {name:?}"),
+                        span.clone(),
+                    ));
                 }
             }
             ExprKind::Neg(x) => {
@@ -729,7 +738,7 @@ impl Cx<'_> {
                     &t,
                     &Type::Primitive(Primitive::I64),
                     "unary \"-\" operand",
-                    x.span,
+                    x.span.clone(),
                 )?;
                 Type::Primitive(Primitive::I64)
             }
@@ -739,7 +748,7 @@ impl Cx<'_> {
                     &t,
                     &Type::Primitive(Primitive::Bool),
                     "\"!\" operand",
-                    x.span,
+                    x.span.clone(),
                 )?;
                 Type::Primitive(Primitive::Bool)
             }
@@ -750,7 +759,14 @@ impl Cx<'_> {
                 // type (if it fits), so `i8_val == 5` needs no explicit `i8(5)`.
                 let rt2 = self.flex_int(r, &rt, &lt)?;
                 let lt2 = self.flex_int(l, &lt, &rt)?;
-                self.check_binop(*op, &lt2, &rt2, l.span, r.span, span)?
+                self.check_binop(
+                    *op,
+                    &lt2,
+                    &rt2,
+                    l.span.clone(),
+                    r.span.clone(),
+                    span.clone(),
+                )?
             }
             ExprKind::If(c, t, e) => {
                 let ct = self.check_expr(c, env, effects)?;
@@ -758,7 +774,7 @@ impl Cx<'_> {
                     &ct,
                     &Type::Primitive(Primitive::Bool),
                     "if condition",
-                    c.span,
+                    c.span.clone(),
                 )?;
                 let tt = self.check_expr(t, env, effects)?;
                 let et = self.check_expr(e, env, effects)?;
@@ -769,7 +785,7 @@ impl Cx<'_> {
                             tyname(&tt),
                             tyname(&et)
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 merge(tt, et)
@@ -784,7 +800,7 @@ impl Cx<'_> {
                     return Err(Error::at(
                         "this result is discarded, ignoring its possible error; handle it \
                          with `match` or propagate it with `?`",
-                        first.span,
+                        first.span.clone(),
                     ));
                 }
                 self.check_expr(rest, env, effects)?
@@ -802,7 +818,7 @@ impl Cx<'_> {
                             tyname(&vt),
                             tyname(&declared)
                         ),
-                        span,
+                        span.clone(),
                     )
                 })?;
                 // `return` doesn't produce a value — it's a statement, like `set`.
@@ -816,7 +832,7 @@ impl Cx<'_> {
                     "a lambda is only valid as an argument to a function with a matching \
                      function-typed parameter"
                         .to_string(),
-                    span,
+                    span.clone(),
                 ));
             }
             ExprKind::TupleLit(elems) => {
@@ -840,10 +856,10 @@ impl Cx<'_> {
                 if is_unit(&vt) {
                     return Err(Error::at(
                         format!("cannot bind {name:?} to a value of type ()"),
-                        val.span,
+                        val.span.clone(),
                     ));
                 }
-                check_result_inspected(name, &vt, body, val.span)?;
+                check_result_inspected(name, &vt, body, val.span.clone())?;
                 let mut env2 = env.clone();
                 env2.insert(
                     name.clone(),
@@ -859,10 +875,10 @@ impl Cx<'_> {
                 if is_unit(&vt) {
                     return Err(Error::at(
                         format!("cannot bind {name:?} to a value of type ()"),
-                        val.span,
+                        val.span.clone(),
                     ));
                 }
-                check_result_inspected(name, &vt, body, val.span)?;
+                check_result_inspected(name, &vt, body, val.span.clone())?;
                 let mut env2 = env.clone();
                 env2.insert(
                     name.clone(),
@@ -874,20 +890,20 @@ impl Cx<'_> {
                 self.check_expr(body, &env2, effects)?
             }
             ExprKind::Assign(name, val, body) => {
-                let binding = env
-                    .get(name)
-                    .ok_or_else(|| Error::at(format!("set: undeclared variable {name:?}"), span))?;
+                let binding = env.get(name).ok_or_else(|| {
+                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+                })?;
                 if !binding.mutable {
                     return Err(Error::at(
                         format!(
                             "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 let expected = binding.ty.clone();
                 let vt = self.check_expr(val, env, effects)?;
-                expect(&vt, &expected, "set", val.span)?;
+                expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr(body, env, effects)?
             }
             ExprKind::For(_var, iter, body) => {
@@ -901,7 +917,7 @@ impl Cx<'_> {
                                 "for-loop iterable must be a str or array, got {}",
                                 tyname(other)
                             ),
-                            iter.span,
+                            iter.span.clone(),
                         ));
                     }
                 };
@@ -922,7 +938,7 @@ impl Cx<'_> {
                     &ct,
                     &Type::Primitive(Primitive::Bool),
                     "while condition",
-                    cond.span,
+                    cond.span.clone(),
                 )?;
                 // The body sees the enclosing scope (no loop binding); a `mut`
                 // tested/updated across iterations is declared before the loop.
@@ -948,7 +964,7 @@ impl Cx<'_> {
                              or a struct, got {}",
                             tyname(&elem_ty)
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 Type::Array(Box::new(elem_ty))
@@ -962,7 +978,7 @@ impl Cx<'_> {
                     if i == 0 {
                         elem_ty = t;
                     } else {
-                        expect(&t, &elem_ty, "set element", e.span)?;
+                        expect(&t, &elem_ty, "set element", e.span.clone())?;
                     }
                 }
                 if !elems.is_empty() && !is_set_elem(&elem_ty) {
@@ -971,7 +987,7 @@ impl Cx<'_> {
                             "set elements must be i64, bool, char, or str, got {}",
                             tyname(&elem_ty)
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 Type::Set(Box::new(elem_ty))
@@ -989,8 +1005,8 @@ impl Cx<'_> {
                         key_ty = kt;
                         val_ty = vt;
                     } else {
-                        expect(&kt, &key_ty, "dict key", k.span)?;
-                        expect(&vt, &val_ty, "dict value", v.span)?;
+                        expect(&kt, &key_ty, "dict key", k.span.clone())?;
+                        expect(&vt, &val_ty, "dict value", v.span.clone())?;
                     }
                 }
                 if !pairs.is_empty() {
@@ -1000,7 +1016,7 @@ impl Cx<'_> {
                                 "dict keys must be i64, bool, char, or str, got {}",
                                 tyname(&key_ty)
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
                     let val_ok = is_valid_elem(&val_ty)
@@ -1013,7 +1029,7 @@ impl Cx<'_> {
                                  or a struct, got {}",
                                 tyname(&val_ty)
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
                 }
@@ -1026,7 +1042,7 @@ impl Cx<'_> {
                     &it,
                     &Type::Primitive(Primitive::I64),
                     "array index",
-                    idx.span,
+                    idx.span.clone(),
                 )?;
                 let elem = match ot {
                     Type::Array(inner) => *inner,
@@ -1035,7 +1051,7 @@ impl Cx<'_> {
                     other => {
                         return Err(Error::at(
                             format!("cannot index a value of type {}", tyname(&other)),
-                            obj.span,
+                            obj.span.clone(),
                         ));
                     }
                 };
@@ -1048,20 +1064,25 @@ impl Cx<'_> {
                     &ot,
                     &Type::Primitive(Primitive::Str),
                     "slice receiver",
-                    obj.span,
+                    obj.span.clone(),
                 )?;
                 let st = self.check_expr(start, env, effects)?;
                 expect(
                     &st,
                     &Type::Primitive(Primitive::I64),
                     "slice start",
-                    start.span,
+                    start.span.clone(),
                 )?;
                 // An open-ended `recv[start..]` has no end expression — it runs to
                 // the receiver's length.
                 if let Some(end) = end {
                     let et = self.check_expr(end, env, effects)?;
-                    expect(&et, &Type::Primitive(Primitive::I64), "slice end", end.span)?;
+                    expect(
+                        &et,
+                        &Type::Primitive(Primitive::I64),
+                        "slice end",
+                        end.span.clone(),
+                    )?;
                 }
                 Type::Primitive(Primitive::Str)
             }
@@ -1076,7 +1097,7 @@ impl Cx<'_> {
                     other => {
                         return Err(Error::at(
                             format!("\"?\" requires a result (T!E), got {}", tyname(&other)),
-                            span,
+                            span.clone(),
                         ));
                     }
                 }
@@ -1086,13 +1107,13 @@ impl Cx<'_> {
                 let Type::Named(sn) = &ot else {
                     return Err(Error::at(
                         format!("field access on non-struct value of type {}", tyname(&ot)),
-                        obj.span,
+                        obj.span.clone(),
                     ));
                 };
                 let fields = self.struct_fields(sn).ok_or_else(|| {
                     Error::at(
                         format!("field access on non-struct value of type {sn}"),
-                        obj.span,
+                        obj.span.clone(),
                     )
                 })?;
                 fields
@@ -1100,15 +1121,17 @@ impl Cx<'_> {
                     .find(|(n, _, _)| n == fname)
                     .map(|(_, t, _)| t.clone())
                     .ok_or_else(|| {
-                        Error::at(format!("struct {sn:?} has no field {fname:?}"), span)
+                        Error::at(
+                            format!("struct {sn:?} has no field {fname:?}"),
+                            span.clone(),
+                        )
                     })?
             }
             ExprKind::Construct(name, inits) => {
-                let fields = self
-                    .structs
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| Error::at(format!("unknown struct {name:?}"), span))?;
+                let fields =
+                    self.structs.get(name).cloned().ok_or_else(|| {
+                        Error::at(format!("unknown struct {name:?}"), span.clone())
+                    })?;
                 // Each provided init must name a real field with a compatible type.
                 for fi in inits {
                     let (_, expected, _) = fields
@@ -1117,7 +1140,7 @@ impl Cx<'_> {
                         .ok_or_else(|| {
                             Error::at(
                                 format!("struct {name:?} has no field {:?}", fi.name),
-                                fi.value.span,
+                                fi.value.span.clone(),
                             )
                         })?;
                     let vt = self.check_expr(&fi.value, env, effects)?;
@@ -1125,7 +1148,7 @@ impl Cx<'_> {
                         &vt,
                         expected,
                         &format!("struct {name:?} field {:?}", fi.name),
-                        fi.value.span,
+                        fi.value.span.clone(),
                     )?;
                 }
                 // Every field without a default must be provided.
@@ -1135,7 +1158,7 @@ impl Cx<'_> {
                             format!(
                                 "struct {name:?} field {fname:?} has no default and was not provided"
                             ),
-                            span,
+                            span.clone(),
                         ));
                     }
                 }
@@ -1147,7 +1170,8 @@ impl Cx<'_> {
                 // for an optional, the declared cases for a variant.
                 let mut merged: Option<Type> = None;
                 for arm in arms {
-                    let bind_tys = self.match_arm_bindings(&st, arm, scrut.span, env, effects)?;
+                    let bind_tys =
+                        self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
                     let mut env2 = env.clone();
                     for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
                         env2.insert(name.clone(), Binding { ty, mutable: false });
@@ -1158,7 +1182,7 @@ impl Cx<'_> {
                         Some(prev) => merge(prev, t),
                     });
                 }
-                self.check_match_exhaustive(&st, arms, span)?;
+                self.check_match_exhaustive(&st, arms, span.clone())?;
                 merged.unwrap_or_else(|| Type::Primitive(Primitive::I64))
             }
             ExprKind::Call(name, args, method_style) => {
@@ -1175,7 +1199,7 @@ impl Cx<'_> {
                             if env.get(v).is_some_and(|b| !b.mutable) {
                                 return Err(Error::at(
                                     format!("cannot call mutating method {:?} on immutable binding {v:?}; declare it with \"mut\"", display(name)),
-                                    span,
+                                    span.clone(),
                                 ));
                             }
                         }
@@ -1188,12 +1212,12 @@ impl Cx<'_> {
                                     "fn {:?} cannot be called as a method (its first parameter must be named \"self\")",
                                     display(name)
                                 ),
-                                recv.span,
+                                recv.span.clone(),
                             ));
                         }
                     }
                 }
-                self.check_call(name, args, env, effects, span)?
+                self.check_call(name, args, env, effects, span.clone())?
             }
         })
     }
@@ -1219,7 +1243,7 @@ impl Cx<'_> {
                             payload.len(),
                             args.len()
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 for (arg, pty) in args.iter().zip(&payload) {
@@ -1229,7 +1253,7 @@ impl Cx<'_> {
                         &at,
                         pty,
                         &format!("constructor {name:?} argument"),
-                        arg.span,
+                        arg.span.clone(),
                     )?;
                 }
                 return Ok(Type::Named(vn.clone()));
@@ -1243,7 +1267,7 @@ impl Cx<'_> {
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("{name:?} conversion expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let at = self.check_expr(&args[0], env, effects)?;
@@ -1253,7 +1277,7 @@ impl Cx<'_> {
                         "{name:?} converts an integer, but its argument is {}",
                         tyname(&at)
                     ),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             }
             // `int_bits` matched, so the name is a known integer primitive.
@@ -1273,7 +1297,7 @@ impl Cx<'_> {
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("{name:?} expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let t = self.check_expr(&args[0], env, effects)?;
@@ -1324,7 +1348,7 @@ impl Cx<'_> {
                             tyname(&elem),
                             tyname(&pat)
                         ),
-                        args[1].span,
+                        args[1].span.clone(),
                     ));
                 }
                 return Ok(Type::Primitive(Primitive::Bool));
@@ -1341,7 +1365,7 @@ impl Cx<'_> {
             let Type::Array(elem) = &t else {
                 return Err(Error::at(
                     format!("{:?} expects an array, got {}", display(name), tyname(&t)),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             };
             if !matches!(elem.as_ref(), Type::Primitive(p) if p.is_int() || *p == Primitive::Char) {
@@ -1351,7 +1375,7 @@ impl Cx<'_> {
                         display(name),
                         tyname(&t)
                     ),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             }
             return Ok(Type::Optional(elem.clone()));
@@ -1365,13 +1389,13 @@ impl Cx<'_> {
             let Type::Fn(ptys, ret) = &b.ty else {
                 return Err(Error::at(
                     format!("{name:?} is not a function and cannot be called"),
-                    span,
+                    span.clone(),
                 ));
             };
             if ptys.len() != args.len() {
                 return Err(Error::at(
                     format!("{name:?} expects {} arg(s), got {}", ptys.len(), args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             for (i, (arg, pty)) in args.iter().zip(ptys).enumerate() {
@@ -1395,7 +1419,7 @@ impl Cx<'_> {
                         "fn {:?} has effect \"!{e}\" but the calling function does not declare it",
                         display(name)
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
         }
@@ -1411,7 +1435,7 @@ impl Cx<'_> {
                     " — \"{name}\" is a builtin; import it with `import {{ {name} }} from builtins;`"
                 ));
             }
-            return Err(Error::at(msg, span));
+            return Err(Error::at(msg, span.clone()));
         };
         if sig.params.len() != args.len() {
             return Err(Error::at(
@@ -1421,7 +1445,7 @@ impl Cx<'_> {
                     sig.params.len(),
                     args.len()
                 ),
-                span,
+                span.clone(),
             ));
         }
 
@@ -1449,7 +1473,7 @@ impl Cx<'_> {
                                 tyname(&elem),
                                 tyname(&aty)
                             ),
-                            arg.span,
+                            arg.span.clone(),
                         ));
                     }
                     atys.push(aty);
@@ -1565,13 +1589,14 @@ impl Cx<'_> {
                 return Err(Error::at(
                     "a lambda can only be passed where a function-typed parameter is expected"
                         .to_string(),
-                    arg.span,
+                    arg.span.clone(),
                 ));
             };
             // Report the lambda's *inferred* type (actual body return), not the
             // expected one, so a generic HOF can pin an only-in-the-lambda return
             // variable (`U` in `map<T, U>`).
-            let body_ty = self.check_lambda(params, body, ptys, ret, env, effects, arg.span)?;
+            let body_ty =
+                self.check_lambda(params, body, ptys, ret, env, effects, arg.span.clone())?;
             return Ok(Type::Fn(ptys.clone(), Box::new(body_ty)));
         }
         // A bare function *name* passed where a function value is expected: a
@@ -1579,7 +1604,7 @@ impl Cx<'_> {
         // binding, so it doesn't resolve through `env` — validate its signature.
         if let (Some(Type::Fn(ptys, ret)), ExprKind::Ident(g)) = (expected, &arg.kind) {
             if !env.contains_key(g) {
-                self.check_fn_ref(g, ptys, ret, effects, arg.span)?;
+                self.check_fn_ref(g, ptys, ret, effects, arg.span.clone())?;
                 return Ok(Type::Fn(ptys.clone(), ret.clone()));
             }
         }
@@ -1587,7 +1612,7 @@ impl Cx<'_> {
         if let Some(e) = expected {
             // A bare literal argument flexes to a narrow-int parameter type.
             let aty = self.flex_int(arg, &aty, e)?;
-            expect(&aty, e, ctx, arg.span)?;
+            expect(&aty, e, ctx, arg.span.clone())?;
             return Ok(aty);
         }
         Ok(aty)
@@ -1618,7 +1643,7 @@ impl Cx<'_> {
                         Box::new(expected_ret.clone())
                     ))
                 ),
-                span,
+                span.clone(),
             ));
         }
         let mut env2 = env.clone();
@@ -1632,7 +1657,7 @@ impl Cx<'_> {
                             tyname(ann),
                             tyname(pty)
                         ),
-                        p.span,
+                        p.span.clone(),
                     ));
                 }
             }
@@ -1652,7 +1677,7 @@ impl Cx<'_> {
                     tyname(&body_ty),
                     tyname(expected_ret)
                 ),
-                body.span,
+                body.span.clone(),
             )
         })?;
         // Return the body's *actual* type: a generic HOF (`map<T, U>`) infers `U`
@@ -1716,7 +1741,7 @@ impl Cx<'_> {
                      or it is generic — passing generic functions is not supported)",
                     display(name)
                 ),
-                span,
+                span.clone(),
             )
         })?;
         if params.len() != expected_params.len() {
@@ -1727,7 +1752,7 @@ impl Cx<'_> {
                     params.len(),
                     expected_params.len()
                 ),
-                span,
+                span.clone(),
             ));
         }
         for (provided, declared) in expected_params.iter().zip(&params) {
@@ -1739,7 +1764,7 @@ impl Cx<'_> {
                         tyname(declared),
                         tyname(provided)
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
         }
@@ -1751,7 +1776,7 @@ impl Cx<'_> {
                     tyname(&ret),
                     tyname(expected_ret)
                 ),
-                span,
+                span.clone(),
             ));
         }
         for e in &fx {
@@ -1761,7 +1786,7 @@ impl Cx<'_> {
                         "fn {:?} has effect \"!{e}\" but the calling function does not declare it",
                         display(name)
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
         }
@@ -1797,7 +1822,7 @@ impl Cx<'_> {
                     }
                     return Err(Error::at(
                         format!("integer literal {v} does not fit in {}", p.name()),
-                        e.span,
+                        e.span.clone(),
                     ));
                 }
             }
@@ -1831,7 +1856,7 @@ impl Cx<'_> {
                 } else if is_str_repr(lt) || is_str_repr(rt) {
                     Err(Error::at(
                         "\"+\" between str and a non-str: both sides must be str".to_string(),
-                        span,
+                        span.clone(),
                     ))
                 } else if same_int {
                     Ok(lt.clone())
@@ -1883,7 +1908,7 @@ impl Cx<'_> {
                             "{:?} is not supported for function values",
                             if op == 'E' { "==" } else { "!=" }
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 let comparable = is_unknown(lt)
@@ -1898,7 +1923,7 @@ impl Cx<'_> {
                             tyname(lt),
                             tyname(rt)
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
                 Ok(Type::Primitive(Primitive::Bool))
@@ -2120,7 +2145,7 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
 /// A result captured in a binding must actually be read somewhere in the
 /// binding's body — leaving it unused would silently drop its error, exactly
 /// like a bare discard. (Reassigning the binding doesn't count as a read: only
-/// `Ident` references do, which is what `count_ident` tallies.) `span` points at
+/// `Ident` references do, which is what `count_ident` tallies.) `span.clone()` points at
 /// the bound value.
 fn check_result_inspected(name: &str, vt: &Type, body: &Expr, span: Span) -> Result<(), Error> {
     if matches!(vt, Type::Result(_, _)) && crate::count_ident(name, body) == 0 {
@@ -2129,7 +2154,7 @@ fn check_result_inspected(name: &str, vt: &Type, body: &Expr, span: Span) -> Res
                 "the result bound to {name:?} is never used, ignoring its possible error; \
                  inspect it with `match` or `?`"
             ),
-            span,
+            span.clone(),
         ));
     }
     Ok(())
@@ -2143,7 +2168,7 @@ fn expect(actual: &Type, expected: &Type, ctx: &str, span: Span) -> Result<(), E
                 tyname(expected),
                 tyname(actual)
             ),
-            span,
+            span.clone(),
         )
     })
 }

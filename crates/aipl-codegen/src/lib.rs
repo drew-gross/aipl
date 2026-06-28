@@ -2393,12 +2393,13 @@ fn builtin_decls() -> Vec<Item> {
 /// `__test_end()`, then yields `__test_summary()` as its i64 exit code.
 /// `Compilation::new(&that).run_0("__test_main")` runs the suite.
 pub fn build_test_program(program: &Program) -> Program {
-    let span = Span { start: 0, end: 0 };
+    let span: Span = 0..0;
     let call = |name: &str, args: Vec<Expr>| {
-        Expr::new(ExprKind::Call(name.to_string(), args, false), span)
+        Expr::new(ExprKind::Call(name.to_string(), args, false), span.clone())
     };
-    let seq =
-        |first: Expr, rest: Expr| Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span);
+    let seq = |first: Expr, rest: Expr| {
+        Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
+    };
     // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`
     // functions), so the synthesized test fns / driver declare every known effect.
     let all_effects = || {
@@ -2442,7 +2443,7 @@ pub fn build_test_program(program: &Program) -> Program {
     for (name, test_fn) in tests.iter().rev() {
         body = seq(call("__test_end", Vec::new()), body);
         body = seq(call(test_fn, Vec::new()), body);
-        let name_lit = Expr::new(ExprKind::Str(name.clone()), span);
+        let name_lit = Expr::new(ExprKind::Str(name.clone()), span.clone());
         body = seq(call("__test_begin", vec![name_lit]), body);
     }
     items.push(Item::Fn(AstFn {
@@ -2649,7 +2650,7 @@ thread_local! {
 /// [`Span`] of the first line's trailing space/tab run, or `None` if no line has
 /// any — computed by the dogfooded AIPL `find_trailing_whitespace`
 /// (`str -> Span?`), marshaled back as an [`FfiValue::Opt`] of a struct via the
-/// FFI. `none` maps to `None`, `some(span)` to `Some(span)` — no sentinel. No
+/// FFI. `none` maps to `None`, `some(span.clone())` to `Some(span.clone())` — no sentinel. No
 /// native fallback; panics if it can't be built or called.
 fn find_trailing_whitespace(src: &str) -> Option<Span> {
     // A `Span` struct value (its `start`/`end` fields) as a Rust `Span`.
@@ -2658,7 +2659,7 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
             Some((_, FfiValue::Int(v))) => *v as usize,
             other => panic!("dogfooded find_trailing_whitespace() Span.{k}: {other:?}"),
         };
-        Span::new(field("start"), field("end"))
+        field("start")..field("end")
     }
     FIND_TRAILING_WHITESPACE_ENGINE.with(|comp| {
         match comp.call_values(
@@ -4688,7 +4689,7 @@ fn env_load(
 ) -> Result<(Value, Type), Error> {
     let binding = env
         .get(name)
-        .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span))?;
+        .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
     Ok(match binding {
         EnvBinding::Immut(v, t) => (*v, t.clone()),
         EnvBinding::Mut(slot, t, _) => {
@@ -4769,7 +4770,7 @@ fn expect_type(actual: &Type, expected: &Type, context: &str, span: Span) -> Res
             type_name(expected),
             type_name(actual)
         ),
-        span,
+        span.clone(),
     ))
 }
 
@@ -4784,7 +4785,7 @@ fn reject_unit_binding(ty: &Type, name: &str, span: Span) -> Result<(), Error> {
                 "cannot bind {name:?} to a value of type () — a function that returns nothing \
                  can't be assigned; call it as a statement instead (`expr;`)"
             ),
-            span,
+            span.clone(),
         ));
     }
     Ok(())
@@ -4902,7 +4903,12 @@ fn define_fn<M: Module>(
         // copy below uses the declared layout.
         // A bare-literal body flexes to a narrow-int return type.
         let body_ty = aipl_syntax::flex_int_ty(&func.body, &body_ty, &declared_ret);
-        expect_type(&body_ty, &declared_ret, "return value", func.body.span)?;
+        expect_type(
+            &body_ty,
+            &declared_ret,
+            "return value",
+            func.body.span.clone(),
+        )?;
 
         // The value actually returned: a mutating method yields its final
         // `self`; a unit `main`, 0; otherwise the body's value.
@@ -7716,14 +7722,16 @@ fn plan_match(
                             "\"match\" on an optional expects \"some\"/\"none\", got {:?}",
                             a.pattern.ctor_name().unwrap_or("")
                         ),
-                        a.span,
+                        a.span.clone(),
                     ));
                 }
             }
-            let some = find("some")
-                .ok_or_else(|| Error::at("match is missing the \"some(v)\" arm", scrut_span))?;
-            let none = find("none")
-                .ok_or_else(|| Error::at("match is missing the \"none\" arm", scrut_span))?;
+            let some = find("some").ok_or_else(|| {
+                Error::at("match is missing the \"some(v)\" arm", scrut_span.clone())
+            })?;
+            let none = find("none").ok_or_else(|| {
+                Error::at("match is missing the \"none\" arm", scrut_span.clone())
+            })?;
             Ok(MatchPlan::Optional {
                 inner: (**inner).clone(),
                 some,
@@ -7744,14 +7752,16 @@ fn plan_match(
                             "\"match\" on a result expects \"ok\"/\"err\", got {:?}",
                             a.pattern.ctor_name().unwrap_or("")
                         ),
-                        a.span,
+                        a.span.clone(),
                     ));
                 }
             }
-            let ok_i = find("ok")
-                .ok_or_else(|| Error::at("match is missing the \"ok(v)\" arm", scrut_span))?;
-            let err_i = find("err")
-                .ok_or_else(|| Error::at("match is missing the \"err(e)\" arm", scrut_span))?;
+            let ok_i = find("ok").ok_or_else(|| {
+                Error::at("match is missing the \"ok(v)\" arm", scrut_span.clone())
+            })?;
+            let err_i = find("err").ok_or_else(|| {
+                Error::at("match is missing the \"err(e)\" arm", scrut_span.clone())
+            })?;
             let mut arm_tags = vec![0usize; arms.len()];
             let mut payloads = vec![Vec::new(); arms.len()];
             arm_tags[ok_i] = 1;
@@ -7771,10 +7781,13 @@ fn plan_match(
             for arm in arms {
                 let name = arm.pattern.ctor_name().unwrap_or("");
                 let (tag, case) = vl.case(name).ok_or_else(|| {
-                    Error::at(format!("{n} has no constructor {name:?}"), arm.span)
+                    Error::at(format!("{n} has no constructor {name:?}"), arm.span.clone())
                 })?;
                 if !seen.insert(tag) {
-                    return Err(Error::at(format!("duplicate \"{name}\" arm"), arm.span));
+                    return Err(Error::at(
+                        format!("duplicate \"{name}\" arm"),
+                        arm.span.clone(),
+                    ));
                 }
                 arm_tags.push(tag);
                 payloads.push(
@@ -7794,7 +7807,7 @@ fn plan_match(
                     .collect();
                 return Err(Error::at(
                     format!("non-exhaustive match: missing {}", missing.join(", ")),
-                    scrut_span,
+                    scrut_span.clone(),
                 ));
             }
             Ok(MatchPlan::Variant { arm_tags, payloads })
@@ -7804,7 +7817,7 @@ fn plan_match(
                 "match scrutinee must be an optional or variant, got {}",
                 type_name(scrut_ty)
             ),
-            scrut_span,
+            scrut_span.clone(),
         )),
     }
 }
@@ -7904,7 +7917,7 @@ fn compile_variant<M: Module>(
                 fields.len(),
                 args.len()
             ),
-            span,
+            span.clone(),
         ));
     }
     let size = cx.structs[vname].size();
@@ -7915,7 +7928,7 @@ fn compile_variant<M: Module>(
     builder.ins().store(MemFlags::trusted(), tag_v, base, 0);
     for ((offset, fty), arg) in fields.iter().zip(args) {
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
-        expect_type(&actual, fty, "constructor argument", arg.span)?;
+        expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
         let dst = builder.ins().iadd_imm(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
         // The variant co-owns each heap payload field — retain on store.
@@ -8034,7 +8047,7 @@ fn compile_call<M: Module>(
                 info.params.len(),
                 args.len()
             ),
-            span,
+            span.clone(),
         ));
     }
     // Callee's effects must be a subset of the current function's declared ones.
@@ -8044,7 +8057,7 @@ fn compile_call<M: Module>(
                 format!(
                     "fn {disp:?} has effect \"!{effect}\" but the calling function does not declare it"
                 ),
-                span,
+                span.clone(),
             ));
         }
     }
@@ -8058,7 +8071,7 @@ fn compile_call<M: Module>(
             &actual,
             expected,
             &format!("fn {disp:?} arg {idx}"),
-            arg.span,
+            arg.span.clone(),
         )?;
         arg_values.push(v);
     }
@@ -8149,7 +8162,7 @@ fn compile_expr<M: Module>(
         error_main: _,
         bindings: _,
     } = cx;
-    let span = expr.span;
+    let span = expr.span.clone();
     Ok(match &expr.kind {
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
@@ -8222,10 +8235,10 @@ fn compile_expr<M: Module>(
             }
             // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
             // into the data section. Pointer points past the 8-byte header.
-            // A source literal's span is unique, so it names the symbol; a
-            // *synthesized* literal carries the dummy span (0,0) and several may
+            // A source literal's span.clone() is unique, so it names the symbol; a
+            // *synthesized* literal carries the dummy span.clone() (0,0) and several may
             // share it (e.g. the `check` driver's test names), so disambiguate
-            // those with a counter. Real literals keep their span-based name so
+            // those with a counter. Real literals keep their span.clone()-based name so
             // object layout (and the `binary size` perf metric) is unchanged.
             let data_name = if span.start == 0 && span.end == 0 {
                 let n = cx.lit_ctr.get();
@@ -8264,11 +8277,21 @@ fn compile_expr<M: Module>(
             // A local binding shadows everything; an unbound name may be a
             // nullary variant constructor (e.g. `Empty`).
             if env.contains_key(name) {
-                env_load(builder, name, env, span)?
+                env_load(builder, name, env, span.clone())?
             } else if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
-                compile_variant(module, builder, cx, scopes, &vname, tag, &fields, &[], span)?
+                compile_variant(
+                    module,
+                    builder,
+                    cx,
+                    scopes,
+                    &vname,
+                    tag,
+                    &fields,
+                    &[],
+                    span.clone(),
+                )?
             } else {
-                env_load(builder, name, env, span)?
+                env_load(builder, name, env, span.clone())?
             }
         }
         ExprKind::None => {
@@ -8291,7 +8314,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"to_str\" expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8305,7 +8328,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"hash\" expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8326,7 +8349,7 @@ fn compile_expr<M: Module>(
                         display_name(name),
                         args.len()
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             let is_min = name == "__builtin_minimum";
@@ -8336,7 +8359,7 @@ fn compile_expr<M: Module>(
                 _ => {
                     return Err(Error::at(
                         format!("{:?} of one argument expects an array", display_name(name)),
-                        args[0].span,
+                        args[0].span.clone(),
                     ))
                 }
             };
@@ -8426,7 +8449,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("{disp:?} expects 2 arguments, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (a, at) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8434,14 +8457,14 @@ fn compile_expr<M: Module>(
                 &at,
                 &Type::Primitive(Primitive::I64),
                 "min/max operand",
-                args[0].span,
+                args[0].span.clone(),
             )?;
             let (b, bt) = compile_expr(module, builder, cx, scopes, &args[1])?;
             expect_type(
                 &bt,
                 &Type::Primitive(Primitive::I64),
                 "min/max operand",
-                args[1].span,
+                args[1].span.clone(),
             )?;
             // `min`: keep `a` when `a < b`; `max`: keep `a` when `a > b`.
             let cc = if name == "__builtin_min" {
@@ -8461,7 +8484,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("split expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (s_v, s_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8469,14 +8492,14 @@ fn compile_expr<M: Module>(
                 &s_t,
                 &Type::Primitive(Primitive::Str),
                 "split receiver",
-                args[0].span,
+                args[0].span.clone(),
             )?;
             let (sep_v, sep_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
             expect_type(
                 &sep_t,
                 &Type::Primitive(Primitive::Str),
                 "split separator",
-                args[1].span,
+                args[1].span.clone(),
             )?;
             emit_inc(builder, module, builtins, s_v);
             emit_inc(builder, module, builtins, sep_v);
@@ -8498,7 +8521,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("read_file_to_string expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (name_v, name_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8506,7 +8529,7 @@ fn compile_expr<M: Module>(
                 &name_t,
                 &Type::Primitive(Primitive::Str),
                 "read_file_to_string filename",
-                args[0].span,
+                args[0].span.clone(),
             )?;
             // The runtime consumes (decs) the filename ref, so inc to keep our
             // scope-tracked ref alive.
@@ -8541,7 +8564,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("write_string_to_file expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (path_v, path_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8549,14 +8572,14 @@ fn compile_expr<M: Module>(
                 &path_t,
                 &Type::Primitive(Primitive::Str),
                 "write_string_to_file path",
-                args[0].span,
+                args[0].span.clone(),
             )?;
             let (data_v, data_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
             expect_type(
                 &data_t,
                 &Type::Primitive(Primitive::Str),
                 "write_string_to_file contents",
-                args[1].span,
+                args[1].span.clone(),
             )?;
             // The runtime consumes (decs) both str args, so inc to keep ours alive.
             emit_inc(builder, module, builtins, path_v);
@@ -8585,7 +8608,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("value_or expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (opt_ptr, opt_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8597,7 +8620,7 @@ fn compile_expr<M: Module>(
                             "value_or is only callable on an optional, got {}",
                             type_name(&opt_ty)
                         ),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             };
@@ -8607,7 +8630,12 @@ fn compile_expr<M: Module>(
             let result_ty = if is_none_inner(&inner) {
                 default_ty.clone()
             } else {
-                expect_type(&default_ty, &inner, "value_or default", args[1].span)?;
+                expect_type(
+                    &default_ty,
+                    &inner,
+                    "value_or default",
+                    args[1].span.clone(),
+                )?;
                 inner
             };
             if !is_array_elem(&result_ty) {
@@ -8617,7 +8645,7 @@ fn compile_expr<M: Module>(
                          unwrap a nested optional)",
                         type_name(&result_ty)
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             let tag = builder
@@ -8645,7 +8673,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"is_some\" expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (ptr, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8655,7 +8683,7 @@ fn compile_expr<M: Module>(
                         "\"is_some\" is only callable on an optional, got {}",
                         type_name(&recv_ty)
                     ),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             }
             // `is_some` is the *outermost* layer: any nonzero tag is `some`
@@ -8671,7 +8699,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("fn \"len\" expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8691,7 +8719,7 @@ fn compile_expr<M: Module>(
                         "\"len\" expects a str, array, set, or dict, got {}",
                         type_name(&t)
                     ),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             };
             (len, Type::Primitive(Primitive::I64))
@@ -8702,7 +8730,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"reverse\" expects 1 argument, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8736,7 +8764,7 @@ fn compile_expr<M: Module>(
             } else {
                 return Err(Error::at(
                     format!("\"reverse\" expects a str or array, got {}", type_name(&t)),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             }
         }
@@ -8756,7 +8784,7 @@ fn compile_expr<M: Module>(
                         display_name(name),
                         args.len()
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8833,7 +8861,7 @@ fn compile_expr<M: Module>(
                                 display_name(name),
                                 type_name(other)
                             ),
-                            args[0].span,
+                            args[0].span.clone(),
                         ));
                     }
                 };
@@ -8893,7 +8921,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("__char_to_str expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (c, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8908,7 +8936,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"contains\" expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (set_ptr, set_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8917,7 +8945,7 @@ fn compile_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"contains\" expects a set, got {}", type_name(other)),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             };
@@ -8930,7 +8958,7 @@ fn compile_expr<M: Module>(
                     Type::Primitive(Primitive::Bool),
                 )
             } else {
-                expect_type(&x_ty, &elem, "contains element", args[1].span)?;
+                expect_type(&x_ty, &elem, "contains element", args[1].span.clone())?;
                 // The runtime reads the queried value through a pointer; spill
                 // the scalar (a `bool` is read back as i64) and pass its address.
                 let s = builder.create_sized_stack_slot(StackSlotData::new(
@@ -8963,7 +8991,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"union\" expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (a_ptr, a_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -8978,7 +9006,7 @@ fn compile_expr<M: Module>(
                         type_name(&a_ty),
                         type_name(&b_ty)
                     ),
-                    span,
+                    span.clone(),
                 ));
             };
             let Type::Set(elem) = &result_ty else {
@@ -9013,7 +9041,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"get\" expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -9022,7 +9050,7 @@ fn compile_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"get\" expects a dict, got {}", type_name(other)),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             };
@@ -9040,7 +9068,7 @@ fn compile_expr<M: Module>(
                 builder.ins().stack_store(zero, slot, 0);
                 (sbase, result_ty)
             } else {
-                expect_type(&key_t, &key_ty, "get key", args[1].span)?;
+                expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
                 // Spill the key and pass its address (a `bool` reads back as i64,
                 // a `str` as its pointer).
                 let ks = builder.create_sized_stack_slot(StackSlotData::new(
@@ -9097,7 +9125,7 @@ fn compile_expr<M: Module>(
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"contains_key\" expects 2 args, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -9106,7 +9134,7 @@ fn compile_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"contains_key\" expects a dict, got {}", type_name(other)),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             };
@@ -9117,7 +9145,7 @@ fn compile_expr<M: Module>(
                     Type::Primitive(Primitive::Bool),
                 )
             } else {
-                expect_type(&key_t, &key_ty, "contains_key key", args[1].span)?;
+                expect_type(&key_t, &key_ty, "contains_key key", args[1].span.clone())?;
                 let ks = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
@@ -9218,7 +9246,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("with_capacity expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (cap, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -9226,7 +9254,7 @@ fn compile_expr<M: Module>(
                 &t,
                 &Type::Primitive(Primitive::I64),
                 "with_capacity capacity",
-                args[0].span,
+                args[0].span.clone(),
             )?;
             // Element type unknown here (`__none__`); the drop-fn and element
             // size are settled by the first `push`. `map`/`filter` only pre-size
@@ -9255,13 +9283,13 @@ fn compile_expr<M: Module>(
                     "\"push\" modifies an array in place; call it as a method on a \
                      mutable array variable: \"xs.push(x)\""
                         .to_string(),
-                    span,
+                    span.clone(),
                 ));
             }
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"push\" expects 1 argument, got {}", args.len() - 1),
-                    span,
+                    span.clone(),
                 ));
             }
             let receiver = &args[0];
@@ -9270,7 +9298,7 @@ fn compile_expr<M: Module>(
                 return Err(Error::at(
                     "\"push\" must be called on a mutable array variable, e.g. \"xs.push(x)\""
                         .to_string(),
-                    receiver.span,
+                    receiver.span.clone(),
                 ));
             };
             let (slot, ty_cell, exclusive) = match env.get(var) {
@@ -9280,13 +9308,13 @@ fn compile_expr<M: Module>(
                         format!(
                             "cannot \"push\" to immutable binding {var:?}; declare it with \"mut\""
                         ),
-                        receiver.span,
+                        receiver.span.clone(),
                     ));
                 }
                 None => {
                     return Err(Error::at(
                         format!("unknown identifier {var:?}"),
-                        receiver.span,
+                        receiver.span.clone(),
                     ));
                 }
             };
@@ -9295,7 +9323,7 @@ fn compile_expr<M: Module>(
                 other => {
                     return Err(Error::at(
                         format!("\"push\" requires an array, got {}", type_name(other)),
-                        receiver.span,
+                        receiver.span.clone(),
                     ));
                 }
             };
@@ -9313,12 +9341,12 @@ fn compile_expr<M: Module>(
                             "\"push\" element must be i64, bool, char, str, or an array, got {}",
                             type_name(&x_ty)
                         ),
-                        value.span,
+                        value.span.clone(),
                     ));
                 }
                 x_ty
             } else {
-                expect_type(&x_ty, &elem_ty, "push element", value.span)?;
+                expect_type(&x_ty, &elem_ty, "push element", value.span.clone())?;
                 elem_ty
             };
             let drop_fn = array_drop_fn_addr(builder, module, cx, &result_elem);
@@ -9382,14 +9410,14 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("{name:?} conversion expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             if !is_int_ty(&t) {
                 return Err(Error::at(
                     format!("{name:?} converts an integer, got {}", type_name(&t)),
-                    args[0].span,
+                    args[0].span.clone(),
                 ));
             }
             (canon_int(builder, v, p), Type::Primitive(p))
@@ -9420,7 +9448,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("fn {name:?} expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -9435,7 +9463,7 @@ fn compile_expr<M: Module>(
                             "{name:?} payload must be a scalar or str, got {}",
                             type_name(&t)
                         ),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             }
@@ -9468,7 +9496,7 @@ fn compile_expr<M: Module>(
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("fn \"some\" expects 1 arg, got {}", args.len()),
-                    span,
+                    span.clone(),
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
@@ -9486,7 +9514,7 @@ fn compile_expr<M: Module>(
                             "\"some\" argument: optional of {} is not supported",
                             type_name(&t)
                         ),
-                        args[0].span,
+                        args[0].span.clone(),
                     ));
                 }
             }
@@ -9525,7 +9553,7 @@ fn compile_expr<M: Module>(
             let ExprKind::Ident(var) = &receiver.kind else {
                 return Err(Error::at(
                     format!("mutating method {disp:?} must be called on a mutable variable"),
-                    receiver.span,
+                    receiver.span.clone(),
                 ));
             };
             let (slot, ty_cell) = match env.get(var) {
@@ -9536,19 +9564,20 @@ fn compile_expr<M: Module>(
                             "cannot call mutating method {disp:?} on immutable binding {var:?}; \
                              declare it with `mut`"
                         ),
-                        receiver.span,
+                        receiver.span.clone(),
                     ));
                 }
                 None => {
                     return Err(Error::at(
                         format!("unknown identifier {var:?}"),
-                        receiver.span,
+                        receiver.span.clone(),
                     ));
                 }
             };
             // `args` is already the effective list `[receiver, method args..]`;
             // its result is the mutated self.
-            let (new_self, _) = compile_call(module, builder, cx, scopes, name, &info, args, span)?;
+            let (new_self, _) =
+                compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
             // Store the mutated receiver back, and refine the variable's type
             // to it (e.g. a `mut a = []` receiver pinned by the method's self).
             builder.ins().stack_store(new_self, slot, 0);
@@ -9560,31 +9589,39 @@ fn compile_expr<M: Module>(
             // A variant constructor `Ctor(args..)` builds an inline tagged value.
             if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
                 return compile_variant(
-                    module, builder, cx, scopes, &vname, tag, &fields, args, span,
+                    module,
+                    builder,
+                    cx,
+                    scopes,
+                    &vname,
+                    tag,
+                    &fields,
+                    args,
+                    span.clone(),
                 );
             }
             let info = funcs
                 .get(name)
                 .cloned()
-                .ok_or_else(|| undefined_fn(name, span))?;
+                .ok_or_else(|| undefined_fn(name, span.clone()))?;
             if info.is_mutating {
                 let disp = display_name(name);
                 return Err(Error::at(
                     format!(
                         "fn {disp:?} mutates its receiver; call it as a method: \"v.{disp}(...)\""
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             // `name` already names the right instance (borrow or owned) chosen
             // by monomorphization; `compile_call` moves the owned args in.
-            compile_call(module, builder, cx, scopes, name, &info, args, span)?
+            compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?
         }
         ExprKind::Construct(name, field_inits) => {
             let layout = structs
                 .get(name)
                 .and_then(TypeDef::as_struct)
-                .ok_or_else(|| Error::at(format!("unknown struct {name:?}"), span))?;
+                .ok_or_else(|| Error::at(format!("unknown struct {name:?}"), span.clone()))?;
             if field_inits.len() != layout.fields.len() {
                 return Err(Error::at(
                     format!(
@@ -9592,7 +9629,7 @@ fn compile_expr<M: Module>(
                         layout.fields.len(),
                         field_inits.len()
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             let slot = alloc_struct_slot(builder, layout);
@@ -9600,7 +9637,7 @@ fn compile_expr<M: Module>(
                 let field = layout.field(&init.name).ok_or_else(|| {
                     Error::at(
                         format!("struct {name:?} has no field {:?}", init.name),
-                        init.value.span,
+                        init.value.span.clone(),
                     )
                 })?;
                 let (offset, fty) = (field.offset, field.ty.clone());
@@ -9611,7 +9648,7 @@ fn compile_expr<M: Module>(
                     &actual,
                     &fty,
                     &format!("struct {name:?} field {:?}", init.name),
-                    init.value.span,
+                    init.value.span.clone(),
                 )?;
                 // A scalar/heap field is an 8-byte value; an optional field is
                 // a 16-byte inline composite, so copy its bytes from the source
@@ -9652,7 +9689,7 @@ fn compile_expr<M: Module>(
                         "field access on non-struct value of type {}",
                         type_name(&obj_ty)
                     ),
-                    obj.span,
+                    obj.span.clone(),
                 ));
             };
             let layout = structs
@@ -9661,13 +9698,13 @@ fn compile_expr<M: Module>(
                 .ok_or_else(|| {
                     Error::at(
                         format!("field access on non-struct value of type {struct_name:?}"),
-                        obj.span,
+                        obj.span.clone(),
                     )
                 })?;
             let field = layout.field(field_name).ok_or_else(|| {
                 Error::at(
                     format!("struct {struct_name:?} has no field {field_name:?}"),
-                    span,
+                    span.clone(),
                 )
             })?;
             let (foff, fty) = (field.offset, field.ty.clone());
@@ -9693,7 +9730,7 @@ fn compile_expr<M: Module>(
                 &t,
                 &Type::Primitive(Primitive::I64),
                 "unary \"-\"",
-                inner.span,
+                inner.span.clone(),
             )?;
             (builder.ins().ineg(v), Type::Primitive(Primitive::I64))
         }
@@ -9703,7 +9740,7 @@ fn compile_expr<M: Module>(
                 &t,
                 &Type::Primitive(Primitive::Bool),
                 "unary \"!\"",
-                inner.span,
+                inner.span.clone(),
             )?;
             (
                 builder.ins().bxor_imm(v, 1),
@@ -9747,7 +9784,7 @@ fn compile_expr<M: Module>(
                                     &lt
                                 })
                             ),
-                            span,
+                            span.clone(),
                         ));
                     } else if is_int_ty(&lt) && lt == rt {
                         // Same-width integer add, wrapped back into range.
@@ -9761,13 +9798,13 @@ fn compile_expr<M: Module>(
                             &lt,
                             &Type::Primitive(Primitive::I64),
                             "arithmetic operand",
-                            l.span,
+                            l.span.clone(),
                         )?;
                         expect_type(
                             &rt,
                             &Type::Primitive(Primitive::I64),
                             "arithmetic operand",
-                            r.span,
+                            r.span.clone(),
                         )?;
                         (builder.ins().iadd(lv, rv), Type::Primitive(Primitive::I64))
                     }
@@ -9793,13 +9830,13 @@ fn compile_expr<M: Module>(
                             &lt,
                             &Type::Primitive(Primitive::I64),
                             "arithmetic operand",
-                            l.span,
+                            l.span.clone(),
                         )?;
                         expect_type(
                             &rt,
                             &Type::Primitive(Primitive::I64),
                             "arithmetic operand",
-                            r.span,
+                            r.span.clone(),
                         )?;
                         let v = match op {
                             '-' => builder.ins().isub(lv, rv),
@@ -9821,7 +9858,7 @@ fn compile_expr<M: Module>(
                     if matches!(lt, Type::Fn(_, _)) || matches!(rt, Type::Fn(_, _)) {
                         return Err(Error::at(
                             format!("\"{opn}\" is not supported for function values"),
-                            span,
+                            span.clone(),
                         ));
                     }
                     let Some(cmp_ty) = merge_types(&lt, &rt) else {
@@ -9831,7 +9868,7 @@ fn compile_expr<M: Module>(
                                 type_name(&lt),
                                 type_name(&rt),
                             ),
-                            span,
+                            span.clone(),
                         ));
                     };
                     let eq = emit_eq(module, builder, builtins, structs, lv, rv, &cmp_ty)?;
@@ -9854,13 +9891,13 @@ fn compile_expr<M: Module>(
                                 &lt,
                                 &Type::Primitive(Primitive::I64),
                                 "comparison operand",
-                                l.span,
+                                l.span.clone(),
                             )?;
                             expect_type(
                                 &rt,
                                 &Type::Primitive(Primitive::I64),
                                 "comparison operand",
-                                r.span,
+                                r.span.clone(),
                             )?;
                             true
                         }
@@ -9887,13 +9924,13 @@ fn compile_expr<M: Module>(
                         &lt,
                         &Type::Primitive(Primitive::Bool),
                         "logical operand",
-                        l.span,
+                        l.span.clone(),
                     )?;
                     expect_type(
                         &rt,
                         &Type::Primitive(Primitive::Bool),
                         "logical operand",
-                        r.span,
+                        r.span.clone(),
                     )?;
                     let v = match op {
                         'A' => builder.ins().band(lv, rv),
@@ -9903,7 +9940,7 @@ fn compile_expr<M: Module>(
                     (v, Type::Primitive(Primitive::Bool))
                 }
                 other => {
-                    return Err(Error::at(format!("unsupported op {other:?}"), span));
+                    return Err(Error::at(format!("unsupported op {other:?}"), span.clone()));
                 }
             }
         }
@@ -9913,7 +9950,7 @@ fn compile_expr<M: Module>(
                 &cond_ty,
                 &Type::Primitive(Primitive::Bool),
                 "if condition",
-                cond.span,
+                cond.span.clone(),
             )?;
 
             let then_block = builder.create_block();
@@ -9956,7 +9993,7 @@ fn compile_expr<M: Module>(
                         type_name(&then_ty),
                         type_name(&else_ty)
                     ),
-                    span,
+                    span.clone(),
                 )
             })?;
             if needs_drop(&else_ty, structs) {
@@ -10003,7 +10040,7 @@ fn compile_expr<M: Module>(
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            reject_unit_binding(&t, name, value.span)?;
+            reject_unit_binding(&t, name, value.span.clone())?;
             let mut new_env = env.clone();
             cx.bindings
                 .borrow_mut()
@@ -10022,7 +10059,7 @@ fn compile_expr<M: Module>(
         }
         ExprKind::LetMut(name, value, body) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            reject_unit_binding(&t, name, value.span)?;
+            reject_unit_binding(&t, name, value.span.clone())?;
             // 8-byte slot, 8-byte aligned: fits any i64/bool/char/str.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -10109,10 +10146,9 @@ fn compile_expr<M: Module>(
         }
         ExprKind::Assign(name, value, body) => {
             // `set name = value;` — store to an existing mut binding.
-            let binding = env
-                .get(name)
-                .cloned()
-                .ok_or_else(|| Error::at(format!("set: undeclared variable {name:?}"), span))?;
+            let binding = env.get(name).cloned().ok_or_else(|| {
+                Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+            })?;
             let (slot, expected_ty, exclusive) = match binding {
                 EnvBinding::Mut(slot, ty, excl) => (slot, ty.borrow().clone(), excl),
                 EnvBinding::Immut(_, _) => {
@@ -10120,7 +10156,7 @@ fn compile_expr<M: Module>(
                         format!(
                             "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
                         ),
-                        span,
+                        span.clone(),
                     ));
                 }
             };
@@ -10141,7 +10177,7 @@ fn compile_expr<M: Module>(
                             &rt,
                             &Type::Primitive(Primitive::Str),
                             "concat operand",
-                            r.span,
+                            r.span.clone(),
                         )?;
                         // `aipl_concat_mut` decs its second arg; inc first so r's
                         // own track balances. `s` is reused, not dec'd.
@@ -10197,7 +10233,7 @@ fn compile_expr<M: Module>(
                     if let (Some(other), false) = (other, is_none_inner(elem)) {
                         let a_ptr = builder.ins().stack_load(types::I64, slot, 0);
                         let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, other)?;
-                        expect_type(&b_ty, &expected_ty, "union operand", other.span)?;
+                        expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
                         // `aipl_set_union_mut` decs `b`; inc first so b's own track
                         // balances. `a` is reused, not dec'd.
                         emit_inc(builder, module, builtins, b_ptr);
@@ -10232,7 +10268,7 @@ fn compile_expr<M: Module>(
                 None
             };
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            expect_type(&t, &expected_ty, "set", value.span)?;
+            expect_type(&t, &expected_ty, "set", value.span.clone())?;
             if let Some(old) = old {
                 // Take sole ownership of the new value for the slot, then release
                 // the reference the slot held before — preserving the slot-track's
@@ -10342,7 +10378,7 @@ fn compile_expr<M: Module>(
                             "for-loop iterable must be a str or array, got {}",
                             type_name(&it_ty)
                         ),
-                        iterable.span,
+                        iterable.span.clone(),
                     ));
                 }
             };
@@ -10419,7 +10455,7 @@ fn compile_expr<M: Module>(
                 &cond_ty,
                 &Type::Primitive(Primitive::Bool),
                 "while condition",
-                cond.span,
+                cond.span.clone(),
             )?;
             drop_scope(
                 builder,
@@ -10477,7 +10513,7 @@ fn compile_expr<M: Module>(
                     let Pattern::Str(lit) = &arm.pattern else {
                         continue;
                     };
-                    let lit_expr = Expr::new(ExprKind::Str(lit.clone()), scrutinee.span);
+                    let lit_expr = Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
                     let (lit_val, _) = compile_expr(module, builder, cx, scopes, &lit_expr)?;
                     emit_inc(builder, module, builtins, ptr);
                     emit_inc(builder, module, builtins, lit_val);
@@ -10562,7 +10598,7 @@ fn compile_expr<M: Module>(
                 let tag = builder.ins().load(types::I64, MemFlags::trusted(), ptr, 0);
                 // Plan each arm's tag + payload bindings up front (snapshotting the
                 // variant layout so it isn't borrowed across the body compilations).
-                let plan = plan_match(&scrut_ty, arms, structs, scrutinee.span)?;
+                let plan = plan_match(&scrut_ty, arms, structs, scrutinee.span.clone())?;
                 // Dispatch on the tag to the matching arm's block.
                 match &plan {
                     MatchPlan::Optional { some, none, .. } => {
@@ -10646,7 +10682,7 @@ fn compile_expr<M: Module>(
                                 type_name(&prev),
                                 type_name(&at),
                             ),
-                            span,
+                            span.clone(),
                         )
                     })?,
                 });
@@ -10683,12 +10719,12 @@ fn compile_expr<M: Module>(
                                     "array elements must be i64, bool, char, str, or an array, got {}",
                                     type_name(&t)
                                 ),
-                                el.span,
+                                el.span.clone(),
                             ));
                         }
                         elem_ty = Some(t.clone());
                     }
-                    Some(expected) => expect_type(&t, expected, "array element", el.span)?,
+                    Some(expected) => expect_type(&t, expected, "array element", el.span.clone())?,
                 }
                 vals.push((v, t));
             }
@@ -10751,12 +10787,12 @@ fn compile_expr<M: Module>(
                                     "set elements must be i64, bool, char, or str, got {}",
                                     type_name(&t)
                                 ),
-                                el.span,
+                                el.span.clone(),
                             ));
                         }
                         elem_ty = Some(t.clone());
                     }
-                    Some(expected) => expect_type(&t, expected, "set element", el.span)?,
+                    Some(expected) => expect_type(&t, expected, "set element", el.span.clone())?,
                 }
                 vals.push(v);
             }
@@ -10821,15 +10857,15 @@ fn compile_expr<M: Module>(
                                     "dict keys must be i64, bool, char, or str, got {}",
                                     type_name(&kt)
                                 ),
-                                k.span,
+                                k.span.clone(),
                             ));
                         }
                         key_ty = Some(kt.clone());
                         val_ty = Some(vt.clone());
                     }
                     Some(expected_k) => {
-                        expect_type(&kt, expected_k, "dict key", k.span)?;
-                        expect_type(&vt, val_ty.as_ref().unwrap(), "dict value", v.span)?;
+                        expect_type(&kt, expected_k, "dict key", k.span.clone())?;
+                        expect_type(&vt, val_ty.as_ref().unwrap(), "dict value", v.span.clone())?;
                     }
                 }
                 vals.push((kv, vv));
@@ -10880,7 +10916,7 @@ fn compile_expr<M: Module>(
                 &idx_t,
                 &Type::Primitive(Primitive::I64),
                 "index",
-                index.span,
+                index.span.clone(),
             )?;
 
             // `s[i]` on a `str` yields `char?` — the byte at `i`, via the runtime
@@ -10899,7 +10935,7 @@ fn compile_expr<M: Module>(
                 _ => {
                     return Err(Error::at(
                         format!("cannot index a value of type {}", type_name(&recv_ty)),
-                        obj.span,
+                        obj.span.clone(),
                     ));
                 }
             };
@@ -10968,14 +11004,14 @@ fn compile_expr<M: Module>(
                 &s_ty,
                 &Type::Primitive(Primitive::Str),
                 "slice receiver",
-                obj.span,
+                obj.span.clone(),
             )?;
             let (a_v, a_t) = compile_expr(module, builder, cx, scopes, start)?;
             expect_type(
                 &a_t,
                 &Type::Primitive(Primitive::I64),
                 "slice start",
-                start.span,
+                start.span.clone(),
             )?;
             // An open-ended `s[start..]` runs to `s`'s byte length — computed here
             // via `aipl_str_len`, so the user needn't import `len`. `s_v` is
@@ -10987,7 +11023,7 @@ fn compile_expr<M: Module>(
                         &b_t,
                         &Type::Primitive(Primitive::I64),
                         "slice end",
-                        end.span,
+                        end.span.clone(),
                     )?;
                     b_v
                 }
@@ -11014,7 +11050,7 @@ fn compile_expr<M: Module>(
             let Type::Result(ok_in, err_in) = &rty else {
                 return Err(Error::at(
                     format!("\"?\" operand must be a result, got {}", type_name(&rty)),
-                    inner.span,
+                    inner.span.clone(),
                 ));
             };
             // The enclosing context must be able to receive the propagated error:
@@ -11026,7 +11062,7 @@ fn compile_expr<M: Module>(
                 _ => {
                     return Err(Error::at(
                         "\"?\" can only be used in a function that returns a result",
-                        span,
+                        span.clone(),
                     ));
                 }
             };
@@ -11044,7 +11080,7 @@ fn compile_expr<M: Module>(
                         type_name(err_in),
                         type_name(&enclosing_err)
                     ),
-                    span,
+                    span.clone(),
                 ));
             }
             let ok_ty = (**ok_in).clone();
@@ -11198,9 +11234,9 @@ fn undefined_fn(name: &str, span: Span) -> Error {
             format!(
                 "\"{name}\" is a builtin; import it with \"import {{ {name} }} from builtins;\""
             ),
-            span,
+            span.clone(),
         )
     } else {
-        Error::at(format!("call to undefined fn {name:?}"), span)
+        Error::at(format!("call to undefined fn {name:?}"), span.clone())
     }
 }

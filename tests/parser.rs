@@ -4,8 +4,6 @@ use aipl::ast::{
     Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param, Primitive, Program,
     StructDecl, Type,
 };
-use aipl::Span;
-
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
 fn parse(src: &str) -> Result<Program, aipl::Error> {
@@ -28,7 +26,7 @@ fn struct_item(p: &Program, idx: usize) -> &StructDecl {
 }
 
 fn dummy(kind: ExprKind) -> Expr {
-    Expr::new(kind, Span::DUMMY)
+    Expr::new(kind, 0..0)
 }
 
 fn num(n: i64) -> Expr {
@@ -517,7 +515,7 @@ fn num_literal_has_span() {
     let p = parse("fn f() { 42 }").unwrap();
     let body = &fn_item(&p, 0).body;
     // "fn f() { 42 }" — "42" is at bytes 9..11.
-    assert_eq!(body.span, Span::new(9, 11));
+    assert_eq!(body.span, 9..11);
 }
 
 #[test]

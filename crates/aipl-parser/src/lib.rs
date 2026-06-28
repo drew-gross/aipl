@@ -6,7 +6,7 @@ use gazelle::lexer::Scanner;
 use gazelle::Precedence;
 use gazelle_macros::gazelle;
 
-use aipl_syntax::{unit_ty, Error, Span};
+use aipl_syntax::{join_spans, unit_ty, Error, Span};
 
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item,
@@ -618,7 +618,7 @@ fn op_import(spelling: &str) -> ImportName {
     ImportName {
         name: spelling.to_string(),
         alias: None,
-        span: Span::new(0, 0),
+        span: 0..0,
     }
 }
 
@@ -1110,7 +1110,7 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             value,
             ..
         } => {
-            let span = name_span.join(acc.span);
+            let span = join_spans(&name_span, &acc.span);
             Expr::new(ExprKind::Let(name, Box::new(value), Box::new(acc)), span)
         }
         StmtSpec::Mut {
@@ -1119,7 +1119,7 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             value,
             ..
         } => {
-            let span = name_span.join(acc.span);
+            let span = join_spans(&name_span, &acc.span);
             Expr::new(ExprKind::LetMut(name, Box::new(value), Box::new(acc)), span)
         }
         StmtSpec::Assign {
@@ -1128,7 +1128,7 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             value,
             ..
         } => {
-            let span = name_span.join(acc.span);
+            let span = join_spans(&name_span, &acc.span);
             Expr::new(ExprKind::Assign(name, Box::new(value), Box::new(acc)), span)
         }
         StmtSpec::For {
@@ -1142,7 +1142,7 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
                 ExprKind::For(var, Box::new(iterable), Box::new(body)),
                 for_span,
             );
-            let span = var_span.join(acc.span);
+            let span = join_spans(&var_span, &acc.span);
             Expr::new(ExprKind::Seq(Box::new(for_expr), Box::new(acc)), span)
         }
         StmtSpec::While {
@@ -1150,8 +1150,8 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             body,
             span: while_span,
         } => {
+            let span = join_spans(&while_span, &acc.span);
             let while_expr = Expr::new(ExprKind::While(Box::new(cond), Box::new(body)), while_span);
-            let span = while_span.join(acc.span);
             Expr::new(ExprKind::Seq(Box::new(while_expr), Box::new(acc)), span)
         }
         StmtSpec::LetTuple {
@@ -1163,18 +1163,18 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             // Wrap the rest of the block with field-access bindings (innermost last).
             let mut result = acc;
             for (i, name) in names.iter().enumerate().rev() {
-                let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tup_span);
+                let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tup_span.clone());
                 let field = Expr::new(
                     ExprKind::Field(Box::new(tmp_ident), format!("_{i}")),
-                    tup_span,
+                    tup_span.clone(),
                 );
-                let inner_span = tup_span.join(result.span);
+                let inner_span = join_spans(&tup_span, &result.span);
                 result = Expr::new(
                     ExprKind::Let(name.clone(), Box::new(field), Box::new(result)),
                     inner_span,
                 );
             }
-            let outer_span = tup_span.join(result.span);
+            let outer_span = join_spans(&tup_span, &result.span);
             Expr::new(
                 ExprKind::Let(tmp, Box::new(value), Box::new(result)),
                 outer_span,
@@ -1184,8 +1184,8 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             value,
             span: ret_span,
         } => {
+            let span = join_spans(&ret_span, &acc.span);
             let ret_expr = Expr::new(ExprKind::Return(Box::new(value)), ret_span);
-            let span = ret_span.join(acc.span);
             // `acc` (the rest of the block) is unreachable after a return, but it's
             // kept in the tree so the checker/codegen see a well-formed block.
             Expr::new(ExprKind::Seq(Box::new(ret_expr), Box::new(acc)), span)
@@ -1204,13 +1204,13 @@ impl gazelle::Action<aipl::BlockBody<Self>> for Build {
     fn build(&mut self, node: aipl::BlockBody<Self>) -> Result<Expr, Self::Error> {
         Ok(match node {
             // Empty / nothing left → the block's value is unit.
-            aipl::BlockBody::Empty => Expr::new(ExprKind::Unit, Span::DUMMY),
+            aipl::BlockBody::Empty => Expr::new(ExprKind::Unit, 0..0),
             // A leading expression: either the block's trailing value, or
             // `expr;` (discard via `Seq`) followed by the rest of the block.
             aipl::BlockBody::HeadExpr(expr, tail) => match tail {
                 BlockTail::Value => expr,
                 BlockTail::Discard(rest) => {
-                    let span = expr.span.join(rest.span);
+                    let span = join_spans(&expr.span, &rest.span);
                     Expr::new(ExprKind::Seq(Box::new(expr), Box::new(rest)), span)
                 }
             },
@@ -1240,9 +1240,9 @@ impl gazelle::Action<aipl::LoopInner<Self>> for Build {
         Ok(match node {
             // The loop discards its body value, so an at-end body is a
             // synthetic `0` (matching the loop expression's own i64 0 result).
-            aipl::LoopInner::Empty => Expr::new(ExprKind::Num(0), Span::DUMMY),
+            aipl::LoopInner::Empty => Expr::new(ExprKind::Num(0), 0..0),
             aipl::LoopInner::ExprSeq(expr, rest) => {
-                let span = expr.span.join(rest.span);
+                let span = join_spans(&expr.span, &rest.span);
                 Expr::new(ExprKind::Seq(Box::new(expr), Box::new(rest)), span)
             }
             aipl::LoopInner::StmtSeq(stmt, rest) => wrap_stmt(stmt, rest),
@@ -1268,7 +1268,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
 impl gazelle::Action<aipl::LetStmt<Self>> for Build {
     fn build(&mut self, node: aipl::LetStmt<Self>) -> Result<StmtSpec, Self::Error> {
         let aipl::LetStmt::LetStmt((name, name_span), value) = node;
-        let span = name_span.join(value.span);
+        let span = join_spans(&name_span, &value.span);
         Ok(StmtSpec::Let {
             name,
             name_span,
@@ -1286,7 +1286,7 @@ impl gazelle::Action<aipl::LetTupleStmt<Self>> for Build {
                 "a tuple pattern needs at least 2 names, e.g. let (a, b) = expr;".to_string(),
             ));
         }
-        let span = value.span;
+        let span = value.span.clone();
         Ok(StmtSpec::LetTuple { names, value, span })
     }
 }
@@ -1294,7 +1294,7 @@ impl gazelle::Action<aipl::LetTupleStmt<Self>> for Build {
 impl gazelle::Action<aipl::MutStmt<Self>> for Build {
     fn build(&mut self, node: aipl::MutStmt<Self>) -> Result<StmtSpec, Self::Error> {
         let aipl::MutStmt::MutStmt((name, name_span), value) = node;
-        let span = name_span.join(value.span);
+        let span = join_spans(&name_span, &value.span);
         Ok(StmtSpec::Mut {
             name,
             name_span,
@@ -1308,7 +1308,7 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
     fn build(&mut self, node: aipl::AssignStmt<Self>) -> Result<StmtSpec, Self::Error> {
         let (name, name_span, value, span) = match node {
             aipl::AssignStmt::AssignStmt((name, name_span), value) => {
-                let span = name_span.join(value.span);
+                let span = join_spans(&name_span, &value.span);
                 (name, name_span, value, span)
             }
             // `set n++;` is `set n = n ++ 1;`, where `++` is its own operator
@@ -1317,13 +1317,14 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
             // `'P'`. The `1` and operator carry the `++` span so diagnostics
             // (a missing `++` import, or a non-integer `n`) point at the operator.
             aipl::AssignStmt::IncrStmt((name, name_span), pp_span) => {
-                let recv = Expr::new(ExprKind::Ident(name.clone()), name_span);
+                let span = join_spans(&name_span, &pp_span);
+                let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
                 let one = Expr::new(ExprKind::Num(1), pp_span);
                 let value = Expr::new(
                     ExprKind::Binop(Box::new(recv), 'P', Box::new(one)),
-                    name_span.join(pp_span),
+                    span.clone(),
                 );
-                (name, name_span, value, name_span.join(pp_span))
+                (name, name_span, value, span)
             }
         };
         Ok(StmtSpec::Assign {
@@ -1338,7 +1339,7 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
 impl gazelle::Action<aipl::ForStmt<Self>> for Build {
     fn build(&mut self, node: aipl::ForStmt<Self>) -> Result<StmtSpec, Self::Error> {
         let aipl::ForStmt::ForStmt((var, var_span), iterable, body) = node;
-        let span = var_span.join(body.span);
+        let span = join_spans(&var_span, &body.span);
         Ok(StmtSpec::For {
             var,
             var_span,
@@ -1362,21 +1363,21 @@ impl gazelle::Action<aipl::ForTupleStmt<Self>> for Build {
         // synthetic temp var and field-access bindings prepended to the body:
         //   for (let __fpat$N : iter) { let a = __fpat$N._0; let b = __fpat$N._1; body }
         let tmp = format!("__fpat${}", iterable.span.start);
-        let tmp_span = iterable.span;
+        let tmp_span = iterable.span.clone();
         let mut new_body = body;
         for (i, name) in names.iter().enumerate().rev() {
-            let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tmp_span);
+            let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), tmp_span.clone());
             let field = Expr::new(
                 ExprKind::Field(Box::new(tmp_ident), format!("_{i}")),
-                tmp_span,
+                tmp_span.clone(),
             );
-            let inner_span = tmp_span.join(new_body.span);
+            let inner_span = join_spans(&tmp_span, &new_body.span);
             new_body = Expr::new(
                 ExprKind::Let(name.clone(), Box::new(field), Box::new(new_body)),
                 inner_span,
             );
         }
-        let span = tmp_span.join(new_body.span);
+        let span = join_spans(&tmp_span, &new_body.span);
         Ok(StmtSpec::For {
             var: tmp,
             var_span: tmp_span,
@@ -1392,7 +1393,7 @@ impl gazelle::Action<aipl::WhileStmt<Self>> for Build {
         let aipl::WhileStmt::WhileStmt(cond, body) = node;
         // No `while`/paren tokens carry spans, so span the condition through the
         // body (mirrors `for`, whose span starts at its loop variable).
-        let span = cond.span.join(body.span);
+        let span = join_spans(&cond.span, &body.span);
         Ok(StmtSpec::While { cond, body, span })
     }
 }
@@ -1400,7 +1401,7 @@ impl gazelle::Action<aipl::WhileStmt<Self>> for Build {
 impl gazelle::Action<aipl::ReturnStmt<Self>> for Build {
     fn build(&mut self, node: aipl::ReturnStmt<Self>) -> Result<StmtSpec, Self::Error> {
         let aipl::ReturnStmt::ReturnStmt(value) = node;
-        let span = value.span;
+        let span = value.span.clone();
         Ok(StmtSpec::Return { value, span })
     }
 }
@@ -1428,11 +1429,11 @@ impl gazelle::Action<aipl::Unary<Self>> for Build {
     fn build(&mut self, node: aipl::Unary<Self>) -> Result<Expr, Self::Error> {
         Ok(match node {
             aipl::Unary::Neg(e) => {
-                let span = e.span;
+                let span = e.span.clone();
                 Expr::new(ExprKind::Neg(Box::new(e)), span)
             }
             aipl::Unary::Not(e) => {
-                let span = e.span;
+                let span = e.span.clone();
                 Expr::new(ExprKind::Not(Box::new(e)), span)
             }
             aipl::Unary::Postfix(e) => e,
@@ -1445,11 +1446,11 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
         Ok(match node {
             aipl::Postfix::Atom(e) => e,
             aipl::Postfix::FieldAccess(obj, (name, name_span)) => {
-                let span = obj.span.join(name_span);
+                let span = join_spans(&obj.span, &name_span);
                 Expr::new(ExprKind::Field(Box::new(obj), name), span)
             }
             aipl::Postfix::TupleIndex(obj, (n, n_span)) => {
-                let span = obj.span.join(n_span);
+                let span = join_spans(&obj.span, &n_span);
                 if n < 0 {
                     return Err(Error::at(
                         "tuple index must be a non-negative integer".to_string(),
@@ -1459,9 +1460,8 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
                 Expr::new(ExprKind::Field(Box::new(obj), format!("_{n}")), span)
             }
             aipl::Postfix::MethodCall(obj, (name, name_span), args) => {
-                let span = obj
-                    .span
-                    .join(args.last().map(|a| a.span).unwrap_or(name_span));
+                let last = args.last().map(|a| a.span.clone()).unwrap_or(name_span);
+                let span = join_spans(&obj.span, &last);
                 // Method call: fold the receiver in as `args[0]` and flag the
                 // method form. `recv.f(a, b)` is stored as `f(recv, a, b)`.
                 let mut all = Vec::with_capacity(args.len() + 1);
@@ -1470,11 +1470,11 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
                 Expr::new(ExprKind::Call(name, all, true), span)
             }
             aipl::Postfix::Index(obj, _lbracket, index) => {
-                let span = obj.span.join(index.span);
+                let span = join_spans(&obj.span, &index.span);
                 Expr::new(ExprKind::Index(Box::new(obj), Box::new(index)), span)
             }
             aipl::Postfix::Slice(obj, _lbracket, start, end) => {
-                let span = obj.span.join(end.span);
+                let span = join_spans(&obj.span, &end.span);
                 Expr::new(
                     ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
                     span,
@@ -1482,22 +1482,22 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
             }
             // `recv[start..]` — open end (runs to the receiver's length).
             aipl::Postfix::SliceOpen(obj, _lbracket, start) => {
-                let span = obj.span.join(start.span);
+                let span = join_spans(&obj.span, &start.span);
                 Expr::new(ExprKind::Slice(Box::new(obj), Box::new(start), None), span)
             }
             // `recv[..end]` — open start. Semantically `recv[0..end]`, so we
             // synthesize a `0` start literal; it flows through check/codegen
             // unchanged (the start clamps to `[0, len]` regardless).
             aipl::Postfix::SliceTo(obj, _lbracket, end) => {
-                let span = obj.span.join(end.span);
-                let start = Expr::new(ExprKind::Num(0), Span::DUMMY);
+                let span = join_spans(&obj.span, &end.span);
+                let start = Expr::new(ExprKind::Num(0), 0..0);
                 Expr::new(
                     ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
                     span,
                 )
             }
             aipl::Postfix::TryOp(obj) => {
-                let span = obj.span;
+                let span = obj.span.clone();
                 Expr::new(ExprKind::Try(Box::new(obj)), span)
             }
         })
@@ -1514,30 +1514,33 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             aipl::Atom::CharLit((b, span)) => Expr::new(ExprKind::Char(b), span),
             aipl::Atom::Ident((s, span)) => Expr::new(ExprKind::Ident(s), span),
             aipl::Atom::Call((name, name_span), args) => {
-                let span = args
-                    .last()
-                    .map(|a| name_span.join(a.span))
-                    .unwrap_or(name_span);
+                let span = match args.last() {
+                    Some(a) => join_spans(&name_span, &a.span),
+                    None => name_span,
+                };
                 Expr::new(ExprKind::Call(name, args, false), span)
             }
             aipl::Atom::Construct((name, name_span), fields) => {
-                let span = fields
-                    .last()
-                    .map(|f| name_span.join(f.value.span))
-                    .unwrap_or(name_span);
+                let span = match fields.last() {
+                    Some(f) => join_spans(&name_span, &f.value.span),
+                    None => name_span,
+                };
                 Expr::new(ExprKind::Construct(name, fields), span)
             }
             aipl::Atom::Paren(e) => e,
             aipl::Atom::TupleLit(first, rest) => {
-                let last_span = rest.last().map(|e| e.span).unwrap_or(first.span);
-                let span = first.span.join(last_span);
+                let last_span = rest
+                    .last()
+                    .map(|e| e.span.clone())
+                    .unwrap_or_else(|| first.span.clone());
+                let span = join_spans(&first.span, &last_span);
                 let mut elems = Vec::with_capacity(1 + rest.len());
                 elems.push(first);
                 elems.extend(rest);
                 Expr::new(ExprKind::TupleLit(elems), span)
             }
             aipl::Atom::IfElse(cond, then_b, else_b) => {
-                let span = cond.span.join(else_b.span);
+                let span = join_spans(&cond.span, &else_b.span);
                 Expr::new(
                     ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
                     span,
@@ -1547,8 +1550,8 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             // exactly like `if (..) { .. } else {}` — unit-valued, used in
             // statement position.
             aipl::Atom::IfNoElse(cond, then_b) => {
-                let span = cond.span.join(then_b.span);
-                let else_b = Expr::new(ExprKind::Unit, span);
+                let span = join_spans(&cond.span, &then_b.span);
+                let else_b = Expr::new(ExprKind::Unit, span.clone());
                 Expr::new(
                     ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
                     span,
@@ -1556,17 +1559,20 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             }
             aipl::Atom::NoneLit(span) => Expr::new(ExprKind::None, span),
             aipl::Atom::MatchExpr(scrutinee, arms) => {
-                let last_span = arms.last().map(|a| a.span).unwrap_or(scrutinee.span);
-                let span = scrutinee.span.join(last_span);
+                let last_span = arms
+                    .last()
+                    .map(|a| a.span.clone())
+                    .unwrap_or_else(|| scrutinee.span.clone());
+                let span = join_spans(&scrutinee.span, &last_span);
                 Expr::new(ExprKind::Match(Box::new(scrutinee), arms), span)
             }
             aipl::Atom::ArrayLit(lbracket_span, elems) => {
                 // Span runs from `[` to the last element (or just the
                 // `[` for an empty literal).
-                let span = elems
-                    .last()
-                    .map(|e| lbracket_span.join(e.span))
-                    .unwrap_or(lbracket_span);
+                let span = match elems.last() {
+                    Some(e) => join_spans(&lbracket_span, &e.span),
+                    None => lbracket_span,
+                };
                 Expr::new(ExprKind::ArrayLit(elems), span)
             }
             // `#{ .. }` — a set or dict literal (or an empty of either). Span
@@ -1596,8 +1602,11 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                                 BraceEntry::KeyOnly(_) => unreachable!("checked above"),
                             })
                             .collect();
-                        let last = pairs.last().map(|(_, v)| v.span).unwrap_or(hash_span);
-                        Expr::new(ExprKind::DictLit(pairs), hash_span.join(last))
+                        let span = match pairs.last() {
+                            Some((_, v)) => join_spans(&hash_span, &v.span),
+                            None => hash_span,
+                        };
+                        Expr::new(ExprKind::DictLit(pairs), span)
                     } else {
                         let elems: Vec<Expr> = entries
                             .into_iter()
@@ -1606,8 +1615,11 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                                 BraceEntry::KeyValue(..) => unreachable!("checked above"),
                             })
                             .collect();
-                        let last = elems.last().map(|e| e.span).unwrap_or(hash_span);
-                        Expr::new(ExprKind::SetLit(elems), hash_span.join(last))
+                        let span = match elems.last() {
+                            Some(e) => join_spans(&hash_span, &e.span),
+                            None => hash_span,
+                        };
+                        Expr::new(ExprKind::SetLit(elems), span)
                     }
                 }
             },
@@ -1785,18 +1797,24 @@ impl gazelle::Action<aipl::Arg<Self>> for Build {
 /// is dispatched to a call there just as in infix position. The synthesized
 /// nodes carry the operator's own span, so a "not imported" error points at it.
 fn op_value_lambda(op: char, sp: Span) -> Expr {
-    let param = |name: &str| LambdaParam {
-        name: name.to_string(),
+    let lhs_param = LambdaParam {
+        name: "lhs".to_string(),
         ty: None,
-        span: sp,
+        span: sp.clone(),
     };
-    let ident = |name: &str| Expr::new(ExprKind::Ident(name.to_string()), sp);
+    let rhs_param = LambdaParam {
+        name: "rhs".to_string(),
+        ty: None,
+        span: sp.clone(),
+    };
+    let lhs = Expr::new(ExprKind::Ident("lhs".to_string()), sp.clone());
+    let rhs = Expr::new(ExprKind::Ident("rhs".to_string()), sp.clone());
     let body = Expr::new(
-        ExprKind::Binop(Box::new(ident("lhs")), op, Box::new(ident("rhs"))),
-        sp,
+        ExprKind::Binop(Box::new(lhs), op, Box::new(rhs)),
+        sp.clone(),
     );
     Expr::new(
-        ExprKind::Lambda(vec![param("lhs"), param("rhs")], Box::new(body)),
+        ExprKind::Lambda(vec![lhs_param, rhs_param], Box::new(body)),
         sp,
     )
 }
@@ -1806,12 +1824,12 @@ impl gazelle::Action<aipl::Lambda<Self>> for Build {
         let (span, params, body) = match node {
             aipl::Lambda::LambdaExpr(pipe_span, params, _pipe2, body)
             | aipl::Lambda::LambdaBlock(pipe_span, params, _pipe2, body) => {
-                (pipe_span.join(body.span), params, body)
+                (join_spans(&pipe_span, &body.span), params, body)
             }
             // `|| body` — no parameters; the `||` token carries no span, so the
             // body's span stands in for the lambda's.
             aipl::Lambda::LambdaNoargs(body) | aipl::Lambda::LambdaNoargsBlock(body) => {
-                (body.span, Vec::new(), body)
+                (body.span.clone(), Vec::new(), body)
             }
         };
         Ok(Expr::new(ExprKind::Lambda(params, Box::new(body)), span))
@@ -1864,7 +1882,7 @@ impl gazelle::Action<aipl::Expr<Self>> for Build {
         Ok(match node {
             aipl::Expr::Term(t) => t,
             aipl::Expr::Binop(l, op, r) => {
-                let span = l.span.join(r.span);
+                let span = join_spans(&l.span, &r.span);
                 Expr::new(ExprKind::Binop(Box::new(l), op, Box::new(r)), span)
             }
         })
@@ -1931,7 +1949,7 @@ fn skip_whitespace_and_comments<I: Iterator<Item = char>>(
                         (None, _) => {
                             return Err(Error::at(
                                 "unterminated block comment",
-                                Span::new(start, src.offset()),
+                                start..src.offset(),
                             ));
                         }
                     }
@@ -2029,13 +2047,16 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                     None => {
                         return Err(Error::at(
                             "unterminated raw string literal",
-                            Span::new(start, src.offset()),
+                            start..src.offset(),
                         ));
                     }
                 }
             }
-            let span = Span::new(start, src.offset());
-            tokens.push((aipl::Terminal::Str((process_raw_string(&raw), span)), span));
+            let span = start..src.offset();
+            tokens.push((
+                aipl::Terminal::Str((process_raw_string(&raw), span.clone())),
+                span,
+            ));
             continue;
         }
 
@@ -2076,13 +2097,13 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                             Some(other) => {
                                 return Err(Error::at(
                                     format!("unknown escape sequence \\{other}"),
-                                    Span::new(esc_start, src.offset() + other.len_utf8()),
+                                    esc_start..src.offset() + other.len_utf8(),
                                 ));
                             }
                             None => {
                                 return Err(Error::at(
                                     "unterminated string literal",
-                                    Span::new(start, src.offset()),
+                                    start..src.offset(),
                                 ));
                             }
                         }
@@ -2094,14 +2115,14 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                     None => {
                         return Err(Error::at(
                             "unterminated string literal",
-                            Span::new(start, src.offset()),
+                            start..src.offset(),
                         ));
                     }
                 }
             }
             src.advance(); // closing "
-            let span = Span::new(start, src.offset());
-            tokens.push((aipl::Terminal::Str((s, span)), span));
+            let span = start..src.offset();
+            tokens.push((aipl::Terminal::Str((s, span.clone())), span));
             continue;
         }
 
@@ -2124,13 +2145,13 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                         Some(other) => {
                             return Err(Error::at(
                                 format!("unknown escape sequence \\{other}"),
-                                Span::new(esc_at, src.offset() + other.len_utf8()),
+                                esc_at..src.offset() + other.len_utf8(),
                             ));
                         }
                         None => {
                             return Err(Error::at(
                                 "unterminated char literal",
-                                Span::new(start, src.offset()),
+                                start..src.offset(),
                             ));
                         }
                     };
@@ -2138,26 +2159,20 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                     b
                 }
                 Some('\'') => {
-                    return Err(Error::at(
-                        "empty char literal",
-                        Span::new(start, src.offset() + 1),
-                    ));
+                    return Err(Error::at("empty char literal", start..src.offset() + 1));
                 }
                 Some(ch) => {
                     if !ch.is_ascii() {
                         return Err(Error::at(
                             format!("non-ASCII character in char literal: {ch:?}"),
-                            Span::new(start, src.offset() + ch.len_utf8()),
+                            start..src.offset() + ch.len_utf8(),
                         ));
                     }
                     src.advance();
                     ch as u8
                 }
                 None => {
-                    return Err(Error::at(
-                        "unterminated char literal",
-                        Span::new(start, src.offset()),
-                    ));
+                    return Err(Error::at("unterminated char literal", start..src.offset()));
                 }
             };
             match src.peek() {
@@ -2167,12 +2182,12 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                 _ => {
                     return Err(Error::at(
                         "char literal must contain exactly one character",
-                        Span::new(start, src.offset()),
+                        start..src.offset(),
                     ));
                 }
             }
-            let span = Span::new(start, src.offset());
-            tokens.push((aipl::Terminal::Char((byte, span)), span));
+            let span = start..src.offset();
+            tokens.push((aipl::Terminal::Char((byte, span.clone())), span));
             continue;
         }
 
@@ -2187,7 +2202,7 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                     break;
                 }
             }
-            let span = Span::new(start, src.offset());
+            let span = start..src.offset();
             let kw = match s.as_str() {
                 "fn" => aipl::Terminal::Fn,
                 "if" => aipl::Terminal::If,
@@ -2205,11 +2220,11 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                 "set" => aipl::Terminal::Set,
                 "match" => aipl::Terminal::Match,
                 "return" => aipl::Terminal::Return,
-                "builtins" => aipl::Terminal::Builtins(span),
-                "none" => aipl::Terminal::None(span),
-                "true" => aipl::Terminal::True(span),
-                "false" => aipl::Terminal::False(span),
-                _ => aipl::Terminal::Ident((s, span)),
+                "builtins" => aipl::Terminal::Builtins(span.clone()),
+                "none" => aipl::Terminal::None(span.clone()),
+                "true" => aipl::Terminal::True(span.clone()),
+                "false" => aipl::Terminal::False(span.clone()),
+                _ => aipl::Terminal::Ident((s, span.clone())),
             };
             tokens.push((kw, span));
             continue;
@@ -2226,11 +2241,11 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
                     break;
                 }
             }
-            let span = Span::new(start, src.offset());
+            let span = start..src.offset();
             let n: i64 = s
                 .parse()
-                .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span))?;
-            tokens.push((aipl::Terminal::Num((n, span)), span));
+                .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span.clone()))?;
+            tokens.push((aipl::Terminal::Num((n, span.clone())), span));
             continue;
         }
 
@@ -2238,7 +2253,7 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
         // `OP` carries its own span (`(char, Span)`) so it can be used as a
         // value (`apply(2, 3, +)`) and still point diagnostics at the operator.
         if let Some(next) = src.peek_n(1) {
-            let op_span = Span::new(start, start + 2);
+            let op_span = start..start + 2;
             let pair_tok = match (c, next) {
                 ('-', '>') => Some(aipl::Terminal::Arrow),
                 // `..` — the range separator in a slice `s[a..b]`. Must beat the
@@ -2258,7 +2273,7 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
             if let Some(t) = pair_tok {
                 src.advance();
                 src.advance();
-                tokens.push((t, Span::new(start, src.offset())));
+                tokens.push((t, start..src.offset()));
                 continue;
             }
         }
@@ -2272,9 +2287,9 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
             // `[` carries a span so array-literal expressions (which may
             // be empty, `[]`, and thus have no element span) can still
             // point somewhere sensible in errors.
-            '[' => aipl::Terminal::Lbracket(Span::new(start, start + 1)),
+            '[' => aipl::Terminal::Lbracket(start..start + 1),
             ']' => aipl::Terminal::Rbracket,
-            '#' => aipl::Terminal::Hash(Span::new(start, start + 1)),
+            '#' => aipl::Terminal::Hash(start..start + 1),
             ',' => aipl::Terminal::Comma,
             ':' => aipl::Terminal::Colon,
             '.' => aipl::Terminal::Dot,
@@ -2284,12 +2299,11 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
             '?' => aipl::Terminal::Question,
             // Single `|` opens/closes a lambda parameter list (`||` for
             // logical-or is handled by the two-char pass above).
-            '|' => aipl::Terminal::Pipe(Span::new(start, start + 1)),
+            '|' => aipl::Terminal::Pipe(start..start + 1),
             '-' => aipl::Terminal::Minus(Precedence::Left(6)),
-            '+' | '*' | '/' | '%' => aipl::Terminal::Op(
-                (c, Span::new(start, start + c.len_utf8())),
-                op_precedence(c),
-            ),
+            '+' | '*' | '/' | '%' => {
+                aipl::Terminal::Op((c, start..start + c.len_utf8()), op_precedence(c))
+            }
             // `<` / `>` are both comparison operators and generic-param
             // brackets; they carry comparison precedence either way.
             '<' => aipl::Terminal::Langle(op_precedence('<')),
@@ -2297,12 +2311,12 @@ fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
             other => {
                 return Err(Error::at(
                     format!("unexpected character {other:?}"),
-                    Span::new(start, start + other.len_utf8()),
+                    start..start + other.len_utf8(),
                 ));
             }
         };
         src.advance();
-        tokens.push((tok, Span::new(start, src.offset())));
+        tokens.push((tok, start..src.offset()));
     }
 
     Ok(tokens)
@@ -2537,7 +2551,7 @@ pub fn parse(input: &str) -> Result<Program, Error> {
     let mut program = parser.finish(&mut actions).map_err(|(p, err)| match err {
         gazelle::ParseError::Syntax { terminal } => {
             // Unexpected end of input: point the caret just past the source.
-            let eof = Span::new(input.len(), input.len());
+            let eof = input.len()..input.len();
             Error::at(friendly_syntax_error(&p, terminal, &texts), eof)
         }
         gazelle::ParseError::Action(e) => e,
@@ -2571,7 +2585,10 @@ fn bake_asserts(e: &mut Expr, src: &str) {
             };
             let mut cond = args.pop().expect("one arg");
             bake_asserts(&mut cond, src);
-            let loc = Expr::new(ExprKind::Str(assert_loc(src, cond.span)), cond.span);
+            let loc = Expr::new(
+                ExprKind::Str(assert_loc(src, cond.span.clone())),
+                cond.span.clone(),
+            );
             e.kind = ExprKind::Call("__assert".to_string(), vec![cond, loc], false);
             return;
         }

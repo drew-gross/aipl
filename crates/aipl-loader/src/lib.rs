@@ -103,7 +103,7 @@ fn check_no_duplicate_import_sources(program: &Program) -> Result<(), Error> {
                     return Err(Error::at(
                         "duplicate import from \"builtins\"; merge the names into the first \
                          `import { .. } from builtins;`",
-                        *span,
+                        span.clone(),
                     ));
                 }
                 seen_builtins = true;
@@ -115,7 +115,7 @@ fn check_no_duplicate_import_sources(program: &Program) -> Result<(), Error> {
                             "duplicate import from {path:?}; merge the names into the first \
                              `import {{ .. }} from {path:?};`"
                         ),
-                        *span,
+                        span.clone(),
                     ));
                 }
             }
@@ -340,7 +340,7 @@ impl Loader {
                                     n.name,
                                     file_label(&imp.from)
                                 ),
-                                n.span,
+                                n.span.clone(),
                             ));
                         };
                         // The name exists in the source file, but only `pub`
@@ -352,10 +352,10 @@ impl Loader {
                                     n.name,
                                     file_label(&imp.from),
                                 ),
-                                n.span,
+                                n.span.clone(),
                             ));
                         }
-                        Ok((n.local().to_string(), n.span, mangled))
+                        Ok((n.local().to_string(), n.span.clone(), mangled))
                     })
                 })
                 .collect::<Result<_, _>>()?;
@@ -373,7 +373,7 @@ impl Loader {
                         "import",
                         &local,
                         span,
-                        import_spans.get(&local).copied(),
+                        import_spans.get(&local).cloned(),
                     ));
                 }
                 import_spans.insert(local, span);
@@ -405,7 +405,7 @@ impl Loader {
                                     "\"{}\" provides the \"{op}\" operator; import it as `{} as {op}`, not `as {a}`",
                                     n.name, n.name
                                 ),
-                                n.span,
+                                n.span.clone(),
                             ))
                         }
                         None => {
@@ -414,7 +414,7 @@ impl Loader {
                                     "\"{}\" provides the \"{op}\" operator; import it as `{} as {op}`",
                                     n.name, n.name
                                 ),
-                                n.span,
+                                n.span.clone(),
                             ))
                         }
                     }
@@ -424,13 +424,13 @@ impl Loader {
                             "the \"+\" operator is provided by `wrapping_add`; \
                              import `wrapping_add as +` from builtins"
                                 .to_string(),
-                            n.span,
+                            n.span.clone(),
                         ));
                     }
                     n.name.clone()
                 } else {
                     builtin_canonical(&n.name).ok_or_else(|| {
-                        Error::at(format!("\"{}\" is not a builtin", n.name), n.span)
+                        Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone())
                     })?
                 };
                 if view.insert(local.to_string(), canonical).is_some() {
@@ -438,11 +438,11 @@ impl Loader {
                         file_label(path),
                         "builtin import",
                         local,
-                        n.span,
-                        import_spans.get(local).copied(),
+                        n.span.clone(),
+                        import_spans.get(local).cloned(),
                     ));
                 }
-                import_spans.insert(local.to_string(), n.span);
+                import_spans.insert(local.to_string(), n.span.clone());
             }
         }
 
@@ -490,16 +490,16 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
     };
     match &e.kind {
         ExprKind::Binop(a, op, b) => {
-            require(aipl_syntax::binop_spelling(*op), e.span)?;
+            require(aipl_syntax::binop_spelling(*op), e.span.clone())?;
             check_operators(a, view)?;
             check_operators(b, view)?;
         }
         ExprKind::Neg(x) => {
-            require("-", e.span)?;
+            require("-", e.span.clone())?;
             check_operators(x, view)?;
         }
         ExprKind::Not(x) => {
-            require("!", e.span)?;
+            require("!", e.span.clone())?;
             check_operators(x, view)?;
         }
         ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => check_operators(x, view)?,
@@ -754,7 +754,7 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                     MatchArm {
                         pattern: arm.pattern.clone(),
                         body: rewrite_expr(&arm.body, view, &arm_locals),
-                        span: arm.span,
+                        span: arm.span.clone(),
                     }
                 })
                 .collect();
@@ -872,14 +872,17 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                     .map(|p| LambdaParam {
                         name: p.name.clone(),
                         ty: p.ty.as_ref().map(|t| rewrite_type(t, view, &[])),
-                        span: p.span,
+                        span: p.span.clone(),
                     })
                     .collect(),
                 Box::new(rewrite_expr(body, view, &inner)),
             )
         }
     };
-    Expr { kind, span: e.span }
+    Expr {
+        kind,
+        span: e.span.clone(),
+    }
 }
 
 /// Render a file path as just its file name (e.g. `util.aipl`) for use
