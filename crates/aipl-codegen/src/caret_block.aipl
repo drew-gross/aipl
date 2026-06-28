@@ -40,9 +40,8 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
     let blank = repeat_str(" ", len(`{line_no}`));
     let caret_pad = repeat_str(" ", col);
     let carets = repeat_str("^", underline_len);
-    let col_no = col + 1;
     ```
-    {blank}--> input:{line_no}:{col_no}
+    {blank}--> input:{line_no}:{col + 1}
     {blank} |
     {line_no} | {line_text}
     {blank} | {caret_pad}{carets}
@@ -92,4 +91,4 @@ deallocations: 74
 reallocations: 93
 bytes allocated: 2714
 instructions executed: 10080
-binary size: 17272
+binary size: 17264

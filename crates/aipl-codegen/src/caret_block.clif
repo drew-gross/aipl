@@ -19,7 +19,7 @@
 ; import 20 aipl_i64_len
 ; import 21 aipl_str_alloc
 ; import 22 aipl_write_i64
-; data 0 __str_1501_1512 0a00000000000000ffffffffffffff7f2d2d3e20696e7075743a00
+; data 0 __str_1475_1486 0a00000000000000ffffffffffffff7f2d2d3e20696e7075743a00
 
 ; find_line_end
 function u0:0(i64, i64) -> i64 apple_aarch64 {
@@ -447,22 +447,22 @@ block0(v0: i64, v1: i64, v2: i64):
     call fn17(v27)  ; v27 = 0x5e05
     v28 = call fn18(v27, v14)  ; v27 = 0x5e05
     v29 = iconst.i64 1
-    v30 = iadd v8, v29  ; v29 = 1
-    v31 = iconst.i64 1
-    call fn19(v31)  ; v31 = 1
+    call fn19(v29)  ; v29 = 1
     call fn20(v24)
-    v32 = call fn21(v31, v24)  ; v31 = 1
-    v33 = symbol_value.i64 gv0
-    v34 = iadd_imm v33, 16
-    v35 = call fn22(v16)
-    call fn23(v34)
-    call fn24(v35)
-    v36 = call fn25(v34, v35)
-    v37 = iconst.i64 0x3a05
-    v38 = call fn26(v30)
-    call fn27(v37)  ; v37 = 0x3a05
+    v30 = call fn21(v29, v24)  ; v29 = 1
+    v31 = symbol_value.i64 gv0
+    v32 = iadd_imm v31, 16
+    v33 = call fn22(v16)
+    call fn23(v32)
+    call fn24(v33)
+    v34 = call fn25(v32, v33)
+    v35 = iconst.i64 0x3a05
+    v36 = iconst.i64 1
+    v37 = iadd v8, v36  ; v36 = 1
+    v38 = call fn26(v37)
+    call fn27(v35)  ; v35 = 0x3a05
     call fn28(v38)
-    v39 = call fn29(v37, v38)  ; v37 = 0x3a05
+    v39 = call fn29(v35, v38)  ; v35 = 0x3a05
     v40 = iconst.i64 2565
     call fn30(v40)  ; v40 = 2565
     call fn31(v24)
@@ -510,12 +510,12 @@ block0(v0: i64, v1: i64, v2: i64):
     call fn67(v39)
     call fn68(v59)
     v60 = call fn69(v39, v59)
-    call fn70(v36)
+    call fn70(v34)
     call fn71(v60)
-    v61 = call fn72(v36, v60)
-    call fn73(v32)
+    v61 = call fn72(v34, v60)
+    call fn73(v30)
     call fn74(v61)
-    v62 = call fn75(v32, v61)
+    v62 = call fn75(v30, v61)
     call fn76(v62)
     call fn77(v0)
     call fn78(v7)
@@ -525,10 +525,10 @@ block0(v0: i64, v1: i64, v2: i64):
     call fn82(v24)
     call fn83(v26)
     call fn84(v28)
-    call fn85(v32)
-    call fn86(v34)
-    call fn87(v35)
-    call fn88(v36)
+    call fn85(v30)
+    call fn86(v32)
+    call fn87(v33)
+    call fn88(v34)
     call fn89(v38)
     call fn90(v39)
     call fn91(v41)
@@ -565,7 +565,6 @@ block0(v0: i64, v1: i64, v2: i64):
 ;   v24 = blank
 ;   v26 = caret_pad
 ;   v28 = carets
-;   v30 = col_no
 ; __m1__line_at
 function u0:3(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
