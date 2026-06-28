@@ -19,7 +19,7 @@ use cranelift::codegen::ir::{
 use cranelift::codegen::isa::TargetIsa;
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{DataDescription, FuncId, Linkage, Module};
+use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::ast::{
@@ -2546,13 +2546,18 @@ const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespac
 /// The checked-in dogfood IR for `find_trailing_whitespace`.
 const FIND_TRAILING_WHITESPACE_CLIF: &str = include_str!("find_trailing_whitespace.clif");
 
-/// The dogfooded AIPL `line_at` (`str, i64 -> LineAt`) the *error renderer*
-/// calls (through the hook installed by [`install_parser_hooks`]) when rendering
-/// a spanned error — it locates the line index and line-start offset for the
-/// caret block.
+/// The dogfooded AIPL `line_at` (`str, i64 -> LineAt`) — bundled as a source
+/// dependency of `caret_block` and verified standalone by the `dogfood_ir` test.
 const LINE_AT_SRC: &str = include_str!("line_at.aipl");
-/// The checked-in dogfood IR for `line_at`.
-const LINE_AT_CLIF: &str = include_str!("line_at.clif");
+
+/// The dogfooded AIPL `caret_block` (`str, i64, i64 -> str`) the *error renderer*
+/// calls (through the hook installed by [`install_parser_hooks`]) when rendering
+/// a spanned error — it formats the rustc-style location + caret underline block.
+/// Bundles `line_at` as an in-engine AIPL import so the line-locator is an
+/// AIPL→AIPL call rather than an FFI crossing.
+const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
+/// The checked-in dogfood IR for `caret_block` (which bundles `line_at`).
+const CARET_BLOCK_CLIF: &str = include_str!("caret_block.clif");
 
 thread_local! {
     /// The `process_raw_string` engine, re-linked from the checked-in IR lazily
@@ -2682,36 +2687,32 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
 }
 
 thread_local! {
-    /// The `line_at` engine, re-linked from the checked-in IR lazily on first use
-    /// per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`. Re-linking
-    /// runs no AIPL frontend, so building it never recurses into error rendering.
-    static LINE_AT_ENGINE: Compilation =
-        Compilation::from_artifact(LINE_AT_CLIF)
-            .expect("dogfooded `line_at` engine builds");
+    /// The `caret_block` engine (which bundles `line_at`), re-linked from the
+    /// checked-in IR lazily on first use per thread. Like [`ADD_ENGINE`], a
+    /// `Compilation` isn't `Sync`. Re-linking runs no AIPL frontend, so building it
+    /// never recurses into error rendering.
+    static CARET_BLOCK_ENGINE: Compilation =
+        Compilation::from_artifact(CARET_BLOCK_CLIF)
+            .expect("dogfooded `caret_block` engine builds");
 }
 
-/// The error renderer's line-locator hook (see [`install_parser_hooks`]): given
-/// `source` and a byte `offset`, returns `(line_index, line_start_offset)` —
-/// computed by the dogfooded AIPL `line_at` via the FFI. The AIPL returns a
-/// `LineAt { line, line_start }` struct, marshaled back as [`FfiValue::Struct`].
-/// No native fallback; panics if it can't be built or called.
-fn line_at(source: &str, offset: usize) -> (usize, usize) {
-    LINE_AT_ENGINE.with(|comp| {
+/// The error renderer's caret-block hook (see [`install_parser_hooks`]): given
+/// `source` and a span (`span_start`, `span_end`), returns the rustc-style
+/// location + underline block — computed by the dogfooded AIPL `caret_block` via
+/// the FFI. The AIPL calls `line_at` in-engine. No native fallback; panics if it
+/// can't be built or called.
+fn caret_block(source: &str, span_start: usize, span_end: usize) -> String {
+    CARET_BLOCK_ENGINE.with(|comp| {
         match comp.call_values(
-            "line_at",
+            "caret_block",
             &[
                 FfiValue::Str(source.to_string()),
-                FfiValue::Int(offset as i64),
+                FfiValue::Int(span_start as i64),
+                FfiValue::Int(span_end as i64),
             ],
         ) {
-            Ok(FfiValue::Struct(fields)) => {
-                let field = |k: &str| match fields.iter().find(|(n, _)| n == k) {
-                    Some((_, FfiValue::Int(v))) => *v as usize,
-                    other => panic!("dogfooded line_at() LineAt.{k}: {other:?}"),
-                };
-                (field("line"), field("line_start"))
-            }
-            other => panic!("dogfooded line_at() call: {other:?}"),
+            Ok(FfiValue::Str(s)) => s,
+            other => panic!("dogfooded caret_block() call: {other:?}"),
         }
     })
 }
@@ -2719,16 +2720,17 @@ fn line_at(source: &str, offset: usize) -> (usize, usize) {
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
-/// and the error-renderer's line locator at [`line_at`]. Idempotent (first install
-/// wins). The compiler's entry points (the CLI and the embedding [`Compilation`]
-/// API's callers) install them; there are **no native fallbacks**, so any
-/// in-process parse (or error render) must install them first.
+/// the trailing-whitespace finder at [`find_trailing_whitespace`], and the
+/// error-renderer's caret-block formatter at [`caret_block`]. Idempotent (first
+/// install wins). The compiler's entry points (the CLI and the embedding
+/// [`Compilation`] API's callers) install them; there are **no native fallbacks**,
+/// so any in-process parse (or error render) must install them first.
 pub fn install_parser_hooks() {
     aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
-    aipl_syntax::set_line_at_hook(line_at);
+    aipl_syntax::set_caret_block_hook(caret_block);
 }
 
 /// A dogfood engine: AIPL the compiler runs from *checked-in IR* rather than by
@@ -2798,10 +2800,23 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
                 FIND_TRAILING_WHITESPACE_SRC,
             )],
         },
+        // `line_at` is still verified standalone even though it's now bundled
+        // inside the `caret_block` engine — the standalone CLIF check stays as
+        // evidence that `line_at.aipl` compiles and runs correctly on its own.
         DogfoodEngine {
             clif_file: "line_at.clif",
             entries: &["line_at"],
             sources: &[("line_at.aipl", LINE_AT_SRC)],
+        },
+        DogfoodEngine {
+            clif_file: "caret_block.clif",
+            entries: &["caret_block"],
+            // Bundles `line_at` (imported by `caret_block`) so line-location is
+            // an in-engine AIPL call rather than an FFI crossing per render.
+            sources: &[
+                ("caret_block.aipl", CARET_BLOCK_SRC),
+                ("line_at.aipl", LINE_AT_SRC),
+            ],
         },
     ]
 }
@@ -3225,11 +3240,39 @@ pub fn generate_dogfood_artifact(
     let mut module = new_jit_module()?;
     let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false)?;
 
-    if module.declarations().get_data_objects().next().is_some() {
-        return Err(Error::msg(
-            "dogfood IR generation does not support data symbols (e.g. string literals) yet",
-        ));
-    }
+    // Collect static data objects (e.g. string literals longer than the 7-byte
+    // inline SSO threshold). Finalize the JIT module only when any exist so we
+    // can read back the raw bytes; functions without data skip the finalize.
+    let mut data_entries: Vec<(u32, String, Vec<u8>)> = {
+        let ids: Vec<(u32, String)> = module
+            .declarations()
+            .get_data_objects()
+            .map(|(id, decl)| {
+                (
+                    id.as_u32(),
+                    decl.name
+                        .clone()
+                        .expect("all dogfood data objects carry their symbol name"),
+                )
+            })
+            .collect();
+        if ids.is_empty() {
+            Vec::new()
+        } else {
+            module
+                .finalize_definitions()
+                .map_err(|e| Error::msg(format!("finalize for data collection: {e}")))?;
+            ids.into_iter()
+                .map(|(id, name)| {
+                    let (ptr, len) = module.get_finalized_data(DataId::from_u32(id));
+                    // SAFETY: JIT memory is valid for `len` bytes until `module` is dropped.
+                    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) }.to_vec();
+                    (id, name, bytes)
+                })
+                .collect()
+        }
+    };
+    data_entries.sort_by_key(|(id, _, _)| *id);
 
     // Builtin imports (id -> symbol), recovered from the module's declarations.
     let mut imports: Vec<(u32, String)> = module
@@ -3317,6 +3360,10 @@ pub fn generate_dogfood_artifact(
     for (id, sym) in &imports {
         out.push_str(&format!("; import {id} {sym}\n"));
     }
+    for (id, name, bytes) in &data_entries {
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        out.push_str(&format!("; data {id} {name} {hex}\n"));
+    }
     out.push('\n');
     out.push_str(&ir);
     Ok(out)
@@ -3361,6 +3408,7 @@ impl Compilation {
         let mut imports: HashMap<u32, String> = HashMap::new();
         let mut entries: Vec<(String, u32, Vec<Type>, Type)> = Vec::new();
         let mut structs: HashMap<String, TypeDef> = HashMap::new();
+        let mut data_entries: Vec<(u32, String, Vec<u8>)> = Vec::new();
         for line in text.lines() {
             let Some(body) = line.trim_start().strip_prefix(';') else {
                 continue;
@@ -3429,6 +3477,31 @@ impl Compilation {
                         .ok_or_else(|| Error::msg("`; entry` line missing return type"))?,
                 )?;
                 entries.push((name.to_string(), id, params, ret));
+            } else if let Some(rest) = body.strip_prefix("data ") {
+                // `data <id> <name> <hex-bytes>` — static data object (string literals).
+                let mut it = rest.splitn(3, ' ');
+                let id: u32 = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or_else(|| Error::msg("malformed `; data` id in dogfood IR"))?;
+                let name = it
+                    .next()
+                    .ok_or_else(|| Error::msg("`; data` line missing name"))?
+                    .to_string();
+                let hex = it
+                    .next()
+                    .ok_or_else(|| Error::msg("`; data` line missing bytes"))?;
+                if hex.len() % 2 != 0 {
+                    return Err(Error::msg("`; data` hex string has odd length"));
+                }
+                let bytes = (0..hex.len())
+                    .step_by(2)
+                    .map(|i| {
+                        u8::from_str_radix(&hex[i..i + 2], 16)
+                            .map_err(|_| Error::msg(format!("`; data` invalid hex at byte {i}")))
+                    })
+                    .collect::<Result<Vec<u8>, _>>()?;
+                data_entries.push((id, name, bytes));
             }
         }
 
@@ -3461,6 +3534,27 @@ impl Compilation {
             .ok_or_else(|| Error::msg("dogfood IR has no functions"))?;
 
         let mut module = new_jit_module()?;
+        // Re-declare static data objects in id order so `u1:N` symbol references
+        // in the CLIF functions resolve to the right data at finalize time.
+        data_entries.sort_by_key(|(id, _, _)| *id);
+        for (expected_id, name, bytes) in &data_entries {
+            let got = module
+                .declare_data(name, Linkage::Local, false, false)
+                .map_err(|e| Error::msg(format!("declare dogfood data {name}: {e}")))?;
+            if got.as_u32() != *expected_id {
+                return Err(Error::msg(format!(
+                    "dogfood IR data id mismatch: expected {expected_id}, got {} \
+                     (declaration order broke)",
+                    got.as_u32()
+                )));
+            }
+            let mut desc = DataDescription::new();
+            desc.set_align(8);
+            desc.define(bytes.clone().into_boxed_slice());
+            module
+                .define_data(got, &desc)
+                .map_err(|e| Error::msg(format!("define dogfood data {name}: {e}")))?;
+        }
         // Declare every id in ascending order so the JIT-assigned FuncIds line up
         // with the `u0:<id>` indices baked into the CLIF.
         let mut ids: Vec<FuncId> = Vec::with_capacity(max_id as usize + 1);
@@ -4796,6 +4890,64 @@ fn reject_unit_binding(ty: &Type, name: &str, span: Span) -> Result<(), Error> {
     Ok(())
 }
 
+/// Replace whole-token occurrences of `from` in `s`, where "whole-token" means the
+/// match is not immediately followed by an ASCII digit. This avoids replacing
+/// "userextname7" inside "userextname70".
+fn replace_whole_number_token(s: &str, from: &str, to: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(pos) = rest.find(from) {
+        let end = pos + from.len();
+        if rest[end..].starts_with(|c: char| c.is_ascii_digit()) {
+            // Part of a larger number-suffixed token; skip one character and retry.
+            out.push_str(&rest[..pos + 1]);
+            rest = &rest[pos + 1..];
+        } else {
+            out.push_str(&rest[..pos]);
+            out.push_str(to);
+            rest = &rest[end..];
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Post-process a CLIF function's IR text to replace opaque `userextname<N>` tokens
+/// (used by Cranelift's display for global-value symbol names) with the explicit
+/// `u<ns>:<idx>` form for any entry that has `namespace == 1` (data-object refs).
+///
+/// Without this fix, round-tripping CLIF through text loses the data-symbol mapping:
+/// `cranelift_reader::parse_functions` resolves `userextname<N>` by position in the
+/// predeclared-names table (populated by `fn<K> = u0:M` declarations), which places
+/// data refs at the wrong slot. Emitting `u1:<idx>` makes the reference self-describing
+/// so the reader inserts the correct `UserExternalName { namespace: 1, index: idx }`.
+fn fix_data_ref_names(func: &Function, ir: &str) -> String {
+    let mut data_refs: Vec<(u32, u32)> = func
+        .params
+        .user_named_funcs()
+        .iter()
+        .filter_map(|(ref_, name)| {
+            if name.namespace == 1 {
+                Some((ref_.as_u32(), name.index))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if data_refs.is_empty() {
+        return ir.to_string();
+    }
+    // Process larger indices first so "userextname70" is handled before "userextname7".
+    data_refs.sort_by(|(a, _), (b, _)| b.cmp(a));
+    let mut result = ir.to_string();
+    for (n, idx) in data_refs {
+        let from = format!("userextname{n}");
+        let to = format!("u1:{idx}");
+        result = replace_whole_number_token(&result, &from, &to);
+    }
+    result
+}
+
 #[allow(clippy::too_many_arguments)]
 fn define_fn<M: Module>(
     module: &mut M,
@@ -4962,7 +5114,10 @@ fn define_fn<M: Module>(
     // self-identify its id, which the dogfood-IR loader relies on to re-link the
     // checked-in CLIF (see `from_artifact`).
     ctx.func.name = UserFuncName::user(0, id.as_u32());
-    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
     // Print the source-variable legend (params + locals → their CLIF value/slot)
     // as trailing comments, so a reader can map `v3`/`ss0` back to source names.
     // Comments are ignored by cranelift's reader, so checked-in `.clif` still loads.
@@ -6654,7 +6809,10 @@ fn define_pair_rc_fn<M: Module>(
         builder.finalize();
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
-    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
     module
         .define_function(id, ctx)
         .map_err(|e| Error::msg(format!("define pair rc fn: {e}")))?;
@@ -6718,7 +6876,10 @@ fn define_elem_rc_fn<M: Module>(
         builder.finalize();
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
-    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
     module
         .define_function(id, ctx)
         .map_err(|e| Error::msg(format!("define elem rc fn: {e}")))?;
@@ -7602,7 +7763,10 @@ fn define_tostr_fn<M: Module>(
         builder.finalize();
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
-    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
     // Instrument after the IR dump and before lowering, mirroring `define_fn`, so
     // rendering work stays counted in the `instructions executed` metric.
     if instrument {

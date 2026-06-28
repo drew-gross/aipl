@@ -72,33 +72,13 @@ impl Error {
 }
 
 /// The rustc-style location + caret block for a single span (no leading label
-/// line — callers prepend `error:`/`note:`):
-///   {pad}--> input:line:col
-///   {pad} |
-///   {line_no} | <source line>
-///   {pad} | <indent>^^^
+/// line — callers prepend `error:`/`note:`). Computed by the dogfooded AIPL
+/// `caret_block` via the embedding FFI (see [`set_caret_block_hook`]).
 fn caret_block(source: &str, span: &Span) -> String {
-    let (line_idx, line_start) = line_at(source, span.start);
-    let line_end = source[line_start..]
-        .find('\n')
-        .map(|n| line_start + n)
-        .unwrap_or(source.len());
-    let line_text = &source[line_start..line_end];
-    let col = span.start - line_start;
-    let underline_len = (span.end.min(line_end) - span.start).max(1);
-
-    let line_no = line_idx + 1;
-    let pad = line_no.to_string().len();
-    let blank = " ".repeat(pad);
-    format!(
-        "{blank}--> input:{line_no}:{col_no}\n\
-         {blank} |\n\
-         {line_no} | {line_text}\n\
-         {blank} | {caret_pad}{carets}",
-        col_no = col + 1,
-        caret_pad = " ".repeat(col),
-        carets = "^".repeat(underline_len),
-    )
+    CARET_BLOCK_HOOK.get().expect(
+        "caret_block hook not installed before rendering an error \
+         (call install_parser_hooks first)",
+    )(source, span.start, span.end)
 }
 
 /// Controls compiler debug output. Threaded through every pass so the
@@ -130,24 +110,18 @@ impl DebugOptions {
     }
 }
 
-/// The hook called by [`caret_block`] to locate a byte offset's line. Installed
-/// by the compiler via [`set_line_at_hook`] (the dogfooded AIPL `line_at`, run
-/// through the embedding FFI). No native fallback — panics if not installed.
-static LINE_AT_HOOK: std::sync::OnceLock<fn(&str, usize) -> (usize, usize)> =
+/// The hook called by [`caret_block`] to format the location + underline block
+/// for a span. Installed by the compiler via [`set_caret_block_hook`] (the
+/// dogfooded AIPL `caret_block`, run through the embedding FFI). No native
+/// fallback — panics if not installed.
+static CARET_BLOCK_HOOK: std::sync::OnceLock<fn(&str, usize, usize) -> String> =
     std::sync::OnceLock::new();
 
-/// Install the line-locator hook (the dogfooded AIPL `line_at`, run through the
-/// embedding FFI). Idempotent — first install wins. Must be called before any
-/// [`Error::render`] with a span (i.e. before `install_parser_hooks` returns).
-pub fn set_line_at_hook(f: fn(&str, usize) -> (usize, usize)) {
-    let _ = LINE_AT_HOOK.set(f);
-}
-
-fn line_at(source: &str, offset: usize) -> (usize, usize) {
-    LINE_AT_HOOK.get().expect(
-        "line_at hook not installed before rendering an error \
-             (call install_parser_hooks first)",
-    )(source, offset)
+/// Install the caret-block hook (the dogfooded AIPL `caret_block`, run through
+/// the embedding FFI). Idempotent — first install wins. Must be called before
+/// any [`Error::render`] with a span (i.e. before `install_parser_hooks` returns).
+pub fn set_caret_block_hook(f: fn(&str, usize, usize) -> String) {
+    let _ = CARET_BLOCK_HOOK.set(f);
 }
 
 pub mod ast {

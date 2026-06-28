@@ -1,0 +1,72 @@
+// The error renderer's caret-block formatter: the compiler calls this through the
+// FFI (see `install_parser_hooks`) when rendering an error with a span. Given
+// `source`, `span_start`, and `span_end` (byte offsets), it returns the
+// rustc-style location + underline block (no leading `error:`/`note:` label):
+//
+//   {pad}--> input:line:col
+//   {pad} |
+//   {line_no} | <source line>
+//   {pad} | <indent>^^^
+import { wrapping_add as +, -, ==, <, len, max, min, enumerate } from builtins;
+import { line_at } from "./line_at.aipl";
+
+fn find_line_end(source: str, line_start: i64) -> i64 {
+    let suffix = source[line_start..];
+    for (let (i, c) : suffix.enumerate()) {
+        if (c == '\n') {
+            return line_start + i;
+        };
+    }
+    source.len()
+}
+
+fn repeat_str(s: str, n: i64) -> str {
+    mut out = "";
+    mut i = 0;
+    while (i < n) {
+        set out = out + s;
+        set i = i + 1;
+    }
+    out
+}
+
+pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
+    let la = line_at(source, span_start);
+    let line_start = la.line_start;
+    let line_idx = la.line;
+    let line_end = find_line_end(source, line_start);
+    let line_text = source[line_start..line_end];
+    let col = span_start - line_start;
+    let underline_len = max(min(span_end, line_end) - span_start, 1);
+    let line_no = line_idx + 1;
+    let blank = repeat_str(" ", len(`{line_no}`));
+    let caret_pad = repeat_str(" ", col);
+    let carets = repeat_str("^", underline_len);
+    let col_no = col + 1;
+    ```
+    {blank}--> input:{line_no}:{col_no}
+    {blank} |
+    {line_no} | {line_text}
+    {blank} | {caret_pad}{carets}
+    ```
+}.test({
+    assert(caret_block("hello world", 0, 5) ==
+        " --> input:1:1\n  |\n1 | hello world\n  | ^^^^^");
+    assert(caret_block("hello\nworld", 6, 11) ==
+        " --> input:2:1\n  |\n2 | world\n  | ^^^^^");
+    assert(caret_block("hello world", 6, 11) ==
+        " --> input:1:7\n  |\n1 | hello world\n  |       ^^^^^");
+    // Zero-width span at col 0 gets at least one caret.
+    assert(caret_block("hi", 0, 0) ==
+        " --> input:1:1\n  |\n1 | hi\n  | ^");
+    // Span extending past line end is clamped to the line.
+    assert(caret_block("hi\nthere", 0, 10) ==
+        " --> input:1:1\n  |\n1 | hi\n  | ^^");
+})
+--- performance ---
+allocations: 74
+deallocations: 74
+reallocations: 93
+bytes allocated: 2714
+instructions executed: 10080
+binary size: 16976

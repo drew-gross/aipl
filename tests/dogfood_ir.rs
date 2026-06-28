@@ -34,9 +34,23 @@ fn artifact_path(engine: &DogfoodEngine) -> PathBuf {
 }
 
 /// Generate the artifact for one engine via the live frontend.
+///
+/// Spawns a scoped thread with a 64 MiB stack: some dogfooded `.aipl` files
+/// (e.g. `caret_block.aipl`) trigger deep recursion in the compiler that
+/// overflows the default test-framework stack (8 MiB on macOS).
 fn generate(engine: &DogfoodEngine) -> String {
-    generate_dogfood_artifact(engine.sources, engine.entries)
-        .unwrap_or_else(|e| panic!("generate dogfood IR for {}: {e}", engine.clif_file))
+    let mut result = None;
+    std::thread::scope(|s| {
+        let handle = std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024)
+            .spawn_scoped(s, || {
+                generate_dogfood_artifact(engine.sources, engine.entries)
+                    .unwrap_or_else(|e| panic!("generate dogfood IR for {}: {e}", engine.clif_file))
+            })
+            .expect("spawn scoped thread");
+        result = Some(handle.join().expect("generate thread panicked"));
+    });
+    result.unwrap()
 }
 
 /// Normalize line endings so a CRLF checkout (git `autocrlf`) compares equal to
@@ -156,6 +170,38 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                     ("line".to_string(), FfiValue::Int(0)),
                     ("line_start".to_string(), FfiValue::Int(0)),
                 ])
+            );
+        }
+        "caret_block.clif" => {
+            // Returns the rustc-style location + caret underline block for a span.
+            let result = comp
+                .call_values(
+                    "caret_block",
+                    &[
+                        FfiValue::Str("hello world".to_string()),
+                        FfiValue::Int(0),
+                        FfiValue::Int(5),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(
+                result,
+                FfiValue::Str(" --> input:1:1\n  |\n1 | hello world\n  | ^^^^^".to_string())
+            );
+            // Multi-line source: span on second line.
+            let line2 = comp
+                .call_values(
+                    "caret_block",
+                    &[
+                        FfiValue::Str("hello\nworld".to_string()),
+                        FfiValue::Int(6),
+                        FfiValue::Int(11),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(
+                line2,
+                FfiValue::Str(" --> input:2:1\n  |\n2 | world\n  | ^^^^^".to_string())
             );
         }
         other => panic!("no sanity check defined for dogfood engine {other}"),
