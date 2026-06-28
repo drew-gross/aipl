@@ -234,6 +234,7 @@ gazelle! {
         // block/loop choice is a single-token decision.
         kw_stmt = let_stmt => let_stmt
                 | let_tuple_stmt => let_tuple_stmt
+                | let_struct_stmt => let_struct_stmt
                 | mut_stmt => mut_stmt
                 | assign_stmt => assign_stmt
                 | for_stmt => for_stmt
@@ -244,6 +245,13 @@ gazelle! {
         // `let (a, b, c) = expr;` — tuple destructuring. Reuses `match_bindings`
         // (existing left-recursive ident list) to avoid adding new LR states.
         let_tuple_stmt = LET LPAREN match_bindings RPAREN EQ expr SEMI => let_tuple_stmt;
+        // `let Point { x, y } = expr;` — struct destructuring. The IDENT after
+        // LET is the struct type name; after LET IDENT the LBRACE lookahead
+        // unambiguously distinguishes this from the plain `let_stmt` (EQ).
+        let_struct_stmt = LET IDENT LBRACE struct_field_bindings RBRACE EQ expr SEMI => let_struct_stmt;
+        struct_field_bindings = struct_field_binding_list => present
+                              | struct_field_binding_list COMMA => present_trailing;
+        struct_field_binding_list = IDENT => first | struct_field_binding_list COMMA IDENT => rest;
         // `return value;` — early-return. A statement (keyword-led, so its FIRST
         // set stays disjoint from `expr`); control never falls through it.
         return_stmt = RETURN expr SEMI => return_stmt;
@@ -491,6 +499,9 @@ impl aipl::Types for Build {
     type KwStmt = StmtSpec;
     type LetStmt = StmtSpec;
     type LetTupleStmt = StmtSpec;
+    type LetStructStmt = StmtSpec;
+    type StructFieldBindings = Vec<String>;
+    type StructFieldBindingList = Vec<String>;
     type MutStmt = StmtSpec;
     type AssignStmt = StmtSpec;
     type ForStmt = StmtSpec;
@@ -510,6 +521,12 @@ pub enum StmtSpec {
     },
     LetTuple {
         names: Vec<String>,
+        value: Expr,
+        span: Span,
+    },
+    LetStruct {
+        struct_name: String,
+        fields: Vec<String>,
         value: Expr,
         span: Span,
     },
@@ -1202,6 +1219,32 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
                 outer_span,
             )
         }
+        StmtSpec::LetStruct {
+            struct_name: _,
+            fields,
+            value,
+            span: struct_span,
+        } => {
+            let tmp = format!("__spat${}", struct_span.start);
+            let mut result = acc;
+            for field_name in fields.iter().rev() {
+                let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), struct_span.clone());
+                let field = Expr::new(
+                    ExprKind::Field(Box::new(tmp_ident), field_name.clone()),
+                    struct_span.clone(),
+                );
+                let inner_span = join_spans(&struct_span, &result.span);
+                result = Expr::new(
+                    ExprKind::Let(field_name.clone(), Box::new(field), Box::new(result)),
+                    inner_span,
+                );
+            }
+            let outer_span = join_spans(&struct_span, &result.span);
+            Expr::new(
+                ExprKind::Let(tmp, Box::new(value), Box::new(result)),
+                outer_span,
+            )
+        }
         StmtSpec::Return {
             value,
             span: ret_span,
@@ -1277,6 +1320,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
         Ok(match node {
             aipl::KwStmt::LetStmt(s) => s,
             aipl::KwStmt::LetTupleStmt(s) => s,
+            aipl::KwStmt::LetStructStmt(s) => s,
             aipl::KwStmt::MutStmt(s) => s,
             aipl::KwStmt::AssignStmt(s) => s,
             aipl::KwStmt::ForStmt(s) => s,
@@ -1310,6 +1354,43 @@ impl gazelle::Action<aipl::LetTupleStmt<Self>> for Build {
         }
         let span = value.span.clone();
         Ok(StmtSpec::LetTuple { names, value, span })
+    }
+}
+
+impl gazelle::Action<aipl::LetStructStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::LetStructStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::LetStructStmt::LetStructStmt((struct_name, _), fields, value) = node;
+        let span = value.span.clone();
+        Ok(StmtSpec::LetStruct {
+            struct_name,
+            fields,
+            value,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::StructFieldBindings<Self>> for Build {
+    fn build(&mut self, node: aipl::StructFieldBindings<Self>) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::StructFieldBindings::Present(list)
+            | aipl::StructFieldBindings::PresentTrailing(list) => list,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::StructFieldBindingList<Self>> for Build {
+    fn build(
+        &mut self,
+        node: aipl::StructFieldBindingList<Self>,
+    ) -> Result<Vec<String>, Self::Error> {
+        Ok(match node {
+            aipl::StructFieldBindingList::First((s, _)) => vec![s],
+            aipl::StructFieldBindingList::Rest(mut prev, (s, _)) => {
+                prev.push(s);
+                prev
+            }
+        })
     }
 }
 
