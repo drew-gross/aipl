@@ -142,8 +142,9 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
             assert_eq!(clean, FfiValue::Opt(None));
         }
         "line_at.clif" => {
-            // Returns `LineAt { line, line_start }`: the 0-based line index and
-            // byte offset of the line's first byte for a given source + offset.
+            // Returns `LineAt { line, line_start, line_end }`: the 0-based line
+            // index, byte offset of the line's first byte, and byte offset of the
+            // line's end (the '\n' terminator or source.len() for the last line).
             let result = comp
                 .call_values(
                     "line_at",
@@ -155,6 +156,7 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 FfiValue::Struct(vec![
                     ("line".to_string(), FfiValue::Int(1)),
                     ("line_start".to_string(), FfiValue::Int(6)),
+                    ("line_end".to_string(), FfiValue::Int(11)),
                 ])
             );
             // Offset 0 always returns line 0, line_start 0.
@@ -169,6 +171,7 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 FfiValue::Struct(vec![
                     ("line".to_string(), FfiValue::Int(0)),
                     ("line_start".to_string(), FfiValue::Int(0)),
+                    ("line_end".to_string(), FfiValue::Int(3)),
                 ])
             );
         }

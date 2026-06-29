@@ -7,34 +7,20 @@
 //   {pad} |
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
-import { wrapping_add as +, -, ==, <, len, max, min, enumerate, repeat } from builtins;
+import { wrapping_add as +, -, ==, len, max, min, repeat } from builtins;
 import { line_at } from "./line_at.aipl";
 
-fn find_line_end(source: str, line_start: i64) -> i64 {
-    let suffix = source[line_start..];
-    for (let (i, c) : suffix.enumerate()) {
-        if (c == '\n') {
-            return line_start + i;
-        };
-    }
-    source.len()
-}
-
 pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
-    let LineAt { line_start, line } = line_at(source, span_start);
-    let line_end = find_line_end(source, line_start);
-    let line_text = source[line_start..line_end];
+    let LineAt { line_start, line, line_end } = line_at(source, span_start);
     let col = span_start - line_start;
     let underline_len = max(min(span_end, line_end) - span_start, 1);
     let line_no = line + 1;
     let blank = " ".repeat(len(`{line_no}`));
-    let caret_pad = " ".repeat(col);
-    let carets = "^".repeat(underline_len);
     ```
     {blank}--> input:{line_no}:{col + 1}
     {blank} |
-    {line_no} | {line_text}
-    {blank} | {caret_pad}{carets}
+    {line_no} | {source[line_start..line_end]}
+    {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
     assert(caret_block("hello world", 0, 5) ==
@@ -76,9 +62,9 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
         """);
 })
 --- performance ---
-allocations: 85
-deallocations: 85
-reallocations: 93
-bytes allocated: 2930
-instructions executed: 9419
-binary size: 16968
+allocations: 84
+deallocations: 84
+reallocations: 99
+bytes allocated: 2898
+instructions executed: 12093
+binary size: 18680

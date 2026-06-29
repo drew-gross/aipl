@@ -1,44 +1,59 @@
 // The error renderer's line locator: the compiler calls this through the FFI
 // (see `install_parser_hooks`) when rendering an error with a span. Given
-// `source` and a byte `offset`, it returns the 0-based line index and the byte
-// offset of that line's first byte.
-import { wrapping_add as +, ==, >=, enumerate } from builtins;
+// `source` and a byte `offset`, it returns the 0-based line index, the byte
+// offset of that line's first byte, and the byte offset of the line's end
+// (the '\n' terminator, or source.len() for the last line).
+import { wrapping_add as +, ==, >=, enumerate, len } from builtins;
 
-struct LineAt { line: i64, line_start: i64 }
+struct LineAt { line: i64, line_start: i64, line_end: i64 }
 
 pub fn line_at(source: str, offset: i64) -> LineAt {
     mut line = 0;
     mut line_start = 0;
+    mut found = false;
     for (let (i, c) : source.enumerate()) {
-        if (i >= offset) {
-            return LineAt { line: line, line_start: line_start };
-        };
         if (c == '\n') {
+            if (found) {
+                return LineAt { line: line, line_start: line_start, line_end: i };
+            };
+            if (i >= offset) {
+                return LineAt { line: line, line_start: line_start, line_end: i };
+            };
             set line = line + 1;
             set line_start = i + 1;
         };
+        if (i >= offset) {
+            set found = true;
+        };
     }
-    LineAt { line: line, line_start: line_start }
+    LineAt { line: line, line_start: line_start, line_end: source.len() }
 }.test({
     assert(line_at("hello", 0).line == 0);
     assert(line_at("hello", 0).line_start == 0);
+    assert(line_at("hello", 0).line_end == 5);
     assert(line_at("hello\nworld", 3).line == 0);
     assert(line_at("hello\nworld", 3).line_start == 0);
+    assert(line_at("hello\nworld", 3).line_end == 5);
     assert(line_at("hello\nworld", 5).line == 0);
     assert(line_at("hello\nworld", 5).line_start == 0);
+    assert(line_at("hello\nworld", 5).line_end == 5);
     assert(line_at("hello\nworld", 6).line == 1);
     assert(line_at("hello\nworld", 6).line_start == 6);
+    assert(line_at("hello\nworld", 6).line_end == 11);
     assert(line_at("a\nb", 10).line == 1);
     assert(line_at("a\nb", 10).line_start == 2);
+    assert(line_at("a\nb", 10).line_end == 3);
     assert(line_at("", 0).line == 0);
     assert(line_at("", 0).line_start == 0);
+    assert(line_at("", 0).line_end == 0);
     assert(line_at("a\nb\nc", 4).line == 2);
     assert(line_at("a\nb\nc", 4).line_start == 4);
+    assert(line_at("a\nb\nc", 4).line_end == 5);
 })
 --- performance ---
-allocations: 14
-deallocations: 14
-reallocations: 52
-bytes allocated: 448
-instructions executed: 4602
-binary size: 7192
+allocations: 21
+deallocations: 21
+reallocations: 78
+bytes allocated: 672
+instructions executed: 8359
+binary size: 10032
