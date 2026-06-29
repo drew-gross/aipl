@@ -28,32 +28,18 @@ pub fn line_at(source: str, offset: i64) -> LineAt {
     }
     LineAt { line: line, line_start: line_start, line_end: source.len() }
 }.test({
-    assert(line_at("hello", 0).line == 0);
-    assert(line_at("hello", 0).line_start == 0);
-    assert(line_at("hello", 0).line_end == 5);
-    assert(line_at("hello\nworld", 3).line == 0);
-    assert(line_at("hello\nworld", 3).line_start == 0);
-    assert(line_at("hello\nworld", 3).line_end == 5);
-    assert(line_at("hello\nworld", 5).line == 0);
-    assert(line_at("hello\nworld", 5).line_start == 0);
-    assert(line_at("hello\nworld", 5).line_end == 5);
-    assert(line_at("hello\nworld", 6).line == 1);
-    assert(line_at("hello\nworld", 6).line_start == 6);
-    assert(line_at("hello\nworld", 6).line_end == 11);
-    assert(line_at("a\nb", 10).line == 1);
-    assert(line_at("a\nb", 10).line_start == 2);
-    assert(line_at("a\nb", 10).line_end == 3);
-    assert(line_at("", 0).line == 0);
-    assert(line_at("", 0).line_start == 0);
-    assert(line_at("", 0).line_end == 0);
-    assert(line_at("a\nb\nc", 4).line == 2);
-    assert(line_at("a\nb\nc", 4).line_start == 4);
-    assert(line_at("a\nb\nc", 4).line_end == 5);
+    assert(line_at("hello", 0) == LineAt { line: 0, line_start: 0, line_end: 5 });
+    assert(line_at("hello\nworld", 3) == LineAt { line: 0, line_start: 0, line_end: 5 });
+    assert(line_at("hello\nworld", 5) == LineAt { line: 0, line_start: 0, line_end: 5 });
+    assert(line_at("hello\nworld", 6) == LineAt { line: 1, line_start: 6, line_end: 11 });
+    assert(line_at("a\nb", 10) == LineAt { line: 1, line_start: 2, line_end: 3 });
+    assert(line_at("", 0) == LineAt { line: 0, line_start: 0, line_end: 0 });
+    assert(line_at("a\nb\nc", 4) == LineAt { line: 2, line_start: 4, line_end: 5 });
 })
 --- performance ---
-allocations: 21
-deallocations: 21
-reallocations: 78
-bytes allocated: 672
-instructions executed: 8359
-binary size: 10032
+allocations: 7
+deallocations: 7
+reallocations: 26
+bytes allocated: 224
+instructions executed: 2982
+binary size: 5968

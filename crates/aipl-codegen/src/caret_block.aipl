@@ -64,9 +64,9 @@ pub fn caret_block(source: str, span: Span) -> str {
         """);
 })
 --- performance ---
-allocations: 84
-deallocations: 84
-reallocations: 99
-bytes allocated: 2898
-instructions executed: 12078
-binary size: 18560
+allocations: 70
+deallocations: 70
+reallocations: 47
+bytes allocated: 2450
+instructions executed: 6701
+binary size: 14488
