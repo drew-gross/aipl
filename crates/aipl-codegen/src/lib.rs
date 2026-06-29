@@ -2718,18 +2718,20 @@ thread_local! {
 }
 
 /// The error renderer's caret-block hook (see [`install_parser_hooks`]): given
-/// `source` and a span (`span_start`, `span_end`), returns the rustc-style
+/// `source` and a `span` (half-open byte range), returns the rustc-style
 /// location + underline block — computed by the dogfooded AIPL `caret_block` via
 /// the FFI. The AIPL calls `line_at` in-engine. No native fallback; panics if it
 /// can't be built or called.
-fn caret_block(source: &str, span_start: usize, span_end: usize) -> String {
+fn caret_block(source: &str, span: Span) -> String {
     CARET_BLOCK_ENGINE.with(|comp| {
         match comp.call_values(
             "caret_block",
             &[
                 FfiValue::Str(source.to_string()),
-                FfiValue::Int(span_start as i64),
-                FfiValue::Int(span_end as i64),
+                FfiValue::Struct(vec![
+                    ("start".to_string(), FfiValue::Int(span.start as i64)),
+                    ("end".to_string(), FfiValue::Int(span.end as i64)),
+                ]),
             ],
         ) {
             Ok(FfiValue::Str(s)) => s,
@@ -3802,9 +3804,11 @@ impl Compilation {
 
         // Marshal each argument to its `i64` ABI, validating the variant against
         // the parameter type. A heap `str` buffer the host allocates is recorded
-        // in `to_free` to release after the call.
+        // in `to_free` to release after the call. Struct buffers are kept alive
+        // in `struct_bufs` until after `invoke` (the ABI passes a pointer).
         let mut abi: Vec<i64> = Vec::with_capacity(args.len());
         let mut to_free: Vec<(*mut u8, usize)> = Vec::new();
+        let mut struct_bufs: Vec<Vec<u8>> = Vec::new();
         for (i, (p, a)) in info.params.iter().zip(args).enumerate() {
             match a {
                 FfiValue::Int(v) if is_ffi_scalar(p) => abi.push(*v),
@@ -3815,6 +3819,73 @@ impl Compilation {
                     }
                     abi.push(val);
                 }
+                FfiValue::Struct(fields) => {
+                    // Collect layout info (clone to end the borrow of self.structs).
+                    let (buf_size, field_specs) = match ffi_struct_layout(p, &self.structs) {
+                        Some(layout) => {
+                            let specs = layout
+                                .fields
+                                .iter()
+                                .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
+                                .collect::<Vec<_>>();
+                            (layout.size as usize, specs)
+                        }
+                        None => {
+                            for (header, content_len) in std::mem::take(&mut to_free) {
+                                unsafe { free_dynamic_string(header, content_len) };
+                            }
+                            return Err(Error::msg(format!(
+                                "fn {name:?} parameter {i} is {}; pass it as the matching \
+                                 FfiValue (Int for i64/bool/char, Str for str, Struct for struct)",
+                                type_name(p)
+                            )));
+                        }
+                    };
+                    if fields.len() != field_specs.len() {
+                        for (header, content_len) in std::mem::take(&mut to_free) {
+                            unsafe { free_dynamic_string(header, content_len) };
+                        }
+                        return Err(Error::msg(format!(
+                            "fn {name:?} parameter {i}: struct {} has {} field(s), got {}",
+                            type_name(p),
+                            field_specs.len(),
+                            fields.len()
+                        )));
+                    }
+                    let mut buf = vec![0u8; buf_size];
+                    for ((fname, fval), (fl_name, fl_offset, fl_ty)) in
+                        fields.iter().zip(field_specs.iter())
+                    {
+                        if fname != fl_name {
+                            for (header, content_len) in std::mem::take(&mut to_free) {
+                                unsafe { free_dynamic_string(header, content_len) };
+                            }
+                            return Err(Error::msg(format!(
+                                "fn {name:?} parameter {i}: expected field {:?}, got {:?}",
+                                fl_name, fname
+                            )));
+                        }
+                        match fval {
+                            FfiValue::Int(v) if is_ffi_scalar(fl_ty) => {
+                                let off = *fl_offset as usize;
+                                buf[off..off + 8].copy_from_slice(&v.to_ne_bytes());
+                            }
+                            _ => {
+                                for (header, content_len) in std::mem::take(&mut to_free) {
+                                    unsafe { free_dynamic_string(header, content_len) };
+                                }
+                                return Err(Error::msg(format!(
+                                    "fn {name:?} parameter {i}, field {:?} is {}; only \
+                                     i64/bool/char fields can be passed in a FfiValue::Struct",
+                                    fl_name,
+                                    type_name(fl_ty)
+                                )));
+                            }
+                        }
+                    }
+                    struct_bufs.push(buf);
+                    abi.push(struct_bufs.last().unwrap().as_ptr() as i64);
+                }
                 _ => {
                     // Release any buffers earlier `str` args already allocated.
                     for (header, content_len) in std::mem::take(&mut to_free) {
@@ -3822,7 +3893,7 @@ impl Compilation {
                     }
                     return Err(Error::msg(format!(
                         "fn {name:?} parameter {i} is {}; pass it as the matching FfiValue \
-                         (Int for i64/bool/char, Str for str)",
+                         (Int for i64/bool/char, Str for str, Struct for struct)",
                         type_name(p)
                     )));
                 }

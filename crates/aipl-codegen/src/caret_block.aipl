@@ -1,6 +1,6 @@
 // The error renderer's caret-block formatter: the compiler calls this through the
 // FFI (see `install_parser_hooks`) when rendering an error with a span. Given
-// `source`, `span_start`, and `span_end` (byte offsets), it returns the
+// `source` and `span` (a half-open byte range `[start, end)`), it returns the
 // rustc-style location + underline block (no leading `error:`/`note:` label):
 //
 //   {pad}--> input:line:col
@@ -10,10 +10,12 @@
 import { wrapping_add as +, -, ==, len, max, min, repeat } from builtins;
 import { line_at } from "./line_at.aipl";
 
-pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
-    let LineAt { line_start, line, line_end } = line_at(source, span_start);
-    let col = span_start - line_start;
-    let underline_len = max(min(span_end, line_end) - span_start, 1);
+struct Span { start: i64, end: i64 }
+
+pub fn caret_block(source: str, span: Span) -> str {
+    let LineAt { line_start, line, line_end } = line_at(source, span.start);
+    let col = span.start - line_start;
+    let underline_len = max(min(span.end, line_end) - span.start, 1);
     let line_no = line + 1;
     let blank = " ".repeat(len(`{line_no}`));
     ```
@@ -23,21 +25,21 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
     {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
-    assert(caret_block("hello world", 0, 5) ==
+    assert(caret_block("hello world", Span { start: 0, end: 5 }) ==
         """
              --> input:1:1
               |
             1 | hello world
               | ^^^^^
         """);
-    assert(caret_block("hello\nworld", 6, 11) ==
+    assert(caret_block("hello\nworld", Span { start: 6, end: 11 }) ==
         """
              --> input:2:1
               |
             2 | world
               | ^^^^^
         """);
-    assert(caret_block("hello world", 6, 11) ==
+    assert(caret_block("hello world", Span { start: 6, end: 11 }) ==
         """
              --> input:1:7
               |
@@ -45,7 +47,7 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
               |       ^^^^^
         """);
     // Zero-width span at col 0 gets at least one caret.
-    assert(caret_block("hi", 0, 0) ==
+    assert(caret_block("hi", Span { start: 0, end: 0 }) ==
         """
              --> input:1:1
               |
@@ -53,7 +55,7 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
               | ^
         """);
     // Span extending past line end is clamped to the line.
-    assert(caret_block("hi\nthere", 0, 10) ==
+    assert(caret_block("hi\nthere", Span { start: 0, end: 10 }) ==
         """
              --> input:1:1
               |
@@ -66,5 +68,5 @@ allocations: 84
 deallocations: 84
 reallocations: 99
 bytes allocated: 2898
-instructions executed: 12093
-binary size: 18680
+instructions executed: 12128
+binary size: 18840

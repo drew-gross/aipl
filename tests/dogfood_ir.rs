@@ -177,14 +177,16 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
         }
         "caret_block.clif" => {
             // Returns the rustc-style location + caret underline block for a span.
+            let span = |start, end| {
+                FfiValue::Struct(vec![
+                    ("start".to_string(), FfiValue::Int(start)),
+                    ("end".to_string(), FfiValue::Int(end)),
+                ])
+            };
             let result = comp
                 .call_values(
                     "caret_block",
-                    &[
-                        FfiValue::Str("hello world".to_string()),
-                        FfiValue::Int(0),
-                        FfiValue::Int(5),
-                    ],
+                    &[FfiValue::Str("hello world".to_string()), span(0, 5)],
                 )
                 .unwrap();
             assert_eq!(
@@ -195,11 +197,7 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
             let line2 = comp
                 .call_values(
                     "caret_block",
-                    &[
-                        FfiValue::Str("hello\nworld".to_string()),
-                        FfiValue::Int(6),
-                        FfiValue::Int(11),
-                    ],
+                    &[FfiValue::Str("hello\nworld".to_string()), span(6, 11)],
                 )
                 .unwrap();
             assert_eq!(

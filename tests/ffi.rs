@@ -267,6 +267,41 @@ pub fn span(present: bool, a: i64, b: i64) -> Span? {
 }
 
 #[test]
+fn call_values_marshals_struct_param() {
+    // A struct of scalar fields passed as `FfiValue::Struct` is written into a
+    // caller-allocated buffer; the callee receives a pointer to it — the same
+    // ABI used for struct locals and returns, but on the input side. This is
+    // the shape `caret_block` uses for its `Span` parameter.
+    let src = "\
+import { wrapping_add as +, - } from builtins;
+struct Span { start: i64, end: i64 }
+pub fn span_len(span: Span) -> i64 { span.end - span.start }
+pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";
+    let e = Engine::compile(src).unwrap();
+    use aipl::FfiValue::{Int, Struct};
+    let span = |start, end| Struct(vec![("start".into(), Int(start)), ("end".into(), Int(end))]);
+
+    assert_eq!(e.call_values("span_len", &[span(3, 10)]).unwrap(), Int(7));
+    assert_eq!(e.call_values("span_len", &[span(0, 0)]).unwrap(), Int(0));
+    // Two struct params.
+    assert_eq!(
+        e.call_values("span_sum", &[span(1, 2), span(3, 4)])
+            .unwrap(),
+        Int(10)
+    );
+    // Wrong field name is rejected.
+    let bad = Struct(vec![("begin".into(), Int(0)), ("end".into(), Int(5))]);
+    assert!(e.call_values("span_len", &[bad]).is_err());
+    // Wrong field count is rejected.
+    let short = Struct(vec![("start".into(), Int(0))]);
+    assert!(e.call_values("span_len", &[short]).is_err());
+    // FfiValue::Struct for a non-struct param is rejected.
+    let src2 = "pub fn id(x: i64) -> i64 { x }";
+    let e2 = Engine::compile(src2).unwrap();
+    assert!(e2.call_values("id", &[span(1, 2)]).is_err());
+}
+
+#[test]
 fn call_values_rejects_struct_with_nonscalar_field() {
     // A struct field that isn't a scalar or `str` (here an array) can't be
     // marshaled back yet — rejected with a clear error rather than mis-read.
