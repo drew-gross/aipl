@@ -1,0 +1,22 @@
+import { print, repeat } from builtins;
+
+fn main() !prints {
+    print("abc".repeat(3));
+    print("x".repeat(1));
+    print("-".repeat(0));
+    print("hi".repeat(2));
+}
+--- stdout ---
+abcabcabc
+x
+
+hihi
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 65
+instructions executed: 36
+binary size: 1400
+--- monomorphizations ---
+main

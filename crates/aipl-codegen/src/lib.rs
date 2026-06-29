@@ -735,6 +735,25 @@ extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
     result
 }
 
+/// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
+/// Returns `""` for `n <= 0`. Consumes `s` (callers pre-inc). Mirrors the linker runtime.
+extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
+    let mut sb = [0u8; 8];
+    let bytes = unsafe { str_bytes(s, &mut sb) };
+    let result = if n <= 0 || bytes.is_empty() {
+        make_str(&[])
+    } else {
+        let total = bytes.len() * n as usize;
+        let mut buf: Vec<u8> = Vec::with_capacity(total);
+        for _ in 0..n {
+            buf.extend_from_slice(bytes);
+        }
+        make_str(&buf)
+    };
+    aipl_dec(s);
+    result
+}
+
 /// `xs.reverse() -> T[]` — O(1): returns a reversed-view repr wrapping `xs`.
 /// Transfers ownership of `xs` into the view (no drop, no retain).
 /// `drop_fn`, `retain_fn`, `elem_size` describe the element type.
@@ -2317,6 +2336,8 @@ fn __builtin_to_str<T: any>(self: T) -> str { "" }
 // Structural hash, consistent with `==`.
 fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
 fn __builtin_trim(self: str) -> str { self }
+// Concatenate `self` with itself `n` times; returns `""` for `n <= 0`.
+fn __builtin_repeat(self: str, n: i64) -> str { "" }
 // True if every byte is ASCII whitespace (or the string is empty).
 fn __builtin_is_all_whitespace(self: str) -> bool { false }
 // True if `self` begins / ends with the argument — `str` bytes or `T[]`
@@ -3116,6 +3137,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
+    jit_builder.symbol("aipl_str_repeat", aipl_str_repeat as *const u8);
     jit_builder.symbol("aipl_str_reverse", aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_str_slice", aipl_str_slice as *const u8);
@@ -4596,7 +4618,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_iter_next"
         | "aipl_read_file_to_string"
         | "aipl_str_reverse" => sig(1, true),
-        "aipl_str_eq"
+        "aipl_str_repeat"
+        | "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
         | "aipl_concat"
@@ -4694,6 +4717,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
             "aipl_write_string_to_file",
         ),
         ("__builtin_trim", "aipl_trim"),
+        ("__builtin_repeat", "aipl_str_repeat"),
         ("__builtin_is_all_whitespace", "aipl_str_is_all_whitespace"),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
         ("__assert", "aipl_assert"),

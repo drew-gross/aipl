@@ -931,6 +931,31 @@ pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
     }
 }
 
+/// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
+/// Returns `""` for `n <= 0`. Consumes `s` (callers pre-inc).
+#[no_mangle]
+pub extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
+    unsafe {
+        let mut sbuf = [0u8; 8];
+        let bytes = str_bytes(s, &mut sbuf);
+        let result = if n <= 0 || bytes.is_empty() {
+            make_str(&[])
+        } else {
+            let chunk = bytes.len();
+            let total = chunk * n as usize;
+            let raw = rt_str_buf(total);
+            let dst = raw.add(STR_HEADER_SIZE) as *mut c_void;
+            let src = bytes.as_ptr() as *const c_void;
+            for i in 0..n as usize {
+                memcpy(dst.add(i * chunk), src, chunk);
+            }
+            raw.add(STR_HEADER_SIZE)
+        };
+        aipl_dec(s);
+        result
+    }
+}
+
 /// `xs.reverse() -> T[]` — new array with elements in reverse order.
 /// O(1): returns a reversed-view repr wrapping `a`.
 /// Transfers ownership of `a` into the view (no drop, no retain on `a`).

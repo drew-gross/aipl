@@ -7,7 +7,7 @@
 //   {pad} |
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
-import { wrapping_add as +, -, ==, <, len, max, min, enumerate } from builtins;
+import { wrapping_add as +, -, ==, <, len, max, min, enumerate, repeat } from builtins;
 import { line_at } from "./line_at.aipl";
 
 fn find_line_end(source: str, line_start: i64) -> i64 {
@@ -20,16 +20,6 @@ fn find_line_end(source: str, line_start: i64) -> i64 {
     source.len()
 }
 
-fn repeat_str(s: str, n: i64) -> str {
-    mut out = "";
-    mut i = 0;
-    while (i < n) {
-        set out = out + s;
-        set i = i + 1;
-    }
-    out
-}
-
 pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
     let LineAt { line_start, line } = line_at(source, span_start);
     let line_end = find_line_end(source, line_start);
@@ -37,9 +27,9 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
     let col = span_start - line_start;
     let underline_len = max(min(span_end, line_end) - span_start, 1);
     let line_no = line + 1;
-    let blank = repeat_str(" ", len(`{line_no}`));
-    let caret_pad = repeat_str(" ", col);
-    let carets = repeat_str("^", underline_len);
+    let blank = " ".repeat(len(`{line_no}`));
+    let caret_pad = " ".repeat(col);
+    let carets = "^".repeat(underline_len);
     ```
     {blank}--> input:{line_no}:{col + 1}
     {blank} |
@@ -86,9 +76,9 @@ pub fn caret_block(source: str, span_start: i64, span_end: i64) -> str {
         """);
 })
 --- performance ---
-allocations: 74
-deallocations: 74
+allocations: 85
+deallocations: 85
 reallocations: 93
-bytes allocated: 2714
-instructions executed: 10080
-binary size: 17264
+bytes allocated: 2930
+instructions executed: 9419
+binary size: 16968
