@@ -889,9 +889,27 @@ pub extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
         while end > start && is_ascii_ws(bytes[end - 1]) {
             end -= 1;
         }
-        let result = make_str(&bytes[start..end]); // inline if <= 7, else heap
-        aipl_dec(s);
-        result
+        let trimmed_n = end - start;
+        // Nothing trimmed: return s as-is, transferring our reference to the caller.
+        if start == 0 && end == n {
+            return s;
+        }
+        // Small result (≤ 7 bytes, incl. all-whitespace → trimmed_n == 0): copy
+        // inline and release s. Inline sources (≤ 7 bytes total) always land here.
+        if trimmed_n <= 7 {
+            let result = make_str(&bytes[start..end]);
+            aipl_dec(s);
+            return result;
+        }
+        // Large result from a heap/view source: return a view into s's buffer.
+        // Transfer our reference of s to the view's owner — no inc, no dec, no copy.
+        let data = bytes.as_ptr().add(start);
+        let obj = rt_alloc(VIEW_SIZE) as *mut u8;
+        *(obj as *mut i64) = 1; // refcount
+        *(obj.add(VIEW_DATA_OFFSET) as *mut *const u8) = data;
+        *(obj.add(VIEW_LEN_OFFSET) as *mut i64) = trimmed_n as i64;
+        *(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8) = s;
+        (obj as usize | VIEW_TAG) as *const u8
     }
 }
 

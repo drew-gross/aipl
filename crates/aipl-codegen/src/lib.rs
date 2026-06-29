@@ -718,9 +718,30 @@ extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
         .iter()
         .rposition(|&b| !is_ws(b))
         .map_or(start, |i| i + 1);
-    let result = make_str(&bytes[start..end]); // inline if <= 7, else heap
-    aipl_dec(s);
-    result
+    let n = end - start;
+    // Nothing trimmed: return s as-is, transferring our reference to the caller.
+    if start == 0 && end == bytes.len() {
+        return s;
+    }
+    // Small result (≤ 7 bytes, incl. all-whitespace → n == 0): pack inline, release s.
+    // Inline sources are always caught here (inline is ≤ 7 bytes, so the trimmed
+    // result is too), so the view path below never sees an inline source.
+    if n <= 7 {
+        let result = make_str(&bytes[start..end]);
+        aipl_dec(s);
+        return result;
+    }
+    // Large result: return a view into s's buffer. Transfer our reference of s to
+    // the view's owner field — no inc, no dec, no byte copy.
+    let data = unsafe { bytes.as_ptr().add(start) };
+    let obj = alloc_view();
+    unsafe {
+        std::ptr::write(obj as *mut i64, 1); // refcount
+        std::ptr::write(obj.add(VIEW_DATA_OFFSET) as *mut *const u8, data);
+        std::ptr::write(obj.add(VIEW_LEN_OFFSET) as *mut i64, n as i64);
+        std::ptr::write(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8, s);
+    }
+    (obj as usize | VIEW_TAG) as *const u8
 }
 
 /// `s.reverse() -> str` — returns a new string with the bytes in reverse order.

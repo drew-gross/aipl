@@ -31,10 +31,10 @@ sections; the compiler treats any such marker as a hard cutoff (see
     assert(parse_test_section_header("--- ---") == none);     // inner is all spaces
 })
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 336
+bytes allocated: 192
 instructions executed: 1130
 binary size: 9760
 --- monomorphizations ---
