@@ -30,21 +30,13 @@ function u0:0(i64, i64, i64) apple_aarch64 {
     sig2 = (i64, i64, i64) -> i64 apple_aarch64
     sig3 = (i64) apple_aarch64
     sig4 = (i64) apple_aarch64
-    sig5 = (i64) apple_aarch64
-    sig6 = (i64) apple_aarch64
-    sig7 = (i64) -> i64 apple_aarch64
-    sig8 = (i64) apple_aarch64
-    sig9 = (i64) apple_aarch64
+    sig5 = (i64) -> i64 apple_aarch64
     fn0 = u0:2 sig0  ; aipl_inc
     fn1 = colocated u0:1 sig1  ; __enumerate0
     fn2 = u0:3 sig2  ; aipl_arr_elem_ptr
     fn3 = u0:4 sig3  ; aipl_dec
     fn4 = u0:5 sig4  ; aipl_array_dec
-    fn5 = u0:4 sig5  ; aipl_dec
-    fn6 = u0:5 sig6  ; aipl_array_dec
-    fn7 = u0:6 sig7  ; aipl_str_len
-    fn8 = u0:4 sig8  ; aipl_dec
-    fn9 = u0:5 sig9  ; aipl_array_dec
+    fn5 = u0:6 sig5  ; aipl_str_len
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -136,8 +128,8 @@ block14:
     stack_store v42, ss6+8
     stack_store.i64 v21, ss6+16
     v43 = stack_addr.i64 ss6
-    call fn5(v1)
-    call fn6(v6)
+    call fn3(v1)
+    call fn4(v6)
     v44 = load.i64 notrap aligned v43
     store notrap aligned v44, v0
     v45 = load.i64 notrap aligned v43+8
@@ -197,11 +189,11 @@ block3:
     stack_store v66, ss7
     v67 = stack_load.i64 ss1
     stack_store v67, ss7+8
-    v68 = call fn7(v1)
+    v68 = call fn5(v1)
     stack_store v68, ss7+16
     v69 = stack_addr.i64 ss7
-    call fn8(v1)
-    call fn9(v6)
+    call fn3(v1)
+    call fn4(v6)
     v70 = load.i64 notrap aligned v69
     store notrap aligned v70, v0
     v71 = load.i64 notrap aligned v69+8

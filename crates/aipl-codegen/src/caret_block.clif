@@ -30,196 +30,62 @@ function u0:0(i64, i64) -> i64 apple_aarch64 {
     sig1 = (i64, i64, i64) apple_aarch64
     sig2 = (i64) -> i64 apple_aarch64
     sig3 = (i64) -> i64 apple_aarch64
-    sig4 = (i64) apple_aarch64
+    sig4 = (i64, i64) -> i64 apple_aarch64
     sig5 = (i64, i64) -> i64 apple_aarch64
-    sig6 = (i64) apple_aarch64
-    sig7 = (i64) apple_aarch64
-    sig8 = (i64, i64) -> i64 apple_aarch64
-    sig9 = (i64) -> i64 apple_aarch64
-    sig10 = (i64) apple_aarch64
-    sig11 = (i64) apple_aarch64
+    sig6 = (i64) -> i64 apple_aarch64
+    sig7 = (i64, i64) -> i64 apple_aarch64
+    sig8 = (i64) -> i64 apple_aarch64
+    sig9 = (i64, i64) -> i64 apple_aarch64
+    sig10 = (i64, i64) -> i64 apple_aarch64
+    sig11 = (i64) -> i64 apple_aarch64
     sig12 = (i64, i64) -> i64 apple_aarch64
-    sig13 = (i64) -> i64 apple_aarch64
-    sig14 = (i64) apple_aarch64
-    sig15 = (i64) apple_aarch64
+    sig13 = (i64, i64, i64) -> i64 apple_aarch64
+    sig14 = (i64, i64) -> i64 apple_aarch64
+    sig15 = (i64, i64) -> i64 apple_aarch64
     sig16 = (i64, i64) -> i64 apple_aarch64
-    sig17 = (i64) apple_aarch64
-    sig18 = (i64) apple_aarch64
+    sig17 = (i64, i64) -> i64 apple_aarch64
+    sig18 = (i64, i64) -> i64 apple_aarch64
     sig19 = (i64, i64) -> i64 apple_aarch64
-    sig20 = (i64) -> i64 apple_aarch64
-    sig21 = (i64) apple_aarch64
-    sig22 = (i64) apple_aarch64
+    sig20 = (i64, i64) -> i64 apple_aarch64
+    sig21 = (i64, i64) -> i64 apple_aarch64
+    sig22 = (i64, i64) -> i64 apple_aarch64
     sig23 = (i64, i64) -> i64 apple_aarch64
-    sig24 = (i64, i64, i64) -> i64 apple_aarch64
-    sig25 = (i64) apple_aarch64
-    sig26 = (i64) apple_aarch64
+    sig24 = (i64, i64) -> i64 apple_aarch64
+    sig25 = (i64, i64) -> i64 apple_aarch64
+    sig26 = (i64, i64) -> i64 apple_aarch64
     sig27 = (i64, i64) -> i64 apple_aarch64
-    sig28 = (i64) apple_aarch64
+    sig28 = (i64, i64) -> i64 apple_aarch64
     sig29 = (i64) apple_aarch64
-    sig30 = (i64, i64) -> i64 apple_aarch64
-    sig31 = (i64) apple_aarch64
-    sig32 = (i64, i64) -> i64 apple_aarch64
-    sig33 = (i64) apple_aarch64
-    sig34 = (i64) apple_aarch64
-    sig35 = (i64, i64) -> i64 apple_aarch64
-    sig36 = (i64) apple_aarch64
-    sig37 = (i64, i64) -> i64 apple_aarch64
-    sig38 = (i64) apple_aarch64
-    sig39 = (i64) apple_aarch64
-    sig40 = (i64, i64) -> i64 apple_aarch64
-    sig41 = (i64) apple_aarch64
-    sig42 = (i64) apple_aarch64
-    sig43 = (i64, i64) -> i64 apple_aarch64
-    sig44 = (i64) apple_aarch64
-    sig45 = (i64) apple_aarch64
-    sig46 = (i64, i64) -> i64 apple_aarch64
-    sig47 = (i64) apple_aarch64
-    sig48 = (i64) apple_aarch64
-    sig49 = (i64, i64) -> i64 apple_aarch64
-    sig50 = (i64) apple_aarch64
-    sig51 = (i64) apple_aarch64
-    sig52 = (i64, i64) -> i64 apple_aarch64
-    sig53 = (i64) apple_aarch64
-    sig54 = (i64) apple_aarch64
-    sig55 = (i64, i64) -> i64 apple_aarch64
-    sig56 = (i64) apple_aarch64
-    sig57 = (i64) apple_aarch64
-    sig58 = (i64, i64) -> i64 apple_aarch64
-    sig59 = (i64) apple_aarch64
-    sig60 = (i64) apple_aarch64
-    sig61 = (i64, i64) -> i64 apple_aarch64
-    sig62 = (i64) apple_aarch64
-    sig63 = (i64) apple_aarch64
-    sig64 = (i64, i64) -> i64 apple_aarch64
-    sig65 = (i64) apple_aarch64
-    sig66 = (i64) apple_aarch64
-    sig67 = (i64, i64) -> i64 apple_aarch64
-    sig68 = (i64) apple_aarch64
-    sig69 = (i64) apple_aarch64
-    sig70 = (i64) apple_aarch64
-    sig71 = (i64) apple_aarch64
-    sig72 = (i64) apple_aarch64
-    sig73 = (i64) apple_aarch64
-    sig74 = (i64) apple_aarch64
-    sig75 = (i64) apple_aarch64
-    sig76 = (i64) apple_aarch64
-    sig77 = (i64) apple_aarch64
-    sig78 = (i64) apple_aarch64
-    sig79 = (i64) apple_aarch64
-    sig80 = (i64) apple_aarch64
-    sig81 = (i64) apple_aarch64
-    sig82 = (i64) apple_aarch64
-    sig83 = (i64) apple_aarch64
-    sig84 = (i64) apple_aarch64
-    sig85 = (i64) apple_aarch64
-    sig86 = (i64) apple_aarch64
-    sig87 = (i64) apple_aarch64
-    sig88 = (i64) apple_aarch64
-    sig89 = (i64) apple_aarch64
-    sig90 = (i64) apple_aarch64
-    sig91 = (i64) apple_aarch64
-    sig92 = (i64) apple_aarch64
-    sig93 = (i64) apple_aarch64
-    sig94 = (i64) apple_aarch64
-    sig95 = (i64) apple_aarch64
-    sig96 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_inc
     fn1 = colocated u0:1 sig1  ; __m1__line_at
     fn2 = colocated u0:4 sig2  ; __to_str_0
     fn3 = u0:5 sig3  ; aipl_str_len
-    fn4 = u0:3 sig4  ; aipl_inc
-    fn5 = u0:6 sig5  ; aipl_str_repeat
-    fn6 = u0:3 sig6  ; aipl_inc
-    fn7 = u0:3 sig7  ; aipl_inc
-    fn8 = u0:7 sig8  ; aipl_concat
-    fn9 = colocated u0:4 sig9  ; __to_str_0
-    fn10 = u0:3 sig10  ; aipl_inc
-    fn11 = u0:3 sig11  ; aipl_inc
+    fn4 = u0:6 sig4  ; aipl_str_repeat
+    fn5 = u0:7 sig5  ; aipl_concat
+    fn6 = colocated u0:4 sig6  ; __to_str_0
+    fn7 = u0:7 sig7  ; aipl_concat
+    fn8 = colocated u0:4 sig8  ; __to_str_0
+    fn9 = u0:7 sig9  ; aipl_concat
+    fn10 = u0:7 sig10  ; aipl_concat
+    fn11 = colocated u0:4 sig11  ; __to_str_0
     fn12 = u0:7 sig12  ; aipl_concat
-    fn13 = colocated u0:4 sig13  ; __to_str_0
-    fn14 = u0:3 sig14  ; aipl_inc
-    fn15 = u0:3 sig15  ; aipl_inc
-    fn16 = u0:7 sig16  ; aipl_concat
-    fn17 = u0:3 sig17  ; aipl_inc
-    fn18 = u0:3 sig18  ; aipl_inc
+    fn13 = u0:8 sig13  ; aipl_str_slice
+    fn14 = u0:7 sig14  ; aipl_concat
+    fn15 = u0:7 sig15  ; aipl_concat
+    fn16 = u0:6 sig16  ; aipl_str_repeat
+    fn17 = u0:7 sig17  ; aipl_concat
+    fn18 = u0:6 sig18  ; aipl_str_repeat
     fn19 = u0:7 sig19  ; aipl_concat
-    fn20 = colocated u0:4 sig20  ; __to_str_0
-    fn21 = u0:3 sig21  ; aipl_inc
-    fn22 = u0:3 sig22  ; aipl_inc
+    fn20 = u0:7 sig20  ; aipl_concat
+    fn21 = u0:7 sig21  ; aipl_concat
+    fn22 = u0:7 sig22  ; aipl_concat
     fn23 = u0:7 sig23  ; aipl_concat
-    fn24 = u0:8 sig24  ; aipl_str_slice
-    fn25 = u0:3 sig25  ; aipl_inc
-    fn26 = u0:3 sig26  ; aipl_inc
+    fn24 = u0:7 sig24  ; aipl_concat
+    fn25 = u0:7 sig25  ; aipl_concat
+    fn26 = u0:7 sig26  ; aipl_concat
     fn27 = u0:7 sig27  ; aipl_concat
-    fn28 = u0:3 sig28  ; aipl_inc
-    fn29 = u0:3 sig29  ; aipl_inc
-    fn30 = u0:7 sig30  ; aipl_concat
-    fn31 = u0:3 sig31  ; aipl_inc
-    fn32 = u0:6 sig32  ; aipl_str_repeat
-    fn33 = u0:3 sig33  ; aipl_inc
-    fn34 = u0:3 sig34  ; aipl_inc
-    fn35 = u0:7 sig35  ; aipl_concat
-    fn36 = u0:3 sig36  ; aipl_inc
-    fn37 = u0:6 sig37  ; aipl_str_repeat
-    fn38 = u0:3 sig38  ; aipl_inc
-    fn39 = u0:3 sig39  ; aipl_inc
-    fn40 = u0:7 sig40  ; aipl_concat
-    fn41 = u0:3 sig41  ; aipl_inc
-    fn42 = u0:3 sig42  ; aipl_inc
-    fn43 = u0:7 sig43  ; aipl_concat
-    fn44 = u0:3 sig44  ; aipl_inc
-    fn45 = u0:3 sig45  ; aipl_inc
-    fn46 = u0:7 sig46  ; aipl_concat
-    fn47 = u0:3 sig47  ; aipl_inc
-    fn48 = u0:3 sig48  ; aipl_inc
-    fn49 = u0:7 sig49  ; aipl_concat
-    fn50 = u0:3 sig50  ; aipl_inc
-    fn51 = u0:3 sig51  ; aipl_inc
-    fn52 = u0:7 sig52  ; aipl_concat
-    fn53 = u0:3 sig53  ; aipl_inc
-    fn54 = u0:3 sig54  ; aipl_inc
-    fn55 = u0:7 sig55  ; aipl_concat
-    fn56 = u0:3 sig56  ; aipl_inc
-    fn57 = u0:3 sig57  ; aipl_inc
-    fn58 = u0:7 sig58  ; aipl_concat
-    fn59 = u0:3 sig59  ; aipl_inc
-    fn60 = u0:3 sig60  ; aipl_inc
-    fn61 = u0:7 sig61  ; aipl_concat
-    fn62 = u0:3 sig62  ; aipl_inc
-    fn63 = u0:3 sig63  ; aipl_inc
-    fn64 = u0:7 sig64  ; aipl_concat
-    fn65 = u0:3 sig65  ; aipl_inc
-    fn66 = u0:3 sig66  ; aipl_inc
-    fn67 = u0:7 sig67  ; aipl_concat
-    fn68 = u0:3 sig68  ; aipl_inc
-    fn69 = u0:9 sig69  ; aipl_dec
-    fn70 = u0:9 sig70  ; aipl_dec
-    fn71 = u0:9 sig71  ; aipl_dec
-    fn72 = u0:9 sig72  ; aipl_dec
-    fn73 = u0:9 sig73  ; aipl_dec
-    fn74 = u0:9 sig74  ; aipl_dec
-    fn75 = u0:9 sig75  ; aipl_dec
-    fn76 = u0:9 sig76  ; aipl_dec
-    fn77 = u0:9 sig77  ; aipl_dec
-    fn78 = u0:9 sig78  ; aipl_dec
-    fn79 = u0:9 sig79  ; aipl_dec
-    fn80 = u0:9 sig80  ; aipl_dec
-    fn81 = u0:9 sig81  ; aipl_dec
-    fn82 = u0:9 sig82  ; aipl_dec
-    fn83 = u0:9 sig83  ; aipl_dec
-    fn84 = u0:9 sig84  ; aipl_dec
-    fn85 = u0:9 sig85  ; aipl_dec
-    fn86 = u0:9 sig86  ; aipl_dec
-    fn87 = u0:9 sig87  ; aipl_dec
-    fn88 = u0:9 sig88  ; aipl_dec
-    fn89 = u0:9 sig89  ; aipl_dec
-    fn90 = u0:9 sig90  ; aipl_dec
-    fn91 = u0:9 sig91  ; aipl_dec
-    fn92 = u0:9 sig92  ; aipl_dec
-    fn93 = u0:9 sig93  ; aipl_dec
-    fn94 = u0:9 sig94  ; aipl_dec
-    fn95 = u0:9 sig95  ; aipl_dec
-    fn96 = u0:9 sig96  ; aipl_dec
+    fn28 = u0:7 sig28  ; aipl_concat
+    fn29 = u0:9 sig29  ; aipl_dec
 
 block0(v0: i64, v1: i64):
     v2 = load.i64 notrap aligned v1
@@ -244,114 +110,114 @@ block0(v0: i64, v1: i64):
     v19 = iconst.i64 8197
     v20 = call fn2(v18)
     v21 = call fn3(v20)
-    call fn4(v19)  ; v19 = 8197
-    v22 = call fn5(v19, v21)  ; v19 = 8197
+    call fn0(v19)  ; v19 = 8197
+    v22 = call fn4(v19, v21)  ; v19 = 8197
     v23 = iconst.i64 1
-    call fn6(v23)  ; v23 = 1
-    call fn7(v22)
-    v24 = call fn8(v23, v22)  ; v23 = 1
+    call fn0(v23)  ; v23 = 1
+    call fn0(v22)
+    v24 = call fn5(v23, v22)  ; v23 = 1
     v25 = symbol_value.i64 gv0
     v26 = iadd_imm v25, 16
-    v27 = call fn9(v18)
-    call fn10(v26)
-    call fn11(v27)
-    v28 = call fn12(v26, v27)
+    v27 = call fn6(v18)
+    call fn0(v26)
+    call fn0(v27)
+    v28 = call fn7(v26, v27)
     v29 = iconst.i64 0x3a05
     v30 = iconst.i64 1
     v31 = iadd v8, v30  ; v30 = 1
-    v32 = call fn13(v31)
-    call fn14(v29)  ; v29 = 0x3a05
-    call fn15(v32)
-    v33 = call fn16(v29, v32)  ; v29 = 0x3a05
+    v32 = call fn8(v31)
+    call fn0(v29)  ; v29 = 0x3a05
+    call fn0(v32)
+    v33 = call fn9(v29, v32)  ; v29 = 0x3a05
     v34 = iconst.i64 2565
-    call fn17(v34)  ; v34 = 2565
-    call fn18(v22)
-    v35 = call fn19(v34, v22)  ; v34 = 2565
+    call fn0(v34)  ; v34 = 2565
+    call fn0(v22)
+    v35 = call fn10(v34, v22)  ; v34 = 2565
     v36 = iconst.i64 0x0a7c_200d
-    v37 = call fn20(v18)
-    call fn21(v36)  ; v36 = 0x0a7c_200d
-    call fn22(v37)
-    v38 = call fn23(v36, v37)  ; v36 = 0x0a7c_200d
+    v37 = call fn11(v18)
+    call fn0(v36)  ; v36 = 0x0a7c_200d
+    call fn0(v37)
+    v38 = call fn12(v36, v37)  ; v36 = 0x0a7c_200d
     v39 = iconst.i64 0x207c_200d
-    v40 = call fn24(v0, v4, v6)
-    call fn25(v39)  ; v39 = 0x207c_200d
-    call fn26(v40)
-    v41 = call fn27(v39, v40)  ; v39 = 0x207c_200d
+    v40 = call fn13(v0, v4, v6)
+    call fn0(v39)  ; v39 = 0x207c_200d
+    call fn0(v40)
+    v41 = call fn14(v39, v40)  ; v39 = 0x207c_200d
     v42 = iconst.i64 2565
-    call fn28(v42)  ; v42 = 2565
-    call fn29(v22)
-    v43 = call fn30(v42, v22)  ; v42 = 2565
+    call fn0(v42)  ; v42 = 2565
+    call fn0(v22)
+    v43 = call fn15(v42, v22)  ; v42 = 2565
     v44 = iconst.i64 0x207c_200d
     v45 = iconst.i64 8197
-    call fn31(v45)  ; v45 = 8197
-    v46 = call fn32(v45, v8)  ; v45 = 8197
-    call fn33(v44)  ; v44 = 0x207c_200d
-    call fn34(v46)
-    v47 = call fn35(v44, v46)  ; v44 = 0x207c_200d
+    call fn0(v45)  ; v45 = 8197
+    v46 = call fn16(v45, v8)  ; v45 = 8197
+    call fn0(v44)  ; v44 = 0x207c_200d
+    call fn0(v46)
+    v47 = call fn17(v44, v46)  ; v44 = 0x207c_200d
     v48 = iconst.i64 1
     v49 = iconst.i64 0x5e05
-    call fn36(v49)  ; v49 = 0x5e05
-    v50 = call fn37(v49, v16)  ; v49 = 0x5e05
-    call fn38(v48)  ; v48 = 1
-    call fn39(v50)
-    v51 = call fn40(v48, v50)  ; v48 = 1
+    call fn0(v49)  ; v49 = 0x5e05
+    v50 = call fn18(v49, v16)  ; v49 = 0x5e05
+    call fn0(v48)  ; v48 = 1
+    call fn0(v50)
+    v51 = call fn19(v48, v50)  ; v48 = 1
     v52 = iconst.i64 1
-    call fn41(v51)
-    call fn42(v52)  ; v52 = 1
-    v53 = call fn43(v51, v52)  ; v52 = 1
-    call fn44(v47)
-    call fn45(v53)
-    v54 = call fn46(v47, v53)
-    call fn47(v43)
-    call fn48(v54)
-    v55 = call fn49(v43, v54)
-    call fn50(v41)
-    call fn51(v55)
-    v56 = call fn52(v41, v55)
-    call fn53(v38)
-    call fn54(v56)
-    v57 = call fn55(v38, v56)
-    call fn56(v35)
-    call fn57(v57)
-    v58 = call fn58(v35, v57)
-    call fn59(v33)
-    call fn60(v58)
-    v59 = call fn61(v33, v58)
-    call fn62(v28)
-    call fn63(v59)
-    v60 = call fn64(v28, v59)
-    call fn65(v24)
-    call fn66(v60)
-    v61 = call fn67(v24, v60)
-    call fn68(v61)
-    call fn69(v0)
-    call fn70(v20)
-    call fn71(v22)
-    call fn72(v24)
-    call fn73(v26)
-    call fn74(v27)
-    call fn75(v28)
-    call fn76(v32)
-    call fn77(v33)
-    call fn78(v35)
-    call fn79(v37)
-    call fn80(v38)
-    call fn81(v40)
-    call fn82(v41)
-    call fn83(v43)
-    call fn84(v46)
-    call fn85(v47)
-    call fn86(v50)
-    call fn87(v51)
-    call fn88(v53)
-    call fn89(v54)
-    call fn90(v55)
-    call fn91(v56)
-    call fn92(v57)
-    call fn93(v58)
-    call fn94(v59)
-    call fn95(v60)
-    call fn96(v61)
+    call fn0(v51)
+    call fn0(v52)  ; v52 = 1
+    v53 = call fn20(v51, v52)  ; v52 = 1
+    call fn0(v47)
+    call fn0(v53)
+    v54 = call fn21(v47, v53)
+    call fn0(v43)
+    call fn0(v54)
+    v55 = call fn22(v43, v54)
+    call fn0(v41)
+    call fn0(v55)
+    v56 = call fn23(v41, v55)
+    call fn0(v38)
+    call fn0(v56)
+    v57 = call fn24(v38, v56)
+    call fn0(v35)
+    call fn0(v57)
+    v58 = call fn25(v35, v57)
+    call fn0(v33)
+    call fn0(v58)
+    v59 = call fn26(v33, v58)
+    call fn0(v28)
+    call fn0(v59)
+    v60 = call fn27(v28, v59)
+    call fn0(v24)
+    call fn0(v60)
+    v61 = call fn28(v24, v60)
+    call fn0(v61)
+    call fn29(v0)
+    call fn29(v20)
+    call fn29(v22)
+    call fn29(v24)
+    call fn29(v26)
+    call fn29(v27)
+    call fn29(v28)
+    call fn29(v32)
+    call fn29(v33)
+    call fn29(v35)
+    call fn29(v37)
+    call fn29(v38)
+    call fn29(v40)
+    call fn29(v41)
+    call fn29(v43)
+    call fn29(v46)
+    call fn29(v47)
+    call fn29(v50)
+    call fn29(v51)
+    call fn29(v53)
+    call fn29(v54)
+    call fn29(v55)
+    call fn29(v56)
+    call fn29(v57)
+    call fn29(v58)
+    call fn29(v59)
+    call fn29(v60)
+    call fn29(v61)
     return v61
 }
 
@@ -381,21 +247,13 @@ function u0:1(i64, i64, i64) apple_aarch64 {
     sig2 = (i64, i64, i64) -> i64 apple_aarch64
     sig3 = (i64) apple_aarch64
     sig4 = (i64) apple_aarch64
-    sig5 = (i64) apple_aarch64
-    sig6 = (i64) apple_aarch64
-    sig7 = (i64) -> i64 apple_aarch64
-    sig8 = (i64) apple_aarch64
-    sig9 = (i64) apple_aarch64
+    sig5 = (i64) -> i64 apple_aarch64
     fn0 = u0:3 sig0  ; aipl_inc
     fn1 = colocated u0:2 sig1  ; __enumerate0
     fn2 = u0:10 sig2  ; aipl_arr_elem_ptr
     fn3 = u0:9 sig3  ; aipl_dec
     fn4 = u0:11 sig4  ; aipl_array_dec
-    fn5 = u0:9 sig5  ; aipl_dec
-    fn6 = u0:11 sig6  ; aipl_array_dec
-    fn7 = u0:5 sig7  ; aipl_str_len
-    fn8 = u0:9 sig8  ; aipl_dec
-    fn9 = u0:11 sig9  ; aipl_array_dec
+    fn5 = u0:5 sig5  ; aipl_str_len
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -487,8 +345,8 @@ block14:
     stack_store v42, ss6+8
     stack_store.i64 v21, ss6+16
     v43 = stack_addr.i64 ss6
-    call fn5(v1)
-    call fn6(v6)
+    call fn3(v1)
+    call fn4(v6)
     v44 = load.i64 notrap aligned v43
     store notrap aligned v44, v0
     v45 = load.i64 notrap aligned v43+8
@@ -548,11 +406,11 @@ block3:
     stack_store v66, ss7
     v67 = stack_load.i64 ss1
     stack_store v67, ss7+8
-    v68 = call fn7(v1)
+    v68 = call fn5(v1)
     stack_store v68, ss7+16
     v69 = stack_addr.i64 ss7
-    call fn8(v1)
-    call fn9(v6)
+    call fn3(v1)
+    call fn4(v6)
     v70 = load.i64 notrap aligned v69
     store notrap aligned v70, v0
     v71 = load.i64 notrap aligned v69+8
@@ -657,12 +515,10 @@ function u0:4(i64) -> i64 apple_aarch64 {
     ss2 = explicit_slot 8, align = 8
     sig0 = (i64) -> i64 apple_aarch64
     sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) -> i64 apple_aarch64
-    sig3 = (i64, i64) -> i64 apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
     fn0 = u0:17 sig0  ; aipl_i64_len
     fn1 = u0:18 sig1  ; aipl_str_alloc
-    fn2 = u0:17 sig2  ; aipl_i64_len
-    fn3 = u0:19 sig3  ; aipl_write_i64
+    fn2 = u0:19 sig2  ; aipl_write_i64
 
 block0(v0: i64):
     v1 = call fn0(v0)
@@ -684,9 +540,9 @@ block2:
     jump block3
 
 block3:
-    v7 = call fn2(v0)
+    v7 = call fn0(v0)
     v8 = stack_load.i64 ss1
-    v9 = call fn3(v8, v0)
+    v9 = call fn2(v8, v0)
     stack_store v9, ss1
     v10 = stack_load.i64 ss0
     v11 = ishl_imm.i64 v1, 2

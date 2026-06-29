@@ -105,13 +105,11 @@ function u0:1(i64, i64) apple_aarch64 {
     sig2 = (i64, i64, i64, i64, i64, i64) apple_aarch64
     sig3 = (i64) apple_aarch64
     sig4 = (i64, i64, i64, i64, i64, i64) apple_aarch64
-    sig5 = (i64) apple_aarch64
     fn0 = u0:2 sig0  ; aipl_str_iter_init
     fn1 = u0:3 sig1  ; aipl_str_iter_next
     fn2 = colocated u0:0 sig2  ; line_end_span
     fn3 = u0:4 sig3  ; aipl_dec
     fn4 = colocated u0:0 sig4  ; line_end_span
-    fn5 = u0:4 sig5  ; aipl_dec
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -247,7 +245,7 @@ block3:
     v70 = stack_load.i64 ss4
     v71 = stack_addr.i64 ss8
     call fn4(v71, v66, v67, v68, v69, v70)
-    call fn5(v1)
+    call fn3(v1)
     v72 = load.i64 notrap aligned v71
     store notrap aligned v72, v0
     v73 = load.i64 notrap aligned v71+8

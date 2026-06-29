@@ -4645,7 +4645,12 @@ fn canon_int(builder: &mut FunctionBuilder, v: Value, p: Primitive) -> Value {
 /// first reference and cache it, so a program's object carries exactly the
 /// builtins it uses.
 struct Builtins {
+    /// `sym` → the module-level `FuncId` (declared once, shared across functions).
     imports: RefCell<HashMap<&'static str, FuncId>>,
+    /// `FuncId` → the `FuncRef` for the *current* function under construction.
+    /// A `FuncRef` is scoped to one `Function`; this is cleared at the start of
+    /// each `define_*` call (before `module.clear_context` makes old refs stale).
+    func_refs: RefCell<HashMap<FuncId, FuncRef>>,
 }
 
 /// Signature of a runtime import `sym`. All take/return i64 (pointers, ints, and
@@ -4731,10 +4736,23 @@ impl Builtins {
         id
     }
 
-    /// Import `sym` into `func` and return the call-ready `FuncRef`.
+    /// Import `sym` into `func` and return the call-ready `FuncRef`, reusing the
+    /// cached ref if `sym` was already imported into this function.
     fn import<M: Module>(&self, module: &mut M, func: &mut Function, sym: &'static str) -> FuncRef {
         let id = self.id(module, sym);
-        module.declare_func_in_func(id, func)
+        if let Some(&fref) = self.func_refs.borrow().get(&id) {
+            return fref;
+        }
+        let fref = module.declare_func_in_func(id, func);
+        self.func_refs.borrow_mut().insert(id, fref);
+        fref
+    }
+
+    /// Clear the per-function `FuncRef` cache. Must be called at the start of
+    /// every `define_*` function so stale refs from the previous `Function` are
+    /// never reused (Cranelift clears `ctx.func` via `module.clear_context`).
+    fn clear_func_cache(&self) {
+        self.func_refs.borrow_mut().clear();
     }
 }
 
@@ -4850,6 +4868,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
     );
     Builtins {
         imports: RefCell::new(HashMap::new()),
+        func_refs: RefCell::new(HashMap::new()),
     }
 }
 
@@ -5058,6 +5077,7 @@ fn define_fn<M: Module>(
     ir_out: &mut String,
     instrument: bool,
 ) -> Result<(), Error> {
+    builtins.clear_func_cache();
     // Parameters this instance owns (moved in): monomorphization marks them, so
     // they aren't dropped on entry-scope exit and `mut y = p` moves rather than
     // copies. Keyed by name for `Cx::owned_params`.
@@ -6857,6 +6877,7 @@ fn define_pair_rc_fn<M: Module>(
     op: RcOp,
     ir_out: &mut String,
 ) -> Result<(), Error> {
+    builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // elems
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // len
     let pair_size = 8 + elem_size_of(val_ty, structs);
@@ -6928,6 +6949,7 @@ fn define_elem_rc_fn<M: Module>(
     op: RcOp,
     ir_out: &mut String,
 ) -> Result<(), Error> {
+    builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // elems
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // len
     let esz = elem_size_of(elem, structs);
@@ -7768,6 +7790,7 @@ fn define_tostr_fn<M: Module>(
     ir_out: &mut String,
     instrument: bool,
 ) -> Result<(), Error> {
+    builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
     ctx.func.signature.returns.push(AbiParam::new(types::I64)); // str
     {

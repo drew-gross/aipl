@@ -19,72 +19,36 @@ function u0:0(i64, i64) apple_aarch64 {
     ss2 = explicit_slot 16, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    sig3 = (i64) apple_aarch64
-    sig4 = (i64, i64) -> i64 apple_aarch64
-    sig5 = (i64) apple_aarch64
-    sig6 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) -> i64 apple_aarch64
+    sig5 = (i64, i64, i64) -> i64 apple_aarch64
+    sig6 = (i64) -> i64 apple_aarch64
     sig7 = (i64, i64) -> i64 apple_aarch64
-    sig8 = (i64) -> i64 apple_aarch64
-    sig9 = (i64) -> i64 apple_aarch64
-    sig10 = (i64, i64, i64) -> i64 apple_aarch64
-    sig11 = (i64) apple_aarch64
-    sig12 = (i64) -> i64 apple_aarch64
-    sig13 = (i64) apple_aarch64
-    sig14 = (i64) apple_aarch64
-    sig15 = (i64, i64) -> i64 apple_aarch64
-    sig16 = (i64) apple_aarch64
-    sig17 = (i64) apple_aarch64
-    sig18 = (i64) apple_aarch64
-    sig19 = (i64) apple_aarch64
-    sig20 = (i64) apple_aarch64
-    sig21 = (i64) apple_aarch64
-    sig22 = (i64) apple_aarch64
-    sig23 = (i64) apple_aarch64
-    sig24 = (i64) apple_aarch64
-    sig25 = (i64) apple_aarch64
-    sig26 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
     fn0 = u0:1 sig0  ; aipl_inc
     fn1 = u0:2 sig1  ; aipl_trim
-    fn2 = u0:1 sig2  ; aipl_inc
-    fn3 = u0:1 sig3  ; aipl_inc
-    fn4 = u0:3 sig4  ; aipl_str_starts_with
-    fn5 = u0:1 sig5  ; aipl_inc
-    fn6 = u0:1 sig6  ; aipl_inc
-    fn7 = u0:4 sig7  ; aipl_str_ends_with
-    fn8 = u0:5 sig8  ; aipl_str_len
-    fn9 = u0:5 sig9  ; aipl_str_len
-    fn10 = u0:6 sig10  ; aipl_str_slice
-    fn11 = u0:1 sig11  ; aipl_inc
-    fn12 = u0:2 sig12  ; aipl_trim
-    fn13 = u0:1 sig13  ; aipl_inc
-    fn14 = u0:1 sig14  ; aipl_inc
-    fn15 = u0:7 sig15  ; aipl_str_eq
-    fn16 = u0:1 sig16  ; aipl_inc
-    fn17 = u0:1 sig17  ; aipl_inc
-    fn18 = u0:8 sig18  ; aipl_dec
-    fn19 = u0:1 sig19  ; aipl_inc
-    fn20 = u0:8 sig20  ; aipl_dec
-    fn21 = u0:8 sig21  ; aipl_dec
-    fn22 = u0:8 sig22  ; aipl_dec
-    fn23 = u0:1 sig23  ; aipl_inc
-    fn24 = u0:8 sig24  ; aipl_dec
-    fn25 = u0:8 sig25  ; aipl_dec
-    fn26 = u0:8 sig26  ; aipl_dec
+    fn2 = u0:3 sig2  ; aipl_str_starts_with
+    fn3 = u0:4 sig3  ; aipl_str_ends_with
+    fn4 = u0:5 sig4  ; aipl_str_len
+    fn5 = u0:6 sig5  ; aipl_str_slice
+    fn6 = u0:2 sig6  ; aipl_trim
+    fn7 = u0:7 sig7  ; aipl_str_eq
+    fn8 = u0:8 sig8  ; aipl_dec
 
 block0(v0: i64, v1: i64):
     call fn0(v1)
     v2 = call fn1(v1)
     v3 = iconst.i64 0x2d2d_2d0d
-    call fn2(v2)
-    call fn3(v3)  ; v3 = 0x2d2d_2d0d
-    v4 = call fn4(v2, v3)  ; v3 = 0x2d2d_2d0d
+    call fn0(v2)
+    call fn0(v3)  ; v3 = 0x2d2d_2d0d
+    v4 = call fn2(v2, v3)  ; v3 = 0x2d2d_2d0d
     v5 = iconst.i64 0x2d2d_2d0d
-    call fn5(v2)
-    call fn6(v5)  ; v5 = 0x2d2d_2d0d
-    v6 = call fn7(v2, v5)  ; v5 = 0x2d2d_2d0d
+    call fn0(v2)
+    call fn0(v5)  ; v5 = 0x2d2d_2d0d
+    v6 = call fn3(v2, v5)  ; v5 = 0x2d2d_2d0d
     v7 = band v4, v6
-    v8 = call fn8(v2)
+    v8 = call fn4(v2)
     v9 = iconst.i64 6
     v10 = icmp sge v8, v9  ; v9 = 6
     v11 = uextend.i64 v10
@@ -93,16 +57,16 @@ block0(v0: i64, v1: i64):
 
 block1:
     v14 = iconst.i64 3
-    v15 = call fn9(v2)
+    v15 = call fn4(v2)
     v16 = iconst.i64 3
     v17 = isub v15, v16  ; v16 = 3
-    v18 = call fn10(v2, v14, v17)  ; v14 = 3
-    call fn11(v18)
-    v19 = call fn12(v18)
+    v18 = call fn5(v2, v14, v17)  ; v14 = 3
+    call fn0(v18)
+    v19 = call fn6(v18)
     v20 = iconst.i64 1
-    call fn13(v19)
-    call fn14(v20)  ; v20 = 1
-    v21 = call fn15(v19, v20)  ; v20 = 1
+    call fn0(v19)
+    call fn0(v20)  ; v20 = 1
+    v21 = call fn7(v19, v20)  ; v20 = 1
     brif v21, block4, block5
 
 block4:
@@ -123,7 +87,7 @@ block5:
 
 block7:
     v30 = load.i64 notrap aligned v25+8
-    call fn16(v30)
+    call fn0(v30)
     jump block8
 
 block8:
@@ -133,7 +97,7 @@ block8:
 
 block9:
     v33 = load.i64 notrap aligned v25+8
-    call fn17(v33)
+    call fn0(v33)
     jump block10
 
 block10:
@@ -143,7 +107,7 @@ block10:
 
 block11:
     v36 = load.i64 notrap aligned v25+8
-    call fn18(v36)
+    call fn8(v36)
     jump block12
 
 block12:
@@ -156,19 +120,19 @@ block6(v22: i64):
 
 block13:
     v39 = load.i64 notrap aligned v22+8
-    call fn19(v39)
+    call fn0(v39)
     jump block14
 
 block14:
-    call fn20(v18)
-    call fn21(v19)
+    call fn8(v18)
+    call fn8(v19)
     v40 = load.i64 notrap aligned v22
     v41 = icmp_imm eq v40, 1
     brif v41, block15, block16
 
 block15:
     v42 = load.i64 notrap aligned v22+8
-    call fn22(v42)
+    call fn8(v42)
     jump block16
 
 block16:
@@ -187,19 +151,19 @@ block3(v13: i64):
 
 block17:
     v47 = load.i64 notrap aligned v13+8
-    call fn23(v47)
+    call fn0(v47)
     jump block18
 
 block18:
-    call fn24(v1)
-    call fn25(v2)
+    call fn8(v1)
+    call fn8(v2)
     v48 = load.i64 notrap aligned v13
     v49 = icmp_imm eq v48, 1
     brif v49, block19, block20
 
 block19:
     v50 = load.i64 notrap aligned v13+8
-    call fn26(v50)
+    call fn8(v50)
     jump block20
 
 block20:
