@@ -7,7 +7,7 @@
 //   {pad} |
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
-import { wrapping_add as +, -, ==, len, max, min, repeat } from builtins;
+import { wrapping_add as +, -, ==, len, max, min, repeat, to_str } from builtins;
 import { line_at } from "./line_at.aipl";
 
 struct Span { start: i64, end: i64 }
@@ -17,7 +17,7 @@ pub fn caret_block(source: str, span: Span) -> str {
     let col = span.start - line_start;
     let underline_len = max(min(span.end, line_end) - span.start, 1);
     let line_no = line + 1;
-    let blank = " ".repeat(len(`{line_no}`));
+    let blank = " ".repeat(line_no.to_str().len());
     ```
     {blank}--> input:{line_no}:{col + 1}
     {blank} |
@@ -68,5 +68,5 @@ allocations: 84
 deallocations: 84
 reallocations: 99
 bytes allocated: 2898
-instructions executed: 12128
-binary size: 18840
+instructions executed: 12078
+binary size: 18560
