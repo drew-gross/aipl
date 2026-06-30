@@ -143,6 +143,44 @@ under-counts (e.g. a token may appear in `--- stdout ---` or source, not the
 assertion that actually breaks), so don't bother — just implement, run, and read
 the failure list.
 
+## Staged IR workflow for dogfood IR changes
+
+Any change that affects how the compiler generates Cranelift IR (new builtins,
+type layout changes, codegen restructuring, etc.) also invalidates the checked-in
+`*.clif` artifacts. Use the staged IR workflow instead of calling `fill_dogfood_ir`
+directly — it lets you validate candidate IR before it becomes the live IR the
+compiler runs on:
+
+1. **Generate staged IR** — compiles each `.aipl` source with the new frontend
+   and writes `*.clif.staged` files next to the live `*.clif` files:
+   `cargo test --test dogfood_ir -- --ignored fill_staged_ir`
+
+2. **Validate staged IR** — loads each `*.clif.staged` and calls its entry
+   functions with known inputs; confirms the IR links and computes correctly:
+   `cargo test --test dogfood_ir -- --ignored validate_staged_ir`
+
+3. **Review the diff** — compare each `*.clif.staged` to the live `*.clif`
+   manually. Pay extra attention to the **parser-hook engines**
+   (`process_raw_string`, `parse_test_section_header`, `strip_test_sections`,
+   `find_trailing_whitespace`): these functions are active during every parse,
+   so a subtle bug in their IR affects the compiler's own source parsing.
+
+4. **Promote staged → live** — validates again, copies `*.clif.staged` →
+   `*.clif`, deletes the staged files, then fails intentionally so you review
+   the final diff before committing:
+   `cargo test --test dogfood_ir -- --ignored promote_staged_ir`
+
+5. **Run full suite**: `cargo test`
+
+**Invariant**: `cargo test` always fails while any `*.clif.staged` file exists
+(the `no_staged_ir_pending` test in `tests/dogfood_ir.rs`). This ensures the
+transition is never silently left half-done. To abort a staged workflow, delete
+the `*.clif.staged` files from `crates/aipl-codegen/src/`.
+
+`fill_dogfood_ir` (writes directly to live) is still available for obviously-safe
+regenerations (e.g. a source comment changed the artifact with no logic change),
+but prefer the staged workflow for any change that touches IR generation logic.
+
 ## Authoring error-case fixtures
 Never hand-write the expected error block in a `tests/cases/` error fixture.
 The expected text must match the compiler's `Error::render` byte-for-byte —

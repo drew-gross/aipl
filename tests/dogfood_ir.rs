@@ -25,12 +25,22 @@ use aipl::FfiValue;
 use std::path::PathBuf;
 
 const FILL_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_dogfood_ir";
+const FILL_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_staged_ir";
+const VALIDATE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored validate_staged_ir";
+const PROMOTE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored promote_staged_ir";
 
 /// Path to a dogfood engine's checked-in `.clif` artifact.
 fn artifact_path(engine: &DogfoodEngine) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("crates/aipl-codegen/src")
         .join(engine.clif_file)
+}
+
+/// Path to the staged (candidate) `.clif.staged` artifact for an engine.
+fn staged_artifact_path(engine: &DogfoodEngine) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("crates/aipl-codegen/src")
+        .join(format!("{}.staged", engine.clif_file))
 }
 
 /// Generate the artifact for one engine via the live frontend.
@@ -245,6 +255,102 @@ fn checked_in_ir_loads_and_runs() {
         });
         sanity_check(&engine, &checked_in);
     }
+}
+
+/// Fails if any `.clif.staged` file is present, signalling a staged IR
+/// workflow is in progress. See CLAUDE.md for the full workflow.
+#[test]
+fn no_staged_ir_pending() {
+    let pending: Vec<_> = dogfood_engines()
+        .into_iter()
+        .filter(|e| staged_artifact_path(e).exists())
+        .map(|e| format!("{}.staged", e.clif_file))
+        .collect();
+    if !pending.is_empty() {
+        panic!(
+            "staged IR pending for: {}\n\
+             Validate with:  {VALIDATE_STAGED_CMD}\n\
+             Then promote:   {PROMOTE_STAGED_CMD}\n\
+             To abort:       delete the .staged files.",
+            pending.join(", ")
+        );
+    }
+}
+
+/// Generate staged (candidate) IR from source — writes `*.clif.staged` files
+/// next to the live `*.clif` files. Sanity-checks each artifact before writing
+/// so only working IR is staged. Intentionally fails so the diff is reviewed
+/// before promoting.
+///
+/// See CLAUDE.md for the full staged IR workflow.
+#[test]
+#[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
+fn fill_staged_ir() {
+    aipl::install_parser_hooks();
+    for engine in dogfood_engines() {
+        let artifact = generate(&engine);
+        sanity_check(&engine, &artifact);
+        let path = staged_artifact_path(&engine);
+        std::fs::write(&path, &artifact)
+            .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+        eprintln!("wrote {}", path.display());
+    }
+    panic!(
+        "fill_staged_ir wrote staged IR — review the diff vs the live .clif files,\n\
+         then validate with: {VALIDATE_STAGED_CMD}\n\
+         then promote with:  {PROMOTE_STAGED_CMD}"
+    );
+}
+
+/// Load and sanity-check each `*.clif.staged` file without modifying anything.
+/// Run after `fill_staged_ir` to confirm staged IR loads and computes correctly
+/// before promoting it to live.
+///
+/// See CLAUDE.md for the full staged IR workflow.
+#[test]
+#[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
+fn validate_staged_ir() {
+    for engine in dogfood_engines() {
+        let path = staged_artifact_path(&engine);
+        let artifact = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
+                path.display()
+            )
+        });
+        sanity_check(&engine, &artifact);
+        eprintln!("validated {}", path.display());
+    }
+}
+
+/// Promote staged IR to live: validates each `*.clif.staged`, copies it to the
+/// live `*.clif`, then deletes the staged file. Intentionally fails so the
+/// resulting diff is reviewed and the suite is re-run before committing.
+///
+/// See CLAUDE.md for the full staged IR workflow.
+#[test]
+#[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
+fn promote_staged_ir() {
+    for engine in dogfood_engines() {
+        let staged = staged_artifact_path(&engine);
+        let artifact = std::fs::read_to_string(&staged).unwrap_or_else(|e| {
+            panic!(
+                "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
+                staged.display()
+            )
+        });
+        sanity_check(&engine, &artifact);
+        let live = artifact_path(&engine);
+        std::fs::write(&live, &artifact)
+            .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
+        std::fs::remove_file(&staged)
+            .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
+        eprintln!("promoted {} → {}", staged.display(), live.display());
+    }
+    panic!(
+        "promote_staged_ir updated the live .clif files — review the diff,\n\
+         then run `cargo test` to confirm the suite is green before committing."
+    );
 }
 
 #[test]
