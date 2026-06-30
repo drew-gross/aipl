@@ -2739,11 +2739,11 @@ thread_local! {
 }
 
 /// The error renderer's caret-block hook (see [`install_parser_hooks`]): given
-/// `source` and a `span` (half-open byte range), returns the rustc-style
-/// location + underline block — computed by the dogfooded AIPL `caret_block` via
-/// the FFI. The AIPL calls `line_at` in-engine. No native fallback; panics if it
-/// can't be built or called.
-fn caret_block(source: &str, span: Span) -> String {
+/// `source`, a `span` (half-open byte range), and a `filename`, returns the
+/// rustc-style location + underline block — computed by the dogfooded AIPL
+/// `caret_block` via the FFI. The AIPL calls `line_at` in-engine. No native
+/// fallback; panics if it can't be built or called.
+fn caret_block(source: &str, span: Span, filename: &str) -> String {
     CARET_BLOCK_ENGINE.with(|comp| {
         match comp.call_values(
             "caret_block",
@@ -2753,6 +2753,7 @@ fn caret_block(source: &str, span: Span) -> String {
                     ("start".to_string(), FfiValue::Int(span.start as i64)),
                     ("end".to_string(), FfiValue::Int(span.end as i64)),
                 ]),
+                FfiValue::Str(filename.to_string()),
             ],
         ) {
             Ok(FfiValue::Str(s)) => s,

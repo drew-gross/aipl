@@ -12,34 +12,34 @@ import { line_at } from "./line_at.aipl";
 
 struct Span { start: i64, end: i64 }
 
-pub fn caret_block(source: str, span: Span) -> str {
+pub fn caret_block(source: str, span: Span, filename: str) -> str {
     let LineAt { line_start, line, line_end } = line_at(source, span.start);
     let col = span.start - line_start;
     let underline_len = max(min(span.end, line_end) - span.start, 1);
     let line_no = line + 1;
     let blank = " ".repeat(line_no.to_str().len());
     ```
-    {blank}--> input:{line_no}:{col + 1}
+    {blank}--> {filename}:{line_no}:{col + 1}
     {blank} |
     {line_no} | {source[line_start..line_end]}
     {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
-    assert(caret_block("hello world", Span { start: 0, end: 5 }) ==
+    assert(caret_block("hello world", Span { start: 0, end: 5 }, "input") ==
         """
              --> input:1:1
               |
             1 | hello world
               | ^^^^^
         """);
-    assert(caret_block("hello\nworld", Span { start: 6, end: 11 }) ==
+    assert(caret_block("hello\nworld", Span { start: 6, end: 11 }, "input") ==
         """
              --> input:2:1
               |
             2 | world
               | ^^^^^
         """);
-    assert(caret_block("hello world", Span { start: 6, end: 11 }) ==
+    assert(caret_block("hello world", Span { start: 6, end: 11 }, "input") ==
         """
              --> input:1:7
               |
@@ -47,7 +47,7 @@ pub fn caret_block(source: str, span: Span) -> str {
               |       ^^^^^
         """);
     // Zero-width span at col 0 gets at least one caret.
-    assert(caret_block("hi", Span { start: 0, end: 0 }) ==
+    assert(caret_block("hi", Span { start: 0, end: 0 }, "input") ==
         """
              --> input:1:1
               |
@@ -55,18 +55,26 @@ pub fn caret_block(source: str, span: Span) -> str {
               | ^
         """);
     // Span extending past line end is clamped to the line.
-    assert(caret_block("hi\nthere", Span { start: 0, end: 10 }) ==
+    assert(caret_block("hi\nthere", Span { start: 0, end: 10 }, "input") ==
         """
              --> input:1:1
               |
             1 | hi
               | ^^
         """);
+    // Real filename appears in output.
+    assert(caret_block("hello world", Span { start: 0, end: 5 }, "foo.aipl") ==
+        """
+             --> foo.aipl:1:1
+              |
+            1 | hello world
+              | ^^^^^
+        """);
 })
 --- performance ---
-allocations: 70
-deallocations: 70
-reallocations: 47
-bytes allocated: 2450
-instructions executed: 6701
-binary size: 14488
+allocations: 90
+deallocations: 90
+reallocations: 52
+bytes allocated: 3246
+instructions executed: 7681
+binary size: 16040

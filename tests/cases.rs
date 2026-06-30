@@ -637,7 +637,7 @@ fn run_error_case(ctx: &str, src_path: &Path, spec: &Spec) -> Outcome {
             ))
         }
     };
-    let actual = err.render(&spec.source);
+    let actual = err.render(&spec.source, "input");
     let expected = spec.errors.as_deref().unwrap_or("");
     // Special-case: a `--- errors ---` section whose body is literally
     // `?` prints the actual error and skips the check. Use this when
@@ -1063,7 +1063,12 @@ fn run_success_case(
 ) -> Outcome {
     let program = match loader::load_program(src_path, debug_opts()) {
         Ok(p) => p,
-        Err(e) => return Outcome::Fail(format!("{ctx}: load failed:\n{}", e.render(&spec.source))),
+        Err(e) => {
+            return Outcome::Fail(format!(
+                "{ctx}: load failed:\n{}",
+                e.render(&spec.source, "input")
+            ))
+        }
     };
     // A *library* case has `.test` blocks but no `main`: it's exercised only
     // through `aipl check` (below), and its `--- performance ---` measures that
@@ -1097,7 +1102,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: compile failed:\n{}",
-                e.render(&spec.source)
+                e.render(&spec.source, "input")
             ))
         }
     };
@@ -1122,7 +1127,12 @@ fn run_success_case(
     }
     let obj_bytes = match obj_comp.emit() {
         Ok(b) => b,
-        Err(e) => return Outcome::Fail(format!("{ctx}: emit failed:\n{}", e.render(&spec.source))),
+        Err(e) => {
+            return Outcome::Fail(format!(
+                "{ctx}: emit failed:\n{}",
+                e.render(&spec.source, "input")
+            ))
+        }
     };
 
     // Behavior (stdout/stderr/exit + written files) needs a real `main`. A library
@@ -1130,7 +1140,10 @@ fn run_success_case(
     if has_main {
         let exe_path = case_dir.join(binary::default_exe_name(stem));
         if let Err(e) = binary::link(&obj_bytes, &exe_path) {
-            return Outcome::Fail(format!("{ctx}: link failed:\n{}", e.render(&spec.source)));
+            return Outcome::Fail(format!(
+                "{ctx}: link failed:\n{}",
+                e.render(&spec.source, "input")
+            ));
         }
 
         // Run in the case's staging dir so relative file reads (e.g.
@@ -1296,7 +1309,7 @@ fn run_performance_check(
             Err(e) => {
                 return Outcome::Fail(format!(
                     "{ctx}: instrumented compile failed:\n{}",
-                    e.render(&spec.source)
+                    e.render(&spec.source, "input")
                 ))
             }
         };
@@ -1371,7 +1384,7 @@ fn measure_perf_stats(
     if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
         return Err(format!(
             "{ctx}: instrumented link failed:\n{}",
-            e.render(&spec.source)
+            e.render(&spec.source, "input")
         ));
     }
 
@@ -1569,7 +1582,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) {
             return;
         }
     };
-    let rendered = err.render(&spec.source);
+    let rendered = err.render(&spec.source, "input");
     // Replace the `?` placeholder line with the rendered error.
     let header_marker = "--- errors ---";
     let header_idx = contents

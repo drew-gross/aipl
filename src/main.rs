@@ -14,7 +14,7 @@ use aipl::{DebugOptions, Error};
 /// right), falling back to the plain message if the file can't be read.
 fn render_err(file: &str, e: Error) -> String {
     match std::fs::read_to_string(file) {
-        Ok(src) => e.render(aipl::strip_test_sections(&src)),
+        Ok(src) => e.render(aipl::strip_test_sections(&src), file),
         Err(_) => e.to_string(),
     }
 }
@@ -189,7 +189,7 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     // Strip any trailing `--- .. ---` harness sections (some `.aipl` files carry
     // a `--- performance ---` block) so the source parses on its own.
     let stripped = aipl::strip_test_sections(&src);
-    let program = aipl::parse(stripped).map_err(|e| e.render(stripped))?;
+    let program = aipl::parse(stripped).map_err(|e| e.render(stripped, file))?;
     for item in &program.items {
         let aipl::ast::Item::Fn(f) = item else {
             continue;

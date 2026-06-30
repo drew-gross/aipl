@@ -58,14 +58,22 @@ impl Error {
 
     /// Render this error against the source string. A primary caret pointer
     /// when a span is present (plus a `note:` block per secondary span), or a
-    /// plain `error: ...` otherwise.
-    pub fn render(&self, source: &str) -> String {
+    /// plain `error: ...` otherwise. `filename` appears in the ` --> ` location
+    /// line; pass `"input"` when no real path is available.
+    pub fn render(&self, source: &str, filename: &str) -> String {
         let Some(span) = self.span.as_ref() else {
             return format!("error: {}", self.message);
         };
-        let mut out = format!("error: {}\n{}", self.message, caret_block(source, span));
+        let mut out = format!(
+            "error: {}\n{}",
+            self.message,
+            caret_block(source, span, filename)
+        );
         for (note, nspan) in &self.notes {
-            out.push_str(&format!("\nnote: {note}\n{}", caret_block(source, nspan)));
+            out.push_str(&format!(
+                "\nnote: {note}\n{}",
+                caret_block(source, nspan, filename)
+            ));
         }
         out
     }
@@ -74,11 +82,11 @@ impl Error {
 /// The rustc-style location + caret block for a single span (no leading label
 /// line — callers prepend `error:`/`note:`). Computed by the dogfooded AIPL
 /// `caret_block` via the embedding FFI (see [`set_caret_block_hook`]).
-fn caret_block(source: &str, span: &Span) -> String {
+fn caret_block(source: &str, span: &Span, filename: &str) -> String {
     CARET_BLOCK_HOOK.get().expect(
         "caret_block hook not installed before rendering an error \
          (call install_parser_hooks first)",
-    )(source, span.clone())
+    )(source, span.clone(), filename)
 }
 
 /// Controls compiler debug output. Threaded through every pass so the
@@ -114,12 +122,13 @@ impl DebugOptions {
 /// for a span. Installed by the compiler via [`set_caret_block_hook`] (the
 /// dogfooded AIPL `caret_block`, run through the embedding FFI). No native
 /// fallback — panics if not installed.
-static CARET_BLOCK_HOOK: std::sync::OnceLock<fn(&str, Span) -> String> = std::sync::OnceLock::new();
+static CARET_BLOCK_HOOK: std::sync::OnceLock<fn(&str, Span, &str) -> String> =
+    std::sync::OnceLock::new();
 
 /// Install the caret-block hook (the dogfooded AIPL `caret_block`, run through
 /// the embedding FFI). Idempotent — first install wins. Must be called before
 /// any [`Error::render`] with a span (i.e. before `install_parser_hooks` returns).
-pub fn set_caret_block_hook(f: fn(&str, Span) -> String) {
+pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
     let _ = CARET_BLOCK_HOOK.set(f);
 }
 

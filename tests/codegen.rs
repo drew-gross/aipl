@@ -52,7 +52,7 @@ fn render_points_at_offending_expression() {
   |
 1 | fn f(c: i64) -> i64 { if (c) { 1 } else { 2 } }
   |                           ^";
-    assert_eq!(err.render(src), expected);
+    assert_eq!(err.render(src, "input"), expected);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn render_multiline_source_picks_correct_line() {
   |
 2 |     bogus
   |     ^^^^^"#;
-    assert_eq!(err.render(src), expected);
+    assert_eq!(err.render(src, "input"), expected);
 }
 
 #[test]

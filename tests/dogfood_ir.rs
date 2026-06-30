@@ -187,6 +187,7 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
         }
         "caret_block.clif" => {
             // Returns the rustc-style location + caret underline block for a span.
+            // Third arg is the filename that appears in the ` --> ` line.
             let span = |start, end| {
                 FfiValue::Struct(vec![
                     ("start".to_string(), FfiValue::Int(start)),
@@ -196,7 +197,11 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
             let result = comp
                 .call_values(
                     "caret_block",
-                    &[FfiValue::Str("hello world".to_string()), span(0, 5)],
+                    &[
+                        FfiValue::Str("hello world".to_string()),
+                        span(0, 5),
+                        FfiValue::Str("input".to_string()),
+                    ],
                 )
                 .unwrap();
             assert_eq!(
@@ -207,12 +212,31 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
             let line2 = comp
                 .call_values(
                     "caret_block",
-                    &[FfiValue::Str("hello\nworld".to_string()), span(6, 11)],
+                    &[
+                        FfiValue::Str("hello\nworld".to_string()),
+                        span(6, 11),
+                        FfiValue::Str("input".to_string()),
+                    ],
                 )
                 .unwrap();
             assert_eq!(
                 line2,
                 FfiValue::Str(" --> input:2:1\n  |\n2 | world\n  | ^^^^^".to_string())
+            );
+            // Filename appears in output when a real path is passed.
+            let with_name = comp
+                .call_values(
+                    "caret_block",
+                    &[
+                        FfiValue::Str("hello world".to_string()),
+                        span(0, 5),
+                        FfiValue::Str("foo.aipl".to_string()),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(
+                with_name,
+                FfiValue::Str(" --> foo.aipl:1:1\n  |\n1 | hello world\n  | ^^^^^".to_string())
             );
         }
         other => panic!("no sanity check defined for dogfood engine {other}"),
