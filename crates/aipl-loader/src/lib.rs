@@ -642,7 +642,8 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>) -> Result<Item, Err
 
 fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[String]) -> Type {
     match t {
-        // Primitives carry no name to resolve — pass through unchanged.
+        // Primitives and Unit carry no name to resolve — pass through unchanged.
+        Type::Unit => Type::Unit,
         Type::Primitive(p) => Type::Primitive(*p),
         Type::Named(s) => {
             if is_builtin_type(s) || type_vars.iter().any(|v| v == s) {

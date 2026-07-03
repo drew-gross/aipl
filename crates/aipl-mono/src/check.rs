@@ -25,7 +25,7 @@ use aipl_syntax::ast::{
 };
 use aipl_syntax::{
     is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, type_name,
-    unit_ty, Error, Span,
+    Error, Span,
 };
 
 /// Generate the canonical synthetic-struct name for a tuple with the given
@@ -33,6 +33,7 @@ use aipl_syntax::{
 pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
     fn mangle(ty: &Type) -> String {
         match ty {
+            Type::Unit => panic!("Tuple members cannot be unit"),
             Type::Primitive(p) => p.name().into(),
             Type::Named(n) => n.replace('$', "_").replace('!', "_"),
             Type::Array(e) => format!("arr_{}", mangle(e)),
@@ -160,7 +161,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
                     FnSig {
                         params: f.params.iter().map(|p| p.ty.clone()).collect(),
                         variadic: f.params.iter().map(|p| p.variadic).collect(),
-                        return_ty: f.return_ty.clone().unwrap_or_else(unit_ty),
+                        return_ty: f.return_ty.clone().unwrap_or(Type::Unit),
                         effects: f.effects.clone(),
                         is_mutating: f.params.first().is_some_and(|p| p.mutable),
                         is_method: f.params.first().is_some_and(|p| p.name == "self"),
@@ -179,7 +180,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
         variants: &variants,
         ctors: &ctors,
         sigs: &sigs,
-        current_ret: std::cell::RefCell::new(unit_ty()),
+        current_ret: std::cell::RefCell::new(Type::Unit),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -212,7 +213,7 @@ fn is_generic(f: &Function) -> bool {
 
 fn ty_mentions_any(t: &Type) -> bool {
     match t {
-        Type::Primitive(_) => false,
+        Type::Unit | Type::Primitive(_) => false,
         Type::Named(n) => n == "any",
         Type::Array(inner) | Type::Optional(inner) | Type::Set(inner) => ty_mentions_any(inner),
         Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
@@ -300,7 +301,7 @@ impl Cx<'_> {
             );
         }
         // A `mut self` method and a `()`-returning fn check their body as unit.
-        let declared = subst_typevars(&f.return_ty.clone().unwrap_or_else(unit_ty), &f.type_params);
+        let declared = subst_typevars(&f.return_ty.clone().unwrap_or(Type::Unit), &f.type_params);
         // Make the declared return type available to any `return value;` in the
         // body (functions are top-level, so this single slot can't nest).
         *self.current_ret.borrow_mut() = declared.clone();
@@ -326,7 +327,7 @@ impl Cx<'_> {
     fn check_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
         match t {
             // Every primitive is a valid type in any general position.
-            Type::Primitive(_) => Ok(()),
+            Type::Unit | Type::Primitive(_) => Ok(()),
             Type::Named(n) => {
                 let ok = matches!(n.as_str(), "any" | "Error")
                     || self.has_struct(n)
@@ -417,6 +418,7 @@ impl Cx<'_> {
 
     fn check_elem_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
         match t {
+            Type::Unit => Err(Error::msg("() is not allowed as an array/option element")),
             // A scalar primitive element: i64/bool/char/str are stored; the
             // narrow integer widths aren't stored in composites yet (only as
             // scalar values).
@@ -711,7 +713,7 @@ impl Cx<'_> {
     fn check_expr(&self, expr: &Expr, env: &Env, effects: &[String]) -> Result<Type, Error> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
-            ExprKind::Unit => unit_ty(),
+            ExprKind::Unit => Type::Unit,
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
             ExprKind::Str(_) => Type::Primitive(Primitive::Str),
@@ -822,7 +824,7 @@ impl Cx<'_> {
                     )
                 })?;
                 // `return` doesn't produce a value — it's a statement, like `set`.
-                unit_ty()
+                Type::Unit
             }
             // A lambda is only valid as a call argument, where the expected
             // function type is known (`check_call` handles it). Anywhere else
@@ -1292,7 +1294,7 @@ impl Cx<'_> {
         if !env.contains_key(name) && (name == "ok" || name == "err") {
             // `ok()` with no argument is the void success of a `!E` result.
             if name == "ok" && args.is_empty() {
-                return Ok(Type::Result(Box::new(unit_ty()), Box::new(none_inner())));
+                return Ok(Type::Result(Box::new(Type::Unit), Box::new(none_inner())));
             }
             if args.len() != 1 {
                 return Err(Error::at(
@@ -1504,7 +1506,7 @@ impl Cx<'_> {
         let return_ty = sig.return_ty.clone();
         let is_mutating = sig.is_mutating;
         let mut map: HashMap<String, Type> = HashMap::new();
-        let mut atys: Vec<Type> = vec![unit_ty(); args.len()];
+        let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
             if matches!(pty, Type::Fn(_, _)) {
@@ -2017,7 +2019,7 @@ fn is_valid_elem(t: &Type) -> bool {
 fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
         Type::Named(n) if n == "any" || type_params.iter().any(|p| p == n) => typevar_ty(),
-        Type::Primitive(_) | Type::Named(_) => t.clone(),
+        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
         Type::Set(inner) => Type::Set(Box::new(subst_typevars(inner, type_params))),
         Type::Dict(k, v) => Type::Dict(
@@ -2071,7 +2073,7 @@ fn tyname(t: &Type) -> String {
 }
 
 fn is_unit(t: &Type) -> bool {
-    *t == unit_ty()
+    *t == Type::Unit
 }
 
 /// The element type `T` of a variadic parameter's sequence type — the inverse of
@@ -2269,7 +2271,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         Type::Named(v) if vars.contains(v.as_str()) => {
             map.get(v).cloned().unwrap_or_else(unknown_ty)
         }
-        Type::Primitive(_) | Type::Named(_) => t.clone(),
+        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
         Type::Set(inner) => Type::Set(Box::new(subst_vars(inner, map, vars))),
         Type::Dict(k, v) => Type::Dict(

@@ -26,13 +26,13 @@ mod check;
 pub use check::check;
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern,
-    Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
+    is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
+    Pattern, Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{
     concat_str_ty, empty_array_arg_ty, error_ty, is_array_elem, is_concat_str, is_empty_array_arg,
-    is_error, is_none_inner, is_none_literal_arg, is_str_repr, is_unit, none_inner_ty,
-    none_literal_arg_ty, type_name, unit_ty,
+    is_error, is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty,
+    type_name,
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
@@ -168,7 +168,7 @@ fn lt_ty(
             params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
             Box::new(lt_ty(ret, fields_map, order)),
         ),
-        Type::Named(_) | Type::Primitive(_) => t.clone(),
+        Type::Named(_) | Type::Primitive(_) | Type::Unit => t.clone(),
     }
 }
 
@@ -1082,7 +1082,7 @@ impl Mono<'_> {
             .collect();
         let ret = match &g.return_ty {
             Some(t) => subst_vars(t, &map),
-            None => unit_ty(),
+            None => Type::Unit,
         };
         let template = Function {
             name: gname.to_string(),
@@ -2599,10 +2599,7 @@ impl Mono<'_> {
         if let Some(vn) = self.ctors.get(name) {
             return Type::Named(vn.clone());
         }
-        self.fn_returns
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| unit_ty())
+        self.fn_returns.get(name).cloned().unwrap_or(Type::Unit)
     }
 
     /// Payload types a `match` arm binds: the optional's element for `some`, a
@@ -2642,7 +2639,7 @@ impl Mono<'_> {
             .get(name)
             .and_then(|f| f.return_ty.clone())
             .or_else(|| builtin_return(name, arg_tys))
-            .unwrap_or_else(unit_ty)
+            .unwrap_or(Type::Unit)
     }
 
     /// Infer `expr`'s concrete type while rewriting any generic call names to
@@ -2651,7 +2648,7 @@ impl Mono<'_> {
         let span = expr.span.clone();
         let node = |kind| Expr::new(kind, span.clone());
         Ok(match &expr.kind {
-            ExprKind::Unit => (expr.clone(), unit_ty()),
+            ExprKind::Unit => (expr.clone(), Type::Unit),
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
             ExprKind::Str(_) => (expr.clone(), Type::Primitive(Primitive::Str)),
@@ -2858,7 +2855,7 @@ impl Mono<'_> {
             ExprKind::Return(value) => {
                 // Rewrite the returned value; the `return` itself yields unit.
                 let (rv, _) = self.infer(value, env)?;
-                (node(ExprKind::Return(Box::new(rv))), unit_ty())
+                (node(ExprKind::Return(Box::new(rv))), Type::Unit)
             }
             // Lambdas as arguments to plain (Call-form) higher-order functions
             // are handled by `specialize_call`. Reaching here means a lambda in
@@ -3112,7 +3109,7 @@ impl Mono<'_> {
                 });
                 if self.concrete.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
                     let template = self.concrete[name].clone();
-                    let ret = self.fn_returns.get(name).cloned().unwrap_or_else(unit_ty);
+                    let ret = self.fn_returns.get(name).cloned().unwrap_or(Type::Unit);
                     return self.specialize_call_with(
                         name,
                         &template,
@@ -3448,7 +3445,9 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             Box::new(error_ty()),
         ),
         // write_string_to_file(path: str, contents: str) -> !Error — ok()/err(message).
-        "__builtin_write_string_to_file" => Type::Result(Box::new(unit_ty()), Box::new(error_ty())),
+        "__builtin_write_string_to_file" => {
+            Type::Result(Box::new(Type::Unit), Box::new(error_ty()))
+        }
         "__builtin_is_some" => Type::Primitive(Primitive::Bool),
         // `s.contains(x): bool` — set membership.
         "__builtin_contains" => Type::Primitive(Primitive::Bool),
@@ -3497,9 +3496,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         // With an arg, `ok(x)` pins the Ok type to `x`; with none, `ok()` is the
         // void success of a `!E` result (Ok side is unit).
         "ok" => Type::Result(
-            Box::new(decay_concat(
-                arg_tys.first().cloned().unwrap_or_else(unit_ty),
-            )),
+            Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
             Box::new(none_inner_ty()),
         ),
         "err" => Type::Result(
@@ -3512,9 +3509,9 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             )),
         ),
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
-        "__filter_keep" | "__filter_drop" | "__filter_truncate" => unit_ty(),
+        "__filter_keep" | "__filter_drop" | "__filter_truncate" => Type::Unit,
         // Internal in-place-map intrinsic (a statement; see `expand_map`).
-        "__map_set" => unit_ty(),
+        "__map_set" => Type::Unit,
         // Internal: reinterpret the reused buffer as the result element type.
         // Its real result type is fixed by codegen (the enclosing fn's return);
         // here it just borrows the input array type so mono inference proceeds.
@@ -3667,7 +3664,7 @@ fn normalize_param_ty(
         Type::Named(n) if n == "any" => Err(Error::msg(format!(
             "fn \"{fname}\": bare \"any\" is not allowed; use \"any[]\", \"any?\", or a named type parameter \"<T: any>\""
         ))),
-        Type::Primitive(_) | Type::Named(_) => Ok(t.clone()),
+        Type::Primitive(_) | Type::Named(_) | Type::Unit=> Ok(t.clone()),
         Type::Optional(inner) => Ok(Type::Optional(Box::new(normalize_inner(
             inner, type_vars, counter,
         )))),
@@ -3713,7 +3710,7 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             type_vars.push(name.clone());
             Type::Named(name)
         }
-        Type::Primitive(_) | Type::Named(_) => t.clone(),
+        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
         // The surface grammar can't nest deeper, but recurse defensively.
         Type::Optional(inner) => {
             Type::Optional(Box::new(normalize_inner(inner, type_vars, counter)))
@@ -3751,7 +3748,7 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
 /// and bare `none` it already knows about.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
-        Type::Primitive(_) => t.clone(),
+        Type::Primitive(_) | Type::Unit => t.clone(),
         Type::Named(v) => map
             .get(v)
             .cloned()
@@ -3800,7 +3797,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
 /// Does `t` mention the named type `name` anywhere?
 fn ty_mentions(t: &Type, name: &str) -> bool {
     match t {
-        Type::Primitive(_) => false,
+        Type::Primitive(_) | Type::Unit => false,
         Type::Named(n) => n == name,
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
@@ -3813,7 +3810,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
 /// Does `t` reference any of the given type variables?
 fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
     match t {
-        Type::Primitive(_) => false,
+        Type::Unit | Type::Primitive(_) => false,
         Type::Named(v) => vars.contains(v.as_str()),
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
             ty_contains_var(inner, vars)

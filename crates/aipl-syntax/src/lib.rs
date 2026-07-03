@@ -370,8 +370,18 @@ pub mod ast {
         }
     }
 
+    pub fn is_unit(t: &Type) -> bool {
+        matches!(t, Type::Unit)
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum Type {
+        /// The unit type — what a function with no declared return type produces:
+        /// nothing. It never appears as a parameter, field, array element, or
+        /// optional inner — the grammar can't express it there — so type validation
+        /// treats it as an unknown scalar and rejects it in those positions, leaving
+        /// the function return as its only home.
+        Unit,
         /// A built-in scalar primitive (`i64`, `bool`, `str`, …). See
         /// [`Primitive`].
         Primitive(Primitive),
@@ -865,29 +875,12 @@ pub fn is_str_repr(t: &Type) -> bool {
     matches!(t, Type::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
 }
 
-/// The unit type — what a function with no declared return type produces:
-/// nothing. Spelled with a reserved name users can't write (omitting `-> ty`
-/// is the only way to get it), so it behaves like the other pseudo-types
-/// (`__none__`, the array/none markers). It never appears as a parameter,
-/// field, array element, or optional inner — the grammar can't express it
-/// there — so type validation treats it as an unknown scalar and rejects it
-/// in those positions, leaving the function return as its only home.
-pub const UNIT: &str = "__unit__";
-
-pub fn unit_ty() -> Type {
-    Type::Named(UNIT.into())
-}
-
-pub fn is_unit(t: &Type) -> bool {
-    matches!(t, Type::Named(s) if s == UNIT)
-}
-
 pub fn type_name(t: &Type) -> String {
     match t {
+        Type::Unit => "()".into(),
         Type::Primitive(p) => p.name().into(),
         Type::Named(s) if s == EMPTY_ARRAY_ARG => "EmptyArray".into(),
         Type::Named(s) if s == NONE_LITERAL_ARG => "NoneLiteral".into(),
-        Type::Named(s) if s == UNIT => "()".into(),
         Type::Named(s) => s.clone(),
         Type::Optional(inner) => format!("{}?", type_name(inner)),
         Type::Array(inner) => format!("{}[]", type_name(inner)),

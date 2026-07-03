@@ -6,7 +6,7 @@ use gazelle::lexer::Scanner;
 use gazelle::Precedence;
 use gazelle_macros::gazelle;
 
-use aipl_syntax::{join_spans, unit_ty, Error, Span};
+use aipl_syntax::{join_spans, Error, Span};
 
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item,
@@ -1072,7 +1072,7 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
         Ok(match node {
             aipl::Ty::Base(t) => t,
             aipl::Ty::Result(ok, err) => Type::Result(Box::new(ok), Box::new(err)),
-            aipl::Ty::ResultVoid(err) => Type::Result(Box::new(unit_ty()), Box::new(err)),
+            aipl::Ty::ResultVoid(err) => Type::Result(Box::new(Type::Unit), Box::new(err)),
             aipl::Ty::FnTy(params, ret) => Type::Fn(params, Box::new(ret)),
             aipl::Ty::TupleTy(args) => {
                 if args.len() < 2 {

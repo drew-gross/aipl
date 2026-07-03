@@ -23,12 +23,12 @@ use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive, Program,
+    is_unit, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive, Program,
     StructDecl, Type,
 };
 use aipl_syntax::{
     error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner, is_set_elem,
-    is_str_repr, is_unit, none_inner_ty, type_name, unit_ty, IMPORTABLE_BUILTINS,
+    is_str_repr, none_inner_ty, type_name, IMPORTABLE_BUILTINS,
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
@@ -4256,7 +4256,7 @@ fn abi_return_ty(f: &AstFn) -> Type {
         // `main` 0/1 derived from its result (see `compile_function`).
         Type::Primitive(Primitive::I64)
     } else {
-        f.return_ty.clone().unwrap_or_else(unit_ty)
+        f.return_ty.clone().unwrap_or(Type::Unit)
     }
 }
 
@@ -4804,7 +4804,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
         let params: Vec<Type> = f.params.iter().map(|p| p.ty.clone()).collect();
-        let return_ty = f.return_ty.clone().unwrap_or_else(unit_ty);
+        let return_ty = f.return_ty.clone().unwrap_or(Type::Unit);
         let effects: Vec<&str> = f.effects.iter().map(String::as_str).collect();
         reg(funcs, name, sym, params, return_ty, &effects);
     }
@@ -5074,7 +5074,7 @@ fn define_fn<M: Module>(
     // The body is checked against the *declared* return type; the *ABI* return
     // (what the signature emits) may differ for entry-style functions — a unit
     // `main` yields its i64 exit code, a mutating method its final `self`.
-    let declared_ret = func.return_ty.clone().unwrap_or_else(unit_ty);
+    let declared_ret = func.return_ty.clone().unwrap_or(Type::Unit);
     let abi_ret = abi_return_ty(func);
     let ret_composite = sret_size(&abi_ret, structs).is_some();
     let mutating = is_mutating_fn(func);
@@ -5363,7 +5363,7 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
-        Type::Primitive(_) => false,
+        Type::Primitive(_) | Type::Unit => false,
         Type::Named(n) => match structs.get(n) {
             Some(TypeDef::Struct(s)) => s.fields.iter().any(|f| needs_drop(&f.ty, structs)),
             // A variant needs cleanup if any case's payload field does.
@@ -5621,7 +5621,7 @@ fn emit_rc<M: Module>(
             builder.ins().call(local, &[v]);
         }
         // Other primitives own no heap (and `needs_drop` gated them out above).
-        Type::Primitive(_) => {}
+        Type::Primitive(_) | Type::Unit => {}
         Type::Array(_) | Type::Set(_) | Type::Dict(_, _) => {
             // A set/dict shares the array heap block, so refcounting is
             // identical. Retain bumps the block's refcount (co-ownership of the
@@ -7788,7 +7788,7 @@ fn define_tostr_fn<M: Module>(
         // rest of `Cx` is irrelevant to rendering, so feed it trivial values.
         let env: Env = HashMap::new();
         let owned_params: HashSet<String> = HashSet::new();
-        let unit = unit_ty();
+        let unit = Type::Unit;
         // A synthesized renderer has no source-level bindings, so its legend is
         // empty (and never printed — this Cx isn't on the `define_fn` path).
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
@@ -8436,7 +8436,7 @@ fn compile_expr<M: Module>(
     Ok(match &expr.kind {
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
-        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), unit_ty()),
+        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
         ExprKind::Return(value) => {
             // Early return: evaluate the value, hand the caller a reference,
             // release *every* live scope (we're leaving the function), then return
@@ -8476,7 +8476,7 @@ fn compile_expr<M: Module>(
             let dead = builder.create_block();
             builder.switch_to_block(dead);
             builder.seal_block(dead);
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Num(n) => (
             builder.ins().iconst(types::I64, *n),
@@ -8878,7 +8878,7 @@ fn compile_expr<M: Module>(
             let local = builtins.import(module, builder.func, "aipl_write_string_to_file");
             let inst = builder.ins().call(local, &[path_v, data_v]);
             let code = builder.inst_results(inst)[0];
-            let result_ty = Type::Result(Box::new(unit_ty()), Box::new(error_ty()));
+            let result_ty = Type::Result(Box::new(Type::Unit), Box::new(error_ty()));
             let ptr = emit_file_result(
                 module,
                 builder,
@@ -9469,7 +9469,7 @@ fn compile_expr<M: Module>(
             let off = builder.ins().imul_imm(w, 8);
             let addr = builder.ins().iadd(base, off);
             builder.ins().store(MemFlags::trusted(), e, addr, 0);
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _) if name == "__filter_drop" => {
             // Internal (in-place `filter`): release a filtered-out element. The
@@ -9478,7 +9478,7 @@ fn compile_expr<M: Module>(
             // it. A no-op for scalar elements (`needs_drop` is false).
             let (e, ety) = compile_expr(module, builder, cx, scopes, &args[0])?;
             emit_drop(builder, module, builtins, structs, e, &ety);
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _) if name == "__filter_truncate" => {
             // Internal (in-place `filter`): set the array's length to `w`. The
@@ -9489,7 +9489,7 @@ fn compile_expr<M: Module>(
             builder
                 .ins()
                 .store(MemFlags::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _) if name == "__map_set" => {
             // Internal (in-place `map`): `__map_set(arr, i, new, old)` overwrites
@@ -9519,7 +9519,7 @@ fn compile_expr<M: Module>(
                 a_ptr,
                 ARR_DROPFN_OFFSET as i32,
             );
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _) if name == "__map_result" => {
             // Internal (in-place `map`): hand the reused buffer back reinterpreted
@@ -9690,7 +9690,7 @@ fn compile_expr<M: Module>(
             // Refine the binding's element type (e.g. `mut a = []` → `i64[]`).
             *ty_cell.borrow_mut() = new_arr_ty;
             // `push` mutates; it produces no value.
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _)
             if Primitive::from_name(name).is_some_and(Primitive::is_int) =>
@@ -9720,7 +9720,7 @@ fn compile_expr<M: Module>(
             // `ok()` with no argument is the void success of a `!E` result: tag 1
             // with an unused (zeroed) value region, Ok side `unit`.
             if is_ok && args.is_empty() {
-                let res_ty = Type::Result(Box::new(unit_ty()), Box::new(none_inner_ty()));
+                let res_ty = Type::Result(Box::new(Type::Unit), Box::new(none_inner_ty()));
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     elem_size_of(&res_ty, structs) as u32,
@@ -9874,7 +9874,7 @@ fn compile_expr<M: Module>(
             builder.ins().stack_store(new_self, slot, 0);
             *ty_cell.borrow_mut() = info.return_ty.clone();
             // A mutating method yields nothing.
-            (builder.ins().iconst(types::I64, 0), unit_ty())
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         ExprKind::Call(name, args, _) => {
             // A variant constructor `Ctor(args..)` builds an inline tagged value.
@@ -11428,7 +11428,7 @@ fn compile_expr<M: Module>(
             builder.seal_block(ok_block);
             // A void-Ok (`!E`) unwraps to unit — there's no payload to read.
             if is_unit(&ok_ty) {
-                return Ok((builder.ins().iconst(types::I64, 0), unit_ty()));
+                return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));
             }
             let val = component(builder, rptr, OPT_VALUE_OFFSET, &ok_ty, structs);
             // A heap Ok payload is now a fresh co-owner of the scrutinee's heap
