@@ -2511,35 +2511,6 @@ pub fn build_test_program(program: &Program) -> Program {
 
 // ---------------------------------------------------------------------------
 // Dogfooding the embedding FFI
-//
-// The compiler JIT-compiles this trivial AIPL function and calls it for some of
-// its own integer arithmetic during code generation (struct field offsets and
-// composite sizes — see `resolve_struct_layout` and `elem_size_of`). The point
-// isn't the function; it's that an AIPL program is exercised regularly as part
-// of compiling, through the same `Compilation` embedding API a host would use.
-const ADD_SRC: &str = include_str!("add.aipl");
-/// The checked-in dogfood IR for `add` — re-linked at runtime instead of
-/// recompiling `add.aipl`. Kept current against `ADD_SRC` by the `dogfood_ir`
-/// test (regenerate with `fill_dogfood_ir`). Loading it runs no codegen, so —
-/// unlike the old source-compiling path — it can't recurse into `aipl_add`.
-const ADD_CLIF: &str = include_str!("add.clif");
-
-thread_local! {
-    /// The `add` engine, re-linked from the checked-in IR lazily on first use per
-    /// thread. A `Compilation` (it owns a `JITModule`) isn't `Sync`, so it's
-    /// thread-local. Re-linking runs no AIPL codegen, so building it never
-    /// re-enters `aipl_add` — no recursion guard needed (unlike the former
-    /// source-compiling path).
-    static ADD_ENGINE: Compilation =
-        Compilation::from_artifact(ADD_CLIF).expect("dogfooded `add` engine builds");
-}
-
-/// `a + b`, computed by the dogfooded AIPL `add` via the embedding FFI. Panics if
-/// the known-good engine can't be built or called, so a regression is loud rather
-/// than silently bypassed.
-fn aipl_add(a: i64, b: i64) -> i64 {
-    ADD_ENGINE.with(|c| c.call("add", &[a, b]).expect("dogfooded aipl add() call"))
-}
 
 /// The dogfooded AIPL `process_raw_string` the *parser* calls (through the hook
 /// installed by [`install_parser_hooks`]) to process `"""..."""` raw strings —
@@ -2799,11 +2770,6 @@ pub struct DogfoodEngine {
 pub fn dogfood_engines() -> Vec<DogfoodEngine> {
     vec![
         DogfoodEngine {
-            clif_file: "add.clif",
-            entries: &["add"],
-            sources: &[("./add.aipl", ADD_SRC)],
-        },
-        DogfoodEngine {
             clif_file: "process_raw_string.clif",
             entries: &["process_raw_string"],
             sources: &[
@@ -2881,9 +2847,6 @@ fn compile_program<M: Module>(
     // separate measurement object.
     instrument: bool,
 ) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Error> {
-    // The embedded AIPL `add` engine this codegen dogfoods for layout arithmetic
-    // builds lazily on the first `aipl_add` call (see `ADD_ENGINE`).
-
     // Standalone type-check over the (non-monomorphized) source: validates
     // every function in isolation, so errors are reported independent of which
     // instances get emitted. Runs before monomorphization.
@@ -4620,8 +4583,8 @@ fn resolve_struct_layout(
             ty: f.ty.clone(),
             offset,
         });
-        // Advance to the next field via the dogfooded AIPL `add` (see ADD_SRC).
-        offset = aipl_add(i64::from(offset), i64::from(size)) as u32;
+        // Advance to the next field
+        offset = offset + size;
     }
     on_stack.remove(name);
     layouts.insert(
@@ -6743,15 +6706,13 @@ const OPT_VALUE_OFFSET: u32 = 8;
 /// layout size. Known at compile time, so it's passed to the array runtime as a
 /// constant rather than stored.
 fn elem_size_of(ty: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
-    // `tag (8) + payload` sizes go through the dogfooded AIPL `add` (see ADD_SRC).
     match ty {
-        Type::Optional(_) => aipl_add(OPT_VALUE_OFFSET as i64, elem_size_of(opt_core(ty), structs)),
+        Type::Optional(_) => OPT_VALUE_OFFSET as i64 + elem_size_of(opt_core(ty), structs),
         // A result is `{ tag, value }` where `value` is sized to the wider
         // payload (8 bytes for v1's scalar/str payloads → 16 total).
-        Type::Result(ok, err) => aipl_add(
-            OPT_VALUE_OFFSET as i64,
-            elem_size_of(ok, structs).max(elem_size_of(err, structs)),
-        ),
+        Type::Result(ok, err) => {
+            OPT_VALUE_OFFSET as i64 + elem_size_of(ok, structs).max(elem_size_of(err, structs))
+        }
         Type::Named(n) => structs.get(n).map_or(8, |t| t.size() as i64),
         _ => 8,
     }
