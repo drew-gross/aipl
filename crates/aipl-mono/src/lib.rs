@@ -438,55 +438,56 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
     // template signature and records which parameters it owns.
     let mut instantiated = 0usize;
     while let Some(inst) = mono.queue.pop_front() {
-        let (params, effects, return_ty, body) = if let Some(g) = generics.get(&inst.template) {
-            // Generic specialization: limit-check (a runaway here means a
-            // self-growing instance), then substitute type arguments.
-            instantiated += 1;
-            if instantiated > INSTANTIATION_LIMIT {
-                return Err(Error::msg(format!(
+        let (params, effects, return_ty, body) =
+            if let Some(Generic { sig, body }) = generics.get(&inst.template) {
+                // Generic specialization: limit-check (a runaway here means a
+                // self-growing instance), then substitute type arguments.
+                instantiated += 1;
+                if instantiated > INSTANTIATION_LIMIT {
+                    return Err(Error::msg(format!(
                     "monomorphization exceeded {INSTANTIATION_LIMIT} generic instances without \
                      terminating — a generic function is most likely instantiating itself with an \
                      ever-growing type. The most recent instance was `{}`. Re-run with `--debug` \
                      to see the full chain of instantiations.",
                     inst.mangled
                 )));
-            }
-            let map: HashMap<String, Type> = g
-                .type_vars
-                .iter()
-                .cloned()
-                .zip(inst.specs.type_args.iter().cloned())
-                .collect();
-            let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
-            let params: Vec<Param> = g
-                .params
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let ty = subst_vars(&p.ty, &map);
-                    // A `str`-as-`char[]` parameter keeps its `str` type: the body
-                    // operates on the str directly, no materialization.
-                    let str_kept = inst.specs.params.get(i).is_some_and(|p| p.str_kept);
-                    let ty = if str_kept && ty == chars {
-                        Type::Primitive(Primitive::Str)
-                    } else {
-                        ty
-                    };
-                    Param {
-                        name: p.name.clone(),
-                        ty,
-                        mutable: p.mutable,
-                        variadic: p.variadic,
-                    }
-                })
-                .collect();
-            let return_ty = g.return_ty.as_ref().map(|t| subst_vars(t, &map));
-            (params, g.effects.clone(), return_ty, g.body.clone())
-        } else {
-            // Concrete function: its signature is already concrete.
-            let f = mono.concrete[&inst.template].clone();
-            (f.params, f.effects, f.return_ty, f.body)
-        };
+                }
+                let map: HashMap<String, Type> = sig
+                    .type_vars
+                    .iter()
+                    .cloned()
+                    .zip(inst.specs.type_args.iter().cloned())
+                    .collect();
+                let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
+                let params: Vec<Param> = sig
+                    .params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let ty = subst_vars(&p.ty, &map);
+                        // A `str`-as-`char[]` parameter keeps its `str` type: the body
+                        // operates on the str directly, no materialization.
+                        let str_kept = inst.specs.params.get(i).is_some_and(|p| p.str_kept);
+                        let ty = if str_kept && ty == chars {
+                            Type::Primitive(Primitive::Str)
+                        } else {
+                            ty
+                        };
+                        Param {
+                            name: p.name.clone(),
+                            ty,
+                            mutable: p.mutable,
+                            variadic: p.variadic,
+                        }
+                    })
+                    .collect();
+                let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
+                (params, sig.effects.clone(), return_ty, body.clone())
+            } else {
+                // Concrete function: its signature is already concrete.
+                let f = mono.concrete[&inst.template].clone();
+                (f.params, f.effects, f.return_ty, f.body)
+            };
         // A concat-specialized instance retypes its marked `str` parameters to
         // the internal concat-str sentinel, so the body (and codegen) carry the
         // representation. Mirrors the `str_params` `char[] -> str` retype above.
@@ -693,15 +694,25 @@ fn specialize_variadic(
     (params, new_body)
 }
 
-/// A generic function template after normalization: its ordered type variables
-/// (declared `<T, ..>` first, then a synthetic name per anonymous `any[]`/`any?`
-/// parameter), and a signature where every type variable is a named reference.
+/// A function's shape apart from its body, after normalization: its ordered
+/// type variables (declared `<T, ..>` first, then a synthetic name per
+/// anonymous `any[]`/`any?` parameter), the params/return/effects where every
+/// type variable is a named reference. [`builtin_sigs`] only needs this —
+/// builtins are never enqueued/specialized like a real generic (see
+/// [`Generic`]), so there's no body to carry.
 #[derive(Clone)]
-struct Generic {
+struct Signature {
     type_vars: Vec<String>,
     params: Vec<Param>,
     return_ty: Option<Type>,
     effects: Vec<String>,
+}
+
+/// A generic function template ready to monomorphize: a [`Signature`] plus the
+/// body to substitute into when specializing a call.
+#[derive(Clone)]
+struct Generic {
+    sig: Signature,
     body: Expr,
 }
 
@@ -1026,8 +1037,8 @@ impl Mono<'_> {
         env: &Env,
         span: Span,
     ) -> Result<(Expr, Type), Error> {
-        let g = self.generics[gname].clone();
-        let var_set: HashSet<&str> = g.type_vars.iter().map(String::as_str).collect();
+        let Generic { sig, body } = self.generics[gname].clone();
+        let var_set: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
         // A lambda carries no type, so the type variables must be pinned by the
         // other (non-function) parameters' arguments.
         let mut map: HashMap<String, Type> = HashMap::new();
@@ -1036,8 +1047,8 @@ impl Mono<'_> {
         // with no `char[]` materialization. `T` is still pinned to `char` (so the
         // element type and any lambda are right), but this parameter's concrete
         // type stays `str`. Record which parameters that applies to.
-        let mut str_arg = vec![false; g.params.len()];
-        for (i, (param, arg)) in g.params.iter().zip(args).enumerate() {
+        let mut str_arg = vec![false; sig.params.len()];
+        for (i, (param, arg)) in sig.params.iter().zip(args).enumerate() {
             if matches!(param.ty, Type::Fn(_, _)) {
                 continue;
             }
@@ -1045,8 +1056,8 @@ impl Mono<'_> {
             collect_bindings(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
         }
-        let mut type_args = Vec::with_capacity(g.type_vars.len());
-        for v in &g.type_vars {
+        let mut type_args = Vec::with_capacity(sig.type_vars.len());
+        for v in &sig.type_vars {
             let t = map.get(v).cloned().ok_or_else(|| {
                 Error::at(
                     format!(
@@ -1064,7 +1075,7 @@ impl Mono<'_> {
         // A `str`-as-`char[]` parameter keeps its `str` type rather than the
         // substituted `char[]`.
         let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
-        let params: Vec<Param> = g
+        let params: Vec<Param> = sig
             .params
             .iter()
             .enumerate()
@@ -1083,7 +1094,7 @@ impl Mono<'_> {
                 }
             })
             .collect();
-        let ret = match &g.return_ty {
+        let ret = match &sig.return_ty {
             Some(t) => subst_vars(t, &map),
             None => Type::Unit,
         };
@@ -1092,9 +1103,9 @@ impl Mono<'_> {
             is_pub: true,
             type_params: Vec::new(),
             params,
-            effects: g.effects.clone(),
+            effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
-            body: g.body.clone(),
+            body: body.clone(),
             owned_params: Vec::new(),
             concat_params: Vec::new(),
             test_body: None,
@@ -2490,11 +2501,11 @@ impl Mono<'_> {
         // Copy the bits we need so we don't borrow `self.generics` across the
         // `&mut self` enqueue.
         let (type_vars, param_tys, return_ty) = {
-            let g = &self.generics[gname];
+            let Generic { sig, .. } = &self.generics[gname];
             (
-                g.type_vars.clone(),
-                g.params.iter().map(|p| p.ty.clone()).collect::<Vec<_>>(),
-                g.return_ty.clone(),
+                sig.type_vars.clone(),
+                sig.params.iter().map(|p| p.ty.clone()).collect::<Vec<_>>(),
+                sig.return_ty.clone(),
             )
         };
         let var_set: HashSet<&str> = type_vars.iter().map(String::as_str).collect();
@@ -2564,14 +2575,14 @@ impl Mono<'_> {
         template: &str,
         type_args: &[Type],
     ) -> (Vec<Param>, Option<Type>, Expr) {
-        if let Some(g) = self.generics.get(template) {
-            let map: HashMap<String, Type> = g
+        if let Some(Generic { sig, body }) = self.generics.get(template) {
+            let map: HashMap<String, Type> = sig
                 .type_vars
                 .iter()
                 .cloned()
                 .zip(type_args.iter().cloned())
                 .collect();
-            let params = g
+            let params = sig
                 .params
                 .iter()
                 .map(|p| Param {
@@ -2581,8 +2592,8 @@ impl Mono<'_> {
                     variadic: p.variadic,
                 })
                 .collect();
-            let return_ty = g.return_ty.as_ref().map(|t| subst_vars(t, &map));
-            (params, return_ty, g.body.clone())
+            let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
+            (params, return_ty, body.clone())
         } else if let Some(f) = self.concrete.get(template) {
             (f.params.clone(), f.return_ty.clone(), f.body.clone())
         } else {
@@ -3154,14 +3165,14 @@ impl Mono<'_> {
                     // so only the `char[]`-substituted parameter is marked).
                     let params: Vec<ParamSpec> = {
                         let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
-                        let g = &self.generics[name];
-                        let tmap: HashMap<String, Type> = g
+                        let Generic { sig, .. } = &self.generics[name];
+                        let tmap: HashMap<String, Type> = sig
                             .type_vars
                             .iter()
                             .cloned()
                             .zip(type_args.iter().cloned())
                             .collect();
-                        g.params
+                        sig.params
                             .iter()
                             .enumerate()
                             .map(|(i, p)| ParamSpec {
@@ -3409,14 +3420,13 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 }
 
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each
-/// normalized into the same [`Generic`] shape a user-defined generic function
-/// gets — the same declarations the checker resolves builtin calls against,
-/// reused here (via [`normalize`]) so mono's own return-type inference doesn't
-/// hand-duplicate them. Only `type_vars`/`params`/`return_ty` are used below;
-/// `effects`/`body` ride along unused (builtins are never enqueued/specialized
-/// like a real generic — see [`declared_builtin_return`]).
-fn builtin_sigs() -> &'static HashMap<String, Generic> {
-    static SIGS: OnceLock<HashMap<String, Generic>> = OnceLock::new();
+/// normalized (via [`normalize`]) into a [`Signature`] — the same declarations
+/// the checker resolves builtin calls against, reused here so mono's own
+/// return-type inference doesn't hand-duplicate them. A builtin is never
+/// enqueued/specialized like a real [`Generic`], so only its `Signature` is
+/// kept (the body `normalize` produces alongside it is discarded).
+fn builtin_sigs() -> &'static HashMap<String, Signature> {
+    static SIGS: OnceLock<HashMap<String, Signature>> = OnceLock::new();
     SIGS.get_or_init(|| {
         let program =
             aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
@@ -3427,7 +3437,7 @@ fn builtin_sigs() -> &'static HashMap<String, Generic> {
                 Item::Fn(f) => {
                     let name = f.name.clone();
                     let g = normalize(&f).expect("builtin signatures are valid AIPL");
-                    Some((name, g))
+                    Some((name, g.sig))
                 }
                 _ => None,
             })
@@ -3726,10 +3736,12 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
     }
 
     Ok(Generic {
-        type_vars,
-        params,
-        return_ty: f.return_ty.clone(),
-        effects: f.effects.clone(),
+        sig: Signature {
+            type_vars,
+            params,
+            return_ty: f.return_ty.clone(),
+            effects: f.effects.clone(),
+        },
         body: f.body.clone(),
     })
 }
