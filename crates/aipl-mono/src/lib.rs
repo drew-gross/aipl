@@ -3408,20 +3408,15 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     }
 }
 
-/// A builtin's declared signature, parsed from
-/// [`aipl_syntax::BUILTIN_SIGNATURES`]: its type variables (empty for a
-/// non-generic builtin) and the param/return types they appear in.
-struct BuiltinSig {
-    type_vars: Vec<String>,
-    params: Vec<Type>,
-    return_ty: Type,
-}
-
-/// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name — the
-/// same declarations the checker resolves builtin calls against, reused here
-/// so mono's own return-type inference doesn't hand-duplicate them.
-fn builtin_sigs() -> &'static HashMap<String, BuiltinSig> {
-    static SIGS: OnceLock<HashMap<String, BuiltinSig>> = OnceLock::new();
+/// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each
+/// normalized into the same [`Generic`] shape a user-defined generic function
+/// gets — the same declarations the checker resolves builtin calls against,
+/// reused here (via [`normalize`]) so mono's own return-type inference doesn't
+/// hand-duplicate them. Only `type_vars`/`params`/`return_ty` are used below;
+/// `effects`/`body` ride along unused (builtins are never enqueued/specialized
+/// like a real generic — see [`declared_builtin_return`]).
+fn builtin_sigs() -> &'static HashMap<String, Generic> {
+    static SIGS: OnceLock<HashMap<String, Generic>> = OnceLock::new();
     SIGS.get_or_init(|| {
         let program =
             aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
@@ -3429,14 +3424,11 @@ fn builtin_sigs() -> &'static HashMap<String, BuiltinSig> {
             .items
             .into_iter()
             .filter_map(|item| match item {
-                Item::Fn(f) => Some((
-                    f.name,
-                    BuiltinSig {
-                        type_vars: f.type_params,
-                        params: f.params.into_iter().map(|p| p.ty).collect(),
-                        return_ty: f.return_ty.unwrap_or(Type::Unit),
-                    },
-                )),
+                Item::Fn(f) => {
+                    let name = f.name.clone();
+                    let g = normalize(&f).expect("builtin signatures are valid AIPL");
+                    Some((name, g))
+                }
                 _ => None,
             })
             .collect()
@@ -3497,8 +3489,8 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         // `value_or`'s uninformative `self` side) only wins if nothing else
         // does, so a later, more informative parameter still takes over.
         let mut none_ish: Option<Type> = None;
-        for (pty, aty) in sig.params.iter().zip(arg_tys) {
-            match bind_builtin_var(pty, aty, v) {
+        for (p, aty) in sig.params.iter().zip(arg_tys) {
+            match bind_builtin_var(&p.ty, aty, v) {
                 Some(t) if !is_none_inner(&t) => {
                     map.insert(v.clone(), t);
                     break;
@@ -3512,7 +3504,10 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         map.entry(v.clone())
             .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
     }
-    Some(subst_vars(&sig.return_ty, &map))
+    Some(match &sig.return_ty {
+        Some(t) => subst_vars(t, &map),
+        None => Type::Unit,
+    })
 }
 
 /// Return type of a builtin call, or `None` if `name` isn't a builtin. Most
