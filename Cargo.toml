@@ -21,12 +21,12 @@ aipl-codegen = { path = "crates/aipl-codegen" }
 aipl-loader = { path = "crates/aipl-loader" }
 aipl-linker = { path = "crates/aipl-linker" }
 # External crates.
-cranelift = "0.128.4"
-cranelift-jit = "0.128.4"
-cranelift-module = "0.128.4"
-cranelift-native = "0.128.4"
-cranelift-reader = "0.128.4"
-cranelift-object = "0.128.4"
+cranelift = "0.129.2"
+cranelift-jit = "0.129.2"
+cranelift-module = "0.129.2"
+cranelift-native = "0.129.2"
+cranelift-reader = "0.129.2"
+cranelift-object = "0.129.2"
 target-lexicon = "0.13"
 gazelle-parser = "0.9.3"
 gazelle-macros = "0.9.3"
