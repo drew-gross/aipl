@@ -61,6 +61,7 @@ dependencies = [
 name = "aipl-mono"
 version = "0.1.0"
 dependencies = [
+ "aipl-parser",
  "aipl-syntax",
 ]
 

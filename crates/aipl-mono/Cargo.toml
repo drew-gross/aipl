@@ -7,6 +7,10 @@ license = "MIT"
 
 [dependencies]
 aipl-syntax = { workspace = true }
+# Parses `aipl_syntax::BUILTIN_SIGNATURES` so mono's own return-type inference
+# for builtin calls substitutes the same declared signatures the checker uses,
+# instead of a hand-maintained duplicate.
+aipl-parser = { workspace = true }
 
 [lib]
 path = "src/lib.rs"

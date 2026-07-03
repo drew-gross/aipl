@@ -23,6 +23,7 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     slice::from_ref,
+    sync::OnceLock,
 };
 
 mod check;
@@ -33,9 +34,9 @@ use aipl_syntax::{
         is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm,
         Param, Pattern, Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
     },
-    concat_str_ty, empty_array_arg_ty, error_ty, is_array_elem, is_concat_str, is_empty_array_arg,
-    is_error, is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty,
-    type_name, DebugOptions, Error, Span,
+    concat_str_ty, empty_array_arg_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error,
+    is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty, type_name,
+    DebugOptions, Error, Span, BUILTIN_SIGNATURES,
 };
 
 /// Hard cap on the number of generic instances monomorphization will emit.
@@ -3407,122 +3408,206 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     }
 }
 
-/// Return type of a builtin call, or `None` if `name` isn't a builtin.
+/// A builtin's declared signature, parsed from
+/// [`aipl_syntax::BUILTIN_SIGNATURES`]: its type variables (empty for a
+/// non-generic builtin) and the param/return types they appear in.
+struct BuiltinSig {
+    type_vars: Vec<String>,
+    params: Vec<Type>,
+    return_ty: Type,
+}
+
+/// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name — the
+/// same declarations the checker resolves builtin calls against, reused here
+/// so mono's own return-type inference doesn't hand-duplicate them.
+fn builtin_sigs() -> &'static HashMap<String, BuiltinSig> {
+    static SIGS: OnceLock<HashMap<String, BuiltinSig>> = OnceLock::new();
+    SIGS.get_or_init(|| {
+        let program =
+            aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
+        program
+            .items
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Fn(f) => Some((
+                    f.name,
+                    BuiltinSig {
+                        type_vars: f.type_params,
+                        params: f.params.into_iter().map(|p| p.ty).collect(),
+                        return_ty: f.return_ty.unwrap_or(Type::Unit),
+                    },
+                )),
+                _ => None,
+            })
+            .collect()
+    })
+}
+
+/// If `param_ty` binds type variable `v` (directly, or nested in a container:
+/// `T[]`, `T?`, `#{T}`, a dict's key/value, or a result's ok/err side),
+/// return the type `v` resolves to given `arg_ty` in the matching position —
+/// even if that's the `__none__` marker (an empty array's element, or the
+/// bare `none` literal's inner). Unlike [`collect_bindings`] (which backs real
+/// monomorphization, restricting a bound variable to a specializable element
+/// type and erroring on a mismatch), this only feeds a *return type*
+/// computation for mono's own inference: any type is a valid binding, and a
+/// shape that doesn't match the parameter yields `None` (the variable may
+/// still be pinned by a different parameter — see [`declared_builtin_return`]).
+fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
+    match param_ty {
+        Type::Named(p) if p == v => Some(arg_ty.clone()),
+        Type::Optional(inner) if ty_mentions(inner, v) => match arg_ty {
+            Type::Optional(a) => bind_builtin_var(inner, a, v),
+            _ => None,
+        },
+        Type::Array(inner) if ty_mentions(inner, v) => match arg_ty {
+            Type::Array(a) => bind_builtin_var(inner, a, v),
+            // `str` is usable as `char[]` — pin the element variable to `char`.
+            Type::Primitive(Primitive::Str) => Some(Type::Primitive(Primitive::Char)),
+            _ => None,
+        },
+        Type::Set(inner) if ty_mentions(inner, v) => match arg_ty {
+            Type::Set(a) => bind_builtin_var(inner, a, v),
+            _ => None,
+        },
+        Type::Dict(pk, pv) if ty_mentions(pk, v) || ty_mentions(pv, v) => match arg_ty {
+            Type::Dict(ak, av) if ty_mentions(pk, v) => bind_builtin_var(pk, ak, v),
+            Type::Dict(_, av) => bind_builtin_var(pv, av, v),
+            _ => None,
+        },
+        Type::Result(po, pe) if ty_mentions(po, v) || ty_mentions(pe, v) => match arg_ty {
+            Type::Result(ao, _) if ty_mentions(po, v) => bind_builtin_var(po, ao, v),
+            Type::Result(_, ae) => bind_builtin_var(pe, ae, v),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Return type of a builtin declared in [`aipl_syntax::BUILTIN_SIGNATURES`],
+/// substituting its type variables from `arg_tys`. `None` if `name` isn't
+/// declared there (an internal/synthetic name, or one of `builtin_return`'s
+/// own special cases).
+fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
+    let sig = builtin_sigs().get(name)?;
+    let mut map: HashMap<String, Type> = HashMap::new();
+    for v in &sig.type_vars {
+        // Prefer the first parameter whose argument concretely pins `v`;
+        // a `__none__` binding (an empty-array/bare-`none` argument, e.g.
+        // `value_or`'s uninformative `self` side) only wins if nothing else
+        // does, so a later, more informative parameter still takes over.
+        let mut none_ish: Option<Type> = None;
+        for (pty, aty) in sig.params.iter().zip(arg_tys) {
+            match bind_builtin_var(pty, aty, v) {
+                Some(t) if !is_none_inner(&t) => {
+                    map.insert(v.clone(), t);
+                    break;
+                }
+                Some(t) => {
+                    none_ish.get_or_insert(t);
+                }
+                None => {}
+            }
+        }
+        map.entry(v.clone())
+            .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
+    }
+    Some(subst_vars(&sig.return_ty, &map))
+}
+
+/// Return type of a builtin call, or `None` if `name` isn't a builtin. Most
+/// builtins substitute directly from their [`aipl_syntax::BUILTIN_SIGNATURES`]
+/// declaration via [`declared_builtin_return`]; the cases here are the ones
+/// where mono's own inference genuinely diverges from that signature (a
+/// different result than the declared one, or a synthetic/internal name not
+/// declared there at all).
 fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     // Integer conversion builtins `i8(x)`/`u32(x)`/… yield the named width.
     if let Some(p) = Primitive::from_name(name).filter(|p| p.is_int()) {
         return Some(Type::Primitive(p));
     }
-    Some(match name {
-        "__builtin_len" => Type::Primitive(Primitive::I64),
-        // `min(a, b)` / `max(a, b)` -> i64.
-        "__builtin_min" | "__builtin_max" => Type::Primitive(Primitive::I64),
-        // `arr.minimum()` / `arr.maximum()` -> `T?` (smallest / largest element).
-        "__builtin_minimum" | "__builtin_maximum" => match arg_tys.first() {
-            Some(Type::Array(inner)) => Type::Optional(inner.clone()),
-            _ => Type::Optional(Box::new(Type::Primitive(Primitive::I64))),
-        },
+    match name {
         // Internal: an empty array reserved to a given capacity (`map`'s output).
         // Untyped element (`__none__`) like `[]`; refined by the first `push`.
-        "__builtin_with_capacity" => Type::Array(Box::new(none_inner_ty())),
-        "__builtin_print" => Type::Primitive(Primitive::I64),
-        // `hash(x): i64` — structural hash, consistent with `==`.
-        "__builtin_hash" => Type::Primitive(Primitive::I64),
-        "__builtin_to_str" | "__builtin_trim" | "__aipl_concat" | "__template_interp" => {
-            Type::Primitive(Primitive::Str)
-        }
+        "__builtin_with_capacity" => return Some(Type::Array(Box::new(none_inner_ty()))),
+        // Declared void (it's a statement); mono needs an `i64` value for the
+        // expression it emits (see the `expr`-position uses of `print`).
+        "__builtin_print" => return Some(Type::Primitive(Primitive::I64)),
         // Internal: a single `char` to a one-char `str`, emitted by variadic
         // `char*` specialization (see `specialize_variadic`).
-        "__char_to_str" => Type::Primitive(Primitive::Str),
-        "__builtin_is_all_whitespace" => Type::Primitive(Primitive::Bool),
-        // `s.starts_with(p)` / `s.ends_with(p): bool` — byte-prefix / -suffix test.
-        "__builtin_starts_with" | "__builtin_ends_with" => Type::Primitive(Primitive::Bool),
-        // `s.split(sep): str[]` — the parts between separators (slices of `s`).
-        "__builtin_split" => Type::Array(Box::new(Type::Primitive(Primitive::Str))),
-        // `parts.join(sep): str` — the parts concatenated with `sep` between them.
-        "__builtin_join" => Type::Primitive(Primitive::Str),
-        // read_file_to_string(name: str) -> str!Error — ok(contents) / err(message).
-        "__builtin_read_file_to_string" => Type::Result(
-            Box::new(Type::Primitive(Primitive::Str)),
-            Box::new(error_ty()),
-        ),
-        // write_string_to_file(path: str, contents: str) -> !Error — ok()/err(message).
-        "__builtin_write_string_to_file" => {
-            Type::Result(Box::new(Type::Unit), Box::new(error_ty()))
-        }
-        "__builtin_is_some" => Type::Primitive(Primitive::Bool),
-        // `s.contains(x): bool` — set membership.
-        "__builtin_contains" => Type::Primitive(Primitive::Bool),
-        // `a.union(b): T{}` — yields a set of the receiver's element type.
-        "__builtin_union" => arg_tys
-            .first()
-            .cloned()
-            .unwrap_or(Type::Primitive(Primitive::I64)),
-        // `d.contains_key(k): bool` — dict membership.
-        "__builtin_contains_key" => Type::Primitive(Primitive::Bool),
-        // `d.get(k): V?` — the dict's value type wrapped in an optional.
-        "__builtin_get" => match arg_tys.first() {
-            Some(Type::Dict(_, v)) => Type::Optional(v.clone()),
-            _ => Type::Optional(Box::new(Type::Primitive(Primitive::I64))),
-        },
+        "__char_to_str" => return Some(Type::Primitive(Primitive::Str)),
         // `xs.reverse() -> T[]` / `s.reverse() -> str` — same type as the input.
-        "__builtin_reverse" => match arg_tys.first() {
-            Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
-            Some(Type::Array(inner)) => Type::Array(inner.clone()),
-            _ => Type::Array(Box::new(none_inner_ty())),
-        },
-        // push returns the array it was given (first effective arg).
-        "__builtin_push" => arg_tys
-            .first()
-            .cloned()
-            .unwrap_or(Type::Primitive(Primitive::I64)),
-        // `o.value_or(d): T` — the optional's element when present, else the
-        // default. Pinned by the optional's element type, or (for a bare `none`,
-        // whose element is `__none__`) by the default argument.
-        "__builtin_value_or" => match arg_tys.first() {
-            Some(Type::Optional(inner)) if !is_none_inner(inner) => (**inner).clone(),
-            _ => arg_tys
-                .get(1)
-                .cloned()
-                .unwrap_or(Type::Primitive(Primitive::I64)),
-        },
-        // some(x) wraps the value's type.
-        "some" => Type::Optional(Box::new(decay_concat(
-            arg_tys
-                .first()
-                .cloned()
-                .unwrap_or(Type::Primitive(Primitive::I64)),
-        ))),
-        // ok(x)/err(e) pin one side of a result; the other is `__none__`,
-        // resolved by the expected result type via coercion (like `none`).
-        // With an arg, `ok(x)` pins the Ok type to `x`; with none, `ok()` is the
-        // void success of a `!E` result (Ok side is unit).
-        "ok" => Type::Result(
-            Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
-            Box::new(none_inner_ty()),
-        ),
-        "err" => Type::Result(
-            Box::new(none_inner_ty()),
-            Box::new(decay_concat(
+        // The declared signature is `T[] -> T[]`; a `str` receiver (which
+        // `collect_bindings`-style unification would bind as `char[]`) instead
+        // dispatches to a `str` result, so this stays hand-written.
+        "__builtin_reverse" => {
+            return Some(match arg_tys.first() {
+                Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
+                Some(Type::Array(inner)) => Type::Array(inner.clone()),
+                _ => Type::Array(Box::new(none_inner_ty())),
+            })
+        }
+        // Declared void (it mutates `self` in place); mono treats the call as
+        // yielding the array it was given (first effective arg).
+        "__builtin_push" => {
+            return Some(
                 arg_tys
                     .first()
                     .cloned()
                     .unwrap_or(Type::Primitive(Primitive::I64)),
-            )),
-        ),
+            )
+        }
+        // some(x) wraps the value's type. Not expressible via plain signature
+        // substitution: a concat-str argument must decay to plain `str` before
+        // it's wrapped (see `decay_concat`).
+        "some" => {
+            return Some(Type::Optional(Box::new(decay_concat(
+                arg_tys
+                    .first()
+                    .cloned()
+                    .unwrap_or(Type::Primitive(Primitive::I64)),
+            ))))
+        }
+        // ok(x)/err(e) pin one side of a result; the other is `__none__`,
+        // resolved by the expected result type via coercion (like `none`).
+        // With an arg, `ok(x)` pins the Ok type to `x`; with none, `ok()` is the
+        // void success of a `!E` result (Ok side is unit). Not declared in
+        // `BUILTIN_SIGNATURES` (the checker special-cases them the same way).
+        "ok" => {
+            return Some(Type::Result(
+                Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
+                Box::new(none_inner_ty()),
+            ))
+        }
+        "err" => {
+            return Some(Type::Result(
+                Box::new(none_inner_ty()),
+                Box::new(decay_concat(
+                    arg_tys
+                        .first()
+                        .cloned()
+                        .unwrap_or(Type::Primitive(Primitive::I64)),
+                )),
+            ))
+        }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
-        "__filter_keep" | "__filter_drop" | "__filter_truncate" => Type::Unit,
+        "__filter_keep" | "__filter_drop" | "__filter_truncate" => return Some(Type::Unit),
         // Internal in-place-map intrinsic (a statement; see `expand_map`).
-        "__map_set" => Type::Unit,
+        "__map_set" => return Some(Type::Unit),
         // Internal: reinterpret the reused buffer as the result element type.
         // Its real result type is fixed by codegen (the enclosing fn's return);
         // here it just borrows the input array type so mono inference proceeds.
-        "__map_result" => arg_tys
-            .first()
-            .cloned()
-            .unwrap_or(Type::Primitive(Primitive::I64)),
-        _ => return None,
-    })
+        "__map_result" => {
+            return Some(
+                arg_tys
+                    .first()
+                    .cloned()
+                    .unwrap_or(Type::Primitive(Primitive::I64)),
+            )
+        }
+        _ => {}
+    }
+    declared_builtin_return(name, arg_tys)
 }
 
 /// Merge two branch/arm types, applying the same `none`/empty-array coercions

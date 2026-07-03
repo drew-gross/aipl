@@ -848,6 +848,90 @@ pub fn is_error(t: &Type) -> bool {
     matches!(t, Type::Named(s) if s == ERROR)
 }
 
+/// Every builtin's signature, written as AIPL source. These are *declarations*
+/// only — the checker (`aipl-codegen`) resolves a call to `map`/`value_or`/
+/// `print`/… against them exactly as it would a user function, with no notion
+/// that they're builtin; monomorphization (`aipl-mono`) substitutes the same
+/// declared signatures to infer a builtin call's concrete return type during
+/// its own inference pass. Each body is a trivial value of the declared return
+/// type so it type-checks like any function — it is never compiled
+/// (monomorphization and codegen lower the real implementations).
+///
+/// Authoring notes: `<T: any>` is the only valid generic bound; effects precede
+/// the return type (`!read_files -> str!Error`); a `mut self` first parameter
+/// marks a mutating method. First parameters are named `self` so the
+/// receiver-style builtins are method-callable (`xs.map(..)`, `opt.value_or(..)`).
+pub const BUILTIN_SIGNATURES: &str = r#"
+fn __builtin_print(self: str) !prints {}
+// Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
+fn __builtin_split(self: str, sep: str) -> str[] { [] }
+// Concatenate the parts with `sep` between consecutive elements.
+fn __builtin_join(self: str[], sep: str) -> str { "" }
+
+// The file builtins return a Result; the `ok(..)` body coerces to the declared
+// `..!Error` (codegen builds the real ok/err).
+fn __builtin_read_file_to_string(self: str) !read_files -> str!Error { ok("") }
+fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Error { ok() }
+
+fn __builtin_to_str<T: any>(self: T) -> str { "" }
+// Structural hash, consistent with `==`.
+fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
+fn __builtin_trim(self: str) -> str { self }
+// Concatenate `self` with itself `n` times; returns `""` for `n <= 0`.
+fn __builtin_repeat(self: str, n: i64) -> str { "" }
+// True if every byte is ASCII whitespace (or the string is empty).
+fn __builtin_is_all_whitespace(self: str) -> bool { false }
+// True if `self` begins / ends with the argument — `str` bytes or `T[]`
+// elements (the empty pattern always matches). A str receiver is dispatched in
+// the checker / codegen (the `T[]` signature doesn't unify with `str`).
+fn __builtin_starts_with<T: any>(self: T[], prefix: T[]) -> bool { false }
+fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
+// Smaller / larger of two `i64`s (codegen compares and selects).
+fn __builtin_min(self: i64, other: i64) -> i64 { self }
+fn __builtin_max(self: i64, other: i64) -> i64 { self }
+// Smallest / largest element of an array, or `none` if empty (codegen folds
+// over the elements). Elements must be comparable (integer or char).
+fn __builtin_minimum<T: any>(self: T[]) -> T? { none }
+fn __builtin_maximum<T: any>(self: T[]) -> T? { none }
+fn __builtin_len<T: any>(self: T[]) -> i64 { 0 }
+fn __builtin_is_some<T: any>(self: T?) -> bool { false }
+
+// Set ops: membership and union.
+fn __builtin_contains<T: any>(self: #{T}, x: T) -> bool { false }
+fn __builtin_union<T: any>(self: #{T}, other: #{T}) -> #{T} { self }
+
+// Dict ops: lookup (none if absent) and membership.
+fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
+fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false }
+
+fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
+fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
+fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
+// True when every element satisfies `pred` (vacuously true for an empty array).
+fn __builtin_all<T: any>(self: T[], pred: (T) -> bool) -> bool { false }
+fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
+fn __builtin_push<T: any>(mut self: T[], x: T) {}
+// Reverse the elements of an array or the bytes of a string.
+fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
+// Pair each element with its index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
+fn __builtin_enumerate<T: any>(self: T[]) -> (i64, T)[] { [] }
+fn some<T: any>(x: T) -> T? { none }
+
+// Test-runner hooks. `__assert(cond, loc)` is what `assert(cond)` lowers to
+// inside a `.test({ .. })` body; the other three are called by the synthesized
+// `__test_main` driver (see `build_test_program`). All are effect-free so test
+// code needs no effect annotations to call them.
+fn __assert(cond: bool, loc: str) {}
+fn __test_begin(name: str) {}
+fn __test_end() {}
+fn __test_summary() -> i64 { 0 }
+// Internal: emitted by the compiler for template-literal concatenation.
+fn __aipl_concat(a: str, b: str) -> str { "" }
+// Internal: emitted for each interpolation in a template literal.
+// Passes a `str` through unchanged; converts any other type via `to_str`.
+fn __template_interp<T: any>(self: T) -> str { "" }
+"#;
+
 /// The *concatenated-string* representation of `str`: an internal, mono-only
 /// pseudo-type that flows out of `a + b` (string concat) to mark a value built as
 /// a lazy concat node (see `aipl_concat_lazy`). To the source author it is just a
