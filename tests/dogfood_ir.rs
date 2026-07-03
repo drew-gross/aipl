@@ -50,6 +50,11 @@ fn staged_artifact_path(engine: &DogfoodEngine) -> PathBuf {
 /// overflows the default test-framework stack (8 MiB on macOS).
 fn generate(engine: &DogfoodEngine) -> String {
     let mut result = None;
+    for (path, _) in engine.sources {
+        if !path.starts_with("./") {
+            panic!("non-relative path: {path:?}")
+        }
+    }
     std::thread::scope(|s| {
         let handle = std::thread::Builder::new()
             .stack_size(64 * 1024 * 1024)

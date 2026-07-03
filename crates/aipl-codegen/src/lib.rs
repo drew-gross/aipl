@@ -2801,26 +2801,26 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
         DogfoodEngine {
             clif_file: "add.clif",
             entries: &["add"],
-            sources: &[("add.aipl", ADD_SRC)],
+            sources: &[("./add.aipl", ADD_SRC)],
         },
         DogfoodEngine {
             clif_file: "process_raw_string.clif",
             entries: &["process_raw_string"],
             sources: &[
-                ("process_raw_string.aipl", RAW_STRING_SRC),
-                ("dedent.aipl", RAW_STRING_DEDENT_SRC),
-                ("count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
-                ("trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
-                ("trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
-                ("trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-                ("trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
+                ("./process_raw_string.aipl", RAW_STRING_SRC),
+                ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
+                ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
+                ("./trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
+                ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
+                ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
+                ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
             ],
         },
         DogfoodEngine {
             clif_file: "parse_test_section_header.clif",
             entries: &["parse_test_section_header"],
             sources: &[(
-                "parse_test_section_header.aipl",
+                "./parse_test_section_header.aipl",
                 PARSE_TEST_SECTION_HEADER_SRC,
             )],
         },
@@ -2830,9 +2830,9 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
             // Bundles `parse_test_section_header` (imported), so its marker check
             // is an in-engine AIPL call rather than an FFI crossing per line.
             sources: &[
-                ("strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
+                ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
                 (
-                    "parse_test_section_header.aipl",
+                    "./parse_test_section_header.aipl",
                     PARSE_TEST_SECTION_HEADER_SRC,
                 ),
             ],
@@ -2841,7 +2841,7 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
             clif_file: "find_trailing_whitespace.clif",
             entries: &["find_trailing_whitespace"],
             sources: &[(
-                "find_trailing_whitespace.aipl",
+                "./find_trailing_whitespace.aipl",
                 FIND_TRAILING_WHITESPACE_SRC,
             )],
         },
@@ -2851,7 +2851,7 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
         DogfoodEngine {
             clif_file: "line_at.clif",
             entries: &["line_at"],
-            sources: &[("line_at.aipl", LINE_AT_SRC)],
+            sources: &[("./line_at.aipl", LINE_AT_SRC)],
         },
         DogfoodEngine {
             clif_file: "caret_block.clif",
@@ -2859,8 +2859,8 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
             // Bundles `line_at` (imported by `caret_block`) so line-location is
             // an in-engine AIPL call rather than an FFI crossing per render.
             sources: &[
-                ("caret_block.aipl", CARET_BLOCK_SRC),
-                ("line_at.aipl", LINE_AT_SRC),
+                ("./caret_block.aipl", CARET_BLOCK_SRC),
+                ("./line_at.aipl", LINE_AT_SRC),
             ],
         },
     ]
@@ -3282,9 +3282,9 @@ pub fn generate_dogfood_artifact(
     entries: &[&str],
 ) -> Result<String, Error> {
     let dbg = DebugOptions::new(false);
-    let program = aipl_loader::load_program_sources(sources, dbg)?;
-    let mut module = new_jit_module()?;
-    let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false)?;
+    let program = aipl_loader::load_program_sources(sources, dbg).unwrap();
+    let mut module = new_jit_module().unwrap();
+    let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false).unwrap();
 
     // Collect static data objects (e.g. string literals longer than the 7-byte
     // inline SSO threshold). Finalize the JIT module only when any exist so we

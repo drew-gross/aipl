@@ -67,23 +67,16 @@ pub fn load_program_sources(sources: &[(&str, &str)], dbg: DebugOptions) -> Resu
     let Some((root_name, _)) = sources.first() else {
         return Err(Error::msg("load_program_sources: no sources provided"));
     };
-    let root = PathBuf::from(normalize_module(root_name));
+    let root = PathBuf::from(root_name);
     let mut loader = Loader {
         dbg,
         ..Loader::default()
     };
     for (name, src) in sources {
-        loader.register_virtual(PathBuf::from(normalize_module(name)), src)?;
+        loader.register_virtual(PathBuf::from(name), src).unwrap();
     }
     loader.check_virtual_imports()?;
     loader.flatten(&root)
-}
-
-/// A module reference (`from "<name>"` or a supplied source's name) reduced to a
-/// canonical key for matching: a leading `./` is dropped so `"./util.aipl"` and
-/// `"util.aipl"` refer to the same virtual file.
-fn normalize_module(s: &str) -> String {
-    s.strip_prefix("./").unwrap_or(s).to_string()
 }
 
 /// Reject importing from the same place on more than one line: every import from
@@ -109,7 +102,7 @@ fn check_no_duplicate_import_sources(program: &Program) -> Result<(), Error> {
                 seen_builtins = true;
             }
             ImportSource::Path { path, span } => {
-                if !seen_paths.insert(normalize_module(path)) {
+                if !seen_paths.insert(path.clone()) {
                     return Err(Error::at(
                         format!(
                             "duplicate import from {path:?}; merge the names into the first \
@@ -227,6 +220,9 @@ impl Loader {
     /// [`check_virtual_imports`]: Loader::check_virtual_imports
     fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Error> {
         let program = parse(src)?;
+        if !key.starts_with("./") {
+            panic!("non-relative path: {key:?}");
+        }
         check_no_duplicate_import_sources(&program)?;
         let mut items = Vec::new();
         let mut imports = Vec::new();
@@ -236,7 +232,7 @@ impl Loader {
                 Item::Import(ImportDecl { names, source }) => match source {
                     ImportSource::Path { path: from, .. } => imports.push(ResolvedImport {
                         names,
-                        from: PathBuf::from(normalize_module(&from)),
+                        from: PathBuf::from(&from),
                     }),
                     ImportSource::Builtins { .. } => builtin_imports.extend(names),
                 },
@@ -272,9 +268,10 @@ impl Loader {
             for imp in &file.imports {
                 if !self.files.contains_key(&imp.from) {
                     return Err(Error::msg(format!(
-                        "{}: imported module {:?} was not provided to compile_sources",
+                        "{}: imported module {:?} was not provided to compile_sources. Sources: {:?}",
                         file_label(path),
                         file_label(&imp.from),
+                        self.files.keys()
                     )));
                 }
             }
@@ -885,14 +882,13 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
     }
 }
 
-/// Render a file path as just its file name (e.g. `util.aipl`) for use
-/// inside error messages. Keeps errors useful enough to point at the
-/// offending file while staying deterministic across machines (no
-/// absolute paths leaking from a temp directory or user home).
+// Used to make errors better by eliminating asbolute paths. TODO: Instead, always
+// use paths relative to the project root i.e. ./file_name.aipl
 fn file_label(path: &Path) -> String {
     path.file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("<unknown>")
+        .expect("File should have file name")
+        .to_str()
+        .expect("Filename was invalid unicode")
         .to_string()
 }
 
