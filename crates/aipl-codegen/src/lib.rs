@@ -5,28 +5,34 @@
 //!   - `bool` (encoded 0/1 in an i64 at the ABI level).
 //!   - Declared struct names — stack-allocated, passed by pointer.
 
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-
-use std::path::Path;
-
-use cranelift::codegen;
-use cranelift::codegen::cursor::{Cursor, FuncCursor};
-use cranelift::codegen::ir::{
-    Block, BlockArg, FuncRef, Function, Signature, StackSlot, UserFuncName,
+use std::{
+    cell::{Cell, RefCell},
+    collections::{HashMap, HashSet},
+    path::Path,
+    rc::Rc,
 };
-use cranelift::codegen::isa::TargetIsa;
-use cranelift::prelude::*;
+
+use cranelift::{
+    codegen::{
+        cursor::{Cursor, FuncCursor},
+        ir::{Block, BlockArg, FuncRef, Function, Signature, StackSlot, UserFuncName},
+        isa::TargetIsa,
+        Context,
+    },
+    prelude::{
+        settings, types, AbiParam, Configurable, FunctionBuilder, FunctionBuilderContext,
+        InstBuilder, IntCC, MemFlags, StackSlotData, StackSlotKind, Value,
+    },
+};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use aipl_syntax::ast::{
-    is_unit, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive, Program,
-    StructDecl, Type,
-};
 use aipl_syntax::{
+    ast::{
+        is_unit, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive,
+        Program, StructDecl, Type,
+    },
     error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner, is_set_elem,
     is_str_repr, none_inner_ty, type_name, IMPORTABLE_BUILTINS,
 };
@@ -5045,7 +5051,7 @@ fn fix_data_ref_names(func: &Function, ir: &str) -> String {
 #[allow(clippy::too_many_arguments)]
 fn define_fn<M: Module>(
     module: &mut M,
-    ctx: &mut codegen::Context,
+    ctx: &mut Context,
     fbc: &mut FunctionBuilderContext,
     id: FuncId,
     func: &AstFn,
@@ -6846,7 +6852,7 @@ fn pair_rc_fn_addrs<M: Module>(
 #[allow(clippy::too_many_arguments)]
 fn define_pair_rc_fn<M: Module>(
     module: &mut M,
-    ctx: &mut codegen::Context,
+    ctx: &mut Context,
     fbc: &mut FunctionBuilderContext,
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
@@ -6919,7 +6925,7 @@ fn define_pair_rc_fn<M: Module>(
 /// strides by the element size and retains/drops each element via `emit_rc`.
 fn define_elem_rc_fn<M: Module>(
     module: &mut M,
-    ctx: &mut codegen::Context,
+    ctx: &mut Context,
     fbc: &mut FunctionBuilderContext,
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
@@ -7756,7 +7762,7 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
 #[allow(clippy::too_many_arguments)]
 fn define_tostr_fn<M: Module>(
     module: &mut M,
-    ctx: &mut codegen::Context,
+    ctx: &mut Context,
     fbc: &mut FunctionBuilderContext,
     funcs: &HashMap<String, FuncInfo>,
     structs: &HashMap<String, TypeDef>,
