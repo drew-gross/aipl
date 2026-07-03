@@ -51,3 +51,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "aipl"
 path = "src/main.rs"
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"
+missing_transmute_annotations = "allow"
+large_enum_variant = "allow"
+filter_map_bool_then = "allow"
+needless_range_loop = "allow"

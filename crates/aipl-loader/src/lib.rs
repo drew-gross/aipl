@@ -329,7 +329,7 @@ impl Loader {
                 .flat_map(|imp| {
                     let from_view = local_views.get(&imp.from);
                     let from_exports = importables.get(&imp.from);
-                    imp.names.iter().cloned().map(move |n| {
+                    imp.names.iter().map(move |n| {
                         let Some(mangled) = from_view.and_then(|v| v.get(&n.name).cloned()) else {
                             return Err(Error::at(
                                 format!(

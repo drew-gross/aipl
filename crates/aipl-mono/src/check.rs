@@ -1416,7 +1416,7 @@ impl Cx<'_> {
         // Effect discipline: a callee's declared effects must be covered by the
         // caller's. Builtins carry their effects in `sigs` like user functions.
         for e in self.callee_effects(name) {
-            if !effects.iter().any(|d| *d == e) {
+            if !effects.contains(&e) {
                 return Err(Error::at(
                     format!(
                         "fn {:?} has effect \"!{e}\" but the calling function does not declare it",

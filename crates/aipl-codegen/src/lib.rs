@@ -285,7 +285,7 @@ fn pack_inline(bytes: &[u8]) -> *const u8 {
 /// Content bytes of any str value: inline content is copied into `buf` (which
 /// must outlive the returned slice); a heap/static pointer yields its NUL-
 /// delimited bytes; a null pointer yields empty.
-unsafe fn str_bytes<'a>(v: *const u8, buf: &'a mut [u8; 8]) -> &'a [u8] {
+unsafe fn str_bytes(v: *const u8, buf: &mut [u8; 8]) -> &[u8] {
     match str_repr(v) {
         StrRepr::Null => &[],
         StrRepr::Inline => {
@@ -995,25 +995,20 @@ extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
             // nothing is flattened here.
             let mut node = *(cur.add(ITER_ROOT) as *const *const u8);
             let mut base: i64 = 0;
-            loop {
-                match str_repr(node) {
-                    StrRepr::Rope(obj) => {
-                        let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-                        if cache.is_null() {
-                            let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-                            let ll = aipl_str_len(left);
-                            if pos - base < ll {
-                                node = left;
-                            } else {
-                                base += ll;
-                                node = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-                            }
-                        } else {
-                            node = cache; // contiguous already — treat as the leaf
-                            break;
-                        }
+            while let StrRepr::Rope(obj) = str_repr(node) {
+                let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
+                if cache.is_null() {
+                    let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
+                    let ll = aipl_str_len(left);
+                    if pos - base < ll {
+                        node = left;
+                    } else {
+                        base += ll;
+                        node = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
                     }
-                    _ => break, // inline / view / heap leaf
+                } else {
+                    node = cache; // contiguous already — treat as the leaf
+                    break;
                 }
             }
             let data = aipl_str_data(node, cur.add(ITER_SCRATCH));
@@ -1348,7 +1343,7 @@ const ELEM_BITPACKED: i64 = 0;
 /// (`elem_size == 0`), else `count * elem_size` (with the historic 8-byte floor).
 fn cap_bytes_for(elem_size: i64, count: usize) -> usize {
     if elem_size == ELEM_BITPACKED {
-        (count + 7) / 8
+        count.div_ceil(8)
     } else {
         count * (elem_size.max(8) as usize)
     }
@@ -1697,7 +1692,7 @@ static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
 
 /// Read a runtime `str` value (inline or heap) as a `&str` for the report.
 /// `buf` backs an inline string's materialized bytes and must outlive the result.
-unsafe fn test_cstr<'a>(p: *const u8, buf: &'a mut [u8; 8]) -> &'a str {
+unsafe fn test_cstr(p: *const u8, buf: &mut [u8; 8]) -> &str {
     if p.is_null() {
         return "<unknown>";
     }
@@ -4584,7 +4579,7 @@ fn resolve_struct_layout(
             offset,
         });
         // Advance to the next field
-        offset = offset + size;
+        offset += size;
     }
     on_stack.remove(name);
     layouts.insert(
@@ -5872,6 +5867,7 @@ fn emit_arr_starts_ends<M: Module>(
 ///     (order-independent — via the runtime `aipl_set_contains` scan)
 ///   - struct: every field equal
 ///   - variant: same tag, then the active case's payload fields equal
+///
 /// Both operands are borrowed; `str_eq`'s consumed refs are balanced by the
 /// incs, so no scope tracking is needed.
 fn emit_eq<M: Module>(
@@ -7001,9 +6997,9 @@ fn fn_addr_or_zero<M: Module>(
     }
 }
 
-/// Call a registered single-argument renderer builtin (by `funcs` name) on
-/// `value`, returning the fresh `str` result. The argument is borrowed (the
-/// renderer never drops it).
+// Call a registered single-argument renderer builtin (by `funcs` name) on
+// `value`, returning the fresh `str` result. The argument is borrowed (the
+// renderer never drops it).
 // ---------- Two-pass `to_str` rendering ----------
 //
 // `to_str` runs `emit_render` twice: once to *measure* the total byte length,
@@ -7012,8 +7008,7 @@ fn fn_addr_or_zero<M: Module>(
 // Every `emit_render*` returns the byte length of what it renders (used to size
 // the buffer in the measure pass; ignored, but cheap, in the write pass) and,
 // in `Write` mode, advances the cursor as it writes.
-
-/// Where a render pass sends its output.
+// Where a render pass sends its output.
 #[derive(Clone, Copy)]
 enum Sink {
     /// Only compute lengths — emit no writes.
@@ -7712,7 +7707,7 @@ fn emit_to_str<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
-    scopes: &mut Vec<Vec<Tracked>>,
+    scopes: &mut [Vec<Tracked>],
     value: Value,
     ty: &Type,
 ) -> Result<Value, Error> {

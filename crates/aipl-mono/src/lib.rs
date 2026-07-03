@@ -354,7 +354,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
                         f.name.clone(),
                         f.return_ty
                             .clone()
-                            .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+                            .unwrap_or(Type::Primitive(Primitive::I64)),
                     );
                     concrete_fns.push(f);
                 }
@@ -3457,7 +3457,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         "__builtin_union" => arg_tys
             .first()
             .cloned()
-            .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+            .unwrap_or(Type::Primitive(Primitive::I64)),
         // `d.contains_key(k): bool` — dict membership.
         "__builtin_contains_key" => Type::Primitive(Primitive::Bool),
         // `d.get(k): V?` — the dict's value type wrapped in an optional.
@@ -3475,7 +3475,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         "__builtin_push" => arg_tys
             .first()
             .cloned()
-            .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+            .unwrap_or(Type::Primitive(Primitive::I64)),
         // `o.value_or(d): T` — the optional's element when present, else the
         // default. Pinned by the optional's element type, or (for a bare `none`,
         // whose element is `__none__`) by the default argument.
@@ -3484,14 +3484,14 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             _ => arg_tys
                 .get(1)
                 .cloned()
-                .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+                .unwrap_or(Type::Primitive(Primitive::I64)),
         },
         // some(x) wraps the value's type.
         "some" => Type::Optional(Box::new(decay_concat(
             arg_tys
                 .first()
                 .cloned()
-                .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+                .unwrap_or(Type::Primitive(Primitive::I64)),
         ))),
         // ok(x)/err(e) pin one side of a result; the other is `__none__`,
         // resolved by the expected result type via coercion (like `none`).
@@ -3507,7 +3507,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                 arg_tys
                     .first()
                     .cloned()
-                    .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+                    .unwrap_or(Type::Primitive(Primitive::I64)),
             )),
         ),
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
@@ -3520,7 +3520,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         "__map_result" => arg_tys
             .first()
             .cloned()
-            .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+            .unwrap_or(Type::Primitive(Primitive::I64)),
         _ => return None,
     })
 }
