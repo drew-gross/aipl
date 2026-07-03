@@ -2589,7 +2589,7 @@ impl Mono<'_> {
     }
 
     /// Resolve the concrete return type of a non-generic call (builtin or user
-    /// fn). Permissive: an unknown callee falls back to `i64` — codegen issues
+    /// fn). Permissive: an unknown callee falls back to Unit — codegen issues
     /// the real "undefined fn"/missing-import diagnostic.
     fn call_return(&self, name: &str, arg_tys: &[Type]) -> Type {
         if let Some(t) = builtin_return(name, arg_tys) {
