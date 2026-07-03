@@ -2602,7 +2602,7 @@ impl Mono<'_> {
         self.fn_returns
             .get(name)
             .cloned()
-            .unwrap_or_else(|| Type::Primitive(Primitive::I64))
+            .unwrap_or_else(|| unit_ty())
     }
 
     /// Payload types a `match` arm binds: the optional's element for `some`, a
