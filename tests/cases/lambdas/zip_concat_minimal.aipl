@@ -20,7 +20,7 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 184
 instructions executed: 373
-binary size: 4368
+binary size: 4336
 --- monomorphizations ---
 __lambda_0
 __zip1$own0$own1

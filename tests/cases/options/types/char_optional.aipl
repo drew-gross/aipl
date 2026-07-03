@@ -15,7 +15,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 85
-binary size: 1776
+binary size: 1760
 --- monomorphizations ---
 __test$code
 code

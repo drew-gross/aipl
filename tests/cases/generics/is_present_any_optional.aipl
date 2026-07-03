@@ -17,7 +17,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 78
-binary size: 1984
+binary size: 1968
 --- monomorphizations ---
 is_present$char
 main

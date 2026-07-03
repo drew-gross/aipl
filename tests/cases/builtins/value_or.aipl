@@ -18,7 +18,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 121
-binary size: 2688
+binary size: 2672
 --- monomorphizations ---
 __test$first_char
 first_char

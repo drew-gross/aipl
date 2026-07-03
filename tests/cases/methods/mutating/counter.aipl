@@ -21,7 +21,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 90
-binary size: 1552
+binary size: 1528
 --- monomorphizations ---
 bump
 main

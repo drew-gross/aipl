@@ -37,7 +37,7 @@ deallocations: 20
 reallocations: 0
 bytes allocated: 944
 instructions executed: 691
-binary size: 6600
+binary size: 6544
 --- monomorphizations ---
 __test$reversed_eq
 __test$reversed_len

@@ -22,7 +22,7 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 376
 instructions executed: 728
-binary size: 6232
+binary size: 6224
 --- monomorphizations ---
 __all1
 __all11

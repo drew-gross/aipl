@@ -51,7 +51,7 @@ deallocations: 38
 reallocations: 0
 bytes allocated: 1736
 instructions executed: 1954
-binary size: 18304
+binary size: 18336
 --- monomorphizations ---
 __test$has_header
 has_header
