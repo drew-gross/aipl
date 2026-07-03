@@ -20,21 +20,23 @@
 //! `$` is not a legal identifier character, so mangled names can never collide
 //! with user functions. Uninstantiated generic templates are simply dropped.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    slice::from_ref,
+};
 
 mod check;
 pub use check::check;
 
-use aipl_syntax::ast::{
-    is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
-    Pattern, Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
-};
 use aipl_syntax::{
+    ast::{
+        is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm,
+        Param, Pattern, Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
+    },
     concat_str_ty, empty_array_arg_ty, error_ty, is_array_elem, is_concat_str, is_empty_array_arg,
     is_error, is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty,
-    type_name,
+    type_name, DebugOptions, Error, Span,
 };
-use aipl_syntax::{DebugOptions, Error, Span};
 
 /// Hard cap on the number of generic instances monomorphization will emit.
 /// For well-behaved generics the reachable instance set is finite (type
@@ -1207,13 +1209,13 @@ impl Mono<'_> {
                 let (_, u) = self.infer(body, &benv)?;
                 // Lift the lambda to `__lambda(x: T, captures..) -> U`.
                 let fname =
-                    self.synth_lambda(params, body, &[elem.clone()], &u, &captures, &effects);
+                    self.synth_lambda(params, body, from_ref(&elem), &u, &captures, &effects);
                 (fname, captures, u)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
                 // A named function (or builtin): `U` is its return type for an
                 // element-typed argument. Ensure it's emitted (no-op for builtins).
-                let u = self.ref_return(g, std::slice::from_ref(&elem));
+                let u = self.ref_return(g, from_ref(&elem));
                 self.enqueue_concrete(g);
                 (g.clone(), Vec::new(), u)
             }
@@ -1920,7 +1922,7 @@ impl Mono<'_> {
                 let fname = self.synth_lambda(
                     params,
                     body,
-                    &[elem.clone()],
+                    from_ref(&elem),
                     &Type::Primitive(Primitive::Bool),
                     &captures,
                     &effects,
@@ -2068,7 +2070,7 @@ impl Mono<'_> {
                 let fname = self.synth_lambda(
                     params,
                     body,
-                    &[elem.clone()],
+                    from_ref(&elem),
                     &Type::Primitive(Primitive::Bool),
                     &captures,
                     &effects,
@@ -2955,7 +2957,7 @@ impl Mono<'_> {
                 }
                 (
                     node(ExprKind::Match(Box::new(rs), rarms)),
-                    merged.unwrap_or_else(|| Type::Primitive(Primitive::I64)),
+                    merged.unwrap_or(Type::Primitive(Primitive::I64)),
                 )
             }
             ExprKind::Construct(name, inits) => {

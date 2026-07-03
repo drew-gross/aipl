@@ -35,7 +35,7 @@ pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
         match ty {
             Type::Unit => panic!("Tuple members cannot be unit"),
             Type::Primitive(p) => p.name().into(),
-            Type::Named(n) => n.replace('$', "_").replace('!', "_"),
+            Type::Named(n) => n.replace(['$', '!'], "_"),
             Type::Array(e) => format!("arr_{}", mangle(e)),
             Type::Optional(e) => format!("opt_{}", mangle(e)),
             Type::Set(e) => format!("set_{}", mangle(e)),
@@ -437,9 +437,10 @@ impl Cx<'_> {
                 }
             }
             Type::Named(n) => {
-                if is_abstract_scalar_name(n, type_params) {
-                    Ok(())
-                } else if self.has_struct(n) || self.variants.contains_key(n) {
+                if is_abstract_scalar_name(n, type_params)
+                    || self.has_struct(n)
+                    || self.variants.contains_key(n)
+                {
                     Ok(()) // arrays and optionals of structs/variants are supported
                 } else {
                     Err(Error::msg(format!("fn {fname:?}: unknown type {n:?}")))
@@ -1185,7 +1186,7 @@ impl Cx<'_> {
                     });
                 }
                 self.check_match_exhaustive(&st, arms, span.clone())?;
-                merged.unwrap_or_else(|| Type::Primitive(Primitive::I64))
+                merged.unwrap_or(Type::Primitive(Primitive::I64))
             }
             ExprKind::Call(name, args, method_style) => {
                 // For a method call the receiver is `args[0]`, and two rules
@@ -1540,7 +1541,7 @@ impl Cx<'_> {
             Ok(atys
                 .into_iter()
                 .next()
-                .unwrap_or_else(|| Type::Primitive(Primitive::I64)))
+                .unwrap_or(Type::Primitive(Primitive::I64)))
         } else if name == "__builtin_reverse" {
             // `str.reverse()` returns `str`, not `char[]` (the generic
             // substitution would give `char[]` since str → T[] pins T=char).
@@ -1805,7 +1806,7 @@ impl Cx<'_> {
             return atys
                 .first()
                 .cloned()
-                .unwrap_or_else(|| Type::Primitive(Primitive::I64));
+                .unwrap_or(Type::Primitive(Primitive::I64));
         }
         sig.return_ty.clone()
     }

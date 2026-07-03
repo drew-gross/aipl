@@ -10982,7 +10982,7 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(merge);
             builder.seal_block(merge);
             let result = builder.block_params(merge)[0];
-            let merged_ty = merged_ty.unwrap_or_else(|| Type::Primitive(Primitive::I64));
+            let merged_ty = merged_ty.unwrap_or(Type::Primitive(Primitive::I64));
             if needs_drop(&merged_ty, structs) {
                 scopes
                     .last_mut()
