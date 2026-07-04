@@ -536,13 +536,12 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             &inst.specs.indices(|p| p.variadic == VShape::Elem),
             &inst.specs.indices(|p| p.variadic == VShape::Opt),
         );
-        let owned_params = inst.specs.indices(|p| p.owned);
         mono.dbg.trace(
             "mono",
             format_args!(
                 "process `{}` (owns {:?}, {} still queued)",
                 inst.mangled,
-                owned_params,
+                inst.specs.indices(|p| p.owned),
                 mono.queue.len()
             ),
         );
@@ -552,7 +551,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             &effects,
             &return_ty,
             &body,
-            &owned_params,
+            &inst.specs.params,
         )?;
         out.concat_params = inst.specs.indices(|p| p.concat);
         out_fns.push(out);
@@ -988,7 +987,7 @@ impl Mono<'_> {
         effects: &[String],
         return_ty: &Option<Type>,
         body: &Expr,
-        owned_params: &[usize],
+        specs: &[ParamSpec],
     ) -> Result<ConcreteFn, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
@@ -1004,6 +1003,10 @@ impl Mono<'_> {
             name: name.to_string(),
             // By now `specialize_variadic` has already resolved every
             // parameter's shape, so `variadic` is always false — dropped here.
+            // `specs` is sized to the highest special-cased index (see
+            // `enqueue`), not necessarily `params.len()`, so a missing entry
+            // means "not owned" — same defensive `.get` used for `str_kept`/
+            // `concat` elsewhere in the driver loop.
             params: params
                 .iter()
                 .enumerate()
@@ -1011,7 +1014,7 @@ impl Mono<'_> {
                     name: p.name.clone(),
                     ty: p.ty.clone(),
                     mutable: p.mutable,
-                    owned: owned_params.contains(&i),
+                    owned: specs.get(i).is_some_and(|s| s.owned),
                 })
                 .collect(),
             effects: effects.to_vec(),
