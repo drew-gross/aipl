@@ -2846,7 +2846,13 @@ fn compile_program<M: Module>(
             is_mutating: is_mutating_fn(f),
             // Parameters this instance takes ownership of: a call site moves the
             // (fresh) argument in instead of retaining it.
-            owned_params: f.owned_params.clone(),
+            owned_params: f
+                .params
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.owned)
+                .map(|(i, _)| i)
+                .collect(),
         };
         funcs.insert(f.name.clone(), info);
         decls.push((id, f));
@@ -4982,9 +4988,10 @@ fn define_fn<M: Module>(
     // they aren't dropped on entry-scope exit and `mut y = p` moves rather than
     // copies. Keyed by name for `Cx::owned_params`.
     let owned_params: HashSet<String> = func
-        .owned_params
+        .params
         .iter()
-        .map(|&i| func.params[i].name.clone())
+        .filter(|p| p.owned)
+        .map(|p| p.name.clone())
         .collect();
     // The body is checked against the *declared* return type; the *ABI* return
     // (what the signature emits) may differ for entry-style functions — a unit
@@ -5024,7 +5031,7 @@ fn define_fn<M: Module>(
         let mut env: Env = HashMap::new();
         let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
         let mut self_slot: Option<StackSlot> = None;
-        for (idx, (p, v)) in func.params.iter().zip(user_params).enumerate() {
+        for (p, v) in func.params.iter().zip(user_params) {
             if p.mutable {
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -5049,7 +5056,7 @@ fn define_fn<M: Module>(
             // A heap parameter is owned by the callee and dropped at exit —
             // unless it's a moved-in owned param, whose ownership transfers to
             // the local it's moved into (so dropping it here would double-free).
-            if is_heap(&p.ty) && !func.owned_params.contains(&idx) {
+            if is_heap(&p.ty) && !p.owned {
                 scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
