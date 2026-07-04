@@ -372,21 +372,20 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
 
     // Own a copy of each concrete function so the demand-driven driver can pull
     // reachable ones without juggling borrows of `program`. Source functions are
-    // already fully resolved (no type parameters) — they just don't have any
-    // ownership/concat specialization yet.
-    let concrete: HashMap<String, ConcreteFn> = concrete_fns
+    // already fully resolved (no type parameters) — they just haven't been
+    // specialized to a particular call site yet (variadic resolution, ownership,
+    // concat representation), which is what registering them as a
+    // `ConcreteTemplate` defers.
+    let concrete: HashMap<String, ConcreteTemplate> = concrete_fns
         .iter()
         .map(|f| {
             (
                 f.name.clone(),
-                ConcreteFn {
-                    name: f.name.clone(),
+                ConcreteTemplate {
                     params: f.params.clone(),
                     effects: f.effects.clone(),
                     return_ty: f.return_ty.clone(),
                     body: f.body.clone(),
-                    owned_params: Vec::new(),
-                    concat_params: Vec::new(),
                 },
             )
         })
@@ -793,7 +792,7 @@ struct Generic {
 #[derive(Clone)]
 pub struct ConcreteFn {
     pub name: String,
-    pub params: Vec<Param>,
+    pub params: Vec<ConcreteParam>,
     pub effects: Vec<String>,
     pub return_ty: Option<Type>,
     pub body: Expr,
@@ -811,6 +810,48 @@ pub struct ConcreteFn {
     /// sees a str-repr parameter; this list records *which* for repr-aware
     /// passes.
     pub concat_params: Vec<usize>,
+}
+
+/// A fully-resolved parameter: `variadic` doesn't appear here because by the
+/// time a [`ConcreteFn`] exists, every variadic parameter has already been
+/// resolved to its per-call shape by `specialize_variadic` (its `ty` retyped to
+/// the element/optional/sequence form as appropriate) — codegen never sees a
+/// parameter still in variadic form. Distinct from [`Param`], whose `variadic`
+/// is exactly the declaration `specialize_variadic` resolves away.
+#[derive(Clone)]
+pub struct ConcreteParam {
+    pub name: String,
+    pub ty: Type,
+    pub mutable: bool,
+}
+
+impl From<Param> for ConcreteParam {
+    fn from(p: Param) -> Self {
+        ConcreteParam {
+            name: p.name,
+            ty: p.ty,
+            mutable: p.mutable,
+        }
+    }
+}
+
+/// A concrete (non-generic) function *registered* with the monomorphizer but
+/// not yet specialized to a particular call site: its parameters may still be
+/// declared `variadic` (unresolved until a call's argument shapes are known —
+/// see `specialize_variadic`), and it carries no ownership/concat-representation
+/// decisions (those are per-*instance*, decided when a call is enqueued, not
+/// per-registration). Looked up by name from `Mono::concrete` (so it carries no
+/// `name` of its own — the map key is the name) and turned into one or more
+/// [`ConcreteFn`] instances as calls to it are discovered. Distinct from
+/// [`Generic`], which additionally carries type variables to substitute — a
+/// `ConcreteTemplate` has none; its shape is already fully concrete modulo
+/// variadic resolution.
+#[derive(Clone)]
+struct ConcreteTemplate {
+    params: Vec<Param>,
+    effects: Vec<String>,
+    return_ty: Option<Type>,
+    body: Expr,
 }
 
 /// The output of [`monomorphize`]: struct/variant declarations pass through
@@ -895,7 +936,7 @@ struct Mono<'a> {
     generics: &'a HashMap<String, Generic>,
     /// Every concrete (non-generic) user function, by name. The reachable subset
     /// is discovered lazily from the seeds and drained from `concrete_queue`.
-    concrete: HashMap<String, ConcreteFn>,
+    concrete: HashMap<String, ConcreteTemplate>,
     /// Return type of each concrete user fn (for typing non-generic calls).
     fn_returns: &'a HashMap<String, Type>,
     /// Names of mutating functions (`mut self` receiver), generic or not.
@@ -960,7 +1001,9 @@ impl Mono<'_> {
         let (body, _) = self.infer(body, &env)?;
         Ok(ConcreteFn {
             name: name.to_string(),
-            params: params.to_vec(),
+            // By now `specialize_variadic` has already resolved every
+            // parameter's shape, so `variadic` is always false — dropped here.
+            params: params.iter().cloned().map(ConcreteParam::from).collect(),
             effects: effects.to_vec(),
             return_ty: return_ty.clone(),
             body,
@@ -991,7 +1034,7 @@ impl Mono<'_> {
     fn specialize_call_with(
         &mut self,
         base_name: &str,
-        template: &ConcreteFn,
+        template: &ConcreteTemplate,
         ret: Type,
         args: &[Expr],
         env: &Env,
@@ -1103,14 +1146,11 @@ impl Mono<'_> {
         self.synth += 1;
         self.concrete.insert(
             spec_name.clone(),
-            ConcreteFn {
-                name: spec_name.clone(),
+            ConcreteTemplate {
                 params: new_params,
                 effects,
                 return_ty: template.return_ty.clone(),
                 body: template.body.clone(),
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         self.lambda_envs.insert(spec_name.clone(), lenv);
@@ -1195,14 +1235,11 @@ impl Mono<'_> {
             Some(t) => subst_vars(t, &map),
             None => Type::Unit,
         };
-        let template = ConcreteFn {
-            name: gname.to_string(),
+        let template = ConcreteTemplate {
             params,
             effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
             body: body.clone(),
-            owned_params: Vec::new(),
-            concat_params: Vec::new(),
         };
         // Name the instance by its type args so different `T`s don't collide in
         // the specialization memo; a `str`-specialized parameter is marked too, so
@@ -1255,14 +1292,11 @@ impl Mono<'_> {
         }
         self.concrete.insert(
             fn_name.clone(),
-            ConcreteFn {
-                name: fn_name.clone(),
+            ConcreteTemplate {
                 params,
                 effects: effects.to_vec(),
                 return_ty: Some(lret.clone()),
                 body: lbody.clone(),
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         self.enqueue_concrete(&fn_name);
@@ -1493,14 +1527,11 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(decay_concat(u)));
         self.concrete.insert(
             map_name.clone(),
-            ConcreteFn {
-                name: map_name.clone(),
+            ConcreteTemplate {
                 params: map_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body: map_body,
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -1939,14 +1970,11 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(r));
         self.concrete.insert(
             zip_name.clone(),
-            ConcreteFn {
-                name: zip_name.clone(),
+            ConcreteTemplate {
                 params: zip_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body,
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         // The in-place bodies consume the fresh input(s), so emit the instance
@@ -2096,14 +2124,11 @@ impl Mono<'_> {
         let ret = Type::Primitive(Primitive::Bool);
         self.concrete.insert(
             all_name.clone(),
-            ConcreteFn {
-                name: all_name.clone(),
+            ConcreteTemplate {
                 params: all_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body,
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         self.enqueue_concrete(&all_name);
@@ -2354,14 +2379,11 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(elem));
         self.concrete.insert(
             filter_name.clone(),
-            ConcreteFn {
-                name: filter_name.clone(),
+            ConcreteTemplate {
                 params: filter_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body: filter_body,
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -2463,8 +2485,7 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(Type::Named(tuple_name)));
         self.concrete.insert(
             enumerate_name.clone(),
-            ConcreteFn {
-                name: enumerate_name.clone(),
+            ConcreteTemplate {
                 params: vec![Param {
                     name: "$arr".to_string(),
                     ty: param_ty,
@@ -2474,8 +2495,6 @@ impl Mono<'_> {
                 effects,
                 return_ty: Some(ret.clone()),
                 body: enumerate_body,
-                owned_params: Vec::new(),
-                concat_params: Vec::new(),
             },
         );
         self.enqueue_concrete(&enumerate_name);
@@ -4354,13 +4373,14 @@ pub fn inline_single_use(program: &Program) -> Program {
 
         // Replace the single `Call(f, ..)` (it lives in exactly one body — `f`'s
         // name is never shadowed, see the `binders` guard).
+        let fparam_names: Vec<String> = f.params.iter().map(|p| p.name.clone()).collect();
         let mut replaced = false;
         for it in &mut program.items {
             if let Item::Fn(g) = it {
                 let body = replace_call(
                     &g.body,
                     &f.name,
-                    &f.params,
+                    &fparam_names,
                     &f.body,
                     &mut counter,
                     &mut replaced,
@@ -4411,12 +4431,13 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             .cloned();
         let Some(f) = candidate else { break };
 
+        let fparam_names: Vec<String> = f.params.iter().map(|p| p.name.clone()).collect();
         let mut replaced = false;
         for g in &mut program.fns {
             let body = replace_call(
                 &g.body,
                 &f.name,
-                &f.params,
+                &fparam_names,
                 &f.body,
                 &mut counter,
                 &mut replaced,
@@ -4450,19 +4471,31 @@ fn is_inline_candidate(
         // only `Call`/`Ident` of this name in the whole program.
         && !binders.contains(&f.name)
         && f.type_params.is_empty()
-        && is_inline_shape(&f.params, &f.body, &f.name)
+        && is_inline_shape(
+            f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
+            f.params.first().is_some_and(|p| p.mutable),
+            &f.body,
+            &f.name,
+        )
 }
 
 /// The shape checks shared by [`is_inline_candidate`] and
-/// [`is_inline_candidate_mono`]: not a higher-order template or variadic (those
-/// resolve via mono), not a mutating method, and the body has no early exit, no
-/// context-typed literal, no in-place HOF intrinsic, and no self-reference. See
-/// the two callers for what each check guards against.
-fn is_inline_shape(params: &[Param], body: &Expr, name: &str) -> bool {
-    !params
-        .iter()
-        .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic)
-        && !params.first().is_some_and(|p| p.mutable)
+/// [`is_inline_candidate_mono`]: not a higher-order template (those resolve via
+/// mono), not a mutating method, and the body has no early exit, no
+/// context-typed literal, no in-place HOF intrinsic, and no self-reference. The
+/// pre-mono caller additionally folds "or variadic" into `higher_order_or_variadic`
+/// — variadic resolution is also a mono job — but the post-mono [`ConcreteParam`]
+/// has no `variadic` field to check (`specialize_variadic` has already resolved
+/// every parameter by the time a [`ConcreteFn`] exists), so its caller passes
+/// just the higher-order check.
+fn is_inline_shape(
+    higher_order_or_variadic: bool,
+    mutating: bool,
+    body: &Expr,
+    name: &str,
+) -> bool {
+    !higher_order_or_variadic
+        && !mutating
         && !contains_early_exit(body)
         && !contains_context_literal(body)
         && !contains_inplace_hof_intrinsic(body)
@@ -4499,7 +4532,12 @@ fn is_inline_candidate_mono(
         && f.name != "main"
         && !skip.contains(&f.name)
         && !binders.contains(&f.name)
-        && is_inline_shape(&f.params, &f.body, &f.name)
+        && is_inline_shape(
+            f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))),
+            f.params.first().is_some_and(|p| p.mutable),
+            &f.body,
+            &f.name,
+        )
 }
 
 /// [`use_counts`] for a [`MonoProgram`].
@@ -4649,15 +4687,17 @@ fn references_name(e: &Expr, name: &str) -> bool {
 }
 
 /// Rebuild `e`, replacing the (single) direct call to `fname` — with matching
-/// arity — by the inlined body of the function it names (`fparams`/`fbody`).
+/// arity — by the inlined body of the function it names (`fparam_names`/`fbody`).
 /// `replaced` guards against touching more than one site (there is only one,
-/// but the flag also short-circuits the rest of the walk). Takes the callee's
-/// pieces rather than a whole function so it works for both the pre-mono
-/// [`Function`] and the post-mono [`ConcreteFn`] representations.
+/// but the flag also short-circuits the rest of the walk). Takes just the
+/// callee's parameter names (rather than a whole function/param list) so it
+/// works for both the pre-mono [`Function`]/[`Param`] and the post-mono
+/// [`ConcreteFn`]/[`ConcreteParam`] representations — inlining only ever
+/// renames and rebinds parameters by name.
 fn replace_call(
     e: &Expr,
     fname: &str,
-    fparams: &[Param],
+    fparam_names: &[String],
     fbody: &Expr,
     counter: &mut usize,
     replaced: &mut bool,
@@ -4669,16 +4709,16 @@ fn replace_call(
             // comes from `f`'s *parameter*, which a `let`-binding discards. Leave
             // the call (so `inline_single_use` keeps `f`).
             if name == fname
-                && args.len() == fparams.len()
+                && args.len() == fparam_names.len()
                 && !args.iter().any(contains_context_literal)
             {
                 *replaced = true;
-                return build_inlined(fparams, fbody, args, e.span.clone(), counter);
+                return build_inlined(fparam_names, fbody, args, e.span.clone(), counter);
             }
         }
     }
     let rc = |x: &Expr, counter: &mut usize, replaced: &mut bool| {
-        replace_call(x, fname, fparams, fbody, counter, replaced)
+        replace_call(x, fname, fparam_names, fbody, counter, replaced)
     };
     let kind = match &e.kind {
         ExprKind::Num(_)
@@ -4792,19 +4832,19 @@ fn replace_call(
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
 fn build_inlined(
-    fparams: &[Param],
+    fparam_names: &[String],
     fbody: &Expr,
     args: &[Expr],
     span: Span,
     counter: &mut usize,
 ) -> Expr {
     let mut map: HashMap<String, String> = HashMap::new();
-    let fresh: Vec<String> = fparams
+    let fresh: Vec<String> = fparam_names
         .iter()
-        .map(|p| {
-            let nm = format!("$inl{}_{}", *counter, p.name);
+        .map(|pname| {
+            let nm = format!("$inl{}_{}", *counter, pname);
             *counter += 1;
-            map.insert(p.name.clone(), nm.clone());
+            map.insert(pname.clone(), nm.clone());
             nm
         })
         .collect();
