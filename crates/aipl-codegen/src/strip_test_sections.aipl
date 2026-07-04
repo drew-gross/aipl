@@ -48,14 +48,13 @@ strips them so `aipl run/ir/build` can be pointed at a fixture directly.
     assert(strip_test_sections("-- not a marker --\ncode") == "-- not a marker --\ncode");
 })
 --- performance ---
-allocations: 15
-deallocations: 15
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 480
-instructions executed: 6931
-binary size: 16224
+bytes allocated: 288
+instructions executed: 5804
+binary size: 8672
 --- monomorphizations ---
 __m1__parse_test_section_header
-__test$__m1__parse_test_section_header
 main
 strip_test_sections

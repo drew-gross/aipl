@@ -13,23 +13,16 @@ pub fn trim_while(self: str, pred: (char) -> bool) -> str {
     assert("xxy".trim_while(|c| c == 'x') == "y");      // stops at first non-match
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 384
-instructions executed: 1045
-binary size: 11400
+bytes allocated: 0
+instructions executed: 331
+binary size: 5400
 --- monomorphizations ---
-__m1__count_while$char$lam11
-__m1__count_while$char$s0$lam24
-__m1__count_while$char$s0$lam25
-__m1__count_while$char$s0$lam26
-__m1__count_while$char$s0$lam27
-__m1__count_while$char$s0$lam28
-__m1__count_while$i64$lam1
-__m1__count_while$i64$lam3
-__m1__count_while$i64$lam5
-__m1__count_while$i64$lam7
-__m1__count_while$i64$lam9
-__m1__count_while$str$lam13
+__m1__count_while$char$s0$lam10
+__m1__count_while$char$s0$lam11
+__m1__count_while$char$s0$lam12
+__m1__count_while$char$s0$lam13
+__m1__count_while$char$s0$lam14
 main

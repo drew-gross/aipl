@@ -48,26 +48,17 @@ pub fn process_raw_string(s: str) -> str {
     assert(process_raw_string("") == "");
 })
 --- performance ---
-allocations: 88
-deallocations: 88
+allocations: 32
+deallocations: 32
 reallocations: 0
-bytes allocated: 3969
-instructions executed: 12881
-binary size: 35296
+bytes allocated: 1288
+instructions executed: 5454
+binary size: 10272
 --- monomorphizations ---
 __m1__trim_prefix
 __m3__trim_suffix
-__m4__dedent
-__m5__count_while$char$lam11
-__m5__count_while$char$s0$lam27
-__m5__count_while$char$s0$lam36
-__m5__count_while$i64$lam1
-__m5__count_while$i64$lam3
-__m5__count_while$i64$lam5
-__m5__count_while$i64$lam7
-__m5__count_while$i64$lam9
-__m5__count_while$str$lam13
-__m6__lines
-__map29$own0
+__m5__count_while$char$s0$lam12
+__m5__count_while$char$s0$lam5
+__map7$own0
 main
 process_raw_string

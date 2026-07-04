@@ -1,0 +1,33 @@
+import { ==, * } from builtins;
+
+// Regression guard: `aipl check` must run *every* function's `.test({ .. })`
+// block in the checked file, not just one of them. The loader's flatten pass
+// drops a `.test` body only for a function coming from a *non-root* (imported)
+// file, so an importer doesn't re-run an already-independently-checked file's
+// tests — it must still keep every test body belonging to the root file
+// itself. Two functions here, each with its own passing test, pin the count
+// via `--- check ---` so a regression that only ran one of them would show up
+// as "1 tests: 1 passed, 0 failed" instead of the expected "2 tests: ...".
+
+fn double(x: i64) -> i64 { x * 2 }.test({
+    assert(double(2) == 4);
+    assert(double(0) == 0);
+})
+
+fn triple(x: i64) -> i64 { x * 3 }.test({
+    assert(triple(2) == 6);
+    assert(triple(0) == 0);
+})
+
+fn main() {}
+--- check ---
+2 tests: 2 passed, 0 failed
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 552
+--- monomorphizations ---
+main

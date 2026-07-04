@@ -41,23 +41,15 @@ original line count is preserved.
         == "first long line\nsecond long line");
 })
 --- performance ---
-allocations: 56
-deallocations: 56
+allocations: 35
+deallocations: 35
 reallocations: 0
-bytes allocated: 2681
-instructions executed: 6402
-binary size: 21984
+bytes allocated: 1641
+instructions executed: 4899
+binary size: 9808
 --- monomorphizations ---
-__m1__count_while$char$lam11
-__m1__count_while$char$s0$lam17
-__m1__count_while$char$s0$lam24
-__m1__count_while$i64$lam1
-__m1__count_while$i64$lam3
-__m1__count_while$i64$lam5
-__m1__count_while$i64$lam7
-__m1__count_while$i64$lam9
-__m1__count_while$str$lam13
-__m2__lines
-__map19$own0
+__m1__count_while$char$s0$lam10
+__m1__count_while$char$s0$lam3
+__map5$own0
 dedent
 main

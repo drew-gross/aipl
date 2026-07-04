@@ -448,6 +448,7 @@ impl Loader {
         // item bodies using that view, collecting into one Program.
         let mut merged = Vec::new();
         for (path, file) in &self.files {
+            let is_root = path == root;
             let view = &full_views[path];
             for item in &file.items {
                 if let Item::Fn(f) = item {
@@ -456,7 +457,7 @@ impl Loader {
                         check_operators(tb, view)?;
                     }
                 }
-                merged.push(rewrite_item(item, view)?);
+                merged.push(rewrite_item(item, view, is_root)?);
             }
         }
         Ok(Program { items: merged })
@@ -567,7 +568,13 @@ fn mangle(is_root: bool, file_index: u32, name: &str) -> String {
     }
 }
 
-fn rewrite_item(item: &Item, view: &HashMap<String, String>) -> Result<Item, Error> {
+/// Rewrite one item's global references through `view`. `is_root` says whether
+/// `item` comes from the file being loaded directly, as opposed to a
+/// transitively imported one: a non-root function's `.test({ .. })` body is
+/// dropped rather than carried into the merged [`Program`], so `aipl check`'s
+/// test driver (`build_test_program`) only ever runs the tests that belong to
+/// the file it was pointed at, not every test reachable through its imports.
+fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> Result<Item, Error> {
     Ok(match item {
         Item::Fn(f) => Item::Fn(Function {
             name: view.get(&f.name).cloned().unwrap_or_else(|| f.name.clone()),
@@ -600,10 +607,14 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>) -> Result<Item, Err
             // Rewrite global references inside the `.test({ .. })` body too (it
             // can call the function under test and other globals). Parameters
             // aren't in scope in a test body — only globals — so no locals.
-            test_body: f
-                .test_body
-                .as_ref()
-                .map(|tb| rewrite_expr(tb, view, &std::collections::HashSet::new())),
+            // Dropped entirely for a non-root item — see this function's doc.
+            test_body: if is_root {
+                f.test_body
+                    .as_ref()
+                    .map(|tb| rewrite_expr(tb, view, &std::collections::HashSet::new()))
+            } else {
+                None
+            },
             // Documentation is plain text — no global references to rewrite.
             doc: f.doc.clone(),
         }),
