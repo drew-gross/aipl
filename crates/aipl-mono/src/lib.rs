@@ -299,7 +299,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
 /// Rewrite `program` so it contains no type variables: every generic function
 /// is replaced by zero or more concrete instances, one per distinct tuple of
 /// type arguments it's called with.
-pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Error> {
+pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram, Error> {
     // Field types per struct (for typing `Field`/`Construct`).
     // struct name → [(field_name, field_type, default_expr)]
     let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();
@@ -371,10 +371,25 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
     }
 
     // Own a copy of each concrete function so the demand-driven driver can pull
-    // reachable ones without juggling borrows of `program`.
-    let concrete: HashMap<String, Function> = concrete_fns
+    // reachable ones without juggling borrows of `program`. Source functions are
+    // already fully resolved (no type parameters) — they just don't have any
+    // ownership/concat specialization yet.
+    let concrete: HashMap<String, ConcreteFn> = concrete_fns
         .iter()
-        .map(|f| (f.name.clone(), (**f).clone()))
+        .map(|f| {
+            (
+                f.name.clone(),
+                ConcreteFn {
+                    name: f.name.clone(),
+                    params: f.params.clone(),
+                    effects: f.effects.clone(),
+                    return_ty: f.return_ty.clone(),
+                    body: f.body.clone(),
+                    owned_params: Vec::new(),
+                    concat_params: Vec::new(),
+                },
+            )
+        })
         .collect();
 
     let mut mono = Mono {
@@ -437,7 +452,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
         ),
     );
 
-    let mut out_fns: Vec<Function> = Vec::new();
+    let mut out_fns: Vec<ConcreteFn> = Vec::new();
     // Drain the work-list until nothing new is discovered. Processing a body
     // enqueues the instances (concrete callees, generic specializations, and
     // their owned forms) it calls, so the reachable set grows transitively from
@@ -538,27 +553,38 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<Program, Err
         out_fns.push(out);
     }
 
-    let syn_struct_items: Vec<Item> = mono
+    let syn_structs: Vec<StructDecl> = mono
         .syn_structs
         .drain()
-        .map(|(name, fields)| {
-            Item::Struct(aipl_syntax::ast::StructDecl {
-                name,
-                fields: fields
-                    .into_iter()
-                    .map(|(fname, ty, _)| aipl_syntax::ast::FieldDecl {
-                        name: fname,
-                        ty,
-                        default: None,
-                    })
-                    .collect(),
-            })
+        .map(|(name, fields)| StructDecl {
+            name,
+            fields: fields
+                .into_iter()
+                .map(|(fname, ty, _)| aipl_syntax::ast::FieldDecl {
+                    name: fname,
+                    ty,
+                    default: None,
+                })
+                .collect(),
         })
         .collect();
-    let mut items = passthrough;
-    items.extend(syn_struct_items);
-    items.extend(out_fns.into_iter().map(Item::Fn));
-    Ok(Program { items })
+    let mut structs: Vec<StructDecl> = Vec::new();
+    let mut variants_out: Vec<VariantDecl> = Vec::new();
+    for item in passthrough {
+        match item {
+            Item::Struct(s) => structs.push(s),
+            Item::Variant(v) => variants_out.push(v),
+            // Imports are resolved by the loader — codegen never sees them.
+            Item::Import(_) => {}
+            Item::Fn(_) => unreachable!("passthrough never carries a fn item"),
+        }
+    }
+    structs.extend(syn_structs);
+    Ok(MonoProgram {
+        structs,
+        variants: variants_out,
+        fns: out_fns,
+    })
 }
 
 /// The shape a variadic (`T*`) argument takes at a call site: the sequence
@@ -753,6 +779,51 @@ struct Generic {
     body: Expr,
 }
 
+/// A fully-resolved function: every type variable has been substituted (there
+/// are none left) and ownership/representation specialization decisions are
+/// final, so it's ready for codegen. Distinct from [`Function`] (the AST type),
+/// which additionally carries source-only concerns — visibility, declared type
+/// parameters, an attached `.test`/`.doc` — that have no meaning once
+/// monomorphization is done; conversely `owned_params`/`concat_params` (below)
+/// have no meaning *before* monomorphization, since specialization is the only
+/// thing that ever sets them. Reusing one struct for both ends of the pass
+/// meant every source function and every synthesized instance carried four
+/// dead fields; splitting them apart makes each representation self-explanatory
+/// and lets the compiler catch a stray reference to the wrong one.
+#[derive(Clone)]
+pub struct ConcreteFn {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub effects: Vec<String>,
+    pub return_ty: Option<Type>,
+    pub body: Expr,
+    /// Indices of parameters this instance *takes ownership of*: the caller
+    /// transfers its sole reference instead of retaining, and the callee is
+    /// responsible for consuming it (so it isn't dropped on entry-scope exit).
+    /// Set when a call passes a fresh, uniquely-owned heap argument; empty for
+    /// a plain borrow instance.
+    pub owned_params: Vec<usize>,
+    /// Indices of `str` parameters this instance receives in the
+    /// *concatenated-string* representation (a lazy concat node — see
+    /// [`aipl_syntax::concat_str_ty`]). Set for a concat-specialized instance
+    /// (`$c{i}`); empty for a plain-`str` instance. The parameter's `ty` is
+    /// retyped to the concat sentinel in such an instance, so codegen still
+    /// sees a str-repr parameter; this list records *which* for repr-aware
+    /// passes.
+    pub concat_params: Vec<usize>,
+}
+
+/// The output of [`monomorphize`]: struct/variant declarations pass through
+/// unchanged, and every function is a [`ConcreteFn`] instance ready for
+/// codegen. Replaces a whole [`Program`] (whose `Item::Fn` would otherwise
+/// force codegen to share `Function` with the pre-mono source representation).
+#[derive(Clone)]
+pub struct MonoProgram {
+    pub structs: Vec<StructDecl>,
+    pub variants: Vec<VariantDecl>,
+    pub fns: Vec<ConcreteFn>,
+}
+
 /// How a *single parameter* is specialized in an instance — the per-parameter
 /// markers the mangled name encodes. A parameter can carry more than one at once
 /// (e.g. a single owned `char[]`-kept-as-`str` parameter is both `owned` and
@@ -824,7 +895,7 @@ struct Mono<'a> {
     generics: &'a HashMap<String, Generic>,
     /// Every concrete (non-generic) user function, by name. The reachable subset
     /// is discovered lazily from the seeds and drained from `concrete_queue`.
-    concrete: HashMap<String, Function>,
+    concrete: HashMap<String, ConcreteFn>,
     /// Return type of each concrete user fn (for typing non-generic calls).
     fn_returns: &'a HashMap<String, Type>,
     /// Names of mutating functions (`mut self` receiver), generic or not.
@@ -876,7 +947,7 @@ impl Mono<'_> {
         effects: &[String],
         return_ty: &Option<Type>,
         body: &Expr,
-    ) -> Result<Function, Error> {
+    ) -> Result<ConcreteFn, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
             env.insert(p.name.clone(), p.ty.clone());
@@ -887,12 +958,8 @@ impl Mono<'_> {
         // bindings; an ordinary function has none.
         self.cur_lenv = self.lambda_envs.get(name).cloned().unwrap_or_default();
         let (body, _) = self.infer(body, &env)?;
-        Ok(Function {
+        Ok(ConcreteFn {
             name: name.to_string(),
-            // Visibility is moot post-load (imports are already resolved).
-            is_pub: true,
-            // Instances and concrete fns alike carry no type parameters.
-            type_params: Vec::new(),
             params: params.to_vec(),
             effects: effects.to_vec(),
             return_ty: return_ty.clone(),
@@ -901,9 +968,6 @@ impl Mono<'_> {
             // decisions.
             owned_params: Vec::new(),
             concat_params: Vec::new(),
-            // Tests attach only to source functions, never synthesized instances.
-            test_body: None,
-            doc: None,
         })
     }
 
@@ -927,7 +991,7 @@ impl Mono<'_> {
     fn specialize_call_with(
         &mut self,
         base_name: &str,
-        template: &Function,
+        template: &ConcreteFn,
         ret: Type,
         args: &[Expr],
         env: &Env,
@@ -1039,18 +1103,14 @@ impl Mono<'_> {
         self.synth += 1;
         self.concrete.insert(
             spec_name.clone(),
-            Function {
+            ConcreteFn {
                 name: spec_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: new_params,
                 effects,
                 return_ty: template.return_ty.clone(),
                 body: template.body.clone(),
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         self.lambda_envs.insert(spec_name.clone(), lenv);
@@ -1135,18 +1195,14 @@ impl Mono<'_> {
             Some(t) => subst_vars(t, &map),
             None => Type::Unit,
         };
-        let template = Function {
+        let template = ConcreteFn {
             name: gname.to_string(),
-            is_pub: true,
-            type_params: Vec::new(),
             params,
             effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
             body: body.clone(),
             owned_params: Vec::new(),
             concat_params: Vec::new(),
-            test_body: None,
-            doc: None,
         };
         // Name the instance by its type args so different `T`s don't collide in
         // the specialization memo; a `str`-specialized parameter is marked too, so
@@ -1199,18 +1255,14 @@ impl Mono<'_> {
         }
         self.concrete.insert(
             fn_name.clone(),
-            Function {
+            ConcreteFn {
                 name: fn_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params,
                 effects: effects.to_vec(),
                 return_ty: Some(lret.clone()),
                 body: lbody.clone(),
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         self.enqueue_concrete(&fn_name);
@@ -1441,18 +1493,14 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(decay_concat(u)));
         self.concrete.insert(
             map_name.clone(),
-            Function {
+            ConcreteFn {
                 name: map_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: map_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body: map_body,
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -1891,18 +1939,14 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(r));
         self.concrete.insert(
             zip_name.clone(),
-            Function {
+            ConcreteFn {
                 name: zip_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: zip_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body,
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         // The in-place bodies consume the fresh input(s), so emit the instance
@@ -2052,18 +2096,14 @@ impl Mono<'_> {
         let ret = Type::Primitive(Primitive::Bool);
         self.concrete.insert(
             all_name.clone(),
-            Function {
+            ConcreteFn {
                 name: all_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: all_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body,
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         self.enqueue_concrete(&all_name);
@@ -2314,18 +2354,14 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(elem));
         self.concrete.insert(
             filter_name.clone(),
-            Function {
+            ConcreteFn {
                 name: filter_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: filter_params,
                 effects,
                 return_ty: Some(ret.clone()),
                 body: filter_body,
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         // The in-place body consumes its array parameter, so emit the *owned*
@@ -2427,10 +2463,8 @@ impl Mono<'_> {
         let ret = Type::Array(Box::new(Type::Named(tuple_name)));
         self.concrete.insert(
             enumerate_name.clone(),
-            Function {
+            ConcreteFn {
                 name: enumerate_name.clone(),
-                is_pub: true,
-                type_params: Vec::new(),
                 params: vec![Param {
                     name: "$arr".to_string(),
                     ty: param_ty,
@@ -2442,8 +2476,6 @@ impl Mono<'_> {
                 body: enumerate_body,
                 owned_params: Vec::new(),
                 concat_params: Vec::new(),
-                test_body: None,
-                doc: None,
             },
         );
         self.enqueue_concrete(&enumerate_name);
@@ -4293,23 +4325,6 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
 /// non-recursive functions are inlined. Repeats to a fixpoint, since inlining
 /// `f` into `g` can make `g` itself single-use.
 pub fn inline_single_use(program: &Program) -> Program {
-    inline_single_use_impl(program, false)
-}
-
-/// Inline single-use functions in the *monomorphized* program — same as
-/// [`inline_single_use`], but `pub` no longer protects a function from inlining.
-/// Before monomorphization a `pub` function may be imported by another file, so
-/// its in-program use count understates its references; after, every reference is
-/// resolved and the only externally-reachable entry of a `main` binary is `main`
-/// itself, so a single-use non-`main` function is genuinely single-use. This is
-/// what lets the lifted lambdas (synthesized `pub`, each called from exactly one
-/// specialization) and other single-use instances fold away. Still gated to
-/// `main` binaries, so FFI engines and the `check` driver are untouched.
-pub fn inline_single_use_post_mono(program: &Program) -> Program {
-    inline_single_use_impl(program, true)
-}
-
-fn inline_single_use_impl(program: &Program, allow_pub: bool) -> Program {
     let has_fn = |n: &str| {
         program
             .items
@@ -4332,9 +4347,7 @@ fn inline_single_use_impl(program: &Program, allow_pub: bool) -> Program {
         let counts = use_counts(&program);
         let binders = collect_binders(&program);
         let candidate = program.items.iter().find_map(|it| match it {
-            Item::Fn(f) if is_inline_candidate(f, &counts, &binders, &skip, allow_pub) => {
-                Some(f.clone())
-            }
+            Item::Fn(f) if is_inline_candidate(f, &counts, &binders, &skip) => Some(f.clone()),
             _ => None,
         });
         let Some(f) = candidate else { break };
@@ -4344,7 +4357,14 @@ fn inline_single_use_impl(program: &Program, allow_pub: bool) -> Program {
         let mut replaced = false;
         for it in &mut program.items {
             if let Item::Fn(g) = it {
-                let body = replace_call(&g.body, &f, &mut counter, &mut replaced);
+                let body = replace_call(
+                    &g.body,
+                    &f.name,
+                    &f.params,
+                    &f.body,
+                    &mut counter,
+                    &mut replaced,
+                );
                 g.body = body;
             }
         }
@@ -4360,6 +4380,58 @@ fn inline_single_use_impl(program: &Program, allow_pub: bool) -> Program {
     program
 }
 
+/// Inline single-use functions in the *monomorphized* program — same idea as
+/// [`inline_single_use`], but over [`MonoProgram`]/[`ConcreteFn`] and with `pub`
+/// no longer protecting a function from inlining. Before monomorphization a
+/// `pub` function may be imported by another file, so its in-program use count
+/// understates its references; after, every reference is resolved and the only
+/// externally-reachable entry of a `main` binary is `main` itself, so a
+/// single-use non-`main` function is genuinely single-use. This is what lets the
+/// lifted lambdas (synthesized, each called from exactly one specialization) and
+/// other single-use instances fold away. Still gated to `main` binaries, so FFI
+/// engines and the `check` driver are untouched.
+pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
+    if !program.fns.iter().any(|f| f.name == "main")
+        || program.fns.iter().any(|f| f.name == "__test_main")
+    {
+        return program.clone();
+    }
+
+    let mut program = program.clone();
+    let mut counter = 0usize;
+    let mut skip: HashSet<String> = HashSet::new();
+
+    loop {
+        let counts = use_counts_mono(&program);
+        let binders = collect_binders_mono(&program);
+        let candidate = program
+            .fns
+            .iter()
+            .find(|f| is_inline_candidate_mono(f, &counts, &binders, &skip))
+            .cloned();
+        let Some(f) = candidate else { break };
+
+        let mut replaced = false;
+        for g in &mut program.fns {
+            let body = replace_call(
+                &g.body,
+                &f.name,
+                &f.params,
+                &f.body,
+                &mut counter,
+                &mut replaced,
+            );
+            g.body = body;
+        }
+        if replaced {
+            program.fns.retain(|g| g.name != f.name);
+        } else {
+            skip.insert(f.name.clone());
+        }
+    }
+    program
+}
+
 /// Whether `f` is a single-use private function safe to inline. See the module
 /// note for the conservative criteria.
 fn is_inline_candidate(
@@ -4367,38 +4439,34 @@ fn is_inline_candidate(
     counts: &HashMap<String, usize>,
     binders: &HashSet<String>,
     skip: &HashSet<String>,
-    allow_pub: bool,
 ) -> bool {
     counts.get(&f.name) == Some(&1)
-        // Pre-monomorphization a `pub` fn may be imported elsewhere (use count
-        // understated); post-mono nothing but `main` is externally reachable.
-        && (allow_pub || !f.is_pub)
+        // A `pub` fn may be imported by another file, so its in-program use
+        // count understates its references.
+        && !f.is_pub
         && f.name != "main"
         && !skip.contains(&f.name)
         // Never shadowed by a local anywhere, so the single counted use is the
         // only `Call`/`Ident` of this name in the whole program.
         && !binders.contains(&f.name)
         && f.type_params.is_empty()
-        // Not a higher-order template or variadic — those resolve via mono.
-        && !f
-            .params
-            .iter()
-            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic)
-        // Not a mutating method (`mut self`): special return/aliasing semantics.
-        && !f.params.first().is_some_and(|p| p.mutable)
-        // No early exit: a `return`/`?` in the body would escape into the caller.
-        && !contains_early_exit(&f.body)
-        // No context-typed literal (`none`, empty `[]`/`#{}`/`#{:}`): such a
-        // literal is typed from its surroundings — often the function's return
-        // type — which inlining discards, leaving the type unresolved (`__none__`).
-        && !contains_context_literal(&f.body)
-        // Not a synthesized in-place HOF loop (`map`/`filter`/`zip_with`): its
-        // `__map_result` reinterprets the buffer via this function's return type,
-        // so it can't leave its own frame. (No-op pre-mono — see the helper.)
-        && !contains_inplace_hof_intrinsic(&f.body)
-        // Not self-recursive: the single use is in some *other* body, so the call
-        // can be replaced and `f` dropped without dangling.
-        && !references_name(&f.body, &f.name)
+        && is_inline_shape(&f.params, &f.body, &f.name)
+}
+
+/// The shape checks shared by [`is_inline_candidate`] and
+/// [`is_inline_candidate_mono`]: not a higher-order template or variadic (those
+/// resolve via mono), not a mutating method, and the body has no early exit, no
+/// context-typed literal, no in-place HOF intrinsic, and no self-reference. See
+/// the two callers for what each check guards against.
+fn is_inline_shape(params: &[Param], body: &Expr, name: &str) -> bool {
+    !params
+        .iter()
+        .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic)
+        && !params.first().is_some_and(|p| p.mutable)
+        && !contains_early_exit(body)
+        && !contains_context_literal(body)
+        && !contains_inplace_hof_intrinsic(body)
+        && !references_name(body, name)
 }
 
 /// Every name bound by a parameter / `let` / `for` / `match` arm / lambda
@@ -4413,6 +4481,46 @@ fn collect_binders(program: &Program) -> HashSet<String> {
             }
             collect_body_binders(&f.body, &mut set);
         }
+    }
+    set
+}
+
+/// [`is_inline_candidate`] for the post-mono [`ConcreteFn`] representation:
+/// every instance is already concrete (no `is_pub`/`type_params` to check —
+/// nothing but `main` is externally reachable, and monomorphization leaves no
+/// type parameters), so only the shared shape checks apply.
+fn is_inline_candidate_mono(
+    f: &ConcreteFn,
+    counts: &HashMap<String, usize>,
+    binders: &HashSet<String>,
+    skip: &HashSet<String>,
+) -> bool {
+    counts.get(&f.name) == Some(&1)
+        && f.name != "main"
+        && !skip.contains(&f.name)
+        && !binders.contains(&f.name)
+        && is_inline_shape(&f.params, &f.body, &f.name)
+}
+
+/// [`use_counts`] for a [`MonoProgram`].
+fn use_counts_mono(program: &MonoProgram) -> HashMap<String, usize> {
+    let mut counts: HashMap<String, usize> =
+        program.fns.iter().map(|f| (f.name.clone(), 0)).collect();
+    for f in &program.fns {
+        let mut bound: HashSet<String> = f.params.iter().map(|p| p.name.clone()).collect();
+        count_uses(&f.body, &mut bound, &mut counts);
+    }
+    counts
+}
+
+/// [`collect_binders`] for a [`MonoProgram`].
+fn collect_binders_mono(program: &MonoProgram) -> HashSet<String> {
+    let mut set = HashSet::new();
+    for f in &program.fns {
+        for p in &f.params {
+            set.insert(p.name.clone());
+        }
+        collect_body_binders(&f.body, &mut set);
     }
     set
 }
@@ -4540,27 +4648,38 @@ fn references_name(e: &Expr, name: &str) -> bool {
     }
 }
 
-/// Rebuild `e`, replacing the (single) direct call to `f` — with matching arity —
-/// by `f`'s inlined body. `replaced` guards against touching more than one site
-/// (there is only one, but the flag also short-circuits the rest of the walk).
-fn replace_call(e: &Expr, f: &Function, counter: &mut usize, replaced: &mut bool) -> Expr {
+/// Rebuild `e`, replacing the (single) direct call to `fname` — with matching
+/// arity — by the inlined body of the function it names (`fparams`/`fbody`).
+/// `replaced` guards against touching more than one site (there is only one,
+/// but the flag also short-circuits the rest of the walk). Takes the callee's
+/// pieces rather than a whole function so it works for both the pre-mono
+/// [`Function`] and the post-mono [`ConcreteFn`] representations.
+fn replace_call(
+    e: &Expr,
+    fname: &str,
+    fparams: &[Param],
+    fbody: &Expr,
+    counter: &mut usize,
+    replaced: &mut bool,
+) -> Expr {
     if !*replaced {
         if let ExprKind::Call(name, args, _) = &e.kind {
             // Skip if any argument is a context-typed literal (`none`, empty
             // `[]`/`#{}`/`#{:}`, or a `some(..)`/`ok(..)` wrapping one): its type
             // comes from `f`'s *parameter*, which a `let`-binding discards. Leave
             // the call (so `inline_single_use` keeps `f`).
-            if name == &f.name
-                && args.len() == f.params.len()
+            if name == fname
+                && args.len() == fparams.len()
                 && !args.iter().any(contains_context_literal)
             {
                 *replaced = true;
-                return build_inlined(f, args, e.span.clone(), counter);
+                return build_inlined(fparams, fbody, args, e.span.clone(), counter);
             }
         }
     }
-    let rc =
-        |x: &Expr, counter: &mut usize, replaced: &mut bool| replace_call(x, f, counter, replaced);
+    let rc = |x: &Expr, counter: &mut usize, replaced: &mut bool| {
+        replace_call(x, fname, fparams, fbody, counter, replaced)
+    };
     let kind = match &e.kind {
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -4672,10 +4791,15 @@ fn replace_call(e: &Expr, f: &Function, counter: &mut usize, replaced: &mut bool
 /// is evaluated in the parameter-binding scope, so a later argument referencing a
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
-fn build_inlined(f: &Function, args: &[Expr], span: Span, counter: &mut usize) -> Expr {
+fn build_inlined(
+    fparams: &[Param],
+    fbody: &Expr,
+    args: &[Expr],
+    span: Span,
+    counter: &mut usize,
+) -> Expr {
     let mut map: HashMap<String, String> = HashMap::new();
-    let fresh: Vec<String> = f
-        .params
+    let fresh: Vec<String> = fparams
         .iter()
         .map(|p| {
             let nm = format!("$inl{}_{}", *counter, p.name);
@@ -4684,7 +4808,7 @@ fn build_inlined(f: &Function, args: &[Expr], span: Span, counter: &mut usize) -
             nm
         })
         .collect();
-    let mut expr = rename_params(&f.body, &map);
+    let mut expr = rename_params(fbody, &map);
     for (fp, arg) in fresh.iter().zip(args).rev() {
         expr = Expr::new(
             ExprKind::Let(fp.clone(), Box::new(arg.clone()), Box::new(expr)),

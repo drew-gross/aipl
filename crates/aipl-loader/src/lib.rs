@@ -597,8 +597,6 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>) -> Result<Item, Err
                 view,
                 &f.params.iter().map(|p| p.name.clone()).collect(),
             ),
-            owned_params: f.owned_params.clone(),
-            concat_params: f.concat_params.clone(),
             // Rewrite global references inside the `.test({ .. })` body too (it
             // can call the function under test and other globals). Parameters
             // aren't in scope in a test body — only globals — so no locals.

@@ -205,22 +205,6 @@ pub mod ast {
         pub effects: Vec<String>,
         pub return_ty: Option<Type>,
         pub body: Expr,
-        /// Indices of parameters this (monomorphized) instance *takes ownership
-        /// of*: the caller transfers its sole reference instead of retaining,
-        /// and the callee is responsible for consuming it (so it isn't dropped
-        /// on entry-scope exit). Set only by monomorphization, which emits a
-        /// distinct owned instance when a call passes a fresh, uniquely-owned
-        /// heap argument. Empty for source functions and borrow instances.
-        pub owned_params: Vec<usize>,
-        /// Indices of `str` parameters this (monomorphized) instance receives in
-        /// the *concatenated-string* representation (a lazy concat node — see
-        /// [`crate::CONCAT_STR`]). Set only by monomorphization, which emits a
-        /// distinct concat-specialized instance (`$c{i}`) when a call passes a
-        /// concat-typed argument to a `str` parameter. Empty for source functions
-        /// and plain-`str` instances. The parameter's `ty` is retyped to the
-        /// concat sentinel in such an instance, so codegen still sees a str-repr
-        /// parameter; this list records *which* for repr-aware passes.
-        pub concat_params: Vec<usize>,
         /// The body of an attached `.test({ .. })` block, if any. A statement
         /// block (asserts plus whatever setup) that the `check` command runs as
         /// a test for this function; ignored by `run`/`build`. The `assert(c)`

@@ -861,8 +861,6 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
             effects,
             return_ty,
             body,
-            owned_params: Vec::new(),
-            concat_params: Vec::new(),
             test_body,
             doc,
         })

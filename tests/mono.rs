@@ -16,7 +16,7 @@ fn parse(src: &str) -> Result<Program, aipl::Error> {
     aipl::parse(src)
 }
 
-/// Sorted function names in a (monomorphized) program.
+/// Sorted function names in a program.
 fn fn_names(p: &Program) -> Vec<String> {
     let mut names: Vec<String> = p
         .items
@@ -30,10 +30,17 @@ fn fn_names(p: &Program) -> Vec<String> {
     names
 }
 
+/// Sorted function names in a monomorphized program.
+fn mono_fn_names(p: &aipl::mono::MonoProgram) -> Vec<String> {
+    let mut names: Vec<String> = p.fns.iter().map(|f| f.name.clone()).collect();
+    names.sort();
+    names
+}
+
 fn mono_names(src: &str) -> Vec<String> {
     let prog = parse(src).expect("parse");
     let mono = monomorphize(&prog, DebugOptions::OFF).expect("monomorphize");
-    fn_names(&mono)
+    mono_fn_names(&mono)
 }
 
 /// Per-function reference counts for `src` (groundwork for inlining). Operates on

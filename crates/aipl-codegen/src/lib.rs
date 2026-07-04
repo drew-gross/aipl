@@ -2393,8 +2393,6 @@ pub fn build_test_program(program: &Program) -> Program {
                     effects: all_effects(),
                     return_ty: None,
                     body: f.test_body.clone().expect("test body present"),
-                    owned_params: Vec::new(),
-                    concat_params: Vec::new(),
                     test_body: None,
                     doc: None,
                 }));
@@ -2420,8 +2418,6 @@ pub fn build_test_program(program: &Program) -> Program {
         effects: all_effects(),
         return_ty: Some(Type::Primitive(Primitive::I64)),
         body,
-        owned_params: Vec::new(),
-        concat_params: Vec::new(),
         test_body: None,
         doc: None,
     }));
@@ -2824,14 +2820,10 @@ fn compile_program<M: Module>(
     let builtins = register_builtins(&mut funcs);
 
     // Monomorphization has already split each function into the instances the
-    // program reaches — borrow and owned forms alike, each its own `Function`
+    // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
     // with `owned_params` set. Codegen just declares and defines each one.
-    let mut decls: Vec<(FuncId, &AstFn)> = Vec::new();
-    for item in &program.items {
-        let f = match item {
-            Item::Fn(f) => f,
-            Item::Struct(_) | Item::Variant(_) | Item::Import(_) => continue,
-        };
+    let mut decls: Vec<(FuncId, &aipl_mono::ConcreteFn)> = Vec::new();
+    for f in &program.fns {
         // Signature/effect/mutating validity is checked up front by
         // `aipl_mono::check`; codegen trusts it and goes straight to lowering.
 
@@ -4143,7 +4135,7 @@ fn cli_args_ty() -> Type {
 /// is implicitly 0. As the program entry it still needs an `i64` result, so
 /// codegen gives it one (emitting 0) — but its body is type-checked as unit,
 /// so a trailing expression (an attempt to return a value) is an error.
-fn is_unit_main(f: &AstFn) -> bool {
+fn is_unit_main(f: &aipl_mono::ConcreteFn) -> bool {
     f.name == "main" && f.return_ty.is_none()
 }
 
@@ -4151,14 +4143,14 @@ fn is_unit_main(f: &AstFn) -> bool {
 /// result; at the ABI level `main` still returns an `i64` exit code, which
 /// codegen derives from the result — `ok()` → 0, `err(msg)` → print
 /// `error: <msg>` and exit 1.
-fn is_error_main(f: &AstFn) -> bool {
+fn is_error_main(f: &aipl_mono::ConcreteFn) -> bool {
     f.name == "main"
         && matches!(&f.return_ty, Some(Type::Result(ok, err)) if is_unit(ok) && is_error(err))
 }
 
 /// A mutating method: `fn f(mut self: T, ...)`. It returns nothing to the
 /// user and mutates its receiver.
-fn is_mutating_fn(f: &AstFn) -> bool {
+fn is_mutating_fn(f: &aipl_mono::ConcreteFn) -> bool {
     f.params.first().is_some_and(|p| p.mutable)
 }
 
@@ -4167,7 +4159,7 @@ fn is_mutating_fn(f: &AstFn) -> bool {
 /// except for two entry-style cases that produce a value while their body is
 /// checked as unit: a unit `main` yields its `i64` exit code, and a mutating
 /// method yields its (mutated) `self`.
-fn abi_return_ty(f: &AstFn) -> Type {
+fn abi_return_ty(f: &aipl_mono::ConcreteFn) -> Type {
     if is_mutating_fn(f) {
         f.params[0].ty.clone()
     } else if is_unit_main(f) || is_error_main(f) {
@@ -4184,7 +4176,11 @@ fn abi_return_ty(f: &AstFn) -> Type {
 /// result — nothing for unit/struct(sret), `(tag, value)` for an optional, a
 /// single i64 otherwise. Used by both the declaration and the definition so
 /// they can't drift.
-fn build_signature(sig: &mut Signature, f: &AstFn, structs: &HashMap<String, TypeDef>) {
+fn build_signature(
+    sig: &mut Signature,
+    f: &aipl_mono::ConcreteFn,
+    structs: &HashMap<String, TypeDef>,
+) {
     let abi = abi_return_ty(f);
     // Composites — structs and optionals (possibly nested) — are returned
     // through a hidden caller-provided pointer (sret), uniformly.
@@ -4360,14 +4356,15 @@ impl ObjectCompilation {
     }
 }
 
-fn build_struct_layouts(program: &Program) -> Result<HashMap<String, TypeDef>, Error> {
+fn build_struct_layouts(
+    program: &aipl_mono::MonoProgram,
+) -> Result<HashMap<String, TypeDef>, Error> {
     // Index declarations by name (rejecting duplicates) up front, so a field
     // may name a struct declared later in the file. Layouts are then resolved
     // in dependency order: a struct-typed field is stored inline, so the
     // nested struct's size must be known before the outer struct's is.
     let mut decls: HashMap<&str, &StructDecl> = HashMap::new();
-    for item in &program.items {
-        let Item::Struct(s) = item else { continue };
+    for s in &program.structs {
         if decls.insert(s.name.as_str(), s).is_some() {
             return Err(Error::msg(format!(
                 "duplicate struct definition {:?}",
@@ -4386,8 +4383,7 @@ fn build_struct_layouts(program: &Program) -> Result<HashMap<String, TypeDef>, E
     // struct, but not — for now — another variant, which would need indirection
     // for a recursive/infinite-size sum type), so every payload field's size is
     // already known.
-    for item in &program.items {
-        let Item::Variant(v) = item else { continue };
+    for v in &program.variants {
         if layouts.contains_key(&v.name) {
             return Err(Error::msg(format!(
                 "duplicate type definition {:?}",
@@ -4972,7 +4968,7 @@ fn define_fn<M: Module>(
     ctx: &mut Context,
     fbc: &mut FunctionBuilderContext,
     id: FuncId,
-    func: &AstFn,
+    func: &aipl_mono::ConcreteFn,
     funcs: &HashMap<String, FuncInfo>,
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
