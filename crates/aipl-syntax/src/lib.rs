@@ -287,9 +287,9 @@ pub mod ast {
     /// (`i8`..`i64`, `u8`..`u64`), `bool`, `char`, and `str`. This is a *closed*
     /// set, so it's a proper enum rather than a stringly-typed name —
     /// `Type::Primitive(..)` is what used to be `Type::Named("i64")` and the
-    /// like. (User structs, variants, generic type parameters, the builtin
-    /// `Error` type, and the compiler's pseudo-type sentinels — `__none__`,
-    /// `__unit__`, `any`, etc. — remain `Type::Named(String)`.)
+    /// like. (User structs, variants, generic type parameters, and the builtin
+    /// `Error` type remain `Type::Named(String)`; the compiler's pseudo-type
+    /// sentinels — `Any`, `NoneInner`, etc. — have their own `Type` variants.)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Primitive {
         I8,
@@ -386,8 +386,9 @@ pub mod ast {
         /// [`Primitive`].
         Primitive(Primitive),
         /// A name that isn't a primitive: a user struct or variant, a generic
-        /// type parameter (`T`), the builtin `Error` type, or a compiler
-        /// pseudo-type sentinel (`__none__`, `__unit__`, `any`, …).
+        /// type parameter (`T`), or the builtin `Error` type. (Compiler
+        /// pseudo-type sentinels that used to overload this — `__none__`,
+        /// `any`, etc. — have their own dedicated variants below instead.)
         Named(String),
         /// `T?` — optional T. Represented at runtime as a 16-byte
         /// stack value `{ tag: i64, value: i64 }` (tag 0 = None,
@@ -429,6 +430,30 @@ pub mod ast {
         /// `__tuple$A$B$C` before type-checking, so only the parser and the
         /// `lower_tuples` pre-pass ever see this variant.
         Tuple(Vec<Type>),
+        /// The anonymous generic bound keyword `any`, as written in `any[]`/
+        /// `any?` — parsed directly from source. Monomorphization's `normalize`
+        /// replaces each occurrence with a synthetic named type variable before
+        /// anything else sees it.
+        Any,
+        /// The placeholder element/inner of an untyped `none`, empty array
+        /// literal (`[]`), or empty set/dict literal (`#{}`/`#{:}`) — coerces to
+        /// any element/inner type at the use site (see [`is_none_inner`]).
+        NoneInner,
+        /// Monomorphization-only: the pseudo-type a generic's type variable is
+        /// bound to when the only argument that could pin it is an empty array
+        /// literal (see the fallback pass in `instantiate_types`). Substituted
+        /// back to `Array(NoneInner)` once it lands in a container, so existing
+        /// codegen treats it as an ordinary empty array.
+        EmptyArrayArg,
+        /// Monomorphization-only: like `EmptyArrayArg`, but for a bare `none`
+        /// literal — substituted back to `Optional(NoneInner)`.
+        NoneLiteralArg,
+        /// A `str` produced by `+`-concatenating two strings — distinguished
+        /// from a plain `str` so codegen can specialize a lazy-concat
+        /// representation for it (see [`is_concat_str`]). Only meaningful as
+        /// the type of a scalar value flowing to a `str` parameter; decays to
+        /// a plain `str` once it's placed into any other container/context.
+        ConcatStr,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -941,14 +966,12 @@ fn __template_interp<T: any>(self: T) -> str { "" }
 /// (the `$c{i}` instances), mirroring how `str_params`/`owned_params` specialize.
 /// It has the `str` runtime representation (`is_str_repr` below), so all codegen
 /// machinery treats it exactly like a `str`.
-pub const CONCAT_STR: &str = "__concat_str__";
-
 pub fn concat_str_ty() -> Type {
-    Type::Named(CONCAT_STR.into())
+    Type::ConcatStr
 }
 
 pub fn is_concat_str(t: &Type) -> bool {
-    matches!(t, Type::Named(s) if s == CONCAT_STR)
+    matches!(t, Type::ConcatStr)
 }
 
 /// Whether `t` has the `str` runtime representation: `str` itself, the builtin
@@ -963,8 +986,6 @@ pub fn type_name(t: &Type) -> String {
     match t {
         Type::Unit => "()".into(),
         Type::Primitive(p) => p.name().into(),
-        Type::Named(s) if s == EMPTY_ARRAY_ARG => "EmptyArray".into(),
-        Type::Named(s) if s == NONE_LITERAL_ARG => "NoneLiteral".into(),
         Type::Named(s) => s.clone(),
         Type::Optional(inner) => format!("{}?", type_name(inner)),
         Type::Array(inner) => format!("{}[]", type_name(inner)),
@@ -979,6 +1000,11 @@ pub fn type_name(t: &Type) -> String {
             let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({es})")
         }
+        Type::Any => "any".into(),
+        Type::NoneInner => "__none__".into(),
+        Type::EmptyArrayArg => "EmptyArray".into(),
+        Type::NoneLiteralArg => "NoneLiteral".into(),
+        Type::ConcatStr => "__concat_str__".into(),
     }
 }
 
@@ -1016,39 +1042,33 @@ pub fn is_dict_key(t: &Type) -> bool {
 /// any `Optional<T>` via `expect_type`. Users can't write this — `none`
 /// is the only way to spell it.
 pub fn none_inner_ty() -> Type {
-    Type::Named("__none__".into())
+    Type::NoneInner
 }
 
 pub fn is_none_inner(t: &Type) -> bool {
-    matches!(t, Type::Named(s) if s == "__none__")
+    matches!(t, Type::NoneInner)
 }
 
-/// Marker the monomorphizer binds a type variable to when the only
-/// argument that could pin it is an empty array literal — the resulting
-/// instance accepts the pseudo-type `EmptyArray` (substituted to
-/// `Array(__none__)` so existing codegen treats it as an empty array).
-pub const EMPTY_ARRAY_ARG: &str = "__empty_array_arg__";
-
-/// Marker the monomorphizer binds a type variable to when the only
-/// argument that could pin it is the bare `none` literal — the resulting
-/// instance accepts the pseudo-type `NoneLiteral` (substituted to
-/// `Optional(__none__)`).
-pub const NONE_LITERAL_ARG: &str = "__none_literal_arg__";
-
+/// The pseudo-type the monomorphizer binds a type variable to when the only
+/// argument that could pin it is an empty array literal — substituted back to
+/// `Array(NoneInner)` so existing codegen treats it as an ordinary empty array.
 pub fn empty_array_arg_ty() -> Type {
-    Type::Named(EMPTY_ARRAY_ARG.into())
+    Type::EmptyArrayArg
 }
 
+/// The pseudo-type the monomorphizer binds a type variable to when the only
+/// argument that could pin it is the bare `none` literal — substituted back to
+/// `Optional(NoneInner)`.
 pub fn none_literal_arg_ty() -> Type {
-    Type::Named(NONE_LITERAL_ARG.into())
+    Type::NoneLiteralArg
 }
 
 pub fn is_empty_array_arg(t: &Type) -> bool {
-    matches!(t, Type::Named(s) if s == EMPTY_ARRAY_ARG)
+    matches!(t, Type::EmptyArrayArg)
 }
 
 pub fn is_none_literal_arg(t: &Type) -> bool {
-    matches!(t, Type::Named(s) if s == NONE_LITERAL_ARG)
+    matches!(t, Type::NoneLiteralArg)
 }
 
 // ---------- Builtin registry ----------

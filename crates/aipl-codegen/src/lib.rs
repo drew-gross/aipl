@@ -5282,7 +5282,14 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
-        Type::Primitive(_) | Type::Unit => false,
+        // An untyped `[]`/`none` element/core carries nothing to drop — it's
+        // never actually a live value (an empty array holds no elements; a
+        // bare `none` optional's payload is garbage), so this reaches codegen
+        // (e.g. picking an empty array literal's element drop-fn) but is
+        // always vacuously drop-free.
+        Type::Primitive(_) | Type::Unit | Type::NoneInner => false,
+        // Already handled by the `is_str_repr` guard above.
+        Type::ConcatStr => unreachable!(),
         Type::Named(n) => match structs.get(n) {
             Some(TypeDef::Struct(s)) => s.fields.iter().any(|f| needs_drop(&f.ty, structs)),
             // A variant needs cleanup if any case's payload field does.
@@ -5301,6 +5308,12 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         Type::Fn(_, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
+        // `Any`/`EmptyArrayArg`/`NoneLiteralArg` are resolved away by
+        // monomorphization (the latter two collapse to `Array`/`Optional` of
+        // `NoneInner` — see `subst_vars`) — codegen never sees them directly.
+        Type::Any | Type::EmptyArrayArg | Type::NoneLiteralArg => {
+            unreachable!("compiler pseudo-type reached codegen")
+        }
     }
 }
 
@@ -5627,6 +5640,13 @@ fn emit_rc<M: Module>(
         Type::Fn(_, _) => {}
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
+        // Already handled by the `is_str_repr` guard above.
+        Type::ConcatStr => unreachable!(),
+        // `needs_drop` panics on these (resolved away by monomorphization), so
+        // the guard above already returned.
+        Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => {
+            unreachable!()
+        }
     }
 }
 

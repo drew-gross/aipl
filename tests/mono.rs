@@ -200,6 +200,24 @@ fn same_element_type_is_memoized() {
 }
 
 #[test]
+fn generic_owned_param_requires_substituted_heap_type() {
+    // `concrete_signature`'s generic branch (`Signature::make_concrete`)
+    // substitutes `T` in the param/return type before `owned_eligible` checks
+    // either is heap-typed. A *bare* `T` (unwrapped in `T[]`/`T?`, where
+    // `is_heap` only cares about the outer container and would pass either
+    // way) is the case that actually depends on the substitution: unsubstituted
+    // it's `Type::Named("T")`, which `is_heap` rejects regardless of what `T`
+    // resolves to, so a substitution bug here would silently disable the
+    // owned optimization for every by-value generic.
+    let names = mono_names(
+        "fn f<T: any>(x: T) -> T { mut y = x; y }
+         fn make_str() -> str { \"abc\" }
+         fn main() -> i64 { let r = f(make_str()); 0 }",
+    );
+    assert!(names.contains(&"f$str$own0".to_string()), "{names:?}");
+}
+
+#[test]
 fn concat_arg_makes_distinct_monomorphization() {
     // A `str + str` value carries the concat-str representation; passing it to a
     // `str` parameter emits a distinct, concat-specialized instance (`$c0`)

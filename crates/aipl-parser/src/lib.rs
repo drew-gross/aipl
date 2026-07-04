@@ -1097,10 +1097,12 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
 impl gazelle::Action<aipl::BaseTy<Self>> for Build {
     fn build(&mut self, node: aipl::BaseTy<Self>) -> Result<Type, Self::Error> {
         Ok(match node {
-            // A base-type identifier is a primitive (`i64`, `bool`, `str`, …) or
-            // a non-primitive name (struct/variant/generic-param/`Error`).
+            // A base-type identifier is a primitive (`i64`, `bool`, `str`, …),
+            // the anonymous generic bound `any`, or a non-primitive name
+            // (struct/variant/generic-param/`Error`).
             aipl::BaseTy::Named((name, _)) => match aipl_syntax::ast::Primitive::from_name(&name) {
                 Some(p) => Type::Primitive(p),
+                None if name == "any" => Type::Any,
                 None => Type::Named(name),
             },
             aipl::BaseTy::Optional(inner) => Type::Optional(Box::new(inner)),

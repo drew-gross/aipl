@@ -24,8 +24,8 @@ use aipl_syntax::ast::{
     Expr, ExprKind, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program, Type,
 };
 use aipl_syntax::{
-    is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, type_name,
-    Error, Span,
+    is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, none_inner_ty,
+    type_name, Error, Span,
 };
 
 /// Generate the canonical synthetic-struct name for a tuple with the given
@@ -34,6 +34,15 @@ pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
     fn mangle(ty: &Type) -> String {
         match ty {
             Type::Unit => panic!("Tuple members cannot be unit"),
+            // A tuple type is parsed straight from source syntax (`(A, B)`);
+            // these are compiler-internal pseudo-types that never appear there.
+            Type::Any
+            | Type::NoneInner
+            | Type::EmptyArrayArg
+            | Type::NoneLiteralArg
+            | Type::ConcatStr => {
+                panic!("Tuple members cannot be a compiler pseudo-type")
+            }
             Type::Primitive(p) => p.name().into(),
             Type::Named(n) => n.replace(['$', '!'], "_"),
             Type::Array(e) => format!("arr_{}", mangle(e)),
@@ -213,8 +222,14 @@ fn is_generic(f: &Function) -> bool {
 
 fn ty_mentions_any(t: &Type) -> bool {
     match t {
-        Type::Unit | Type::Primitive(_) => false,
-        Type::Named(n) => n == "any",
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::Named(_)
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
+        Type::Any => true,
         Type::Array(inner) | Type::Optional(inner) | Type::Set(inner) => ty_mentions_any(inner),
         Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
         Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
@@ -223,12 +238,13 @@ fn ty_mentions_any(t: &Type) -> bool {
     }
 }
 
-/// During checking, these [`Type::Named`] spellings stand in for an as-yet-
-/// unknown scalar: the `any` constraint, the bare-`none` inner marker
-/// (`__none__`), and an in-scope generic type parameter. They're permitted
-/// wherever a concrete scalar primitive is (set elements, dict keys, etc.).
-fn is_abstract_scalar_name(n: &str, type_params: &[String]) -> bool {
-    n == "any" || n == "__none__" || type_params.iter().any(|tp| tp == n)
+/// During checking, these types stand in for an as-yet-unknown scalar: the
+/// `any` constraint, the bare-`none` inner marker, and an in-scope generic
+/// type parameter. They're permitted wherever a concrete scalar primitive is
+/// (set elements, dict keys, etc.).
+fn is_abstract_scalar_ty(t: &Type, type_params: &[String]) -> bool {
+    matches!(t, Type::Any | Type::NoneInner)
+        || matches!(t, Type::Named(n) if type_params.iter().any(|tp| tp == n))
 }
 
 impl Cx<'_> {
@@ -328,8 +344,18 @@ impl Cx<'_> {
         match t {
             // Every primitive is a valid type in any general position.
             Type::Unit | Type::Primitive(_) => Ok(()),
+            // The anonymous generic bound is valid anywhere a type-parameter
+            // name is (that's what it desugars to during monomorphization).
+            Type::Any => Ok(()),
+            // These are compiler-internal pseudo-types, never part of a
+            // declared signature a user wrote — but `check_ty` also runs on
+            // synthesized types (e.g. a struct field's inferred default), so
+            // handle them permissively rather than asserting they can't occur.
+            Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::ConcatStr => {
+                Ok(())
+            }
             Type::Named(n) => {
-                let ok = matches!(n.as_str(), "any" | "Error")
+                let ok = n == "Error"
                     || self.has_struct(n)
                     || self.variants.contains_key(n)
                     || type_params.iter().any(|tp| tp == n);
@@ -348,9 +374,7 @@ impl Cx<'_> {
             // parameter (pinned to one of those when monomorphized). No nested
             // containers, no struct/variant.
             Type::Set(inner) => {
-                if is_set_elem(inner)
-                    || matches!(inner.as_ref(), Type::Named(n) if is_abstract_scalar_name(n, type_params))
-                {
+                if is_set_elem(inner) || is_abstract_scalar_ty(inner, type_params) {
                     Ok(())
                 } else {
                     Err(Error::msg(format!(
@@ -363,9 +387,7 @@ impl Cx<'_> {
             // the value is any value type an array/optional element may be
             // (scalar, str, array, optional, struct, variant).
             Type::Dict(k, v) => {
-                if !(is_dict_key(k)
-                    || matches!(k.as_ref(), Type::Named(n) if is_abstract_scalar_name(n, type_params)))
-                {
+                if !(is_dict_key(k) || is_abstract_scalar_ty(k, type_params)) {
                     return Err(Error::msg(format!(
                         "fn {fname:?}: a dict key must be i64, bool, char, or str, got {}",
                         tyname(k)
@@ -381,7 +403,7 @@ impl Cx<'_> {
                 let scalar = |p: &Type| {
                     is_set_elem(p) // i64/bool/char/str
                         || is_error(p)
-                        || matches!(p, Type::Named(n) if is_abstract_scalar_name(n, type_params))
+                        || is_abstract_scalar_ty(p, type_params)
                 };
                 if !scalar(ok) && !is_unit(ok) {
                     return Err(Error::msg(format!(
@@ -436,8 +458,13 @@ impl Cx<'_> {
                     )))
                 }
             }
+            // The anonymous generic bound and the bare-`none`/empty-container
+            // marker are abstract scalars — always a valid element.
+            Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => Ok(()),
+            // A concat-str has the `str` runtime representation.
+            Type::ConcatStr => Ok(()),
             Type::Named(n) => {
-                if is_abstract_scalar_name(n, type_params)
+                if type_params.iter().any(|tp| tp == n)
                     || self.has_struct(n)
                     || self.variants.contains_key(n)
                 {
@@ -719,7 +746,7 @@ impl Cx<'_> {
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
             ExprKind::Str(_) => Type::Primitive(Primitive::Str),
             ExprKind::Char(_) => Type::Primitive(Primitive::Char),
-            ExprKind::None => Type::Optional(Box::new(none_inner())),
+            ExprKind::None => Type::Optional(Box::new(none_inner_ty())),
             ExprKind::Ident(name) => {
                 // A local binding shadows everything; otherwise a bare name may
                 // be a nullary variant constructor (e.g. `Empty`).
@@ -949,7 +976,7 @@ impl Cx<'_> {
                 Type::Primitive(Primitive::I64)
             }
             ExprKind::ArrayLit(elems) => {
-                let mut elem_ty = none_inner();
+                let mut elem_ty = none_inner_ty();
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
                     if i == 0 {
@@ -975,7 +1002,7 @@ impl Cx<'_> {
             ExprKind::SetLit(elems) => {
                 // Elements share one type (i64/bool/char/str); an empty `#{}` is
                 // `__none__` (coerces to any `T{}`). Dups dropped at runtime.
-                let mut elem_ty = none_inner();
+                let mut elem_ty = none_inner_ty();
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
                     if i == 0 {
@@ -999,8 +1026,8 @@ impl Cx<'_> {
                 // Keys share one scalar/str type; values share one value type.
                 // An empty `#{:}` is `#{__none__: __none__}` (coerces to any
                 // `#{K: V}`). Duplicate keys keep the last binding (at runtime).
-                let mut key_ty = none_inner();
-                let mut val_ty = none_inner();
+                let mut key_ty = none_inner_ty();
+                let mut val_ty = none_inner_ty();
                 for (i, (k, v)) in pairs.iter().enumerate() {
                     let kt = self.check_expr(k, env, effects)?;
                     let vt = self.check_expr(v, env, effects)?;
@@ -1295,7 +1322,10 @@ impl Cx<'_> {
         if !env.contains_key(name) && (name == "ok" || name == "err") {
             // `ok()` with no argument is the void success of a `!E` result.
             if name == "ok" && args.is_empty() {
-                return Ok(Type::Result(Box::new(Type::Unit), Box::new(none_inner())));
+                return Ok(Type::Result(
+                    Box::new(Type::Unit),
+                    Box::new(none_inner_ty()),
+                ));
             }
             if args.len() != 1 {
                 return Err(Error::at(
@@ -1304,7 +1334,7 @@ impl Cx<'_> {
                 ));
             }
             let t = self.check_expr(&args[0], env, effects)?;
-            let none = || Box::new(none_inner());
+            let none = || Box::new(none_inner_ty());
             return Ok(if name == "ok" {
                 Type::Result(Box::new(t), none())
             } else {
@@ -1974,10 +2004,6 @@ fn display(name: &str) -> &str {
     name.strip_prefix("__builtin_").unwrap_or(name)
 }
 
-fn none_inner() -> Type {
-    Type::Named("__none__".to_string())
-}
-
 /// A type the checker can't pin down (e.g. a generic call's type-variable
 /// result that we don't instantiate here). It coerces with anything, so the
 /// checker stays permissive rather than reporting a false mismatch.
@@ -2019,8 +2045,15 @@ fn is_valid_elem(t: &Type) -> bool {
 /// type variables coerce only with themselves. Identity for a concrete signature.
 fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
-        Type::Named(n) if n == "any" || type_params.iter().any(|p| p == n) => typevar_ty(),
-        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
+        Type::Any => typevar_ty(),
+        Type::Named(n) if type_params.iter().any(|p| p == n) => typevar_ty(),
+        Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Unit
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
         Type::Set(inner) => Type::Set(Box::new(subst_typevars(inner, type_params))),
         Type::Dict(k, v) => Type::Dict(
@@ -2272,7 +2305,14 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         Type::Named(v) if vars.contains(v.as_str()) => {
             map.get(v).cloned().unwrap_or_else(unknown_ty)
         }
-        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
+        Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Unit
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
         Type::Set(inner) => Type::Set(Box::new(subst_vars(inner, map, vars))),
         Type::Dict(k, v) => Type::Dict(

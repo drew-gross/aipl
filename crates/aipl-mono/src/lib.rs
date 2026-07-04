@@ -171,7 +171,14 @@ fn lt_ty(
             params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
             Box::new(lt_ty(ret, fields_map, order)),
         ),
-        Type::Named(_) | Type::Primitive(_) | Type::Unit => t.clone(),
+        Type::Named(_)
+        | Type::Primitive(_)
+        | Type::Unit
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
     }
 }
 
@@ -706,6 +713,36 @@ struct Signature {
     params: Vec<Param>,
     return_ty: Option<Type>,
     effects: Vec<String>,
+}
+
+impl Signature {
+    /// Substitute `type_args` (positional, matching `type_vars` order) into
+    /// this signature's params and return type, yielding the concrete
+    /// (monomorphic) params/return-type pair a specialized instance has.
+    /// Used by [`Mono::concrete_signature`] for ownership eligibility — the
+    /// substituted params/return must be concrete heap types for
+    /// `owned_eligible` to recognize them, so a raw type variable left
+    /// unsubstituted here would silently disable the owned optimization.
+    fn make_concrete(&self, type_args: &[Type]) -> (Vec<Param>, Option<Type>) {
+        let map: HashMap<String, Type> = self
+            .type_vars
+            .iter()
+            .cloned()
+            .zip(type_args.iter().cloned())
+            .collect();
+        let params = self
+            .params
+            .iter()
+            .map(|p| Param {
+                name: p.name.clone(),
+                ty: subst_vars(&p.ty, &map),
+                mutable: p.mutable,
+                variadic: p.variadic,
+            })
+            .collect();
+        let return_ty = self.return_ty.as_ref().map(|t| subst_vars(t, &map));
+        (params, return_ty)
+    }
 }
 
 /// A generic function template ready to monomorphize: a [`Signature`] plus the
@@ -2576,23 +2613,7 @@ impl Mono<'_> {
         type_args: &[Type],
     ) -> (Vec<Param>, Option<Type>, Expr) {
         if let Some(Generic { sig, body }) = self.generics.get(template) {
-            let map: HashMap<String, Type> = sig
-                .type_vars
-                .iter()
-                .cloned()
-                .zip(type_args.iter().cloned())
-                .collect();
-            let params = sig
-                .params
-                .iter()
-                .map(|p| Param {
-                    name: p.name.clone(),
-                    ty: subst_vars(&p.ty, &map),
-                    mutable: p.mutable,
-                    variadic: p.variadic,
-                })
-                .collect();
-            let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
+            let (params, return_ty) = sig.make_concrete(type_args);
             (params, return_ty, body.clone())
         } else if let Some(f) = self.concrete.get(template) {
             (f.params.clone(), f.return_ty.clone(), f.body.clone())
@@ -3755,10 +3776,16 @@ fn normalize_param_ty(
     fname: &str,
 ) -> Result<Type, Error> {
     match t {
-        Type::Named(n) if n == "any" => Err(Error::msg(format!(
+        Type::Any => Err(Error::msg(format!(
             "fn \"{fname}\": bare \"any\" is not allowed; use \"any[]\", \"any?\", or a named type parameter \"<T: any>\""
         ))),
-        Type::Primitive(_) | Type::Named(_) | Type::Unit=> Ok(t.clone()),
+        Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Unit
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => Ok(t.clone()),
         Type::Optional(inner) => Ok(Type::Optional(Box::new(normalize_inner(
             inner, type_vars, counter,
         )))),
@@ -3798,13 +3825,19 @@ fn normalize_param_ty(
 /// `any` becomes a fresh synthetic variable; anything else is kept as-is.
 fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -> Type {
     match t {
-        Type::Named(n) if n == "any" => {
+        Type::Any => {
             let name = format!("$any{counter}");
             *counter += 1;
             type_vars.push(name.clone());
             Type::Named(name)
         }
-        Type::Primitive(_) | Type::Named(_) | Type::Unit => t.clone(),
+        Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Unit
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
         // The surface grammar can't nest deeper, but recurse defensively.
         Type::Optional(inner) => {
             Type::Optional(Box::new(normalize_inner(inner, type_vars, counter)))
@@ -3842,7 +3875,17 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
 /// and bare `none` it already knows about.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
-        Type::Primitive(_) | Type::Unit => t.clone(),
+        // `t` is always a piece of an already-`normalize`d signature, which
+        // never contains `Any` (converted to a synthetic `Named` type var) or
+        // the mono-only pseudo-types (only ever produced as *substituted
+        // values*, via `map`, never as signature structure to recurse into).
+        Type::Primitive(_)
+        | Type::Unit
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => t.clone(),
         Type::Named(v) => map
             .get(v)
             .cloned()
@@ -3888,10 +3931,18 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
     }
 }
 
-/// Does `t` mention the named type `name` anywhere?
+/// Does `t` mention the named type `name` anywhere? `t` may be a raw,
+/// pre-`normalize` signature (this is how `is_generic` and its callers detect
+/// anonymous `any`), so `Type::Any` counts as mentioning `"any"`.
 fn ty_mentions(t: &Type, name: &str) -> bool {
     match t {
-        Type::Primitive(_) | Type::Unit => false,
+        Type::Primitive(_)
+        | Type::Unit
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
+        Type::Any => name == "any",
         Type::Named(n) => n == name,
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
@@ -3901,10 +3952,18 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
     }
 }
 
-/// Does `t` reference any of the given type variables?
+/// Does `t` reference any of the given type variables? `t` is always a piece
+/// of an already-`normalize`d signature (never `Any`, never a mono-only
+/// pseudo-type — see `subst_vars`).
 fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
     match t {
-        Type::Unit | Type::Primitive(_) => false,
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
         Type::Named(v) => vars.contains(v.as_str()),
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
             ty_contains_var(inner, vars)
