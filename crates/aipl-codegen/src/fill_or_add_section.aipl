@@ -28,15 +28,32 @@ Like `fill_section`, but appends `--- section ---\\n<body>\\n` (after dropping
 any trailing newlines) when `contents` doesn't already carry that section,
 instead of requiring it to exist.
 """).test({
+    // Expected values here carry real `--- name ---` marker lines, so they
+    // stay escaped (`\n`), not `"""`-raw: this file is itself parsed through
+    // `strip_test_sections`, which cuts at the first line that trims to
+    // exactly `--- name ---` — a raw string with such a line embedded would
+    // truncate mid-literal at parse time. Inputs with no marker lines use a
+    // plain multiline string.
+
     // Section already present: same behavior as `fill_section`.
     assert(fill_or_add_section("a\n--- foo ---\nold\n", "foo", "new")
         == "a\n--- foo ---\nnew\n");
     // Section missing: appended after stripping trailing newlines.
-    assert(fill_or_add_section("code\n", "stdout", "hi")
-        == "code\n--- stdout ---\nhi\n");
+    assert(fill_or_add_section(
+        """
+        code
+
+        """,
+        "stdout", "hi") == "code\n--- stdout ---\nhi\n");
     // Missing, with several trailing newlines to strip first.
-    assert(fill_or_add_section("code\n\n\n", "stdout", "hi")
-        == "code\n--- stdout ---\nhi\n");
+    assert(fill_or_add_section(
+        """
+        code
+
+
+
+        """,
+        "stdout", "hi") == "code\n--- stdout ---\nhi\n");
     // Missing, no trailing newline at all.
     assert(fill_or_add_section("code", "stdout", "hi")
         == "code\n--- stdout ---\nhi\n");
@@ -49,4 +66,4 @@ deallocations: 34
 reallocations: 6
 bytes allocated: 1392
 instructions executed: 3083
-binary size: 12608
+binary size: 12664

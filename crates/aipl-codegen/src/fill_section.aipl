@@ -42,14 +42,31 @@ Replaces the body of the `--- section ---` block in `contents` with `body`
 everything else. The section must already exist in `contents`; a `--- name ---`
 that doesn't match `section` is passed through unchanged.
 """).test({
+    // Most cases here exercise real `--- name ---` marker lines, so their
+    // fixture strings must stay escaped (`\n`), not `"""`-raw: this very file
+    // is itself parsed through `strip_test_sections`, which cuts a file at the
+    // first line that trims to exactly `--- name ---` — a raw string with such
+    // a line embedded would truncate mid-literal at parse time.
+
     // Single-line body, more content follows.
     assert(fill_section("a\n--- foo ---\nold\n--- bar ---\nb\n", "foo", "new")
         == "a\n--- foo ---\nnew\n--- bar ---\nb\n");
     // Multi-line old body, all of it dropped.
     assert(fill_section("--- foo ---\nold1\nold2\n", "foo", "new")
         == "--- foo ---\nnew\n");
-    // No matching section: unchanged.
-    assert(fill_section("x\ny\n", "foo", "new") == "x\ny\n");
+    // No matching section: unchanged. No marker lines in this content, so a
+    // plain multiline string is safe here.
+    assert(fill_section(
+        """
+        x
+        y
+
+        """,
+        "foo", "new") == """
+        x
+        y
+
+        """);
     // The header is the final, unterminated line (no trailing `\n` at all).
     assert(fill_section("--- foo ---", "foo", "new") == "--- foo ---\nnew\n");
     // Old body is the final, unterminated content.
@@ -67,4 +84,4 @@ deallocations: 48
 reallocations: 31
 bytes allocated: 1808
 instructions executed: 8110
-binary size: 11472
+binary size: 11544
