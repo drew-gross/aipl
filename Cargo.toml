@@ -48,6 +48,9 @@ regex = { workspace = true }
 [lib]
 path = "src/lib.rs"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "aipl"
 path = "src/main.rs"

@@ -869,7 +869,7 @@ fn function_without_type_params_has_none() {
 
 // ---------- builtin imports ----------
 
-fn import_at<'a>(p: &'a Program, idx: usize) -> &'a aipl::ast::ImportDecl {
+fn import_at(p: &Program, idx: usize) -> &aipl::ast::ImportDecl {
     match &p.items[idx] {
         Item::Import(i) => i,
         other => panic!("expected import at {idx}, got {other:?}"),

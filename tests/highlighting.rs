@@ -226,7 +226,7 @@ fn walk_refs(
                 if m.start() >= end {
                     continue;
                 }
-                if best.as_ref().map_or(true, |b| m.start() < b.0) {
+                if best.as_ref().is_none_or(|b| m.start() < b.0) {
                     best = Some((m.start(), pat, m));
                 }
             }
@@ -294,7 +294,7 @@ fn pattern_match_at<'t>(pat: &Pattern, text: &'t str, pos: usize) -> Option<rege
     }
 }
 
-fn apply_match(pat: &Pattern, text: &str, m: &regex::Match, scopes: &mut Vec<Vec<String>>) {
+fn apply_match(pat: &Pattern, text: &str, m: &regex::Match, scopes: &mut [Vec<String>]) {
     if let Some(name) = &pat.name {
         push_scope(scopes, m.start()..m.end(), name);
     }

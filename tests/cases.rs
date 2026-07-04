@@ -85,6 +85,7 @@
 //!     subset.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
+//!
 //! Each diverges (fails) when done so its summary is visible. The relevant
 //! failure messages (e.g. a `performance` mismatch) name the command to run.
 //!
@@ -822,7 +823,7 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
             build_ms,
             peak_kb: peak_bytes.div_ceil(1024),
         });
-        if rows.len() % 25 == 0 {
+        if rows.len().is_multiple_of(25) {
             eprintln!("measured {} case(s)...", rows.len());
         }
     }
@@ -1110,12 +1111,10 @@ fn run_success_case(
     // `--- monomorphizations ---` section. Read before `emit` consumes `obj_comp`.
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
-        if fill_mode() {
-            if actual != *expected {
-                fill_section(orig_path, "monomorphizations", &actual);
-                eprintln!("[{}]: filled monomorphizations list", orig_path.display());
-                return Outcome::Skip;
-            }
+        if fill_mode() && actual != *expected {
+            fill_section(orig_path, "monomorphizations", &actual);
+            eprintln!("[{}]: filled monomorphizations list", orig_path.display());
+            return Outcome::Skip;
             // Already correct — fall through so subsequent fill targets (e.g. performance) get reached.
         }
         if actual != *expected {
