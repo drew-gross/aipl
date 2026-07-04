@@ -545,7 +545,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 mono.queue.len()
             ),
         );
-        let mut out = mono.process(
+        let out = mono.process(
             &inst.mangled,
             &params,
             &effects,
@@ -553,7 +553,6 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             &body,
             &inst.specs.params,
         )?;
-        out.concat_params = inst.specs.indices(|p| p.concat);
         out_fns.push(out);
     }
 
@@ -788,13 +787,12 @@ struct Generic {
 /// final, so it's ready for codegen. Distinct from [`Function`] (the AST type),
 /// which additionally carries source-only concerns — visibility, declared type
 /// parameters, an attached `.test`/`.doc` — that have no meaning once
-/// monomorphization is done; conversely `concat_params` (below) and each
-/// param's `owned` have no meaning *before* monomorphization, since
-/// specialization is the only thing that ever sets them. Reusing one struct for
-/// both ends of the pass meant every source function and every synthesized
-/// instance carried dead fields; splitting them apart makes each
-/// representation self-explanatory and lets the compiler catch a stray
-/// reference to the wrong one.
+/// monomorphization is done; conversely each param's `owned` has no meaning
+/// *before* monomorphization, since specialization is the only thing that ever
+/// sets it. Reusing one struct for both ends of the pass meant every source
+/// function and every synthesized instance carried dead fields; splitting them
+/// apart makes each representation self-explanatory and lets the compiler
+/// catch a stray reference to the wrong one.
 #[derive(Clone)]
 pub struct ConcreteFn {
     pub name: String,
@@ -802,14 +800,6 @@ pub struct ConcreteFn {
     pub effects: Vec<String>,
     pub return_ty: Option<Type>,
     pub body: Expr,
-    /// Indices of `str` parameters this instance receives in the
-    /// *concatenated-string* representation (a lazy concat node — see
-    /// [`aipl_syntax::concat_str_ty`]). Set for a concat-specialized instance
-    /// (`$c{i}`); empty for a plain-`str` instance. The parameter's `ty` is
-    /// retyped to the concat sentinel in such an instance, so codegen still
-    /// sees a str-repr parameter; this list records *which* for repr-aware
-    /// passes.
-    pub concat_params: Vec<usize>,
 }
 
 /// A fully-resolved parameter: `variadic` doesn't appear here because by the
@@ -1020,8 +1010,6 @@ impl Mono<'_> {
             effects: effects.to_vec(),
             return_ty: return_ty.clone(),
             body,
-            // The driver sets this from the instance's concat-repr decisions.
-            concat_params: Vec::new(),
         })
     }
 
