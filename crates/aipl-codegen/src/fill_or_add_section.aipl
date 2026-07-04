@@ -1,0 +1,52 @@
+import { wrapping_add as +, ==, || } from builtins;
+import { lines } from "./lines.aipl";
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+import { fill_section } from "./fill_section.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+// Whether `contents` already carries a `--- section ---` header. `lines`
+// mirrors plain `split("\n")` (a spurious trailing empty element for a final
+// `\n`), unlike Rust's `str::lines()` — harmless here since an empty line
+// never parses as a header.
+fn contains_section(contents: str, section: str) -> bool {
+    for (let line : contents.lines()) {
+        if (parse_test_section_header(line) == some(section)) {
+            return true;
+        };
+    }
+    false
+}
+
+pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
+    if (contains_section(contents, section)) {
+        fill_section(contents, section, body)
+    } else {
+        contents.trim_end_while(|c| c == '\n' || c == '\r') + "\n--- " + section + " ---\n" + body + "\n"
+    }
+}.doc("""
+Like `fill_section`, but appends `--- section ---\\n<body>\\n` (after dropping
+any trailing newlines) when `contents` doesn't already carry that section,
+instead of requiring it to exist.
+""").test({
+    // Section already present: same behavior as `fill_section`.
+    assert(fill_or_add_section("a\n--- foo ---\nold\n", "foo", "new")
+        == "a\n--- foo ---\nnew\n");
+    // Section missing: appended after stripping trailing newlines.
+    assert(fill_or_add_section("code\n", "stdout", "hi")
+        == "code\n--- stdout ---\nhi\n");
+    // Missing, with several trailing newlines to strip first.
+    assert(fill_or_add_section("code\n\n\n", "stdout", "hi")
+        == "code\n--- stdout ---\nhi\n");
+    // Missing, no trailing newline at all.
+    assert(fill_or_add_section("code", "stdout", "hi")
+        == "code\n--- stdout ---\nhi\n");
+    // Empty input, section missing.
+    assert(fill_or_add_section("", "stdout", "hi") == "\n--- stdout ---\nhi\n");
+})
+--- performance ---
+allocations: 34
+deallocations: 34
+reallocations: 6
+bytes allocated: 1392
+instructions executed: 3083
+binary size: 12608

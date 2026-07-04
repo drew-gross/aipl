@@ -1497,43 +1497,23 @@ fn fill_performance(path: &Path, stats: &PerfStats) {
 /// Replace the body of the `--- <section> ---` block in the case file with
 /// `body` (dropping the old body up to the next header or EOF). The section
 /// must already exist in the file; to add a missing section use
-/// [`fill_or_add_section`].
+/// [`fill_or_add_section`]. The transform itself is the dogfooded AIPL
+/// `fill_section`, run from checked-in IR (see [`aipl::codegen::fill_section`]).
 fn fill_section(path: &Path, section: &str, body: &str) {
     let contents = fs::read_to_string(path).expect("read case for fill");
-    let mut out = String::new();
-    let mut lines = contents.lines().peekable();
-    while let Some(line) = lines.next() {
-        out.push_str(line);
-        out.push('\n');
-        if aipl::parse_test_section_header(line).as_deref() == Some(section) {
-            out.push_str(body);
-            out.push('\n');
-            while let Some(next) = lines.peek() {
-                if aipl::parse_test_section_header(next).is_some() {
-                    break;
-                }
-                lines.next();
-            }
-        }
-    }
+    let out = aipl::codegen::fill_section(&contents, section, body);
     fs::write(path, out).expect("rewrite case file with filled section");
 }
 
 /// Like [`fill_section`], but appends `--- <section> ---\n<body>\n` when the
 /// section doesn't already exist in the file. Used for `stdout`, which many
-/// cases omit (they rely on the default-empty behavior).
+/// cases omit (they rely on the default-empty behavior). The dogfooded AIPL
+/// `fill_or_add_section`, run from checked-in IR (see
+/// [`aipl::codegen::fill_or_add_section`]).
 fn fill_or_add_section(path: &Path, section: &str, body: &str) {
     let contents = fs::read_to_string(path).expect("read case for fill");
-    if contents
-        .lines()
-        .any(|l| aipl::parse_test_section_header(l).as_deref() == Some(section))
-    {
-        fill_section(path, section, body);
-    } else {
-        let trimmed = strip_trailing_newlines(contents);
-        let new_contents = format!("{trimmed}\n--- {section} ---\n{body}\n");
-        fs::write(path, new_contents).expect("rewrite case file adding section");
-    }
+    let out = aipl::codegen::fill_or_add_section(&contents, section, body);
+    fs::write(path, out).expect("rewrite case file adding section");
 }
 
 fn normalize_output(s: &str) -> String {
