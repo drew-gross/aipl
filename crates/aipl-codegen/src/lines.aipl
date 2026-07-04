@@ -1,0 +1,27 @@
+import { ==, split } from builtins;
+
+pub fn lines(self: str) -> str[] {
+    self.split("\n")
+}.doc("""
+Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing
+`\n` yields a final empty element (not Rust's `str::lines()` semantics, which
+would drop it), and an empty `self` yields a single empty element.
+""").test({
+    assert(lines("a\nb\nc") == ["a", "b", "c"]);
+    assert(lines("solo") == ["solo"]);
+    assert(lines("") == [""]);
+    // Trailing newline produces a trailing empty line.
+    assert(lines("a\nb\n") == ["a", "b", ""]);
+    // Every line blank.
+    assert(lines("\n\n") == ["", "", ""]);
+    // Long (heap) lines exercise the view/concat paths.
+    assert(lines("first long line\nsecond long line")
+        == ["first long line", "second long line"]);
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 656
+instructions executed: 730
+binary size: 7192

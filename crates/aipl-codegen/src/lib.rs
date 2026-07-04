@@ -2431,11 +2431,12 @@ pub fn build_test_program(program: &Program) -> Program {
 /// installed by [`install_parser_hooks`]) to process `"""..."""` raw strings —
 /// trim the surrounding line breaks and de-dent. The FFI is exercised on real
 /// raw-string source, not just in tests. `process_raw_string` imports the
-/// dogfooded `dedent` (which imports `count_while`); all three are supplied as
-/// in-memory modules.
+/// dogfooded `dedent` (which imports `count_while` and `lines`); all four are
+/// supplied as in-memory modules.
 const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
 const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
 const RAW_STRING_COUNT_WHILE_SRC: &str = include_str!("count_while.aipl");
+const RAW_STRING_LINES_SRC: &str = include_str!("lines.aipl");
 // `trim_while` is no longer imported by `process_raw_string` (the no-trailing-
 // whitespace invariant made it unnecessary), but it's kept as a dogfooded helper
 // and still supplied to the engine so it loads alongside the others.
@@ -2691,6 +2692,7 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
                 ("./process_raw_string.aipl", RAW_STRING_SRC),
                 ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
                 ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
+                ("./lines.aipl", RAW_STRING_LINES_SRC),
                 ("./trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
                 ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
                 ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),

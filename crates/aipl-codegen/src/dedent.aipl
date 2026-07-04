@@ -1,15 +1,16 @@
-import { ==, !, split, is_all_whitespace, minimum, value_or, map, join, filter } from builtins;
+import { ==, !, is_all_whitespace, minimum, value_or, map, join, filter } from builtins;
 import { count_while } from "./count_while.aipl";
+import { lines } from "./lines.aipl";
 
 pub fn dedent(self: str) -> str {
-    let lines = self.split("\n");
+    let ls = self.lines();
     // The common indent `n` is the smallest leading-space run over the non-blank
     // lines: count each non-blank line's leading spaces, then take the minimum.
     // With no non-blank lines there's nothing to strip, so `value_or(0)`.
-    let n = lines.filter(|l| !l.is_all_whitespace()).map(|l| l.count_while(|c| c == ' ')).minimum().value_or(0);
+    let n = ls.filter(|l| !l.is_all_whitespace()).map(|l| l.count_while(|c| c == ' ')).minimum().value_or(0);
     // Rebuild: strip the first `n` bytes from each non-blank line (blank lines
     // become empty), rejoined with `\n` so the original line count is preserved.
-    lines.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
+    ls.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
 }.doc("""
 Strips the common leading-space indentation shared by every non-blank line — the
 de-denting the parser applies to raw-string contents. Blank lines (empty or
@@ -40,12 +41,12 @@ original line count is preserved.
         == "first long line\nsecond long line");
 })
 --- performance ---
-allocations: 42
-deallocations: 42
+allocations: 56
+deallocations: 56
 reallocations: 0
-bytes allocated: 2025
-instructions executed: 5613
-binary size: 15736
+bytes allocated: 2681
+instructions executed: 6402
+binary size: 21984
 --- monomorphizations ---
 __m1__count_while$char$lam11
 __m1__count_while$char$s0$lam17
@@ -56,6 +57,7 @@ __m1__count_while$i64$lam5
 __m1__count_while$i64$lam7
 __m1__count_while$i64$lam9
 __m1__count_while$str$lam13
+__m2__lines
 __map19$own0
 dedent
 main
