@@ -546,10 +546,14 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 mono.queue.len()
             ),
         );
-        let mut out = mono.process(&inst.mangled, &params, &effects, &return_ty, &body)?;
-        for &i in &owned_params {
-            out.params[i].owned = true;
-        }
+        let mut out = mono.process(
+            &inst.mangled,
+            &params,
+            &effects,
+            &return_ty,
+            &body,
+            &owned_params,
+        )?;
         out.concat_params = inst.specs.indices(|p| p.concat);
         out_fns.push(out);
     }
@@ -831,19 +835,6 @@ pub struct ConcreteParam {
     pub owned: bool,
 }
 
-impl From<Param> for ConcreteParam {
-    fn from(p: Param) -> Self {
-        ConcreteParam {
-            name: p.name,
-            ty: p.ty,
-            mutable: p.mutable,
-            // Never known until a call site pins it — see the driver loop in
-            // `monomorphize`, which sets this after building the base params.
-            owned: false,
-        }
-    }
-}
-
 /// A concrete (non-generic) function *registered* with the monomorphizer but
 /// not yet specialized to a particular call site: its parameters may still be
 /// declared `variadic` (unresolved until a call's argument shapes are known —
@@ -997,6 +988,7 @@ impl Mono<'_> {
         effects: &[String],
         return_ty: &Option<Type>,
         body: &Expr,
+        owned_params: &[usize],
     ) -> Result<ConcreteFn, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
@@ -1012,9 +1004,16 @@ impl Mono<'_> {
             name: name.to_string(),
             // By now `specialize_variadic` has already resolved every
             // parameter's shape, so `variadic` is always false — dropped here.
-            // `owned` defaults to false too; the driver sets it per-parameter
-            // from the instance's ownership decision once this returns.
-            params: params.iter().cloned().map(ConcreteParam::from).collect(),
+            params: params
+                .iter()
+                .enumerate()
+                .map(|(i, p)| ConcreteParam {
+                    name: p.name.clone(),
+                    ty: p.ty.clone(),
+                    mutable: p.mutable,
+                    owned: owned_params.contains(&i),
+                })
+                .collect(),
             effects: effects.to_vec(),
             return_ty: return_ty.clone(),
             body,
