@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use aipl_parser::parse;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
-    MatchArm, Param, Program, Signature, StructDecl, Type,
+    MatchArm, Param, Program, Signature, StructDecl, Type, TypeParam,
 };
 use aipl_syntax::{builtin_canonical, DebugOptions, Error, Span};
 
@@ -653,7 +653,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
     })
 }
 
-fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[String]) -> Type {
+fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam]) -> Type {
     match t {
         // Primitives, Unit, and the compiler pseudo-types carry no name to
         // resolve — pass through unchanged.
@@ -665,7 +665,7 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[String]) 
         Type::NoneLiteralArg => Type::NoneLiteralArg,
         Type::ConcatStr => Type::ConcatStr,
         Type::Named(s) => {
-            if is_builtin_type(s) || type_vars.iter().any(|v| v == s) {
+            if is_builtin_type(s) || type_vars.iter().any(|v| v.name == *s) {
                 // Builtin type (`Error`) or a local generic type variable →
                 // keep as-is.
                 Type::Named(s.clone())

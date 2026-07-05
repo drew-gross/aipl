@@ -187,6 +187,57 @@ pub mod ast {
         Builtins { span: Span },
     }
 
+    /// A constraint on a declared type variable, restricting which concrete
+    /// types it may be instantiated with. `any` (the default almost every
+    /// generic uses) accepts anything; `ord` narrows a variable to the
+    /// primitives usable with `<`/`>` — currently the integers and `char` —
+    /// so a signature like `minimum`/`maximum`'s can declare comparability
+    /// itself instead of a caller hand-checking element types by name.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Bound {
+        Any,
+        Ord,
+    }
+
+    impl Bound {
+        /// Parse a bound keyword from source text (the `any`/`ord` in
+        /// `<T: any>`/`<T: ord>`), or `None` if unrecognized.
+        pub fn from_name(name: &str) -> Option<Bound> {
+            match name {
+                "any" => Some(Bound::Any),
+                "ord" => Some(Bound::Ord),
+                _ => None,
+            }
+        }
+
+        /// Source spelling of this bound, for error messages.
+        pub fn name(&self) -> &'static str {
+            match self {
+                Bound::Any => "any",
+                Bound::Ord => "ord",
+            }
+        }
+
+        /// Does `ty` satisfy this bound? `Any` accepts everything; `Ord`
+        /// accepts only the primitives usable with `<`/`>` — integers and
+        /// `char`.
+        pub fn accepts(&self, ty: &Type) -> bool {
+            match self {
+                Bound::Any => true,
+                Bound::Ord => {
+                    matches!(ty, Type::Primitive(p) if p.is_int() || *p == Primitive::Char)
+                }
+            }
+        }
+    }
+
+    /// A declared generic type parameter: its name and bound (see [`Bound`]).
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct TypeParam {
+        pub name: String,
+        pub bound: Bound,
+    }
+
     /// A function's shape apart from its body and source-only concerns (name,
     /// visibility, `.test`/`.doc`): its declared type variables, value
     /// parameters, declared effects, and return type. Shared with aipl-mono,
@@ -197,9 +248,10 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Signature {
         /// Declared generic type parameters, e.g. `fn f<T: any>(...)` →
-        /// `["T"]`. These names act as type variables in `params`/`return_ty`
-        /// and are resolved by monomorphization.
-        pub type_vars: Vec<String>,
+        /// `[TypeParam { name: "T", bound: Any }]`. These names act as type
+        /// variables in `params`/`return_ty` and are resolved by
+        /// monomorphization.
+        pub type_vars: Vec<TypeParam>,
         pub params: Vec<Param>,
         /// Effects declared in the signature, e.g. `!prints`. Callers of this
         /// function must declare at least these effects themselves.
@@ -235,6 +287,13 @@ pub mod ast {
         /// anonymous `any` in a parameter.
         pub fn is_generic(&self) -> bool {
             !self.type_vars.is_empty() || self.params.iter().any(|p| ty_mentions_any(&p.ty))
+        }
+
+        /// Just the declared type variables' names, discarding their bounds —
+        /// for callers that only need to recognize which `Type::Named` values
+        /// are in-scope type parameters (substitution, name-validity checks).
+        pub fn type_var_names(&self) -> Vec<String> {
+            self.type_vars.iter().map(|tp| tp.name.clone()).collect()
         }
     }
 
@@ -927,7 +986,9 @@ pub fn is_error(t: &Type) -> bool {
 /// type so it type-checks like any function — it is never compiled
 /// (monomorphization and codegen lower the real implementations).
 ///
-/// Authoring notes: `<T: any>` is the only valid generic bound; effects precede
+/// Authoring notes: `<T: any>` (unconstrained) and `<T: ord>` (comparable
+/// scalars — integers and `char`, see [`ast::Bound`]) are the only valid
+/// generic bounds; effects precede
 /// the return type (`!read_files -> str!Error`); a `mut self` first parameter
 /// marks a mutating method. First parameters are named `self` so the
 /// receiver-style builtins are method-callable (`xs.map(..)`, `opt.value_or(..)`).
@@ -960,9 +1021,11 @@ fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
 fn __builtin_min(self: i64, other: i64) -> i64 { self }
 fn __builtin_max(self: i64, other: i64) -> i64 { self }
 // Smallest / largest element of an array, or `none` if empty (codegen folds
-// over the elements). Elements must be comparable (integer or char).
-fn __builtin_minimum<T: any>(self: T[]) -> T? { none }
-fn __builtin_maximum<T: any>(self: T[]) -> T? { none }
+// over the elements). `ord` restricts `T` to comparable elements (integer or
+// char), enforced generically by the checker's bound-checking, not a special
+// case for these two names.
+fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
+fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_len<T: any>(self: T[]) -> i64 { 0 }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
 

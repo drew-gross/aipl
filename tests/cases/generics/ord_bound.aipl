@@ -1,0 +1,23 @@
+import { == } from builtins;
+
+// A generic bound `<T: ord>` restricts `T` to comparable scalars — currently
+// integers and char, the same primitives usable with `<`/`>`. Declaring it in
+// the signature lets the checker enforce comparability generically (any
+// concrete `T` a call resolves to must satisfy the bound), instead of a
+// caller hand-checking element types by name the way `minimum`/`maximum`
+// used to.
+fn identity<T: ord>(x: T) -> T {
+    x
+}.test({
+    assert(identity(5) == 5);
+    assert(identity('a') == 'a');
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 32
+binary size: 1440
+--- monomorphizations ---
+main

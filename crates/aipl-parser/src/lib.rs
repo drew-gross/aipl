@@ -9,9 +9,9 @@ use gazelle_macros::gazelle;
 use aipl_syntax::{join_spans, Error, Span};
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item,
-    LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type,
-    VariantCase, VariantDecl,
+    Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource,
+    Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type,
+    TypeParam, VariantCase, VariantDecl,
 };
 
 gazelle! {
@@ -439,9 +439,9 @@ impl aipl::Types for Build {
     type FnAttr = ParsedAttr;
     type FnAttrList = Vec<ParsedAttr>;
     type FnAttrs = Vec<ParsedAttr>;
-    type TypeParams = Vec<String>;
-    type TypeParamList = Vec<String>;
-    type TypeParam = String;
+    type TypeParams = Vec<TypeParam>;
+    type TypeParamList = Vec<TypeParam>;
+    type TypeParam = TypeParam;
     type Block = Expr;
     type LoopBody = Expr;
     type Function = Function;
@@ -1029,7 +1029,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::TypeParams<Self>> for Build {
-    fn build(&mut self, node: aipl::TypeParams<Self>) -> Result<Vec<String>, Self::Error> {
+    fn build(&mut self, node: aipl::TypeParams<Self>) -> Result<Vec<TypeParam>, Self::Error> {
         Ok(match node {
             aipl::TypeParams::Present(list) => list,
             aipl::TypeParams::Empty => Vec::new(),
@@ -1038,7 +1038,7 @@ impl gazelle::Action<aipl::TypeParams<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::TypeParamList<Self>> for Build {
-    fn build(&mut self, node: aipl::TypeParamList<Self>) -> Result<Vec<String>, Self::Error> {
+    fn build(&mut self, node: aipl::TypeParamList<Self>) -> Result<Vec<TypeParam>, Self::Error> {
         Ok(match node {
             aipl::TypeParamList::First(p) => vec![p],
             aipl::TypeParamList::Rest(mut prev, p) => {
@@ -1050,11 +1050,18 @@ impl gazelle::Action<aipl::TypeParamList<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::TypeParam<Self>> for Build {
-    fn build(&mut self, node: aipl::TypeParam<Self>) -> Result<String, Self::Error> {
-        // `name : bound` — only the name matters; the bound (`any`) is the
-        // single supported constraint and is checked during monomorphization.
-        let aipl::TypeParam::TypeParam((name, _), (_bound, _)) = node;
-        Ok(name)
+    fn build(&mut self, node: aipl::TypeParam<Self>) -> Result<TypeParam, Self::Error> {
+        // `name : bound` — the bound names a constraint on `name` (`any`
+        // accepts everything; `ord` accepts comparable scalars), enforced
+        // when the type variable is later resolved by a call.
+        let aipl::TypeParam::TypeParam((name, _), (bound_name, bound_span)) = node;
+        let bound = Bound::from_name(&bound_name).ok_or_else(|| {
+            Error::at(
+                format!("unknown type parameter bound {bound_name:?}; expected \"any\" or \"ord\""),
+                bound_span,
+            )
+        })?;
+        Ok(TypeParam { name, bound })
     }
 }
 

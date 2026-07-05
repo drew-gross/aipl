@@ -1,0 +1,18 @@
+struct Point { x: i64, y: i64 }
+
+// `identity`'s `<T: ord>` only accepts comparable scalars (integers, char) —
+// a struct doesn't satisfy that bound.
+fn identity<T: ord>(x: T) -> T {
+    x
+}
+
+fn main() -> i64 {
+    identity(Point { x: 1, y: 2 });
+    0
+}
+--- errors ---
+error: fn "identity": type parameter "T" requires "ord", but was inferred as Point
+  --> input:10:5
+   |
+10 |     identity(Point { x: 1, y: 2 });
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^

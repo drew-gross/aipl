@@ -1,0 +1,9 @@
+// Only `any` and `ord` are valid generic bounds.
+fn f<T: whatever>(x: T) -> T { x }
+fn main() -> i64 { 0 }
+--- errors ---
+error: unknown type parameter bound "whatever"; expected "any" or "ord"
+ --> input:2:9
+  |
+2 | fn f<T: whatever>(x: T) -> T { x }
+  |         ^^^^^^^^

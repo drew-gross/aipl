@@ -1,8 +1,8 @@
 //! Integration tests for the parser.
 
 use aipl::ast::{
-    Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param, Primitive, Program,
-    StructDecl, Type,
+    Bound, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param, Primitive,
+    Program, StructDecl, Type, TypeParam,
 };
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
@@ -841,7 +841,13 @@ fn index_accepts_expression_subscript() {
 fn generic_type_params_parse() {
     let p = parse("fn value_or<T: any>(x: T?, d: T) -> T { d }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.sig.type_vars, vec!["T".to_string()]);
+    assert_eq!(
+        f.sig.type_vars,
+        vec![TypeParam {
+            name: "T".to_string(),
+            bound: Bound::Any
+        }]
+    );
     assert_eq!(
         f.sig.params[0].ty,
         Type::Optional(Box::new(Type::Named("T".into())))
@@ -851,11 +857,38 @@ fn generic_type_params_parse() {
 }
 
 #[test]
+fn ord_bound_parses() {
+    let p = parse("fn smallest<T: ord>(self: T[]) -> T? { none }").unwrap();
+    assert_eq!(
+        fn_item(&p, 0).sig.type_vars,
+        vec![TypeParam {
+            name: "T".to_string(),
+            bound: Bound::Ord
+        }]
+    );
+}
+
+#[test]
+fn unknown_type_param_bound_is_a_parse_error() {
+    let err = parse("fn f<T: whatever>(x: T) -> T { x }").unwrap_err();
+    assert!(err.message.contains("whatever"), "{}", err.message);
+}
+
+#[test]
 fn multiple_type_params_parse() {
     let p = parse("fn f<T: any, U: any>(a: T, b: U) -> i64 { 0 }").unwrap();
     assert_eq!(
         fn_item(&p, 0).sig.type_vars,
-        vec!["T".to_string(), "U".to_string()]
+        vec![
+            TypeParam {
+                name: "T".to_string(),
+                bound: Bound::Any
+            },
+            TypeParam {
+                name: "U".to_string(),
+                bound: Bound::Any
+            }
+        ]
     );
 }
 

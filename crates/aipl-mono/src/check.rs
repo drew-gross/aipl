@@ -237,8 +237,9 @@ impl Cx<'_> {
         // Signature types must be valid (type parameters count as valid names).
         // A function type is allowed as a *parameter* (a lambda) but not as a
         // return type — there's no first-class function value to hand back.
+        let type_var_names = f.sig.type_var_names();
         for p in &f.sig.params {
-            self.check_ty(&p.ty, &f.sig.type_vars, &f.name)?;
+            self.check_ty(&p.ty, &type_var_names, &f.name)?;
         }
         if let Some(rt) = &f.sig.return_ty {
             if matches!(rt, Type::Fn(_, _)) {
@@ -248,7 +249,7 @@ impl Cx<'_> {
                     tyname(rt)
                 )));
             }
-            self.check_ty(rt, &f.sig.type_vars, &f.name)?;
+            self.check_ty(rt, &type_var_names, &f.name)?;
         }
 
         // Generic bodies are checked abstractly: each type variable (a declared
@@ -262,13 +263,13 @@ impl Cx<'_> {
             env.insert(
                 p.name.clone(),
                 Binding {
-                    ty: subst_typevars(&p.ty, &f.sig.type_vars),
+                    ty: subst_typevars(&p.ty, &type_var_names),
                     mutable: p.mutable,
                 },
             );
         }
         // A `mut self` method and a `()`-returning fn check their body as unit.
-        let declared = subst_typevars(&f.sig.return_type(), &f.sig.type_vars);
+        let declared = subst_typevars(&f.sig.return_type(), &type_var_names);
         // Make the declared return type available to any `return value;` in the
         // body (functions are top-level, so this single slot can't nest).
         *self.current_ret.borrow_mut() = declared.clone();
@@ -1344,30 +1345,6 @@ impl Cx<'_> {
             // A non-str/array receiver: fall through to report the mismatch
             // against the generic `T[]` signature.
         }
-        // `arr.minimum()` / `arr.maximum()` — the smallest / largest element, or
-        // `none` if the array is empty (hence `T?`). Distinct from the two-arg
-        // scalar `min(a, b)` / `max(a, b)`. Elements must be comparable (integer
-        // or char).
-        if (name == "__builtin_minimum" || name == "__builtin_maximum") && args.len() == 1 {
-            let t = self.check_expr(&args[0], env, effects)?;
-            let Type::Array(elem) = &t else {
-                return Err(Error::at(
-                    format!("{:?} expects an array, got {}", display(name), tyname(&t)),
-                    args[0].span.clone(),
-                ));
-            };
-            if !matches!(elem.as_ref(), Type::Primitive(p) if p.is_int() || *p == Primitive::Char) {
-                return Err(Error::at(
-                    format!(
-                        "{:?} needs comparable (integer or char) elements, got {}",
-                        display(name),
-                        tyname(&t)
-                    ),
-                    args[0].span.clone(),
-                ));
-            }
-            return Ok(Type::Optional(elem.clone()));
-        }
         // A call *through* a function-typed binding (a lambda parameter or a
         // local bound to one): `f(x)`. Check arity and arguments against the
         // function type and yield its return type. No effect check — the Fn
@@ -1487,7 +1464,7 @@ impl Cx<'_> {
         // pinned here (codegen settles the concrete fit), so coercing against it
         // would be unsound. The result type is the substituted return type, with
         // any still-unresolved variable left permissive (`__unknown__`).
-        let vars: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
+        let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
         let params = sig.param_types();
         let return_ty = sig.return_type();
         let is_mutating = sig.is_mutating();
@@ -1519,6 +1496,25 @@ impl Cx<'_> {
             // this function-typed parameter — e.g. `U` in `map<T, U>(self: T[], f:
             // (T) -> U)`, learned from the lambda's body return type.
             collect_var_bindings(pty, &atys[i], &vars, &mut map);
+        }
+        // A bound-constrained type variable (e.g. `<T: ord>`) must resolve to a
+        // type that satisfies its bound — the unification above is purely
+        // structural and knows nothing about bounds.
+        for tp in &sig.type_vars {
+            if let Some(bound_ty) = map.get(&tp.name) {
+                if !tp.bound.accepts(bound_ty) {
+                    return Err(Error::at(
+                        format!(
+                            "fn {:?}: type parameter {:?} requires \"{}\", but was inferred as {}",
+                            display(name),
+                            tp.name,
+                            tp.bound.name(),
+                            tyname(bound_ty)
+                        ),
+                        span.clone(),
+                    ));
+                }
+            }
         }
         // A mutating method yields its (mutated) receiver; otherwise the
         // substituted return type.
@@ -1692,7 +1688,7 @@ impl Cx<'_> {
             // un-substituted signature).
             return Some((sig.param_types(), sig.return_type(), sig.effects.clone()));
         }
-        let vars: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
+        let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
         let param_types = sig.param_types();
         for (pty, ety) in param_types.iter().zip(expected_params) {

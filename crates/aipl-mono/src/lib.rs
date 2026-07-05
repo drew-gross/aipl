@@ -31,8 +31,9 @@ pub use check::check;
 
 use aipl_syntax::{
     ast::{
-        is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm,
-        Param, Pattern, Primitive, Program, Signature, StructDecl, Type, VariantCase, VariantDecl,
+        is_unit, Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam,
+        MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
+        VariantCase, VariantDecl,
     },
     concat_str_ty, empty_array_arg_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error,
     is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty, type_name,
@@ -486,7 +487,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 let map: HashMap<String, Type> = sig
                     .type_vars
                     .iter()
-                    .cloned()
+                    .map(|tp| tp.name.clone())
                     .zip(inst.specs.type_args.iter().cloned())
                     .collect();
                 let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
@@ -753,7 +754,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
     let map: HashMap<String, Type> = sig
         .type_vars
         .iter()
-        .cloned()
+        .map(|tp| tp.name.clone())
         .zip(type_args.iter().cloned())
         .collect();
     let params = sig
@@ -1170,7 +1171,7 @@ impl Mono<'_> {
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let Generic { sig, body } = self.generics[gname].clone();
-        let var_set: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
+        let var_set: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
         // A lambda carries no type, so the type variables must be pinned by the
         // other (non-function) parameters' arguments.
         let mut map: HashMap<String, Type> = HashMap::new();
@@ -1189,13 +1190,13 @@ impl Mono<'_> {
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
         }
         let mut type_args = Vec::with_capacity(sig.type_vars.len());
-        for v in &sig.type_vars {
-            let t = map.get(v).cloned().ok_or_else(|| {
+        for tp in &sig.type_vars {
+            let t = map.get(&tp.name).cloned().ok_or_else(|| {
                 Error::at(
                     format!(
                         "cannot infer a type for \"{}\" in generic \"{gname}\" — it appears only \
                          in a function-typed parameter, so it can't be pinned by a lambda argument",
-                        display_var(v)
+                        display_var(&tp.name)
                     ),
                     span.clone(),
                 )
@@ -2586,7 +2587,7 @@ impl Mono<'_> {
         let (type_vars, param_tys, return_ty) = {
             let Generic { sig, .. } = &self.generics[gname];
             (
-                sig.type_vars.clone(),
+                sig.type_var_names(),
                 sig.params.iter().map(|p| p.ty.clone()).collect::<Vec<_>>(),
                 sig.return_ty.clone(),
             )
@@ -3236,7 +3237,7 @@ impl Mono<'_> {
                         let tmap: HashMap<String, Type> = sig
                             .type_vars
                             .iter()
-                            .cloned()
+                            .map(|tp| tp.name.clone())
                             .zip(type_args.iter().cloned())
                             .collect();
                         sig.params
@@ -3560,16 +3561,16 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     let sig = builtin_sigs().get(name)?;
     let mut map: HashMap<String, Type> = HashMap::new();
-    for v in &sig.type_vars {
+    for tp in &sig.type_vars {
         // Prefer the first parameter whose argument concretely pins `v`;
         // a `__none__` binding (an empty-array/bare-`none` argument, e.g.
         // `value_or`'s uninformative `self` side) only wins if nothing else
         // does, so a later, more informative parameter still takes over.
         let mut none_ish: Option<Type> = None;
         for (p, aty) in sig.params.iter().zip(arg_tys) {
-            match bind_builtin_var(&p.ty, aty, v) {
+            match bind_builtin_var(&p.ty, aty, &tp.name) {
                 Some(t) if !is_none_inner(&t) => {
-                    map.insert(v.clone(), t);
+                    map.insert(tp.name.clone(), t);
                     break;
                 }
                 Some(t) => {
@@ -3578,7 +3579,7 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                 None => {}
             }
         }
-        map.entry(v.clone())
+        map.entry(tp.name.clone())
             .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
     }
     Some(match &sig.return_ty {
@@ -3751,29 +3752,32 @@ fn is_generic(f: &Function) -> bool {
 /// variables (declared names, then one synthetic per anonymous `any[]`/`any?`
 /// parameter) and rewrite anonymous `any` to those synthetic names.
 fn normalize(f: &Function) -> Result<Generic, Error> {
-    let mut type_vars: Vec<String> = Vec::new();
+    // Names only, in declaration order plus one appended per anonymous
+    // `any[]`/`any?`; bounds are reattached from `f.sig.type_vars` at the end
+    // (a synthetic name has none of its own — it's always `any`).
+    let mut var_names: Vec<String> = Vec::new();
     let mut declared: HashSet<String> = HashSet::new();
     for tp in &f.sig.type_vars {
-        if RESERVED_TYPE_NAMES.contains(&tp.as_str()) {
+        if RESERVED_TYPE_NAMES.contains(&tp.name.as_str()) {
             return Err(Error::msg(format!(
-                "fn \"{}\": \"{tp}\" is not a valid type parameter name (reserved)",
-                f.name
+                "fn \"{}\": \"{}\" is not a valid type parameter name (reserved)",
+                f.name, tp.name
             )));
         }
-        if !declared.insert(tp.clone()) {
+        if !declared.insert(tp.name.clone()) {
             return Err(Error::msg(format!(
-                "fn \"{}\": duplicate type parameter \"{tp}\"",
-                f.name
+                "fn \"{}\": duplicate type parameter \"{}\"",
+                f.name, tp.name
             )));
         }
-        type_vars.push(tp.clone());
+        var_names.push(tp.name.clone());
     }
 
     // Normalize parameter types: anonymous `any` → a fresh synthetic variable.
     let mut counter = 0usize;
     let mut params = Vec::with_capacity(f.sig.params.len());
     for p in &f.sig.params {
-        let ty = normalize_param_ty(&p.ty, &mut type_vars, &mut counter, &f.name)?;
+        let ty = normalize_param_ty(&p.ty, &mut var_names, &mut counter, &f.name)?;
         params.push(Param {
             name: p.name.clone(),
             ty,
@@ -3798,13 +3802,27 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
     // Every declared type parameter must appear in a parameter, or it could
     // never be inferred from a call.
     for tp in &f.sig.type_vars {
-        if !params.iter().any(|p| ty_mentions(&p.ty, tp)) {
+        if !params.iter().any(|p| ty_mentions(&p.ty, &tp.name)) {
             return Err(Error::msg(format!(
-                "fn \"{}\": type parameter \"{tp}\" is not used by any parameter, so it can't be inferred",
-                f.name
+                "fn \"{}\": type parameter \"{}\" is not used by any parameter, so it can't be inferred",
+                f.name, tp.name
             )));
         }
     }
+
+    let type_vars = var_names
+        .into_iter()
+        .map(|name| {
+            let bound = f
+                .sig
+                .type_vars
+                .iter()
+                .find(|tp| tp.name == name)
+                .map(|tp| tp.bound)
+                .unwrap_or(Bound::Any);
+            TypeParam { name, bound }
+        })
+        .collect();
 
     Ok(Generic {
         sig: Signature {
