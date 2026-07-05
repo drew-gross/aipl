@@ -2882,7 +2882,12 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
         DogfoodEngine {
             clif_file: "assert_loc.clif",
             entries: &["assert_loc"],
-            sources: &[("./assert_loc.aipl", ASSERT_LOC_SRC)],
+            // Bundles `lines` (imported) so the newline count is an in-engine
+            // AIPL call rather than an FFI crossing.
+            sources: &[
+                ("./assert_loc.aipl", ASSERT_LOC_SRC),
+                ("./lines.aipl", RAW_STRING_LINES_SRC),
+            ],
         },
         // `line_at` is still verified standalone even though it's now bundled
         // inside the `caret_block` engine — the standalone CLIF check stays as

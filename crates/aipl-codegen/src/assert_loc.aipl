@@ -5,18 +5,13 @@
 // half-open byte range within `src`; both bounds clamp to `[0, len]` (and an
 // out-of-order range collapses to "") via ordinary string-slicing semantics, so
 // no manual clamping is needed here.
-import { wrapping_add as +, ==, trim } from builtins;
+import { ==, len, trim } from builtins;
+import { lines } from "./lines.aipl";
 
 struct Span { start: i64, end: i64 }
 
 pub fn assert_loc(src: str, span: Span) -> str {
-    mut n = 0;
-    for (let c : src[..span.start]) {
-        if (c == '\n') {
-            set n = n + 1;
-        };
-    }
-    let line = n + 1;
+    let line = src[..span.start].lines().len();
     let text = src[span.start..span.end].trim();
     `input:{line}: {text}`
 }.test({
@@ -31,3 +26,10 @@ pub fn assert_loc(src: str, span: Span) -> str {
     // An empty source with a zero-width span at 0.
     assert(assert_loc("", Span { start: 0, end: 0 }) == "input:1: ");
 })
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 543
+instructions executed: 518
+binary size: 6832
