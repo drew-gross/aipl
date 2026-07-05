@@ -207,6 +207,19 @@ pub mod ast {
         pub return_ty: Option<Type>,
     }
 
+    impl Signature {
+        /// Each parameter's declared type, discarding name/mutability/variadic.
+        pub fn param_types(&self) -> Vec<Type> {
+            self.params.iter().map(|p| p.ty.clone()).collect()
+        }
+
+        /// The declared return type, defaulting to `Unit` — a function with no
+        /// `-> T` returns unit.
+        pub fn return_type(&self) -> Type {
+            self.return_ty.clone().unwrap_or(Type::Unit)
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Function {
         pub name: String,

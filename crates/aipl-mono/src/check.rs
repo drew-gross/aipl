@@ -21,7 +21,8 @@
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program, Type,
+    Expr, ExprKind, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program, Signature,
+    Type,
 };
 use aipl_syntax::{
     is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, none_inner_ty,
@@ -73,19 +74,11 @@ pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
 const KNOWN_EFFECTS: &[&str] = &["prints", "read_files", "write_files"];
 
 struct FnSig {
-    params: Vec<Type>,
-    /// Per-parameter variadic (`T*`) flag, parallel to `params`. A variadic
-    /// parameter's `params` entry is its *sequence type* (`str` or `T[]`); at a
-    /// call site it also accepts a single element or an optional of the element
-    /// type (see the call-checking path).
-    variadic: Vec<bool>,
-    return_ty: Type,
-    effects: Vec<String>,
+    sig: Signature,
     is_mutating: bool,
     /// First parameter is named `self`, so it's callable as `recv.f(..)`.
     is_method: bool,
     is_generic: bool,
-    type_params: Vec<String>,
 }
 
 /// A bound name's type and whether it's reassignable (`let mut` / `mut self`).
@@ -168,14 +161,10 @@ pub fn check(program: &Program) -> Result<(), Error> {
                 sigs.insert(
                     f.name.clone(),
                     FnSig {
-                        params: f.sig.params.iter().map(|p| p.ty.clone()).collect(),
-                        variadic: f.sig.params.iter().map(|p| p.variadic).collect(),
-                        return_ty: f.sig.return_ty.clone().unwrap_or(Type::Unit),
-                        effects: f.sig.effects.clone(),
+                        sig: f.sig.clone(),
                         is_mutating: f.sig.params.first().is_some_and(|p| p.mutable),
                         is_method: f.sig.params.first().is_some_and(|p| p.name == "self"),
                         is_generic: is_generic(f),
-                        type_params: f.sig.type_vars.clone(),
                     },
                 );
             }
@@ -317,10 +306,7 @@ impl Cx<'_> {
             );
         }
         // A `mut self` method and a `()`-returning fn check their body as unit.
-        let declared = subst_typevars(
-            &f.sig.return_ty.clone().unwrap_or(Type::Unit),
-            &f.sig.type_vars,
-        );
+        let declared = subst_typevars(&f.sig.return_type(), &f.sig.type_vars);
         // Make the declared return type available to any `return value;` in the
         // body (functions are top-level, so this single slot can't nest).
         *self.current_ret.borrow_mut() = declared.clone();
@@ -735,7 +721,7 @@ impl Cx<'_> {
     fn callee_effects(&self, name: &str) -> Vec<String> {
         self.sigs
             .get(name)
-            .map(|s| s.effects.clone())
+            .map(|s| s.sig.effects.clone())
             .unwrap_or_default()
     }
 
@@ -1473,12 +1459,12 @@ impl Cx<'_> {
             }
             return Err(Error::at(msg, span.clone()));
         };
-        if sig.params.len() != args.len() {
+        if sig.sig.params.len() != args.len() {
             return Err(Error::at(
                 format!(
                     "fn {:?} expects {} arg(s), got {}",
                     display(name),
-                    sig.params.len(),
+                    sig.sig.params.len(),
                     args.len()
                 ),
                 span.clone(),
@@ -1488,11 +1474,11 @@ impl Cx<'_> {
         if !sig.is_generic {
             // Concrete signature: check each argument against its declared
             // parameter type (pushing the expected type into a lambda/fn-ref).
-            let params = sig.params.clone();
-            let variadic = sig.variadic.clone();
+            let params = sig.sig.params.clone();
             let mut atys = Vec::with_capacity(args.len());
-            for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
-                if variadic[i] {
+            for (i, (arg, p)) in args.iter().zip(&params).enumerate() {
+                let pty = &p.ty;
+                if p.variadic {
                     // A variadic `T*` parameter accepts its sequence type, a
                     // single element, or an optional element — codegen
                     // normalizes whichever form to the sequence. Synthesize the
@@ -1535,9 +1521,9 @@ impl Cx<'_> {
         // pinned here (codegen settles the concrete fit), so coercing against it
         // would be unsound. The result type is the substituted return type, with
         // any still-unresolved variable left permissive (`__unknown__`).
-        let vars: HashSet<&str> = sig.type_params.iter().map(String::as_str).collect();
-        let params = sig.params.clone();
-        let return_ty = sig.return_ty.clone();
+        let vars: HashSet<&str> = sig.sig.type_vars.iter().map(String::as_str).collect();
+        let params = sig.sig.param_types();
+        let return_ty = sig.sig.return_type();
         let is_mutating = sig.is_mutating;
         let mut map: HashMap<String, Type> = HashMap::new();
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
@@ -1735,27 +1721,27 @@ impl Cx<'_> {
         expected_params: &[Type],
     ) -> Option<(Vec<Type>, Type, Vec<String>)> {
         let sig = self.sigs.get(name)?;
-        if !sig.is_generic || sig.params.len() != expected_params.len() {
+        if !sig.is_generic || sig.sig.params.len() != expected_params.len() {
             // Concrete (or an arity mismatch the caller will report against the
             // un-substituted signature).
             return Some((
-                sig.params.clone(),
-                sig.return_ty.clone(),
-                sig.effects.clone(),
+                sig.sig.param_types(),
+                sig.sig.return_type(),
+                sig.sig.effects.clone(),
             ));
         }
-        let vars: HashSet<&str> = sig.type_params.iter().map(String::as_str).collect();
+        let vars: HashSet<&str> = sig.sig.type_vars.iter().map(String::as_str).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
-        for (pty, ety) in sig.params.iter().zip(expected_params) {
+        let param_types = sig.sig.param_types();
+        for (pty, ety) in param_types.iter().zip(expected_params) {
             collect_var_bindings(pty, ety, &vars, &mut map);
         }
-        let params = sig
-            .params
+        let params = param_types
             .iter()
             .map(|p| subst_vars(p, &map, &vars))
             .collect();
-        let ret = subst_vars(&sig.return_ty, &map, &vars);
-        Some((params, ret, sig.effects.clone()))
+        let ret = subst_vars(&sig.sig.return_type(), &map, &vars);
+        Some((params, ret, sig.sig.effects.clone()))
     }
 
     /// Validate that the function named `name` can be passed where a
@@ -1841,7 +1827,7 @@ impl Cx<'_> {
                 .cloned()
                 .unwrap_or(Type::Primitive(Primitive::I64));
         }
-        sig.return_ty.clone()
+        sig.sig.return_type()
     }
 
     /// Flexibly retype a bare integer literal `e` (currently `ety`) to a target

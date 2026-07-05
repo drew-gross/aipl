@@ -4958,8 +4958,8 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
-        let params: Vec<Type> = f.sig.params.iter().map(|p| p.ty.clone()).collect();
-        let return_ty = f.sig.return_ty.clone().unwrap_or(Type::Unit);
+        let params: Vec<Type> = f.sig.param_types();
+        let return_ty = f.sig.return_type();
         let effects: Vec<&str> = f.sig.effects.iter().map(String::as_str).collect();
         reg(funcs, name, sym, params, return_ty, &effects);
     }
