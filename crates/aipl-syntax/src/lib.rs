@@ -218,6 +218,42 @@ pub mod ast {
         pub fn return_type(&self) -> Type {
             self.return_ty.clone().unwrap_or(Type::Unit)
         }
+
+        /// `true` for a mutating method (`fn f(mut self: T, ...)`): it returns
+        /// nothing to the user, mutates its receiver, and must be called as
+        /// `v.f(...)`.
+        pub fn is_mutating(&self) -> bool {
+            self.params.first().is_some_and(|p| p.mutable)
+        }
+
+        /// First parameter is named `self`, so it's callable as `recv.f(..)`.
+        pub fn is_method(&self) -> bool {
+            self.params.first().is_some_and(|p| p.name == "self")
+        }
+
+        /// A function is generic if it declares type parameters or uses
+        /// anonymous `any` in a parameter.
+        pub fn is_generic(&self) -> bool {
+            !self.type_vars.is_empty() || self.params.iter().any(|p| ty_mentions_any(&p.ty))
+        }
+    }
+
+    fn ty_mentions_any(t: &Type) -> bool {
+        match t {
+            Type::Unit
+            | Type::Primitive(_)
+            | Type::Named(_)
+            | Type::NoneInner
+            | Type::EmptyArrayArg
+            | Type::NoneLiteralArg
+            | Type::ConcatStr => false,
+            Type::Any => true,
+            Type::Array(inner) | Type::Optional(inner) | Type::Set(inner) => ty_mentions_any(inner),
+            Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
+            Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
+            Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
+            Type::Tuple(elems) => elems.iter().any(ty_mentions_any),
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]

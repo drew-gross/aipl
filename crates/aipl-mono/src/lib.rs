@@ -349,7 +349,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             }
             Item::Import(_) => passthrough.push(item.clone()),
             Item::Fn(f) => {
-                if f.sig.params.first().is_some_and(|p| p.mutable) {
+                if f.sig.is_mutating() {
                     mutating.insert(f.name.clone());
                 }
                 if is_generic(f) {
@@ -4472,7 +4472,7 @@ fn is_inline_candidate(
         && f.sig.type_vars.is_empty()
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
-            f.sig.params.first().is_some_and(|p| p.mutable),
+            f.sig.is_mutating(),
             &f.body,
             &f.name,
         )

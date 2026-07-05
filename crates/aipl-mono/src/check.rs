@@ -73,14 +73,6 @@ pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
 /// reads from the filesystem; `write_files` = writes to the filesystem.
 const KNOWN_EFFECTS: &[&str] = &["prints", "read_files", "write_files"];
 
-struct FnSig {
-    sig: Signature,
-    is_mutating: bool,
-    /// First parameter is named `self`, so it's callable as `recv.f(..)`.
-    is_method: bool,
-    is_generic: bool,
-}
-
 /// A bound name's type and whether it's reassignable (`let mut` / `mut self`).
 #[derive(Clone)]
 struct Binding {
@@ -99,7 +91,7 @@ struct Cx<'a> {
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     /// Constructor name → the variant it belongs to (for typing `Ctor(..)`).
     ctors: &'a HashMap<String, String>,
-    sigs: &'a HashMap<String, FnSig>,
+    sigs: &'a HashMap<String, Signature>,
     /// The declared return type of the function currently being checked (with
     /// type-vars substituted), so a `return value;` can be checked against it.
     /// Functions are top-level (never nested), so a single slot suffices.
@@ -128,7 +120,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
     let mut ctors: HashMap<String, String> = HashMap::new();
-    let mut sigs: HashMap<String, FnSig> = HashMap::new();
+    let mut sigs: HashMap<String, Signature> = HashMap::new();
     for item in &program.items {
         match item {
             Item::Struct(s) => {
@@ -158,15 +150,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
                 );
             }
             Item::Fn(f) => {
-                sigs.insert(
-                    f.name.clone(),
-                    FnSig {
-                        sig: f.sig.clone(),
-                        is_mutating: f.sig.params.first().is_some_and(|p| p.mutable),
-                        is_method: f.sig.params.first().is_some_and(|p| p.name == "self"),
-                        is_generic: is_generic(f),
-                    },
-                );
+                sigs.insert(f.name.clone(), f.sig.clone());
             }
             Item::Import(_) => {}
         }
@@ -205,28 +189,6 @@ pub fn check(program: &Program) -> Result<(), Error> {
     Ok(())
 }
 
-fn is_generic(f: &Function) -> bool {
-    !f.sig.type_vars.is_empty() || f.sig.params.iter().any(|p| ty_mentions_any(&p.ty))
-}
-
-fn ty_mentions_any(t: &Type) -> bool {
-    match t {
-        Type::Unit
-        | Type::Primitive(_)
-        | Type::Named(_)
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => false,
-        Type::Any => true,
-        Type::Array(inner) | Type::Optional(inner) | Type::Set(inner) => ty_mentions_any(inner),
-        Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
-        Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
-        Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
-        Type::Tuple(elems) => elems.iter().any(ty_mentions_any),
-    }
-}
-
 /// During checking, these types stand in for an as-yet-unknown scalar: the
 /// `any` constraint, the bare-`none` inner marker, and an in-scope generic
 /// type parameter. They're permitted wherever a concrete scalar primitive is
@@ -256,7 +218,7 @@ impl Cx<'_> {
                 )));
             }
         }
-        if f.sig.params.first().is_some_and(|p| p.mutable) {
+        if f.sig.is_mutating() {
             let self_p = &f.sig.params[0];
             if self_p.name != "self" {
                 return Err(Error::msg(format!(
@@ -721,7 +683,7 @@ impl Cx<'_> {
     fn callee_effects(&self, name: &str) -> Vec<String> {
         self.sigs
             .get(name)
-            .map(|s| s.sig.effects.clone())
+            .map(|s| s.effects.clone())
             .unwrap_or_default()
     }
 
@@ -1213,7 +1175,11 @@ impl Cx<'_> {
                     // A mutating method (incl. the builtin `push`) needs a
                     // mutable variable receiver, since it writes the result
                     // back into it.
-                    if self.sigs.get(name.as_str()).is_some_and(|s| s.is_mutating) {
+                    if self
+                        .sigs
+                        .get(name.as_str())
+                        .is_some_and(|s| s.is_mutating())
+                    {
                         if let ExprKind::Ident(v) = &recv.kind {
                             if env.get(v).is_some_and(|b| !b.mutable) {
                                 return Err(Error::at(
@@ -1225,7 +1191,7 @@ impl Cx<'_> {
                     }
                     // A user function called as a method must declare a `self` receiver.
                     if let Some(s) = self.sigs.get(name.as_str()) {
-                        if !s.is_method {
+                        if !s.is_method() {
                             return Err(Error::at(
                                 format!(
                                     "fn {:?} cannot be called as a method (its first parameter must be named \"self\")",
@@ -1459,22 +1425,22 @@ impl Cx<'_> {
             }
             return Err(Error::at(msg, span.clone()));
         };
-        if sig.sig.params.len() != args.len() {
+        if sig.params.len() != args.len() {
             return Err(Error::at(
                 format!(
                     "fn {:?} expects {} arg(s), got {}",
                     display(name),
-                    sig.sig.params.len(),
+                    sig.params.len(),
                     args.len()
                 ),
                 span.clone(),
             ));
         }
 
-        if !sig.is_generic {
+        if !sig.is_generic() {
             // Concrete signature: check each argument against its declared
             // parameter type (pushing the expected type into a lambda/fn-ref).
-            let params = sig.sig.params.clone();
+            let params = sig.params.clone();
             let mut atys = Vec::with_capacity(args.len());
             for (i, (arg, p)) in args.iter().zip(&params).enumerate() {
                 let pty = &p.ty;
@@ -1521,10 +1487,10 @@ impl Cx<'_> {
         // pinned here (codegen settles the concrete fit), so coercing against it
         // would be unsound. The result type is the substituted return type, with
         // any still-unresolved variable left permissive (`__unknown__`).
-        let vars: HashSet<&str> = sig.sig.type_vars.iter().map(String::as_str).collect();
-        let params = sig.sig.param_types();
-        let return_ty = sig.sig.return_type();
-        let is_mutating = sig.is_mutating;
+        let vars: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
+        let params = sig.param_types();
+        let return_ty = sig.return_type();
+        let is_mutating = sig.is_mutating();
         let mut map: HashMap<String, Type> = HashMap::new();
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
@@ -1721,18 +1687,14 @@ impl Cx<'_> {
         expected_params: &[Type],
     ) -> Option<(Vec<Type>, Type, Vec<String>)> {
         let sig = self.sigs.get(name)?;
-        if !sig.is_generic || sig.sig.params.len() != expected_params.len() {
+        if !sig.is_generic() || sig.params.len() != expected_params.len() {
             // Concrete (or an arity mismatch the caller will report against the
             // un-substituted signature).
-            return Some((
-                sig.sig.param_types(),
-                sig.sig.return_type(),
-                sig.sig.effects.clone(),
-            ));
+            return Some((sig.param_types(), sig.return_type(), sig.effects.clone()));
         }
-        let vars: HashSet<&str> = sig.sig.type_vars.iter().map(String::as_str).collect();
+        let vars: HashSet<&str> = sig.type_vars.iter().map(String::as_str).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
-        let param_types = sig.sig.param_types();
+        let param_types = sig.param_types();
         for (pty, ety) in param_types.iter().zip(expected_params) {
             collect_var_bindings(pty, ety, &vars, &mut map);
         }
@@ -1740,8 +1702,8 @@ impl Cx<'_> {
             .iter()
             .map(|p| subst_vars(p, &map, &vars))
             .collect();
-        let ret = subst_vars(&sig.sig.return_type(), &map, &vars);
-        Some((params, ret, sig.sig.effects.clone()))
+        let ret = subst_vars(&sig.return_type(), &map, &vars);
+        Some((params, ret, sig.effects.clone()))
     }
 
     /// Validate that the function named `name` can be passed where a
@@ -1821,13 +1783,13 @@ impl Cx<'_> {
         let Some(sig) = self.sigs.get(name) else {
             return Type::Primitive(Primitive::I64);
         };
-        if sig.is_mutating {
+        if sig.is_mutating() {
             return atys
                 .first()
                 .cloned()
                 .unwrap_or(Type::Primitive(Primitive::I64));
         }
-        sig.sig.return_type()
+        sig.return_type()
     }
 
     /// Flexibly retype a bare integer literal `e` (currently `ety`) to a target
