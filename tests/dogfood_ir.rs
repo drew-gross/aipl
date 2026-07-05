@@ -295,7 +295,7 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                     ],
                 )
                 .unwrap();
-            assert_eq!(result, FfiValue::Str(String::new())); // "" means success
+            assert_eq!(result, FfiValue::Res(Ok(Box::new(FfiValue::Int(0)))));
             let written = std::fs::read_to_string(&path).expect("read back staged file");
             assert_eq!(written, "code\n--- stdout ---\nnew\n");
 
@@ -311,7 +311,12 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                     ],
                 )
                 .unwrap();
-            assert_eq!(err, FfiValue::Str("could not read file".to_string()));
+            assert_eq!(
+                err,
+                FfiValue::Res(Err(Box::new(FfiValue::Str(
+                    "could not read file".to_string()
+                ))))
+            );
 
             let _ = std::fs::remove_dir_all(&dir);
         }

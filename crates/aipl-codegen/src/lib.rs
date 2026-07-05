@@ -2300,20 +2300,26 @@ impl TypeDef {
 
 /// A value marshaled across the embedding FFI by [`Compilation::call_values`].
 /// Scalars (`i64`/`bool`/`char`) ride their shared `i64` ABI as `Int` (`bool` is
-/// `0`/`1`, `char` a codepoint); a `str` is `Str`; an optional `T?` over a scalar
-/// or `str` core is `Opt` (only as a *return* value so far — optionals can't be
-/// passed as arguments yet). A `struct` of scalar/`str` fields is `Struct`, also
-/// return-only. Other composites (arrays, sets, dicts, variants) aren't
-/// marshalable yet.
+/// `0`/`1`, `char` a codepoint; `Unit` also reads back as `Int(0)`); a `str` (or
+/// the builtin `Error`) is `Str`; an optional `T?` over a scalar or `str` core
+/// is `Opt`; a `Result` is `Res` (only as a *return* value so far — optionals
+/// and results can't be passed as arguments yet). A `struct` of scalar/`str`
+/// fields is `Struct`, also return-only. Other composites (arrays, sets, dicts,
+/// variants) aren't marshalable yet.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FfiValue {
     /// A scalar AIPL value at its `i64` ABI.
     Int(i64),
-    /// An AIPL `str`.
+    /// An AIPL `str` (or the builtin `Error`, which shares its representation).
     Str(String),
     /// An AIPL optional: `Opt(None)` is `none`; `Opt(Some(v))` is `some(v)`
     /// (nested for `T??`). The inner core is an `Int` or `Str`.
     Opt(Option<Box<FfiValue>>),
+    /// An AIPL `Result<ok, err>`: `Res(Ok(v))` for `ok(v)`, `Res(Err(e))` for
+    /// `err(e)`. Each side's payload is an `Int` (also standing in for a
+    /// `Unit` side, e.g. `!Error`'s ok case), `Str`, or `Struct` — whatever
+    /// [`check_ffi_return`] accepted for that side.
+    Res(Result<Box<FfiValue>, Box<FfiValue>>),
     /// An AIPL `struct`: its fields in declaration order, each a `(name, value)`.
     /// Returned through a hidden sret pointer (like an optional). Fields are
     /// scalars (`Int`) or `str` (`Str`) for now — see [`Compilation::call_values`].
@@ -2724,7 +2730,8 @@ thread_local! {
 /// `fill_or_add_section_file` via the FFI (itself doing the file I/O; nothing
 /// here touches `std::fs`). Not a parser hook — only the cases test harness
 /// calls this. Returns `Ok(())` on success or the builtin `Error`'s message on
-/// a read/write failure. No native fallback; panics if it can't be built or
+/// a read/write failure — the AIPL function returns `!Error` directly, marshaled
+/// through `FfiValue::Res`. No native fallback; panics if it can't be built or
 /// called.
 pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result<(), String> {
     FILL_OR_ADD_SECTION_FILE_ENGINE.with(|comp| {
@@ -2736,8 +2743,11 @@ pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result
                 FfiValue::Str(body.to_string()),
             ],
         ) {
-            Ok(FfiValue::Str(s)) if s.is_empty() => Ok(()),
-            Ok(FfiValue::Str(s)) => Err(s),
+            Ok(FfiValue::Res(Ok(_))) => Ok(()),
+            Ok(FfiValue::Res(Err(e))) => match *e {
+                FfiValue::Str(s) => Err(s),
+                other => panic!("dogfooded fill_or_add_section_file() err payload: {other:?}"),
+            },
             other => panic!("dogfooded fill_or_add_section_file() call: {other:?}"),
         }
     })
@@ -3224,55 +3234,74 @@ fn new_jit_module() -> Result<JITModule, Error> {
 }
 
 /// The dogfood-IR tag for an FFI-marshalable entry type. The FFI marshals
-/// scalars, `str`, optionals of those (a trailing `?` per `Optional` layer, e.g.
-/// `str?`), and structs (the bare type name, e.g. `Span`, whose layout is carried
-/// separately on a `; struct` manifest line). Anything else can't cross the FFI
-/// and is rejected here.
+/// scalars, `str`, `Unit` (the empty-payload side of a `Result`), optionals of
+/// those (a trailing `?` per `Optional` layer, e.g. `str?`), results of those
+/// (`{ok}!{err}`, e.g. `unit!Error`), and structs (the bare type name, e.g.
+/// `Span`, whose layout is carried separately on a `; struct` manifest line).
+/// Anything else can't cross the FFI and is rejected here.
 fn ffi_type_tag(t: &Type) -> Result<String, Error> {
     Ok(match t {
         Type::Primitive(Primitive::I64) => "i64".to_string(),
         Type::Primitive(Primitive::Bool) => "bool".to_string(),
         Type::Primitive(Primitive::Char) => "char".to_string(),
         Type::Primitive(Primitive::Str) => "str".to_string(),
+        Type::Unit => "unit".to_string(),
         Type::Optional(inner) => format!("{}?", ffi_type_tag(inner)?),
+        Type::Result(ok, err) => format!("{}!{}", ffi_type_tag(ok)?, ffi_type_tag(err)?),
         Type::Named(n) => n.clone(),
         _ => {
             return Err(Error::msg(format!(
                 "dogfood entry type {} is not FFI-serializable (only i64/bool/char/str, \
-                 optionals of those, and structs)",
+                 optionals/results of those, and structs)",
                 type_name(t)
             )))
         }
     })
 }
 
-/// Collect the distinct struct type names a type references (itself if `Named`,
-/// or the core of an `Optional`), appending any not already in `out`. Used to
-/// gather the struct layouts a set of dogfood entries needs serialized.
+/// Collect the distinct struct type names a type references (itself if
+/// `Named` and not the builtin `Error` — which is str-repr, not a struct —,
+/// or the core of an `Optional`/either side of a `Result`), appending any not
+/// already in `out`. Used to gather the struct layouts a set of dogfood
+/// entries needs serialized.
 fn collect_named_types(t: &Type, out: &mut Vec<String>) {
     match t {
-        Type::Named(n) => {
+        Type::Named(n) if !is_error(t) => {
             if !out.iter().any(|s| s == n) {
                 out.push(n.clone());
             }
         }
         Type::Optional(inner) => collect_named_types(inner, out),
+        Type::Result(ok, err) => {
+            collect_named_types(ok, out);
+            collect_named_types(err, out);
+        }
         _ => {}
     }
 }
 
 /// Inverse of [`ffi_type_tag`]: parse a manifest type tag back into a `Type`. A
-/// trailing `?` is an `Optional` layer over the rest; a non-keyword tag is a
-/// struct type name ([`Type::Named`]) whose layout the `; struct` lines supply.
+/// trailing `?` is an `Optional` layer over the rest; an unsuffixed tag
+/// containing `!` is a `Result` (`{ok}!{err}`, each side parsed the same way —
+/// `!` can't appear in a bare tag otherwise, since identifiers don't carry it);
+/// a non-keyword tag is a struct type name ([`Type::Named`]) whose layout the
+/// `; struct` lines supply.
 fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
     if let Some(base) = tag.strip_suffix('?') {
         return Ok(Type::Optional(Box::new(ffi_type_from_tag(base)?)));
+    }
+    if let Some((ok, err)) = tag.split_once('!') {
+        return Ok(Type::Result(
+            Box::new(ffi_type_from_tag(ok)?),
+            Box::new(ffi_type_from_tag(err)?),
+        ));
     }
     Ok(match tag {
         "i64" => Type::Primitive(Primitive::I64),
         "bool" => Type::Primitive(Primitive::Bool),
         "char" => Type::Primitive(Primitive::Char),
         "str" => Type::Primitive(Primitive::Str),
+        "unit" => Type::Unit,
         _ => Type::Named(tag.to_string()),
     })
 }
@@ -3831,6 +3860,9 @@ impl Compilation {
         // An optional `T?` (possibly nested) — scalar, `str`, or struct core — is
         // returned through a hidden sret pointer (see the sret path below).
         let ret_is_opt = matches!(info.return_ty, Type::Optional(_));
+        // A `Result<ok, err>` — each side a scalar/`str`/`Unit`/struct — is also
+        // sret-returned, same shape as an optional but tagged/sized differently.
+        let ret_is_result = matches!(info.return_ty, Type::Result(_, _));
         // A `struct` returned directly (not under an optional); read back field by
         // field from the sret buffer.
         let ret_struct = ffi_struct_layout(&info.return_ty, &self.structs);
@@ -3969,6 +4001,37 @@ impl Compilation {
             return Ok(result);
         }
 
+        if ret_is_result {
+            // Composite (result) return: same sret shape as an optional (a
+            // leading pointer, no register return), but the buffer is sized to
+            // the wider of the two sides and the tag means `1` = Ok / `0` = Err
+            // rather than a nesting depth.
+            let words = (elem_size_of(&info.return_ty, &self.structs) as usize)
+                .div_ceil(8)
+                .max(1);
+            let mut sret_buf = vec![0i64; words];
+            let mut sret_abi = Vec::with_capacity(1 + abi.len());
+            sret_abi.push(sret_buf.as_mut_ptr() as i64);
+            sret_abi.extend_from_slice(&abi);
+            if sret_abi.len() > 6 {
+                for (header, content_len) in to_free {
+                    unsafe { free_dynamic_string(header, content_len) };
+                }
+                return Err(Error::msg(format!(
+                    "fn {name:?} has too many parameters for a result return; the FFI \
+                     supports up to 5 (plus the hidden return pointer)"
+                )));
+            }
+            // SAFETY: as the optional path above.
+            let _ = unsafe { invoke(ptr, &sret_abi) };
+            let result =
+                unsafe { read_ffi_result(sret_buf.as_ptr(), &info.return_ty, &self.structs) };
+            for (header, content_len) in to_free {
+                unsafe { free_dynamic_string(header, content_len) };
+            }
+            return Ok(result);
+        }
+
         if let Some(layout) = ret_struct {
             // Composite (struct) return: like the optional path, the callee writes
             // the struct through a hidden leading sret pointer and returns nothing.
@@ -4053,20 +4116,28 @@ fn ffi_struct_layout<'a>(
 }
 
 /// Validate that `ty` can be marshaled back across the embedding FFI as a return
-/// value: a scalar, `str`, a `struct` whose fields are all scalar/`str`, or an
-/// optional (possibly nested) whose core is one of those. Errors name the
-/// offending type/field. (`call_values` then dispatches on the type's shape.)
+/// value: a scalar, `str`, `Unit`, a `struct` whose fields are all scalar/`str`,
+/// an optional (possibly nested) whose core is one of those, or a `Result`
+/// whose `ok`/`err` sides are each independently one of those (so `!Error`,
+/// i.e. `Result<Unit, Error>`, is fine: `Unit` on the ok side, `Error` — a
+/// `str`-repr type — on the err side). Errors name the offending type/field.
+/// (`call_values` then dispatches on the type's shape.)
 fn check_ffi_return(
     name: &str,
     ty: &Type,
     structs: &HashMap<String, TypeDef>,
 ) -> Result<(), Error> {
-    if is_ffi_scalar(ty) || is_str_repr(ty) {
+    if is_ffi_scalar(ty) || is_str_repr(ty) || is_unit(ty) {
         return Ok(());
     }
     match ty {
         // Peel optional layers down to the (shared, flattened) core.
         Type::Optional(inner) => check_ffi_return(name, inner, structs),
+        // Each side independently: same rules as a bare return.
+        Type::Result(ok, err) => {
+            check_ffi_return(name, ok, structs)?;
+            check_ffi_return(name, err, structs)
+        }
         Type::Named(_) => match ffi_struct_layout(ty, structs) {
             Some(layout) => match layout
                 .fields
@@ -4085,13 +4156,13 @@ fn check_ffi_return(
             // A named non-struct (a variant) isn't marshalable yet.
             None => Err(Error::msg(format!(
                 "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs of \
-                 those, and optionals of those",
+                 those, and optionals/results of those",
                 type_name(ty)
             ))),
         },
         _ => Err(Error::msg(format!(
             "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs of those, \
-             and optionals of those",
+             and optionals/results of those",
             type_name(ty)
         ))),
     }
@@ -4164,6 +4235,34 @@ unsafe fn read_ffi_optional(
 ) -> FfiValue {
     let tag = unsafe { *buf };
     unsafe { read_ffi_optional_tag(buf, ty, tag, structs) }
+}
+
+/// Read a flattened `Result<ok, err>` from the sret buffer `buf` a
+/// result-returning function wrote, into an [`FfiValue::Res`]. The layout
+/// mirrors codegen: an `i64` tag at offset 0 (`1` = `Ok`, `0` = `Err`) and the
+/// active side's payload at [`OPT_VALUE_OFFSET`] — read with [`read_ffi_core`],
+/// which already reads a `Unit` side (e.g. `!Error`'s ok case) back as a
+/// harmless `Int(0)`.
+///
+/// SAFETY: `buf` must point at a `{ i64 tag, value }` a `Result`-returning
+/// callee filled, with `ok`/`err` each a scalar, `str`, `Unit`, or struct.
+unsafe fn read_ffi_result(
+    buf: *const i64,
+    ty: &Type,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
+    let (ok_ty, err_ty) = match ty {
+        Type::Result(ok, err) => (ok.as_ref(), err.as_ref()),
+        _ => unreachable!("read_ffi_result on a non-result type"),
+    };
+    let tag = unsafe { *buf };
+    if tag == 1 {
+        FfiValue::Res(Ok(Box::new(unsafe { read_ffi_core(buf, ok_ty, structs) })))
+    } else {
+        FfiValue::Res(Err(Box::new(unsafe {
+            read_ffi_core(buf, err_ty, structs)
+        })))
+    }
 }
 
 /// Reconstruct the nested `Opt` for `ty` given the flattened `tag`. Because the
