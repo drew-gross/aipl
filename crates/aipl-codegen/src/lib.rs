@@ -31,7 +31,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use aipl_syntax::{
     ast::{
         is_unit, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive,
-        Program, StructDecl, Type,
+        Program, Signature as AstSignature, StructDecl, Type,
     },
     error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner, is_set_elem,
     is_str_repr, none_inner_ty, type_name, IMPORTABLE_BUILTINS,
@@ -2394,10 +2394,12 @@ pub fn build_test_program(program: &Program) -> Program {
                 items.push(Item::Fn(AstFn {
                     name: test_fn.clone(),
                     is_pub: true,
-                    type_params: Vec::new(),
-                    params: Vec::new(),
-                    effects: all_effects(),
-                    return_ty: None,
+                    sig: AstSignature {
+                        type_vars: Vec::new(),
+                        params: Vec::new(),
+                        effects: all_effects(),
+                        return_ty: None,
+                    },
                     body: f.test_body.clone().expect("test body present"),
                     test_body: None,
                     doc: None,
@@ -2419,10 +2421,12 @@ pub fn build_test_program(program: &Program) -> Program {
     items.push(Item::Fn(AstFn {
         name: "__test_main".to_string(),
         is_pub: true,
-        type_params: Vec::new(),
-        params: Vec::new(),
-        effects: all_effects(),
-        return_ty: Some(Type::Primitive(Primitive::I64)),
+        sig: AstSignature {
+            type_vars: Vec::new(),
+            params: Vec::new(),
+            effects: all_effects(),
+            return_ty: Some(Type::Primitive(Primitive::I64)),
+        },
         body,
         test_body: None,
         doc: None,
@@ -4456,8 +4460,8 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
         if f.name != "main" {
             continue;
         }
-        match f.params.as_slice() {
-            [] => f.params.push(Param {
+        match f.sig.params.as_slice() {
+            [] => f.sig.params.push(Param {
                 name: "__cli_args".to_string(),
                 ty: cli_args_ty(),
                 mutable: false,
@@ -4954,9 +4958,9 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
-        let params: Vec<Type> = f.params.iter().map(|p| p.ty.clone()).collect();
-        let return_ty = f.return_ty.clone().unwrap_or(Type::Unit);
-        let effects: Vec<&str> = f.effects.iter().map(String::as_str).collect();
+        let params: Vec<Type> = f.sig.params.iter().map(|p| p.ty.clone()).collect();
+        let return_ty = f.sig.return_ty.clone().unwrap_or(Type::Unit);
+        let effects: Vec<&str> = f.sig.effects.iter().map(String::as_str).collect();
         reg(funcs, name, sym, params, return_ty, &effects);
     }
     // Internal codegen helpers — `str + str` and the in-place `+`/`trim` variants

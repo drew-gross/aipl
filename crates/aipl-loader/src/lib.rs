@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use aipl_parser::parse;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
-    MatchArm, Param, Program, StructDecl, Type,
+    MatchArm, Param, Program, Signature, StructDecl, Type,
 };
 use aipl_syntax::{builtin_canonical, DebugOptions, Error, Span};
 
@@ -579,30 +579,34 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
         Item::Fn(f) => Item::Fn(Function {
             name: view.get(&f.name).cloned().unwrap_or_else(|| f.name.clone()),
             is_pub: f.is_pub,
-            // Generic type-param names are local type variables, not global
-            // items — leave them untouched when rewriting signature types.
-            type_params: f.type_params.clone(),
-            params: f
-                .params
-                .iter()
-                .map(|p| Param {
-                    name: p.name.clone(),
-                    ty: rewrite_type(&p.ty, view, &f.type_params),
-                    mutable: p.mutable,
-                    variadic: p.variadic,
-                })
-                .collect(),
-            effects: f.effects.clone(),
-            return_ty: f
-                .return_ty
-                .as_ref()
-                .map(|t| rewrite_type(t, view, &f.type_params)),
+            sig: Signature {
+                // Generic type-var names are local type variables, not global
+                // items — leave them untouched when rewriting signature types.
+                type_vars: f.sig.type_vars.clone(),
+                params: f
+                    .sig
+                    .params
+                    .iter()
+                    .map(|p| Param {
+                        name: p.name.clone(),
+                        ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
+                        mutable: p.mutable,
+                        variadic: p.variadic,
+                    })
+                    .collect(),
+                effects: f.sig.effects.clone(),
+                return_ty: f
+                    .sig
+                    .return_ty
+                    .as_ref()
+                    .map(|t| rewrite_type(t, view, &f.sig.type_vars)),
+            },
             // Parameters are locals — they shadow any global of the same name,
             // so an ident referring to a parameter is never rewritten.
             body: rewrite_expr(
                 &f.body,
                 view,
-                &f.params.iter().map(|p| p.name.clone()).collect(),
+                &f.sig.params.iter().map(|p| p.name.clone()).collect(),
             ),
             // Rewrite global references inside the `.test({ .. })` body too (it
             // can call the function under test and other globals). Parameters

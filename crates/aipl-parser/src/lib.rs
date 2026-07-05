@@ -10,8 +10,8 @@ use aipl_syntax::{join_spans, Error, Span};
 
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item,
-    LambdaParam, MatchArm, Param, Pattern, Primitive, Program, StructDecl, Type, VariantCase,
-    VariantDecl,
+    LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type,
+    VariantCase, VariantDecl,
 };
 
 gazelle! {
@@ -856,10 +856,12 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
         Ok(Function {
             name,
             is_pub,
-            type_params,
-            params,
-            effects,
-            return_ty,
+            sig: Signature {
+                type_vars: type_params,
+                params,
+                effects,
+                return_ty,
+            },
             body,
             test_body,
             doc,

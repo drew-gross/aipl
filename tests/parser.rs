@@ -88,8 +88,8 @@ fn simplest_function() {
     let p = parse("fn main() { 0 }").unwrap();
     let f = fn_item(&p, 0);
     assert_eq!(f.name, "main");
-    assert!(f.params.is_empty());
-    assert_eq!(f.return_ty, None);
+    assert!(f.sig.params.is_empty());
+    assert_eq!(f.sig.return_ty, None);
     assert_eq!(f.body, num(0));
 }
 
@@ -97,7 +97,7 @@ fn simplest_function() {
 fn function_with_return_type() {
     let p = parse("fn answer() -> i64 { 42 }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.return_ty, Some(i64_ty()));
+    assert_eq!(f.sig.return_ty, Some(i64_ty()));
     assert_eq!(f.body, num(42));
 }
 
@@ -106,7 +106,7 @@ fn function_with_one_param() {
     let p = parse("fn id(x: i64) -> i64 { x }").unwrap();
     let f = fn_item(&p, 0);
     assert_eq!(
-        f.params,
+        f.sig.params,
         vec![Param {
             name: "x".into(),
             ty: i64_ty(),
@@ -121,9 +121,9 @@ fn function_with_one_param() {
 fn function_with_multiple_params() {
     let p = parse("fn add(x: i64, y: i64) -> i64 { x + y }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.params.len(), 2);
-    assert_eq!(f.params[0].name, "x");
-    assert_eq!(f.params[1].name, "y");
+    assert_eq!(f.sig.params.len(), 2);
+    assert_eq!(f.sig.params[0].name, "x");
+    assert_eq!(f.sig.params[1].name, "y");
     assert_eq!(f.body, binop(ident("x"), '+', ident("y")));
 }
 
@@ -344,7 +344,7 @@ fn chained_field_access_left_associative() {
 fn struct_as_param_type() {
     let p = parse("fn f(p: Point) -> i64 { p.x }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.params[0].ty, Type::Named("Point".into()));
+    assert_eq!(f.sig.params[0].ty, Type::Named("Point".into()));
 }
 
 #[test]
@@ -441,20 +441,20 @@ fn comparison_binds_tighter_than_and() {
 #[test]
 fn function_without_effects_has_empty_list() {
     let p = parse("fn f() -> i64 { 0 }").unwrap();
-    assert!(fn_item(&p, 0).effects.is_empty());
+    assert!(fn_item(&p, 0).sig.effects.is_empty());
 }
 
 #[test]
 fn single_effect_parses() {
     let p = parse("fn f() !prints -> i64 { 0 }").unwrap();
-    assert_eq!(fn_item(&p, 0).effects, vec!["prints".to_string()]);
+    assert_eq!(fn_item(&p, 0).sig.effects, vec!["prints".to_string()]);
 }
 
 #[test]
 fn multiple_effects_parse() {
     let p = parse("fn f() !prints !reads -> i64 { 0 }").unwrap();
     assert_eq!(
-        fn_item(&p, 0).effects,
+        fn_item(&p, 0).sig.effects,
         vec!["prints".to_string(), "reads".to_string()]
     );
 }
@@ -462,16 +462,16 @@ fn multiple_effects_parse() {
 #[test]
 fn effects_parse_without_return_type() {
     let p = parse("fn f() !prints { 0 }").unwrap();
-    assert_eq!(fn_item(&p, 0).effects, vec!["prints".to_string()]);
-    assert_eq!(fn_item(&p, 0).return_ty, None);
+    assert_eq!(fn_item(&p, 0).sig.effects, vec!["prints".to_string()]);
+    assert_eq!(fn_item(&p, 0).sig.return_ty, None);
 }
 
 #[test]
 fn bool_as_param_type() {
     let p = parse("fn f(b: bool) -> bool { !b }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.params[0].ty, Type::Primitive(Primitive::Bool));
-    assert_eq!(f.return_ty, Some(Type::Primitive(Primitive::Bool)));
+    assert_eq!(f.sig.params[0].ty, Type::Primitive(Primitive::Bool));
+    assert_eq!(f.sig.return_ty, Some(Type::Primitive(Primitive::Bool)));
 }
 
 // ---------- string tests ----------
@@ -505,7 +505,7 @@ fn string_in_call() {
 fn str_as_param_type() {
     let p = parse("fn f(s: str) -> i64 { 0 }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.params[0].ty, Type::Primitive(Primitive::Str));
+    assert_eq!(f.sig.params[0].ty, Type::Primitive(Primitive::Str));
 }
 
 // ---------- span tests ----------
@@ -763,7 +763,7 @@ fn trailing_commas_are_optional() {
 fn array_type_parses() {
     let p = parse("fn f(xs: i64[]) -> i64 { 0 }").unwrap();
     assert_eq!(
-        fn_item(&p, 0).params[0].ty,
+        fn_item(&p, 0).sig.params[0].ty,
         Type::Array(Box::new(Type::Primitive(Primitive::I64)))
     );
 }
@@ -773,11 +773,11 @@ fn array_type_of_char_and_bool() {
     let p = parse("fn f(a: char[], b: bool[]) -> i64 { 0 }").unwrap();
     let f = fn_item(&p, 0);
     assert_eq!(
-        f.params[0].ty,
+        f.sig.params[0].ty,
         Type::Array(Box::new(Type::Primitive(Primitive::Char)))
     );
     assert_eq!(
-        f.params[1].ty,
+        f.sig.params[1].ty,
         Type::Array(Box::new(Type::Primitive(Primitive::Bool)))
     );
 }
@@ -841,20 +841,20 @@ fn index_accepts_expression_subscript() {
 fn generic_type_params_parse() {
     let p = parse("fn value_or<T: any>(x: T?, d: T) -> T { d }").unwrap();
     let f = fn_item(&p, 0);
-    assert_eq!(f.type_params, vec!["T".to_string()]);
+    assert_eq!(f.sig.type_vars, vec!["T".to_string()]);
     assert_eq!(
-        f.params[0].ty,
+        f.sig.params[0].ty,
         Type::Optional(Box::new(Type::Named("T".into())))
     );
-    assert_eq!(f.params[1].ty, Type::Named("T".into()));
-    assert_eq!(f.return_ty, Some(Type::Named("T".into())));
+    assert_eq!(f.sig.params[1].ty, Type::Named("T".into()));
+    assert_eq!(f.sig.return_ty, Some(Type::Named("T".into())));
 }
 
 #[test]
 fn multiple_type_params_parse() {
     let p = parse("fn f<T: any, U: any>(a: T, b: U) -> i64 { 0 }").unwrap();
     assert_eq!(
-        fn_item(&p, 0).type_params,
+        fn_item(&p, 0).sig.type_vars,
         vec!["T".to_string(), "U".to_string()]
     );
 }
@@ -863,7 +863,7 @@ fn multiple_type_params_parse() {
 fn function_without_type_params_has_none() {
     // The `<..>` list is optional and `<`/`>` still parse as comparisons.
     let p = parse("fn f(x: i64) -> bool { x < 3 }").unwrap();
-    assert!(fn_item(&p, 0).type_params.is_empty());
+    assert!(fn_item(&p, 0).sig.type_vars.is_empty());
     assert_eq!(fn_item(&p, 0).body, binop(ident("x"), '<', num(3)));
 }
 
@@ -942,7 +942,7 @@ fn parses_function_type_parameter() {
     let p = parse("fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }").unwrap();
     let f = fn_item(&p, 0);
     assert_eq!(
-        f.params[0].ty,
+        f.sig.params[0].ty,
         Type::Fn(
             vec![Type::Primitive(Primitive::I64)],
             Box::new(Type::Primitive(Primitive::I64))

@@ -187,6 +187,26 @@ pub mod ast {
         Builtins { span: Span },
     }
 
+    /// A function's shape apart from its body and source-only concerns (name,
+    /// visibility, `.test`/`.doc`): its declared type variables, value
+    /// parameters, declared effects, and return type. Shared with aipl-mono,
+    /// which normalizes its own copy of this (synthesizing a type variable per
+    /// anonymous `any[]`/`any?` parameter, and rewriting those parameters to
+    /// reference it) ahead of monomorphizing a generic — see
+    /// `aipl_mono::normalize`.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Signature {
+        /// Declared generic type parameters, e.g. `fn f<T: any>(...)` →
+        /// `["T"]`. These names act as type variables in `params`/`return_ty`
+        /// and are resolved by monomorphization.
+        pub type_vars: Vec<String>,
+        pub params: Vec<Param>,
+        /// Effects declared in the signature, e.g. `!prints`. Callers of this
+        /// function must declare at least these effects themselves.
+        pub effects: Vec<String>,
+        pub return_ty: Option<Type>,
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Function {
         pub name: String,
@@ -195,15 +215,7 @@ pub mod ast {
         /// importing it is a loader error. Always treated as public for the
         /// builtin pseudo-declarations and within a single file.
         pub is_pub: bool,
-        /// Declared generic type parameters, e.g. `fn f<T: any>(...)` →
-        /// `["T"]`. These names act as type variables in the signature
-        /// (params + return) and are resolved by monomorphization.
-        pub type_params: Vec<String>,
-        pub params: Vec<Param>,
-        /// Effects declared in the signature, e.g. `!prints`. Callers of this
-        /// function must declare at least these effects themselves.
-        pub effects: Vec<String>,
-        pub return_ty: Option<Type>,
+        pub sig: Signature,
         pub body: Expr,
         /// The body of an attached `.test({ .. })` block, if any. A statement
         /// block (asserts plus whatever setup) that the `check` command runs as

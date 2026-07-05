@@ -32,7 +32,7 @@ pub use check::check;
 use aipl_syntax::{
     ast::{
         is_unit, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam, MatchArm,
-        Param, Pattern, Primitive, Program, StructDecl, Type, VariantCase, VariantDecl,
+        Param, Pattern, Primitive, Program, Signature, StructDecl, Type, VariantCase, VariantDecl,
     },
     concat_str_ty, empty_array_arg_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error,
     is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty, type_name,
@@ -64,6 +64,7 @@ pub fn lower_tuples(program: &Program) -> Program {
         .map(|item| match item {
             Item::Fn(f) => {
                 let new_params: Vec<Param> = f
+                    .sig
                     .params
                     .iter()
                     .map(|p| Param {
@@ -72,6 +73,7 @@ pub fn lower_tuples(program: &Program) -> Program {
                     })
                     .collect();
                 let new_ret = f
+                    .sig
                     .return_ty
                     .as_ref()
                     .map(|t| lt_ty(t, &mut fields_map, &mut order));
@@ -81,8 +83,11 @@ pub fn lower_tuples(program: &Program) -> Program {
                     .as_ref()
                     .map(|tb| lt_expr(tb, &mut fields_map, &mut order));
                 Item::Fn(Function {
-                    params: new_params,
-                    return_ty: new_ret,
+                    sig: Signature {
+                        params: new_params,
+                        return_ty: new_ret,
+                        ..f.sig.clone()
+                    },
                     body: new_body,
                     test_body: new_test,
                     ..f.clone()
@@ -344,14 +349,18 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             }
             Item::Import(_) => passthrough.push(item.clone()),
             Item::Fn(f) => {
-                if f.params.first().is_some_and(|p| p.mutable) {
+                if f.sig.params.first().is_some_and(|p| p.mutable) {
                     mutating.insert(f.name.clone());
                 }
                 if is_generic(f) {
                     generics.insert(f.name.clone(), normalize(f)?);
                 } else {
                     // A non-generic fn must not mention `any` in its return.
-                    if f.return_ty.as_ref().is_some_and(|t| ty_mentions(t, "any")) {
+                    if f.sig
+                        .return_ty
+                        .as_ref()
+                        .is_some_and(|t| ty_mentions(t, "any"))
+                    {
                         return Err(Error::msg(format!(
                             "fn \"{}\": \"any\" is only allowed in a parameter (\"any[]\", \"any?\") \
                              or via a declared type parameter \"<T: any>\"",
@@ -360,7 +369,8 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     }
                     fn_returns.insert(
                         f.name.clone(),
-                        f.return_ty
+                        f.sig
+                            .return_ty
                             .clone()
                             .unwrap_or(Type::Primitive(Primitive::I64)),
                     );
@@ -382,9 +392,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             (
                 f.name.clone(),
                 ConcreteTemplate {
-                    params: f.params.clone(),
-                    effects: f.effects.clone(),
-                    return_ty: f.return_ty.clone(),
+                    params: f.sig.params.clone(),
+                    effects: f.sig.effects.clone(),
+                    return_ty: f.sig.return_ty.clone(),
                     body: f.body.clone(),
                 },
             )
@@ -428,7 +438,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     } else {
         concrete_fns
             .iter()
-            .filter(|f| !f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))))
+            .filter(|f| !f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))))
             .map(|f| f.name.clone())
             .collect()
     };
@@ -730,48 +740,34 @@ fn specialize_variadic(
     (params, new_body)
 }
 
-/// A function's shape apart from its body, after normalization: its ordered
-/// type variables (declared `<T, ..>` first, then a synthetic name per
-/// anonymous `any[]`/`any?` parameter), the params/return/effects where every
-/// type variable is a named reference. [`builtin_sigs`] only needs this —
-/// builtins are never enqueued/specialized like a real generic (see
-/// [`Generic`]), so there's no body to carry.
-#[derive(Clone)]
-struct Signature {
-    type_vars: Vec<String>,
-    params: Vec<Param>,
-    return_ty: Option<Type>,
-    effects: Vec<String>,
-}
-
-impl Signature {
-    /// Substitute `type_args` (positional, matching `type_vars` order) into
-    /// this signature's params and return type, yielding the concrete
-    /// (monomorphic) params/return-type pair a specialized instance has.
-    /// Used by [`Mono::concrete_signature`] for ownership eligibility — the
-    /// substituted params/return must be concrete heap types for
-    /// `owned_eligible` to recognize them, so a raw type variable left
-    /// unsubstituted here would silently disable the owned optimization.
-    fn make_concrete(&self, type_args: &[Type]) -> (Vec<Param>, Option<Type>) {
-        let map: HashMap<String, Type> = self
-            .type_vars
-            .iter()
-            .cloned()
-            .zip(type_args.iter().cloned())
-            .collect();
-        let params = self
-            .params
-            .iter()
-            .map(|p| Param {
-                name: p.name.clone(),
-                ty: subst_vars(&p.ty, &map),
-                mutable: p.mutable,
-                variadic: p.variadic,
-            })
-            .collect();
-        let return_ty = self.return_ty.as_ref().map(|t| subst_vars(t, &map));
-        (params, return_ty)
-    }
+/// Substitute `type_args` (positional, matching `sig.type_vars` order) into
+/// `sig`'s params and return type, yielding the concrete (monomorphic)
+/// params/return-type pair a specialized instance has. Used by
+/// [`Mono::concrete_signature`] for ownership eligibility — the substituted
+/// params/return must be concrete heap types for `owned_eligible` to
+/// recognize them, so a raw type variable left unsubstituted here would
+/// silently disable the owned optimization. A free function (not an inherent
+/// method) because `Signature` is defined in `aipl_syntax`, which orphan rules
+/// forbid inherent-impl'ing from here.
+fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Type>) {
+    let map: HashMap<String, Type> = sig
+        .type_vars
+        .iter()
+        .cloned()
+        .zip(type_args.iter().cloned())
+        .collect();
+    let params = sig
+        .params
+        .iter()
+        .map(|p| Param {
+            name: p.name.clone(),
+            ty: subst_vars(&p.ty, &map),
+            mutable: p.mutable,
+            variadic: p.variadic,
+        })
+        .collect();
+    let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
+    (params, return_ty)
 }
 
 /// A generic function template ready to monomorphize: a [`Signature`] plus the
@@ -2663,7 +2659,7 @@ impl Mono<'_> {
         type_args: &[Type],
     ) -> (Vec<Param>, Option<Type>, Expr) {
         if let Some(Generic { sig, body }) = self.generics.get(template) {
-            let (params, return_ty) = sig.make_concrete(type_args);
+            let (params, return_ty) = make_concrete(sig, type_args);
             (params, return_ty, body.clone())
         } else if let Some(f) = self.concrete.get(template) {
             (f.params.clone(), f.return_ty.clone(), f.body.clone())
@@ -3748,7 +3744,7 @@ const RESERVED_TYPE_NAMES: &[&str] = &["i64", "bool", "char", "str", "any"];
 /// A function is generic if it declares type parameters or uses anonymous
 /// `any` in a parameter.
 fn is_generic(f: &Function) -> bool {
-    !f.type_params.is_empty() || f.params.iter().any(|p| ty_mentions(&p.ty, "any"))
+    !f.sig.type_vars.is_empty() || f.sig.params.iter().any(|p| ty_mentions(&p.ty, "any"))
 }
 
 /// Validate a generic function's signature and normalize it: collect its type
@@ -3757,7 +3753,7 @@ fn is_generic(f: &Function) -> bool {
 fn normalize(f: &Function) -> Result<Generic, Error> {
     let mut type_vars: Vec<String> = Vec::new();
     let mut declared: HashSet<String> = HashSet::new();
-    for tp in &f.type_params {
+    for tp in &f.sig.type_vars {
         if RESERVED_TYPE_NAMES.contains(&tp.as_str()) {
             return Err(Error::msg(format!(
                 "fn \"{}\": \"{tp}\" is not a valid type parameter name (reserved)",
@@ -3775,8 +3771,8 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
 
     // Normalize parameter types: anonymous `any` → a fresh synthetic variable.
     let mut counter = 0usize;
-    let mut params = Vec::with_capacity(f.params.len());
-    for p in &f.params {
+    let mut params = Vec::with_capacity(f.sig.params.len());
+    for p in &f.sig.params {
         let ty = normalize_param_ty(&p.ty, &mut type_vars, &mut counter, &f.name)?;
         params.push(Param {
             name: p.name.clone(),
@@ -3788,7 +3784,11 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
 
     // The return type may reference declared type parameters, but never the
     // anonymous `any` keyword (it has no name to bind).
-    if f.return_ty.as_ref().is_some_and(|t| ty_mentions(t, "any")) {
+    if f.sig
+        .return_ty
+        .as_ref()
+        .is_some_and(|t| ty_mentions(t, "any"))
+    {
         return Err(Error::msg(format!(
             "fn \"{}\": bare \"any\" is not allowed in a return type; declare \"<T: any>\" and return \"T\"",
             f.name
@@ -3797,7 +3797,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
 
     // Every declared type parameter must appear in a parameter, or it could
     // never be inferred from a call.
-    for tp in &f.type_params {
+    for tp in &f.sig.type_vars {
         if !params.iter().any(|p| ty_mentions(&p.ty, tp)) {
             return Err(Error::msg(format!(
                 "fn \"{}\": type parameter \"{tp}\" is not used by any parameter, so it can't be inferred",
@@ -3810,8 +3810,8 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
         sig: Signature {
             type_vars,
             params,
-            return_ty: f.return_ty.clone(),
-            effects: f.effects.clone(),
+            return_ty: f.sig.return_ty.clone(),
+            effects: f.sig.effects.clone(),
         },
         body: f.body.clone(),
     })
@@ -4200,7 +4200,7 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
             // A function's parameters shadow same-named globals within its body
             // (e.g. a `(T) -> bool` parameter `pred` called as `pred(x)` is the
             // parameter, not a top-level `pred`).
-            let mut bound: HashSet<String> = f.params.iter().map(|p| p.name.clone()).collect();
+            let mut bound: HashSet<String> = f.sig.params.iter().map(|p| p.name.clone()).collect();
             count_uses(&f.body, &mut bound, &mut counts);
         }
     }
@@ -4372,7 +4372,7 @@ pub fn inline_single_use(program: &Program) -> Program {
 
         // Replace the single `Call(f, ..)` (it lives in exactly one body — `f`'s
         // name is never shadowed, see the `binders` guard).
-        let fparam_names: Vec<String> = f.params.iter().map(|p| p.name.clone()).collect();
+        let fparam_names: Vec<String> = f.sig.params.iter().map(|p| p.name.clone()).collect();
         let mut replaced = false;
         for it in &mut program.items {
             if let Item::Fn(g) = it {
@@ -4469,10 +4469,10 @@ fn is_inline_candidate(
         // Never shadowed by a local anywhere, so the single counted use is the
         // only `Call`/`Ident` of this name in the whole program.
         && !binders.contains(&f.name)
-        && f.type_params.is_empty()
+        && f.sig.type_vars.is_empty()
         && is_inline_shape(
-            f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
-            f.params.first().is_some_and(|p| p.mutable),
+            f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
+            f.sig.params.first().is_some_and(|p| p.mutable),
             &f.body,
             &f.name,
         )
@@ -4508,7 +4508,7 @@ fn collect_binders(program: &Program) -> HashSet<String> {
     let mut set = HashSet::new();
     for it in &program.items {
         if let Item::Fn(f) = it {
-            for p in &f.params {
+            for p in &f.sig.params {
                 set.insert(p.name.clone());
             }
             collect_body_binders(&f.body, &mut set);

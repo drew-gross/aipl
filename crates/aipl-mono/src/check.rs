@@ -168,14 +168,14 @@ pub fn check(program: &Program) -> Result<(), Error> {
                 sigs.insert(
                     f.name.clone(),
                     FnSig {
-                        params: f.params.iter().map(|p| p.ty.clone()).collect(),
-                        variadic: f.params.iter().map(|p| p.variadic).collect(),
-                        return_ty: f.return_ty.clone().unwrap_or(Type::Unit),
-                        effects: f.effects.clone(),
-                        is_mutating: f.params.first().is_some_and(|p| p.mutable),
-                        is_method: f.params.first().is_some_and(|p| p.name == "self"),
+                        params: f.sig.params.iter().map(|p| p.ty.clone()).collect(),
+                        variadic: f.sig.params.iter().map(|p| p.variadic).collect(),
+                        return_ty: f.sig.return_ty.clone().unwrap_or(Type::Unit),
+                        effects: f.sig.effects.clone(),
+                        is_mutating: f.sig.params.first().is_some_and(|p| p.mutable),
+                        is_method: f.sig.params.first().is_some_and(|p| p.name == "self"),
                         is_generic: is_generic(f),
-                        type_params: f.type_params.clone(),
+                        type_params: f.sig.type_vars.clone(),
                     },
                 );
             }
@@ -217,7 +217,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
 }
 
 fn is_generic(f: &Function) -> bool {
-    !f.type_params.is_empty() || f.params.iter().any(|p| ty_mentions_any(&p.ty))
+    !f.sig.type_vars.is_empty() || f.sig.params.iter().any(|p| ty_mentions_any(&p.ty))
 }
 
 fn ty_mentions_any(t: &Type) -> bool {
@@ -251,7 +251,7 @@ impl Cx<'_> {
     fn check_fn(&self, f: &Function) -> Result<(), Error> {
         // Effects must be known and `mut` receivers well-formed regardless of
         // genericity.
-        for e in &f.effects {
+        for e in &f.sig.effects {
             if !KNOWN_EFFECTS.contains(&e.as_str()) {
                 return Err(Error::msg(format!(
                     "fn {:?} declares unknown effect \"!{e}\"",
@@ -259,7 +259,7 @@ impl Cx<'_> {
                 )));
             }
         }
-        for (i, p) in f.params.iter().enumerate() {
+        for (i, p) in f.sig.params.iter().enumerate() {
             if p.mutable && i != 0 {
                 return Err(Error::msg(format!(
                     "fn {:?}: only the first parameter may be \"mut\"",
@@ -267,15 +267,15 @@ impl Cx<'_> {
                 )));
             }
         }
-        if f.params.first().is_some_and(|p| p.mutable) {
-            let self_p = &f.params[0];
+        if f.sig.params.first().is_some_and(|p| p.mutable) {
+            let self_p = &f.sig.params[0];
             if self_p.name != "self" {
                 return Err(Error::msg(format!(
                     "fn {:?}: a \"mut\" receiver must be named \"self\"",
                     f.name
                 )));
             }
-            if f.return_ty.is_some() {
+            if f.sig.return_ty.is_some() {
                 return Err(Error::msg(format!(
                     "fn {:?}: a mutating method cannot return a value",
                     f.name
@@ -286,10 +286,10 @@ impl Cx<'_> {
         // Signature types must be valid (type parameters count as valid names).
         // A function type is allowed as a *parameter* (a lambda) but not as a
         // return type — there's no first-class function value to hand back.
-        for p in &f.params {
-            self.check_ty(&p.ty, &f.type_params, &f.name)?;
+        for p in &f.sig.params {
+            self.check_ty(&p.ty, &f.sig.type_vars, &f.name)?;
         }
-        if let Some(rt) = &f.return_ty {
+        if let Some(rt) = &f.sig.return_ty {
             if matches!(rt, Type::Fn(_, _)) {
                 return Err(Error::msg(format!(
                     "fn {:?}: cannot return a function value ({})",
@@ -297,7 +297,7 @@ impl Cx<'_> {
                     tyname(rt)
                 )));
             }
-            self.check_ty(rt, &f.type_params, &f.name)?;
+            self.check_ty(rt, &f.sig.type_vars, &f.name)?;
         }
 
         // Generic bodies are checked abstractly: each type variable (a declared
@@ -307,21 +307,24 @@ impl Cx<'_> {
         // validity depends on the concrete instantiation stay permissive. For a
         // concrete function the substitution is the identity.
         let mut env: Env = HashMap::new();
-        for p in &f.params {
+        for p in &f.sig.params {
             env.insert(
                 p.name.clone(),
                 Binding {
-                    ty: subst_typevars(&p.ty, &f.type_params),
+                    ty: subst_typevars(&p.ty, &f.sig.type_vars),
                     mutable: p.mutable,
                 },
             );
         }
         // A `mut self` method and a `()`-returning fn check their body as unit.
-        let declared = subst_typevars(&f.return_ty.clone().unwrap_or(Type::Unit), &f.type_params);
+        let declared = subst_typevars(
+            &f.sig.return_ty.clone().unwrap_or(Type::Unit),
+            &f.sig.type_vars,
+        );
         // Make the declared return type available to any `return value;` in the
         // body (functions are top-level, so this single slot can't nest).
         *self.current_ret.borrow_mut() = declared.clone();
-        let body_ty = self.check_expr(&f.body, &env, &f.effects)?;
+        let body_ty = self.check_expr(&f.body, &env, &f.sig.effects)?;
         // A bare-literal body flexes to a narrow-int return type (`fn g() -> u8
         // { 200 }`).
         let body_ty = self.flex_int(&f.body, &body_ty, &declared)?;
