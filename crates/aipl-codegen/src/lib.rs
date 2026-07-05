@@ -2503,6 +2503,18 @@ const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
 /// and `trim_end_while`).
 const FILL_OR_ADD_SECTION_CLIF: &str = include_str!("fill_or_add_section.clif");
 
+/// The dogfooded AIPL `fill_or_add_section_file` (`str, str, str -> str`) —
+/// like [`FILL_OR_ADD_SECTION_SRC`], used only by the test harness. Reads the
+/// file at `path`, runs it through `fill_or_add_section`, and writes the
+/// result back — the read/write/error-collapsing wrapper the harness used to
+/// do in Rust (`fs::read_to_string`/`fs::write`) is AIPL now too. Returns the
+/// empty string on success or a builtin `Error`'s message otherwise (plain
+/// `str`, not `!Error` — the FFI can't marshal a `Result` return yet).
+const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
+/// The checked-in dogfood IR for `fill_or_add_section_file` (which bundles
+/// `fill_or_add_section`, `lines`, and `trim_end_while`).
+const FILL_OR_ADD_SECTION_FILE_CLIF: &str = include_str!("fill_or_add_section_file.clif");
+
 thread_local! {
     /// The `process_raw_string` engine, re-linked from the checked-in IR lazily
     /// on first use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`.
@@ -2696,6 +2708,41 @@ pub fn fill_or_add_section(contents: &str, section: &str, body: &str) -> String 
     })
 }
 
+thread_local! {
+    /// The `fill_or_add_section_file` engine (which bundles
+    /// `fill_or_add_section`, `lines`, and `trim_end_while`), re-linked from
+    /// the checked-in IR lazily on first use per thread. A `Compilation` isn't
+    /// `Sync`, hence one per thread.
+    static FILL_OR_ADD_SECTION_FILE_ENGINE: Compilation =
+        Compilation::from_artifact(FILL_OR_ADD_SECTION_FILE_CLIF)
+            .expect("dogfooded `fill_or_add_section_file` engine builds");
+}
+
+/// Reads the file at `path`, splices `body` into (or appends) its
+/// `--- section ---` block via the dogfooded AIPL `fill_or_add_section`, and
+/// writes the result back to `path` — computed by the dogfooded AIPL
+/// `fill_or_add_section_file` via the FFI (itself doing the file I/O; nothing
+/// here touches `std::fs`). Not a parser hook — only the cases test harness
+/// calls this. Returns `Ok(())` on success or the builtin `Error`'s message on
+/// a read/write failure. No native fallback; panics if it can't be built or
+/// called.
+pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result<(), String> {
+    FILL_OR_ADD_SECTION_FILE_ENGINE.with(|comp| {
+        match comp.call_values(
+            "fill_or_add_section_file",
+            &[
+                FfiValue::Str(path.to_string()),
+                FfiValue::Str(section.to_string()),
+                FfiValue::Str(body.to_string()),
+            ],
+        ) {
+            Ok(FfiValue::Str(s)) if s.is_empty() => Ok(()),
+            Ok(FfiValue::Str(s)) => Err(s),
+            other => panic!("dogfooded fill_or_add_section_file() call: {other:?}"),
+        }
+    })
+}
+
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
@@ -2800,6 +2847,25 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
             // separate import. Bundles `parse_test_section_header`, `lines`,
             // and `trim_end_while` (all imported) as in-engine AIPL calls.
             sources: &[
+                ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
+                (
+                    "./parse_test_section_header.aipl",
+                    PARSE_TEST_SECTION_HEADER_SRC,
+                ),
+                ("./lines.aipl", RAW_STRING_LINES_SRC),
+                ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
+            ],
+        },
+        DogfoodEngine {
+            clif_file: "fill_or_add_section_file.clif",
+            entries: &["fill_or_add_section_file"],
+            // Bundles `fill_or_add_section` (imported) and everything it in
+            // turn bundles.
+            sources: &[
+                (
+                    "./fill_or_add_section_file.aipl",
+                    FILL_OR_ADD_SECTION_FILE_SRC,
+                ),
                 ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
                 (
                     "./parse_test_section_header.aipl",

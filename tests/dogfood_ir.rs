@@ -273,6 +273,48 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 .unwrap();
             assert_eq!(replaced, FfiValue::Str("a\n--- foo ---\nnew\n".to_string()));
         }
+        "fill_or_add_section_file.clif" => {
+            // Real file I/O, so stage it under the OS temp dir (never the repo
+            // tree) and clean up after.
+            let dir = std::env::temp_dir().join(format!(
+                "aipl-dogfood-fill-or-add-section-file-{}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("mkdir sanity-check staging");
+            let path = dir.join("case.txt");
+            std::fs::write(&path, "code\n--- stdout ---\nold\n").expect("write staged file");
+            let path_str = path.to_str().expect("utf-8 temp path").to_string();
+
+            let result = comp
+                .call_values(
+                    "fill_or_add_section_file",
+                    &[
+                        FfiValue::Str(path_str.clone()),
+                        FfiValue::Str("stdout".to_string()),
+                        FfiValue::Str("new".to_string()),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(result, FfiValue::Str(String::new())); // "" means success
+            let written = std::fs::read_to_string(&path).expect("read back staged file");
+            assert_eq!(written, "code\n--- stdout ---\nnew\n");
+
+            // A missing file surfaces the builtin `Error`'s message.
+            let missing = dir.join("no_such_file.txt");
+            let err = comp
+                .call_values(
+                    "fill_or_add_section_file",
+                    &[
+                        FfiValue::Str(missing.to_str().unwrap().to_string()),
+                        FfiValue::Str("stdout".to_string()),
+                        FfiValue::Str("new".to_string()),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(err, FfiValue::Str("could not read file".to_string()));
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
         other => panic!("no sanity check defined for dogfood engine {other}"),
     }
 }

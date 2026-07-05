@@ -1,0 +1,34 @@
+import { ==, read_file_to_string, write_string_to_file } from builtins;
+import { fill_or_add_section } from "./fill_or_add_section.aipl";
+
+pub fn fill_or_add_section_file(path: str, section: str, body: str) !read_files !write_files -> str {
+    match (read_file_to_string(path)) {
+        ok(contents) => match (write_string_to_file(path, fill_or_add_section(contents, section, body))) {
+            ok => "",
+            err(e) => e,
+        },
+        err(e) => e,
+    }
+}.doc("""
+Reads the file at `path`, splices `body` into (or appends) its `--- section
+---` block via `fill_or_add_section`, and writes the result back to `path`.
+Returns the empty string on success, or a builtin `Error`'s message on a read
+or write failure — plain `str`, not `!Error`, since the embedding FFI can't
+marshal a `Result` return yet.
+""").test({
+    // This file is loaded in place by `aipl check` (some callers run it with
+    // cwd at the repo root, not a staged throwaway dir like `tests/cases/
+    // files/` fixtures get), so only the read-failure path — which touches
+    // nothing on disk — is safe to exercise directly here. The write-failure
+    // branch mirrors it exactly, and `write_string_to_file`'s own error
+    // behavior is covered in `tests/cases/files/write_file.aipl`.
+    assert(fill_or_add_section_file("no_such_file_xyz_12345.aipl", "foo", "bar")
+        == "could not read file");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 58
+binary size: 10448

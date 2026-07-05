@@ -1493,13 +1493,13 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
 /// `--- <section> ---\n<body>\n` when the section doesn't already exist. Every
 /// call site here targets a section that's already required to exist except
 /// `stdout` (which many cases omit, relying on the default-empty behavior), so
-/// one function covers both. The transform itself is the dogfooded AIPL
-/// fill_or_add_section, run from checked-in IR (see
-/// [`aipl::codegen::fill_or_add_section`]).
+/// one function covers both. The read/transform/write is all the dogfooded AIPL
+/// `fill_or_add_section_file`, run from checked-in IR (see
+/// [`aipl::codegen::fill_or_add_section_file`]) — no `std::fs` here.
 fn fill_or_add_section(path: &Path, section: &str, body: &str) {
-    let contents = fs::read_to_string(path).expect("read case for fill");
-    let out = aipl::codegen::fill_or_add_section(&contents, section, body);
-    fs::write(path, out).expect("rewrite case file adding section");
+    let path = path.to_str().expect("utf-8 case path");
+    aipl::codegen::fill_or_add_section_file(path, section, body)
+        .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
 }
 
 fn normalize_output(s: &str) -> String {
