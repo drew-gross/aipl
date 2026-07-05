@@ -2488,23 +2488,19 @@ const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
 /// The checked-in dogfood IR for `caret_block` (which bundles `line_at`).
 const CARET_BLOCK_CLIF: &str = include_str!("caret_block.clif");
 
-/// The dogfooded AIPL `fill_section` (`str, str, str -> str`) — not a parser
-/// hook (nothing in the compiler itself calls it); the *cases test harness*
-/// (`tests/cases.rs`) uses it to splice a fresh body into a fixture's
-/// `--- section ---` block when refreshing expected output. Checked in like
-/// every other dogfood engine, for uniformity, even though there's no
-/// self-hosting bootstrap concern to protect against here.
-const FILL_SECTION_SRC: &str = include_str!("fill_section.aipl");
-/// The checked-in dogfood IR for `fill_section`.
-const FILL_SECTION_CLIF: &str = include_str!("fill_section.clif");
-
-/// The dogfooded AIPL `fill_or_add_section` (`str, str, str -> str`) — like
-/// [`FILL_SECTION_SRC`], used only by the test harness, not a parser hook.
-/// Bundles `fill_section`, `parse_test_section_header`, `lines`, and
+/// The dogfooded AIPL `fill_or_add_section` (`str, str, str -> str`) — not a
+/// parser hook (nothing in the compiler itself calls it); the *cases test
+/// harness* (`tests/cases.rs`) uses it to splice a fresh body into a fixture's
+/// `--- section ---` block (or append a missing one) when refreshing expected
+/// output. Checked in like every other dogfood engine, for uniformity, even
+/// though there's no self-hosting bootstrap concern to protect against here.
+/// `fill_section` is a private helper defined in the same file (folded in
+/// rather than kept as its own module — it was never called except from here),
+/// so this bundles just `parse_test_section_header`, `lines`, and
 /// `trim_end_while` as in-engine AIPL imports.
 const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
-/// The checked-in dogfood IR for `fill_or_add_section` (which bundles
-/// `fill_section`, `lines`, and `trim_end_while`).
+/// The checked-in dogfood IR for `fill_or_add_section` (which bundles `lines`
+/// and `trim_end_while`).
 const FILL_OR_ADD_SECTION_CLIF: &str = include_str!("fill_or_add_section.clif");
 
 thread_local! {
@@ -2669,47 +2665,21 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
 }
 
 thread_local! {
-    /// The `fill_section` engine, re-linked from the checked-in IR lazily on
-    /// first use per thread. A `Compilation` isn't `Sync`, hence one per thread.
-    static FILL_SECTION_ENGINE: Compilation = Compilation::from_artifact(FILL_SECTION_CLIF)
-        .expect("dogfooded `fill_section` engine builds");
-}
-
-/// Replace the body of the `--- section ---` block in `contents` with `body`
-/// (dropping the old body up to the next header line or EOF), computed by the
-/// dogfooded AIPL `fill_section` via the FFI. Not a parser hook — only the
-/// cases test harness calls this, to refresh a fixture's expected-output
-/// sections. No native fallback; panics if it can't be built or called.
-pub fn fill_section(contents: &str, section: &str, body: &str) -> String {
-    FILL_SECTION_ENGINE.with(|comp| {
-        match comp.call_values(
-            "fill_section",
-            &[
-                FfiValue::Str(contents.to_string()),
-                FfiValue::Str(section.to_string()),
-                FfiValue::Str(body.to_string()),
-            ],
-        ) {
-            Ok(FfiValue::Str(s)) => s,
-            other => panic!("dogfooded fill_section() call: {other:?}"),
-        }
-    })
-}
-
-thread_local! {
-    /// The `fill_or_add_section` engine (which bundles `fill_section`, `lines`,
-    /// and `trim_end_while`), re-linked from the checked-in IR lazily on first
+    /// The `fill_or_add_section` engine (which bundles `lines` and
+    /// `trim_end_while`), re-linked from the checked-in IR lazily on first
     /// use per thread. A `Compilation` isn't `Sync`, hence one per thread.
     static FILL_OR_ADD_SECTION_ENGINE: Compilation =
         Compilation::from_artifact(FILL_OR_ADD_SECTION_CLIF)
             .expect("dogfooded `fill_or_add_section` engine builds");
 }
 
-/// Like [`fill_section`], but appends `--- section ---\n<body>\n` (after
-/// dropping trailing newlines) when `contents` doesn't already carry that
-/// section, computed by the dogfooded AIPL `fill_or_add_section` via the FFI.
-/// Not a parser hook — only the cases test harness calls this. No native
-/// fallback; panics if it can't be built or called.
+/// Replaces the body of the `--- section ---` block in `contents` with `body`
+/// (dropping the old body up to the next header line or EOF), or appends
+/// `--- section ---\n<body>\n` (after dropping trailing newlines) when
+/// `contents` doesn't already carry that section — computed by the dogfooded
+/// AIPL `fill_or_add_section` via the FFI. Not a parser hook — only the cases
+/// test harness calls this. No native fallback; panics if it can't be built or
+/// called.
 pub fn fill_or_add_section(contents: &str, section: &str, body: &str) -> String {
     FILL_OR_ADD_SECTION_ENGINE.with(|comp| {
         match comp.call_values(
@@ -2824,24 +2794,13 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
             ],
         },
         DogfoodEngine {
-            clif_file: "fill_section.clif",
-            entries: &["fill_section"],
-            sources: &[
-                ("./fill_section.aipl", FILL_SECTION_SRC),
-                (
-                    "./parse_test_section_header.aipl",
-                    PARSE_TEST_SECTION_HEADER_SRC,
-                ),
-            ],
-        },
-        DogfoodEngine {
             clif_file: "fill_or_add_section.clif",
             entries: &["fill_or_add_section"],
-            // Bundles `fill_section`, `parse_test_section_header`, `lines`, and
-            // `trim_end_while` (all imported) as in-engine AIPL calls.
+            // `fill_section` is a private helper in the same source file, not a
+            // separate import. Bundles `parse_test_section_header`, `lines`,
+            // and `trim_end_while` (all imported) as in-engine AIPL calls.
             sources: &[
                 ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
-                ("./fill_section.aipl", FILL_SECTION_SRC),
                 (
                     "./parse_test_section_header.aipl",
                     PARSE_TEST_SECTION_HEADER_SRC,

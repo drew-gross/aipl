@@ -1112,7 +1112,7 @@ fn run_success_case(
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
         if fill_mode() && actual != *expected {
-            fill_section(orig_path, "monomorphizations", &actual);
+            fill_or_add_section(orig_path, "monomorphizations", &actual);
             eprintln!("[{}]: filled monomorphizations list", orig_path.display());
             return Outcome::Skip;
             // Already correct — fall through so subsequent fill targets (e.g. performance) get reached.
@@ -1209,7 +1209,7 @@ fn run_success_case(
                 }
             };
             if fill_mode() {
-                fill_section(orig_path, &format!("expect file: {rel}"), &actual);
+                fill_or_add_section(orig_path, &format!("expect file: {rel}"), &actual);
                 eprintln!("[{}]: filled expect file {rel}", orig_path.display());
                 filled_file = true;
                 continue;
@@ -1247,7 +1247,7 @@ fn run_success_case(
             // how a *failing* test is documented).
             Some(expected) => {
                 if fill_mode() {
-                    fill_section(orig_path, "check", &report);
+                    fill_or_add_section(orig_path, "check", &report);
                     eprintln!("[{}]: filled check report", orig_path.display());
                     return Outcome::Skip;
                 }
@@ -1491,23 +1491,15 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
 /// Rewrite the `--- performance ---` body of `path` in place with the measured
 /// counts, preserving any other sections.
 fn fill_performance(path: &Path, stats: &PerfStats) {
-    fill_section(path, "performance", &stats.render());
+    fill_or_add_section(path, "performance", &stats.render());
 }
 
 /// Replace the body of the `--- <section> ---` block in the case file with
-/// `body` (dropping the old body up to the next header or EOF). The section
-/// must already exist in the file; to add a missing section use
-/// [`fill_or_add_section`]. The transform itself is the dogfooded AIPL
-/// `fill_section`, run from checked-in IR (see [`aipl::codegen::fill_section`]).
-fn fill_section(path: &Path, section: &str, body: &str) {
-    let contents = fs::read_to_string(path).expect("read case for fill");
-    let out = aipl::codegen::fill_section(&contents, section, body);
-    fs::write(path, out).expect("rewrite case file with filled section");
-}
-
-/// Like [`fill_section`], but appends `--- <section> ---\n<body>\n` when the
-/// section doesn't already exist in the file. Used for `stdout`, which many
-/// cases omit (they rely on the default-empty behavior). The dogfooded AIPL
+/// `body` (dropping the old body up to the next header or EOF), or append
+/// `--- <section> ---\n<body>\n` when the section doesn't already exist. Every
+/// call site here targets a section that's already required to exist except
+/// `stdout` (which many cases omit, relying on the default-empty behavior), so
+/// one function covers both. The transform itself is the dogfooded AIPL
 /// `fill_or_add_section`, run from checked-in IR (see
 /// [`aipl::codegen::fill_or_add_section`]).
 fn fill_or_add_section(path: &Path, section: &str, body: &str) {

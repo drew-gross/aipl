@@ -244,23 +244,6 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 FfiValue::Str(" --> foo.aipl:1:1\n  |\n1 | hello world\n  | ^^^^^".to_string())
             );
         }
-        "fill_section.clif" => {
-            // Replaces an existing section's body, leaving the rest untouched.
-            let result = comp
-                .call_values(
-                    "fill_section",
-                    &[
-                        FfiValue::Str("a\n--- foo ---\nold\n--- bar ---\nb\n".to_string()),
-                        FfiValue::Str("foo".to_string()),
-                        FfiValue::Str("new".to_string()),
-                    ],
-                )
-                .unwrap();
-            assert_eq!(
-                result,
-                FfiValue::Str("a\n--- foo ---\nnew\n--- bar ---\nb\n".to_string())
-            );
-        }
         "fill_or_add_section.clif" => {
             // Section missing: appended after stripping trailing newlines.
             let result = comp

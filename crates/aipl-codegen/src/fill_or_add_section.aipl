@@ -1,8 +1,50 @@
-import { wrapping_add as +, ==, || } from builtins;
-import { lines } from "./lines.aipl";
+import { wrapping_add as +, ==, &&, !, <, ||, enumerate, len } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
-import { fill_section } from "./fill_section.aipl";
+import { lines } from "./lines.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
+
+// Replaces the body of the `--- section ---` block in `contents` with `body`
+// (dropping the old body up to the next header line or EOF), preserving
+// everything else. Only ever called once `fill_or_add_section` has confirmed
+// `section` is present, so the "not found" fallthrough below is never actually
+// hit by a real caller — it falls out of the line-walk for free, not worth
+// special-casing away.
+fn fill_section(contents: str, section: str, body: str) -> str {
+    // Walk `contents` line by line (matching Rust's `str::lines()`: no line
+    // terminators kept, no trailing empty line for a final `\n`, but the final
+    // unterminated line — if any — still counts). Every line is re-emitted with
+    // a `\n` terminator; when a line is the `--- section ---` header, `body`
+    // replaces whatever followed it up to (not including) the next header.
+    mut out = "";
+    mut skipping = false;
+    mut line_start = 0;
+    for (let (i, c) : contents.enumerate()) {
+        if (c == '\n') {
+            let line = contents[line_start..i];
+            let hdr = parse_test_section_header(line);
+            if (!(skipping && hdr == none)) {
+                set skipping = false;
+                set out = out + line + "\n";
+                if (hdr == some(section)) {
+                    set out = out + body + "\n";
+                    set skipping = true;
+                };
+            };
+            set line_start = i + 1;
+        };
+    }
+    if (line_start < contents.len()) {
+        let line = contents[line_start..];
+        let hdr = parse_test_section_header(line);
+        if (!(skipping && hdr == none)) {
+            set out = out + line + "\n";
+            if (hdr == some(section)) {
+                set out = out + body + "\n";
+            };
+        };
+    };
+    out
+}
 
 // Whether `contents` already carries a `--- section ---` header. `lines`
 // mirrors plain `split("\n")` (a spurious trailing empty element for a final
@@ -24,20 +66,36 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
         contents.trim_end_while(|c| c == '\n' || c == '\r') + "\n--- " + section + " ---\n" + body + "\n"
     }
 }.doc("""
-Like `fill_section`, but appends `--- section ---\\n<body>\\n` (after dropping
-any trailing newlines) when `contents` doesn't already carry that section,
+Replaces the body of the `--- section ---` block in `contents` with `body`
+(dropping the old body up to the next header line or EOF), preserving
+everything else; or, when `contents` doesn't already carry that section,
+appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
 instead of requiring it to exist.
 """).test({
-    // Expected values here carry real `--- name ---` marker lines, so they
-    // stay escaped (`\n`), not `"""`-raw: this file is itself parsed through
-    // `strip_test_sections`, which cuts at the first line that trims to
-    // exactly `--- name ---` — a raw string with such a line embedded would
-    // truncate mid-literal at parse time. Inputs with no marker lines use a
-    // plain multiline string.
+    // Most cases here exercise real `--- name ---` marker lines, so their
+    // fixture strings must stay escaped (`\n`), not `"""`-raw: this file is
+    // itself parsed through `strip_test_sections`, which cuts a file at the
+    // first line that trims to exactly `--- name ---` — a raw string with such
+    // a line embedded would truncate mid-literal at parse time. Content with no
+    // marker lines uses a plain multiline string.
 
-    // Section already present: same behavior as `fill_section`.
-    assert(fill_or_add_section("a\n--- foo ---\nold\n", "foo", "new")
-        == "a\n--- foo ---\nnew\n");
+    // Section present: single-line body, more content follows.
+    assert(fill_or_add_section("a\n--- foo ---\nold\n--- bar ---\nb\n", "foo", "new")
+        == "a\n--- foo ---\nnew\n--- bar ---\nb\n");
+    // Section present: multi-line old body, all of it dropped.
+    assert(fill_or_add_section("--- foo ---\nold1\nold2\n", "foo", "new")
+        == "--- foo ---\nnew\n");
+    // Section present: the header is the final, unterminated line (no
+    // trailing `\n` at all).
+    assert(fill_or_add_section("--- foo ---", "foo", "new") == "--- foo ---\nnew\n");
+    // Section present: old body is the final, unterminated content.
+    assert(fill_or_add_section("--- foo ---\nold", "foo", "new") == "--- foo ---\nnew\n");
+    // Section present: adjacent headers — an empty old body (the next line is
+    // itself a header) has nothing to drop, and the following section passes
+    // through untouched.
+    assert(fill_or_add_section("--- foo ---\n--- bar ---\nX\n", "foo", "new")
+        == "--- foo ---\nnew\n--- bar ---\nX\n");
+
     // Section missing: appended after stripping trailing newlines.
     assert(fill_or_add_section(
         """
@@ -61,9 +119,9 @@ instead of requiring it to exist.
     assert(fill_or_add_section("", "stdout", "hi") == "\n--- stdout ---\nhi\n");
 })
 --- performance ---
-allocations: 34
-deallocations: 34
-reallocations: 6
-bytes allocated: 1392
-instructions executed: 3083
-binary size: 12664
+allocations: 78
+deallocations: 78
+reallocations: 28
+bytes allocated: 3096
+instructions executed: 9984
+binary size: 16072
