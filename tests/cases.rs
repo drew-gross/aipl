@@ -1332,7 +1332,7 @@ fn run_performance_check(
     let placeholder = expected_body.trim() == "?";
     // In fill mode always overwrite — no `?` required.
     if fill_mode() {
-        fill_performance(orig_path, &actual);
+        fill_or_add_section(orig_path, "performance", &actual.render());
         eprintln!("[{}]: filled performance counts", orig_path.display());
         return Outcome::Skip;
     }
@@ -1488,19 +1488,13 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     })
 }
 
-/// Rewrite the `--- performance ---` body of `path` in place with the measured
-/// counts, preserving any other sections.
-fn fill_performance(path: &Path, stats: &PerfStats) {
-    fill_or_add_section(path, "performance", &stats.render());
-}
-
 /// Replace the body of the `--- <section> ---` block in the case file with
 /// `body` (dropping the old body up to the next header or EOF), or append
 /// `--- <section> ---\n<body>\n` when the section doesn't already exist. Every
 /// call site here targets a section that's already required to exist except
 /// `stdout` (which many cases omit, relying on the default-empty behavior), so
 /// one function covers both. The transform itself is the dogfooded AIPL
-/// `fill_or_add_section`, run from checked-in IR (see
+/// fill_or_add_section, run from checked-in IR (see
 /// [`aipl::codegen::fill_or_add_section`]).
 fn fill_or_add_section(path: &Path, section: &str, body: &str) {
     let contents = fs::read_to_string(path).expect("read case for fill");
