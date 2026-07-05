@@ -1,0 +1,178 @@
+; dogfood-ir v1
+; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
+; DO NOT EDIT BY HAND. Regenerate:
+;   cargo test --test dogfood_ir -- --ignored fill_dogfood_ir
+; entry assert_loc 0 str Span -> str
+; struct Span 16 start@0:i64 end@8:i64
+; import 1 aipl_str_slice
+; import 2 aipl_str_iter_init
+; import 3 aipl_str_iter_next
+; import 4 aipl_inc
+; import 5 aipl_trim
+; import 7 aipl_concat
+; import 8 aipl_dec
+; import 9 aipl_i64_len
+; import 10 aipl_str_alloc
+; import 11 aipl_write_i64
+
+; assert_loc
+function u0:0(i64, i64) -> i64 apple_aarch64 {
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 56, align = 8
+    ss2 = explicit_slot 8, align = 8
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    sig1 = (i64, i64) apple_aarch64
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    sig4 = (i64) -> i64 apple_aarch64
+    sig5 = (i64) -> i64 apple_aarch64
+    sig6 = (i64, i64) -> i64 apple_aarch64
+    sig7 = (i64, i64) -> i64 apple_aarch64
+    sig8 = (i64, i64) -> i64 apple_aarch64
+    sig9 = (i64, i64) -> i64 apple_aarch64
+    sig10 = (i64) apple_aarch64
+    fn0 = u0:1 sig0  ; aipl_str_slice
+    fn1 = u0:2 sig1  ; aipl_str_iter_init
+    fn2 = u0:3 sig2  ; aipl_str_iter_next
+    fn3 = u0:4 sig3  ; aipl_inc
+    fn4 = u0:5 sig4  ; aipl_trim
+    fn5 = colocated u0:6 sig5  ; __to_str_0
+    fn6 = u0:7 sig6  ; aipl_concat
+    fn7 = u0:7 sig7  ; aipl_concat
+    fn8 = u0:7 sig8  ; aipl_concat
+    fn9 = u0:7 sig9  ; aipl_concat
+    fn10 = u0:8 sig10  ; aipl_dec
+
+block0(v0: i64, v1: i64):
+    v2 = iconst.i64 0
+    stack_store v2, ss0  ; v2 = 0
+    v3 = iconst.i64 0
+    v4 = load.i64 notrap aligned v1
+    v5 = call fn0(v0, v3, v4)  ; v3 = 0
+    v6 = stack_addr.i64 ss1
+    call fn1(v6, v5)
+    v7 = iconst.i64 0
+    stack_store v7, ss2  ; v7 = 0
+    jump block1
+
+block1:
+    v8 = stack_load.i64 ss2
+    v9 = call fn2(v6)
+    v10 = icmp_imm sge v9, 0
+    brif v10, block2, block3
+
+block2:
+    v11 = iconst.i64 10
+    v12 = icmp.i64 eq v9, v11  ; v11 = 10
+    v13 = uextend.i64 v12
+    brif v13, block4, block5
+
+block4:
+    v15 = stack_load.i64 ss0
+    v16 = iconst.i64 1
+    v17 = iadd v15, v16  ; v16 = 1
+    stack_store v17, ss0
+    v18 = iconst.i64 0
+    jump block6(v18)  ; v18 = 0
+
+block5:
+    v19 = iconst.i64 0
+    jump block6(v19)  ; v19 = 0
+
+block6(v14: i64):
+    v20 = iconst.i64 0
+    v21 = iadd_imm.i64 v8, 1
+    stack_store v21, ss2
+    jump block1
+
+block3:
+    v22 = iconst.i64 0
+    v23 = stack_load.i64 ss0
+    v24 = iconst.i64 1
+    v25 = iadd v23, v24  ; v24 = 1
+    v26 = load.i64 notrap aligned v1
+    v27 = load.i64 notrap aligned v1+8
+    v28 = call fn0(v0, v26, v27)
+    call fn3(v28)
+    v29 = call fn4(v28)
+    v30 = iconst.i64 0x003a_7475_706e_6919
+    v31 = call fn5(v25)
+    call fn3(v30)  ; v30 = 0x003a_7475_706e_6919
+    call fn3(v31)
+    v32 = call fn6(v30, v31)  ; v30 = 0x003a_7475_706e_6919
+    v33 = iconst.i64 0x0020_3a09
+    call fn3(v33)  ; v33 = 0x0020_3a09
+    call fn3(v29)
+    v34 = call fn7(v33, v29)  ; v33 = 0x0020_3a09
+    v35 = iconst.i64 1
+    call fn3(v34)
+    call fn3(v35)  ; v35 = 1
+    v36 = call fn8(v34, v35)  ; v35 = 1
+    call fn3(v32)
+    call fn3(v36)
+    v37 = call fn9(v32, v36)
+    call fn3(v37)
+    call fn10(v0)
+    call fn10(v5)
+    call fn10(v28)
+    call fn10(v29)
+    call fn10(v31)
+    call fn10(v32)
+    call fn10(v34)
+    call fn10(v36)
+    call fn10(v37)
+    return v37
+}
+
+; source variables:
+;   v0 = src
+;   v1 = span
+;   ss0 = n
+;   v9 = c
+;   v25 = line
+;   v29 = text
+; __to_str_0
+function u0:6(i64) -> i64 apple_aarch64 {
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 8, align = 8
+    ss2 = explicit_slot 8, align = 8
+    sig0 = (i64) -> i64 apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    fn0 = u0:9 sig0  ; aipl_i64_len
+    fn1 = u0:10 sig1  ; aipl_str_alloc
+    fn2 = u0:11 sig2  ; aipl_write_i64
+
+block0(v0: i64):
+    v1 = call fn0(v0)
+    v2 = icmp_imm sle v1, 7
+    brif v2, block1, block2
+
+block1:
+    v3 = iconst.i64 0
+    stack_store v3, ss0  ; v3 = 0
+    v4 = stack_addr.i64 ss0
+    v5 = iadd_imm v4, 1
+    stack_store v5, ss1
+    jump block3
+
+block2:
+    v6 = call fn1(v1)
+    stack_store v6, ss1
+    stack_store v6, ss2
+    jump block3
+
+block3:
+    v7 = call fn0(v0)
+    v8 = stack_load.i64 ss1
+    v9 = call fn2(v8, v0)
+    stack_store v9, ss1
+    v10 = stack_load.i64 ss0
+    v11 = ishl_imm.i64 v1, 2
+    v12 = bor_imm v11, 1
+    v13 = bor v10, v12
+    v14 = stack_load.i64 ss2
+    v15 = select v2, v13, v14
+    return v15
+}
+

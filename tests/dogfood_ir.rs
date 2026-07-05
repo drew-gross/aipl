@@ -156,6 +156,29 @@ fn sanity_check(engine: &DogfoodEngine, artifact: &str) {
                 .unwrap();
             assert_eq!(clean, FfiValue::Opt(None));
         }
+        "assert_loc.clif" => {
+            // Formats `input:LINE: TEXT` (1-based line, trimmed condition text).
+            let span = |start, end| {
+                FfiValue::Struct(vec![
+                    ("start".to_string(), FfiValue::Int(start)),
+                    ("end".to_string(), FfiValue::Int(end)),
+                ])
+            };
+            let result = comp
+                .call_values(
+                    "assert_loc",
+                    &[FfiValue::Str("assert(x == 1)".to_string()), span(7, 13)],
+                )
+                .unwrap();
+            assert_eq!(result, FfiValue::Str("input:1: x == 1".to_string()));
+            let line2 = comp
+                .call_values(
+                    "assert_loc",
+                    &[FfiValue::Str("a\nassert(y)".to_string()), span(9, 10)],
+                )
+                .unwrap();
+            assert_eq!(line2, FfiValue::Str("input:2: y".to_string()));
+        }
         "line_at.clif" => {
             // Returns `LineAt { line, line_start, line_end }`: the 0-based line
             // index, byte offset of the line's first byte, and byte offset of the

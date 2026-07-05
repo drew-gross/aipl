@@ -3180,12 +3180,27 @@ fn bake_asserts(e: &mut Expr, src: &str) {
 
 /// Format an assertion's source location as `input:LINE: TEXT` (1-based line,
 /// the condition's trimmed source text), matching the `input:` filename the rest
-/// of the compiler's diagnostics use.
+/// of the compiler's diagnostics use. Dogfooded: the AIPL `assert_loc`, run
+/// through the embedding FFI via the installed hook. There is **no native
+/// fallback**: it panics if the hook isn't installed, so install it (via
+/// `install_parser_hooks`) before parsing.
 fn assert_loc(src: &str, span: Span) -> String {
-    let upto = span.start.min(src.len());
-    let line = src[..upto].bytes().filter(|&b| b == b'\n').count() + 1;
-    let text = src.get(span.start..span.end).unwrap_or("").trim();
-    format!("input:{line}: {text}")
+    let hook = ASSERT_LOC_HOOK
+        .get()
+        .expect("assert-loc hook not installed before parsing (call install_parser_hooks)");
+    hook(src, span)
+}
+
+/// The assertion-location formatter, installed by the compiler (via
+/// [`set_assert_loc_hook`]) to dogfood the AIPL `assert_loc`. Required — see
+/// [`assert_loc`].
+static ASSERT_LOC_HOOK: std::sync::OnceLock<fn(&str, Span) -> String> = std::sync::OnceLock::new();
+
+/// Install the assertion-location formatter. The compiler points this at the
+/// dogfooded AIPL `assert_loc`, run through the embedding FFI. First install
+/// wins (the hook is process-global).
+pub fn set_assert_loc_hook(f: fn(&str, Span) -> String) {
+    let _ = ASSERT_LOC_HOOK.set(f);
 }
 
 /// Friendly names for grammar symbols, used to turn the parser's internal

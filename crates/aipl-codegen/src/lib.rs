@@ -2485,6 +2485,14 @@ const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespac
 /// The checked-in dogfood IR for `find_trailing_whitespace`.
 const FIND_TRAILING_WHITESPACE_CLIF: &str = include_str!("find_trailing_whitespace.clif");
 
+/// The dogfooded AIPL `assert_loc` (`str, Span -> str`) the *parser* calls
+/// (through the hook installed by [`install_parser_hooks`]) while baking
+/// `assert(cond)` calls inside `.test({ .. })` bodies into `__assert(cond, loc)`,
+/// to format each assertion's source location for the `check` failure report.
+const ASSERT_LOC_SRC: &str = include_str!("assert_loc.aipl");
+/// The checked-in dogfood IR for `assert_loc`.
+const ASSERT_LOC_CLIF: &str = include_str!("assert_loc.clif");
+
 /// The dogfooded AIPL `line_at` (`str, i64 -> LineAt`) — bundled as a source
 /// dependency of `caret_block` and verified standalone by the `dogfood_ir` test.
 const LINE_AT_SRC: &str = include_str!("line_at.aipl");
@@ -2653,6 +2661,39 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
 }
 
 thread_local! {
+    /// The `assert_loc` engine, re-linked from the checked-in IR lazily on first
+    /// use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`.
+    /// Re-linking runs no AIPL frontend, so it never recurses into parsing even
+    /// though this hook is itself invoked from the parser.
+    static ASSERT_LOC_ENGINE: Compilation = Compilation::from_artifact(ASSERT_LOC_CLIF)
+        .expect("dogfooded `assert_loc` engine builds");
+}
+
+/// The parser's assert-location hook (see [`install_parser_hooks`]): formats an
+/// assertion's source location as `input:LINE: TEXT` (1-based line, the
+/// condition's trimmed source text) — computed by the dogfooded AIPL
+/// `assert_loc` via the FFI, with `span` marshaled as an [`FfiValue::Struct`] of
+/// its `start`/`end` fields (mirroring [`caret_block`]). No native fallback;
+/// panics if it can't be built or called.
+fn assert_loc(source: &str, span: Span) -> String {
+    ASSERT_LOC_ENGINE.with(|comp| {
+        match comp.call_values(
+            "assert_loc",
+            &[
+                FfiValue::Str(source.to_string()),
+                FfiValue::Struct(vec![
+                    ("start".to_string(), FfiValue::Int(span.start as i64)),
+                    ("end".to_string(), FfiValue::Int(span.end as i64)),
+                ]),
+            ],
+        ) {
+            Ok(FfiValue::Str(s)) => s,
+            other => panic!("dogfooded assert_loc() call: {other:?}"),
+        }
+    })
+}
+
+thread_local! {
     /// The `caret_block` engine (which bundles `line_at`), re-linked from the
     /// checked-in IR lazily on first use per thread. Like [`ADD_ENGINE`], a
     /// `Compilation` isn't `Sync`. Re-linking runs no AIPL frontend, so building it
@@ -2760,16 +2801,18 @@ pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
-/// the trailing-whitespace finder at [`find_trailing_whitespace`], and the
-/// error-renderer's caret-block formatter at [`caret_block`]. Idempotent (first
-/// install wins). The compiler's entry points (the CLI and the embedding
-/// [`Compilation`] API's callers) install them; there are **no native fallbacks**,
-/// so any in-process parse (or error render) must install them first.
+/// the trailing-whitespace finder at [`find_trailing_whitespace`], the
+/// assertion-location formatter at [`assert_loc`], and the error-renderer's
+/// caret-block formatter at [`caret_block`]. Idempotent (first install wins).
+/// The compiler's entry points (the CLI and the embedding [`Compilation`] API's
+/// callers) install them; there are **no native fallbacks**, so any in-process
+/// parse (or error render) must install them first.
 pub fn install_parser_hooks() {
     aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
+    aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_syntax::set_caret_block_hook(caret_block);
 }
 
@@ -2835,6 +2878,11 @@ pub fn dogfood_engines() -> Vec<DogfoodEngine> {
                 "./find_trailing_whitespace.aipl",
                 FIND_TRAILING_WHITESPACE_SRC,
             )],
+        },
+        DogfoodEngine {
+            clif_file: "assert_loc.clif",
+            entries: &["assert_loc"],
+            sources: &[("./assert_loc.aipl", ASSERT_LOC_SRC)],
         },
         // `line_at` is still verified standalone even though it's now bundled
         // inside the `caret_block` engine — the standalone CLIF check stays as

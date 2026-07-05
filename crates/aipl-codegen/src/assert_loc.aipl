@@ -1,0 +1,33 @@
+// The `assert(cond)` location formatter: the compiler calls this through the
+// FFI (see `install_parser_hooks`) while baking `assert(cond)` calls inside
+// `.test({ .. })` bodies into `__assert(cond, loc)`, capturing each assertion's
+// source location for the `check` failure report. `span` is the condition's
+// half-open byte range within `src`; both bounds clamp to `[0, len]` (and an
+// out-of-order range collapses to "") via ordinary string-slicing semantics, so
+// no manual clamping is needed here.
+import { wrapping_add as +, ==, trim } from builtins;
+
+struct Span { start: i64, end: i64 }
+
+pub fn assert_loc(src: str, span: Span) -> str {
+    mut n = 0;
+    for (let c : src[..span.start]) {
+        if (c == '\n') {
+            set n = n + 1;
+        };
+    }
+    let line = n + 1;
+    let text = src[span.start..span.end].trim();
+    `input:{line}: {text}`
+}.test({
+    assert(assert_loc("assert(x == 1)", Span { start: 7, end: 13 }) == "input:1: x == 1");
+    // Line number counts newlines strictly before the span's start.
+    assert(assert_loc("a\nassert(y)", Span { start: 9, end: 10 }) == "input:2: y");
+    assert(assert_loc("a\nb\nassert(z)", Span { start: 11, end: 12 }) == "input:3: z");
+    // The condition text is trimmed of surrounding whitespace.
+    assert(assert_loc("assert(  x  )", Span { start: 7, end: 12 }) == "input:1: x");
+    // A span past the end of `src` clamps to the whole remainder (empty here).
+    assert(assert_loc("short", Span { start: 5, end: 10 }) == "input:1: ");
+    // An empty source with a zero-width span at 0.
+    assert(assert_loc("", Span { start: 0, end: 0 }) == "input:1: ");
+})
