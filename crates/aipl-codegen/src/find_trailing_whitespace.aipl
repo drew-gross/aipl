@@ -1,14 +1,11 @@
 // The parser's trailing-whitespace locator: the compiler calls this through the
 // FFI (see `install_parser_hooks`) from `reject_trailing_whitespace` on every
 // parse, and `aipl check` exercises it via the `.test` block below. It returns a
-// `Span?` — an optional user-defined struct returned over the FFI — locating the
+// `Span?` — an optional builtin `Span` returned over the FFI — locating the
 // first offending run, or `none` when there is none; `aipl_str_iter_next` walks
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
-import { wrapping_add as +, ==, ||, &&, -, >, is_some } from builtins;
-
-// A half-open byte range `[start, end)`.
-struct Span { start: i64, end: i64 }
+import { wrapping_add as +, ==, ||, &&, -, >, is_some, Span } from builtins;
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'

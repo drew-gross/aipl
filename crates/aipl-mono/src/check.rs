@@ -314,7 +314,13 @@ impl Cx<'_> {
                 if ok {
                     Ok(())
                 } else {
-                    Err(Error::msg(format!("fn {fname:?}: unknown type {n:?}")))
+                    let mut msg = format!("fn {fname:?}: unknown type {n:?}");
+                    if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&n.as_str()) {
+                        msg.push_str(&format!(
+                            " — {n:?} is a builtin type; import it with `import {{ {n} }} from builtins;`"
+                        ));
+                    }
+                    Err(Error::msg(msg))
                 }
             }
             // Array/optional element types: a scalar, `str`, a nested array, or
@@ -1094,7 +1100,7 @@ impl Cx<'_> {
                 };
                 let fields = self.struct_fields(sn).ok_or_else(|| {
                     Error::at(
-                        format!("field access on non-struct value of type {sn}"),
+                        format!("field access on non-struct value of type {}", display(sn)),
                         obj.span.clone(),
                     )
                 })?;
@@ -1104,16 +1110,21 @@ impl Cx<'_> {
                     .map(|(_, t, _)| t.clone())
                     .ok_or_else(|| {
                         Error::at(
-                            format!("struct {sn:?} has no field {fname:?}"),
+                            format!("struct {:?} has no field {fname:?}", display(sn)),
                             span.clone(),
                         )
                     })?
             }
             ExprKind::Construct(name, inits) => {
-                let fields =
-                    self.structs.get(name).cloned().ok_or_else(|| {
-                        Error::at(format!("unknown struct {name:?}"), span.clone())
-                    })?;
+                let fields = self.structs.get(name).cloned().ok_or_else(|| {
+                    let mut msg = format!("unknown struct {name:?}");
+                    if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&name.as_str()) {
+                        msg.push_str(&format!(
+                            " — {name:?} is a builtin type; import it with `import {{ {name} }} from builtins;`"
+                        ));
+                    }
+                    Error::at(msg, span.clone())
+                })?;
                 // Each provided init must name a real field with a compatible type.
                 for fi in inits {
                     let (_, expected, _) = fields
@@ -1121,7 +1132,7 @@ impl Cx<'_> {
                         .find(|(n, _, _)| *n == fi.name)
                         .ok_or_else(|| {
                             Error::at(
-                                format!("struct {name:?} has no field {:?}", fi.name),
+                                format!("struct {:?} has no field {:?}", display(name), fi.name),
                                 fi.value.span.clone(),
                             )
                         })?;
@@ -1129,7 +1140,7 @@ impl Cx<'_> {
                     expect(
                         &vt,
                         expected,
-                        &format!("struct {name:?} field {:?}", fi.name),
+                        &format!("struct {:?} field {:?}", display(name), fi.name),
                         fi.value.span.clone(),
                     )?;
                 }
@@ -1138,7 +1149,8 @@ impl Cx<'_> {
                     if !has_default && !inits.iter().any(|i| &i.name == fname) {
                         return Err(Error::at(
                             format!(
-                                "struct {name:?} field {fname:?} has no default and was not provided"
+                                "struct {:?} field {fname:?} has no default and was not provided",
+                                display(name)
                             ),
                             span.clone(),
                         ));
@@ -2040,6 +2052,10 @@ fn tyname(t: &Type) -> String {
         Type::Array(inner) if is_typevar(inner) => "an array of a type parameter".to_string(),
         Type::Set(inner) if is_typevar(inner) => "a set of a type parameter".to_string(),
         Type::Named(n) if n == "__unknown__" => "_".to_string(),
+        // A builtin type (e.g. `Span`) is internally named with the reserved
+        // `__builtin_` prefix (see `display`) so a user's own type can never
+        // collide with it — strip it back off for diagnostics.
+        Type::Named(n) => display(n).to_string(),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
         Type::Set(inner) => format!("#{{{}}}", tyname(inner)),

@@ -986,6 +986,12 @@ pub fn is_error(t: &Type) -> bool {
 /// type so it type-checks like any function — it is never compiled
 /// (monomorphization and codegen lower the real implementations).
 ///
+/// It also carries builtin *type* declarations (currently just `Span`) for the
+/// same reason: the checker recognizes them as ordinary structs with no notion
+/// that they're builtin, while `aipl-codegen` separately seeds its own struct
+/// layout table with them (see `builtin_struct_decls`/`build_struct_layouts`),
+/// since a user program's own compiled AST never contains these items.
+///
 /// Authoring notes: `<T: any>` (unconstrained) and `<T: ord>` (comparable
 /// scalars — integers and `char`, see [`ast::Bound`]) are the only valid
 /// generic bounds; effects precede
@@ -993,6 +999,9 @@ pub fn is_error(t: &Type) -> bool {
 /// marks a mutating method. First parameters are named `self` so the
 /// receiver-style builtins are method-callable (`xs.map(..)`, `opt.value_or(..)`).
 pub const BUILTIN_SIGNATURES: &str = r#"
+// A half-open byte range `[start, end)`, e.g. a source-text location.
+struct __builtin_Span { start: i64, end: i64 }
+
 fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
@@ -1224,6 +1233,26 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
 /// never collide with — or silently shadow — a builtin.
 pub fn builtin_canonical(name: &str) -> Option<String> {
     if IMPORTABLE_BUILTINS.contains(&name) {
+        Some(format!("__builtin_{name}"))
+    } else {
+        None
+    }
+}
+
+/// Built-in *type* names that must be brought into scope with
+/// `import { .. } from builtins;` before use — the type-level analog of
+/// [`IMPORTABLE_BUILTINS`]. Unlike the ambient builtin `Error` type (which
+/// needs no import), these behave like any other importable builtin: gated,
+/// and mapped to a reserved canonical name so a user's own type of the same
+/// name can never silently collide.
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span"];
+
+/// Canonical internal name for an importable builtin type, or `None` if
+/// `name` isn't one. Mirrors [`builtin_canonical`] for types: the loader
+/// rewrites an imported `Span` to `__builtin_Span`, the name
+/// [`BUILTIN_SIGNATURES`] actually declares the struct under.
+pub fn builtin_type_canonical(name: &str) -> Option<String> {
+    if IMPORTABLE_BUILTIN_TYPES.contains(&name) {
         Some(format!("__builtin_{name}"))
     } else {
         None

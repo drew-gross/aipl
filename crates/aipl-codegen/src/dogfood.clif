@@ -5,16 +5,14 @@
 ; entry process_raw_string 12 str -> str
 ; entry parse_test_section_header 11 str -> str?
 ; entry strip_test_sections 13 str -> str
-; entry find_trailing_whitespace 8 str -> __m10__Span?
-; entry assert_loc 0 str __m11__Span -> str
+; entry find_trailing_whitespace 8 str -> __builtin_Span?
+; entry assert_loc 0 str __builtin_Span -> str
 ; entry line_at 9 str i64 -> __m12__LineAt
-; entry caret_block 1 str __m13__Span str -> str
+; entry caret_block 1 str __builtin_Span str -> str
 ; entry fill_or_add_section 5 str str str -> str
 ; entry fill_or_add_section_file 6 str str str -> unit!Error
-; struct __m10__Span 16 start@0:i64 end@8:i64
-; struct __m11__Span 16 start@0:i64 end@8:i64
+; struct __builtin_Span 16 start@0:i64 end@8:i64
 ; struct __m12__LineAt 24 line@0:i64 line_start@8:i64 line_end@16:i64
-; struct __m13__Span 16 start@0:i64 end@8:i64
 ; import 32 aipl_str_slice
 ; import 33 aipl_inc
 ; import 34 aipl_trim
@@ -335,7 +333,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ;   v0 = source
 ;   v1 = span
 ;   v2 = filename
-;   v4 = __spat$700
+;   v4 = __spat$668
 ;   v5 = line_start
 ;   v6 = line
 ;   v7 = line_end

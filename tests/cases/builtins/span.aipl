@@ -1,0 +1,27 @@
+import { print, to_str, ==, hash, Span } from builtins;
+
+fn main() !prints {
+    let s = Span { start: 3, end: 7 };
+    print(s.start.to_str());
+    print(s.end.to_str());
+    print(to_str(s));
+    print((s == Span { start: 3, end: 7 }).to_str());
+    print((s == Span { start: 3, end: 8 }).to_str());
+    print((hash(s) == hash(Span { start: 3, end: 7 })).to_str());
+}
+--- stdout ---
+3
+7
+Span { start: 3, end: 7 }
+true
+false
+true
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 42
+instructions executed: 368
+binary size: 3856
+--- monomorphizations ---
+main

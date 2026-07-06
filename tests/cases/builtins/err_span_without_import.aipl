@@ -1,0 +1,9 @@
+fn main() {
+    let s = Span { start: 1, end: 2 };
+}
+--- errors ---
+error: unknown struct "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+ --> input:2:13
+  |
+2 |     let s = Span { start: 1, end: 2 };
+  |             ^^^^^^^^^^^^^^^^^^^^^^^

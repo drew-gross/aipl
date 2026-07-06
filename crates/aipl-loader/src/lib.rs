@@ -425,10 +425,15 @@ impl Loader {
                         ));
                     }
                     n.name.clone()
+                } else if let Some(canonical) = builtin_canonical(&n.name) {
+                    canonical
+                } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
+                    canonical
                 } else {
-                    builtin_canonical(&n.name).ok_or_else(|| {
-                        Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone())
-                    })?
+                    return Err(Error::at(
+                        format!("\"{}\" is not a builtin", n.name),
+                        n.span.clone(),
+                    ));
                 };
                 if view.insert(local.to_string(), canonical).is_some() {
                     return Err(import_conflict(

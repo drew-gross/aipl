@@ -2357,6 +2357,19 @@ fn builtin_decls() -> Vec<Item> {
         .collect()
 }
 
+/// The `struct` declarations among [`BUILTIN_SIGNATURES`] (currently just
+/// `__builtin_Span`) — the builtin *types*, as opposed to the builtin
+/// function signatures that make up the rest of that constant.
+fn builtin_struct_decls() -> Vec<StructDecl> {
+    builtin_decls()
+        .into_iter()
+        .filter_map(|item| match item {
+            Item::Struct(s) => Some(s),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Build the program the `check` command JIT-runs. Keeps every original item
 /// (with any `.test` body stripped so `run`/`build` semantics are unchanged),
 /// adds a `__test$<fn>` function per tested function (body = the test block,
@@ -2764,6 +2777,22 @@ fn compile_program<M: Module>(
     // separate measurement object.
     instrument: bool,
 ) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Error> {
+    // Builtin *types* (e.g. `__builtin_Span`) are real struct declarations,
+    // unlike builtin functions: a call to a builtin function is intercepted by
+    // reserved name in codegen and never needs to reach monomorphization as a
+    // real item, but a builtin-typed value is constructed/laid out/passed
+    // around exactly like a user struct, so it must flow through mono and
+    // codegen as one. Prepend them to the actual compiled program (not just
+    // the checker-only view below) so `build_struct_layouts` and mono's own
+    // struct table see them regardless of which file (if any) imports them.
+    let program = &Program {
+        items: builtin_struct_decls()
+            .into_iter()
+            .map(Item::Struct)
+            .chain(program.items.iter().cloned())
+            .collect(),
+    };
+
     // Standalone type-check over the (non-monomorphized) source: validates
     // every function in isolation, so errors are reported independent of which
     // instances get emitted. Runs before monomorphization.
@@ -2781,7 +2810,10 @@ fn compile_program<M: Module>(
     // Builtin signatures may contain tuple types (e.g. `enumerate`'s `(i64, T)[]`
     // return), so lower them the same way the user's program was lowered. The
     // resulting synthetic struct definitions are prepended; the checker overwrites
-    // on duplicate names, which is fine since identical structs are always produced.
+    // on duplicate names, which is fine since identical structs are always produced
+    // (this also re-adds the builtin struct decls spliced in above, redundantly but
+    // harmlessly — the checker's struct map is a plain overwrite-on-insert, not an
+    // error, on a duplicate name).
     let lowered_builtins = aipl_mono::lower_tuples(&Program {
         items: builtin_decls(),
     });
@@ -7521,7 +7553,13 @@ fn emit_render_struct<M: Module>(
         .iter()
         .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
         .collect();
-    let mut len = emit_lit(module, builder, cx, sink, format!("{sname} {{ ").as_bytes())?;
+    let mut len = emit_lit(
+        module,
+        builder,
+        cx,
+        sink,
+        format!("{} {{ ", display_name(sname)).as_bytes(),
+    )?;
     for (i, (fname, offset, fty)) in fields.iter().enumerate() {
         if i > 0 {
             let sep = emit_lit(module, builder, cx, sink, b", ")?;
@@ -9974,11 +10012,17 @@ fn compile_expr<M: Module>(
             let layout = structs
                 .get(name)
                 .and_then(TypeDef::as_struct)
-                .ok_or_else(|| Error::at(format!("unknown struct {name:?}"), span.clone()))?;
+                .ok_or_else(|| {
+                    Error::at(
+                        format!("unknown struct {:?}", display_name(name)),
+                        span.clone(),
+                    )
+                })?;
             if field_inits.len() != layout.fields.len() {
                 return Err(Error::at(
                     format!(
-                        "struct {name:?} expects {} field(s), got {}",
+                        "struct {:?} expects {} field(s), got {}",
+                        display_name(name),
                         layout.fields.len(),
                         field_inits.len()
                     ),
@@ -9989,7 +10033,11 @@ fn compile_expr<M: Module>(
             for init in field_inits {
                 let field = layout.field(&init.name).ok_or_else(|| {
                     Error::at(
-                        format!("struct {name:?} has no field {:?}", init.name),
+                        format!(
+                            "struct {:?} has no field {:?}",
+                            display_name(name),
+                            init.name
+                        ),
                         init.value.span.clone(),
                     )
                 })?;
@@ -10000,7 +10048,7 @@ fn compile_expr<M: Module>(
                 expect_type(
                     &actual,
                     &fty,
-                    &format!("struct {name:?} field {:?}", init.name),
+                    &format!("struct {:?} field {:?}", display_name(name), init.name),
                     init.value.span.clone(),
                 )?;
                 // A scalar/heap field is an 8-byte value; an optional field is
@@ -10050,13 +10098,19 @@ fn compile_expr<M: Module>(
                 .and_then(TypeDef::as_struct)
                 .ok_or_else(|| {
                     Error::at(
-                        format!("field access on non-struct value of type {struct_name:?}"),
+                        format!(
+                            "field access on non-struct value of type {:?}",
+                            display_name(struct_name)
+                        ),
                         obj.span.clone(),
                     )
                 })?;
             let field = layout.field(field_name).ok_or_else(|| {
                 Error::at(
-                    format!("struct {struct_name:?} has no field {field_name:?}"),
+                    format!(
+                        "struct {:?} has no field {field_name:?}",
+                        display_name(struct_name)
+                    ),
                     span.clone(),
                 )
             })?;
