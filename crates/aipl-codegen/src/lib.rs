@@ -2443,13 +2443,16 @@ pub fn build_test_program(program: &Program) -> Program {
 // separately list its own transitive dependencies as bundled in-memory
 // modules — every dogfooded `.aipl` file is gathered into one list
 // ([`DOGFOOD_SOURCES`]) and compiled together as a single program with one
-// root ([`dogfood_entries.aipl`], included first), one checked-in artifact
-// ([`dogfood.clif`]), and one set of FFI entry points ([`DOGFOOD_ENTRIES`]).
-// Adding a newly-dogfooded function is then: write the `.aipl` file, add it to
-// `DOGFOOD_SOURCES`, add a trampoline + its name to `dogfood_entries.aipl` /
-// `DOGFOOD_ENTRIES` — one list touched, not a new bundle of duplicated
+// checked-in artifact ([`dogfood.clif`]) and one set of FFI entry points
+// ([`DOGFOOD_ENTRIES`]). `aipl_loader::load_program_sources` still designates
+// `DOGFOOD_SOURCES`' first file as "root" (only its top-level names stay
+// unmangled; every other file's are renamed to `__m<index>__<name>`), but
+// [`resolve_dogfood_entry`] resolves an entries name against either form, so
+// any dogfooded function can be an entry regardless of which file declares
+// it — no aggregator/re-export file required. Adding a newly-dogfooded
+// function is then: write the `.aipl` file and add it to `DOGFOOD_SOURCES` /
+// `DOGFOOD_ENTRIES` — two lists touched, not a new bundle of duplicated
 // dependency sources.
-const DOGFOOD_ENTRIES_SRC: &str = include_str!("dogfood_entries.aipl");
 const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
 const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
 const RAW_STRING_COUNT_WHILE_SRC: &str = include_str!("count_while.aipl");
@@ -2471,16 +2474,14 @@ const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
 const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
-/// modules — the root ([`dogfood_entries.aipl`]) first, so `from "./..."`
-/// imports resolve without disk access. Each file appears exactly once (unlike
-/// the old per-function engines, which each separately bundled copies of their
-/// shared dependencies — `lines.aipl`, `parse_test_section_header.aipl`, etc.).
-/// This is the single source of truth shared by [`DOGFOOD_ENGINE`] (re-linked
-/// from the checked-in [`DOGFOOD_CLIF`]), the author helper that regenerates
-/// it, and the test that verifies it's current — keep it in sync with
-/// `dogfood_entries.aipl`'s imports.
+/// modules — so `from "./..."` imports resolve without disk access. Each file
+/// appears exactly once (unlike the old per-function engines, which each
+/// separately bundled copies of their shared dependencies — `lines.aipl`,
+/// `parse_test_section_header.aipl`, etc.). This is the single source of
+/// truth shared by [`DOGFOOD_ENGINE`] (re-linked from the checked-in
+/// [`DOGFOOD_CLIF`]), the author helper that regenerates it, and the test that
+/// verifies it's current.
 pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
-    ("./dogfood_entries.aipl", DOGFOOD_ENTRIES_SRC),
     ("./process_raw_string.aipl", RAW_STRING_SRC),
     ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
     ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
@@ -2509,10 +2510,10 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
-/// checked-in artifact) — each is a trampoline declared in
-/// `dogfood_entries.aipl` under its real name (see that file's doc comment for
-/// why a trampoline, rather than the real definition, has to be the one at the
-/// program's root).
+/// checked-in artifact) — the real name each is declared with in its own file
+/// under [`DOGFOOD_SOURCES`]. Resolved through mangling by
+/// [`resolve_dogfood_entry`], so a function need not live in the root file to
+/// be listed here.
 pub const DOGFOOD_ENTRIES: &[&str] = &[
     "process_raw_string",
     "parse_test_section_header",
@@ -3166,6 +3167,39 @@ fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
     })
 }
 
+/// Resolve a dogfood `entries` name (e.g. `"assert_loc"`) to its compiled
+/// [`FuncInfo`] in `funcs`, regardless of which file in `sources` declared it.
+/// `aipl_loader::load_program_sources` treats `sources`' first file as root and
+/// leaves its top-level names unmangled, but renames every other file's to
+/// `__m<index>__<name>` — so a match is either an exact hit (the declaring
+/// file was root) or the single compiled name that
+/// [`aipl_loader::unmangled_name`] recovers `name` from. This is what lets any
+/// dogfooded function serve as an FFI entry no matter which file declares it,
+/// with no aggregator/re-export file required. Errors if `name` isn't declared
+/// `pub` anywhere, or is declared in more than one file (ambiguous).
+fn resolve_dogfood_entry<'a>(
+    funcs: &'a HashMap<String, FuncInfo>,
+    name: &str,
+) -> Result<&'a FuncInfo, Error> {
+    if let Some(info) = funcs.get(name) {
+        return Ok(info);
+    }
+    let mut matches = funcs
+        .iter()
+        .filter(|(compiled, _)| aipl_loader::unmangled_name(compiled) == name);
+    let (found_name, info) = matches.next().ok_or_else(|| {
+        Error::msg(format!(
+            "dogfood entry {name:?} not found in the compilation"
+        ))
+    })?;
+    if let Some((other, _)) = matches.next() {
+        return Err(Error::msg(format!(
+            "dogfood entry {name:?} is ambiguous: both {found_name:?} and {other:?} compiled to it"
+        )));
+    }
+    Ok(info)
+}
+
 /// Compile the dogfooded AIPL `sources` through the live frontend and serialize
 /// the result as a checked-in dogfood-IR artifact: CLIF text with a `;`-comment
 /// manifest header recording the builtin-import id↔symbol table and the FFI
@@ -3246,11 +3280,7 @@ pub fn generate_dogfood_artifact(
     // as `; struct` lines after the entries.
     let mut referenced_structs: Vec<String> = Vec::new();
     for name in entries {
-        let info = funcs.get(*name).ok_or_else(|| {
-            Error::msg(format!(
-                "dogfood entry {name:?} not found in the compilation"
-            ))
-        })?;
+        let info = resolve_dogfood_entry(&funcs, name)?;
         let id = match info.link {
             FuncLink::User(id) => id.as_u32(),
             FuncLink::Builtin(_) => {

@@ -568,6 +568,23 @@ fn mangle(is_root: bool, file_index: u32, name: &str) -> String {
     }
 }
 
+/// The inverse of [`mangle`]'s non-root case: strips a `__m<digits>__` prefix
+/// from a compiled item's name, recovering the plain name it was declared with
+/// in its own file — the identity function for a root item (already unmangled)
+/// or any other string that doesn't match the pattern. Lets a caller holding a
+/// flattened [`Program`]'s item names (functions and structs are named exactly
+/// like this — see the module doc) look an item up by the name its source
+/// used, regardless of which file — root or not — declared it.
+pub fn unmangled_name(name: &str) -> &str {
+    let Some(rest) = name.strip_prefix("__m") else {
+        return name;
+    };
+    match rest.find("__") {
+        Some(i) if i > 0 && rest.as_bytes()[..i].iter().all(u8::is_ascii_digit) => &rest[i + 2..],
+        _ => name,
+    }
+}
+
 /// Rewrite one item's global references through `view`. `is_root` says whether
 /// `item` comes from the file being loaded directly, as opposed to a
 /// transitively imported one: a non-root function's `.test({ .. })` body is
@@ -950,4 +967,32 @@ fn import_conflict(
 fn canonicalize(path: &Path) -> Result<PathBuf, Error> {
     path.canonicalize()
         .map_err(|e| Error::msg(format!("resolve {}: {e}", path.display())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unmangled_name;
+
+    #[test]
+    fn strips_a_mangled_prefix() {
+        assert_eq!(unmangled_name("__m3__assert_loc"), "assert_loc");
+        assert_eq!(unmangled_name("__m0__x"), "x");
+        assert_eq!(unmangled_name("__m12__count_while"), "count_while");
+    }
+
+    #[test]
+    fn leaves_an_unmangled_name_alone() {
+        assert_eq!(unmangled_name("assert_loc"), "assert_loc");
+        assert_eq!(unmangled_name(""), "");
+    }
+
+    #[test]
+    fn leaves_lookalikes_alone() {
+        // No digit run between "__m" and the next "__".
+        assert_eq!(unmangled_name("__m__x"), "__m__x");
+        // No second "__" at all.
+        assert_eq!(unmangled_name("__mfoo"), "__mfoo");
+        // A non-digit inside what should be the index.
+        assert_eq!(unmangled_name("__m3a__x"), "__m3a__x");
+    }
 }

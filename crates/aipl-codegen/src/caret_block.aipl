@@ -9,7 +9,8 @@
 //   {pad} | <indent>^^^
 import { wrapping_add as +, -, ==, len, max, min, repeat, to_str } from builtins;
 import { line_at } from "./line_at.aipl";
-import { Span } from "./dogfood_entries.aipl";
+
+struct Span { start: i64, end: i64 }
 
 pub fn caret_block(source: str, span: Span, filename: str) -> str {
     let LineAt { line_start, line, line_end } = line_at(source, span.start);
