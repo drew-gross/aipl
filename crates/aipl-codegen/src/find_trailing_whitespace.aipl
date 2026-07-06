@@ -6,9 +6,7 @@
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
 import { wrapping_add as +, ==, ||, &&, -, >, is_some } from builtins;
-
-// A half-open byte range `[start, end)`.
-struct Span { start: i64, end: i64 }
+import { Span } from "./dogfood_entries.aipl";
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'

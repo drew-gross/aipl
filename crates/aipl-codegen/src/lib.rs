@@ -2436,13 +2436,20 @@ pub fn build_test_program(program: &Program) -> Program {
 
 // ---------------------------------------------------------------------------
 // Dogfooding the embedding FFI
-
-/// The dogfooded AIPL `process_raw_string` the *parser* calls (through the hook
-/// installed by [`install_parser_hooks`]) to process `"""..."""` raw strings —
-/// trim the surrounding line breaks and de-dent. The FFI is exercised on real
-/// raw-string source, not just in tests. `process_raw_string` imports the
-/// dogfooded `dedent` (which imports `count_while` and `lines`); all four are
-/// supplied as in-memory modules.
+//
+// The compiler dogfoods a growing set of AIPL functions through the embedding
+// FFI (raw-string processing, test-section parsing, error rendering, ...).
+// Rather than one hand-assembled `Compilation` per function — each having to
+// separately list its own transitive dependencies as bundled in-memory
+// modules — every dogfooded `.aipl` file is gathered into one list
+// ([`DOGFOOD_SOURCES`]) and compiled together as a single program with one
+// root ([`dogfood_entries.aipl`], included first), one checked-in artifact
+// ([`dogfood.clif`]), and one set of FFI entry points ([`DOGFOOD_ENTRIES`]).
+// Adding a newly-dogfooded function is then: write the `.aipl` file, add it to
+// `DOGFOOD_SOURCES`, add a trampoline + its name to `dogfood_entries.aipl` /
+// `DOGFOOD_ENTRIES` — one list touched, not a new bundle of duplicated
+// dependency sources.
+const DOGFOOD_ENTRIES_SRC: &str = include_str!("dogfood_entries.aipl");
 const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
 const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
 const RAW_STRING_COUNT_WHILE_SRC: &str = include_str!("count_while.aipl");
@@ -2454,92 +2461,86 @@ const RAW_STRING_TRIM_WHILE_SRC: &str = include_str!("trim_while.aipl");
 const RAW_STRING_TRIM_PREFIX_SRC: &str = include_str!("trim_prefix.aipl");
 const RAW_STRING_TRIM_END_WHILE_SRC: &str = include_str!("trim_end_while.aipl");
 const RAW_STRING_TRIM_SUFFIX_SRC: &str = include_str!("trim_suffix.aipl");
-/// The checked-in dogfood IR for `process_raw_string` and its helpers, re-linked
-/// at runtime instead of recompiling the sources above. Kept current against
-/// them by the `dogfood_ir` test (regenerate with `fill_dogfood_ir`).
-const RAW_STRING_CLIF: &str = include_str!("process_raw_string.clif");
-
-/// The dogfooded AIPL `parse_test_section_header` the *parser* calls (through the
-/// hook installed by [`install_parser_hooks`]) while stripping `--- section ---`
-/// markers — so this runs on essentially every line of every parse. Like the
-/// others it's exercised through the embedding FFI.
 const PARSE_TEST_SECTION_HEADER_SRC: &str = include_str!("parse_test_section_header.aipl");
-/// The checked-in dogfood IR for `parse_test_section_header`, re-linked instead
-/// of recompiling the source above (kept current by the `dogfood_ir` test).
-const PARSE_TEST_SECTION_HEADER_CLIF: &str = include_str!("parse_test_section_header.clif");
-
-/// The dogfooded AIPL `strip_test_sections` the *parser* calls (through the hook
-/// installed by [`install_parser_hooks`]) once per parse, to cut a fixture file's
-/// trailing `--- section ---` blocks. It imports (and so bundles) the dogfooded
-/// `parse_test_section_header` to classify each line — the per-line marker check
-/// is now an AIPL→AIPL call inside the engine, not an FFI crossing per line.
 const STRIP_TEST_SECTIONS_SRC: &str = include_str!("strip_test_sections.aipl");
-/// The checked-in dogfood IR for `strip_test_sections` (which bundles
-/// `parse_test_section_header`), re-linked instead of recompiling the sources.
-const STRIP_TEST_SECTIONS_CLIF: &str = include_str!("strip_test_sections.clif");
-
-/// The dogfooded AIPL `find_trailing_whitespace` (`str -> Span`) the *parser*
-/// calls (through the hook installed by [`install_parser_hooks`]) on every parse,
-/// to locate the first trailing-whitespace run (an empty `Span` means none).
 const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespace.aipl");
-/// The checked-in dogfood IR for `find_trailing_whitespace`.
-const FIND_TRAILING_WHITESPACE_CLIF: &str = include_str!("find_trailing_whitespace.clif");
-
-/// The dogfooded AIPL `assert_loc` (`str, Span -> str`) the *parser* calls
-/// (through the hook installed by [`install_parser_hooks`]) while baking
-/// `assert(cond)` calls inside `.test({ .. })` bodies into `__assert(cond, loc)`,
-/// to format each assertion's source location for the `check` failure report.
 const ASSERT_LOC_SRC: &str = include_str!("assert_loc.aipl");
-/// The checked-in dogfood IR for `assert_loc`.
-const ASSERT_LOC_CLIF: &str = include_str!("assert_loc.clif");
-
-/// The dogfooded AIPL `line_at` (`str, i64 -> LineAt`) — bundled as a source
-/// dependency of `caret_block` and verified standalone by the `dogfood_ir` test.
 const LINE_AT_SRC: &str = include_str!("line_at.aipl");
-
-/// The dogfooded AIPL `caret_block` (`str, i64, i64 -> str`) the *error renderer*
-/// calls (through the hook installed by [`install_parser_hooks`]) when rendering
-/// a spanned error — it formats the rustc-style location + caret underline block.
-/// Bundles `line_at` as an in-engine AIPL import so the line-locator is an
-/// AIPL→AIPL call rather than an FFI crossing.
 const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
-/// The checked-in dogfood IR for `caret_block` (which bundles `line_at`).
-const CARET_BLOCK_CLIF: &str = include_str!("caret_block.clif");
-
-/// The dogfooded AIPL `fill_or_add_section` (`str, str, str -> str`) — not a
-/// parser hook (nothing in the compiler itself calls it); the *cases test
-/// harness* (`tests/cases.rs`) uses it to splice a fresh body into a fixture's
-/// `--- section ---` block (or append a missing one) when refreshing expected
-/// output. Checked in like every other dogfood engine, for uniformity, even
-/// though there's no self-hosting bootstrap concern to protect against here.
-/// `fill_section` is a private helper defined in the same file (folded in
-/// rather than kept as its own module — it was never called except from here),
-/// so this bundles just `parse_test_section_header`, `lines`, and
-/// `trim_end_while` as in-engine AIPL imports.
 const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
-/// The checked-in dogfood IR for `fill_or_add_section` (which bundles `lines`
-/// and `trim_end_while`).
-const FILL_OR_ADD_SECTION_CLIF: &str = include_str!("fill_or_add_section.clif");
-
-/// The dogfooded AIPL `fill_or_add_section_file` (`str, str, str -> str`) —
-/// like [`FILL_OR_ADD_SECTION_SRC`], used only by the test harness. Reads the
-/// file at `path`, runs it through `fill_or_add_section`, and writes the
-/// result back — the read/write/error-collapsing wrapper the harness used to
-/// do in Rust (`fs::read_to_string`/`fs::write`) is AIPL now too. Returns the
-/// empty string on success or a builtin `Error`'s message otherwise (plain
-/// `str`, not `!Error` — the FFI can't marshal a `Result` return yet).
 const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
-/// The checked-in dogfood IR for `fill_or_add_section_file` (which bundles
-/// `fill_or_add_section`, `lines`, and `trim_end_while`).
-const FILL_OR_ADD_SECTION_FILE_CLIF: &str = include_str!("fill_or_add_section_file.clif");
+
+/// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
+/// modules — the root ([`dogfood_entries.aipl`]) first, so `from "./..."`
+/// imports resolve without disk access. Each file appears exactly once (unlike
+/// the old per-function engines, which each separately bundled copies of their
+/// shared dependencies — `lines.aipl`, `parse_test_section_header.aipl`, etc.).
+/// This is the single source of truth shared by [`DOGFOOD_ENGINE`] (re-linked
+/// from the checked-in [`DOGFOOD_CLIF`]), the author helper that regenerates
+/// it, and the test that verifies it's current — keep it in sync with
+/// `dogfood_entries.aipl`'s imports.
+pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
+    ("./dogfood_entries.aipl", DOGFOOD_ENTRIES_SRC),
+    ("./process_raw_string.aipl", RAW_STRING_SRC),
+    ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
+    ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
+    ("./lines.aipl", RAW_STRING_LINES_SRC),
+    ("./trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
+    ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
+    ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
+    ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
+    (
+        "./parse_test_section_header.aipl",
+        PARSE_TEST_SECTION_HEADER_SRC,
+    ),
+    ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
+    (
+        "./find_trailing_whitespace.aipl",
+        FIND_TRAILING_WHITESPACE_SRC,
+    ),
+    ("./assert_loc.aipl", ASSERT_LOC_SRC),
+    ("./line_at.aipl", LINE_AT_SRC),
+    ("./caret_block.aipl", CARET_BLOCK_SRC),
+    ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
+    (
+        "./fill_or_add_section_file.aipl",
+        FILL_OR_ADD_SECTION_FILE_SRC,
+    ),
+];
+
+/// The functions Rust calls via the FFI (need `; entry` metadata in the
+/// checked-in artifact) — each is a trampoline declared in
+/// `dogfood_entries.aipl` under its real name (see that file's doc comment for
+/// why a trampoline, rather than the real definition, has to be the one at the
+/// program's root).
+pub const DOGFOOD_ENTRIES: &[&str] = &[
+    "process_raw_string",
+    "parse_test_section_header",
+    "strip_test_sections",
+    "find_trailing_whitespace",
+    "assert_loc",
+    "line_at",
+    "caret_block",
+    "fill_or_add_section",
+    "fill_or_add_section_file",
+];
+
+/// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
+/// [`DOGFOOD_ENTRIES`], re-linked at runtime instead of recompiling from
+/// source. Kept current by the `dogfood_ir` test (regenerate with
+/// `fill_dogfood_ir`).
+pub const DOGFOOD_CLIF: &str = include_str!("dogfood.clif");
+/// The checked-in artifact's filename, for the `dogfood_ir` test.
+pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
 
 thread_local! {
-    /// The `process_raw_string` engine, re-linked from the checked-in IR lazily
-    /// on first use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`.
-    /// Re-linking runs no AIPL frontend, so it works even when the frontend can't
-    /// currently compile the dogfooded sources.
-    static RAW_STRING_ENGINE: Compilation = Compilation::from_artifact(RAW_STRING_CLIF)
-        .expect("dogfooded `process_raw_string` engine builds");
+    /// The one dogfood engine, re-linked from the checked-in IR lazily on first
+    /// use per thread. A `Compilation` isn't `Sync`, hence one per thread.
+    /// Re-linking runs no AIPL frontend, so it works even when the frontend
+    /// can't currently compile the dogfooded sources, and never recurses even
+    /// though several of these hooks are themselves invoked from the parser.
+    static DOGFOOD_ENGINE: Compilation = Compilation::from_artifact(DOGFOOD_CLIF)
+        .expect("dogfood engine builds");
 }
 
 /// Process a raw string's verbatim contents `s` (trim the surrounding line breaks
@@ -2549,22 +2550,12 @@ thread_local! {
 /// engine can't be built or called, so a regression is loud rather than silently
 /// bypassed.
 pub fn process_raw_string(s: &str) -> String {
-    RAW_STRING_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values("process_raw_string", &[FfiValue::Str(s.to_string())]) {
             Ok(FfiValue::Str(out)) => out,
             other => panic!("dogfooded process_raw_string() call: {other:?}"),
         }
     })
-}
-
-thread_local! {
-    /// The `parse_test_section_header` engine, re-linked from the checked-in IR
-    /// lazily on first use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't
-    /// `Sync`. Re-linking runs no AIPL frontend, so building it never recurses
-    /// into parsing — even though this hook is itself invoked from the parser.
-    static PARSE_TEST_SECTION_HEADER_ENGINE: Compilation =
-        Compilation::from_artifact(PARSE_TEST_SECTION_HEADER_CLIF)
-            .expect("dogfooded `parse_test_section_header` engine builds");
 }
 
 /// The parser's test-section-header hook (see [`install_parser_hooks`]): whether
@@ -2575,7 +2566,7 @@ thread_local! {
 /// for the no-hook case); once installed, the known-good IR is authoritative, so
 /// this panics if it can't be built or called.
 fn parse_test_section_header(line: &str) -> Option<String> {
-    PARSE_TEST_SECTION_HEADER_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "parse_test_section_header",
             &[FfiValue::Str(line.to_string())],
@@ -2592,17 +2583,6 @@ fn parse_test_section_header(line: &str) -> Option<String> {
     })
 }
 
-thread_local! {
-    /// The `strip_test_sections` engine (which bundles `parse_test_section_header`),
-    /// re-linked from the checked-in IR lazily on first use per thread. Like
-    /// [`ADD_ENGINE`], a `Compilation` isn't `Sync`. Re-linking runs no AIPL
-    /// frontend, so it never recurses into parsing — even though this hook is
-    /// itself invoked from the parser.
-    static STRIP_TEST_SECTIONS_ENGINE: Compilation =
-        Compilation::from_artifact(STRIP_TEST_SECTIONS_CLIF)
-            .expect("dogfooded `strip_test_sections` engine builds");
-}
-
 /// The parser's strip-test-sections hook (see [`install_parser_hooks`]): the
 /// portion of `src` to keep — everything before the first `--- name ---` marker
 /// line — computed by the dogfooded AIPL `strip_test_sections` via the FFI (which
@@ -2612,22 +2592,12 @@ thread_local! {
 /// as `&src[..kept.len()]`. No native fallback; panics if it can't be built or
 /// called.
 fn strip_test_sections(src: &str) -> String {
-    STRIP_TEST_SECTIONS_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values("strip_test_sections", &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Str(kept)) => kept,
             other => panic!("dogfooded strip_test_sections() call: {other:?}"),
         }
     })
-}
-
-thread_local! {
-    /// The `find_trailing_whitespace` engine, re-linked from the checked-in IR
-    /// lazily on first use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't
-    /// `Sync`; re-linking runs no AIPL frontend, so it never recurses into parsing
-    /// even though this hook is itself invoked from the parser.
-    static FIND_TRAILING_WHITESPACE_ENGINE: Compilation =
-        Compilation::from_artifact(FIND_TRAILING_WHITESPACE_CLIF)
-            .expect("dogfooded `find_trailing_whitespace` engine builds");
 }
 
 /// The parser's trailing-whitespace hook (see [`install_parser_hooks`]): the
@@ -2645,7 +2615,7 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
         };
         field("start")..field("end")
     }
-    FIND_TRAILING_WHITESPACE_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "find_trailing_whitespace",
             &[FfiValue::Str(src.to_string())],
@@ -2660,15 +2630,6 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
     })
 }
 
-thread_local! {
-    /// The `assert_loc` engine, re-linked from the checked-in IR lazily on first
-    /// use per thread. Like [`ADD_ENGINE`], a `Compilation` isn't `Sync`.
-    /// Re-linking runs no AIPL frontend, so it never recurses into parsing even
-    /// though this hook is itself invoked from the parser.
-    static ASSERT_LOC_ENGINE: Compilation = Compilation::from_artifact(ASSERT_LOC_CLIF)
-        .expect("dogfooded `assert_loc` engine builds");
-}
-
 /// The parser's assert-location hook (see [`install_parser_hooks`]): formats an
 /// assertion's source location as `input:LINE: TEXT` (1-based line, the
 /// condition's trimmed source text) — computed by the dogfooded AIPL
@@ -2676,7 +2637,7 @@ thread_local! {
 /// its `start`/`end` fields (mirroring [`caret_block`]). No native fallback;
 /// panics if it can't be built or called.
 fn assert_loc(source: &str, span: Span) -> String {
-    ASSERT_LOC_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "assert_loc",
             &[
@@ -2693,23 +2654,13 @@ fn assert_loc(source: &str, span: Span) -> String {
     })
 }
 
-thread_local! {
-    /// The `caret_block` engine (which bundles `line_at`), re-linked from the
-    /// checked-in IR lazily on first use per thread. Like [`ADD_ENGINE`], a
-    /// `Compilation` isn't `Sync`. Re-linking runs no AIPL frontend, so building it
-    /// never recurses into error rendering.
-    static CARET_BLOCK_ENGINE: Compilation =
-        Compilation::from_artifact(CARET_BLOCK_CLIF)
-            .expect("dogfooded `caret_block` engine builds");
-}
-
 /// The error renderer's caret-block hook (see [`install_parser_hooks`]): given
 /// `source`, a `span` (half-open byte range), and a `filename`, returns the
 /// rustc-style location + underline block — computed by the dogfooded AIPL
 /// `caret_block` via the FFI. The AIPL calls `line_at` in-engine. No native
 /// fallback; panics if it can't be built or called.
 fn caret_block(source: &str, span: Span, filename: &str) -> String {
-    CARET_BLOCK_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "caret_block",
             &[
@@ -2727,15 +2678,6 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
     })
 }
 
-thread_local! {
-    /// The `fill_or_add_section` engine (which bundles `lines` and
-    /// `trim_end_while`), re-linked from the checked-in IR lazily on first
-    /// use per thread. A `Compilation` isn't `Sync`, hence one per thread.
-    static FILL_OR_ADD_SECTION_ENGINE: Compilation =
-        Compilation::from_artifact(FILL_OR_ADD_SECTION_CLIF)
-            .expect("dogfooded `fill_or_add_section` engine builds");
-}
-
 /// Replaces the body of the `--- section ---` block in `contents` with `body`
 /// (dropping the old body up to the next header line or EOF), or appends
 /// `--- section ---\n<body>\n` (after dropping trailing newlines) when
@@ -2744,7 +2686,7 @@ thread_local! {
 /// test harness calls this. No native fallback; panics if it can't be built or
 /// called.
 pub fn fill_or_add_section(contents: &str, section: &str, body: &str) -> String {
-    FILL_OR_ADD_SECTION_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "fill_or_add_section",
             &[
@@ -2759,16 +2701,6 @@ pub fn fill_or_add_section(contents: &str, section: &str, body: &str) -> String 
     })
 }
 
-thread_local! {
-    /// The `fill_or_add_section_file` engine (which bundles
-    /// `fill_or_add_section`, `lines`, and `trim_end_while`), re-linked from
-    /// the checked-in IR lazily on first use per thread. A `Compilation` isn't
-    /// `Sync`, hence one per thread.
-    static FILL_OR_ADD_SECTION_FILE_ENGINE: Compilation =
-        Compilation::from_artifact(FILL_OR_ADD_SECTION_FILE_CLIF)
-            .expect("dogfooded `fill_or_add_section_file` engine builds");
-}
-
 /// Reads the file at `path`, splices `body` into (or appends) its
 /// `--- section ---` block via the dogfooded AIPL `fill_or_add_section`, and
 /// writes the result back to `path` — computed by the dogfooded AIPL
@@ -2779,7 +2711,7 @@ thread_local! {
 /// through `FfiValue::Res`. No native fallback; panics if it can't be built or
 /// called.
 pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result<(), String> {
-    FILL_OR_ADD_SECTION_FILE_ENGINE.with(|comp| {
+    DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
             "fill_or_add_section_file",
             &[
@@ -2814,135 +2746,6 @@ pub fn install_parser_hooks() {
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_syntax::set_caret_block_hook(caret_block);
-}
-
-/// A dogfood engine: AIPL the compiler runs from *checked-in IR* rather than by
-/// recompiling from source. Pairs the `.clif` artifact filename with the entry
-/// names called from Rust and the in-memory sources (so `from "./..."` imports
-/// resolve without disk access). This is the single source of truth shared by
-/// the engine builders, the author helper that regenerates the `.clif` files,
-/// and the test that verifies they are current — keep it in sync with the
-/// `include_str!`ed `*.clif` the builders load.
-pub struct DogfoodEngine {
-    /// The checked-in CLIF artifact under `crates/aipl-codegen/src/`.
-    pub clif_file: &'static str,
-    /// Functions called from Rust via the FFI (need `; entry` metadata).
-    pub entries: &'static [&'static str],
-    /// In-memory `(name, source)` modules — the root first.
-    pub sources: &'static [(&'static str, &'static str)],
-}
-
-/// Every dogfood engine whose IR is checked in. See [`generate_dogfood_artifact`]
-/// (regenerate) and the `dogfood_ir` test (verify the checked-in `.clif` matches).
-pub fn dogfood_engines() -> Vec<DogfoodEngine> {
-    vec![
-        DogfoodEngine {
-            clif_file: "process_raw_string.clif",
-            entries: &["process_raw_string"],
-            sources: &[
-                ("./process_raw_string.aipl", RAW_STRING_SRC),
-                ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
-                ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
-                ("./lines.aipl", RAW_STRING_LINES_SRC),
-                ("./trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
-                ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
-                ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-                ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
-            ],
-        },
-        DogfoodEngine {
-            clif_file: "parse_test_section_header.clif",
-            entries: &["parse_test_section_header"],
-            sources: &[(
-                "./parse_test_section_header.aipl",
-                PARSE_TEST_SECTION_HEADER_SRC,
-            )],
-        },
-        DogfoodEngine {
-            clif_file: "strip_test_sections.clif",
-            entries: &["strip_test_sections"],
-            // Bundles `parse_test_section_header` (imported), so its marker check
-            // is an in-engine AIPL call rather than an FFI crossing per line.
-            sources: &[
-                ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
-                (
-                    "./parse_test_section_header.aipl",
-                    PARSE_TEST_SECTION_HEADER_SRC,
-                ),
-            ],
-        },
-        DogfoodEngine {
-            clif_file: "find_trailing_whitespace.clif",
-            entries: &["find_trailing_whitespace"],
-            sources: &[(
-                "./find_trailing_whitespace.aipl",
-                FIND_TRAILING_WHITESPACE_SRC,
-            )],
-        },
-        DogfoodEngine {
-            clif_file: "assert_loc.clif",
-            entries: &["assert_loc"],
-            // Bundles `lines` (imported) so the newline count is an in-engine
-            // AIPL call rather than an FFI crossing.
-            sources: &[
-                ("./assert_loc.aipl", ASSERT_LOC_SRC),
-                ("./lines.aipl", RAW_STRING_LINES_SRC),
-            ],
-        },
-        // `line_at` is still verified standalone even though it's now bundled
-        // inside the `caret_block` engine — the standalone CLIF check stays as
-        // evidence that `line_at.aipl` compiles and runs correctly on its own.
-        DogfoodEngine {
-            clif_file: "line_at.clif",
-            entries: &["line_at"],
-            sources: &[("./line_at.aipl", LINE_AT_SRC)],
-        },
-        DogfoodEngine {
-            clif_file: "caret_block.clif",
-            entries: &["caret_block"],
-            // Bundles `line_at` (imported by `caret_block`) so line-location is
-            // an in-engine AIPL call rather than an FFI crossing per render.
-            sources: &[
-                ("./caret_block.aipl", CARET_BLOCK_SRC),
-                ("./line_at.aipl", LINE_AT_SRC),
-            ],
-        },
-        DogfoodEngine {
-            clif_file: "fill_or_add_section.clif",
-            entries: &["fill_or_add_section"],
-            // `fill_section` is a private helper in the same source file, not a
-            // separate import. Bundles `parse_test_section_header`, `lines`,
-            // and `trim_end_while` (all imported) as in-engine AIPL calls.
-            sources: &[
-                ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
-                (
-                    "./parse_test_section_header.aipl",
-                    PARSE_TEST_SECTION_HEADER_SRC,
-                ),
-                ("./lines.aipl", RAW_STRING_LINES_SRC),
-                ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-            ],
-        },
-        DogfoodEngine {
-            clif_file: "fill_or_add_section_file.clif",
-            entries: &["fill_or_add_section_file"],
-            // Bundles `fill_or_add_section` (imported) and everything it in
-            // turn bundles.
-            sources: &[
-                (
-                    "./fill_or_add_section_file.aipl",
-                    FILL_OR_ADD_SECTION_FILE_SRC,
-                ),
-                ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
-                (
-                    "./parse_test_section_header.aipl",
-                    PARSE_TEST_SECTION_HEADER_SRC,
-                ),
-                ("./lines.aipl", RAW_STRING_LINES_SRC),
-                ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-            ],
-        },
-    ]
 }
 
 /// Compile every function in `program` into `module`. When `main_export_name`
@@ -3368,8 +3171,8 @@ fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
 /// manifest header recording the builtin-import id↔symbol table and the FFI
 /// metadata of each callable `entries` function. The inverse is
 /// [`Compilation::from_artifact`]. Used by the `fill_dogfood_ir` author helper to
-/// (re)generate `add.clif` / `process_raw_string.clif` after a frontend change,
-/// and by the verify test to confirm the checked-in artifact is up to date.
+/// (re)generate `dogfood.clif` after a frontend change, and by the verify test
+/// to confirm the checked-in artifact is up to date.
 ///
 /// Data symbols (string literals) aren't round-tripped yet; none of the current
 /// dogfooded functions produce any, and generation errors loudly if one ever

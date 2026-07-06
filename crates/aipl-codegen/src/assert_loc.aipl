@@ -7,10 +7,11 @@
 // no manual clamping is needed here.
 import { ==, len, trim } from builtins;
 import { lines } from "./lines.aipl";
-
-struct Span { start: i64, end: i64 }
+import { Span } from "./dogfood_entries.aipl";
 
 pub fn assert_loc(src: str, span: Span) -> str {
+    // Splitting on "\n" always yields (newline count + 1) parts, so the
+    // prefix's line count is just its number of lines.
     let line = src[..span.start].lines().len();
     let text = src[span.start..span.end].trim();
     `input:{line}: {text}`
