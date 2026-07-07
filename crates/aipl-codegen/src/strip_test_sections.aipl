@@ -46,14 +46,16 @@ strips them so `aipl run/ir/build` can be pointed at a fixture directly.
     assert(strip_test_sections("a\r\n--- c ---\r\n") == "a\r\n");
     // A non-marker dashed line (only two dashes) doesn't cut — keep it all.
     assert(strip_test_sections("-- not a marker --\ncode") == "-- not a marker --\ncode");
+    // An indented marker line doesn't cut — a header must start at column 0.
+    assert(strip_test_sections("code\n  --- stdout ---\nfoo") == "code\n  --- stdout ---\nfoo");
 })
 --- performance ---
-allocations: 9
-deallocations: 9
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 288
-instructions executed: 5804
-binary size: 8672
+bytes allocated: 320
+instructions executed: 6932
+binary size: 9544
 --- monomorphizations ---
 __m1__parse_test_section_header
 main

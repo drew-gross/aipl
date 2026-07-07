@@ -2845,8 +2845,9 @@ fn tokenize_triple_template<I: Iterator<Item = char>>(
 /// compiler treats any such marker as a hard cutoff (see
 /// [`strip_test_sections`]).
 ///
-/// A line is a marker iff it starts and ends with `---` (whitespace
-/// trimmed) and the inner segment is non-empty.
+/// A line is a marker iff it starts with `---` at column 0 (no leading
+/// whitespace) and, once trailing whitespace is trimmed, ends with `---`
+/// with a non-empty inner segment.
 ///
 /// The marker logic is dogfooded — the AIPL `parse_test_section_header`, run
 /// through the embedding FFI via the installed hook. There is **no native

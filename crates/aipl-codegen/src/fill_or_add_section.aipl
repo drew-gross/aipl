@@ -117,11 +117,15 @@ instead of requiring it to exist.
         == "code\n--- stdout ---\nhi\n");
     // Empty input, section missing.
     assert(fill_or_add_section("", "stdout", "hi") == "\n--- stdout ---\nhi\n");
+    // An indented `--- foo ---` line isn't a real header (must start at column
+    // 0), so the section is treated as missing and appended fresh.
+    assert(fill_or_add_section("code\n  --- foo ---\nold\n", "foo", "new")
+        == "code\n  --- foo ---\nold\n--- foo ---\nnew\n");
 })
 --- performance ---
-allocations: 78
-deallocations: 78
+allocations: 86
+deallocations: 86
 reallocations: 28
-bytes allocated: 3096
-instructions executed: 9984
-binary size: 16072
+bytes allocated: 3424
+instructions executed: 10718
+binary size: 17088

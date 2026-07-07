@@ -485,7 +485,7 @@ fn section_markers_are_scoped_as_comments() {
         for line in src.split_inclusive('\n') {
             let trimmed_len = line.len() - line.chars().rev().take_while(|c| *c == '\n').count();
             let line_no_nl = &line[..trimmed_len];
-            if parse_test_section_header(line_no_nl.trim()).is_some() {
+            if parse_test_section_header(line_no_nl).is_some() {
                 // Check the marker's body bytes — skip whitespace-only
                 // edges — are scoped as a comment.
                 let body_start = offset + line_no_nl.find("---").unwrap();
