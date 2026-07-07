@@ -1,0 +1,45 @@
+import { ==, print, to_str, reverse, len, hash } from builtins;
+
+// `str` and `char[]` share a runtime representation (a `char` is a single
+// byte, exactly like a `str`'s content), so they're mutually usable wherever
+// the other is expected, and compare/hash equal when their bytes match.
+fn takes_str(s: str) -> i64 { s.len() }
+fn takes_chars(cs: char[]) -> i64 { cs.len() }
+fn str_rev(s: str) -> str { s.reverse() }
+fn chars_rev(cs: char[]) -> char[] { cs.reverse() }
+
+fn main() !prints {
+    // A real `char[]` flows into a `str` parameter, and vice versa.
+    print(takes_str(['x', 'y', 'z']).to_str());
+    print(takes_chars("hello").to_str());
+
+    // `reverse` on a real `str` still returns `str`; on a real `char[]` it
+    // still returns `char[]` — its declared `T[] -> T[]` signature needs no
+    // per-builtin override (see aipl-mono's `check_call`).
+    print(str_rev("abc"));
+    print(to_str(chars_rev(['a', 'b', 'c'])));
+
+    // Cross-type equality and hashing (both directions).
+    print((['a', 'b'] == "ab").to_str());
+    print(("ab" == ['a', 'b']).to_str());
+    print((['a', 'b'] == "ac").to_str());
+    print((hash(['a', 'b']) == hash("ab")).to_str());
+}
+--- stdout ---
+3
+5
+cba
+['c', 'b', 'a']
+true
+true
+false
+true
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 148
+instructions executed: 497
+binary size: 4656
+--- monomorphizations ---
+main

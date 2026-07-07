@@ -17,8 +17,8 @@ fn is_len_greater_than_5(v: any[]) -> bool {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 177
-instructions executed: 111
-binary size: 2216
+bytes allocated: 113
+instructions executed: 107
+binary size: 2272
 --- monomorphizations ---
 main

@@ -1,0 +1,38 @@
+import { ==, push, len } from builtins;
+
+// Growable char[]: `cs.push(x)` grows the variable in place (rebuilding a
+// fresh `str`-shaped value each time — `char[]` has no in-place-growable
+// form, see `is_char_array`); a snapshot taken first (`let snap = cs`) keeps
+// its own value, so a later push to `cs` doesn't disturb it (value
+// semantics), mirroring `push_bool.aipl`/`push_growth.aipl`.
+//
+// Must start from a char[] literal with at least one element, not an
+// untyped `[]` — see the `push` codegen arm in aipl-codegen: a push that
+// would convert an untyped-empty binding's representation can't be proven to
+// run only once (a push inside a loop compiles once but runs every
+// iteration), so that specific transition is rejected at compile time
+// instead of risking silent corruption (see `err_push_from_empty.aipl`).
+fn appended(xs: char[], x: char) -> char[] {
+    mut ys = xs;
+    ys.push(x);
+    ys
+}.test({
+    mut cs = ['a'];
+    cs.push('b');
+    let snap = cs;        // snapshot of ['a', 'b']
+    cs.push('c');         // grows cs only
+    assert(cs == ['a', 'b', 'c']);
+    assert(snap == ['a', 'b']);     // snapshot unchanged
+    assert(len(snap) == 2);
+    assert(appended(snap, 'z') == ['a', 'b', 'z']);
+    assert(snap == ['a', 'b']);
+})
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 155
+instructions executed: 165
+binary size: 3768
+--- monomorphizations ---
+main

@@ -1481,12 +1481,6 @@ impl Cx<'_> {
         let return_ty = sig.return_type();
         let is_mutating = sig.is_mutating();
         let mut map: HashMap<String, Type> = HashMap::new();
-        // Type variables pinned to `char` by a `str` argument (rather than a
-        // real `char[]`) at a `T[]`-shaped parameter — e.g. `reverse`'s `self:
-        // T[]`. Lets a `T[] -> T[]` signature hand back `str` for a `str`
-        // receiver with no per-builtin special case: see the return-type
-        // computation below.
-        let mut str_pinned: HashSet<String> = HashSet::new();
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
@@ -1494,13 +1488,6 @@ impl Cx<'_> {
                 continue;
             }
             let aty = self.check_expr(arg, env, effects)?;
-            if let Type::Array(inner) = pty {
-                if let Type::Named(v) = inner.as_ref() {
-                    if vars.contains(v.as_str()) && aty == Type::Primitive(Primitive::Str) {
-                        str_pinned.insert(v.clone());
-                    }
-                }
-            }
             collect_var_bindings(pty, &aty, &vars, &mut map);
             atys[i] = aty;
         }
@@ -1571,16 +1558,12 @@ impl Cx<'_> {
             Ok(Type::Array(Box::new(Type::Named(tuple_name))))
         } else {
             // A `T[] -> T[]` signature (e.g. `reverse`) called on a `str`
-            // hands back `str`, not `char[]` — the plain substitution below
-            // would give `char[]` since `str` pins `T = char` (see the
-            // `str_pinned` collection above and `collect_var_bindings`).
-            let str_return = matches!(&return_ty, Type::Array(inner)
-                if matches!(inner.as_ref(), Type::Named(v) if str_pinned.contains(v)));
-            if str_return {
-                Ok(Type::Primitive(Primitive::Str))
-            } else {
-                Ok(subst_vars(&return_ty, &map, &vars))
-            }
+            // substitutes to `char[]` (since `str` pins `T = char` — see
+            // `collect_var_bindings`), not `str` — but `coerce` treats the two
+            // as freely interchangeable (see its `is_char_array` rule), so no
+            // per-builtin override is needed here to keep e.g. `fn f(s: str)
+            // -> str { s.reverse() }` type-checking.
+            Ok(subst_vars(&return_ty, &map, &vars))
         }
     }
 
@@ -2125,6 +2108,17 @@ fn is_pattern_literal(e: &Expr) -> bool {
     }
 }
 
+/// Whether `t` is `char[]`. This element specialization shares `str`'s
+/// runtime representation entirely (see `is_char_array` in `aipl-codegen`,
+/// its codegen-side counterpart) — a `char` is a single byte and `str`'s
+/// content is just packed bytes — which is what makes the `coerce` rule below
+/// sound: an actual `char[]` value and an actual `str` value are
+/// bit-identical, so treating the two types as freely interchangeable never
+/// mismatches a value's real layout.
+fn is_char_array(t: &Type) -> bool {
+    matches!(t, Type::Array(inner) if **inner == Type::Primitive(Primitive::Char))
+}
+
 fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     if actual == expected || is_unknown(actual) || is_unknown(expected) {
         return Ok(());
@@ -2141,6 +2135,16 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     // anywhere a `str` is (e.g. `print(e)`).
     if (is_error(actual) && *expected == Type::Primitive(Primitive::Str))
         || (*actual == Type::Primitive(Primitive::Str) && is_error(expected))
+    {
+        return Ok(());
+    }
+    // `str` functions as an alias of `char[]` (see `is_char_array`): a generic
+    // `T[]`-shaped builtin (e.g. `reverse`) called on a `str` unifies `T =
+    // char` (see `collect_var_bindings`) and its substituted `char[]` return
+    // type must still be usable as `str` — and, symmetrically, a real
+    // `char[]` value is usable wherever `str` is expected.
+    if (is_char_array(actual) && *expected == Type::Primitive(Primitive::Str))
+        || (*actual == Type::Primitive(Primitive::Str) && is_char_array(expected))
     {
         return Ok(());
     }

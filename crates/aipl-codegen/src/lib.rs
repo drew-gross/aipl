@@ -4982,8 +4982,11 @@ fn coercible(actual: &Type, expected: &Type) -> bool {
     }
     // `str`, `Error`, and the internal concat-str all share a representation and
     // coerce freely among themselves (mirrors the checker's `Error`/`str` rule;
-    // the concat-str of a `a + b` value fits a `str`/`Error` parameter).
-    if is_str_repr(actual) && is_str_repr(expected) {
+    // the concat-str of a `a + b` value fits a `str`/`Error` parameter). `char[]`
+    // joins them too (`is_str_shaped`) — it shares `str`'s representation
+    // entirely (see `is_char_array`), so it's a real bit-for-bit fit, not just
+    // a logical one.
+    if is_str_shaped(actual) && is_str_shaped(expected) {
         return true;
     }
     match (actual, expected) {
@@ -5010,6 +5013,14 @@ fn merge_types(a: &Type, b: &Type) -> Option<Type> {
     // `Error` and `str` share a representation; their common type is a plain str.
     if (is_error(a) && *b == Type::Primitive(Primitive::Str))
         || (*a == Type::Primitive(Primitive::Str) && is_error(b))
+    {
+        return Some(Type::Primitive(Primitive::Str));
+    }
+    // `char[]` and `str` share a representation too (see `is_char_array`);
+    // their common type is a plain str (`emit_eq` dispatches identically for
+    // either — see `is_str_shaped` — so the choice is just a label).
+    if (is_char_array(a) && *b == Type::Primitive(Primitive::Str))
+        || (*a == Type::Primitive(Primitive::Str) && is_char_array(b))
     {
         return Some(Type::Primitive(Primitive::Str));
     }
@@ -5566,6 +5577,59 @@ fn is_bit_packed(elem: &Type) -> bool {
     matches!(elem, Type::Primitive(Primitive::Bool))
 }
 
+/// Whether `ty` is `char[]` — the one array element type that shares `str`'s
+/// runtime representation entirely (tag scheme, heap layout, refcounting)
+/// rather than the generic array block, since a `char` is a single byte and
+/// `str`'s content is just packed bytes (see the "Representation dispatch"
+/// doc above `StrRepr`). `char[]` stays a distinct compile-time `Type` (it
+/// still displays and type-checks as `char[]`, not `str`) — only its runtime
+/// construction/access/refcounting is redirected to the `str` runtime, at
+/// every site that would otherwise use the generic array runtime.
+fn is_char_array(ty: &Type) -> bool {
+    matches!(ty, Type::Array(elem) if **elem == Type::Primitive(Primitive::Char))
+}
+
+/// Whether `ty`'s runtime value is str-shaped: a real `str`/`Error`/concat-str
+/// (`is_str_repr`), or `char[]` (`is_char_array`). Deliberately kept separate
+/// from `is_str_repr` itself (rather than folding `char[]` into that shared
+/// helper) so this only widens the specific array-construction/access/
+/// refcounting dispatch sites that need it — not every one of `is_str_repr`'s
+/// many other consumers (FFI marshaling, monomorphization's generic-instance
+/// naming, the concat-str pseudo-type, etc.), which weren't audited for a
+/// `char[]` value flowing through them.
+fn is_str_shaped(ty: &Type) -> bool {
+    is_str_repr(ty) || is_char_array(ty)
+}
+
+/// A bare `[]` literal has no element type to infer from, so it's built as the
+/// generic (array-shaped) empty collection — `Type::Array(NoneInner)` — same
+/// as an empty `i64[]`/`bool[]`/etc., since those all happen to share one
+/// physical empty-array representation. `char[]` doesn't: it's str-shaped
+/// (see `is_char_array`), so an empty array-shaped value passed where a
+/// `char[]` is expected would misinterpret the header layout downstream. This
+/// substitutes the canonical empty `str` value (inline, length 0) in that one
+/// case, freeing the now-unused throwaway empty array block first. A known
+/// narrow gap: only call sites that route through this (currently just
+/// function-call arguments) get the fixup — an empty literal flowing into a
+/// `char[]`-typed struct field or `return` isn't covered.
+fn coerce_empty_to_char_array<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    v: Value,
+    actual: &Type,
+    expected: &Type,
+) -> Value {
+    let is_empty_placeholder = matches!(actual, Type::Array(inner) if is_none_inner(inner));
+    if is_char_array(expected) && is_empty_placeholder {
+        let dec = builtins.import(module, builder.func, "aipl_array_dec");
+        builder.ins().call(dec, &[v]);
+        builder.ins().iconst(types::I64, 1) // pack_inline(&[]): tag (0 << 2) | 1
+    } else {
+        v
+    }
+}
+
 /// The `elem_size` argument handed to the array runtime: a byte stride, or the
 /// sentinel 0 for a bit-packed `bool` array.
 fn runtime_elem_size(elem: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
@@ -5675,6 +5739,65 @@ fn load_array_elem<M: Module>(
     builder.ins().stack_load(types::I64, val_slot, 0)
 }
 
+/// Byte `idx` of a str-shaped `char[]` (see `is_char_array`), without
+/// consuming it. `aipl_char_at` decs its receiver internally, so this
+/// pre-incs to balance — mirroring `emit_char_at`, but returning the raw byte
+/// (`idx` is trusted in-bounds; no optional wrapping) for callers that
+/// already know the index is valid, like a fold over every element.
+fn load_char_array_byte<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    arr_ptr: Value,
+    idx: Value,
+) -> Value {
+    emit_inc(builder, module, builtins, arr_ptr);
+    let f = builtins.import(module, builder.func, "aipl_char_at");
+    let inst = builder.ins().call(f, &[arr_ptr, idx]);
+    builder.inst_results(inst)[0]
+}
+
+/// Sequence length for a `str`-shaped `char[]` (see `is_char_array`) or a
+/// real array/set/dict — the common "how many elements" query. Dispatches on
+/// `ty` (not the runtime value), since `char[]` stays str-shaped
+/// unconditionally.
+fn seq_len<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    ptr: Value,
+    ty: &Type,
+) -> Value {
+    if is_char_array(ty) {
+        let f = builtins.import(module, builder.func, "aipl_str_len");
+        let inst = builder.ins().call(f, &[ptr]);
+        builder.inst_results(inst)[0]
+    } else {
+        load_arr_len(builder, ptr)
+    }
+}
+
+/// Element `idx` of a `str`-shaped `char[]` (see `is_char_array`) or a real
+/// array — the common "read element `idx`" query, mirroring `seq_len`.
+/// `idx` is trusted in-bounds.
+fn seq_elem<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    ptr: Value,
+    idx: Value,
+    arr_ty: &Type,
+) -> Value {
+    if is_char_array(arr_ty) {
+        load_char_array_byte(module, builder, builtins, ptr, idx)
+    } else if let Type::Array(elem) = arr_ty {
+        load_array_elem(module, builder, builtins, ptr, idx, elem, structs)
+    } else {
+        unreachable!("seq_elem called with a non-array type")
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 enum RcOp {
     Retain,
@@ -5698,8 +5821,10 @@ fn emit_rc<M: Module>(
         return;
     }
     match ty {
-        // `str` (and `Error`, a refcounted str pointer) — inc/dec the pointer.
-        _ if is_str_repr(ty) => {
+        // `str` (and `Error`, a refcounted str pointer, and `char[]`, which
+        // shares `str`'s representation — see `is_char_array`) — inc/dec the
+        // pointer.
+        _ if is_str_repr(ty) || is_char_array(ty) => {
             let sym = match op {
                 RcOp::Retain => "aipl_inc",
                 RcOp::Drop => "aipl_dec",
@@ -5985,8 +6110,9 @@ fn emit_eq<M: Module>(
             let b = builder.ins().icmp(IntCC::Equal, lv, rv);
             builder.ins().uextend(types::I64, b)
         }
-        // `str` (and `Error`) compares by its string content.
-        _ if is_str_repr(ty) => {
+        // `str` (and `Error`, and `char[]` — see `is_str_shaped`) compares by
+        // its byte content.
+        _ if is_str_shaped(ty) => {
             // `str_eq` consumes a ref from each input; these are borrowed, so inc
             // first to keep them owned by whoever owns them.
             emit_inc(builder, module, builtins, lv);
@@ -6473,8 +6599,9 @@ fn emit_hash<M: Module>(
 ) -> Result<Value, Error> {
     Ok(match ty {
         Type::Primitive(p) if !matches!(p, Primitive::Str) => emit_scalar_hash(builder, v),
-        // `str` (and `Error`) hashes by its string content.
-        _ if is_str_repr(ty) => {
+        // `str` (and `Error`, and `char[]` — see `is_str_shaped`) hashes by
+        // its byte content.
+        _ if is_str_shaped(ty) => {
             let f = builtins.import(module, builder.func, "aipl_str_hash");
             let inst = builder.ins().call(f, &[v]);
             builder.inst_results(inst)[0]
@@ -6828,6 +6955,10 @@ fn array_drop_fn_addr<M: Module>(
     let b = cx.builtins;
     let id = match elem {
         Type::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_drop_str")),
+        // `char[]` shares `str`'s representation (see `is_char_array`), so a
+        // nested `char[]` element (e.g. in `char[][]`) is freed the same way
+        // a `str` element is, not via the generic array-element drop-fn.
+        Type::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_drop_str")),
         Type::Array(_) => Some(b.id(module, "aipl_arr_drop_arr")),
         Type::Optional(inner) if matches!(inner.as_ref(), Type::Primitive(Primitive::Str)) => {
             Some(b.id(module, "aipl_arr_drop_opt_str"))
@@ -7251,6 +7382,11 @@ fn emit_render<M: Module>(
             }
             builder.ins().iadd_imm(content, 2)
         }
+        // `char[]` is str-shaped (see `is_char_array`) but keeps its own
+        // array-bracket rendering (`['a', 'b', 'c']`, not `str`'s `"abc"`) —
+        // read via the same byte cursor `for`-loop iteration uses, since
+        // `value` is a real `str` underneath, not a generic array block.
+        _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
         Type::Array(elem) => emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?,
         Type::Set(elem) => emit_render_seq(module, builder, cx, value, elem, sink, b'{', b'}')?,
         Type::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
@@ -7644,6 +7780,93 @@ fn add_len(builder: &mut FunctionBuilder, slot: StackSlot, v: Value) {
     let cur = builder.ins().stack_load(types::I64, slot, 0);
     let sum = builder.ins().iadd(cur, v);
     builder.ins().stack_store(sum, slot, 0);
+}
+
+/// Render a `char[]` as `['a', 'b', 'c']` (empty: `[]`) — `emit_render_seq`'s
+/// bracket style, but reading bytes via the same cursor `for`-loop iteration
+/// uses (`aipl_str_iter_init`/`_next`) instead of `load_array_elem`, since
+/// `arr` is str-shaped (see `is_char_array`), not a generic array block.
+/// Borrows `arr` (the cursor is read-only, like `for`'s).
+fn emit_render_char_array<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    arr: Value,
+    sink: Sink,
+) -> Result<Value, Error> {
+    let b = cx.builtins;
+    let len_slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(zero, len_slot, 0);
+    let open_len = emit_lit(module, builder, cx, sink, b"[")?;
+    add_len(builder, len_slot, open_len);
+
+    let cur = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        ITER_SIZE as u32,
+        3,
+    ));
+    let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
+    let init_f = b.import(module, builder.func, "aipl_str_iter_init");
+    builder.ins().call(init_f, &[cur_addr, arr]);
+
+    // 1 until the first element has been rendered, then 0 — controls the
+    // leading ", " separator (mirrors `emit_render_seq`'s `is_first` check,
+    // but this cursor has no index to compare against 0).
+    let first_slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().stack_store(one, first_slot, 0);
+
+    let header = builder.create_block();
+    let body = builder.create_block();
+    let exit = builder.create_block();
+    builder.ins().jump(header, &[]);
+
+    builder.switch_to_block(header);
+    let next_f = b.import(module, builder.func, "aipl_str_iter_next");
+    let inst = builder.ins().call(next_f, &[cur_addr]);
+    let byte_i64 = builder.inst_results(inst)[0];
+    let more = builder
+        .ins()
+        .icmp_imm(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
+    builder.ins().brif(more, body, &[], exit, &[]);
+
+    builder.switch_to_block(body);
+    builder.seal_block(body);
+    let is_first = builder.ins().stack_load(types::I64, first_slot, 0);
+    let is_first_b = builder.ins().icmp_imm(IntCC::NotEqual, is_first, 0);
+    let sep_b = builder.create_block();
+    let after_sep = builder.create_block();
+    builder.ins().brif(is_first_b, after_sep, &[], sep_b, &[]);
+    builder.switch_to_block(sep_b);
+    builder.seal_block(sep_b);
+    let sep = emit_lit(module, builder, cx, sink, b", ")?;
+    add_len(builder, len_slot, sep);
+    builder.ins().jump(after_sep, &[]);
+    builder.switch_to_block(after_sep);
+    builder.seal_block(after_sep);
+    let zero_flag = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(zero_flag, first_slot, 0);
+
+    let elem_len = emit_render(
+        module,
+        builder,
+        cx,
+        byte_i64,
+        &Type::Primitive(Primitive::Char),
+        sink,
+    )?;
+    add_len(builder, len_slot, elem_len);
+    builder.ins().jump(header, &[]);
+    builder.seal_block(header);
+
+    builder.switch_to_block(exit);
+    builder.seal_block(exit);
+    let close_len = emit_lit(module, builder, cx, sink, b"]")?;
+    add_len(builder, len_slot, close_len);
+    Ok(builder.ins().stack_load(types::I64, len_slot, 0))
 }
 
 /// Render an array (`[a, b, c]`) or set (`{a, b, c}`) — the two share the heap
@@ -8443,6 +8666,7 @@ fn compile_call<M: Module>(
             &format!("fn {disp:?} arg {idx}"),
             arg.span.clone(),
         )?;
+        let v = coerce_empty_to_char_array(builder, module, builtins, v, &actual, expected);
         arg_values.push(v);
     }
     // Hand each heap (str/array) arg to the callee. A borrowed param is
@@ -8762,7 +8986,7 @@ fn compile_expr<M: Module>(
                 3,
             ));
             let result_ptr = builder.ins().stack_addr(types::I64, rslot, 0);
-            let len = load_arr_len(builder, arr_ptr);
+            let len = seq_len(module, builder, builtins, arr_ptr, &arr_ty);
             let zero = builder.ins().iconst(types::I64, 0);
             let is_empty = builder.ins().icmp(IntCC::Equal, len, zero);
             let empty_b = builder.create_block();
@@ -8792,7 +9016,7 @@ fn compile_expr<M: Module>(
                 8,
                 3,
             ));
-            let acc0 = load_array_elem(module, builder, builtins, arr_ptr, zero, &elem, structs);
+            let acc0 = seq_elem(module, builder, builtins, structs, arr_ptr, zero, &arr_ty);
             builder.ins().stack_store(acc0, acc_slot, 0);
             let one = builder.ins().iconst(types::I64, 1);
             builder.ins().stack_store(one, i_slot, 0);
@@ -8808,7 +9032,7 @@ fn compile_expr<M: Module>(
 
             builder.switch_to_block(body);
             builder.seal_block(body);
-            let e = load_array_elem(module, builder, builtins, arr_ptr, i, &elem, structs);
+            let e = seq_elem(module, builder, builtins, structs, arr_ptr, i, &arr_ty);
             let acc = builder.ins().stack_load(types::I64, acc_slot, 0);
             let cc = if is_min {
                 IntCC::SignedLessThan
@@ -9094,9 +9318,10 @@ fn compile_expr<M: Module>(
                 ));
             }
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let len = if is_str_repr(&t) {
-                // A `str` stores no length field (it can be inline/owned/view);
-                // `aipl_str_len` computes the byte length for any representation.
+            let len = if is_str_shaped(&t) {
+                // A `str` (or a str-shaped `char[]`, see `is_str_shaped`) stores
+                // no length field (it can be inline/owned/view); `aipl_str_len`
+                // computes the byte length for any representation.
                 let f = builtins.import(module, builder.func, "aipl_str_len");
                 let inst = builder.ins().call(f, &[ptr]);
                 builder.inst_results(inst)[0]
@@ -9135,6 +9360,18 @@ fn compile_expr<M: Module>(
                     .expect("scope")
                     .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
                 (result, Type::Primitive(Primitive::Str))
+            } else if is_char_array(&t) {
+                // Str-shaped (see `is_char_array`), but — unlike a bare `str`
+                // receiver above — keeps its nominal `char[]` type.
+                emit_inc(builder, module, builtins, ptr);
+                let f = builtins.import(module, builder.func, "aipl_str_reverse");
+                let inst = builder.ins().call(f, &[ptr]);
+                let result = builder.inst_results(inst)[0];
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(result, &t));
+                (result, t)
             } else if let Type::Array(elem) = &t {
                 let elem = (**elem).clone();
                 emit_inc(builder, module, builtins, ptr);
@@ -9180,7 +9417,7 @@ fn compile_expr<M: Module>(
             }
             let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (pat_v, pat_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            let result = if is_str_repr(&recv_ty) {
+            let result = if is_str_shaped(&recv_ty) {
                 // `char*` pattern. The str runtime consumes (decs) both refs, so
                 // each str handed to it is pre-inc'd; a built 1-char string is
                 // inline, so its inc/dec are no-ops. For the optional shape `none`
@@ -9720,9 +9957,10 @@ fn compile_expr<M: Module>(
             };
             let arr_ptr = builder.ins().stack_load(types::I64, slot, 0);
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, value)?;
+            let elem_was_none = is_none_inner(&elem_ty);
             // An empty array (`__none__` element) takes its element type from
             // the first pushed value; otherwise the value must match.
-            let result_elem = if is_none_inner(&elem_ty) {
+            let result_elem = if elem_was_none {
                 let ok = is_array_elem(&x_ty)
                     || matches!(&x_ty, Type::Optional(_))
                     || matches!(&x_ty, Type::Named(n) if structs.contains_key(n));
@@ -9761,7 +9999,92 @@ fn compile_expr<M: Module>(
                 builder.ins().stack_addr(types::I64, s, 0)
             };
             let new_arr_ty = Type::Array(Box::new(result_elem));
-            if exclusive {
+            if is_char_array(&new_arr_ty) {
+                // `char[]` is str-shaped (see `is_char_array`) and `str` has no
+                // in-place-growable form yet: every push rebuilds a fresh
+                // `str` (old bytes + the new byte) rather than growing in
+                // place — but the *ownership bookkeeping* still follows the
+                // same `exclusive`-vs-shared split as a real array push below,
+                // just swapping in `str` construction for `aipl_array_push[_mut]`.
+                //
+                // `mut cs = []` starts as the generic (array-shaped) empty
+                // placeholder — see `coerce_empty_to_char_array` — since an
+                // untyped `[]` has no way to know its first push will be a
+                // `char`. Converting *that* specific value requires knowing
+                // this is genuinely the *first* ever push to it — a fact
+                // `elem_was_none` only captures at compile time, for *this*
+                // call site. A push inside a loop compiles once but runs
+                // every iteration, so on the second iteration the "first
+                // push" code would wrongly re-run against a value that's
+                // already been converted to a real `str` on the iteration
+                // before. There's no cheap runtime way to tell those apart
+                // (both are ordinary heap pointers), so this specific
+                // transition is rejected rather than risking silent
+                // corruption — initialize with a real `char` first instead.
+                if elem_was_none {
+                    return Err(Error::at(
+                        "cannot push a char onto an array that started as an untyped empty \
+                         literal (`mut cs = []`) — initialize it with a char first, e.g. \
+                         \"mut cs = ['a']\", since the first push can't be proven to run \
+                         only once"
+                            .to_string(),
+                        receiver.span.clone(),
+                    ));
+                }
+                let len_f = builtins.import(module, builder.func, "aipl_str_len");
+                let inst = builder.ins().call(len_f, &[arr_ptr]);
+                let old_len = builder.inst_results(inst)[0];
+                let new_len = builder.ins().iadd_imm(old_len, 1);
+                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
+                let inst = builder.ins().call(alloc_f, &[new_len]);
+                let buf = builder.inst_results(inst)[0];
+                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
+                let data_f = builtins.import(module, builder.func, "aipl_str_data");
+                let inst = builder.ins().call(data_f, &[arr_ptr, scratch_addr]);
+                let src = builder.inst_results(inst)[0];
+                let copy_f = builtins.import(module, builder.func, "aipl_write_bytes");
+                builder.ins().call(copy_f, &[buf, src, old_len]);
+                let dst_addr = builder.ins().iadd(buf, old_len);
+                builder.ins().istore8(MemFlags::trusted(), x_v, dst_addr, 0);
+                builder.ins().stack_store(buf, slot, 0);
+                if exclusive {
+                    // Statically proven unaliased: the old value is already
+                    // owned solely by this binding's slot-track (from
+                    // `LetMut`), so free it for real — no compensating inc —
+                    // and don't track `buf` separately; the slot-track now
+                    // covers it instead.
+                    emit_rc(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        arr_ptr,
+                        &new_arr_ty,
+                        RcOp::Drop,
+                    );
+                } else {
+                    // Possibly shared: the old value is owned by a separate
+                    // track elsewhere (the binding's initial value-track, or
+                    // — for a `mut` parameter — its function-entry track),
+                    // which will drop it once at that track's scope exit.
+                    // Unlike `aipl_array_push` below (which *consumes* its
+                    // input, requiring a compensating pre-inc), building `buf`
+                    // only *borrows* `arr_ptr` (`aipl_str_len`/`aipl_str_data`
+                    // don't touch its refcount) — so the old track's single
+                    // eventual drop is already exactly right; the slot simply
+                    // stops pointing at it. `buf` is fresh and gets its own
+                    // track.
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(buf, &new_arr_ty));
+                }
+            } else if exclusive {
                 // Statically proven unaliased: mutate in place. No pre-inc and
                 // no new value-track — the binding's slot-track (added at
                 // `LetMut`) already owns the block, even after a relocating grow.
@@ -10712,7 +11035,7 @@ fn compile_expr<M: Module>(
             // representation — including a rope, leaf-by-leaf without
             // materializing — so the header just pulls the next byte (`-1` at the
             // end). For an array this is unused.
-            let str_cursor = if it_ty == Type::Primitive(Primitive::Str) {
+            let str_cursor = if it_ty == Type::Primitive(Primitive::Str) || is_char_array(&it_ty) {
                 let cur = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     ITER_SIZE as u32,
@@ -10746,7 +11069,7 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(header);
             let i = builder.ins().stack_load(types::I64, slot, 0);
             let (var_value, var_ty) = match &it_ty {
-                t if *t == Type::Primitive(Primitive::Str) => {
+                t if *t == Type::Primitive(Primitive::Str) || is_char_array(t) => {
                     // Pull the next byte from the cursor; `-1` signals the end (so
                     // a rope is walked leaf-by-leaf, never flattened, and we never
                     // index out of bounds).
@@ -10792,7 +11115,7 @@ fn compile_expr<M: Module>(
 
             // Body: bind var, run body in fresh refcount scope, advance i.
             // (For the array case we already switched to body_block above.)
-            if it_ty == Type::Primitive(Primitive::Str) {
+            if it_ty == Type::Primitive(Primitive::Str) || is_char_array(&it_ty) {
                 builder.switch_to_block(body_block);
             }
             builder.seal_block(body_block);
@@ -10961,7 +11284,7 @@ fn compile_expr<M: Module>(
                         Ok(vals)
                     })
                     .collect::<Result<_, Error>>()?;
-                let scrut_len = load_arr_len(builder, ptr);
+                let scrut_len = seq_len(module, builder, builtins, ptr, &scrut_ty);
                 for (i, arm) in arms.iter().enumerate() {
                     let Pattern::Array(elems) = &arm.pattern else {
                         continue;
@@ -10983,7 +11306,7 @@ fn compile_expr<M: Module>(
                     for j in 0..elems.len() {
                         let idx = builder.ins().iconst(types::I64, j as i64);
                         let scrut_elem =
-                            load_array_elem(module, builder, builtins, ptr, idx, elem, structs);
+                            seq_elem(module, builder, builtins, structs, ptr, idx, &scrut_ty);
                         let eq = emit_eq(
                             module,
                             builder,
@@ -11136,6 +11459,29 @@ fn compile_expr<M: Module>(
                 vals.push((v, t));
             }
             let elem = elem_ty.unwrap_or_else(none_inner_ty);
+            let arr_ty = Type::Array(Box::new(elem.clone()));
+            if is_char_array(&arr_ty) {
+                // `char[]` is str-shaped (see `is_char_array`): build a heap
+                // `str` buffer and write each element's byte directly, rather
+                // than a generic array block. `vals` is non-empty here — an
+                // empty `[]` never infers `elem == char` (it stays the
+                // untyped `NoneInner` element and takes the generic path
+                // below), so there's no empty/SSO case to special-case.
+                // Always heap-allocates (no small-string inlining yet).
+                let len = builder.ins().iconst(types::I64, vals.len() as i64);
+                let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
+                let inst = builder.ins().call(alloc, &[len]);
+                let buf = builder.inst_results(inst)[0];
+                for (i, (v, _)) in vals.into_iter().enumerate() {
+                    let addr = builder.ins().iadd_imm(buf, i as i64);
+                    builder.ins().istore8(MemFlags::trusted(), v, addr, 0);
+                }
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(buf, &arr_ty));
+                return Ok((buf, arr_ty));
+            }
             let len = builder.ins().iconst(types::I64, elems.len() as i64);
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
             let esz_v = builder
@@ -11168,7 +11514,6 @@ fn compile_expr<M: Module>(
                     emit_retain(builder, module, builtins, structs, v, &elem);
                 }
             }
-            let arr_ty = Type::Array(Box::new(elem));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -11326,9 +11671,12 @@ fn compile_expr<M: Module>(
                 index.span.clone(),
             )?;
 
-            // `s[i]` on a `str` yields `char?` — the byte at `i`, via the runtime
-            // `aipl_char_at`.
-            if recv_ty == Type::Primitive(Primitive::Str) {
+            // `s[i]` on a `str` (or a str-shaped `char[]`, see `is_char_array`)
+            // yields `char?` — the byte at `i`, via the runtime `aipl_char_at`.
+            // (Exact-`str` plus `char[]`, not the broader `is_str_shaped`: the
+            // original check was an exact `Str` match, not `is_str_repr` — kept
+            // that scope, since `Error`/concat-str indexing wasn't audited.)
+            if recv_ty == Type::Primitive(Primitive::Str) || is_char_array(&recv_ty) {
                 let ptr = emit_char_at(builder, module, builtins, recv_v, idx_v);
                 return Ok((
                     ptr,

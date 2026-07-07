@@ -17,8 +17,8 @@ fn same_length(v1: any[], v2: any[]) -> bool {
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 273
-instructions executed: 135
-binary size: 2504
+bytes allocated: 193
+instructions executed: 123
+binary size: 2600
 --- monomorphizations ---
 main

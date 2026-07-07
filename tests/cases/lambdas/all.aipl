@@ -20,9 +20,9 @@ fn positive(xs: i64[]) -> bool {
 allocations: 7
 deallocations: 7
 reallocations: 0
-bytes allocated: 376
-instructions executed: 728
-binary size: 6224
+bytes allocated: 340
+instructions executed: 690
+binary size: 6272
 --- monomorphizations ---
 __all1
 __all11

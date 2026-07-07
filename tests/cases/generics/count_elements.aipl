@@ -20,8 +20,8 @@ fn count(v: any[]) -> i64 {
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 178
-instructions executed: 329
-binary size: 2680
+bytes allocated: 149
+instructions executed: 303
+binary size: 2728
 --- monomorphizations ---
 main

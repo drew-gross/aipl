@@ -1,0 +1,21 @@
+import { push } from builtins;
+
+// `char[]` is str-shaped (see `is_char_array` in aipl-codegen); str has no
+// in-place-growable form, so the first push onto a char array that started
+// as an untyped empty literal (`mut cs = []`) must convert its
+// representation. That conversion can only safely happen once, but the
+// compiler can't prove a given push call site runs only once (e.g. inside a
+// loop, the same compiled code runs every iteration) — so it's rejected
+// rather than risking silent corruption on a second run. Starting from a
+// real `char[]` literal (`mut cs = ['a']`) avoids the issue entirely — see
+// `push_char.aipl`.
+fn main() {
+    mut cs = [];
+    cs.push('a');
+}
+--- errors ---
+error: cannot push a char onto an array that started as an untyped empty literal (`mut cs = []`) — initialize it with a char first, e.g. "mut cs = ['a']", since the first push can't be proven to run only once
+  --> input:14:5
+   |
+14 |     cs.push('a');
+   |     ^^

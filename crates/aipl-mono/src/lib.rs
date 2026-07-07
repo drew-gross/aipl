@@ -1372,9 +1372,14 @@ impl Mono<'_> {
         // wouldn't fit an 8-byte slot anyway. A `bool` array (in or out) is
         // excluded too — it's bit-packed, so the per-element byte-stride writes
         // the in-place intrinsics emit don't apply.
+        // A `char` element (in or out) makes the *array* str-shaped (see
+        // `is_char_array` in aipl-codegen) — 1 byte per element, not the
+        // generic 8-byte slot this in-place overwrite assumes — so it's
+        // excluded from the reusable set even though a bare `char` is
+        // otherwise a plain 8-byte scalar.
         let reusable = |t: &Type| {
             !matches!(t, Type::Optional(_))
-                && !matches!(t, Type::Primitive(Primitive::Bool))
+                && !matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
                 && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
         };
         let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
@@ -1654,9 +1659,12 @@ impl Mono<'_> {
         // the result type must be 8-byte non-composites (see `expand_map` for
         // the full rationale); the *other* array is only indexed, so its element
         // type is unconstrained.
+        // `char` is excluded too — it makes the array str-shaped (see
+        // `is_char_array` in aipl-codegen), 1 byte per element, not the
+        // generic 8-byte slot these intrinsics move.
         let reusable = |t: &Type| {
             !matches!(t, Type::Optional(_))
-                && !matches!(t, Type::Primitive(Primitive::Bool))
+                && !matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
                 && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
         };
         let own_a = is_fresh_heap(&rarr_a, &ty_a) && reusable(&elem_a) && reusable(&r);
@@ -2161,9 +2169,12 @@ impl Mono<'_> {
         // reusing the same allocation — instead of building a fresh output.
         // Optional elements are excluded: the in-place intrinsics move 8-byte
         // slots, but a `T?` element is 16 bytes. `bool` is excluded too — it's
-        // bit-packed, so per-element byte moves don't apply.
+        // bit-packed, so per-element byte moves don't apply. `char` is
+        // excluded too — it makes the array str-shaped (see `is_char_array`
+        // in aipl-codegen), 1 byte per element, not the generic 8-byte slot
+        // these intrinsics move.
         let in_place = !matches!(&elem, Type::Optional(_))
-            && !matches!(&elem, Type::Primitive(Primitive::Bool))
+            && !matches!(&elem, Type::Primitive(Primitive::Bool | Primitive::Char))
             && is_fresh_heap(&rarr, &arr_ty);
         // Resolve the predicate `(T) -> bool`: lift a lambda (threading its
         // captures through), or use a named function directly (no captures).

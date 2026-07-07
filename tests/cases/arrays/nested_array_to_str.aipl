@@ -19,8 +19,8 @@ fn main() !prints {
 allocations: 24
 deallocations: 24
 reallocations: 0
-bytes allocated: 1011
-instructions executed: 2931
-binary size: 12480
+bytes allocated: 945
+instructions executed: 2868
+binary size: 12472
 --- monomorphizations ---
 main

@@ -21,9 +21,9 @@ fn count_eq<T: any>(self: T[], target: T) -> i64 {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 120
-instructions executed: 518
-binary size: 3400
+bytes allocated: 84
+instructions executed: 480
+binary size: 3368
 --- monomorphizations ---
 count_eq$char$s0
 main

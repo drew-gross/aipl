@@ -24,9 +24,9 @@ fn first_true(bs: bool[]) -> i64 {
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 202
-instructions executed: 405
-binary size: 3856
+bytes allocated: 152
+instructions executed: 346
+binary size: 3904
 --- monomorphizations ---
 __test$count_h
 __test$first_true
