@@ -72,29 +72,89 @@ everything else; or, when `contents` doesn't already carry that section,
 appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
 instead of requiring it to exist.
 """).test({
-    // Most cases here exercise real `--- name ---` marker lines, so their
-    // fixture strings must stay escaped (`\n`), not `"""`-raw: this file is
-    // itself parsed through `strip_test_sections`, which cuts a file at the
-    // first line that trims to exactly `--- name ---` — a raw string with such
-    // a line embedded would truncate mid-literal at parse time. Content with no
-    // marker lines uses a plain multiline string.
+    // Fixtures below embed real `--- name ---` marker lines inside `"""` raw
+    // strings. That's safe: this file is itself parsed through
+    // `strip_test_sections`, which only cuts at a marker line that starts at
+    // column 0 of the *source* — every line inside these raw strings sits
+    // under the surrounding indentation, so it never lands at column 0. (The
+    // dedented *value* can still start a line at its own column 0; only the
+    // physical source position matters for the file-level cut.)
 
     // Section present: single-line body, more content follows.
-    assert(fill_or_add_section("a\n--- foo ---\nold\n--- bar ---\nb\n", "foo", "new")
-        == "a\n--- foo ---\nnew\n--- bar ---\nb\n");
+    assert(fill_or_add_section(
+        """
+        a
+        --- foo ---
+        old
+        --- bar ---
+        b
+
+        """,
+        "foo", "new") ==
+        """
+        a
+        --- foo ---
+        new
+        --- bar ---
+        b
+
+        """);
     // Section present: multi-line old body, all of it dropped.
-    assert(fill_or_add_section("--- foo ---\nold1\nold2\n", "foo", "new")
-        == "--- foo ---\nnew\n");
+    assert(fill_or_add_section(
+        """
+        --- foo ---
+        old1
+        old2
+
+        """,
+        "foo", "new") ==
+        """
+        --- foo ---
+        new
+
+        """);
     // Section present: the header is the final, unterminated line (no
     // trailing `\n` at all).
-    assert(fill_or_add_section("--- foo ---", "foo", "new") == "--- foo ---\nnew\n");
+    assert(fill_or_add_section(
+        """
+        --- foo ---
+        """,
+        "foo", "new") ==
+        """
+        --- foo ---
+        new
+
+        """);
     // Section present: old body is the final, unterminated content.
-    assert(fill_or_add_section("--- foo ---\nold", "foo", "new") == "--- foo ---\nnew\n");
+    assert(fill_or_add_section(
+        """
+        --- foo ---
+        old
+        """,
+        "foo", "new") ==
+        """
+        --- foo ---
+        new
+
+        """);
     // Section present: adjacent headers — an empty old body (the next line is
     // itself a header) has nothing to drop, and the following section passes
     // through untouched.
-    assert(fill_or_add_section("--- foo ---\n--- bar ---\nX\n", "foo", "new")
-        == "--- foo ---\nnew\n--- bar ---\nX\n");
+    assert(fill_or_add_section(
+        """
+        --- foo ---
+        --- bar ---
+        X
+
+        """,
+        "foo", "new") ==
+        """
+        --- foo ---
+        new
+        --- bar ---
+        X
+
+        """);
 
     // Section missing: appended after stripping trailing newlines.
     assert(fill_or_add_section(
@@ -102,7 +162,13 @@ instead of requiring it to exist.
         code
 
         """,
-        "stdout", "hi") == "code\n--- stdout ---\nhi\n");
+        "stdout", "hi") ==
+        """
+        code
+        --- stdout ---
+        hi
+
+        """);
     // Missing, with several trailing newlines to strip first.
     assert(fill_or_add_section(
         """
@@ -111,16 +177,47 @@ instead of requiring it to exist.
 
 
         """,
-        "stdout", "hi") == "code\n--- stdout ---\nhi\n");
+        "stdout", "hi") ==
+        """
+        code
+        --- stdout ---
+        hi
+
+        """);
     // Missing, no trailing newline at all.
-    assert(fill_or_add_section("code", "stdout", "hi")
-        == "code\n--- stdout ---\nhi\n");
+    assert(fill_or_add_section("code", "stdout", "hi") ==
+        """
+        code
+        --- stdout ---
+        hi
+
+        """);
     // Empty input, section missing.
-    assert(fill_or_add_section("", "stdout", "hi") == "\n--- stdout ---\nhi\n");
+    assert(fill_or_add_section("", "stdout", "hi") ==
+        """
+
+        --- stdout ---
+        hi
+
+        """);
     // An indented `--- foo ---` line isn't a real header (must start at column
     // 0), so the section is treated as missing and appended fresh.
-    assert(fill_or_add_section("code\n  --- foo ---\nold\n", "foo", "new")
-        == "code\n  --- foo ---\nold\n--- foo ---\nnew\n");
+    assert(fill_or_add_section(
+        """
+        code
+          --- foo ---
+        old
+
+        """,
+        "foo", "new") ==
+        """
+        code
+          --- foo ---
+        old
+        --- foo ---
+        new
+
+        """);
 })
 --- performance ---
 allocations: 86
@@ -128,4 +225,4 @@ deallocations: 86
 reallocations: 28
 bytes allocated: 3424
 instructions executed: 10718
-binary size: 17088
+binary size: 17816
