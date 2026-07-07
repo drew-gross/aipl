@@ -1481,6 +1481,12 @@ impl Cx<'_> {
         let return_ty = sig.return_type();
         let is_mutating = sig.is_mutating();
         let mut map: HashMap<String, Type> = HashMap::new();
+        // Type variables pinned to `char` by a `str` argument (rather than a
+        // real `char[]`) at a `T[]`-shaped parameter — e.g. `reverse`'s `self:
+        // T[]`. Lets a `T[] -> T[]` signature hand back `str` for a `str`
+        // receiver with no per-builtin special case: see the return-type
+        // computation below.
+        let mut str_pinned: HashSet<String> = HashSet::new();
         let mut atys: Vec<Type> = vec![Type::Unit; args.len()];
         // Pass 1: non-function arguments — type them and collect type-var bindings.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
@@ -1488,6 +1494,13 @@ impl Cx<'_> {
                 continue;
             }
             let aty = self.check_expr(arg, env, effects)?;
+            if let Type::Array(inner) = pty {
+                if let Type::Named(v) = inner.as_ref() {
+                    if vars.contains(v.as_str()) && aty == Type::Primitive(Primitive::Str) {
+                        str_pinned.insert(v.clone());
+                    }
+                }
+            }
             collect_var_bindings(pty, &aty, &vars, &mut map);
             atys[i] = aty;
         }
@@ -1535,14 +1548,6 @@ impl Cx<'_> {
                 .into_iter()
                 .next()
                 .unwrap_or(Type::Primitive(Primitive::I64)))
-        } else if name == "__builtin_reverse" {
-            // `str.reverse()` returns `str`, not `char[]` (the generic
-            // substitution would give `char[]` since str → T[] pins T=char).
-            if atys.first().is_some_and(is_str_repr) {
-                Ok(Type::Primitive(Primitive::Str))
-            } else {
-                Ok(subst_vars(&return_ty, &map, &vars))
-            }
         } else if name == "__builtin_enumerate" {
             // The return type `(i64, T)[]` is lowered to `Named("__tuple$i64$T")[]` by
             // lower_tuples. `subst_vars` can't substitute `T` inside a mangled struct name,
@@ -1565,7 +1570,17 @@ impl Cx<'_> {
             }
             Ok(Type::Array(Box::new(Type::Named(tuple_name))))
         } else {
-            Ok(subst_vars(&return_ty, &map, &vars))
+            // A `T[] -> T[]` signature (e.g. `reverse`) called on a `str`
+            // hands back `str`, not `char[]` — the plain substitution below
+            // would give `char[]` since `str` pins `T = char` (see the
+            // `str_pinned` collection above and `collect_var_bindings`).
+            let str_return = matches!(&return_ty, Type::Array(inner)
+                if matches!(inner.as_ref(), Type::Named(v) if str_pinned.contains(v)));
+            if str_return {
+                Ok(Type::Primitive(Primitive::Str))
+            } else {
+                Ok(subst_vars(&return_ty, &map, &vars))
+            }
         }
     }
 
