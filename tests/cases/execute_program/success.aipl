@@ -1,0 +1,32 @@
+import { wrapping_add as +, print, to_str, execute_program } from builtins;
+
+// `execute_program(program, args) -> ExecResult` spawns `program` with `args`
+// (argv-style, no shell) and waits for it, capturing stdout/stderr and the
+// exit code into an `ExecResult { stdout, stderr, exit_code }`. It carries the
+// `!execute_program` effect, so `main` must declare it.
+fn main() !prints !execute_program {
+    let ok = execute_program("echo", ["hello", "world"]);
+    print("[" + ok.stdout + "] exit=" + to_str(ok.exit_code));
+
+    let both = execute_program("sh", ["-c", "echo out; echo err >&2; exit 7"]);
+    print("[" + both.stdout + "][" + both.stderr + "] exit=" + to_str(both.exit_code));
+
+    let noargs = execute_program("true", []);
+    print("exit=" + to_str(noargs.exit_code));
+}
+--- stdout ---
+[hello world
+] exit=0
+[out
+][err
+] exit=7
+exit=0
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 0
+bytes allocated: 676
+instructions executed: 196
+binary size: 4168
+--- monomorphizations ---
+main

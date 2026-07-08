@@ -1,0 +1,13 @@
+import { print, to_str, execute_program } from builtins;
+
+// `execute_program` has the `!execute_program` effect; a caller that doesn't
+// declare it is rejected.
+fn main() !prints {
+    print(to_str(execute_program("echo", []).exit_code));
+}
+--- errors ---
+error: fn "execute_program" has effect "!execute_program" but the calling function does not declare it
+ --> input:6:18
+  |
+6 |     print(to_str(execute_program("echo", []).exit_code));
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^

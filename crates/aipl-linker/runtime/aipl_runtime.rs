@@ -677,6 +677,318 @@ unsafe fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
+/// `execute_program(program, args) -> ExecResult` (sret ABI, mirroring the JIT
+/// runtime): writes `ExecResult`'s three fields directly into `out` at their
+/// declared offsets 0/8/16 (`stdout`/`stderr`/`exit_code` — must stay in sync
+/// with `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Spawns `program` with
+/// `args` (no shell) and waits for it; POSIX-only for now (`cfg(unix)`) — on
+/// any other target, or any launch failure (bad UTF-8, not found, embedded
+/// NUL in captured output), writes empty `stdout`, the failure reason in
+/// `stderr`, and `exit_code: -1` (a struct payload can't ride a separate
+/// `Error` side yet, so failure is folded into the struct itself — see the
+/// JIT runtime's `aipl_execute_program` for the full rationale). Decrements
+/// `program` and `args` per the refcount protocol.
+#[no_mangle]
+pub extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
+    let a = aipl_arr_ensure_heap(args);
+    unsafe { execute_program_impl(out, program, a) };
+    aipl_dec(program);
+    aipl_array_dec(a);
+}
+
+fn write_exec_result(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
+    let stdout_ptr = make_str(stdout);
+    let stderr_ptr = make_str(stderr);
+    unsafe {
+        *out = stdout_ptr as i64;
+        *out.add(1) = stderr_ptr as i64;
+        *out.add(2) = exit_code;
+    }
+}
+
+#[cfg(not(unix))]
+unsafe fn execute_program_impl(out: *mut i64, _program: *const u8, _args: *const u8) {
+    // Process spawning isn't implemented on this platform yet.
+    write_exec_result(out, b"", b"could not execute program", -1);
+}
+
+#[cfg(unix)]
+unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
+    unsafe {
+        if program.is_null() || args.is_null() {
+            write_exec_result(out, b"", b"could not execute program", -1);
+            return;
+        }
+        exec_unix::run(out, program, args);
+    }
+}
+
+// ---------- POSIX process spawning (`execute_program`) ----------
+//
+// Redirects the child's stdout/stderr to unique temp files (rather than pipes)
+// so the parent can't deadlock waiting on one stream while the child blocks
+// writing to a full buffer on the other — it just reads each file back after
+// `waitpid`, reusing the same fopen/fread path as `read_file_to_string`.
+#[cfg(unix)]
+mod exec_unix {
+    use super::{
+        aipl_array_dec, aipl_dec, array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
+        ftell, make_str, rt_alloc, rt_free, str_bytes, ARR_ELEMS_OFFSET, SEEK_END, SEEK_SET,
+    };
+    use core::ffi::{c_char, c_int, c_void};
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    extern "C" {
+        fn fork() -> c_int;
+        fn execvp(path: *const c_char, argv: *const *const c_char) -> c_int;
+        fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int;
+        fn _exit(code: c_int) -> !;
+        fn dup2(oldfd: c_int, newfd: c_int) -> c_int;
+        fn fileno(stream: *mut c_void) -> c_int;
+        fn remove(path: *const c_char) -> c_int;
+        fn getpid() -> c_int;
+        fn pipe(fds: *mut c_int) -> c_int;
+        fn fcntl(fd: c_int, cmd: c_int, arg: c_int) -> c_int;
+        fn close(fd: c_int) -> c_int;
+        fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
+        fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
+    }
+
+    // POSIX-standard values (`<fcntl.h>`), identical on Linux and macOS.
+    const F_SETFD: c_int = 2;
+    const FD_CLOEXEC: c_int = 1;
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// A fresh, `rt_alloc`'d, NUL-terminated copy of a str value's bytes (any
+    /// representation), for building a C `argv` entry. Freed by the caller.
+    unsafe fn dup_cstr(v: *const u8) -> *mut c_char {
+        unsafe {
+            let mut b = [0u8; 8];
+            let bytes = str_bytes(v, &mut b);
+            let n = bytes.len();
+            let buf = rt_alloc(n + 1) as *mut u8;
+            if buf.is_null() {
+                super::abort();
+            }
+            if n > 0 {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, n);
+            }
+            *buf.add(n) = 0;
+            buf as *mut c_char
+        }
+    }
+
+    /// Build a unique temp-file path `/tmp/aipl_exec_<pid>_<counter>_<suffix>`
+    /// into `buf`, NUL-terminated, returning a `c_char` pointer into it.
+    unsafe fn temp_path(buf: &mut [u8; 96], suffix: &[u8]) -> *const c_char {
+        let mut digits = [0u8; 20];
+        let mut pos = 0usize;
+        let prefix = b"/tmp/aipl_exec_";
+        buf[..prefix.len()].copy_from_slice(prefix);
+        pos += prefix.len();
+        let start = fmt_i64(&mut digits, unsafe { getpid() } as i64);
+        buf[pos..pos + (20 - start)].copy_from_slice(&digits[start..]);
+        pos += 20 - start;
+        buf[pos] = b'_';
+        pos += 1;
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed) as i64;
+        let start = fmt_i64(&mut digits, n);
+        buf[pos..pos + (20 - start)].copy_from_slice(&digits[start..]);
+        pos += 20 - start;
+        buf[pos] = b'_';
+        pos += 1;
+        buf[pos..pos + suffix.len()].copy_from_slice(suffix);
+        pos += suffix.len();
+        buf[pos] = 0;
+        buf.as_ptr() as *const c_char
+    }
+
+    /// Read a temp file's full contents back as an owned `str`, or `None` on
+    /// any failure — including an embedded NUL, which a NUL-terminated str
+    /// can't hold (same constraint as `read_file_to_string`).
+    unsafe fn read_temp_file(path: *const c_char) -> Option<*const u8> {
+        unsafe {
+            let f = fopen(path, b"rb\0".as_ptr() as *const c_char);
+            if f.is_null() {
+                return None;
+            }
+            if fseek(f, 0, SEEK_END) != 0 {
+                fclose(f);
+                return None;
+            }
+            let size = ftell(f);
+            if size < 0 || fseek(f, 0, SEEK_SET) != 0 {
+                fclose(f);
+                return None;
+            }
+            let size = size as usize;
+            if size == 0 {
+                fclose(f);
+                return Some(make_str(&[]));
+            }
+            let buf = rt_alloc(size) as *mut u8;
+            if buf.is_null() {
+                fclose(f);
+                super::abort();
+            }
+            let n = fread(buf as *mut c_void, 1, size, f);
+            fclose(f);
+            let result = if n != size || core::slice::from_raw_parts(buf, size).contains(&0) {
+                None
+            } else {
+                Some(make_str(core::slice::from_raw_parts(buf, size)))
+            };
+            rt_free(buf as *mut c_void);
+            result
+        }
+    }
+
+    /// Free `argv[0..count]` (each a `dup_cstr`'d buffer) and the `argv` array
+    /// itself.
+    unsafe fn free_argv(argv: *mut *mut c_char, count: usize) {
+        unsafe {
+            for i in 0..count {
+                rt_free(*argv.add(i) as *mut c_void);
+            }
+            rt_free(argv as *mut c_void);
+        }
+    }
+
+    /// `program`/`a` (a heap-representation array — the caller already
+    /// materialized any reversed view) are each consumed exactly once, on
+    /// every path.
+    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8) {
+        unsafe {
+            let len = array_len(a);
+            let elems = a.add(ARR_ELEMS_OFFSET) as *const i64;
+
+            // argv: program, each arg, then a NULL terminator.
+            let argv =
+                rt_alloc((len + 2) * core::mem::size_of::<*mut c_char>()) as *mut *mut c_char;
+            if argv.is_null() {
+                super::abort();
+            }
+            *argv = dup_cstr(program);
+            aipl_dec(program);
+            for i in 0..len {
+                let ep = core::ptr::read(elems.add(i)) as *const u8;
+                *argv.add(1 + i) = dup_cstr(ep);
+            }
+            *argv.add(1 + len) = core::ptr::null_mut();
+            aipl_array_dec(a);
+
+            let mut outbuf = [0u8; 96];
+            let mut errbuf = [0u8; 96];
+            let out_path = temp_path(&mut outbuf, b"out");
+            let err_path = temp_path(&mut errbuf, b"err");
+            let out_f = fopen(out_path, b"wb\0".as_ptr() as *const c_char);
+            let err_f = fopen(err_path, b"wb\0".as_ptr() as *const c_char);
+            if out_f.is_null() || err_f.is_null() {
+                if !out_f.is_null() {
+                    fclose(out_f);
+                    remove(out_path);
+                }
+                if !err_f.is_null() {
+                    fclose(err_f);
+                    remove(err_path);
+                }
+                free_argv(argv, 1 + len);
+                return fail_msg(out);
+            }
+            let out_fd = fileno(out_f);
+            let err_fd = fileno(err_f);
+
+            // Self-pipe exec-error trick: the write end is marked close-on-exec,
+            // so a *successful* `execvp` closes it for free (the exec'd image
+            // never touches it) and the parent's `read` sees EOF; a *failed*
+            // `execvp` leaves the child running our code, which writes one byte
+            // before exiting. This is the only reliable way to tell "the child
+            // ran and exited 127 on its own" from "execvp itself never ran the
+            // program" — a real child could legitimately exit 127 too.
+            let mut errpipe = [0 as c_int; 2];
+            if pipe(errpipe.as_mut_ptr()) != 0 {
+                fclose(out_f);
+                fclose(err_f);
+                remove(out_path);
+                remove(err_path);
+                free_argv(argv, 1 + len);
+                return fail_msg(out);
+            }
+            let (err_r, err_w) = (errpipe[0], errpipe[1]);
+            fcntl(err_w, F_SETFD, FD_CLOEXEC);
+
+            let pid = fork();
+            if pid < 0 {
+                close(err_r);
+                close(err_w);
+                fclose(out_f);
+                fclose(err_f);
+                remove(out_path);
+                remove(err_path);
+                free_argv(argv, 1 + len);
+                return fail_msg(out);
+            }
+            if pid == 0 {
+                // Child: redirect stdout/stderr to the temp files, then exec.
+                close(err_r);
+                dup2(out_fd, 1);
+                dup2(err_fd, 2);
+                fclose(out_f);
+                fclose(err_f);
+                execvp(*argv, argv as *const *const c_char);
+                // execvp failed: signal it via the pipe, then exit.
+                let byte = 1u8;
+                write(err_w, &byte as *const u8 as *const c_void, 1);
+                _exit(127);
+            }
+            // Parent.
+            close(err_w);
+            fclose(out_f);
+            fclose(err_f);
+            free_argv(argv, 1 + len);
+
+            let mut sentinel = 0u8;
+            let exec_failed = read(err_r, &mut sentinel as *mut u8 as *mut c_void, 1) > 0;
+            close(err_r);
+
+            let mut status: c_int = 0;
+            waitpid(pid, &mut status, 0);
+            // Traditional System V wait-status encoding (shared by Linux and
+            // macOS): low 7 bits 0 = exited normally, high byte = exit code;
+            // otherwise the child was signal-terminated.
+            let exit_code: i64 = if status & 0x7f == 0 {
+                ((status >> 8) & 0xff) as i64
+            } else {
+                -1
+            };
+
+            if exec_failed {
+                remove(out_path);
+                remove(err_path);
+                return fail_msg(out);
+            }
+
+            let stdout_ptr = read_temp_file(out_path);
+            let stderr_ptr = read_temp_file(err_path);
+            remove(out_path);
+            remove(err_path);
+            match (stdout_ptr, stderr_ptr) {
+                (Some(so), Some(se)) => {
+                    *out = so as i64;
+                    *out.add(1) = se as i64;
+                    *out.add(2) = exit_code;
+                }
+                _ => fail_msg(out),
+            }
+        }
+    }
+}
+
+fn fail_msg(out: *mut i64) {
+    write_exec_result(out, b"", b"could not execute program", -1);
+}
+
 /// Format `n` in decimal into the END of `buf` (at least 20 bytes), returning
 /// the start index of the written bytes. Digits are built least-significant
 /// first; `wrapping_neg` on the bit pattern yields the magnitude even for

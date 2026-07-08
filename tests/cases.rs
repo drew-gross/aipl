@@ -1112,7 +1112,9 @@ fn run_success_case(
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
         if fill_mode() && actual != *expected {
-            fill_or_add_section(orig_path, "monomorphizations", &actual);
+            let path = orig_path.to_str().expect("utf-8 case path");
+            aipl::codegen::fill_or_add_section_file(path, "monomorphizations", &actual)
+                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
             eprintln!("[{}]: filled monomorphizations list", orig_path.display());
             return Outcome::Skip;
             // Already correct — fall through so subsequent fill targets (e.g. performance) get reached.
@@ -1170,7 +1172,9 @@ fn run_success_case(
 
         let stdout_placeholder = spec.stdout.as_deref() == Some("?");
         if fill_mode() && stdout != exp_stdout {
-            fill_or_add_section(orig_path, "stdout", &stdout);
+            let path = orig_path.to_str().expect("utf-8 case path");
+            aipl::codegen::fill_or_add_section_file(path, "stdout", &stdout)
+                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
             eprintln!("[{}]: filled stdout", orig_path.display());
             return Outcome::Skip;
         }
@@ -1209,7 +1213,13 @@ fn run_success_case(
                 }
             };
             if fill_mode() {
-                fill_or_add_section(orig_path, &format!("expect file: {rel}"), &actual);
+                let path = orig_path.to_str().expect("utf-8 case path");
+                aipl::codegen::fill_or_add_section_file(
+                    path,
+                    &format!("expect file: {rel}"),
+                    &actual,
+                )
+                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
                 eprintln!("[{}]: filled expect file {rel}", orig_path.display());
                 filled_file = true;
                 continue;
@@ -1247,7 +1257,9 @@ fn run_success_case(
             // how a *failing* test is documented).
             Some(expected) => {
                 if fill_mode() {
-                    fill_or_add_section(orig_path, "check", &report);
+                    let path = orig_path.to_str().expect("utf-8 case path");
+                    aipl::codegen::fill_or_add_section_file(path, "check", &report)
+                        .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
                     eprintln!("[{}]: filled check report", orig_path.display());
                     return Outcome::Skip;
                 }
@@ -1332,7 +1344,9 @@ fn run_performance_check(
     let placeholder = expected_body.trim() == "?";
     // In fill mode always overwrite — no `?` required.
     if fill_mode() {
-        fill_or_add_section(orig_path, "performance", &actual.render());
+        let path = orig_path.to_str().expect("utf-8 case path");
+        aipl::codegen::fill_or_add_section_file(path, "performance", &actual.render())
+            .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
         eprintln!("[{}]: filled performance counts", orig_path.display());
         return Outcome::Skip;
     }
@@ -1486,20 +1500,6 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
         instructions: instructions?,
         binary_size: binary_size?,
     })
-}
-
-/// Replace the body of the `--- <section> ---` block in the case file with
-/// `body` (dropping the old body up to the next header or EOF), or append
-/// `--- <section> ---\n<body>\n` when the section doesn't already exist. Every
-/// call site here targets a section that's already required to exist except
-/// `stdout` (which many cases omit, relying on the default-empty behavior), so
-/// one function covers both. The read/transform/write is all the dogfooded AIPL
-/// `fill_or_add_section_file`, run from checked-in IR (see
-/// [`aipl::codegen::fill_or_add_section_file`]) — no `std::fs` here.
-fn fill_or_add_section(path: &Path, section: &str, body: &str) {
-    let path = path.to_str().expect("utf-8 case path");
-    aipl::codegen::fill_or_add_section_file(path, section, body)
-        .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
 }
 
 fn normalize_output(s: &str) -> String {

@@ -986,7 +986,7 @@ pub fn is_error(t: &Type) -> bool {
 /// type so it type-checks like any function — it is never compiled
 /// (monomorphization and codegen lower the real implementations).
 ///
-/// It also carries builtin *type* declarations (currently just `Span`) for the
+/// It also carries builtin *type* declarations (e.g. `Span`, `ExecResult`) for the
 /// same reason: the checker recognizes them as ordinary structs with no notion
 /// that they're builtin, while `aipl-codegen` separately seeds its own struct
 /// layout table with them (see `builtin_struct_decls`/`build_struct_layouts`),
@@ -1001,6 +1001,8 @@ pub fn is_error(t: &Type) -> bool {
 pub const BUILTIN_SIGNATURES: &str = r#"
 // A half-open byte range `[start, end)`, e.g. a source-text location.
 struct __builtin_Span { start: i64, end: i64 }
+// A finished child process's captured output and exit status.
+struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
 
 fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
@@ -1012,6 +1014,16 @@ fn __builtin_join(self: str[], sep: str) -> str { "" }
 // `..!Error` (codegen builds the real ok/err).
 fn __builtin_read_file_to_string(self: str) !read_files -> str!Error { ok("") }
 fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Error { ok() }
+// Spawn `self` with `args` (no shell involved) and wait for it to finish.
+// A struct payload can't ride inside a `Result` yet (v1's Ok/Err payloads are
+// scalar/str/unit only), so a launch failure (not found, bad path, ...) is
+// folded into the struct itself instead of an `Error` side: `exit_code: -1`,
+// empty `stdout`, and the failure message in `stderr` — mirroring how a shell
+// already reports an exec failure via a reserved exit code (127), not a
+// separate channel.
+fn __builtin_execute_program(self: str, args: str[]) !execute_program -> __builtin_ExecResult {
+    __builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 }
+}
 
 fn __builtin_to_str<T: any>(self: T) -> str { "" }
 // Structural hash, consistent with `==`.
@@ -1214,6 +1226,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "contains",
     "read_file_to_string",
     "write_string_to_file",
+    "execute_program",
     "union",
     "get",
     "contains_key",
@@ -1245,7 +1258,7 @@ pub fn builtin_canonical(name: &str) -> Option<String> {
 /// needs no import), these behave like any other importable builtin: gated,
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
-pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span"];
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult"];
 
 /// Canonical internal name for an importable builtin type, or `None` if
 /// `name` isn't one. Mirrors [`builtin_canonical`] for types: the loader

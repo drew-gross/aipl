@@ -564,6 +564,72 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
+/// `execute_program(program, args) -> ExecResult` runtime: this is the
+/// hidden-sret ABI the generic `compile_call` path already builds for any
+/// composite-returning builtin (see its `sret` handling) — `out` is the
+/// caller-provided buffer sized for `ExecResult`, so this fn writes the
+/// struct's fields directly (`stdout`/`stderr`/`exit_code`, at their declared
+/// offsets 0/8/16 — must stay in sync with `__builtin_ExecResult` in
+/// `BUILTIN_SIGNATURES`) rather than returning through a register. Spawns
+/// `program` with `args` (no shell) and waits for it. A launch failure (bad
+/// UTF-8, not found, embedded NUL in captured output) can't ride a separate
+/// `Error` side — v1 `Result`s don't carry struct payloads yet — so it's
+/// folded into the struct instead: empty `stdout`, the failure reason in
+/// `stderr`, `exit_code: -1` (also used for a signal-terminated child, so `-1`
+/// is ambiguous between the two — acceptable for now, given the payload
+/// restriction). Decrements `program` and `args` per the refcount protocol.
+extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
+    let arr = aipl_arr_ensure_heap(args);
+    execute_program_impl(out, program, arr);
+    aipl_dec(program);
+    aipl_array_dec(arr);
+}
+
+fn write_exec_result(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
+    let stdout_ptr = make_str(stdout);
+    let stderr_ptr = make_str(stderr);
+    unsafe {
+        *out = stdout_ptr as i64;
+        *out.add(1) = stderr_ptr as i64;
+        *out.add(2) = exit_code;
+    }
+}
+
+fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
+    if program.is_null() || args.is_null() {
+        return write_exec_result(out, b"", b"could not execute program", -1);
+    }
+    let mut pbuf = [0u8; 8];
+    let Ok(program) = std::str::from_utf8(unsafe { str_bytes(program, &mut pbuf) }) else {
+        return write_exec_result(out, b"", b"could not execute program", -1);
+    };
+    let len = unsafe { array_len_of(args) };
+    let elems = unsafe { args.add(ARR_ELEMS_OFFSET) as *const i64 };
+    let mut arg_strings: Vec<String> = Vec::with_capacity(len);
+    for i in 0..len {
+        let ep = unsafe { std::ptr::read(elems.add(i)) as *const u8 };
+        let mut buf = [0u8; 8];
+        let Ok(s) = std::str::from_utf8(unsafe { str_bytes(ep, &mut buf) }) else {
+            return write_exec_result(out, b"", b"could not execute program", -1);
+        };
+        arg_strings.push(s.to_string());
+    }
+    let output = match std::process::Command::new(program)
+        .args(&arg_strings)
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return write_exec_result(out, b"", b"could not execute program", -1),
+    };
+    // A NUL-terminated str can't hold an embedded NUL byte (same constraint as
+    // `read_file_to_string`).
+    if output.stdout.contains(&0) || output.stderr.contains(&0) {
+        return write_exec_result(out, b"", b"could not execute program", -1);
+    }
+    let exit_code = i64::from(output.status.code().unwrap_or(-1));
+    write_exec_result(out, &output.stdout, &output.stderr, exit_code);
+}
+
 // ---------- One-allocation `to_str` primitives ----------
 //
 // `to_str` renders in two passes: a measure pass sums the total byte length, the
@@ -2357,8 +2423,8 @@ fn builtin_decls() -> Vec<Item> {
         .collect()
 }
 
-/// The `struct` declarations among [`BUILTIN_SIGNATURES`] (currently just
-/// `__builtin_Span`) — the builtin *types*, as opposed to the builtin
+/// The `struct` declarations among [`BUILTIN_SIGNATURES`] (e.g. `__builtin_Span`,
+/// `__builtin_ExecResult`) — the builtin *types*, as opposed to the builtin
 /// function signatures that make up the rest of that constant.
 fn builtin_struct_decls() -> Vec<StructDecl> {
     builtin_decls()
@@ -2385,13 +2451,15 @@ pub fn build_test_program(program: &Program) -> Program {
     let seq = |first: Expr, rest: Expr| {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
     };
-    // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`
-    // functions), so the synthesized test fns / driver declare every known effect.
+    // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`/
+    // `!execute_program` functions), so the synthesized test fns / driver declare
+    // every known effect.
     let all_effects = || {
         vec![
             "prints".to_string(),
             "read_files".to_string(),
             "write_files".to_string(),
+            "execute_program".to_string(),
         ]
     };
 
@@ -2688,29 +2756,6 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
         ) {
             Ok(FfiValue::Str(s)) => s,
             other => panic!("dogfooded caret_block() call: {other:?}"),
-        }
-    })
-}
-
-/// Replaces the body of the `--- section ---` block in `contents` with `body`
-/// (dropping the old body up to the next header line or EOF), or appends
-/// `--- section ---\n<body>\n` (after dropping trailing newlines) when
-/// `contents` doesn't already carry that section — computed by the dogfooded
-/// AIPL `fill_or_add_section` via the FFI. Not a parser hook — only the cases
-/// test harness calls this. No native fallback; panics if it can't be built or
-/// called.
-pub fn fill_or_add_section(contents: &str, section: &str, body: &str) -> String {
-    DOGFOOD_ENGINE.with(|comp| {
-        match comp.call_values(
-            "fill_or_add_section",
-            &[
-                FfiValue::Str(contents.to_string()),
-                FfiValue::Str(section.to_string()),
-                FfiValue::Str(body.to_string()),
-            ],
-        ) {
-            Ok(FfiValue::Str(s)) => s,
-            other => panic!("dogfooded fill_or_add_section() call: {other:?}"),
         }
     })
 }
@@ -3073,6 +3118,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_write_string_to_file",
         aipl_write_string_to_file as *const u8,
     );
+    jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
     jit_builder.symbol("aipl_str_repeat", aipl_str_repeat as *const u8);
@@ -4741,6 +4787,9 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_iter_init" => sig(2, false),
         "aipl_arr_load_bit" => sig(2, true),
         "aipl_arr_elem_ptr" => sig(3, true),
+        // sret ptr + (program, args): writes the whole composite `Result` via
+        // the hidden pointer, so it returns nothing.
+        "aipl_execute_program" => sig(3, false),
         "aipl_str_alloc"
         | "aipl_i64_len"
         | "aipl_u64_len"
@@ -4863,6 +4912,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
             "__builtin_write_string_to_file",
             "aipl_write_string_to_file",
         ),
+        ("__builtin_execute_program", "aipl_execute_program"),
         ("__builtin_trim", "aipl_trim"),
         ("__builtin_repeat", "aipl_str_repeat"),
         ("__builtin_is_all_whitespace", "aipl_str_is_all_whitespace"),
