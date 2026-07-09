@@ -63,7 +63,13 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
     if (contains_section(contents, section)) {
         fill_section(contents, section, body)
     } else {
-        contents.trim_end_while(|c| c == '\n' || c == '\r') + "\n--- " + section + " ---\n" + body + "\n"
+        let trimmed = contents.trim_end_while(|c| c == '\n' || c == '\r');
+        ```
+        {trimmed}
+        --- {section} ---
+        {body}
+
+        ```
     }
 }.doc("""
 Replaces the body of the `--- section ---` block in `contents` with `body`
@@ -220,9 +226,9 @@ instead of requiring it to exist.
         """);
 })
 --- performance ---
-allocations: 86
-deallocations: 86
+allocations: 83
+deallocations: 83
 reallocations: 28
-bytes allocated: 3424
-instructions executed: 10718
-binary size: 17816
+bytes allocated: 3141
+instructions executed: 10743
+binary size: 17992
