@@ -6560,12 +6560,50 @@ fn emit_eq<M: Module>(
     })
 }
 
-/// Fast path for `x == ok(y)` / `x == err(e)` (either order, and `!=` too):
-/// when exactly one side is written as a literal `ok(..)`/`err(..)` call,
-/// compare the *other* side's tag directly against the constructor's known
-/// tag and only compile/compare the payload when the tags match — instead of
-/// materializing a synthetic `Result` for the constructor side just to have
-/// `emit_eq` immediately load its tag back out and walk it apart. Returns
+/// The tag (and, for a variant, the field layout) a literal `ok(..)`/`err(..)`/
+/// named-variant-case call would build, resolved without building it.
+enum CtorShape {
+    /// Result's `ok`/`err`: the payload type isn't known from the call alone
+    /// (`Result` isn't in `structs`) — it's resolved from the other side's
+    /// concrete `Result(ok_ty, err_ty)` once that side is compiled.
+    Result { is_ok: bool },
+    /// A user-defined variant case, resolved statically via `variant_ctor`.
+    Variant {
+        tag: usize,
+        fields: Vec<(u32, Type)>,
+    },
+}
+
+/// Recognizes `e` as a literal `ok(..)`/`err(..)`/named-variant-case
+/// constructor — either call syntax (`Circle(1)`) or, for a nullary case, a
+/// bare unshadowed identifier (`Empty`, mirroring how `ExprKind::Ident`
+/// codegen itself resolves one) — purely from its AST shape, no codegen.
+/// `None` if it's neither.
+fn ctor_shape(cx: Cx, e: &Expr) -> Option<CtorShape> {
+    match &e.kind {
+        ExprKind::Call(name, _, _) => {
+            if name == "ok" || name == "err" {
+                return Some(CtorShape::Result {
+                    is_ok: name == "ok",
+                });
+            }
+            let (_, tag, fields) = variant_ctor(cx.structs, name)?;
+            Some(CtorShape::Variant { tag, fields })
+        }
+        ExprKind::Ident(name) if !cx.env.contains_key(name) => {
+            let (_, tag, fields) = variant_ctor(cx.structs, name)?;
+            Some(CtorShape::Variant { tag, fields })
+        }
+        _ => None,
+    }
+}
+
+/// Fast path for `x == Ctor(..)` (either order, and `!=` too), where `Ctor` is
+/// `ok`/`err` or any user-defined variant case: compare the *other* side's tag
+/// directly against the constructor's known tag, and only compile/compare its
+/// fields (directly, never wrapped in the constructor) when the tags match —
+/// instead of materializing a synthetic value for the constructor side just to
+/// have `emit_eq` immediately load its tag back out and walk it apart. Returns
 /// `None` when neither/both sides are such a literal, decided purely from the
 /// AST shape before anything is compiled, so the caller can fall back to the
 /// generic path with no risk of double-compiling an operand; once it commits
@@ -6579,44 +6617,76 @@ fn compile_ctor_eq<M: Module>(
     l: &Expr,
     r: &Expr,
 ) -> Result<Option<(Value, Type)>, Error> {
-    fn ctor(e: &Expr) -> Option<(bool, &[Expr])> {
-        match &e.kind {
-            ExprKind::Call(name, args, _) if name == "ok" || name == "err" => {
-                Some((name == "ok", args.as_slice()))
-            }
-            _ => None,
-        }
-    }
-    let (other, is_ok_ctor, ctor_args) = match (ctor(l), ctor(r)) {
-        (Some((is_ok, args)), None) => (r, is_ok, args),
-        (None, Some((is_ok, args))) => (l, is_ok, args),
-        _ => return Ok(None),
-    };
     let structs = cx.structs;
     let builtins = cx.builtins;
-    let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
-    let Type::Result(ok_ty, err_ty) = &ot else {
-        return Err(Error::at(
-            format!(
-                "\"{}\" between a result and {}: both sides must be the same type",
-                if op == 'E' { "==" } else { "!=" },
-                type_name(&ot)
-            ),
-            other.span.clone(),
-        ));
+    let (other, ctor_expr, shape) = match (ctor_shape(cx, l), ctor_shape(cx, r)) {
+        (Some(shape), None) => (r, l, shape),
+        (None, Some(shape)) => (l, r, shape),
+        _ => return Ok(None),
     };
-    let payload_ty = if is_ok_ctor {
-        ok_ty.as_ref()
-    } else {
-        err_ty.as_ref()
+    // A bare nullary-case identifier (`Empty`) takes no arguments, mirroring
+    // how its own `ExprKind::Ident` codegen constructs it with `&[]`.
+    let ctor_args: &[Expr] = match &ctor_expr.kind {
+        ExprKind::Call(_, args, _) => args.as_slice(),
+        ExprKind::Ident(_) => &[],
+        _ => unreachable!("ctor_shape only matches Call/Ident expressions"),
+    };
+    let opn = if op == 'E' { "==" } else { "!=" };
+    let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
+    let (expect_tag, fields) = match shape {
+        CtorShape::Result { is_ok } => {
+            let Type::Result(ok_ty, err_ty) = &ot else {
+                return Err(Error::at(
+                    format!(
+                        "\"{opn}\" between a result and {}: both sides must be the same type",
+                        type_name(&ot)
+                    ),
+                    other.span.clone(),
+                ));
+            };
+            let payload_ty = if is_ok {
+                (**ok_ty).clone()
+            } else {
+                (**err_ty).clone()
+            };
+            // A trivial payload (void `ok()`, or an unconstructible `__none__`
+            // side) carries nothing to compare — matching tags alone means equal.
+            let fields = if is_unit(&payload_ty) || is_none_inner(&payload_ty) {
+                vec![]
+            } else {
+                vec![(OPT_VALUE_OFFSET, payload_ty)]
+            };
+            (i64::from(is_ok), fields)
+        }
+        CtorShape::Variant { tag, fields } => {
+            if !matches!(&ot, Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some())
+            {
+                return Err(Error::at(
+                    format!(
+                        "\"{opn}\" between a variant and {}: both sides must be the same type",
+                        type_name(&ot)
+                    ),
+                    other.span.clone(),
+                ));
+            }
+            if fields.len() != ctor_args.len() {
+                return Err(Error::at(
+                    format!(
+                        "variant constructor takes {} argument(s), got {}",
+                        fields.len(),
+                        ctor_args.len()
+                    ),
+                    ctor_expr.span.clone(),
+                ));
+            }
+            (tag as i64, fields)
+        }
     };
     let tag = builder.ins().load(types::I64, MemFlags::trusted(), ov, 0);
-    let tag_matches = builder
-        .ins()
-        .icmp_imm(IntCC::Equal, tag, i64::from(is_ok_ctor));
-    // A trivial payload (void `ok()`, or an unconstructible `__none__` side)
-    // carries nothing to compare — matching tags alone means equal.
-    let eq = if is_unit(payload_ty) || is_none_inner(payload_ty) {
+    let tag_matches = builder.ins().icmp_imm(IntCC::Equal, tag, expect_tag);
+    // A tagless match (void `ok()`, or a nullary variant case) carries nothing
+    // to compare — matching tags alone means equal.
+    let eq = if fields.is_empty() {
         builder.ins().uextend(types::I64, tag_matches)
     } else {
         let res = i64_slot(builder);
@@ -6625,31 +6695,37 @@ fn compile_ctor_eq<M: Module>(
         let cmp_b = builder.create_block();
         let merge = builder.create_block();
         builder.ins().brif(tag_matches, cmp_b, &[], merge, &[]);
-        // Only reached when tags match: compile the constructor's payload
-        // expression directly (never wrapped in a Result) and compare it
-        // against the other side's payload, borrowed in place.
+        // Only reached when tags match: compile each field expression
+        // directly (never wrapped in the constructor) and AND-fold its
+        // equality against the other side's corresponding field, borrowed
+        // in place. Chained directly in SSA (not through the `res` slot) so a
+        // single-field case (every `ok`/`err`, and most variant cases) costs
+        // no more than a bare comparison.
         builder.switch_to_block(cmp_b);
         builder.seal_block(cmp_b);
-        let other_payload = component(builder, ov, OPT_VALUE_OFFSET, payload_ty, structs);
         scopes.push(Vec::new());
-        let (cv, _) = compile_expr(module, builder, cx, scopes, &ctor_args[0])?;
-        let payload_eq = emit_eq(
-            module,
-            builder,
-            builtins,
-            structs,
-            other_payload,
-            cv,
-            payload_ty,
-        )?;
+        let mut fields_eq = None;
+        for ((offset, fty), arg) in fields.iter().zip(ctor_args.iter()) {
+            let other_field = component(builder, ov, *offset, fty, structs);
+            let (cv, _) = compile_expr(module, builder, cx, scopes, arg)?;
+            let feq = emit_eq(module, builder, builtins, structs, other_field, cv, fty)?;
+            fields_eq = Some(match fields_eq {
+                None => feq,
+                Some(acc) => builder.ins().band(acc, feq),
+            });
+        }
         drop_scope(
             builder,
             module,
             builtins,
             structs,
-            scopes.pop().expect("ctor-eq payload scope"),
+            scopes.pop().expect("ctor-eq fields scope"),
         );
-        builder.ins().stack_store(payload_eq, res, 0);
+        builder.ins().stack_store(
+            fields_eq.expect("fields is non-empty in this branch"),
+            res,
+            0,
+        );
         builder.ins().jump(merge, &[]);
         builder.switch_to_block(merge);
         builder.seal_block(merge);
