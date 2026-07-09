@@ -1,0 +1,14 @@
+import { print } from builtins;
+
+// `{1` is never closed by a `}`, and nothing follows before EOF — the
+// interpolation scanner hits end-of-input while still looking for the
+// closing brace. The error points at the unclosed `{` itself, not at the
+// (irrelevant) EOF position.
+fn main() !prints {
+    print(```{1
+--- errors ---
+error: unterminated template literal interpolation
+ --> input:8:14
+  |
+8 |     print(```{1
+  |              ^

@@ -2512,6 +2512,7 @@ fn tokenize_template<I: Iterator<Item = char>>(
 
     // Scan the first text segment (before the first `{` or closing `` ` ``).
     let mut text = String::new();
+    let mut open_brace: Span;
     loop {
         match src.peek() {
             None => {
@@ -2529,8 +2530,10 @@ fn tokenize_template<I: Iterator<Item = char>>(
             }
             Some('{') => {
                 // First interpolation: emit TEMPLATE_HEAD.
-                let head_end = src.offset() + 1;
+                let brace_start = src.offset();
+                let head_end = brace_start + 1;
                 src.advance(); // consume {
+                open_brace = brace_start..head_end;
                 let head_span = template_start..head_end;
                 tokens.push((
                     aipl::Terminal::TemplateHead((text, head_span.clone())),
@@ -2590,7 +2593,7 @@ fn tokenize_template<I: Iterator<Item = char>>(
     // HEAD was emitted. Alternate: scan expression tokens, then a text
     // segment ending in MIDDLE or TAIL.
     loop {
-        tokenize_template_expr(src, template_start, tokens)?;
+        tokenize_template_expr(src, open_brace.clone(), tokens)?;
 
         let seg_start = src.offset();
         let mut seg = String::new();
@@ -2612,8 +2615,10 @@ fn tokenize_template<I: Iterator<Item = char>>(
                     return Ok(());
                 }
                 Some('{') => {
-                    let mid_end = src.offset() + 1;
+                    let brace_start = src.offset();
+                    let mid_end = brace_start + 1;
                     src.advance(); // consume {
+                    open_brace = brace_start..mid_end;
                     let mid_span = seg_start..mid_end;
                     tokens.push((
                         aipl::Terminal::TemplateMiddle((seg, mid_span.clone())),
@@ -2673,23 +2678,35 @@ fn tokenize_template<I: Iterator<Item = char>>(
 }
 
 /// Scan the expression tokens inside a `{ .. }` interpolation. The opening
-/// `{` has already been consumed. Emits tokens until the matching `}` is
-/// reached; that closing `}` is consumed but NOT emitted (it is the template
-/// delimiter, not an `RBRACE`). Nested `{` / `}` pairs (e.g. from set/dict
-/// literals, blocks, or nested template literals) are depth-tracked so their
-/// `LBRACE`/`RBRACE` tokens are emitted normally.
+/// `{` has already been consumed (`open_brace` is its span, for error
+/// reporting). Emits tokens until the matching `}` is reached; that closing
+/// `}` is consumed but NOT emitted (it is the template delimiter, not an
+/// `RBRACE`). Nested `{` / `}` pairs (e.g. from set/dict literals, blocks, or
+/// nested template literals) are depth-tracked so their `LBRACE`/`RBRACE`
+/// tokens are emitted normally.
+///
+/// A missing `}` doesn't necessarily surface as an error *here*: scanning
+/// just keeps consuming subsequent source looking for the closing brace, so a
+/// stray token deep inside (e.g. a `` ` `` that reads as opening some other
+/// template literal) can fail far from the real mistake — often past the
+/// enclosing template literal's own closing delimiter, which then itself
+/// misreports as "unterminated". So every error that can propagate out of
+/// this scan (whether from here directly or from a nested tokenize call) gets
+/// `open_brace` attached as a note, pointing back at the interpolation that
+/// was never actually closed.
 fn tokenize_template_expr<I: Iterator<Item = char>>(
     src: &mut Scanner<I>,
-    template_start: usize,
+    open_brace: Span,
     tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
 ) -> Result<(), Error> {
     let mut depth = 1usize;
     while depth > 0 {
-        skip_whitespace_and_comments(src)?;
+        skip_whitespace_and_comments(src)
+            .map_err(|e| e.with_note("in this unclosed interpolation", open_brace.clone()))?;
         if src.at_end() {
             return Err(Error::at(
                 "unterminated template literal interpolation",
-                template_start..src.offset(),
+                open_brace.clone(),
             ));
         }
         let pos = src.offset();
@@ -2708,7 +2725,9 @@ fn tokenize_template_expr<I: Iterator<Item = char>>(
                 // depth == 0: closing } of the interpolation; don't emit it.
             }
             _ => {
-                tokenize_one(src, tokens)?;
+                tokenize_one(src, tokens).map_err(|e| {
+                    e.with_note("in this unclosed interpolation", open_brace.clone())
+                })?;
             }
         }
     }
@@ -2765,13 +2784,14 @@ fn tokenize_triple_template<I: Iterator<Item = char>>(
                 break;
             }
             Some('{') => {
-                let seg_end = src.offset() + 1; // include the {
+                let brace_start = src.offset();
+                let seg_end = brace_start + 1; // include the {
                 src.advance(); // consume {
                 text_segs.push((cur_text.clone(), seg_start, seg_end));
                 cur_text = String::new();
 
                 let mut expr_tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
-                tokenize_template_expr(src, template_start, &mut expr_tokens)?;
+                tokenize_template_expr(src, brace_start..seg_end, &mut expr_tokens)?;
                 expr_bufs.push(expr_tokens);
                 seg_start = src.offset();
             }

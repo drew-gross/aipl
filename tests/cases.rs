@@ -1054,6 +1054,19 @@ fn compare_metrics(old: &HashMap<String, (f64, f64, f64)>, rows: &[PerfRow]) -> 
     out
 }
 
+/// The bare path `ctx` labels, for use as an `Error::render` filename. `ctx`
+/// is `"[{rel}]"` (the bracketed prefix on every `Outcome::Fail` message);
+/// stripping the brackets recovers the plain repo-relative path. Only for
+/// *unexpected*-failure diagnostics (a case that was supposed to load/compile/
+/// link cleanly, but didn't) — those aren't compared against a checked-in
+/// fixture, so showing the real path is strictly more useful than the
+/// generic `"input"` placeholder `run_error_case`/`try_fill_expected` use for
+/// `--- errors ---` fixtures (which *are* compared byte-for-byte, so must stay
+/// host-independent).
+fn ctx_filename(ctx: &str) -> &str {
+    ctx.trim_start_matches('[').trim_end_matches(']')
+}
+
 fn run_success_case(
     ctx: &str,
     orig_path: &Path,
@@ -1067,7 +1080,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: load failed:\n{}",
-                e.render(&spec.source, "input")
+                e.render(&spec.source, ctx_filename(ctx))
             ))
         }
     };
@@ -1103,7 +1116,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: compile failed:\n{}",
-                e.render(&spec.source, "input")
+                e.render(&spec.source, ctx_filename(ctx))
             ))
         }
     };
@@ -1131,7 +1144,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: emit failed:\n{}",
-                e.render(&spec.source, "input")
+                e.render(&spec.source, ctx_filename(ctx))
             ))
         }
     };
@@ -1143,7 +1156,7 @@ fn run_success_case(
         if let Err(e) = binary::link(&obj_bytes, &exe_path) {
             return Outcome::Fail(format!(
                 "{ctx}: link failed:\n{}",
-                e.render(&spec.source, "input")
+                e.render(&spec.source, ctx_filename(ctx))
             ));
         }
 
@@ -1320,7 +1333,7 @@ fn run_performance_check(
             Err(e) => {
                 return Outcome::Fail(format!(
                     "{ctx}: instrumented compile failed:\n{}",
-                    e.render(&spec.source, "input")
+                    e.render(&spec.source, ctx_filename(ctx))
                 ))
             }
         };
@@ -1397,7 +1410,7 @@ fn measure_perf_stats(
     if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
         return Err(format!(
             "{ctx}: instrumented link failed:\n{}",
-            e.render(&spec.source, "input")
+            e.render(&spec.source, ctx_filename(ctx))
         ));
     }
 

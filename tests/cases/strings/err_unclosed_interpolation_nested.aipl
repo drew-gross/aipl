@@ -1,0 +1,23 @@
+import { print } from builtins;
+
+// `{1` is never closed by a `}` (a stray space + ``` follows instead). The
+// interpolation scanner, still looking for `}`, reads that stray ``` as the
+// *opening* of a brand-new triple-backtick literal (a legitimate thing to
+// nest in general) and keeps scanning for a closing ``` that doesn't exist —
+// so the primary error reports "unterminated" at that inner (misidentified)
+// literal, far from the actual mistake. A `note:` should still point back at
+// the real culprit: the unclosed `{`.
+fn main() !prints {
+    print(```{1 ```)
+}
+--- errors ---
+error: unterminated triple-backtick template literal
+  --> input:11:17
+   |
+11 |     print(```{1 ```)
+   |                 ^^^^
+note: in this unclosed interpolation
+  --> input:11:14
+   |
+11 |     print(```{1 ```)
+   |              ^
