@@ -5,7 +5,7 @@ pub fn add(a: i64, b: i64) -> i64 {
 }.note("not a real attribute")
 --- errors ---
 error: unknown function attribute "note"; only `.test({ .. })` and `.doc("..")` are supported
- --> input:5:3
+ --> ./tests/cases/docs/err_unknown_attr.aipl:5:3
   |
 5 | }.note("not a real attribute")
   |   ^^^^

@@ -7,7 +7,7 @@ fn main() !prints -> i64 {
 }
 --- errors ---
 error: unterminated raw string literal
- --> input:5:11
+ --> ./tests/cases/strings/raw/err_raw_string_unterminated.aipl:5:11
   |
 5 |     print("""oops, never closed);
   |           ^^^^^^^^^^^^^^^^^^^^^^^

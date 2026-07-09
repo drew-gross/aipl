@@ -5,7 +5,7 @@ fn blank(s: str) -> bool {
 }
 --- errors ---
 error: call to undefined fn "is_all_whitespace" — "is_all_whitespace" is a builtin; import it with `import { is_all_whitespace } from builtins;`
- --> input:4:5
+ --> ./tests/cases/builtins/err_unimported_builtin.aipl:4:5
   |
 4 |     s.is_all_whitespace()
   |     ^^^^^^^^^^^^^^^^^^^

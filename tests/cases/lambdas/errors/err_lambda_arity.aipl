@@ -8,7 +8,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: lambda has 2 parameter(s), but (i64) -> i64 was expected
- --> input:7:11
+ --> ./tests/cases/lambdas/errors/err_lambda_arity.aipl:7:11
   |
 7 |     apply(|x, y| x + y, 3)
   |           ^^^^^^^^^^^^

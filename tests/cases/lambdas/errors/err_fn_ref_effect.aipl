@@ -14,7 +14,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "shout" has effect "!prints" but the calling function does not declare it
-  --> input:12:21
+  --> ./tests/cases/lambdas/errors/err_fn_ref_effect.aipl:12:21
    |
 12 |     let ys = xs.map(shout);
    |                     ^^^^^

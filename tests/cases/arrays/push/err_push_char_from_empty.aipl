@@ -15,7 +15,7 @@ fn main() {
 }
 --- errors ---
 error: cannot push a char onto an array that started as an untyped empty literal (`mut cs = []`) — initialize it with a char first, e.g. "mut cs = ['a']", since the first push can't be proven to run only once
-  --> input:14:5
+  --> ./tests/cases/arrays/push/err_push_char_from_empty.aipl:14:5
    |
 14 |     cs.push('a');
    |     ^^

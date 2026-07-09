@@ -13,7 +13,7 @@ fn main() !prints {
 }
 --- errors ---
 error: "match" on a str expects string literals or `_`
- --> input:6:9
+ --> ./tests/cases/strings/err_match_ctor_arm.aipl:6:9
   |
 6 |         some(v) => v,
   |         ^^^^

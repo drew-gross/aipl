@@ -8,7 +8,7 @@ fn main() !prints {
     print(```{1
 --- errors ---
 error: unterminated template literal interpolation
- --> input:8:14
+ --> ./tests/cases/strings/err_unclosed_interpolation_eof.aipl:8:14
   |
 8 |     print(```{1
   |              ^

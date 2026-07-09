@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: "==" between char and i64: both sides must be the same type
- --> input:3:33
+ --> ./tests/cases/loops/errors/err_for_body_type_mismatch.aipl:3:33
   |
 3 |     for (let c : "x") { let _ = c == 5; }
   |                                 ^^^^^^

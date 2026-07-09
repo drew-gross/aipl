@@ -11,7 +11,7 @@ fn main() !prints {
 }
 --- errors ---
 error: fn "twice" returns i64, but bool is expected here
-  --> input:10:28
+  --> ./tests/cases/lambdas/errors/err_filter_named_not_bool.aipl:10:28
    |
 10 |     print(to_str(xs.filter(twice)));
    |                            ^^^^^

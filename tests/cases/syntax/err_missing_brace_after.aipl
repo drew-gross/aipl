@@ -1,7 +1,7 @@
 fn f() 1 }
 --- errors ---
 error: unexpected '1'; expected '->', '{', or effect
- --> input:1:8
+ --> ./tests/cases/syntax/err_missing_brace_after.aipl:1:8
   |
 1 | fn f() 1 }
   |        ^

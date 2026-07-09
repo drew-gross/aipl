@@ -13,12 +13,12 @@ pub fn val() -> i64 { 1 }
 pub fn val() -> i64 { 2 }
 --- errors ---
 error: err_import_imported_twice.aipl: import "val" conflicts with another import
- --> input:5:10
+ --> ./tests/cases/imports/err_import_imported_twice.aipl:5:10
   |
 5 | import { val } from "./b.aipl";
   |          ^^^
 note: "val" first imported here
- --> input:4:10
+ --> ./tests/cases/imports/err_import_imported_twice.aipl:4:10
   |
 4 | import { val } from "./a.aipl";
   |          ^^^

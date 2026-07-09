@@ -9,7 +9,7 @@ fn main() {
 }
 --- errors ---
 error: "?" can only be used in a function that returns a result
- --> input:4:5
+ --> ./tests/cases/results/err_try_outside_result.aipl:4:5
   |
 4 |     x?
   |     ^

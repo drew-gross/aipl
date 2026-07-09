@@ -12,7 +12,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "identity": type parameter "T" requires "ord", but was inferred as Point
-  --> input:10:5
+  --> ./tests/cases/generics/errors/err_ord_bound_violation.aipl:10:5
    |
 10 |     identity(Point { x: 1, y: 2 });
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^

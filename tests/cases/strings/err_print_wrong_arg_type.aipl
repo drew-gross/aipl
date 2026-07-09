@@ -6,7 +6,7 @@ fn main() !prints -> i64 {
 }
 --- errors ---
 error: fn "print" arg 0: expected str, got i64
- --> input:4:19
+ --> ./tests/cases/strings/err_print_wrong_arg_type.aipl:4:19
   |
 4 |     let _ = print(42);
   |                   ^^

@@ -5,7 +5,7 @@ pub fn add(a: i64, b: i64) -> i64 {
 }.doc("first").doc("second")
 --- errors ---
 error: duplicate `.doc` attribute
- --> input:5:16
+ --> ./tests/cases/docs/err_duplicate_doc.aipl:5:16
   |
 5 | }.doc("first").doc("second")
   |                ^^^

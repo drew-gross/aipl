@@ -11,7 +11,7 @@ fn main() {
 }
 --- errors ---
 error: the result bound to "r" is never used, ignoring its possible error; inspect it with `match` or `?`
-  --> input:10:13
+  --> ./tests/cases/results/err_unused_result_binding.aipl:10:13
    |
 10 |     let r = might_fail(5);
    |             ^^^^^^^^^^^^

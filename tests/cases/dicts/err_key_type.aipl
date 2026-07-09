@@ -7,7 +7,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: dict keys must be i64, bool, char, or str, got i64[]
- --> input:5:13
+ --> ./tests/cases/dicts/err_key_type.aipl:5:13
   |
 5 |     let d = #{[1]: "a"};
   |             ^^^^^^^^^^

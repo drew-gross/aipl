@@ -3,7 +3,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: call to undefined fn "len" — "len" is a builtin; import it with `import { len } from builtins;`
- --> input:2:5
+ --> ./tests/cases/builtins/err_use_without_import.aipl:2:5
   |
 2 |     len([1, 2, 3])
   |     ^^^^^^^^^^^^

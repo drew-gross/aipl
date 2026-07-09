@@ -5,7 +5,7 @@ fn main() {
 }
 --- errors ---
 error: slice receiver: expected str, got i64
- --> input:4:13
+ --> ./tests/cases/strings/errors/err_slice_non_str.aipl:4:13
   |
 4 |     let s = n[0..2];
   |             ^

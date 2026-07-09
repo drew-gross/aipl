@@ -9,7 +9,7 @@ fn main() {
 }
 --- errors ---
 error: integer literal 300 does not fit in u8
- --> input:8:18
+ --> ./tests/cases/integers/err_literal_out_of_range.aipl:8:18
   |
 8 |     let y = take(300);
   |                  ^^^

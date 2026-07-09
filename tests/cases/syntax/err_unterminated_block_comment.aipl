@@ -1,7 +1,7 @@
 fn f() { /* never closed }
 --- errors ---
 error: unterminated block comment
- --> input:1:10
+ --> ./tests/cases/syntax/err_unterminated_block_comment.aipl:1:10
   |
 1 | fn f() { /* never closed }
   |          ^^^^^^^^^^^^^^^^^

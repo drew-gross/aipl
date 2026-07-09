@@ -1,7 +1,7 @@
 fn f() { "abc }
 --- errors ---
 error: unterminated string literal
- --> input:1:10
+ --> ./tests/cases/strings/literals/err_unterminated_string.aipl:1:10
   |
 1 | fn f() { "abc }
   |          ^^^^^^

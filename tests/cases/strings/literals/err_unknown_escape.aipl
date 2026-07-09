@@ -1,7 +1,7 @@
 fn f() -> str { "\q" }
 --- errors ---
 error: unknown escape sequence \q
- --> input:1:18
+ --> ./tests/cases/strings/literals/err_unknown_escape.aipl:1:18
   |
 1 | fn f() -> str { "\q" }
   |                  ^^

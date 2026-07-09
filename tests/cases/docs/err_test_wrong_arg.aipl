@@ -5,7 +5,7 @@ pub fn add(a: i64, b: i64) -> i64 {
 }.test("should be a block, not a string")
 --- errors ---
 error: `.test` takes a `{ .. }` block, not a string argument
- --> input:5:3
+ --> ./tests/cases/docs/err_test_wrong_arg.aipl:5:3
   |
 5 | }.test("should be a block, not a string")
   |   ^^^^

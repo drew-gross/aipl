@@ -14,7 +14,7 @@ fn main() !prints {
 }
 --- errors ---
 error: duplicate "a" arm
- --> input:7:9
+ --> ./tests/cases/strings/err_match_duplicate.aipl:7:9
   |
 7 |         "a" => "y",
   |         ^^^

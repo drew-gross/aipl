@@ -1,7 +1,7 @@
 fn f() -> char { 'é' }
 --- errors ---
 error: non-ASCII character in char literal: 'é'
- --> input:1:18
+ --> ./tests/cases/chars/err_non_ascii_char.aipl:1:18
   |
 1 | fn f() -> char { 'é' }
   |                  ^^^

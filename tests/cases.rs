@@ -602,7 +602,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool) -> Ou
                 "{ctx}: `expect file:` section requires a running program, so it cannot coexist with `errors`"
             ));
         }
-        run_error_case(&ctx, &src_path, &spec)
+        run_error_case(&ctx, path, &src_path, &spec)
     } else {
         // A `--- performance ---` section is mandatory for every running test
         // case (but not for the user-facing `examples/`, which aren't staged).
@@ -627,7 +627,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool) -> Ou
     }
 }
 
-fn run_error_case(ctx: &str, src_path: &Path, spec: &Spec) -> Outcome {
+fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> Outcome {
     let result = loader::load_program(src_path, debug_opts())
         .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
     let err = match result {
@@ -638,7 +638,7 @@ fn run_error_case(ctx: &str, src_path: &Path, spec: &Spec) -> Outcome {
             ))
         }
     };
-    let actual = err.render(&spec.source, "input");
+    let actual = err.render(&spec.source, &render_path(orig_path));
     let expected = spec.errors.as_deref().unwrap_or("");
     // Special-case: a `--- errors ---` section whose body is literally
     // `?` prints the actual error and skips the check. Use this when
@@ -1054,17 +1054,16 @@ fn compare_metrics(old: &HashMap<String, (f64, f64, f64)>, rows: &[PerfRow]) -> 
     out
 }
 
-/// The bare path `ctx` labels, for use as an `Error::render` filename. `ctx`
-/// is `"[{rel}]"` (the bracketed prefix on every `Outcome::Fail` message);
-/// stripping the brackets recovers the plain repo-relative path. Only for
-/// *unexpected*-failure diagnostics (a case that was supposed to load/compile/
-/// link cleanly, but didn't) — those aren't compared against a checked-in
-/// fixture, so showing the real path is strictly more useful than the
-/// generic `"input"` placeholder `run_error_case`/`try_fill_expected` use for
-/// `--- errors ---` fixtures (which *are* compared byte-for-byte, so must stay
-/// host-independent).
-fn ctx_filename(ctx: &str) -> &str {
-    ctx.trim_start_matches('[').trim_end_matches(']')
+/// The path an `Error::render` filename should show for `path` (a case
+/// file): relative to the repo root and `/`-separated regardless of host
+/// platform, prefixed with `./` — host-independent (no absolute filesystem
+/// path), so it's safe to bake into a checked-in `--- errors ---` fixture,
+/// but still a real, useful path instead of the generic old `"input"`
+/// placeholder.
+fn render_path(path: &Path) -> String {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let rel = path.strip_prefix(root).unwrap_or(path);
+    format!("./{}", rel.to_string_lossy().replace('\\', "/"))
 }
 
 fn run_success_case(
@@ -1080,7 +1079,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: load failed:\n{}",
-                e.render(&spec.source, ctx_filename(ctx))
+                e.render(&spec.source, &render_path(orig_path))
             ))
         }
     };
@@ -1116,7 +1115,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: compile failed:\n{}",
-                e.render(&spec.source, ctx_filename(ctx))
+                e.render(&spec.source, &render_path(orig_path))
             ))
         }
     };
@@ -1144,7 +1143,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: emit failed:\n{}",
-                e.render(&spec.source, ctx_filename(ctx))
+                e.render(&spec.source, &render_path(orig_path))
             ))
         }
     };
@@ -1156,7 +1155,7 @@ fn run_success_case(
         if let Err(e) = binary::link(&obj_bytes, &exe_path) {
             return Outcome::Fail(format!(
                 "{ctx}: link failed:\n{}",
-                e.render(&spec.source, ctx_filename(ctx))
+                e.render(&spec.source, &render_path(orig_path))
             ));
         }
 
@@ -1333,11 +1332,19 @@ fn run_performance_check(
             Err(e) => {
                 return Outcome::Fail(format!(
                     "{ctx}: instrumented compile failed:\n{}",
-                    e.render(&spec.source, ctx_filename(ctx))
+                    e.render(&spec.source, &render_path(orig_path))
                 ))
             }
         };
-    let actual = match measure_perf_stats(ctx, &obj_bytes, stem, spec, case_dir, prod_obj_size) {
+    let actual = match measure_perf_stats(
+        ctx,
+        orig_path,
+        &obj_bytes,
+        stem,
+        spec,
+        case_dir,
+        prod_obj_size,
+    ) {
         Ok(v) => v,
         Err(msg) => return Outcome::Fail(msg),
     };
@@ -1400,6 +1407,7 @@ fn run_performance_check(
 /// whole `PerfStats` parses through one path.
 fn measure_perf_stats(
     ctx: &str,
+    orig_path: &Path,
     obj_bytes: &[u8],
     stem: &str,
     spec: &Spec,
@@ -1410,7 +1418,7 @@ fn measure_perf_stats(
     if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
         return Err(format!(
             "{ctx}: instrumented link failed:\n{}",
-            e.render(&spec.source, ctx_filename(ctx))
+            e.render(&spec.source, &render_path(orig_path))
         ));
     }
 
@@ -1560,7 +1568,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) {
             return;
         }
     };
-    let rendered = err.render(&spec.source, "input");
+    let rendered = err.render(&spec.source, &render_path(path));
     // Replace the `?` placeholder line with the rendered error.
     let header_marker = "--- errors ---";
     let header_idx = contents

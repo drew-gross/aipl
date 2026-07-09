@@ -10,7 +10,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: cannot call mutating method "add" on immutable binding "n"; declare it with "mut"
- --> input:8:5
+ --> ./tests/cases/methods/mutating/err_immutable_receiver.aipl:8:5
   |
 8 |     n.add(2);
   |     ^^^^^^^

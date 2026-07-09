@@ -13,7 +13,7 @@ fn main() !prints {
 }
 --- errors ---
 error: string-literal pattern matches a str, not i64?
- --> input:6:9
+ --> ./tests/cases/options/err_match_str_literal.aipl:6:9
   |
 6 |         "a" => "x",
   |         ^^^

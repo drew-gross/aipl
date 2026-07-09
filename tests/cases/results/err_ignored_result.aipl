@@ -11,7 +11,7 @@ fn main() {
 }
 --- errors ---
 error: this result is discarded, ignoring its possible error; handle it with `match` or propagate it with `?`
-  --> input:10:5
+  --> ./tests/cases/results/err_ignored_result.aipl:10:5
    |
 10 |     might_fail(5);
    |     ^^^^^^^^^^^^

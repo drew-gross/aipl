@@ -1,7 +1,7 @@
 f() { 1 }
 --- errors ---
 error: unexpected 'f'; expected definition or end of input
- --> input:1:1
+ --> ./tests/cases/functions/err_missing_fn_keyword.aipl:1:1
   |
 1 | f() { 1 }
   | ^

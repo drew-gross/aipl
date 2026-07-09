@@ -7,7 +7,7 @@ fn main() !prints {
 }
 --- errors ---
 error: fn "read_file_to_string" has effect "!read_files" but the calling function does not declare it
- --> input:6:18
+ --> ./tests/cases/files/err_missing_effect.aipl:6:18
   |
 6 |     print(to_str(read_file_to_string("x.txt")));
   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^

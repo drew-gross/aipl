@@ -6,7 +6,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: value_or default: expected i64, got char
- --> input:5:22
+ --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:5:22
   |
 5 |     some(1).value_or('z')
   |                      ^^^

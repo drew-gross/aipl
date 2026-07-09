@@ -5,7 +5,7 @@ fn f() !prints -> i64 { print("x") }
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns (), but the declared return type is i64
- --> input:4:25
+ --> ./tests/cases/functions/return_types/err_return_void_for_i64.aipl:4:25
   |
 4 | fn f() !prints -> i64 { print("x") }
   |                         ^^^^^^^^^

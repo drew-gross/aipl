@@ -15,7 +15,7 @@ fn main() !prints {
 }
 --- errors ---
 error: non-exhaustive match: missing Rect
- --> input:7:12
+ --> ./tests/cases/variants/err_non_exhaustive.aipl:7:12
   |
 7 |     match (s) {
   |            ^^^^

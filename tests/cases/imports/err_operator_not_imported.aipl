@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: operator "+" must be imported: add `import { wrapping_add as + } from builtins;`
- --> input:4:5
+ --> ./tests/cases/imports/err_operator_not_imported.aipl:4:5
   |
 4 |     1 + 2
   |     ^^^^^

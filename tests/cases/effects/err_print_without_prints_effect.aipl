@@ -6,7 +6,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "print" has effect "!prints" but the calling function does not declare it
- --> input:4:13
+ --> ./tests/cases/effects/err_print_without_prints_effect.aipl:4:13
   |
 4 |     let _ = print("forbidden");
   |             ^^^^^^^^^^^^^^^^^

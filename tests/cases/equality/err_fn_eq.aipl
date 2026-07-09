@@ -10,7 +10,7 @@ fn main() {
 }
 --- errors ---
 error: "==" is not supported for function values
- --> input:5:5
+ --> ./tests/cases/equality/err_fn_eq.aipl:5:5
   |
 5 |     f == f
   |     ^^^^^^

@@ -9,7 +9,7 @@ fn main() {
 }
 --- errors ---
 error: "err" expects 1 argument, got 0
- --> input:4:5
+ --> ./tests/cases/results/err_void_err.aipl:4:5
   |
 4 |     err()
   |     ^^^

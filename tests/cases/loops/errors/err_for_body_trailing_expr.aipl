@@ -7,7 +7,7 @@ fn f(s: str) -> i64 {
 }
 --- errors ---
 error: unexpected '}'; expected '.', ';', '?', '[', or operator
- --> input:5:25
+ --> ./tests/cases/loops/errors/err_for_body_trailing_expr.aipl:5:25
   |
 5 |     for (let c : s) { 0 }
   |                         ^

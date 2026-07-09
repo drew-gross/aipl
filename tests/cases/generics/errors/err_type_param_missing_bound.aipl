@@ -2,7 +2,7 @@ fn f<T>(x: T) -> i64 { 0 }
 fn main() -> i64 { 0 }
 --- errors ---
 error: unexpected '>'; expected ':'
- --> input:1:7
+ --> ./tests/cases/generics/errors/err_type_param_missing_bound.aipl:1:7
   |
 1 | fn f<T>(x: T) -> i64 { 0 }
   |       ^

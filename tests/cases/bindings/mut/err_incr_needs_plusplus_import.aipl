@@ -12,7 +12,7 @@ fn bump(limit: i64) -> i64 {
 }
 --- errors ---
 error: operator "++" must be imported: add `import { ++ } from builtins;`
- --> input:9:13
+ --> ./tests/cases/bindings/mut/err_incr_needs_plusplus_import.aipl:9:13
   |
 9 |         set n++;
   |             ^^^

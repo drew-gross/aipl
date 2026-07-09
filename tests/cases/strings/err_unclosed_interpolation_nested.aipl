@@ -12,12 +12,12 @@ fn main() !prints {
 }
 --- errors ---
 error: unterminated triple-backtick template literal
-  --> input:11:17
+  --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:11:17
    |
 11 |     print(```{1 ```)
    |                 ^^^^
 note: in this unclosed interpolation
-  --> input:11:14
+  --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:11:14
    |
 11 |     print(```{1 ```)
    |              ^

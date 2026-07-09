@@ -1,7 +1,7 @@
 fn main() -> i64 { missing(1) }
 --- errors ---
 error: call to undefined fn "missing"
- --> input:1:20
+ --> ./tests/cases/functions/err_call_undefined_fn.aipl:1:20
   |
 1 | fn main() -> i64 { missing(1) }
   |                    ^^^^^^^^^

@@ -7,7 +7,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: array elements must be i64, bool, char, str, an array, an optional, or a struct, got #{i64: i64}
- --> input:5:14
+ --> ./tests/cases/dicts/err_dict_as_array_elem.aipl:5:14
   |
 5 |     let xs = [#{1: 2}];
   |              ^^^^^^^

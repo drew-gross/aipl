@@ -8,7 +8,7 @@ fn main() !prints -> i64 {
 }
 --- errors ---
 error: cannot bind "_" to a value of type ()
- --> input:6:13
+ --> ./tests/cases/functions/void/err_bind_void_result.aipl:6:13
   |
 6 |     let _ = print("hi");
   |             ^^^^^^^^^^

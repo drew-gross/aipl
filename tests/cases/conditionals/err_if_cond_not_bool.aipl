@@ -1,7 +1,7 @@
 fn main() -> i64 { if (5) { 1 } else { 2 } }
 --- errors ---
 error: if condition: expected bool, got i64
- --> input:1:24
+ --> ./tests/cases/conditionals/err_if_cond_not_bool.aipl:1:24
   |
 1 | fn main() -> i64 { if (5) { 1 } else { 2 } }
   |                        ^

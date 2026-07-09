@@ -8,7 +8,7 @@ fn main() -> i64 { dup() }
 pub fn helper() -> i64 { 1 }
 --- errors ---
 error: err_alias_collides_with_local.aipl: import "dup" conflicts with a local item
- --> input:3:10
+ --> ./tests/cases/imports/err_alias_collides_with_local.aipl:3:10
   |
 3 | import { helper as dup } from "./util.aipl";
   |          ^^^^^^

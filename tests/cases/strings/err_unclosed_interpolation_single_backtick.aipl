@@ -6,7 +6,7 @@ fn main() !prints {
     print(`{1
 --- errors ---
 error: unterminated template literal interpolation
- --> input:6:12
+ --> ./tests/cases/strings/err_unclosed_interpolation_single_backtick.aipl:6:12
   |
 6 |     print(`{1
   |            ^

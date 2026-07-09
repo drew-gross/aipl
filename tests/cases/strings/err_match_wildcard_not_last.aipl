@@ -13,7 +13,7 @@ fn main() !prints {
 }
 --- errors ---
 error: the `_` arm must be last (arms after it are unreachable)
- --> input:6:9
+ --> ./tests/cases/strings/err_match_wildcard_not_last.aipl:6:9
   |
 6 |         _ => "default",
   |         ^

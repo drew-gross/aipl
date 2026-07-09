@@ -8,7 +8,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: "push" modifies an array in place; call it as a method on a mutable array variable: "xs.push(x)"
- --> input:6:14
+ --> ./tests/cases/arrays/push/err_push_call_form.aipl:6:14
   |
 6 |     let ys = push(xs, 2);
   |              ^^^^^^^^^^

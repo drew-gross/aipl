@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: "x" is not a function and cannot be called
- --> input:4:5
+ --> ./tests/cases/lambdas/errors/err_call_non_function.aipl:4:5
   |
 4 |     x(3)
   |     ^^^

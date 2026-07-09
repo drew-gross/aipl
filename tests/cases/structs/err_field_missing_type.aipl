@@ -2,7 +2,7 @@ struct P { x }
 fn main() -> i64 { 0 }
 --- errors ---
 error: unexpected '}'; expected ':'
- --> input:1:14
+ --> ./tests/cases/structs/err_field_missing_type.aipl:1:14
   |
 1 | struct P { x }
   |              ^

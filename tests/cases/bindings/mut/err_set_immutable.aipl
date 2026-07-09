@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: set: cannot assign to immutable binding "x" (use "let mut")
- --> input:3:9
+ --> ./tests/cases/bindings/mut/err_set_immutable.aipl:3:9
   |
 3 |     set x = 2;
   |         ^^^^^^

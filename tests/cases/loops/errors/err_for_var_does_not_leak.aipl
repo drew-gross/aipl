@@ -4,7 +4,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: unknown identifier "c"
- --> input:3:5
+ --> ./tests/cases/loops/errors/err_for_var_does_not_leak.aipl:3:5
   |
 3 |     c
   |     ^

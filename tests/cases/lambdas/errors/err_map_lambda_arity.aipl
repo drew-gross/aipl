@@ -7,7 +7,7 @@ fn main() !prints {
 }
 --- errors ---
 error: lambda has 2 parameter(s), but (i64) -> _ was expected
- --> input:6:25
+ --> ./tests/cases/lambdas/errors/err_map_lambda_arity.aipl:6:25
   |
 6 |     print(to_str(xs.map(|x, y| x + y)));
   |                         ^^^^^^^^^^^^

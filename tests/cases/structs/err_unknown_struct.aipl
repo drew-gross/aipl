@@ -1,7 +1,7 @@
 fn main() -> i64 { Bogus { x: 1 }.x }
 --- errors ---
 error: unknown struct "Bogus"
- --> input:1:20
+ --> ./tests/cases/structs/err_unknown_struct.aipl:1:20
   |
 1 | fn main() -> i64 { Bogus { x: 1 }.x }
   |                    ^^^^^^^^^^^^

@@ -3,7 +3,7 @@ struct Point { x: i64, y: i64 }
 fn main() -> i64 { Point { x: 1, z: 2 }.x }
 --- errors ---
 error: struct "Point" has no field "z"
- --> input:3:37
+ --> ./tests/cases/structs/fields/err_unknown_field.aipl:3:37
   |
 3 | fn main() -> i64 { Point { x: 1, z: 2 }.x }
   |                                     ^

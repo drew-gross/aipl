@@ -7,7 +7,7 @@ fn main() !prints {
 }
 --- errors ---
 error: map expects an array, got i64
- --> input:6:18
+ --> ./tests/cases/lambdas/errors/err_map_not_array.aipl:6:18
   |
 6 |     print(to_str(n.map(|x| x + 1)));
   |                  ^

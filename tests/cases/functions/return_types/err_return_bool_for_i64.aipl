@@ -4,7 +4,7 @@ fn f() -> i64 { 1 < 2 }
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns bool, but the declared return type is i64
- --> input:3:17
+ --> ./tests/cases/functions/return_types/err_return_bool_for_i64.aipl:3:17
   |
 3 | fn f() -> i64 { 1 < 2 }
   |                 ^^^^^

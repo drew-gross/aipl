@@ -1,7 +1,7 @@
 fn main() -> i64 { foo bar }
 --- errors ---
 error: unexpected 'bar'; expected '(', '.', ';', '?', '[', '{', '}', or operator
- --> input:1:24
+ --> ./tests/cases/syntax/err_unexpected_token_in_expr.aipl:1:24
   |
 1 | fn main() -> i64 { foo bar }
   |                        ^^^

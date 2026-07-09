@@ -12,7 +12,7 @@ fn main() !prints {
 }
 --- errors ---
 error: fn "takes_str" expects a str argument, but will be called with i64 here
-  --> input:11:25
+  --> ./tests/cases/lambdas/errors/err_fn_ref_map_type.aipl:11:25
    |
 11 |     print(to_str(xs.map(takes_str)));
    |                         ^^^^^^^^^

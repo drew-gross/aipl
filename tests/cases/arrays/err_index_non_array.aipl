@@ -6,7 +6,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: cannot index a value of type i64
- --> input:5:5
+ --> ./tests/cases/arrays/err_index_non_array.aipl:5:5
   |
 5 |     x[0].value_or(0)
   |     ^

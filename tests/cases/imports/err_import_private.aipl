@@ -9,7 +9,7 @@ fn secret(n: i64) -> i64 { n * 2 }
 pub fn shared(n: i64) -> i64 { secret(n) + 1 }
 --- errors ---
 error: "secret" is private; mark it `pub` in util.aipl to import it
- --> input:4:10
+ --> ./tests/cases/imports/err_import_private.aipl:4:10
   |
 4 | import { secret } from "./util.aipl";
   |          ^^^^^^

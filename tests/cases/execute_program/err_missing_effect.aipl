@@ -10,7 +10,7 @@ fn main() !prints {
 }
 --- errors ---
 error: fn "execute_program" has effect "!execute_program" but the calling function does not declare it
- --> input:6:12
+ --> ./tests/cases/execute_program/err_missing_effect.aipl:6:12
   |
 6 |     match (execute_program("echo", [])) {
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^

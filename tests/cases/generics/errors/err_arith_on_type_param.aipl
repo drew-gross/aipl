@@ -10,7 +10,7 @@ fn add_them<T: any>(a: T, b: T) -> T {
 fn main() -> i64 { 0 }
 --- errors ---
 error: arithmetic operand: expected i64, got a type parameter
- --> input:7:5
+ --> ./tests/cases/generics/errors/err_arith_on_type_param.aipl:7:5
   |
 7 |     a + b
   |     ^

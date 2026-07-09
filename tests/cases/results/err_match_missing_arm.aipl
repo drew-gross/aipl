@@ -10,7 +10,7 @@ fn main() {
 }
 --- errors ---
 error: non-exhaustive match: missing err
- --> input:3:12
+ --> ./tests/cases/results/err_match_missing_arm.aipl:3:12
   |
 3 |     match (r) {
   |            ^^^^

@@ -14,7 +14,7 @@ fn main() -> str {
 }
 --- errors ---
 error: fn "inc" expects a i64 argument, but will be called with str here
-  --> input:13:11
+  --> ./tests/cases/lambdas/errors/err_fn_ref_sig.aipl:13:11
    |
 13 |     apply(inc, "hi")
    |           ^^^

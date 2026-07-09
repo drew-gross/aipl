@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: "+" between str and a non-str: both sides must be str
- --> input:3:13
+ --> ./tests/cases/strings/err_str_plus_i64.aipl:3:13
   |
 3 |     let _ = "hi" + 5;
   |             ^^^^^^^^

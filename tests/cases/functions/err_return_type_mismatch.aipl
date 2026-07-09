@@ -8,7 +8,7 @@ fn f(b: bool) -> i64 {
 }
 --- errors ---
 error: return value is str, but the function returns i64
- --> input:5:16
+ --> ./tests/cases/functions/err_return_type_mismatch.aipl:5:16
   |
 5 |         return "nope";
   |                ^^^^^^

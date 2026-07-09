@@ -7,7 +7,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: lambda body returns bool, but i64 was expected
- --> input:6:15
+ --> ./tests/cases/lambdas/errors/err_lambda_body_type.aipl:6:15
   |
 6 |     apply(|x| true, 3)
   |               ^^^^

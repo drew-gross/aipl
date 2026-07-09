@@ -3,7 +3,7 @@ fn no_self(x: i64) -> i64 { x }
 fn main() -> i64 { 5.no_self() }
 --- errors ---
 error: fn "no_self" cannot be called as a method (its first parameter must be named "self")
- --> input:3:20
+ --> ./tests/cases/methods/err_method_call_without_self.aipl:3:20
   |
 3 | fn main() -> i64 { 5.no_self() }
   |                    ^

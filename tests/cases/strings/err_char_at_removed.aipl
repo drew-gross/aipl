@@ -4,7 +4,7 @@ import { char_at } from builtins;
 fn main() {}
 --- errors ---
 error: "char_at" is not a builtin
- --> input:2:10
+ --> ./tests/cases/strings/err_char_at_removed.aipl:2:10
   |
 2 | import { char_at } from builtins;
   |          ^^^^^^^

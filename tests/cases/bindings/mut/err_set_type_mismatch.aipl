@@ -5,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: set: expected str, got i64
- --> input:3:13
+ --> ./tests/cases/bindings/mut/err_set_type_mismatch.aipl:3:13
   |
 3 |     set s = 42;
   |             ^^

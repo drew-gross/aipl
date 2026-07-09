@@ -12,7 +12,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "make": body returns Color, but the declared return type is Point
- --> input:7:22
+ --> ./tests/cases/structs/returns/err_wrong_struct_return.aipl:7:22
   |
 7 | fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
   |                      ^^^^^^^^^^^^^^^^^^^^^^^^

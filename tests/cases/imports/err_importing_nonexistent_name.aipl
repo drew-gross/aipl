@@ -5,7 +5,7 @@ fn main() -> i64 { not_here() }
 fn a() -> i64 { 1 }
 --- errors ---
 error: "not_here" is not exported by util.aipl
- --> input:1:10
+ --> ./tests/cases/imports/err_importing_nonexistent_name.aipl:1:10
   |
 1 | import { not_here } from "./util.aipl";
   |          ^^^^^^^^

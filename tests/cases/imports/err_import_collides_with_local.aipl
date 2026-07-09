@@ -6,7 +6,7 @@ fn main() -> i64 { dup() }
 pub fn dup() -> i64 { 1 }
 --- errors ---
 error: err_import_collides_with_local.aipl: import "dup" conflicts with a local item
- --> input:1:10
+ --> ./tests/cases/imports/err_import_collides_with_local.aipl:1:10
   |
 1 | import { dup } from "./util.aipl";
   |          ^^^

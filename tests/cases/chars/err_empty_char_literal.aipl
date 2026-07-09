@@ -1,7 +1,7 @@
 fn f() -> char { '' }
 --- errors ---
 error: empty char literal
- --> input:1:18
+ --> ./tests/cases/chars/err_empty_char_literal.aipl:1:18
   |
 1 | fn f() -> char { '' }
   |                  ^^

@@ -6,7 +6,7 @@ fn main() {
 }
 --- errors ---
 error: fn "main": body returns i64, but the declared return type is ()
- --> input:5:5
+ --> ./tests/cases/functions/return_types/err_main_returns_value.aipl:5:5
   |
 5 |     5
   |     ^

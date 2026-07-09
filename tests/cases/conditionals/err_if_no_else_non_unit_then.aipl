@@ -4,7 +4,7 @@
 fn f() { if (true) { 2 } }
 --- errors ---
 error: if branches have mismatched types: i64 vs ()
- --> input:4:14
+ --> ./tests/cases/conditionals/err_if_no_else_non_unit_then.aipl:4:14
   |
 4 | fn f() { if (true) { 2 } }
   |              ^^^^^^^^^

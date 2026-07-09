@@ -14,7 +14,7 @@ fn main() !prints {
 }
 --- errors ---
 error: array-pattern elements must be literals
- --> input:7:13
+ --> ./tests/cases/arrays/err_match_non_literal.aipl:7:13
   |
 7 |         [1, k + 1] => 1,
   |             ^^^^^

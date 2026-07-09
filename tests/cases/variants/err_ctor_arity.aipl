@@ -8,7 +8,7 @@ fn main() !prints {
 }
 --- errors ---
 error: constructor "Circle" expects 1 argument(s), got 2
- --> input:7:18
+ --> ./tests/cases/variants/err_ctor_arity.aipl:7:18
   |
 7 |     print(to_str(Circle(1, 2)));
   |                  ^^^^^^^^^^^

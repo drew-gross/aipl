@@ -3,7 +3,7 @@ fn f() -> str { 5 }
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns i64, but the declared return type is str
- --> input:2:17
+ --> ./tests/cases/functions/return_types/err_return_i64_for_str.aipl:2:17
   |
 2 | fn f() -> str { 5 }
   |                 ^
