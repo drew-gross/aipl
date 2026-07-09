@@ -14,15 +14,12 @@ Reads the file at `path`, splices `body` into (or appends) its `--- section
     // nothing on disk — is safe to exercise directly here. The write-failure
     // branch mirrors it exactly, and `write_string_to_file`'s own error
     // behavior is covered in `tests/cases/files/write_file.aipl`.
-    match (fill_or_add_section_file("no_such_file_xyz_12345.aipl", "foo", "bar")) {
-        ok => assert(false),
-        err(e) => assert(e == "could not read file"),
-    };
+    assert(fill_or_add_section_file("no_such_file_xyz_12345.aipl", "foo", "bar") == err("could not read file"));
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 83
-binary size: 11344
+instructions executed: 84
+binary size: 11144

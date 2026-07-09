@@ -6560,6 +6560,109 @@ fn emit_eq<M: Module>(
     })
 }
 
+/// Fast path for `x == ok(y)` / `x == err(e)` (either order, and `!=` too):
+/// when exactly one side is written as a literal `ok(..)`/`err(..)` call,
+/// compare the *other* side's tag directly against the constructor's known
+/// tag and only compile/compare the payload when the tags match — instead of
+/// materializing a synthetic `Result` for the constructor side just to have
+/// `emit_eq` immediately load its tag back out and walk it apart. Returns
+/// `None` when neither/both sides are such a literal, decided purely from the
+/// AST shape before anything is compiled, so the caller can fall back to the
+/// generic path with no risk of double-compiling an operand; once it commits
+/// past that check it always returns `Some(..)` or a genuine `Err`.
+fn compile_ctor_eq<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    op: char,
+    l: &Expr,
+    r: &Expr,
+) -> Result<Option<(Value, Type)>, Error> {
+    fn ctor(e: &Expr) -> Option<(bool, &[Expr])> {
+        match &e.kind {
+            ExprKind::Call(name, args, _) if name == "ok" || name == "err" => {
+                Some((name == "ok", args.as_slice()))
+            }
+            _ => None,
+        }
+    }
+    let (other, is_ok_ctor, ctor_args) = match (ctor(l), ctor(r)) {
+        (Some((is_ok, args)), None) => (r, is_ok, args),
+        (None, Some((is_ok, args))) => (l, is_ok, args),
+        _ => return Ok(None),
+    };
+    let structs = cx.structs;
+    let builtins = cx.builtins;
+    let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
+    let Type::Result(ok_ty, err_ty) = &ot else {
+        return Err(Error::at(
+            format!(
+                "\"{}\" between a result and {}: both sides must be the same type",
+                if op == 'E' { "==" } else { "!=" },
+                type_name(&ot)
+            ),
+            other.span.clone(),
+        ));
+    };
+    let payload_ty = if is_ok_ctor {
+        ok_ty.as_ref()
+    } else {
+        err_ty.as_ref()
+    };
+    let tag = builder.ins().load(types::I64, MemFlags::trusted(), ov, 0);
+    let tag_matches = builder
+        .ins()
+        .icmp_imm(IntCC::Equal, tag, i64::from(is_ok_ctor));
+    // A trivial payload (void `ok()`, or an unconstructible `__none__` side)
+    // carries nothing to compare — matching tags alone means equal.
+    let eq = if is_unit(payload_ty) || is_none_inner(payload_ty) {
+        builder.ins().uextend(types::I64, tag_matches)
+    } else {
+        let res = i64_slot(builder);
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().stack_store(zero, res, 0);
+        let cmp_b = builder.create_block();
+        let merge = builder.create_block();
+        builder.ins().brif(tag_matches, cmp_b, &[], merge, &[]);
+        // Only reached when tags match: compile the constructor's payload
+        // expression directly (never wrapped in a Result) and compare it
+        // against the other side's payload, borrowed in place.
+        builder.switch_to_block(cmp_b);
+        builder.seal_block(cmp_b);
+        let other_payload = component(builder, ov, OPT_VALUE_OFFSET, payload_ty, structs);
+        scopes.push(Vec::new());
+        let (cv, _) = compile_expr(module, builder, cx, scopes, &ctor_args[0])?;
+        let payload_eq = emit_eq(
+            module,
+            builder,
+            builtins,
+            structs,
+            other_payload,
+            cv,
+            payload_ty,
+        )?;
+        drop_scope(
+            builder,
+            module,
+            builtins,
+            structs,
+            scopes.pop().expect("ctor-eq payload scope"),
+        );
+        builder.ins().stack_store(payload_eq, res, 0);
+        builder.ins().jump(merge, &[]);
+        builder.switch_to_block(merge);
+        builder.seal_block(merge);
+        builder.ins().stack_load(types::I64, res, 0)
+    };
+    let result = if op == 'N' {
+        builder.ins().bxor_imm(eq, 1)
+    } else {
+        eq
+    };
+    Ok(Some((result, Type::Primitive(Primitive::Bool))))
+}
+
 /// splitmix64 finalizer: a strong avalanche mix of an i64. Used to hash scalars
 /// and to fold lengths/tags into a hash. Cheap — a few shifts/xors/multiplies —
 /// and diffuses low bits well, so sequential keys (1, 2, 3) don't cluster in a
@@ -10543,6 +10646,11 @@ fn compile_expr<M: Module>(
             )
         }
         ExprKind::Binop(l, op, r) => {
+            if matches!(*op, 'E' | 'N') {
+                if let Some(result) = compile_ctor_eq(module, builder, cx, scopes, *op, l, r)? {
+                    return Ok(result);
+                }
+            }
             let (lv, lt) = compile_expr(module, builder, cx, scopes, l)?;
             let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
             // A bare literal operand flexes to the other's integer type — its
