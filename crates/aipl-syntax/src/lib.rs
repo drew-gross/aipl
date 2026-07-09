@@ -1014,15 +1014,12 @@ fn __builtin_join(self: str[], sep: str) -> str { "" }
 // `..!Error` (codegen builds the real ok/err).
 fn __builtin_read_file_to_string(self: str) !read_files -> str!Error { ok("") }
 fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Error { ok() }
-// Spawn `self` with `args` (no shell involved) and wait for it to finish.
-// A struct payload can't ride inside a `Result` yet (v1's Ok/Err payloads are
-// scalar/str/unit only), so a launch failure (not found, bad path, ...) is
-// folded into the struct itself instead of an `Error` side: `exit_code: -1`,
-// empty `stdout`, and the failure message in `stderr` — mirroring how a shell
-// already reports an exec failure via a reserved exit code (127), not a
-// separate channel.
-fn __builtin_execute_program(self: str, args: str[]) !execute_program -> __builtin_ExecResult {
-    __builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 }
+// Spawn `self` with `args` (no shell involved) and wait for it to finish:
+// `ok(ExecResult)` whenever it was actually launched, whatever it then exited
+// with; `err(message)` only if it couldn't be launched at all (not found,
+// permission denied, ...).
+fn __builtin_execute_program(self: str, args: str[]) !execute_program -> __builtin_ExecResult!Error {
+    ok(__builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 })
 }
 
 fn __builtin_to_str<T: any>(self: T) -> str { "" }

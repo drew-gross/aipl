@@ -677,16 +677,16 @@ unsafe fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
-/// `execute_program(program, args) -> ExecResult` (sret ABI, mirroring the JIT
-/// runtime): writes `ExecResult`'s three fields directly into `out` at their
-/// declared offsets 0/8/16 (`stdout`/`stderr`/`exit_code` — must stay in sync
-/// with `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Spawns `program` with
-/// `args` (no shell) and waits for it; POSIX-only for now (`cfg(unix)`) — on
-/// any other target, or any launch failure (bad UTF-8, not found, embedded
-/// NUL in captured output), writes empty `stdout`, the failure reason in
-/// `stderr`, and `exit_code: -1` (a struct payload can't ride a separate
-/// `Error` side yet, so failure is folded into the struct itself — see the
-/// JIT runtime's `aipl_execute_program` for the full rationale). Decrements
+/// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring
+/// the JIT runtime): writes `Result<ExecResult, Error>` directly into `out`
+/// (tag 1 = ok, 0 = err, matching the `ok`/`err` expression codegen; the
+/// `ExecResult` fields go at their declared struct offsets 0/8/16 —
+/// `stdout`/`stderr`/`exit_code`, must stay in sync with
+/// `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Spawns `program` with
+/// `args` and waits for it; POSIX-only for now (`cfg(unix)`). `ok(ExecResult)`
+/// for any run that was actually launched, whatever it then exited with;
+/// `err(message)` only if it couldn't be launched at all (bad UTF-8, not
+/// found, embedded NUL in captured output, unsupported platform). Decrements
 /// `program` and `args` per the refcount protocol.
 #[no_mangle]
 pub extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
@@ -696,27 +696,35 @@ pub extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: 
     aipl_array_dec(a);
 }
 
-fn write_exec_result(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
-    let stdout_ptr = make_str(stdout);
-    let stderr_ptr = make_str(stderr);
+fn write_err(out: *mut i64, message: &[u8]) {
+    let ptr = make_str(message);
     unsafe {
-        *out = stdout_ptr as i64;
-        *out.add(1) = stderr_ptr as i64;
-        *out.add(2) = exit_code;
+        *out = 0;
+        *out.add(1) = ptr as i64;
+    }
+}
+
+/// `stdout_ptr`/`stderr_ptr` are already-constructed `str` values (owned).
+fn write_ok(out: *mut i64, stdout_ptr: *const u8, stderr_ptr: *const u8, exit_code: i64) {
+    unsafe {
+        *out = 1;
+        *out.add(1) = stdout_ptr as i64;
+        *out.add(2) = stderr_ptr as i64;
+        *out.add(3) = exit_code;
     }
 }
 
 #[cfg(not(unix))]
 unsafe fn execute_program_impl(out: *mut i64, _program: *const u8, _args: *const u8) {
     // Process spawning isn't implemented on this platform yet.
-    write_exec_result(out, b"", b"could not execute program", -1);
+    write_err(out, b"could not execute program");
 }
 
 #[cfg(unix)]
 unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
     unsafe {
         if program.is_null() || args.is_null() {
-            write_exec_result(out, b"", b"could not execute program", -1);
+            write_err(out, b"could not execute program");
             return;
         }
         exec_unix::run(out, program, args);
@@ -733,7 +741,8 @@ unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u
 mod exec_unix {
     use super::{
         aipl_array_dec, aipl_dec, array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
-        ftell, make_str, rt_alloc, rt_free, str_bytes, ARR_ELEMS_OFFSET, SEEK_END, SEEK_SET,
+        ftell, make_str, rt_alloc, rt_free, str_bytes, write_ok, ARR_ELEMS_OFFSET, SEEK_END,
+        SEEK_SET,
     };
     use core::ffi::{c_char, c_int, c_void};
     use core::sync::atomic::{AtomicU64, Ordering};
@@ -974,11 +983,7 @@ mod exec_unix {
             remove(out_path);
             remove(err_path);
             match (stdout_ptr, stderr_ptr) {
-                (Some(so), Some(se)) => {
-                    *out = so as i64;
-                    *out.add(1) = se as i64;
-                    *out.add(2) = exit_code;
-                }
+                (Some(so), Some(se)) => write_ok(out, so, se, exit_code),
                 _ => fail_msg(out),
             }
         }
@@ -986,7 +991,7 @@ mod exec_unix {
 }
 
 fn fail_msg(out: *mut i64) {
-    write_exec_result(out, b"", b"could not execute program", -1);
+    write_err(out, b"could not execute program");
 }
 
 /// Format `n` in decimal into the END of `buf` (at least 20 bytes), returning

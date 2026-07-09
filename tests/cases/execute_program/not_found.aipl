@@ -1,21 +1,21 @@
-import { print, to_str, wrapping_add as +, execute_program } from builtins;
+import { wrapping_add as +, print, execute_program } from builtins;
 
-// A launch failure (program not found) can't ride a separate `Error` side —
-// `ExecResult` is a plain struct, not wrapped in a `Result` — so it's folded
-// into the struct itself: empty `stdout`, a message in `stderr`, and
-// `exit_code: -1`.
+// A launch failure (program not found) is `err(message)` — the only case
+// that's `err` rather than `ok(ExecResult)`.
 fn main() !prints !execute_program {
-    let r = execute_program("no_such_binary_xyz_123", ["a", "b"]);
-    print("[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code));
+    match (execute_program("no_such_binary_xyz_123", ["a", "b"])) {
+        ok(r) => print("ok"),
+        err(e) => print("err:[" + e + "]"),
+    };
 }
 --- stdout ---
-[][could not execute program] exit=-1
+err:[could not execute program]
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 349
-instructions executed: 84
-binary size: 2616
+bytes allocated: 229
+instructions executed: 54
+binary size: 1992
 --- monomorphizations ---
 main

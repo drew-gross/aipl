@@ -354,25 +354,26 @@ impl Cx<'_> {
                 }
                 self.check_elem_ty(v, type_params, fname)
             }
-            // A result `T!E`: the Ok and Err payloads are scalar/`str` in v1
-            // (or a type parameter pinned to one). Composite payloads come later.
-            // The Ok side may also be unit — a void-result `!E` whose success
-            // carries no value.
+            // A result `T!E`: the Ok and Err payloads are scalar/`str`/a
+            // struct (or a type parameter pinned to a scalar). Variants aren't
+            // supported as a payload yet. The Ok side may also be unit — a
+            // void-result `!E` whose success carries no value.
             Type::Result(ok, err) => {
-                let scalar = |p: &Type| {
+                let payload_ok = |p: &Type| {
                     is_set_elem(p) // i64/bool/char/str
                         || is_error(p)
                         || is_abstract_scalar_ty(p, type_params)
+                        || matches!(p, Type::Named(n) if self.has_struct(n))
                 };
-                if !scalar(ok) && !is_unit(ok) {
+                if !payload_ok(ok) && !is_unit(ok) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Ok payload must be i64, bool, char, str, or unit (\"!E\"), got {}",
+                        "fn {fname:?}: a result Ok payload must be i64, bool, char, str, a struct, or unit (\"!E\"), got {}",
                         tyname(ok)
                     )));
                 }
-                if !scalar(err) {
+                if !payload_ok(err) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Err payload must be i64, bool, char, str, or Error, got {}",
+                        "fn {fname:?}: a result Err payload must be i64, bool, char, str, Error, or a struct, got {}",
                         tyname(err)
                     )));
                 }

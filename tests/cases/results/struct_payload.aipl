@@ -1,0 +1,45 @@
+import { wrapping_add as +, ==, &&, print, to_str } from builtins;
+
+// A result's Ok/Err payload may be a struct (in addition to scalar/str/unit):
+// `elem_size_of`/`store_array_elem`/`emit_rc` already size, copy, and refcount
+// composite `Result` payloads generically (the same machinery an optional's
+// core uses), so this needed no new runtime support — just widening the
+// checker's/`ok`/`err`-codegen's allowed-payload list.
+struct Point { x: i64, y: i64, label: str }
+
+fn parse(valid: bool) -> Point!str {
+    if (valid) { ok(Point { x: 1, y: 2, label: "hi" }) } else { err("bad point") }
+}.test({
+    match (parse(true)) {
+        ok(p) => assert(p.x == 1 && p.y == 2 && p.label == "hi"),
+        err(e) => assert(false),
+    };
+    match (parse(false)) {
+        ok(p) => assert(false),
+        err(e) => assert(e == "bad point"),
+    };
+})
+
+fn main() !prints {
+    match (parse(true)) {
+        ok(p) => print(to_str(p.x) + "," + to_str(p.y) + "," + p.label),
+        err(e) => print("err: " + e),
+    };
+    match (parse(false)) {
+        ok(p) => print("ok"),
+        err(e) => print("err: " + e),
+    };
+}
+--- stdout ---
+1,2,hi
+err: bad point
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 200
+instructions executed: 245
+binary size: 3680
+--- monomorphizations ---
+main
+parse

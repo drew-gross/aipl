@@ -1,32 +1,40 @@
 import { wrapping_add as +, print, to_str, execute_program } from builtins;
 
-// `execute_program(program, args) -> ExecResult` spawns `program` with `args`
-// (argv-style, no shell) and waits for it, capturing stdout/stderr and the
-// exit code into an `ExecResult { stdout, stderr, exit_code }`. It carries the
+// `execute_program(program, args) -> ExecResult!Error` spawns `program` with
+// `args` (argv-style, no shell) and waits for it, capturing stdout/stderr and
+// the exit code: `ok(ExecResult)` for any run that was actually launched
+// (whatever it then exited with), `err(message)` only if it couldn't be
+// launched at all (not found, permission denied, ...). It carries the
 // `!execute_program` effect, so `main` must declare it.
 fn main() !prints !execute_program {
-    let ok = execute_program("echo", ["hello", "world"]);
-    print("[" + ok.stdout + "] exit=" + to_str(ok.exit_code));
+    match (execute_program("echo", ["hello", "world"])) {
+        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
+        err(e) => print("err:[" + e + "]"),
+    };
 
-    let both = execute_program("sh", ["-c", "echo out; echo err >&2; exit 7"]);
-    print("[" + both.stdout + "][" + both.stderr + "] exit=" + to_str(both.exit_code));
+    match (execute_program("sh", ["-c", "echo out; echo err >&2; exit 7"])) {
+        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
+        err(e) => print("err:[" + e + "]"),
+    };
 
-    let noargs = execute_program("true", []);
-    print("exit=" + to_str(noargs.exit_code));
+    match (execute_program("true", [])) {
+        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
+        err(e) => print("err:[" + e + "]"),
+    };
 }
 --- stdout ---
-[hello world
-] exit=0
-[out
+ok:[hello world
+][] exit=0
+ok:[out
 ][err
 ] exit=7
-exit=0
+ok:[][] exit=0
 --- performance ---
-allocations: 26
-deallocations: 26
+allocations: 32
+deallocations: 32
 reallocations: 0
-bytes allocated: 676
-instructions executed: 196
-binary size: 4168
+bytes allocated: 916
+instructions executed: 292
+binary size: 7112
 --- monomorphizations ---
 main

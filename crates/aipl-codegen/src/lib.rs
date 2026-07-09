@@ -564,20 +564,20 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
-/// `execute_program(program, args) -> ExecResult` runtime: this is the
+/// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
 /// hidden-sret ABI the generic `compile_call` path already builds for any
 /// composite-returning builtin (see its `sret` handling) — `out` is the
-/// caller-provided buffer sized for `ExecResult`, so this fn writes the
-/// struct's fields directly (`stdout`/`stderr`/`exit_code`, at their declared
-/// offsets 0/8/16 — must stay in sync with `__builtin_ExecResult` in
-/// `BUILTIN_SIGNATURES`) rather than returning through a register. Spawns
-/// `program` with `args` (no shell) and waits for it. A launch failure (bad
-/// UTF-8, not found, embedded NUL in captured output) can't ride a separate
-/// `Error` side — v1 `Result`s don't carry struct payloads yet — so it's
-/// folded into the struct instead: empty `stdout`, the failure reason in
-/// `stderr`, `exit_code: -1` (also used for a signal-terminated child, so `-1`
-/// is ambiguous between the two — acceptable for now, given the payload
-/// restriction). Decrements `program` and `args` per the refcount protocol.
+/// caller-provided buffer sized for `Result<ExecResult, Error>` (`{tag: i64,
+/// payload}`, tag 1 = ok, 0 = err, matching the `ok`/`err` expression
+/// codegen), so this fn writes the whole result directly rather than
+/// returning through a register. Spawns `program` with `args` (no shell) and
+/// waits for it: `ok(ExecResult)` for any run that was actually launched,
+/// whatever it then exited with; `err(message)` only if it couldn't be
+/// launched at all (bad UTF-8, not found, embedded NUL in captured output).
+/// The `ExecResult` fields are written at their declared struct offsets
+/// 0/8/16 (`stdout`/`stderr`/`exit_code` — must stay in sync with
+/// `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Decrements `program` and
+/// `args` per the refcount protocol.
 extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
     let arr = aipl_arr_ensure_heap(args);
     execute_program_impl(out, program, arr);
@@ -585,23 +585,32 @@ extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *con
     aipl_array_dec(arr);
 }
 
-fn write_exec_result(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
+fn write_err(out: *mut i64, message: &[u8]) {
+    let ptr = make_str(message);
+    unsafe {
+        *out = 0;
+        *out.add(1) = ptr as i64;
+    }
+}
+
+fn write_ok(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
     let stdout_ptr = make_str(stdout);
     let stderr_ptr = make_str(stderr);
     unsafe {
-        *out = stdout_ptr as i64;
-        *out.add(1) = stderr_ptr as i64;
-        *out.add(2) = exit_code;
+        *out = 1;
+        *out.add(1) = stdout_ptr as i64;
+        *out.add(2) = stderr_ptr as i64;
+        *out.add(3) = exit_code;
     }
 }
 
 fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
     if program.is_null() || args.is_null() {
-        return write_exec_result(out, b"", b"could not execute program", -1);
+        return write_err(out, b"could not execute program");
     }
     let mut pbuf = [0u8; 8];
     let Ok(program) = std::str::from_utf8(unsafe { str_bytes(program, &mut pbuf) }) else {
-        return write_exec_result(out, b"", b"could not execute program", -1);
+        return write_err(out, b"could not execute program");
     };
     let len = unsafe { array_len_of(args) };
     let elems = unsafe { args.add(ARR_ELEMS_OFFSET) as *const i64 };
@@ -610,7 +619,7 @@ fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
         let ep = unsafe { std::ptr::read(elems.add(i)) as *const u8 };
         let mut buf = [0u8; 8];
         let Ok(s) = std::str::from_utf8(unsafe { str_bytes(ep, &mut buf) }) else {
-            return write_exec_result(out, b"", b"could not execute program", -1);
+            return write_err(out, b"could not execute program");
         };
         arg_strings.push(s.to_string());
     }
@@ -619,15 +628,15 @@ fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
         .output()
     {
         Ok(o) => o,
-        Err(_) => return write_exec_result(out, b"", b"could not execute program", -1),
+        Err(_) => return write_err(out, b"could not execute program"),
     };
     // A NUL-terminated str can't hold an embedded NUL byte (same constraint as
     // `read_file_to_string`).
     if output.stdout.contains(&0) || output.stderr.contains(&0) {
-        return write_exec_result(out, b"", b"could not execute program", -1);
+        return write_err(out, b"could not execute program");
     }
     let exit_code = i64::from(output.status.code().unwrap_or(-1));
-    write_exec_result(out, &output.stdout, &output.stderr, exit_code);
+    write_ok(out, &output.stdout, &output.stderr, exit_code);
 }
 
 // ---------- One-allocation `to_str` primitives ----------
@@ -10221,10 +10230,16 @@ fn compile_expr<M: Module>(
                     Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
                 ) => {}
                 _ if is_error(&t) => {}
+                // A struct payload is an inline composite (like an optional's
+                // core): `elem_size_of`/`store_array_elem`/`emit_rc` already
+                // size, copy, and refcount it generically once it's addressed
+                // as a `Result` payload, so only variants remain unsupported
+                // here.
+                Type::Named(n) if structs.get(n).is_some_and(|d| d.as_struct().is_some()) => {}
                 _ => {
                     return Err(Error::at(
                         format!(
-                            "{name:?} payload must be a scalar or str, got {}",
+                            "{name:?} payload must be a scalar, str, or struct, got {}",
                             type_name(&t)
                         ),
                         args[0].span.clone(),

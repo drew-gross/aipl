@@ -6,4 +6,4 @@ fn bad() -> i64[]!str {
 
 fn main() {}
 --- errors ---
-error: fn "bad": a result Ok payload must be i64, bool, char, str, or unit ("!E"), got i64[]
+error: fn "bad": a result Ok payload must be i64, bool, char, str, a struct, or unit ("!E"), got i64[]
