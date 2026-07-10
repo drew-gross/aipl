@@ -1,0 +1,32 @@
+// The cases harness's captured-output normalizer: the test harness calls this
+// through the embedding FFI (see `aipl::codegen::normalize_output`) to compare a
+// child program's stdout/stderr against the expected sections, and `aipl check`
+// exercises it via the `.test` block below. Collapsing CRLF to LF matters on
+// Windows, where libc text-mode stdout rewrites the runtime's `\n` to `\r\n`.
+import { ==, ||, join, split } from builtins;
+import { trim_end_while } from "./trim_end_while.aipl";
+
+pub fn normalize_output(self: str) -> str {
+    // `split("\r\n").join("\n")` is `replace("\r\n", "\n")` (non-overlapping,
+    // left-to-right), then drop the trailing run of newline bytes.
+    self.split("\r\n").join("\n").trim_end_while(|c| c == '\n' || c == '\r')
+}.doc("Normalizes captured program output for the cases harness: collapses CRLF line endings to LF, then strips the trailing run of `\\n`/`\\r`. A lone interior CR is left untouched.").test({
+    assert(normalize_output("plain") == "plain"); // nothing to change
+    assert(normalize_output("") == ""); // empty input
+    assert(normalize_output("a\r\nb") == "a\nb"); // CRLF collapsed to LF
+    assert(normalize_output("out\n\n\n") == "out"); // trailing newlines dropped
+    assert(normalize_output("out\r") == "out"); // trailing lone CR dropped
+    assert(normalize_output("a\r\nb\r\n") == "a\nb"); // collapse + trim together
+    assert(normalize_output("a\rb") == "a\rb"); // interior lone CR preserved
+    assert(normalize_output("\r\n\r\n") == ""); // all line endings -> empty
+})
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 360
+instructions executed: 1027
+binary size: 5376
+--- monomorphizations ---
+main
+normalize_output

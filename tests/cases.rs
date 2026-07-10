@@ -1523,10 +1523,12 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     })
 }
 
+/// Normalizes captured child output before comparing it against the expected
+/// sections. Dogfooded: the AIPL `normalize_output` (collapse CRLF to LF, then
+/// strip the trailing `\n`/`\r` run), run through the embedding FFI. No native
+/// fallback — see `aipl::codegen::normalize_output`.
 fn normalize_output(s: &str) -> String {
-    let lf = s.replace("\r\n", "\n");
-    let trimmed = lf.trim_end_matches(['\n', '\r']);
-    trimmed.to_string()
+    aipl::codegen::normalize_output(s)
 }
 
 fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) {

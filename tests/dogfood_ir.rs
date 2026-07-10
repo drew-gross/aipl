@@ -322,6 +322,15 @@ fn sanity_check(artifact: &str) {
         ))))
     );
 
+    // Collapses CRLF to LF, then strips the trailing `\n`/`\r` run.
+    let normalized = comp
+        .call_values(
+            "normalize_output",
+            &[FfiValue::Str("a\r\nb\r\n".to_string())],
+        )
+        .unwrap();
+    assert_eq!(normalized, FfiValue::Str("a\nb".to_string()));
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 

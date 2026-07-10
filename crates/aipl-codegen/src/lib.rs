@@ -2562,6 +2562,7 @@ const LINE_AT_SRC: &str = include_str!("line_at.aipl");
 const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
 const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
 const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
+const NORMALIZE_OUTPUT_SRC: &str = include_str!("normalize_output.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2597,6 +2598,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
         "./fill_or_add_section_file.aipl",
         FILL_OR_ADD_SECTION_FILE_SRC,
     ),
+    ("./normalize_output.aipl", NORMALIZE_OUTPUT_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -2614,6 +2616,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "caret_block",
     "fill_or_add_section",
     "fill_or_add_section_file",
+    "normalize_output",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -2794,6 +2797,20 @@ pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result
                 other => panic!("dogfooded fill_or_add_section_file() err payload: {other:?}"),
             },
             other => panic!("dogfooded fill_or_add_section_file() call: {other:?}"),
+        }
+    })
+}
+
+/// Normalizes a child program's captured output for the cases test harness:
+/// collapses CRLF to LF, then strips the trailing run of `\n`/`\r` — computed by
+/// the dogfooded AIPL `normalize_output` via the FFI. Not a parser hook; only the
+/// cases harness calls this. No native fallback; panics if it can't be built or
+/// called.
+pub fn normalize_output(s: &str) -> String {
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("normalize_output", &[FfiValue::Str(s.to_string())]) {
+            Ok(FfiValue::Str(out)) => out,
+            other => panic!("dogfooded normalize_output() call: {other:?}"),
         }
     })
 }
