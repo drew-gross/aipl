@@ -1,0 +1,28 @@
+// File header comment.
+
+import { print } from builtins;
+
+// Standalone comment, blank line after.
+
+// Attached to main.
+fn main() !prints {
+    // Before a statement.
+    print("a"); // trailing a statement
+
+
+    print("b");
+}
+--- formatted ---
+// File header comment.
+
+import { print } from builtins;
+
+// Standalone comment, blank line after.
+
+// Attached to main.
+fn main() !prints {
+    // Before a statement.
+    print("a"); // trailing a statement
+
+    print("b");
+}

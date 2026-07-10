@@ -1,0 +1,13 @@
+import { print } from builtins;
+fn main() !prints { print("hi");
+}
+--- stdout ---
+hi
+--- formatted ---
+import { print } from builtins;
+
+fn main() !prints {
+    print("hi");
+}
+--- stdout ---
+hi

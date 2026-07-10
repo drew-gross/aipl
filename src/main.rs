@@ -45,6 +45,8 @@ fn cli() -> ExitCode {
         Some("ir") => ir_cmd(&args[2..]),
         Some("doc") => doc_cmd(&args[2..]),
         Some("build") => build_cmd(&args[2..]),
+        // `fmt` owns its exit code (`--check` reports needs-formatting as 1).
+        Some("fmt") => return fmt_cmd(&args[2..]),
         // `check` owns its exit code (0 = all tests passed, 1 = a failure) and
         // prints its own report, so it returns an `ExitCode` directly.
         Some("check") => return check_cmd(&args[2..]),
@@ -71,6 +73,7 @@ fn usage(prog: &str) -> String {
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print each fn's `.doc(\"..\")` documentation
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
+  {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
   {prog} check <file.aipl>                  run every fn's `.test({{ .. }})` block
 
 args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
@@ -129,6 +132,57 @@ fn run_cmd(args: &[String]) -> Result<(), String> {
     };
     println!("{result}");
     Ok(())
+}
+
+/// `fmt <file> [--check]` — rewrite the file in canonical format (in place).
+/// With `--check`, write nothing: exit 0 if already formatted, 1 if not (or on
+/// any error). Trailing `--- section ---` blocks are preserved byte-for-byte.
+fn fmt_cmd(args: &[String]) -> ExitCode {
+    let mut file: Option<&str> = None;
+    let mut check = false;
+    for a in args {
+        match a.as_str() {
+            "--check" => check = true,
+            other => {
+                if file.is_some() {
+                    eprintln!("unexpected arg {other:?}");
+                    return ExitCode::FAILURE;
+                }
+                file = Some(other);
+            }
+        }
+    }
+    let Some(file) = file else {
+        eprintln!("missing source file");
+        return ExitCode::FAILURE;
+    };
+    let src = match std::fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{file}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let formatted = match aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("{}", e.render(aipl::strip_test_sections(&src), file));
+            return ExitCode::FAILURE;
+        }
+    };
+    if formatted == src {
+        return ExitCode::SUCCESS;
+    }
+    if check {
+        eprintln!("{file}: needs formatting");
+        return ExitCode::FAILURE;
+    }
+    if let Err(e) = std::fs::write(file, &formatted) {
+        eprintln!("{file}: {e}");
+        return ExitCode::FAILURE;
+    }
+    println!("formatted {file}");
+    ExitCode::SUCCESS
 }
 
 /// `check <file>` — JIT-run every function's `.test({ .. })` block and report.

@@ -1,0 +1,12 @@
+fn take(a: i64, b: i64, c: i64, d: i64) -> i64 { a }
+fn main() -> i64 { take(1000000000, 2000000000, 3000000000, 4000000000) + take(1000000000, 2000000000, 3000000000, 4000000000) }
+import { wrapping_add as + } from builtins;
+--- formatted ---
+import { wrapping_add as + } from builtins;
+
+fn take(a: i64, b: i64, c: i64, d: i64) -> i64 { a }
+
+fn main() -> i64 {
+    take(1000000000, 2000000000, 3000000000, 4000000000)
+        + take(1000000000, 2000000000, 3000000000, 4000000000)
+}

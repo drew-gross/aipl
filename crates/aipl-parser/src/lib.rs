@@ -2100,14 +2100,19 @@ fn skip_whitespace_and_comments<I: Iterator<Item = char>>(
         src.skip_whitespace();
         match (src.peek(), src.peek_n(1)) {
             (Some('/'), Some('/')) => {
+                let start = src.offset();
                 src.advance();
                 src.advance();
                 while let Some(c) = src.peek() {
-                    src.advance();
                     if c == '\n' {
                         break;
                     }
+                    src.advance();
                 }
+                // The span excludes the terminating newline (a comment's text,
+                // not its line ending); the newline is consumed by the next
+                // `skip_whitespace`.
+                record_comment(start..src.offset());
             }
             (Some('/'), Some('*')) => {
                 let start = src.offset();
@@ -2137,10 +2142,30 @@ fn skip_whitespace_and_comments<I: Iterator<Item = char>>(
                         }
                     }
                 }
+                record_comment(start..src.offset());
             }
             _ => return Ok(()),
         }
     }
+}
+
+thread_local! {
+    /// When armed (by [`lex_tokens_and_comments`]), every comment the lexer
+    /// skips is recorded here. A thread-local rather than a parameter so the
+    /// recursive tokenizer plumbing (templates re-enter `tokenize_one`) stays
+    /// untouched; ordinary parses leave it disarmed and pay one cell read per
+    /// comment.
+    static COMMENT_SINK: std::cell::RefCell<Option<Vec<Span>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Record a skipped comment's span into the armed sink, if any.
+fn record_comment(span: Span) {
+    COMMENT_SINK.with(|sink| {
+        if let Some(v) = sink.borrow_mut().as_mut() {
+            v.push(span);
+        }
+    });
 }
 
 /// Tokenize, pairing each terminal with its source span so the parser can
@@ -3017,6 +3042,57 @@ pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
     let input = strip_test_sections(input);
     let raw = tokenize(input)?;
     Ok(raw.into_iter().map(|(t, sp)| (classify(&t), sp)).collect())
+}
+
+/// A [`TokenKind`] refined for the formatter: template-literal pieces are kept
+/// distinct instead of folded into `Str`. The formatter copies a template
+/// verbatim from its head to its matching tail, so it must see the piece
+/// boundaries — and it can't recover them from token text (an empty segment's
+/// `TemplateMiddle` is the single character `{`, identical to a brace).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FmtTokenKind {
+    Plain(TokenKind),
+    /// `` `text{ `` — opens a template literal, through the first `{`.
+    TemplateHead,
+    /// `}text{` between two interpolations (span starts just after the
+    /// previous interpolation's `}`, which the lexer does not emit).
+    TemplateMiddle,
+    /// `` }text` `` — closes the template literal.
+    TemplateTail,
+}
+
+/// Tokenize `input` for the formatter: every token plus the span of every
+/// comment, both in source order (token text is recovered from the span, so
+/// literals stay verbatim). Unlike [`lex_tokens`] the input is taken as-is —
+/// no test-section stripping — because the formatter splits trailing
+/// `--- section ---` blocks off itself and must account for every byte it is
+/// given.
+#[allow(clippy::type_complexity)]
+pub fn lex_tokens_and_comments(
+    input: &str,
+) -> Result<(Vec<(FmtTokenKind, Span)>, Vec<Span>), Error> {
+    COMMENT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+    // Disarm the sink on every exit path (including a tokenize error), so a
+    // later plain parse on this thread doesn't keep recording.
+    let result = tokenize(input);
+    let comments = COMMENT_SINK
+        .with(|sink| sink.borrow_mut().take())
+        .expect("comment sink armed above");
+    let raw = result?;
+    let toks = raw
+        .into_iter()
+        .map(|(t, sp)| {
+            use self::aipl::Terminal as T;
+            let kind = match &t {
+                T::TemplateHead(_) => FmtTokenKind::TemplateHead,
+                T::TemplateMiddle(_) => FmtTokenKind::TemplateMiddle,
+                T::TemplateTail(_) => FmtTokenKind::TemplateTail,
+                other => FmtTokenKind::Plain(classify(other)),
+            };
+            (kind, sp)
+        })
+        .collect();
+    Ok((toks, comments))
 }
 
 fn classify(t: &aipl::Terminal<Build>) -> TokenKind {

@@ -1,0 +1,9 @@
+import { wrapping_add as + } from builtins;
+fn scaled(n: i64, bump : i64=100) -> i64 { n+bump }
+fn main() -> i64 { scaled(1, bump  =  5) }
+--- formatted ---
+import { wrapping_add as + } from builtins;
+
+fn scaled(n: i64, bump: i64 = 100) -> i64 { n + bump }
+
+fn main() -> i64 { scaled(1, bump=5) }

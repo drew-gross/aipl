@@ -1,0 +1,13 @@
+[package]
+name = "aipl-fmt"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL auto-formatter: canonical source layout from the token stream"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+aipl-parser = { workspace = true }
+
+[lints]
+workspace = true

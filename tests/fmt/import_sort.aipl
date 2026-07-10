@@ -1,0 +1,12 @@
+import { zebra, alpha } from "./z.aipl";
+fn main() { alpha(); }
+import { to_str, print, wrapping_add as +, ==, len } from builtins;
+import { beta } from "./a.aipl";
+--- formatted ---
+import { wrapping_add as +, ==, len, print, to_str } from builtins;
+import { beta } from "./a.aipl";
+import { alpha, zebra } from "./z.aipl";
+
+fn main() {
+    alpha();
+}

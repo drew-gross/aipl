@@ -1,0 +1,24 @@
+import { print, wrapping_add as + } from builtins;
+fn main() !prints {
+    let raw = """
+        keep   my    spacing
+          and indentation
+    """;
+    let t = `one {1 + 2} two {raw} three`;
+    let s = "escaped\tstring\n";
+    let c = '\n';
+    print(t);
+}
+--- formatted ---
+import { wrapping_add as +, print } from builtins;
+
+fn main() !prints {
+    let raw = """
+        keep   my    spacing
+          and indentation
+    """;
+    let t = `one {1 + 2} two {raw} three`;
+    let s = "escaped\tstring\n";
+    let c = '\n';
+    print(t);
+}

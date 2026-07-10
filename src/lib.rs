@@ -12,13 +12,15 @@ pub use aipl_syntax::{ast, DebugOptions, Error, Span};
 
 // Lexer + parser surface.
 pub use aipl_parser::{
-    lex_tokens, parse, parse_test_section_header, strip_test_sections, TokenKind,
+    lex_tokens, lex_tokens_and_comments, parse, parse_test_section_header, strip_test_sections,
+    FmtTokenKind, TokenKind,
 };
 
 // Compiler passes and backends, each re-exported as a module so existing
 // `aipl::codegen::…`, `aipl::mono::…`, etc. paths keep resolving.
 pub use aipl_codegen as codegen;
 pub use aipl_codegen::FfiValue;
+pub use aipl_fmt as fmt;
 pub use aipl_linker as binary;
 pub use aipl_loader as loader;
 pub use aipl_mono as mono;

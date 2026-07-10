@@ -1,0 +1,47 @@
+import { push, ==, wrapping_add as +, enumerate } from builtins;
+pub fn generic<T : any, U:ord>(xs: T[], y: U, rest: i64 *) -> i64 { 0 }
+fn effectful(mut self: i64[], v: i64 = 1) !prints { self.push(v); }
+fn result_types(s: str) -> str!Error { ok(s) }
+fn void_result() -> !Error { ok() }
+fn tested(x: i64) -> i64 { x + 1 }.test({
+    assert(tested(1) == 2);
+    assert(tested(2) == 3);
+}).doc("Adds one.")
+struct Point { x: i64, y: i64 = 0 }
+fn destructure(p: Point) -> i64 {
+    let Point { x, y } = p;
+    let (a, b) = (x, y);
+    for (let (i, c) : "ab".enumerate()) { set_use(i, c); }
+    a + b
+}
+fn set_use(i: i64, c: char) {}
+--- formatted ---
+import { wrapping_add as +, ==, enumerate, push } from builtins;
+
+pub fn generic<T: any, U: ord>(xs: T[], y: U, rest: i64*) -> i64 { 0 }
+
+fn effectful(mut self: i64[], v: i64 = 1) !prints {
+    self.push(v);
+}
+
+fn result_types(s: str) -> str!Error { ok(s) }
+
+fn void_result() -> !Error { ok() }
+
+fn tested(x: i64) -> i64 { x + 1 }.test({
+    assert(tested(1) == 2);
+    assert(tested(2) == 3);
+}).doc("Adds one.")
+
+struct Point { x: i64, y: i64 = 0 }
+
+fn destructure(p: Point) -> i64 {
+    let Point { x, y } = p;
+    let (a, b) = (x, y);
+    for (let (i, c) : "ab".enumerate()) {
+        set_use(i, c);
+    }
+    a + b
+}
+
+fn set_use(i: i64, c: char) {}

@@ -16,6 +16,7 @@ name = "aipl"
 version = "0.1.0"
 dependencies = [
  "aipl-codegen",
+ "aipl-fmt",
  "aipl-linker",
  "aipl-loader",
  "aipl-mono",
@@ -40,6 +41,14 @@ dependencies = [
  "cranelift-object",
  "cranelift-reader",
  "target-lexicon",
+]
+
+[[package]]
+name = "aipl-fmt"
+version = "0.1.0"
+dependencies = [
+ "aipl-parser",
+ "aipl-syntax",
 ]
 
 [[package]]

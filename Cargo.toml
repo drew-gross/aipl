@@ -20,6 +20,7 @@ aipl-mono = { path = "crates/aipl-mono" }
 aipl-codegen = { path = "crates/aipl-codegen" }
 aipl-loader = { path = "crates/aipl-loader" }
 aipl-linker = { path = "crates/aipl-linker" }
+aipl-fmt = { path = "crates/aipl-fmt" }
 # External crates.
 cranelift = "0.131.3"
 cranelift-jit = "0.131.3"
@@ -40,6 +41,7 @@ aipl-mono = { workspace = true }
 aipl-codegen = { workspace = true }
 aipl-loader = { workspace = true }
 aipl-linker = { workspace = true }
+aipl-fmt = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

@@ -1,0 +1,17 @@
+import { map, filter, len, wrapping_add as +, < } from builtins;
+fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
+fn main() -> i64 {
+    let doubled = [1, 2].map( | x |  x + x );
+    let small = doubled.filter(|x: i64| { x < 3 });
+    apply(2, 3, +) + small.len()
+}
+--- formatted ---
+import { wrapping_add as +, <, filter, len, map } from builtins;
+
+fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
+
+fn main() -> i64 {
+    let doubled = [1, 2].map(|x| x + x);
+    let small = doubled.filter(|x: i64| { x < 3 });
+    apply(2, 3, +) + small.len()
+}

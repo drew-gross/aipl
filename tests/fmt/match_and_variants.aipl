@@ -1,0 +1,12 @@
+import { == , wrapping_add as +, * } from builtins;
+variant Shape = Circle(i64)|Rect(i64,i64)|Empty
+fn area(s: Shape) -> i64 { match(s){ Circle(r)=>r*r*3, Rect(w,h)=>w*h, Empty=>0 } }
+fn tiny(o: i64 ?) -> i64 { match (o) { some(v)=>v, none=>0 } }
+--- formatted ---
+import { *, wrapping_add as +, == } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+fn area(s: Shape) -> i64 { match (s) { Circle(r) => r * r * 3, Rect(w, h) => w * h, Empty => 0 } }
+
+fn tiny(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }
