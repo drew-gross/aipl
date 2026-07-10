@@ -5,9 +5,9 @@ import { == } from builtins;
 // `"""` is indented; its line contributes no trailing newline.
 fn raw() -> str {
     """
-       This is
-       a raw
-       string
+        This is
+        a raw
+        string
     """
 }.test({
     assert(raw() == "This is\na raw\nstring");

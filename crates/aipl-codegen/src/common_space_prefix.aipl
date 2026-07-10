@@ -15,10 +15,10 @@ pub fn common_space_prefix(a: str, b: str) -> i64 {
     }
     i
 }.doc("""
-Returns the length of the longest common prefix of `a` and `b` made up entirely
-of space characters — their shared space-only indentation. Stops at the first
-index where the strings differ or the (matching) byte isn't a space (a tab or
-letter ends the count).
+    Returns the length of the longest common prefix of `a` and `b` made up entirely
+    of space characters — their shared space-only indentation. Stops at the first
+    index where the strings differ or the (matching) byte isn't a space (a tab or
+    letter ends the count).
 """).test({
     // Identical space runs: the whole (shorter-or-equal) run is the prefix.
     assert(common_space_prefix("", "") == 0);

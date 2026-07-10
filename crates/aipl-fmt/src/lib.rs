@@ -26,7 +26,7 @@ mod doc;
 
 use std::collections::VecDeque;
 
-use aipl_parser::{lex_tokens_and_comments, FmtTokenKind, TokenKind};
+use aipl_parser::{lex_signatures_and_comments, lex_tokens_and_comments, FmtTokenKind, TokenKind};
 use aipl_syntax::{Error, Span};
 use doc::{concat, group, indent, text, Doc};
 
@@ -133,18 +133,21 @@ fn clean_trailing_whitespace(src: &str) -> String {
 }
 
 /// Lex both texts and compare token/comment content as multisets (imports may
-/// legitimately reorder). Errors with a formatter-bug message on mismatch.
+/// legitimately reorder). Tokens are compared by *semantic value* (see
+/// [`lex_signatures_and_comments`]), so the formatter's value-preserving
+/// whitespace edits inside a raw block are not flagged, while any change to a
+/// literal's value is. Errors with a formatter-bug message on mismatch.
 fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
-    let (in_toks, in_comments) = lex_tokens_and_comments(input)?;
-    let (out_toks, out_comments) = lex_tokens_and_comments(output)
+    let (in_toks, in_comments) = lex_signatures_and_comments(input)?;
+    let (out_toks, out_comments) = lex_signatures_and_comments(output)
         .map_err(|e| Error::msg(format!("formatter produced unlexable output: {e}")))?;
     // Trailing commas are normalized by design (dropped when a list renders
     // flat, added when it breaks), so commas don't participate in the check.
-    let texts = |src: &str, toks: &[(FmtTokenKind, Span)]| -> Vec<String> {
+    let texts = |toks: &[(FmtTokenKind, String)]| -> Vec<String> {
         let mut v: Vec<String> = toks
             .iter()
-            .filter(|(_, sp)| &src[(*sp).clone()] != ",")
-            .map(|(k, sp)| format!("{k:?} {}", canonical_raw(&src[sp.clone()])))
+            .filter(|(_, sig)| sig != ",")
+            .map(|(k, sig)| format!("{k:?} {sig}"))
             .collect();
         v.sort();
         v
@@ -154,8 +157,8 @@ fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
         v.sort();
         v
     };
-    let before = texts(input, &in_toks);
-    let after = texts(output, &out_toks);
+    let before = texts(&in_toks);
+    let after = texts(&out_toks);
     if before != after {
         // Name a few tokens from the symmetric difference, to make the bug
         // report (and debugging) concrete.
@@ -174,23 +177,6 @@ fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
         ));
     }
     Ok(())
-}
-
-/// Canonicalize a token's raw text for the preservation check: a multi-line
-/// raw-string / template token whose last line is a bare closing delimiter has
-/// that line's leading whitespace collapsed, so the formatter's re-indentation
-/// of the closing `"""` / ``` ``` ``` (its only edit to a raw block) reads as
-/// no change. Every other token — and every content line — is left as-is, so a
-/// real corruption still trips the check.
-fn canonical_raw(text: &str) -> String {
-    if let Some(nl) = text.rfind('\n') {
-        let (head, last) = text.split_at(nl + 1);
-        let trimmed = last.trim_start();
-        if trimmed == "\"\"\"" || trimmed == "```" {
-            return format!("{head}{trimmed}");
-        }
-    }
-    text.to_string()
 }
 
 /// Binary operator spellings as they appear in token text.

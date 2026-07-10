@@ -3095,6 +3095,46 @@ pub fn lex_tokens_and_comments(
     Ok((toks, comments))
 }
 
+/// Tokenize `input` for the formatter's *preservation check*: each token as
+/// `(kind, signature)` plus every comment span. A token's signature is its
+/// **semantic value** — the lexer's processed string for a `"..."`/`"""`
+/// literal or a template `` ` `` piece (i.e. after escape handling and
+/// raw-string de-denting), and the raw source text for everything else. Two
+/// spellings that lex to the same value therefore share a signature, so the
+/// formatter's value-preserving whitespace edits (re-indenting a raw block's
+/// content or its closing delimiter) don't register as changes, while any real
+/// change to a literal's value does. Input is taken as-is (no section
+/// stripping), like [`lex_tokens_and_comments`].
+#[allow(clippy::type_complexity)]
+pub fn lex_signatures_and_comments(
+    input: &str,
+) -> Result<(Vec<(FmtTokenKind, String)>, Vec<Span>), Error> {
+    COMMENT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+    let result = tokenize(input);
+    let comments = COMMENT_SINK
+        .with(|sink| sink.borrow_mut().take())
+        .expect("comment sink armed above");
+    let raw = result?;
+    let toks = raw
+        .into_iter()
+        .map(|(t, sp)| {
+            use self::aipl::Terminal as T;
+            let (kind, sig) = match &t {
+                T::TemplateHead((v, _)) => (FmtTokenKind::TemplateHead, v.clone()),
+                T::TemplateMiddle((v, _)) => (FmtTokenKind::TemplateMiddle, v.clone()),
+                T::TemplateTail((v, _)) => (FmtTokenKind::TemplateTail, v.clone()),
+                T::Str((v, _)) => (FmtTokenKind::Plain(TokenKind::Str), v.clone()),
+                other => (
+                    FmtTokenKind::Plain(classify(other)),
+                    input[sp.clone()].to_string(),
+                ),
+            };
+            (kind, sig)
+        })
+        .collect();
+    Ok((toks, comments))
+}
+
 fn classify(t: &aipl::Terminal<Build>) -> TokenKind {
     // `aipl` as a bare path is ambiguous here: rustc has to choose between
     // the crate (this is the aipl crate) and the gazelle-generated module

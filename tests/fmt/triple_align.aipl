@@ -1,23 +1,26 @@
 import { print } from builtins;
 fn main() !prints {
-    // Opening triple on its own line: the closing triple lands directly under
-    // it (both at the statement indent); content lines are kept verbatim.
+    // A `"""` raw string: the closing triple aligns with the opening (both at
+    // the statement indent), and the content is shifted one level deeper,
+    // keeping each line's indentation relative to the common base.
     print(
         """
         four spaces
       two spaces
     """,
     );
-    // Triple-backtick template: same alignment of the closing fence.
+    // A triple-backtick template formats the same way — content one level
+    // deeper — with interpolations carried along on their lines.
     let name = "world";
     print(
         ```
         indented {name}
+      two spaces
     ```,
     );
 }
-// A mid-line opening (`... }.doc("""`): the closing aligns to the opening
-// line's indentation (here 0), not the far-right column of the opening triple.
+// A mid-line opening (`... }.doc("""`): the block aligns to the opening line's
+// indentation (here 0) — closing at column 0, content one level deeper.
 fn documented() -> i64 { 0 }.doc("""
 Line one.
 Line two.
@@ -26,26 +29,30 @@ Line two.
 import { print } from builtins;
 
 fn main() !prints {
-    // Opening triple on its own line: the closing triple lands directly under
-    // it (both at the statement indent); content lines are kept verbatim.
+    // A `"""` raw string: the closing triple aligns with the opening (both at
+    // the statement indent), and the content is shifted one level deeper,
+    // keeping each line's indentation relative to the common base.
     print(
         """
-        four spaces
-      two spaces
+              four spaces
+            two spaces
         """,
     );
-    // Triple-backtick template: same alignment of the closing fence.
+
+    // A triple-backtick template formats the same way — content one level
+    // deeper — with interpolations carried along on their lines.
     let name = "world";
     print(
         ```
-        indented {name}
+              indented {name}
+            two spaces
         ```,
     );
 }
 
-// A mid-line opening (`... }.doc("""`): the closing aligns to the opening
-// line's indentation (here 0), not the far-right column of the opening triple.
+// A mid-line opening (`... }.doc("""`): the block aligns to the opening line's
+// indentation (here 0) — closing at column 0, content one level deeper.
 fn documented() -> i64 { 0 }.doc("""
-Line one.
-Line two.
+    Line one.
+    Line two.
 """)

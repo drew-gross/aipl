@@ -65,18 +65,18 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
     } else {
         let trimmed = contents.trim_end_while(|c| c == '\n' || c == '\r');
         ```
-        {trimmed}
-        --- {section} ---
-        {body}
+            {trimmed}
+            --- {section} ---
+            {body}
 
         ```
     }
 }.doc("""
-Replaces the body of the `--- section ---` block in `contents` with `body`
-(dropping the old body up to the next header line or EOF), preserving
-everything else; or, when `contents` doesn't already carry that section,
-appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
-instead of requiring it to exist.
+    Replaces the body of the `--- section ---` block in `contents` with `body`
+    (dropping the old body up to the next header line or EOF), preserving
+    everything else; or, when `contents` doesn't already carry that section,
+    appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
+    instead of requiring it to exist.
 """).test({
     // Fixtures below embed real `--- name ---` marker lines inside `"""` raw
     // strings. That's safe: this file is itself parsed through
@@ -90,22 +90,22 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        a
-        --- foo ---
-        old
-        --- bar ---
-        b
+                a
+                --- foo ---
+                old
+                --- bar ---
+                b
 
             """,
             "foo",
             "new",
         )
             == """
-        a
-        --- foo ---
-        new
-        --- bar ---
-        b
+                a
+                --- foo ---
+                new
+                --- bar ---
+                b
 
             """,
     );
@@ -113,17 +113,17 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        --- foo ---
-        old1
-        old2
+                --- foo ---
+                old1
+                old2
 
             """,
             "foo",
             "new",
         )
             == """
-        --- foo ---
-        new
+                --- foo ---
+                new
 
             """,
     );
@@ -133,14 +133,14 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        --- foo ---
+                --- foo ---
             """,
             "foo",
             "new",
         )
             == """
-        --- foo ---
-        new
+                --- foo ---
+                new
 
             """,
     );
@@ -148,15 +148,15 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        --- foo ---
-        old
+                --- foo ---
+                old
             """,
             "foo",
             "new",
         )
             == """
-        --- foo ---
-        new
+                --- foo ---
+                new
 
             """,
     );
@@ -167,19 +167,19 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        --- foo ---
-        --- bar ---
-        X
+                --- foo ---
+                --- bar ---
+                X
 
             """,
             "foo",
             "new",
         )
             == """
-        --- foo ---
-        new
-        --- bar ---
-        X
+                --- foo ---
+                new
+                --- bar ---
+                X
 
             """,
     );
@@ -188,16 +188,16 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        code
+                code
 
             """,
             "stdout",
             "hi",
         )
             == """
-        code
-        --- stdout ---
-        hi
+                code
+                --- stdout ---
+                hi
 
             """,
     );
@@ -205,7 +205,7 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        code
+                code
 
 
 
@@ -214,9 +214,9 @@ instead of requiring it to exist.
             "hi",
         )
             == """
-        code
-        --- stdout ---
-        hi
+                code
+                --- stdout ---
+                hi
 
             """,
     );
@@ -224,9 +224,9 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section("code", "stdout", "hi")
             == """
-        code
-        --- stdout ---
-        hi
+                code
+                --- stdout ---
+                hi
 
             """,
     );
@@ -235,8 +235,8 @@ instead of requiring it to exist.
         fill_or_add_section("", "stdout", "hi")
             == """
 
-        --- stdout ---
-        hi
+                --- stdout ---
+                hi
 
             """,
     );
@@ -246,20 +246,20 @@ instead of requiring it to exist.
     assert(
         fill_or_add_section(
             """
-        code
-          --- foo ---
-        old
+                code
+                  --- foo ---
+                old
 
             """,
             "foo",
             "new",
         )
             == """
-        code
-          --- foo ---
-        old
-        --- foo ---
-        new
+                code
+                  --- foo ---
+                old
+                --- foo ---
+                new
 
             """,
     );
@@ -270,4 +270,4 @@ deallocations: 83
 reallocations: 28
 bytes allocated: 3141
 instructions executed: 10743
-binary size: 18344
+binary size: 18744

@@ -8,8 +8,8 @@ fn main() !prints {
     print(```no interpolation```);
     print(
         ```
-        indented {name}
-        and {n}
+            indented {name}
+            and {n}
         ```,
     );
     print(```prefix {name} middle {n} suffix```);

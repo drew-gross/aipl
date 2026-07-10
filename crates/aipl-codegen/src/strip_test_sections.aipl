@@ -24,11 +24,11 @@ pub fn strip_test_sections(src: str) -> str {
     // returns all of `src`.)
     if (parse_test_section_header(src[line_start..]) != none) { src[..line_start] } else { src }
 }.doc("""
-Returns the portion of `src` before the first `--- name ---` test-section marker
-line, or all of `src` if there is none. The cases test harness appends
-expected-output sections after the AIPL code with these markers; the compiler
-strips them so `aipl run/ir/build` can be pointed at a fixture directly.
-(`parse_test_section_header` classifies each line.)
+    Returns the portion of `src` before the first `--- name ---` test-section marker
+    line, or all of `src` if there is none. The cases test harness appends
+    expected-output sections after the AIPL code with these markers; the compiler
+    strips them so `aipl run/ir/build` can be pointed at a fixture directly.
+    (`parse_test_section_header` classifies each line.)
 """).test({
     // No marker: keep everything.
     assert(strip_test_sections("fn main() {}\n") == "fn main() {}\n");

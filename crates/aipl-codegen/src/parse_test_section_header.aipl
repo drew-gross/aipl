@@ -12,13 +12,13 @@ pub fn parse_test_section_header(line: str) -> str? {
         none
     }
 }.doc("""
-If `line` is a `--- name ---` test-section marker, returns `some(name)` with the
-trimmed inner name; otherwise — or when the inner name is empty — returns `none`.
-A line is a marker iff it starts with `---` with **no leading whitespace** (the
-marker must begin at column 0), and, once trailing whitespace is trimmed, ends
-with `---` and is at least 6 bytes long. The cases test harness uses these
-markers to delimit sections; the compiler treats any such marker as a hard
-cutoff (see `strip_test_sections`).
+    If `line` is a `--- name ---` test-section marker, returns `some(name)` with the
+    trimmed inner name; otherwise — or when the inner name is empty — returns `none`.
+    A line is a marker iff it starts with `---` with **no leading whitespace** (the
+    marker must begin at column 0), and, once trailing whitespace is trimmed, ends
+    with `---` and is at least 6 bytes long. The cases test harness uses these
+    markers to delimit sections; the compiler treats any such marker as a hard
+    cutoff (see `strip_test_sections`).
 """).test({
     // Markers: some(trimmed inner name).
     assert(parse_test_section_header("--- performance ---") == some("performance"));

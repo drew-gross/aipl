@@ -1,16 +1,16 @@
 import { ==, split } from builtins;
 
 pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
-Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing
-`\n` yields a final empty element (not Rust's `str::lines()` semantics, which
-would drop it), and an empty `self` yields a single empty element.
+    Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing
+    `\n` yields a final empty element (not Rust's `str::lines()` semantics, which
+    would drop it), and an empty `self` yields a single empty element.
 """).test({
     assert(
         lines(
             """
-        a
-        b
-        c
+                a
+                b
+                c
             """,
         )
             == ["a", "b", "c"],
@@ -21,8 +21,8 @@ would drop it), and an empty `self` yields a single empty element.
     assert(
         lines(
             """
-        a
-        b
+                a
+                b
 
             """,
         )
@@ -34,8 +34,8 @@ would drop it), and an empty `self` yields a single empty element.
     assert(
         lines(
             """
-        first long line
-        second long line
+                first long line
+                second long line
             """,
         )
             == ["first long line", "second long line"],
@@ -47,4 +47,4 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 656
 instructions executed: 730
-binary size: 7392
+binary size: 7448

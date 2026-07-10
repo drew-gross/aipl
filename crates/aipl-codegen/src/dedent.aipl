@@ -18,10 +18,10 @@ pub fn dedent(self: str) -> str {
     // become empty), rejoined with `\n` so the original line count is preserved.
     ls.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
 }.doc("""
-Strips the common leading-space indentation shared by every non-blank line — the
-de-denting the parser applies to raw-string contents. Blank lines (empty or
-all-whitespace) don't constrain the common indent and are emitted empty; the
-original line count is preserved.
+    Strips the common leading-space indentation shared by every non-blank line — the
+    de-denting the parser applies to raw-string contents. Blank lines (empty or
+    all-whitespace) don't constrain the common indent and are emitted empty; the
+    original line count is preserved.
 """).test({
     // No common indent: unchanged.
     assert(dedent("a\nb") == "a\nb");

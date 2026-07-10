@@ -4,9 +4,9 @@ import { print } from builtins;
 fn main() !prints -> i64 {
     print(
         """
-      first
+            first
 
-      second
+            second
         """,
     );
     0

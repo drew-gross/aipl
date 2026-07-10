@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 
 use aipl::fmt::{format_source, FmtOptions};
-use aipl::{lex_tokens_and_comments, FmtTokenKind, Span};
+use aipl::{lex_signatures_and_comments, FmtTokenKind};
 
 fn setup() {
     aipl::install_parser_hooks();
@@ -36,48 +36,35 @@ fn aipl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The token stream of `src` split into import statements and everything
-/// else: `(sorted import-statement token texts, the remaining token texts in
-/// order, sorted comment texts)`. Imports may legitimately reorder (they are
-/// hoisted and sorted), so each import statement's tokens are compared as one
-/// sorted unit; every other token must survive in exact order.
+/// A value fingerprint of `src` split into import statements and everything
+/// else: `(sorted import-statement signatures, the remaining token signatures
+/// in order, sorted comment texts)`. Tokens are compared by *semantic value*
+/// (see `lex_signatures_and_comments`), so the formatter's value-preserving
+/// whitespace edits to a raw block don't show. Imports may legitimately reorder
+/// (they are hoisted and sorted), so each import statement's tokens are
+/// compared as one sorted unit; every other token must survive in exact order.
 fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let (toks, comments) = lex_tokens_and_comments(src).expect("lexes");
-    // Collapse a raw-string / template *closing-delimiter* line's indentation:
-    // the formatter re-aligns the closing `"""` / ``` ``` ``` under the opening
-    // one, which is a deliberate (value-preserving) change, so it must not read
-    // as a token difference here. Content lines keep their exact bytes.
-    let text = |sp: &Span| -> String {
-        let t = &src[sp.clone()];
-        if let Some(nl) = t.rfind('\n') {
-            let (head, last) = t.split_at(nl + 1);
-            let trimmed = last.trim_start();
-            if trimmed == "\"\"\"" || trimmed == "```" {
-                return format!("{head}{trimmed}");
-            }
-        }
-        t.to_string()
-    };
+    let (toks, comments) = lex_signatures_and_comments(src).expect("lexes");
     let mut imports: Vec<String> = Vec::new();
     let mut rest: Vec<String> = Vec::new();
     let mut i = 0;
     while i < toks.len() {
-        let (kind, sp) = &toks[i];
-        if text(sp) == "," {
+        let (kind, sig) = &toks[i];
+        if sig == "," {
             // Trailing commas are normalized by design (dropped when flat,
             // added when broken); commas don't participate in the check.
             i += 1;
             continue;
         }
-        if *kind == FmtTokenKind::Plain(aipl::TokenKind::Keyword) && text(sp) == "import" {
+        if *kind == FmtTokenKind::Plain(aipl::TokenKind::Keyword) && sig == "import" {
             // Collect through the terminating `;`, sorting the names inside so
             // reordering within the list doesn't matter either.
             let mut stmt: Vec<String> = Vec::new();
             while i < toks.len() {
-                let t = text(&toks[i].1);
+                let t = &toks[i].1;
                 let done = t == ";";
                 if t != "," {
-                    stmt.push(t);
+                    stmt.push(t.clone());
                 }
                 i += 1;
                 if done {
@@ -87,12 +74,15 @@ fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
             stmt.sort();
             imports.push(stmt.join(" "));
         } else {
-            rest.push(format!("{kind:?} {}", text(sp)));
+            rest.push(format!("{kind:?} {sig}"));
             i += 1;
         }
     }
     imports.sort();
-    let mut ctexts: Vec<String> = comments.iter().map(text).collect();
+    let mut ctexts: Vec<String> = comments
+        .iter()
+        .map(|sp| src[sp.clone()].to_string())
+        .collect();
     ctexts.sort();
     (imports, rest, ctexts)
 }

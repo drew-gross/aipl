@@ -59,22 +59,73 @@ pub fn raw_block(s: impl Into<String>) -> Doc {
     Doc::RawBlock(s.into())
 }
 
-/// Re-indent a raw block's *closing-delimiter line* to `start_col` columns.
-/// Only the final line is considered, and only when it is whitespace followed
-/// by a bare `"""` / ``` ``` ``` — the semantically inert blank closing line.
-/// Everything before it (the opening delimiter and every content line) is left
-/// exactly as written, so the de-dented string value can't shift.
-pub fn reindent_closing(s: &str, start_col: usize) -> String {
-    let Some(nl) = s.rfind('\n') else {
+/// Re-lay-out a multi-line raw-string / template atom around `base` columns:
+///
+/// - The **closing-delimiter line** is re-indented to `base` — but only when it
+///   is whitespace followed by a bare `"""` / ``` ``` ``` (the semantically
+///   inert blank closing line). Otherwise the atom is returned unchanged.
+/// - For a **bare-opening `"""` raw string or ``` ``` ``` template** (its
+///   opening line is exactly the delimiter), every non-blank content line is
+///   shifted so the block's common indent becomes `base + INDENT` — one level
+///   deeper than the delimiters — while each line keeps its indentation
+///   *relative* to that common base.
+///
+/// Content shifting is value-safe: `process_raw_string` (which de-dents both
+/// `"""` strings and ``` ``` ``` templates) strips the common leading-space
+/// indent, so moving every non-blank line by the same amount (and leaving blank
+/// lines empty, since trailing whitespace is illegal) leaves the value
+/// unchanged; a template's interpolations ride along on their lines untouched.
+/// A content-bearing opening line keeps its content byte-for-byte (only the
+/// closing line moves), and a single-backtick template — not de-dented — never
+/// matches a bare triple delimiter, so it is left entirely alone.
+pub fn reindent_block(s: &str, base: usize) -> String {
+    let lines: Vec<&str> = s.split('\n').collect();
+    if lines.len() < 2 {
         return s.to_string();
-    };
-    let (head, last) = s.split_at(nl + 1);
-    let trimmed = last.trim_start();
-    if trimmed == "\"\"\"" || trimmed == "```" {
-        format!("{head}{}{trimmed}", " ".repeat(start_col))
-    } else {
-        s.to_string()
     }
+    let closing = lines[lines.len() - 1].trim_start();
+    if closing != "\"\"\"" && closing != "```" {
+        return s.to_string();
+    }
+    let opening = lines[0];
+    let content = &lines[1..lines.len() - 1];
+    // Content re-indentation applies to a bare-delimiter `"""` / ``` ``` ```
+    // block (its opening line is exactly the delimiter).
+    let common = if opening == "\"\"\"" || opening == "```" {
+        content
+            .iter()
+            .filter(|l| !l.trim().is_empty())
+            .map(leading_spaces)
+            .min()
+    } else {
+        None
+    };
+    let target = base + INDENT;
+    let mut out = String::from(opening);
+    for line in content {
+        out.push('\n');
+        if line.trim().is_empty() {
+            // A blank content line is emitted empty — its whitespace would be
+            // trailing (illegal), and `dedent` renders it empty anyway.
+        } else if let Some(c) = common {
+            // Uniform shift: drop the common indent, add the target, keeping
+            // this line's extra (relative) indent.
+            out.push_str(&" ".repeat(target));
+            out.push_str(&line[c..]);
+        } else {
+            out.push_str(line);
+        }
+    }
+    out.push('\n');
+    out.push_str(&" ".repeat(base));
+    out.push_str(closing);
+    out
+}
+
+/// Count of leading space characters (not tabs — matching `dedent`, which
+/// counts only spaces).
+fn leading_spaces(line: &&str) -> usize {
+    line.len() - line.trim_start_matches(' ').len()
 }
 
 pub fn concat(docs: Vec<Doc>) -> Doc {
@@ -136,14 +187,14 @@ pub fn print(doc: &Doc, max_width: usize) -> String {
                 };
             }
             Doc::RawBlock(s) => {
-                // Align the closing delimiter to the *opening line's* indent
-                // (`ind * INDENT`), not the raw column the triple opened at.
-                // When the opening triple begins its own line the two are equal
-                // — closing lands directly under opening — and when it's
-                // mid-line (`... }.doc("""`) the closing aligns to the
-                // statement indent instead of hanging far to the right. Content
-                // lines are emitted verbatim.
-                let rendered = reindent_closing(s, ind * INDENT);
+                // Lay the block out around the *opening line's* indent
+                // (`ind * INDENT`), not the raw column the triple opened at:
+                // the closing delimiter aligns there, and a bare-`"""` raw
+                // string's content sits one level deeper. When the opening
+                // triple begins its own line, the closing lands directly under
+                // it; when it's mid-line (`... }.doc("""`) the block aligns to
+                // the statement indent instead of hanging far to the right.
+                let rendered = reindent_block(s, ind * INDENT);
                 col = match rendered.rfind('\n') {
                     Some(i) => rendered.len() - i - 1,
                     None => col + rendered.len(),

@@ -9,8 +9,8 @@ pub fn fill_or_add_section_file(
     let contents = read_file_to_string(path)?;
     write_string_to_file(path, fill_or_add_section(contents, section, body))
 }.doc("""
-Reads the file at `path`, splices `body` into (or appends) its `--- section
----` block via `fill_or_add_section`, and writes the result back to `path`.
+    Reads the file at `path`, splices `body` into (or appends) its `--- section
+    ---` block via `fill_or_add_section`, and writes the result back to `path`.
 """).test({
     // This file is loaded in place by `aipl check` (some callers run it with
     // cwd at the repo root, not a staged throwaway dir like `tests/cases/

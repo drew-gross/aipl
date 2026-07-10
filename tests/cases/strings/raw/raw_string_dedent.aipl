@@ -6,15 +6,15 @@ import { print } from builtins;
 fn main() !prints -> i64 {
     print(
         """
-        four spaces
-      two spaces
+              four spaces
+            two spaces
         """,
     );
     print("----");
     print(
         """
-flush left
-    indented under it
+            flush left
+                indented under it
         """,
     );
     0
