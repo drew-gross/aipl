@@ -3,11 +3,11 @@ import { print, to_str } from builtins;
 // `to_str` renders nested arrays (`T[][]`, and deeper) element-by-element,
 // recursing through each inner array. Debug-style: `[[1, 2], [3]]`.
 fn main() !prints {
-    print(to_str([[1, 2], [3], [4, 5, 6]]));    // [[1, 2], [3], [4, 5, 6]]
-    print(to_str([["a", "b"], ["c"]]));          // [["a", "b"], ["c"]]
-    print(to_str([[true], [false, true]]));      // [[true], [false, true]]
-    print(to_str([[1], []]));                    // [[1], []]   (empty inner array)
-    print(to_str([[['x']], [['y'], ['z']]]));    // [[['x']], [['y'], ['z']]]  (triple-nested)
+    print(to_str([[1, 2], [3], [4, 5, 6]])); // [[1, 2], [3], [4, 5, 6]]
+    print(to_str([["a", "b"], ["c"]])); // [["a", "b"], ["c"]]
+    print(to_str([[true], [false, true]])); // [[true], [false, true]]
+    print(to_str([[1], []])); // [[1], []]   (empty inner array)
+    print(to_str([[['x']], [['y'], ['z']]])); // [[['x']], [['y'], ['z']]]  (triple-nested)
 }
 --- stdout ---
 [[1, 2], [3], [4, 5, 6]]

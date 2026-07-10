@@ -5,7 +5,7 @@
 // half-open byte range within `src`; both bounds clamp to `[0, len]` (and an
 // out-of-order range collapses to "") via ordinary string-slicing semantics, so
 // no manual clamping is needed here.
-import { ==, len, trim, Span } from builtins;
+import { ==, Span, len, trim } from builtins;
 import { lines } from "./lines.aipl";
 
 pub fn assert_loc(src: str, span: Span) -> str {

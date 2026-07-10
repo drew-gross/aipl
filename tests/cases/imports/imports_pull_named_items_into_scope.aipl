@@ -1,5 +1,5 @@
-import { add } from "./util.aipl";
 import { print, to_str } from builtins;
+import { add } from "./util.aipl";
 
 fn main() !prints {
     print(to_str(add(3, 4)));

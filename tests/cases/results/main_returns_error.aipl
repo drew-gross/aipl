@@ -1,12 +1,10 @@
 // `fn main() -> !Error` is an allowed entry variation: returning `ok()` exits 0,
 // while returning an error prints `error: <message>` to stderr and exits 1.
 // `?` propagates an error straight out of `main`.
-fn checked(bad: bool) -> !Error {
-    if (bad) { err("the thing failed") } else { ok() }
-}
+fn checked(bad: bool) -> !Error { if (bad) { err("the thing failed") } else { ok() } }
 
 fn main() -> !Error {
-    checked(true)?;   // propagates the error → main returns it → exit 1
+    checked(true)?; // propagates the error → main returns it → exit 1
     ok()
 }
 --- stderr ---

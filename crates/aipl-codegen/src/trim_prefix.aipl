@@ -3,16 +3,12 @@
 import { == } from builtins;
 
 pub fn trim_prefix(self: str, c: char) -> str {
-    if (self[0] == some(c)) {
-        self[1..]
-    } else {
-        self
-    }
+    if (self[0] == some(c)) { self[1..] } else { self }
 }.doc("Drops a single leading `c` if present, else returns `self` unchanged.").test({
     assert("\nrest".trim_prefix('\n') == "rest"); // leading char dropped
-    assert("rest".trim_prefix('\n') == "rest");   // absent -> unchanged
-    assert("".trim_prefix('\n') == "");           // empty source
-    assert("xxy".trim_prefix('x') == "xy");       // only the first is dropped
+    assert("rest".trim_prefix('\n') == "rest"); // absent -> unchanged
+    assert("".trim_prefix('\n') == ""); // empty source
+    assert("xxy".trim_prefix('x') == "xy"); // only the first is dropped
 })
 --- performance ---
 allocations: 0

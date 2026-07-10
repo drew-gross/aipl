@@ -1,4 +1,4 @@
-import { print, to_str, len } from builtins;
+import { len, print, to_str } from builtins;
 
 // Converting doesn't consume the array: the refcount protocol (caller incs,
 // callee decs) leaves `xs` usable afterward — no double-free or leak.

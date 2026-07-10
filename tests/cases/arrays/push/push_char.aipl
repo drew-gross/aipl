@@ -1,4 +1,4 @@
-import { ==, push, len } from builtins;
+import { ==, len, push } from builtins;
 
 // Growable char[]: `cs.push(x)` grows the variable in place (rebuilding a
 // fresh `str`-shaped value each time — `char[]` has no in-place-growable
@@ -19,10 +19,10 @@ fn appended(xs: char[], x: char) -> char[] {
 }.test({
     mut cs = ['a'];
     cs.push('b');
-    let snap = cs;        // snapshot of ['a', 'b']
-    cs.push('c');         // grows cs only
+    let snap = cs; // snapshot of ['a', 'b']
+    cs.push('c'); // grows cs only
     assert(cs == ['a', 'b', 'c']);
-    assert(snap == ['a', 'b']);     // snapshot unchanged
+    assert(snap == ['a', 'b']); // snapshot unchanged
     assert(len(snap) == 2);
     assert(appended(snap, 'z') == ['a', 'b', 'z']);
     assert(snap == ['a', 'b']);

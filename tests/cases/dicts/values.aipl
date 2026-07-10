@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, len, get, value_or } from builtins;
+import { wrapping_add as +, ==, get, len, value_or } from builtins;
 
 // Dict values may be any value type: arrays, optionals, structs — and heap
 // strings the dict must free. Keys may be any scalar/str. Exercises the
@@ -6,27 +6,21 @@ import { wrapping_add as +, ==, len, get, value_or } from builtins;
 
 struct Point { x: i64, y: i64 }
 
-fn array_values() -> #{i64: i64[]} {
-    #{1: [10, 20], 2: [30]}
-}.test({
+fn array_values() -> #{i64: i64[]} { #{1: [10, 20], 2: [30]} }.test({
     let d = array_values();
     assert(d == #{1: [10, 20], 2: [30]});
     assert(len(d.get(1).value_or([])) == 2);
     assert(d.get(1) == some([10, 20]));
 })
 
-fn optional_values() -> #{i64: i64?} {
-    #{1: some(5), 2: none}
-}.test({
+fn optional_values() -> #{i64: i64?} { #{1: some(5), 2: none} }.test({
     let d = optional_values();
     assert(d == #{1: some(5), 2: none});
     assert(d.get(1) == some(some(5)));
     assert(d.get(2) == some(none));
 })
 
-fn struct_values() -> #{str: Point} {
-    #{"o": Point { x: 1, y: 2 }}
-}.test({
+fn struct_values() -> #{str: Point} { #{"o": Point { x: 1, y: 2 }} }.test({
     let d = struct_values();
     assert(d == #{"o": Point { x: 1, y: 2 }});
     assert(d.get("o") == some(Point { x: 1, y: 2 }));
@@ -41,9 +35,7 @@ fn heap_str_values() -> #{str: str} {
     assert(len(d) == 2);
 })
 
-fn char_keys() -> #{char: i64} {
-    #{'a': 1, 'b': 2}
-}.test({
+fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
     assert(char_keys().get('b').value_or(0) == 2);
     let b = #{true: "yes", false: "no"};
     assert(b.get(true).value_or("?") == "yes");

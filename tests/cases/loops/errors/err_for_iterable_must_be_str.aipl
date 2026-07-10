@@ -1,10 +1,10 @@
 fn main() -> i64 {
-    for (let c : 42) { }
+    for (let c : 42) {}
     0
 }
 --- errors ---
 error: for-loop iterable must be a str or array, got i64
  --> ./tests/cases/loops/errors/err_for_iterable_must_be_str.aipl:2:18
   |
-2 |     for (let c : 42) { }
+2 |     for (let c : 42) {}
   |                  ^^

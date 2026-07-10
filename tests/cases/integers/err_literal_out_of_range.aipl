@@ -1,15 +1,13 @@
 // A literal only flexes to a narrow integer type if it actually fits — 300
 // doesn't fit a u8, so this is a compile error rather than a silent wrap.
-fn take(x: u8) -> u8 {
-    x
-}
+fn take(x: u8) -> u8 { x }
 
 fn main() {
     let y = take(300);
 }
 --- errors ---
 error: integer literal 300 does not fit in u8
- --> ./tests/cases/integers/err_literal_out_of_range.aipl:8:18
+ --> ./tests/cases/integers/err_literal_out_of_range.aipl:6:18
   |
-8 |     let y = take(300);
+6 |     let y = take(300);
   |                  ^^^

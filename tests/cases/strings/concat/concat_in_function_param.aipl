@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 // String materialized inline as a fn argument; lifetime must survive
 // the call.
 fn joined() -> str { "hello, " + "world" }.test({

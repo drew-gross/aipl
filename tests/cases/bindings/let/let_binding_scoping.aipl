@@ -1,6 +1,12 @@
 import { == } from builtins;
+
 fn f() -> i64 {
-    let outer = if (true) { let inner = 42; inner } else { 0 };
+    let outer = if (true) {
+        let inner = 42;
+        inner
+    } else {
+        0
+    };
     outer
 }.test({
     assert(f() == 42);
@@ -11,6 +17,6 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 23
-binary size: 1088
+binary size: 1096
 --- monomorphizations ---
 main

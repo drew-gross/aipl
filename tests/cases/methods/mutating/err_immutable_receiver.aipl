@@ -1,8 +1,10 @@
 import { wrapping_add as + } from builtins;
+
 // A mutating method needs a mutable receiver; a `let` binding can't be mutated.
 fn add(mut self: i64, x: i64) {
     set self = self + x;
 }
+
 fn main() -> i64 {
     let n = 1;
     n.add(2);
@@ -10,7 +12,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: cannot call mutating method "add" on immutable binding "n"; declare it with "mut"
- --> ./tests/cases/methods/mutating/err_immutable_receiver.aipl:8:5
-  |
-8 |     n.add(2);
-  |     ^^^^^^^
+  --> ./tests/cases/methods/mutating/err_immutable_receiver.aipl:10:5
+   |
+10 |     n.add(2);
+   |     ^^^^^^^

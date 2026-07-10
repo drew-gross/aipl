@@ -3,15 +3,13 @@ import { == } from builtins;
 // `s[..end]` slices from the start of the string to `end` (the open start is 0,
 // filled in by the parser — no `len` import needed). `end` is clamped to
 // `[0, len]`, like the closed `s[start..end]` form.
-fn take_prefix(s: str, n: i64) -> str {
-    s[..n]
-}.test({
-    assert("hello"[..5] == "hello");        // whole string
-    assert("hello"[..2] == "he");           // up to the 3rd byte
-    assert("hello"[..0] == "");             // end == 0 -> empty
-    assert("hello"[..10] == "hello");       // end past len -> clamped to whole
+fn take_prefix(s: str, n: i64) -> str { s[..n] }.test({
+    assert("hello"[..5] == "hello"); // whole string
+    assert("hello"[..2] == "he"); // up to the 3rd byte
+    assert("hello"[..0] == ""); // end == 0 -> empty
+    assert("hello"[..10] == "hello"); // end past len -> clamped to whole
     assert(take_prefix("abcdef", 4) == "abcd"); // first 4 bytes
-    assert(""[..0] == "");                  // empty source
+    assert(""[..0] == ""); // empty source
     // The other forms still work (regression).
     assert("hello"[1..3] == "el");
     assert("hello"[2..] == "llo");

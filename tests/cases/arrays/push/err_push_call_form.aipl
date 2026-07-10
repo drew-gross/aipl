@@ -1,4 +1,4 @@
-import { push, len } from builtins;
+import { len, push } from builtins;
 
 // `push` mutates, so the function-call form is rejected — use `xs.push(x)`.
 fn main() -> i64 {

@@ -1,8 +1,8 @@
 // a and b form a cycle (a imports from b, b imports back from a).
 // The entry only imports from a; the cycle is internal. The loader
 // must terminate rather than walking the cycle forever.
-import { a_fn } from "./a.aipl";
 import { print, to_str } from builtins;
+import { a_fn } from "./a.aipl";
 
 fn main() !prints {
     print(to_str(a_fn()));

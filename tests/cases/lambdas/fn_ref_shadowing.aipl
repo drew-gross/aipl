@@ -1,11 +1,9 @@
-import { wrapping_add as +, *, ==, len, map } from builtins;
+import { *, wrapping_add as +, ==, len, map } from builtins;
 
 // A local binding may share a name with a global function or imported builtin.
 // The local shadows the global, so a bare reference resolves to the value, not
 // the function — only an *unshadowed* name is treated as a function reference.
-fn double(x: i64) -> i64 {
-    x * 2
-}.test({
+fn double(x: i64) -> i64 { x * 2 }.test({
     // `len` is an imported builtin, but here it's a plain local i64.
     let len = 42;
     assert(len == 42);

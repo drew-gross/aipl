@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 // `len` written in AIPL using the for-each-char loop + mutation.
 fn len(s: str) -> i64 {
     mut n = 0;

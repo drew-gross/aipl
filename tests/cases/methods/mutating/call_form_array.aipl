@@ -7,9 +7,9 @@ fn extend(mut self: i64[], a: i64, b: i64) {
     self.push(b);
 }.test({
     let xs = [1];
-    let grown = extend(xs, 2, 3);   // copies xs, pushes onto the copy
-    assert(xs == [1]);              // xs is still [1]
-    assert(grown == [1, 2, 3]);     // grown is [1, 2, 3]
+    let grown = extend(xs, 2, 3); // copies xs, pushes onto the copy
+    assert(xs == [1]); // xs is still [1]
+    assert(grown == [1, 2, 3]); // grown is [1, 2, 3]
 })
 --- performance ---
 allocations: 5

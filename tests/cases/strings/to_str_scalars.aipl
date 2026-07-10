@@ -4,14 +4,14 @@ import { wrapping_add as +, -, print, to_str } from builtins;
 // decimal, bool as true/false, char as 'c', str as "s" (Debug-style quoting).
 // Callable as a function or a method.
 fn main() !prints {
-    print(to_str(42));        // 42
-    print(to_str(-7));        // -7
-    print(to_str(true));      // true
-    print(to_str(false));     // false
-    print(to_str('c'));       // 'c'
-    print(to_str("hi"));      // "hi"
-    print((1 + 2).to_str());  // 3 (method form)
-    print("x = " + to_str(5));  // x = 5
+    print(to_str(42)); // 42
+    print(to_str(-7)); // -7
+    print(to_str(true)); // true
+    print(to_str(false)); // false
+    print(to_str('c')); // 'c'
+    print(to_str("hi")); // "hi"
+    print((1 + 2).to_str()); // 3 (method form)
+    print("x = " + to_str(5)); // x = 5
 }
 --- stdout ---
 42

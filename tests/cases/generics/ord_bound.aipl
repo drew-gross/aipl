@@ -6,9 +6,7 @@ import { == } from builtins;
 // concrete `T` a call resolves to must satisfy the bound), instead of a
 // caller hand-checking element types by name the way `minimum`/`maximum`
 // used to.
-fn identity<T: ord>(x: T) -> T {
-    x
-}.test({
+fn identity<T: ord>(x: T) -> T { x }.test({
     assert(identity(5) == 5);
     assert(identity('a') == 'a');
 })

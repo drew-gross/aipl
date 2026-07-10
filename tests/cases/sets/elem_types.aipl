@@ -1,17 +1,18 @@
-import { ==, !, len, contains } from builtins;
+import { !, ==, contains, len } from builtins;
 
 // Sets of bool and char (the other two scalar element types). A bool set holds
 // at most {true, false}; chars behave like array char elements.
 fn bools() -> #{bool} {
-    #{true, false, true, false}   // -> {true, false}
+    #{true, false, true, false} // -> {true, false}
 }.test({
     let bs = bools();
     assert(bs == #{true, false});
     assert(len(bs) == 2);
     assert(bs.contains(false));
 })
+
 fn chars() -> #{char} {
-    #{'a', 'b', 'a', 'c'}          // -> {'a', 'b', 'c'}
+    #{'a', 'b', 'a', 'c'} // -> {'a', 'b', 'c'}
 }.test({
     let cs = chars();
     assert(cs == #{'a', 'b', 'c'});

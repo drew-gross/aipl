@@ -4,17 +4,17 @@
 // (leading/trailing/consecutive separators); a missing separator yields one part
 // (the whole string); an empty separator yields `[s]`. Callable free or as a
 // method (`s.split(sep)`).
-import { print, to_str, split, ==, wrapping_add as + } from builtins;
+import { wrapping_add as +, ==, print, split, to_str } from builtins;
 
 fn main() !prints {
-    print(to_str(split("a,bb,ccc", ",")));            // ["a", "bb", "ccc"]
-    print(to_str(split("a,,b", ",")));                // ["a", "", "b"]  (empty middle)
-    print(to_str(split("a,b,", ",")));                // ["a", "b", ""]  (trailing sep)
-    print(to_str(split("abc", ",")));                 // ["abc"]         (no separator)
-    print(to_str(split("", ",")));                    // [""]            (empty source)
-    print(to_str(split("xyz", "")));                  // ["xyz"]         (empty separator)
-    print(to_str(split("a::b::cee", "::")));          // ["a", "b", "cee"] (multi-char sep)
-    print(to_str(split("name=longvaluehere", "=")));  // ["name", "longvaluehere"] (view part)
+    print(to_str(split("a,bb,ccc", ","))); // ["a", "bb", "ccc"]
+    print(to_str(split("a,,b", ","))); // ["a", "", "b"]  (empty middle)
+    print(to_str(split("a,b,", ","))); // ["a", "b", ""]  (trailing sep)
+    print(to_str(split("abc", ","))); // ["abc"]         (no separator)
+    print(to_str(split("", ","))); // [""]            (empty source)
+    print(to_str(split("xyz", ""))); // ["xyz"]         (empty separator)
+    print(to_str(split("a::b::cee", "::"))); // ["a", "b", "cee"] (multi-char sep)
+    print(to_str(split("name=longvaluehere", "="))); // ["name", "longvaluehere"] (view part)
 }
 
 // A long part (>= 8 bytes) is a buffer-sharing view, yet still compares equal to a
@@ -24,8 +24,7 @@ fn count_eq(s: str, sep: str, target: str) -> i64 {
     for (let p : split(s, sep)) {
         if (p == target) {
             set n = n + 1;
-        } else {
-        };
+        } else {};
     }
     n
 }.test({

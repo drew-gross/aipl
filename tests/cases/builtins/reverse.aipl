@@ -1,4 +1,4 @@
-import { reverse, ==, print, len } from builtins;
+import { ==, len, print, reverse } from builtins;
 
 fn str_rev(s: str) -> str { s.reverse() }.test({
     assert(str_rev("abc") == "cba");

@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 fn joined() -> str { "hello, " + "world" }.test({
     assert(joined() == "hello, world");
 })

@@ -7,8 +7,8 @@ import { wrapping_add as +, ==, trim } from builtins;
 // a realloc, not an allocation.
 fn build() -> str {
     mut s = "";
-    set s = s + "  padded  ";   // heap buffer via concat
-    set s = trim(s);            // trimmed in place (realloc, not a fresh alloc)
+    set s = s + "  padded  "; // heap buffer via concat
+    set s = trim(s); // trimmed in place (realloc, not a fresh alloc)
     s
 }.test({
     assert(build() == "padded");

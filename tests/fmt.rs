@@ -83,6 +83,86 @@ fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     (imports, rest, ctexts)
 }
 
+/// The `.aipl` files whose checked-in text is required to already be in
+/// canonical format (see [`all_aipl_files_stay_formatted`] /
+/// [`format_corpus`]). This is every `.aipl` in the repo *except* the
+/// formatter's own `tests/fmt/` fixtures, whose inputs are deliberately
+/// misformatted to exercise the formatter.
+fn enforced_files() -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for dir in ["tests/cases", "crates", "examples", "tests/ffi_fixtures"] {
+        aipl_files(Path::new(dir), &mut files);
+    }
+    files
+}
+
+/// Every checked-in `.aipl` file (outside the formatter's own fixtures) must
+/// already be in canonical format — this is what keeps the corpus, and any new
+/// file, formatted. A file that doesn't parse (a parse-error fixture) can't be
+/// formatted and is exempt. Fix a failure with
+/// `cargo test --test fmt -- --ignored format_corpus`.
+#[test]
+fn all_aipl_files_stay_formatted() {
+    setup();
+    let opts = FmtOptions::default();
+    let mut unformatted: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for path in enforced_files() {
+        let src = std::fs::read_to_string(&path).unwrap();
+        if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
+            continue; // parse-error fixture; nothing to format
+        }
+        checked += 1;
+        match format_source(&src, &opts) {
+            Ok(formatted) if formatted == src => {}
+            Ok(_) => unformatted.push(path.display().to_string()),
+            Err(e) => unformatted.push(format!("{} (format error: {e})", path.display())),
+        }
+    }
+    assert!(
+        checked > 100,
+        "enforcement checked too few files ({checked})"
+    );
+    assert!(
+        unformatted.is_empty(),
+        "{} file(s) are not canonically formatted; run \
+         `cargo test --test fmt -- --ignored format_corpus` to fix:\n{}",
+        unformatted.len(),
+        unformatted.join("\n")
+    );
+}
+
+/// Authoring helper: rewrite every enforced `.aipl` file in place with its
+/// canonical formatting, then fail so the run is visibly a bulk rewrite.
+/// Review the diff (and refill any `--- performance ---`/`--- errors ---`
+/// sections whose spans shifted) before committing.
+#[test]
+#[ignore]
+fn format_corpus() {
+    setup();
+    let opts = FmtOptions::default();
+    let mut changed = 0usize;
+    for path in enforced_files() {
+        let src = std::fs::read_to_string(&path).unwrap();
+        if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
+            continue;
+        }
+        let formatted = format_source(&src, &opts)
+            .unwrap_or_else(|e| panic!("[{}] format failed: {e}", path.display()));
+        if formatted != src {
+            std::fs::write(&path, &formatted).unwrap();
+            eprintln!("[{}]: reformatted", path.display());
+            changed += 1;
+        }
+    }
+    panic!(
+        "reformatted {changed} file(s); review the diff, refill any shifted \
+         --- performance ---/--- errors ---/--- check --- sections \
+         (`fill_expected`) and regenerate dogfood IR (`fill_dogfood_ir`), \
+         then re-run the suite (this run fails intentionally)"
+    );
+}
+
 /// Format every parseable `.aipl` in the repo and hold the formatter to its
 /// invariants. Files that don't parse (error-case fixtures) are skipped —
 /// there is nothing to format.

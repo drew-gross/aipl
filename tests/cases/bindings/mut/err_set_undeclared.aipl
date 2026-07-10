@@ -1,7 +1,10 @@
-fn main() -> i64 { set ghost = 1; 0 }
+fn main() -> i64 {
+    set ghost = 1;
+    0
+}
 --- errors ---
 error: set: undeclared variable "ghost"
- --> ./tests/cases/bindings/mut/err_set_undeclared.aipl:1:24
+ --> ./tests/cases/bindings/mut/err_set_undeclared.aipl:2:9
   |
-1 | fn main() -> i64 { set ghost = 1; 0 }
-  |                        ^^^^^^^^^^^^
+2 |     set ghost = 1;
+  |         ^^^^^^^^^^

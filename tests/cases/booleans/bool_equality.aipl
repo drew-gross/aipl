@@ -1,8 +1,10 @@
-import { ==, != } from builtins;
+import { !=, == } from builtins;
+
 fn beq(x: bool, y: bool) -> bool { x == y }.test({
     assert(beq(true, true) == true);
     assert(beq(true, false) == false);
 })
+
 fn bne(x: bool, y: bool) -> bool { x != y }.test({
     assert(bne(false, true) == true);
 })

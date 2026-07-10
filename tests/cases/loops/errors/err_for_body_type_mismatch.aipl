@@ -1,11 +1,14 @@
 import { == } from builtins;
+
 fn main() -> i64 {
-    for (let c : "x") { let _ = c == 5; }
+    for (let c : "x") {
+        let _ = c == 5;
+    }
     0
 }
 --- errors ---
 error: "==" between char and i64: both sides must be the same type
- --> ./tests/cases/loops/errors/err_for_body_type_mismatch.aipl:3:33
+ --> ./tests/cases/loops/errors/err_for_body_type_mismatch.aipl:5:17
   |
-3 |     for (let c : "x") { let _ = c == 5; }
-  |                                 ^^^^^^
+5 |         let _ = c == 5;
+  |                 ^^^^^^

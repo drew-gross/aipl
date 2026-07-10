@@ -1,6 +1,7 @@
 // The body's type must match the declared return type: here a `str` value
 // is returned from a function declared to return `i64`.
 fn f() -> i64 { "hi" }
+
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns str, but the declared return type is i64

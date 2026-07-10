@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 // Marquee use case: len(s) implemented in AIPL.
 fn len(s: str) -> i64 {
     mut n = 0;

@@ -1,4 +1,5 @@
 import { == } from builtins;
+
 fn eq_in_if() -> i64 { if (true == true) { 1 } else { 0 } }.test({
     assert(eq_in_if() == 1);
 })

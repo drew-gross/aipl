@@ -1,7 +1,9 @@
 import { print } from builtins;
 
 fn outer() !prints { inner() }
+
 fn inner() !prints { print("hello") }
+
 fn main() !prints -> i64 {
     outer();
     0

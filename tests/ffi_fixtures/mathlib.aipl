@@ -1,4 +1,5 @@
 // A helper module the FFI root file imports from. Only `pub` functions are
 // importable.
 import { * } from builtins;
+
 pub fn square(n: i64) -> i64 { n * n }

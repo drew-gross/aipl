@@ -1,4 +1,4 @@
-import { ==, &&, >=, -, !, trim, starts_with, ends_with, len } from builtins;
+import { !, &&, -, ==, >=, ends_with, len, starts_with, trim } from builtins;
 
 pub fn parse_test_section_header(line: str) -> str? {
     if (!line.starts_with("---")) {
@@ -29,10 +29,10 @@ cutoff (see `strip_test_sections`).
     // Not markers (or empty inner) -> none.
     assert(parse_test_section_header("") == none);
     assert(parse_test_section_header("fn main() {") == none);
-    assert(parse_test_section_header("-- two --") == none);  // only two dashes
-    assert(parse_test_section_header("-----") == none);      // five dashes (< 6 bytes)
-    assert(parse_test_section_header("------") == none);      // six dashes, empty inner
-    assert(parse_test_section_header("--- ---") == none);     // inner is all spaces
+    assert(parse_test_section_header("-- two --") == none); // only two dashes
+    assert(parse_test_section_header("-----") == none); // five dashes (< 6 bytes)
+    assert(parse_test_section_header("------") == none); // six dashes, empty inner
+    assert(parse_test_section_header("--- ---") == none); // inner is all spaces
     // Leading whitespace disqualifies a marker, even if it would otherwise match.
     assert(parse_test_section_header("   --- stdout ---") == none);
     assert(parse_test_section_header("\t--- stdout ---") == none);

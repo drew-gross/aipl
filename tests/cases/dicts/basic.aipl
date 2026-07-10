@@ -1,19 +1,17 @@
-import { ==, !, len, get, contains_key, value_or } from builtins;
+import { !, ==, contains_key, get, len, value_or } from builtins;
 
 // A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
 // literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with
 // `get` (→ `V?`), tested with `contains_key`, sized with `len`. (Split across
 // small functions to keep each one's codegen modest, like the set tests.)
 
-fn ints() -> #{i64: str} {
-    #{1: "one", 2: "two", 3: "three"}
-}.test({
+fn ints() -> #{i64: str} { #{1: "one", 2: "two", 3: "three"} }.test({
     let d = ints();
     assert(d == #{1: "one", 2: "two", 3: "three"});
     assert(len(d) == 3);
     assert(d.get(2) == some("two"));
     assert(d.get(2).value_or("?") == "two");
-    assert(d.get(9) == none);                 // absent
+    assert(d.get(9) == none); // absent
     assert(d.get(9).value_or("?") == "?");
     assert(d.contains_key(1));
     assert(!d.contains_key(9));
@@ -37,12 +35,10 @@ fn dedup() -> #{i64: str} {
     assert(d.get(1).value_or("?") == "y");
 })
 
-fn make_empty() -> #{i64: str} {
-    #{:}
-}.test({
+fn make_empty() -> #{i64: str} { #{:} }.test({
     let d = make_empty();
     assert(len(d) == 0);
-    assert(d.get(1) == none);                  // absent
+    assert(d.get(1) == none); // absent
     assert(d.get(1).value_or("none") == "none");
 })
 --- performance ---

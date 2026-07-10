@@ -698,11 +698,24 @@ impl<'s> Walker<'s> {
 
     // ---------- blocks & statements ----------
 
+    /// A `{ .. }` block as its own independently-breaking group. See
+    /// [`block_layout`] for the shared-group form an `if`/`else` uses.
+    ///
+    /// [`block_layout`]: Walker::block_layout
+    fn block(&mut self) -> Result<Doc, Error> {
+        Ok(group(self.block_layout()?))
+    }
+
     /// A `{ .. }` block: statements (`;`-terminated) plus an optional trailing
     /// expression. Renders `{}` when empty, `{ expr }` when a lone trailing
     /// expression fits, and one statement per line otherwise (any `;` forces
-    /// the break via the hard lines between statements).
-    fn block(&mut self) -> Result<Doc, Error> {
+    /// the break via the hard lines between statements). The result is *not*
+    /// wrapped in a group, so a caller can place several blocks under one
+    /// shared group (an `if`/`else` breaks both branches together) — [`block`]
+    /// is the grouped form for a standalone block.
+    ///
+    /// [`block`]: Walker::block
+    fn block_layout(&mut self) -> Result<Doc, Error> {
         self.expect("{")?;
         let body_start = self.pos;
         let mut entries: Vec<Doc> = Vec::new();
@@ -753,14 +766,14 @@ impl<'s> Walker<'s> {
             return Ok(text("{}"));
         }
         let edge = if has_stmt { Doc::HardLine } else { Doc::Line };
-        Ok(group(concat(vec![
+        Ok(concat(vec![
             text("{"),
             indent(concat(
                 std::iter::once(edge.clone()).chain(entries).collect(),
             )),
             edge,
             text("}"),
-        ])))
+        ]))
     }
 
     /// One statement (consuming its `;`) or the block's trailing expression.
@@ -937,7 +950,11 @@ impl<'s> Walker<'s> {
     }
 
     fn postfix(&mut self) -> Result<Doc, Error> {
-        let mut d = vec![self.atom()?];
+        let head = self.atom()?;
+        // Collect postfix segments, tagging `.method(...)` calls so a long
+        // chain can break *before each call* rather than exploding an inner
+        // argument list. Field access, indexing, and `?` glue to their left.
+        let mut segs: Vec<(bool, Doc)> = Vec::new();
         loop {
             match self.peek_text() {
                 "." => {
@@ -947,40 +964,65 @@ impl<'s> Walker<'s> {
                         self.bump();
                         let args = self.call_args_until(")")?;
                         self.expect(")")?;
-                        d.push(text(format!(".{member}")));
-                        d.push(self.comma_list_docs(args, ListStyle::Parens));
+                        let d = concat(vec![
+                            text(format!(".{member}")),
+                            self.comma_list_docs(args, ListStyle::Parens),
+                        ]);
+                        segs.push((true, d));
                     } else {
-                        d.push(text(format!(".{member}")));
+                        segs.push((false, text(format!(".{member}"))));
                     }
                 }
                 "[" => {
                     self.bump();
-                    d.push(text("["));
+                    let mut idx = vec![text("[")];
                     if self.peek_text() == ".." {
                         self.bump();
-                        d.push(text(".."));
-                        d.push(self.expr()?);
+                        idx.push(text(".."));
+                        idx.push(self.expr()?);
                     } else {
-                        d.push(self.expr()?);
+                        idx.push(self.expr()?);
                         if self.peek_text() == ".." {
                             self.bump();
-                            d.push(text(".."));
+                            idx.push(text(".."));
                             if self.peek_text() != "]" {
-                                d.push(self.expr()?);
+                                idx.push(self.expr()?);
                             }
                         }
                     }
                     self.expect("]")?;
-                    d.push(text("]"));
+                    idx.push(text("]"));
+                    segs.push((false, concat(idx)));
                 }
                 "?" => {
                     self.bump();
-                    d.push(text("?"));
+                    segs.push((false, text("?")));
                 }
                 _ => break,
             }
         }
-        Ok(concat(d))
+        if segs.is_empty() {
+            return Ok(head);
+        }
+        // A "member chain" (2+ method calls) becomes one group that, when it
+        // can't fit on a line, breaks before every call segment — the
+        // receiver ends up alone on the first line and each `.method(...)`
+        // starts its own indented line. Fewer than two calls: no chain break
+        // (a lone call's own argument list may still break).
+        let call_count = segs.iter().filter(|(is_call, _)| *is_call).count();
+        if call_count < 2 {
+            let mut parts = vec![head];
+            parts.extend(segs.into_iter().map(|(_, d)| d));
+            return Ok(concat(parts));
+        }
+        let mut chain = Vec::new();
+        for (is_call, d) in segs {
+            if is_call {
+                chain.push(Doc::SoftLine);
+            }
+            chain.push(d);
+        }
+        Ok(group(concat(vec![head, indent(concat(chain))])))
     }
 
     fn atom(&mut self) -> Result<Doc, Error> {
@@ -1099,7 +1141,12 @@ impl<'s> Walker<'s> {
         self.expect("(")?;
         let cond = self.expr()?;
         self.expect(")")?;
-        let then_b = self.block()?;
+        // The branches share one group (via the ungrouped `block_layout`), so
+        // they break *together*: an `if`/`else` is either `if (c) { a } else
+        // { b }` on one line or both blocks broken — never one inline and the
+        // other split. A trailing `else if` stays its own group so a fitting
+        // tail can remain inline.
+        let then_b = self.block_layout()?;
         let mut d = vec![text("if ("), cond, text(") "), then_b];
         if self.peek_text() == "else" {
             self.bump();
@@ -1107,10 +1154,10 @@ impl<'s> Walker<'s> {
             if self.peek_text() == "if" {
                 d.push(self.if_expr()?);
             } else {
-                d.push(self.block()?);
+                d.push(self.block_layout()?);
             }
         }
-        Ok(concat(d))
+        Ok(group(concat(d)))
     }
 
     fn match_expr(&mut self) -> Result<Doc, Error> {

@@ -12,12 +12,12 @@ fn appended(xs: i64[], x: i64) -> i64[] {
     mut a = [1];
     a.push(2);
     a.push(3);
-    let b = a;       // snapshot of [1, 2, 3]
+    let b = a; // snapshot of [1, 2, 3]
     a.push(4);
     a.push(5);
     a.push(6);
     assert(a == [1, 2, 3, 4, 5, 6]);
-    assert(b == [1, 2, 3]);   // unchanged
+    assert(b == [1, 2, 3]); // unchanged
 })
 --- performance ---
 allocations: 8

@@ -6,9 +6,9 @@ import { ==, trim } from builtins;
 // string trims to "".
 fn trim_spaces() -> str { trim("  hello  ") }.test({
     assert(trim_spaces() == "hello");
-    assert("\t a b \n".trim() == "a b");   // tabs/newline stripped, inner space kept
-    assert(trim("   ") == "");             // all-whitespace -> empty
-    assert(trim("none") == "none");        // unchanged
+    assert("\t a b \n".trim() == "a b"); // tabs/newline stripped, inner space kept
+    assert(trim("   ") == ""); // all-whitespace -> empty
+    assert(trim("none") == "none"); // unchanged
 })
 --- performance ---
 allocations: 0

@@ -1,4 +1,4 @@
-import { print, to_str, map } from builtins;
+import { map, print, to_str } from builtins;
 
 // Passing an effectful function to `map` charges its effect to the caller, just
 // like an effectful lambda body would. `main` doesn't declare `!prints`.

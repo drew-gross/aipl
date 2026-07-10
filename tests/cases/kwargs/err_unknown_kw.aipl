@@ -1,8 +1,9 @@
 fn f(a: i64, b: i64 = 1) -> i64 { a }
-fn main() -> i64 { f(1, c = 2) }
+
+fn main() -> i64 { f(1, c=2) }
 --- errors ---
 error: fn "f" has no keyword parameter "c"; its keyword parameter is "b"
- --> ./tests/cases/kwargs/err_unknown_kw.aipl:2:25
+ --> ./tests/cases/kwargs/err_unknown_kw.aipl:3:25
   |
-2 | fn main() -> i64 { f(1, c = 2) }
-  |                         ^^^^^
+3 | fn main() -> i64 { f(1, c=2) }
+  |                         ^^^

@@ -1,9 +1,10 @@
-import { ==, !=, ! } from builtins;
+import { !, !=, == } from builtins;
+
 // Set equality is order-independent: same size and same members.
 fn eq_set(a: #{i64}, b: #{i64}) -> bool { a == b }.test({
     assert(#{1, 2, 3} == #{3, 2, 1});
-    assert(!(#{1, 2, 3} == #{1, 2}));     // size differs
-    assert(!(#{1, 2, 3} == #{1, 2, 4}));  // member differs
+    assert(!(#{1, 2, 3} == #{1, 2})); // size differs
+    assert(!(#{1, 2, 3} == #{1, 2, 4})); // member differs
     assert(!(#{1, 2} != #{2, 1}));
     assert(#{} == #{});
 })

@@ -1,6 +1,4 @@
-fn main() {
-    for (let c : "") { }
-}
+fn main() { for (let c : "") {} }
 --- performance ---
 allocations: 0
 deallocations: 0

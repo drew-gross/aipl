@@ -1,10 +1,13 @@
 import { == } from builtins;
+
 fn first() -> str { "first" }.test({
     assert(first() == "first");
 })
+
 fn second() -> str { "second" }.test({
     assert(second() == "second");
 })
+
 fn third() -> str { "third" }.test({
     assert(third() == "third");
 })

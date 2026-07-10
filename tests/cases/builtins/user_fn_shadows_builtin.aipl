@@ -1,10 +1,9 @@
 import { wrapping_add as +, == } from builtins;
+
 // A user function may reuse a builtin's name freely: since the builtin
 // is only in scope when imported (and here it isn't), `len` resolves to
 // the user's definition with no conflict.
-fn len(x: i64) -> i64 {
-    x + x
-}.test({
+fn len(x: i64) -> i64 { x + x }.test({
     assert(len(21) == 42);
 })
 --- performance ---

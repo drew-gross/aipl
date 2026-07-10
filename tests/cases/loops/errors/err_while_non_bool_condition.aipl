@@ -1,4 +1,5 @@
 import { wrapping_add as + } from builtins;
+
 // A `while` condition must be a bool, like an `if` condition.
 fn main() {
     mut i = 0;
@@ -8,7 +9,7 @@ fn main() {
 }
 --- errors ---
 error: while condition: expected bool, got i64
- --> ./tests/cases/loops/errors/err_while_non_bool_condition.aipl:5:12
+ --> ./tests/cases/loops/errors/err_while_non_bool_condition.aipl:6:12
   |
-5 |     while (i + 1) {
+6 |     while (i + 1) {
   |            ^^^^^

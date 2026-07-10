@@ -1,8 +1,6 @@
 import { frobnicate } from builtins;
 
-fn main() -> i64 {
-    0
-}
+fn main() -> i64 { 0 }
 --- errors ---
 error: "frobnicate" is not a builtin
  --> ./tests/cases/builtins/err_unknown_builtin.aipl:1:10

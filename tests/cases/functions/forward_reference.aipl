@@ -1,7 +1,9 @@
 import { *, == } from builtins;
+
 fn caller() -> i64 { callee(7) }.test({
     assert(caller() == 14);
 })
+
 fn callee(x: i64) -> i64 { x * 2 }
 --- performance ---
 allocations: 0

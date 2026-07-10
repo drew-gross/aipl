@@ -2,10 +2,10 @@
 // `install_parser_hooks`) for every `"""..."""` literal, and `aipl check`
 // exercises it via the `.test` block below.
 import { ==, ||, ends_with } from builtins;
-import { trim_prefix } from "./trim_prefix.aipl";
-import { trim_end_while } from "./trim_end_while.aipl";
-import { trim_suffix } from "./trim_suffix.aipl";
 import { dedent } from "./dedent.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+import { trim_prefix } from "./trim_prefix.aipl";
+import { trim_suffix } from "./trim_suffix.aipl";
 
 pub fn process_raw_string(s: str) -> str {
     // Drop a blank opening line. Trailing whitespace is a compile error (even
@@ -15,6 +15,7 @@ pub fn process_raw_string(s: str) -> str {
     // char is absent, so a first line with real content keeps both its `\r`-less
     // start and its indentation for `dedent`.
     let opened = s.trim_prefix('\r').trim_prefix('\n');
+
     // Drop a blank closing line: skip the closing line's leading indentation
     // (genuine whitespace — *not* trailing, since `"""` follows it on that line)
     // with `trim_end_while`. A blank closing line then leaves `tail` ending in the
@@ -55,10 +56,10 @@ bytes allocated: 1288
 instructions executed: 5454
 binary size: 10272
 --- monomorphizations ---
-__m1__trim_prefix
-__m3__trim_suffix
-__m5__count_while$char$s0$lam12
-__m5__count_while$char$s0$lam5
+__m2__count_while$char$s0$lam12
+__m2__count_while$char$s0$lam5
+__m5__trim_prefix
+__m6__trim_suffix
 __map7$own0
 main
 process_raw_string

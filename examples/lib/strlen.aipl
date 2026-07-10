@@ -1,4 +1,5 @@
 import { wrapping_add as + } from builtins;
+
 // `len` implemented in AIPL itself rather than as a builtin: walk the
 // string char-by-char with a `for` loop, incrementing a mutable counter.
 //

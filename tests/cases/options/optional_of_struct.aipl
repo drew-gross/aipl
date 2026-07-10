@@ -1,11 +1,11 @@
 import { -, == } from builtins;
+
 struct Point { x: i64, y: i64 }
+
 struct Named { id: i64, label: str }
 
 // `Point?` returned from a function — built and handed back via sret.
-fn wrap(p: Point) -> Point? {
-    some(p)
-}.test({
+fn wrap(p: Point) -> Point? { some(p) }.test({
     // Construct and match-unwrap a struct optional.
     let op = some(Point { x: 7, y: 8 });
     assert(op == some(Point { x: 7, y: 8 }));

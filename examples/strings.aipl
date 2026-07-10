@@ -19,7 +19,6 @@ fn main() !prints -> i64 {
     print(classify("xyz"));
     0
 }
-
 --- stdout ---
 greeting
 unknown: xyz

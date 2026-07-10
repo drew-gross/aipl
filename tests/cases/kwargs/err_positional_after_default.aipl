@@ -1,4 +1,5 @@
 fn f(a: i64 = 1, b: i64) -> i64 { b }
+
 fn main() -> i64 { f(2) }
 --- errors ---
 error: fn "f": parameter "b" has no default but follows keyword parameter "a"; parameters with defaults must come last

@@ -1,13 +1,19 @@
-import { ==, !, is_all_whitespace, minimum, value_or, map, join, filter } from builtins;
+import { !, ==, filter, is_all_whitespace, join, map, minimum, value_or } from builtins;
 import { count_while } from "./count_while.aipl";
 import { lines } from "./lines.aipl";
 
 pub fn dedent(self: str) -> str {
     let ls = self.lines();
+
     // The common indent `n` is the smallest leading-space run over the non-blank
     // lines: count each non-blank line's leading spaces, then take the minimum.
     // With no non-blank lines there's nothing to strip, so `value_or(0)`.
-    let n = ls.filter(|l| !l.is_all_whitespace()).map(|l| l.count_while(|c| c == ' ')).minimum().value_or(0);
+    let n = ls
+        .filter(|l| !l.is_all_whitespace())
+        .map(|l| l.count_while(|c| c == ' '))
+        .minimum()
+        .value_or(0);
+
     // Rebuild: strip the first `n` bytes from each non-blank line (blank lines
     // become empty), rejoined with `\n` so the original line count is preserved.
     ls.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
@@ -23,6 +29,7 @@ original line count is preserved.
     assert(dedent("    a\n    b") == "a\nb");
     // The smallest indent wins; deeper lines keep the extra.
     assert(dedent("  a\n    b") == "a\n  b");
+
     // Blank lines don't constrain the indent and are emitted empty (here the
     // middle line is all spaces).
     assert(dedent("    a\n  \n    b") == "a\n\nb");
@@ -37,8 +44,10 @@ original line count is preserved.
     // Empty input.
     assert(dedent("") == "");
     // Long (heap) lines exercise the view/concat paths.
-    assert(dedent("        first long line\n        second long line")
-        == "first long line\nsecond long line");
+    assert(
+        dedent("        first long line\n        second long line")
+            == "first long line\nsecond long line",
+    );
 })
 --- performance ---
 allocations: 35
@@ -46,7 +55,7 @@ deallocations: 35
 reallocations: 0
 bytes allocated: 1641
 instructions executed: 4899
-binary size: 9808
+binary size: 9816
 --- monomorphizations ---
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam3

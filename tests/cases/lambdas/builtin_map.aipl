@@ -1,13 +1,11 @@
-import { wrapping_add as +, *, ==, to_str, map } from builtins;
+import { *, wrapping_add as +, ==, map, to_str } from builtins;
 
 // `map` is a builtin: no user definition needed. It desugars to an inline loop
 // in the enclosing scope, so lambdas (including capturing ones) just work.
-fn doubled(xs: i64[]) -> i64[] {
-    xs.map(|x| x * 2)
-}.test({
+fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     let xs = [1, 2, 3];
-    assert(xs.map(|x| x * 2) == [2, 4, 6]);       // method form
-    assert(map(xs, |x| x + 1) == [2, 3, 4]);      // function form
+    assert(xs.map(|x| x * 2) == [2, 4, 6]); // method form
+    assert(map(xs, |x| x + 1) == [2, 3, 4]); // function form
 
     // A captured variable.
     let k = 10;
@@ -25,7 +23,7 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 616
 instructions executed: 1407
-binary size: 6928
+binary size: 6920
 --- monomorphizations ---
 __map12$own0
 main

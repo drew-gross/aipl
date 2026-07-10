@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 fn f() -> i64 {
     let x = 1;
     let x = x + 10;

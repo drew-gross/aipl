@@ -7,8 +7,8 @@ fn append<T: any>(mut self: T[], x: T) {
     self.push(x);
 }.test({
     let xs = [10, 20];
-    let grown = append(xs, 30);   // copies xs, appends to the copy
-    assert(xs == [10, 20]);       // xs is still [10, 20]
+    let grown = append(xs, 30); // copies xs, appends to the copy
+    assert(xs == [10, 20]); // xs is still [10, 20]
     assert(grown == [10, 20, 30]); // grown is [10, 20, 30]
 })
 --- performance ---

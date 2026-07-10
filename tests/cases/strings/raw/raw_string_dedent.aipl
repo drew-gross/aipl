@@ -4,15 +4,19 @@ import { print } from builtins;
 // so a more-indented line keeps its extra indent, while a line flush at
 // column 0 makes the common indent empty (nothing is stripped).
 fn main() !prints -> i64 {
-    print("""
+    print(
+        """
         four spaces
       two spaces
-    """);
+    """,
+    );
     print("----");
-    print("""
+    print(
+        """
 flush left
     indented under it
-    """);
+    """,
+    );
     0
 }
 --- stdout ---

@@ -1,7 +1,9 @@
 import { wrapping_add as +, == } from builtins;
+
 fn lead_empty() -> str { "" + "lone" }.test({
     assert(lead_empty() == "lone");
 })
+
 fn trail_empty() -> str { "lone" + "" }.test({
     assert(trail_empty() == "lone");
 })

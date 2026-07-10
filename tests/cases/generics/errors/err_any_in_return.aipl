@@ -1,4 +1,5 @@
 fn g(v: any[]) -> any[] { v }
+
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "g": bare "any" is not allowed in a return type; declare "<T: any>" and return "T"

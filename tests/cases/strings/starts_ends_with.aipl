@@ -1,40 +1,38 @@
-import { ==, !, &&, starts_with, ends_with } from builtins;
+import { !, &&, ==, ends_with, starts_with } from builtins;
 
 // `s.starts_with(p)` / `s.ends_with(p)` test whether `s`'s bytes begin / end
 // with `p`'s. The pattern is variadic (`char*`): besides a `str` it accepts a
 // single `char` or a `char?` (an AIPL string is the char sequence). The empty
 // pattern always matches; a pattern longer than `s` never does. A view (long
 // slice) works as a receiver too.
-fn is_dotfile(name: str) -> bool {
-    name.starts_with(".") && !name.ends_with("/")
-}.test({
-    assert("hello".starts_with("he"));      // common prefix
-    assert("hello".starts_with("hello"));   // whole string
-    assert("hello".starts_with(""));        // empty prefix always matches
-    assert(!"hello".starts_with("el"));     // not a prefix
-    assert(!"hi".starts_with("hello"));     // pattern longer than source
-    assert(!"".starts_with("x"));           // empty source, non-empty pattern
-    assert("".starts_with(""));             // both empty
+fn is_dotfile(name: str) -> bool { name.starts_with(".") && !name.ends_with("/") }.test({
+    assert("hello".starts_with("he")); // common prefix
+    assert("hello".starts_with("hello")); // whole string
+    assert("hello".starts_with("")); // empty prefix always matches
+    assert(!"hello".starts_with("el")); // not a prefix
+    assert(!"hi".starts_with("hello")); // pattern longer than source
+    assert(!"".starts_with("x")); // empty source, non-empty pattern
+    assert("".starts_with("")); // both empty
 
-    assert("hello".ends_with("lo"));        // common suffix
-    assert("hello".ends_with("hello"));     // whole string
-    assert("hello".ends_with(""));          // empty suffix always matches
-    assert(!"hello".ends_with("ll"));       // not a suffix
-    assert(!"hi".ends_with("hello"));       // pattern longer than source
+    assert("hello".ends_with("lo")); // common suffix
+    assert("hello".ends_with("hello")); // whole string
+    assert("hello".ends_with("")); // empty suffix always matches
+    assert(!"hello".ends_with("ll")); // not a suffix
+    assert(!"hi".ends_with("hello")); // pattern longer than source
 
     // Variadic `char*` pattern: a single `char`, or an optional `char?`.
-    assert("hello".starts_with('h'));       // char -> "h"
-    assert(!"hello".starts_with('e'));      // wrong first char
-    assert("hello".ends_with('o'));         // char suffix
+    assert("hello".starts_with('h')); // char -> "h"
+    assert(!"hello".starts_with('e')); // wrong first char
+    assert("hello".ends_with('o')); // char suffix
     assert("hello".starts_with(some('h'))); // some(char) -> "h"
-    assert("hello".starts_with(none));      // none -> "" always matches
+    assert("hello".starts_with(none)); // none -> "" always matches
     assert("hello".ends_with(none));
 
     // A heap view receiver (slice of a long string > 7 bytes).
     let v = "hello, world!"[7..]; // "world!"
     assert(v.starts_with("wor"));
     assert(v.ends_with("!"));
-    assert(v.ends_with('!'));               // char on a view receiver
+    assert(v.ends_with('!')); // char on a view receiver
 
     assert(is_dotfile(".bashrc"));
     assert(!is_dotfile("README"));

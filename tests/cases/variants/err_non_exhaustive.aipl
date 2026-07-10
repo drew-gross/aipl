@@ -3,19 +3,14 @@ import { *, print, to_str } from builtins;
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
 // A `match` must cover every case of the variant.
-fn area(s: Shape) -> i64 {
-    match (s) {
-        Circle(r) => r * r,
-        Empty => 0,
-    }
-}
+fn area(s: Shape) -> i64 { match (s) { Circle(r) => r * r, Empty => 0 } }
 
 fn main() !prints {
     print(to_str(area(Empty)));
 }
 --- errors ---
 error: non-exhaustive match: missing Rect
- --> ./tests/cases/variants/err_non_exhaustive.aipl:7:12
+ --> ./tests/cases/variants/err_non_exhaustive.aipl:6:35
   |
-7 |     match (s) {
-  |            ^^^^
+6 | fn area(s: Shape) -> i64 { match (s) { Circle(r) => r * r, Empty => 0 } }
+  |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

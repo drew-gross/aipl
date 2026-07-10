@@ -26,6 +26,27 @@ check — targeted runs alone can miss regressions in unrelated areas.
 Run `cargo fmt` at the end of every task, before handing the change back.
 The pre-handoff sequence is: full `cargo test`, then `cargo fmt`.
 
+## AIPL source formatting (`aipl fmt`)
+Every checked-in `.aipl` file (outside the formatter's own `tests/fmt/`
+fixtures) must be in canonical format — the `all_aipl_files_stay_formatted`
+test in `tests/fmt.rs` enforces it over `tests/cases/`, `crates/`, `examples/`,
+and `tests/ffi_fixtures/`. So a **new or edited `.aipl` file must be formatted**:
+run `aipl fmt <file>` (in place; `--check` reports without writing), or reformat
+the whole corpus at once with the author helper
+`cargo test --test fmt -- --ignored format_corpus`.
+
+The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
+(gofmt-style — it decides line breaks; width defaults to 100) and works off the
+lexer token stream, so it preserves comments/literals verbatim and leaves
+trailing `--- section ---` blocks byte-for-byte. Because it is span-driven,
+reformatting shifts spans and therefore invalidates the usual downstream
+artifacts — treat a corpus reformat like any span-shifting change: refill
+`--- performance ---`/`--- errors ---`/`--- check ---` sections with
+`fill_expected` afterward (the checked-in `dogfood.clif` is renumbered and
+stays stable, so it normally needs no regeneration — the `checked_in_ir_is_current`
+test will tell you if it does). Fixture files under `tests/fmt/*.aipl` are
+*intentionally* misformatted inputs and are exempt from the enforcement test.
+
 ## Performance monitoring (non-deterministic)
 Two separate perf tracks:
 - **Deterministic, asserted**: the per-case `--- performance ---` sections

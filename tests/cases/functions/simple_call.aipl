@@ -1,7 +1,9 @@
 import { wrapping_add as +, == } from builtins;
+
 fn add(x: i64, y: i64) -> i64 { x + y }.test({
     assert(add(2, 3) == 5);
 })
+
 fn use_add() -> i64 { add(2, 3) }.test({
     assert(use_add() == 5);
 })

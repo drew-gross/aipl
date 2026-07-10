@@ -1,4 +1,5 @@
 import { wrapping_add as +, -, == } from builtins;
+
 // char[] iteration and bool[] indexing.
 fn count_h(cs: char[]) -> i64 {
     mut n = 0;
@@ -10,11 +11,9 @@ fn count_h(cs: char[]) -> i64 {
     assert(count_h(['h', 'i', 'h', 'o', 'h']) == 3);
     assert(count_h([]) == 0);
 })
+
 fn first_true(bs: bool[]) -> i64 {
-    match (bs[0]) {
-        some(v) => if (v) { 1 } else { 0 },
-        none => -1,
-    }
+    match (bs[0]) { some(v) => if (v) { 1 } else { 0 }, none => -1 }
 }.test({
     assert(first_true([true, false]) == 1);
     assert(first_true([false, true]) == 0);

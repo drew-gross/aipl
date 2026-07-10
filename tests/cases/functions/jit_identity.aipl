@@ -1,4 +1,5 @@
 import { wrapping_add as +, -, == } from builtins;
+
 fn id(x: i64) -> i64 { x }.test({
     assert(id(7) == 7);
     assert(id(-3) == -3);

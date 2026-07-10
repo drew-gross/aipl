@@ -4,7 +4,9 @@
 import { print } from builtins;
 import { to_str } from builtins;
 
-fn main() !prints { print(to_str(1)); }
+fn main() !prints {
+    print(to_str(1));
+}
 --- errors ---
 error: duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`
  --> ./tests/cases/imports/err_duplicate_import_source.aipl:5:24

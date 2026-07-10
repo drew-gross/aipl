@@ -12,11 +12,11 @@ fn sum(self: i64, others: i64*) -> i64 {
     total
 }.test({
     assert(1.sum([2, 3, 4]) == 10); // an array, as-is
-    assert(1.sum(2) == 3);          // a single element -> [2]
-    assert(1.sum(some(5)) == 6);    // some(v) -> [v]
-    assert(1.sum(none) == 1);       // none -> []
-    assert(1.sum([]) == 1);         // an explicit empty array
-    assert(sum(10, [1, 1]) == 12);  // the plain (non-method) call form
+    assert(1.sum(2) == 3); // a single element -> [2]
+    assert(1.sum(some(5)) == 6); // some(v) -> [v]
+    assert(1.sum(none) == 1); // none -> []
+    assert(1.sum([]) == 1); // an explicit empty array
+    assert(sum(10, [1, 1]) == 12); // the plain (non-method) call form
 })
 
 // `str*` is `str[]` — a variadic of heap elements, so the single-element call
@@ -29,10 +29,10 @@ fn joined(self: str, parts: str*) -> str {
     }
     s
 }.test({
-    assert(joined("a", "b") == "ab");         // single str -> ["b"]
+    assert(joined("a", "b") == "ab"); // single str -> ["b"]
     assert(joined("a", ["b", "c"]) == "abc"); // a str[], as-is
-    assert(joined("x", some("y")) == "xy");   // some("y") -> ["y"]
-    assert(joined("x", none) == "x");         // none -> []
+    assert(joined("x", some("y")) == "xy"); // some("y") -> ["y"]
+    assert(joined("x", none) == "x"); // none -> []
 })
 --- performance ---
 allocations: 14

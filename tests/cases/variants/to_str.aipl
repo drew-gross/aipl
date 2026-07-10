@@ -8,17 +8,17 @@ struct P { x: i64, y: i64 }
 variant V = I(i64) | S(str) | Arr(i64[]) | Opt(i64?) | Pt(P) | Nil
 
 fn main() !prints {
-    print(to_str(I(5)));                  // I(5)
-    print(to_str(S("hi")));               // S("hi")
-    print(to_str(Arr([1, 2, 3])));        // Arr([1, 2, 3])
-    print(to_str(Opt(some(7))));          // Opt(some(7))
-    print(to_str(Opt(none)));             // Opt(none)
-    print(to_str(Pt(P { x: 1, y: 2 })));  // Pt(P { x: 1, y: 2 })
-    print(to_str(Nil));                   // Nil
+    print(to_str(I(5))); // I(5)
+    print(to_str(S("hi"))); // S("hi")
+    print(to_str(Arr([1, 2, 3]))); // Arr([1, 2, 3])
+    print(to_str(Opt(some(7)))); // Opt(some(7))
+    print(to_str(Opt(none))); // Opt(none)
+    print(to_str(Pt(P { x: 1, y: 2 }))); // Pt(P { x: 1, y: 2 })
+    print(to_str(Nil)); // Nil
 
     // And nested inside other composites.
-    print(to_str(some(I(9))));            // some(I(9))
-    print(to_str([I(1), Nil, S("z")]));   // [I(1), Nil, S("z")]
+    print(to_str(some(I(9)))); // some(I(9))
+    print(to_str([I(1), Nil, S("z")])); // [I(1), Nil, S("z")]
 }
 --- stdout ---
 I(5)

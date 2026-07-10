@@ -1,4 +1,5 @@
 import { wrapping_add as +, ==, print, to_str } from builtins;
+
 // A slice of a long (heap) string whose result is > 7 bytes shares the source's
 // buffer as a *view*. A view is still a plain `str`: it prints, renders with
 // `to_str`, iterates with `for`, concatenates, compares, and re-slices — and its

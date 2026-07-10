@@ -1,4 +1,4 @@
-import { join, split, == } from builtins;
+import { ==, join, split } from builtins;
 
 // `join(parts, sep)` concatenates the parts with `sep` *between* consecutive
 // elements — none before the first or after the last. `[]` -> `""`, `[x]` -> `x`.

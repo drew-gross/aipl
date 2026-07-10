@@ -1,6 +1,8 @@
-import { ==, !=, ! } from builtins;
+import { !, !=, == } from builtins;
+
 // Structs compare field by field (recursing into heap fields like str).
 struct Point { x: i64, y: i64 }
+
 struct Named { id: i64, name: str }
 
 fn eq_point(a: Point, b: Point) -> bool { a == b }.test({

@@ -1,20 +1,14 @@
 import { ==, print } from builtins;
 
 // A repeated string-literal arm is dead code.
-fn label(s: str) -> str {
-    match (s) {
-        "a" => "x",
-        "a" => "y",
-        _ => "z",
-    }
-}
+fn label(s: str) -> str { match (s) { "a" => "x", "a" => "y", _ => "z" } }
 
 fn main() !prints {
     print(label("a"));
 }
 --- errors ---
 error: duplicate "a" arm
- --> ./tests/cases/strings/err_match_duplicate.aipl:7:9
+ --> ./tests/cases/strings/err_match_duplicate.aipl:4:51
   |
-7 |         "a" => "y",
-  |         ^^^
+4 | fn label(s: str) -> str { match (s) { "a" => "x", "a" => "y", _ => "z" } }
+  |                                                   ^^^

@@ -1,19 +1,14 @@
 import { print, to_str } from builtins;
 
 // An array match is open-domain, so it must end with a `_` default arm.
-fn code(xs: i64[]) -> i64 {
-    match (xs) {
-        [1, 2] => 1,
-        [3, 4] => 2,
-    }
-}
+fn code(xs: i64[]) -> i64 { match (xs) { [1, 2] => 1, [3, 4] => 2 } }
 
 fn main() !prints {
     print(to_str(code([1, 2])));
 }
 --- errors ---
 error: non-exhaustive match on an array: add a `_` arm
- --> ./tests/cases/arrays/err_match_non_exhaustive.aipl:5:12
+ --> ./tests/cases/arrays/err_match_non_exhaustive.aipl:4:36
   |
-5 |     match (xs) {
-  |            ^^^^^
+4 | fn code(xs: i64[]) -> i64 { match (xs) { [1, 2] => 1, [3, 4] => 2 } }
+  |                                    ^^^^^^^^^^^^^^^^^^^^

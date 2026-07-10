@@ -1,9 +1,11 @@
 import { wrapping_add as + } from builtins;
+
 fn add(x: i64, y: i64) -> i64 { x + y }
+
 fn main() -> i64 { add(1) }
 --- errors ---
 error: fn "add" expects 2 arg(s), got 1
- --> ./tests/cases/functions/err_arity_mismatch.aipl:3:20
+ --> ./tests/cases/functions/err_arity_mismatch.aipl:5:20
   |
-3 | fn main() -> i64 { add(1) }
+5 | fn main() -> i64 { add(1) }
   |                    ^^^^^

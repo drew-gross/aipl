@@ -1,6 +1,7 @@
-import { wrapping_add as +, print, to_str, push } from builtins;
+import { wrapping_add as +, print, push, to_str } from builtins;
 
 struct Point { x: i64, y: i64 }
+
 struct Named { id: i64, label: str }
 
 // Arrays of structs: elements are stored inline at the struct's size. A struct
@@ -9,19 +10,19 @@ struct Named { id: i64, label: str }
 fn main() !prints {
     // Scalar-field structs: literal, to_str, index (→ Point?), iteration.
     let pts = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
-    print(to_str(pts));        // [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
-    print(to_str(pts[1]));     // some(Point { x: 3, y: 4 })
+    print(to_str(pts)); // [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
+    print(to_str(pts[1])); // some(Point { x: 3, y: 4 })
     mut sx = 0;
     for (let p : pts) {
         set sx = sx + p.x;
     }
-    print(to_str(sx));         // 4
+    print(to_str(sx)); // 4
 
     // Heap-field structs (`str`): exercises the generated per-struct element
     // drop/retain — a leak or double-free would unbalance the alloc counts.
     mut ns = [Named { id: 1, label: "a" }];
     ns.push(Named { id: 2, label: "bb" });
-    print(to_str(ns));         // [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
+    print(to_str(ns)); // [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
 }
 --- stdout ---
 [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]

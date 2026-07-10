@@ -1,5 +1,7 @@
 import { == } from builtins;
+
 fn a(s: str) -> str { s }
+
 fn b(s: str) -> str { a(s) }.test({
     assert(b("threaded") == "threaded");
 })

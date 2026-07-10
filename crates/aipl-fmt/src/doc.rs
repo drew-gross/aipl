@@ -206,9 +206,13 @@ fn fits(budget: usize, candidate: &Doc, rest: &[(usize, Mode, &Doc)]) -> bool {
                     // it simply ends the line.
                     return mode != Mode::Flat;
                 }
-                // Measure nested groups flat — the standard (slightly
-                // pessimistic) one-line lookahead.
-                stack.push((Mode::Flat, inner));
+                // Inherit the ambient mode: a group nested inside the flat
+                // candidate is measured flat, but a group encountered in the
+                // *following* content keeps its own (broken) mode, so its next
+                // line break ends this fit scan. Forcing every such group flat
+                // would wrongly count a long, independently-breaking sibling
+                // (e.g. the function body after a signature) against the line.
+                stack.push((mode, inner));
             }
             Doc::IfBroken(s) => {
                 if mode == Mode::Break {

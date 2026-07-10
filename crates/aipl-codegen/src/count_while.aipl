@@ -1,9 +1,11 @@
-import { ++, ==, <=, ! } from builtins;
+import { !, ++, <=, == } from builtins;
 
 pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> i64 {
     mut n = 0;
     for (let x : self) {
-        if (!pred(x)) { return n; };
+        if (!pred(x)) {
+            return n;
+        };
         set n++;
     }
     n

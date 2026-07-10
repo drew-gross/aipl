@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, to_str, push } from builtins;
+import { wrapping_add as +, ==, push, to_str } from builtins;
 
 // A higher-order *method*: its first parameter is `self`, so it's callable as
 // `xs.tag(..)`. Method-call form is specialized for the lambda just like the
@@ -11,8 +11,8 @@ fn tag(self: i64[], f: (i64) -> str) -> str[] {
     out
 }.test({
     let xs = [1, 2, 3];
-    assert(tag(xs, |x| to_str(x)) == ["1", "2", "3"]);  // function-call form
-    assert(xs.tag(|x| to_str(x)) == ["1", "2", "3"]);   // method-call form
+    assert(tag(xs, |x| to_str(x)) == ["1", "2", "3"]); // function-call form
+    assert(xs.tag(|x| to_str(x)) == ["1", "2", "3"]); // method-call form
     // A capture works in method form too.
     let suffix = 100;
     assert(xs.tag(|x| to_str(x + suffix)) == ["101", "102", "103"]);

@@ -1,14 +1,12 @@
 import { wrapping_add as +, -, == } from builtins;
-fn is_even(n: i64) -> i64 {
-    if (n == 0) { 1 } else { is_odd(n - 1) }
-}.test({
+
+fn is_even(n: i64) -> i64 { if (n == 0) { 1 } else { is_odd(n - 1) } }.test({
     assert(is_even(0) == 1);
     assert(is_even(7) == 0);
     assert(is_even(100) == 1);
 })
-fn is_odd(n: i64) -> i64 {
-    if (n == 0) { 0 } else { is_even(n - 1) }
-}.test({
+
+fn is_odd(n: i64) -> i64 { if (n == 0) { 0 } else { is_even(n - 1) } }.test({
     assert(is_odd(7) == 1);
 })
 --- performance ---

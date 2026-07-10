@@ -1,16 +1,12 @@
 // Matching a result must be exhaustive: both `ok` and `err` arms are required.
-fn miss(r: i64!str) -> i64 {
-    match (r) {
-        ok(v) => v,
-    }
-}
+fn miss(r: i64!str) -> i64 { match (r) { ok(v) => v } }
 
 fn main() {
     miss(ok(1));
 }
 --- errors ---
 error: non-exhaustive match: missing err
- --> ./tests/cases/results/err_match_missing_arm.aipl:3:12
+ --> ./tests/cases/results/err_match_missing_arm.aipl:2:37
   |
-3 |     match (r) {
-  |            ^^^^
+2 | fn miss(r: i64!str) -> i64 { match (r) { ok(v) => v } }
+  |                                     ^^^^^^^

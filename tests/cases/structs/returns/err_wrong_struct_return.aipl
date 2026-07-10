@@ -2,6 +2,7 @@
 // different struct is a compile error — without the check the sret copy
 // would read `Point`'s fields out of a `Color`-shaped value.
 struct Point { x: i64, y: i64 }
+
 struct Color { r: i64, g: i64, b: i64 }
 
 fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
@@ -12,7 +13,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: fn "make": body returns Color, but the declared return type is Point
- --> ./tests/cases/structs/returns/err_wrong_struct_return.aipl:7:22
+ --> ./tests/cases/structs/returns/err_wrong_struct_return.aipl:8:22
   |
-7 | fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
+8 | fn make() -> Point { Color { r: 1, g: 2, b: 3 } }
   |                      ^^^^^^^^^^^^^^^^^^^^^^^^

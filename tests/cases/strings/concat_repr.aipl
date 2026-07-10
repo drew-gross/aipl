@@ -1,4 +1,5 @@
-import { wrapping_add as +, ==, print, len, to_str } from builtins;
+import { wrapping_add as +, ==, len, print, to_str } from builtins;
+
 // Every `str + str` builds the *concatenated-string* representation — a lazy
 // rope of two str pointers, materialized (and memoized) only when its bytes are
 // first read. To the source it is just a `str`: it prints, measures with `len`,
@@ -6,9 +7,7 @@ import { wrapping_add as +, ==, print, len, to_str } from builtins;
 // a `str` parameter. Passing a concat value to a `str` parameter also selects a
 // distinct, concat-specialized monomorphization of the callee (here `label`).
 
-fn label(s: str) -> str {
-    "[" + s + "]"
-}
+fn label(s: str) -> str { "[" + s + "]" }
 
 fn main() !prints {
     let g = "foo" + "bar"; // a concat node ("foobar")

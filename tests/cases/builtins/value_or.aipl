@@ -1,16 +1,15 @@
 import { ==, value_or } from builtins;
+
 // The `value_or` builtin unwraps an optional, falling back to a default.
 // Works as a method (`opt.value_or(d)`) or a free call (`value_or(opt, d)`),
 // over any optional element type.
 
-fn first_char(s: str) -> char {
-    s[0].value_or('?')
-}.test({
+fn first_char(s: str) -> char { s[0].value_or('?') }.test({
     assert(first_char("hello") == 'h');
     assert(first_char("") == '?');
-    assert(some(7).value_or(0) == 7);       // present -> 7
-    assert(none.value_or(35) == 35);        // absent  -> 35
-    assert(value_or(some(5), 9) == 5);      // free-fn form -> 5
+    assert(some(7).value_or(0) == 7); // present -> 7
+    assert(none.value_or(35) == 35); // absent  -> 35
+    assert(value_or(some(5), 9) == 5); // free-fn form -> 5
 })
 --- performance ---
 allocations: 0

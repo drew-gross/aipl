@@ -1,8 +1,9 @@
 import { wrapping_add as + } from builtins;
+
 fn main() -> i64 { if (true + false) { 1 } else { 2 } }
 --- errors ---
 error: arithmetic operand: expected i64, got bool
- --> ./tests/cases/arithmetic/err_arith_on_bool.aipl:2:24
+ --> ./tests/cases/arithmetic/err_arith_on_bool.aipl:3:24
   |
-2 | fn main() -> i64 { if (true + false) { 1 } else { 2 } }
+3 | fn main() -> i64 { if (true + false) { 1 } else { 2 } }
   |                        ^^^^

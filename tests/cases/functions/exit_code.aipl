@@ -1,6 +1,4 @@
-fn main() -> i64 {
-    42
-}
+fn main() -> i64 { 42 }
 --- exit code ---
 42
 --- performance ---

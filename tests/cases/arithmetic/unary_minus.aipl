@@ -1,4 +1,5 @@
 import { wrapping_add as +, -, == } from builtins;
+
 fn neg(x: i64) -> i64 { -x }.test({
     assert(neg(5) == -5);
     assert(neg(-7) == 7);

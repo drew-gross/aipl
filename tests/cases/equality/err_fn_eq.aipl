@@ -1,16 +1,14 @@
 import { ==, print } from builtins;
 
 // Function values have no runtime identity — equality on them is rejected.
-fn apply(f: (i64) -> i64) -> bool {
-    f == f
-}
+fn apply(f: (i64) -> i64) -> bool { f == f }
 
 fn main() {
     print("unreachable");
 }
 --- errors ---
 error: "==" is not supported for function values
- --> ./tests/cases/equality/err_fn_eq.aipl:5:5
+ --> ./tests/cases/equality/err_fn_eq.aipl:4:37
   |
-5 |     f == f
-  |     ^^^^^^
+4 | fn apply(f: (i64) -> i64) -> bool { f == f }
+  |                                     ^^^^^^

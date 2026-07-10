@@ -1,17 +1,16 @@
 import { < } from builtins;
+
 // Discarding a result as a bare statement silently drops its possible error,
 // which is a compile error: it must be handled (match on it, propagate with
 // `?`, or bind it with `let`).
-fn might_fail(n: i64) -> i64!str {
-    if (n < 0) { err("negative") } else { ok(n) }
-}
+fn might_fail(n: i64) -> i64!str { if (n < 0) { err("negative") } else { ok(n) } }
 
 fn main() {
     might_fail(5);
 }
 --- errors ---
 error: this result is discarded, ignoring its possible error; handle it with `match` or propagate it with `?`
-  --> ./tests/cases/results/err_ignored_result.aipl:10:5
-   |
-10 |     might_fail(5);
-   |     ^^^^^^^^^^^^
+ --> ./tests/cases/results/err_ignored_result.aipl:9:5
+  |
+9 |     might_fail(5);
+  |     ^^^^^^^^^^^^

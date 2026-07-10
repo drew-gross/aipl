@@ -1,4 +1,4 @@
-import { print, to_str, enumerate } from builtins;
+import { enumerate, print, to_str } from builtins;
 
 fn main() !prints {
     let words = ["zero", "one", "two"];

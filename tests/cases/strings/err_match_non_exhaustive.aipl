@@ -1,19 +1,14 @@
 import { ==, print } from builtins;
 
 // A `str` match is open-domain, so it must end with a `_` default arm.
-fn label(s: str) -> str {
-    match (s) {
-        "a" => "x",
-        "b" => "y",
-    }
-}
+fn label(s: str) -> str { match (s) { "a" => "x", "b" => "y" } }
 
 fn main() !prints {
     print(label("a"));
 }
 --- errors ---
 error: non-exhaustive match on a str: add a `_` arm
- --> ./tests/cases/strings/err_match_non_exhaustive.aipl:5:12
+ --> ./tests/cases/strings/err_match_non_exhaustive.aipl:4:34
   |
-5 |     match (s) {
-  |            ^^^^
+4 | fn label(s: str) -> str { match (s) { "a" => "x", "b" => "y" } }
+  |                                  ^^^^^^^^^^^^^^^^^^^^

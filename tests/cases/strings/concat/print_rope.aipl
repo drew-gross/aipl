@@ -1,4 +1,5 @@
 import { wrapping_add as +, print } from builtins;
+
 // Printing a rope streams its leaves straight to stdout without materializing,
 // so no flattened buffer is allocated even when the result exceeds the inline
 // (<= 7 byte) limit. The only heap here is the concat node itself: `allocations`

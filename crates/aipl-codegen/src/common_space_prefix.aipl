@@ -1,7 +1,7 @@
 // A dogfooded helper, no longer wired in (the raw-string de-denter moved to the
 // dogfooded `dedent`); kept as a well-tested example. Returns a *length* rather
 // than a slice deliberately — AIPL has no substring operator.
-import { wrapping_add as +, ==, && } from builtins;
+import { &&, wrapping_add as +, == } from builtins;
 
 pub fn common_space_prefix(a: str, b: str) -> i64 {
     // Walk forward while both strings still have a space at index `i`. `s[i]`
@@ -26,6 +26,7 @@ letter ends the count).
     // The shorter run bounds the prefix.
     assert(common_space_prefix("  ", "      ") == 2);
     assert(common_space_prefix("      ", "  ") == 2);
+
     // A non-space byte ends the count, even when the bytes match: tabs and
     // letters are not spaces, so a leading tab or a shared word yields 0.
     assert(common_space_prefix("\t\t", "\t\t") == 0);

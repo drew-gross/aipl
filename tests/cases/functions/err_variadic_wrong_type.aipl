@@ -2,16 +2,14 @@ import { wrapping_add as + } from builtins;
 
 // A variadic `i64*` parameter accepts an `i64`, an `i64[]`, or an `i64?` — but
 // not an unrelated type. A `bool` argument fits none of those forms.
-fn sum(self: i64, others: i64*) -> i64 {
-    self
-}
+fn sum(self: i64, others: i64*) -> i64 { self }
 
 fn main() {
     let _ = 1.sum(true);
 }
 --- errors ---
 error: fn "sum" arg 1: variadic parameter expects i64[], i64, or i64?, got bool
-  --> ./tests/cases/functions/err_variadic_wrong_type.aipl:10:19
-   |
-10 |     let _ = 1.sum(true);
-   |                   ^^^^
+ --> ./tests/cases/functions/err_variadic_wrong_type.aipl:8:19
+  |
+8 |     let _ = 1.sum(true);
+  |                   ^^^^

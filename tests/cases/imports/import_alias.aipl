@@ -5,8 +5,8 @@ import { print, to_str as show } from builtins;
 import { helper as double, greeting } from "./util.aipl";
 
 fn main() !prints {
-    print(show(double(21)));   // double = util's `helper`; show = to_str
-    print(greeting());         // imported under its own name, alongside aliases
+    print(show(double(21))); // double = util's `helper`; show = to_str
+    print(greeting()); // imported under its own name, alongside aliases
 }
 --- file: util.aipl ---
 import { * } from builtins;

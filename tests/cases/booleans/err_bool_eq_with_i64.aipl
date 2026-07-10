@@ -1,8 +1,9 @@
 import { == } from builtins;
+
 fn main() -> i64 { if (true == 1) { 1 } else { 2 } }
 --- errors ---
 error: "==" between bool and i64: both sides must be the same type
- --> ./tests/cases/booleans/err_bool_eq_with_i64.aipl:2:24
+ --> ./tests/cases/booleans/err_bool_eq_with_i64.aipl:3:24
   |
-2 | fn main() -> i64 { if (true == 1) { 1 } else { 2 } }
+3 | fn main() -> i64 { if (true == 1) { 1 } else { 2 } }
   |                        ^^^^^^^^^

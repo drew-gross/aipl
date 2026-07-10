@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 fn pick(c: bool) -> i64 { if (c) { 1 } else { 2 } }.test({
     assert(pick(true) == 1);
     assert(pick(false) == 2);

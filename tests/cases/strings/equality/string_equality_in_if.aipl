@@ -1,7 +1,6 @@
 import { wrapping_add as +, == } from builtins;
-fn classify(s: str) -> i64 {
-    if (s == "hello") { 1 } else { 0 }
-}.test({
+
+fn classify(s: str) -> i64 { if (s == "hello") { 1 } else { 0 } }.test({
     assert(classify("hello") == 1);
     assert(classify("world") == 0);
 })

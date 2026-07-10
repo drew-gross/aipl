@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, &&, print, to_str } from builtins;
+import { &&, wrapping_add as +, ==, print, to_str } from builtins;
 
 // A result's Ok/Err payload may be a struct (in addition to scalar/str/unit):
 // `elem_size_of`/`store_array_elem`/`emit_rc` already size, copy, and refcount
@@ -14,10 +14,7 @@ fn parse(valid: bool) -> Point!str {
         ok(p) => assert(p.x == 1 && p.y == 2 && p.label == "hi"),
         err(e) => assert(false),
     };
-    match (parse(false)) {
-        ok(p) => assert(false),
-        err(e) => assert(e == "bad point"),
-    };
+    match (parse(false)) { ok(p) => assert(false), err(e) => assert(e == "bad point") };
 })
 
 fn main() !prints {
@@ -25,10 +22,7 @@ fn main() !prints {
         ok(p) => print(to_str(p.x) + "," + to_str(p.y) + "," + p.label),
         err(e) => print("err: " + e),
     };
-    match (parse(false)) {
-        ok(p) => print("ok"),
-        err(e) => print("err: " + e),
-    };
+    match (parse(false)) { ok(p) => print("ok"), err(e) => print("err: " + e) };
 }
 --- stdout ---
 1,2,hi

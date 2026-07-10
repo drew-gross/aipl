@@ -1,6 +1,8 @@
 // Mutually recursive defaults can never be fully filled in.
 fn f(a: i64 = g()) -> i64 { a }
+
 fn g(b: i64 = f()) -> i64 { b }
+
 fn main() -> i64 { f() }
 --- errors ---
 error: cycle in keyword-parameter defaults: f -> g -> f

@@ -1,4 +1,4 @@
-import { print, to_str, read_file_to_string } from builtins;
+import { print, read_file_to_string, to_str } from builtins;
 
 // `read_file_to_string` has the `!read_files` effect; a caller that doesn't
 // declare it is rejected.

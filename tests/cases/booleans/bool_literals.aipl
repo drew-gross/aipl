@@ -1,7 +1,9 @@
 import { == } from builtins;
+
 fn t() -> bool { true }.test({
     assert(t() == true);
 })
+
 fn f() -> bool { false }.test({
     assert(f() == false);
 })

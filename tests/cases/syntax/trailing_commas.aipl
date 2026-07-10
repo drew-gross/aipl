@@ -1,25 +1,14 @@
 import { wrapping_add as +, == } from builtins;
+
 // Trailing commas are accepted in params, struct fields, struct literal
 // field inits, and call args.
-struct Point {
-    x: i64,
-    y: i64,
-}
-fn add(
-    a: i64,
-    b: i64,
-) -> i64 {
-    a + b
-}
+struct Point { x: i64, y: i64 }
+
+fn add(a: i64, b: i64) -> i64 { a + b }
+
 fn sum_point() -> i64 {
-    let p = Point {
-        x: 30,
-        y: 12,
-    };
-    add(
-        p.x,
-        p.y,
-    )
+    let p = Point { x: 30, y: 12 };
+    add(p.x, p.y)
 }.test({
     assert(sum_point() == 42);
 })

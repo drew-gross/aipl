@@ -2,11 +2,13 @@ import { print } from builtins;
 
 // Interior blank lines are preserved (and don't affect the common indent).
 fn main() !prints -> i64 {
-    print("""
+    print(
+        """
       first
 
       second
-    """);
+    """,
+    );
     0
 }
 --- stdout ---

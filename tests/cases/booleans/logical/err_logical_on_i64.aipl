@@ -1,8 +1,9 @@
 import { && } from builtins;
+
 fn main() -> i64 { if (1 && 2) { 1 } else { 2 } }
 --- errors ---
 error: logical operand: expected bool, got i64
- --> ./tests/cases/booleans/logical/err_logical_on_i64.aipl:2:24
+ --> ./tests/cases/booleans/logical/err_logical_on_i64.aipl:3:24
   |
-2 | fn main() -> i64 { if (1 && 2) { 1 } else { 2 } }
+3 | fn main() -> i64 { if (1 && 2) { 1 } else { 2 } }
   |                        ^

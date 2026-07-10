@@ -1,4 +1,4 @@
-import { ==, ++ } from builtins;
+import { ++, == } from builtins;
 
 // A `str` is implicitly usable as `char[]`: passing a string to a generic `T[]`
 // parameter infers `T = char` and materializes the string's bytes into a real
@@ -7,15 +7,17 @@ import { ==, ++ } from builtins;
 fn count_eq<T: any>(self: T[], target: T) -> i64 {
     mut n = 0;
     for (let x : self) {
-        if (x == target) { set n++; };
+        if (x == target) {
+            set n++;
+        };
     }
     n
 }.test({
-    assert(count_eq([1, 2, 2, 3], 2) == 2);      // i64[] — unaffected
+    assert(count_eq([1, 2, 2, 3], 2) == 2); // i64[] — unaffected
     assert(count_eq(['a', 'b', 'a'], 'a') == 2); // char[] directly
-    assert(count_eq("banana", 'a') == 3);        // str used as char[]
-    assert(count_eq("  x ", ' ') == 3);          // byte values preserved
-    assert(count_eq("", 'z') == 0);              // empty string
+    assert(count_eq("banana", 'a') == 3); // str used as char[]
+    assert(count_eq("  x ", ' ') == 3); // byte values preserved
+    assert(count_eq("", 'z') == 0); // empty string
 })
 --- performance ---
 allocations: 2

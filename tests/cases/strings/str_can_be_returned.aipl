@@ -1,4 +1,5 @@
 import { == } from builtins;
+
 fn greet() -> str { "hello" }.test({
     assert(greet() == "hello");
 })

@@ -1,4 +1,4 @@
-import { print, to_str, push } from builtins;
+import { print, push, to_str } from builtins;
 
 // Allocation accounting doubles as a leak/double-free check: a refcount-correct
 // program frees everything it allocates, so allocations == deallocations. The

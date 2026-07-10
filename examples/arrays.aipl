@@ -22,9 +22,7 @@ fn sum(xs: i64[]) -> i64 {
 // Build `[1, 2, ..., n]` by repeated push, starting from the empty
 // array. Recurses since the only loop form iterates an existing
 // sequence.
-fn range(n: i64) -> i64[] {
-    fill([], 1, n)
-}
+fn range(n: i64) -> i64[] { fill([], 1, n) }
 
 fn fill(acc: i64[], i: i64, n: i64) -> i64[] {
     if (i > n) {

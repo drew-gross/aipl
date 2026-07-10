@@ -7,41 +7,31 @@ import { -, print, to_str } from builtins;
 
 // `T??` parameter: unwrap two levels.
 fn unwrap2(x: i64??) -> i64 {
-    match (x) {
-        some(inner) => match (inner) {
-            some(v) => v,
-            none => -1,
-        },
-        none => -2,
-    }
+    match (x) { some(inner) => match (inner) { some(v) => v, none => -1 }, none => -2 }
 }
 
 // `T??` return type (built and handed back via sret).
-fn wrap2(v: i64) -> i64?? {
-    some(some(v))
-}
+fn wrap2(v: i64) -> i64?? { some(some(v)) }
 
 // `str??` parameter and return — a heap inner threaded through the ABI.
-fn echo2(s: str??) -> str?? {
-    s
-}
+fn echo2(s: str??) -> str?? { s }
 
 fn main() !prints {
     // `T??` as a local variable.
     let a = some(some(1));
-    print(to_str(a));                       // some(some(1))
+    print(to_str(a)); // some(some(1))
 
     // `T??` as a function argument.
-    print(to_str(unwrap2(some(some(7)))));  // 7
-    print(to_str(unwrap2(none)));           // -2   (outer none)
+    print(to_str(unwrap2(some(some(7))))); // 7
+    print(to_str(unwrap2(none))); // -2   (outer none)
 
     // `T??` as a function return (sret), and round-tripped through both.
-    print(to_str(wrap2(5)));                // some(some(5))
-    print(to_str(unwrap2(wrap2(9))));       // 9
+    print(to_str(wrap2(5))); // some(some(5))
+    print(to_str(unwrap2(wrap2(9)))); // 9
 
     // `T???` — triple-nested optional, as a local.
     let t = some(some(some(42)));
-    print(to_str(t));                       // some(some(some(42)))
+    print(to_str(t)); // some(some(some(42)))
 
     // `str??` argument + return — heap inner through the ABI (alloc balance).
     print(to_str(echo2(some(some("hi"))))); // some(some("hi"))

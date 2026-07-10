@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 // A for-loop body needn't end in an expression — its value is discarded,
 // so no trailing `0` is required. The first loop is statement-only; the
 // second has an empty body (a no-op iteration).
@@ -7,8 +8,7 @@ fn count(s: str) -> i64 {
     for (let c : s) {
         set n = n + 1;
     }
-    for (let c : "ignored") {
-    }
+    for (let c : "ignored") {}
     n
 }.test({
     assert(count("hello") == 5);

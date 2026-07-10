@@ -1,8 +1,6 @@
 // Stage 1: the narrow integer types work as scalar values, but aren't stored in
 // composites (arrays/structs/optionals) yet — that's a later stage.
-fn f(xs: i32[]) -> i64 {
-    0
-}
+fn f(xs: i32[]) -> i64 { 0 }
 
 fn main() {
     f([]);

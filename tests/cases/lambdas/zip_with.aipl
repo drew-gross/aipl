@@ -2,11 +2,9 @@
 // Haskell's zipWith / Python's `map(f, zip(a, b))`. The pairing function can be
 // an operator passed as a value (`+`), a lambda, or a named function. The
 // result runs to the shorter input (Python `zip` semantics).
-import { print, to_str, zip_with, wrapping_add as +, * } from builtins;
+import { *, wrapping_add as +, print, to_str, zip_with } from builtins;
 
-fn tagged(x: i64, y: i64) -> i64 {
-    x + y + 1000
-}
+fn tagged(x: i64, y: i64) -> i64 { x + y + 1000 }
 
 fn show(label: str, xs: i64[]) !prints {
     print(label);

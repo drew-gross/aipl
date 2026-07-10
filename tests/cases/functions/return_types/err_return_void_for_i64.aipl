@@ -2,6 +2,7 @@ import { print } from builtins;
 
 // `print` returns nothing (unit), so its result can't satisfy an `i64` return.
 fn f() !prints -> i64 { print("x") }
+
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns (), but the declared return type is i64

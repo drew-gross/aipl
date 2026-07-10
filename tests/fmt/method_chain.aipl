@@ -1,0 +1,32 @@
+import { filter, map, minimum, value_or, len, ==, !, <, wrapping_add as + } from builtins;
+fn f(some_long_receiver_name: i64[]) -> i64 {
+    // Short chain that fits stays on one line.
+    let a = some_long_receiver_name.len();
+    // A long member chain breaks before each call: the receiver ends up alone
+    // on the first line, each `.method(...)` on its own indented line.
+    let b = some_long_receiver_name.filter(|x| x < 100).map(|x| x + x + x + x).minimum().value_or(0);
+    // A single call whose args are long breaks the args, not a chain.
+    let c = one_call(1000000000, 2000000000, 3000000000, 4000000000, 5000000000);
+    a + b + c
+}
+fn one_call(a: i64, b: i64, c: i64, d: i64, e: i64) -> i64 { a }
+--- formatted ---
+import { !, wrapping_add as +, <, ==, filter, len, map, minimum, value_or } from builtins;
+
+fn f(some_long_receiver_name: i64[]) -> i64 {
+    // Short chain that fits stays on one line.
+    let a = some_long_receiver_name.len();
+
+    // A long member chain breaks before each call: the receiver ends up alone
+    // on the first line, each `.method(...)` on its own indented line.
+    let b = some_long_receiver_name
+        .filter(|x| x < 100)
+        .map(|x| x + x + x + x)
+        .minimum()
+        .value_or(0);
+    // A single call whose args are long breaks the args, not a chain.
+    let c = one_call(1000000000, 2000000000, 3000000000, 4000000000, 5000000000);
+    a + b + c
+}
+
+fn one_call(a: i64, b: i64, c: i64, d: i64, e: i64) -> i64 { a }

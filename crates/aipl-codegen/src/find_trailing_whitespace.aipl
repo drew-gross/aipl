@@ -5,7 +5,7 @@
 // first offending run, or `none` when there is none; `aipl_str_iter_next` walks
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
-import { wrapping_add as +, ==, ||, &&, -, >, is_some, Span } from builtins;
+import { &&, wrapping_add as +, -, ==, >, ||, Span, is_some } from builtins;
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'
@@ -25,11 +25,11 @@ fn line_end_span(prev: char, prev2: char, boundary: i64, ws_start: i64, line_sta
 }
 
 pub fn find_trailing_whitespace(src: str) -> Span? {
-    mut i = 0;             // index of the current byte `c`
-    mut prev = '\n';       // byte at i-1 (sentinel '\n': line start, not ws/CR)
-    mut prev2 = '\n';      // byte at i-2
-    mut ws_start = 0;      // start of the space/tab run ending at the last ws byte
-    mut line_start = 0;    // index of the current line's first byte
+    mut i = 0; // index of the current byte `c`
+    mut prev = '\n'; // byte at i-1 (sentinel '\n': line start, not ws/CR)
+    mut prev2 = '\n'; // byte at i-2
+    mut ws_start = 0; // start of the space/tab run ending at the last ws byte
+    mut line_start = 0; // index of the current line's first byte
     for (let c : src) {
         if (c == '\n') {
             // End of a line: return its trailing run if any. Returning on the first
@@ -58,7 +58,7 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
     assert(find_trailing_whitespace("") == none);
     assert(find_trailing_whitespace("clean") == none);
     assert(find_trailing_whitespace("a\nb\nc") == none);
-    assert(find_trailing_whitespace("a\n") == none);      // a newline alone isn't trailing ws
+    assert(find_trailing_whitespace("a\n") == none); // a newline alone isn't trailing ws
 
     // A trailing space/tab at end of input spans the run.
     assert(find_trailing_whitespace("oops ") == some(Span { start: 4, end: 5 }));

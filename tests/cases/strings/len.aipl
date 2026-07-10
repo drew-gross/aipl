@@ -1,4 +1,4 @@
-import { len, == } from builtins;
+import { ==, len } from builtins;
 
 // `len` on a string is its *byte* length. It works for every representation —
 // inline (<= 7 bytes), heap (>= 8), and a buffer-sharing view — and counts bytes,

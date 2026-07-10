@@ -1,4 +1,4 @@
-import { ==, <, - } from builtins;
+import { -, <, == } from builtins;
 
 // An `if` in statement position (its value discarded) may omit `else`. Its
 // `then` block must be unit-typed and the `if` itself yields unit, so it reads
@@ -16,11 +16,16 @@ fn sign(n: i64) -> i64 {
     assert(sign(-5) == -1);
     assert(sign(0) == 0);
     assert(sign(9) == 1);
+
     // An `else` after a nested `if` binds to that inner `if`, not the else-less
     // outer one (dangling-else resolves to the nearest `if`).
     mut s = 0;
     if (1 < 2) {
-        if (3 < 4) { set s = 1; } else { set s = 2; };
+        if (3 < 4) {
+            set s = 1;
+        } else {
+            set s = 2;
+        };
     };
     assert(s == 1);
 })

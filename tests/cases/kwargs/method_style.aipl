@@ -1,11 +1,13 @@
 import { wrapping_add as +, ==, print, to_str } from builtins;
+
 fn bumped(self: i64, by: i64 = 7) -> i64 { self + by }.test({
     assert(1.bumped() == 8);
-    assert(1.bumped(by = 2) == 3);
+    assert(1.bumped(by=2) == 3);
 })
+
 fn main() !prints {
     print(to_str(1.bumped()));
-    print(to_str(10.bumped(by = 2)));
+    print(to_str(10.bumped(by=2)));
 }
 --- stdout ---
 8

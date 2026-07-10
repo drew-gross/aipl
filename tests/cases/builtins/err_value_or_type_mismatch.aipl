@@ -1,12 +1,10 @@
 // The default passed to `value_or` must match the optional's element type.
 import { value_or } from builtins;
 
-fn main() -> i64 {
-    some(1).value_or('z')
-}
+fn main() -> i64 { some(1).value_or('z') }
 --- errors ---
 error: value_or default: expected i64, got char
- --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:5:22
+ --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:4:37
   |
-5 |     some(1).value_or('z')
-  |                      ^^^
+4 | fn main() -> i64 { some(1).value_or('z') }
+  |                                     ^^^

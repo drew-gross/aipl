@@ -1,9 +1,8 @@
-import { wrapping_add as +, -, ==, < } from builtins;
+import { wrapping_add as +, -, <, == } from builtins;
+
 // The `?` operator unwraps an `ok` in place and short-circuits an `err` by
 // returning it from the enclosing (result-returning) function.
-fn parse_pos(n: i64) -> i64!str {
-    if (n < 0) { err("negative") } else { ok(n) }
-}
+fn parse_pos(n: i64) -> i64!str { if (n < 0) { err("negative") } else { ok(n) } }
 
 // `?` chains: each step unwraps on ok, propagates the err otherwise. The
 // enclosing function's err type must match the propagated one (`str` here).
@@ -13,20 +12,12 @@ fn sum_pos(a: i64, b: i64) -> i64!str {
     ok(x + y)
 }
 
-fn unwrap_or(r: i64!str, d: i64) -> i64 {
-    match (r) {
-        ok(v) => v,
-        err(e) => d,
-    }
-}.test({
+fn unwrap_or(r: i64!str, d: i64) -> i64 { match (r) { ok(v) => v, err(e) => d } }.test({
     // Both ok → unwrapped sum.
     assert(unwrap_or(sum_pos(3, 4), -1) == 7);
 
     // First arg errors → that err is propagated, second step never runs.
-    match (sum_pos(-1, 4)) {
-        ok(v) => assert(false),
-        err(e) => assert(e == "negative"),
-    };
+    match (sum_pos(-1, 4)) { ok(v) => assert(false), err(e) => assert(e == "negative") };
 
     // Second arg errors → its err propagates.
     assert(unwrap_or(sum_pos(2, -9), -1) == -1);

@@ -4,9 +4,7 @@
 import { wrapping_add as + } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 
-fn main() -> i64 {
-    2 + 3
-}
+fn main() -> i64 { 2 + 3 }
 --- file: mymath.aipl ---
 import { wrapping_add as + } from builtins;
 pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }

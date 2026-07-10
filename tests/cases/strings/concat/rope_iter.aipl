@@ -1,4 +1,5 @@
 import { wrapping_add as +, ==, print, to_str } from builtins;
+
 // Iterating a rope's chars (`for c in s`) streams its leaves via a small
 // stack-allocated cursor — no flattened buffer. Building this 18-byte rope and
 // walking every char allocates only the concat node (1), never a materialized

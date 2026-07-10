@@ -1,4 +1,5 @@
 import { wrapping_add as +, <, == } from builtins;
+
 // `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
 // it before each pass. The counter is a `mut` declared before the loop; the
 // body reassigns it with `set`, and the change persists across iterations.

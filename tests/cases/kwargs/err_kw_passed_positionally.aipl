@@ -1,10 +1,11 @@
 // A keyword parameter is keyword-only: it cannot be filled by a positional
 // argument.
 fn f(a: i64, b: i64 = 1) -> i64 { a }
+
 fn main() -> i64 { f(1, 2) }
 --- errors ---
 error: fn "f" expects 1 positional arg(s), got 2 (its keyword parameter must be passed by keyword: "b")
- --> ./tests/cases/kwargs/err_kw_passed_positionally.aipl:4:20
+ --> ./tests/cases/kwargs/err_kw_passed_positionally.aipl:5:20
   |
-4 | fn main() -> i64 { f(1, 2) }
+5 | fn main() -> i64 { f(1, 2) }
   |                    ^^^^^^

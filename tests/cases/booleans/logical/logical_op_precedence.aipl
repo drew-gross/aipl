@@ -1,4 +1,5 @@
-import { ==, &&, || } from builtins;
+import { &&, ==, || } from builtins;
+
 // && binds tighter than ||: false || true && false = false || false = false
 fn prec() -> bool { false || true && false }.test({
     assert(prec() == false);

@@ -1,14 +1,12 @@
-import { ==, <=, >, !, all, filter } from builtins;
+import { !, <=, ==, >, all, filter } from builtins;
 
 // `arr.all(pred)` is true when every element satisfies `pred` (short-circuits at
 // the first that fails; an empty array is vacuously true). A higher-order
 // builtin like `filter`/`map`: the lambda is lifted, captures threaded through.
-fn positive(xs: i64[]) -> bool {
-    xs.all(|x| x > 0)
-}.test({
-    assert([2, 4, 6].all(|x| x <= 6));         // every element satisfies it
-    assert(![1, 2, 9].all(|x| x <= 5));        // 9 fails -> false
-    assert(all([5, 5], |x| x == 5));           // free-call form
+fn positive(xs: i64[]) -> bool { xs.all(|x| x > 0) }.test({
+    assert([2, 4, 6].all(|x| x <= 6)); // every element satisfies it
+    assert(![1, 2, 9].all(|x| x <= 5)); // 9 fails -> false
+    assert(all([5, 5], |x| x == 5)); // free-call form
     assert(['a', 'a', 'a'].all(|c| c == 'a')); // any comparable element type
     // Vacuously true on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(|x| x > 100).all(|x| x <= 0));
@@ -22,7 +20,7 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 340
 instructions executed: 690
-binary size: 6272
+binary size: 6264
 --- monomorphizations ---
 __all1
 __all11

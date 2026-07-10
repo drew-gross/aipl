@@ -1,4 +1,5 @@
-import { ==, !=, ! } from builtins;
+import { !, !=, == } from builtins;
+
 // Structural equality of optionals (including nesting and comparison to `none`).
 fn eq_opt(a: i64?, b: i64?) -> bool { a == b }.test({
     let a = some(5);
@@ -21,7 +22,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 195
-binary size: 2784
+binary size: 2792
 --- monomorphizations ---
 __test$eq_opt
 main

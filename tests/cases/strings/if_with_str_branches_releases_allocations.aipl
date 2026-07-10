@@ -1,9 +1,8 @@
 import { wrapping_add as +, == } from builtins;
+
 // Each branch allocates a fresh string; the merge value must hold
 // exactly one ref so the outer scope can dec safely.
-fn pick(c: bool) -> str {
-    if (c) { "left" + "" } else { "right" + "" }
-}.test({
+fn pick(c: bool) -> str { if (c) { "left" + "" } else { "right" + "" } }.test({
     assert(pick(true) == "left");
     assert(pick(false) == "right");
 })

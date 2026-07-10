@@ -1,6 +1,8 @@
 import { print, to_str } from builtins;
 
-fn main() !prints { print(to_str(42)); }
+fn main() !prints {
+    print(to_str(42));
+}
 --- stdout ---
 42
 --- performance ---

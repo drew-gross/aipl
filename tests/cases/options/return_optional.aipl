@@ -1,10 +1,9 @@
 import { wrapping_add as +, -, /, ==, value_or } from builtins;
+
 // Optional returns: callee emits (tag, value) as two i64s; caller
 // reconstructs a 16-byte slot. Unwrap with the `value_or` builtin.
 
-fn divide(x: i64, y: i64) -> i64? {
-    if (y == 0) { none } else { some(x / y) }
-}.test({
+fn divide(x: i64, y: i64) -> i64? { if (y == 0) { none } else { some(x / y) } }.test({
     assert(divide(100, 4) == some(25));
     assert(divide(100, 0) == none);
     assert(divide(100, 4).value_or(-1) + divide(100, 0).value_or(-1) == 24);

@@ -1,4 +1,5 @@
-import { ==, <, ! } from builtins;
+import { !, <, == } from builtins;
+
 // `<` returns bool, so it can feed `!`.
 fn not_lt(x: i64, y: i64) -> bool { !(x < y) }.test({
     assert(not_lt(3, 5) == false);

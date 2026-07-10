@@ -1,8 +1,6 @@
 import { print, to_str } from builtins;
 
-fn make_pairs() -> (i64, str)[] {
-    [(1, "one"), (2, "two"), (3, "three")]
-}
+fn make_pairs() -> (i64, str)[] { [(1, "one"), (2, "two"), (3, "three")] }
 
 fn main() !prints {
     let pairs = make_pairs();

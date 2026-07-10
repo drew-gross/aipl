@@ -6,27 +6,36 @@ import { -, print, to_str } from builtins;
 // distinct from an element that is itself `none`.
 fn main() !prints {
     // Nested optional construction + Debug-style rendering.
-    print(to_str(some(some(1))));     // some(some(1))
+    print(to_str(some(some(1)))); // some(some(1))
 
     // Indexing `i64?[]` → `i64??`.
     let xs = [some(1), none, some(3)];
-    print(to_str(xs[0]));             // some(some(1))   (in bounds, element some(1))
-    print(to_str(xs[1]));             // some(none)      (in bounds, element none)
-    print(to_str(xs[9]));             // none            (out of bounds)
+    print(to_str(xs[0])); // some(some(1))   (in bounds, element some(1))
+    print(to_str(xs[1])); // some(none)      (in bounds, element none)
+    print(to_str(xs[9])); // none            (out of bounds)
 
     // Nested match distinguishes out-of-bounds, present-but-none, and a value.
-    let n0 = match (xs[0]) { some(inner) => match (inner) { some(v) => v, none => -1 }, none => -2 };
-    let n1 = match (xs[1]) { some(inner) => match (inner) { some(v) => v, none => -1 }, none => -2 };
-    let n9 = match (xs[9]) { some(inner) => match (inner) { some(v) => v, none => -1 }, none => -2 };
-    print(to_str(n0));                // 1
-    print(to_str(n1));                // -1   (present, inner none)
-    print(to_str(n9));                // -2   (out of bounds)
+    let n0 = match (xs[0]) {
+        some(inner) => match (inner) { some(v) => v, none => -1 },
+        none => -2,
+    };
+    let n1 = match (xs[1]) {
+        some(inner) => match (inner) { some(v) => v, none => -1 },
+        none => -2,
+    };
+    let n9 = match (xs[9]) {
+        some(inner) => match (inner) { some(v) => v, none => -1 },
+        none => -2,
+    };
+    print(to_str(n0)); // 1
+    print(to_str(n1)); // -1   (present, inner none)
+    print(to_str(n9)); // -2   (out of bounds)
 
     // `str?[]` indexed → `str??` — exercises nested-optional heap refcounting;
     // a leak or double-free would unbalance the alloc counts.
     let ss = [some("hi"), none];
-    print(to_str(ss[0]));             // some(some("hi"))
-    print(to_str(ss[1]));             // some(none)
+    print(to_str(ss[0])); // some(some("hi"))
+    print(to_str(ss[1])); // some(none)
 }
 --- stdout ---
 some(some(1))

@@ -1,9 +1,7 @@
-import { wrapping_add as +, *, ==, to_str, map, push } from builtins;
+import { *, wrapping_add as +, ==, map, push, to_str } from builtins;
 
 // Plain named functions — no captures, just regular `fn`s.
-fn double(x: i64) -> i64 {
-    x * 2
-}.test({
+fn double(x: i64) -> i64 { x * 2 }.test({
     let xs = [1, 2, 3];
     // Pass a named function to a builtin HOF (method form).
     assert(xs.map(double) == [2, 4, 6]);
@@ -13,18 +11,14 @@ fn double(x: i64) -> i64 {
     assert(xs.map(to_str) == ["1", "2", "3"]);
 })
 
-fn inc(x: i64) -> i64 {
-    x + 1
-}.test({
+fn inc(x: i64) -> i64 { x + 1 }.test({
     let xs = [1, 2, 3];
     // Pass a named function to a builtin HOF (function form).
     assert(map(xs, inc) == [2, 3, 4]);
 })
 
 // A user-defined higher-order function taking a function-typed parameter.
-fn apply(f: (i64) -> i64, x: i64) -> i64 {
-    f(x)
-}.test({
+fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
     // Pass a named function to a user-defined HOF (function-call form).
     assert(apply(double, 20) == 40);
     // A lambda is interchangeable with a named function here.

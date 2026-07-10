@@ -1,4 +1,5 @@
 import { == } from builtins;
+
 fn f() -> i64 {
     mut x = 1;
     set x = 99;

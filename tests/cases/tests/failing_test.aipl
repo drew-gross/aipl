@@ -1,4 +1,5 @@
 import { ==, > } from builtins;
+
 // What happens when a user writes a failing test: `aipl check` reports each
 // failed assertion (with its source location) under a per-test FAIL header and
 // exits non-zero. The `--- check ---` section below pins that exact report.
@@ -16,8 +17,8 @@ fn answer() -> i64 { 41 }.test({
 fn main() {}
 --- check ---
 test answer ... FAIL
-  assert failed at input:12: answer() == 42
-  assert failed at input:13: answer() > 100
+  assert failed at input:13: answer() == 42
+  assert failed at input:14: answer() > 100
 2 tests: 1 passed, 1 failed
 --- performance ---
 allocations: 0

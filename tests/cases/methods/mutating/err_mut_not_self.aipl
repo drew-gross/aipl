@@ -2,6 +2,7 @@
 fn bad(mut other: i64) {
     set other = 0;
 }
+
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "bad": a "mut" receiver must be named "self"

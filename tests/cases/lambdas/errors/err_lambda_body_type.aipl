@@ -1,13 +1,10 @@
 // The lambda's body must produce the function type's return type.
-fn apply(f: (i64) -> i64, x: i64) -> i64 {
-    f(x)
-}
-fn main() -> i64 {
-    apply(|x| true, 3)
-}
+fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }
+
+fn main() -> i64 { apply(|x| true, 3) }
 --- errors ---
 error: lambda body returns bool, but i64 was expected
- --> ./tests/cases/lambdas/errors/err_lambda_body_type.aipl:6:15
+ --> ./tests/cases/lambdas/errors/err_lambda_body_type.aipl:4:30
   |
-6 |     apply(|x| true, 3)
-  |               ^^^^
+4 | fn main() -> i64 { apply(|x| true, 3) }
+  |                              ^^^^

@@ -1,4 +1,5 @@
-import { wrapping_add as +, *, == } from builtins;
+import { *, wrapping_add as +, == } from builtins;
+
 fn f() -> i64 {
     mut x = 10;
     set x = x + 5;

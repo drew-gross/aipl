@@ -1,4 +1,5 @@
 import { wrapping_add as +, ==, push } from builtins;
+
 // A generic that iterates the array elements (binding each as the concrete
 // element type per instance) and counts them. Exercises element-level body
 // operations across i64[], char[], and bool[] instances.

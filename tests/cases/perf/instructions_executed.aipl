@@ -18,7 +18,7 @@ fn triangle() -> i64 {
 }
 
 fn main() !prints {
-    print(to_str(triangle()));   // 1+2+...+10 = 55
+    print(to_str(triangle())); // 1+2+...+10 = 55
 }
 --- stdout ---
 55

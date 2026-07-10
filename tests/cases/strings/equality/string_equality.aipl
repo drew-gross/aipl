@@ -1,4 +1,5 @@
-import { ==, != } from builtins;
+import { !=, == } from builtins;
+
 fn eq_same() -> i64 { if ("hi" == "hi") { 1 } else { 0 } }.test({
     assert("hi" == "hi");
     assert("hi" != "bye");

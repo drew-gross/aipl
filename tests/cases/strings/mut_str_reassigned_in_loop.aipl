@@ -1,4 +1,4 @@
-import { split, == } from builtins;
+import { ==, split } from builtins;
 
 // Regression test for a use-after-free in `mut str` reassignment.
 //

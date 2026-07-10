@@ -1,7 +1,6 @@
-import { -, *, == } from builtins;
-fn fact(n: i64) -> i64 {
-    if (n == 0) { 1 } else { n * fact(n - 1) }
-}.test({
+import { *, -, == } from builtins;
+
+fn fact(n: i64) -> i64 { if (n == 0) { 1 } else { n * fact(n - 1) } }.test({
     // 10! = 3628800 (well beyond what an exit code could carry).
     assert(fact(10) == 3628800);
 })

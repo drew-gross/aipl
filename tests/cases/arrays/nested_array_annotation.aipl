@@ -1,4 +1,4 @@
-import { ==, push, value_or, len } from builtins;
+import { ==, len, push, value_or } from builtins;
 
 // Explicitly-written nested type annotations: `str[][]` as a parameter and
 // return type, `str[]` as the element. The recursive type grammar parses
@@ -13,9 +13,7 @@ fn add_row(grid: str[][], row: str[]) -> str[][] {
     assert(len(g) == 2);
 })
 
-fn first(grid: str[][]) -> str[]? {
-    grid[0]
-}.test({
+fn first(grid: str[][]) -> str[]? { grid[0] }.test({
     let g = add_row([["a"]], ["b", "c"]);
     let row0 = first(g).value_or([]);
     assert(row0[0] == some("a"));

@@ -1,7 +1,6 @@
 import { wrapping_add as +, == } from builtins;
-fn is_a(c: char) -> i64 {
-    if (c == 'a') { 1 } else { 0 }
-}.test({
+
+fn is_a(c: char) -> i64 { if (c == 'a') { 1 } else { 0 } }.test({
     assert(is_a('a') == 1);
     assert(is_a('b') == 0);
 })

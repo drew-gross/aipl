@@ -1,4 +1,4 @@
-import { ==, !, is_some } from builtins;
+import { !, ==, is_some } from builtins;
 
 // Indexing past the end returns None; .is_some() is false.
 fn past_end_is_some() -> i64 {

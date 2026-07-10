@@ -1,19 +1,14 @@
 import { ==, print } from builtins;
 
 // A `str` match takes string-literal arms (and `_`), not constructor patterns.
-fn label(s: str) -> str {
-    match (s) {
-        some(v) => v,
-        _ => "default",
-    }
-}
+fn label(s: str) -> str { match (s) { some(v) => v, _ => "default" } }
 
 fn main() !prints {
     print(label("a"));
 }
 --- errors ---
 error: "match" on a str expects string literals or `_`
- --> ./tests/cases/strings/err_match_ctor_arm.aipl:6:9
+ --> ./tests/cases/strings/err_match_ctor_arm.aipl:4:39
   |
-6 |         some(v) => v,
-  |         ^^^^
+4 | fn label(s: str) -> str { match (s) { some(v) => v, _ => "default" } }
+  |                                       ^^^^

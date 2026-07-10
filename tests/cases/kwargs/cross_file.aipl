@@ -2,11 +2,12 @@
 // so its references must resolve through the declaring file's imports:
 // `framed`'s default calls `default_edge`, a private helper of frame.aipl that
 // this root file never imports (and couldn't — it isn't pub).
-import { framed } from "./frame.aipl";
 import { print } from builtins;
+import { framed } from "./frame.aipl";
+
 fn main() !prints {
     print(framed("hi"));
-    print(framed("hi", edge = "*"));
+    print(framed("hi", edge="*"));
 }
 --- stdout ---
 |hi|

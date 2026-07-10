@@ -1,37 +1,35 @@
-import { ==, !, starts_with, ends_with } from builtins;
+import { !, ==, ends_with, starts_with } from builtins;
 
 // `xs.starts_with(p)` / `xs.ends_with(p)` test whether `p`'s elements equal a
 // contiguous prefix / suffix of `xs`'s, by element-wise structural `==`. The
 // pattern is variadic (`T*`): besides a `T[]` it accepts a single `T` or a `T?`.
 // The empty pattern always matches; a pattern longer than `xs` never does.
 // Elements can be any comparable type (scalars, str, even nested arrays).
-fn has_header(xs: i64[]) -> bool {
-    xs.starts_with([0, 0])
-}.test({
+fn has_header(xs: i64[]) -> bool { xs.starts_with([0, 0]) }.test({
     let xs = [1, 2, 3, 4];
-    assert(xs.starts_with([1, 2]));         // common prefix
-    assert(xs.starts_with([1, 2, 3, 4]));   // whole array
-    assert(xs.starts_with([]));             // empty pattern always matches
-    assert(!xs.starts_with([2, 3]));        // not a prefix
+    assert(xs.starts_with([1, 2])); // common prefix
+    assert(xs.starts_with([1, 2, 3, 4])); // whole array
+    assert(xs.starts_with([])); // empty pattern always matches
+    assert(!xs.starts_with([2, 3])); // not a prefix
     assert(!xs.starts_with([1, 2, 3, 4, 5])); // pattern longer than source
 
-    assert(xs.ends_with([3, 4]));           // common suffix
-    assert(xs.ends_with([4]));              // last element
-    assert(xs.ends_with([]));               // empty pattern always matches
-    assert(!xs.ends_with([3]));             // 3 isn't the last element
-    assert(!xs.ends_with([2, 4]));          // not a contiguous suffix
+    assert(xs.ends_with([3, 4])); // common suffix
+    assert(xs.ends_with([4])); // last element
+    assert(xs.ends_with([])); // empty pattern always matches
+    assert(!xs.ends_with([3])); // 3 isn't the last element
+    assert(!xs.ends_with([2, 4])); // not a contiguous suffix
 
     // Variadic `T*` pattern: a single element, or an optional element.
-    assert(xs.starts_with(1));              // single i64 -> [1]
-    assert(!xs.starts_with(2));             // 2 isn't the first element
-    assert(xs.ends_with(4));                // single i64 suffix
-    assert(xs.starts_with(some(1)));        // some(v) -> [v]
-    assert(xs.starts_with(none));           // none -> [] always matches
-    assert(!xs.ends_with(some(3)));         // 3 isn't the last element
+    assert(xs.starts_with(1)); // single i64 -> [1]
+    assert(!xs.starts_with(2)); // 2 isn't the first element
+    assert(xs.ends_with(4)); // single i64 suffix
+    assert(xs.starts_with(some(1))); // some(v) -> [v]
+    assert(xs.starts_with(none)); // none -> [] always matches
+    assert(!xs.ends_with(some(3))); // 3 isn't the last element
 
     // Both empty (untyped) — length-fits is the whole answer.
     assert([].starts_with([]));
-    assert(![].starts_with([7]));           // empty source, non-empty pattern
+    assert(![].starts_with([7])); // empty source, non-empty pattern
 
     // str elements compare by content.
     assert(["a", "bc", "d"].starts_with(["a", "bc"]));
@@ -42,7 +40,7 @@ fn has_header(xs: i64[]) -> bool {
     assert([[1], [2, 3]].ends_with([[2, 3]]));
     assert(![[1], [2, 3]].starts_with([[2]]));
 
-    assert(has_header([0, 0, 9]));          // free helper / method form
+    assert(has_header([0, 0, 9])); // free helper / method form
     assert(!has_header([0, 9]));
 })
 --- performance ---

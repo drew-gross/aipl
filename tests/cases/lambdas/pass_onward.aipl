@@ -1,4 +1,4 @@
-import { wrapping_add as +, *, ==, push } from builtins;
+import { *, wrapping_add as +, ==, push } from builtins;
 
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     mut out = [];
@@ -12,9 +12,7 @@ fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
 // calling it directly. Monomorphization specializes `pipe` for the lambda,
 // then — seeing `g` forwarded to `map` — specializes `map` for the same
 // synthesized function, threading any captures through both.
-fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] {
-    map(xs, g)
-}.test({
+fn pipe(xs: i64[], g: (i64) -> i64) -> i64[] { map(xs, g) }.test({
     assert(pipe([1, 2, 3], |x| x + 1) == [2, 3, 4]);
     // A captured variable is forwarded through `pipe` into `map`'s call.
     let k = 10;

@@ -1,14 +1,11 @@
 import { wrapping_add as +, == } from builtins;
+
 // A struct returned out of an `if` — both branches build the struct, the
 // merge yields the selected one, and the function returns it via sret.
 struct Vec2 { x: i64, y: i64 }
 
 fn choose(big: bool) -> Vec2 {
-    if (big) {
-        Vec2 { x: 100, y: 200 }
-    } else {
-        Vec2 { x: 1, y: 2 }
-    }
+    if (big) { Vec2 { x: 100, y: 200 } } else { Vec2 { x: 1, y: 2 } }
 }.test({
     let a = choose(true);
     let b = choose(false);

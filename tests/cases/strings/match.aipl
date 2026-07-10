@@ -1,4 +1,5 @@
 import { wrapping_add as +, ==, print, to_str } from builtins;
+
 // `match` on a `str`: each arm is a string literal, with a required `_` default
 // as the last arm. Arms compare by content (string equality), so a rope (a
 // `str + str` value) scrutinee matches the same as a flat one.
@@ -6,18 +7,13 @@ fn classify(s: str) -> str {
     match (s) {
         "foo" => "got foo",
         "bar" => "got bar",
-        "" => "empty", // the empty string matches only "" (exact equality)
+        "" => "empty",
+        // the empty string matches only "" (exact equality)
         _ => "other",
     }
 }
 
-fn code(s: str) -> i64 {
-    match (s) {
-        "a" => 1,
-        "bb" => 2,
-        _ => 0,
-    }
-}
+fn code(s: str) -> i64 { match (s) { "a" => 1, "bb" => 2, _ => 0 } }
 
 fn main() !prints {
     print(classify("foo")); // got foo

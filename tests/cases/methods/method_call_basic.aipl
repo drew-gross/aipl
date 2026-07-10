@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 fn double(self: i64) -> i64 { self + self }.test({
     assert(21.double() == 42);
 })

@@ -1,16 +1,16 @@
-import { ==, !, len, contains } from builtins;
+import { !, ==, contains, len } from builtins;
 
 // Set literals dedup at construction; `contains`/`len` query them.
 fn build() -> #{i64} {
-    #{1, 2, 3, 2, 1}       // duplicates dropped -> {1, 2, 3}
+    #{1, 2, 3, 2, 1} // duplicates dropped -> {1, 2, 3}
 }.test({
     let s = build();
     assert(s == #{1, 2, 3});
     assert(len(s) == 3);
-    assert(s.len() == 3);          // method form
+    assert(s.len() == 3); // method form
     assert(s.contains(2));
     assert(!s.contains(5));
-    assert(contains(s, 3));        // call form
+    assert(contains(s, 3)); // call form
 
     let empty = #{};
     assert(len(empty) == 0);

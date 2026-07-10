@@ -1,7 +1,7 @@
 // `helper` isn't imported by main, but `entry` calls it internally —
 // the loader must keep within-file references wired up post-rewrite.
-import { entry } from "./util.aipl";
 import { print, to_str } from builtins;
+import { entry } from "./util.aipl";
 
 fn main() !prints {
     print(to_str(entry(5)));

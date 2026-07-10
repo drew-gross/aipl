@@ -7,10 +7,10 @@ pub fn trim_while(self: str, pred: (char) -> bool) -> str {
     self[self.count_while(pred)..]
 }.doc("Drops the leading run of characters satisfying `pred` (the complement of `count_while`).").test({
     assert("   abc".trim_while(|c| c == ' ') == "abc"); // leading spaces dropped
-    assert("abc".trim_while(|c| c == ' ') == "abc");    // nothing to trim
-    assert("   ".trim_while(|c| c == ' ') == "");       // all trimmed
-    assert("".trim_while(|c| c == ' ') == "");          // empty source
-    assert("xxy".trim_while(|c| c == 'x') == "y");      // stops at first non-match
+    assert("abc".trim_while(|c| c == ' ') == "abc"); // nothing to trim
+    assert("   ".trim_while(|c| c == ' ') == ""); // all trimmed
+    assert("".trim_while(|c| c == ' ') == ""); // empty source
+    assert("xxy".trim_while(|c| c == 'x') == "y"); // stops at first non-match
 })
 --- performance ---
 allocations: 0

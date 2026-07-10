@@ -6,10 +6,12 @@ fn main() !prints {
     print(```hello {name}```);
     print(```value is {n}```);
     print(```no interpolation```);
-    print(```
+    print(
+        ```
         indented {name}
         and {n}
-    ```);
+    ```,
+    );
     print(```prefix {name} middle {n} suffix```);
 }
 --- stdout ---

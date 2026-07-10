@@ -1,9 +1,7 @@
-import { -, *, /, ==, !=, <, >, filter, map } from builtins;
+import { !=, *, -, /, <, ==, >, filter, map } from builtins;
 
 // A named predicate.
-fn is_even(x: i64) -> bool {
-    x - (x / 2) * 2 == 0
-}.test({
+fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
     let xs = [1, 2, 3, 4, 5, 6];
 
     // Method form and function form with a lambda predicate.
@@ -34,7 +32,7 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 1032
 instructions executed: 2403
-binary size: 9520
+binary size: 9512
 --- monomorphizations ---
 __filter9$own0
 __map13$own0

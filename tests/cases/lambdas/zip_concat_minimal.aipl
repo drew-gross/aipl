@@ -1,4 +1,4 @@
-import { print, zip_with, wrapping_add as + } from builtins;
+import { wrapping_add as +, print, zip_with } from builtins;
 
 fn show_strs(label: str, xs: str[]) !prints {
     print(label);

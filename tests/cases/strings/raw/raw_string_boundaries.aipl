@@ -5,8 +5,12 @@ import { wrapping_add as +, print } from builtins;
 // inside a line are kept verbatim.
 fn main() !prints -> i64 {
     print("[" + """""" + "]");
-    print("[" + """
-""" + "]");
+    print(
+        "["
+            + """
+"""
+            + "]",
+    );
     print("[" + """kept  """ + "]");
     0
 }

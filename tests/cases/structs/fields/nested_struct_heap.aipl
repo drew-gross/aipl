@@ -6,16 +6,15 @@ import { wrapping_add as +, ==, value_or } from builtins;
 // heap fields, so the balanced alloc/dealloc count below proves each string is
 // retained on construction and released exactly once when the struct drops.
 struct Name { first: str, last: str }
+
 struct Contact { name: Name, nick: str? }
 
-fn full_first(c: Contact) -> str {
-    c.name.first
-}.test({
+fn full_first(c: Contact) -> str { c.name.first }.test({
     let c = Contact {
         name: Name { first: "Ad" + "a", last: "Love" + "lace" },
         nick: some("Count" + "ess"),
     };
-    assert(full_first(c) == "Ada");          // heap str through two struct levels
+    assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");
     assert(c.nick.value_or("(none)") == "Countess"); // optional field on outer
 })

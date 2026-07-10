@@ -1,11 +1,9 @@
-import { wrapping_add as +, -, *, /, ==, >, print, to_str } from builtins;
+import { *, wrapping_add as +, -, /, ==, >, print, to_str } from builtins;
 
 // Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.
 // Values are created/converted with `i8(x)`/`u32(x)`/… (wrapping). Arithmetic
 // and comparison happen at the type's width and signedness; results wrap.
-fn add8(a: i8, b: i8) -> i8 {
-    a + b
-}.test({
+fn add8(a: i8, b: i8) -> i8 { a + b }.test({
     // Signed addition wraps two's-complement.
     assert(i8(127) + i8(1) == i8(-128));
     assert(add8(i8(100), i8(50)) == i8(-106));
@@ -33,7 +31,7 @@ fn add8(a: i8, b: i8) -> i8 {
 
 fn main() !prints {
     print(to_str(add8(i8(100), i8(50)))); // -106
-    print(to_str(u32(4000000000)));       // 4000000000
+    print(to_str(u32(4000000000))); // 4000000000
 }
 --- stdout ---
 -106

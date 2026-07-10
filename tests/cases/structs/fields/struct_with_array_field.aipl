@@ -1,4 +1,4 @@
-import { wrapping_add as +, *, ==, push, value_or, len } from builtins;
+import { *, wrapping_add as +, ==, len, push, value_or } from builtins;
 
 // A struct field may be an array (`str[]`), an 8-byte heap pointer. The
 // field is retained on construction and released when the struct drops.

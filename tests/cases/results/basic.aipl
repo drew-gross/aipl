@@ -1,27 +1,19 @@
-import { wrapping_add as +, /, ==, to_str, print } from builtins;
+import { wrapping_add as +, /, ==, print, to_str } from builtins;
 
 // A result `T!E` is `ok(v)` or `err(e)` — an inline `{tag, value}` (tag 1 = ok,
 // 0 = err), matched like an optional. `ok`/`err` are constructors like
 // `some`/`none`: the unbound side is inferred from context.
-fn safe_div(a: i64, b: i64) -> i64!str {
-    if (b == 0) { err("divide by zero") } else { ok(a / b) }
-}
+fn safe_div(a: i64, b: i64) -> i64!str { if (b == 0) { err("divide by zero") } else { ok(a / b) } }
 
 fn describe(a: i64, b: i64) -> str {
-    match (safe_div(a, b)) {
-        ok(v) => "= " + to_str(v),
-        err(e) => "error: " + e,
-    }
+    match (safe_div(a, b)) { ok(v) => "= " + to_str(v), err(e) => "error: " + e }
 }.test({
     assert(describe(10, 2) == "= 5");
     assert(describe(1, 0) == "error: divide by zero");
 
     // Match on a result value directly.
     let r = safe_div(9, 3);
-    match (r) {
-        ok(v) => assert(v == 3),
-        err(e) => assert(false),
-    }
+    match (r) { ok(v) => assert(v == 3), err(e) => assert(false) }
 })
 
 fn main() !prints {

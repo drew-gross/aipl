@@ -1,6 +1,6 @@
-import { wrapping_add as +, ==, &&, !, <, ||, enumerate, len } from builtins;
-import { parse_test_section_header } from "./parse_test_section_header.aipl";
+import { !, &&, wrapping_add as +, <, ==, ||, enumerate, len } from builtins;
 import { lines } from "./lines.aipl";
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
 // Replaces the body of the `--- section ---` block in `contents` with `body`
@@ -87,8 +87,9 @@ instead of requiring it to exist.
     // physical source position matters for the file-level cut.)
 
     // Section present: single-line body, more content follows.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         a
         --- foo ---
         old
@@ -96,134 +97,172 @@ instead of requiring it to exist.
         b
 
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         a
         --- foo ---
         new
         --- bar ---
         b
 
-        """);
+        """,
+    );
     // Section present: multi-line old body, all of it dropped.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         --- foo ---
         old1
         old2
 
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         --- foo ---
         new
 
-        """);
+        """,
+    );
+
     // Section present: the header is the final, unterminated line (no
     // trailing `\n` at all).
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         --- foo ---
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         --- foo ---
         new
 
-        """);
+        """,
+    );
     // Section present: old body is the final, unterminated content.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         --- foo ---
         old
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         --- foo ---
         new
 
-        """);
+        """,
+    );
+
     // Section present: adjacent headers — an empty old body (the next line is
     // itself a header) has nothing to drop, and the following section passes
     // through untouched.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         --- foo ---
         --- bar ---
         X
 
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         --- foo ---
         new
         --- bar ---
         X
 
-        """);
+        """,
+    );
 
     // Section missing: appended after stripping trailing newlines.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         code
 
         """,
-        "stdout", "hi") ==
-        """
+            "stdout",
+            "hi",
+        )
+            == """
         code
         --- stdout ---
         hi
 
-        """);
+        """,
+    );
     // Missing, with several trailing newlines to strip first.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         code
 
 
 
         """,
-        "stdout", "hi") ==
-        """
+            "stdout",
+            "hi",
+        )
+            == """
         code
         --- stdout ---
         hi
 
-        """);
+        """,
+    );
     // Missing, no trailing newline at all.
-    assert(fill_or_add_section("code", "stdout", "hi") ==
-        """
+    assert(
+        fill_or_add_section("code", "stdout", "hi")
+            == """
         code
         --- stdout ---
         hi
 
-        """);
+        """,
+    );
     // Empty input, section missing.
-    assert(fill_or_add_section("", "stdout", "hi") ==
-        """
+    assert(
+        fill_or_add_section("", "stdout", "hi")
+            == """
 
         --- stdout ---
         hi
 
-        """);
+        """,
+    );
+
     // An indented `--- foo ---` line isn't a real header (must start at column
     // 0), so the section is treated as missing and appended fresh.
-    assert(fill_or_add_section(
-        """
+    assert(
+        fill_or_add_section(
+            """
         code
           --- foo ---
         old
 
         """,
-        "foo", "new") ==
-        """
+            "foo",
+            "new",
+        )
+            == """
         code
           --- foo ---
         old
         --- foo ---
         new
 
-        """);
+        """,
+    );
 })
 --- performance ---
 allocations: 83
@@ -231,4 +270,4 @@ deallocations: 83
 reallocations: 28
 bytes allocated: 3141
 instructions executed: 10743
-binary size: 17992
+binary size: 18264

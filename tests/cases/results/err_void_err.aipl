@@ -1,15 +1,13 @@
 // Only `ok()` can be argument-less (the void success of a `!E`). `err()` must
 // always carry an error value — there's no "void error".
-fn f() -> !str {
-    err()
-}
+fn f() -> !str { err() }
 
 fn main() {
     f();
 }
 --- errors ---
 error: "err" expects 1 argument, got 0
- --> ./tests/cases/results/err_void_err.aipl:4:5
+ --> ./tests/cases/results/err_void_err.aipl:3:18
   |
-4 |     err()
-  |     ^^^
+3 | fn f() -> !str { err() }
+  |                  ^^^

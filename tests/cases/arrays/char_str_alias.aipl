@@ -1,11 +1,14 @@
-import { ==, print, to_str, reverse, len, hash } from builtins;
+import { ==, hash, len, print, reverse, to_str } from builtins;
 
 // `str` and `char[]` share a runtime representation (a `char` is a single
 // byte, exactly like a `str`'s content), so they're mutually usable wherever
 // the other is expected, and compare/hash equal when their bytes match.
 fn takes_str(s: str) -> i64 { s.len() }
+
 fn takes_chars(cs: char[]) -> i64 { cs.len() }
+
 fn str_rev(s: str) -> str { s.reverse() }
+
 fn chars_rev(cs: char[]) -> char[] { cs.reverse() }
 
 fn main() !prints {

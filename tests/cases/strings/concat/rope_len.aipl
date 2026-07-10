@@ -1,4 +1,5 @@
-import { wrapping_add as +, print, len, to_str } from builtins;
+import { wrapping_add as +, len, print, to_str } from builtins;
+
 // A rope stores its total length at its root (summed once at construction from
 // its children's stored lengths), so `len` is O(1) and never materializes the
 // rope. Building an 18-byte rope and only measuring it allocates just the concat

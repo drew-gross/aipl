@@ -1,14 +1,12 @@
 import { wrapping_add as + } from builtins;
+
 // The lambda's parameter count must match the expected function type.
-fn apply(f: (i64) -> i64, x: i64) -> i64 {
-    f(x)
-}
-fn main() -> i64 {
-    apply(|x, y| x + y, 3)
-}
+fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }
+
+fn main() -> i64 { apply(|x, y| x + y, 3) }
 --- errors ---
 error: lambda has 2 parameter(s), but (i64) -> i64 was expected
- --> ./tests/cases/lambdas/errors/err_lambda_arity.aipl:7:11
+ --> ./tests/cases/lambdas/errors/err_lambda_arity.aipl:6:26
   |
-7 |     apply(|x, y| x + y, 3)
-  |           ^^^^^^^^^^^^
+6 | fn main() -> i64 { apply(|x, y| x + y, 3) }
+  |                          ^^^^^^^^^^^^

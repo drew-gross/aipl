@@ -4,7 +4,7 @@
 // the longer one (only known at runtime) is reused and the shorter freed. The
 // reused array's surplus elements are dropped and its length truncated, so the
 // balanced allocation counters below double as a leak check.
-import { print, to_str, zip_with, map, wrapping_add as + } from builtins;
+import { wrapping_add as +, map, print, to_str, zip_with } from builtins;
 
 fn show(label: str, xs: i64[]) !prints {
     print(label);
@@ -27,6 +27,7 @@ fn main() !prints {
     // Both fresh, second longer: the second buffer is reused.
     show("b longer", zip_with([1, 2], [10, 20, 30, 40], +));
     let b = [5, 5, 5];
+
     // Only the first input is fresh: its buffer is reused even when it's the
     // shorter side (the borrowed one is only indexed).
     show("a fresh", zip_with([1, 2], b, +));
@@ -34,9 +35,11 @@ fn main() !prints {
     show("b fresh", zip_with(b, [100, 200, 300, 400], +));
     // A call result is as fresh as a literal.
     show("call result", zip_with(b.map(|x| x + 1), [10, 10, 10], +));
+
     // The result type may differ from the reused element type (each slot's
     // element drop-fn is patched as it's overwritten): i64 slots, str results.
     show_strs("strs", zip_with([1, 2, 3], [4, 5, 6], |x, y| to_str(x + y)));
+
     // Heap elements: the overwritten slots and the dropped tail ("c") are
     // released exactly once.
     show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s + t));

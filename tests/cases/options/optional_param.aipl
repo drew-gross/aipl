@@ -1,4 +1,5 @@
 import { wrapping_add as +, -, ==, value_or } from builtins;
+
 // Unwrap optionals with the `value_or` builtin (present → value, else default).
 
 fn pick(x: i64?) -> i64 { x.value_or(-1) }.test({

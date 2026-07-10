@@ -1,4 +1,5 @@
 import { ==, >= } from builtins;
+
 fn ge(x: i64, y: i64) -> i64 { if (x >= y) { 1 } else { 0 } }.test({
     assert(ge(3, 3) == 1);
     assert(ge(2, 3) == 0);

@@ -1,4 +1,5 @@
 import { wrapping_add as +, == } from builtins;
+
 // Calling a mutating function in `foo(b, ..)` style (instead of `b.foo(..)`)
 // is sugar for copy-and-modify: `b` is copied, the copy is mutated, and the
 // modified copy is the value of the call. The original `b` is left untouched.
@@ -8,8 +9,8 @@ fn bump(mut self: Counter, by: i64) {
     set self = Counter { n: self.n + by };
 }.test({
     let original = Counter { n: 0 };
-    let modified = bump(original, 7);   // copies original, bumps the copy
-    assert(original.n == 0);            // original is unchanged
+    let modified = bump(original, 7); // copies original, bumps the copy
+    assert(original.n == 0); // original is unchanged
     assert(modified.n == 7);
 })
 --- performance ---

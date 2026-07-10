@@ -1,5 +1,7 @@
 import { wrapping_add as +, == } from builtins;
+
 struct Point { x: i64, y: i64 }
+
 fn sum(p: Point) -> i64 { p.x + p.y }.test({
     assert(sum(Point { x: 10, y: 32 }) == 42);
 })

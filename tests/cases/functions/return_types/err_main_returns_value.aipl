@@ -1,12 +1,10 @@
 // A `main` with no return type returns nothing, so a trailing expression — an
 // attempt to produce a value/exit code — is a compile error. Declare
 // `-> i64` to return an exit code.
-fn main() {
-    5
-}
+fn main() { 5 }
 --- errors ---
 error: fn "main": body returns i64, but the declared return type is ()
- --> ./tests/cases/functions/return_types/err_main_returns_value.aipl:5:5
+ --> ./tests/cases/functions/return_types/err_main_returns_value.aipl:4:13
   |
-5 |     5
-  |     ^
+4 | fn main() { 5 }
+  |             ^

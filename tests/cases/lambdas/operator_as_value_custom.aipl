@@ -5,9 +5,7 @@
 import { print, to_str } from builtins;
 import { my_custom_add as + } from "./mymath.aipl";
 
-fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 {
-    f(a, b)
-}
+fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 
 fn main() !prints {
     print(to_str(apply(2, 3, +))); // my_custom_add(2, 3) == 2 + 3 + 1000 == 1005

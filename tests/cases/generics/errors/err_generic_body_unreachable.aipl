@@ -4,14 +4,12 @@
 // codegen would otherwise check. Here `len` yields i64 but `bad` declares bool.
 import { len } from builtins;
 
-fn bad(v: any[]) -> bool {
-    len(v)
-}
+fn bad(v: any[]) -> bool { len(v) }
 
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "bad": body returns i64, but the declared return type is bool
- --> ./tests/cases/generics/errors/err_generic_body_unreachable.aipl:8:5
+ --> ./tests/cases/generics/errors/err_generic_body_unreachable.aipl:7:28
   |
-8 |     len(v)
-  |     ^^^^^
+7 | fn bad(v: any[]) -> bool { len(v) }
+  |                            ^^^^^

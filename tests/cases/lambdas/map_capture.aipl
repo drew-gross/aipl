@@ -1,4 +1,4 @@
-import { wrapping_add as +, *, ==, push } from builtins;
+import { *, wrapping_add as +, ==, push } from builtins;
 
 // A higher-order function: `f` is a function-typed parameter, called per
 // element. At the call site, the lambda `|x| x + hi` captures `hi` from the

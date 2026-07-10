@@ -1,20 +1,15 @@
 import { wrapping_add as + } from builtins;
+
 // A named function passed to a user-defined higher-order function must match
 // the expected function type.
-fn apply(f: (str) -> str, x: str) -> str {
-    f(x)
-}
+fn apply(f: (str) -> str, x: str) -> str { f(x) }
 
-fn inc(n: i64) -> i64 {
-    n + 1
-}
+fn inc(n: i64) -> i64 { n + 1 }
 
-fn main() -> str {
-    apply(inc, "hi")
-}
+fn main() -> str { apply(inc, "hi") }
 --- errors ---
 error: fn "inc" expects a i64 argument, but will be called with str here
-  --> ./tests/cases/lambdas/errors/err_fn_ref_sig.aipl:13:11
-   |
-13 |     apply(inc, "hi")
-   |           ^^^
+ --> ./tests/cases/lambdas/errors/err_fn_ref_sig.aipl:9:26
+  |
+9 | fn main() -> str { apply(inc, "hi") }
+  |                          ^^^

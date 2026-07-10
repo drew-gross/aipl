@@ -1,17 +1,11 @@
 // Both arguments constrain the single type parameter `T`, so they must agree.
 // Here the optional's inner type (i64) and the default (char) disagree.
-fn value_or<T: any>(self: T?, default: T) -> T {
-    match (self) {
-        some(v) => v,
-        none => default,
-    }
-}
-fn main() -> i64 {
-    value_or(some(7), 'z')
-}
+fn value_or<T: any>(self: T?, default: T) -> T { match (self) { some(v) => v, none => default } }
+
+fn main() -> i64 { value_or(some(7), 'z') }
 --- errors ---
 error: conflicting types for "T" in "value_or": i64 vs char
-  --> ./tests/cases/generics/errors/err_type_param_conflict.aipl:10:5
-   |
-10 |     value_or(some(7), 'z')
-   |     ^^^^^^^^^^^^^^^^^^^^^
+ --> ./tests/cases/generics/errors/err_type_param_conflict.aipl:5:20
+  |
+5 | fn main() -> i64 { value_or(some(7), 'z') }
+  |                    ^^^^^^^^^^^^^^^^^^^^^

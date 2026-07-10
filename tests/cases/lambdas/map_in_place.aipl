@@ -1,4 +1,4 @@
-import { wrapping_add as +, *, ==, to_str, map } from builtins;
+import { *, wrapping_add as +, ==, map, to_str } from builtins;
 
 // When `map` receives a freshly-allocated, uniquely-owned array, it overwrites
 // each slot in place and reuses the same allocation instead of building a new
@@ -6,9 +6,7 @@ import { wrapping_add as +, *, ==, to_str, map } from builtins;
 // and neither is a composite (optional/struct). For non-composite types that
 // means both are 8-byte (scalars, `str`, arrays), so `T` and `U` may DIFFER;
 // the per-slot element drop-fn is patched from `T`'s to `U`'s as it goes.
-fn doubled(xs: i64[]) -> i64[] {
-    xs.map(|x| x * 2)
-}.test({
+fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // T == U (i64): mapped in place.
     assert([1, 2, 3, 4].map(|x| x * 2) == [2, 4, 6, 8]);
 

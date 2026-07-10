@@ -1,10 +1,8 @@
-import { wrapping_add as +, *, ==, to_str, map, len } from builtins;
+import { *, wrapping_add as +, ==, len, map, to_str } from builtins;
 
 // Mapping an empty array yields an empty array: the lambda never runs, so the
 // (possibly unknown) element type is never observed — only the empty result is.
-fn empty_ints() -> i64[] {
-    []
-}.test({
+fn empty_ints() -> i64[] { [] }.test({
     // A bare empty literal (`[]` has the placeholder element type).
     assert([].map(|x| x * 2) == []);
     assert(len([].map(|x| x * 2)) == 0);

@@ -1,12 +1,10 @@
-import { *, ==, !=, >, filter, map } from builtins;
+import { !=, *, ==, >, filter, map } from builtins;
 
 // When `filter` receives a freshly-allocated, uniquely-owned array (an array
 // literal, or a call result like `xs.map(..)`), it filters in place: kept
 // elements are compacted toward the front of the same allocation and the
 // filtered-out ones are dropped, so no separate output array is allocated.
-fn keep_gt3(xs: i64[]) -> i64[] {
-    xs.filter(|x| x > 3)
-}.test({
+fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
     // Array literal → owned → filtered in place.
     assert([1, 2, 3, 4, 5, 6].filter(|x| x > 3) == [4, 5, 6]);
 

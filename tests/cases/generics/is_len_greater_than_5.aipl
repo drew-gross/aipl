@@ -1,10 +1,9 @@
 import { ==, >, len } from builtins;
+
 // A generic function over `any[]`: written once, monomorphized per element
 // type at each call site.
 
-fn is_len_greater_than_5(v: any[]) -> bool {
-    len(v) > 5
-}.test({
+fn is_len_greater_than_5(v: any[]) -> bool { len(v) > 5 }.test({
     let ints = [1, 2, 3];
     let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
     let bools = [true, false];

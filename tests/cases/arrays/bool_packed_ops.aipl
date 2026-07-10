@@ -1,4 +1,4 @@
-import { ==, >, !, len, push, map, filter } from builtins;
+import { !, ==, >, filter, len, map, push } from builtins;
 
 // `push`, `map`, and `filter` on bit-packed `bool[]`, including growth across a
 // byte boundary.
@@ -7,8 +7,8 @@ import { ==, >, !, len, push, map, filter } from builtins;
 // the packed buffer grows into a second byte.
 fn grown() -> bool[] {
     mut ys = [true, false, true, true, false, true, false];
-    ys.push(true);   // 8th element fills byte 0
-    ys.push(false);  // 9th element starts byte 1
+    ys.push(true); // 8th element fills byte 0
+    ys.push(false); // 9th element starts byte 1
     ys
 }.test({
     let ys = grown();

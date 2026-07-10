@@ -1,4 +1,4 @@
-import { ==, * } from builtins;
+import { *, == } from builtins;
 
 // Regression guard: `aipl check` must run *every* function's `.test({ .. })`
 // block in the checked file, not just one of them. The loader's flatten pass

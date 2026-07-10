@@ -1,9 +1,7 @@
-fn main() -> i64 {
-    len([1, 2, 3])
-}
+fn main() -> i64 { len([1, 2, 3]) }
 --- errors ---
 error: call to undefined fn "len" — "len" is a builtin; import it with `import { len } from builtins;`
- --> ./tests/cases/builtins/err_use_without_import.aipl:2:5
+ --> ./tests/cases/builtins/err_use_without_import.aipl:1:20
   |
-2 |     len([1, 2, 3])
-  |     ^^^^^^^^^^^^
+1 | fn main() -> i64 { len([1, 2, 3]) }
+  |                    ^^^^^^^^^^^^

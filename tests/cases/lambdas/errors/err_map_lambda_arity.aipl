@@ -1,4 +1,4 @@
-import { wrapping_add as +, map, to_str, print } from builtins;
+import { wrapping_add as +, map, print, to_str } from builtins;
 
 // `map`'s lambda must take exactly one parameter.
 fn main() !prints {

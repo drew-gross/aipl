@@ -1,8 +1,6 @@
 import { ==, is_some } from builtins;
 
-fn check(x: i64?) -> i64 {
-    if (x.is_some()) { 1 } else { 0 }
-}.test({
+fn check(x: i64?) -> i64 { if (x.is_some()) { 1 } else { 0 } }.test({
     assert(check(some(7)) == 1);
     assert(check(none) == 0);
 })

@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, push, value_or, len } from builtins;
+import { wrapping_add as +, ==, len, push, value_or } from builtins;
 
 // `str[][]` — an array whose elements are themselves `str[]`. Both levels
 // are refcounted heap pointers (8-byte elements), so the outer array's

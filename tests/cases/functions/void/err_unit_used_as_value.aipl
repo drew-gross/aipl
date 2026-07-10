@@ -1,12 +1,10 @@
 import { wrapping_add as +, print } from builtins;
 
 // `print` returns nothing, so its result can't be used as a value.
-fn main() !prints -> i64 {
-    print("hi") + 1
-}
+fn main() !prints -> i64 { print("hi") + 1 }
 --- errors ---
 error: arithmetic operand: expected i64, got ()
- --> ./tests/cases/functions/void/err_unit_used_as_value.aipl:5:5
+ --> ./tests/cases/functions/void/err_unit_used_as_value.aipl:4:28
   |
-5 |     print("hi") + 1
-  |     ^^^^^^^^^^
+4 | fn main() !prints -> i64 { print("hi") + 1 }
+  |                            ^^^^^^^^^^

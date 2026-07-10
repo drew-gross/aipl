@@ -1,4 +1,5 @@
-import { wrapping_add as +, ==, print, len, to_str, starts_with, ends_with } from builtins;
+import { wrapping_add as +, ==, ends_with, len, print, starts_with, to_str } from builtins;
+
 // Query operations stream a rope's leaves instead of flattening it: equality,
 // prefix/suffix tests, indexing, and length all run without materializing. So
 // building this 18-byte rope and querying it every which way allocates only the

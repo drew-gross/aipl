@@ -1,4 +1,5 @@
 import { wrapping_add as +, print } from builtins;
+
 // String slicing `s[start..end]` yields the bytes in `[start, end)`. Both
 // bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
 // `start >= end` gives `""`.

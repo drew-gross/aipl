@@ -1,5 +1,7 @@
 import { *, == } from builtins;
+
 struct Pair { a: i64, b: i64 }
+
 fn mul(p: Pair) -> i64 { p.a * p.b }.test({
     // 6 * 7 = 42
     assert(mul(Pair { a: 6, b: 7 }) == 42);

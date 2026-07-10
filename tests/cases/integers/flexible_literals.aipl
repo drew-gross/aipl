@@ -28,8 +28,8 @@ fn make() -> i16 {
 
 fn main() !prints {
     print(to_str(i8(127) + 1)); // -128
-    print(to_str(inc(200)));    // 201
-    print(to_str(make()));      // 1000
+    print(to_str(inc(200))); // 201
+    print(to_str(make())); // 1000
 }
 --- stdout ---
 -128

@@ -1,4 +1,4 @@
-import { ==, !=, <, wrapping_add as +, ++, len } from builtins;
+import { !=, wrapping_add as +, ++, <, ==, len } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 
 pub fn strip_test_sections(src: str) -> str {
@@ -18,14 +18,11 @@ pub fn strip_test_sections(src: str) -> str {
         };
         set i++;
     }
+
     // The final line has no trailing newline. (When `src` ends in `\n`,
     // `line_start == len` and the trailing empty line is never a marker, so this
     // returns all of `src`.)
-    if (parse_test_section_header(src[line_start..]) != none) {
-        src[..line_start]
-    } else {
-        src
-    }
+    if (parse_test_section_header(src[line_start..]) != none) { src[..line_start] } else { src }
 }.doc("""
 Returns the portion of `src` before the first `--- name ---` test-section marker
 line, or all of `src` if there is none. The cases test harness appends

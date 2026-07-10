@@ -16,18 +16,14 @@ fn sum_reversed(xs: i64[]) -> i64 {
     assert(sum_reversed([]) == 0);
 })
 
-fn reversed_eq(xs: i64[], ys: i64[]) -> i64 {
-    if (xs.reverse() == ys) { 1 } else { 0 }
-}.test({
+fn reversed_eq(xs: i64[], ys: i64[]) -> i64 { if (xs.reverse() == ys) { 1 } else { 0 } }.test({
     assert(reversed_eq([1, 2, 3], [3, 2, 1]) == 1);
     assert(reversed_eq([1, 2, 3], [1, 2, 3]) == 0);
     assert(reversed_eq([], []) == 1);
     assert(reversed_eq([42], [42]) == 1);
 })
 
-fn reversed_len(xs: i64[]) -> i64 {
-    len(xs.reverse())
-}.test({
+fn reversed_len(xs: i64[]) -> i64 { len(xs.reverse()) }.test({
     assert(reversed_len([1, 2, 3]) == 3);
     assert(reversed_len([]) == 0);
 })

@@ -1,4 +1,4 @@
-import { ==, push, len } from builtins;
+import { ==, len, push } from builtins;
 
 // Growable bool[]: start empty and push. `bs.push(x)` grows the variable in
 // place; a snapshot taken first (`let snap = bs`) keeps its own value, so a
@@ -11,10 +11,10 @@ fn appended(xs: bool[], x: bool) -> bool[] {
     mut bs = [];
     bs.push(true);
     bs.push(false);
-    let snap = bs;        // snapshot of [true, false]
-    bs.push(true);        // grows bs only
+    let snap = bs; // snapshot of [true, false]
+    bs.push(true); // grows bs only
     assert(bs == [true, false, true]);
-    assert(snap == [true, false]);  // snapshot unchanged
+    assert(snap == [true, false]); // snapshot unchanged
     assert(len(snap) == 2);
     assert(appended(snap, true) == [true, false, true]);
     assert(snap == [true, false]);

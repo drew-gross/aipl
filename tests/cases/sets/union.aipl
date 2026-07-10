@@ -1,4 +1,4 @@
-import { ==, len, contains, union } from builtins;
+import { ==, contains, len, union } from builtins;
 
 // `a.union(b)` is the set of all distinct elements of both (overlap deduped).
 // `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
@@ -8,7 +8,7 @@ import { ==, len, contains, union } from builtins;
 fn basic() -> #{i64} {
     let a = #{1, 2, 3};
     let b = #{3, 4, 5};
-    a.union(b)                       // {1, 2, 3, 4, 5} (3 deduped)
+    a.union(b) // {1, 2, 3, 4, 5} (3 deduped)
 }.test({
     let a = #{1, 2, 3};
     let b = #{3, 4, 5};
@@ -16,7 +16,7 @@ fn basic() -> #{i64} {
     assert(c == #{1, 2, 3, 4, 5});
     assert(len(c) == 5);
     assert(c.contains(4));
-    assert(len(a) == 3);             // operands unchanged
+    assert(len(a) == 3); // operands unchanged
 })
 
 fn in_place() -> #{i64} {
@@ -29,12 +29,9 @@ fn in_place() -> #{i64} {
     assert(in_place() == #{1, 2, 3, 4, 5});
 })
 
-fn empty_set() -> #{i64} {
-    #{}
-}
-fn empty_union() -> #{i64} {
-    empty_set().union(empty_set())
-}.test({
+fn empty_set() -> #{i64} { #{} }
+
+fn empty_union() -> #{i64} { empty_set().union(empty_set()) }.test({
     // String elements (heap): content dedup, freed cleanly.
     assert(#{"a", "b"}.union(#{"b", "c"}) == #{"a", "b", "c"});
     // Union of two empty sets is empty.

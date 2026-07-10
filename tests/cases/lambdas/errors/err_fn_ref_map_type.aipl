@@ -1,10 +1,8 @@
-import { print, to_str, map } from builtins;
+import { map, print, to_str } from builtins;
 
 // A named function whose parameter type doesn't match the array element type
 // can't be passed to `map`.
-fn takes_str(s: str) -> str {
-    s
-}
+fn takes_str(s: str) -> str { s }
 
 fn main() !prints {
     let xs = [1, 2, 3];
@@ -12,7 +10,7 @@ fn main() !prints {
 }
 --- errors ---
 error: fn "takes_str" expects a str argument, but will be called with i64 here
-  --> ./tests/cases/lambdas/errors/err_fn_ref_map_type.aipl:11:25
-   |
-11 |     print(to_str(xs.map(takes_str)));
-   |                         ^^^^^^^^^
+ --> ./tests/cases/lambdas/errors/err_fn_ref_map_type.aipl:9:25
+  |
+9 |     print(to_str(xs.map(takes_str)));
+  |                         ^^^^^^^^^

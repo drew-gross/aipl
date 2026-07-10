@@ -1,16 +1,13 @@
-import { print, execute_program } from builtins;
+import { execute_program, print } from builtins;
 
 // `args` is a keyword parameter, so it can no longer be passed positionally —
 // it must be named (`execute_program("echo", args = [...])`) or omitted.
 fn main() !prints !execute_program {
-    match (execute_program("echo", ["a"])) {
-        ok(r) => print(r.stdout),
-        err(e) => print(e),
-    };
+    match (execute_program("echo", ["a"])) { ok(r) => print(r.stdout), err(e) => print(e) };
 }
 --- errors ---
 error: fn "execute_program" expects 1 positional arg(s), got 2 (its keyword parameter must be passed by keyword: "args")
  --> ./tests/cases/execute_program/err_args_positional.aipl:6:12
   |
-6 |     match (execute_program("echo", ["a"])) {
+6 |     match (execute_program("echo", ["a"])) { ok(r) => print(r.stdout), err(e) => print(e) };
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,6 +1,7 @@
 import { print, to_str } from builtins;
 
 struct Point { x: i64, y: i64 }
+
 struct LineAt { line: i64, line_start: i64 }
 
 fn main() !prints {

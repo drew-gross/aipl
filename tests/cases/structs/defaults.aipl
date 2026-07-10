@@ -1,6 +1,7 @@
 import { == } from builtins;
 
 struct Point { x: i64 = 0, y: i64 = 0 }
+
 struct Config { retries: i64 = 3, label: str = "default" }
 
 fn all_defaults() -> Point { Point {} }.test({

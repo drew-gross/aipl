@@ -1,4 +1,5 @@
 fn f(k: i64 = true) -> i64 { k }
+
 fn main() -> i64 { f() }
 --- errors ---
 error: default for fn "f" parameter "k": expected i64, got bool

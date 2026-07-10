@@ -1,4 +1,4 @@
-import { -, print, to_str, is_some } from builtins;
+import { -, is_some, print, to_str } from builtins;
 
 // The flattened optional representation: an optional chain `Optional^n(Core)` is
 // `{ tag: i64, value: <Core> }` — a single core-sized value field shared by the
@@ -9,10 +9,10 @@ fn main() !prints {
     // Four `some` layers — the tag reaches 4, the value field still holds one
     // i64. Rendering walks the tag back down to the core.
     let a = some(some(some(some(42))));
-    print(to_str(a));            // some(some(some(some(42))))
+    print(to_str(a)); // some(some(some(some(42))))
 
     // `is_some` tests only the outermost layer (any nonzero tag).
-    print(to_str(a.is_some()));  // true
+    print(to_str(a.is_some())); // true
 
     // Peel all four layers with nested matches.
     let v = match (a) {
@@ -25,12 +25,12 @@ fn main() !prints {
         },
         none => -4,
     };
-    print(to_str(v));            // 42
+    print(to_str(v)); // 42
 
     // A `str????` (heap core, deep): the str is owned only at the full tag, so
     // refcounting stays balanced through construction, rendering, and teardown.
     let s = some(some(some(some("deep"))));
-    print(to_str(s));            // some(some(some(some("deep"))))
+    print(to_str(s)); // some(some(some(some("deep"))))
 }
 --- stdout ---
 some(some(some(some(42))))

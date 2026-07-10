@@ -1,5 +1,6 @@
 // Returning an `i64` from a function declared to return `str`.
 fn f() -> str { 5 }
+
 fn main() -> i64 { 0 }
 --- errors ---
 error: fn "f": body returns i64, but the declared return type is str

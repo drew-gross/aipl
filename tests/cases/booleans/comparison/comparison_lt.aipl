@@ -1,4 +1,5 @@
-import { ==, < } from builtins;
+import { <, == } from builtins;
+
 fn lt(x: i64, y: i64) -> i64 { if (x < y) { 1 } else { 0 } }.test({
     assert(lt(1, 2) == 1);
     assert(lt(2, 2) == 0);

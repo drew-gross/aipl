@@ -1,4 +1,4 @@
-import { wrapping_add as +, print, to_str, filter } from builtins;
+import { wrapping_add as +, filter, print, to_str } from builtins;
 
 // `filter`'s predicate must return bool.
 fn main() !prints {

@@ -4,9 +4,7 @@
 import { val } from "./a.aipl";
 import { val } from "./b.aipl";
 
-fn main() -> i64 {
-    val()
-}
+fn main() -> i64 { val() }
 --- file: a.aipl ---
 pub fn val() -> i64 { 1 }
 --- file: b.aipl ---

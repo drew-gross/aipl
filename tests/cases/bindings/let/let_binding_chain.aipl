@@ -1,4 +1,5 @@
-import { wrapping_add as +, *, == } from builtins;
+import { *, wrapping_add as +, == } from builtins;
+
 fn f() -> i64 {
     let a = 1;
     let b = 2;

@@ -1,9 +1,9 @@
-import { ==, to_str, print } from builtins;
+import { ==, print, to_str } from builtins;
 
 // `to_str` on a char yields its Debug-style quoted form, `'X'`.
 fn main() !prints {
     let s = to_str('X');
-    print(to_str(if (s == "'X'") { 1 } else { 0 }));   // 1
+    print(to_str(if (s == "'X'") { 1 } else { 0 })); // 1
 }
 --- stdout ---
 1
