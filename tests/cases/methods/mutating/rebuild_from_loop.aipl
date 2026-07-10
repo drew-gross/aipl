@@ -1,0 +1,36 @@
+import { ==, push } from builtins;
+
+// Regression: a mutating method that rebuilds its receiver from a fresh array
+// grown in a loop, then moves it in with `set self = out`. The loop-grown local
+// must transfer cleanly into `self`. Previously the move wasn't recognized as a
+// last use, so `out` stayed non-exclusive and its `push` inside the loop tracked
+// each fresh (relocated) buffer in the loop-body scope — freeing the live buffer
+// at the end of every iteration and leaving `self` dangling, which corrupted
+// memory / aborted on the caller's next read.
+fn double_each(mut self: i64[]) {
+    mut out = [];
+    for (let x : self) {
+        out.push(x);
+        out.push(x);
+    }
+    set self = out;
+}.test({
+    mut xs = [1, 2, 3];
+    xs.double_each();
+    assert(xs == [1, 1, 2, 2, 3, 3]);
+
+    // A longer receiver forces the loop-grown buffer to reallocate mid-loop.
+    mut ys = [1, 2, 3, 4, 5];
+    ys.double_each();
+    assert(ys == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 9
+bytes allocated: 384
+instructions executed: 1022
+binary size: 3424
+--- monomorphizations ---
+double_each
+main

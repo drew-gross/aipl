@@ -5211,8 +5211,17 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     }
                     _ => true,
                 }
+            } else if is_n(val) {
+                // `set other = name` moves `name`'s buffer into another binding.
+                // In tail position that's a last-use move-out (like `return
+                // name`), not an alias — so `name` stays exclusive and its
+                // in-loop `push` mutates in place instead of tracking each fresh
+                // buffer in the loop-body scope (which would free the live buffer
+                // mid-loop). Any use of `name` *after* the move is still caught by
+                // the `rec_tail(b)` below.
+                !tail
             } else {
-                is_n(val) || rec(val)
+                rec(val)
             };
             lhs_bad || rec_tail(b)
         }
