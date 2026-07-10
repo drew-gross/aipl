@@ -1,0 +1,8 @@
+fn f(k: i64 = true) -> i64 { k }
+fn main() -> i64 { f() }
+--- errors ---
+error: default for fn "f" parameter "k": expected i64, got bool
+ --> ./tests/cases/kwargs/err_default_type_mismatch.aipl:1:15
+  |
+1 | fn f(k: i64 = true) -> i64 { k }
+  |               ^^^^

@@ -1,0 +1,8 @@
+fn f(a: i64, b: i64 = 1) -> i64 { a }
+fn main() -> i64 { f(1, a = 2) }
+--- errors ---
+error: parameter "a" of fn "f" is positional (it has no default) and cannot be passed by keyword
+ --> ./tests/cases/kwargs/err_kw_for_positional.aipl:2:25
+  |
+2 | fn main() -> i64 { f(1, a = 2) }
+  |                         ^^^^^

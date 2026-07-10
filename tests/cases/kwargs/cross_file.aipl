@@ -1,0 +1,27 @@
+// A keyword parameter's default is spliced into call sites in *other* files,
+// so its references must resolve through the declaring file's imports:
+// `framed`'s default calls `default_edge`, a private helper of frame.aipl that
+// this root file never imports (and couldn't — it isn't pub).
+import { framed } from "./frame.aipl";
+import { print } from builtins;
+fn main() !prints {
+    print(framed("hi"));
+    print(framed("hi", edge = "*"));
+}
+--- stdout ---
+|hi|
+*hi*
+--- file: frame.aipl ---
+import { wrapping_add as + } from builtins;
+fn default_edge() -> str { "|" }
+pub fn framed(s: str, edge: str = default_edge()) -> str { edge + s + edge }
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 160
+instructions executed: 46
+binary size: 1512
+--- monomorphizations ---
+__m1__framed
+main

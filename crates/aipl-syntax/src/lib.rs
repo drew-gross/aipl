@@ -385,6 +385,14 @@ pub mod ast {
         /// normalization to the sequence type happens in codegen. The body is
         /// unaffected — it just sees a plain `ty`.
         pub variadic: bool,
+        /// `Some(expr)` for a *keyword* parameter, written `k: T = expr`: having
+        /// a default is exactly what makes a parameter a keyword parameter.
+        /// Keyword parameters must come after every positional parameter, may
+        /// only be supplied by keyword at a call site (`f(1, k = 2)`), and are
+        /// not part of the function's type. The loader expands every call so
+        /// each omitted keyword argument is filled from this default; after
+        /// loading, the default is inert (calls are fully positional).
+        pub default: Option<Expr>,
     }
 
     /// The language's built-in scalar primitive types: the fixed-width integers
@@ -697,6 +705,13 @@ pub mod ast {
         /// `Construct(synth_struct_name, ..)` by mono's `infer` after element
         /// types are known; only the parser through the mono pass see this.
         TupleLit(Vec<Expr>),
+        /// `name = expr` inside a call's argument list — a keyword argument.
+        /// Only the parser and the loader ever see this: the loader's
+        /// keyword-argument expansion resolves it against the callee's keyword
+        /// parameters and rewrites the call to plain positional arguments
+        /// (erroring on any misuse), so every later pass can treat it as
+        /// unreachable.
+        KwArg(String, Box<Expr>),
     }
 
     /// A lambda parameter: a name and an optional type annotation (inferred
@@ -907,7 +922,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             out.insert("!".to_string());
             collect_operators(x, out);
         }
-        K::Field(x, _) | K::Try(x) | K::Return(x) => collect_operators(x, out),
+        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) => collect_operators(x, out),
         K::Seq(a, b)
         | K::Index(a, b)
         | K::Let(_, a, b)

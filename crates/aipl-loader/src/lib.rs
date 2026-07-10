@@ -12,6 +12,8 @@
 //! The root file's items keep their original names — codegen still expects
 //! to find an unmangled `main`.
 
+mod kwargs;
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -461,11 +463,22 @@ impl Loader {
                     if let Some(tb) = &f.test_body {
                         check_operators(tb, view)?;
                     }
+                    // Keyword-parameter defaults are expressions too — an
+                    // operator used in one needs this file's import.
+                    for p in &f.sig.params {
+                        if let Some(d) = &p.default {
+                            check_operators(d, view)?;
+                        }
+                    }
                 }
                 merged.push(rewrite_item(item, view, is_root)?);
             }
         }
-        Ok(Program { items: merged })
+        // Resolve keyword arguments (and fill omitted keyword parameters from
+        // their defaults) now that every reference is a final global name —
+        // after this, calls are fully positional and no `ExprKind::KwArg`
+        // survives into the merged program.
+        kwargs::expand_keyword_args(&Program { items: merged })
     }
 }
 
@@ -505,7 +518,9 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
             require("!", e.span.clone())?;
             check_operators(x, view)?;
         }
-        ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => check_operators(x, view)?,
+        ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) | ExprKind::KwArg(_, x) => {
+            check_operators(x, view)?
+        }
         ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, a, b)
@@ -614,6 +629,16 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
                         ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
                         mutable: p.mutable,
                         variadic: p.variadic,
+                        // A keyword parameter's default is spliced into *call
+                        // sites* (possibly in other files), so its global
+                        // references must resolve through the declaring file's
+                        // view now. Defaults can't reference the function's
+                        // parameters (they're checked in an empty environment),
+                        // so no locals shadow anything here.
+                        default: p
+                            .default
+                            .as_ref()
+                            .map(|d| rewrite_expr(d, view, &HashSet::new())),
                     })
                     .collect(),
                 effects: f.sig.effects.clone(),
@@ -893,6 +918,11 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                 .map(|e| Box::new(rewrite_expr(e, view, locals))),
         ),
         ExprKind::Try(e) => ExprKind::Try(Box::new(rewrite_expr(e, view, locals))),
+        // The keyword name refers to the callee's parameter, not a global —
+        // only the value is rewritten.
+        ExprKind::KwArg(name, value) => {
+            ExprKind::KwArg(name.clone(), Box::new(rewrite_expr(value, view, locals)))
+        }
         ExprKind::Seq(first, rest) => ExprKind::Seq(
             Box::new(rewrite_expr(first, view, locals)),
             Box::new(rewrite_expr(rest, view, locals)),

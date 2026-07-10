@@ -159,9 +159,14 @@ gazelle! {
         // `OP` must be `*` (validated in the build action). The only operator
         // that can follow a complete `ty` in parameter position is this marker,
         // so there's no conflict with expression operators.
+        // `k: T = expr` declares a *keyword* parameter (the default is what
+        // makes it one — see `ast::Param::default`). After a complete `ty`,
+        // one token of lookahead (`EQ` vs `OP` vs FOLLOW(param)) picks the
+        // production, so the three forms never conflict.
         param = IDENT COLON ty => param
               | MUT IDENT COLON ty => mut_param
-              | IDENT COLON ty OP => variadic_param;
+              | IDENT COLON ty OP => variadic_param
+              | IDENT COLON ty EQ expr => with_default;
 
         return_ty = ARROW ty => present | _ => absent;
 
@@ -365,13 +370,17 @@ gazelle! {
              | arg_list COMMA => present_trailing
              | _ => empty;
         arg_list = arg => first | arg_list COMMA arg => rest;
-        // An argument is an ordinary expression, a lambda, or a bare operator
-        // passed as a value (`apply(2, 3, +)`). All three are confined to
-        // argument position (a lambda's/operator-value's only valid use), which
-        // keeps the expression grammar — and its operator precedence —
-        // untouched. An `OP`-token operator can't begin any other arg form, so
-        // it's unambiguous here; it desugars to a binary lambda.
-        arg = expr => expr | lambda => lambda | OP => op_value;
+        // An argument is an ordinary expression, a lambda, a bare operator
+        // passed as a value (`apply(2, 3, +)`), or a keyword argument
+        // (`f(1, k = 2)`). All are confined to argument position (a
+        // lambda's/operator-value's only valid use), which keeps the expression
+        // grammar — and its operator precedence — untouched. An `OP`-token
+        // operator can't begin any other arg form, so it's unambiguous here; it
+        // desugars to a binary lambda. A keyword argument is unambiguous too:
+        // `=` (EQ) never follows an expression, so after an IDENT the EQ
+        // lookahead selects this production over reducing the IDENT to an atom.
+        arg = expr => expr | lambda => lambda | OP => op_value
+            | IDENT EQ expr => kw_arg;
         lambda = PIPE lambda_params PIPE expr => lambda_expr
                | PIPE lambda_params PIPE block => lambda_block
                | OROR expr => lambda_noargs
@@ -991,12 +1000,23 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 ty,
                 mutable: false,
                 variadic: false,
+                default: None,
             },
             aipl::Param::MutParam((name, _), ty) => Param {
                 name,
                 ty,
                 mutable: true,
                 variadic: false,
+                default: None,
+            },
+            // `k: T = expr` — a keyword parameter (the default is what makes
+            // it one; see `ast::Param::default`).
+            aipl::Param::WithDefault((name, _), ty, default) => Param {
+                name,
+                ty,
+                mutable: false,
+                variadic: false,
+                default: Some(default),
             },
             // `x: T*` — a variadic parameter. The trailing operator must be `*`.
             // The stored type is the *sequence type* the body sees: `str` when
@@ -1022,6 +1042,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                     ty,
                     mutable: false,
                     variadic: true,
+                    default: None,
                 }
             }
         })
@@ -1941,6 +1962,12 @@ impl gazelle::Action<aipl::Arg<Self>> for Build {
         Ok(match node {
             aipl::Arg::Expr(e) | aipl::Arg::Lambda(e) => e,
             aipl::Arg::OpValue((c, span)) => op_value_lambda(c, span),
+            // `k = expr` — a keyword argument, spanning the name through the
+            // value. Resolved (and removed) by the loader's expansion.
+            aipl::Arg::KwArg((name, name_span), value) => {
+                let span = join_spans(&name_span, &value.span);
+                Expr::new(ExprKind::KwArg(name, Box::new(value)), span)
+            }
         })
     }
 }
@@ -3176,7 +3203,8 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::Not(x)
         | ExprKind::Field(x, _)
         | ExprKind::Try(x)
-        | ExprKind::Return(x) => bake_asserts(x, src),
+        | ExprKind::Return(x)
+        | ExprKind::KwArg(_, x) => bake_asserts(x, src),
         ExprKind::Construct(_, inits) => {
             for fi in inits {
                 bake_asserts(&mut fi.value, src);

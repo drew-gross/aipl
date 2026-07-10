@@ -4439,6 +4439,7 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
                 ty: cli_args_ty(),
                 mutable: false,
                 variadic: false,
+                default: None,
             }),
             [p] if p.ty == cli_args_ty() => wants_args = true,
             _ => {
@@ -8996,6 +8997,7 @@ fn compile_expr<M: Module>(
     } = cx;
     let span = expr.span.clone();
     Ok(match &expr.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),

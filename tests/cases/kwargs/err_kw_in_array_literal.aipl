@@ -1,0 +1,12 @@
+// The grammar shares the argument list with array literals, but a keyword
+// argument only means something in a call.
+fn main() -> i64 {
+    let xs = [a = 1];
+    0
+}
+--- errors ---
+error: a keyword argument is only valid in a function call's arguments
+ --> ./tests/cases/kwargs/err_kw_in_array_literal.aipl:4:15
+  |
+4 |     let xs = [a = 1];
+  |               ^^^^^

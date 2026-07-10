@@ -1,0 +1,8 @@
+fn f(a: i64, b: i64, c: i64 = 1) -> i64 { a }
+fn main() -> i64 { f(1, c = 2, 3) }
+--- errors ---
+error: positional argument after a keyword argument
+ --> ./tests/cases/kwargs/err_positional_after_kw.aipl:2:32
+  |
+2 | fn main() -> i64 { f(1, c = 2, 3) }
+  |                                ^

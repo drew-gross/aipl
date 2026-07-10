@@ -1,0 +1,9 @@
+// Builtins declare no keyword parameters.
+import { split, len } from builtins;
+fn main() -> i64 { "a,b".split(sep = ",").len() }
+--- errors ---
+error: "split" has no keyword parameter "sep" (a keyword parameter is one declared with a default, e.g. `k: i64 = 0`)
+ --> ./tests/cases/kwargs/err_kw_on_builtin.aipl:3:32
+  |
+3 | fn main() -> i64 { "a,b".split(sep = ",").len() }
+  |                                ^^^^^^^^^

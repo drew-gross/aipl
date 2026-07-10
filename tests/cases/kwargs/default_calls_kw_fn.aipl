@@ -1,0 +1,24 @@
+// A keyword parameter's default may itself call a function with keyword
+// parameters — the loader expands defaults recursively (`shifted(1)` fills
+// `by = base()`, whose call fills `x = 7`).
+import { wrapping_add as +, print, to_str } from builtins;
+fn base(x: i64 = 7) -> i64 { x }
+fn shifted(a: i64, by: i64 = base()) -> i64 { a + by }
+fn main() !prints {
+    print(to_str(shifted(1)));
+    print(to_str(shifted(1, by = base(x = 2))));
+}
+--- stdout ---
+8
+3
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 68
+binary size: 1376
+--- monomorphizations ---
+base
+main
+shifted

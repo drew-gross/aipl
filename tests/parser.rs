@@ -112,6 +112,7 @@ fn function_with_one_param() {
             ty: i64_ty(),
             mutable: false,
             variadic: false,
+            default: None,
         }]
     );
     assert_eq!(f.body, ident("x"));

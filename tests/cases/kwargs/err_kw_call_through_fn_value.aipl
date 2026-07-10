@@ -1,0 +1,10 @@
+// A call through a function-typed value takes no keyword arguments — a
+// function type has no keyword parameters.
+fn apply(g: (i64) -> i64) -> i64 { g(5, k = 1) }
+fn main() -> i64 { apply(|x| x) }
+--- errors ---
+error: "g" is a function value, and a function value takes no keyword arguments
+ --> ./tests/cases/kwargs/err_kw_call_through_fn_value.aipl:3:41
+  |
+3 | fn apply(g: (i64) -> i64) -> i64 { g(5, k = 1) }
+  |                                         ^^^^^

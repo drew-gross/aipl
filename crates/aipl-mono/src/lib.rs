@@ -192,6 +192,7 @@ fn lt_ty(
 /// type annotations. All other expression structure is preserved unchanged.
 fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<String>) -> Expr {
     let kind = match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Lambda(params, body) => {
             let new_params: Vec<LambdaParam> = params
                 .iter()
@@ -510,6 +511,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             ty,
                             mutable: p.mutable,
                             variadic: p.variadic,
+                            default: p.default.clone(),
                         }
                     })
                     .collect();
@@ -765,6 +767,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
             ty: subst_vars(&p.ty, &map),
             mutable: p.mutable,
             variadic: p.variadic,
+            default: p.default.clone(),
         })
         .collect();
     let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
@@ -1123,6 +1126,7 @@ impl Mono<'_> {
                             ty: ct.clone(),
                             mutable: false,
                             variadic: false,
+                            default: None,
                         });
                         cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
                     }
@@ -1224,6 +1228,7 @@ impl Mono<'_> {
                     ty,
                     mutable: p.mutable,
                     variadic: p.variadic,
+                    default: p.default.clone(),
                 }
             })
             .collect();
@@ -1276,6 +1281,7 @@ impl Mono<'_> {
                 ty: pty.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             })
             .collect();
         for (cn, ct) in captures {
@@ -1284,6 +1290,7 @@ impl Mono<'_> {
                 ty: ct.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             });
         }
         self.concrete.insert(
@@ -1390,6 +1397,7 @@ impl Mono<'_> {
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
             variadic: false,
+            default: None,
         }];
         let mut call_args = vec![rarr];
         let mut cap_idents: Vec<Expr> = Vec::new();
@@ -1401,6 +1409,7 @@ impl Mono<'_> {
                 ty: ct.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             });
             cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
@@ -1677,12 +1686,14 @@ impl Mono<'_> {
                 ty: Type::Array(Box::new(elem_a.clone())),
                 mutable: false,
                 variadic: false,
+                default: None,
             },
             Param {
                 name: "$b".to_string(),
                 ty: Type::Array(Box::new(elem_b.clone())),
                 mutable: false,
                 variadic: false,
+                default: None,
             },
         ];
         let mut call_args = vec![rarr_a, rarr_b];
@@ -1695,6 +1706,7 @@ impl Mono<'_> {
                 ty: ct.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             });
             cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
@@ -2076,6 +2088,7 @@ impl Mono<'_> {
             ty: arr_param_ty,
             mutable: false,
             variadic: false,
+            default: None,
         }];
         let mut call_args = vec![rarr];
         let mut pred_args = vec![id("$e")];
@@ -2087,6 +2100,7 @@ impl Mono<'_> {
                 ty: ct.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             });
             pred_args.push(id(&cap));
             call_args.push(self.infer(&id(cn), env)?.0);
@@ -2218,6 +2232,7 @@ impl Mono<'_> {
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
             variadic: false,
+            default: None,
         }];
         let mut call_args = vec![rarr];
         let mut cap_idents: Vec<Expr> = Vec::new();
@@ -2229,6 +2244,7 @@ impl Mono<'_> {
                 ty: ct.clone(),
                 mutable: false,
                 variadic: false,
+                default: None,
             });
             cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
@@ -2498,6 +2514,7 @@ impl Mono<'_> {
                     ty: param_ty,
                     mutable: false,
                     variadic: false,
+                    default: None,
                 }],
                 effects,
                 return_ty: Some(ret.clone()),
@@ -2741,6 +2758,7 @@ impl Mono<'_> {
         let span = expr.span.clone();
         let node = |kind| Expr::new(kind, span.clone());
         Ok(match &expr.kind {
+            ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Unit => (expr.clone(), Type::Unit),
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
@@ -3794,6 +3812,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
             ty,
             mutable: p.mutable,
             variadic: p.variadic,
+            default: p.default.clone(),
         });
     }
 
@@ -4088,6 +4107,7 @@ fn collect_free(
     seen: &mut HashSet<String>,
 ) {
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Ident(n) => {
             if !bound.contains(n) && !seen.contains(n) {
                 if let Some(t) = env.get(n) {
@@ -4245,6 +4265,7 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
 /// builtin), since AIPL has no global variables.
 fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String, usize>) {
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Ident(n) => {
             if !bound.contains(n) {
                 *counts.entry(n.clone()).or_insert(0) += 1;
@@ -4618,6 +4639,7 @@ fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
 /// The direct sub-expressions of `e` (read-only traversal helper).
 fn children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -4749,6 +4771,7 @@ fn replace_call(
         replace_call(x, fname, fparam_names, fbody, counter, replaced)
     };
     let kind = match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -4906,6 +4929,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         m
     };
     let kind = match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
         ExprKind::Call(name, args, m) => ExprKind::Call(
             sub(name),
@@ -5084,6 +5108,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
     let rec = |x: &Expr| aliases_or_unsafe(name, x, iterating, false);
     let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail);
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Ident(n) => n == name && !tail,
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -5213,6 +5238,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
 pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
     let c = |x: &Expr| count_ident(name, x);
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Ident(n) => usize::from(n == name),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -5250,6 +5276,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
 /// body)` — the local a moved parameter is consumed into.
 fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
     match &e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::LetMut(y, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
             Some((y.as_str(), body))
         }

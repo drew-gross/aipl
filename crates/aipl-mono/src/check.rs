@@ -253,6 +253,31 @@ impl Cx<'_> {
             self.check_ty(rt, &type_var_names, &f.name)?;
         }
 
+        // Keyword-parameter defaults are checked like struct field defaults: in
+        // an empty environment (a default can't reference other parameters —
+        // it is spliced into *call sites*, where none are in scope). Effects
+        // are the function's own declared set: every caller must cover the
+        // callee's effects anyway, so a spliced default's effects are covered
+        // wherever it lands. The expected type gets the same type-variable
+        // substitution as the body check, so a generic function stays checkable.
+        for p in &f.sig.params {
+            if let Some(default) = &p.default {
+                let dt = self.check_expr(default, &HashMap::new(), &f.sig.effects)?;
+                let pty = subst_typevars(&p.ty, &type_var_names);
+                let dt = self.flex_int(default, &dt, &pty)?;
+                expect(
+                    &dt,
+                    &pty,
+                    &format!(
+                        "default for fn {:?} parameter {:?}",
+                        display(&f.name),
+                        p.name
+                    ),
+                    default.span.clone(),
+                )?;
+            }
+        }
+
         // Generic bodies are checked abstractly: each type variable (a declared
         // `<T>` or an anonymous `any`) is replaced by the permissive `__unknown__`
         // wildcard, so the body's *structural* type rules are still enforced (you
@@ -701,6 +726,7 @@ impl Cx<'_> {
     fn check_expr(&self, expr: &Expr, env: &Env, effects: &[String]) -> Result<Type, Error> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
+            ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Unit => Type::Unit,
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),

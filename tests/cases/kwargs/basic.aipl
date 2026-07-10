@@ -1,0 +1,25 @@
+import { wrapping_add as +, *, ==, print, to_str } from builtins;
+fn scaled(n: i64, bump: i64 = 100, scale: i64 = 2) -> i64 { (n + bump) * scale }.test({
+    assert(scaled(1) == 202);
+    assert(scaled(1, bump = 5) == 12);
+    assert(scaled(1, scale = 3, bump = 0) == 3);
+})
+fn main() !prints {
+    print(to_str(scaled(1)));
+    print(to_str(scaled(1, bump = 5)));
+    print(to_str(scaled(1, scale = 3, bump = 0)));
+}
+--- stdout ---
+202
+12
+3
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 100
+binary size: 1448
+--- monomorphizations ---
+main
+scaled
