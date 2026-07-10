@@ -1193,17 +1193,40 @@ impl<'s> Walker<'s> {
             let pat = self.pattern()?;
             self.expect("=>")?;
             let body = self.expr()?;
-            arms.push(concat(vec![lead, pat, text(" => "), body]));
             if self.peek_text() == "," {
                 self.bump();
             }
+            // A same-line `// comment` after the arm rides on its line.
+            let trailing = self.trailing_comment();
+            arms.push(concat(vec![
+                lead,
+                pat,
+                text(" => "),
+                body,
+                text(","),
+                trailing,
+            ]));
         }
         self.expect("}")?;
+        let head = concat(vec![text("match ("), scrutinee, text(") ")]);
+        if arms.is_empty() {
+            return Ok(concat(vec![head, text("{}")]));
+        }
+        // A `match` always lays out one arm per line (hard breaks), never
+        // collapsing onto a single line even when it would fit — and the hard
+        // breaks force any enclosing group (a `let` value, a call argument) to
+        // break around it too.
+        let mut inner: Vec<Doc> = Vec::new();
+        for arm in arms {
+            inner.push(Doc::HardLine);
+            inner.push(arm);
+        }
         Ok(concat(vec![
-            text("match ("),
-            scrutinee,
-            text(") "),
-            self.comma_list_docs(arms, ListStyle::SpacedBraces),
+            head,
+            text("{"),
+            indent(concat(inner)),
+            Doc::HardLine,
+            text("}"),
         ]))
     }
 

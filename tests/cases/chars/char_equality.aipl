@@ -1,7 +1,10 @@
 import { == } from builtins;
 
 fn second_is_e() -> i64 {
-    match ("hello"[1]) { some(c) => if (c == 'e') { 101 } else { 0 }, none => 0 }
+    match ("hello"[1]) {
+        some(c) => if (c == 'e') { 101 } else { 0 },
+        none => 0,
+    }
 }.test({
     assert(second_is_e() == 101);
     assert("hello"[1] == some('e'));

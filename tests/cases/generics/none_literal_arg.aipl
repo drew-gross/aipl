@@ -3,7 +3,12 @@ import { == } from builtins;
 // A bare `none` passed to an `any?` parameter pins the type variable to the
 // `NoneLiteral` pseudo-type and monomorphizes the function for the none-only
 // case. `match` over the param always takes the `none` arm.
-fn is_present(x: any?) -> bool { match (x) { some(v) => true, none => false } }.test({
+fn is_present(x: any?) -> bool {
+    match (x) {
+        some(v) => true,
+        none => false,
+    }
+}.test({
     assert(is_present(none) == false);
 })
 --- performance ---
@@ -12,7 +17,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 33
-binary size: 1376
+binary size: 1384
 --- monomorphizations ---
 __test$is_present
 is_present$NoneLiteral

@@ -18,7 +18,10 @@ fn main() !prints {
     let v = match (a) {
         some(x1) => match (x1) {
             some(x2) => match (x2) {
-                some(x3) => match (x3) { some(x4) => x4, none => -1 },
+                some(x3) => match (x3) {
+                    some(x4) => x4,
+                    none => -1,
+                },
                 none => -2,
             },
             none => -3,

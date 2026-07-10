@@ -27,7 +27,14 @@ fn main() !prints {
     // match arm merge — the none arm's deep none takes the some arm's concrete
     // type. (`xs[0]` is `i64???`; unwrapping once binds `inner : i64??`.)
     let xs = [some(some(9))];
-    print(to_str(match (xs[0]) { some(inner) => inner, none => some(none) })); // some(some(9))
+    print(
+        to_str(
+            match (xs[0]) {
+                some(inner) => inner,
+                none => some(none),
+            },
+        ),
+    ); // some(some(9))
 }
 --- stdout ---
 some(some(none))

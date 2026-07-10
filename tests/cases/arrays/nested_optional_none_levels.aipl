@@ -34,17 +34,34 @@ fn main() !prints {
 
     // Matching peels one `some` per level; a `none` at a level stops the peel.
     print(
-        to_str(match (none2()) { some(i) => match (i) { some(v) => v, none => -1 }, none => -2 }),
+        to_str(
+            match (none2()) {
+                some(i) => match (i) {
+                    some(v) => v,
+                    none => -1,
+                },
+                none => -2,
+            },
+        ),
     ); // -2
     print(
         to_str(
-            match (wrap2(none)) { some(i) => match (i) { some(v) => v, none => -1 }, none => -2 },
+            match (wrap2(none)) {
+                some(i) => match (i) {
+                    some(v) => v,
+                    none => -1,
+                },
+                none => -2,
+            },
         ),
     ); // -1
     print(
         to_str(
             match (wrap2(some(5))) {
-                some(i) => match (i) { some(v) => v, none => -1 },
+                some(i) => match (i) {
+                    some(v) => v,
+                    none => -1,
+                },
                 none => -2,
             },
         ),

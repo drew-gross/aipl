@@ -13,7 +13,10 @@ fn count_h(cs: char[]) -> i64 {
 })
 
 fn first_true(bs: bool[]) -> i64 {
-    match (bs[0]) { some(v) => if (v) { 1 } else { 0 }, none => -1 }
+    match (bs[0]) {
+        some(v) => if (v) { 1 } else { 0 },
+        none => -1,
+    }
 }.test({
     assert(first_true([true, false]) == 1);
     assert(first_true([false, true]) == 0);

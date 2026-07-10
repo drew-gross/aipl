@@ -2,7 +2,12 @@ import { == } from builtins;
 
 // A generic over `any?`: monomorphized per optional inner type at each call.
 
-fn is_present(x: any?) -> bool { match (x) { some(v) => true, none => false } }.test({
+fn is_present(x: any?) -> bool {
+    match (x) {
+        some(v) => true,
+        none => false,
+    }
+}.test({
     assert(is_present(some(7)) == true); // i64? some
     assert(is_present(some('z')) == true); // char? some
     assert(is_present(""[0]) == false); // char? none (index past end)

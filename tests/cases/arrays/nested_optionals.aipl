@@ -7,7 +7,13 @@ import { -, print, to_str } from builtins;
 
 // `T??` parameter: unwrap two levels.
 fn unwrap2(x: i64??) -> i64 {
-    match (x) { some(inner) => match (inner) { some(v) => v, none => -1 }, none => -2 }
+    match (x) {
+        some(inner) => match (inner) {
+            some(v) => v,
+            none => -1,
+        },
+        none => -2,
+    }
 }
 
 // `T??` return type (built and handed back via sret).

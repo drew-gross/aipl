@@ -13,7 +13,12 @@ fn validate(a: i64, b: i64) -> !str {
     ok()
 }
 
-fn describe(r: !str) -> str { match (r) { ok => "valid", err(e) => "invalid: " + e } }.test({
+fn describe(r: !str) -> str {
+    match (r) {
+        ok => "valid",
+        err(e) => "invalid: " + e,
+    }
+}.test({
     assert(describe(validate(1, 2)) == "valid");
     assert(describe(validate(-1, 2)) == "invalid: negative");
     assert(describe(validate(1, -2)) == "invalid: negative");

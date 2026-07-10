@@ -12,12 +12,20 @@ fn sum_pos(a: i64, b: i64) -> i64!str {
     ok(x + y)
 }
 
-fn unwrap_or(r: i64!str, d: i64) -> i64 { match (r) { ok(v) => v, err(e) => d } }.test({
+fn unwrap_or(r: i64!str, d: i64) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => d,
+    }
+}.test({
     // Both ok → unwrapped sum.
     assert(unwrap_or(sum_pos(3, 4), -1) == 7);
 
     // First arg errors → that err is propagated, second step never runs.
-    match (sum_pos(-1, 4)) { ok(v) => assert(false), err(e) => assert(e == "negative") };
+    match (sum_pos(-1, 4)) {
+        ok(v) => assert(false),
+        err(e) => assert(e == "negative"),
+    };
 
     // Second arg errors → its err propagates.
     assert(unwrap_or(sum_pos(2, -9), -1) == -1);

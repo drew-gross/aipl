@@ -1,14 +1,19 @@
 import { ==, print, to_str } from builtins;
 
 // A string-literal pattern only matches a `str` scrutinee, not an optional.
-fn label(x: i64?) -> str { match (x) { "a" => "x", _ => "y" } }
+fn label(x: i64?) -> str {
+    match (x) {
+        "a" => "x",
+        _ => "y",
+    }
+}
 
 fn main() !prints {
     print(label(some(1)));
 }
 --- errors ---
 error: string-literal pattern matches a str, not i64?
- --> ./tests/cases/options/err_match_str_literal.aipl:4:40
+ --> ./tests/cases/options/err_match_str_literal.aipl:6:9
   |
-4 | fn label(x: i64?) -> str { match (x) { "a" => "x", _ => "y" } }
-  |                                        ^^^
+6 |         "a" => "x",
+  |         ^^^

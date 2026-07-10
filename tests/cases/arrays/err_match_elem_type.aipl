@@ -1,14 +1,19 @@
 import { print, to_str } from builtins;
 
 // A pattern element's type must match the scrutinee's element type.
-fn code(xs: i64[]) -> i64 { match (xs) { ["a", "b"] => 1, _ => 0 } }
+fn code(xs: i64[]) -> i64 {
+    match (xs) {
+        ["a", "b"] => 1,
+        _ => 0,
+    }
+}
 
 fn main() !prints {
     print(to_str(code([1, 2])));
 }
 --- errors ---
 error: array-pattern element: expected i64, got str
- --> ./tests/cases/arrays/err_match_elem_type.aipl:4:43
+ --> ./tests/cases/arrays/err_match_elem_type.aipl:6:10
   |
-4 | fn code(xs: i64[]) -> i64 { match (xs) { ["a", "b"] => 1, _ => 0 } }
-  |                                           ^^^
+6 |         ["a", "b"] => 1,
+  |          ^^^

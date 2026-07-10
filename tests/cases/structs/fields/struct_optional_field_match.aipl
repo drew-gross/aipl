@@ -4,7 +4,12 @@ import { wrapping_add as +, -, == } from builtins;
 // directly — here through a struct passed by reference as a parameter.
 struct Cell { v: i64? }
 
-fn describe(c: Cell) -> i64 { match (c.v) { some(x) => x, none => 0 - 1 } }.test({
+fn describe(c: Cell) -> i64 {
+    match (c.v) {
+        some(x) => x,
+        none => 0 - 1,
+    }
+}.test({
     let full = Cell { v: some(99) };
     let empty = Cell { v: none };
     assert(describe(full) == 99);

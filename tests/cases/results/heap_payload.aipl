@@ -13,7 +13,10 @@ fn greet(k: str) -> str!str {
 }
 
 fn show(r: str!str) -> str {
-    match (r) { ok(v) => "ok(" + v + ")", err(e) => "err(" + e + ")" }
+    match (r) {
+        ok(v) => "ok(" + v + ")",
+        err(e) => "err(" + e + ")",
+    }
 }.test({
     assert(show(greet("x")) == "ok(hello found-x)");
     assert(show(greet("y")) == "err(missing: y)");

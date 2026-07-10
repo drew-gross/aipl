@@ -1,7 +1,10 @@
 import { == } from builtins;
 
 fn code(c: char?) -> i64 {
-    match (c) { some(v) => if (v == 'A') { 65 } else { 0 }, none => 0 }
+    match (c) {
+        some(v) => if (v == 'A') { 65 } else { 0 },
+        none => 0,
+    }
 }.test({
     assert(code(some('A')) == 65);
     assert(code(some('B')) == 0);

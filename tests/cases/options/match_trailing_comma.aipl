@@ -1,6 +1,11 @@
 import { == } from builtins;
 
-fn unwrap(x: i64?) -> i64 { match (x) { some(v) => v, none => 0 } }.test({
+fn unwrap(x: i64?) -> i64 {
+    match (x) {
+        some(v) => v,
+        none => 0,
+    }
+}.test({
     assert(unwrap(some(42)) == 42);
     assert(unwrap(none) == 0);
 })

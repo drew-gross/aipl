@@ -22,7 +22,10 @@ fn first(path: str) !read_files -> str!Error {
 }
 
 fn describe(path: str) !read_files -> str {
-    match (first(path)) { ok(c) => "read: " + c, err(e) => "error: " + e }
+    match (first(path)) {
+        ok(c) => "read: " + c,
+        err(e) => "error: " + e,
+    }
     // e: Error concatenated as a str
 }.test({
     assert(describe("data.txt") == "read: hi");

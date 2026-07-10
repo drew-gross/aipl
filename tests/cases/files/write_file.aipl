@@ -9,7 +9,10 @@ fn write_to(path: str, contents: str) !write_files -> !str {
     write_string_to_file(path, contents)
 }.test({
     // ok() on a writable path.
-    match (write_to("rt.txt", "ok")) { ok => assert(true), err(e) => assert(false) };
+    match (write_to("rt.txt", "ok")) {
+        ok => assert(true),
+        err(e) => assert(false),
+    };
     // err(message) when the directory doesn't exist.
     match (write_to("no_such_dir/x.txt", "data")) {
         ok => assert(false),

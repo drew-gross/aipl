@@ -13,7 +13,13 @@ fn classify(s: str) -> str {
     }
 }
 
-fn code(s: str) -> i64 { match (s) { "a" => 1, "bb" => 2, _ => 0 } }
+fn code(s: str) -> i64 {
+    match (s) {
+        "a" => 1,
+        "bb" => 2,
+        _ => 0,
+    }
+}
 
 fn main() !prints {
     print(classify("foo")); // got foo
