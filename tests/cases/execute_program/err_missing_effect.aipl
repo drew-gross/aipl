@@ -3,7 +3,7 @@ import { print, execute_program } from builtins;
 // `execute_program` has the `!execute_program` effect; a caller that doesn't
 // declare it is rejected.
 fn main() !prints {
-    match (execute_program("echo", [])) {
+    match (execute_program("echo")) {
         ok(r) => print(r.stdout),
         err(e) => print(e),
     };
@@ -12,5 +12,5 @@ fn main() !prints {
 error: fn "execute_program" has effect "!execute_program" but the calling function does not declare it
  --> ./tests/cases/execute_program/err_missing_effect.aipl:6:12
   |
-6 |     match (execute_program("echo", [])) {
-  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     match (execute_program("echo")) {
+  |            ^^^^^^^^^^^^^^^^^^^^^^

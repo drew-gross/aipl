@@ -3,7 +3,7 @@ import { wrapping_add as +, print, execute_program } from builtins;
 // A launch failure (program not found) is `err(message)` — the only case
 // that's `err` rather than `ok(ExecResult)`.
 fn main() !prints !execute_program {
-    match (execute_program("no_such_binary_xyz_123", ["a", "b"])) {
+    match (execute_program("no_such_binary_xyz_123", args = ["a", "b"])) {
         ok(r) => print("ok"),
         err(e) => print("err:[" + e + "]"),
     };

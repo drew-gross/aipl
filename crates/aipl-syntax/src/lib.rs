@@ -1032,8 +1032,10 @@ fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Err
 // Spawn `self` with `args` (no shell involved) and wait for it to finish:
 // `ok(ExecResult)` whenever it was actually launched, whatever it then exited
 // with; `err(message)` only if it couldn't be launched at all (not found,
-// permission denied, ...).
-fn __builtin_execute_program(self: str, args: str[]) !execute_program -> __builtin_ExecResult!Error {
+// permission denied, ...). `args` is a keyword parameter defaulting to no
+// arguments, so `"true".execute_program()` runs a bare program and
+// `"echo".execute_program(args = ["hi"])` passes argv.
+fn __builtin_execute_program(self: str, args: str[] = []) !execute_program -> __builtin_ExecResult!Error {
     ok(__builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 })
 }
 

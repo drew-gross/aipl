@@ -1,23 +1,26 @@
 import { wrapping_add as +, print, to_str, execute_program } from builtins;
 
-// `execute_program(program, args) -> ExecResult!Error` spawns `program` with
-// `args` (argv-style, no shell) and waits for it, capturing stdout/stderr and
-// the exit code: `ok(ExecResult)` for any run that was actually launched
-// (whatever it then exited with), `err(message)` only if it couldn't be
-// launched at all (not found, permission denied, ...). It carries the
-// `!execute_program` effect, so `main` must declare it.
+// `execute_program(program, args = [...]) -> ExecResult!Error` spawns
+// `program` with `args` (argv-style, no shell) and waits for it, capturing
+// stdout/stderr and the exit code: `ok(ExecResult)` for any run that was
+// actually launched (whatever it then exited with), `err(message)` only if it
+// couldn't be launched at all (not found, permission denied, ...). `args` is a
+// keyword parameter defaulting to no arguments, so `execute_program("true")`
+// runs a bare program. It carries the `!execute_program` effect, so `main`
+// must declare it.
 fn main() !prints !execute_program {
-    match (execute_program("echo", ["hello", "world"])) {
+    match (execute_program("echo", args = ["hello", "world"])) {
         ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
         err(e) => print("err:[" + e + "]"),
     };
 
-    match (execute_program("sh", ["-c", "echo out; echo err >&2; exit 7"])) {
+    match (execute_program("sh", args = ["-c", "echo out; echo err >&2; exit 7"])) {
         ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
         err(e) => print("err:[" + e + "]"),
     };
 
-    match (execute_program("true", [])) {
+    // `args` omitted — defaults to no arguments.
+    match (execute_program("true")) {
         ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
         err(e) => print("err:[" + e + "]"),
     };

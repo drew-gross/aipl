@@ -30,7 +30,12 @@ use aipl_syntax::{Error, Span};
 /// function without that keyword parameter, duplicate/positional-after-keyword
 /// arguments, or a function with keyword parameters used as a value.
 pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
-    let mut fns: HashMap<String, FnKwInfo> = HashMap::new();
+    // Builtins with keyword parameters (currently just `execute_program`'s
+    // `args`) participate too: their calls are already rewritten to canonical
+    // `__builtin_*` names by this point, and the info comes straight from the
+    // single source of truth, `BUILTIN_SIGNATURES`. Seed them first; a user
+    // item can never shadow a reserved `__builtin_*` name.
+    let mut fns: HashMap<String, FnKwInfo> = builtin_kw_infos()?;
     for item in &program.items {
         let Item::Fn(f) = item else { continue };
         fns.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
@@ -123,6 +128,24 @@ impl FnKwInfo {
         }
         Ok(FnKwInfo { positional, kw })
     }
+}
+
+/// Keyword-parameter info for every builtin that declares one, keyed by the
+/// canonical `__builtin_*` name its calls carry after loader rewriting. Parsed
+/// from `BUILTIN_SIGNATURES` so a builtin gains a keyword parameter simply by
+/// declaring a default there — no second list to keep in sync. Builtins with no
+/// defaulted parameter are skipped (an all-positional call needs no info).
+fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
+    let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
+        .expect("builtin signatures are valid AIPL");
+    let mut map = HashMap::new();
+    for item in &program.items {
+        let Item::Fn(f) = item else { continue };
+        if f.sig.params.iter().any(|p| p.default.is_some()) {
+            map.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
+        }
+    }
+    Ok(map)
 }
 
 struct Expander {
