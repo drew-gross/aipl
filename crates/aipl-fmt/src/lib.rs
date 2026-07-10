@@ -144,7 +144,7 @@ fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
         let mut v: Vec<String> = toks
             .iter()
             .filter(|(_, sp)| &src[(*sp).clone()] != ",")
-            .map(|(k, sp)| format!("{k:?} {}", &src[sp.clone()]))
+            .map(|(k, sp)| format!("{k:?} {}", canonical_raw(&src[sp.clone()])))
             .collect();
         v.sort();
         v
@@ -174,6 +174,23 @@ fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
         ));
     }
     Ok(())
+}
+
+/// Canonicalize a token's raw text for the preservation check: a multi-line
+/// raw-string / template token whose last line is a bare closing delimiter has
+/// that line's leading whitespace collapsed, so the formatter's re-indentation
+/// of the closing `"""` / ``` ``` ``` (its only edit to a raw block) reads as
+/// no change. Every other token — and every content line — is left as-is, so a
+/// real corruption still trips the check.
+fn canonical_raw(text: &str) -> String {
+    if let Some(nl) = text.rfind('\n') {
+        let (head, last) = text.split_at(nl + 1);
+        let trimmed = last.trim_start();
+        if trimmed == "\"\"\"" || trimmed == "```" {
+            return format!("{head}{trimmed}");
+        }
+    }
+    text.to_string()
 }
 
 /// Binary operator spellings as they appear in token text.
@@ -506,7 +523,14 @@ impl<'s> Walker<'s> {
             let arg = if self.peek_text() == "{" {
                 self.block()?
             } else {
-                text(self.bump()) // the doc string, verbatim
+                // The doc string, verbatim — a `"""` raw block aligns its
+                // closing delimiter under the opening; a plain `"..."` is text.
+                let t = self.bump();
+                if t.starts_with("\"\"\"") {
+                    doc::raw_block(t)
+                } else {
+                    text(t)
+                }
             };
             self.expect(")")?;
             sig.push(text(format!(".{attr}(")));
@@ -1028,8 +1052,19 @@ impl<'s> Walker<'s> {
     fn atom(&mut self) -> Result<Doc, Error> {
         match self.peek_kind() {
             Some(FmtTokenKind::TemplateHead) => return self.template_verbatim(),
+            Some(FmtTokenKind::Plain(TokenKind::Str)) => {
+                // A `"""..."""` raw string is a [`RawBlock`] so its closing
+                // delimiter aligns under the opening one; a plain `"..."`
+                // string is ordinary verbatim text.
+                let t = self.bump();
+                return Ok(if t.starts_with("\"\"\"") {
+                    doc::raw_block(t)
+                } else {
+                    text(t)
+                });
+            }
             Some(FmtTokenKind::Plain(
-                TokenKind::Number | TokenKind::Str | TokenKind::Char | TokenKind::Constant,
+                TokenKind::Number | TokenKind::Char | TokenKind::Constant,
             )) => return Ok(text(self.bump())),
             _ => {}
         }
@@ -1327,7 +1362,10 @@ impl<'s> Walker<'s> {
         while self.comments.front().is_some_and(|c| c.start < end) {
             self.comments.pop_front();
         }
-        Ok(text(&self.src[start..end]))
+        // A triple-backtick template is a raw block (its closing ``` aligns
+        // under the opening); a single-backtick template has no own-line
+        // closing delimiter, so `reindent_closing` leaves it untouched.
+        Ok(doc::raw_block(&self.src[start..end]))
     }
 
     // ---------- shared list machinery ----------

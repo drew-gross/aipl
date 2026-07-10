@@ -39,10 +39,42 @@ pub enum Doc {
     /// line, so nothing may be flattened onto the line after it — the
     /// *existing* separators then supply the actual newline.
     BreakParent,
+    /// A verbatim multi-line raw-string (`"""..."""`) or triple-backtick
+    /// template atom. Like [`Doc::Text`] it is emitted byte-for-byte and forces
+    /// enclosing groups to break — *except* its closing-delimiter line, whose
+    /// leading whitespace is re-indented to the column the atom opened at, so
+    /// the opening and closing triples line up. Only the blank closing line is
+    /// touched (never a content line), and `process_raw_string` drops that line
+    /// regardless, so the string's value is unchanged.
+    RawBlock(String),
 }
 
 pub fn text(s: impl Into<String>) -> Doc {
     Doc::Text(s.into())
+}
+
+/// A verbatim raw-string / triple-backtick atom whose closing delimiter is
+/// aligned under its opening delimiter at print time — see [`Doc::RawBlock`].
+pub fn raw_block(s: impl Into<String>) -> Doc {
+    Doc::RawBlock(s.into())
+}
+
+/// Re-indent a raw block's *closing-delimiter line* to `start_col` columns.
+/// Only the final line is considered, and only when it is whitespace followed
+/// by a bare `"""` / ``` ``` ``` — the semantically inert blank closing line.
+/// Everything before it (the opening delimiter and every content line) is left
+/// exactly as written, so the de-dented string value can't shift.
+pub fn reindent_closing(s: &str, start_col: usize) -> String {
+    let Some(nl) = s.rfind('\n') else {
+        return s.to_string();
+    };
+    let (head, last) = s.split_at(nl + 1);
+    let trimmed = last.trim_start();
+    if trimmed == "\"\"\"" || trimmed == "```" {
+        format!("{head}{}{trimmed}", " ".repeat(start_col))
+    } else {
+        s.to_string()
+    }
 }
 
 pub fn concat(docs: Vec<Doc>) -> Doc {
@@ -69,7 +101,7 @@ pub fn group(d: Doc) -> Doc {
 /// forced inner group means the outer can't be flat either.
 fn has_hard(d: &Doc) -> bool {
     match d {
-        Doc::Text(s) => s.contains('\n'),
+        Doc::Text(s) | Doc::RawBlock(s) => s.contains('\n'),
         Doc::Concat(ds) => ds.iter().any(has_hard),
         Doc::Line | Doc::SoftLine | Doc::IfBroken(_) => false,
         Doc::HardLine | Doc::BlankLine | Doc::BreakParent => true,
@@ -102,6 +134,21 @@ pub fn print(doc: &Doc, max_width: usize) -> String {
                     Some(i) => s.len() - i - 1,
                     None => col + s.len(),
                 };
+            }
+            Doc::RawBlock(s) => {
+                // Align the closing delimiter to the *opening line's* indent
+                // (`ind * INDENT`), not the raw column the triple opened at.
+                // When the opening triple begins its own line the two are equal
+                // — closing lands directly under opening — and when it's
+                // mid-line (`... }.doc("""`) the closing aligns to the
+                // statement indent instead of hanging far to the right. Content
+                // lines are emitted verbatim.
+                let rendered = reindent_closing(s, ind * INDENT);
+                col = match rendered.rfind('\n') {
+                    Some(i) => rendered.len() - i - 1,
+                    None => col + rendered.len(),
+                };
+                out.push_str(&rendered);
             }
             Doc::Concat(ds) => {
                 for child in ds.iter().rev() {
@@ -176,7 +223,7 @@ fn fits(budget: usize, candidate: &Doc, rest: &[(usize, Mode, &Doc)]) -> bool {
             return false;
         }
         match d {
-            Doc::Text(s) => {
+            Doc::Text(s) | Doc::RawBlock(s) => {
                 if s.contains('\n') {
                     // A multi-line atom can't be part of a flat line.
                     return mode != Mode::Flat;

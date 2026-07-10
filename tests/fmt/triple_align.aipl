@@ -1,0 +1,51 @@
+import { print } from builtins;
+fn main() !prints {
+    // Opening triple on its own line: the closing triple lands directly under
+    // it (both at the statement indent); content lines are kept verbatim.
+    print(
+        """
+        four spaces
+      two spaces
+    """,
+    );
+    // Triple-backtick template: same alignment of the closing fence.
+    let name = "world";
+    print(
+        ```
+        indented {name}
+    ```,
+    );
+}
+// A mid-line opening (`... }.doc("""`): the closing aligns to the opening
+// line's indentation (here 0), not the far-right column of the opening triple.
+fn documented() -> i64 { 0 }.doc("""
+Line one.
+Line two.
+""")
+--- formatted ---
+import { print } from builtins;
+
+fn main() !prints {
+    // Opening triple on its own line: the closing triple lands directly under
+    // it (both at the statement indent); content lines are kept verbatim.
+    print(
+        """
+        four spaces
+      two spaces
+        """,
+    );
+    // Triple-backtick template: same alignment of the closing fence.
+    let name = "world";
+    print(
+        ```
+        indented {name}
+        ```,
+    );
+}
+
+// A mid-line opening (`... }.doc("""`): the closing aligns to the opening
+// line's indentation (here 0), not the far-right column of the opening triple.
+fn documented() -> i64 { 0 }.doc("""
+Line one.
+Line two.
+""")

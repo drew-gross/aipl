@@ -7,7 +7,7 @@ fn main() !prints -> i64 {
       first
 
       second
-    """,
+        """,
     );
     0
 }

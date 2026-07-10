@@ -10,7 +10,7 @@ fn main() !prints {
         ```
         indented {name}
         and {n}
-    ```,
+        ```,
     );
     print(```prefix {name} middle {n} suffix```);
 }

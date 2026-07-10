@@ -8,14 +8,14 @@ fn main() !prints -> i64 {
         """
         four spaces
       two spaces
-    """,
+        """,
     );
     print("----");
     print(
         """
 flush left
     indented under it
-    """,
+        """,
     );
     0
 }

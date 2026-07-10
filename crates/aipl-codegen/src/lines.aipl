@@ -11,7 +11,7 @@ would drop it), and an empty `self` yields a single empty element.
         a
         b
         c
-        """,
+            """,
         )
             == ["a", "b", "c"],
     );
@@ -24,7 +24,7 @@ would drop it), and an empty `self` yields a single empty element.
         a
         b
 
-        """,
+            """,
         )
             == ["a", "b", ""],
     );
@@ -36,7 +36,7 @@ would drop it), and an empty `self` yields a single empty element.
             """
         first long line
         second long line
-        """,
+            """,
         )
             == ["first long line", "second long line"],
     );
@@ -47,4 +47,4 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 656
 instructions executed: 730
-binary size: 7384
+binary size: 7392

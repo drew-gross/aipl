@@ -43,7 +43,21 @@ fn aipl_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// sorted unit; every other token must survive in exact order.
 fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     let (toks, comments) = lex_tokens_and_comments(src).expect("lexes");
-    let text = |sp: &Span| src[sp.clone()].to_string();
+    // Collapse a raw-string / template *closing-delimiter* line's indentation:
+    // the formatter re-aligns the closing `"""` / ``` ``` ``` under the opening
+    // one, which is a deliberate (value-preserving) change, so it must not read
+    // as a token difference here. Content lines keep their exact bytes.
+    let text = |sp: &Span| -> String {
+        let t = &src[sp.clone()];
+        if let Some(nl) = t.rfind('\n') {
+            let (head, last) = t.split_at(nl + 1);
+            let trimmed = last.trim_start();
+            if trimmed == "\"\"\"" || trimmed == "```" {
+                return format!("{head}{trimmed}");
+            }
+        }
+        t.to_string()
+    };
     let mut imports: Vec<String> = Vec::new();
     let mut rest: Vec<String> = Vec::new();
     let mut i = 0;

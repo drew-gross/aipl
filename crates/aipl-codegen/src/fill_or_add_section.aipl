@@ -96,7 +96,7 @@ instead of requiring it to exist.
         --- bar ---
         b
 
-        """,
+            """,
             "foo",
             "new",
         )
@@ -107,7 +107,7 @@ instead of requiring it to exist.
         --- bar ---
         b
 
-        """,
+            """,
     );
     // Section present: multi-line old body, all of it dropped.
     assert(
@@ -117,7 +117,7 @@ instead of requiring it to exist.
         old1
         old2
 
-        """,
+            """,
             "foo",
             "new",
         )
@@ -125,7 +125,7 @@ instead of requiring it to exist.
         --- foo ---
         new
 
-        """,
+            """,
     );
 
     // Section present: the header is the final, unterminated line (no
@@ -134,7 +134,7 @@ instead of requiring it to exist.
         fill_or_add_section(
             """
         --- foo ---
-        """,
+            """,
             "foo",
             "new",
         )
@@ -142,7 +142,7 @@ instead of requiring it to exist.
         --- foo ---
         new
 
-        """,
+            """,
     );
     // Section present: old body is the final, unterminated content.
     assert(
@@ -150,7 +150,7 @@ instead of requiring it to exist.
             """
         --- foo ---
         old
-        """,
+            """,
             "foo",
             "new",
         )
@@ -158,7 +158,7 @@ instead of requiring it to exist.
         --- foo ---
         new
 
-        """,
+            """,
     );
 
     // Section present: adjacent headers — an empty old body (the next line is
@@ -171,7 +171,7 @@ instead of requiring it to exist.
         --- bar ---
         X
 
-        """,
+            """,
             "foo",
             "new",
         )
@@ -181,7 +181,7 @@ instead of requiring it to exist.
         --- bar ---
         X
 
-        """,
+            """,
     );
 
     // Section missing: appended after stripping trailing newlines.
@@ -190,7 +190,7 @@ instead of requiring it to exist.
             """
         code
 
-        """,
+            """,
             "stdout",
             "hi",
         )
@@ -199,7 +199,7 @@ instead of requiring it to exist.
         --- stdout ---
         hi
 
-        """,
+            """,
     );
     // Missing, with several trailing newlines to strip first.
     assert(
@@ -209,7 +209,7 @@ instead of requiring it to exist.
 
 
 
-        """,
+            """,
             "stdout",
             "hi",
         )
@@ -218,7 +218,7 @@ instead of requiring it to exist.
         --- stdout ---
         hi
 
-        """,
+            """,
     );
     // Missing, no trailing newline at all.
     assert(
@@ -228,7 +228,7 @@ instead of requiring it to exist.
         --- stdout ---
         hi
 
-        """,
+            """,
     );
     // Empty input, section missing.
     assert(
@@ -238,7 +238,7 @@ instead of requiring it to exist.
         --- stdout ---
         hi
 
-        """,
+            """,
     );
 
     // An indented `--- foo ---` line isn't a real header (must start at column
@@ -250,7 +250,7 @@ instead of requiring it to exist.
           --- foo ---
         old
 
-        """,
+            """,
             "foo",
             "new",
         )
@@ -261,7 +261,7 @@ instead of requiring it to exist.
         --- foo ---
         new
 
-        """,
+            """,
     );
 })
 --- performance ---
@@ -270,4 +270,4 @@ deallocations: 83
 reallocations: 28
 bytes allocated: 3141
 instructions executed: 10743
-binary size: 18264
+binary size: 18344

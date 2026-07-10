@@ -30,7 +30,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             1 | hello world
               | ^^^^^
-        """,
+            """,
     );
     assert(
         caret_block("hello\nworld", Span { start: 6, end: 11 }, "input")
@@ -39,7 +39,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             2 | world
               | ^^^^^
-        """,
+            """,
     );
     assert(
         caret_block("hello world", Span { start: 6, end: 11 }, "input")
@@ -48,7 +48,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             1 | hello world
               |       ^^^^^
-        """,
+            """,
     );
     // Zero-width span at col 0 gets at least one caret.
     assert(
@@ -58,7 +58,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             1 | hi
               | ^
-        """,
+            """,
     );
     // Span extending past line end is clamped to the line.
     assert(
@@ -68,7 +68,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             1 | hi
               | ^^
-        """,
+            """,
     );
     // Real filename appears in output.
     assert(
@@ -78,7 +78,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               |
             1 | hello world
               | ^^^^^
-        """,
+            """,
     );
 })
 --- performance ---
@@ -87,4 +87,4 @@ deallocations: 83
 reallocations: 26
 bytes allocated: 3022
 instructions executed: 4700
-binary size: 12240
+binary size: 12272
