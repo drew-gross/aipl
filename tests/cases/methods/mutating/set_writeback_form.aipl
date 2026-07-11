@@ -1,0 +1,36 @@
+import { wrapping_add as +, ==, push } from builtins;
+
+// `set recv.f(args)` is the writeback form of a mutating method call: it mutates
+// `recv` in place. It works for the builtin `push` and for user `mut self`
+// methods (which themselves use the `set` form internally), including inside a
+// loop, where the receiver grows in place rather than being copied per iteration.
+fn extend2(mut self: i64[], a: i64, b: i64) {
+    set self.push(a);
+    set self.push(b);
+}.test({
+    mut xs = [1];
+    set xs.push(2);
+    assert(xs == [1, 2]);
+
+    // A user mutating method, called in `set` form.
+    set xs.extend2(3, 4);
+    assert(xs == [1, 2, 3, 4]);
+
+    // `set`-push in a loop grows the receiver in place.
+    mut ys = [];
+    for (let x : [7, 8, 9]) {
+        set ys.push(x);
+    }
+    assert(ys == [7, 8, 9]);
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 3
+bytes allocated: 464
+instructions executed: 586
+binary size: 4144
+--- monomorphizations ---
+__test$extend2
+extend2
+main

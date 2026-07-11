@@ -11143,6 +11143,22 @@ fn compile_expr<M: Module>(
             )?
         }
         ExprKind::Assign(name, value, body) => {
+            // `set recv.f(args)` (parsed as `set recv = recv.f(args)`): a mutating
+            // method call on the assign target. The call's own codegen (the
+            // `push` / mutating-method arms) writes the mutated result back into
+            // `recv`'s slot, so just run it and continue — no separate store, and
+            // no type-check against the binding (the call yields unit).
+            let is_writeback_call = matches!(
+                &value.kind,
+                ExprKind::Call(f, cargs, true)
+                    if !cargs.is_empty()
+                        && matches!(&cargs[0].kind, ExprKind::Ident(recv) if recv == name)
+                        && (f == "__builtin_push" || funcs.get(f).is_some_and(|i| i.is_mutating))
+            );
+            if is_writeback_call {
+                compile_expr(module, builder, cx, scopes, value)?;
+                return compile_expr(module, builder, cx, scopes, body);
+            }
             // `set name = value;` — store to an existing mut binding.
             let binding = env.get(name).cloned().ok_or_else(|| {
                 Error::at(format!("set: undeclared variable {name:?}"), span.clone())

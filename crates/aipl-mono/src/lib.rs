@@ -5209,6 +5209,18 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     {
                         iterating || rec(&cargs[1])
                     }
+                    // `set a = a.push(x)` (the `set a.push(x)` writeback form)
+                    // grows `a` in place — safe unless we're iterating `a`, or the
+                    // pushed value aliases `a`. Keeping `a` exclusive routes `push`
+                    // through the in-place path (a per-iteration copy in a loop
+                    // would free the live buffer — see `set self = out`).
+                    ExprKind::Call(f, cargs, _)
+                        if f == "__builtin_push"
+                            && cargs.len() == 2
+                            && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
+                    {
+                        iterating || is_n(&cargs[1]) || rec(&cargs[1])
+                    }
                     _ => true,
                 }
             } else if is_n(val) {

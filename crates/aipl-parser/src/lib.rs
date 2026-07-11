@@ -265,7 +265,12 @@ gazelle! {
         // `set n = n + 1;` (so it desugars to a `+`/`wrapping_add` use and is
         // gated on importing `+` like any other operator).
         assign_stmt = SET IDENT EQ expr SEMI => assign_stmt
-                    | SET IDENT PLUSPLUS SEMI => incr_stmt;
+                    | SET IDENT PLUSPLUS SEMI => incr_stmt
+                    // `set recv.method(args);` — writeback form of a mutating
+                    // method call. Desugars to `set recv = recv.method(args)`;
+                    // the `DOT` after `SET IDENT` disambiguates from the two
+                    // forms above (`EQ`/`PLUSPLUS`). Receiver is a simple variable.
+                    | SET IDENT DOT IDENT LPAREN args RPAREN SEMI => set_call_stmt;
         for_stmt = FOR LPAREN LET IDENT COLON expr RPAREN loop_body => for_stmt;
         // `for (let (a, b) : expr) { ... }` — destructuring for loop. Desugars to
         // a plain for loop with a synthetic temp var and field-access let bindings
@@ -1458,6 +1463,20 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                     span.clone(),
                 );
                 (name, name_span, value, span)
+            }
+            // `set recv.method(args);` — the writeback form of a mutating method
+            // call, desugared to `set recv = recv.method(args)`. The receiver is
+            // folded in as `args[0]` and the call is flagged method-style, exactly
+            // as `recv.method(args)` parses in expression position; the enclosing
+            // `set` is what makes it write the (mutated) result back into `recv`.
+            aipl::AssignStmt::SetCallStmt((recv, recv_span), (method, method_span), args) => {
+                let last = args.last().map(|a| a.span.clone()).unwrap_or(method_span);
+                let span = join_spans(&recv_span, &last);
+                let mut all = Vec::with_capacity(args.len() + 1);
+                all.push(Expr::new(ExprKind::Ident(recv.clone()), recv_span.clone()));
+                all.extend(args);
+                let value = Expr::new(ExprKind::Call(method, all, true), span.clone());
+                (recv, recv_span, value, span)
             }
         };
         Ok(StmtSpec::Assign {
