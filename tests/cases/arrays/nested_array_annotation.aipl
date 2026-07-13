@@ -5,7 +5,7 @@ import { ==, len, push, value_or } from builtins;
 // `T[]`, `T[][]`, `T[]?`, etc.
 fn add_row(grid: str[][], row: str[]) -> str[][] {
     mut g = grid;
-    g.push(row);
+    set g.push(row);
     g
 }.test({
     let g = add_row([["a"]], ["b", "c"]);

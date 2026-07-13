@@ -4,7 +4,7 @@ import { ==, push } from builtins;
 // form. Monomorphization desugars the call to `.append(..)` on a copy and
 // mangles the instance, so value semantics and specialization both hold.
 fn append<T: any>(mut self: T[], x: T) {
-    self.push(x);
+    set self.push(x);
 }.test({
     let xs = [10, 20];
     let grown = append(xs, 30); // copies xs, appends to the copy

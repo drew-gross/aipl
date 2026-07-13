@@ -14,13 +14,13 @@ import { ==, len, push } from builtins;
 // instead of risking silent corruption (see `err_push_from_empty.aipl`).
 fn appended(xs: char[], x: char) -> char[] {
     mut ys = xs;
-    ys.push(x);
+    set ys.push(x);
     ys
 }.test({
     mut cs = ['a'];
-    cs.push('b');
+    set cs.push('b');
     let snap = cs; // snapshot of ['a', 'b']
-    cs.push('c'); // grows cs only
+    set cs.push('c'); // grows cs only
     assert(cs == ['a', 'b', 'c']);
     assert(snap == ['a', 'b']); // snapshot unchanged
     assert(len(snap) == 2);

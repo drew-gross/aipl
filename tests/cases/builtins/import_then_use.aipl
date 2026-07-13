@@ -5,7 +5,7 @@ import { ==, len, push } from builtins;
 
 fn pushed_len() -> i64 {
     mut xs = [1, 2];
-    xs.push(3);
+    set xs.push(3);
     len(xs)
 }.test({
     assert(pushed_len() == 3);

@@ -7,14 +7,14 @@ import { ==, push } from builtins;
 // pushes 1,2,3,5 (4 of them); pushes 4,6,7,8 land in spare capacity for free.
 fn grown() -> i64[] {
     mut a = [];
-    a.push(1);
-    a.push(2);
-    a.push(3);
-    a.push(4);
-    a.push(5);
-    a.push(6);
-    a.push(7);
-    a.push(8);
+    set a.push(1);
+    set a.push(2);
+    set a.push(3);
+    set a.push(4);
+    set a.push(5);
+    set a.push(6);
+    set a.push(7);
+    set a.push(8);
     a
 }.test({
     assert(grown() == [1, 2, 3, 4, 5, 6, 7, 8]);

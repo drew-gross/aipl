@@ -21,7 +21,7 @@ fn main() !prints {
     // Heap-field structs (`str`): exercises the generated per-struct element
     // drop/retain — a leak or double-free would unbalance the alloc counts.
     mut ns = [Named { id: 1, label: "a" }];
-    ns.push(Named { id: 2, label: "bb" });
+    set ns.push(Named { id: 2, label: "bb" });
     print(to_str(ns)); // [Named { id: 1, label: "a" }, Named { id: 2, label: "bb" }]
 }
 --- stdout ---

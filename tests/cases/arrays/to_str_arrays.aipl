@@ -11,8 +11,8 @@ fn main() !prints {
     let empty = [];
     print(to_str(empty)); // []
     mut xs = [7];
-    xs.push(8);
-    xs.push(9);
+    set xs.push(8);
+    set xs.push(9);
     print(to_str(xs)); // [7, 8, 9]
 }
 --- stdout ---

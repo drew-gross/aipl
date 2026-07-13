@@ -54,7 +54,7 @@ allocations: 35
 deallocations: 35
 reallocations: 0
 bytes allocated: 1641
-instructions executed: 4899
+instructions executed: 4937
 binary size: 9816
 --- monomorphizations ---
 __m1__count_while$char$s0$lam10

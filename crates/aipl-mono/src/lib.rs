@@ -382,6 +382,12 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         }
     }
 
+    // The builtin `push` mutates its receiver (`mut self`), so it joins the
+    // mutating set: an expression-position `v.push(x)` (method or free form)
+    // copy-and-modifies like a user mutating method, while `set v.push(x)`
+    // writes back in place.
+    mutating.insert("__builtin_push".to_string());
+
     // Own a copy of each concrete function so the demand-driven driver can pull
     // reachable ones without juggling borrows of `program`. Source functions are
     // already fully resolved (no type parameters) — they just haven't been
@@ -419,6 +425,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         cur_lenv: HashMap::new(),
         lambda_envs: HashMap::new(),
         spec_memo: HashMap::new(),
+        skip_mut_desugar: false,
         dbg,
     };
 
@@ -962,7 +969,37 @@ struct Mono<'a> {
     /// Lets a forwarded lambda reuse a specialization, so recursive higher-order
     /// functions terminate.
     spec_memo: HashMap<(String, Vec<String>), String>,
+    /// Set by the `Assign` arm just before inferring the RHS of an in-place
+    /// `set recv.f(args)` writeback, and consumed by the `Call` arm: it keeps
+    /// that one method call raw (a writeback that mutates `recv` in place)
+    /// instead of desugaring it to copy-and-modify like an expression-position
+    /// mutating call.
+    skip_mut_desugar: bool,
     dbg: DebugOptions,
+}
+
+/// The in-place writeback `set <out> = <out>.push(<val>);` as a unit-valued
+/// statement — how the array-building intrinsics (`map`/`filter`/`enumerate`
+/// expansions) grow their accumulator. Written as the `set` form so it's a raw
+/// in-place `push` (the `Assign` arm keeps it out of the copy-and-modify
+/// desugar) and yields unit (an empty `else`/`none` arm matches it).
+fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
+    let call = Expr::new(
+        ExprKind::Call("__builtin_push".to_string(), vec![out.clone(), val], true),
+        span.clone(),
+    );
+    let out_name = match &out.kind {
+        ExprKind::Ident(n) => n.clone(),
+        _ => unreachable!("set_push accumulator is always an ident"),
+    };
+    Expr::new(
+        ExprKind::Assign(
+            out_name,
+            Box::new(call),
+            Box::new(Expr::new(ExprKind::Unit, span.clone())),
+        ),
+        span,
+    )
 }
 
 type Env = HashMap<String, Type>;
@@ -1488,14 +1525,11 @@ impl Mono<'_> {
             )
         } else {
             // Copying path: `mut $out = with_capacity(len($arr));
-            //                for (let $e : $arr) { $out.push(f($e, caps..)); } $out`
+            //                for (let $e : $arr) { set $out.push(f($e, caps..)); } $out`
             // `$out` is pre-sized to the source length: the result has exactly
             // one element per input, so reserving up front turns the `push`
             // loop's doubling reallocations into plain stores into spare capacity.
-            let push = Expr::new(
-                ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), call], true),
-                span.clone(),
-            );
+            let push = set_push(id("$out"), call, span.clone());
             let loop_ = Expr::new(
                 ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(push)),
                 span.clone(),
@@ -1914,14 +1948,11 @@ impl Mono<'_> {
             //   mut $out = [];
             //   mut $i = 0;
             //   for (let $e : $a) {
-            //       match ($b[$i]) { some($v) => $out.push(f($e, $v, ..)), none => () };
+            //       match ($b[$i]) { some($v) => set $out.push(f($e, $v, ..)), none => () };
             //       set $i = $i + 1;
             //   }
             //   $out
-            let push = Expr::new(
-                ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), call], true),
-                span.clone(),
-            );
+            let push = set_push(id("$out"), call, span.clone());
             let index = Expr::new(
                 ExprKind::Index(Box::new(id("$b")), Box::new(id("$i"))),
                 span.clone(),
@@ -2343,15 +2374,9 @@ impl Mono<'_> {
             //                $out`
             // `$out` is reserved to the source length — an upper bound, since
             // filter keeps at most every element — so the `push` loop never
-            // reallocates. `push` yields unit, so the empty `else` matches.
-            let push = Expr::new(
-                ExprKind::Call(
-                    "__builtin_push".to_string(),
-                    vec![id("$out"), id("$e")],
-                    true,
-                ),
-                span.clone(),
-            );
+            // reallocates. The writeback `set` yields unit, so the empty `else`
+            // matches.
+            let push = set_push(id("$out"), id("$e"), span.clone());
             let guarded = Expr::new(
                 ExprKind::If(
                     Box::new(cond),
@@ -2454,13 +2479,10 @@ impl Mono<'_> {
         // Body:
         //   mut $i = 0;
         //   mut $out = [];
-        //   for (let $e : $arr) { $out.push(($i, $e)); set $i = $i + 1; }
+        //   for (let $e : $arr) { set $out.push(($i, $e)); set $i = $i + 1; }
         //   $out
         let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span.clone());
-        let push = Expr::new(
-            ExprKind::Call("__builtin_push".to_string(), vec![id("$out"), tuple], true),
-            span.clone(),
-        );
+        let push = set_push(id("$out"), tuple, span.clone());
         let incr = Expr::new(
             ExprKind::Assign(
                 "$i".to_string(),
@@ -3001,7 +3023,19 @@ impl Mono<'_> {
                 )
             }
             ExprKind::Assign(name, val, body) => {
+                // `set recv.f(args)` parses to `set recv = recv.f(args)`: an
+                // in-place writeback, not a copy. Keep that method call raw by
+                // signalling the `Call` arm to skip the copy-and-modify desugar.
+                if matches!(
+                    &val.kind,
+                    ExprKind::Call(f, cargs, true)
+                        if self.mutating.contains(f)
+                            && matches!(cargs.first().map(|a| &a.kind), Some(ExprKind::Ident(t)) if t == name)
+                ) {
+                    self.skip_mut_desugar = true;
+                }
                 let (rv, _) = self.infer(val, env)?;
+                self.skip_mut_desugar = false;
                 // Codegen compiles the body under the unchanged env.
                 let (rb, bt) = self.infer(body, env)?;
                 (
@@ -3185,27 +3219,44 @@ impl Mono<'_> {
                         return Ok((node(ExprKind::Call(lb.fn_name, rargs, false)), ret));
                     }
                 }
-                // The free-call form `foo(b, rest..)` of a mutating function is
-                // sugar for copy-and-modify: copy `b`, mutate the copy, and yield
-                // it, leaving the original `b` untouched. Desugar to
-                // `{ mut __mut_copy = b; __mut_copy.foo(rest..); __mut_copy }` and
-                // re-infer — the method form below then handles the mutation (and
-                // any generic mangling). An explicit `b.foo(..)` skips this: it
-                // mutates `b` in place.
-                if !method_style && self.mutating.contains(name) && !args.is_empty() {
-                    let tmp = "__mut_copy".to_string();
-                    let recv = || Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
-                    let mut margs = Vec::with_capacity(args.len());
-                    margs.push(recv());
-                    margs.extend(args[1..].iter().cloned());
-                    let method = node(ExprKind::Call(name.clone(), margs, true));
-                    let seq = node(ExprKind::Seq(Box::new(method), Box::new(recv())));
-                    let desugared = node(ExprKind::LetMut(
-                        tmp.clone(),
-                        Box::new(args[0].clone()),
-                        Box::new(seq),
-                    ));
-                    return self.infer(&desugared, env);
+                // A mutating call used as a *value* (not the RHS of an in-place
+                // `set recv.f(args)`) is copy-and-modify: copy the receiver,
+                // mutate the copy, and yield it, leaving the original untouched.
+                // This covers both the free-call form `push(b, x)` and the method
+                // form `b.push(x)` in expression position. Desugar to
+                // `{ mut __mut_copy$k = b; set __mut_copy$k.foo(rest..); __mut_copy$k }`
+                // and re-infer: the inner call is the `set` writeback form, so it
+                // mutates the fresh copy in place (the copy is a fresh local, so
+                // the receiver `b` is never touched). The in-place `set b.foo(..)`
+                // writeback keeps its call raw — the `Assign` arm sets
+                // `skip_mut_desugar` so it isn't turned into a copy.
+                if self.mutating.contains(name) && !args.is_empty() {
+                    if method_style && self.skip_mut_desugar {
+                        self.skip_mut_desugar = false;
+                        // Fall through to the raw method-call inference (in-place
+                        // writeback into the receiver's slot).
+                    } else {
+                        let k = self.synth;
+                        self.synth += 1;
+                        let tmp = format!("__mut_copy${k}");
+                        let recv = || Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
+                        let mut margs = Vec::with_capacity(args.len());
+                        margs.push(recv());
+                        margs.extend(args[1..].iter().cloned());
+                        let method = node(ExprKind::Call(name.clone(), margs, true));
+                        // `set __mut_copy$k.foo(rest..); __mut_copy$k`
+                        let set = node(ExprKind::Assign(
+                            tmp.clone(),
+                            Box::new(method),
+                            Box::new(recv()),
+                        ));
+                        let desugared = node(ExprKind::LetMut(
+                            tmp.clone(),
+                            Box::new(args[0].clone()),
+                            Box::new(set),
+                        ));
+                        return self.infer(&desugared, env);
+                    }
                 }
                 // A higher-order call passing lambda (or forwarded) arguments is
                 // specialized for those lambdas (lifting/reusing their functions

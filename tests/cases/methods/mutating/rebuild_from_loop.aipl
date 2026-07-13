@@ -10,18 +10,18 @@ import { ==, push } from builtins;
 fn double_each(mut self: i64[]) {
     mut out = [];
     for (let x : self) {
-        out.push(x);
-        out.push(x);
+        set out.push(x);
+        set out.push(x);
     }
     set self = out;
 }.test({
     mut xs = [1, 2, 3];
-    xs.double_each();
+    set xs.double_each();
     assert(xs == [1, 1, 2, 2, 3, 3]);
 
     // A longer receiver forces the loop-grown buffer to reallocate mid-loop.
     mut ys = [1, 2, 3, 4, 5];
-    ys.double_each();
+    set ys.double_each();
     assert(ys == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
 })
 --- performance ---

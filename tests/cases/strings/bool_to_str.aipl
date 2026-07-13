@@ -12,7 +12,7 @@ fn main() !prints {
     // Concatenation of two rendered strings.
     print("flags: " + to_str([false, true])); // flags: [false, true]
     mut bs = [true];
-    bs.push(false);
+    set bs.push(false);
     print(to_str(bs)); // [true, false]
 }
 --- stdout ---

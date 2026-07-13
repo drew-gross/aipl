@@ -3,8 +3,8 @@ import { ==, push } from builtins;
 // Copy-and-modify call form on an array receiver: `extend(xs, ..)` copies the
 // array, grows the copy, and yields it; the original `xs` keeps its length.
 fn extend(mut self: i64[], a: i64, b: i64) {
-    self.push(a);
-    self.push(b);
+    set self.push(a);
+    set self.push(b);
 }.test({
     let xs = [1];
     let grown = extend(xs, 2, 3); // copies xs, pushes onto the copy

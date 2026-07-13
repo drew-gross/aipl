@@ -6,7 +6,7 @@ import { ==, push } from builtins;
 // on a *named* (shared) array borrows and copies, leaving the original intact.
 fn extended(xs: bool[]) -> bool[] {
     mut ys = xs;
-    ys.push(true);
+    set ys.push(true);
     ys
 }.test({
     // Fresh literal → moved into the owned instance, mutated in place.

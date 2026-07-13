@@ -6,7 +6,7 @@ struct Tags { id: i64, names: str[] }
 
 fn make() -> Tags {
     mut ns = ["a"];
-    ns.push("b");
+    set ns.push("b");
     Tags { id: 7, names: ns }
 }.test({
     let t = make();

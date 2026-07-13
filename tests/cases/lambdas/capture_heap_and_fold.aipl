@@ -19,7 +19,7 @@ fn reduce(xs: i64[], seed: i64, f: (i64, i64) -> i64) -> i64 {
 fn tag(xs: i64[], f: (i64) -> str) -> str[] {
     mut out = [];
     for (let x : xs) {
-        out.push(f(x));
+        set out.push(f(x));
     }
     out
 }.test({

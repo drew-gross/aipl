@@ -807,6 +807,32 @@ impl Cx<'_> {
                 merge(tt, et)
             }
             ExprKind::Seq(first, rest) => {
+                // A mutating method call in statement position discards its
+                // result, silently losing the mutation. Require the `set` form,
+                // which writes the mutated value back into the receiver (or use
+                // the returned value in an expression). A non-mutating method
+                // called for effect (`x.print()`) is unaffected.
+                if let ExprKind::Call(name, cargs, true) = &first.kind {
+                    if self
+                        .sigs
+                        .get(name.as_str())
+                        .is_some_and(|s| s.is_mutating())
+                    {
+                        let method = display(name);
+                        let recv = match cargs.first().map(|a| &a.kind) {
+                            Some(ExprKind::Ident(v)) => v.clone(),
+                            _ => "recv".to_string(),
+                        };
+                        return Err(Error::at(
+                            format!(
+                                "the result of mutating method \"{method}\" is discarded, \
+                                 losing the mutation; write \"set {recv}.{method}(..)\" to \
+                                 mutate {recv} in place, or use the returned value"
+                            ),
+                            first.span.clone(),
+                        ));
+                    }
+                }
                 let ft = self.check_expr(first, env, effects)?;
                 // A discarded statement whose value is a result would silently
                 // drop its error — forbid it. The error must be handled: match on
@@ -1213,23 +1239,11 @@ impl Cx<'_> {
                 // handles arity/types/effects uniformly for both forms.)
                 if *method_style {
                     let recv = &args[0];
-                    // A mutating method (incl. the builtin `push`) needs a
-                    // mutable variable receiver, since it writes the result
-                    // back into it.
-                    if self
-                        .sigs
-                        .get(name.as_str())
-                        .is_some_and(|s| s.is_mutating())
-                    {
-                        if let ExprKind::Ident(v) = &recv.kind {
-                            if env.get(v).is_some_and(|b| !b.mutable) {
-                                return Err(Error::at(
-                                    format!("cannot call mutating method {:?} on immutable binding {v:?}; declare it with \"mut\"", display(name)),
-                                    span.clone(),
-                                ));
-                            }
-                        }
-                    }
+                    // A mutating method in *expression* position copies its
+                    // receiver (copy-and-modify), so it doesn't require a mutable
+                    // receiver. The in-place writeback form `set recv.f(args)`
+                    // does — that's enforced by the `Assign` check ("cannot assign
+                    // to immutable binding"), which fires on the target directly.
                     // A user function called as a method must declare a `self` receiver.
                     if let Some(s) = self.sigs.get(name.as_str()) {
                         if !s.is_method() {

@@ -3,7 +3,7 @@ import { *, wrapping_add as +, ==, push } from builtins;
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     mut out = [];
     for (let x : xs) {
-        out.push(f(x));
+        set out.push(f(x));
     }
     out
 }

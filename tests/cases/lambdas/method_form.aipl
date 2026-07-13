@@ -6,7 +6,7 @@ import { wrapping_add as +, ==, push, to_str } from builtins;
 fn tag(self: i64[], f: (i64) -> str) -> str[] {
     mut out = [];
     for (let x : self) {
-        out.push(f(x));
+        set out.push(f(x));
     }
     out
 }.test({

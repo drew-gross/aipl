@@ -14,7 +14,7 @@ fn count(v: any[]) -> i64 {
     assert(count([10, 20, 30, 40]) == 4);
     assert(count(['x', 'y']) == 2);
     mut bs = [true];
-    bs.push(false);
+    set bs.push(false);
     assert(count(bs) == 2);
 })
 --- performance ---

@@ -6,9 +6,9 @@ import { print, push, to_str } from builtins;
 // a missing free, a double-free) shows up here as a mismatch.
 fn main() !prints {
     mut xs = [];
-    xs.push(1);
-    xs.push(2);
-    xs.push(3);
+    set xs.push(1);
+    set xs.push(2);
+    set xs.push(3);
     print(to_str(xs));
 }
 --- stdout ---

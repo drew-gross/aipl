@@ -30,7 +30,7 @@ fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
 fn each(self: i64[], f: (i64) -> i64) -> i64[] {
     mut out = [];
     for (let x : self) {
-        out.push(f(x));
+        set out.push(f(x));
     }
     out
 }.test({
@@ -43,7 +43,7 @@ allocations: 13
 deallocations: 13
 reallocations: 3
 bytes allocated: 704
-instructions executed: 1528
+instructions executed: 1540
 binary size: 8240
 --- monomorphizations ---
 __map2$own0

@@ -5,14 +5,14 @@ import { ==, len, push } from builtins;
 // later push to `bs` doesn't disturb it (value semantics).
 fn appended(xs: bool[], x: bool) -> bool[] {
     mut ys = xs;
-    ys.push(x);
+    set ys.push(x);
     ys
 }.test({
     mut bs = [];
-    bs.push(true);
-    bs.push(false);
+    set bs.push(true);
+    set bs.push(false);
     let snap = bs; // snapshot of [true, false]
-    bs.push(true); // grows bs only
+    set bs.push(true); // grows bs only
     assert(bs == [true, false, true]);
     assert(snap == [true, false]); // snapshot unchanged
     assert(len(snap) == 2);

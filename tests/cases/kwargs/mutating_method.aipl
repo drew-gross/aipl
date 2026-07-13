@@ -2,13 +2,13 @@
 import { len, print, push, to_str } from builtins;
 
 fn extend(mut self: i64[], v: i64 = 5) {
-    self.push(v);
+    set self.push(v);
 }
 
 fn main() !prints {
     mut xs = [1];
-    xs.extend();
-    xs.extend(v=9);
+    set xs.extend();
+    set xs.extend(v=9);
     print(to_str(xs.len()));
 }
 --- stdout ---

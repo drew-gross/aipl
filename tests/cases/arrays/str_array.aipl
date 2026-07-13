@@ -6,12 +6,12 @@ import { wrapping_add as +, ==, len, push, value_or } from builtins;
 // before pushing, so `xs` stays length 2 (value semantics).
 fn appended(xs: str[], s: str) -> str[] {
     mut ys = xs;
-    ys.push(s);
+    set ys.push(s);
     ys
 }.test({
     let xs = ["foo", "bar"];
     mut ys = xs;
-    ys.push("baz");
+    set ys.push("baz");
     // index yields str?
     assert(ys[0] == some("foo"));
     assert(ys == ["foo", "bar", "baz"]);

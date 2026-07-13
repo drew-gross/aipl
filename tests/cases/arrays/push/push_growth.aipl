@@ -5,15 +5,15 @@ import { ==, push } from builtins;
 // independent — pushing to `a` afterward doesn't change `b` (value semantics).
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut ys = xs;
-    ys.push(x);
+    set ys.push(x);
     ys
 }.test({
     mut a = [];
-    a.push(1);
-    a.push(2);
-    a.push(3);
+    set a.push(1);
+    set a.push(2);
+    set a.push(3);
     let b = a; // snapshot of [1, 2, 3]
-    a.push(4); // grows a only
+    set a.push(4); // grows a only
     assert(a == [1, 2, 3, 4]);
     assert(b == [1, 2, 3]); // b stays [1, 2, 3]
     assert(appended(b, 4) == [1, 2, 3, 4]);

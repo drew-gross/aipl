@@ -7,8 +7,8 @@ fn empty() -> i64[] { [] }
 fn main() !prints {
     print(empty().to_str());
     mut xs = [10];
-    xs.push(20);
-    xs.push(30);
+    set xs.push(20);
+    set xs.push(30);
     print(xs.to_str());
 }
 --- stdout ---

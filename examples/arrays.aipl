@@ -29,7 +29,7 @@ fn fill(acc: i64[], i: i64, n: i64) -> i64[] {
         acc
     } else {
         mut next = acc;
-        next.push(i);
+        set next.push(i);
         fill(next, i + 1, n)
     }
 }

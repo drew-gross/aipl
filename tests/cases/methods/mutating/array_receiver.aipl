@@ -3,12 +3,12 @@ import { ==, push } from builtins;
 // A mutating method whose receiver is an array; it `push`es inside, and the
 // growth is reflected in the caller's variable.
 fn extend(mut self: i64[], a: i64, b: i64) {
-    self.push(a);
-    self.push(b);
+    set self.push(a);
+    set self.push(b);
 }.test({
     mut xs = [1];
-    xs.extend(2, 3);
-    xs.extend(4, 5);
+    set xs.extend(2, 3);
+    set xs.extend(4, 5);
     assert(xs == [1, 2, 3, 4, 5]);
 })
 --- performance ---

@@ -3,12 +3,12 @@ import { push } from builtins;
 // `push` needs a mutable receiver; a `let` binding can't be pushed to.
 fn main() -> i64 {
     let xs = [1];
-    xs.push(2);
+    set xs.push(2);
     0
 }
 --- errors ---
-error: cannot call mutating method "push" on immutable binding "xs"; declare it with "mut"
- --> ./tests/cases/arrays/push/err_push_immutable.aipl:6:5
+error: set: cannot assign to immutable binding "xs" (use "let mut")
+ --> ./tests/cases/arrays/push/err_push_immutable.aipl:6:9
   |
-6 |     xs.push(2);
-  |     ^^^^^^^^^
+6 |     set xs.push(2);
+  |         ^^^^^^^^^^^

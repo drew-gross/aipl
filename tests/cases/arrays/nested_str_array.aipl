@@ -6,7 +6,7 @@ import { wrapping_add as +, ==, len, push, value_or } from builtins;
 fn grid3() -> str[][] {
     let grid = [["a", "b"], ["c"]];
     mut g2 = grid;
-    g2.push(["d", "e", "f"]);
+    set g2.push(["d", "e", "f"]);
     g2
 }.test({
     let g2 = grid3();

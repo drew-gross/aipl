@@ -2674,26 +2674,27 @@ block7:
     v29 = call fn6(v24, v28, v25, v26, v27)  ; v27 = 8
     stack_store v29, ss0
     v30 = iconst.i64 0
-    jump block9(v30)  ; v30 = 0
-
-block8:
     v31 = iconst.i64 0
     jump block9(v31)  ; v31 = 0
 
+block8:
+    v32 = iconst.i64 0
+    jump block9(v32)  ; v32 = 0
+
 block9(v23: i64):
     call fn7(v21)
-    v32 = iadd_imm.i64 v7, 1
-    stack_store v32, ss1
+    v33 = iadd_imm.i64 v7, 1
+    stack_store v33, ss1
     jump block1
 
 block3:
-    v33 = iconst.i64 0
-    v34 = stack_load.i64 ss0
-    call fn8(v34)
-    call fn9(v0)
+    v34 = iconst.i64 0
     v35 = stack_load.i64 ss0
-    call fn9(v35)
-    return v34
+    call fn8(v35)
+    call fn9(v0)
+    v36 = stack_load.i64 ss0
+    call fn9(v36)
+    return v35
 }
 
 ; source variables:
@@ -3014,20 +3015,21 @@ block6:
     v29 = call fn6(v23, v28, v25, v26, v27)  ; v27 = 8
     stack_store v29, ss0
     v30 = iconst.i64 0
+    v31 = iconst.i64 0
     call fn7(v22)
     call fn7(v24)
-    v31 = iadd_imm.i64 v8, 1
-    stack_store v31, ss1
+    v32 = iadd_imm.i64 v8, 1
+    stack_store v32, ss1
     jump block1
 
 block3:
-    v32 = iconst.i64 0
-    v33 = stack_load.i64 ss0
-    call fn8(v33)
-    call fn9(v0)
+    v33 = iconst.i64 0
     v34 = stack_load.i64 ss0
-    call fn9(v34)
-    return v33
+    call fn8(v34)
+    call fn9(v0)
+    v35 = stack_load.i64 ss0
+    call fn9(v35)
+    return v34
 }
 
 ; source variables:
@@ -3090,23 +3092,24 @@ block2:
     v18 = call fn3(v12, v14, v15, v16, v17)  ; v15 = 0, v16 = 0, v17 = 16
     stack_store v18, ss1
     v19 = iconst.i64 0
-    v20 = stack_load.i64 ss0
-    v21 = iconst.i64 1
-    v22 = iadd v20, v21  ; v21 = 1
-    stack_store v22, ss0
-    v23 = iconst.i64 0
-    v24 = iadd_imm.i64 v9, 1
-    stack_store v24, ss3
+    v20 = iconst.i64 0
+    v21 = stack_load.i64 ss0
+    v22 = iconst.i64 1
+    v23 = iadd v21, v22  ; v22 = 1
+    stack_store v23, ss0
+    v24 = iconst.i64 0
+    v25 = iadd_imm.i64 v9, 1
+    stack_store v25, ss3
     jump block1
 
 block3:
-    v25 = iconst.i64 0
-    v26 = stack_load.i64 ss1
-    call fn4(v26)
-    call fn5(v0)
+    v26 = iconst.i64 0
     v27 = stack_load.i64 ss1
-    call fn6(v27)
-    return v26
+    call fn4(v27)
+    call fn5(v0)
+    v28 = stack_load.i64 ss1
+    call fn6(v28)
+    return v27
 }
 
 ; source variables:
@@ -3261,23 +3264,24 @@ block2:
     v18 = call fn3(v12, v14, v15, v16, v17)  ; v15 = 0, v16 = 0, v17 = 16
     stack_store v18, ss1
     v19 = iconst.i64 0
-    v20 = stack_load.i64 ss0
-    v21 = iconst.i64 1
-    v22 = iadd v20, v21  ; v21 = 1
-    stack_store v22, ss0
-    v23 = iconst.i64 0
-    v24 = iadd_imm.i64 v9, 1
-    stack_store v24, ss3
+    v20 = iconst.i64 0
+    v21 = stack_load.i64 ss0
+    v22 = iconst.i64 1
+    v23 = iadd v21, v22  ; v22 = 1
+    stack_store v23, ss0
+    v24 = iconst.i64 0
+    v25 = iadd_imm.i64 v9, 1
+    stack_store v25, ss3
     jump block1
 
 block3:
-    v25 = iconst.i64 0
-    v26 = stack_load.i64 ss1
-    call fn4(v26)
-    call fn5(v0)
+    v26 = iconst.i64 0
     v27 = stack_load.i64 ss1
-    call fn6(v27)
-    return v26
+    call fn4(v27)
+    call fn5(v0)
+    v28 = stack_load.i64 ss1
+    call fn6(v28)
+    return v27
 }
 
 ; source variables:

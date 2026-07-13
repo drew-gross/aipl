@@ -1,0 +1,15 @@
+import { push } from builtins;
+
+// A mutating method call in statement position (its result discarded) is an
+// error: the mutation would be lost. Use `set xs.push(x)` to mutate in place,
+// or use the returned value as an expression.
+fn main() {
+    mut xs = [1];
+    xs.push(2);
+}
+--- errors ---
+error: the result of mutating method "push" is discarded, losing the mutation; write "set xs.push(..)" to mutate xs in place, or use the returned value
+ --> ./tests/cases/methods/mutating/err_bare_mutating_call.aipl:8:5
+  |
+8 |     xs.push(2);
+  |     ^^^^^^^^^

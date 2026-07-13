@@ -6,16 +6,16 @@ import { ==, push } from builtins;
 // have triggered in-place relocation were `a` exclusive) confirm `b` stays put.
 fn appended(xs: i64[], x: i64) -> i64[] {
     mut ys = xs;
-    ys.push(x);
+    set ys.push(x);
     ys
 }.test({
     mut a = [1];
-    a.push(2);
-    a.push(3);
+    set a.push(2);
+    set a.push(3);
     let b = a; // snapshot of [1, 2, 3]
-    a.push(4);
-    a.push(5);
-    a.push(6);
+    set a.push(4);
+    set a.push(5);
+    set a.push(6);
     assert(a == [1, 2, 3, 4, 5, 6]);
     assert(b == [1, 2, 3]); // unchanged
 })

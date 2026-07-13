@@ -1,0 +1,19 @@
+import { &&, ==, len, push } from builtins;
+
+// A mutating call used as a *value* is copy-and-modify: it returns a fresh array
+// with the element appended and leaves the receiver untouched. This holds for
+// both the free-call form `push(xs, x)` and the method form `xs.push(x)` in
+// expression position. To mutate in place, use the `set` writeback form
+// (`set xs.push(x)`).
+fn probe() -> bool {
+    mut xs = [1];
+    let a = push(xs, 2); // free form: a == [1, 2]
+    let b = xs.push(3); // method form: b == [1, 3]
+    xs == [1] && a == [1, 2] && b == [1, 3]
+}.test({
+    assert(probe());
+})
+--- performance ---
+?
+--- monomorphizations ---
+main

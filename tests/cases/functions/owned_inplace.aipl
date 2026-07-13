@@ -7,7 +7,7 @@ import { ==, push } from builtins;
 // (shared) array borrows and copies, leaving the original intact.
 fn extended(xs: i64[]) -> i64[] {
     mut ys = xs;
-    ys.push(99);
+    set ys.push(99);
     ys
 }.test({
     // Fresh array literal → moved into extended$mut, mutated in place.

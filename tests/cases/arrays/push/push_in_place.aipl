@@ -4,8 +4,8 @@ import { ==, push } from builtins;
 // array afterward (no reassignment needed).
 fn grown() -> i64[] {
     mut xs = [5];
-    xs.push(6);
-    xs.push(7);
+    set xs.push(6);
+    set xs.push(7);
     xs
 }.test({
     assert(grown() == [5, 6, 7]);

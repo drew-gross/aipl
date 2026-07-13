@@ -7,8 +7,8 @@ import { !, ==, >, filter, len, map, push } from builtins;
 // the packed buffer grows into a second byte.
 fn grown() -> bool[] {
     mut ys = [true, false, true, true, false, true, false];
-    ys.push(true); // 8th element fills byte 0
-    ys.push(false); // 9th element starts byte 1
+    set ys.push(true); // 8th element fills byte 0
+    set ys.push(false); // 9th element starts byte 1
     ys
 }.test({
     let ys = grown();
@@ -28,7 +28,7 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 367
-instructions executed: 1720
+instructions executed: 1733
 binary size: 6008
 --- monomorphizations ---
 __filter5
