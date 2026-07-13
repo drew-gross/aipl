@@ -1,0 +1,43 @@
+import { &&, wrapping_add as +, ==, push } from builtins;
+
+// Regression for the latent ownership bug: a *non-exclusive* `mut` array grown
+// by a mutating call inside a loop must stay correct. The fresh per-iteration
+// buffer is currently tracked in the loop-body scope and freed at the end of
+// each iteration, leaving the binding dangling (corruption / abort). Two shapes
+// exercise the two broken codegen paths:
+//   1. a user `mut self` method called in `set` form inside a loop
+//      (the mutating-method writeback path), and
+//   2. a genuinely-aliased array (`let alias = a`) grown in a loop
+//      (the non-exclusive `push` copy path).
+
+fn addtwo(mut self: i64[], v: i64) {
+    set self.push(v);
+    set self.push(v);
+}.test({
+    // A user mutating method in a `set` loop grows the receiver correctly.
+    mut c = [];
+    for (let x : [4, 5]) {
+        set c.addtwo(x);
+    }
+    assert(c == [4, 4, 5, 5]);
+})
+
+// Grows `a` (aliased, so non-exclusive) in a loop; the alias is copy-on-write
+// and stays untouched. Wrapped in a function so both post-conditions are checked
+// on real return values.
+fn grow_aliased_matches() -> bool {
+    mut a = [1];
+    let alias = a;
+    for (let x : [4, 5, 6]) {
+        set a.push(x);
+    }
+    a == [1, 4, 5, 6] && alias == [1]
+}.test({
+    assert(grow_aliased_matches());
+})
+--- performance ---
+?
+--- monomorphizations ---
+__test$addtwo
+addtwo
+main
