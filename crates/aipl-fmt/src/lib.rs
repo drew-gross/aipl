@@ -861,6 +861,22 @@ impl<'s> Walker<'s> {
                     self.expect(";")?;
                     return Ok(text(format!("set {name}++;")));
                 }
+                // `set recv.method(args);` — the writeback form of a mutating
+                // method call (receiver is a simple variable). Formats like the
+                // `.method(...)` segment in `postfix`.
+                if self.peek_text() == "." {
+                    self.bump(); // "."
+                    let member = self.bump().to_string();
+                    self.expect("(")?;
+                    let args = self.call_args_until(")")?;
+                    self.expect(")")?;
+                    self.expect(";")?;
+                    return Ok(concat(vec![
+                        text(format!("set {name}.{member}")),
+                        self.comma_list_docs(args, ListStyle::Parens),
+                        text(";"),
+                    ]));
+                }
                 self.expect("=")?;
                 let value = self.expr()?;
                 self.expect(";")?;
