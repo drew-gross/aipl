@@ -16,8 +16,8 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 208
-instructions executed: 276
-binary size: 2744
+instructions executed: 285
+binary size: 2904
 --- monomorphizations ---
 append$i64
 main

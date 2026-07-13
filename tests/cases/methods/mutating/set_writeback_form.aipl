@@ -28,8 +28,8 @@ allocations: 9
 deallocations: 9
 reallocations: 3
 bytes allocated: 464
-instructions executed: 586
-binary size: 4144
+instructions executed: 595
+binary size: 4240
 --- monomorphizations ---
 __test$extend2
 extend2

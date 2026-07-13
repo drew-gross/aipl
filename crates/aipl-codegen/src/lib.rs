@@ -5287,6 +5287,15 @@ fn define_fn<M: Module>(
                     .borrow_mut()
                     .push((p.name.clone(), format!("ss{}", slot.as_u32())));
                 self_slot = Some(slot);
+                // A `mut` array param's slot takes its own reference on the
+                // current value (see `mut_binding_owns_slot_ref`), so a mutation
+                // that replaces it inside a loop body stays owned across
+                // iterations; the entry value-track below still keeps the entry
+                // version alive to fn exit for borrows.
+                if mut_binding_owns_slot_ref(&p.ty) {
+                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
+                    scopes[0].push(Tracked::slot(slot, &p.ty));
+                }
             } else {
                 env.insert(p.name.clone(), EnvBinding::Immut(*v, p.ty.clone()));
                 bindings
@@ -5664,6 +5673,25 @@ fn is_bit_packed(elem: &Type) -> bool {
 /// every site that would otherwise use the generic array runtime.
 fn is_char_array(ty: &Type) -> bool {
     matches!(ty, Type::Array(elem) if **elem == Type::Primitive(Primitive::Char))
+}
+
+/// Whether a `mut` binding of type `ty` follows the slot-owned-reference model:
+/// its stack slot holds one reference of its own on the binding's *current*
+/// value (retained at declaration and at every replacement, released when
+/// replaced), with a slot-track in the declaration scope releasing the final
+/// value. Per-version value-tracks ("region tracks") are kept alongside, so a
+/// non-retaining borrow (`let alias = a`) of any version stays valid until the
+/// scope where that version was created exits. This is what keeps a
+/// non-exclusive binding correct when a mutating call replaces it inside a
+/// *loop* body: the per-iteration region track dies with the iteration, but the
+/// slot's own reference carries the current value across iterations.
+///
+/// Only non-`char[]` arrays for now: `char[]` is str-shaped (different rc entry
+/// points and an inline representation that isn't a pointer), `str` has its own
+/// established slot model, and sets/dicts keep the value-track model until a
+/// case demands otherwise.
+fn mut_binding_owns_slot_ref(ty: &Type) -> bool {
+    matches!(ty, Type::Array(_)) && !is_char_array(ty)
 }
 
 /// Whether `ty`'s runtime value is str-shaped: a real `str`/`Error`/concat-str
@@ -10352,16 +10380,22 @@ fn compile_expr<M: Module>(
                 let new_ptr = builder.inst_results(inst)[0];
                 builder.ins().stack_store(new_ptr, slot, 0);
             } else {
-                // Possibly shared: `aipl_array_push` copies and decs its arg, so
-                // inc first to keep the old block owned by its scope/aliases. It
-                // returns a fresh block, tracked for drop and stored back.
-                emit_inc(builder, module, builtins, arr_ptr);
+                // Possibly shared: `aipl_array_push` copies its arg into a fresh
+                // block, then decs the arg — that dec releases the *slot's* own
+                // reference on the old value (see `mut_binding_owns_slot_ref`);
+                // the old version's creation-scope value-track still owns it, so
+                // aliases/borrows of it stay valid to that scope's exit. The
+                // fresh block's sole reference becomes the slot's; the extra
+                // retain + value-track below is the new version's region track,
+                // keeping it borrowable to the *current* scope's exit — while
+                // the slot's own reference carries it across loop iterations.
                 let local = builtins.import(module, builder.func, "aipl_array_push");
                 let inst = builder
                     .ins()
                     .call(local, &[arr_ptr, x_ptr, drop_fn, retain_fn, esz]);
                 let new_ptr = builder.inst_results(inst)[0];
                 builder.ins().stack_store(new_ptr, slot, 0);
+                emit_retain(builder, module, builtins, structs, new_ptr, &new_arr_ty);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -10551,6 +10585,18 @@ fn compile_expr<M: Module>(
                     ));
                 }
             };
+            // For an array receiver, the binding's slot owns a reference on its
+            // current value (see `mut_binding_owns_slot_ref`): snapshot the old
+            // value so the slot's reference on it can be released after the call
+            // replaces it. (The callee borrows the receiver — `compile_call`
+            // retains it for the callee's own drop — so the snapshot stays live
+            // through the call.)
+            let old_ty = ty_cell.borrow().clone();
+            let old = if mut_binding_owns_slot_ref(&old_ty) {
+                Some(builder.ins().stack_load(types::I64, slot, 0))
+            } else {
+                None
+            };
             // `args` is already the effective list `[receiver, method args..]`;
             // its result is the mutated self.
             let (new_self, _) =
@@ -10558,6 +10604,15 @@ fn compile_expr<M: Module>(
             // Store the mutated receiver back, and refine the variable's type
             // to it (e.g. a `mut a = []` receiver pinned by the method's self).
             builder.ins().stack_store(new_self, slot, 0);
+            if let Some(old) = old {
+                // The slot takes its own reference on the mutated receiver (the
+                // call-return value-track stays as the new version's region
+                // track — it dies with the current scope, e.g. a loop body,
+                // while the slot's reference carries the value onward), then
+                // releases its reference on the replaced value.
+                emit_retain(builder, module, builtins, structs, new_self, &old_ty);
+                emit_drop(builder, module, builtins, structs, old, &old_ty);
+            }
             *ty_cell.borrow_mut() = info.return_ty.clone();
             // A mutating method yields nothing.
             (builder.ins().iconst(types::I64, 0), Type::Unit)
@@ -11122,6 +11177,18 @@ fn compile_expr<M: Module>(
                     scope.pop(); // the literal's value-track (just pushed)
                 }
                 scope.push(Tracked::slot(slot, &t));
+            } else if mut_binding_owns_slot_ref(&t) {
+                // A non-exclusive `mut` array: the slot takes its *own* reference
+                // on the current value (see `mut_binding_owns_slot_ref`), released
+                // by this slot-track at scope exit or by the mutation that
+                // replaces it. The value's existing ownership (a fresh literal's
+                // value-track, or a borrowed source binding) is untouched, so
+                // borrows of this version stay valid to scope exit as before.
+                emit_retain(builder, module, builtins, structs, v, &t);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::slot(slot, &t));
             }
             let mut new_env = env.clone();
             cx.bindings
@@ -11271,12 +11338,15 @@ fn compile_expr<M: Module>(
                     }
                 }
             }
-            // For a `str` binding (slot owns one reference — see `LetMut`),
-            // snapshot the slot's current value so it can be released after the
-            // store. Read before evaluating the new value: `set s = f(s)` reads
-            // `s` but never writes it, so the snapshot holds. Arrays/sets/dicts and
-            // scalars keep the plain store (their in-place / value-track model).
-            let old = if is_str_repr(&expected_ty) {
+            // For a `str` or (non-`char[]`) array binding (whose slot owns a
+            // reference on its current value — see `LetMut` and
+            // `mut_binding_owns_slot_ref`), snapshot the slot's current value so
+            // it can be released after the store. Read before evaluating the new
+            // value: `set s = f(s)` reads `s` but never writes it, so the
+            // snapshot holds. Sets/dicts and scalars keep the plain store (their
+            // in-place / value-track model).
+            let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty);
+            let old = if is_str_repr(&expected_ty) || arr_slot_ref {
                 Some(builder.ins().stack_load(types::I64, slot, 0))
             } else {
                 None
@@ -11284,22 +11354,35 @@ fn compile_expr<M: Module>(
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             expect_type(&t, &expected_ty, "set", value.span.clone())?;
             if let Some(old) = old {
-                // Take sole ownership of the new value for the slot, then release
-                // the reference the slot held before — preserving the slot-track's
-                // single-reference invariant across the reassignment.
-                own_value_into_slot(
-                    builder,
-                    module,
-                    builtins,
-                    structs,
-                    scopes,
-                    v,
-                    &expected_ty,
-                    value,
-                    cx.owned_params,
-                );
-                builder.ins().stack_store(v, slot, 0);
-                emit_drop(builder, module, builtins, structs, old, &expected_ty);
+                if arr_slot_ref {
+                    // Array: the slot takes its *own* reference on the new value
+                    // (the value's existing ownership — a fresh literal's
+                    // value-track, or a borrowed source binding — is untouched,
+                    // preserving borrows of it), then releases its reference on
+                    // the replaced value. Aliases of the old value keep it alive
+                    // through its own creation-scope track.
+                    emit_retain(builder, module, builtins, structs, v, &expected_ty);
+                    builder.ins().stack_store(v, slot, 0);
+                    emit_drop(builder, module, builtins, structs, old, &expected_ty);
+                } else {
+                    // `str`: take sole ownership of the new value for the slot,
+                    // then release the reference the slot held before —
+                    // preserving the slot-track's single-reference invariant
+                    // across the reassignment.
+                    own_value_into_slot(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        scopes,
+                        v,
+                        &expected_ty,
+                        value,
+                        cx.owned_params,
+                    );
+                    builder.ins().stack_store(v, slot, 0);
+                    emit_drop(builder, module, builtins, structs, old, &expected_ty);
+                }
             } else {
                 builder.ins().stack_store(v, slot, 0);
             }

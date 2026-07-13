@@ -36,7 +36,12 @@ fn grow_aliased_matches() -> bool {
     assert(grow_aliased_matches());
 })
 --- performance ---
-?
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 720
+instructions executed: 694
+binary size: 4480
 --- monomorphizations ---
 __test$addtwo
 addtwo
