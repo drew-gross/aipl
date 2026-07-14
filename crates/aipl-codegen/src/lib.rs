@@ -3326,6 +3326,35 @@ fn resolve_dogfood_entry<'a>(
     Ok(info)
 }
 
+/// Rewrite every `u0:<id>` function/import reference in CLIF text `ir` through
+/// `remap`, in a single left-to-right pass (so no id is remapped twice). Only the
+/// function namespace (`u0:`) is touched — data references (`u1:`) and all other
+/// text are copied verbatim. Panics on a referenced id missing from `remap`,
+/// which would mean the map is incomplete (a serialize bug).
+fn remap_func_ids(ir: &str, remap: &HashMap<u32, u32>) -> String {
+    let mut out = String::with_capacity(ir.len());
+    let mut rest = ir;
+    while let Some(pos) = rest.find("u0:") {
+        out.push_str(&rest[..pos]);
+        let after = &rest[pos + 3..];
+        let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if digits.is_empty() {
+            // "u0:" not followed by digits — copy the marker and move past it.
+            out.push_str("u0:");
+            rest = after;
+            continue;
+        }
+        let old: u32 = digits.parse().expect("u0: id fits u32");
+        let new = remap
+            .get(&old)
+            .unwrap_or_else(|| panic!("dogfood id remap missing u0:{old}"));
+        out.push_str(&format!("u0:{new}"));
+        rest = &after[digits.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Compile the dogfooded AIPL `sources` through the live frontend and serialize
 /// the result as a checked-in dogfood-IR artifact: CLIF text with a `;`-comment
 /// manifest header recording the builtin-import id↔symbol table and the FFI
@@ -3396,6 +3425,46 @@ pub fn generate_dogfood_artifact(
         .collect();
     imports.sort_by_key(|(id, _)| *id);
 
+    // Canonical id layout for a stable checked-in artifact: number the builtin
+    // imports first (`0..K`), then the user-defined functions (`K..`). Because the
+    // two regions no longer interleave, adding a dogfooded function only appends
+    // user ids and never renumbers the imports — so a new function is a localized
+    // diff instead of shifting every `u0:<import>` reference in the file. Imports
+    // are ordered by symbol name (not first-use order, which is itself codegen-
+    // order-dependent), so the import region is stable on its own; user functions
+    // keep their existing relative order, offset by `K`. No gap between the regions,
+    // so ids stay dense (`from_artifact` declares `0..=max_id`) — adding an import
+    // still shifts the user block, but that is the rare case.
+    let remap: HashMap<u32, u32> = {
+        let mut imports_by_name = imports.clone();
+        imports_by_name.sort_by(|a, b| a.1.cmp(&b.1));
+        let mut user_ids: Vec<u32> = module
+            .declarations()
+            .get_functions()
+            .filter(|(_, d)| d.linkage != Linkage::Import)
+            .map(|(id, _)| id.as_u32())
+            .collect();
+        user_ids.sort_unstable();
+        let mut m = HashMap::new();
+        for (new_id, (old_id, _)) in imports_by_name.iter().enumerate() {
+            m.insert(*old_id, new_id as u32);
+        }
+        let k = imports_by_name.len() as u32;
+        for (i, old_id) in user_ids.iter().enumerate() {
+            m.insert(*old_id, k + i as u32);
+        }
+        m
+    };
+    // Re-key the import table (now the leading `0..K` block) and the function
+    // bodies' `u0:<id>` references into the canonical numbering. Entry ids are
+    // mapped at emission below.
+    let mut imports: Vec<(u32, String)> = imports
+        .iter()
+        .map(|(old, sym)| (remap[old], sym.clone()))
+        .collect();
+    imports.sort_by_key(|(id, _)| *id);
+    let ir = remap_func_ids(&ir, &remap);
+
     let mut out = String::new();
     out.push_str("; dogfood-ir v1\n");
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
@@ -3408,7 +3477,7 @@ pub fn generate_dogfood_artifact(
     for name in entries {
         let info = resolve_dogfood_entry(&funcs, name)?;
         let id = match info.link {
-            FuncLink::User(id) => id.as_u32(),
+            FuncLink::User(id) => remap[&id.as_u32()],
             FuncLink::Builtin(_) => {
                 return Err(Error::msg(format!(
                     "dogfood entry {name:?} is a builtin, not a fn"
