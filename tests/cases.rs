@@ -3,10 +3,14 @@
 //! describing the expected outcome. The harness builds + links + runs
 //! the program (via the same pipeline as `aipl build`) and compares.
 //!
+//! Every present section is *validated* on a normal `cargo test` run: if the
+//! actual output differs from the section body, the case fails (there is no `?`
+//! or placeholder escape — a stale or `?` body is just a mismatch). The
+//! `fill_expected` helper (below) refreshes every section from the actual output
+//! in a single pass.
+//!
 //! Section format (all lines like `--- name ---` on their own line):
-//!   `--- stdout ---`     — expected stdout (default: empty). A body of `?`
-//!                          fills in the actual output (see the `fill_expected`
-//!                          helper below).
+//!   `--- stdout ---`     — expected stdout (default: empty)
 //!   `--- stderr ---`     — expected stderr (default: empty)
 //!   `--- exit code ---`  — expected exit code (default: 0)
 //!   `--- cli ---`        — CLI arguments for the built binary, one per
@@ -25,8 +29,7 @@
 //!                          harness builds a separate instrumented object, links
 //!                          it against the instrumented runtime, runs it, and
 //!                          checks the tallies (binary size is measured from the
-//!                          non-instrumented object). A body of `?` fills in the
-//!                          measured values (see the `fill_expected` helper below).
+//!                          non-instrumented object).
 //!                          Mutually exclusive with `errors`. REQUIRED on every
 //!                          running case under `tests/cases/` (the user-facing
 //!                          `examples/` are exempt); a success case without one
@@ -40,8 +43,7 @@
 //! section, since those observe a `main`-driven run.
 //!   `--- check ---`      — expected stdout of `aipl check` (the in-language
 //!                          `.test` runner) for this case, byte-for-byte. Lets a
-//!                          *failing* test be a documented fixture. A body of `?`
-//!                          fills in the actual report (see the `fill_expected` helper).
+//!                          *failing* test be a documented fixture.
 //!                          When absent, a case with `.test` blocks must instead
 //!                          pass cleanly (the harness requires `check` to exit 0).
 //!                          Mutually exclusive with `errors`.
@@ -49,8 +51,7 @@
 //!                          monomorphization emits into the final binary, one per
 //!                          line, sorted (each generic specialization / owned form
 //!                          is its own instance). Lets a change in what gets
-//!                          specialized show up as a diff. A `?` body fills in the
-//!                          actual list. REQUIRED on every running case under
+//!                          specialized show up as a diff. REQUIRED on every running case under
 //!                          `tests/cases/` (same gate as `performance` — the
 //!                          user-facing `examples/` are exempt). Mutually
 //!                          exclusive with `errors`.
@@ -62,8 +63,7 @@
 //!                          `write_string_to_file`). After the run, the harness
 //!                          reads it from the staging dir and compares to the
 //!                          section body (trailing newlines stripped, like
-//!                          stdout). A body of `?` fills in the file's actual
-//!                          contents (see the `fill_expected` helper). Success cases
+//!                          stdout). Success cases
 //!                          only (mutually exclusive with `errors`).
 //!
 //! The runner walks `tests/cases/` recursively so cases can be grouped
@@ -79,10 +79,10 @@
 //!
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
-//!   - `cargo test --test cases -- --ignored fill_expected` — overwrite every
-//!     `stdout`/`performance`/`monomorphizations`/`check`/`errors`/`expect file`
-//!     section with actual output. Combine with `AIPL_CASE` to target a
-//!     subset.
+//!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
+//!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
+//!     `performance`/`monomorphizations`/`check`/`errors`/`expect file`) with the
+//!     actual output. Combine with `AIPL_CASE` to target a subset.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
 //!
@@ -134,28 +134,26 @@ struct Spec {
     /// (relative path, expected contents) for any `--- expect file: ... ---`
     /// section: a file the program is expected to have *written* (e.g. via
     /// `write_string_to_file`), checked against the staging dir after the run.
-    /// A body of `?` triggers fill-in mode like `errors`.
     expect_files: Vec<(String, String)>,
     stdout: Option<String>,
     stderr: Option<String>,
     exit_code: Option<i32>,
     errors: Option<String>,
     /// Expected allocation accounting, as the raw `--- performance ---` body
-    /// (e.g. `allocations: 3\ndeallocations: 3`). A body of `?` triggers
-    /// fill-in mode like `errors`. `None` means the case is not perf-checked.
+    /// (e.g. `allocations: 3\ndeallocations: 3`). `None` means the case is not perf-checked.
     performance: Option<String>,
     /// CLI arguments passed to the built binary, one per line of the
     /// `--- cli ---` section. Reaches the program as `main`'s `str[]`.
     cli: Vec<String>,
     /// Expected stdout of `aipl check` (the in-language `.test` runner) for this
-    /// case, byte-for-byte. A body of `?` triggers fill-in mode like `errors`.
+    /// case, byte-for-byte.
     /// When present, the harness compares `check`'s output against it (so a
     /// *failing* test can be a documented fixture); when absent, a case with
     /// `.test` blocks must instead pass cleanly (`check` exits 0).
     check: Option<String>,
     /// Expected list of monomorphized function instances emitted into the final
     /// binary (the `--- monomorphizations ---` body): the mangled instance names,
-    /// one per line, sorted. A body of `?` triggers fill-in mode like the others.
+    /// one per line, sorted.
     /// `None` means the case doesn't pin its monomorphizations.
     monomorphizations: Option<String>,
 }
@@ -235,9 +233,9 @@ fn strip_trailing_newlines(mut s: String) -> String {
     s
 }
 
-/// The result of running a single case. `Skip` covers cases that the
-/// harness intentionally didn't check (e.g. fill mode — the `fill_expected`
-/// helper — or a `?` error placeholder), so they're neither failures nor passes.
+/// The result of running a single case. `Skip` covers cases the harness
+/// refreshed rather than validated — i.e. fill mode (the `fill_expected` helper)
+/// rewrote at least one section — so they're neither failures nor passes.
 enum Outcome {
     Pass,
     Skip,
@@ -303,10 +301,11 @@ case_shards! {
 // normal green run. The `#[ignore]` reason repeats the command for `cargo test
 // -- --list`/`--ignored` output.
 
-/// Author helper: refresh every `--- stdout ---` section whose actual output
-/// differs, and every `?`-bodied `--- performance ---` / `--- errors ---` /
-/// `--- check ---` / `--- expect file ---` section. Set `AIPL_CASE` to target
-/// a subset. Run with:
+/// Author helper: in one pass, rewrite every section whose body differs from the
+/// actual output — `stdout` / `stderr` / `exit code` / `performance` /
+/// `monomorphizations` / `check` / `errors` / `expect file`. No `?` placeholder
+/// or repeated runs are needed; a single pass refreshes all sections of every
+/// case. Set `AIPL_CASE` to target a subset. Run with:
 ///   cargo test --test cases -- --ignored fill_expected
 #[test]
 #[ignore = "author helper — run: cargo test --test cases -- --ignored fill_expected"]
@@ -407,10 +406,47 @@ fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path
     out
 }
 
-/// Author-helper "fill" mode: overwrite `?`-bodied sections and stdout/errors
-/// with actual output. Toggled by the ignored [`fill_expected`] test.
+/// Author-helper "fill" mode: overwrite every expected section with the actual
+/// output. Toggled by the ignored [`fill_expected`] test.
 fn fill_mode() -> bool {
     FILL_MODE.load(Ordering::Relaxed)
+}
+
+/// Validate one expected section, or refresh it in fill mode.
+///
+/// - Normal run: any difference between `actual` and `expected` is a failure —
+///   there is no `?`/placeholder escape hatch, so a stale (or `?`) section fails
+///   like any other mismatch.
+/// - Fill mode: if they differ, rewrite the section with `actual` and set
+///   `*filled`, then return `None` so the caller keeps checking the *remaining*
+///   sections — one fill pass refreshes them all (no need to run it repeatedly).
+///
+/// `None` means "matched / refreshed — continue"; `Some(Fail)` short-circuits a
+/// normal run.
+fn check_or_fill(
+    orig_path: &Path,
+    ctx: &str,
+    section: &str,
+    actual: &str,
+    expected: &str,
+    filled: &mut bool,
+) -> Option<Outcome> {
+    if actual == expected {
+        return None;
+    }
+    if fill_mode() {
+        let path = orig_path.to_str().expect("utf-8 case path");
+        aipl::codegen::fill_or_add_section_file(path, section, actual)
+            .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
+        eprintln!("[{}]: refreshed `{section}`", orig_path.display());
+        *filled = true;
+        None
+    } else {
+        Some(Outcome::Fail(format!(
+            "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
+             If this change is intended, run `{FILL_CMD}`."
+        )))
+    }
 }
 
 fn run_shard(shard: usize) {
@@ -512,7 +548,7 @@ fn run_shard(shard: usize) {
     // run is never mistaken for a normal green suite.
     if fill_mode() {
         panic!(
-            "section refresh complete: {skipped} refreshed section(s), {passed} \
+            "section refresh complete: {skipped} case(s) refreshed, {passed} \
              already-current, {matched} case(s) seen. Failing intentionally so the \
              summary above is visible — this is not a normal test run (`{FILL_CMD}`).",
         );
@@ -640,16 +676,11 @@ fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> 
     };
     let actual = err.render(&spec.source, &render_path(orig_path));
     let expected = spec.errors.as_deref().unwrap_or("");
-    // Special-case: a `--- errors ---` section whose body is literally
-    // `?` prints the actual error and skips the check. Use this when
-    // authoring a new error test to capture the expected output.
-    if expected.trim() == "?" {
-        eprintln!("=== ACTUAL ERROR for {ctx} ===\n{actual}\n===");
-        return Outcome::Skip;
-    }
+    // Fill mode refreshed this above (see `run_case`); here we only validate.
     if actual != expected {
         return Outcome::Fail(format!(
-            "{ctx}: error mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n",
+            "{ctx}: error mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
+             If this change is intended, run `{FILL_CMD}`.",
         ));
     }
     Outcome::Pass
@@ -1119,23 +1150,22 @@ fn run_success_case(
             ))
         }
     };
+    // Tracks whether fill mode refreshed any section, so the case is reported as
+    // a refresh (`Skip`) rather than a clean pass. Normal runs never set it.
+    let mut filled = false;
     // The monomorphized instances emitted into this binary, pinned by an optional
     // `--- monomorphizations ---` section. Read before `emit` consumes `obj_comp`.
     if let Some(expected) = &spec.monomorphizations {
         let actual = obj_comp.monomorphized_fns().join("\n");
-        if fill_mode() && actual != *expected {
-            let path = orig_path.to_str().expect("utf-8 case path");
-            aipl::codegen::fill_or_add_section_file(path, "monomorphizations", &actual)
-                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-            eprintln!("[{}]: filled monomorphizations list", orig_path.display());
-            return Outcome::Skip;
-            // Already correct — fall through so subsequent fill targets (e.g. performance) get reached.
-        }
-        if actual != *expected {
-            return Outcome::Fail(format!(
-                "{ctx}: monomorphizations mismatch\n--- expected ---\n{expected}\n\
-                 --- actual ---\n{actual}\nIf this change is intended, run `{FILL_CMD}`."
-            ));
+        if let Some(o) = check_or_fill(
+            orig_path,
+            ctx,
+            "monomorphizations",
+            &actual,
+            expected,
+            &mut filled,
+        ) {
+            return o;
         }
     }
     let obj_bytes = match obj_comp.emit() {
@@ -1182,39 +1212,27 @@ fn run_success_case(
         let exp_stderr = spec.stderr.as_deref().unwrap_or("");
         let exp_exit = spec.exit_code.unwrap_or(0) & 0xff;
 
-        let stdout_placeholder = spec.stdout.as_deref() == Some("?");
-        if fill_mode() && stdout != exp_stdout {
-            let path = orig_path.to_str().expect("utf-8 case path");
-            aipl::codegen::fill_or_add_section_file(path, "stdout", &stdout)
-                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-            eprintln!("[{}]: filled stdout", orig_path.display());
-            return Outcome::Skip;
+        if let Some(o) = check_or_fill(orig_path, ctx, "stdout", &stdout, exp_stdout, &mut filled) {
+            return o;
         }
-        if stdout_placeholder {
-            eprintln!("=== ACTUAL STDOUT for {ctx} ===\n{stdout}\n===");
-            return Outcome::Skip;
+        if let Some(o) = check_or_fill(orig_path, ctx, "stderr", &stderr, exp_stderr, &mut filled) {
+            return o;
         }
-        if stdout != exp_stdout {
-            return Outcome::Fail(format!(
-            "{ctx}: stdout mismatch\n--- expected ---\n{exp_stdout}\n--- actual ---\n{stdout}\n",
-        ));
-        }
-        if stderr != exp_stderr {
-            return Outcome::Fail(format!(
-            "{ctx}: stderr mismatch\n--- expected ---\n{exp_stderr}\n--- actual ---\n{stderr}\n",
-        ));
-        }
-        if exit != exp_exit {
-            return Outcome::Fail(format!(
-                "{ctx}: exit code mismatch (expected {exp_exit}, got {exit})"
-            ));
+        if let Some(o) = check_or_fill(
+            orig_path,
+            ctx,
+            "exit code",
+            &exit.to_string(),
+            &exp_exit.to_string(),
+            &mut filled,
+        ) {
+            return o;
         }
 
         // Validate any files the program was expected to *write* (e.g. via
         // `write_string_to_file`). Checked after stdout/exit so a file mismatch
         // never masks a behavioral regression. The behavior run above wrote them
-        // into `case_dir`; a `?` body captures the actual contents in fill mode.
-        let mut filled_file = false;
+        // into `case_dir`.
         for (rel, expected) in &spec.expect_files {
             let actual = match fs::read_to_string(case_dir.join(rel)) {
                 Ok(c) => normalize_output(&c),
@@ -1224,26 +1242,16 @@ fn run_success_case(
                     ))
                 }
             };
-            if fill_mode() {
-                let path = orig_path.to_str().expect("utf-8 case path");
-                aipl::codegen::fill_or_add_section_file(
-                    path,
-                    &format!("expect file: {rel}"),
-                    &actual,
-                )
-                .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-                eprintln!("[{}]: filled expect file {rel}", orig_path.display());
-                filled_file = true;
-                continue;
+            if let Some(o) = check_or_fill(
+                orig_path,
+                ctx,
+                &format!("expect file: {rel}"),
+                &actual,
+                expected,
+                &mut filled,
+            ) {
+                return o;
             }
-            if &actual != expected {
-                return Outcome::Fail(format!(
-                "{ctx}: output file {rel:?} mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n",
-            ));
-            }
-        }
-        if filled_file {
-            return Outcome::Skip;
         }
     } // end `if has_main` (behavior run)
 
@@ -1268,17 +1276,10 @@ fn run_success_case(
             // A `--- check ---` section pins the expected report exactly (this is
             // how a *failing* test is documented).
             Some(expected) => {
-                if fill_mode() {
-                    let path = orig_path.to_str().expect("utf-8 case path");
-                    aipl::codegen::fill_or_add_section_file(path, "check", &report)
-                        .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-                    eprintln!("[{}]: filled check report", orig_path.display());
-                    return Outcome::Skip;
-                }
-                if &report != expected {
-                    return Outcome::Fail(format!(
-                        "{ctx}: `check` output mismatch\n--- expected ---\n{expected}\n--- actual ---\n{report}\n",
-                    ));
+                if let Some(o) =
+                    check_or_fill(orig_path, ctx, "check", &report, expected, &mut filled)
+                {
+                    return o;
                 }
             }
             // No pinned report: the in-language tests must simply pass.
@@ -1298,7 +1299,7 @@ fn run_success_case(
     if let Some(perf) = &spec.performance {
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — the machine code emitted for the program.
-        return run_performance_check(
+        if let Some(o) = run_performance_check(
             ctx,
             orig_path,
             &measured,
@@ -1307,9 +1308,18 @@ fn run_success_case(
             case_dir,
             perf,
             obj_bytes.len() as u64,
-        );
+            &mut filled,
+        ) {
+            return o;
+        }
     }
-    Outcome::Pass
+    // Fill mode reports a refreshed case as `Skip` (counted separately from clean
+    // passes); a normal run that got here matched every section.
+    if fill_mode() && filled {
+        Outcome::Skip
+    } else {
+        Outcome::Pass
+    }
 }
 
 /// Build the *instrumented* object (executed-instruction counter enabled), link
@@ -1325,15 +1335,16 @@ fn run_performance_check(
     case_dir: &Path,
     expected_body: &str,
     prod_obj_size: u64,
-) -> Outcome {
+    filled: &mut bool,
+) -> Option<Outcome> {
     let obj_bytes =
         match ObjectCompilation::new(program, stem, debug_opts(), true).and_then(|c| c.emit()) {
             Ok(b) => b,
             Err(e) => {
-                return Outcome::Fail(format!(
+                return Some(Outcome::Fail(format!(
                     "{ctx}: instrumented compile failed:\n{}",
                     e.render(&spec.source, &render_path(orig_path))
-                ))
+                )))
             }
         };
     let actual = match measure_perf_stats(
@@ -1346,58 +1357,38 @@ fn run_performance_check(
         prod_obj_size,
     ) {
         Ok(v) => v,
-        Err(msg) => return Outcome::Fail(msg),
+        Err(msg) => return Some(Outcome::Fail(msg)),
     };
 
-    // Memory-leak gate: every heap allocation must be paired with a free.
-    // Catch this before fill_mode so `fill_expected` cannot bake in a leak.
+    // Memory-leak gate: every heap allocation must be paired with a free. Checked
+    // even in fill mode so `fill_expected` cannot bake in a leak.
     if actual.allocations != actual.deallocations {
-        return Outcome::Fail(format!(
+        return Some(Outcome::Fail(format!(
             "{ctx}: memory leak — allocations ({}) != deallocations ({})\n\
              Fix the leak, then re-run `{FILL_CMD}` to refresh the expected counts.",
             actual.allocations, actual.deallocations,
-        ));
+        )));
     }
 
-    let expected = parse_perf_stats(expected_body);
-
-    let placeholder = expected_body.trim() == "?";
-    // In fill mode always overwrite — no `?` required.
-    if fill_mode() {
-        let path = orig_path.to_str().expect("utf-8 case path");
-        aipl::codegen::fill_or_add_section_file(path, "performance", &actual.render())
-            .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-        eprintln!("[{}]: filled performance counts", orig_path.display());
-        return Outcome::Skip;
-    }
-    if placeholder {
-        eprintln!(
-            "=== ACTUAL PERFORMANCE for {ctx} ===\n{}\n===",
-            actual.render()
-        );
-        return Outcome::Skip;
-    }
-
-    let expected = match expected {
-        Some(v) => v,
-        None => {
-            return Outcome::Fail(format!(
-                "{ctx}: malformed `performance` section; expected `allocations: N`, \
-                 `deallocations: M`, `reallocations: K`, `bytes allocated: B`, \
-                 `instructions executed: I`, and `binary size: S` lines, got:\n{expected_body}"
-            ))
-        }
+    // A malformed (or `?`) expected body never parses, so it can't equal the
+    // rendered actual — it's treated as an ordinary mismatch (a normal run fails;
+    // fill mode overwrites it). Comparing on the rendered string keeps
+    // `check_or_fill`'s "differs ⇒ refresh/fail" contract uniform across sections.
+    let expected_render = match parse_perf_stats(expected_body) {
+        Some(v) => v.render(),
+        None => String::new(),
     };
-
-    if actual != expected {
-        return Outcome::Fail(format!(
-            "{ctx}: performance mismatch\n--- expected ---\n{}\n--- actual ---\n{}\n\
-             If this change is intended, run `{FILL_CMD}`.",
-            expected.render(),
-            actual.render(),
-        ));
+    if let Some(o) = check_or_fill(
+        orig_path,
+        ctx,
+        "performance",
+        &actual.render(),
+        &expected_render,
+        filled,
+    ) {
+        return Some(o);
     }
-    Outcome::Pass
+    None
 }
 
 /// Build the instrumented variant of the case, run it with `AIPL_ALLOC_STATS`
@@ -1534,8 +1525,8 @@ fn normalize_output(s: &str) -> String {
 fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) {
     // Re-run the load/compile path against the in-memory source so we
     // can render an error to splice in. If compilation succeeds the
-    // author has a bigger problem than missing expected output, so the
-    // re-run will fail when the placeholder gets dropped.
+    // author has a bigger problem than a stale expected error — the normal
+    // run will fail (`expected an error, but compilation succeeded`).
     //
     // Stage to a per-PID subdir using the case's stem as the filename,
     // so any errors that mention the source file's name (e.g. the
@@ -1571,7 +1562,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) {
         }
     };
     let rendered = err.render(&spec.source, &render_path(path));
-    // Replace the `?` placeholder line with the rendered error.
+    // Replace everything after the `--- errors ---` header with the rendered error.
     let header_marker = "--- errors ---";
     let header_idx = contents
         .find(header_marker)
