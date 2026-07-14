@@ -331,6 +331,31 @@ fn sanity_check(artifact: &str) {
         .unwrap();
     assert_eq!(normalized, FfiValue::Str("a\nb".to_string()));
 
+    // Range-checks a flexible integer literal against a type name; `bool` rides
+    // back as `Int(0|1)`. In-range at the edge fits; just over does not; a
+    // non-integer name never fits.
+    let fits = comp
+        .call_values(
+            "int_fits",
+            &[FfiValue::Int(255), FfiValue::Str("u8".to_string())],
+        )
+        .unwrap();
+    assert_eq!(fits, FfiValue::Int(1));
+    let overflows = comp
+        .call_values(
+            "int_fits",
+            &[FfiValue::Int(256), FfiValue::Str("u8".to_string())],
+        )
+        .unwrap();
+    assert_eq!(overflows, FfiValue::Int(0));
+    let not_int = comp
+        .call_values(
+            "int_fits",
+            &[FfiValue::Int(0), FfiValue::Str("bool".to_string())],
+        )
+        .unwrap();
+    assert_eq!(not_int, FfiValue::Int(0));
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 

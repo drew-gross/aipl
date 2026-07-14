@@ -2563,6 +2563,7 @@ const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
 const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
 const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
 const NORMALIZE_OUTPUT_SRC: &str = include_str!("normalize_output.aipl");
+const INT_FITS_SRC: &str = include_str!("int_fits.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2599,6 +2600,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
         FILL_OR_ADD_SECTION_FILE_SRC,
     ),
     ("./normalize_output.aipl", NORMALIZE_OUTPUT_SRC),
+    ("./int_fits.aipl", INT_FITS_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -2617,6 +2619,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "fill_or_add_section",
     "fill_or_add_section_file",
     "normalize_output",
+    "int_fits",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -2815,15 +2818,33 @@ pub fn normalize_output(s: &str) -> String {
     })
 }
 
+/// The checker's flexible-literal range check (see
+/// [`aipl_syntax::set_int_fits_hook`]): whether integer literal `v` is
+/// representable in the integer type named `name` — computed by the dogfooded
+/// AIPL `int_fits` via the FFI. The `bool` result rides back on the shared `i64`
+/// ABI as `Int(0|1)`. No native fallback; panics if it can't be built or called.
+fn int_fits(v: i64, name: &str) -> bool {
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values(
+            "int_fits",
+            &[FfiValue::Int(v), FfiValue::Str(name.to_string())],
+        ) {
+            Ok(FfiValue::Int(b)) => b != 0,
+            other => panic!("dogfooded int_fits() call: {other:?}"),
+        }
+    })
+}
+
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
 /// the trailing-whitespace finder at [`find_trailing_whitespace`], the
-/// assertion-location formatter at [`assert_loc`], and the error-renderer's
-/// caret-block formatter at [`caret_block`]. Idempotent (first install wins).
-/// The compiler's entry points (the CLI and the embedding [`Compilation`] API's
-/// callers) install them; there are **no native fallbacks**, so any in-process
-/// parse (or error render) must install them first.
+/// assertion-location formatter at [`assert_loc`], the error-renderer's
+/// caret-block formatter at [`caret_block`], and the checker's flexible-literal
+/// range check at [`int_fits`]. Idempotent (first install wins). The compiler's
+/// entry points (the CLI and the embedding [`Compilation`] API's callers) install
+/// them; there are **no native fallbacks**, so any in-process parse (or error
+/// render, or literal range-check) must install them first.
 pub fn install_parser_hooks() {
     aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
@@ -2831,6 +2852,7 @@ pub fn install_parser_hooks() {
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_syntax::set_caret_block_hook(caret_block);
+    aipl_syntax::set_int_fits_hook(int_fits);
 }
 
 /// Compile every function in `program` into `module`. When `main_export_name`

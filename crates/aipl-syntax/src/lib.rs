@@ -818,19 +818,27 @@ pub fn const_int(e: &ast::Expr) -> Option<i64> {
 
 /// Whether the integer value `v` (an `i64` literal) is representable in integer
 /// type `name`. `u64` accepts any non-negative value (a literal can't exceed
-/// `i64::MAX`, which fits `u64`).
+/// `i64::MAX`, which fits `u64`). Computed by the dogfooded AIPL `int_fits` via
+/// the embedding FFI (see [`set_int_fits_hook`]) — no native fallback.
 pub fn int_fits(v: i64, name: &str) -> bool {
-    match name {
-        "i8" => i8::try_from(v).is_ok(),
-        "i16" => i16::try_from(v).is_ok(),
-        "i32" => i32::try_from(v).is_ok(),
-        "i64" => true,
-        "u8" => u8::try_from(v).is_ok(),
-        "u16" => u16::try_from(v).is_ok(),
-        "u32" => u32::try_from(v).is_ok(),
-        "u64" => v >= 0,
-        _ => false,
-    }
+    INT_FITS_HOOK.get().expect(
+        "int_fits hook not installed before checking an integer literal \
+         (call install_parser_hooks first)",
+    )(v, name)
+}
+
+/// The hook called by [`int_fits`] to range-check a flexible integer literal.
+/// Installed by the compiler via [`set_int_fits_hook`] (the dogfooded AIPL
+/// `int_fits`, run through the embedding FFI). No native fallback — panics if not
+/// installed.
+static INT_FITS_HOOK: std::sync::OnceLock<fn(i64, &str) -> bool> = std::sync::OnceLock::new();
+
+/// Install the int-fits hook (the dogfooded AIPL `int_fits`, run through the
+/// embedding FFI). Idempotent — first install wins. Must be called before any
+/// check that range-flexes an integer literal (i.e. before `install_parser_hooks`
+/// returns).
+pub fn set_int_fits_hook(f: fn(i64, &str) -> bool) {
+    let _ = INT_FITS_HOOK.set(f);
 }
 
 /// Retype a bare integer literal `e` (currently `ety`) to a target integer type

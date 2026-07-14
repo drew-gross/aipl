@@ -1,0 +1,46 @@
+import { -, == } from builtins;
+
+// Pins the exact acceptance boundaries of integer-literal flexing — the behavior
+// `int_fits` encodes: the extreme in-range literal for each width flexes into a
+// narrow parameter without an explicit conversion. Guards against an off-by-one
+// in the range check (e.g. the dogfood port of `int_fits`); the just-over-the-
+// edge rejections live in the sibling `err_literal_*` cases (one error per file).
+fn i8v(x: i8) -> i8 { x }
+
+fn i16v(x: i16) -> i16 { x }
+
+fn i32v(x: i32) -> i32 { x }
+
+fn u8v(x: u8) -> u8 { x }
+
+fn u16v(x: u16) -> u16 { x }
+
+fn u32v(x: u32) -> u32 { x }
+
+fn probe() -> bool { true }.test({
+    // Signed: the exact max and min flex in at the edge.
+    assert(i8v(127) == 127);
+    assert(i8v(-128) == -128);
+    assert(i16v(32767) == 32767);
+    assert(i16v(-32768) == -32768);
+    assert(i32v(2147483647) == 2147483647);
+    assert(i32v(-2147483648) == -2147483648);
+    // Unsigned: the exact max and zero.
+    assert(u8v(255) == 255);
+    assert(u8v(0) == 0);
+    assert(u16v(65535) == 65535);
+    assert(u32v(4294967295) == 4294967295);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 132
+binary size: 3440
+--- monomorphizations ---
+i16v
+i32v
+i8v
+main
+u8v
