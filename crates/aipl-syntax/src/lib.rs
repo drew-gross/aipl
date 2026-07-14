@@ -868,24 +868,26 @@ pub fn operator_builtin(name: &str) -> Option<&'static str> {
 
 /// Whether `s` spells a built-in operator that must be imported to be used
 /// (e.g. `import { == } from builtins;`; `+` comes via `wrapping_add as +`).
+/// Computed by the dogfooded AIPL `is_operator_name` via the embedding FFI (see
+/// [`set_is_operator_name_hook`]) — no native fallback.
 pub fn is_operator_name(s: &str) -> bool {
-    matches!(
-        s,
-        "+" | "-"
-            | "*"
-            | "/"
-            | "%"
-            | "=="
-            | "!="
-            | "<"
-            | ">"
-            | "<="
-            | ">="
-            | "&&"
-            | "||"
-            | "!"
-            | "++"
-    )
+    IS_OPERATOR_NAME_HOOK.get().expect(
+        "is_operator_name hook not installed before resolving an operator import \
+         (call install_parser_hooks first)",
+    )(s)
+}
+
+/// The hook called by [`is_operator_name`]. Installed by the compiler via
+/// [`set_is_operator_name_hook`] (the dogfooded AIPL `is_operator_name`, run
+/// through the embedding FFI). No native fallback — panics if not installed.
+static IS_OPERATOR_NAME_HOOK: std::sync::OnceLock<fn(&str) -> bool> = std::sync::OnceLock::new();
+
+/// Install the is-operator-name hook (the dogfooded AIPL `is_operator_name`, run
+/// through the embedding FFI). Idempotent — first install wins. Must be called
+/// before any operator-import resolution (i.e. before `install_parser_hooks`
+/// returns).
+pub fn set_is_operator_name_hook(f: fn(&str) -> bool) {
+    let _ = IS_OPERATOR_NAME_HOOK.set(f);
 }
 
 /// Spelling of a binary-operator char as stored in `ExprKind::Binop` (e.g. `'E'`

@@ -356,6 +356,16 @@ fn sanity_check(artifact: &str) {
         .unwrap();
     assert_eq!(not_int, FfiValue::Int(0));
 
+    // Whether a string spells a built-in operator; `bool` rides back as `Int(0|1)`.
+    let is_op = comp
+        .call_values("is_operator_name", &[FfiValue::Str("==".to_string())])
+        .unwrap();
+    assert_eq!(is_op, FfiValue::Int(1));
+    let not_op = comp
+        .call_values("is_operator_name", &[FfiValue::Str("map".to_string())])
+        .unwrap();
+    assert_eq!(not_op, FfiValue::Int(0));
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 

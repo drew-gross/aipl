@@ -1,0 +1,14 @@
+// A bare `import { + }` is gated by `is_operator_name`: `+` is recognized as an
+// operator spelling (so this is NOT the "is not a builtin" fallthrough), but `+`
+// is special — it must be imported as `wrapping_add as +`. This pins that
+// `is_operator_name` classifies `+` as an operator; a port that dropped `+` from
+// the operator set would instead produce the generic "is not a builtin" error.
+import { + } from builtins;
+
+fn main() {}
+--- errors ---
+error: the "+" operator is provided by `wrapping_add`; import `wrapping_add as +` from builtins
+ --> ./tests/cases/imports/err_bare_plus_operator.aipl:1:1
+  |
+1 | // A bare `import { + }` is gated by `is_operator_name`: `+` is recognized as an
+  | ^
