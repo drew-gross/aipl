@@ -1,30 +1,29 @@
 // A super-basic library for building lexers. `lex` turns source text into a
 // flat `Token[]` using the default character classes: identifiers, integer
-// literals, and single-byte punctuation, with whitespace skipped. The `is_*`
-// classifiers and `scan_while` are the reusable pieces a custom lexer composes.
-// Not yet dogfooded by the compiler — this is the seed library the AIPL-in-AIPL
-// lexer will grow from.
-import { !, &&, wrapping_add as +, <, ==, ||, len, push, value_or } from builtins;
+// literals, and single-byte punctuation, with whitespace skipped. The
+// library-specific `is_ident_start` and `is_ident_continue` classifiers, along
+// with `scan_while`, are the reusable pieces a custom lexer composes. The
+// builtin `is_space` and `is_digit` predicates are re-exported here for
+// convenience.
+import {
+    !,
+    &&,
+    wrapping_add as +,
+    <,
+    ==,
+    ||,
+    is_digit,
+    is_space,
+    len,
+    push,
+    value_or,
+} from builtins;
 
 // What a token is: its class, the exact source text it covers, and the byte
 // offset where it starts (so `start + text.len()` is the end). The kind is a
 // `str` — `"ident"`, `"int"`, or `"punct"` — because a variant would be the
 // natural fit but variants aren't yet supported as struct fields.
 struct Token { kind: str, text: str, start: i64 }
-
-pub fn is_space(self: char) -> bool {
-    self == ' ' || self == '\t' || self == '\n' || self == '\r'
-}.doc("""
-    Whether `self` is ASCII whitespace: space, tab, newline, or carriage return.
-""").test({
-    assert(' '.is_space());
-    assert('\t'.is_space());
-    assert('\n'.is_space());
-    assert('\r'.is_space());
-    assert(!'a'.is_space());
-    assert(!'0'.is_space());
-    assert(!'_'.is_space());
-})
 
 pub fn contains_char(self: str, c: char) -> bool {
     for (let x : self) {
@@ -34,29 +33,15 @@ pub fn contains_char(self: str, c: char) -> bool {
     }
     false
 }.doc("""
-    Whether any byte of `self` is `c` — `strchr` as a predicate. The classifiers
-    below use it to spell character classes as literal strings (chars don't
-    support ordering comparisons yet, so a range check like `'0' <= c` isn't
-    available).
+    Whether any byte of `self` is `c` — `strchr` as a predicate. Used by the
+    library-specific character classifiers to spell identifier character classes
+    as literal strings.
 """).test({
     assert("abc".contains_char('b'));
     assert("abc".contains_char('a'));
     assert("abc".contains_char('c'));
     assert(!"abc".contains_char('d'));
     assert(!"".contains_char('a'));
-})
-
-pub fn is_digit(self: char) -> bool { "0123456789".contains_char(self) }.doc("""
-    Whether `self` is an ASCII decimal digit, `'0'` through `'9'`.
-""").test({
-    assert('0'.is_digit());
-    assert('5'.is_digit());
-    assert('9'.is_digit());
-    // The ASCII neighbours of the digit range.
-    assert(!'/'.is_digit());
-    assert(!':'.is_digit());
-    assert(!'a'.is_digit());
-    assert(!' '.is_digit());
 })
 
 pub fn is_ident_start(self: char) -> bool {
@@ -208,15 +193,13 @@ allocations: 24
 deallocations: 24
 reallocations: 16
 bytes allocated: 1152
-instructions executed: 31075
-binary size: 36848
+instructions executed: 26299
+binary size: 33032
 --- monomorphizations ---
 __test$lex
 contains_char
-is_digit
 is_ident_continue
 is_ident_start
-is_space
 lex
 main
 scan_while$lam1

@@ -9686,6 +9686,64 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, nz);
             (b, Type::Primitive(Primitive::Bool))
         }
+        "__builtin_is_space" => {
+            // `c.is_space() -> bool` — true when c is ASCII whitespace.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"is_space\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+                return Err(Error::at(
+                    format!(
+                        "\"is_space\" is only callable on a char, got {}",
+                        type_name(&recv_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            // Check if c is ' ', '\t', '\n', or '\r' (32, 9, 10, 13).
+            let sp = builder.ins().icmp_imm(IntCC::Equal, c, 32);
+            let tab = builder.ins().icmp_imm(IntCC::Equal, c, 9);
+            let lf = builder.ins().icmp_imm(IntCC::Equal, c, 10);
+            let cr = builder.ins().icmp_imm(IntCC::Equal, c, 13);
+            let or1 = builder.ins().bor(sp, tab);
+            let or2 = builder.ins().bor(lf, cr);
+            let result = builder.ins().bor(or1, or2);
+            let b = builder.ins().uextend(types::I64, result);
+            (b, Type::Primitive(Primitive::Bool))
+        }
+        "__builtin_is_digit" => {
+            // `c.is_digit() -> bool` — true when c is '0'..'9'.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"is_digit\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+                return Err(Error::at(
+                    format!(
+                        "\"is_digit\" is only callable on a char, got {}",
+                        type_name(&recv_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            // Check if '0' (48) <= c <= '9' (57).
+            let ge_0 = builder
+                .ins()
+                .icmp_imm(IntCC::UnsignedGreaterThanOrEqual, c, 48);
+            let le_9 = builder
+                .ins()
+                .icmp_imm(IntCC::UnsignedLessThanOrEqual, c, 57);
+            let result = builder.ins().band(ge_0, le_9);
+            let b = builder.ins().uextend(types::I64, result);
+            (b, Type::Primitive(Primitive::Bool))
+        }
         "__builtin_len" => {
             // `len(a) -> i64` — element/byte count. Reads `a` without consuming
             // it (it stays live in the caller's scope), so no inc/dec.

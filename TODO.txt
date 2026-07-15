@@ -6,4 +6,6 @@ Language gaps the exercise exposed — these shaped the design and are worth kno
 3. Variants can't be struct fields — I wanted variant TokenKind = Ident | Int | Punct per the repo's classify+match philosophy, but Token { kind: TokenKind, ... } is rejected, hence the str kind.
 4. A real bug: a named-fn reference inside a .test block picks up the synthesized test driver's !prints effect and poisons the same named reference in regular code (fn "scan_while$lam12" has effect "!prints"...). Worked around with a |c| is_digit(c) wrapper in the test; commented in the file.
 
-Make is digit, is_whitespace, etc.
+Make is digit, is_whitespace, etc. builtin
+
+Build out infra to write builtins in .aipl itself

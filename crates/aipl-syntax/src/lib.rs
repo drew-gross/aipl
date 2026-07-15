@@ -1083,6 +1083,10 @@ fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_len<T: any>(self: T[]) -> i64 { 0 }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
+// Character classification: ASCII whitespace (space/tab/newline/carriage return).
+fn __builtin_is_space(self: char) -> bool { false }
+// Character classification: ASCII decimal digit ('0' through '9').
+fn __builtin_is_digit(self: char) -> bool { false }
 
 // Set ops: membership and union.
 fn __builtin_contains<T: any>(self: #{T}, x: T) -> bool { false }
@@ -1256,6 +1260,8 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "len",
     "push",
     "is_some",
+    "is_space",
+    "is_digit",
     "value_or",
     "contains",
     "read_file_to_string",
