@@ -4,7 +4,6 @@ Language gaps the exercise exposed — these shaped the design and are worth kno
 1. No </<= on char — so no '0' <= c range checks; classifiers use string-membership ("0123456789".contains_char(c)) instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64, while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
 2. Char literals aren't valid match arms (str/int/array literals are).
 3. Variants can't be struct fields — I wanted variant TokenKind = Ident | Int | Punct per the repo's classify+match philosophy, but Token { kind: TokenKind, ... } is rejected, hence the str kind.
-4. A real bug: a named-fn reference inside a .test block picks up the synthesized test driver's !prints effect and poisons the same named reference in regular code (fn "scan_while$lam12" has effect "!prints"...). Worked around with a |c| is_digit(c) wrapper in the test; commented in the file.
 
 Make is digit, is_whitespace, etc. builtin
 
