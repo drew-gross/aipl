@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { wrapping_add as +, +++, == } from builtins;
 
 // A variadic ("zero or more") parameter is written `T*`. Inside the body it is
 // the *sequence* type — `i64[]` here — so it iterates like any array. At a call
@@ -25,7 +25,7 @@ fn sum(self: i64, others: i64*) -> i64 {
 fn joined(self: str, parts: str*) -> str {
     mut s = self;
     for (let p : parts) {
-        set s = s + p;
+        set s = s +++ p;
     }
     s
 }.test({

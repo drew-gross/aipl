@@ -690,7 +690,7 @@ fn for_body_is_statement_only() {
 fn for_loop_iterable_can_be_expr() {
     let _ = parse(
         "fn f(s: str) -> i64 {
-            for (let c : \"x\" + s) { }
+            for (let c : \"x\" +++ s) { }
             0
         }",
     )

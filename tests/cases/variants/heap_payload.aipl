@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, to_str } from builtins;
+import { wrapping_add as +, +++, ==, to_str } from builtins;
 
 // Variant cases with heap payloads (`str`): construction retains them and the
 // per-variant drop releases only the active case's fields. Used in an array, so
@@ -10,7 +10,7 @@ fn describe(j: Json) -> str {
         Null => "null",
         Num(n) => to_str(n),
         Text(s) => s,
-        Pair(k, v) => k + "=" + to_str(v),
+        Pair(k, v) => k +++ "=" +++ to_str(v),
     }
 }.test({
     assert(describe(Num(1)) == "1");

@@ -4,11 +4,11 @@
 // `--- performance ---` counters below show ZERO heap activity. (A string of >= 8
 // bytes still allocates; see the other string cases.) SSO is invisible to program
 // semantics — these print exactly as a heap-backed string would.
-import { wrapping_add as +, print, to_str, trim } from builtins;
+import { wrapping_add as +, +++, print, to_str, trim } from builtins;
 
 fn main() !prints {
     let greeting = "hi"; // inline literal (2 bytes)
-    let banged = greeting + "!"; // inline concat -> "hi!" (3 bytes)
+    let banged = greeting +++ "!"; // inline concat -> "hi!" (3 bytes)
     print(banged);
     print(trim("  ok  ")); // inline trim result -> "ok" (2 bytes)
     print(to_str(42)); // inline to_str -> "42" (2 bytes)

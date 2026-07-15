@@ -5,8 +5,8 @@ fn main() -> i64 {
     0
 }
 --- errors ---
-error: "+" between str and a non-str: both sides must be str
+error: "+" is integer addition, but this operand is str; use "+++" to concatenate strings
  --> ./tests/cases/strings/err_str_plus_i64.aipl:4:13
   |
 4 |     let _ = "hi" + 5;
-  |             ^^^^^^^^
+  |             ^^^^

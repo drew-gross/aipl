@@ -923,7 +923,7 @@ block32(v96: i64):
 ;   ss0 = out
 ;   ss1 = skipping
 ;   ss2 = line_start
-;   v20 = __fpat$1213
+;   v20 = __fpat$1218
 ;   v21 = i
 ;   v22 = c
 ;   v28 = line
@@ -1783,172 +1783,183 @@ block0(v0: i64):
     call fn0(v0)
     call fn0(v2)  ; v2 = 0x2b05
     v3 = call fn1(v0, v2)  ; v2 = 0x2b05
-    brif v3, block2, block18
+    brif v3, block2, block19
 
-block18:
+block19:
     v4 = iconst.i64 0x2d05
     call fn0(v0)
     call fn0(v4)  ; v4 = 0x2d05
     v5 = call fn1(v0, v4)  ; v4 = 0x2d05
-    brif v5, block3, block19
+    brif v5, block3, block20
 
-block19:
+block20:
     v6 = iconst.i64 0x2a05
     call fn0(v0)
     call fn0(v6)  ; v6 = 0x2a05
     v7 = call fn1(v0, v6)  ; v6 = 0x2a05
-    brif v7, block4, block20
+    brif v7, block4, block21
 
-block20:
+block21:
     v8 = iconst.i64 0x2f05
     call fn0(v0)
     call fn0(v8)  ; v8 = 0x2f05
     v9 = call fn1(v0, v8)  ; v8 = 0x2f05
-    brif v9, block5, block21
+    brif v9, block5, block22
 
-block21:
+block22:
     v10 = iconst.i64 9477
     call fn0(v0)
     call fn0(v10)  ; v10 = 9477
     v11 = call fn1(v0, v10)  ; v10 = 9477
-    brif v11, block6, block22
+    brif v11, block6, block23
 
-block22:
+block23:
     v12 = iconst.i64 0x003d_3d09
     call fn0(v0)
     call fn0(v12)  ; v12 = 0x003d_3d09
     v13 = call fn1(v0, v12)  ; v12 = 0x003d_3d09
-    brif v13, block7, block23
+    brif v13, block7, block24
 
-block23:
+block24:
     v14 = iconst.i64 0x003d_2109
     call fn0(v0)
     call fn0(v14)  ; v14 = 0x003d_2109
     v15 = call fn1(v0, v14)  ; v14 = 0x003d_2109
-    brif v15, block8, block24
+    brif v15, block8, block25
 
-block24:
+block25:
     v16 = iconst.i64 0x3c05
     call fn0(v0)
     call fn0(v16)  ; v16 = 0x3c05
     v17 = call fn1(v0, v16)  ; v16 = 0x3c05
-    brif v17, block9, block25
+    brif v17, block9, block26
 
-block25:
+block26:
     v18 = iconst.i64 0x3e05
     call fn0(v0)
     call fn0(v18)  ; v18 = 0x3e05
     v19 = call fn1(v0, v18)  ; v18 = 0x3e05
-    brif v19, block10, block26
+    brif v19, block10, block27
 
-block26:
+block27:
     v20 = iconst.i64 0x003d_3c09
     call fn0(v0)
     call fn0(v20)  ; v20 = 0x003d_3c09
     v21 = call fn1(v0, v20)  ; v20 = 0x003d_3c09
-    brif v21, block11, block27
+    brif v21, block11, block28
 
-block27:
+block28:
     v22 = iconst.i64 0x003d_3e09
     call fn0(v0)
     call fn0(v22)  ; v22 = 0x003d_3e09
     v23 = call fn1(v0, v22)  ; v22 = 0x003d_3e09
-    brif v23, block12, block28
+    brif v23, block12, block29
 
-block28:
+block29:
     v24 = iconst.i64 0x0026_2609
     call fn0(v0)
     call fn0(v24)  ; v24 = 0x0026_2609
     v25 = call fn1(v0, v24)  ; v24 = 0x0026_2609
-    brif v25, block13, block29
+    brif v25, block13, block30
 
-block29:
+block30:
     v26 = iconst.i64 0x007c_7c09
     call fn0(v0)
     call fn0(v26)  ; v26 = 0x007c_7c09
     v27 = call fn1(v0, v26)  ; v26 = 0x007c_7c09
-    brif v27, block14, block30
+    brif v27, block14, block31
 
-block30:
+block31:
     v28 = iconst.i64 8453
     call fn0(v0)
     call fn0(v28)  ; v28 = 8453
     v29 = call fn1(v0, v28)  ; v28 = 8453
-    brif v29, block15, block31
+    brif v29, block15, block32
 
-block31:
+block32:
     v30 = iconst.i64 0x002b_2b09
     call fn0(v0)
     call fn0(v30)  ; v30 = 0x002b_2b09
     v31 = call fn1(v0, v30)  ; v30 = 0x002b_2b09
-    brif v31, block16, block32
+    brif v31, block16, block33
 
-block32:
-    jump block17
+block33:
+    v32 = iconst.i64 0x2b2b_2b0d
+    call fn0(v0)
+    call fn0(v32)  ; v32 = 0x2b2b_2b0d
+    v33 = call fn1(v0, v32)  ; v32 = 0x2b2b_2b0d
+    brif v33, block17, block34
+
+block34:
+    jump block18
 
 block2:
-    v32 = iconst.i64 1
-    jump block1(v32)  ; v32 = 1
-
-block3:
-    v33 = iconst.i64 1
-    jump block1(v33)  ; v33 = 1
-
-block4:
     v34 = iconst.i64 1
     jump block1(v34)  ; v34 = 1
 
-block5:
+block3:
     v35 = iconst.i64 1
     jump block1(v35)  ; v35 = 1
 
-block6:
+block4:
     v36 = iconst.i64 1
     jump block1(v36)  ; v36 = 1
 
-block7:
+block5:
     v37 = iconst.i64 1
     jump block1(v37)  ; v37 = 1
 
-block8:
+block6:
     v38 = iconst.i64 1
     jump block1(v38)  ; v38 = 1
 
-block9:
+block7:
     v39 = iconst.i64 1
     jump block1(v39)  ; v39 = 1
 
-block10:
+block8:
     v40 = iconst.i64 1
     jump block1(v40)  ; v40 = 1
 
-block11:
+block9:
     v41 = iconst.i64 1
     jump block1(v41)  ; v41 = 1
 
-block12:
+block10:
     v42 = iconst.i64 1
     jump block1(v42)  ; v42 = 1
 
-block13:
+block11:
     v43 = iconst.i64 1
     jump block1(v43)  ; v43 = 1
 
-block14:
+block12:
     v44 = iconst.i64 1
     jump block1(v44)  ; v44 = 1
 
-block15:
+block13:
     v45 = iconst.i64 1
     jump block1(v45)  ; v45 = 1
 
-block16:
+block14:
     v46 = iconst.i64 1
     jump block1(v46)  ; v46 = 1
 
+block15:
+    v47 = iconst.i64 1
+    jump block1(v47)  ; v47 = 1
+
+block16:
+    v48 = iconst.i64 1
+    jump block1(v48)  ; v48 = 1
+
 block17:
-    v47 = iconst.i64 0
-    jump block1(v47)  ; v47 = 0
+    v49 = iconst.i64 1
+    jump block1(v49)  ; v49 = 1
+
+block18:
+    v50 = iconst.i64 0
+    jump block1(v50)  ; v50 = 0
 
 block1(v1: i64):
     call fn2(v0)

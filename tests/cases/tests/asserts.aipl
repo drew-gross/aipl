@@ -1,4 +1,15 @@
-import { wrapping_add as +, -, ==, contains_key, get, len, print, to_str, value_or } from builtins;
+import {
+    wrapping_add as +,
+    +++,
+    -,
+    ==,
+    contains_key,
+    get,
+    len,
+    print,
+    to_str,
+    value_or,
+} from builtins;
 
 // Exercises the `aipl check` path (run by the cases harness on every `.test`
 // case) across a few value kinds: i64, str, array, and dict. The `main` run is
@@ -9,7 +20,7 @@ fn add(a: i64, b: i64) -> i64 { a + b }.test({
     assert(add(-1, 1) == 0);
 })
 
-fn greet(name: str) -> str { "hi " + name }.test({
+fn greet(name: str) -> str { "hi " +++ name }.test({
     assert(greet("al") == "hi al");
     assert(greet("") == "hi ");
 })

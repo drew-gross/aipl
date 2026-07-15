@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, print, to_str } from builtins;
+import { wrapping_add as +, +++, ==, print, to_str } from builtins;
 
 // `match` on a `str`: each arm is a string literal, with a required `_` default
 // as the last arm. Arms compare by content (string equality), so a rope (a
@@ -26,7 +26,7 @@ fn main() !prints {
     print(classify("bar")); // got bar
     print(classify("")); // empty
     print(classify("baz")); // other
-    print(classify("f" + "oo")); // got foo  (a rope scrutinee compares by content)
+    print(classify("f" +++ "oo")); // got foo  (a rope scrutinee compares by content)
     print(to_str(code("a"))); // 1
     print(to_str(code("bb"))); // 2
     print(to_str(code("zzz"))); // 0

@@ -393,11 +393,18 @@ impl Loader {
                 // `rewrite_expr` keeps as a primitive `Binop`. An operator
                 // aliased to a user function maps to that function instead and
                 // is dispatched to a call.
-                let canonical = if let Some(op) = aipl_syntax::operator_builtin(&n.name) {
+                let canonical = if let Some((op, canonical_impl)) =
+                    aipl_syntax::operator_builtin(&n.name)
+                {
                     // A named operator builtin (`wrapping_add as +`) must be
-                    // aliased to exactly the operator it provides.
+                    // aliased to exactly the operator it provides. The view maps
+                    // the operator spelling to the reserved `__builtin_*` impl, so
+                    // a use of the operator resolves (in `rewrite_expr`) to a call
+                    // to that impl — codegen intrinsifies it. Different builtins on
+                    // the same operator (`wrapping_add`/`saturating_add` → `+`)
+                    // thus dispatch to different impls, spelling-agnostically.
                     match n.alias.as_deref() {
-                        Some(a) if a == op => op.to_string(),
+                        Some(a) if a == op => canonical_impl.to_string(),
                         Some(a) => {
                             return Err(Error::at(
                                 format!(
@@ -420,8 +427,9 @@ impl Loader {
                 } else if aipl_syntax::is_operator_name(&n.name) {
                     if n.name == "+" {
                         return Err(Error::at(
-                            "the \"+\" operator is provided by `wrapping_add`; \
-                             import `wrapping_add as +` from builtins"
+                            "the \"+\" operator has no bare form; pick a semantics and \
+                             import it aliased, e.g. `wrapping_add as +` or \
+                             `saturating_add as +` from builtins"
                                 .to_string(),
                             n.span.clone(),
                         ));

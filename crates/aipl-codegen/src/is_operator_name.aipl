@@ -17,6 +17,7 @@ pub fn is_operator_name(s: str) -> bool {
         "||" => true,
         "!" => true,
         "++" => true,
+        "+++" => true,
         _ => false,
     }
 }.doc("""
@@ -40,6 +41,7 @@ pub fn is_operator_name(s: str) -> bool {
     assert(is_operator_name("||"));
     assert(is_operator_name("!"));
     assert(is_operator_name("++"));
+    assert(is_operator_name("+++"));
 
     // Non-operators: names, near-misses, and the empty string.
     assert(!is_operator_name("wrapping_add"));
@@ -47,6 +49,6 @@ pub fn is_operator_name(s: str) -> bool {
     assert(!is_operator_name(""));
     assert(!is_operator_name("=")); // a single `=` is not an operator
     assert(!is_operator_name("&")); // single, not `&&`
-    assert(!is_operator_name("+++"));
+    assert(!is_operator_name("++++")); // four, not `+++`
     assert(!is_operator_name("and"));
 })

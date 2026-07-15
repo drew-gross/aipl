@@ -1,0 +1,38 @@
+import { saturating_add as +, -, == } from builtins;
+
+// `import { saturating_add as + }` binds `+` to clamping integer add: instead of
+// wrapping on overflow (`wrapping_add`), the result is pinned at the type's
+// bound. The operator resolves to the `saturating_add` builtin, so the same
+// `a + b` spelling means saturating here and wrapping in a file that imported
+// `wrapping_add as +`.
+fn probe() -> bool { true }.test({
+    // In range: exact sum, same as any add.
+    assert(i8(10) + i8(20) == 30);
+    assert(u8(100) + u8(50) == 150);
+    assert(5 + 3 == 8);
+
+    // Signed narrow: clamp at the max (127/32767/2147483647) and min.
+    assert(i8(100) + i8(100) == 127);
+    assert(i8(-100) + i8(-100) == -128);
+    assert(i16(30000) + i16(10000) == 32767);
+    assert(i16(-30000) + i16(-10000) == -32768);
+    assert(i32(2000000000) + i32(2000000000) == 2147483647);
+    assert(i32(-2000000000) + i32(-2000000000) == -2147483648);
+
+    // Unsigned narrow: clamp at the max (0 is a natural floor).
+    assert(u8(200) + u8(100) == 255);
+    assert(u16(60000) + u16(10000) == 65535);
+    assert(u32(4000000000) + u32(1000000000) == 4294967295);
+
+    // 64-bit: i64::MAX + 1 saturates (a wrapping add would flip to i64::MIN).
+    assert(9223372036854775807 + 1 == 9223372036854775807);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 283
+binary size: 4688
+--- monomorphizations ---
+main

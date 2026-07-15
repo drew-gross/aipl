@@ -1,8 +1,8 @@
-import { wrapping_add as +, == } from builtins;
+import { wrapping_add as +, +++, == } from builtins;
 
 // Allocate many short-lived concat results; if refcounts are right,
 // no leak, no double free.
-fn build(n: i64) -> str { "x" + "y" }.test({
+fn build(n: i64) -> str { "x" +++ "y" }.test({
     assert(build(0) == "xy");
 })
 --- performance ---

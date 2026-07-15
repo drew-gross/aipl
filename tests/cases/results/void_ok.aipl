@@ -1,4 +1,4 @@
-import { !=, wrapping_add as +, -, <, ==, print, to_str } from builtins;
+import { !=, wrapping_add as +, +++, -, <, ==, print, to_str } from builtins;
 
 // A "void with result" type `!E`: success carries no value (`ok()`), failure
 // carries an error (`err(e)`). Useful for fallible effects whose only output is
@@ -16,7 +16,7 @@ fn validate(a: i64, b: i64) -> !str {
 fn describe(r: !str) -> str {
     match (r) {
         ok => "valid",
-        err(e) => "invalid: " + e,
+        err(e) => "invalid: " +++ e,
     }
 }.test({
     assert(describe(validate(1, 2)) == "valid");

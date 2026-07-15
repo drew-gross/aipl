@@ -4,7 +4,7 @@
 // the longer one (only known at runtime) is reused and the shorter freed. The
 // reused array's surplus elements are dropped and its length truncated, so the
 // balanced allocation counters below double as a leak check.
-import { wrapping_add as +, map, print, to_str, zip_with } from builtins;
+import { wrapping_add as +, +++, map, print, to_str, zip_with } from builtins;
 
 fn show(label: str, xs: i64[]) !prints {
     print(label);
@@ -42,7 +42,7 @@ fn main() !prints {
 
     // Heap elements: the overwritten slots and the dropped tail ("c") are
     // released exactly once.
-    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s + t));
+    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s +++ t));
 }
 --- stdout ---
 a longer

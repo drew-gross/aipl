@@ -1,4 +1,4 @@
-import { !, &&, wrapping_add as +, <, ==, ||, enumerate, len } from builtins;
+import { !, &&, wrapping_add as +, +++, <, ==, ||, enumerate, len } from builtins;
 import { lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
@@ -24,9 +24,9 @@ fn fill_section(contents: str, section: str, body: str) -> str {
             let hdr = parse_test_section_header(line);
             if (!(skipping && hdr == none)) {
                 set skipping = false;
-                set out = out + line + "\n";
+                set out = out +++ line +++ "\n";
                 if (hdr == some(section)) {
-                    set out = out + body + "\n";
+                    set out = out +++ body +++ "\n";
                     set skipping = true;
                 };
             };
@@ -37,9 +37,9 @@ fn fill_section(contents: str, section: str, body: str) -> str {
         let line = contents[line_start..];
         let hdr = parse_test_section_header(line);
         if (!(skipping && hdr == none)) {
-            set out = out + line + "\n";
+            set out = out +++ line +++ "\n";
             if (hdr == some(section)) {
-                set out = out + body + "\n";
+                set out = out +++ body +++ "\n";
             };
         };
     };

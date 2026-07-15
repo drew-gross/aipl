@@ -2821,13 +2821,15 @@ impl Mono<'_> {
                 let lt = aipl_syntax::flex_int_ty(&rl, &lt, &rt);
                 let rt = aipl_syntax::flex_int_ty(&rr, &rt, &lt);
                 let ty = match op {
-                    // String concatenation builds a lazy concat node (see
+                    // `+++` string concatenation builds a lazy concat node (see
                     // `aipl_concat_lazy`), so its result carries the *concat-str*
                     // representation — which a downstream `fn(s: str)` call uses to
                     // select a concat-specialized instance. (`Error` concatenates
                     // like `str` too.)
-                    '+' if is_str_repr(&lt) && is_str_repr(&rt) => concat_str_ty(),
+                    'C' => concat_str_ty(),
                     // Same-integer-type arithmetic keeps that width/signedness.
+                    // (`+` here is the increment sugar / mono's internal index math;
+                    // user `+` is a call to `__builtin_wrapping_add`/`_saturating_add`.)
                     '+' | '-' | '*' | '/' | '%' if aipl_syntax::is_int_ty(&lt) && lt == rt => {
                         lt.clone()
                     }
@@ -3403,6 +3405,23 @@ impl Mono<'_> {
                     );
                     let ret = self.call_return(name, &atys);
                     (node(ExprKind::Call(mangled, rargs, method_style)), ret)
+                } else if (name == "__builtin_wrapping_add" || name == "__builtin_saturating_add")
+                    && atys.len() == 2
+                {
+                    // `+` resolved to an integer-add builtin (wrapping/saturating
+                    // differ only in codegen). The result width follows the operands
+                    // — same-width int keeps its width, else i64 — with a bare
+                    // literal operand flexing to the other's width, matching the
+                    // checker's `check_int_add` and codegen. The name is kept as-is;
+                    // codegen intrinsifies it (no emitted instance).
+                    let lt = aipl_syntax::flex_int_ty(&rargs[0], &atys[0], &atys[1]);
+                    let rt = aipl_syntax::flex_int_ty(&rargs[1], &atys[1], &lt);
+                    let ret = if aipl_syntax::is_int_ty(&lt) && lt == rt {
+                        lt
+                    } else {
+                        Type::Primitive(Primitive::I64)
+                    };
+                    (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
                 } else if (name == "__builtin_starts_with" || name == "__builtin_ends_with")
                     && atys.len() == 2
                 {

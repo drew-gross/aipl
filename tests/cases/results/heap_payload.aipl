@@ -1,21 +1,21 @@
-import { wrapping_add as +, ==, print } from builtins;
+import { wrapping_add as +, +++, ==, print } from builtins;
 
 // Both sides of a result can be `str` (heap). Constructing, matching, and `?`-
 // propagating them must keep refcounts balanced — the `--- performance ---`
 // alloc/dealloc counts below would diverge on a leak or double-free.
-fn lookup(k: str) -> str!str { if (k == "x") { ok("found-x") } else { err("missing: " + k) } }
+fn lookup(k: str) -> str!str { if (k == "x") { ok("found-x") } else { err("missing: " +++ k) } }
 
 // `?` on a `str!str`: the ok `str` is unwrapped (and owned) here; an err `str`
 // is propagated to the caller. Concatenation forces fresh heap allocations.
 fn greet(k: str) -> str!str {
     let v = lookup(k)?;
-    ok("hello " + v)
+    ok("hello " +++ v)
 }
 
 fn show(r: str!str) -> str {
     match (r) {
-        ok(v) => "ok(" + v + ")",
-        err(e) => "err(" + e + ")",
+        ok(v) => "ok(" +++ v +++ ")",
+        err(e) => "err(" +++ e +++ ")",
     }
 }.test({
     assert(show(greet("x")) == "ok(hello found-x)");

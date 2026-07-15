@@ -1,11 +1,11 @@
-import { wrapping_add as +, == } from builtins;
+import { wrapping_add as +, +++, == } from builtins;
 
 // Returning a struct that owns a heap (`str`) field: the field is retained
 // for the caller and released when the returned struct is dropped — no leak
 // or double-free, even though the string is freshly allocated by `+`.
 struct Tagged { label: str, n: i64 }
 
-fn tag(name: str, k: i64) -> Tagged { Tagged { label: "tag: " + name, n: k } }.test({
+fn tag(name: str, k: i64) -> Tagged { Tagged { label: "tag: " +++ name, n: k } }.test({
     let t = tag("alpha", 7);
     assert(t.label == "tag: alpha");
     assert(t.n == 7);

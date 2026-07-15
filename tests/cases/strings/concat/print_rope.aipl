@@ -1,4 +1,4 @@
-import { wrapping_add as +, print } from builtins;
+import { wrapping_add as +, +++, print } from builtins;
 
 // Printing a rope streams its leaves straight to stdout without materializing,
 // so no flattened buffer is allocated even when the result exceeds the inline
@@ -7,11 +7,11 @@ import { wrapping_add as +, print } from builtins;
 // streams its sub-ropes the same way, still without flattening.
 fn main() !prints {
     // 18 bytes: materializing would heap-allocate a flattened buffer.
-    let greeting = "Hello, " + "rope world!";
+    let greeting = "Hello, " +++ "rope world!";
     print(greeting); // Hello, rope world!
 
     // A rope of ropes — printed leaf-by-leaf, no node flattened.
-    print(("aaaa" + "bbbb") + ("cccc" + "dddd")); // aaaabbbbccccdddd
+    print(("aaaa" +++ "bbbb") +++ ("cccc" +++ "dddd")); // aaaabbbbccccdddd
 }
 --- stdout ---
 Hello, rope world!

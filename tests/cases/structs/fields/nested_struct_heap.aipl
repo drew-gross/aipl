@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, value_or } from builtins;
+import { wrapping_add as +, +++, ==, value_or } from builtins;
 
 // A nested struct that holds heap data: the inner `Name` owns two `str`s (built
 // by concatenation, so they're genuinely heap-allocated, not static literals),
@@ -11,8 +11,8 @@ struct Contact { name: Name, nick: str? }
 
 fn full_first(c: Contact) -> str { c.name.first }.test({
     let c = Contact {
-        name: Name { first: "Ad" + "a", last: "Love" + "lace" },
-        nick: some("Count" + "ess"),
+        name: Name { first: "Ad" +++ "a", last: "Love" +++ "lace" },
+        nick: some("Count" +++ "ess"),
     };
     assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");

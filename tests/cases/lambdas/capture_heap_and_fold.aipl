@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, push, to_str, trim } from builtins;
+import { wrapping_add as +, +++, ==, push, to_str, trim } from builtins;
 
 // `reduce` folds an array with a binary function and a seed.
 fn reduce(xs: i64[], seed: i64, f: (i64, i64) -> i64) -> i64 {
@@ -25,7 +25,7 @@ fn tag(xs: i64[], f: (i64) -> str) -> str[] {
 }.test({
     // Capture `label` (a heap str) used once per element.
     let label = trim("  n=  "); // "n=" on the heap
-    assert(tag([1, 2], |x| label + to_str(x)) == ["n=1", "n=2"]);
+    assert(tag([1, 2], |x| label +++ to_str(x)) == ["n=1", "n=2"]);
 })
 --- performance ---
 allocations: 6

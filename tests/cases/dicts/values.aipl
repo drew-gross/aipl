@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, get, len, value_or } from builtins;
+import { wrapping_add as +, +++, ==, get, len, value_or } from builtins;
 
 // Dict values may be any value type: arrays, optionals, structs — and heap
 // strings the dict must free. Keys may be any scalar/str. Exercises the
@@ -28,7 +28,7 @@ fn struct_values() -> #{str: Point} { #{"o": Point { x: 1, y: 2 }} }.test({
 
 fn heap_str_values() -> #{str: str} {
     // Non-static (heap) string keys and values: the dict co-owns and frees them.
-    #{"k" + "1": "a" + "b", "k" + "2": "c" + "d"}
+    #{"k" +++ "1": "a" +++ "b", "k" +++ "2": "c" +++ "d"}
 }.test({
     let d = heap_str_values();
     assert(d.get("k1").value_or("?") == "ab");

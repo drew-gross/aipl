@@ -855,13 +855,19 @@ pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
     ety.clone()
 }
 
-/// If `name` is a named operator builtin, the operator it provides. An operator
-/// builtin must be imported aliased to that operator: `import { wrapping_add as
-/// + } from builtins;`. (Later additions like `saturating_add` will also map to
-/// `+`, letting a file pick the `+` semantics it wants.)
-pub fn operator_builtin(name: &str) -> Option<&'static str> {
+/// If `name` is a named operator builtin, the `(operator, canonical impl)` it
+/// provides — the operator spelling it must be aliased to, and the reserved
+/// `__builtin_*` function the operator resolves to (intrinsified by codegen). An
+/// operator builtin must be imported aliased to its operator: `import {
+/// wrapping_add as + } from builtins;`. Multiple builtins map to the same operator
+/// (`wrapping_add`/`saturating_add` both provide `+`), letting a file pick the
+/// semantics it wants; the operator use dispatches on the resolved impl, not on
+/// the spelling. This registry is the single place operator builtins are declared
+/// — extend it (not per-operator special-cases) to add flavors.
+pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static str)> {
     match name {
-        "wrapping_add" => Some("+"),
+        "wrapping_add" => Some(("+", "__builtin_wrapping_add")),
+        "saturating_add" => Some(("+", "__builtin_saturating_add")),
         _ => None,
     }
 }
@@ -910,6 +916,8 @@ pub fn binop_spelling(c: char) -> &'static str {
         // `++` — the increment operator (from `set n++;`). Lowered to `+` by the
         // loader after operator gating; this spelling is what the gate requires.
         'P' => "++",
+        // `+++` — the string-concatenation operator.
+        'C' => "+++",
         _ => "?",
     }
 }

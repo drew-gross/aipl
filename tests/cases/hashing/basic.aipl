@@ -1,4 +1,4 @@
-import { !=, wrapping_add as +, ==, hash } from builtins;
+import { !=, wrapping_add as +, +++, ==, hash } from builtins;
 
 // `hash(x) -> i64` is a deterministic structural hash, consistent with `==`:
 // equal values hash equal. It recurses over every type. Set/dict hashing is
@@ -13,7 +13,7 @@ fn h(x: i64) -> i64 { hash(x) }.test({
 
 fn hs(s: str) -> i64 { hash(s) }.test({
     // By content — a heap-built string hashes like its literal.
-    assert(hs("hello") == hash("hel" + "lo"));
+    assert(hs("hello") == hash("hel" +++ "lo"));
     assert(hs("hello") != hs("world"));
 })
 

@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, <=, ==, print, to_str } from builtins;
+import { wrapping_add as +, +++, -, <=, ==, print, to_str } from builtins;
 
 // `return value;` early-exits the enclosing function. It's a statement (like
 // `set`), so it appears followed by `;`; control never falls through it, and the
@@ -17,7 +17,7 @@ fn first_index_reaching(xs: i64[], limit: i64) -> str {
     mut log = "";
     mut i = 0;
     for (let x : xs) {
-        set log = log + "s";
+        set log = log +++ "s";
         if (limit <= x) {
             return to_str(i);
         };
@@ -43,12 +43,12 @@ fn main() !prints {
 1
 ss
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 104
-instructions executed: 295
-binary size: 2608
+bytes allocated: 264
+instructions executed: 307
+binary size: 2688
 --- monomorphizations ---
 clamp_low
 first_index_reaching

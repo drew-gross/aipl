@@ -1,4 +1,4 @@
-import { *, wrapping_add as +, ==, map, to_str } from builtins;
+import { *, wrapping_add as +, +++, ==, map, to_str } from builtins;
 
 // When `map` receives a freshly-allocated, uniquely-owned array, it overwrites
 // each slot in place and reuses the same allocation instead of building a new
@@ -16,7 +16,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // Heap (str) elements, T == U: the old string in each slot is dropped and
     // the new one stored in place. A leak or double-free would unbalance the
     // allocation/deallocation counts.
-    assert(["a", "b", "c"].map(|s| s + "!") == ["a!", "b!", "c!"]);
+    assert(["a", "b", "c"].map(|s| s +++ "!") == ["a!", "b!", "c!"]);
 
     // A captured variable, in place.
     let k = 100;
@@ -38,7 +38,7 @@ deallocations: 16
 reallocations: 1
 bytes allocated: 817
 instructions executed: 1955
-binary size: 10008
+binary size: 10016
 --- monomorphizations ---
 __map1$own0
 __map10$own0

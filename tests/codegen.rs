@@ -118,10 +118,10 @@ fn concat_arg_emits_concat_specialized_instance() {
     // Each variant is called twice so the post-monomorphization inlining pass
     // (which folds single-use functions away) keeps both as standalone instances.
     let comp = compile(
-        "import { wrapping_add as + } from builtins;
+        "import { wrapping_add as +, +++ } from builtins;
          fn label(s: str) -> i64 { 0 }
          fn main() -> i64 {
-             label(\"abcdefgh\" + \"ijklmnop\") + label(\"qrstuvwx\" + \"yz012345\")
+             label(\"abcdefgh\" +++ \"ijklmnop\") + label(\"qrstuvwx\" +++ \"yz012345\")
              + label(\"plainval\") + label(\"another0\")
          }",
     );

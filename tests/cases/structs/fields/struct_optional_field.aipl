@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, value_or } from builtins;
+import { wrapping_add as +, +++, ==, value_or } from builtins;
 
 // A struct may hold optional fields (`T?`), stored inline as 16-byte
 // {tag, value} composites. They're built with `some`/`none`, read back with
@@ -8,7 +8,7 @@ struct Box { item: str?, count: i64? }
 
 fn make(present: bool) -> Box {
     if (present) {
-        Box { item: some("he" + "re"), count: some(7) }
+        Box { item: some("he" +++ "re"), count: some(7) }
     } else {
         Box { item: none, count: none }
     }

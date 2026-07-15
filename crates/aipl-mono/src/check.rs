@@ -1362,6 +1362,20 @@ impl Cx<'_> {
                 return Ok(Type::Primitive(Primitive::I64));
             }
         }
+        // `a + b` resolves (in the loader) to a call to the file's bound `+`
+        // implementation — `__builtin_wrapping_add` or `__builtin_saturating_add`.
+        // Both are integer add (they differ only in overflow codegen), typed here
+        // exactly like the primitive `+` Binop: same-width integers, with a bare
+        // literal operand flexing to the other's width. Reserved, not imported.
+        if (name == "__builtin_wrapping_add" || name == "__builtin_saturating_add")
+            && args.len() == 2
+        {
+            let lt = self.check_expr(&args[0], env, effects)?;
+            let rt = self.check_expr(&args[1], env, effects)?;
+            let rt2 = self.flex_int(&args[1], &rt, &lt)?;
+            let lt2 = self.flex_int(&args[0], &lt, &rt)?;
+            return self.check_int_add(&lt2, &rt2, args[0].span.clone(), args[1].span.clone());
+        }
         // `s.starts_with(p)` / `s.ends_with(p)`: the pattern is variadic, so it
         // accepts the sequence, a single element, or an optional element. A
         // `str` receiver takes a `char*` pattern (a `str`, a `char`, or a
@@ -1862,6 +1876,51 @@ impl Cx<'_> {
         Ok(ety.clone())
     }
 
+    /// Type of an integer addition — the `+` operator and the `wrapping_add` /
+    /// `saturating_add` builtins it resolves to. Both operands must be the *same*
+    /// integer width (convert explicitly with `i32(x)` etc.; no implicit mixing);
+    /// `i64` is the common default. An unresolved generic operand stays permissive.
+    /// Non-integers are rejected — `+` is integer-only (string concat is `+++`).
+    fn check_int_add(&self, lt: &Type, rt: &Type, lspan: Span, rspan: Span) -> Result<Type, Error> {
+        if is_unknown(lt) || is_unknown(rt) {
+            return Ok(unknown_ty());
+        }
+        if aipl_syntax::is_int_ty(lt) && lt == rt {
+            return Ok(lt.clone());
+        }
+        // A string operand is the common mistake now that `+` is integer-only —
+        // point at `+++` (string concatenation) rather than the generic
+        // "expected i64" arithmetic error.
+        if is_str_repr(lt) || is_str_repr(rt) {
+            let (bad, span) = if is_str_repr(lt) {
+                (lt, lspan)
+            } else {
+                (rt, rspan)
+            };
+            return Err(Error::at(
+                format!(
+                    "\"+\" is integer addition, but this operand is {}; use \"+++\" to \
+                     concatenate strings",
+                    tyname(bad)
+                ),
+                span,
+            ));
+        }
+        expect(
+            lt,
+            &Type::Primitive(Primitive::I64),
+            "arithmetic operand",
+            lspan,
+        )?;
+        expect(
+            rt,
+            &Type::Primitive(Primitive::I64),
+            "arithmetic operand",
+            rspan,
+        )?;
+        Ok(Type::Primitive(Primitive::I64))
+    }
+
     fn check_binop(
         &self,
         op: char,
@@ -1876,36 +1935,23 @@ impl Cx<'_> {
         // with `i32(x)` etc.; no implicit mixing). `i64` is the common default.
         let same_int = aipl_syntax::is_int_ty(lt) && lt == rt;
         match op {
-            '+' => {
-                // An unresolved generic *call result* could be `str` (concat) or
-                // `i64` (addition); stay permissive. A bare type variable, by
-                // contrast, is rejected below (it goes through `expect`).
+            // `+` is integer add only — the increment sugar `set n++` lowers to a
+            // primitive `+`. User `+` resolves (in the loader) to a call to its
+            // bound `wrapping_add`/`saturating_add`/user fn instead; those calls
+            // reuse `check_int_add` too. String concatenation is `+++` (`'C'`).
+            '+' => self.check_int_add(lt, rt, lspan, rspan),
+            // `+++` — string concatenation. `Error` concatenates like `str`; the
+            // result is a plain str. An unresolved generic result stays permissive.
+            'C' => {
                 if is_unknown(lt) || is_unknown(rt) {
                     Ok(unknown_ty())
                 } else if is_str_repr(lt) && is_str_repr(rt) {
-                    // `Error` concatenates like `str`; the result is a plain str.
                     Ok(Type::Primitive(Primitive::Str))
-                } else if is_str_repr(lt) || is_str_repr(rt) {
+                } else {
                     Err(Error::at(
-                        "\"+\" between str and a non-str: both sides must be str".to_string(),
+                        "\"+++\" concatenates strings: both sides must be str".to_string(),
                         span.clone(),
                     ))
-                } else if same_int {
-                    Ok(lt.clone())
-                } else {
-                    expect(
-                        lt,
-                        &Type::Primitive(Primitive::I64),
-                        "arithmetic operand",
-                        lspan,
-                    )?;
-                    expect(
-                        rt,
-                        &Type::Primitive(Primitive::I64),
-                        "arithmetic operand",
-                        rspan,
-                    )?;
-                    Ok(Type::Primitive(Primitive::I64))
                 }
             }
             '-' | '*' | '/' | '%' => {

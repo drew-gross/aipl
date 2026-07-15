@@ -1,10 +1,10 @@
-import { wrapping_add as +, print } from builtins;
+import { wrapping_add as +, +++, print } from builtins;
 
 // A function with no `-> ty` returns nothing (unit). Its body can be a pure
 // list of statements with no trailing expression — there's no value to yield.
 // Such a function is called for its effects alone.
 fn banner(title: str) !prints {
-    print("== " + title + " ==");
+    print("== " +++ title +++ " ==");
     print("ready");
 }
 

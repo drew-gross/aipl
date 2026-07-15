@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, len, print, to_str } from builtins;
+import { wrapping_add as +, +++, ==, len, print, to_str } from builtins;
 
 // Every `str + str` builds the *concatenated-string* representation — a lazy
 // rope of two str pointers, materialized (and memoized) only when its bytes are
@@ -7,17 +7,17 @@ import { wrapping_add as +, ==, len, print, to_str } from builtins;
 // a `str` parameter. Passing a concat value to a `str` parameter also selects a
 // distinct, concat-specialized monomorphization of the callee (here `label`).
 
-fn label(s: str) -> str { "[" + s + "]" }
+fn label(s: str) -> str { "[" +++ s +++ "]" }
 
 fn main() !prints {
-    let g = "foo" + "bar"; // a concat node ("foobar")
+    let g = "foo" +++ "bar"; // a concat node ("foobar")
     print(g); // foobar
     print(to_str(len(g))); // 6
     print(to_str(g == "foobar")); // true
     print(to_str(g == "nope")); // false
 
     // Nested: a rope of ropes.
-    let h = ("a" + "b") + ("c" + "d");
+    let h = ("a" +++ "b") +++ ("c" +++ "d");
     print(h); // abcd
 
     // Index and slice transparently materialize.

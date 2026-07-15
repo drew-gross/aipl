@@ -4878,6 +4878,71 @@ fn canon_int(builder: &mut FunctionBuilder, v: Value, p: Primitive) -> Value {
     }
 }
 
+/// Emit an integer add for AIPL primitive `p`, in wrapping or saturating mode —
+/// the two forms the `+` operator resolves to (`wrapping_add`/`saturating_add`).
+/// Operands `lv`/`rv` are canonical narrow ints in i64 registers (see
+/// [`canon_int`]). The result is likewise canonical.
+///
+/// - Wrapping: add in i64 and re-canonicalize (drop the out-of-range bits).
+/// - Saturating: clamp to `[min, max]` of the width. A narrow width adds exactly
+///   in i64 (operands are small, so the sum can't overflow i64) and clamps the
+///   exact sum; a full `i64`/`u64` detects overflow from the operand/sum signs
+///   (Cranelift's `*add_sat` are SIMD-only, so this is done with `icmp`/`select`).
+///   A clamped in-range value is already its own canonical form.
+fn emit_int_add(
+    builder: &mut FunctionBuilder,
+    lv: Value,
+    rv: Value,
+    p: Primitive,
+    saturating: bool,
+) -> Value {
+    if !saturating {
+        let sum = builder.ins().iadd(lv, rv);
+        return canon_int(builder, sum, p);
+    }
+    let bits = p.int_bits().expect("integer type");
+    let signed = p.int_signed();
+    let sum = builder.ins().iadd(lv, rv);
+    if bits < 64 {
+        // The i64 sum is exact; clamp it to the width's range.
+        let (min, max) = if signed {
+            (-(1i64 << (bits - 1)), (1i64 << (bits - 1)) - 1)
+        } else {
+            (0, (1i64 << bits) - 1)
+        };
+        let maxc = builder.ins().iconst(types::I64, max);
+        let over = builder.ins().icmp(IntCC::SignedGreaterThan, sum, maxc);
+        let capped = builder.ins().select(over, maxc, sum);
+        if signed {
+            // Unsigned operands are non-negative, so the sum can't underflow `min`
+            // (0); only signed narrow adds need the lower clamp.
+            let minc = builder.ins().iconst(types::I64, min);
+            let under = builder.ins().icmp(IntCC::SignedLessThan, capped, minc);
+            builder.ins().select(under, minc, capped)
+        } else {
+            capped
+        }
+    } else if signed {
+        // Signed i64 overflow: both operands share a sign that differs from the
+        // sum's — i.e. `(a ^ sum) & (b ^ sum)` is negative. Saturate toward the
+        // operands' sign: `i64::MIN` if negative, else `i64::MAX`.
+        let ax = builder.ins().bxor(lv, sum);
+        let bx = builder.ins().bxor(rv, sum);
+        let both = builder.ins().band(ax, bx);
+        let overflowed = builder.ins().icmp_imm(IntCC::SignedLessThan, both, 0);
+        let is_neg = builder.ins().icmp_imm(IntCC::SignedLessThan, lv, 0);
+        let maxc = builder.ins().iconst(types::I64, i64::MAX);
+        let minc = builder.ins().iconst(types::I64, i64::MIN);
+        let sat = builder.ins().select(is_neg, minc, maxc);
+        builder.ins().select(overflowed, sat, sum)
+    } else {
+        // Unsigned u64 overflow: the wrapped sum is less than an operand.
+        let overflowed = builder.ins().icmp(IntCC::UnsignedLessThan, sum, lv);
+        let umax = builder.ins().iconst(types::I64, -1); // all ones = u64::MAX
+        builder.ins().select(overflowed, umax, sum)
+    }
+}
+
 /// Runtime builtins, declared lazily. Every builtin is an imported `aipl_*`
 /// runtime function (cranelift-object emits an object symbol for *every*
 /// declared import, used or not), so declaring them all up-front made each
@@ -9298,6 +9363,45 @@ fn compile_expr<M: Module>(
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             (ptr, Type::Optional(Box::new(none_inner_ty())))
         }
+        ExprKind::Call(name, args, _)
+            if name == "__builtin_wrapping_add" || name == "__builtin_saturating_add" =>
+        {
+            // `a + b` resolved (in the loader) to its bound integer-add builtin.
+            // Both operands are the same integer type (checker-verified); a bare
+            // literal flexes to the other's width. Wrapping vs saturating is the
+            // only difference — see `emit_int_add`. Scalar ints carry no refcount,
+            // so there's nothing to track.
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("{name:?} expects 2 arguments, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (lv, lt) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (rv, rt) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let lt = aipl_syntax::flex_int_ty(&args[0], &lt, &rt);
+            let rt = aipl_syntax::flex_int_ty(&args[1], &rt, &lt);
+            let p = match (&lt, &rt) {
+                (Type::Primitive(a), Type::Primitive(b)) if a.is_int() && a == b => *a,
+                _ => {
+                    expect_type(
+                        &lt,
+                        &Type::Primitive(Primitive::I64),
+                        "arithmetic operand",
+                        args[0].span.clone(),
+                    )?;
+                    expect_type(
+                        &rt,
+                        &Type::Primitive(Primitive::I64),
+                        "arithmetic operand",
+                        args[1].span.clone(),
+                    )?;
+                    Primitive::I64
+                }
+            };
+            let sum = emit_int_add(builder, lv, rv, p, name == "__builtin_saturating_add");
+            (sum, Type::Primitive(p))
+        }
         ExprKind::Call(name, args, _) if name == "__builtin_to_str" => {
             // Generic `to_str(x)`: render by the argument's static type.
             if args.len() != 1 {
@@ -10919,43 +11023,17 @@ fn compile_expr<M: Module>(
             let lt = aipl_syntax::flex_int_ty(l, &lt, &rt);
             let rt = aipl_syntax::flex_int_ty(r, &rt, &lt);
             match op {
+                // `+` is integer add only. User `+` resolves to a call to its
+                // bound `wrapping_add`/`saturating_add` (intrinsified above), so a
+                // primitive `+` Binop here is the increment sugar (`set n++`) or
+                // mono's own index arithmetic — always wrapping. String concat is
+                // `+++` (`'C'`).
                 '+' => {
-                    // `Error` is str-represented, so it concatenates like a `str`.
-                    // Concatenation builds a *lazy concat node* (see
-                    // `aipl_concat_lazy`) rather than copying eagerly — the result
-                    // is still a `str` to the source, in the concat representation.
-                    if is_str_repr(&lt) && is_str_repr(&rt) {
-                        // The concat node takes ownership of its inputs; inc both
-                        // before the call so our local refs balance.
-                        emit_inc(builder, module, builtins, lv);
-                        emit_inc(builder, module, builtins, rv);
-                        let local = builtins.import(module, builder.func, "aipl_concat_lazy");
-                        let inst = builder.ins().call(local, &[lv, rv]);
-                        let ret = builder.inst_results(inst)[0];
-                        scopes
-                            .last_mut()
-                            .expect("scope")
-                            .push(Tracked::new(ret, &Type::Primitive(Primitive::Str)));
-                        (ret, Type::Primitive(Primitive::Str))
-                    } else if is_str_repr(&lt) || is_str_repr(&rt) {
-                        return Err(Error::at(
-                            format!(
-                                "\"+\" between str and {}: both sides must be str",
-                                type_name(if lt == Type::Primitive(Primitive::Str) {
-                                    &rt
-                                } else {
-                                    &lt
-                                })
-                            ),
-                            span.clone(),
-                        ));
-                    } else if is_int_ty(&lt) && lt == rt {
-                        // Same-width integer add, wrapped back into range.
+                    if is_int_ty(&lt) && lt == rt {
                         let Type::Primitive(p) = &lt else {
                             unreachable!()
                         };
-                        let sum = builder.ins().iadd(lv, rv);
-                        (canon_int(builder, sum, *p), lt.clone())
+                        (emit_int_add(builder, lv, rv, *p, false), lt.clone())
                     } else {
                         expect_type(
                             &lt,
@@ -10970,6 +11048,31 @@ fn compile_expr<M: Module>(
                             r.span.clone(),
                         )?;
                         (builder.ins().iadd(lv, rv), Type::Primitive(Primitive::I64))
+                    }
+                }
+                // `+++` string concatenation. `Error` is str-represented, so it
+                // concatenates like a `str`. Builds a *lazy concat node* (see
+                // `aipl_concat_lazy`) rather than copying eagerly — the result is
+                // still a `str` to the source, in the concat representation.
+                'C' => {
+                    if is_str_repr(&lt) && is_str_repr(&rt) {
+                        // The concat node takes ownership of its inputs; inc both
+                        // before the call so our local refs balance.
+                        emit_inc(builder, module, builtins, lv);
+                        emit_inc(builder, module, builtins, rv);
+                        let local = builtins.import(module, builder.func, "aipl_concat_lazy");
+                        let inst = builder.ins().call(local, &[lv, rv]);
+                        let ret = builder.inst_results(inst)[0];
+                        scopes
+                            .last_mut()
+                            .expect("scope")
+                            .push(Tracked::new(ret, &Type::Primitive(Primitive::Str)));
+                        (ret, Type::Primitive(Primitive::Str))
+                    } else {
+                        return Err(Error::at(
+                            "\"+++\" concatenates strings: both sides must be str".to_string(),
+                            span.clone(),
+                        ));
                     }
                 }
                 '-' | '*' | '/' | '%' => {

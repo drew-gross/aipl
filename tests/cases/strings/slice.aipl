@@ -1,4 +1,4 @@
-import { wrapping_add as +, print } from builtins;
+import { wrapping_add as +, +++, print } from builtins;
 
 // String slicing `s[start..end]` yields the bytes in `[start, end)`. Both
 // bounds clamp to `[0, len]`, so an out-of-range end gives a shorter string and
@@ -12,7 +12,7 @@ fn main() !prints {
     print("hello"[3..3]); // "" (empty range)
     print("hello"[4..2]); // "" (start > end)
     print("hi"[0..2]); // hi  (SSO source copies)
-    print(("ab" + "cdefgh")[2..7]); // cdefg  (slice of a fresh heap string)
+    print(("ab" +++ "cdefgh")[2..7]); // cdefg  (slice of a fresh heap string)
 }
 --- stdout ---
 hello

@@ -232,7 +232,7 @@ fn concat_arg_makes_distinct_monomorphization() {
     let names = mono_names(
         "fn label(s: str) -> str { s }
          fn main() {
-             let g = \"a\" + \"b\";
+             let g = \"a\" +++ \"b\";
              label(g);
              label(\"x\");
          }",

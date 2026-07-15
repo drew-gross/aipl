@@ -696,6 +696,8 @@ fn op_spelling(c: char) -> &'static str {
         'L' => "<=",
         'G' => ">=",
         'A' => "&&",
+        // `+++` — the string-concatenation operator.
+        'C' => "+++",
         other => unreachable!("unexpected OP char {other:?} in import"),
     }
 }
@@ -2103,7 +2105,9 @@ fn op_precedence(c: char) -> Precedence {
         'A' => Precedence::Left(3),
         'E' | 'N' => Precedence::Left(4),
         '<' | '>' | 'L' | 'G' => Precedence::Left(5),
-        '+' => Precedence::Left(6),
+        // `+` (integer add) and `'C'` (`+++`, string concat) share additive
+        // precedence.
+        '+' | 'C' => Precedence::Left(6),
         '*' | '/' | '%' => Precedence::Left(7),
         _ => unreachable!("unknown op code {c:?}"),
     }
@@ -2495,6 +2499,21 @@ fn tokenize_one<I: Iterator<Item = char>>(
             .parse()
             .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span.clone()))?;
         tokens.push((aipl::Terminal::Num((n, span.clone())), span));
+        return Ok(());
+    }
+
+    // Three-char operators (must beat two-char and single-char). `+++` is the
+    // string-concatenation binary operator (internal Binop char `'C'`); it must
+    // beat the `++` increment token and the single `+`.
+    if c == '+' && src.peek_n(1) == Some('+') && src.peek_n(2) == Some('+') {
+        let op_span = start..start + 3;
+        src.advance();
+        src.advance();
+        src.advance();
+        tokens.push((
+            aipl::Terminal::Op(('C', op_span), op_precedence('C')),
+            start..src.offset(),
+        ));
         return Ok(());
     }
 

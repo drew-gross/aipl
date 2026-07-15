@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, print } from builtins;
+import { wrapping_add as +, +++, ==, print } from builtins;
 
 // Strings: literal comparison, concatenation, and the `print` builtin.
 // `print` carries the `!prints` effect, so any caller has to declare it.
@@ -8,7 +8,7 @@ fn classify(s: str) -> str {
         "greeting"
     } else {
         // `+` on two `str` operands is concat (allocates a new string).
-        "unknown: " + s
+        "unknown: " +++ s
     }
 }
 

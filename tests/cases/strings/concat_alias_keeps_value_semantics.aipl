@@ -1,14 +1,14 @@
-import { wrapping_add as +, == } from builtins;
+import { wrapping_add as +, +++, == } from builtins;
 
 // Aliasing disables the in-place concat: once `s` is captured by `t`, the
 // static analysis marks `s` non-exclusive, so further `set s = s + ..` build
 // fresh strings (copy) and the snapshot `t` is never mutated underneath us.
 fn grown() -> str {
     mut s = "ab";
-    set s = s + "c";
+    set s = s +++ "c";
     let t = s; // snapshot "abc"
-    set s = s + "d";
-    set s = s + "e";
+    set s = s +++ "d";
+    set s = s +++ "e";
     s // abcde
 }.test({
     assert(grown() == "abcde");
@@ -16,10 +16,10 @@ fn grown() -> str {
 
 fn snapshot() -> str {
     mut s = "ab";
-    set s = s + "c";
+    set s = s +++ "c";
     let t = s; // snapshot "abc"
-    set s = s + "d";
-    set s = s + "e";
+    set s = s +++ "d";
+    set s = s +++ "e";
     t // abc — unchanged
 }.test({
     assert(snapshot() == "abc");

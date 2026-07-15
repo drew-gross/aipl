@@ -1,11 +1,11 @@
-import { wrapping_add as +, ==, print, to_str } from builtins;
+import { wrapping_add as +, +++, ==, print, to_str } from builtins;
 
 // Iterating a rope's chars (`for c in s`) streams its leaves via a small
 // stack-allocated cursor — no flattened buffer. Building this 18-byte rope and
 // walking every char allocates only the concat node (1), never a materialized
 // 18-byte buffer. The cursor itself lives on the stack (zero heap allocation).
 fn main() !prints {
-    let r = "Hello, " + "rope world!"; // 18-byte rope (two leaves)
+    let r = "Hello, " +++ "rope world!"; // 18-byte rope (two leaves)
     mut n = 0;
     mut last_is_bang = false;
     for (let c : r) {

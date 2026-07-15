@@ -5,12 +5,12 @@
 // inline arg + inline literal stays inline). So the only heap allocations the
 // counters report are the `str[]` block plus the single long arg; the short arg,
 // the literal, and the "hi!" concat are all inline (zero allocations).
-import { wrapping_add as +, ==, print } from builtins;
+import { wrapping_add as +, +++, ==, print } from builtins;
 
 fn main(args: str[]) !prints {
     for (let a : args) {
         if (a == "hi") {
-            print(a + "!"); // inline arg + inline literal -> inline "hi!"
+            print(a +++ "!"); // inline arg +++ inline literal -> inline "hi!"
         } else {
             print(a);
         };

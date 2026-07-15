@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, print, to_str } from builtins;
+import { wrapping_add as +, +++, -, print, to_str } from builtins;
 
 // The generic `to_str` renders any value by its static type. Scalars: i64 as
 // decimal, bool as true/false, char as 'c', str as "s" (Debug-style quoting).
@@ -11,7 +11,7 @@ fn main() !prints {
     print(to_str('c')); // 'c'
     print(to_str("hi")); // "hi"
     print((1 + 2).to_str()); // 3 (method form)
-    print("x = " + to_str(5)); // x = 5
+    print("x = " +++ to_str(5)); // x = 5
 }
 --- stdout ---
 42

@@ -1,4 +1,4 @@
-import { wrapping_add as +, execute_program, print, to_str } from builtins;
+import { wrapping_add as +, +++, execute_program, print, to_str } from builtins;
 
 // `execute_program(program, args = [...]) -> ExecResult!Error` spawns
 // `program` with `args` (argv-style, no shell) and waits for it, capturing
@@ -10,19 +10,25 @@ import { wrapping_add as +, execute_program, print, to_str } from builtins;
 // must declare it.
 fn main() !prints !execute_program {
     match (execute_program("echo", args=["hello", "world"])) {
-        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
-        err(e) => print("err:[" + e + "]"),
+        ok(r) => print(
+            "ok:[" +++ r.stdout +++ "][" +++ r.stderr +++ "] exit=" +++ to_str(r.exit_code),
+        ),
+        err(e) => print("err:[" +++ e +++ "]"),
     };
 
     match (execute_program("sh", args=["-c", "echo out; echo err >&2; exit 7"])) {
-        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
-        err(e) => print("err:[" + e + "]"),
+        ok(r) => print(
+            "ok:[" +++ r.stdout +++ "][" +++ r.stderr +++ "] exit=" +++ to_str(r.exit_code),
+        ),
+        err(e) => print("err:[" +++ e +++ "]"),
     };
 
     // `args` omitted — defaults to no arguments.
     match (execute_program("true")) {
-        ok(r) => print("ok:[" + r.stdout + "][" + r.stderr + "] exit=" + to_str(r.exit_code)),
-        err(e) => print("err:[" + e + "]"),
+        ok(r) => print(
+            "ok:[" +++ r.stdout +++ "][" +++ r.stderr +++ "] exit=" +++ to_str(r.exit_code),
+        ),
+        err(e) => print("err:[" +++ e +++ "]"),
     };
 }
 --- stdout ---

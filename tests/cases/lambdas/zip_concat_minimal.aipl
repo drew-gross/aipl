@@ -1,4 +1,4 @@
-import { wrapping_add as +, print, zip_with } from builtins;
+import { wrapping_add as +, +++, print, zip_with } from builtins;
 
 fn show_strs(label: str, xs: str[]) !prints {
     print(label);
@@ -8,7 +8,7 @@ fn show_strs(label: str, xs: str[]) !prints {
 }
 
 fn main() !prints {
-    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s + t));
+    show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| s +++ t));
 }
 --- stdout ---
 concat

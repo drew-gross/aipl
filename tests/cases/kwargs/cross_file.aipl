@@ -13,9 +13,9 @@ fn main() !prints {
 |hi|
 *hi*
 --- file: frame.aipl ---
-import { wrapping_add as + } from builtins;
+import { +++ } from builtins;
 fn default_edge() -> str { "|" }
-pub fn framed(s: str, edge: str = default_edge()) -> str { edge + s + edge }
+pub fn framed(s: str, edge: str = default_edge()) -> str { edge +++ s +++ edge }
 --- performance ---
 allocations: 4
 deallocations: 4

@@ -7,7 +7,7 @@ import { + } from builtins;
 
 fn main() {}
 --- errors ---
-error: the "+" operator is provided by `wrapping_add`; import `wrapping_add as +` from builtins
+error: the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins
  --> ./tests/cases/imports/err_bare_plus_operator.aipl:1:1
   |
 1 | // A bare `import { + }` is gated by `is_operator_name`: `+` is recognized as an

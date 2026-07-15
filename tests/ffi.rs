@@ -121,9 +121,9 @@ fn call_values_marshals_str_return() {
     // Identity returns one of the (borrowed) argument buffers; concat builds a
     // fresh heap string. Both must round-trip and free cleanly.
     let src = "\
-import { wrapping_add as + } from builtins;
+import { +++ } from builtins;
 pub fn id(s: str) -> str { s }
-pub fn shout(s: str) -> str { s + \" is loud!\" }";
+pub fn shout(s: str) -> str { s +++ \" is loud!\" }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::Str;
     // Inline arg, inline return.
@@ -200,12 +200,12 @@ fn call_values_marshals_struct_return() {
     // `find_trailing_whitespace` to report a `Span`. Fields come back in
     // declaration order, each tagged with its name.
     let src = "\
-import { wrapping_add as + } from builtins;
+import { +++ } from builtins;
 struct Span { start: i64, end: i64 }
 struct Tagged { name: str, ok: bool, code: char }
 pub fn span(a: i64, b: i64) -> Span { Span { start: a, end: b } }
 pub fn tagged(suffix: str, present: bool) -> Tagged {
-    Tagged { name: \"item-\" + suffix, ok: present, code: 'Z' }
+    Tagged { name: \"item-\" +++ suffix, ok: present, code: 'Z' }
 }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Str, Struct};

@@ -1,4 +1,4 @@
-import { !, !=, wrapping_add as +, ==, contains, len } from builtins;
+import { !, !=, wrapping_add as +, +++, ==, contains, len } from builtins;
 
 // Sets of strings: deduplicated and tested for membership by *content* (not
 // pointer identity), and freed/retained like a `str[]`.
@@ -16,7 +16,7 @@ fn build() -> #{str} {
     assert(!s.contains("grape"));
 
     // Membership is by content: a freshly built "banana" still matches.
-    let key = "ba" + "nana";
+    let key = "ba" +++ "nana";
     assert(s.contains(key));
 
     // Equality is order-independent and by content.
