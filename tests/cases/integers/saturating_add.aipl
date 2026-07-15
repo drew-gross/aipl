@@ -1,4 +1,4 @@
-import { saturating_add as +, -, == } from builtins;
+import { saturating_add as +, wrapping_sub as -, == } from builtins;
 
 // `import { saturating_add as + }` binds `+` to clamping integer add: instead of
 // wrapping on overflow (`wrapping_add`), the result is pinned at the type's

@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, <=, == } from builtins;
+import { wrapping_add as +, wrapping_sub as -, <=, == } from builtins;
 
 // `rec` forwards its function parameter to itself recursively, then calls it at
 // the base case. Specialization is memoized by (callee, synthesized function),

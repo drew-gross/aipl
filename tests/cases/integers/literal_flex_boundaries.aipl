@@ -1,4 +1,4 @@
-import { -, == } from builtins;
+import { wrapping_sub as -, == } from builtins;
 
 // Pins the exact acceptance boundaries of integer-literal flexing — the behavior
 // `int_fits` encodes: the extreme in-range literal for each width flexes into a

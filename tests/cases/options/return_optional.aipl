@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, /, ==, value_or } from builtins;
+import { wrapping_add as +, wrapping_sub as -, /, ==, value_or } from builtins;
 
 // Optional returns: callee emits (tag, value) as two i64s; caller
 // reconstructs a 16-byte slot. Unwrap with the `value_or` builtin.

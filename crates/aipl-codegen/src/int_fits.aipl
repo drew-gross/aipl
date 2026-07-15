@@ -1,4 +1,4 @@
-import { !, &&, -, <=, ==, >= } from builtins;
+import { !, &&, wrapping_sub as -, <=, ==, >= } from builtins;
 
 pub fn int_fits(v: i64, name: str) -> bool {
     match (name) {

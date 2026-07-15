@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, == } from builtins;
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 fn add(x: i64, y: i64) -> i64 { x + y }.test({
     assert(add(1, 2) == 3);

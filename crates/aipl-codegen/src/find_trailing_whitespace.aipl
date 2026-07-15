@@ -5,7 +5,7 @@
 // first offending run, or `none` when there is none; `aipl_str_iter_next` walks
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
-import { &&, wrapping_add as +, -, ==, >, ||, Span, is_some } from builtins;
+import { &&, wrapping_add as +, wrapping_sub as -, ==, >, ||, Span, is_some } from builtins;
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'

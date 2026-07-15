@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, ==, >, print, to_str } from builtins;
+import { wrapping_add as +, wrapping_sub as -, ==, >, print, to_str } from builtins;
 
 // A bare integer literal flexes to a narrow integer type by context — no
 // explicit conversion needed — as long as it fits. It works against the other

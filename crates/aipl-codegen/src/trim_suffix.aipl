@@ -1,6 +1,6 @@
 // Used by the raw-string processor to drop the newline (and CR) that end a blank
 // closing line.
-import { -, ==, len } from builtins;
+import { wrapping_sub as -, ==, len } from builtins;
 
 pub fn trim_suffix(self: str, c: char) -> str {
     if (self[self.len() - 1] == some(c)) { self[0..self.len() - 1] } else { self }

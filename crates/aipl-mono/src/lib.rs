@@ -3405,15 +3405,20 @@ impl Mono<'_> {
                     );
                     let ret = self.call_return(name, &atys);
                     (node(ExprKind::Call(mangled, rargs, method_style)), ret)
-                } else if (name == "__builtin_wrapping_add" || name == "__builtin_saturating_add")
-                    && atys.len() == 2
+                } else if matches!(
+                    name.as_str(),
+                    "__builtin_wrapping_add"
+                        | "__builtin_saturating_add"
+                        | "__builtin_wrapping_sub"
+                        | "__builtin_saturating_sub"
+                ) && atys.len() == 2
                 {
-                    // `+` resolved to an integer-add builtin (wrapping/saturating
-                    // differ only in codegen). The result width follows the operands
-                    // — same-width int keeps its width, else i64 — with a bare
-                    // literal operand flexing to the other's width, matching the
-                    // checker's `check_int_add` and codegen. The name is kept as-is;
-                    // codegen intrinsifies it (no emitted instance).
+                    // `+`/`-` resolved to an integer arithmetic builtin
+                    // (wrapping/saturating differ only in codegen). The result width
+                    // follows the operands — same-width int keeps its width, else
+                    // i64 — with a bare literal operand flexing to the other's width,
+                    // matching the checker's `check_int_arith` and codegen. The name
+                    // is kept as-is; codegen intrinsifies it (no emitted instance).
                     let lt = aipl_syntax::flex_int_ty(&rargs[0], &atys[0], &atys[1]);
                     let rt = aipl_syntax::flex_int_ty(&rargs[1], &atys[1], &lt);
                     let ret = if aipl_syntax::is_int_ty(&lt) && lt == rt {

@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, <= } from builtins;
+import { wrapping_add as +, wrapping_sub as -, <= } from builtins;
 
 // Smallest end-to-end example: a struct and a fn that sums its fields. `main`
 // also runs a deliberately heavy naive recursive Fibonacci — recursion depth

@@ -1,4 +1,4 @@
-import { *, wrapping_add as +, -, == } from builtins;
+import { *, wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 fn fact(n: i64) -> i64 { if (n == 0) { 1 } else { n * fact(n - 1) } }.test({
     assert(fact(0) == 1);

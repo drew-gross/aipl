@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, == } from builtins;
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 // `.doc("...")` attaches documentation; it's ignored by run/check/build (only
 // surfaced by `aipl doc`), and composes with `.test({ .. })` in any order.

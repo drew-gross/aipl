@@ -1362,19 +1362,29 @@ impl Cx<'_> {
                 return Ok(Type::Primitive(Primitive::I64));
             }
         }
-        // `a + b` resolves (in the loader) to a call to the file's bound `+`
-        // implementation — `__builtin_wrapping_add` or `__builtin_saturating_add`.
-        // Both are integer add (they differ only in overflow codegen), typed here
-        // exactly like the primitive `+` Binop: same-width integers, with a bare
-        // literal operand flexing to the other's width. Reserved, not imported.
-        if (name == "__builtin_wrapping_add" || name == "__builtin_saturating_add")
-            && args.len() == 2
-        {
-            let lt = self.check_expr(&args[0], env, effects)?;
-            let rt = self.check_expr(&args[1], env, effects)?;
-            let rt2 = self.flex_int(&args[1], &rt, &lt)?;
-            let lt2 = self.flex_int(&args[0], &lt, &rt)?;
-            return self.check_int_add(&lt2, &rt2, args[0].span.clone(), args[1].span.clone());
+        // `a + b` / `a - b` resolve (in the loader) to a call to the file's bound
+        // `+`/`-` implementation — `__builtin_{wrapping,saturating}_{add,sub}`.
+        // Each is integer arithmetic (the flavors differ only in overflow codegen),
+        // typed here exactly like the primitive Binop: same-width integers, with a
+        // bare literal operand flexing to the other's width. Reserved, not imported.
+        if let Some(op) = match name {
+            "__builtin_wrapping_add" | "__builtin_saturating_add" => Some("+"),
+            "__builtin_wrapping_sub" | "__builtin_saturating_sub" => Some("-"),
+            _ => None,
+        } {
+            if args.len() == 2 {
+                let lt = self.check_expr(&args[0], env, effects)?;
+                let rt = self.check_expr(&args[1], env, effects)?;
+                let rt2 = self.flex_int(&args[1], &rt, &lt)?;
+                let lt2 = self.flex_int(&args[0], &lt, &rt)?;
+                return self.check_int_arith(
+                    op,
+                    &lt2,
+                    &rt2,
+                    args[0].span.clone(),
+                    args[1].span.clone(),
+                );
+            }
         }
         // `s.starts_with(p)` / `s.ends_with(p)`: the pattern is variadic, so it
         // accepts the sequence, a single element, or an optional element. A
@@ -1881,26 +1891,42 @@ impl Cx<'_> {
     /// integer width (convert explicitly with `i32(x)` etc.; no implicit mixing);
     /// `i64` is the common default. An unresolved generic operand stays permissive.
     /// Non-integers are rejected — `+` is integer-only (string concat is `+++`).
-    fn check_int_add(&self, lt: &Type, rt: &Type, lspan: Span, rspan: Span) -> Result<Type, Error> {
+    /// Type of an integer add/subtract — the `+`/`-` operators and the
+    /// `wrapping_*`/`saturating_*` builtins they resolve to. `op` is the spelling
+    /// (`"+"` or `"-"`), used only for diagnostics. Both operands must be the same
+    /// integer width; an unresolved generic operand stays permissive; non-integers
+    /// are rejected (with a `+++`-concat hint for a string given to `+`).
+    fn check_int_arith(
+        &self,
+        op: &str,
+        lt: &Type,
+        rt: &Type,
+        lspan: Span,
+        rspan: Span,
+    ) -> Result<Type, Error> {
         if is_unknown(lt) || is_unknown(rt) {
             return Ok(unknown_ty());
         }
         if aipl_syntax::is_int_ty(lt) && lt == rt {
             return Ok(lt.clone());
         }
-        // A string operand is the common mistake now that `+` is integer-only —
-        // point at `+++` (string concatenation) rather than the generic
-        // "expected i64" arithmetic error.
+        // A string operand is the common mistake now that `+`/`-` are integer-only.
+        // For `+`, point at `+++` (string concatenation).
         if is_str_repr(lt) || is_str_repr(rt) {
             let (bad, span) = if is_str_repr(lt) {
                 (lt, lspan)
             } else {
                 (rt, rspan)
             };
+            let verb = if op == "+" { "addition" } else { "subtraction" };
+            let hint = if op == "+" {
+                "; use \"+++\" to concatenate strings"
+            } else {
+                ""
+            };
             return Err(Error::at(
                 format!(
-                    "\"+\" is integer addition, but this operand is {}; use \"+++\" to \
-                     concatenate strings",
+                    "\"{op}\" is integer {verb}, but this operand is {}{hint}",
                     tyname(bad)
                 ),
                 span,
@@ -1936,10 +1962,10 @@ impl Cx<'_> {
         let same_int = aipl_syntax::is_int_ty(lt) && lt == rt;
         match op {
             // `+` is integer add only — the increment sugar `set n++` lowers to a
-            // primitive `+`. User `+` resolves (in the loader) to a call to its
-            // bound `wrapping_add`/`saturating_add`/user fn instead; those calls
-            // reuse `check_int_add` too. String concatenation is `+++` (`'C'`).
-            '+' => self.check_int_add(lt, rt, lspan, rspan),
+            // primitive `+`. User `+`/`-` resolve (in the loader) to a call to their
+            // bound `wrapping_*`/`saturating_*`/user fn instead; those calls reuse
+            // `check_int_arith` too. String concatenation is `+++` (`'C'`).
+            '+' => self.check_int_arith("+", lt, rt, lspan, rspan),
             // `+++` — string concatenation. `Error` concatenates like `str`; the
             // result is a plain str. An unresolved generic result stays permissive.
             'C' => {

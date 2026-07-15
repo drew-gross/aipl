@@ -868,6 +868,8 @@ pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static str)> {
     match name {
         "wrapping_add" => Some(("+", "__builtin_wrapping_add")),
         "saturating_add" => Some(("+", "__builtin_saturating_add")),
+        "wrapping_sub" => Some(("-", "__builtin_wrapping_sub")),
+        "saturating_sub" => Some(("-", "__builtin_saturating_sub")),
         _ => None,
     }
 }

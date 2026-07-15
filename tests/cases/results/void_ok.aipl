@@ -1,4 +1,4 @@
-import { !=, wrapping_add as +, +++, -, <, ==, print, to_str } from builtins;
+import { !=, wrapping_add as +, +++, wrapping_sub as -, <, ==, print, to_str } from builtins;
 
 // A "void with result" type `!E`: success carries no value (`ok()`), failure
 // carries an error (`err(e)`). Useful for fallible effects whose only output is

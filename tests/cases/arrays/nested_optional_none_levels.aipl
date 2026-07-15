@@ -1,4 +1,4 @@
-import { -, print, to_str } from builtins;
+import { wrapping_sub as -, print, to_str } from builtins;
 
 // `none` at every level of a nested optional. Each chain is built from a
 // concrete-core piece (the `wrap`/`none` functions) so the core type is known —

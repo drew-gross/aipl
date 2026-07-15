@@ -1,4 +1,4 @@
-import { !=, *, -, /, <, ==, >, filter, map } from builtins;
+import { !=, *, wrapping_sub as -, /, <, ==, >, filter, map } from builtins;
 
 // A named predicate.
 fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({

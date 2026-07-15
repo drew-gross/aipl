@@ -1,4 +1,4 @@
-import { -, print, to_str } from builtins;
+import { wrapping_sub as -, print, to_str } from builtins;
 
 // `T??` / `T???` as local variables, function parameters, and return types.
 // Nested optionals are stored inline (the outer's value region holds the whole

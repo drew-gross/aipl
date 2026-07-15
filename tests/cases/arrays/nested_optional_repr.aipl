@@ -1,4 +1,4 @@
-import { -, is_some, print, to_str } from builtins;
+import { wrapping_sub as -, is_some, print, to_str } from builtins;
 
 // The flattened optional representation: an optional chain `Optional^n(Core)` is
 // `{ tag: i64, value: <Core> }` — a single core-sized value field shared by the

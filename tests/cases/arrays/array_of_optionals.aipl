@@ -1,4 +1,4 @@
-import { -, print, to_str } from builtins;
+import { wrapping_sub as -, print, to_str } from builtins;
 
 // Optionals nest: `some(some(1))` is an `i64??`, stored inline (the outer's
 // value region holds the whole inner optional). And indexing a `T?[]` yields a

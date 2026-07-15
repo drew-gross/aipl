@@ -1,4 +1,4 @@
-import { -, <, == } from builtins;
+import { wrapping_sub as -, <, == } from builtins;
 
 // An `if` in statement position (its value discarded) may omit `else`. Its
 // `then` block must be unit-typed and the `if` itself yields unit, so it reads

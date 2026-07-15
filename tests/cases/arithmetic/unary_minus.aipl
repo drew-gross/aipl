@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, == } from builtins;
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 fn neg(x: i64) -> i64 { -x }.test({
     assert(neg(5) == -5);
@@ -12,7 +12,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 61
-binary size: 1640
+binary size: 1648
 --- monomorphizations ---
 main
 neg

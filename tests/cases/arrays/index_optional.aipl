@@ -1,4 +1,4 @@
-import { wrapping_add as +, -, == } from builtins;
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 // Indexing yields an optional: some(elem) in bounds, none out of bounds.
 fn at(xs: i64[], i: i64) -> i64 {

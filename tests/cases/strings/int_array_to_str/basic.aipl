@@ -1,4 +1,4 @@
-import { -, print, to_str } from builtins;
+import { wrapping_sub as -, print, to_str } from builtins;
 
 // `to_str(xs)` renders an i64[] as a bracketed, comma-separated
 // list. Negatives and zero render via the same decimal logic as to_str.

@@ -336,7 +336,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ;   v0 = source
 ;   v1 = span
 ;   v2 = filename
-;   v4 = __spat$668
+;   v4 = __spat$721
 ;   v5 = line_start
 ;   v6 = line
 ;   v7 = line_end

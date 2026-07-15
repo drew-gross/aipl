@@ -273,7 +273,7 @@ fn call_values_marshals_struct_param() {
     // ABI used for struct locals and returns, but on the input side. This is
     // the shape `caret_block` uses for its `Span` parameter.
     let src = "\
-import { wrapping_add as +, - } from builtins;
+import { wrapping_add as +, wrapping_sub as - } from builtins;
 struct Span { start: i64, end: i64 }
 pub fn span_len(span: Span) -> i64 { span.end - span.start }
 pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";

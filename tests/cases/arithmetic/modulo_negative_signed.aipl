@@ -1,4 +1,4 @@
-import { %, wrapping_add as +, -, == } from builtins;
+import { %, wrapping_add as +, wrapping_sub as -, == } from builtins;
 
 // srem semantics: result takes sign of dividend.
 fn m(x: i64, y: i64) -> i64 { x % y }.test({

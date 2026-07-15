@@ -1,7 +1,7 @@
 import {
     wrapping_add as +,
     +++,
-    -,
+    wrapping_sub as -,
     ==,
     contains_key,
     get,

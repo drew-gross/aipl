@@ -4878,44 +4878,49 @@ fn canon_int(builder: &mut FunctionBuilder, v: Value, p: Primitive) -> Value {
     }
 }
 
-/// Emit an integer add for AIPL primitive `p`, in wrapping or saturating mode —
-/// the two forms the `+` operator resolves to (`wrapping_add`/`saturating_add`).
-/// Operands `lv`/`rv` are canonical narrow ints in i64 registers (see
-/// [`canon_int`]). The result is likewise canonical.
+/// Emit an integer add or subtract for AIPL primitive `p`, in wrapping or
+/// saturating mode — the forms the `+`/`-` operators resolve to
+/// (`wrapping_add`/`saturating_add`/`wrapping_sub`/`saturating_sub`). Operands
+/// `lv`/`rv` are canonical narrow ints in i64 registers (see [`canon_int`]); the
+/// result is likewise canonical. `sub` selects subtraction.
 ///
-/// - Wrapping: add in i64 and re-canonicalize (drop the out-of-range bits).
-/// - Saturating: clamp to `[min, max]` of the width. A narrow width adds exactly
-///   in i64 (operands are small, so the sum can't overflow i64) and clamps the
-///   exact sum; a full `i64`/`u64` detects overflow from the operand/sum signs
-///   (Cranelift's `*add_sat` are SIMD-only, so this is done with `icmp`/`select`).
-///   A clamped in-range value is already its own canonical form.
-fn emit_int_add(
+/// - Wrapping: compute in i64 and re-canonicalize (drop the out-of-range bits).
+/// - Saturating: clamp to `[min, max]` of the width. A narrow width computes
+///   exactly in i64 (operands are small, so it can't overflow i64) and clamps; a
+///   full `i64`/`u64` detects over/underflow from the operand/result signs
+///   (Cranelift's saturating ops are SIMD-only, so this uses `icmp`/`select`). A
+///   clamped in-range value is already its own canonical form.
+fn emit_int_addsub(
     builder: &mut FunctionBuilder,
     lv: Value,
     rv: Value,
     p: Primitive,
+    sub: bool,
     saturating: bool,
 ) -> Value {
+    let raw = if sub {
+        builder.ins().isub(lv, rv)
+    } else {
+        builder.ins().iadd(lv, rv)
+    };
     if !saturating {
-        let sum = builder.ins().iadd(lv, rv);
-        return canon_int(builder, sum, p);
+        return canon_int(builder, raw, p);
     }
     let bits = p.int_bits().expect("integer type");
     let signed = p.int_signed();
-    let sum = builder.ins().iadd(lv, rv);
     if bits < 64 {
-        // The i64 sum is exact; clamp it to the width's range.
+        // The i64 result is exact; clamp it to the width's range.
         let (min, max) = if signed {
             (-(1i64 << (bits - 1)), (1i64 << (bits - 1)) - 1)
         } else {
             (0, (1i64 << bits) - 1)
         };
         let maxc = builder.ins().iconst(types::I64, max);
-        let over = builder.ins().icmp(IntCC::SignedGreaterThan, sum, maxc);
-        let capped = builder.ins().select(over, maxc, sum);
-        if signed {
-            // Unsigned operands are non-negative, so the sum can't underflow `min`
-            // (0); only signed narrow adds need the lower clamp.
+        let over = builder.ins().icmp(IntCC::SignedGreaterThan, raw, maxc);
+        let capped = builder.ins().select(over, maxc, raw);
+        // A signed result can go below `min`; an unsigned one can only underflow
+        // `0` on a subtraction (an add of non-negative operands never does).
+        if signed || sub {
             let minc = builder.ins().iconst(types::I64, min);
             let under = builder.ins().icmp(IntCC::SignedLessThan, capped, minc);
             builder.ins().select(under, minc, capped)
@@ -4923,23 +4928,35 @@ fn emit_int_add(
             capped
         }
     } else if signed {
-        // Signed i64 overflow: both operands share a sign that differs from the
-        // sum's — i.e. `(a ^ sum) & (b ^ sum)` is negative. Saturate toward the
-        // operands' sign: `i64::MIN` if negative, else `i64::MAX`.
-        let ax = builder.ins().bxor(lv, sum);
-        let bx = builder.ins().bxor(rv, sum);
-        let both = builder.ins().band(ax, bx);
+        // Signed i64 over/underflow. Add: both operands share a sign differing from
+        // the result's — `(a ^ r) & (b ^ r) < 0`. Sub: the operands differ in sign
+        // and the result's sign differs from `a` — `(a ^ b) & (a ^ r) < 0`. Either
+        // way, saturate toward `a`'s sign: `i64::MIN` if `a < 0`, else `i64::MAX`.
+        let both = if sub {
+            let ab = builder.ins().bxor(lv, rv);
+            let ar = builder.ins().bxor(lv, raw);
+            builder.ins().band(ab, ar)
+        } else {
+            let ar = builder.ins().bxor(lv, raw);
+            let br = builder.ins().bxor(rv, raw);
+            builder.ins().band(ar, br)
+        };
         let overflowed = builder.ins().icmp_imm(IntCC::SignedLessThan, both, 0);
         let is_neg = builder.ins().icmp_imm(IntCC::SignedLessThan, lv, 0);
         let maxc = builder.ins().iconst(types::I64, i64::MAX);
         let minc = builder.ins().iconst(types::I64, i64::MIN);
         let sat = builder.ins().select(is_neg, minc, maxc);
-        builder.ins().select(overflowed, sat, sum)
+        builder.ins().select(overflowed, sat, raw)
+    } else if sub {
+        // Unsigned u64 underflow: `a < b` borrows; saturate to `0`.
+        let underflowed = builder.ins().icmp(IntCC::UnsignedLessThan, lv, rv);
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().select(underflowed, zero, raw)
     } else {
         // Unsigned u64 overflow: the wrapped sum is less than an operand.
-        let overflowed = builder.ins().icmp(IntCC::UnsignedLessThan, sum, lv);
+        let overflowed = builder.ins().icmp(IntCC::UnsignedLessThan, raw, lv);
         let umax = builder.ins().iconst(types::I64, -1); // all ones = u64::MAX
-        builder.ins().select(overflowed, umax, sum)
+        builder.ins().select(overflowed, umax, raw)
     }
 }
 
@@ -9364,12 +9381,19 @@ fn compile_expr<M: Module>(
             (ptr, Type::Optional(Box::new(none_inner_ty())))
         }
         ExprKind::Call(name, args, _)
-            if name == "__builtin_wrapping_add" || name == "__builtin_saturating_add" =>
+            if matches!(
+                name.as_str(),
+                "__builtin_wrapping_add"
+                    | "__builtin_saturating_add"
+                    | "__builtin_wrapping_sub"
+                    | "__builtin_saturating_sub"
+            ) =>
         {
-            // `a + b` resolved (in the loader) to its bound integer-add builtin.
-            // Both operands are the same integer type (checker-verified); a bare
-            // literal flexes to the other's width. Wrapping vs saturating is the
-            // only difference — see `emit_int_add`. Scalar ints carry no refcount,
+            // `a + b` / `a - b` resolved (in the loader) to their bound integer
+            // arithmetic builtin. Both operands are the same integer type
+            // (checker-verified); a bare literal flexes to the other's width. The
+            // flavor (wrapping/saturating) and operation (add/sub) are the only
+            // differences — see `emit_int_addsub`. Scalar ints carry no refcount,
             // so there's nothing to track.
             if args.len() != 2 {
                 return Err(Error::at(
@@ -9399,8 +9423,10 @@ fn compile_expr<M: Module>(
                     Primitive::I64
                 }
             };
-            let sum = emit_int_add(builder, lv, rv, p, name == "__builtin_saturating_add");
-            (sum, Type::Primitive(p))
+            let sub = name.ends_with("_sub");
+            let saturating = name.starts_with("__builtin_saturating_");
+            let out = emit_int_addsub(builder, lv, rv, p, sub, saturating);
+            (out, Type::Primitive(p))
         }
         ExprKind::Call(name, args, _) if name == "__builtin_to_str" => {
             // Generic `to_str(x)`: render by the argument's static type.
@@ -11033,7 +11059,10 @@ fn compile_expr<M: Module>(
                         let Type::Primitive(p) = &lt else {
                             unreachable!()
                         };
-                        (emit_int_add(builder, lv, rv, *p, false), lt.clone())
+                        (
+                            emit_int_addsub(builder, lv, rv, *p, false, false),
+                            lt.clone(),
+                        )
                     } else {
                         expect_type(
                             &lt,

@@ -425,12 +425,21 @@ impl Loader {
                         }
                     }
                 } else if aipl_syntax::is_operator_name(&n.name) {
-                    if n.name == "+" {
+                    // Operators with pluggable semantics (`+`, `-`) have no bare
+                    // form — you must pick a flavor and alias it. Everything else
+                    // (`==`, `*`, `+++`, …) is a bare builtin operator.
+                    if let Some((verb, wrapping, saturating)) = match n.name.as_str() {
+                        "+" => Some(("add", "wrapping_add", "saturating_add")),
+                        "-" => Some(("subtract", "wrapping_sub", "saturating_sub")),
+                        _ => None,
+                    } {
                         return Err(Error::at(
-                            "the \"+\" operator has no bare form; pick a semantics and \
-                             import it aliased, e.g. `wrapping_add as +` or \
-                             `saturating_add as +` from builtins"
-                                .to_string(),
+                            format!(
+                                "the \"{}\" operator has no bare form; pick a semantics and \
+                                 import it aliased, e.g. `{wrapping} as {}` or `{saturating} as {}` \
+                                 from builtins ({verb})",
+                                n.name, n.name, n.name
+                            ),
                             n.span.clone(),
                         ));
                     }
