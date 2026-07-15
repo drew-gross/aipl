@@ -52,3 +52,13 @@ pub fn is_operator_name(s: str) -> bool {
     assert(!is_operator_name("++++")); // four, not `+++`
     assert(!is_operator_name("and"));
 })
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1567
+binary size: 9456
+--- monomorphizations ---
+is_operator_name
+main

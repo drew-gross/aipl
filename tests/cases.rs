@@ -31,10 +31,11 @@
 //!                          checks the tallies (binary size is measured from the
 //!                          non-instrumented object).
 //!                          Mutually exclusive with `errors`. REQUIRED on every
-//!                          running case under `tests/cases/` (the user-facing
-//!                          `examples/` are exempt); a success case without one
-//!                          fails. For a *library* case (no `main`), it measures
-//!                          the `.test` run instead — see below.
+//!                          running case under `tests/cases/` and `crates/`
+//!                          (only the user-facing `examples/` are exempt); a
+//!                          success case without one fails. For a *library* case
+//!                          (no `main`), it measures the `.test` run instead —
+//!                          see below.
 //!
 //! A case need not define `main`. A *library* case has `.test` blocks but no
 //! `main`: it's exercised only through `aipl check`, and its `--- performance ---`
@@ -52,9 +53,9 @@
 //!                          line, sorted (each generic specialization / owned form
 //!                          is its own instance). Lets a change in what gets
 //!                          specialized show up as a diff. REQUIRED on every running case under
-//!                          `tests/cases/` (same gate as `performance` — the
-//!                          user-facing `examples/` are exempt). Mutually
-//!                          exclusive with `errors`.
+//!                          `tests/cases/` and `crates/` (same gate as
+//!                          `performance` — the user-facing `examples/` are
+//!                          exempt). Mutually exclusive with `errors`.
 //!   `--- file: rel/path.aipl ---` — additional source files, staged
 //!                          alongside the entry source so `import`s
 //!                          resolve as written.
@@ -398,8 +399,8 @@ fn run_perfmon() {
 ///     `import`s resolve.
 ///   - `crates/**/*.aipl` — the compiler-dogfooded helpers (`add`, `count_while`,
 ///     `dedent`, `process_raw_string`, …), loaded in place. Run as library cases:
-///     their `.test` blocks are verified and any `--- performance ---` section is
-///     asserted.
+///     their `.test` blocks are verified and their (required) `--- performance ---`
+///     and `--- monomorphizations ---` sections are asserted.
 fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path) -> Vec<CaseFile> {
     let mut cases = Vec::new();
     collect_cases(cases_root, &mut cases);
@@ -671,10 +672,12 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         run_error_case(&ctx, path, &src_path, &spec)
     } else {
         // A `--- performance ---` section is mandatory for every running test
-        // case (but not for the user-facing `examples/`, which aren't staged).
-        // Author a new case with a `?` body and run the fill helper to capture
-        // the measured allocation counts.
-        if stage_to_temp && spec.performance.is_none() {
+        // case — `tests/cases/` and the compiler-dogfooded `crates/` helpers
+        // alike; only the user-facing `examples/` are exempt. Author a new case
+        // with a `?` body and run the fill helper to capture the measured
+        // allocation counts.
+        let exempt = rel.starts_with("examples");
+        if !exempt && spec.performance.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- performance ---` section. Add one with a \
                  `?` body and run `{FILL_CMD}` to fill in the measured \
@@ -683,7 +686,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         }
         // A `--- monomorphizations ---` section is likewise mandatory for every
         // running test case (same gate as performance — examples are exempt).
-        if stage_to_temp && spec.monomorphizations.is_none() {
+        if !exempt && spec.monomorphizations.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- monomorphizations ---` section. Add one with a \
                  `?` body and run `{FILL_CMD}` to fill in the emitted instances."

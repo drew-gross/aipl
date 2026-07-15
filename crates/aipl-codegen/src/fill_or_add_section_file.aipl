@@ -30,3 +30,10 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 84
 binary size: 11160
+--- monomorphizations ---
+__enumerate2
+__m1__contains_section
+__m1__fill_section
+__m3__parse_test_section_header
+fill_or_add_section_file
+main

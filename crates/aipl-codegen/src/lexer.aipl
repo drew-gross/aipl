@@ -206,3 +206,28 @@ pub fn lex(self: str) -> Token[] {
     // Leading/trailing whitespace shifts `start` but produces no tokens.
     assert(lex("  hi  ") == [Token { kind: "ident", text: "hi", start: 2 }]);
 })
+--- performance ---
+allocations: 24
+deallocations: 24
+reallocations: 16
+bytes allocated: 1152
+instructions executed: 31075
+binary size: 36848
+--- monomorphizations ---
+__test$lex
+contains_char
+is_digit
+is_ident_continue
+is_ident_start
+is_space
+lex
+main
+scan_while$lam1
+scan_while$lam11
+scan_while$lam13
+scan_while$lam14
+scan_while$lam15
+scan_while$lam3
+scan_while$lam5
+scan_while$lam7
+scan_while$lam9

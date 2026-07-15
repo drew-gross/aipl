@@ -98,3 +98,8 @@ reallocations: 26
 bytes allocated: 3022
 instructions executed: 4754
 binary size: 12368
+--- monomorphizations ---
+__enumerate0
+__m1__line_at
+caret_block
+main

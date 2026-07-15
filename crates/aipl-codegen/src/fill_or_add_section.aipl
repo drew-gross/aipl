@@ -271,3 +271,10 @@ reallocations: 28
 bytes allocated: 3141
 instructions executed: 10849
 binary size: 18744
+--- monomorphizations ---
+__enumerate2
+__m2__parse_test_section_header
+contains_section
+fill_or_add_section
+fill_section
+main

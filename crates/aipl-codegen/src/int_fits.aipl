@@ -68,3 +68,13 @@ pub fn int_fits(v: i64, name: str) -> bool {
     assert(!int_fits(0, "bool"));
     assert(!int_fits(5, "str"));
 })
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1356
+binary size: 11176
+--- monomorphizations ---
+int_fits
+main
