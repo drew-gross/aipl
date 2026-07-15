@@ -12,16 +12,18 @@ import { !, &&, wrapping_add as +, <, ==, ||, len, push, value_or } from builtin
 // natural fit but variants aren't yet supported as struct fields.
 struct Token { kind: str, text: str, start: i64 }
 
-pub fn is_space(c: char) -> bool { c == ' ' || c == '\t' || c == '\n' || c == '\r' }.doc("""
-    Whether `c` is ASCII whitespace: space, tab, newline, or carriage return.
+pub fn is_space(self: char) -> bool {
+    self == ' ' || self == '\t' || self == '\n' || self == '\r'
+}.doc("""
+    Whether `self` is ASCII whitespace: space, tab, newline, or carriage return.
 """).test({
-    assert(is_space(' '));
-    assert(is_space('\t'));
-    assert(is_space('\n'));
-    assert(is_space('\r'));
-    assert(!is_space('a'));
-    assert(!is_space('0'));
-    assert(!is_space('_'));
+    assert(' '.is_space());
+    assert('\t'.is_space());
+    assert('\n'.is_space());
+    assert('\r'.is_space());
+    assert(!'a'.is_space());
+    assert(!'0'.is_space());
+    assert(!'_'.is_space());
 })
 
 pub fn contains_char(self: str, c: char) -> bool {
@@ -44,46 +46,46 @@ pub fn contains_char(self: str, c: char) -> bool {
     assert(!"".contains_char('a'));
 })
 
-pub fn is_digit(c: char) -> bool { "0123456789".contains_char(c) }.doc("""
-    Whether `c` is an ASCII decimal digit, `'0'` through `'9'`.
+pub fn is_digit(self: char) -> bool { "0123456789".contains_char(self) }.doc("""
+    Whether `self` is an ASCII decimal digit, `'0'` through `'9'`.
 """).test({
-    assert(is_digit('0'));
-    assert(is_digit('5'));
-    assert(is_digit('9'));
+    assert('0'.is_digit());
+    assert('5'.is_digit());
+    assert('9'.is_digit());
     // The ASCII neighbours of the digit range.
-    assert(!is_digit('/'));
-    assert(!is_digit(':'));
-    assert(!is_digit('a'));
-    assert(!is_digit(' '));
+    assert(!'/'.is_digit());
+    assert(!':'.is_digit());
+    assert(!'a'.is_digit());
+    assert(!' '.is_digit());
 })
 
-pub fn is_ident_start(c: char) -> bool {
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains_char(c)
+pub fn is_ident_start(self: char) -> bool {
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains_char(self)
 }.doc("""
-    Whether `c` may begin an identifier: an ASCII letter or `'_'`.
+    Whether `self` may begin an identifier: an ASCII letter or `'_'`.
 """).test({
-    assert(is_ident_start('a'));
-    assert(is_ident_start('z'));
-    assert(is_ident_start('A'));
-    assert(is_ident_start('Z'));
-    assert(is_ident_start('_'));
+    assert('a'.is_ident_start());
+    assert('z'.is_ident_start());
+    assert('A'.is_ident_start());
+    assert('Z'.is_ident_start());
+    assert('_'.is_ident_start());
     // The ASCII neighbours of both letter ranges.
-    assert(!is_ident_start('@'));
-    assert(!is_ident_start('['));
-    assert(!is_ident_start('`'));
-    assert(!is_ident_start('{'));
-    assert(!is_ident_start('0'));
-    assert(!is_ident_start(' '));
+    assert(!'@'.is_ident_start());
+    assert(!'['.is_ident_start());
+    assert(!'`'.is_ident_start());
+    assert(!'{'.is_ident_start());
+    assert(!'0'.is_ident_start());
+    assert(!' '.is_ident_start());
 })
 
-pub fn is_ident_continue(c: char) -> bool { is_ident_start(c) || is_digit(c) }.doc("""
-    Whether `c` may continue an identifier: an ident-start char or a digit.
+pub fn is_ident_continue(self: char) -> bool { self.is_ident_start() || self.is_digit() }.doc("""
+    Whether `self` may continue an identifier: an ident-start char or a digit.
 """).test({
-    assert(is_ident_continue('a'));
-    assert(is_ident_continue('_'));
-    assert(is_ident_continue('7'));
-    assert(!is_ident_continue('-'));
-    assert(!is_ident_continue(' '));
+    assert('a'.is_ident_continue());
+    assert('_'.is_ident_continue());
+    assert('7'.is_ident_continue());
+    assert(!'-'.is_ident_continue());
+    assert(!' '.is_ident_continue());
 })
 
 pub fn scan_while(self: str, start: i64, pred: (char) -> bool) -> i64 {
@@ -108,12 +110,7 @@ pub fn scan_while(self: str, start: i64, pred: (char) -> bool) -> i64 {
     assert("aaaa".scan_while(0, |c| c == 'a') == 4); // run reaches the end
     assert("aaab".scan_while(4, |c| c == 'a') == 4); // from at the end
     assert("".scan_while(0, |c| c == 'a') == 0);
-
-    // Wraps `is_digit` in a lambda instead of passing it by name: a named-fn
-    // reference in a test block currently picks up the synthesized test
-    // driver's `!prints` effect and poisons the same reference in regular
-    // code (`next_token` passes `is_digit` by name).
-    assert("x123y".scan_while(1, |c| is_digit(c)) == 4);
+    assert("x123y".scan_while(1, |c| c.is_digit()) == 4);
 })
 
 // The single token starting at `start` (which the caller guarantees is in
@@ -121,14 +118,14 @@ pub fn scan_while(self: str, start: i64, pred: (char) -> bool) -> i64 {
 // token to the end of its class's run.
 fn next_token(self: str, start: i64) -> Token {
     let c = self[start].value_or(' '); // in bounds: always some
-    let kind = if (is_ident_start(c)) {
+    let kind = if (c.is_ident_start()) {
         "ident"
     } else {
-        if (is_digit(c)) { "int" } else { "punct" }
+        if (c.is_digit()) { "int" } else { "punct" }
     };
     let end = match (kind) {
-        "ident" => self.scan_while(start + 1, is_ident_continue),
-        "int" => self.scan_while(start + 1, is_digit),
+        "ident" => self.scan_while(start + 1, |x| x.is_ident_continue()),
+        "int" => self.scan_while(start + 1, |x| x.is_digit()),
         _ => start + 1, // "punct"
     };
     Token { kind: kind, text: self[start..end], start: start }
@@ -139,7 +136,7 @@ pub fn lex(self: str) -> Token[] {
     mut i = 0;
     while (i < self.len()) {
         let c = self[i].value_or(' '); // in bounds: always some
-        if (is_space(c)) {
+        if (c.is_space()) {
             set i = i + 1;
         } else {
             let t = self.next_token(i);
@@ -225,8 +222,8 @@ main
 scan_while$lam1
 scan_while$lam11
 scan_while$lam13
-scan_while$lam14
 scan_while$lam15
+scan_while$lam17
 scan_while$lam3
 scan_while$lam5
 scan_while$lam7

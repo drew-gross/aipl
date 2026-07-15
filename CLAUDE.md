@@ -101,6 +101,14 @@ since the import shifts line numbers, refill any `--- errors ---`/`--- check ---
 /`--- performance ---` sections (string-literal data symbols are span-named, so
 `binary size` shifts too).
 
+## Predicate methods (`is_*` functions)
+Boolean predicates should be written as methods on their receiver, not
+free functions — `c.is_digit()` reads more naturally than `is_digit(c)`.
+Spell them as `fn is_name(self: T) -> bool`. When calling, use the method
+syntax: `my_var.is_digit()` (or the equivalent function form `is_digit(my_var)`,
+but prefer the method). This applies to all predicate functions, not just
+compiler internals.
+
 ## AIPL functions used in the compiler must be well-tested
 The compiler dogfoods AIPL via the FFI: some `.aipl` files under `crates/*/src/`
 are JIT-compiled and called during compilation (e.g.

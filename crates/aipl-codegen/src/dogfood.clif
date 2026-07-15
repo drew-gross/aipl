@@ -1967,7 +1967,7 @@ block1(v1: i64):
 }
 
 ; source variables:
-;   v0 = s
+;   v0 = self
 ; __m12__line_at
 function u0:41(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8

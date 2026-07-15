@@ -1,7 +1,7 @@
 import { ! } from builtins;
 
-pub fn is_operator_name(s: str) -> bool {
-    match (s) {
+pub fn is_operator_name(self: str) -> bool {
+    match (self) {
         "+" => true,
         "-" => true,
         "*" => true,
@@ -21,36 +21,37 @@ pub fn is_operator_name(s: str) -> bool {
         _ => false,
     }
 }.doc("""
-    Whether `s` spells a built-in operator that must be imported to be used (e.g.
-    `import { == } from builtins;`; `+` comes via `wrapping_add as +`). Used by the
-    loader to gate operator imports and usage; dogfooded through the FFI.
+    Whether `self` spells a built-in operator that must be imported to be used
+    (e.g. `import { == } from builtins;`; `+` comes via `wrapping_add as +`).
+    Used by the loader to gate operator imports and usage; dogfooded through the
+    FFI.
 """).test({
     // Every recognized operator spelling.
-    assert(is_operator_name("+"));
-    assert(is_operator_name("-"));
-    assert(is_operator_name("*"));
-    assert(is_operator_name("/"));
-    assert(is_operator_name("%"));
-    assert(is_operator_name("=="));
-    assert(is_operator_name("!="));
-    assert(is_operator_name("<"));
-    assert(is_operator_name(">"));
-    assert(is_operator_name("<="));
-    assert(is_operator_name(">="));
-    assert(is_operator_name("&&"));
-    assert(is_operator_name("||"));
-    assert(is_operator_name("!"));
-    assert(is_operator_name("++"));
-    assert(is_operator_name("+++"));
+    assert("+".is_operator_name());
+    assert("-".is_operator_name());
+    assert("*".is_operator_name());
+    assert("/".is_operator_name());
+    assert("%".is_operator_name());
+    assert("==".is_operator_name());
+    assert("!=".is_operator_name());
+    assert("<".is_operator_name());
+    assert(">".is_operator_name());
+    assert("<=".is_operator_name());
+    assert(">=".is_operator_name());
+    assert("&&".is_operator_name());
+    assert("||".is_operator_name());
+    assert("!".is_operator_name());
+    assert("++".is_operator_name());
+    assert("+++".is_operator_name());
 
     // Non-operators: names, near-misses, and the empty string.
-    assert(!is_operator_name("wrapping_add"));
-    assert(!is_operator_name("map"));
-    assert(!is_operator_name(""));
-    assert(!is_operator_name("=")); // a single `=` is not an operator
-    assert(!is_operator_name("&")); // single, not `&&`
-    assert(!is_operator_name("++++")); // four, not `+++`
-    assert(!is_operator_name("and"));
+    assert(!"wrapping_add".is_operator_name());
+    assert(!"map".is_operator_name());
+    assert(!"".is_operator_name());
+    assert(!"=".is_operator_name()); // a single `=` is not an operator
+    assert(!"&".is_operator_name()); // single, not `&&`
+    assert(!"++++".is_operator_name()); // four, not `+++`
+    assert(!"and".is_operator_name());
 })
 --- performance ---
 allocations: 0
@@ -58,7 +59,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1567
-binary size: 9456
+binary size: 9464
 --- monomorphizations ---
 is_operator_name
 main
