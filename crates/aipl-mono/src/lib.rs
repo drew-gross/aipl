@@ -1089,8 +1089,7 @@ impl Mono<'_> {
                 let (fn_name, forwards): (String, Vec<Expr>) = match &arg.kind {
                     ExprKind::Lambda(lparams, lbody) => {
                         let captures = free_vars(lbody, lparams, env);
-                        let fn_name =
-                            self.synth_lambda(lparams, lbody, ptys, lret, &captures, &effects);
+                        let fn_name = self.synth_lambda(lparams, lbody, ptys, lret, &captures);
                         let forwards = captures
                             .iter()
                             .map(|(cn, _)| Expr::new(ExprKind::Ident(cn.clone()), arg.span.clone()))
@@ -1306,7 +1305,6 @@ impl Mono<'_> {
         ptys: &[Type],
         lret: &Type,
         captures: &[(String, Type)],
-        effects: &[String],
     ) -> String {
         let fn_name = format!("__lambda_{}", self.synth);
         self.synth += 1;
@@ -1334,7 +1332,7 @@ impl Mono<'_> {
             fn_name.clone(),
             ConcreteTemplate {
                 params,
-                effects: effects.to_vec(),
+                effects: Vec::new(),
                 return_ty: Some(lret.clone()),
                 body: lbody.clone(),
             },
@@ -1383,8 +1381,7 @@ impl Mono<'_> {
                 benv.insert(params[0].name.clone(), elem.clone());
                 let (_, u) = self.infer(body, &benv)?;
                 // Lift the lambda to `__lambda(x: T, captures..) -> U`.
-                let fname =
-                    self.synth_lambda(params, body, from_ref(&elem), &u, &captures, &effects);
+                let fname = self.synth_lambda(params, body, from_ref(&elem), &u, &captures);
                 (fname, captures, u)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
@@ -1677,7 +1674,6 @@ impl Mono<'_> {
                     &[elem_a.clone(), elem_b.clone()],
                     &r,
                     &captures,
-                    &effects,
                 );
                 (fname, captures, r)
             }
@@ -2093,7 +2089,6 @@ impl Mono<'_> {
                     from_ref(&elem),
                     &Type::Primitive(Primitive::Bool),
                     &captures,
-                    &effects,
                 );
                 (fname, captures)
             }
@@ -2239,7 +2234,6 @@ impl Mono<'_> {
                     from_ref(&elem),
                     &Type::Primitive(Primitive::Bool),
                     &captures,
-                    &effects,
                 );
                 (fname, captures)
             }
