@@ -9209,15 +9209,22 @@ fn compile_call<M: Module>(
     Ok((ret_v, info.return_ty.clone()))
 }
 
-fn compile_expr<M: Module>(
+/// Compile a call expression, dispatched on the callee `name` — the
+/// `ExprKind::Call` handling extracted from [`compile_expr`] so expression
+/// dispatch stays readable. `args`/`style` are the call's arguments and method-
+/// call flag; `span` is the call site. Reserved builtin / intrinsic names are
+/// matched first; the wildcard arm compiles an ordinary (monomorphized) user or
+/// builtin call via [`compile_call`].
+fn compile_call_expr<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    expr: &Expr,
+    name: &str,
+    args: &[Expr],
+    style: bool,
+    span: Span,
 ) -> Result<(Value, Type), Error> {
-    // Destructure into the names the body already uses, so only the signature
-    // and call sites change. `cx` itself stays in scope for `..cx` spreads.
     let Cx {
         env,
         funcs,
@@ -9232,163 +9239,11 @@ fn compile_expr<M: Module>(
         error_main: _,
         bindings: _,
     } = cx;
-    let span = expr.span.clone();
-    Ok(match &expr.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        // Unit carries no value; hand back a placeholder i64 the unit type
-        // forbids anyone from consuming, mirroring the unit-call result.
-        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
-        ExprKind::Return(value) => {
-            // Early return: evaluate the value, hand the caller a reference,
-            // release *every* live scope (we're leaving the function), then return
-            // per the ABI — mirroring the function epilogue. Whatever follows in
-            // the block is unreachable, so a fresh (dead) block receives it.
-            let (rv, rty) = compile_expr(module, builder, cx, scopes, value)?;
-            let ret_val = if cx.error_main {
-                // `fn main() -> !Error`: derive the exit code (printing
-                // `error: <msg>` on the err side) before releasing the scopes.
-                emit_error_main_exit_code(builder, module, builtins, rv)
-            } else {
-                rv
-            };
-            if needs_drop(cx.ret_ty, structs) {
-                emit_retain(builder, module, builtins, structs, ret_val, cx.ret_ty);
-            }
-            for scope in scopes.iter() {
-                for t in scope {
-                    let v = match t.owned {
-                        Owned::Value(v) => v,
-                        Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
-                    };
-                    emit_drop(builder, module, builtins, structs, v, &t.ty);
-                }
-            }
-            if is_unit(cx.ret_ty) {
-                builder.ins().return_(&[]);
-            } else if sret_size(cx.ret_ty, structs).is_some() {
-                let sret = cx.sret.expect("composite return has an sret pointer");
-                copy_composite(builder, sret, ret_val, &rty, structs);
-                builder.ins().return_(&[]);
-            } else {
-                builder.ins().return_(&[ret_val]);
-            }
-            // Unreachable continuation: subsequent statements compile into here and
-            // are dropped as dead code.
-            let dead = builder.create_block();
-            builder.switch_to_block(dead);
-            builder.seal_block(dead);
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
-        }
-        ExprKind::Num(n) => (
-            builder.ins().iconst(types::I64, *n),
-            Type::Primitive(Primitive::I64),
-        ),
-        ExprKind::Bool(b) => (
-            builder.ins().iconst(types::I64, if *b { 1 } else { 0 }),
-            Type::Primitive(Primitive::Bool),
-        ),
-        ExprKind::Char(c) => (
-            builder.ins().iconst(types::I64, i64::from(*c)),
-            Type::Primitive(Primitive::Char),
-        ),
-        ExprKind::Str(s) => {
-            let content = s.as_bytes();
-            // SSO: a literal of <= 7 bytes is an *inline* str value — emit it as a
-            // constant, with no data object, allocation, or refcount. (inc/dec
-            // no-op on it; the surrounding scope-drop is a no-op too, so it needs
-            // no tracking.)
-            if content.len() <= 7 {
-                let packed = pack_inline(content) as usize as i64;
-                return Ok((
-                    builder.ins().iconst(types::I64, packed),
-                    Type::Primitive(Primitive::Str),
-                ));
-            }
-            // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
-            // into the data section. Pointer points past the 8-byte header.
-            // A source literal's span.clone() is unique, so it names the symbol; a
-            // *synthesized* literal carries the dummy span.clone() (0,0) and several may
-            // share it (e.g. the `check` driver's test names), so disambiguate
-            // those with a counter. Real literals keep their span.clone()-based name so
-            // object layout (and the `binary size` perf metric) is unchanged.
-            let data_name = if span.start == 0 && span.end == 0 {
-                let n = cx.lit_ctr.get();
-                cx.lit_ctr.set(n + 1);
-                format!("__str_synth_{n}")
-            } else {
-                format!("__str_{}_{}", span.start, span.end)
-            };
-            let data_id = module
-                .declare_data(&data_name, Linkage::Local, false, false)
-                .map_err(|e| Error::msg(format!("declare data: {e}")))?;
-            // Static string layout: [len: i64][refcount = STATIC][bytes][NUL];
-            // the pointer points past both header words.
-            let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
-            bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
-            bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-            bytes.extend_from_slice(content);
-            bytes.push(0);
-            let mut desc = DataDescription::new();
-            // 8-byte align so the i64 header words read safely.
-            desc.set_align(8);
-            desc.define(bytes.into_boxed_slice());
-            module
-                .define_data(data_id, &desc)
-                .map_err(|e| Error::msg(format!("define data: {e}")))?;
-            let gv = module.declare_data_in_func(data_id, builder.func);
-            let base = builder.ins().symbol_value(types::I64, gv);
-            let ptr = builder.ins().iadd_imm(base, STR_HEADER_SIZE as i64);
-            scopes
-                .last_mut()
-                .expect("scope")
-                .push(Tracked::new(ptr, &Type::Primitive(Primitive::Str)));
-            (ptr, Type::Primitive(Primitive::Str))
-        }
-        ExprKind::Ident(name) => {
-            // A local binding shadows everything; an unbound name may be a
-            // nullary variant constructor (e.g. `Empty`).
-            if env.contains_key(name) {
-                env_load(builder, name, env, span.clone())?
-            } else if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
-                compile_variant(
-                    module,
-                    builder,
-                    cx,
-                    scopes,
-                    &vname,
-                    tag,
-                    &fields,
-                    &[],
-                    span.clone(),
-                )?
-            } else {
-                env_load(builder, name, env, span.clone())?
-            }
-        }
-        ExprKind::None => {
-            // Allocate a 16-byte slot with tag = 0. Value field stays
-            // undefined (callers must check is_some before touching it).
-            // Type is Optional(__none__) — implicitly converts to any
-            // Optional(T) via expect_type.
-            let slot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                16,
-                3,
-            ));
-            let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, slot, 0);
-            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            (ptr, Type::Optional(Box::new(none_inner_ty())))
-        }
-        ExprKind::Call(name, args, _)
-            if matches!(
-                name.as_str(),
-                "__builtin_wrapping_add"
-                    | "__builtin_saturating_add"
-                    | "__builtin_wrapping_sub"
-                    | "__builtin_saturating_sub"
-            ) =>
-        {
+    Ok(match name {
+        "__builtin_wrapping_add"
+        | "__builtin_saturating_add"
+        | "__builtin_wrapping_sub"
+        | "__builtin_saturating_sub" => {
             // `a + b` / `a - b` resolved (in the loader) to their bound integer
             // arithmetic builtin. Both operands are the same integer type
             // (checker-verified); a bare literal flexes to the other's width. The
@@ -9428,7 +9283,7 @@ fn compile_expr<M: Module>(
             let out = emit_int_addsub(builder, lv, rv, p, sub, saturating);
             (out, Type::Primitive(p))
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_to_str" => {
+        "__builtin_to_str" => {
             // Generic `to_str(x)`: render by the argument's static type.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -9440,7 +9295,7 @@ fn compile_expr<M: Module>(
             let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
             (s, Type::Primitive(Primitive::Str))
         }
-        ExprKind::Call(name, args, _) if name == "__template_interp" => {
+        "__template_interp" => {
             // Template-literal interpolation: pass `str` through as-is; convert
             // any other type via `to_str`. This avoids wrapping string values in
             // quotes (which `to_str` would do).
@@ -9461,7 +9316,7 @@ fn compile_expr<M: Module>(
                 (s, Type::Primitive(Primitive::Str))
             }
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_hash" => {
+        "__builtin_hash" => {
             // Generic `hash(x) -> i64`: structural hash by the argument's static
             // type. Borrows the argument (no consume), so its scope-track is
             // untouched.
@@ -9475,9 +9330,7 @@ fn compile_expr<M: Module>(
             let h = emit_hash(module, builder, cx.builtins, cx.structs, v, &t)?;
             (h, Type::Primitive(Primitive::I64))
         }
-        ExprKind::Call(name, args, _)
-            if name == "__builtin_minimum" || name == "__builtin_maximum" =>
-        {
+        "__builtin_minimum" | "__builtin_maximum" => {
             // `arr.minimum()` / `arr.maximum()`: smallest / largest element as
             // `T?` (`none` if empty). Elements are comparable scalars (the checker
             // restricts to integers/char), so the optional owns no heap. Walks
@@ -9582,7 +9435,7 @@ fn compile_expr<M: Module>(
             builder.seal_block(done);
             (result_ptr, opt_ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_min" || name == "__builtin_max" => {
+        "__builtin_min" | "__builtin_max" => {
             // `min(a, b)` / `max(a, b)` on `i64`: compare and select the smaller
             // or larger. Both operands are scalars (own no heap), so no inc/dec.
             let disp = display_name(name);
@@ -9616,7 +9469,7 @@ fn compile_expr<M: Module>(
             let r = builder.ins().select(cond, a, b);
             (r, Type::Primitive(Primitive::I64))
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_split" => {
+        "__builtin_split" => {
             // `split(s, sep) -> str[]`: the runtime builds the array of parts
             // (views of `s` for long parts, copies for short). It consumes both
             // str refs, so inc each first (our scope-tracked refs must survive),
@@ -9653,7 +9506,7 @@ fn compile_expr<M: Module>(
                 .push(Tracked::new(result, &ty));
             (result, ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_read_file_to_string" => {
+        "__builtin_read_file_to_string" => {
             // `(str) -> str!str`: ok(contents) on success, err(message) on any
             // failure. The runtime returns the contents pointer or null; codegen
             // wraps it into the Result with a static error message. The
@@ -9697,7 +9550,7 @@ fn compile_expr<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_write_string_to_file" => {
+        "__builtin_write_string_to_file" => {
             // `(str, str) -> !str`: ok() on success, err(message) on failure. The
             // runtime returns 1/0; codegen wraps it into the void-Ok Result with a
             // static error message. The `!write_files` effect is checker-enforced.
@@ -9740,7 +9593,7 @@ fn compile_expr<M: Module>(
             // so no scope tracking is required.
             (ptr, result_ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_value_or" => {
+        "__builtin_value_or" => {
             // `value_or(opt: T?, default: T) -> T` — the optional's value if
             // present, else the default. Optionals of i64/bool/char all carry
             // a single i64 value, so this is a tag `select` with no per-type
@@ -9808,7 +9661,7 @@ fn compile_expr<M: Module>(
             }
             (result, result_ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_is_some" => {
+        "__builtin_is_some" => {
             // `is_some(opt: T?) -> bool` — true when the optional is present.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -9833,7 +9686,7 @@ fn compile_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, nz);
             (b, Type::Primitive(Primitive::Bool))
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_len" => {
+        "__builtin_len" => {
             // `len(a) -> i64` — element/byte count. Reads `a` without consuming
             // it (it stays live in the caller's scope), so no inc/dec.
             if args.len() != 1 {
@@ -9865,7 +9718,7 @@ fn compile_expr<M: Module>(
             };
             (len, Type::Primitive(Primitive::I64))
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_reverse" => {
+        "__builtin_reverse" => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
             // elements (or bytes) in reverse order. Consumes `self` (callers pre-inc).
             if args.len() != 1 {
@@ -9921,7 +9774,7 @@ fn compile_expr<M: Module>(
                 ));
             }
         }
-        ExprKind::Call(name, args, _) if starts_ends_variant(name).is_some() => {
+        _ if starts_ends_variant(name).is_some() => {
             // `s.starts_with(p)` / `s.ends_with(p) -> bool` over a `str` (byte
             // compare) or `T[]` (element-wise structural compare). The pattern is
             // variadic; monomorphization has already resolved its shape into the
@@ -10068,7 +9921,7 @@ fn compile_expr<M: Module>(
             };
             (result, Type::Primitive(Primitive::Bool))
         }
-        ExprKind::Call(name, args, _) if name == "__char_to_str" => {
+        "__char_to_str" => {
             // Internal: a single `char` to a one-char inline `str`. Emitted by
             // variadic `char*` specialization (see mono's `specialize_variadic`).
             if args.len() != 1 {
@@ -10083,7 +9936,7 @@ fn compile_expr<M: Module>(
                 Type::Primitive(Primitive::Str),
             )
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_contains" => {
+        "__builtin_contains" => {
             // `contains(s: T{}, x: T) -> bool` — set membership. Borrows the set
             // (it stays live in the caller's scope), so no inc/dec.
             if args.len() != 2 {
@@ -10136,7 +9989,7 @@ fn compile_expr<M: Module>(
                 )
             }
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_union" => {
+        "__builtin_union" => {
             // `union(a: T{}, b: T{}) -> T{}` — a fresh set of all distinct
             // elements of both. (The in-place `set a = a.union(b)` reuse for an
             // exclusive `a` is handled in the Assign arm.) `aipl_set_union`
@@ -10187,7 +10040,7 @@ fn compile_expr<M: Module>(
                 .push(Tracked::new(res, &result_ty));
             (res, result_ty)
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_get" => {
+        "__builtin_get" => {
             // `get(d: #{K: V}, key: K) -> V?` — the bound value, else `none`.
             // Borrows the dict (no inc/dec); the matched value is retained into
             // the `some` result, so it outlives the dict.
@@ -10273,7 +10126,7 @@ fn compile_expr<M: Module>(
                 (sbase, result_ty)
             }
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_contains_key" => {
+        "__builtin_contains_key" => {
             // `contains_key(d: #{K: V}, key: K) -> bool`. Borrows the dict.
             if args.len() != 2 {
                 return Err(Error::at(
@@ -10320,7 +10173,7 @@ fn compile_expr<M: Module>(
                 )
             }
         }
-        ExprKind::Call(name, args, _) if name == "__filter_keep" => {
+        "__filter_keep" => {
             // Internal (in-place `filter`): `__filter_keep(arr, w, e)` stores
             // element `e` at slot `w` with a raw pointer copy — no refcount
             // change, since ownership relocates from `e`'s read slot to slot `w`.
@@ -10333,7 +10186,7 @@ fn compile_expr<M: Module>(
             builder.ins().store(MemFlags::trusted(), e, addr, 0);
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _) if name == "__filter_drop" => {
+        "__filter_drop" => {
             // Internal (in-place `filter`): release a filtered-out element. The
             // surrounding `for` loop retains/releases `e` each iteration (a
             // no-op net), so this single drop removes the array's ownership of
@@ -10342,7 +10195,7 @@ fn compile_expr<M: Module>(
             emit_drop(builder, module, builtins, structs, e, &ety);
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _) if name == "__filter_truncate" => {
+        "__filter_truncate" => {
             // Internal (in-place `filter`): set the array's length to `w`. The
             // dead tail `[w, old_len)` holds relocated/stale pointers and is
             // never released (the block is later freed by its capacity).
@@ -10353,7 +10206,7 @@ fn compile_expr<M: Module>(
                 .store(MemFlags::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _) if name == "__map_set" => {
+        "__map_set" => {
             // Internal (in-place `map`): `__map_set(arr, i, new, old)` overwrites
             // slot `i` with the mapped value `new` (a `U`), then releases the
             // `old` element it replaced (a `T`). `new` is a fresh result tracked
@@ -10383,7 +10236,7 @@ fn compile_expr<M: Module>(
             );
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _) if name == "__map_result" => {
+        "__map_result" => {
             // Internal (in-place `map`): hand the reused buffer back reinterpreted
             // as the enclosing function's declared return type (`U[]`). `$a`'s
             // static type is still `T[]`, but the elements are now `U` and the
@@ -10392,7 +10245,7 @@ fn compile_expr<M: Module>(
             let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             (a_ptr, cx.ret_ty.clone())
         }
-        ExprKind::Call(name, args, _) if name == "__builtin_with_capacity" => {
+        "__builtin_with_capacity" => {
             // Internal (emitted by `map`): allocate an empty array reserved to
             // the given capacity. Element type is unknown (`__none__`) like an
             // empty `[]`; it's refined and its drop-fn set by the first `push`.
@@ -10424,14 +10277,14 @@ fn compile_expr<M: Module>(
                 .push(Tracked::new(ptr, &arr_ty));
             (ptr, arr_ty)
         }
-        ExprKind::Call(name, args, method_style) if name == "__builtin_push" => {
+        "__builtin_push" => {
             // `push` mutates an array in place, so it must be written as a
             // method call (`xs.push(x)`) on a *mutable* array variable: the
             // receiver is `args[0]` and the grown array is stored back into it.
             // Value semantics are kept — a possibly-shared array is copied
             // first (the old block, still referenced elsewhere, is untouched);
             // an exclusive one is grown in place.
-            if !*method_style {
+            if !style {
                 return Err(Error::at(
                     "\"push\" modifies an array in place; call it as a method on a \
                      mutable array variable: \"xs.push(x)\""
@@ -10646,9 +10499,7 @@ fn compile_expr<M: Module>(
             // `push` mutates; it produces no value.
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _)
-            if Primitive::from_name(name).is_some_and(Primitive::is_int) =>
-        {
+        _ if Primitive::from_name(name).is_some_and(Primitive::is_int) => {
             // Integer conversion builtin `i8(x)`/`u32(x)`/… — convert the (integer)
             // argument to this width by re-canonicalizing the i64-register value.
             let p = Primitive::from_name(name).expect("guard checked it's an integer primitive");
@@ -10667,7 +10518,7 @@ fn compile_expr<M: Module>(
             }
             (canon_int(builder, v, p), Type::Primitive(p))
         }
-        ExprKind::Call(name, args, _) if name == "ok" || name == "err" => {
+        "ok" | "err" => {
             // A Result `{ tag, value }` (tag 1 = ok, 0 = err). The unbound side is
             // `__none__`, resolved by coercion at the use site (like bare `none`).
             let is_ok = name == "ok";
@@ -10743,7 +10594,7 @@ fn compile_expr<M: Module>(
             }
             (ptr, res_ty)
         }
-        ExprKind::Call(name, args, _) if name == "some" => {
+        "some" => {
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("fn \"some\" expects 1 arg, got {}", args.len()),
@@ -10791,7 +10642,7 @@ fn compile_expr<M: Module>(
             }
             (ptr, opt_ty)
         }
-        ExprKind::Call(name, args, true) if funcs.get(name).is_some_and(|i| i.is_mutating) => {
+        _ if style && funcs.get(name).is_some_and(|i| i.is_mutating) => {
             // A method-style call to a mutating user method behaves like
             // `set v = foo(v, args)`: `foo` takes the receiver (`args[0]`) by
             // value, returns the mutated receiver, and we store it back into the
@@ -10857,7 +10708,7 @@ fn compile_expr<M: Module>(
             // A mutating method yields nothing.
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
-        ExprKind::Call(name, args, _) => {
+        _ => {
             // A variant constructor `Ctor(args..)` builds an inline tagged value.
             if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
                 return compile_variant(
@@ -10889,6 +10740,190 @@ fn compile_expr<M: Module>(
             // by monomorphization; `compile_call` moves the owned args in.
             compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?
         }
+    })
+}
+
+fn compile_expr<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    expr: &Expr,
+) -> Result<(Value, Type), Error> {
+    // Destructure into the names the body already uses, so only the signature
+    // and call sites change. `cx` itself stays in scope for `..cx` spreads.
+    let Cx {
+        env,
+        funcs,
+        structs,
+        builtins,
+        effects: _,
+        owned_params: _,
+        lit_ctr: _,
+        elem_rc: _,
+        ret_ty: _,
+        sret: _,
+        error_main: _,
+        bindings: _,
+    } = cx;
+    let span = expr.span.clone();
+    Ok(match &expr.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        // Unit carries no value; hand back a placeholder i64 the unit type
+        // forbids anyone from consuming, mirroring the unit-call result.
+        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
+        ExprKind::Return(value) => {
+            // Early return: evaluate the value, hand the caller a reference,
+            // release *every* live scope (we're leaving the function), then return
+            // per the ABI — mirroring the function epilogue. Whatever follows in
+            // the block is unreachable, so a fresh (dead) block receives it.
+            let (rv, rty) = compile_expr(module, builder, cx, scopes, value)?;
+            let ret_val = if cx.error_main {
+                // `fn main() -> !Error`: derive the exit code (printing
+                // `error: <msg>` on the err side) before releasing the scopes.
+                emit_error_main_exit_code(builder, module, builtins, rv)
+            } else {
+                rv
+            };
+            if needs_drop(cx.ret_ty, structs) {
+                emit_retain(builder, module, builtins, structs, ret_val, cx.ret_ty);
+            }
+            for scope in scopes.iter() {
+                for t in scope {
+                    let v = match t.owned {
+                        Owned::Value(v) => v,
+                        Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
+                    };
+                    emit_drop(builder, module, builtins, structs, v, &t.ty);
+                }
+            }
+            if is_unit(cx.ret_ty) {
+                builder.ins().return_(&[]);
+            } else if sret_size(cx.ret_ty, structs).is_some() {
+                let sret = cx.sret.expect("composite return has an sret pointer");
+                copy_composite(builder, sret, ret_val, &rty, structs);
+                builder.ins().return_(&[]);
+            } else {
+                builder.ins().return_(&[ret_val]);
+            }
+            // Unreachable continuation: subsequent statements compile into here and
+            // are dropped as dead code.
+            let dead = builder.create_block();
+            builder.switch_to_block(dead);
+            builder.seal_block(dead);
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
+        }
+        ExprKind::Num(n) => (
+            builder.ins().iconst(types::I64, *n),
+            Type::Primitive(Primitive::I64),
+        ),
+        ExprKind::Bool(b) => (
+            builder.ins().iconst(types::I64, if *b { 1 } else { 0 }),
+            Type::Primitive(Primitive::Bool),
+        ),
+        ExprKind::Char(c) => (
+            builder.ins().iconst(types::I64, i64::from(*c)),
+            Type::Primitive(Primitive::Char),
+        ),
+        ExprKind::Str(s) => {
+            let content = s.as_bytes();
+            // SSO: a literal of <= 7 bytes is an *inline* str value — emit it as a
+            // constant, with no data object, allocation, or refcount. (inc/dec
+            // no-op on it; the surrounding scope-drop is a no-op too, so it needs
+            // no tracking.)
+            if content.len() <= 7 {
+                let packed = pack_inline(content) as usize as i64;
+                return Ok((
+                    builder.ins().iconst(types::I64, packed),
+                    Type::Primitive(Primitive::Str),
+                ));
+            }
+            // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
+            // into the data section. Pointer points past the 8-byte header.
+            // A source literal's span.clone() is unique, so it names the symbol; a
+            // *synthesized* literal carries the dummy span.clone() (0,0) and several may
+            // share it (e.g. the `check` driver's test names), so disambiguate
+            // those with a counter. Real literals keep their span.clone()-based name so
+            // object layout (and the `binary size` perf metric) is unchanged.
+            let data_name = if span.start == 0 && span.end == 0 {
+                let n = cx.lit_ctr.get();
+                cx.lit_ctr.set(n + 1);
+                format!("__str_synth_{n}")
+            } else {
+                format!("__str_{}_{}", span.start, span.end)
+            };
+            let data_id = module
+                .declare_data(&data_name, Linkage::Local, false, false)
+                .map_err(|e| Error::msg(format!("declare data: {e}")))?;
+            // Static string layout: [len: i64][refcount = STATIC][bytes][NUL];
+            // the pointer points past both header words.
+            let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
+            bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
+            bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
+            bytes.extend_from_slice(content);
+            bytes.push(0);
+            let mut desc = DataDescription::new();
+            // 8-byte align so the i64 header words read safely.
+            desc.set_align(8);
+            desc.define(bytes.into_boxed_slice());
+            module
+                .define_data(data_id, &desc)
+                .map_err(|e| Error::msg(format!("define data: {e}")))?;
+            let gv = module.declare_data_in_func(data_id, builder.func);
+            let base = builder.ins().symbol_value(types::I64, gv);
+            let ptr = builder.ins().iadd_imm(base, STR_HEADER_SIZE as i64);
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &Type::Primitive(Primitive::Str)));
+            (ptr, Type::Primitive(Primitive::Str))
+        }
+        ExprKind::Ident(name) => {
+            // A local binding shadows everything; an unbound name may be a
+            // nullary variant constructor (e.g. `Empty`).
+            if env.contains_key(name) {
+                env_load(builder, name, env, span.clone())?
+            } else if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
+                compile_variant(
+                    module,
+                    builder,
+                    cx,
+                    scopes,
+                    &vname,
+                    tag,
+                    &fields,
+                    &[],
+                    span.clone(),
+                )?
+            } else {
+                env_load(builder, name, env, span.clone())?
+            }
+        }
+        ExprKind::None => {
+            // Allocate a 16-byte slot with tag = 0. Value field stays
+            // undefined (callers must check is_some before touching it).
+            // Type is Optional(__none__) — implicitly converts to any
+            // Optional(T) via expect_type.
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                16,
+                3,
+            ));
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(zero, slot, 0);
+            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+            (ptr, Type::Optional(Box::new(none_inner_ty())))
+        }
+        ExprKind::Call(name, args, style) => compile_call_expr(
+            module,
+            builder,
+            cx,
+            scopes,
+            name,
+            args,
+            *style,
+            span.clone(),
+        )?,
         ExprKind::Construct(name, field_inits) => {
             let layout = structs
                 .get(name)
