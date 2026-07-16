@@ -28,3 +28,7 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 - Synergy: inlining exposes retain/release pairs across the old call boundary —
   refcount elision after inlining likely beats the call-overhead win itself.
+Make x..y syntax for creating spans
+generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
+spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
+lex json
