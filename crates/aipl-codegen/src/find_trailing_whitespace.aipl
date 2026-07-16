@@ -82,8 +82,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 3283
-binary size: 7840
+instructions executed: 3244
+binary size: 6376
 --- monomorphizations ---
 __test$find_trailing_whitespace
 find_trailing_whitespace

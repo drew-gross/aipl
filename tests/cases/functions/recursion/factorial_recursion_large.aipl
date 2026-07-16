@@ -9,8 +9,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 128
-binary size: 1224
+instructions executed: 125
+binary size: 1040
 --- monomorphizations ---
 fact
 main

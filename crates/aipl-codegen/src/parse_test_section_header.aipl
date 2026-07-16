@@ -42,8 +42,8 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 192
-instructions executed: 1202
-binary size: 11160
+instructions executed: 1123
+binary size: 9216
 --- monomorphizations ---
 __test$parse_test_section_header
 main

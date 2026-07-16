@@ -22,8 +22,8 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 580
-instructions executed: 551
-binary size: 7504
+instructions executed: 511
+binary size: 6072
 --- monomorphizations ---
 arr_rev
 main

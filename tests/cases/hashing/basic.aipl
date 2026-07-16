@@ -48,8 +48,8 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 704
-instructions executed: 1993
-binary size: 14704
+instructions executed: 1949
+binary size: 13120
 --- monomorphizations ---
 h
 hs

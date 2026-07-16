@@ -29,8 +29,8 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 480
-instructions executed: 897
-binary size: 5904
+instructions executed: 876
+binary size: 5168
 --- monomorphizations ---
 __test$grid3
 main

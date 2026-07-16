@@ -74,8 +74,8 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 800
-instructions executed: 2883
-binary size: 14608
+instructions executed: 2868
+binary size: 14080
 --- monomorphizations ---
 __lambda_0
 __lambda_10

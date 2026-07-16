@@ -47,8 +47,8 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 264
-instructions executed: 307
-binary size: 2688
+instructions executed: 301
+binary size: 2624
 --- monomorphizations ---
 clamp_low
 first_index_reaching

@@ -38,8 +38,8 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 305
-binary size: 7752
+instructions executed: 237
+binary size: 5200
 --- monomorphizations ---
 first_char
 main

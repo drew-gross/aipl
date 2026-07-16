@@ -21,8 +21,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 195
-binary size: 2792
+instructions executed: 182
+binary size: 2248
 --- monomorphizations ---
 __test$eq_opt
 main

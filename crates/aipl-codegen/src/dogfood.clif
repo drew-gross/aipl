@@ -89,16 +89,13 @@ block0(v0: i64, v1: i64):
     v11 = call fn3(v10)
     v12 = iconst.i64 0x003a_7475_706e_6919
     v13 = call fn4(v7)
-    call fn1(v12)  ; v12 = 0x003a_7475_706e_6919
     call fn1(v13)
     v14 = call fn5(v12, v13)  ; v12 = 0x003a_7475_706e_6919
     v15 = iconst.i64 0x0020_3a09
-    call fn1(v15)  ; v15 = 0x0020_3a09
     call fn1(v11)
     v16 = call fn6(v15, v11)  ; v15 = 0x0020_3a09
     v17 = iconst.i64 1
     call fn1(v16)
-    call fn1(v17)  ; v17 = 1
     v18 = call fn7(v16, v17)  ; v17 = 1
     call fn1(v14)
     call fn1(v18)
@@ -213,63 +210,49 @@ block0(v0: i64, v1: i64, v2: i64):
     v20 = iconst.i64 8197
     v21 = call fn2(v19)
     v22 = call fn3(v21)
-    call fn0(v20)  ; v20 = 8197
     v23 = call fn4(v20, v22)  ; v20 = 8197
     v24 = iconst.i64 1
-    call fn0(v24)  ; v24 = 1
     call fn0(v23)
     v25 = call fn5(v24, v23)  ; v24 = 1
     v26 = iconst.i64 0x0020_3e2d_2d11
-    call fn0(v26)  ; v26 = 0x0020_3e2d_2d11
     call fn0(v2)
     v27 = call fn6(v26, v2)  ; v26 = 0x0020_3e2d_2d11
     v28 = iconst.i64 0x3a05
     v29 = call fn7(v19)
-    call fn0(v28)  ; v28 = 0x3a05
     call fn0(v29)
     v30 = call fn8(v28, v29)  ; v28 = 0x3a05
     v31 = iconst.i64 0x3a05
     v32 = iconst.i64 1
     v33 = iadd v9, v32  ; v32 = 1
     v34 = call fn9(v33)
-    call fn0(v31)  ; v31 = 0x3a05
     call fn0(v34)
     v35 = call fn10(v31, v34)  ; v31 = 0x3a05
     v36 = iconst.i64 2565
-    call fn0(v36)  ; v36 = 2565
     call fn0(v23)
     v37 = call fn11(v36, v23)  ; v36 = 2565
     v38 = iconst.i64 0x0a7c_200d
     v39 = call fn12(v19)
-    call fn0(v38)  ; v38 = 0x0a7c_200d
     call fn0(v39)
     v40 = call fn13(v38, v39)  ; v38 = 0x0a7c_200d
     v41 = iconst.i64 0x207c_200d
     v42 = call fn14(v0, v5, v7)
-    call fn0(v41)  ; v41 = 0x207c_200d
     call fn0(v42)
     v43 = call fn15(v41, v42)  ; v41 = 0x207c_200d
     v44 = iconst.i64 2565
-    call fn0(v44)  ; v44 = 2565
     call fn0(v23)
     v45 = call fn16(v44, v23)  ; v44 = 2565
     v46 = iconst.i64 0x207c_200d
     v47 = iconst.i64 8197
-    call fn0(v47)  ; v47 = 8197
     v48 = call fn17(v47, v9)  ; v47 = 8197
-    call fn0(v46)  ; v46 = 0x207c_200d
     call fn0(v48)
     v49 = call fn18(v46, v48)  ; v46 = 0x207c_200d
     v50 = iconst.i64 1
     v51 = iconst.i64 0x5e05
-    call fn0(v51)  ; v51 = 0x5e05
     v52 = call fn19(v51, v17)  ; v51 = 0x5e05
-    call fn0(v50)  ; v50 = 1
     call fn0(v52)
     v53 = call fn20(v50, v52)  ; v50 = 1
     v54 = iconst.i64 1
     call fn0(v53)
-    call fn0(v54)  ; v54 = 1
     v55 = call fn21(v53, v54)  ; v54 = 1
     call fn0(v49)
     call fn0(v55)
@@ -468,7 +451,6 @@ block3:
     v45 = call fn5(v1, v44)
     v46 = iconst.i64 2565
     call fn0(v45)
-    call fn0(v46)  ; v46 = 2565
     v47 = call fn6(v45, v46)  ; v46 = 2565
     call fn0(v47)
     call fn7(v0)
@@ -526,7 +508,6 @@ function u0:33(i64, i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 1
     stack_store v3, ss0  ; v3 = 1
-    call fn0(v3)  ; v3 = 1
     v4 = iconst.i64 0
     stack_store v4, ss1  ; v4 = 0
     v5 = iconst.i64 0
@@ -623,7 +604,6 @@ block14:
     v49 = call fn6(v48, v28)
     v50 = iconst.i64 2565
     call fn0(v49)
-    call fn0(v50)  ; v50 = 2565
     v51 = call fn6(v49, v50)  ; v50 = 2565
     stack_store v51, ss0
     call fn7(v47)
@@ -679,7 +659,6 @@ block23:
     v71 = call fn6(v70, v2)
     v72 = iconst.i64 2565
     call fn0(v71)
-    call fn0(v72)  ; v72 = 2565
     v73 = call fn6(v71, v72)  ; v72 = 2565
     stack_store v73, ss0
     call fn7(v69)
@@ -798,7 +777,6 @@ block37:
     v119 = call fn6(v118, v99)
     v120 = iconst.i64 2565
     call fn0(v119)
-    call fn0(v120)  ; v120 = 2565
     v121 = call fn6(v119, v120)  ; v120 = 2565
     stack_store v121, ss0
     call fn7(v117)
@@ -854,7 +832,6 @@ block46:
     v141 = call fn6(v140, v2)
     v142 = iconst.i64 2565
     call fn0(v141)
-    call fn0(v142)  ; v142 = 2565
     v143 = call fn6(v141, v142)  ; v142 = 2565
     stack_store v143, ss0
     call fn7(v139)
@@ -1158,20 +1135,16 @@ block2:
     call fn0(v0)
     v6 = call fn4(v0)
     v7 = iconst.i64 1
-    call fn0(v7)  ; v7 = 1
     call fn0(v6)
     v8 = call fn5(v7, v6)  ; v7 = 1
     v9 = iconst.i64 0x202d_2d2d_0a15
-    call fn0(v9)  ; v9 = 0x202d_2d2d_0a15
     call fn0(v1)
     v10 = call fn6(v9, v1)  ; v9 = 0x202d_2d2d_0a15
     v11 = iconst.i64 0x0a2d_2d2d_2015
-    call fn0(v11)  ; v11 = 0x0a2d_2d2d_2015
     call fn0(v2)
     v12 = call fn7(v11, v2)  ; v11 = 0x0a2d_2d2d_2015
     v13 = iconst.i64 2565
     call fn0(v12)
-    call fn0(v13)  ; v13 = 2565
     v14 = call fn8(v12, v13)  ; v13 = 2565
     call fn0(v10)
     call fn0(v14)
@@ -1628,56 +1601,48 @@ function u0:39(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
     v3 = iconst.i64 0x0038_6909
     call fn0(v1)
-    call fn0(v3)  ; v3 = 0x0038_6909
     v4 = call fn1(v1, v3)  ; v3 = 0x0038_6909
     brif v4, block2, block11
 
 block11:
     v5 = iconst.i64 0x3631_690d
     call fn0(v1)
-    call fn0(v5)  ; v5 = 0x3631_690d
     v6 = call fn1(v1, v5)  ; v5 = 0x3631_690d
     brif v6, block3, block12
 
 block12:
     v7 = iconst.i64 0x3233_690d
     call fn0(v1)
-    call fn0(v7)  ; v7 = 0x3233_690d
     v8 = call fn1(v1, v7)  ; v7 = 0x3233_690d
     brif v8, block4, block13
 
 block13:
     v9 = iconst.i64 0x3436_690d
     call fn0(v1)
-    call fn0(v9)  ; v9 = 0x3436_690d
     v10 = call fn1(v1, v9)  ; v9 = 0x3436_690d
     brif v10, block5, block14
 
 block14:
     v11 = iconst.i64 0x0038_7509
     call fn0(v1)
-    call fn0(v11)  ; v11 = 0x0038_7509
     v12 = call fn1(v1, v11)  ; v11 = 0x0038_7509
     brif v12, block6, block15
 
 block15:
     v13 = iconst.i64 0x3631_750d
     call fn0(v1)
-    call fn0(v13)  ; v13 = 0x3631_750d
     v14 = call fn1(v1, v13)  ; v13 = 0x3631_750d
     brif v14, block7, block16
 
 block16:
     v15 = iconst.i64 0x3233_750d
     call fn0(v1)
-    call fn0(v15)  ; v15 = 0x3233_750d
     v16 = call fn1(v1, v15)  ; v15 = 0x3233_750d
     brif v16, block8, block17
 
 block17:
     v17 = iconst.i64 0x3436_750d
     call fn0(v1)
-    call fn0(v17)  ; v17 = 0x3436_750d
     v18 = call fn1(v1, v17)  ; v17 = 0x3436_750d
     brif v18, block9, block18
 
@@ -1781,112 +1746,96 @@ function u0:40(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v2 = iconst.i64 0x2b05
     call fn0(v0)
-    call fn0(v2)  ; v2 = 0x2b05
     v3 = call fn1(v0, v2)  ; v2 = 0x2b05
     brif v3, block2, block19
 
 block19:
     v4 = iconst.i64 0x2d05
     call fn0(v0)
-    call fn0(v4)  ; v4 = 0x2d05
     v5 = call fn1(v0, v4)  ; v4 = 0x2d05
     brif v5, block3, block20
 
 block20:
     v6 = iconst.i64 0x2a05
     call fn0(v0)
-    call fn0(v6)  ; v6 = 0x2a05
     v7 = call fn1(v0, v6)  ; v6 = 0x2a05
     brif v7, block4, block21
 
 block21:
     v8 = iconst.i64 0x2f05
     call fn0(v0)
-    call fn0(v8)  ; v8 = 0x2f05
     v9 = call fn1(v0, v8)  ; v8 = 0x2f05
     brif v9, block5, block22
 
 block22:
     v10 = iconst.i64 9477
     call fn0(v0)
-    call fn0(v10)  ; v10 = 9477
     v11 = call fn1(v0, v10)  ; v10 = 9477
     brif v11, block6, block23
 
 block23:
     v12 = iconst.i64 0x003d_3d09
     call fn0(v0)
-    call fn0(v12)  ; v12 = 0x003d_3d09
     v13 = call fn1(v0, v12)  ; v12 = 0x003d_3d09
     brif v13, block7, block24
 
 block24:
     v14 = iconst.i64 0x003d_2109
     call fn0(v0)
-    call fn0(v14)  ; v14 = 0x003d_2109
     v15 = call fn1(v0, v14)  ; v14 = 0x003d_2109
     brif v15, block8, block25
 
 block25:
     v16 = iconst.i64 0x3c05
     call fn0(v0)
-    call fn0(v16)  ; v16 = 0x3c05
     v17 = call fn1(v0, v16)  ; v16 = 0x3c05
     brif v17, block9, block26
 
 block26:
     v18 = iconst.i64 0x3e05
     call fn0(v0)
-    call fn0(v18)  ; v18 = 0x3e05
     v19 = call fn1(v0, v18)  ; v18 = 0x3e05
     brif v19, block10, block27
 
 block27:
     v20 = iconst.i64 0x003d_3c09
     call fn0(v0)
-    call fn0(v20)  ; v20 = 0x003d_3c09
     v21 = call fn1(v0, v20)  ; v20 = 0x003d_3c09
     brif v21, block11, block28
 
 block28:
     v22 = iconst.i64 0x003d_3e09
     call fn0(v0)
-    call fn0(v22)  ; v22 = 0x003d_3e09
     v23 = call fn1(v0, v22)  ; v22 = 0x003d_3e09
     brif v23, block12, block29
 
 block29:
     v24 = iconst.i64 0x0026_2609
     call fn0(v0)
-    call fn0(v24)  ; v24 = 0x0026_2609
     v25 = call fn1(v0, v24)  ; v24 = 0x0026_2609
     brif v25, block13, block30
 
 block30:
     v26 = iconst.i64 0x007c_7c09
     call fn0(v0)
-    call fn0(v26)  ; v26 = 0x007c_7c09
     v27 = call fn1(v0, v26)  ; v26 = 0x007c_7c09
     brif v27, block14, block31
 
 block31:
     v28 = iconst.i64 8453
     call fn0(v0)
-    call fn0(v28)  ; v28 = 8453
     v29 = call fn1(v0, v28)  ; v28 = 8453
     brif v29, block15, block32
 
 block32:
     v30 = iconst.i64 0x002b_2b09
     call fn0(v0)
-    call fn0(v30)  ; v30 = 0x002b_2b09
     v31 = call fn1(v0, v30)  ; v30 = 0x002b_2b09
     brif v31, block16, block33
 
 block33:
     v32 = iconst.i64 0x2b2b_2b0d
     call fn0(v0)
-    call fn0(v32)  ; v32 = 0x2b2b_2b0d
     v33 = call fn1(v0, v32)  ; v32 = 0x2b2b_2b0d
     brif v33, block17, block34
 
@@ -2181,7 +2130,6 @@ function u0:42(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 2565
     call fn0(v0)
-    call fn0(v1)  ; v1 = 2565
     v2 = call fn1(v0, v1)  ; v1 = 2565
     call fn2(v2)
     call fn3(v0)
@@ -2209,11 +2157,9 @@ function u0:43(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 0x000a_0d09
     call fn0(v0)
-    call fn0(v1)  ; v1 = 0x000a_0d09
     v2 = call fn1(v0, v1)  ; v1 = 0x000a_0d09
     v3 = iconst.i64 2565
     call fn0(v2)
-    call fn0(v3)  ; v3 = 2565
     v4 = call fn2(v2, v3)  ; v3 = 2565
     call fn0(v4)
     v5 = call fn3(v4)
@@ -2255,7 +2201,6 @@ function u0:44(i64, i64) apple_aarch64 {
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0x2d2d_2d0d
     call fn0(v1)
-    call fn0(v2)  ; v2 = 0x2d2d_2d0d
     v3 = call fn1(v1, v2)  ; v2 = 0x2d2d_2d0d
     v4 = bxor_imm v3, 1
     brif v4, block1, block2
@@ -2295,7 +2240,6 @@ block3(v5: i64):
     v16 = call fn3(v1)
     v17 = iconst.i64 0x2d2d_2d0d
     call fn0(v16)
-    call fn0(v17)  ; v17 = 0x2d2d_2d0d
     v18 = call fn4(v16, v17)  ; v17 = 0x2d2d_2d0d
     v19 = call fn5(v16)
     v20 = iconst.i64 6
@@ -2314,7 +2258,6 @@ block7:
     v30 = call fn7(v29)
     v31 = iconst.i64 1
     call fn0(v30)
-    call fn0(v31)  ; v31 = 1
     v32 = call fn8(v30, v31)  ; v31 = 1
     brif v32, block10, block11
 
@@ -3276,7 +3219,6 @@ block1:
 
 block2:
     v7 = iconst.i64 1
-    call fn0(v7)  ; v7 = 1
     jump block3(v7)  ; v7 = 1
 
 block3(v4: i64):

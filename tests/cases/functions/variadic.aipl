@@ -39,8 +39,8 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 568
-instructions executed: 703
-binary size: 8056
+instructions executed: 670
+binary size: 6864
 --- monomorphizations ---
 __test$joined
 __test$sum

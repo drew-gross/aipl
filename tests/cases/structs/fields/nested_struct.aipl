@@ -31,8 +31,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 135
-binary size: 2160
+instructions executed: 125
+binary size: 1712
 --- monomorphizations ---
 dx
 main

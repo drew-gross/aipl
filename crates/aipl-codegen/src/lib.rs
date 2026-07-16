@@ -5696,12 +5696,57 @@ fn instrument_insn_count<M: Module>(module: &mut M, func: &mut Function, count_f
     }
 }
 
+/// True when a refcount op on the str-repr value `v` is statically known to be
+/// a runtime no-op, so the `aipl_inc`/`aipl_dec` call would be pure overhead
+/// and is elided. Recognized by the defining instruction:
+///   - a constant that is null (`0`) or inline-tagged (`..01`, a packed <= 7
+///     byte literal) — neither owns heap. A heap/view/rope pointer is never a
+///     codegen-time constant, and a heap-tagged (`..00`) constant is excluded
+///     anyway, so this can't misfire on a baked pointer;
+///   - `symbol_value + STR_HEADER_SIZE` — a pointer into a static string
+///     literal's data object, whose `STATIC_REFCOUNT` header makes the runtime
+///     ignore every inc/dec on it (and which is never freed).
+/// Best-effort by design: a literal that arrives through a block param, a
+/// stack slot, or a component load isn't recognized, and its (no-op) rc call
+/// is emitted exactly as before — eliding is only ever an optimization, never
+/// required for balance, because rc ops on these representations don't count.
+fn rc_statically_noop(func: &Function, v: Value) -> bool {
+    use cranelift::codegen::ir::{instructions::InstructionData, Opcode, ValueDef};
+    let ValueDef::Result(inst, _) = func.dfg.value_def(v) else {
+        return false;
+    };
+    match func.dfg.insts[inst] {
+        InstructionData::UnaryImm {
+            opcode: Opcode::Iconst,
+            imm,
+        } => {
+            let raw = imm.bits();
+            raw == 0 || raw & TAG_MASK as i64 == INLINE_TAG as i64
+        }
+        InstructionData::BinaryImm64 {
+            opcode: Opcode::IaddImm,
+            arg,
+            imm,
+        } if imm.bits() == STR_HEADER_SIZE as i64 => {
+            matches!(
+                func.dfg.value_def(arg),
+                ValueDef::Result(def, _)
+                    if func.dfg.insts[def].opcode() == Opcode::SymbolValue
+            )
+        }
+        _ => false,
+    }
+}
+
 fn emit_inc<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     builtins: &Builtins,
     v: Value,
 ) {
+    if rc_statically_noop(builder.func, v) {
+        return;
+    }
     let local = builtins.import(module, builder.func, "aipl_inc");
     builder.ins().call(local, &[v]);
 }
@@ -6188,6 +6233,11 @@ fn emit_rc<M: Module>(
         // shares `str`'s representation — see `is_char_array`) — inc/dec the
         // pointer.
         _ if is_str_repr(ty) || is_char_array(ty) => {
+            // Skip the call entirely when `v` is a literal the runtime would
+            // ignore anyway (static/inline — see `rc_statically_noop`).
+            if rc_statically_noop(builder.func, v) {
+                return;
+            }
             let sym = match op {
                 RcOp::Retain => "aipl_inc",
                 RcOp::Drop => "aipl_dec",

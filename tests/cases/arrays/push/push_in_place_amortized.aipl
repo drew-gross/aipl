@@ -24,8 +24,8 @@ allocations: 2
 deallocations: 2
 reallocations: 4
 bytes allocated: 128
-instructions executed: 404
-binary size: 2432
+instructions executed: 401
+binary size: 2264
 --- monomorphizations ---
 grown
 main

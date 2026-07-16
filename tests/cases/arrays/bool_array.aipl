@@ -22,8 +22,8 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 66
-instructions executed: 473
-binary size: 3464
+instructions executed: 461
+binary size: 2960
 --- monomorphizations ---
 __test$count_true
 main

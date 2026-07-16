@@ -73,8 +73,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1356
-binary size: 11176
+instructions executed: 1117
+binary size: 7248
 --- monomorphizations ---
 int_fits
 main

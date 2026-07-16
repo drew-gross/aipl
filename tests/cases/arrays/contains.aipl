@@ -40,8 +40,8 @@ allocations: 30
 deallocations: 30
 reallocations: 0
 bytes allocated: 1568
-instructions executed: 2019
-binary size: 14432
+instructions executed: 1965
+binary size: 12472
 --- monomorphizations ---
 __test$single
 main

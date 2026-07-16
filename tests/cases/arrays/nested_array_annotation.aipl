@@ -24,8 +24,8 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 520
-instructions executed: 526
-binary size: 5936
+instructions executed: 507
+binary size: 5288
 --- monomorphizations ---
 __test$first
 add_row

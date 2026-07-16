@@ -41,8 +41,8 @@ allocations: 7
 deallocations: 7
 reallocations: 26
 bytes allocated: 224
-instructions executed: 3028
-binary size: 5968
+instructions executed: 3003
+binary size: 5016
 --- monomorphizations ---
 __enumerate0
 line_at

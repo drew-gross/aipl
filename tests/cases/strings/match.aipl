@@ -45,8 +45,8 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 246
-binary size: 4080
+instructions executed: 217
+binary size: 3208
 --- monomorphizations ---
 classify
 code

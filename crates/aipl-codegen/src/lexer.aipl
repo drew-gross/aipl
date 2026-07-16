@@ -159,8 +159,8 @@ allocations: 25
 deallocations: 25
 reallocations: 19
 bytes allocated: 1184
-instructions executed: 5881
-binary size: 25688
+instructions executed: 5683
+binary size: 21768
 --- monomorphizations ---
 __test$lex
 is_ident_continue

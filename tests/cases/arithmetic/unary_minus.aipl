@@ -11,8 +11,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 61
-binary size: 1648
+instructions executed: 54
+binary size: 1328
 --- monomorphizations ---
 main
 neg

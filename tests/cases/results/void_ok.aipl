@@ -45,8 +45,8 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 290
-binary size: 3784
+instructions executed: 286
+binary size: 3656
 --- monomorphizations ---
 check_positive
 describe

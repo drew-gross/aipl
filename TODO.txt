@@ -4,7 +4,6 @@ TODOs:
 2. Char literals aren't valid match arms (str/int/array literals are).
 
 Finishing making aipl self hosting
-Build out infra to write builtins in .aipl itself
 Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 Make the language features powerful enough that we don't need builtin_return
 Fix indentation of == assertions in lexer.aipl
@@ -29,6 +28,3 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 - Synergy: inlining exposes retain/release pairs across the old call boundary —
   refcount elision after inlining likely beats the call-overhead win itself.
-- When it lands: expect a mass `fill_expected` refresh (instructions executed /
-  binary size shift nearly everywhere) and the staged IR workflow for the
-  dogfooded engines.

@@ -38,8 +38,8 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 200
-instructions executed: 245
-binary size: 3680
+instructions executed: 240
+binary size: 3464
 --- monomorphizations ---
 main
 parse

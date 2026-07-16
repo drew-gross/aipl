@@ -11,8 +11,8 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 60
-binary size: 2192
+instructions executed: 49
+binary size: 1784
 --- monomorphizations ---
 main
 pick

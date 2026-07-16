@@ -23,8 +23,8 @@ allocations: 6
 deallocations: 6
 reallocations: 5
 bytes allocated: 272
-instructions executed: 467
-binary size: 3512
+instructions executed: 462
+binary size: 3312
 --- monomorphizations ---
 main
 map$lam5

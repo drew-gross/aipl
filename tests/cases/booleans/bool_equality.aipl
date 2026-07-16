@@ -13,8 +13,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 61
-binary size: 1744
+instructions executed: 53
+binary size: 1392
 --- monomorphizations ---
 beq
 main
