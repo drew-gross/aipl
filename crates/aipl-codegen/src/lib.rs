@@ -4697,44 +4697,146 @@ impl ObjectCompilation {
     }
 }
 
+/// A struct or variant declaration, indexed by name for layout resolution.
+#[derive(Clone, Copy)]
+enum TypeDeclRef<'a> {
+    Struct(&'a StructDecl),
+    Variant(&'a aipl_syntax::ast::VariantDecl),
+}
+
 fn build_struct_layouts(
     program: &aipl_mono::MonoProgram,
 ) -> Result<HashMap<String, TypeDef>, Error> {
-    // Index declarations by name (rejecting duplicates) up front, so a field
-    // may name a struct declared later in the file. Layouts are then resolved
-    // in dependency order: a struct-typed field is stored inline, so the
-    // nested struct's size must be known before the outer struct's is.
-    let mut decls: HashMap<&str, &StructDecl> = HashMap::new();
+    // Index declarations (structs and variants together — they share one
+    // namespace) by name up front, rejecting duplicates, so a field may name
+    // a type declared later in the file. Layouts are then resolved in
+    // dependency order: a struct- or variant-typed field is stored inline, so
+    // the nested type's size must be known before the outer type's is.
+    let mut decls: HashMap<&str, TypeDeclRef> = HashMap::new();
     for s in &program.structs {
-        if decls.insert(s.name.as_str(), s).is_some() {
+        if decls
+            .insert(s.name.as_str(), TypeDeclRef::Struct(s))
+            .is_some()
+        {
             return Err(Error::msg(format!(
                 "duplicate struct definition {:?}",
                 s.name
             )));
         }
     }
-
-    let mut layouts: HashMap<String, TypeDef> = HashMap::new();
-    let mut on_stack: HashSet<String> = HashSet::new();
-    let names: Vec<&str> = decls.keys().copied().collect();
-    for name in names {
-        resolve_struct_layout(name, &decls, &mut layouts, &mut on_stack)?;
-    }
-    // Variants are resolved after all structs (a variant payload may be a
-    // struct, but not — for now — another variant, which would need indirection
-    // for a recursive/infinite-size sum type), so every payload field's size is
-    // already known.
     for v in &program.variants {
-        if layouts.contains_key(&v.name) {
+        if decls
+            .insert(v.name.as_str(), TypeDeclRef::Variant(v))
+            .is_some()
+        {
             return Err(Error::msg(format!(
                 "duplicate type definition {:?}",
                 v.name
             )));
         }
-        let layout = build_variant_layout(v, &layouts)?;
-        layouts.insert(v.name.clone(), TypeDef::Variant(layout));
+    }
+
+    let mut layouts: HashMap<String, TypeDef> = HashMap::new();
+    let mut on_stack: HashSet<String> = HashSet::new();
+    // Sorted so resolution order — and therefore which type a cycle error is
+    // reported against — is deterministic across runs.
+    let mut names: Vec<&str> = decls.keys().copied().collect();
+    names.sort_unstable();
+    for name in names {
+        resolve_type_layout(name, &decls, &mut layouts, &mut on_stack)?;
     }
     Ok(layouts)
+}
+
+/// Compute (and memoize into `layouts`) the layout of the struct or variant
+/// `name`, recursing into any struct- or variant-typed components first.
+/// `on_stack` tracks the types currently being resolved so a cycle (which
+/// would have infinite size) is reported rather than recursing forever.
+fn resolve_type_layout(
+    name: &str,
+    decls: &HashMap<&str, TypeDeclRef>,
+    layouts: &mut HashMap<String, TypeDef>,
+    on_stack: &mut HashSet<String>,
+) -> Result<(), Error> {
+    if layouts.contains_key(name) {
+        return Ok(());
+    }
+    let decl = *decls
+        .get(name)
+        .expect("resolve_type_layout called with a declared type");
+    if !on_stack.insert(name.to_string()) {
+        let kind = match decl {
+            TypeDeclRef::Struct(_) => "struct",
+            TypeDeclRef::Variant(_) => "variant",
+        };
+        return Err(Error::msg(format!(
+            "{kind} {name}: recursive types have infinite size (a type cannot \
+             contain itself, directly or transitively)"
+        )));
+    }
+    let def = match decl {
+        TypeDeclRef::Struct(s) => {
+            TypeDef::Struct(build_struct_layout(s, decls, layouts, on_stack)?)
+        }
+        TypeDeclRef::Variant(v) => {
+            TypeDef::Variant(build_variant_layout(v, decls, layouts, on_stack)?)
+        }
+    };
+    on_stack.remove(name);
+    layouts.insert(name.to_string(), def);
+    Ok(())
+}
+
+/// Lay out a `struct`: fields are stored sequentially (no padding — every
+/// field size is a multiple of 8), nested composites inline.
+fn build_struct_layout(
+    decl: &StructDecl,
+    decls: &HashMap<&str, TypeDeclRef>,
+    layouts: &mut HashMap<String, TypeDef>,
+    on_stack: &mut HashSet<String>,
+) -> Result<StructLayout, Error> {
+    let mut fields = Vec::with_capacity(decl.fields.len());
+    let mut offset: u32 = 0;
+    for f in &decl.fields {
+        // Allowed field types: i64/bool/char (by value), `str` or an array
+        // (8-byte refcounted heap pointers), another declared struct or a
+        // variant (stored inline — resolve it here so its size is known), or
+        // an optional of a scalar/str/array (a 16-byte inline `{tag, value}`
+        // composite).
+        match &f.ty {
+            Type::Primitive(
+                Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
+            ) => {}
+            Type::Named(n) if decls.contains_key(n.as_str()) => {
+                resolve_type_layout(n, decls, layouts, on_stack)?;
+            }
+            Type::Array(_) => {}
+            Type::Optional(inner)
+                if is_set_elem(inner) || matches!(inner.as_ref(), Type::Array(_)) => {}
+            _ => {
+                return Err(Error::msg(format!(
+                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a struct, a variant, an array, or an optional of (i64, bool, char, str, or an array)",
+                    decl.name,
+                    f.name,
+                    type_name(&f.ty),
+                )));
+            }
+        }
+        // The nested struct/variant (if any) is now resolved, so its size is
+        // in `layouts`.
+        let size = field_size(&f.ty, layouts);
+        fields.push(FieldLayout {
+            name: f.name.clone(),
+            ty: f.ty.clone(),
+            offset,
+        });
+        // Advance to the next field
+        offset += size;
+    }
+    Ok(StructLayout {
+        fields,
+        size: offset,
+    })
 }
 
 /// Lay out a `variant`: the tag occupies offset 0, each case's payload is laid
@@ -4742,7 +4844,9 @@ fn build_struct_layouts(
 /// sized to the widest case so all cases share one payload region.
 fn build_variant_layout(
     v: &aipl_syntax::ast::VariantDecl,
-    layouts: &HashMap<String, TypeDef>,
+    decls: &HashMap<&str, TypeDeclRef>,
+    layouts: &mut HashMap<String, TypeDef>,
+    on_stack: &mut HashSet<String>,
 ) -> Result<VariantLayout, Error> {
     let mut cases = Vec::with_capacity(v.cases.len());
     let mut max_payload: u32 = 0;
@@ -4751,11 +4855,21 @@ fn build_variant_layout(
         let mut offset = VARIANT_PAYLOAD_OFFSET;
         for ty in &c.payload {
             // A payload field is an array element / inline composite: a scalar,
-            // `str`, an array, an optional, or a struct — never another variant
-            // (an inline recursive sum type would have infinite size).
-            let ok = is_set_elem(ty) // i64/bool/char/str
-                || matches!(ty, Type::Array(_) | Type::Optional(_))
-                || matches!(ty, Type::Named(n) if layouts.get(n).is_some_and(|t| t.as_struct().is_some()));
+            // `str`, an array, an optional, or a struct (resolved here so its
+            // size is known) — never another variant directly (an inline
+            // recursive sum type would have infinite size).
+            let ok = match ty {
+                _ if is_set_elem(ty) => true, // i64/bool/char/str
+                Type::Array(_) | Type::Optional(_) => true,
+                Type::Named(n) => match decls.get(n.as_str()) {
+                    Some(TypeDeclRef::Struct(_)) => {
+                        resolve_type_layout(n, decls, layouts, on_stack)?;
+                        true
+                    }
+                    _ => false,
+                },
+                _ => false,
+            };
             if !ok {
                 return Err(Error::msg(format!(
                     "variant {} case {}: payload type {} is not supported (use i64, bool, char, \
@@ -4782,75 +4896,6 @@ fn build_variant_layout(
         cases,
         size: VARIANT_PAYLOAD_OFFSET + max_payload,
     })
-}
-
-/// Compute (and memoize into `layouts`) the layout of struct `name`, recursing
-/// into any struct-typed fields first. `on_stack` tracks the structs currently
-/// being resolved so a cycle (which would have infinite size) is reported
-/// rather than recursing forever.
-fn resolve_struct_layout(
-    name: &str,
-    decls: &HashMap<&str, &StructDecl>,
-    layouts: &mut HashMap<String, TypeDef>,
-    on_stack: &mut HashSet<String>,
-) -> Result<(), Error> {
-    if layouts.contains_key(name) {
-        return Ok(());
-    }
-    if !on_stack.insert(name.to_string()) {
-        return Err(Error::msg(format!(
-            "struct {name}: recursive structs have infinite size (a struct cannot \
-             contain itself, directly or transitively)"
-        )));
-    }
-    let decl = *decls
-        .get(name)
-        .expect("resolve_struct_layout called with a declared struct");
-    let mut fields = Vec::with_capacity(decl.fields.len());
-    let mut offset: u32 = 0;
-    for f in &decl.fields {
-        // Allowed field types: i64/bool/char (by value), `str` or an array
-        // (8-byte refcounted heap pointers), another declared struct (stored
-        // inline — resolve it here so its size is known), or an optional of a
-        // scalar/str/array (a 16-byte inline `{tag, value}` composite).
-        match &f.ty {
-            Type::Primitive(
-                Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
-            ) => {}
-            Type::Named(n) if decls.contains_key(n.as_str()) => {
-                resolve_struct_layout(n, decls, layouts, on_stack)?;
-            }
-            Type::Array(_) => {}
-            Type::Optional(inner)
-                if is_set_elem(inner) || matches!(inner.as_ref(), Type::Array(_)) => {}
-            _ => {
-                return Err(Error::msg(format!(
-                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a struct, an array, or an optional of (i64, bool, char, str, or an array)",
-                    decl.name,
-                    f.name,
-                    type_name(&f.ty),
-                )));
-            }
-        }
-        // The nested struct (if any) is now resolved, so its size is in `layouts`.
-        let size = field_size(&f.ty, layouts);
-        fields.push(FieldLayout {
-            name: f.name.clone(),
-            ty: f.ty.clone(),
-            offset,
-        });
-        // Advance to the next field
-        offset += size;
-    }
-    on_stack.remove(name);
-    layouts.insert(
-        name.to_string(),
-        TypeDef::Struct(StructLayout {
-            fields,
-            size: offset,
-        }),
-    );
-    Ok(())
 }
 
 fn cl_type_of(_t: &Type) -> types::Type {

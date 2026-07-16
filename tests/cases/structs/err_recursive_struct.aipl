@@ -4,4 +4,4 @@ struct Node { v: i64, next: Node }
 
 fn main() -> i64 { 0 }
 --- errors ---
-error: struct Node: recursive structs have infinite size (a struct cannot contain itself, directly or transitively)
+error: struct Node: recursive types have infinite size (a type cannot contain itself, directly or transitively)

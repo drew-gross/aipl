@@ -1,0 +1,9 @@
+// A cycle through a variant is still an infinite-size type: S stores V inline,
+// and V's payload stores S inline.
+struct S { v: V }
+
+variant V = C(S)
+
+fn main() {}
+--- errors ---
+error: struct S: recursive types have infinite size (a type cannot contain itself, directly or transitively)

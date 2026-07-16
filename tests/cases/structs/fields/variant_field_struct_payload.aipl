@@ -1,0 +1,33 @@
+import { *, wrapping_add as +, == } from builtins;
+
+// Struct → variant → struct nesting (non-recursive): a variant whose payload
+// is a struct can itself be a field of another struct. The outer layout sizes
+// the variant field to its widest case (tag + inline Point).
+struct Point { x: i64, y: i64 }
+
+variant Shape = Dot(Point) | Empty
+
+struct Cell { shape: Shape, id: i64 }
+
+fn weight(c: Cell) -> i64 {
+    match (c.shape) {
+        Dot(p) => p.x + p.y,
+        Empty => 0,
+    }
+}.test({
+    let c = Cell { shape: Dot(Point { x: 1, y: 2 }), id: 7 };
+    assert(weight(c) == 3);
+    assert(c.id == 7);
+    assert(weight(Cell { shape: Empty, id: 8 }) == 0);
+    assert(c == Cell { shape: Dot(Point { x: 1, y: 2 }), id: 7 });
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 169
+binary size: 2328
+--- monomorphizations ---
+main
+weight

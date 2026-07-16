@@ -1,0 +1,38 @@
+import { *, == } from builtins;
+
+// A variant is legal as a struct field: stored inline like a nested struct,
+// read back by address, matched and compared structurally.
+variant Kind = Ident | Int | Punct
+
+struct Token { kind: Kind, start: i64 }
+
+fn describe(t: Token) -> str {
+    match (t.kind) {
+        Ident => "ident",
+        Int => "int",
+        Punct => "punct",
+    }
+}.test({
+    // Construct with each case, then match on the field.
+    assert(describe(Token { kind: Ident, start: 0 }) == "ident");
+    assert(describe(Token { kind: Int, start: 2 }) == "int");
+    assert(describe(Token { kind: Punct, start: 5 }) == "punct");
+
+    // Structs with variant fields compare structurally.
+    assert(Token { kind: Int, start: 2 } == Token { kind: Int, start: 2 });
+
+    // The field reads back as an ordinary variant value.
+    let t = Token { kind: Punct, start: 9 };
+    assert(t.kind == Punct);
+    assert(t.start == 9);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 182
+binary size: 3480
+--- monomorphizations ---
+describe
+main
