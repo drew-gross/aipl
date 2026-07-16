@@ -35,9 +35,8 @@ use aipl_syntax::{
         MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
         VariantCase, VariantDecl,
     },
-    concat_str_ty, empty_array_arg_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error,
-    is_none_inner, is_none_literal_arg, is_str_repr, none_inner_ty, none_literal_arg_ty, type_name,
-    DebugOptions, Error, Span, BUILTIN_SIGNATURES,
+    concat_str_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error, is_none_inner,
+    is_none_literal_arg, is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
 };
 
 /// Hard cap on the number of generic instances monomorphization will emit.
@@ -2780,7 +2779,7 @@ impl Mono<'_> {
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
             ExprKind::Str(_) => (expr.clone(), Type::Primitive(Primitive::Str)),
             ExprKind::Char(_) => (expr.clone(), Type::Primitive(Primitive::Char)),
-            ExprKind::None => (expr.clone(), Type::Optional(Box::new(none_inner_ty()))),
+            ExprKind::None => (expr.clone(), Type::Optional(Box::new(Type::NoneInner))),
             ExprKind::Ident(name) => {
                 // A bare name is a local binding, or — if unbound — a nullary
                 // variant constructor (e.g. `Empty`), whose type is its variant.
@@ -2834,7 +2833,7 @@ impl Mono<'_> {
             }
             ExprKind::ArrayLit(elems) => {
                 let mut relems = Vec::with_capacity(elems.len());
-                let mut elem_ty = none_inner_ty();
+                let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let (re, t) = self.infer(e, env)?;
                     if i == 0 {
@@ -2880,7 +2879,7 @@ impl Mono<'_> {
             }
             ExprKind::SetLit(elems) => {
                 let mut relems = Vec::with_capacity(elems.len());
-                let mut elem_ty = none_inner_ty();
+                let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let (re, t) = self.infer(e, env)?;
                     if i == 0 {
@@ -2895,8 +2894,8 @@ impl Mono<'_> {
             }
             ExprKind::DictLit(pairs) => {
                 let mut rpairs = Vec::with_capacity(pairs.len());
-                let mut key_ty = none_inner_ty();
-                let mut val_ty = none_inner_ty();
+                let mut key_ty = Type::NoneInner;
+                let mut val_ty = Type::NoneInner;
                 for (i, (k, v)) in pairs.iter().enumerate() {
                     let (rk, kt) = self.infer(k, env)?;
                     let (rv, vt) = self.infer(v, env)?;
@@ -2921,7 +2920,7 @@ impl Mono<'_> {
                     Type::Array(inner) => *inner,
                     // `s[i]` on a `str` is the byte at `i` as a `char?`.
                     Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
-                    _ => none_inner_ty(),
+                    _ => Type::NoneInner,
                 };
                 // Indexing yields `elem?` — for a `T?[]` that's a genuine `T??`.
                 (
@@ -2947,7 +2946,7 @@ impl Mono<'_> {
                 let (rin, it) = self.infer(inner, env)?;
                 let ok = match it {
                     Type::Result(ok, _) => *ok,
-                    _ => none_inner_ty(),
+                    _ => Type::NoneInner,
                 };
                 (node(ExprKind::Try(Box::new(rin))), ok)
             }
@@ -3574,12 +3573,12 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
         (Type::Array(inner), Type::Array(a))
             if matches!(inner.as_ref(), Type::Named(n) if n == v) && is_none_inner(a) =>
         {
-            Some(empty_array_arg_ty())
+            Some(Type::EmptyArrayArg)
         }
         (Type::Optional(inner), Type::Optional(a))
             if matches!(inner.as_ref(), Type::Named(n) if n == v) && is_none_inner(a) =>
         {
-            Some(none_literal_arg_ty())
+            Some(Type::NoneLiteralArg)
         }
         _ => None,
     }
@@ -3700,7 +3699,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     match name {
         // Internal: an empty array reserved to a given capacity (`map`'s output).
         // Untyped element (`__none__`) like `[]`; refined by the first `push`.
-        "__builtin_with_capacity" => return Some(Type::Array(Box::new(none_inner_ty()))),
+        "__builtin_with_capacity" => return Some(Type::Array(Box::new(Type::NoneInner))),
         // Declared void (it's a statement); mono needs an `i64` value for the
         // expression it emits (see the `expr`-position uses of `print`).
         "__builtin_print" => return Some(Type::Primitive(Primitive::I64)),
@@ -3715,7 +3714,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             return Some(match arg_tys.first() {
                 Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
                 Some(Type::Array(inner)) => Type::Array(inner.clone()),
-                _ => Type::Array(Box::new(none_inner_ty())),
+                _ => Type::Array(Box::new(Type::NoneInner)),
             })
         }
         // Declared void (it mutates `self` in place); mono treats the call as
@@ -3747,12 +3746,12 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         "ok" => {
             return Some(Type::Result(
                 Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
-                Box::new(none_inner_ty()),
+                Box::new(Type::NoneInner),
             ))
         }
         "err" => {
             return Some(Type::Result(
-                Box::new(none_inner_ty()),
+                Box::new(Type::NoneInner),
                 Box::new(decay_concat(
                     arg_tys
                         .first()
@@ -4060,7 +4059,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
         Type::Optional(inner) => {
             let i = subst_vars(inner, map);
             if is_none_literal_arg(&i) {
-                Type::Optional(Box::new(none_inner_ty()))
+                Type::Optional(Box::new(Type::NoneInner))
             } else {
                 Type::Optional(Box::new(i))
             }
@@ -4068,7 +4067,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
         Type::Array(inner) => {
             let i = subst_vars(inner, map);
             if is_empty_array_arg(&i) {
-                Type::Array(Box::new(none_inner_ty()))
+                Type::Array(Box::new(Type::NoneInner))
             } else {
                 Type::Array(Box::new(i))
             }
@@ -4080,7 +4079,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
             // `Optional` arm above (so `ok(5)`'s `__none__` err stays `__none__`).
             let collapse = |t: Type| {
                 if is_none_literal_arg(&t) {
-                    none_inner_ty()
+                    Type::NoneInner
                 } else {
                     t
                 }

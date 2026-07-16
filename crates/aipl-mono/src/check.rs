@@ -25,8 +25,8 @@ use aipl_syntax::ast::{
     Type,
 };
 use aipl_syntax::{
-    is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, none_inner_ty,
-    type_name, Error, Span,
+    is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, type_name,
+    Error, Span,
 };
 
 /// Generate the canonical synthetic-struct name for a tuple with the given
@@ -732,7 +732,7 @@ impl Cx<'_> {
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
             ExprKind::Str(_) => Type::Primitive(Primitive::Str),
             ExprKind::Char(_) => Type::Primitive(Primitive::Char),
-            ExprKind::None => Type::Optional(Box::new(none_inner_ty())),
+            ExprKind::None => Type::Optional(Box::new(Type::NoneInner)),
             ExprKind::Ident(name) => {
                 // A local binding shadows everything; otherwise a bare name may
                 // be a nullary variant constructor (e.g. `Empty`).
@@ -988,7 +988,7 @@ impl Cx<'_> {
                 Type::Primitive(Primitive::I64)
             }
             ExprKind::ArrayLit(elems) => {
-                let mut elem_ty = none_inner_ty();
+                let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
                     if i == 0 {
@@ -1014,7 +1014,7 @@ impl Cx<'_> {
             ExprKind::SetLit(elems) => {
                 // Elements share one type (i64/bool/char/str); an empty `#{}` is
                 // `__none__` (coerces to any `T{}`). Dups dropped at runtime.
-                let mut elem_ty = none_inner_ty();
+                let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
                     if i == 0 {
@@ -1038,8 +1038,8 @@ impl Cx<'_> {
                 // Keys share one scalar/str type; values share one value type.
                 // An empty `#{:}` is `#{__none__: __none__}` (coerces to any
                 // `#{K: V}`). Duplicate keys keep the last binding (at runtime).
-                let mut key_ty = none_inner_ty();
-                let mut val_ty = none_inner_ty();
+                let mut key_ty = Type::NoneInner;
+                let mut val_ty = Type::NoneInner;
                 for (i, (k, v)) in pairs.iter().enumerate() {
                     let kt = self.check_expr(k, env, effects)?;
                     let vt = self.check_expr(v, env, effects)?;
@@ -1334,7 +1334,7 @@ impl Cx<'_> {
             if name == "ok" && args.is_empty() {
                 return Ok(Type::Result(
                     Box::new(Type::Unit),
-                    Box::new(none_inner_ty()),
+                    Box::new(Type::NoneInner),
                 ));
             }
             if args.len() != 1 {
@@ -1344,7 +1344,7 @@ impl Cx<'_> {
                 ));
             }
             let t = self.check_expr(&args[0], env, effects)?;
-            let none = || Box::new(none_inner_ty());
+            let none = || Box::new(Type::NoneInner);
             return Ok(if name == "ok" {
                 Type::Result(Box::new(t), none())
             } else {

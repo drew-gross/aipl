@@ -34,7 +34,7 @@ use aipl_syntax::{
         Program, Signature as AstSignature, StructDecl, Type,
     },
     error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner, is_set_elem,
-    is_str_repr, none_inner_ty, type_name, IMPORTABLE_BUILTINS,
+    is_str_repr, type_name, IMPORTABLE_BUILTINS,
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
@@ -10328,7 +10328,7 @@ fn compile_call_expr<M: Module>(
             let esz = builder.ins().iconst(types::I64, 8); // elem_size
             let inst = builder.ins().call(with_cap, &[cap, zero, esz]);
             let ptr = builder.inst_results(inst)[0];
-            let arr_ty = Type::Array(Box::new(none_inner_ty()));
+            let arr_ty = Type::Array(Box::new(Type::NoneInner));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -10583,7 +10583,7 @@ fn compile_call_expr<M: Module>(
             // `ok()` with no argument is the void success of a `!E` result: tag 1
             // with an unused (zeroed) value region, Ok side `unit`.
             if is_ok && args.is_empty() {
-                let res_ty = Type::Result(Box::new(Type::Unit), Box::new(none_inner_ty()));
+                let res_ty = Type::Result(Box::new(Type::Unit), Box::new(Type::NoneInner));
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     elem_size_of(&res_ty, structs) as u32,
@@ -10628,9 +10628,9 @@ fn compile_call_expr<M: Module>(
                 }
             }
             let res_ty = if is_ok {
-                Type::Result(Box::new(t.clone()), Box::new(none_inner_ty()))
+                Type::Result(Box::new(t.clone()), Box::new(Type::NoneInner))
             } else {
-                Type::Result(Box::new(none_inner_ty()), Box::new(t.clone()))
+                Type::Result(Box::new(Type::NoneInner), Box::new(t.clone()))
             };
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -10970,7 +10970,7 @@ fn compile_expr<M: Module>(
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().stack_store(zero, slot, 0);
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            (ptr, Type::Optional(Box::new(none_inner_ty())))
+            (ptr, Type::Optional(Box::new(Type::NoneInner)))
         }
         ExprKind::Call(name, args, style) => compile_call_expr(
             module,
@@ -12160,7 +12160,7 @@ fn compile_expr<M: Module>(
                 }
                 vals.push((v, t));
             }
-            let elem = elem_ty.unwrap_or_else(none_inner_ty);
+            let elem = elem_ty.unwrap_or(Type::NoneInner);
             let arr_ty = Type::Array(Box::new(elem.clone()));
             if is_char_array(&arr_ty) {
                 // `char[]` is str-shaped (see `is_char_array`): build a heap
@@ -12250,7 +12250,7 @@ fn compile_expr<M: Module>(
                 }
                 vals.push(v);
             }
-            let elem = elem_ty.unwrap_or_else(none_inner_ty);
+            let elem = elem_ty.unwrap_or(Type::NoneInner);
             let esz = runtime_elem_size(&elem, structs);
             let esz_v = builder.ins().iconst(types::I64, esz);
             // `str` elements are heap: store the array `str` drop/retain helpers
@@ -12324,8 +12324,8 @@ fn compile_expr<M: Module>(
                 }
                 vals.push((kv, vv));
             }
-            let key = key_ty.unwrap_or_else(none_inner_ty);
-            let val = val_ty.unwrap_or_else(none_inner_ty);
+            let key = key_ty.unwrap_or(Type::NoneInner);
+            let val = val_ty.unwrap_or(Type::NoneInner);
             let pair_size = 8 + elem_size_of(&val, structs);
             let psz = builder.ins().iconst(types::I64, pair_size);
             let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key, &val);

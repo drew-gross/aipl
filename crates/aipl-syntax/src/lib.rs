@@ -1207,27 +1207,8 @@ pub fn is_dict_key(t: &Type) -> bool {
 
 /// Marker for the inner type of bare `none`. Implicitly converts to
 /// any `Optional<T>` via `expect_type`. Users can't write this — `none`
-/// is the only way to spell it.
-pub fn none_inner_ty() -> Type {
-    Type::NoneInner
-}
-
 pub fn is_none_inner(t: &Type) -> bool {
     matches!(t, Type::NoneInner)
-}
-
-/// The pseudo-type the monomorphizer binds a type variable to when the only
-/// argument that could pin it is an empty array literal — substituted back to
-/// `Array(NoneInner)` so existing codegen treats it as an ordinary empty array.
-pub fn empty_array_arg_ty() -> Type {
-    Type::EmptyArrayArg
-}
-
-/// The pseudo-type the monomorphizer binds a type variable to when the only
-/// argument that could pin it is the bare `none` literal — substituted back to
-/// `Optional(NoneInner)`.
-pub fn none_literal_arg_ty() -> Type {
-    Type::NoneLiteralArg
 }
 
 pub fn is_empty_array_arg(t: &Type) -> bool {

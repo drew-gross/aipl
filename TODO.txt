@@ -5,6 +5,5 @@ Language gaps the exercise exposed — these shaped the design and are worth kno
 2. Char literals aren't valid match arms (str/int/array literals are).
 3. Variants can't be struct fields — I wanted variant TokenKind = Ident | Int | Punct per the repo's classify+match philosophy, but Token { kind: TokenKind, ... } is rejected, hence the str kind.
 
-Make is digit, is_whitespace, etc. builtin
-
 Build out infra to write builtins in .aipl itself
+Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
