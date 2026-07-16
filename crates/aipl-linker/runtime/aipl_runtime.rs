@@ -2237,6 +2237,25 @@ pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
     i64::from(ends)
 }
 
+/// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
+/// contiguously anywhere in `s`'s. Consumes (decs) both inputs; callers
+/// pre-inc. The empty needle always matches. Reads both strings via
+/// `str_bytes` (a rope receiver materializes its memoized cache). Mirrors the
+/// JIT `aipl_str_contains`.
+#[no_mangle]
+pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
+    let mut sb = [0u8; 8];
+    let mut nb = [0u8; 8];
+    let found = unsafe {
+        let sbytes = str_bytes(s, &mut sb);
+        let nbytes = str_bytes(needle, &mut nb);
+        nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
+    };
+    aipl_dec(s);
+    aipl_dec(needle);
+    i64::from(found)
+}
+
 /// FNV-1a content hash of a NUL-terminated string (consistent with `rt_str_eq`).
 /// Borrows `a` (no refcount change). Mirrors the JIT `aipl_str_hash`.
 #[no_mangle]

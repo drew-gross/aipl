@@ -1072,6 +1072,13 @@ fn __builtin_is_all_whitespace(self: str) -> bool { false }
 // the checker / codegen (the `T[]` signature doesn't unify with `str`).
 fn __builtin_starts_with<T: any>(self: T[], prefix: T[]) -> bool { false }
 fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
+// True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
+// contiguous subsequence (substring), a `T` (or `char`) as a single element,
+// and a `T?` as its element when `some` — a `none` needle is nothing to find,
+// so it's `false` (unlike `starts_with`/`ends_with`, whose `none` pattern is
+// the empty pattern and matches). A str receiver is dispatched in the
+// checker / codegen (the `T[]` signature doesn't unify with `str`).
+fn __builtin_contains<T: any>(self: T[], needle: T[]) -> bool { false }
 // Smaller / larger of two `i64`s (codegen compares and selects).
 fn __builtin_min(self: i64, other: i64) -> i64 { self }
 fn __builtin_max(self: i64, other: i64) -> i64 { self }
@@ -1089,7 +1096,7 @@ fn __builtin_is_space(self: char) -> bool { false }
 fn __builtin_is_digit(self: char) -> bool { false }
 
 // Set ops: membership and union.
-fn __builtin_contains<T: any>(self: #{T}, x: T) -> bool { false }
+fn __builtin_has<T: any>(self: #{T}, x: T) -> bool { false }
 fn __builtin_union<T: any>(self: #{T}, other: #{T}) -> #{T} { self }
 
 // Dict ops: lookup (none if absent) and membership.
@@ -1245,6 +1252,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "is_digit",
     "value_or",
     "contains",
+    "has",
     "read_file_to_string",
     "write_string_to_file",
     "execute_program",

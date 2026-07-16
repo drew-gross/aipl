@@ -1,4 +1,4 @@
-import { !, !=, wrapping_add as +, +++, ==, contains, len } from builtins;
+import { !, !=, wrapping_add as +, +++, ==, has, len } from builtins;
 
 // Sets of strings: deduplicated and tested for membership by *content* (not
 // pointer identity), and freed/retained like a `str[]`.
@@ -12,12 +12,12 @@ fn build() -> #{str} {
     let s = build();
     assert(s == #{"apple", "banana", "cherry"});
     assert(len(s) == 3);
-    assert(s.contains("banana"));
-    assert(!s.contains("grape"));
+    assert(s.has("banana"));
+    assert(!s.has("grape"));
 
     // Membership is by content: a freshly built "banana" still matches.
     let key = "ba" +++ "nana";
-    assert(s.contains(key));
+    assert(s.has(key));
 
     // Equality is order-independent and by content.
     assert(#{"a", "b"} == #{"b", "a"});
@@ -29,6 +29,6 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 416
 instructions executed: 431
-binary size: 6280
+binary size: 6264
 --- monomorphizations ---
 main

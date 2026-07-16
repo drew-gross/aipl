@@ -1,0 +1,48 @@
+import { !, ==, contains } from builtins;
+
+// `contains` takes a variadic needle: a `T[]` matches as a contiguous
+// subsequence (the array analog of a substring), a bare `T` as a single
+// element, and a `T?` as its element when `some` — a `none` needle is nothing
+// to find, so it's `false` (unlike `starts_with`/`ends_with`, whose `none`
+// pattern is the always-matching empty pattern).
+
+fn single(xs: i64[], x: i64) -> bool { xs.contains(x) }.test({
+    // Single-element needle.
+    assert([1, 2, 3].contains(2));
+    assert([1, 2, 3].contains(1));
+    assert([1, 2, 3].contains(3));
+    assert(![1, 2, 3].contains(4));
+    assert(!single([], 1)); // empty receiver holds nothing
+
+    // Subsequence needle: contiguous run anywhere in the receiver.
+    assert([1, 2, 3, 4].contains([2, 3]));
+    assert([1, 2, 3, 4].contains([1, 2]));
+    assert([1, 2, 3, 4].contains([3, 4]));
+    assert([1, 2, 3, 4].contains([1, 2, 3, 4]));
+    assert(![1, 2, 3, 4].contains([2, 4])); // present but not contiguous
+    assert(![1, 2, 3, 4].contains([4, 5]));
+    assert(![1, 2].contains([1, 2, 3])); // needle longer than receiver
+    assert([1, 2, 3].contains([])); // empty needle always matches
+    assert([].contains([])); // even in an empty receiver
+
+    // Optional needle: `some(x)` finds x; `none` finds nothing.
+    assert([1, 2, 3].contains(some(2)));
+    assert(![1, 2, 3].contains(some(9)));
+    assert(![1, 2, 3].contains(none));
+
+    // Str elements compare by content.
+    assert(["ab", "cd"].contains("cd"));
+    assert(!["ab", "cd"].contains("ef"));
+    assert(["ab", "cd", "ef"].contains(["cd", "ef"]));
+})
+--- performance ---
+allocations: 30
+deallocations: 30
+reallocations: 0
+bytes allocated: 1568
+instructions executed: 2019
+binary size: 14432
+--- monomorphizations ---
+__test$single
+main
+single

@@ -1,0 +1,13 @@
+import { contains } from builtins;
+
+// Set membership is spelled `has`; `contains` is the array/str subsequence
+// builtin, and a set receiver gets a pointer at the right name.
+fn member(s: #{i64}) -> bool { s.contains(1) }
+
+fn main() {}
+--- errors ---
+error: "contains" takes an array or str receiver; for set membership use "has"
+ --> ./tests/cases/sets/err_contains_on_set.aipl:5:32
+  |
+5 | fn member(s: #{i64}) -> bool { s.contains(1) }
+  |                                ^

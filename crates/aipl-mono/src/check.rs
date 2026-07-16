@@ -1386,12 +1386,17 @@ impl Cx<'_> {
                 );
             }
         }
-        // `s.starts_with(p)` / `s.ends_with(p)`: the pattern is variadic, so it
-        // accepts the sequence, a single element, or an optional element. A
-        // `str` receiver takes a `char*` pattern (a `str`, a `char`, or a
-        // `char?`); a `T[]` receiver takes a `T*` pattern (a `T[]`, a `T`, or a
-        // `T?`). Fully dispatched here rather than through the generic signature.
-        if (name == "__builtin_starts_with" || name == "__builtin_ends_with") && args.len() == 2 {
+        // `s.starts_with(p)` / `s.ends_with(p)` / `s.contains(n)`: the
+        // pattern/needle is variadic, so it accepts the sequence, a single
+        // element, or an optional element. A `str` receiver takes a `char*`
+        // pattern (a `str`, a `char`, or a `char?`); a `T[]` receiver takes a
+        // `T*` pattern (a `T[]`, a `T`, or a `T?`). Fully dispatched here
+        // rather than through the generic signature.
+        if matches!(
+            name,
+            "__builtin_starts_with" | "__builtin_ends_with" | "__builtin_contains"
+        ) && args.len() == 2
+        {
             let recv = self.check_expr(&args[0], env, effects)?;
             let pat = self.check_expr(&args[1], env, effects)?;
             // The variadic sequence type per receiver: `str` for a string,
@@ -1419,6 +1424,14 @@ impl Cx<'_> {
                     ));
                 }
                 return Ok(Type::Primitive(Primitive::Bool));
+            }
+            // Set membership is its own builtin — point at it rather than
+            // reporting a confusing mismatch against the `T[]` signature.
+            if name == "__builtin_contains" && matches!(recv, Type::Set(_)) {
+                return Err(Error::at(
+                    "\"contains\" takes an array or str receiver; for set membership use \"has\"",
+                    args[0].span.clone(),
+                ));
             }
             // A non-str/array receiver: fall through to report the mismatch
             // against the generic `T[]` signature.

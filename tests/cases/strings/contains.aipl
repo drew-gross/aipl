@@ -1,0 +1,45 @@
+import { !, +++, ==, contains } from builtins;
+
+// `contains` on a `str` receiver takes a `char*` needle: a `str` matches as a
+// substring, a `char` as a single character, and a `char?` as its character
+// when `some` — a `none` needle is nothing to find, so it's `false`.
+
+fn first_char(s: str) -> char? { s[0] }.test({
+    // Char needle.
+    assert("asdf".contains('d'));
+    assert("asdf".contains('a'));
+    assert("asdf".contains('f'));
+    assert(!"asdf".contains('x'));
+    assert(!"".contains('a'));
+
+    // Substring needle.
+    assert("asdf".contains("sd"));
+    assert("asdf".contains("as"));
+    assert("asdf".contains("df"));
+    assert("asdf".contains("asdf"));
+    assert(!"asdf".contains("sf")); // present but not contiguous
+    assert(!"asdf".contains("asdfg")); // needle longer than receiver
+    assert("asdf".contains("")); // empty needle always matches
+    assert("".contains(""));
+
+    // A rope receiver (built by `+++`) is searched across the join.
+    let rope = "abc" +++ "def";
+    assert(rope.contains("cd"));
+    assert(!rope.contains("ce"));
+
+    // Optional needle: `some(c)` finds c; `none` finds nothing. Indexing
+    // yields a `char?`, so `s[i]` feeds straight in.
+    assert("asdf".contains(first_char("apple")));
+    assert(!"asdf".contains(first_char("zebra")));
+    assert(!"asdf".contains(first_char(""))); // out of bounds: none
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 305
+binary size: 7752
+--- monomorphizations ---
+first_char
+main

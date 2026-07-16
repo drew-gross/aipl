@@ -1942,6 +1942,25 @@ extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
     i64::from(ends)
 }
 
+/// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
+/// contiguously anywhere in `s`'s. Consumes (decs) both inputs, like the other
+/// str builtins; callers pre-inc. The empty needle always matches. Unlike
+/// `starts_with`/`ends_with` this reads both strings via `str_bytes` (a rope
+/// receiver materializes its memoized cache) — a streaming window search
+/// across chunk boundaries isn't worth the complexity here.
+extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
+    let mut sb = [0u8; 8];
+    let mut nb = [0u8; 8];
+    let found = unsafe {
+        let sbytes = str_bytes(s, &mut sb);
+        let nbytes = str_bytes(needle, &mut nb);
+        nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
+    };
+    aipl_dec(s);
+    aipl_dec(needle);
+    i64::from(found)
+}
+
 /// FNV-1a content hash of a NUL-terminated runtime string (consistent with
 /// `rt_str_eq`: equal content → equal hash). Borrows `a` — no refcount change.
 /// A null pointer hashes to the bare offset basis.
@@ -3176,6 +3195,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_str_eq", aipl_str_eq as *const u8);
     jit_builder.symbol("aipl_str_starts_with", aipl_str_starts_with as *const u8);
+    jit_builder.symbol("aipl_str_contains", aipl_str_contains as *const u8);
     jit_builder.symbol("aipl_str_ends_with", aipl_str_ends_with as *const u8);
     jit_builder.symbol(
         "aipl_read_file_to_string",
@@ -5069,6 +5089,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
+        | "aipl_str_contains"
         | "aipl_concat"
         | "aipl_concat_lazy"
         | "aipl_concat_mut"
@@ -9087,6 +9108,21 @@ fn starts_ends_variant(name: &str) -> Option<(bool, SeShape)> {
     }
 }
 
+/// Parse a (possibly shape-suffixed) `contains` builtin name into its needle
+/// shape, or `None` if it isn't one. Same suffix encoding as
+/// [`starts_ends_variant`]: mono appends `$ve`/`$vo` for the element/optional
+/// monomorphizations; the bare name is the sequence form.
+fn contains_shape(name: &str) -> Option<SeShape> {
+    let (base, shape) = if let Some(b) = name.strip_suffix("$ve") {
+        (b, SeShape::Elem)
+    } else if let Some(b) = name.strip_suffix("$vo") {
+        (b, SeShape::Opt)
+    } else {
+        (name, SeShape::Seq)
+    };
+    (base == "__builtin_contains").then_some(shape)
+}
+
 /// Build a one-char inline `str` value from a `char` register value `c`: the
 /// inline layout is byte0 = `(1 << 2) | 1` (= 5) and content byte = `c`, so the
 /// value is `5 | (c << 8)`. No allocation, no refcount (see the SSO note). This
@@ -9131,6 +9167,161 @@ fn emit_arr_starts_ends_elem<M: Module>(
     let e = load_array_elem(module, builder, builtins, arr, idx, elem, structs);
     let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
     builder.ins().stack_store(eq, res, 0);
+    builder.ins().jump(merge, &[]);
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    Ok(builder.ins().stack_load(types::I64, res, 0))
+}
+
+/// `arr.contains(x)` for a single element `x` of type `elem` — the `$ve`
+/// (element) monomorphization. True iff any element of `arr` structurally
+/// equals `x`, scanning forward with early exit. Borrows `arr`; `emit_eq`
+/// balances its own per-element refs.
+fn emit_arr_contains_elem<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    arr: Value,
+    elem_val: Value,
+    elem: &Type,
+) -> Result<Value, Error> {
+    let Cx {
+        structs, builtins, ..
+    } = cx;
+    let len = load_arr_len(builder, arr);
+    let res = i64_slot(builder);
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(zero, res, 0);
+    let idx = i64_slot(builder);
+    builder.ins().stack_store(zero, idx, 0);
+    let header = builder.create_block();
+    let body = builder.create_block();
+    let found = builder.create_block();
+    let merge = builder.create_block();
+    builder.ins().jump(header, &[]);
+
+    builder.switch_to_block(header);
+    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
+    builder.ins().brif(more, body, &[], merge, &[]);
+
+    builder.switch_to_block(body);
+    builder.seal_block(body);
+    let e = load_array_elem(module, builder, builtins, arr, i, elem, structs);
+    let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
+    let cont = builder.create_block();
+    builder.ins().brif(eq, found, &[], cont, &[]);
+    builder.switch_to_block(cont);
+    builder.seal_block(cont);
+    let next = builder.ins().iadd_imm(i, 1);
+    builder.ins().stack_store(next, idx, 0);
+    builder.ins().jump(header, &[]);
+    builder.seal_block(header);
+
+    builder.switch_to_block(found);
+    builder.seal_block(found);
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().stack_store(one, res, 0);
+    builder.ins().jump(merge, &[]);
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    Ok(builder.ins().stack_load(types::I64, res, 0))
+}
+
+/// `arr.contains(other)` for two arrays of element type `elem` — the sequence
+/// monomorphization. True iff `other`'s elements equal a contiguous run of
+/// `arr`'s at any offset (the array analog of a substring search; the empty
+/// needle always matches). A naive O(la·lb) window scan — fine for the array
+/// sizes structural `emit_eq` comparison is fine for. Borrows both arrays;
+/// `emit_eq` balances its own per-element refs.
+fn emit_arr_contains_seq<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    self_ptr: Value,
+    other_ptr: Value,
+    elem: &Type,
+) -> Result<Value, Error> {
+    let Cx {
+        structs, builtins, ..
+    } = cx;
+    let la = load_arr_len(builder, self_ptr);
+    let lb = load_arr_len(builder, other_ptr);
+    // Both arrays are the untyped empty literal (`[].contains([])`): the empty
+    // needle matches, and there's no element type to compare. Skip the loops —
+    // `emit_eq` can't lower a `__none__` element.
+    if is_none_inner(elem) {
+        let empty = builder.ins().icmp_imm(IntCC::Equal, lb, 0);
+        return Ok(builder.ins().uextend(types::I64, empty));
+    }
+    let res = i64_slot(builder);
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(zero, res, 0);
+    // A needle longer than the receiver can't occur in it (and for `lb <= la`
+    // the window offsets `0..=la-lb` are valid; `lb == 0` matches at offset 0).
+    let fits = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lb, la);
+    let outer_pre = builder.create_block();
+    let merge = builder.create_block();
+    builder.ins().brif(fits, outer_pre, &[], merge, &[]);
+
+    builder.switch_to_block(outer_pre);
+    builder.seal_block(outer_pre);
+    let limit = builder.ins().isub(la, lb);
+    let start = i64_slot(builder);
+    builder.ins().stack_store(zero, start, 0);
+    let idx = i64_slot(builder);
+    let outer_header = builder.create_block();
+    let outer_body = builder.create_block();
+    let inner_header = builder.create_block();
+    let inner_body = builder.create_block();
+    let next_start = builder.create_block();
+    let found = builder.create_block();
+    builder.ins().jump(outer_header, &[]);
+
+    builder.switch_to_block(outer_header);
+    let s = builder.ins().stack_load(types::I64, start, 0);
+    let more_windows = builder.ins().icmp(IntCC::SignedLessThanOrEqual, s, limit);
+    builder
+        .ins()
+        .brif(more_windows, outer_body, &[], merge, &[]);
+
+    builder.switch_to_block(outer_body);
+    builder.seal_block(outer_body);
+    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().jump(inner_header, &[]);
+
+    builder.switch_to_block(inner_header);
+    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let more_elems = builder.ins().icmp(IntCC::SignedLessThan, i, lb);
+    // The whole needle matched at this window — found.
+    builder.ins().brif(more_elems, inner_body, &[], found, &[]);
+
+    builder.switch_to_block(inner_body);
+    builder.seal_block(inner_body);
+    let si = builder.ins().iadd(s, i);
+    let el = load_array_elem(module, builder, builtins, self_ptr, si, elem, structs);
+    let er = load_array_elem(module, builder, builtins, other_ptr, i, elem, structs);
+    let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
+    let inner_cont = builder.create_block();
+    builder.ins().brif(ee, inner_cont, &[], next_start, &[]);
+    builder.switch_to_block(inner_cont);
+    builder.seal_block(inner_cont);
+    let next_i = builder.ins().iadd_imm(i, 1);
+    builder.ins().stack_store(next_i, idx, 0);
+    builder.ins().jump(inner_header, &[]);
+    builder.seal_block(inner_header);
+
+    builder.switch_to_block(next_start);
+    builder.seal_block(next_start);
+    let next_s = builder.ins().iadd_imm(s, 1);
+    builder.ins().stack_store(next_s, start, 0);
+    builder.ins().jump(outer_header, &[]);
+    builder.seal_block(outer_header);
+
+    builder.switch_to_block(found);
+    builder.seal_block(found);
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().stack_store(one, res, 0);
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
@@ -10024,6 +10215,133 @@ fn compile_call_expr<M: Module>(
             };
             (result, Type::Primitive(Primitive::Bool))
         }
+        _ if contains_shape(name).is_some() => {
+            // `s.contains(n) -> bool` over a `str` (byte window compare) or
+            // `T[]` (element-wise structural compare). The needle is variadic;
+            // monomorphization has already resolved its shape into the name
+            // suffix (`$ve` element, `$vo` optional, none = the sequence), so
+            // each shape is implemented directly here. The empty needle always
+            // matches; a `none` needle is nothing to find, so it never does
+            // (unlike `starts_with`/`ends_with`, whose `none` is the
+            // always-matching empty pattern).
+            let shape = contains_shape(name).unwrap();
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"contains\" expects 2 args, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (ndl_v, ndl_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let result = if is_str_shaped(&recv_ty) {
+                // `char*` needle. The str runtime consumes (decs) both refs, so
+                // each str handed to it is pre-inc'd; a built 1-char string is
+                // inline, so its inc/dec are no-ops. The element/optional value
+                // is materialized only as an inline string — no allocation.
+                let ndl: Option<Value> = match shape {
+                    SeShape::Seq => Some(ndl_v),
+                    SeShape::Elem => Some(emit_char_to_str(builder, ndl_v)),
+                    SeShape::Opt => None,
+                };
+                if let Some(ndl) = ndl {
+                    emit_inc(builder, module, builtins, recv);
+                    emit_inc(builder, module, builtins, ndl);
+                    let f = builtins.import(module, builder.func, "aipl_str_contains");
+                    let inst = builder.ins().call(f, &[recv, ndl]);
+                    builder.inst_results(inst)[0]
+                } else {
+                    // Optional `char?`: `none` → false; `some(c)` → window scan.
+                    let res = i64_slot(builder);
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    builder.ins().stack_store(zero, res, 0);
+                    let tag = builder
+                        .ins()
+                        .load(types::I64, MemFlags::trusted(), ndl_v, 0);
+                    let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                    let some_b = builder.create_block();
+                    let merge = builder.create_block();
+                    builder.ins().brif(is_some, some_b, &[], merge, &[]);
+                    builder.switch_to_block(some_b);
+                    builder.seal_block(some_b);
+                    let cv = builder.ins().load(
+                        types::I64,
+                        MemFlags::trusted(),
+                        ndl_v,
+                        OPT_VALUE_OFFSET as i32,
+                    );
+                    let s = emit_char_to_str(builder, cv);
+                    emit_inc(builder, module, builtins, recv);
+                    let f = builtins.import(module, builder.func, "aipl_str_contains");
+                    let inst = builder.ins().call(f, &[recv, s]);
+                    let r = builder.inst_results(inst)[0];
+                    builder.ins().stack_store(r, res, 0);
+                    builder.ins().jump(merge, &[]);
+                    builder.switch_to_block(merge);
+                    builder.seal_block(merge);
+                    builder.ins().stack_load(types::I64, res, 0)
+                }
+            } else {
+                // `T*` needle — element-wise structural compare. Borrows both
+                // arrays; `emit_eq` balances its own per-element refs.
+                let self_elem = match &recv_ty {
+                    Type::Array(e) => (**e).clone(),
+                    other => {
+                        return Err(Error::at(
+                            format!(
+                                "\"contains\" expects a str or array, got {}",
+                                type_name(other)
+                            ),
+                            args[0].span.clone(),
+                        ));
+                    }
+                };
+                // The comparison element type: the receiver's, or — for an empty
+                // `[]` receiver (untyped element) — the needle's.
+                let elem = if !is_none_inner(&self_elem) {
+                    self_elem
+                } else {
+                    match (shape, &ndl_ty) {
+                        (SeShape::Elem, t) => t.clone(),
+                        (_, Type::Array(e) | Type::Optional(e)) => (**e).clone(),
+                        (_, t) => t.clone(),
+                    }
+                };
+                match shape {
+                    SeShape::Seq => emit_arr_contains_seq(module, builder, cx, recv, ndl_v, &elem)?,
+                    SeShape::Elem => {
+                        emit_arr_contains_elem(module, builder, cx, recv, ndl_v, &elem)?
+                    }
+                    SeShape::Opt if is_none_inner(&elem) => {
+                        // `[].contains(none)`: an untyped `none` needle in an
+                        // untyped empty array — nothing to find.
+                        builder.ins().iconst(types::I64, 0)
+                    }
+                    SeShape::Opt => {
+                        // `none` → false; `some(v)` → single-element scan.
+                        let res = i64_slot(builder);
+                        let zero = builder.ins().iconst(types::I64, 0);
+                        builder.ins().stack_store(zero, res, 0);
+                        let tag = builder
+                            .ins()
+                            .load(types::I64, MemFlags::trusted(), ndl_v, 0);
+                        let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                        let some_b = builder.create_block();
+                        let merge = builder.create_block();
+                        builder.ins().brif(is_some, some_b, &[], merge, &[]);
+                        builder.switch_to_block(some_b);
+                        builder.seal_block(some_b);
+                        let cv = component(builder, ndl_v, OPT_VALUE_OFFSET, &elem, structs);
+                        let r = emit_arr_contains_elem(module, builder, cx, recv, cv, &elem)?;
+                        builder.ins().stack_store(r, res, 0);
+                        builder.ins().jump(merge, &[]);
+                        builder.switch_to_block(merge);
+                        builder.seal_block(merge);
+                        builder.ins().stack_load(types::I64, res, 0)
+                    }
+                }
+            };
+            (result, Type::Primitive(Primitive::Bool))
+        }
         "__char_to_str" => {
             // Internal: a single `char` to a one-char inline `str`. Emitted by
             // variadic `char*` specialization (see mono's `specialize_variadic`).
@@ -10039,12 +10357,12 @@ fn compile_call_expr<M: Module>(
                 Type::Primitive(Primitive::Str),
             )
         }
-        "__builtin_contains" => {
-            // `contains(s: T{}, x: T) -> bool` — set membership. Borrows the set
+        "__builtin_has" => {
+            // `has(s: T{}, x: T) -> bool` — set membership. Borrows the set
             // (it stays live in the caller's scope), so no inc/dec.
             if args.len() != 2 {
                 return Err(Error::at(
-                    format!("\"contains\" expects 2 args, got {}", args.len()),
+                    format!("\"has\" expects 2 args, got {}", args.len()),
                     span.clone(),
                 ));
             }
@@ -10053,7 +10371,7 @@ fn compile_call_expr<M: Module>(
                 Type::Set(inner) => (**inner).clone(),
                 other => {
                     return Err(Error::at(
-                        format!("\"contains\" expects a set, got {}", type_name(other)),
+                        format!("\"has\" expects a set, got {}", type_name(other)),
                         args[0].span.clone(),
                     ));
                 }
@@ -10067,7 +10385,7 @@ fn compile_call_expr<M: Module>(
                     Type::Primitive(Primitive::Bool),
                 )
             } else {
-                expect_type(&x_ty, &elem, "contains element", args[1].span.clone())?;
+                expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
                 // The runtime reads the queried value through a pointer; spill
                 // the scalar (a `bool` is read back as i64) and pass its address.
                 let s = builder.create_sized_stack_slot(StackSlotData::new(

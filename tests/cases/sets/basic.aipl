@@ -1,6 +1,6 @@
-import { !, ==, contains, len } from builtins;
+import { !, ==, has, len } from builtins;
 
-// Set literals dedup at construction; `contains`/`len` query them.
+// Set literals dedup at construction; `has`/`len` query them.
 fn build() -> #{i64} {
     #{1, 2, 3, 2, 1} // duplicates dropped -> {1, 2, 3}
 }.test({
@@ -8,13 +8,13 @@ fn build() -> #{i64} {
     assert(s == #{1, 2, 3});
     assert(len(s) == 3);
     assert(s.len() == 3); // method form
-    assert(s.contains(2));
-    assert(!s.contains(5));
-    assert(contains(s, 3)); // call form
+    assert(s.has(2));
+    assert(!s.has(5));
+    assert(has(s, 3)); // call form
 
     let empty = #{};
     assert(len(empty) == 0);
-    assert(!empty.contains(7));
+    assert(!empty.has(7));
 })
 --- performance ---
 allocations: 3
@@ -22,7 +22,7 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 160
 instructions executed: 235
-binary size: 3920
+binary size: 3912
 --- monomorphizations ---
 __test$build
 main

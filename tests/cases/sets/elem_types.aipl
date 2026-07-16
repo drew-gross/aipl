@@ -1,4 +1,4 @@
-import { !, ==, contains, len } from builtins;
+import { !, ==, has, len } from builtins;
 
 // Sets of bool and char (the other two scalar element types). A bool set holds
 // at most {true, false}; chars behave like array char elements.
@@ -8,7 +8,7 @@ fn bools() -> #{bool} {
     let bs = bools();
     assert(bs == #{true, false});
     assert(len(bs) == 2);
-    assert(bs.contains(false));
+    assert(bs.has(false));
 })
 
 fn chars() -> #{char} {
@@ -17,8 +17,8 @@ fn chars() -> #{char} {
     let cs = chars();
     assert(cs == #{'a', 'b', 'c'});
     assert(len(cs) == 3);
-    assert(cs.contains('b'));
-    assert(!cs.contains('z'));
+    assert(cs.has('b'));
+    assert(!cs.has('z'));
 })
 --- performance ---
 allocations: 4
@@ -26,6 +26,6 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 186
 instructions executed: 322
-binary size: 4400
+binary size: 4376
 --- monomorphizations ---
 main

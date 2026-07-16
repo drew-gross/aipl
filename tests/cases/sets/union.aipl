@@ -1,4 +1,4 @@
-import { ==, contains, len, union } from builtins;
+import { ==, has, len, union } from builtins;
 
 // `a.union(b)` is the set of all distinct elements of both (overlap deduped).
 // `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
@@ -15,7 +15,7 @@ fn basic() -> #{i64} {
     let c = a.union(b);
     assert(c == #{1, 2, 3, 4, 5});
     assert(len(c) == 5);
-    assert(c.contains(4));
+    assert(c.has(4));
     assert(len(a) == 3); // operands unchanged
 })
 

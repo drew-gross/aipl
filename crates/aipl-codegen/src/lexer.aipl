@@ -7,11 +7,11 @@
 // convenience.
 import {
     !,
-    &&,
     wrapping_add as +,
     <,
     ==,
     ||,
+    contains,
     is_digit,
     is_space,
     len,
@@ -27,27 +27,8 @@ variant TokenKind = Ident | Int | Punct
 // offset where it starts (so `start + text.len()` is the end).
 struct Token { kind: TokenKind, text: str, start: i64 }
 
-pub fn contains_char(self: str, c: char) -> bool {
-    for (let x : self) {
-        if (x == c) {
-            return true;
-        };
-    }
-    false
-}.doc("""
-    Whether any byte of `self` is `c` — `strchr` as a predicate. Used by the
-    library-specific character classifiers to spell identifier character classes
-    as literal strings.
-""").test({
-    assert("abc".contains_char('b'));
-    assert("abc".contains_char('a'));
-    assert("abc".contains_char('c'));
-    assert(!"abc".contains_char('d'));
-    assert(!"".contains_char('a'));
-})
-
 pub fn is_ident_start(self: char) -> bool {
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains_char(self)
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(self)
 }.doc("""
     Whether `self` may begin an identifier: an ASCII letter or `'_'`.
 """).test({
@@ -191,11 +172,10 @@ allocations: 24
 deallocations: 24
 reallocations: 16
 bytes allocated: 1152
-instructions executed: 26270
-binary size: 30112
+instructions executed: 5138
+binary size: 28256
 --- monomorphizations ---
 __test$lex
-contains_char
 is_ident_continue
 is_ident_start
 lex
