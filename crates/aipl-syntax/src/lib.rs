@@ -1107,6 +1107,8 @@ fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 // True when every element satisfies `pred` (vacuously true for an empty array).
+// Implemented in AIPL (`aipl-mono/src/builtin_all.aipl`), not codegen — this
+// declaration still types calls; mono swaps in the real body.
 fn __builtin_all<T: any>(self: T[], pred: (T) -> bool) -> bool { false }
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}

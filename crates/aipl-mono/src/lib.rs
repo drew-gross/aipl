@@ -387,6 +387,14 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     // writes back in place.
     mutating.insert("__builtin_push".to_string());
 
+    // Builtins implemented in AIPL join the generic templates under their
+    // canonical `__builtin_*` names (which no user identifier can spell, so
+    // nothing collides). Calls to them then specialize exactly like calls to
+    // a user generic.
+    for (name, g) in aipl_builtin_generics() {
+        generics.insert(name.clone(), g.clone());
+    }
+
     // Own a copy of each concrete function so the demand-driven driver can pull
     // reachable ones without juggling borrows of `program`. Source functions are
     // already fully resolved (no type parameters) — they just haven't been
@@ -1066,12 +1074,17 @@ impl Mono<'_> {
     /// reuse-memo key (the original callee for a concrete fn, or its type-args
     /// instance for a generic one); `template` is the concrete (already
     /// type-substituted, if generic) function and `ret` its concrete return type.
+    /// `inferred` optionally supplies the rewritten form of a non-function
+    /// argument the caller already inferred (indexed like `args`), so it isn't
+    /// inferred twice — a second pass over e.g. a chained `xs.filter(..)`
+    /// receiver would synthesize (and emit) a duplicate instance of it.
     fn specialize_call_with(
         &mut self,
         base_name: &str,
         template: &ConcreteTemplate,
         ret: Type,
         args: &[Expr],
+        inferred: &[Option<Expr>],
         env: &Env,
         span: Span,
     ) -> Result<(Expr, Type), Error> {
@@ -1083,7 +1096,7 @@ impl Mono<'_> {
         // binds to and the capture types (to shape the specialized callee).
         let mut new_args: Vec<Expr> = Vec::new();
         let mut targets: Vec<Option<(String, Vec<Type>)>> = Vec::new();
-        for (arg, param) in args.iter().zip(&template.params) {
+        for (i, (arg, param)) in args.iter().zip(&template.params).enumerate() {
             if let Type::Fn(ptys, lret) = &param.ty {
                 let (fn_name, forwards): (String, Vec<Expr>) = match &arg.kind {
                     ExprKind::Lambda(lparams, lbody) => {
@@ -1124,7 +1137,10 @@ impl Mono<'_> {
                 }
                 targets.push(Some((fn_name, cap_types)));
             } else {
-                let (ra, _) = self.infer(arg, env)?;
+                let ra = match inferred.get(i).and_then(|p| p.clone()) {
+                    Some(ra) => ra,
+                    None => self.infer(arg, env)?.0,
+                };
                 new_args.push(ra);
                 targets.push(None);
             }
@@ -1220,13 +1236,18 @@ impl Mono<'_> {
         // element type and any lambda are right), but this parameter's concrete
         // type stays `str`. Record which parameters that applies to.
         let mut str_arg = vec![false; sig.params.len()];
+        // Keep each rewritten argument for `specialize_call_with`, so inferring
+        // it here (which may synthesize instances — e.g. a chained
+        // `xs.filter(..)` receiver) isn't repeated there.
+        let mut inferred: Vec<Option<Expr>> = vec![None; sig.params.len()];
         for (i, (param, arg)) in sig.params.iter().zip(args).enumerate() {
             if matches!(param.ty, Type::Fn(_, _)) {
                 continue;
             }
-            let (_, aty) = self.infer(arg, env)?;
+            let (ra, aty) = self.infer(arg, env)?;
             collect_bindings(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
+            inferred[i] = Some(ra);
         }
         let mut type_args = Vec::with_capacity(sig.type_vars.len());
         for tp in &sig.type_vars {
@@ -1291,7 +1312,7 @@ impl Mono<'_> {
                 base.push_str(&format!("$s{i}"));
             }
         }
-        self.specialize_call_with(&base, &template, ret, args, env, span.clone())
+        self.specialize_call_with(&base, &template, ret, args, &inferred, env, span.clone())
     }
 
     /// Synthesize a top-level function from a lambda: its parameters (typed from
@@ -2035,148 +2056,6 @@ impl Mono<'_> {
         };
         Ok((
             Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
-            ret,
-        ))
-    }
-
-    /// Expand the builtin `arr.all(|x| pred)` (or `all(arr, |x| pred)`) into a
-    /// synthesized function `(xs: T[], captures..) -> bool` that returns `false`
-    /// at the first element failing `pred` and `true` otherwise (so an empty
-    /// array is vacuously `true`). The predicate is lifted like any lambda (its
-    /// captures threaded through as parameters), or used directly when it's a
-    /// named function.
-    fn expand_all(
-        &mut self,
-        arr: &Expr,
-        pred: &Expr,
-        env: &Env,
-        span: Span,
-    ) -> Result<(Expr, Type), Error> {
-        let (rarr, arr_ty) = self.infer(arr, env)?;
-        // The element type, and the parameter type for the synthesized function.
-        // A `str` is iterated as its bytes (`char`s) directly — keeping the `str`
-        // representation, no `char[]` materialization — mirroring the generic
-        // str-as-`char[]` rule.
-        let (elem, arr_param_ty) = match &arr_ty {
-            Type::Array(inner) => ((**inner).clone(), arr_ty.clone()),
-            Type::Primitive(Primitive::Str) => (
-                Type::Primitive(Primitive::Char),
-                Type::Primitive(Primitive::Str),
-            ),
-            _ => {
-                return Err(Error::at(
-                    format!("all expects an array or string, got {}", type_name(&arr_ty)),
-                    arr.span.clone(),
-                ))
-            }
-        };
-        let effects = self.cur_effects.clone();
-        // Resolve the predicate `(T) -> bool`: lift a lambda (threading captures
-        // through), or use a named function directly.
-        let (pred_fn, captures): (String, Vec<(String, Type)>) = match &pred.kind {
-            ExprKind::Lambda(params, body) => {
-                if params.len() != 1 {
-                    return Err(Error::at(
-                        format!("all's lambda takes 1 parameter, got {}", params.len()),
-                        pred.span.clone(),
-                    ));
-                }
-                let captures = free_vars(body, params, env);
-                let fname = self.synth_lambda(
-                    params,
-                    body,
-                    from_ref(&elem),
-                    &Type::Primitive(Primitive::Bool),
-                    &captures,
-                );
-                (fname, captures)
-            }
-            ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new())
-            }
-            _ => {
-                return Err(Error::at(
-                    "all expects a lambda or a function name, e.g. \"xs.all(|x| ..)\" or \
-                     \"xs.all(f)\""
-                        .to_string(),
-                    pred.span.clone(),
-                ));
-            }
-        };
-
-        // The `all` function: `(xs: T[], captures..) -> bool`. Params/args mirror
-        // `expand_filter`: the array, then one parameter per capture.
-        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
-        let mut all_params = vec![Param {
-            name: "$arr".to_string(),
-            ty: arr_param_ty,
-            mutable: false,
-            variadic: false,
-            default: None,
-        }];
-        let mut call_args = vec![rarr];
-        let mut pred_args = vec![id("$e")];
-        for (cn, ct) in &captures {
-            let cap = format!("$cap{}", self.synth);
-            self.synth += 1;
-            all_params.push(Param {
-                name: cap.clone(),
-                ty: ct.clone(),
-                mutable: false,
-                variadic: false,
-                default: None,
-            });
-            pred_args.push(id(&cap));
-            call_args.push(self.infer(&id(cn), env)?.0);
-        }
-        // body: `for (let $e : $arr) { if (!pred($e, caps..)) { return false; }; } true`
-        let cond = Expr::new(
-            ExprKind::Not(Box::new(Expr::new(
-                ExprKind::Call(pred_fn, pred_args, false),
-                span.clone(),
-            ))),
-            span.clone(),
-        );
-        let ret_false = Expr::new(
-            ExprKind::Return(Box::new(Expr::new(ExprKind::Bool(false), span.clone()))),
-            span.clone(),
-        );
-        let guarded = Expr::new(
-            ExprKind::If(
-                Box::new(cond),
-                Box::new(ret_false),
-                Box::new(Expr::new(ExprKind::Unit, span.clone())),
-            ),
-            span.clone(),
-        );
-        let loop_ = Expr::new(
-            ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
-            span.clone(),
-        );
-        let body = Expr::new(
-            ExprKind::Seq(
-                Box::new(loop_),
-                Box::new(Expr::new(ExprKind::Bool(true), span.clone())),
-            ),
-            span.clone(),
-        );
-
-        let all_name = format!("__all{}", self.synth);
-        self.synth += 1;
-        let ret = Type::Primitive(Primitive::Bool);
-        self.concrete.insert(
-            all_name.clone(),
-            ConcreteTemplate {
-                params: all_params,
-                effects,
-                return_ty: Some(ret.clone()),
-                body,
-            },
-        );
-        self.enqueue_concrete(&all_name);
-        Ok((
-            Expr::new(ExprKind::Call(all_name, call_args, false), span.clone()),
             ret,
         ))
     }
@@ -3159,18 +3038,6 @@ impl Mono<'_> {
                     }
                     return self.expand_filter(&args[0], &args[1], env, span.clone());
                 }
-                if name == "__builtin_all" {
-                    if args.len() != 2 {
-                        return Err(Error::at(
-                            format!(
-                                "all takes an array and a predicate, got {} argument(s)",
-                                args.len()
-                            ),
-                            span.clone(),
-                        ));
-                    }
-                    return self.expand_all(&args[0], &args[1], env, span.clone());
-                }
                 if name == "__builtin_zip_with" {
                     if args.len() != 3 {
                         return Err(Error::at(
@@ -3272,6 +3139,7 @@ impl Mono<'_> {
                         &template,
                         ret,
                         args,
+                        &[],
                         env,
                         span.clone(),
                     );
@@ -3585,6 +3453,57 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
         }
         _ => None,
     }
+}
+
+/// Builtins *implemented in AIPL*, rather than expanded in Rust here or
+/// intrinsified in codegen. Most builtins stay codegen-generated because the
+/// generated IR beats what compiled AIPL would produce; when it wouldn't, the
+/// implementation belongs in real AIPL source, where it doubles as
+/// documentation and carries its own `.test` block (see `builtin_all.aipl`).
+///
+/// Each entry is `(canonical name, source)`. The source declares exactly one
+/// `pub fn` — under the builtin's user-facing spelling, so the file's tests
+/// read like user code — plus any private helpers those tests need. Only the
+/// `pub fn` is registered (under the canonical `__builtin_*` name, which no
+/// user identifier can spell), so its body must be self-contained: no calls to
+/// the file's helpers or to itself. The declaration in [`BUILTIN_SIGNATURES`]
+/// stays — the checker and the loader's import gating are untouched; this
+/// table only changes what a call lowers to.
+///
+/// The template joins the `generics` map in [`monomorphize`], so calls
+/// specialize through the ordinary generic / higher-order paths
+/// (`specialize_generic_call`): type arguments inferred from the non-lambda
+/// arguments, lambdas lifted with captures threaded through, `str` receivers
+/// kept in the `str` representation. An entry the program never calls costs
+/// nothing (uninstantiated templates are dropped).
+const AIPL_BUILTIN_SOURCES: &[(&str, &str)] =
+    &[("__builtin_all", include_str!("builtin_all.aipl"))];
+
+/// [`AIPL_BUILTIN_SOURCES`] parsed and normalized once: canonical builtin name
+/// → generic template. Parsing needs the parser hooks installed, like any
+/// in-process parse — which every `monomorphize` caller already satisfies,
+/// having parsed the program it passes in.
+fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
+    static GENERICS: OnceLock<HashMap<String, Generic>> = OnceLock::new();
+    GENERICS.get_or_init(|| {
+        AIPL_BUILTIN_SOURCES
+            .iter()
+            .map(|(canonical, src)| {
+                let program = aipl_parser::parse(src)
+                    .expect("AIPL-implemented builtin sources are valid AIPL");
+                let f = program
+                    .items
+                    .iter()
+                    .find_map(|item| match item {
+                        Item::Fn(f) if f.is_pub => Some(f),
+                        _ => None,
+                    })
+                    .expect("an AIPL-implemented builtin source declares its builtin as pub fn");
+                let g = normalize(f).expect("AIPL-implemented builtin signatures normalize");
+                (canonical.to_string(), g)
+            })
+            .collect()
+    })
 }
 
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each

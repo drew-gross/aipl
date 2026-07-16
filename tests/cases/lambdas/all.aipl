@@ -3,10 +3,15 @@ import { !, <=, ==, >, all, filter } from builtins;
 // `arr.all(pred)` is true when every element satisfies `pred` (short-circuits at
 // the first that fails; an empty array is vacuously true). A higher-order
 // builtin like `filter`/`map`: the lambda is lifted, captures threaded through.
+// Unlike those, `all` is implemented in AIPL itself (`builtin_all.aipl`) and
+// specializes like a user generic.
+fn is_pos(self: i64) -> bool { self > 0 }
+
 fn positive(xs: i64[]) -> bool { xs.all(|x| x > 0) }.test({
     assert([2, 4, 6].all(|x| x <= 6)); // every element satisfies it
     assert(![1, 2, 9].all(|x| x <= 5)); // 9 fails -> false
     assert(all([5, 5], |x| x == 5)); // free-call form
+    assert([1, 2].all(is_pos)); // a named predicate, no lambda
     assert(['a', 'a', 'a'].all(|c| c == 'a')); // any comparable element type
     // Vacuously true on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(|x| x > 100).all(|x| x <= 0));
@@ -15,19 +20,20 @@ fn positive(xs: i64[]) -> bool { xs.all(|x| x > 0) }.test({
     assert(!positive([1, 0, 3]));
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 340
-instructions executed: 690
-binary size: 6264
+bytes allocated: 388
+instructions executed: 790
+binary size: 7080
 --- monomorphizations ---
-__all1
-__all11
-__all13
-__all3
-__all5
-__all7
-__filter9$own0
+__builtin_all$char$lam8
+__builtin_all$i64$lam1
+__builtin_all$i64$lam12
+__builtin_all$i64$lam14
+__builtin_all$i64$lam3
+__builtin_all$i64$lam5
+__builtin_all$i64$lam6
+__filter10$own0
 main
 positive

@@ -1,11 +1,34 @@
 TODOs:
 
-Language gaps the exercise exposed — these shaped the design and are worth knowing for iteration:
 1. No </<= on char — so no '0' <= c range checks; classifiers use string-membership ("0123456789".contains_char(c)) instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64, while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
 2. Char literals aren't valid match arms (str/int/array literals are).
 
+Finishing making aipl self hosting
 Build out infra to write builtins in .aipl itself
 Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 Make the language features powerful enough that we don't need builtin_return
 Fix indentation of == assertions in lexer.aipl
 make some_var[Span{ ... }] work
+better inlining — idea list (from the builtins-in-aipl work; none implemented yet):
+- Inline specialized HOF instances at their call sites: a `__builtin_all$i64$lamN`
+  (or `count_while$...$lamN`) instance typically has exactly one call site, so
+  inlining it and not emitting the function is a pure win (call overhead + binary
+  size). The spec_memo already knows when an instance is reused.
+- Fuse the lifted lambda into the specialized HOF body: after
+  `specialize_call_with`, the loop calls `__lambda_N($e, caps..)` through a
+  statically-known binding — inlining the predicate into the loop removes a call
+  per element. Probably the single highest-value inline for AIPL-implemented
+  builtins like `all`.
+- Pick the layer: AST-level in mono (cheap — mono already synthesizes/rewrites
+  bodies; but must lower early `return` in an inlined body, e.g. `all`'s
+  `return false`, into a value-producing form) vs Cranelift-IR-level (handles
+  every body shape, bigger lift; check what cranelift's own inlining infra
+  offers now).
+- Heuristics: always inline single-call-site instances; otherwise a body-size
+  threshold; never inline recursive fns; memoized instances with many call
+  sites stay outlined to avoid bloat.
+- Synergy: inlining exposes retain/release pairs across the old call boundary —
+  refcount elision after inlining likely beats the call-overhead win itself.
+- When it lands: expect a mass `fill_expected` refresh (instructions executed /
+  binary size shift nearly everywhere) and the staged IR workflow for the
+  dogfooded engines.

@@ -1,0 +1,56 @@
+import { !, <=, ==, filter } from builtins;
+
+// The AIPL implementation of the `all` builtin. Monomorphization registers this
+// function under the canonical name `__builtin_all` (see `AIPL_BUILTIN_SOURCES`
+// in `lib.rs`), so a user's `xs.all(pred)` specializes through the ordinary
+// generic / higher-order machinery — the in-file name `all` is only for this
+// file's own tests, which read exactly like user code.
+pub fn all<T: any>(self: T[], pred: (T) -> bool) -> bool {
+    for (let x : self) {
+        if (!pred(x)) {
+            return false;
+        };
+    }
+    true
+}.doc("""
+    True when every element satisfies `pred`, short-circuiting at the first element
+    that fails it; an empty array is vacuously true. Generic over the element type
+    and callable as a method: `xs.all(pred)`.
+""").test({
+    assert([2, 4, 6].all(|x| x <= 6)); // every element satisfies it
+    assert(![1, 2, 9].all(|x| x <= 5)); // 9 fails -> false
+    assert(all([5, 5], |x| x == 5)); // free-call form
+    assert(['a', 'a', 'a'].all(|c| c == 'a')); // any comparable element type
+    assert("aaa".all(|c| c == 'a')); // a str receiver iterates its chars
+    assert(!"aab".all(|c| c == 'a'));
+    assert([9, 9].all(is_nine)); // a named predicate, no lambda
+    // Vacuously true on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).all(|x| x == 99));
+    let limit = 3;
+    assert([1, 2].all(|x| x <= limit)); // a captured bound
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 324
+instructions executed: 835
+binary size: 8184
+--- monomorphizations ---
+__filter13$own0
+all$char$lam7
+all$char$s0$lam11
+all$char$s0$lam9
+all$i64$lam1
+all$i64$lam12
+all$i64$lam15
+all$i64$lam18
+all$i64$lam3
+all$i64$lam5
+is_nine
+main
