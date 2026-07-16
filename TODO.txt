@@ -7,3 +7,4 @@ Language gaps the exercise exposed — these shaped the design and are worth kno
 
 Build out infra to write builtins in .aipl itself
 Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
+Make the language features powerful enough that we don't need builtin_return

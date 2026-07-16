@@ -393,37 +393,27 @@ impl Loader {
                 // `rewrite_expr` keeps as a primitive `Binop`. An operator
                 // aliased to a user function maps to that function instead and
                 // is dispatched to a call.
-                let canonical = if let Some((op, canonical_impl)) =
+                let canonical = if let Some((_op, canonical_impl)) =
                     aipl_syntax::operator_builtin(&n.name)
                 {
-                    // A named operator builtin (`wrapping_add as +`) must be
-                    // aliased to exactly the operator it provides. The view maps
-                    // the operator spelling to the reserved `__builtin_*` impl, so
-                    // a use of the operator resolves (in `rewrite_expr`) to a call
-                    // to that impl — codegen intrinsifies it. Different builtins on
-                    // the same operator (`wrapping_add`/`saturating_add` → `+`)
-                    // thus dispatch to different impls, spelling-agnostically.
-                    match n.alias.as_deref() {
-                        Some(a) if a == op => canonical_impl.to_string(),
-                        Some(a) => {
-                            return Err(Error::at(
-                                format!(
-                                    "\"{}\" provides the \"{op}\" operator; import it as `{} as {op}`, not `as {a}`",
-                                    n.name, n.name
-                                ),
-                                n.span.clone(),
-                            ))
-                        }
-                        None => {
-                            return Err(Error::at(
-                                format!(
-                                    "\"{}\" provides the \"{op}\" operator; import it as `{} as {op}`",
-                                    n.name, n.name
-                                ),
-                                n.span.clone(),
-                            ))
-                        }
+                    // A named operator builtin can be aliased to any operator
+                    // name, though aliasing to a different operator than the one
+                    // it provides is confusing and generally a bad idea. The view
+                    // maps the operator spelling to the reserved `__builtin_*`
+                    // impl, so a use of the operator resolves (in `rewrite_expr`)
+                    // to a call to that impl — codegen intrinsifies it. Different
+                    // builtins on the same operator (`wrapping_add`/`saturating_add`
+                    // → `+`) thus dispatch to different impls, spelling-agnostically.
+                    if n.alias.is_none() {
+                        return Err(Error::at(
+                            format!(
+                                "\"{}\" is an operator builtin; it must be aliased to an operator (e.g., `{} as +`)",
+                                n.name, n.name
+                            ),
+                            n.span.clone(),
+                        ));
                     }
+                    canonical_impl.to_string()
                 } else if aipl_syntax::is_operator_name(&n.name) {
                     // Operators with pluggable semantics (`+`, `-`) have no bare
                     // form — you must pick a flavor and alias it. Everything else

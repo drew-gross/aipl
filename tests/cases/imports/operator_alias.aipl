@@ -1,0 +1,24 @@
+// Operators can be aliased to different operator names when imported, though
+// this is a bad idea and confusing. This documents that it's legal.
+import { wrapping_add as -, ==, print, to_str } from builtins;
+
+fn compute(a: i64, b: i64) -> i64 { a - b }.test({
+    // Using - which is actually wrapping_add
+    assert(3 - 4 == 7);
+    assert(10 - 5 == 15);
+})
+
+fn main() !prints {
+    print(to_str(compute(3, 4))); // 7
+}
+--- stdout ---
+7
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 32
+binary size: 1128
+--- monomorphizations ---
+main
