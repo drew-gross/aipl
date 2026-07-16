@@ -19,11 +19,13 @@ import {
     value_or,
 } from builtins;
 
+// The default token classes: identifiers, integer literals, and single-byte
+// punctuation.
+variant TokenKind = Ident | Int | Punct
+
 // What a token is: its class, the exact source text it covers, and the byte
-// offset where it starts (so `start + text.len()` is the end). The kind is a
-// `str` — `"ident"`, `"int"`, or `"punct"` — because a variant would be the
-// natural fit but variants aren't yet supported as struct fields.
-struct Token { kind: str, text: str, start: i64 }
+// offset where it starts (so `start + text.len()` is the end).
+struct Token { kind: TokenKind, text: str, start: i64 }
 
 pub fn contains_char(self: str, c: char) -> bool {
     for (let x : self) {
@@ -103,15 +105,11 @@ pub fn scan_while(self: str, start: i64, pred: (char) -> bool) -> i64 {
 // token to the end of its class's run.
 fn next_token(self: str, start: i64) -> Token {
     let c = self[start].value_or(' '); // in bounds: always some
-    let kind = if (c.is_ident_start()) {
-        "ident"
-    } else {
-        if (c.is_digit()) { "int" } else { "punct" }
-    };
+    let kind = if (c.is_ident_start()) { Ident } else { if (c.is_digit()) { Int } else { Punct } };
     let end = match (kind) {
-        "ident" => self.scan_while(start + 1, |x| x.is_ident_continue()),
-        "int" => self.scan_while(start + 1, |x| x.is_digit()),
-        _ => start + 1, // "punct"
+        Ident => self.scan_while(start + 1, |x| x.is_ident_continue()),
+        Int => self.scan_while(start + 1, |x| x.is_digit()),
+        Punct => start + 1,
     };
     Token { kind: kind, text: self[start..end], start: start }
 }
@@ -141,18 +139,18 @@ pub fn lex(self: str) -> Token[] {
     assert(lex(" \t\n\r ") == []);
 
     // Single tokens of each kind.
-    assert(lex("foo") == [Token { kind: "ident", text: "foo", start: 0 }]);
-    assert(lex("42") == [Token { kind: "int", text: "42", start: 0 }]);
-    assert(lex("+") == [Token { kind: "punct", text: "+", start: 0 }]);
+    assert(lex("foo") == [Token { kind: Ident, text: "foo", start: 0 }]);
+    assert(lex("42") == [Token { kind: Int, text: "42", start: 0 }]);
+    assert(lex("+") == [Token { kind: Punct, text: "+", start: 0 }]);
 
     // Idents may contain (but not start with) digits; `_` is a letter here.
-    assert(lex("x1") == [Token { kind: "ident", text: "x1", start: 0 }]);
-    assert(lex("_x") == [Token { kind: "ident", text: "_x", start: 0 }]);
+    assert(lex("x1") == [Token { kind: Ident, text: "x1", start: 0 }]);
+    assert(lex("_x") == [Token { kind: Ident, text: "_x", start: 0 }]);
     assert(
         lex("1x")
             == [
-                Token { kind: "int", text: "1", start: 0 },
-                Token { kind: "ident", text: "x", start: 1 },
+                Token { kind: Int, text: "1", start: 0 },
+                Token { kind: Ident, text: "x", start: 1 },
             ],
     );
 
@@ -160,9 +158,9 @@ pub fn lex(self: str) -> Token[] {
     assert(
         lex("foo + 12")
             == [
-                Token { kind: "ident", text: "foo", start: 0 },
-                Token { kind: "punct", text: "+", start: 4 },
-                Token { kind: "int", text: "12", start: 6 },
+                Token { kind: Ident, text: "foo", start: 0 },
+                Token { kind: Punct, text: "+", start: 4 },
+                Token { kind: Int, text: "12", start: 6 },
             ],
     );
 
@@ -170,9 +168,9 @@ pub fn lex(self: str) -> Token[] {
     assert(
         lex("a+1")
             == [
-                Token { kind: "ident", text: "a", start: 0 },
-                Token { kind: "punct", text: "+", start: 1 },
-                Token { kind: "int", text: "1", start: 2 },
+                Token { kind: Ident, text: "a", start: 0 },
+                Token { kind: Punct, text: "+", start: 1 },
+                Token { kind: Int, text: "1", start: 2 },
             ],
     );
 
@@ -180,21 +178,21 @@ pub fn lex(self: str) -> Token[] {
     assert(
         lex("==")
             == [
-                Token { kind: "punct", text: "=", start: 0 },
-                Token { kind: "punct", text: "=", start: 1 },
+                Token { kind: Punct, text: "=", start: 0 },
+                Token { kind: Punct, text: "=", start: 1 },
             ],
     );
 
     // Leading/trailing whitespace shifts `start` but produces no tokens.
-    assert(lex("  hi  ") == [Token { kind: "ident", text: "hi", start: 2 }]);
+    assert(lex("  hi  ") == [Token { kind: Ident, text: "hi", start: 2 }]);
 })
 --- performance ---
 allocations: 24
 deallocations: 24
 reallocations: 16
 bytes allocated: 1152
-instructions executed: 26299
-binary size: 33032
+instructions executed: 26270
+binary size: 30112
 --- monomorphizations ---
 __test$lex
 contains_char
