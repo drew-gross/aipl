@@ -13,6 +13,7 @@ import {
     wrapping_add as +,
     <,
     ==,
+    ||,
     Span,
     contains,
     is_digit,
@@ -25,8 +26,9 @@ import {
 
 // The token classes. `lex` classifies each token by its first char, checked in
 // this order: a string delimiter opens a `Str`, an ident-start char opens an
-// `Ident`, a digit opens an `Int`, and anything else is `Punct`.
-variant TokenKind = Ident | Int | Punct | Str
+// `Ident`, a digit opens an `Int` (or a `Float`, when the `floats` rule lets
+// the run extend past a fraction or exponent), and anything else is `Punct`.
+variant TokenKind = Ident | Int | Float | Punct | Str
 
 // What a token is: its class and the half-open byte range it covers in the
 // source — the text is recovered by slicing, `src[t.span.start..t.span.end]`.
@@ -53,6 +55,11 @@ struct LexRules {
     // The marker that starts a line comment ("" for none). The comment runs
     // to the end of the line and produces no token, like whitespace.
     line_comment: str,
+    // Whether numbers may be floats: when true, a digit run extends past a
+    // fraction (`.` plus at least one digit) and/or an exponent (`e`/`E`, an
+    // optional sign, at least one digit) into a single `Float` token, JSON
+    // style. A bare digit run stays `Int` either way.
+    floats: bool,
 }
 
 // Test-block shorthand for an expected token.
@@ -67,11 +74,12 @@ pub fn default_rules() -> LexRules {
         puncts: [],
         string_delims: "",
         line_comment: "",
+        floats: false,
     }
 }.doc("""
     A minimal rule set to start from: identifiers are `[A-Za-z_][A-Za-z0-9_]*`,
     and the extras are all off — no multi-byte punctuation, no string
-    literals, no line comments.
+    literals, no line comments, no floats.
 """).test({
     let r = default_rules();
     assert(r.ident_start.contains('a'));
@@ -82,6 +90,7 @@ pub fn default_rules() -> LexRules {
     assert(r.puncts == []);
     assert(r.string_delims == "");
     assert(r.line_comment == "");
+    assert(!r.floats);
 })
 
 pub fn with_ident_chars(self: LexRules, start: str, continued: str) -> LexRules {
@@ -91,6 +100,7 @@ pub fn with_ident_chars(self: LexRules, start: str, continued: str) -> LexRules 
         puncts: self.puncts,
         string_delims: self.string_delims,
         line_comment: self.line_comment,
+        floats: self.floats,
     }
 }.doc("""
     `self` with the identifier char classes replaced: `start` chars may begin
@@ -109,6 +119,7 @@ pub fn with_puncts(self: LexRules, puncts: str[]) -> LexRules {
         puncts: puncts,
         string_delims: self.string_delims,
         line_comment: self.line_comment,
+        floats: self.floats,
     }
 }.doc("""
     `self` with the multi-byte punctuation list replaced by `puncts`.
@@ -125,6 +136,7 @@ pub fn with_string_delims(self: LexRules, delims: str) -> LexRules {
         puncts: self.puncts,
         string_delims: delims,
         line_comment: self.line_comment,
+        floats: self.floats,
     }
 }.doc("""
     `self` with the string-literal delimiter class replaced by `delims`.
@@ -141,6 +153,7 @@ pub fn with_line_comment(self: LexRules, marker: str) -> LexRules {
         puncts: self.puncts,
         string_delims: self.string_delims,
         line_comment: marker,
+        floats: self.floats,
     }
 }.doc("""
     `self` with the line-comment marker replaced by `marker` ("" turns line
@@ -149,6 +162,23 @@ pub fn with_line_comment(self: LexRules, marker: str) -> LexRules {
     let r = default_rules().with_line_comment("//");
     assert(r.line_comment == "//");
     assert(r.string_delims == ""); // other rules unchanged
+})
+
+pub fn with_floats(self: LexRules, on: bool) -> LexRules {
+    LexRules {
+        ident_start: self.ident_start,
+        ident_continue: self.ident_continue,
+        puncts: self.puncts,
+        string_delims: self.string_delims,
+        line_comment: self.line_comment,
+        floats: on,
+    }
+}.doc("""
+    `self` with float lexing turned on or off.
+""").test({
+    let r = default_rules().with_floats(true);
+    assert(r.floats);
+    assert(r.line_comment == ""); // other rules unchanged
 })
 
 pub fn scan_while(self: str, start: i64, pred: (char) -> bool) -> i64 {
@@ -190,6 +220,28 @@ fn string_token(self: str, start: i64, delim: char) -> Token {
     Token { kind: Str, span: Span { start: start, end: end } }
 }
 
+// The end of the number token whose integer part ends at `int_end`: extends
+// past a fraction (`.` then at least one digit), then past an exponent (`e`
+// or `E`, an optional sign, then at least one digit). Either part may be
+// absent; `int_end` comes back unchanged when neither matches, meaning the
+// token is a plain `Int`. Out-of-bounds reads come back as ' ', which fails
+// every check, so a number at the end of the source ends cleanly.
+fn number_end(self: str, int_end: i64) -> i64 {
+    mut end = int_end;
+    if (self[end].value_or(' ') == '.' && self[end + 1].value_or(' ').is_digit()) {
+        set end = self.scan_while(end + 1, |x| x.is_digit());
+    };
+    let e = self[end].value_or(' ');
+    if (e == 'e' || e == 'E') {
+        let sign = self[end + 1].value_or(' ');
+        let digits = if (sign == '+' || sign == '-') { end + 2 } else { end + 1 };
+        if (self[digits].value_or(' ').is_digit()) {
+            set end = self.scan_while(digits, |x| x.is_digit());
+        };
+    };
+    end
+}
+
 // The punctuation token at `start`: the longest entry of `rules.puncts`
 // matching there, or a single byte when none match.
 fn punct_token(self: str, start: i64, rules: LexRules) -> Token {
@@ -216,8 +268,10 @@ fn next_token(self: str, start: i64, rules: LexRules) -> Token {
         return Token { kind: Ident, span: Span { start: start, end: end } };
     };
     if (c.is_digit()) {
-        let end = self.scan_while(start + 1, |x| x.is_digit());
-        return Token { kind: Int, span: Span { start: start, end: end } };
+        let int_end = self.scan_while(start + 1, |x| x.is_digit());
+        let end = if (rules.floats) { self.number_end(int_end) } else { int_end };
+        let kind = if (int_end < end) { Float } else { Int };
+        return Token { kind: kind, span: Span { start: start, end: end } };
     };
     self.punct_token(start, rules)
 }
@@ -242,8 +296,9 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     tokens
 }.doc("""
     Lexes `self` into a flat token list, as described by `rules`. Whitespace
-    and line comments separate tokens and are dropped; identifiers, integer
-    literals (`[0-9]+`), and listed punctuation are maximal runs; string
+    and line comments separate tokens and are dropped; identifiers, number
+    literals (`[0-9]+`, extending into a `Float` past a fraction/exponent when
+    the `floats` rule is on), and listed punctuation are maximal runs; string
     literals run delimiter to delimiter. Any other byte is a single-char
     `Punct` token, so `lex` never fails — unrecognized input just comes back
     as punctuation.
@@ -308,32 +363,56 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     assert(lex("// only", cmt) == []); // comment with no newline: to the end
     assert(lex("a / b", cmt) == [tok(Ident, 0, 1), tok(Punct, 2, 3), tok(Ident, 4, 5)]);
 
+    // Floats: a digit run may extend with a fraction and/or an exponent.
+    let flt = default_rules().with_floats(true);
+    assert(lex("1.5", flt) == [tok(Float, 0, 3)]);
+    assert(lex("42", flt) == [tok(Int, 0, 2)]); // bare digits stay Int
+    assert(lex("1e5", flt) == [tok(Float, 0, 3)]);
+    assert(lex("2E+10", flt) == [tok(Float, 0, 5)]);
+    assert(lex("1.5e-3", flt) == [tok(Float, 0, 6)]);
+
+    // A fraction needs a digit after the dot, and a number starts with a
+    // digit — so neither `1.` nor `.5` is a float.
+    assert(lex("1.", flt) == [tok(Int, 0, 1), tok(Punct, 1, 2)]);
+    assert(lex(".5", flt) == [tok(Punct, 0, 1), tok(Int, 1, 2)]);
+
+    // An exponent needs at least one digit, else the `e` is left for the
+    // next token (an ident here).
+    assert(lex("1e", flt) == [tok(Int, 0, 1), tok(Ident, 1, 2)]);
+    assert(lex("1e-", flt) == [tok(Int, 0, 1), tok(Ident, 1, 2), tok(Punct, 2, 3)]);
+    // Only one fraction: a second dot starts a new token.
+    assert(lex("1.2.3", flt) == [tok(Float, 0, 3), tok(Punct, 3, 4), tok(Int, 4, 5)]);
+    // With floats off (the default), a dot always splits the digits.
+    assert(lex("1.5", default_rules()) == [tok(Int, 0, 1), tok(Punct, 1, 2), tok(Int, 2, 3)]);
+
     // --- Rule sets resembling real languages. ---
 
-    // JSON-flavored rules: strings, and idents for true/false/null.
-    let json = default_rules().with_string_delims("\"");
-    let jsrc = "{\"a\": [1, true]}";
+    // JSON-flavored rules: strings, floats, and idents for true/false/null.
+    // (A leading `-` on a number stays a `Punct` for the parser to fold in.)
+    let json = default_rules().with_string_delims("\"").with_floats(true);
+    let jsrc = "{\"pi\": 3.14, \"n\": [1, 2e10, true]}";
     let jtoks = [
+        // `{`, `"pi"`, `:`
         tok(Punct, 0, 1),
-        // {
-        tok(Str, 1, 4),
-        // "a"
-        tok(Punct, 4, 5),
-        // :
-        tok(Punct, 6, 7),
-        // [
-        tok(Int, 7, 8),
-        // 1
-        tok(Punct, 8, 9),
-        // ,
-        tok(Ident, 10, 14),
-        // true
-        tok(Punct, 14, 15),
-        // ]
-        tok(Punct, 15, 16),
+        tok(Str, 1, 5),
+        tok(Punct, 5, 6),
+        // `3.14`, `,`
+        tok(Float, 7, 11),
+        tok(Punct, 11, 12),
+        // `"n"`, `:`, `[`
+        tok(Str, 13, 16),
+        tok(Punct, 16, 17),
+        tok(Punct, 18, 19),
+        // `1`, `,`, `2e10`, `,`, `true`
+        tok(Int, 19, 20),
+        tok(Punct, 20, 21),
+        tok(Float, 22, 26),
+        tok(Punct, 26, 27),
+        tok(Ident, 28, 32),
+        // `]`, `}`
+        tok(Punct, 32, 33),
+        tok(Punct, 33, 34),
     ];
-    // }
-
     assert(lex(jsrc, json) == jtoks);
 
     // AIPL-flavored rules: multi-byte operators, strings, line comments.
@@ -343,31 +422,25 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
         .with_line_comment("//");
     let asrc = "let ok = s == \"hi\"; // check";
     let atoks = [
+        // `let`, `ok`, `=`
         tok(Ident, 0, 3),
-        // let
         tok(Ident, 4, 6),
-        // ok
         tok(Punct, 7, 8),
-        // =
+        // `s`, `==`, `"hi"`, `;` — the trailing comment produces nothing
         tok(Ident, 9, 10),
-        // s
         tok(Punct, 11, 13),
-        // ==
         tok(Str, 14, 18),
-        // "hi"
         tok(Punct, 18, 19),
     ];
-    // ;
-
     assert(lex(asrc, aipl) == atoks);
 })
 --- performance ---
-allocations: 113
-deallocations: 113
-reallocations: 45
-bytes allocated: 4856
-instructions executed: 19914
-binary size: 52824
+allocations: 149
+deallocations: 149
+reallocations: 65
+bytes allocated: 6632
+instructions executed: 29306
+binary size: 67888
 --- monomorphizations ---
 __test$default_rules
 __test$lex
@@ -384,11 +457,14 @@ scan_while$lam15
 scan_while$lam18
 scan_while$lam21
 scan_while$lam23
+scan_while$lam25
+scan_while$lam27
 scan_while$lam3
 scan_while$lam5
 scan_while$lam7
 scan_while$lam9
 tok
+with_floats
 with_line_comment
 with_puncts
 with_string_delims
