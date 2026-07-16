@@ -11,6 +11,7 @@ import {
     <,
     ==,
     ||,
+    Span,
     contains,
     is_digit,
     is_space,
@@ -23,9 +24,14 @@ import {
 // punctuation.
 variant TokenKind = Ident | Int | Punct
 
-// What a token is: its class, the exact source text it covers, and the byte
-// offset where it starts (so `start + text.len()` is the end).
-struct Token { kind: TokenKind, text: str, start: i64 }
+// What a token is: its class and the half-open byte range it covers in the
+// source — the text is recovered by slicing, `src[t.span.start..t.span.end]`.
+struct Token { kind: TokenKind, span: Span }
+
+// Test-block shorthand for an expected token.
+fn tok(kind: TokenKind, start: i64, end: i64) -> Token {
+    Token { kind: kind, span: Span { start: start, end: end } }
+}
 
 pub fn is_ident_start(self: char) -> bool {
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(self)
@@ -92,7 +98,7 @@ fn next_token(self: str, start: i64) -> Token {
         Int => self.scan_while(start + 1, |x| x.is_digit()),
         Punct => start + 1,
     };
-    Token { kind: kind, text: self[start..end], start: start }
+    Token { kind: kind, span: Span { start: start, end: end } }
 }
 
 pub fn lex(self: str) -> Token[] {
@@ -104,7 +110,7 @@ pub fn lex(self: str) -> Token[] {
             set i = i + 1;
         } else {
             let t = self.next_token(i);
-            set i = i + t.text.len();
+            set i = t.span.end;
             set tokens.push(t);
         };
     }
@@ -120,60 +126,41 @@ pub fn lex(self: str) -> Token[] {
     assert(lex(" \t\n\r ") == []);
 
     // Single tokens of each kind.
-    assert(lex("foo") == [Token { kind: Ident, text: "foo", start: 0 }]);
-    assert(lex("42") == [Token { kind: Int, text: "42", start: 0 }]);
-    assert(lex("+") == [Token { kind: Punct, text: "+", start: 0 }]);
+    assert(lex("foo") == [tok(Ident, 0, 3)]);
+    assert(lex("42") == [tok(Int, 0, 2)]);
+    assert(lex("+") == [tok(Punct, 0, 1)]);
 
     // Idents may contain (but not start with) digits; `_` is a letter here.
-    assert(lex("x1") == [Token { kind: Ident, text: "x1", start: 0 }]);
-    assert(lex("_x") == [Token { kind: Ident, text: "_x", start: 0 }]);
-    assert(
-        lex("1x")
-            == [
-                Token { kind: Int, text: "1", start: 0 },
-                Token { kind: Ident, text: "x", start: 1 },
-            ],
-    );
+    assert(lex("x1") == [tok(Ident, 0, 2)]);
+    assert(lex("_x") == [tok(Ident, 0, 2)]);
+    assert(lex("1x") == [tok(Int, 0, 1), tok(Ident, 1, 2)]);
 
-    // Tokens split on whitespace, with `start` tracking the gaps.
-    assert(
-        lex("foo + 12")
-            == [
-                Token { kind: Ident, text: "foo", start: 0 },
-                Token { kind: Punct, text: "+", start: 4 },
-                Token { kind: Int, text: "12", start: 6 },
-            ],
-    );
+    // Tokens split on whitespace, with the spans tracking the gaps.
+    assert(lex("foo + 12") == [tok(Ident, 0, 3), tok(Punct, 4, 5), tok(Int, 6, 8)]);
 
     // Adjacent tokens need no whitespace: class changes split them.
-    assert(
-        lex("a+1")
-            == [
-                Token { kind: Ident, text: "a", start: 0 },
-                Token { kind: Punct, text: "+", start: 1 },
-                Token { kind: Int, text: "1", start: 2 },
-            ],
-    );
+    assert(lex("a+1") == [tok(Ident, 0, 1), tok(Punct, 1, 2), tok(Int, 2, 3)]);
 
     // Runs of punctuation lex one byte at a time (no multi-char operators yet).
-    assert(
-        lex("==")
-            == [
-                Token { kind: Punct, text: "=", start: 0 },
-                Token { kind: Punct, text: "=", start: 1 },
-            ],
-    );
+    assert(lex("==") == [tok(Punct, 0, 1), tok(Punct, 1, 2)]);
 
-    // Leading/trailing whitespace shifts `start` but produces no tokens.
-    assert(lex("  hi  ") == [Token { kind: Ident, text: "hi", start: 2 }]);
+    // Leading/trailing whitespace shifts the span but produces no tokens.
+    assert(lex("  hi  ") == [tok(Ident, 2, 4)]);
+
+    // The token's text is recovered by slicing its span out of the source.
+    let src = "foo + 12";
+    match (lex(src)[0]) {
+        some(t) => assert(src[t.span.start..t.span.end] == "foo"),
+        none => assert(false),
+    };
 })
 --- performance ---
-allocations: 24
-deallocations: 24
-reallocations: 16
-bytes allocated: 1152
-instructions executed: 5138
-binary size: 28256
+allocations: 25
+deallocations: 25
+reallocations: 19
+bytes allocated: 1184
+instructions executed: 5881
+binary size: 25688
 --- monomorphizations ---
 __test$lex
 is_ident_continue
@@ -189,3 +176,4 @@ scan_while$lam3
 scan_while$lam5
 scan_while$lam7
 scan_while$lam9
+tok
