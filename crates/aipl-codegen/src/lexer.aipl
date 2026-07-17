@@ -52,10 +52,13 @@ struct LexError { message: str, span: Span }
 //   when the char after it is absent or outside `boundary` (the identifier
 //   continue class) — so a keyword rule placed before the identifier rule
 //   claims `if` without biting the front off `iffy`.
-// - `Delimited(delims)`: a char in `delims` opens the token, which runs to
-//   just past the next occurrence of the *same* char (no escapes yet). A
-//   token still open at the end of the source is a lex error. String
-//   literals.
+// - `Delimited(delims, escapes)`: a char in `delims` opens the token, which
+//   runs to just past the next occurrence of the *same* char. `escapes` is
+//   the set of chars that may follow a backslash inside the token: `\` plus
+//   an allowed char is content (in particular an escaped delimiter does not
+//   close), `\` plus anything else is a lex error, and "" turns escape
+//   handling off entirely (a backslash is ordinary content). A token still
+//   open at the end of the source is a lex error. String literals.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -66,7 +69,7 @@ variant Matcher =
     CharRun(str, str)
     | Exact(str[])
     | Keyword(str[], str)
-    | Delimited(str)
+    | Delimited(str, str)
     | ToEol(str)
     | Float
 
@@ -120,19 +123,45 @@ fn keyword_len(self: str, spellings: str[], boundary: str) -> i64 {
 
 // `Delimited`: a `delims` char opens the token, which spans to just past the
 // next occurrence of the same char. ok(0) when the first char isn't a
-// delimiter; a token still open at the end of the source is a hard error
-// (`at` is the token's absolute start, so the error span covers the
-// unterminated tail of the source).
-fn delimited_len(self: str, at: i64, delims: str) -> i64!LexError {
+// delimiter. With a non-empty `escapes` set, a backslash escapes its next
+// char: an allowed char is content (an escaped delimiter doesn't close), a
+// disallowed one is a hard error, and a dangling backslash at the end of the
+// source leaves the token unterminated. A token still open at the end of the
+// source is a hard error (`at` is the token's absolute start, so error spans
+// land in the real source).
+fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError {
     if (!self[0].is_some_and(|c| delims.contains(c))) {
         return ok(0);
     };
     let d = self[0].value_or(' '); // in bounds: the guard above saw a char
-    let content_end = 1 + self[1..].count_while(|x| x != d);
-    if (self.len() < content_end + 1) {
+    mut i = 1;
+    mut closed = false;
+    while (!closed && i < self.len()) {
+        let c = self[i].value_or(' '); // in bounds: the loop condition holds
+        if (c == d) {
+            set closed = true;
+        } else {
+            // A backslash escapes its next char (when escapes are on and one
+            // exists — a dangling backslash at the end of the source escapes
+            // nothing, so the loop just runs out and the token is
+            // unterminated). The escaped char must be allowed, and is content:
+            // the extra step below skips it, so an escaped delimiter can't
+            // close the token.
+            if (c == '\\' && 0 < escapes.len() && i + 1 < self.len()) {
+                if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
+                    return err(
+                        LexError { message: "unknown escape sequence", span: at + i..at + i + 2 },
+                    );
+                };
+                set i = i + 1;
+            };
+        };
+        set i = i + 1;
+    }
+    if (!closed) {
         return err(LexError { message: "unterminated delimited token", span: at..at + self.len() });
     };
-    ok(content_end + 1)
+    ok(i)
 }
 
 // `ToEol`: the marker, then everything up to (not including) the next
@@ -181,7 +210,7 @@ fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
         CharRun(first, cont) => ok(self.char_run_len(first, cont)),
         Exact(spellings) => ok(self.longest_prefix(spellings)),
         Keyword(spellings, boundary) => ok(self.keyword_len(spellings, boundary)),
-        Delimited(delims) => self.delimited_len(at, delims),
+        Delimited(delims, escapes) => self.delimited_len(at, delims, escapes),
         ToEol(marker) => ok(self.to_eol_len(marker)),
         Float => ok(self.float_len()),
     }
@@ -297,7 +326,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     // unterminated token is a hard lex error — not a decline — so it points
     // at the open delimiter instead of falling through to "unexpected
     // character".
-    let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'") }, ident];
+    let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'", "") }, ident];
     assert(lex("\"hi\" x", strs) == ok([tok("str", 0, 4), tok("ident", 5, 6)]));
     assert(lex("''", strs) == ok([tok("str", 0, 2)])); // empty string literal
     assert(lex("'a\"b'", strs) == ok([tok("str", 0, 5)])); // other delim is content
@@ -306,6 +335,27 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     // The error span is absolute — an unterminated token mid-source points
     // at its own opening delimiter through the end.
     assert(lex("x \"hi", strs) == err(lex_err("unterminated delimited token", 2, 5)));
+
+    // With escapes off (""), a backslash is ordinary content: `"a\"` closes
+    // at the quote right after it.
+    assert(lex("\"a\\\"", strs) == ok([tok("str", 0, 4)]));
+
+    // Escapes on: `n`, `t`, `\`, and `"` may follow a backslash.
+    let esc = [ws, TokenRule { kind: "str", matcher: Delimited("\"", "nt\\\"") }, ident];
+    // An escaped delimiter is content, not a close: `"a\"b"` is one token.
+    assert(lex("\"a\\\"b\"", esc) == ok([tok("str", 0, 6)]));
+    // An ordinary escape is content: `"a\nb"`.
+    assert(lex("\"a\\nb\"", esc) == ok([tok("str", 0, 6)]));
+    // `"\""` — the escape may sit right against both delimiters.
+    assert(lex("\"\\\"\"", esc) == ok([tok("str", 0, 4)]));
+    // A char outside the escape set is a lex error pointing at the `\x` pair.
+    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence", 2, 4)));
+    // A dangling backslash can't close the token: unterminated, open to end.
+    assert(lex("\"ab\\", esc) == err(lex_err("unterminated delimited token", 0, 4)));
+
+    // Escaping the closer means the token never closes either: `"a\"` is
+    // unterminated with escapes on (it closed with escapes off, above).
+    assert(lex("\"a\\\"", esc) == err(lex_err("unterminated delimited token", 0, 4)));
 
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
@@ -347,7 +397,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     // for the parser to fold in.)
     let json = [
         ws,
-        TokenRule { kind: "str", matcher: Delimited("\"") },
+        TokenRule { kind: "str", matcher: Delimited("\"", "\"\\/bfnrtu") },
         TokenRule { kind: "float", matcher: Float },
         int_r,
         TokenRule { kind: "kw", matcher: Keyword(["true", "false", "null"], alnum) },
@@ -378,6 +428,13 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     ];
     assert(lex(jsrc, json) == ok(jtoks));
 
+    // JSON string escapes: `"a\"b"` is one string token, and `\q` is not a
+    // JSON escape.
+    assert(
+        lex("""["a\"b"]""", json) == ok([tok("punct", 0, 1), tok("str", 1, 7), tok("punct", 7, 8)]),
+    );
+    assert(lex("""["a\qb"]""", json) == err(lex_err("unknown escape sequence", 3, 5)));
+
     // AIPL-flavored rules: keywords, multi-byte operators, strings, line
     // comments.
     let aipl = [
@@ -386,7 +443,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
         TokenRule { kind: "kw", matcher: Keyword(["fn", "let", "mut", "set"], alnum) },
         ident,
         int_r,
-        TokenRule { kind: "str", matcher: Delimited("\"") },
+        TokenRule { kind: "str", matcher: Delimited("\"", "ntr\\\"") },
         TokenRule { kind: "op", matcher: Exact(["==", "->", "&&", "=", ";"]) },
     ];
     let asrc = "let ok = s == \"hi\"; // check";
@@ -404,16 +461,15 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 210
-deallocations: 210
+allocations: 230
+deallocations: 230
 reallocations: 0
-bytes allocated: 15224
-instructions executed: 77615
-binary size: 99120
+bytes allocated: 16416
+instructions executed: 89296
+binary size: 115032
 --- monomorphizations ---
 __builtin_is_some_and$char$lam18
 __m1__count_while$char$s0$lam10
-__m1__count_while$char$s0$lam16
 __m1__count_while$char$s0$lam17
 __m1__count_while$char$s0$lam5
 __test$lex
