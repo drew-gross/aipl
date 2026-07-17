@@ -1,0 +1,15 @@
+import { Span, len } from builtins;
+
+// A `Span` index is slice sugar, so it needs a sliceable (str or array)
+// receiver, like the `[start..end]` form.
+fn main() -> i64 {
+    let n = 5;
+    let s = Span { start: 0, end: 2 };
+    n[s].len()
+}
+--- errors ---
+error: cannot slice a value of type i64
+ --> ./tests/cases/strings/err_slice_span_unsliceable.aipl:8:5
+  |
+8 |     n[s].len()
+  |     ^

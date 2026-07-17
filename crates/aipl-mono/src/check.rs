@@ -724,6 +724,19 @@ impl Cx<'_> {
 
     /// Check `expr` and return its type. `effects` is the enclosing function's
     /// declared effect set (callees must not exceed it).
+    /// The result type of slicing a receiver of type `ot` (`recv[a..b]`, or
+    /// the `recv[span]` Span-index sugar): a `str` slices to `str`, an array
+    /// (including `char[]`) to its own type.
+    fn slice_receiver_ty(&self, ot: &Type, span: Span) -> Result<Type, Error> {
+        match ot {
+            Type::Primitive(Primitive::Str) | Type::Array(_) => Ok(ot.clone()),
+            other => Err(Error::at(
+                format!("cannot slice a value of type {}", tyname(other)),
+                span,
+            )),
+        }
+    }
+
     fn check_expr(&self, expr: &Expr, env: &Env, effects: &[String]) -> Result<Type, Error> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
@@ -1124,15 +1137,9 @@ impl Cx<'_> {
                 let it = self.check_expr(idx, env, effects)?;
                 // `s[span]` — a `Span` index is slice sugar for
                 // `s[span.start..span.end]`, so it takes the slice rules:
-                // `str` receiver, `str` result.
+                // a `str` or array receiver, sliced to its own type.
                 if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
-                    expect(
-                        &ot,
-                        &Type::Primitive(Primitive::Str),
-                        "slice receiver",
-                        obj.span.clone(),
-                    )?;
-                    return Ok(Type::Primitive(Primitive::Str));
+                    return self.slice_receiver_ty(&ot, obj.span.clone());
                 }
                 expect(
                     &it,
@@ -1156,12 +1163,7 @@ impl Cx<'_> {
             }
             ExprKind::Slice(obj, start, end) => {
                 let ot = self.check_expr(obj, env, effects)?;
-                expect(
-                    &ot,
-                    &Type::Primitive(Primitive::Str),
-                    "slice receiver",
-                    obj.span.clone(),
-                )?;
+                let result = self.slice_receiver_ty(&ot, obj.span.clone())?;
                 let st = self.check_expr(start, env, effects)?;
                 expect(
                     &st,
@@ -1180,7 +1182,7 @@ impl Cx<'_> {
                         end.span.clone(),
                     )?;
                 }
-                Type::Primitive(Primitive::Str)
+                result
             }
             ExprKind::Try(inner) => {
                 // `expr?` requires a result `T!E` and yields the Ok type `T`. The

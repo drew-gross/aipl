@@ -1339,6 +1339,48 @@ pub extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u
     }
 }
 
+/// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
+/// out-of-range end yields a shorter array; `start >= end` yields `[]`).
+/// *Borrows* `xs` (does not drop it) and returns a fresh heap array holding
+/// copies of the elements in `[start, end)`, each retained via `retain_fn`
+/// (0 for scalar elements). Mirrors the JIT runtime's `aipl_arr_slice`.
+#[no_mangle]
+pub extern "C" fn aipl_arr_slice(
+    a: *const u8,
+    start: i64,
+    end: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    if a.is_null() {
+        return a;
+    }
+    unsafe {
+        let len = array_len(a) as i64;
+        let lo = start.clamp(0, len) as usize;
+        let hi = end.clamp(0, len) as usize;
+        let n = hi.saturating_sub(lo);
+        if elem_size == ELEM_BITPACKED {
+            let raw = array_alloc(n, n, drop_fn, ELEM_BITPACKED) as *const u8;
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..n {
+                write_packed_bit(dst, i, arr_load_bit_rt(a, lo + i));
+            }
+            return raw;
+        }
+        let es = elem_size.max(8) as usize;
+        let raw = array_alloc(n, n, drop_fn, elem_size) as *const u8;
+        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        for i in 0..n {
+            let src = arr_elem_ptr_rt(a, lo + i, es);
+            memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
+        }
+        elem_rc(retain_fn, dst_base, n);
+        raw
+    }
+}
+
 /// `split(self, sep) -> str[]` — parts of `self` between non-overlapping
 /// occurrences of `sep`, each a slice of `self` (a buffer-sharing view for a long
 /// part, else an inline/heap copy). An empty `sep` yields one part: the whole

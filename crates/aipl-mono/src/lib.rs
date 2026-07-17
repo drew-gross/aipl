@@ -2860,12 +2860,15 @@ impl Mono<'_> {
                 let (ro, ot) = self.infer(obj, env)?;
                 let (ridx, it) = self.infer(idx, env)?;
                 // `s[span]` — a `Span` index is slice sugar for
-                // `s[span.start..span.end]`, so it yields a `str`, not `elem?`.
+                // `s[span.start..span.end]`, so it yields the receiver's own
+                // type (a `str` slices to `str`, an array to itself), not
+                // `elem?`.
                 if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
-                    return Ok((
-                        node(ExprKind::Index(Box::new(ro), Box::new(ridx))),
-                        Type::Primitive(Primitive::Str),
-                    ));
+                    let result = match &ot {
+                        Type::Array(_) => ot.clone(),
+                        _ => Type::Primitive(Primitive::Str),
+                    };
+                    return Ok((node(ExprKind::Index(Box::new(ro), Box::new(ridx))), result));
                 }
                 let elem = match ot {
                     Type::Array(inner) => *inner,
@@ -2880,15 +2883,21 @@ impl Mono<'_> {
                 )
             }
             ExprKind::Slice(obj, start, end) => {
-                let (ro, _) = self.infer(obj, env)?;
+                let (ro, ot) = self.infer(obj, env)?;
                 let (rs, _) = self.infer(start, env)?;
                 let re = match end {
                     Some(e) => Some(Box::new(self.infer(e, env)?.0)),
                     None => None,
                 };
+                // A `str` slices to `str`; an array (including `char[]`)
+                // slices to its own type.
+                let result = match &ot {
+                    Type::Array(_) => ot.clone(),
+                    _ => Type::Primitive(Primitive::Str),
+                };
                 (
                     node(ExprKind::Slice(Box::new(ro), Box::new(rs), re)),
-                    Type::Primitive(Primitive::Str),
+                    result,
                 )
             }
             ExprKind::Try(inner) => {

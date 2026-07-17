@@ -706,15 +706,21 @@ pub mod ast {
         /// its key/value types are `__none__` and coerce to any `#{K: V}`.
         DictLit(Vec<(Expr, Expr)>),
         /// `receiver[index]` — array indexing. Evaluates to `T?`: the
-        /// element wrapped in `some` when in bounds, else `none`.
+        /// element wrapped in `some` when in bounds, else `none`. An index
+        /// whose type is the builtin `Span` struct means slicing instead —
+        /// `recv[span]` is sugar for `recv[span.start..span.end]` (see
+        /// [`Slice`](Self::Slice)); the passes dispatch on the index type.
         Index(Box<Expr>, Box<Expr>),
-        /// `receiver[start..end]` — string slicing (`recv`, `start`, `end`).
-        /// Evaluates to a `str` holding the bytes in `[start, end)`, with both
-        /// bounds clamped to `[0, len]` (out-of-range ends yield a shorter
-        /// string; `start >= end` yields `""`). The result shares the source's
-        /// backing buffer when possible (a copy for a small or SSO source).
-        /// An open-ended `receiver[start..]` (end `None`) runs to the receiver's
-        /// length — codegen fills it in, so no user-level `len` is needed.
+        /// `receiver[start..end]` — slicing (`recv`, `start`, `end`). A `str`
+        /// receiver yields a `str` holding the bytes in `[start, end)`; an
+        /// array receiver yields a fresh array of the elements in that range.
+        /// Both bounds are clamped to `[0, len]` (out-of-range ends yield a
+        /// shorter result; `start >= end` yields an empty one). A `str` result
+        /// shares the source's backing buffer when possible (a copy for a
+        /// small or SSO source); an array result copies (and retains) its
+        /// elements. An open-ended `receiver[start..]` (end `None`) runs to
+        /// the receiver's length — codegen fills it in, so no user-level
+        /// `len` is needed.
         Slice(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
         /// `expr?` — the error-propagation operator. `expr` must be a result
         /// `T!E`; in an `_!E`-returning function it evaluates to the `T` when

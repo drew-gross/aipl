@@ -903,6 +903,50 @@ extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
     (obj as usize | VIEW_TAG) as *const u8
 }
 
+/// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
+/// out-of-range end yields a shorter array; `start >= end` yields `[]`).
+/// *Borrows* `xs` (does not drop it) and returns a fresh heap array holding
+/// copies of the elements in `[start, end)`, each retained via `retain_fn`
+/// (0 for scalar elements).
+extern "C" fn aipl_arr_slice(
+    a: *const u8,
+    start: i64,
+    end: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    if a.is_null() {
+        return a;
+    }
+    let len = unsafe { array_len_of(a) } as i64;
+    let lo = start.clamp(0, len) as usize;
+    let hi = end.clamp(0, len) as usize;
+    let n = hi.saturating_sub(lo);
+    if elem_size == ELEM_BITPACKED {
+        let raw = alloc_array(n, n, drop_fn, ELEM_BITPACKED);
+        unsafe {
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..n {
+                let bit = arr_load_bit(a, lo + i);
+                write_packed_bit(dst, i, bit);
+            }
+        }
+        return raw;
+    }
+    let es = elem_size.max(8) as usize;
+    let raw = alloc_array(n, n, drop_fn, elem_size);
+    unsafe {
+        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        for i in 0..n {
+            let src = arr_elem_ptr(a, lo + i, es);
+            std::ptr::copy_nonoverlapping(src, dst_base.add(i * es), es);
+        }
+        elem_rc(retain_fn, dst_base, n);
+    }
+    raw
+}
+
 /// `split(self, sep) -> str[]` — the parts of `self` between non-overlapping
 /// occurrences of `sep`, each produced by `aipl_str_slice` (a buffer-sharing view
 /// for a large part, else an inline/heap copy). An empty `sep` yields one part:
@@ -3217,6 +3261,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_reverse", aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_str_slice", aipl_str_slice as *const u8);
+    jit_builder.symbol("aipl_arr_slice", aipl_arr_slice as *const u8);
     jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
     jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
     jit_builder.symbol("aipl_str_data", aipl_str_data as *const u8);
@@ -5112,9 +5157,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
             sig(4, true)
         }
         "aipl_array_push" | "aipl_array_push_mut" => sig(5, true),
-        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert" => {
-            sig(6, true)
-        }
+        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
+        | "aipl_arr_slice" => sig(6, true),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -11219,6 +11263,79 @@ fn compile_call_expr<M: Module>(
     })
 }
 
+/// Emit `recv[a..b]` for any sliceable receiver — the shared tail of
+/// `ExprKind::Slice` and the Span-index sugar in `ExprKind::Index`:
+///
+/// - `str` → `aipl_str_slice` (a buffer-sharing view for a large heap source,
+///   else a copy); an open-ended `b` of `None` is filled with `aipl_str_len`.
+/// - `char[]` → same runtime path (it shares `str`'s representation, see
+///   `is_char_array`) but keeps its nominal `char[]` type, like `reverse`.
+/// - `T[]` → `aipl_arr_slice`, a fresh heap array copying the element range
+///   (each element retained); `None` becomes `i64::MAX`, which the runtime
+///   clamps to the length.
+///
+/// Every runtime path *borrows* the receiver and clamps both bounds, so the
+/// call site just tracks the fresh result for drop.
+#[allow(clippy::too_many_arguments)]
+fn emit_slice<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    recv_v: Value,
+    recv_ty: &Type,
+    a_v: Value,
+    b_v: Option<Value>,
+    recv_span: &Span,
+) -> Result<(Value, Type), Error> {
+    let structs = cx.structs;
+    let builtins = cx.builtins;
+    // Exact `str` plus `char[]`, not the broader `is_str_shaped` — matching
+    // the char-at scope in `ExprKind::Index` (`Error`/concat-str receivers
+    // aren't part of the slice surface).
+    if *recv_ty == Type::Primitive(Primitive::Str) || is_char_array(recv_ty) {
+        let b_v = match b_v {
+            Some(b) => b,
+            None => {
+                let len_f = builtins.import(module, builder.func, "aipl_str_len");
+                let inst = builder.ins().call(len_f, &[recv_v]);
+                builder.inst_results(inst)[0]
+            }
+        };
+        let f = builtins.import(module, builder.func, "aipl_str_slice");
+        let inst = builder.ins().call(f, &[recv_v, a_v, b_v]);
+        let result = builder.inst_results(inst)[0];
+        scopes
+            .last_mut()
+            .expect("scope")
+            .push(Tracked::new(result, recv_ty));
+        return Ok((result, recv_ty.clone()));
+    }
+    if let Type::Array(elem) = recv_ty {
+        let elem = (**elem).clone();
+        let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+        let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+        let esz = builder
+            .ins()
+            .iconst(types::I64, runtime_elem_size(&elem, structs));
+        let b_v = b_v.unwrap_or_else(|| builder.ins().iconst(types::I64, i64::MAX));
+        let f = builtins.import(module, builder.func, "aipl_arr_slice");
+        let inst = builder
+            .ins()
+            .call(f, &[recv_v, a_v, b_v, drop_fn, retain_fn, esz]);
+        let result = builder.inst_results(inst)[0];
+        scopes
+            .last_mut()
+            .expect("scope")
+            .push(Tracked::new(result, recv_ty));
+        return Ok((result, recv_ty.clone()));
+    }
+    Err(Error::at(
+        format!("cannot slice a value of type {}", type_name(recv_ty)),
+        recv_span.clone(),
+    ))
+}
+
 fn compile_expr<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -12795,12 +12912,6 @@ fn compile_expr<M: Module>(
             // struct (evaluated once, receiver first) and slice exactly like
             // `ExprKind::Slice`.
             if matches!(&idx_t, Type::Named(n) if n == "__builtin_Span") {
-                expect_type(
-                    &recv_ty,
-                    &Type::Primitive(Primitive::Str),
-                    "slice receiver",
-                    obj.span.clone(),
-                )?;
                 let layout = structs
                     .get("__builtin_Span")
                     .and_then(TypeDef::as_struct)
@@ -12819,14 +12930,17 @@ fn compile_expr<M: Module>(
                 };
                 let a_v = bound("start")?;
                 let b_v = bound("end")?;
-                let f = builtins.import(module, builder.func, "aipl_str_slice");
-                let inst = builder.ins().call(f, &[recv_v, a_v, b_v]);
-                let result = builder.inst_results(inst)[0];
-                scopes
-                    .last_mut()
-                    .expect("scope")
-                    .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
-                return Ok((result, Type::Primitive(Primitive::Str)));
+                return emit_slice(
+                    module,
+                    builder,
+                    cx,
+                    scopes,
+                    recv_v,
+                    &recv_ty,
+                    a_v,
+                    Some(b_v),
+                    &obj.span,
+                );
             }
 
             expect_type(
@@ -12916,16 +13030,9 @@ fn compile_expr<M: Module>(
             (ptr, result_ty)
         }
         ExprKind::Slice(obj, start, end) => {
-            // `s[start..end]` -> a fresh `str` (a buffer-sharing view for a large
-            // heap source, else a copy). `aipl_str_slice` borrows `s` and clamps
-            // the bounds, so the call site just tracks the fresh result for drop.
+            // `s[start..end]` — see `emit_slice` for the receiver dispatch
+            // (str / char[] / array) and ownership notes.
             let (s_v, s_ty) = compile_expr(module, builder, cx, scopes, obj)?;
-            expect_type(
-                &s_ty,
-                &Type::Primitive(Primitive::Str),
-                "slice receiver",
-                obj.span.clone(),
-            )?;
             let (a_v, a_t) = compile_expr(module, builder, cx, scopes, start)?;
             expect_type(
                 &a_t,
@@ -12933,9 +13040,6 @@ fn compile_expr<M: Module>(
                 "slice start",
                 start.span.clone(),
             )?;
-            // An open-ended `s[start..]` runs to `s`'s byte length — computed here
-            // via `aipl_str_len`, so the user needn't import `len`. `s_v` is
-            // evaluated once (above), so there's no double-evaluation of `obj`.
             let b_v = match end {
                 Some(end) => {
                     let (b_v, b_t) = compile_expr(module, builder, cx, scopes, end)?;
@@ -12945,22 +13049,11 @@ fn compile_expr<M: Module>(
                         "slice end",
                         end.span.clone(),
                     )?;
-                    b_v
+                    Some(b_v)
                 }
-                None => {
-                    let len_f = builtins.import(module, builder.func, "aipl_str_len");
-                    let inst = builder.ins().call(len_f, &[s_v]);
-                    builder.inst_results(inst)[0]
-                }
+                None => None,
             };
-            let f = builtins.import(module, builder.func, "aipl_str_slice");
-            let inst = builder.ins().call(f, &[s_v, a_v, b_v]);
-            let result = builder.inst_results(inst)[0];
-            scopes
-                .last_mut()
-                .expect("scope")
-                .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
-            (result, Type::Primitive(Primitive::Str))
+            return emit_slice(module, builder, cx, scopes, s_v, &s_ty, a_v, b_v, &obj.span);
         }
         ExprKind::Try(inner) => {
             // `r?` propagates: evaluate the result `r`; on Err, rebuild the
