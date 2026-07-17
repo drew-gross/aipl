@@ -1,0 +1,44 @@
+import { *, wrapping_add as +, ==, map, push } from builtins;
+
+// A payload-carrying variant constructor can be passed as a function value,
+// anywhere a named function can: `xs.map(Circle)` means `xs.map(|x| Circle(x))`.
+// (Nullary constructors are unaffected — a bare `Dot` is already a value.)
+variant Shape = Circle(i64) | Rect(i64, i64) | Label(str) | Dot
+
+// A builtin HOF taking a constructor, in both call forms.
+fn circles(xs: i64[]) -> Shape[] { xs.map(Circle) }.test({
+    assert(circles([1, 2]) == [Circle(1), Circle(2)]);
+    assert(map([3], Circle) == [Circle(3)]); // function form
+    // The constructor and the eta-expanded lambda are interchangeable.
+    assert([4].map(Circle) == [4].map(|x| Circle(x))); #[allow]
+})
+
+// A heap payload (str) works too — construction through the synthesized
+// lambda retains it like any other.
+fn labels(ss: str[]) -> Shape[] { ss.map(Label) }.test({
+    assert(labels(["a", "b"]) == [Label("a"), Label("b")]);
+})
+
+// A user-defined HOF and a multi-payload constructor: `Rect` is passed where
+// a two-parameter function is expected.
+fn pair_up(xs: i64[], f: (i64, i64) -> Shape) -> Shape[] {
+    mut out = [];
+    for (let x : xs) {
+        set out.push(f(x, x + 1));
+    }
+    out
+}.test({
+    assert(pair_up([7], Rect) == [Rect(7, 8)]);
+    assert(pair_up([1, 2], Rect) == [Rect(1, 2), Rect(2, 3)]);
+})
+--- performance ---
+allocations: 19
+deallocations: 19
+reallocations: 10
+bytes allocated: 936
+instructions executed: 1405
+binary size: 11376
+--- monomorphizations ---
+main
+pair_up$lam11
+pair_up$lam13

@@ -70,3 +70,5 @@ Lex aipl:
   9. Token values. Terminal carries processed payloads — escaped string contents, the raw-string dedent (via the already-dogfooded process_raw_string), char byte values, parsed i64 (with overflow reported at lex time, lib.rs:2597). Our tokens are span-only; slicing covers idents/numbers, but string unescaping and the overflow check need a post-pass per kind. process_raw_string can be reused as-is.
 
   Rough dependency order if you want a sequence: 5 (error machinery) unblocks 1–4 (the new matchers all need hard errors); 6 is independent and small; 7 is the largest and worth its own design pass; 8 needs your call on ASCII vs Unicode first.
+
+Syntax highligher is handling triple quotes with embedded single quotes poorly

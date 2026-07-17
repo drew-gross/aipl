@@ -51,6 +51,235 @@ use aipl_syntax::{
 /// findable; `--debug` then prints the exact chain of growing instances.
 const INSTANTIATION_LIMIT: usize = 10_000;
 
+/// Rewrite a bare reference to a *payload-carrying* variant constructor used as
+/// a value (`xs.map(Circle)`) into the equivalent lambda (`xs.map(|a| Circle(a))`),
+/// so a constructor can be passed wherever a named function can. Runs before
+/// `check`, which therefore only ever sees the lambda; the synthesized lambda's
+/// parameters are annotated with the payload types from the variant declaration,
+/// so no inference is needed. A *nullary* constructor is untouched — a bare
+/// `Empty` is already a value, not a function — and any binding in scope with
+/// the constructor's name shadows it, like everywhere else.
+pub fn lower_ctor_refs(program: &Program) -> Program {
+    // Payload-carrying constructors: name → payload types (arity >= 1).
+    let ctors: HashMap<&str, &[Type]> = program
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Variant(v) => Some(&v.cases),
+            _ => None,
+        })
+        .flatten()
+        .filter(|c| !c.payload.is_empty())
+        .map(|c| (c.name.as_str(), c.payload.as_slice()))
+        .collect();
+    if ctors.is_empty() {
+        return program.clone();
+    }
+    let items = program
+        .items
+        .iter()
+        .map(|item| match item {
+            Item::Fn(f) => {
+                // The function's parameters are in scope everywhere in it —
+                // including keyword-parameter defaults, which may name them.
+                let mut scope: Vec<String> = f.sig.params.iter().map(|p| p.name.clone()).collect();
+                let params: Vec<Param> = f
+                    .sig
+                    .params
+                    .iter()
+                    .map(|p| Param {
+                        default: p.default.as_ref().map(|d| lcr_expr(d, &ctors, &mut scope)),
+                        ..p.clone()
+                    })
+                    .collect();
+                Item::Fn(Function {
+                    sig: Signature {
+                        params,
+                        ..f.sig.clone()
+                    },
+                    body: lcr_expr(&f.body, &ctors, &mut scope),
+                    test_body: f
+                        .test_body
+                        .as_ref()
+                        .map(|tb| lcr_expr(tb, &ctors, &mut scope)),
+                    ..f.clone()
+                })
+            }
+            Item::Struct(s) => Item::Struct(StructDecl {
+                name: s.name.clone(),
+                fields: s
+                    .fields
+                    .iter()
+                    .map(|fd| FieldDecl {
+                        default: fd
+                            .default
+                            .as_ref()
+                            .map(|d| lcr_expr(d, &ctors, &mut Vec::new())),
+                        ..fd.clone()
+                    })
+                    .collect(),
+            }),
+            Item::Variant(_) | Item::Import(_) => item.clone(),
+        })
+        .collect();
+    Program { items }
+}
+
+/// [`lower_ctor_refs`]'s expression walk. `scope` is the stack of bindings in
+/// scope (a name is pushed for the subexpressions it covers and popped after),
+/// so a shadowed constructor name is left alone.
+fn lcr_expr(e: &Expr, ctors: &HashMap<&str, &[Type]>, scope: &mut Vec<String>) -> Expr {
+    use ExprKind as K;
+    let rw = |k: ExprKind| Expr::new(k, e.span.clone());
+    match &e.kind {
+        K::Ident(name) => {
+            let Some(payload) = ctors.get(name.as_str()) else {
+                return e.clone();
+            };
+            if scope.iter().any(|s| s == name) {
+                return e.clone();
+            }
+            // `Circle` → `|__ctor0: T0, ..| Circle(__ctor0, ..)`, every piece
+            // carrying the reference's span.
+            let params: Vec<LambdaParam> = payload
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| LambdaParam {
+                    name: format!("__ctor{i}"),
+                    ty: Some(ty.clone()),
+                    span: e.span.clone(),
+                })
+                .collect();
+            let args: Vec<Expr> = (0..payload.len())
+                .map(|i| Expr::new(K::Ident(format!("__ctor{i}")), e.span.clone()))
+                .collect();
+            let body = Expr::new(K::Call(name.clone(), args, false), e.span.clone());
+            rw(K::Lambda(params, Box::new(body)))
+        }
+        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => e.clone(),
+        K::Call(name, args, method) => rw(K::Call(
+            name.clone(),
+            args.iter().map(|a| lcr_expr(a, ctors, scope)).collect(),
+            *method,
+        )),
+        K::ArrayLit(xs) => rw(K::ArrayLit(
+            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+        )),
+        K::SetLit(xs) => rw(K::SetLit(
+            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+        )),
+        K::TupleLit(xs) => rw(K::TupleLit(
+            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+        )),
+        K::DictLit(pairs) => rw(K::DictLit(
+            pairs
+                .iter()
+                .map(|(k, v)| (lcr_expr(k, ctors, scope), lcr_expr(v, ctors, scope)))
+                .collect(),
+        )),
+        K::Construct(name, inits) => rw(K::Construct(
+            name.clone(),
+            inits
+                .iter()
+                .map(|init| FieldInit {
+                    value: lcr_expr(&init.value, ctors, scope),
+                    ..init.clone()
+                })
+                .collect(),
+        )),
+        K::Binop(a, op, b) => rw(K::Binop(
+            Box::new(lcr_expr(a, ctors, scope)),
+            *op,
+            Box::new(lcr_expr(b, ctors, scope)),
+        )),
+        K::Seq(a, b) => rw(K::Seq(
+            Box::new(lcr_expr(a, ctors, scope)),
+            Box::new(lcr_expr(b, ctors, scope)),
+        )),
+        K::Index(a, b) => rw(K::Index(
+            Box::new(lcr_expr(a, ctors, scope)),
+            Box::new(lcr_expr(b, ctors, scope)),
+        )),
+        K::While(a, b) => rw(K::While(
+            Box::new(lcr_expr(a, ctors, scope)),
+            Box::new(lcr_expr(b, ctors, scope)),
+        )),
+        K::Let(name, val, body) => {
+            let val = lcr_expr(val, ctors, scope);
+            scope.push(name.clone());
+            let body = lcr_expr(body, ctors, scope);
+            scope.pop();
+            rw(K::Let(name.clone(), Box::new(val), Box::new(body)))
+        }
+        K::LetMut(name, val, body) => {
+            let val = lcr_expr(val, ctors, scope);
+            scope.push(name.clone());
+            let body = lcr_expr(body, ctors, scope);
+            scope.pop();
+            rw(K::LetMut(name.clone(), Box::new(val), Box::new(body)))
+        }
+        K::For(var, iter, body) => {
+            let iter = lcr_expr(iter, ctors, scope);
+            scope.push(var.clone());
+            let body = lcr_expr(body, ctors, scope);
+            scope.pop();
+            rw(K::For(var.clone(), Box::new(iter), Box::new(body)))
+        }
+        K::Assign(lhs, val, body) => rw(K::Assign(
+            Box::new(lcr_expr(lhs, ctors, scope)),
+            Box::new(lcr_expr(val, ctors, scope)),
+            Box::new(lcr_expr(body, ctors, scope)),
+        )),
+        K::If(c, t, f) => rw(K::If(
+            Box::new(lcr_expr(c, ctors, scope)),
+            Box::new(lcr_expr(t, ctors, scope)),
+            Box::new(lcr_expr(f, ctors, scope)),
+        )),
+        K::Neg(x) => rw(K::Neg(Box::new(lcr_expr(x, ctors, scope)))),
+        K::Not(x) => rw(K::Not(Box::new(lcr_expr(x, ctors, scope)))),
+        K::Field(x, f) => rw(K::Field(Box::new(lcr_expr(x, ctors, scope)), f.clone())),
+        K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, ctors, scope)))),
+        K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, ctors, scope)))),
+        K::KwArg(name, x) => rw(K::KwArg(name.clone(), Box::new(lcr_expr(x, ctors, scope)))),
+        K::Lambda(params, body) => {
+            for p in params {
+                scope.push(p.name.clone());
+            }
+            let body = lcr_expr(body, ctors, scope);
+            for _ in params {
+                scope.pop();
+            }
+            rw(K::Lambda(params.clone(), Box::new(body)))
+        }
+        K::Match(scrutinee, arms) => {
+            let scrutinee = lcr_expr(scrutinee, ctors, scope);
+            let arms = arms
+                .iter()
+                .map(|arm| {
+                    let bindings = arm.pattern.bindings();
+                    for b in bindings {
+                        scope.push(b.clone());
+                    }
+                    let body = lcr_expr(&arm.body, ctors, scope);
+                    for _ in bindings {
+                        scope.pop();
+                    }
+                    MatchArm {
+                        body,
+                        ..arm.clone()
+                    }
+                })
+                .collect();
+            rw(K::Match(Box::new(scrutinee), arms))
+        }
+        K::Slice(a, b, c) => rw(K::Slice(
+            Box::new(lcr_expr(a, ctors, scope)),
+            Box::new(lcr_expr(b, ctors, scope)),
+            c.as_ref().map(|c| Box::new(lcr_expr(c, ctors, scope))),
+        )),
+    }
+}
+
 /// Lower all `Type::Tuple` annotations in `program` to synthetic named structs.
 ///
 /// Every `(A, B, C)` type annotation is replaced by `Type::Named("__tuple$A$B$C")` and
@@ -1437,11 +1666,15 @@ impl Mono<'_> {
         // `is_char_array` in aipl-codegen) — 1 byte per element, not the
         // generic 8-byte slot this in-place overwrite assumes — so it's
         // excluded from the reusable set even though a bare `char` is
-        // otherwise a plain 8-byte scalar.
+        // otherwise a plain 8-byte scalar. A `Named` element is a composite
+        // whether it names a struct *or a variant* (tag + payload, 16+
+        // bytes), so both are excluded.
         let reusable = |t: &Type| {
             !matches!(t, Type::Optional(_))
                 && !matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
-                && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
+                && !matches!(t, Type::Named(n) if self.structs.contains_key(n)
+                    || self.syn_structs.contains_key(n)
+                    || self.variants.contains_key(n))
         };
         let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
 

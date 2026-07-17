@@ -2986,6 +2986,11 @@ fn compile_program<M: Module>(
     // and monomorphization so the rest of the pipeline only sees named types.
     let program = &aipl_mono::lower_tuples(program);
 
+    // Rewrite payload-carrying variant constructors used as function values
+    // (`xs.map(Circle)`) into equivalent lambdas, so the checker and mono only
+    // ever see the ordinary lambda form.
+    let program = &aipl_mono::lower_ctor_refs(program);
+
     // Builtin signatures may contain tuple types (e.g. `enumerate`'s `(i64, T)[]`
     // return), so lower them the same way the user's program was lowered. The
     // resulting synthetic struct definitions are prepended; the checker overwrites
