@@ -1,0 +1,15 @@
+import { *, ==, map, to_str } from builtins;
+
+// A lint: `|x| to_str(x)` (or the method form `|x| x.to_str()`) only forwards
+// its argument to a single call, so the lambda is redundant — pass `to_str`
+// itself. Lints are ordinary errors, but appending `#[allow]` to the offending
+// line squelches them (see eta_lambda_allow.aipl).
+fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }.test({
+    assert(stringify([1, 2, 3]) == ["1", "2", "3"]);
+})
+--- errors ---
+error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_eta_lambda.aipl:7:43
+  |
+7 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }.test({
+  |                                           ^^^^^^^^^^^^

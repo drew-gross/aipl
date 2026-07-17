@@ -11,8 +11,12 @@ fn tag(self: i64[], f: (i64) -> str) -> str[] {
     out
 }.test({
     let xs = [1, 2, 3];
-    assert(tag(xs, |x| to_str(x)) == ["1", "2", "3"]); // function-call form
-    assert(xs.tag(|x| to_str(x)) == ["1", "2", "3"]); // method-call form
+
+    // function-call form (the forwarding lambda is kept deliberately, hence
+    // #[allow]; see the eta-lambda lint)
+    assert(tag(xs, |x| to_str(x)) == ["1", "2", "3"]); #[allow]
+    // method-call form
+    assert(xs.tag(|x| to_str(x)) == ["1", "2", "3"]); #[allow]
     // A capture works in method form too.
     let suffix = 100;
     assert(xs.tag(|x| to_str(x + suffix)) == ["101", "102", "103"]);

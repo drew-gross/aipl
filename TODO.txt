@@ -43,3 +43,5 @@ support rust style field construction when the field and variable name are the s
 remove install_parser_hook with lazy loader
 
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
+
+spread in args e.g. fn foo(self: Span { start, end })

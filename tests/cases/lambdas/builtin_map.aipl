@@ -12,7 +12,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     assert(xs.map(|x| x + k) == [11, 12, 13]);
 
     // map may change the element type.
-    assert(xs.map(|x| to_str(x)) == ["1", "2", "3"]);
+    assert(xs.map(to_str) == ["1", "2", "3"]);
 
     // chained / nested.
     assert(xs.map(|x| x + 1).map(|y| y * y) == [4, 9, 16]);
@@ -23,7 +23,7 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 616
 instructions executed: 1408
-binary size: 6416
+binary size: 6408
 --- monomorphizations ---
-__map12$own0
+__map11$own0
 main

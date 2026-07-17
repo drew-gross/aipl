@@ -22,21 +22,19 @@ fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
     // Lambda in test block calling is_even. Without the fix, the lambda
     // would inherit !prints from the synthesized test function, causing
     // effect mismatches. With the fix, the lambda correctly has no effects.
-    assert(filter_evens([1, 2, 3, 4, 5], |x| is_even(x)) == [2, 4]);
+    assert(filter_evens([1, 2, 3, 4, 5], is_even) == [2, 4]);
 
     // Call it again with a different array to ensure the specialization
     // is stable and works consistently.
-    assert(filter_evens([10, 11, 12, 13], |x| is_even(x)) == [10, 12]);
+    assert(filter_evens([10, 11, 12, 13], is_even) == [10, 12]);
 })
 --- performance ---
 allocations: 6
 deallocations: 6
 reallocations: 4
 bytes allocated: 296
-instructions executed: 593
-binary size: 3592
+instructions executed: 575
+binary size: 3056
 --- monomorphizations ---
-filter_evens$lam1
-filter_evens$lam3
-is_even
+filter_evens$lam0
 main

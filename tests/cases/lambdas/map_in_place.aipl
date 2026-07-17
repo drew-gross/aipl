@@ -25,7 +25,7 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     // T != U, both 8-byte — also in place. i64 -> str: each scalar slot is
     // overwritten with a fresh string and the array's element drop-fn is patched
     // from null (i64) to `str`'s, so the result strings are freed exactly once.
-    assert([1, 2, 3].map(|x| to_str(x)) == ["1", "2", "3"]);
+    assert([1, 2, 3].map(to_str) == ["1", "2", "3"]);
 
     // str -> bool is NOT in place: a `bool[]` is bit-packed (8 per byte), so it
     // can't reuse the 8-byte-per-element `str` buffer. Built fresh via the
@@ -38,12 +38,12 @@ deallocations: 16
 reallocations: 1
 bytes allocated: 817
 instructions executed: 1924
-binary size: 9032
+binary size: 9024
 --- monomorphizations ---
 __map1$own0
 __map10$own0
-__map12$own0
-__map14
+__map11$own0
+__map13
 __map3$own0
 __map5$own0
 __map7$own0

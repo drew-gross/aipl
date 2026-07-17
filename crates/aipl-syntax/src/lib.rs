@@ -1376,6 +1376,7 @@ pub mod lint {
             allows.iter().map(|sp| line_of(src, sp.start)).collect();
         let mut hits: Vec<Error> = Vec::new();
         each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
+        each_expr(program, &mut |e| eta_lambda(e, &mut hits));
         hits.retain(|e| match &e.span {
             Some(sp) => !allowed.contains(&line_of(src, sp.start)),
             None => true,
@@ -1420,6 +1421,42 @@ pub mod lint {
                  \"{recv}[{st}..]\" (or append #[allow] to this line to keep it)"
             ),
             end.span.clone(),
+        ));
+    }
+
+    /// `|x| f(x)` / `|x| x.f()` — a lambda whose body only forwards its
+    /// parameters, unchanged and in order, to a single call. A named function
+    /// (or a function-typed value) can be passed directly, so recommend passing
+    /// `f` itself. Purely syntactic: the call's arguments must be exactly the
+    /// lambda parameters as bare identifiers, in order and in full — a captured
+    /// or reordered argument, an extra argument, or an unused parameter all
+    /// leave it un-flagged. The callee name must not itself be one of the
+    /// parameters (that's self-application, `|x| x(x)`, not forwarding). Method
+    /// form (`x.f()`) is stored as the free call `f(x)`, so it's covered too.
+    fn eta_lambda(e: &Expr, hits: &mut Vec<Error>) {
+        let ExprKind::Lambda(params, body) = &e.kind else {
+            return;
+        };
+        let ExprKind::Call(name, args, _) = &body.kind else {
+            return;
+        };
+        if args.len() != params.len() || params.iter().any(|p| &p.name == name) {
+            return;
+        }
+        for (arg, param) in args.iter().zip(params) {
+            let ExprKind::Ident(a) = &arg.kind else {
+                return;
+            };
+            if a != &param.name {
+                return;
+            }
+        }
+        hits.push(Error::at(
+            format!(
+                "lambda only forwards its argument(s) to \"{name}\" — pass \
+                 \"{name}\" directly (or append #[allow] to this line to keep it)"
+            ),
+            e.span.clone(),
         ));
     }
 
