@@ -1,0 +1,14 @@
+import { len, print } from builtins;
+
+// The open-start form `x[..x.len()]` synthesizes a `0` start, so the
+// recommendation spells it back out: `x[0..]`.
+fn main() !prints {
+    let x = "hello";
+    print(x[..x.len()]);
+}
+--- errors ---
+error: slice end is the receiver's whole length — use the open-ended "x[0..]" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_slice_to_len_open_start.aipl:7:15
+  |
+7 |     print(x[..x.len()]);
+  |               ^^^^^

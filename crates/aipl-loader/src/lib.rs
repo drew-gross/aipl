@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aipl_parser::parse;
+use aipl_parser::parse_with_allows;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
     MatchArm, Param, Program, Signature, StructDecl, Type, TypeParam,
@@ -169,7 +169,10 @@ impl Loader {
         // Keep the original Error (including span) so `render()` can show
         // the caret pointing into the imported file's source. The path
         // tied to that source is implicit from the source line itself.
-        let program = parse(src)?;
+        let (program, allows) = parse_with_allows(src)?;
+        // Lints run right after the parse, per file, while the source (for
+        // line-scoped `#[allow]` squelching) is in hand.
+        aipl_syntax::lint::check(&program, src, &allows)?;
         check_no_duplicate_import_sources(&program)?;
 
         let mut items = Vec::new();
@@ -221,7 +224,8 @@ impl Loader {
     ///
     /// [`check_virtual_imports`]: Loader::check_virtual_imports
     fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Error> {
-        let program = parse(src)?;
+        let (program, allows) = parse_with_allows(src)?;
+        aipl_syntax::lint::check(&program, src, &allows)?;
         if !key.starts_with("./") {
             panic!("non-relative path: {key:?}");
         }

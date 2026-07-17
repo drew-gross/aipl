@@ -1,0 +1,19 @@
+import { len, print } from builtins;
+
+// The `#[allow]` lint-squelch marker rides through formatting like a
+// trailing comment: glued to its line with one space, so the line-scoped
+// squelch keeps working on the formatted output.
+fn main() !prints {
+    let x = "hello";
+      print(x[0..x.len()]);     #[allow]
+}
+--- formatted ---
+import { len, print } from builtins;
+
+// The `#[allow]` lint-squelch marker rides through formatting like a
+// trailing comment: glued to its line with one space, so the line-scoped
+// squelch keeps working on the formatted output.
+fn main() !prints {
+    let x = "hello";
+    print(x[0..x.len()]); #[allow]
+}

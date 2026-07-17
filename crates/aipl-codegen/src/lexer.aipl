@@ -183,7 +183,7 @@ pub fn with_floats(self: LexRules, on: bool) -> LexRules {
 // Whether `marker` occurs in `self` starting at byte offset `at`. An empty
 // marker never matches, so a feature whose marker is "" is simply off.
 fn matches_at(self: str, at: i64, marker: str) -> bool {
-    0 < marker.len() && self[at..self.len()].starts_with(marker)
+    0 < marker.len() && self[at..].starts_with(marker)
 }
 
 // The string token opened by the delimiter `delim` at `start`: it spans to

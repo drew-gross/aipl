@@ -2270,6 +2270,24 @@ fn record_comment(span: Span) {
     });
 }
 
+thread_local! {
+    /// When armed (by [`parse_with_allows`]), every `#[allow]` lint-squelch
+    /// marker's span is recorded here. Same shape as [`COMMENT_SINK`]: plain
+    /// [`parse`] leaves it disarmed (the markers only matter to the loader's
+    /// lint pass, which uses `parse_with_allows`).
+    static ALLOW_SINK: std::cell::RefCell<Option<Vec<Span>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Record an `#[allow]` marker's span into the armed sink, if any.
+fn record_allow(span: Span) {
+    ALLOW_SINK.with(|sink| {
+        if let Some(v) = sink.borrow_mut().as_mut() {
+            v.push(span);
+        }
+    });
+}
+
 /// Tokenize, pairing each terminal with its source span so the parser can
 /// point a caret at the offending token on a syntax error.
 /// Process the verbatim contents of a `"""..."""` raw string: trim the
@@ -2594,6 +2612,30 @@ fn tokenize_one<I: Iterator<Item = char>>(
             start..src.offset(),
         ));
         return Ok(());
+    }
+
+    // `#[allow]` — the lint-squelch marker (see `aipl_syntax::lint`). Not a
+    // token: like a comment it is recorded and skipped, and it squelches every
+    // *lint* error on its line (regular errors are unaffected). Checked ahead
+    // of the single-char `#`, so a `#[` not followed by exactly `allow]` still
+    // lexes as HASH + LBRACKET (a parse error, as ever).
+    if c == '#' {
+        const MARKER: &str = "[allow]";
+        if MARKER
+            .chars()
+            .enumerate()
+            .all(|(i, m)| src.peek_n(i + 1) == Some(m))
+        {
+            for _ in 0..=MARKER.len() {
+                src.advance();
+            }
+            let span = start..src.offset();
+            record_allow(span.clone());
+            // Recorded as a comment too, so the formatter carries it through
+            // (rendered verbatim, glued to its line like a trailing comment).
+            record_comment(span);
+            return Ok(());
+        }
     }
 
     // Two-char operators (must beat their single-char counterparts). An
@@ -3319,6 +3361,19 @@ fn reject_trailing_whitespace(src: &str) -> Result<(), Error> {
             span,
         )),
     }
+}
+
+/// [`parse`], additionally returning the spans of every `#[allow]`
+/// lint-squelch marker the lexer skipped — the loader hands them to
+/// [`aipl_syntax::lint`]'s pass, which drops lint errors squelched by a
+/// same-line marker.
+pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Error> {
+    ALLOW_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+    let result = parse(input);
+    let allows = ALLOW_SINK
+        .with(|sink| sink.borrow_mut().take())
+        .expect("allow sink armed above");
+    Ok((result?, allows))
 }
 
 pub fn parse(input: &str) -> Result<Program, Error> {

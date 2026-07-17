@@ -1,0 +1,20 @@
+import { len, print } from builtins;
+
+// `#[allow]` at the end of a line squelches every lint on that line — the
+// program compiles and runs as written. Only lints are squelchable; regular
+// errors (type mismatches etc.) take no notice of the marker.
+fn main() !prints {
+    let x = "hello, world";
+    print(x[3..x.len()]); #[allow]
+}
+--- stdout ---
+lo, world
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 32
+instructions executed: 13
+binary size: 960
+--- monomorphizations ---
+main

@@ -31,11 +31,13 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 Make x..y syntax for creating spans
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
+leverage defaults in lexer.aipl, remove the fluent API stuff
 lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 warn/err on:
 - bar(|x| x.foo()) or bar(|x| foo(x)) (just use bar(foo))
-- vec[x..x.len()] should just be vec[x..]
+- self[end].value_or(' ') == '.' should be self[end] == some('.')
 output multiple errors at once
 support rust style field construction when the field and variable name are the same
+remove install_parser_hook with lazy loader

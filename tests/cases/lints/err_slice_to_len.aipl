@@ -1,0 +1,15 @@
+import { len, print } from builtins;
+
+// A lint: `x[y..x.len()]` already means "to the end", so the open-ended
+// `x[y..]` is the right spelling. Lints are ordinary errors, but appending
+// `#[allow]` to the offending line squelches them (see allow_squelch.aipl).
+fn main() !prints {
+    let x = "hello, world";
+    print(x[3..x.len()]);
+}
+--- errors ---
+error: slice end is the receiver's whole length — use the open-ended "x[3..]" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_slice_to_len.aipl:8:16
+  |
+8 |     print(x[3..x.len()]);
+  |                ^^^^^

@@ -1,0 +1,15 @@
+import { len, print } from builtins;
+
+// `#[allow]` is line-scoped: a marker on a neighboring line squelches
+// nothing.
+fn main() !prints {
+    let x = "hello, world";
+    #[allow]
+    print(x[3..x.len()]);
+}
+--- errors ---
+error: slice end is the receiver's whole length — use the open-ended "x[3..]" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_allow_wrong_line.aipl:8:16
+  |
+8 |     print(x[3..x.len()]);
+  |                ^^^^^
