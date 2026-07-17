@@ -390,7 +390,7 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     // JSON-flavored rules: strings, floats, and idents for true/false/null.
     // (A leading `-` on a number stays a `Punct` for the parser to fold in.)
     let json = default_rules().with_string_delims("\"").with_floats(true);
-    let jsrc = "{\"pi\": 3.14, \"n\": [1, 2e10, true]}";
+    let jsrc = """{"pi": 3.14, "n": [1, 2e10, true]}""";
     let jtoks = [
         // `{`, `"pi"`, `:`
         tok(Punct, 0, 1),
