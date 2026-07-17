@@ -15,4 +15,4 @@ error: set: cannot assign to immutable binding "n" (use "let mut")
   --> ./tests/cases/methods/mutating/err_immutable_receiver.aipl:10:9
    |
 10 |     set n.add(2);
-   |         ^^^^^^^^^
+   |         ^^^^^^^

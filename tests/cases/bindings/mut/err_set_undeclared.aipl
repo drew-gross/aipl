@@ -7,4 +7,4 @@ error: set: undeclared variable "ghost"
  --> ./tests/cases/bindings/mut/err_set_undeclared.aipl:2:9
   |
 2 |     set ghost = 1;
-  |         ^^^^^^^^^^
+  |         ^^^^^^^^^

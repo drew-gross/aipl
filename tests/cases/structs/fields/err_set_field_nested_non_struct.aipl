@@ -1,0 +1,12 @@
+struct Point { x: i64, y: i64 }
+
+fn main() {
+    mut p = Point { x: 1, y: 2 };
+    set p.x.y = 3;
+}
+--- errors ---
+error: set: field assignment target must be a struct, "p.x" has type i64
+ --> ./tests/cases/structs/fields/err_set_field_nested_non_struct.aipl:5:9
+  |
+5 |     set p.x.y = 3;
+  |         ^^^^^^^^^

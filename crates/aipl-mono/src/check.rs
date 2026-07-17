@@ -20,6 +20,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use aipl_syntax::ast;
 use aipl_syntax::ast::{
     Expr, ExprKind, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program, Signature,
     Type,
@@ -931,64 +932,60 @@ impl Cx<'_> {
                 );
                 self.check_expr(body, &env2, effects)?
             }
-            ExprKind::Assign(name, val, body) => {
-                let binding = env.get(name).ok_or_else(|| {
-                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
-                })?;
-                if !binding.mutable {
+            ExprKind::Assign(lhs, val, body) => {
+                let Some((name, path)) = ast::assign_target(lhs) else {
                     return Err(Error::at(
-                        format!(
-                            "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
-                        ),
-                        span.clone(),
-                    ));
-                }
-                let expected = binding.ty.clone();
-                let vt = self.check_expr(val, env, effects)?;
-                expect(&vt, &expected, "set", val.span.clone())?;
-                self.check_expr(body, env, effects)?
-            }
-            ExprKind::AssignField(name, field, val, body) => {
-                let binding = env.get(name).ok_or_else(|| {
-                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
-                })?;
-                if !binding.mutable {
-                    return Err(Error::at(
-                        format!(
-                            "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
-                        ),
-                        span.clone(),
-                    ));
-                }
-                let ty = binding.ty.clone();
-                let Type::Named(sn) = &ty else {
-                    return Err(Error::at(
-                        format!(
-                            "set: field assignment target must be a struct, {name:?} has type {}",
-                            tyname(&ty)
-                        ),
-                        span.clone(),
+                        "set: assignment target must be a variable or a field of one".to_string(),
+                        lhs.span.clone(),
                     ));
                 };
-                let fields = self.struct_fields(sn).ok_or_else(|| {
-                    Error::at(
+                let binding = env.get(name).ok_or_else(|| {
+                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+                })?;
+                if !binding.mutable {
+                    return Err(Error::at(
                         format!(
-                            "set: field assignment target must be a struct, {name:?} has type {}",
-                            display(sn)
+                            "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
                         ),
                         span.clone(),
-                    )
-                })?;
-                let expected = fields
-                    .iter()
-                    .find(|(n, _, _)| n == field)
-                    .map(|(_, t, _)| t.clone())
-                    .ok_or_else(|| {
+                    ));
+                }
+                // Walk the field path down to the stored-to place's type; every
+                // step but the last must land on a struct.
+                let mut expected = binding.ty.clone();
+                for (i, field) in path.iter().enumerate() {
+                    let target = ast::assign_target_display(name, &path, i);
+                    let Type::Named(sn) = &expected else {
+                        return Err(Error::at(
+                            format!(
+                                "set: field assignment target must be a struct, {target:?} \
+                                 has type {}",
+                                tyname(&expected)
+                            ),
+                            span.clone(),
+                        ));
+                    };
+                    let fields = self.struct_fields(sn).ok_or_else(|| {
                         Error::at(
-                            format!("struct {:?} has no field {field:?}", display(sn)),
+                            format!(
+                                "set: field assignment target must be a struct, {target:?} \
+                                 has type {}",
+                                display(sn)
+                            ),
                             span.clone(),
                         )
                     })?;
+                    expected = fields
+                        .iter()
+                        .find(|(n, _, _)| n == *field)
+                        .map(|(_, t, _)| t.clone())
+                        .ok_or_else(|| {
+                            Error::at(
+                                format!("struct {:?} has no field {field:?}", display(sn)),
+                                span.clone(),
+                            )
+                        })?;
+                }
                 let vt = self.check_expr(val, env, effects)?;
                 expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr(body, env, effects)?

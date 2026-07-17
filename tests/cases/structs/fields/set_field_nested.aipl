@@ -1,0 +1,61 @@
+import { wrapping_add as +, +++, == } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Line { start: Point, end: Point, label: str }
+
+// `set l.start.x = v;` rewrites one nested field, leaving every other field —
+// at both levels — unchanged.
+fn shift_start_x(l: Line, by: i64) -> Line {
+    mut m = l;
+    set m.start.x = m.start.x + by;
+    m
+}.test({
+    let l = Line {
+        start: Point { x: 1, y: 2 },
+        end: Point { x: 10, y: 20 },
+        label: "diag" +++ "onal",
+    };
+    let m = shift_start_x(l, 100);
+    assert(m.start.x == 101); // updated nested field
+    assert(m.start.y == 2); // sibling at the inner level unchanged
+    assert(m.end.x == 10); // sibling at the outer level unchanged
+    assert(m.label == "diagonal"); // heap field carried across the update
+    assert(l.start.x == 1); // source struct unaffected
+})
+
+// Three levels deep, plus a heap (str) field replaced mid-struct: the old
+// label is released and the new one co-owned — the performance section below
+// shows the allocations balance.
+struct Seg { line: Line, id: i64 }
+
+fn retag(s: Seg, tag: str, y: i64) -> Seg {
+    mut t = s;
+    set t.line.start.y = y;
+    set t.line.label = tag;
+    t
+}.test({
+    let s = Seg {
+        line: Line {
+            start: Point { x: 1, y: 2 },
+            end: Point { x: 10, y: 20 },
+            label: "old" +++ "!",
+        },
+        id: 5,
+    };
+    let t = retag(s, "new" +++ "!", 9);
+    assert(t.line.start.y == 9); // updated three levels down
+    assert(t.line.start.x == 1); // deep sibling unchanged
+    assert(t.line.label == "new!"); // replaced heap field
+    assert(t.id == 5); // top-level sibling unchanged
+    assert(s.line.start.y == 2); // source struct unaffected
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 120
+instructions executed: 347
+binary size: 4984
+--- monomorphizations ---
+main

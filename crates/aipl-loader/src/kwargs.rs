@@ -459,14 +459,10 @@ impl Expander {
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, &with(name))?),
             ),
-            ExprKind::Assign(name, value, body) => ExprKind::Assign(
-                name.clone(),
-                Box::new(self.expand_expr(value, locals)?),
-                Box::new(self.expand_expr(body, locals)?),
-            ),
-            ExprKind::AssignField(name, field, value, body) => ExprKind::AssignField(
-                name.clone(),
-                field.clone(),
+            // The LHS is a place rooted at a local mut binding (idents/fields
+            // only — no calls), so it needs no expansion.
+            ExprKind::Assign(lhs, value, body) => ExprKind::Assign(
+                lhs.clone(),
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, locals)?),
             ),

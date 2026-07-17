@@ -30,6 +30,7 @@ mod check;
 pub use check::check;
 
 use aipl_syntax::{
+    ast,
     ast::{
         is_unit, Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam,
         MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
@@ -248,14 +249,8 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
-        ExprKind::Assign(n, a, b) => ExprKind::Assign(
-            n.clone(),
-            Box::new(lt_expr(a, fm, ord)),
-            Box::new(lt_expr(b, fm, ord)),
-        ),
-        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
-            n.clone(),
-            f.clone(),
+        ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
+            lhs.clone(),
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
@@ -1001,13 +996,9 @@ fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
         ExprKind::Call("__builtin_push".to_string(), vec![out.clone(), val], true),
         span.clone(),
     );
-    let out_name = match &out.kind {
-        ExprKind::Ident(n) => n.clone(),
-        _ => unreachable!("set_push accumulator is always an ident"),
-    };
     Expr::new(
         ExprKind::Assign(
-            out_name,
+            Box::new(out),
             Box::new(call),
             Box::new(Expr::new(ExprKind::Unit, span.clone())),
         ),
@@ -1503,7 +1494,7 @@ impl Mono<'_> {
             );
             let incr = Expr::new(
                 ExprKind::Assign(
-                    "$i".to_string(),
+                    Box::new(id("$i")),
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id("$i")),
@@ -1781,7 +1772,7 @@ impl Mono<'_> {
         let incr = |n: &str| {
             Expr::new(
                 ExprKind::Assign(
-                    n.to_string(),
+                    Box::new(id(n)),
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id(n)),
@@ -2192,7 +2183,7 @@ impl Mono<'_> {
             );
             let incr = Expr::new(
                 ExprKind::Assign(
-                    "$w".to_string(),
+                    Box::new(id("$w")),
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id("$w")),
@@ -2363,7 +2354,7 @@ impl Mono<'_> {
         let push = set_push(id("$out"), tuple, span.clone());
         let incr = Expr::new(
             ExprKind::Assign(
-                "$i".to_string(),
+                Box::new(id("$i")),
                 Box::new(Expr::new(
                     ExprKind::Binop(
                         Box::new(id("$i")),
@@ -2652,6 +2643,70 @@ impl Mono<'_> {
             .unwrap_or(Type::Unit)
     }
 
+    /// Build the value expression for a field-path assignment (`set
+    /// <base>.<path> = val;`): the struct at each path step is rebuilt with
+    /// the addressed field replaced and every other field copied from the
+    /// current value — `set a.b.c = v` yields
+    /// `A { b: B { c: v, other: a.b.other }, other: a.other }`.
+    fn build_field_update(
+        &self,
+        base: &Expr,
+        base_ty: &Type,
+        path: &[&str],
+        val: &Expr,
+        span: &Span,
+    ) -> Result<Expr, Error> {
+        let field = path[0];
+        let Type::Named(sn) = base_ty else {
+            return Err(Error::at(
+                format!(
+                    "set: field assignment target must be a struct, got {}",
+                    type_name(base_ty)
+                ),
+                span.clone(),
+            ));
+        };
+        let field_defs = self
+            .structs
+            .get(sn.as_str())
+            .or_else(|| self.syn_structs.get(sn.as_str()))
+            .cloned()
+            .unwrap_or_default();
+        let Some((_, fty, _)) = field_defs.iter().find(|(n, _, _)| n.as_str() == field) else {
+            return Err(Error::at(
+                format!("struct {sn:?} has no field {field:?}"),
+                span.clone(),
+            ));
+        };
+        let fty = fty.clone();
+        let inits = field_defs
+            .iter()
+            .map(|(fname, _, _)| {
+                let read = Expr::new(
+                    ExprKind::Field(Box::new(base.clone()), fname.clone()),
+                    span.clone(),
+                );
+                let value = if fname.as_str() == field {
+                    if path.len() == 1 {
+                        val.clone()
+                    } else {
+                        self.build_field_update(&read, &fty, &path[1..], val, span)?
+                    }
+                } else {
+                    read
+                };
+                Ok(FieldInit {
+                    name: fname.clone(),
+                    value,
+                })
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+        Ok(Expr::new(
+            ExprKind::Construct(sn.clone(), inits),
+            span.clone(),
+        ))
+    }
+
     /// Infer `expr`'s concrete type while rewriting any generic call names to
     /// their mangled instances. Returns the rewritten expression and its type.
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
@@ -2902,13 +2957,39 @@ impl Mono<'_> {
                     bt,
                 )
             }
-            ExprKind::Assign(name, val, body) => {
+            ExprKind::Assign(lhs, val, body) => {
+                // A field-path LHS (`set a.b.c = v;`) is a functional update.
+                // Now that the structs along the path are known, desugar it to
+                // nested constructs — `set a = A { b: B { c: v, ... }, ... }`
+                // with every other field copied from the current value — and
+                // infer that; after this pass an `Assign` LHS is always a bare
+                // ident.
+                if !matches!(&lhs.kind, ExprKind::Ident(_)) {
+                    let Some((name, path)) = ast::assign_target(lhs) else {
+                        return Err(Error::at(
+                            "set: assignment target must be a variable or a field of one"
+                                .to_string(),
+                            lhs.span.clone(),
+                        ));
+                    };
+                    let ty = env.get(name).cloned().ok_or_else(|| {
+                        Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+                    })?;
+                    let base = Expr::new(ExprKind::Ident(name.to_string()), lhs.span.clone());
+                    let update = self.build_field_update(&base, &ty, &path, val, &span)?;
+                    let desugared = node(ExprKind::Assign(
+                        Box::new(base),
+                        Box::new(update),
+                        Box::new((**body).clone()),
+                    ));
+                    return self.infer(&desugared, env);
+                }
                 // `set recv.f(args)` parses to `set recv = recv.f(args)`: an
                 // in-place writeback, not a copy. Keep that method call raw by
                 // signalling the `Call` arm to skip the copy-and-modify desugar.
                 if matches!(
-                    &val.kind,
-                    ExprKind::Call(f, cargs, true)
+                    (&val.kind, &lhs.kind),
+                    (ExprKind::Call(f, cargs, true), ExprKind::Ident(name))
                         if self.mutating.contains(f)
                             && matches!(cargs.first().map(|a| &a.kind), Some(ExprKind::Ident(t)) if t == name)
                 ) {
@@ -2919,66 +3000,9 @@ impl Mono<'_> {
                 // Codegen compiles the body under the unchanged env.
                 let (rb, bt) = self.infer(body, env)?;
                 (
-                    node(ExprKind::Assign(name.clone(), Box::new(rv), Box::new(rb))),
+                    node(ExprKind::Assign(lhs.clone(), Box::new(rv), Box::new(rb))),
                     bt,
                 )
-            }
-            ExprKind::AssignField(name, field, val, body) => {
-                // `set name.field = val;` — a functional field update. Now that
-                // `name`'s struct type is known, desugar to the full construct
-                // `set name = S { field: val, other: name.other, ... }` and
-                // infer that; no later pass ever sees `AssignField`.
-                let ty = env.get(name).cloned().ok_or_else(|| {
-                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
-                })?;
-                let Type::Named(sn) = &ty else {
-                    return Err(Error::at(
-                        format!(
-                            "set: field assignment target must be a struct, {name:?} has type {}",
-                            type_name(&ty)
-                        ),
-                        span.clone(),
-                    ));
-                };
-                let field_defs = self
-                    .structs
-                    .get(sn.as_str())
-                    .or_else(|| self.syn_structs.get(sn.as_str()))
-                    .cloned()
-                    .unwrap_or_default();
-                if !field_defs.iter().any(|(n, _, _)| n == field) {
-                    return Err(Error::at(
-                        format!("struct {sn:?} has no field {field:?}"),
-                        span.clone(),
-                    ));
-                }
-                let inits = field_defs
-                    .iter()
-                    .map(|(fname, _, _)| FieldInit {
-                        name: fname.clone(),
-                        value: if fname == field {
-                            (**val).clone()
-                        } else {
-                            Expr::new(
-                                ExprKind::Field(
-                                    Box::new(Expr::new(
-                                        ExprKind::Ident(name.clone()),
-                                        span.clone(),
-                                    )),
-                                    fname.clone(),
-                                ),
-                                span.clone(),
-                            )
-                        },
-                    })
-                    .collect();
-                let construct = Expr::new(ExprKind::Construct(sn.clone(), inits), span.clone());
-                let desugared = node(ExprKind::Assign(
-                    name.clone(),
-                    Box::new(construct),
-                    Box::new((**body).clone()),
-                ));
-                return self.infer(&desugared, env);
             }
             ExprKind::For(var, iter, body) => {
                 let (ri, it) = self.infer(iter, env)?;
@@ -3171,7 +3195,7 @@ impl Mono<'_> {
                         let method = node(ExprKind::Call(name.clone(), margs, true));
                         // `set __mut_copy$k.foo(rest..); __mut_copy$k`
                         let set = node(ExprKind::Assign(
-                            tmp.clone(),
+                            Box::new(node(ExprKind::Ident(tmp.clone()))),
                             Box::new(method),
                             Box::new(recv()),
                         ));
@@ -4239,18 +4263,13 @@ fn collect_free(
                 bound.remove(n);
             }
         }
-        ExprKind::Assign(_, val, b) => {
-            collect_free(val, bound, env, out, seen);
-            collect_free(b, bound, env, out, seen);
-        }
-        // Unlike `Assign`, the target is also a *read*: the functional-update
-        // desugar copies the struct's other fields out of it.
-        ExprKind::AssignField(n, _, val, b) => {
-            if !bound.contains(n) && !seen.contains(n) {
-                if let Some(t) = env.get(n) {
-                    seen.insert(n.clone());
-                    out.push((n.clone(), t.clone()));
-                }
+        // A bare-ident LHS is an lvalue, not a use; a field-path LHS is also a
+        // *read* (the functional-update desugar copies the struct's other
+        // fields out of it), so walk it like any expression — it bottoms out
+        // at the base `Ident`.
+        ExprKind::Assign(lhs, val, b) => {
+            if !matches!(&lhs.kind, ExprKind::Ident(_)) {
+                collect_free(lhs, bound, env, out, seen);
             }
             collect_free(val, bound, env, out, seen);
             collect_free(b, bound, env, out, seen);
@@ -4411,10 +4430,9 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
                 bound.remove(n);
             }
         }
-        // `Assign`'s target is an existing binding (an lvalue), not a use.
-        // (`AssignField`'s target also reads the struct, but it's a local
-        // either way — never a countable function reference.)
-        ExprKind::Assign(_, val, b) | ExprKind::AssignField(_, _, val, b) => {
+        // An `Assign` LHS is rooted at an existing binding (an lvalue) — a
+        // local either way, never a countable function reference.
+        ExprKind::Assign(_, val, b) => {
             count_uses(val, bound, counts);
             count_uses(b, bound, counts);
         }
@@ -4725,7 +4743,6 @@ fn children(e: &Expr) -> Vec<&Expr> {
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => vec![a, b],
         ExprKind::If(a, b, c) => vec![a, b, c],
@@ -4884,14 +4901,9 @@ fn replace_call(
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
-        ExprKind::Assign(n, a, b) => ExprKind::Assign(
-            n.clone(),
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-        ),
-        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
-            n.clone(),
-            f.clone(),
+        // The LHS is a place (idents/fields only) — no calls to replace.
+        ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
+            lhs.clone(),
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
@@ -5073,16 +5085,10 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                 })
                 .collect(),
         ),
-        // `Assign`'s target is a `mut` local (parameters are immutable), so it's
-        // never a mapped parameter — keep it.
-        ExprKind::Assign(n, a, b) => ExprKind::Assign(
-            n.clone(),
-            Box::new(rename_params(a, map)),
-            Box::new(rename_params(b, map)),
-        ),
-        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
-            n.clone(),
-            f.clone(),
+        // An `Assign` LHS is rooted at a `mut` local (parameters are
+        // immutable), so it never names a mapped parameter — keep it.
+        ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
+            lhs.clone(),
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, map)),
         ),
@@ -5263,7 +5269,14 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         ExprKind::Let(_, val, b) | ExprKind::LetMut(_, val, b) => {
             is_n(val) || rec(val) || rec_tail(b)
         }
-        ExprKind::Assign(target, val, b) => {
+        ExprKind::Assign(lhs, val, b) => {
+            // A field-path LHS (`set target.f = v`) both reads and rewrites
+            // `target` (the functional-update desugar copies its other
+            // fields), so recurse into it — a matching base ident makes it
+            // conservatively unsafe.
+            let ExprKind::Ident(target) = &lhs.kind else {
+                return rec(lhs) || is_n(val) || rec(val) || rec_tail(b);
+            };
             let lhs_bad = if target == name {
                 match &val.kind {
                     ExprKind::Binop(l, '+', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
@@ -5317,12 +5330,6 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             };
             lhs_bad || rec_tail(b)
         }
-        // `set target.field = val` both reads and rewrites `target` (the
-        // functional-update desugar copies its other fields), so a matching
-        // target is conservatively unsafe.
-        ExprKind::AssignField(target, _, val, b) => {
-            target == name || is_n(val) || rec(val) || rec_tail(b)
-        }
         ExprKind::For(_, iter, fbody) => {
             if is_n(iter) {
                 aliases_or_unsafe(name, fbody, true, false)
@@ -5363,12 +5370,20 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
-        | ExprKind::Assign(_, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => c(a) + c(b),
-        // The target is also a read (the functional-update desugar copies the
-        // struct's other fields out of it); overcounting is the safe direction.
-        ExprKind::AssignField(n, _, a, b) => usize::from(n == name) + c(a) + c(b),
+        // A bare-ident LHS is an lvalue, not a read; a field-path LHS also
+        // *reads* its base (the functional-update desugar copies the struct's
+        // other fields out of it) — counting it once overcounts at worst,
+        // which is the safe direction.
+        ExprKind::Assign(lhs, a, b) => {
+            let lhs_reads = if matches!(&lhs.kind, ExprKind::Ident(_)) {
+                0
+            } else {
+                c(lhs)
+            };
+            lhs_reads + c(a) + c(b)
+        }
         ExprKind::If(a, b, d) => c(a) + c(b) + c(d),
         ExprKind::Slice(a, b, d) => c(a) + c(b) + d.as_ref().map_or(0, |d| c(d)),
         ExprKind::Call(_, args, _)
@@ -5393,7 +5408,6 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Binop(a, _, b)
         | ExprKind::Index(a, b)

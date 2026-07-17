@@ -596,6 +596,39 @@ pub mod ast {
 
     impl Eq for Expr {}
 
+    /// Decompose an assignment LHS (a place expression) into its base binding
+    /// name and the field path leading from it, outermost field last —
+    /// `a.b.c` yields `("a", ["b", "c"])`, a bare `a` yields `("a", [])`.
+    /// `None` for any other expression shape (not a valid place).
+    pub fn assign_target(lhs: &Expr) -> Option<(&str, Vec<&str>)> {
+        let mut path = Vec::new();
+        let mut cur = lhs;
+        loop {
+            match &cur.kind {
+                ExprKind::Ident(name) => {
+                    path.reverse();
+                    return Some((name, path));
+                }
+                ExprKind::Field(obj, field) => {
+                    path.push(field.as_str());
+                    cur = obj;
+                }
+                _ => return None,
+            }
+        }
+    }
+
+    /// The source spelling of an assignment LHS prefix — the base name plus
+    /// the first `depth` fields, dotted (`"a.b"`). For diagnostics.
+    pub fn assign_target_display(name: &str, path: &[&str], depth: usize) -> String {
+        let mut s = name.to_string();
+        for f in &path[..depth] {
+            s.push('.');
+            s.push_str(f);
+        }
+        s
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum ExprKind {
         Num(i64),
@@ -626,15 +659,15 @@ pub mod ast {
         Let(String, Box<Expr>, Box<Expr>),
         /// `let mut name = value; body` — mutable binding, lives in a stack slot.
         LetMut(String, Box<Expr>, Box<Expr>),
-        /// `name = value; body` — store to an existing mut binding.
-        Assign(String, Box<Expr>, Box<Expr>),
-        /// `set name.field = value; body` — update one field of a mut
-        /// struct binding (`name`, `field`, `value`, `body`). A functional
-        /// update with value semantics: mono's `infer` desugars it to
-        /// `set name = S { field: value, other: name.other, ... }` once
-        /// `name`'s struct type is known, so aliases of the old value are
-        /// unaffected and no pass after mono ever sees this node.
-        AssignField(String, String, Box<Expr>, Box<Expr>),
+        /// `set lhs = value; body` — store to an existing mut binding. The
+        /// LHS is a *place* expression: a bare `Ident` (store to the binding
+        /// itself) or a `Field` chain of any depth rooted at one
+        /// (`set a.b.c = v;`). A field-chain store is a functional update
+        /// with value semantics: mono's `infer` desugars it to nested
+        /// constructs (`set a = A { b: B { c: v, ... }, ... }`) once the
+        /// struct types are known, so aliases of the old value are unaffected
+        /// and every pass after mono only ever sees a bare-`Ident` LHS.
+        Assign(Box<Expr>, Box<Expr>, Box<Expr>),
         /// `for (let var : iterable) { body }` — iterates each byte of
         /// `iterable` (a str) until NUL, binding `var: char` per iteration.
         /// Body's value is discarded; the loop expression itself is i64 0.
@@ -950,12 +983,13 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             collect_operators(x, out);
         }
         K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) => collect_operators(x, out),
+        // An `Assign` LHS is a place (idents/fields only), so it can't
+        // contain an operator — only the value and body need walking.
         K::Seq(a, b)
         | K::Index(a, b)
         | K::Let(_, a, b)
         | K::LetMut(_, a, b)
         | K::Assign(_, a, b)
-        | K::AssignField(_, _, a, b)
         | K::For(_, a, b)
         | K::While(a, b) => {
             collect_operators(a, out);

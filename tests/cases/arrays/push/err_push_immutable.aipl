@@ -11,4 +11,4 @@ error: set: cannot assign to immutable binding "xs" (use "let mut")
  --> ./tests/cases/arrays/push/err_push_immutable.aipl:6:9
   |
 6 |     set xs.push(2);
-  |         ^^^^^^^^^^^
+  |         ^^^^^^^^^

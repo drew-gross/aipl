@@ -528,12 +528,13 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) | ExprKind::KwArg(_, x) => {
             check_operators(x, view)?
         }
+        // An `Assign` LHS is a place (idents/fields only), so it can't
+        // contain an operator — only the value and body need walking.
         ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => {
             check_operators(a, view)?;
@@ -874,16 +875,11 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
             Box::new(rewrite_expr(value, view, locals)),
             Box::new(rewrite_expr(body, view, &with(name))),
         ),
-        // `set name = value; body` — `name` is already bound by an enclosing
-        // `let mut`, so it stays a local in both `value` and `body`.
-        ExprKind::Assign(name, value, body) => ExprKind::Assign(
-            name.clone(),
-            Box::new(rewrite_expr(value, view, locals)),
-            Box::new(rewrite_expr(body, view, locals)),
-        ),
-        ExprKind::AssignField(name, field, value, body) => ExprKind::AssignField(
-            name.clone(),
-            field.clone(),
+        // `set lhs = value; body` — the LHS is rooted at a binding from an
+        // enclosing `let mut` (always a local, never an imported alias), so it
+        // needs no rewriting; the name stays a local in both `value` and `body`.
+        ExprKind::Assign(lhs, value, body) => ExprKind::Assign(
+            lhs.clone(),
             Box::new(rewrite_expr(value, view, locals)),
             Box::new(rewrite_expr(body, view, locals)),
         ),

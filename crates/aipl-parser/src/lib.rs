@@ -271,10 +271,12 @@ gazelle! {
                     // the `DOT` after `SET IDENT` disambiguates from the two
                     // forms above (`EQ`/`PLUSPLUS`). Receiver is a simple variable.
                     | SET IDENT DOT IDENT LPAREN args RPAREN SEMI => set_call_stmt
-                    // `set recv.field = expr;` — update one field of a mut
-                    // struct binding. After `SET IDENT DOT IDENT`, the next
-                    // token (`EQ` here vs `LPAREN` above) picks the form.
-                    | SET IDENT DOT IDENT EQ expr SEMI => set_field_stmt;
+                    // `set recv.f.g = expr;` — update one (arbitrarily nested)
+                    // field of a mut struct binding. After `SET IDENT DOT
+                    // IDENT`, the next token picks the form: `LPAREN` is the
+                    // method call above; `EQ`/`DOT` reduce into `field_path`.
+                    | SET IDENT DOT field_path EQ expr SEMI => set_field_stmt;
+        field_path = IDENT => first | field_path DOT IDENT => rest;
         for_stmt = FOR LPAREN LET IDENT COLON expr RPAREN loop_body => for_stmt;
         // `for (let (a, b) : expr) { ... }` — destructuring for loop. Desugars to
         // a plain for loop with a synthetic temp var and field-access let bindings
@@ -522,6 +524,7 @@ impl aipl::Types for Build {
     type StructFieldBindingList = Vec<String>;
     type MutStmt = StmtSpec;
     type AssignStmt = StmtSpec;
+    type FieldPath = Vec<(String, Span)>;
     type ForStmt = StmtSpec;
     type ForTupleStmt = StmtSpec;
     type WhileStmt = StmtSpec;
@@ -555,15 +558,9 @@ pub enum StmtSpec {
         span: Span,
     },
     Assign {
-        name: String,
-        name_span: Span,
-        value: Expr,
-        span: Span,
-    },
-    AssignField {
-        name: String,
-        name_span: Span,
-        field: String,
+        /// The place being stored to: a bare `Ident`, or a `Field` chain of
+        /// any depth rooted at one (`set a.b.c = v;`).
+        lhs: Expr,
         value: Expr,
         span: Span,
     },
@@ -1209,29 +1206,13 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             let span = join_spans(&name_span, &acc.span);
             Expr::new(ExprKind::LetMut(name, Box::new(value), Box::new(acc)), span)
         }
-        StmtSpec::Assign {
-            name,
-            name_span,
-            value,
-            ..
-        } => {
-            let span = join_spans(&name_span, &acc.span);
-            Expr::new(ExprKind::Assign(name, Box::new(value), Box::new(acc)), span)
-        }
-        StmtSpec::AssignField {
-            name,
-            field,
-            value,
-            span,
-            ..
-        } => {
-            // The statement's own span (`name` through `value`), not the usual
-            // join with the rest of the block: errors against this node (an
+        StmtSpec::Assign { lhs, value, span } => {
+            // The statement's own span (LHS through value), not the usual join
+            // with the rest of the block: errors against this node (an
             // immutable target, an unknown field) should point at the
-            // statement, and nothing downstream needs the chain-covering span
-            // (mono desugars the node away).
+            // statement, not at whatever follows it.
             Expr::new(
-                ExprKind::AssignField(name, field, Box::new(value), Box::new(acc)),
+                ExprKind::Assign(Box::new(lhs), Box::new(value), Box::new(acc)),
                 span,
             )
         }
@@ -1474,10 +1455,11 @@ impl gazelle::Action<aipl::MutStmt<Self>> for Build {
 
 impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
     fn build(&mut self, node: aipl::AssignStmt<Self>) -> Result<StmtSpec, Self::Error> {
-        let (name, name_span, value, span) = match node {
+        let (lhs, value, span) = match node {
             aipl::AssignStmt::AssignStmt((name, name_span), value) => {
                 let span = join_spans(&name_span, &value.span);
-                (name, name_span, value, span)
+                let lhs = Expr::new(ExprKind::Ident(name), name_span);
+                (lhs, value, span)
             }
             // `set n++;` is `set n = n ++ 1;`, where `++` is its own operator
             // (encoded `'P'`, gated on importing `++`). The loader collapses it
@@ -1492,7 +1474,8 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                     ExprKind::Binop(Box::new(recv), 'P', Box::new(one)),
                     span.clone(),
                 );
-                (name, name_span, value, span)
+                let lhs = Expr::new(ExprKind::Ident(name), name_span);
+                (lhs, value, span)
             }
             // `set recv.method(args);` — the writeback form of a mutating method
             // call, desugared to `set recv = recv.method(args)`. The receiver is
@@ -1506,28 +1489,36 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                 all.push(Expr::new(ExprKind::Ident(recv.clone()), recv_span.clone()));
                 all.extend(args);
                 let value = Expr::new(ExprKind::Call(method, all, true), span.clone());
-                (recv, recv_span, value, span)
+                let lhs = Expr::new(ExprKind::Ident(recv), recv_span);
+                (lhs, value, span)
             }
-            // `set recv.field = expr;` — a single-field update of a mut struct
-            // binding. Kept as its own statement (not desugared here): the
-            // rewrite to a full construct needs the struct's field list, which
-            // only mono's `infer` knows.
-            aipl::AssignStmt::SetFieldStmt((recv, recv_span), (field, _field_span), value) => {
+            // `set recv.f.g = expr;` — a field update of a mut struct binding.
+            // The LHS becomes a `Field` chain, exactly as `recv.f.g` parses in
+            // expression position. Not desugared here: the rewrite to nested
+            // constructs needs the structs' field lists, which only mono's
+            // `infer` knows.
+            aipl::AssignStmt::SetFieldStmt((recv, recv_span), path, value) => {
                 let span = join_spans(&recv_span, &value.span);
-                return Ok(StmtSpec::AssignField {
-                    name: recv,
-                    name_span: recv_span,
-                    field,
-                    value,
-                    span,
-                });
+                let mut lhs = Expr::new(ExprKind::Ident(recv), recv_span.clone());
+                for (field, field_span) in path {
+                    let fspan = join_spans(&recv_span, &field_span);
+                    lhs = Expr::new(ExprKind::Field(Box::new(lhs), field), fspan);
+                }
+                (lhs, value, span)
             }
         };
-        Ok(StmtSpec::Assign {
-            name,
-            name_span,
-            value,
-            span,
+        Ok(StmtSpec::Assign { lhs, value, span })
+    }
+}
+
+impl gazelle::Action<aipl::FieldPath<Self>> for Build {
+    fn build(&mut self, node: aipl::FieldPath<Self>) -> Result<Vec<(String, Span)>, Self::Error> {
+        Ok(match node {
+            aipl::FieldPath::First(id) => vec![id],
+            aipl::FieldPath::Rest(mut prev, id) => {
+                prev.push(id);
+                prev
+            }
         })
     }
 }
@@ -3377,7 +3368,6 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
-        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::Index(a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => {

@@ -11240,9 +11240,6 @@ fn compile_expr<M: Module>(
     let span = expr.span.clone();
     Ok(match &expr.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::AssignField(..) => {
-            unreachable!("field assignment is desugared during monomorphization")
-        }
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
@@ -11960,7 +11957,12 @@ fn compile_expr<M: Module>(
                 body,
             )?
         }
-        ExprKind::Assign(name, value, body) => {
+        ExprKind::Assign(lhs, value, body) => {
+            // Mono's `infer` desugars every field-path LHS to a bare-ident
+            // store, so only idents reach codegen.
+            let ExprKind::Ident(name) = &lhs.kind else {
+                unreachable!("field assignment is desugared during monomorphization")
+            };
             // `set recv.f(args)` (parsed as `set recv = recv.f(args)`): a mutating
             // method call on the assign target. The call's own codegen (the
             // `push` / mutating-method arms) writes the mutated result back into

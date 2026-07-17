@@ -861,19 +861,24 @@ impl<'s> Walker<'s> {
                     self.expect(";")?;
                     return Ok(text(format!("set {name}++;")));
                 }
-                // `set recv.member ...` — either the writeback form of a
+                // `set recv.member...` — either the writeback form of a
                 // mutating method call (`set recv.method(args);`) or a field
-                // assignment (`set recv.field = expr;`); the token after the
-                // member (`(` vs `=`) picks the form.
+                // assignment (`set recv.f.g = expr;`, any depth); the token
+                // after the last member (`(` vs `=`) picks the form.
                 if self.peek_text() == "." {
-                    self.bump(); // "."
-                    let member = self.bump().to_string();
+                    let mut path = name;
+                    while self.peek_text() == "." {
+                        self.bump(); // "."
+                        let member = self.bump().to_string();
+                        path.push('.');
+                        path.push_str(&member);
+                    }
                     if self.peek_text() == "=" {
                         self.bump(); // "="
                         let value = self.expr()?;
                         self.expect(";")?;
                         return Ok(concat(vec![
-                            text(format!("set {name}.{member} = ")),
+                            text(format!("set {path} = ")),
                             value,
                             text(";"),
                         ]));
@@ -883,7 +888,7 @@ impl<'s> Walker<'s> {
                     self.expect(")")?;
                     self.expect(";")?;
                     return Ok(concat(vec![
-                        text(format!("set {name}.{member}")),
+                        text(format!("set {path}")),
                         self.comma_list_docs(args, ListStyle::Parens),
                         text(";"),
                     ]));
