@@ -1,0 +1,57 @@
+import { *, wrapping_add as +, <, ==, len, push } from builtins;
+
+// A result payload may be an array — on either side. Array payloads ride the
+// same generic machinery as struct payloads (a single refcounted pointer
+// word), so construction, `match` binding, `==`, and `?` all work; the
+// allocation accounting confirms the payload is retained and dropped in
+// balance.
+
+// Ok side: the values below a threshold, or an error when none are.
+fn below(xs: i64[], cap: i64) -> i64[]!str {
+    mut out = [];
+    for (let x : xs) {
+        if (x < cap) {
+            set out.push(x);
+        };
+    }
+    if (out.len() == 0) { err("none below") } else { ok(out) }
+}.test({
+    assert(below([1, 5, 2, 9], 3) == ok([1, 2]));
+    assert(below([5, 9], 3) == err("none below"));
+    // The payload binds in a match arm like any other.
+    match (below([1], 3)) {
+        ok(v) => assert(v == [1]),
+        err(e) => assert(false),
+    };
+})
+
+// An empty array literal coerces inside `ok(...)` like any `[]`.
+fn nothing() -> i64[]!str { ok([]) }.test({
+    assert(nothing() == ok([]));
+    match (nothing()) {
+        ok(v) => assert(v.len() == 0),
+        err(e) => assert(false),
+    };
+})
+
+// `?` propagates through an array-payload result.
+fn tail_below(xs: i64[], cap: i64) -> i64[]!str {
+    let v = below(xs, cap)?;
+    ok(v[1..])
+}.test({
+    assert(tail_below([1, 5, 2], 3) == ok([2]));
+    assert(tail_below([9], 3) == err("none below"));
+})
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 888
+instructions executed: 1346
+binary size: 8760
+--- monomorphizations ---
+__test$nothing
+below
+main
+nothing
+tail_below

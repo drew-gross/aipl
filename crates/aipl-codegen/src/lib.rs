@@ -11081,12 +11081,15 @@ fn compile_call_expr<M: Module>(
                 // core): `elem_size_of`/`store_array_elem`/`emit_rc` already
                 // size, copy, and refcount it generically once it's addressed
                 // as a `Result` payload, so only variants remain unsupported
-                // here.
+                // here. An array payload is a single refcounted pointer word,
+                // handled by the same machinery (an empty literal's element
+                // type coerces at the use site, like any `[]`).
                 Type::Named(n) if structs.get(n).is_some_and(|d| d.as_struct().is_some()) => {}
+                Type::Array(_) => {}
                 _ => {
                     return Err(Error::at(
                         format!(
-                            "{name:?} payload must be a scalar, str, or struct, got {}",
+                            "{name:?} payload must be a scalar, str, struct, or array, got {}",
                             type_name(&t)
                         ),
                         args[0].span.clone(),

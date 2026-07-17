@@ -7,7 +7,8 @@
 // tests. At each position the *first* rule whose matcher matches wins, so
 // order is priority: put keywords before identifiers, floats before ints.
 // Whitespace and comments are ordinary rules marked `skip: true` — matched and
-// consumed, but producing no token.
+// consumed, but producing no token. A byte no rule matches is a lex error:
+// `lex` returns `err` carrying that byte's span.
 import {
     !,
     !=,
@@ -30,8 +31,7 @@ import { count_while } from "./count_while.aipl";
 
 // What a token is: the `kind` label of the rule that matched it, and the
 // half-open byte range it covers in the source — the text is recovered by
-// slicing, `src[t.span]`. A byte no rule matches becomes a single-byte token
-// with the empty kind "", so `lex` never fails.
+// slicing, `src[t.span]`.
 struct Token { kind: str, span: Span }
 
 // One token shape, as plain data. Char classes are spelled as strings
@@ -169,7 +169,7 @@ fn match_len(self: str, m: Matcher) -> i64 {
     }
 }
 
-pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
+pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     mut tokens = [];
     mut rest = self;
     while (0 < rest.len()) {
@@ -191,23 +191,23 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
             };
         }
         if (n == 0) {
-            // No rule matched: a single-byte token with the empty kind, so
-            // `lex` never fails and always advances.
-            set n = 1;
+            // No rule matched: a lex error carrying the offending byte's span
+            // (slice the source with it to show the byte).
+            return err(start..start + 1);
         };
         if (!skip) {
             set tokens.push(Token { kind: kind, span: start..start + n });
         };
         set rest = rest[n..];
     }
-    tokens
+    ok(tokens)
 }.doc("""
     Lexes `self` into a flat token list, as described by the ordered `rules`.
     At each position the first rule whose matcher matches claims the token
     (so order is priority — keywords before identifiers, floats before
     ints); a `skip: true` rule consumes its match without producing a token
-    (whitespace, comments). A byte no rule matches becomes a single-byte
-    token with the empty kind "", so `lex` never fails.
+    (whitespace, comments). A byte no rule matches is an error: `lex`
+    returns `err` carrying that byte's span.
 """).test({
     // A base rule set: skipped whitespace, `[A-Za-z_][A-Za-z0-9_]*`
     // identifiers, `[0-9]+` ints.
@@ -219,89 +219,99 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
     let base = [ws, ident, int_r];
 
     // Empty and all-whitespace input: no tokens.
-    assert(lex("", base) == []);
-    assert(lex(" \t\n\r ", base) == []);
+    assert(lex("", base) == ok([]));
+    assert(lex(" \t\n\r ", base) == ok([]));
 
     // Single tokens of each base kind.
-    assert(lex("foo", base) == [tok("ident", 0, 3)]);
-    assert(lex("42", base) == [tok("int", 0, 2)]);
+    assert(lex("foo", base) == ok([tok("ident", 0, 3)]));
+    assert(lex("42", base) == ok([tok("int", 0, 2)]));
 
     // Idents may contain (but not start with) digits; `_` is a letter here.
-    assert(lex("x1", base) == [tok("ident", 0, 2)]);
-    assert(lex("_x", base) == [tok("ident", 0, 2)]);
-    assert(lex("1x", base) == [tok("int", 0, 1), tok("ident", 1, 2)]);
+    assert(lex("x1", base) == ok([tok("ident", 0, 2)]));
+    assert(lex("_x", base) == ok([tok("ident", 0, 2)]));
+    assert(lex("1x", base) == ok([tok("int", 0, 1), tok("ident", 1, 2)]));
 
-    // A byte no rule matches: a single-byte token with the empty kind.
-    assert(lex("a+1", base) == [tok("ident", 0, 1), tok("", 1, 2), tok("int", 2, 3)]);
+    // A byte no rule matches is a lex error carrying that byte's span —
+    // sliced out of the source, it names the offender.
+    assert(lex("a+1", base) == err(1..2));
+    match (lex("a+1", base)) {
+        ok(ts) => assert(false),
+        err(e) => assert("a+1"[e] == "+"),
+    };
 
     // Leading/trailing whitespace shifts the span but produces no tokens.
-    assert(lex("  hi  ", base) == [tok("ident", 2, 4)]);
+    assert(lex("  hi  ", base) == ok([tok("ident", 2, 4)]));
 
     // The token's text is recovered by slicing its span out of the source.
-    let src = "foo + 12";
-    match (lex(src, base)[0]) {
-        some(t) => assert(src[t.span] == "foo"),
-        none => assert(false),
+    let src = "foo bar";
+    match (lex(src, base)) {
+        ok(ts) => match (ts[0]) {
+            some(t) => assert(src[t.span] == "foo"),
+            none => assert(false),
+        },
+        err(e) => assert(false),
     };
 
     // --- Each matcher on its own. ---
 
     // Exact: the longest matching spelling wins regardless of list order,
-    // and an unlisted byte falls through (to the "" kind here).
+    // and an unlisted byte is a lex error.
     let ops = [ws, TokenRule { kind: "op", matcher: Exact(["=", "=>", "=="]) }, ident];
-    assert(lex("===", ops) == [tok("op", 0, 2), tok("op", 2, 3)]);
-    assert(lex("=>", ops) == [tok("op", 0, 2)]);
-    assert(lex("a=b", ops) == [tok("ident", 0, 1), tok("op", 1, 2), tok("ident", 2, 3)]);
-    assert(lex("+", ops) == [tok("", 0, 1)]); // unlisted: single "" byte
+    assert(lex("===", ops) == ok([tok("op", 0, 2), tok("op", 2, 3)]));
+    assert(lex("=>", ops) == ok([tok("op", 0, 2)]));
+    assert(lex("a=b", ops) == ok([tok("ident", 0, 1), tok("op", 1, 2), tok("ident", 2, 3)]));
+    assert(lex("+", ops) == err(0..1)); // unlisted: error at the byte
 
     // Keyword: a spelling only matches when it doesn't end inside an
     // identifier — `iffy` is one ident even though the keyword rule comes
     // first, while a boundary (space, `=`, end of source) lets `if` match.
     let kw = TokenRule { kind: "kw", matcher: Keyword(["if", "let"], alnum) };
     let kws = [ws, kw, ident, TokenRule { kind: "op", matcher: Exact(["="]) }];
-    assert(lex("iffy", kws) == [tok("ident", 0, 4)]);
-    assert(lex("if fy", kws) == [tok("kw", 0, 2), tok("ident", 3, 5)]);
-    assert(lex("if=", kws) == [tok("kw", 0, 2), tok("op", 2, 3)]);
-    assert(lex("if", kws) == [tok("kw", 0, 2)]); // end of source is a boundary
-    assert(lex("lets", kws) == [tok("ident", 0, 4)]);
+    assert(lex("iffy", kws) == ok([tok("ident", 0, 4)]));
+    assert(lex("if fy", kws) == ok([tok("kw", 0, 2), tok("ident", 3, 5)]));
+    assert(lex("if=", kws) == ok([tok("kw", 0, 2), tok("op", 2, 3)]));
+    assert(lex("if", kws) == ok([tok("kw", 0, 2)])); // end of source is a boundary
+    assert(lex("lets", kws) == ok([tok("ident", 0, 4)]));
 
     // Delimited: delimiter to matching delimiter, spans include both.
     let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'") }, ident];
-    assert(lex("\"hi\" x", strs) == [tok("str", 0, 4), tok("ident", 5, 6)]);
-    assert(lex("''", strs) == [tok("str", 0, 2)]); // empty string literal
-    assert(lex("'a\"b'", strs) == [tok("str", 0, 5)]); // other delim is content
-    assert(lex("\"hi", strs) == [tok("str", 0, 3)]); // unterminated: to the end
+    assert(lex("\"hi\" x", strs) == ok([tok("str", 0, 4), tok("ident", 5, 6)]));
+    assert(lex("''", strs) == ok([tok("str", 0, 2)])); // empty string literal
+    assert(lex("'a\"b'", strs) == ok([tok("str", 0, 5)])); // other delim is content
+    assert(lex("\"hi", strs) == ok([tok("str", 0, 3)])); // unterminated: to the end
 
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
-    assert(lex("a // b\nc", cmt) == [tok("ident", 0, 1), tok("ident", 7, 8)]);
-    assert(lex("// only", cmt) == []); // comment with no newline: to the end
-    assert(lex("a / b", cmt) == [tok("ident", 0, 1), tok("", 2, 3), tok("ident", 4, 5)]);
+    assert(lex("a // b\nc", cmt) == ok([tok("ident", 0, 1), tok("ident", 7, 8)]));
+    assert(lex("// only", cmt) == ok([])); // comment with no newline: to the end
+    assert(lex("a / b", cmt) == err(2..3)); // a lone `/` matches no rule
 
     // Float before int: a digit run extends with a fraction and/or exponent,
     // and a bare run falls through to the int rule.
     let dot = TokenRule { kind: "dot", matcher: Exact(["."]) };
     let flt = [ws, TokenRule { kind: "float", matcher: Float }, int_r, ident, dot];
-    assert(lex("1.5", flt) == [tok("float", 0, 3)]);
-    assert(lex("42", flt) == [tok("int", 0, 2)]); // bare digits stay int
-    assert(lex("1e5", flt) == [tok("float", 0, 3)]);
-    assert(lex("2E+10", flt) == [tok("float", 0, 5)]);
-    assert(lex("1.5e-3", flt) == [tok("float", 0, 6)]);
+    assert(lex("1.5", flt) == ok([tok("float", 0, 3)]));
+    assert(lex("42", flt) == ok([tok("int", 0, 2)])); // bare digits stay int
+    assert(lex("1e5", flt) == ok([tok("float", 0, 3)]));
+    assert(lex("2E+10", flt) == ok([tok("float", 0, 5)]));
+    assert(lex("1.5e-3", flt) == ok([tok("float", 0, 6)]));
 
     // A fraction needs a digit after the dot, and a number starts with a
     // digit — so neither `1.` nor `.5` is a float.
-    assert(lex("1.", flt) == [tok("int", 0, 1), tok("dot", 1, 2)]);
-    assert(lex(".5", flt) == [tok("dot", 0, 1), tok("int", 1, 2)]);
+    assert(lex("1.", flt) == ok([tok("int", 0, 1), tok("dot", 1, 2)]));
+    assert(lex(".5", flt) == ok([tok("dot", 0, 1), tok("int", 1, 2)]));
 
     // An exponent needs at least one digit, else the `e` is left for the
-    // next token (an ident here).
-    assert(lex("1e", flt) == [tok("int", 0, 1), tok("ident", 1, 2)]);
-    assert(lex("1e-", flt) == [tok("int", 0, 1), tok("ident", 1, 2), tok("", 2, 3)]);
+    // next token (an ident here, then an error at the ruleless `-`).
+    assert(lex("1e", flt) == ok([tok("int", 0, 1), tok("ident", 1, 2)]));
+    assert(lex("1e-", flt) == err(2..3));
     // Only one fraction: a second dot starts a new token.
-    assert(lex("1.2.3", flt) == [tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)]);
+    assert(lex("1.2.3", flt) == ok([tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)]));
     // Without a float rule, a dot always splits the digits.
-    assert(lex("1.5", [ws, int_r, dot]) == [tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)]);
+    assert(
+        lex("1.5", [ws, int_r, dot]) == ok([tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)]),
+    );
 
     // --- Rule sets resembling real languages. ---
 
@@ -338,7 +348,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
         tok("punct", 32, 33),
         tok("punct", 33, 34),
     ];
-    assert(lex(jsrc, json) == jtoks);
+    assert(lex(jsrc, json) == ok(jtoks));
 
     // AIPL-flavored rules: keywords, multi-byte operators, strings, line
     // comments.
@@ -363,15 +373,15 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
         tok("str", 14, 18),
         tok("op", 18, 19),
     ];
-    assert(lex(asrc, aipl) == atoks);
+    assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 140
-deallocations: 140
-reallocations: 66
-bytes allocated: 7992
-instructions executed: 72849
-binary size: 92400
+allocations: 210
+deallocations: 210
+reallocations: 0
+bytes allocated: 15248
+instructions executed: 72386
+binary size: 91800
 --- monomorphizations ---
 __builtin_is_some_and$char$lam18
 __m1__count_while$char$s0$lam10

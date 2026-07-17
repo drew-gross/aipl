@@ -1,7 +1,9 @@
-// A result payload (either side) must be a scalar or `str` in v1 — composite
-// payloads like arrays aren't supported yet.
-fn bad() -> i64[]!str { ok([1, 2]) }
+// A result payload (either side) must be a scalar, `str`, a struct, or an
+// array — variant payloads aren't supported yet.
+variant V = A | B
+
+fn bad() -> V!str { ok(A) }
 
 fn main() {}
 --- errors ---
-error: fn "bad": a result Ok payload must be i64, bool, char, str, a struct, or unit ("!E"), got i64[]
+error: fn "bad": a result Ok payload must be i64, bool, char, str, a struct, an array, or unit ("!E"), got V
