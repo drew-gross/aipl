@@ -33,13 +33,21 @@ fn config_override() -> Config { Config { label: "custom" } }.test({
     assert(config_override().retries == 3);
     assert(config_override().label == "custom");
 })
+
+// A string-literal default is materialized at every construction site that
+// omits the field, each carrying the default expression's one span — so the
+// span-derived data symbol repeats. Two such sites (here and in
+// `config_defaults` above) reuse the single definition rather than colliding.
+fn label_here() -> str { Config {}.label }.test({
+    assert(label_here() == "default");
+})
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 313
-binary size: 4888
+instructions executed: 337
+binary size: 5400
 --- monomorphizations ---
 all_defaults
 all_explicit

@@ -11463,9 +11463,18 @@ fn compile_expr<M: Module>(
             // 8-byte align so the i64 header words read safely.
             desc.set_align(8);
             desc.define(bytes.into_boxed_slice());
-            module
-                .define_data(data_id, &desc)
-                .map_err(|e| Error::msg(format!("define data: {e}")))?;
+            // A struct-field default that is a string literal is materialized at
+            // every construction site omitting that field, each carrying the
+            // default expression's original span — so the span-derived symbol name
+            // repeats across sites. The bytes are identical (same span ⇒ same
+            // source literal) and `declare_data` already returned the existing id,
+            // so a repeat `define_data` is redundant: tolerate the duplicate and
+            // reuse the first definition. (The synth path uses unique counter names,
+            // so it never hits this.)
+            match module.define_data(data_id, &desc) {
+                Ok(()) | Err(cranelift_module::ModuleError::DuplicateDefinition(_)) => {}
+                Err(e) => return Err(Error::msg(format!("define data: {e}"))),
+            }
             let gv = module.declare_data_in_func(data_id, builder.func);
             let base = builder.ins().symbol_value(types::I64, gv);
             let ptr = builder.ins().iadd_imm(base, STR_HEADER_SIZE as i64);
