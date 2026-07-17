@@ -205,14 +205,14 @@ fn string_token(self: str, start: i64, delim: char) -> Token {
 fn number_end(self: str, int_end: i64) -> i64 {
     mut end = int_end;
     if (self[end].value_or(' ') == '.' && self[end + 1].value_or(' ').is_digit()) {
-        set end = end + 1 + self[end + 1..].count_while(|x| x.is_digit());
+        set end = end + 1 + self[end + 1..].count_while(is_digit);
     };
     let e = self[end].value_or(' ');
     if (e == 'e' || e == 'E') {
         let sign = self[end + 1].value_or(' ');
         let digits = if (sign == '+' || sign == '-') { end + 2 } else { end + 1 };
         if (self[digits].value_or(' ').is_digit()) {
-            set end = digits + self[digits..].count_while(|x| x.is_digit());
+            set end = digits + self[digits..].count_while(is_digit);
         };
     };
     end
@@ -244,7 +244,7 @@ fn next_token(self: str, start: i64, rules: LexRules) -> Token {
         return Token { kind: Ident, span: Span { start: start, end: end } };
     };
     if (c.is_digit()) {
-        let int_end = start + 1 + self[start + 1..].count_while(|x| x.is_digit());
+        let int_end = start + 1 + self[start + 1..].count_while(is_digit);
         let end = if (rules.floats) { self.number_end(int_end) } else { int_end };
         let kind = if (int_end < end) { Float } else { Int };
         return Token { kind: kind, span: Span { start: start, end: end } };
@@ -416,14 +416,12 @@ deallocations: 149
 reallocations: 65
 bytes allocated: 6632
 instructions executed: 29114
-binary size: 62960
+binary size: 62232
 --- monomorphizations ---
 __m1__count_while$char$s0$lam1
-__m1__count_while$char$s0$lam11
-__m1__count_while$char$s0$lam13
 __m1__count_while$char$s0$lam4
 __m1__count_while$char$s0$lam7
-__m1__count_while$char$s0$lam9
+__m1__count_while$char$s0$lam8
 __test$default_rules
 __test$lex
 __test$with_string_delims
