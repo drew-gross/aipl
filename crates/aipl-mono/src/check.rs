@@ -948,6 +948,51 @@ impl Cx<'_> {
                 expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr(body, env, effects)?
             }
+            ExprKind::AssignField(name, field, val, body) => {
+                let binding = env.get(name).ok_or_else(|| {
+                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+                })?;
+                if !binding.mutable {
+                    return Err(Error::at(
+                        format!(
+                            "set: cannot assign to immutable binding {name:?} (use \"let mut\")"
+                        ),
+                        span.clone(),
+                    ));
+                }
+                let ty = binding.ty.clone();
+                let Type::Named(sn) = &ty else {
+                    return Err(Error::at(
+                        format!(
+                            "set: field assignment target must be a struct, {name:?} has type {}",
+                            tyname(&ty)
+                        ),
+                        span.clone(),
+                    ));
+                };
+                let fields = self.struct_fields(sn).ok_or_else(|| {
+                    Error::at(
+                        format!(
+                            "set: field assignment target must be a struct, {name:?} has type {}",
+                            display(sn)
+                        ),
+                        span.clone(),
+                    )
+                })?;
+                let expected = fields
+                    .iter()
+                    .find(|(n, _, _)| n == field)
+                    .map(|(_, t, _)| t.clone())
+                    .ok_or_else(|| {
+                        Error::at(
+                            format!("struct {:?} has no field {field:?}", display(sn)),
+                            span.clone(),
+                        )
+                    })?;
+                let vt = self.check_expr(val, env, effects)?;
+                expect(&vt, &expected, "set", val.span.clone())?;
+                self.check_expr(body, env, effects)?
+            }
             ExprKind::For(_var, iter, body) => {
                 let it = self.check_expr(iter, env, effects)?;
                 let elem = match &it {

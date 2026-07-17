@@ -464,6 +464,12 @@ impl Expander {
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, locals)?),
             ),
+            ExprKind::AssignField(name, field, value, body) => ExprKind::AssignField(
+                name.clone(),
+                field.clone(),
+                Box::new(self.expand_expr(value, locals)?),
+                Box::new(self.expand_expr(body, locals)?),
+            ),
             ExprKind::For(var, iterable, body) => ExprKind::For(
                 var.clone(),
                 Box::new(self.expand_expr(iterable, locals)?),

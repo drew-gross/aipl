@@ -1,0 +1,67 @@
+import { wrapping_add as +, +++, == } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+// `set p.field = value;` updates one field of a mut struct binding, leaving
+// the other fields unchanged. The old field value may appear on the right.
+fn bump_x(p: Point, by: i64) -> Point {
+    mut q = p;
+    set q.x = q.x + by;
+    q
+}.test({
+    let p = Point { x: 1, y: 2 };
+    let q = bump_x(p, 10);
+    assert(q.x == 11); // updated field
+    assert(q.y == 2); // other field unchanged
+    assert(p.x == 1); // the source struct is unaffected
+})
+
+// A field update has value semantics: a binding that copied the struct before
+// the update still sees the old value.
+fn alias_unaffected() -> i64 {
+    mut p = Point { x: 1, y: 2 };
+    let q = p;
+    set p.x = 100;
+    q.x
+}.test({
+    assert(alias_unaffected() == 1);
+})
+
+// A defaulted field keeps its *current* value across another field's update
+// (the rewrite copies every field from the old value; defaults never re-fire).
+struct Tagged { n: i64, tag: i64 = 7 }
+
+fn set_n(t: Tagged, n: i64) -> Tagged {
+    mut u = t;
+    set u.n = n;
+    u
+}.test({
+    let t = set_n(Tagged { n: 1, tag: 100 }, 2);
+    assert(t.n == 2);
+    assert(t.tag == 100); // stays 100, not reset to the default 7
+})
+
+// A heap (str) field: the update releases the struct's reference on the old
+// string and co-owns the new one — the performance section below shows the
+// allocations balance.
+struct Named { name: str, x: i64 }
+
+fn rename(n: Named, name: str) -> Named {
+    mut m = n;
+    set m.name = name;
+    m
+}.test({
+    let n = Named { name: "old" +++ "!", x: 5 };
+    let m = rename(n, "new" +++ "!");
+    assert(m.name == "new!");
+    assert(m.x == 5);
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 80
+instructions executed: 165
+binary size: 3016
+--- monomorphizations ---
+main

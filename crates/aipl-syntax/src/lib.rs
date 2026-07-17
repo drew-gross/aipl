@@ -628,6 +628,13 @@ pub mod ast {
         LetMut(String, Box<Expr>, Box<Expr>),
         /// `name = value; body` — store to an existing mut binding.
         Assign(String, Box<Expr>, Box<Expr>),
+        /// `set name.field = value; body` — update one field of a mut
+        /// struct binding (`name`, `field`, `value`, `body`). A functional
+        /// update with value semantics: mono's `infer` desugars it to
+        /// `set name = S { field: value, other: name.other, ... }` once
+        /// `name`'s struct type is known, so aliases of the old value are
+        /// unaffected and no pass after mono ever sees this node.
+        AssignField(String, String, Box<Expr>, Box<Expr>),
         /// `for (let var : iterable) { body }` — iterates each byte of
         /// `iterable` (a str) until NUL, binding `var: char` per iteration.
         /// Body's value is discarded; the loop expression itself is i64 0.
@@ -948,6 +955,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
         | K::Let(_, a, b)
         | K::LetMut(_, a, b)
         | K::Assign(_, a, b)
+        | K::AssignField(_, _, a, b)
         | K::For(_, a, b)
         | K::While(a, b) => {
             collect_operators(a, out);

@@ -1,0 +1,12 @@
+struct Point { x: i64, y: i64 }
+
+fn main() {
+    mut p = Point { x: 1, y: 2 };
+    set p.x = true;
+}
+--- errors ---
+error: set: expected i64, got bool
+ --> ./tests/cases/structs/fields/err_set_field_type_mismatch.aipl:5:15
+  |
+5 |     set p.x = true;
+  |               ^^^^

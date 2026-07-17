@@ -11240,6 +11240,9 @@ fn compile_expr<M: Module>(
     let span = expr.span.clone();
     Ok(match &expr.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::AssignField(..) => {
+            unreachable!("field assignment is desugared during monomorphization")
+        }
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),

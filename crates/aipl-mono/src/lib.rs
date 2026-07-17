@@ -253,6 +253,12 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
+        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
+            n.clone(),
+            f.clone(),
+            Box::new(lt_expr(a, fm, ord)),
+            Box::new(lt_expr(b, fm, ord)),
+        ),
         ExprKind::For(v, iter, body) => ExprKind::For(
             v.clone(),
             Box::new(lt_expr(iter, fm, ord)),
@@ -2917,6 +2923,63 @@ impl Mono<'_> {
                     bt,
                 )
             }
+            ExprKind::AssignField(name, field, val, body) => {
+                // `set name.field = val;` — a functional field update. Now that
+                // `name`'s struct type is known, desugar to the full construct
+                // `set name = S { field: val, other: name.other, ... }` and
+                // infer that; no later pass ever sees `AssignField`.
+                let ty = env.get(name).cloned().ok_or_else(|| {
+                    Error::at(format!("set: undeclared variable {name:?}"), span.clone())
+                })?;
+                let Type::Named(sn) = &ty else {
+                    return Err(Error::at(
+                        format!(
+                            "set: field assignment target must be a struct, {name:?} has type {}",
+                            type_name(&ty)
+                        ),
+                        span.clone(),
+                    ));
+                };
+                let field_defs = self
+                    .structs
+                    .get(sn.as_str())
+                    .or_else(|| self.syn_structs.get(sn.as_str()))
+                    .cloned()
+                    .unwrap_or_default();
+                if !field_defs.iter().any(|(n, _, _)| n == field) {
+                    return Err(Error::at(
+                        format!("struct {sn:?} has no field {field:?}"),
+                        span.clone(),
+                    ));
+                }
+                let inits = field_defs
+                    .iter()
+                    .map(|(fname, _, _)| FieldInit {
+                        name: fname.clone(),
+                        value: if fname == field {
+                            (**val).clone()
+                        } else {
+                            Expr::new(
+                                ExprKind::Field(
+                                    Box::new(Expr::new(
+                                        ExprKind::Ident(name.clone()),
+                                        span.clone(),
+                                    )),
+                                    fname.clone(),
+                                ),
+                                span.clone(),
+                            )
+                        },
+                    })
+                    .collect();
+                let construct = Expr::new(ExprKind::Construct(sn.clone(), inits), span.clone());
+                let desugared = node(ExprKind::Assign(
+                    name.clone(),
+                    Box::new(construct),
+                    Box::new((**body).clone()),
+                ));
+                return self.infer(&desugared, env);
+            }
             ExprKind::For(var, iter, body) => {
                 let (ri, it) = self.infer(iter, env)?;
                 let elem = match it {
@@ -4180,6 +4243,18 @@ fn collect_free(
             collect_free(val, bound, env, out, seen);
             collect_free(b, bound, env, out, seen);
         }
+        // Unlike `Assign`, the target is also a *read*: the functional-update
+        // desugar copies the struct's other fields out of it.
+        ExprKind::AssignField(n, _, val, b) => {
+            if !bound.contains(n) && !seen.contains(n) {
+                if let Some(t) = env.get(n) {
+                    seen.insert(n.clone());
+                    out.push((n.clone(), t.clone()));
+                }
+            }
+            collect_free(val, bound, env, out, seen);
+            collect_free(b, bound, env, out, seen);
+        }
         ExprKind::For(v, iter, b) => {
             collect_free(iter, bound, env, out, seen);
             let added = bound.insert(v.clone());
@@ -4337,7 +4412,9 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
             }
         }
         // `Assign`'s target is an existing binding (an lvalue), not a use.
-        ExprKind::Assign(_, val, b) => {
+        // (`AssignField`'s target also reads the struct, but it's a local
+        // either way — never a countable function reference.)
+        ExprKind::Assign(_, val, b) | ExprKind::AssignField(_, _, val, b) => {
             count_uses(val, bound, counts);
             count_uses(b, bound, counts);
         }
@@ -4648,6 +4725,7 @@ fn children(e: &Expr) -> Vec<&Expr> {
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
+        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => vec![a, b],
         ExprKind::If(a, b, c) => vec![a, b, c],
@@ -4808,6 +4886,12 @@ fn replace_call(
         ),
         ExprKind::Assign(n, a, b) => ExprKind::Assign(
             n.clone(),
+            Box::new(rc(a, counter, replaced)),
+            Box::new(rc(b, counter, replaced)),
+        ),
+        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
+            n.clone(),
+            f.clone(),
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
@@ -4993,6 +5077,12 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         // never a mapped parameter — keep it.
         ExprKind::Assign(n, a, b) => ExprKind::Assign(
             n.clone(),
+            Box::new(rename_params(a, map)),
+            Box::new(rename_params(b, map)),
+        ),
+        ExprKind::AssignField(n, f, a, b) => ExprKind::AssignField(
+            n.clone(),
+            f.clone(),
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, map)),
         ),
@@ -5227,6 +5317,12 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             };
             lhs_bad || rec_tail(b)
         }
+        // `set target.field = val` both reads and rewrites `target` (the
+        // functional-update desugar copies its other fields), so a matching
+        // target is conservatively unsafe.
+        ExprKind::AssignField(target, _, val, b) => {
+            target == name || is_n(val) || rec(val) || rec_tail(b)
+        }
         ExprKind::For(_, iter, fbody) => {
             if is_n(iter) {
                 aliases_or_unsafe(name, fbody, true, false)
@@ -5270,6 +5366,9 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         | ExprKind::Assign(_, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => c(a) + c(b),
+        // The target is also a read (the functional-update desugar copies the
+        // struct's other fields out of it); overcounting is the safe direction.
+        ExprKind::AssignField(n, _, a, b) => usize::from(n == name) + c(a) + c(b),
         ExprKind::If(a, b, d) => c(a) + c(b) + c(d),
         ExprKind::Slice(a, b, d) => c(a) + c(b) + d.as_ref().map_or(0, |d| c(d)),
         ExprKind::Call(_, args, _)
@@ -5294,6 +5393,7 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
+        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Binop(a, _, b)
         | ExprKind::Index(a, b)

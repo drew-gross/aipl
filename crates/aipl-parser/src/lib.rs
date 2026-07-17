@@ -270,7 +270,11 @@ gazelle! {
                     // method call. Desugars to `set recv = recv.method(args)`;
                     // the `DOT` after `SET IDENT` disambiguates from the two
                     // forms above (`EQ`/`PLUSPLUS`). Receiver is a simple variable.
-                    | SET IDENT DOT IDENT LPAREN args RPAREN SEMI => set_call_stmt;
+                    | SET IDENT DOT IDENT LPAREN args RPAREN SEMI => set_call_stmt
+                    // `set recv.field = expr;` — update one field of a mut
+                    // struct binding. After `SET IDENT DOT IDENT`, the next
+                    // token (`EQ` here vs `LPAREN` above) picks the form.
+                    | SET IDENT DOT IDENT EQ expr SEMI => set_field_stmt;
         for_stmt = FOR LPAREN LET IDENT COLON expr RPAREN loop_body => for_stmt;
         // `for (let (a, b) : expr) { ... }` — destructuring for loop. Desugars to
         // a plain for loop with a synthetic temp var and field-access let bindings
@@ -553,6 +557,13 @@ pub enum StmtSpec {
     Assign {
         name: String,
         name_span: Span,
+        value: Expr,
+        span: Span,
+    },
+    AssignField {
+        name: String,
+        name_span: Span,
+        field: String,
         value: Expr,
         span: Span,
     },
@@ -1207,6 +1218,23 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             let span = join_spans(&name_span, &acc.span);
             Expr::new(ExprKind::Assign(name, Box::new(value), Box::new(acc)), span)
         }
+        StmtSpec::AssignField {
+            name,
+            field,
+            value,
+            span,
+            ..
+        } => {
+            // The statement's own span (`name` through `value`), not the usual
+            // join with the rest of the block: errors against this node (an
+            // immutable target, an unknown field) should point at the
+            // statement, and nothing downstream needs the chain-covering span
+            // (mono desugars the node away).
+            Expr::new(
+                ExprKind::AssignField(name, field, Box::new(value), Box::new(acc)),
+                span,
+            )
+        }
         StmtSpec::For {
             var,
             var_span,
@@ -1479,6 +1507,20 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                 all.extend(args);
                 let value = Expr::new(ExprKind::Call(method, all, true), span.clone());
                 (recv, recv_span, value, span)
+            }
+            // `set recv.field = expr;` — a single-field update of a mut struct
+            // binding. Kept as its own statement (not desugared here): the
+            // rewrite to a full construct needs the struct's field list, which
+            // only mono's `infer` knows.
+            aipl::AssignStmt::SetFieldStmt((recv, recv_span), (field, _field_span), value) => {
+                let span = join_spans(&recv_span, &value.span);
+                return Ok(StmtSpec::AssignField {
+                    name: recv,
+                    name_span: recv_span,
+                    field,
+                    value,
+                    span,
+                });
             }
         };
         Ok(StmtSpec::Assign {
@@ -3335,6 +3377,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
+        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::Index(a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => {

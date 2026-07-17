@@ -1,0 +1,10 @@
+fn main() {
+    mut n = 1;
+    set n.x = 2;
+}
+--- errors ---
+error: set: field assignment target must be a struct, "n" has type i64
+ --> ./tests/cases/structs/fields/err_set_field_non_struct.aipl:3:9
+  |
+3 |     set n.x = 2;
+  |         ^^^^^^^

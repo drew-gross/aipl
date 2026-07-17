@@ -1,0 +1,12 @@
+struct Point { x: i64, y: i64 }
+
+fn main() {
+    mut p = Point { x: 1, y: 2 };
+    set p.z = 3;
+}
+--- errors ---
+error: struct "Point" has no field "z"
+ --> ./tests/cases/structs/fields/err_set_field_unknown.aipl:5:9
+  |
+5 |     set p.z = 3;
+  |         ^^^^^^^

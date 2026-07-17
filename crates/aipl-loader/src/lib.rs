@@ -533,6 +533,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         | ExprKind::Let(_, a, b)
         | ExprKind::LetMut(_, a, b)
         | ExprKind::Assign(_, a, b)
+        | ExprKind::AssignField(_, _, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => {
             check_operators(a, view)?;
@@ -877,6 +878,12 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
         // `let mut`, so it stays a local in both `value` and `body`.
         ExprKind::Assign(name, value, body) => ExprKind::Assign(
             name.clone(),
+            Box::new(rewrite_expr(value, view, locals)),
+            Box::new(rewrite_expr(body, view, locals)),
+        ),
+        ExprKind::AssignField(name, field, value, body) => ExprKind::AssignField(
+            name.clone(),
+            field.clone(),
             Box::new(rewrite_expr(value, view, locals)),
             Box::new(rewrite_expr(body, view, locals)),
         ),
