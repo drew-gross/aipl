@@ -32,7 +32,7 @@ import { count_while } from "./count_while.aipl";
 variant TokenKind = Ident | Int | Float | Punct | Str
 
 // What a token is: its class and the half-open byte range it covers in the
-// source — the text is recovered by slicing, `src[t.span.start..t.span.end]`.
+// source — the text is recovered by slicing, `src[t.span]`.
 struct Token { kind: TokenKind, span: Span }
 
 // How to lex a particular language. Char classes are spelled as strings
@@ -312,7 +312,7 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     // The token's text is recovered by slicing its span out of the source.
     let src = "foo + 12";
     match (lex(src, default_rules())[0]) {
-        some(t) => assert(src[t.span.start..t.span.end] == "foo"),
+        some(t) => assert(src[t.span] == "foo"),
         none => assert(false),
     };
 
@@ -415,8 +415,8 @@ allocations: 149
 deallocations: 149
 reallocations: 65
 bytes allocated: 6632
-instructions executed: 29114
-binary size: 62232
+instructions executed: 29113
+binary size: 62208
 --- monomorphizations ---
 __m1__count_while$char$s0$lam1
 __m1__count_while$char$s0$lam4

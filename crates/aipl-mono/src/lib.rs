@@ -2858,7 +2858,15 @@ impl Mono<'_> {
             }
             ExprKind::Index(obj, idx) => {
                 let (ro, ot) = self.infer(obj, env)?;
-                let (ridx, _) = self.infer(idx, env)?;
+                let (ridx, it) = self.infer(idx, env)?;
+                // `s[span]` — a `Span` index is slice sugar for
+                // `s[span.start..span.end]`, so it yields a `str`, not `elem?`.
+                if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
+                    return Ok((
+                        node(ExprKind::Index(Box::new(ro), Box::new(ridx))),
+                        Type::Primitive(Primitive::Str),
+                    ));
+                }
                 let elem = match ot {
                     Type::Array(inner) => *inner,
                     // `s[i]` on a `str` is the byte at `i` as a `char?`.

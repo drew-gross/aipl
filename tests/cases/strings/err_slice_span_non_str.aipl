@@ -1,0 +1,15 @@
+import { Span, len } from builtins;
+
+// A `Span` index is slice sugar, and slicing only supports `str` receivers —
+// a `Span` index on an array is rejected like any other slice of an array.
+fn main() -> i64 {
+    let xs = [1, 2, 3];
+    let s = Span { start: 0, end: 2 };
+    xs[s].len()
+}
+--- errors ---
+error: slice receiver: expected str, got i64[]
+ --> ./tests/cases/strings/err_slice_span_non_str.aipl:8:5
+  |
+8 |     xs[s].len()
+  |     ^^

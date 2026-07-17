@@ -12,7 +12,7 @@ pub fn assert_loc(src: str, span: Span) -> str {
     // Splitting on "\n" always yields (newline count + 1) parts, so the
     // prefix's line count is just its number of lines.
     let line = src[..span.start].lines().len();
-    let text = src[span.start..span.end].trim();
+    let text = src[span].trim();
     `input:{line}: {text}`
 }.test({
     assert(assert_loc("assert(x == 1)", Span { start: 7, end: 13 }) == "input:1: x == 1");

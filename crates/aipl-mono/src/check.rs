@@ -1122,6 +1122,18 @@ impl Cx<'_> {
             ExprKind::Index(obj, idx) => {
                 let ot = self.check_expr(obj, env, effects)?;
                 let it = self.check_expr(idx, env, effects)?;
+                // `s[span]` — a `Span` index is slice sugar for
+                // `s[span.start..span.end]`, so it takes the slice rules:
+                // `str` receiver, `str` result.
+                if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
+                    expect(
+                        &ot,
+                        &Type::Primitive(Primitive::Str),
+                        "slice receiver",
+                        obj.span.clone(),
+                    )?;
+                    return Ok(Type::Primitive(Primitive::Str));
+                }
                 expect(
                     &it,
                     &Type::Primitive(Primitive::I64),

@@ -35,3 +35,4 @@ lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 warn/err on bar(|x| x.foo()) or bar(|x| foo(x)) (just use bar(foo))
+output multiple errors at once

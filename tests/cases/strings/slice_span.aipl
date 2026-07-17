@@ -1,0 +1,32 @@
+import { +++, Span, print } from builtins;
+
+// Passing a `Span` to the index operator slices: `s[span]` is sugar for
+// `s[span.start..span.end]`, with the same bound clamping as `s[start..end]`.
+fn main() !prints {
+    let s = "hello, world";
+    let hello = Span { start: 0, end: 5 };
+    print(s[hello]); // hello
+    print(s[Span { start: 7, end: 12 }]); // world
+    print("[" +++ s[Span { start: 3, end: 3 }] +++ "]"); // [] (empty range)
+    print("[" +++ s[Span { start: 5, end: 100 }] +++ "]"); // end clamped to len
+    // A span read back out of a struct field slices like any other expression.
+    let t = Token { span: Span { start: 7, end: 12 } };
+    print(s[t.span]); // world
+}
+
+struct Token { span: Span }
+--- stdout ---
+hello
+world
+[]
+[, world]
+world
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 160
+instructions executed: 88
+binary size: 2024
+--- monomorphizations ---
+main

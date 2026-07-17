@@ -12789,6 +12789,46 @@ fn compile_expr<M: Module>(
         ExprKind::Index(obj, index) => {
             let (recv_v, recv_ty) = compile_expr(module, builder, cx, scopes, obj)?;
             let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, index)?;
+
+            // `s[span]` — a `Span` index is slice sugar for
+            // `s[span.start..span.end]`: load the two bound fields from the
+            // struct (evaluated once, receiver first) and slice exactly like
+            // `ExprKind::Slice`.
+            if matches!(&idx_t, Type::Named(n) if n == "__builtin_Span") {
+                expect_type(
+                    &recv_ty,
+                    &Type::Primitive(Primitive::Str),
+                    "slice receiver",
+                    obj.span.clone(),
+                )?;
+                let layout = structs
+                    .get("__builtin_Span")
+                    .and_then(TypeDef::as_struct)
+                    .ok_or_else(|| {
+                        Error::at("Span struct layout missing (compiler bug)", span.clone())
+                    })?;
+                let i64_ty = Type::Primitive(Primitive::I64);
+                let mut bound = |field: &str| -> Result<Value, Error> {
+                    let f = layout.field(field).ok_or_else(|| {
+                        Error::at(
+                            format!("Span struct has no field {field:?} (compiler bug)"),
+                            span.clone(),
+                        )
+                    })?;
+                    Ok(component(builder, idx_v, f.offset, &i64_ty, structs))
+                };
+                let a_v = bound("start")?;
+                let b_v = bound("end")?;
+                let f = builtins.import(module, builder.func, "aipl_str_slice");
+                let inst = builder.ins().call(f, &[recv_v, a_v, b_v]);
+                let result = builder.inst_results(inst)[0];
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
+                return Ok((result, Type::Primitive(Primitive::Str)));
+            }
+
             expect_type(
                 &idx_t,
                 &Type::Primitive(Primitive::I64),
