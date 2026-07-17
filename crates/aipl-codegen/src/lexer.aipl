@@ -7,8 +7,10 @@
 // tests. At each position the *first* rule whose matcher matches wins, so
 // order is priority: put keywords before identifiers, floats before ints.
 // Whitespace and comments are ordinary rules marked `skip: true` — matched and
-// consumed, but producing no token. A byte no rule matches is a lex error:
-// `lex` returns `err` carrying that byte's span.
+// consumed, but producing no token. Lexing can fail: a byte no rule matches,
+// or a matcher that matches invalid input outright (an unterminated
+// `Delimited` token), aborts the lex with a `LexError` — a message plus the
+// span of the offending source.
 import {
     !,
     !=,
@@ -34,6 +36,10 @@ import { count_while } from "./count_while.aipl";
 // slicing, `src[t.span]`.
 struct Token { kind: str, span: Span }
 
+// Why a lex failed: what went wrong, and the span of the offending source
+// (absolute into the lexed string — slice it to show the offender).
+struct LexError { message: str, span: Span }
+
 // One token shape, as plain data. Char classes are spelled as strings
 // (membership via `contains`) and spellings as string lists; none of them
 // ever match empty input, so `lex` always makes progress.
@@ -47,8 +53,9 @@ struct Token { kind: str, span: Span }
 //   continue class) — so a keyword rule placed before the identifier rule
 //   claims `if` without biting the front off `iffy`.
 // - `Delimited(delims)`: a char in `delims` opens the token, which runs to
-//   just past the next occurrence of the *same* char (no escapes yet), or to
-//   the end of the source when unterminated. String literals.
+//   just past the next occurrence of the *same* char (no escapes yet). A
+//   token still open at the end of the source is a lex error. String
+//   literals.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -68,8 +75,12 @@ variant Matcher =
 // token (whitespace, comments).
 struct TokenRule { kind: str, matcher: Matcher, skip: bool = false }
 
-// Test-block shorthand for an expected token.
+// Test-block shorthands for an expected token / an expected lex error.
 fn tok(kind: str, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
+
+fn lex_err(message: str, start: i64, end: i64) -> LexError {
+    LexError { message: message, span: start..end }
+}
 
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
 // char, then `cont` chars. 0 when the first char isn't in `first`.
@@ -108,15 +119,20 @@ fn keyword_len(self: str, spellings: str[], boundary: str) -> i64 {
 }
 
 // `Delimited`: a `delims` char opens the token, which spans to just past the
-// next occurrence of the same char, or to the end of the source when
-// unterminated. 0 when the first char isn't a delimiter.
-fn delimited_len(self: str, delims: str) -> i64 {
+// next occurrence of the same char. ok(0) when the first char isn't a
+// delimiter; a token still open at the end of the source is a hard error
+// (`at` is the token's absolute start, so the error span covers the
+// unterminated tail of the source).
+fn delimited_len(self: str, at: i64, delims: str) -> i64!LexError {
     if (!self[0].is_some_and(|c| delims.contains(c))) {
-        return 0;
+        return ok(0);
     };
     let d = self[0].value_or(' '); // in bounds: the guard above saw a char
     let content_end = 1 + self[1..].count_while(|x| x != d);
-    if (content_end < self.len()) { content_end + 1 } else { content_end }
+    if (self.len() < content_end + 1) {
+        return err(LexError { message: "unterminated delimited token", span: at..at + self.len() });
+    };
+    ok(content_end + 1)
 }
 
 // `ToEol`: the marker, then everything up to (not including) the next
@@ -155,21 +171,23 @@ fn float_len(self: str) -> i64 {
     if (int_end < end) { end } else { 0 }
 }
 
-// How far `m` matches at the start of `self`: the matched length, or 0 for no
-// match. No matcher matches empty input, so a nonzero length always means
-// progress.
-fn match_len(self: str, m: Matcher) -> i64 {
+// How far `m` matches at the start of `self`: ok with the matched length (0
+// for no match — no matcher matches empty input, so a nonzero length always
+// means progress), or err when the matcher saw invalid input outright. `self`
+// is the unlexed suffix of the source; `at` is its absolute offset, used only
+// to place error spans.
+fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
     match (m) {
-        CharRun(first, cont) => self.char_run_len(first, cont),
-        Exact(spellings) => self.longest_prefix(spellings),
-        Keyword(spellings, boundary) => self.keyword_len(spellings, boundary),
-        Delimited(delims) => self.delimited_len(delims),
-        ToEol(marker) => self.to_eol_len(marker),
-        Float => self.float_len(),
+        CharRun(first, cont) => ok(self.char_run_len(first, cont)),
+        Exact(spellings) => ok(self.longest_prefix(spellings)),
+        Keyword(spellings, boundary) => ok(self.keyword_len(spellings, boundary)),
+        Delimited(delims) => self.delimited_len(at, delims),
+        ToEol(marker) => ok(self.to_eol_len(marker)),
+        Float => ok(self.float_len()),
     }
 }
 
-pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
+pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     mut tokens = [];
     mut rest = self;
     while (0 < rest.len()) {
@@ -180,10 +198,10 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
         mut skip = false;
 
         // First match wins: once a rule matches (`n` nonzero), later rules
-        // aren't tried.
+        // aren't tried. A matcher that fails outright aborts the whole lex.
         for (let r : rules) {
             if (n == 0) {
-                set n = rest.match_len(r.matcher);
+                set n = rest.match_len(start, r.matcher)?;
                 if (0 < n) {
                     set kind = r.kind;
                     set skip = r.skip;
@@ -191,9 +209,9 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
             };
         }
         if (n == 0) {
-            // No rule matched: a lex error carrying the offending byte's span
-            // (slice the source with it to show the byte).
-            return err(start..start + 1);
+            // No rule matched: a lex error at the offending byte (slice the
+            // source with the span to show it).
+            return err(LexError { message: "unexpected character", span: start..start + 1 });
         };
         if (!skip) {
             set tokens.push(Token { kind: kind, span: start..start + n });
@@ -206,8 +224,10 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     At each position the first rule whose matcher matches claims the token
     (so order is priority — keywords before identifiers, floats before
     ints); a `skip: true` rule consumes its match without producing a token
-    (whitespace, comments). A byte no rule matches is an error: `lex`
-    returns `err` carrying that byte's span.
+    (whitespace, comments). Lexing fails with an `err` — a `LexError`
+    carrying a message and the offending span — when a byte matches no rule
+    or a matcher sees invalid input outright (an unterminated `Delimited`
+    token).
 """).test({
     // A base rule set: skipped whitespace, `[A-Za-z_][A-Za-z0-9_]*`
     // identifiers, `[0-9]+` ints.
@@ -231,12 +251,12 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     assert(lex("_x", base) == ok([tok("ident", 0, 2)]));
     assert(lex("1x", base) == ok([tok("int", 0, 1), tok("ident", 1, 2)]));
 
-    // A byte no rule matches is a lex error carrying that byte's span —
-    // sliced out of the source, it names the offender.
-    assert(lex("a+1", base) == err(1..2));
+    // A byte no rule matches is a lex error carrying a message and that
+    // byte's span — sliced out of the source, the span names the offender.
+    assert(lex("a+1", base) == err(lex_err("unexpected character", 1, 2)));
     match (lex("a+1", base)) {
         ok(ts) => assert(false),
-        err(e) => assert("a+1"[e] == "+"),
+        err(e) => assert("a+1"[e.span] == "+"),
     };
 
     // Leading/trailing whitespace shifts the span but produces no tokens.
@@ -260,7 +280,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     assert(lex("===", ops) == ok([tok("op", 0, 2), tok("op", 2, 3)]));
     assert(lex("=>", ops) == ok([tok("op", 0, 2)]));
     assert(lex("a=b", ops) == ok([tok("ident", 0, 1), tok("op", 1, 2), tok("ident", 2, 3)]));
-    assert(lex("+", ops) == err(0..1)); // unlisted: error at the byte
+    assert(lex("+", ops) == err(lex_err("unexpected character", 0, 1))); // unlisted
 
     // Keyword: a spelling only matches when it doesn't end inside an
     // identifier — `iffy` is one ident even though the keyword rule comes
@@ -273,19 +293,27 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     assert(lex("if", kws) == ok([tok("kw", 0, 2)])); // end of source is a boundary
     assert(lex("lets", kws) == ok([tok("ident", 0, 4)]));
 
-    // Delimited: delimiter to matching delimiter, spans include both.
+    // Delimited: delimiter to matching delimiter, spans include both. An
+    // unterminated token is a hard lex error — not a decline — so it points
+    // at the open delimiter instead of falling through to "unexpected
+    // character".
     let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'") }, ident];
     assert(lex("\"hi\" x", strs) == ok([tok("str", 0, 4), tok("ident", 5, 6)]));
     assert(lex("''", strs) == ok([tok("str", 0, 2)])); // empty string literal
     assert(lex("'a\"b'", strs) == ok([tok("str", 0, 5)])); // other delim is content
-    assert(lex("\"hi", strs) == ok([tok("str", 0, 3)])); // unterminated: to the end
+    assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0, 3)));
+
+    // The error span is absolute — an unterminated token mid-source points
+    // at its own opening delimiter through the end.
+    assert(lex("x \"hi", strs) == err(lex_err("unterminated delimited token", 2, 5)));
 
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
     assert(lex("a // b\nc", cmt) == ok([tok("ident", 0, 1), tok("ident", 7, 8)]));
     assert(lex("// only", cmt) == ok([])); // comment with no newline: to the end
-    assert(lex("a / b", cmt) == err(2..3)); // a lone `/` matches no rule
+    // A lone `/` matches no rule.
+    assert(lex("a / b", cmt) == err(lex_err("unexpected character", 2, 3)));
 
     // Float before int: a digit run extends with a fraction and/or exponent,
     // and a bare run falls through to the int rule.
@@ -305,7 +333,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
     // An exponent needs at least one digit, else the `e` is left for the
     // next token (an ident here, then an error at the ruleless `-`).
     assert(lex("1e", flt) == ok([tok("int", 0, 1), tok("ident", 1, 2)]));
-    assert(lex("1e-", flt) == err(2..3));
+    assert(lex("1e-", flt) == err(lex_err("unexpected character", 2, 3)));
     // Only one fraction: a second dot starts a new token.
     assert(lex("1.2.3", flt) == ok([tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)]));
     // Without a float rule, a dot always splits the digits.
@@ -379,9 +407,9 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!Span {
 allocations: 210
 deallocations: 210
 reallocations: 0
-bytes allocated: 15248
-instructions executed: 72386
-binary size: 91800
+bytes allocated: 15224
+instructions executed: 77615
+binary size: 99120
 --- monomorphizations ---
 __builtin_is_some_and$char$lam18
 __m1__count_while$char$s0$lam10
@@ -392,5 +420,6 @@ __test$lex
 delimited_len
 float_len
 lex
+lex_err
 main
 tok
