@@ -109,6 +109,18 @@ use aipl::DebugOptions;
 /// Surfaced in failure messages so a stale `--- performance ---`/`errors`/`check`
 /// section tells you exactly how to re-record it.
 const FILL_CMD: &str = "cargo test --test cases -- --ignored fill_expected";
+
+/// Build a **scoped** fill command for one case's failure message: refresh just
+/// the offending case via `AIPL_CASE` instead of re-running the whole (serial)
+/// fill over every case. `ctx` is the bracketed display path
+/// (`[cases/foo/bar.aipl]`); stripping the brackets recovers the exact substring
+/// the `AIPL_CASE` filter matches on. Preferred over bare [`FILL_CMD`] in any
+/// per-case mismatch message — the whole-suite form is slow and rarely what you
+/// want when a single case is stale.
+fn scoped_fill_cmd(ctx: &str) -> String {
+    let path = ctx.trim_start_matches('[').trim_end_matches(']');
+    format!("AIPL_CASE='{path}' {FILL_CMD}")
+}
 /// The command that runs the ignored perfmon-table refresh ([`refresh_perfmon`]).
 const PERFMON_CMD: &str = "cargo test --test cases -- --ignored refresh_perfmon";
 
@@ -466,7 +478,8 @@ fn check_or_fill(
     } else {
         Outcome::Fail(format!(
             "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-             If this change is intended, run `{FILL_CMD}`."
+             If this change is intended, run `{}`.",
+            scoped_fill_cmd(ctx)
         ))
     }
 }
@@ -680,8 +693,9 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         if !exempt && spec.performance.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- performance ---` section. Add one with a \
-                 `?` body and run `{FILL_CMD}` to fill in the measured \
-                 allocation/deallocation counts."
+                 `?` body and run `{}` to fill in the measured \
+                 allocation/deallocation counts.",
+                scoped_fill_cmd(&ctx)
             ));
         }
         // A `--- monomorphizations ---` section is likewise mandatory for every
@@ -689,7 +703,8 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         if !exempt && spec.monomorphizations.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- monomorphizations ---` section. Add one with a \
-                 `?` body and run `{FILL_CMD}` to fill in the emitted instances."
+                 `?` body and run `{}` to fill in the emitted instances.",
+                scoped_fill_cmd(&ctx)
             ));
         }
         run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, fill)
@@ -713,7 +728,8 @@ fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> 
     if actual != expected {
         return Outcome::Fail(format!(
             "{ctx}: error mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-             If this change is intended, run `{FILL_CMD}`.",
+             If this change is intended, run `{}`.",
+            scoped_fill_cmd(ctx)
         ));
     }
     Outcome::Pass
@@ -1395,8 +1411,10 @@ fn run_performance_check(
     if actual.allocations != actual.deallocations {
         return Outcome::Fail(format!(
             "{ctx}: memory leak — allocations ({}) != deallocations ({})\n\
-             Fix the leak, then re-run `{FILL_CMD}` to refresh the expected counts.",
-            actual.allocations, actual.deallocations,
+             Fix the leak, then re-run `{}` to refresh the expected counts.",
+            actual.allocations,
+            actual.deallocations,
+            scoped_fill_cmd(ctx),
         ));
     }
 

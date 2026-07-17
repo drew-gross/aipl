@@ -43,3 +43,4 @@ support rust style field construction when the field and variable name are the s
 remove install_parser_hook with lazy loader
 
 Replaceing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
+self[end + 1].value_or(' ').is_digit() -> self[end + 1].is_some_and(is_digit)
