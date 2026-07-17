@@ -3573,9 +3573,11 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// read like user code — plus any private helpers those tests need. Only the
 /// `pub fn` is registered (under the canonical `__builtin_*` name, which no
 /// user identifier can spell), so its body must be self-contained: no calls to
-/// the file's helpers or to itself. The declaration in [`BUILTIN_SIGNATURES`]
-/// stays — the checker and the loader's import gating are untouched; this
-/// table only changes what a call lowers to.
+/// the file's helpers or to itself. This table is the *single source* of both
+/// the builtin's body and its signature: it is **not** re-declared in
+/// [`BUILTIN_SIGNATURES`]; instead [`aipl_builtin_sig_decls`] extracts the
+/// signature from the same `pub fn` and feeds it to the checker and codegen's
+/// call-site signature registry.
 ///
 /// The template joins the `generics` map in [`monomorphize`], so calls
 /// specialize through the ordinary generic / higher-order paths
@@ -3618,18 +3620,51 @@ fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
     })
 }
 
+/// Signature-only AST declarations for the [`AIPL_BUILTIN_SOURCES`] builtins,
+/// under their canonical `__builtin_*` names, with `.test`/`doc` stripped. These
+/// let a consumer that would otherwise read [`aipl_syntax::BUILTIN_SIGNATURES`]
+/// (the checker's builtin decls, codegen's call-site signature registry) see an
+/// AIPL-implemented builtin's signature without it being duplicated there — the
+/// `pub fn` in the `.aipl` source is the single source of the signature. The
+/// body is kept (it type-checks — operators are native AST nodes, so no imports
+/// are needed) so the decl is a complete, checkable function.
+pub fn aipl_builtin_sig_decls() -> Vec<Item> {
+    AIPL_BUILTIN_SOURCES
+        .iter()
+        .map(|(canonical, src)| {
+            let program =
+                aipl_parser::parse(src).expect("AIPL-implemented builtin sources are valid AIPL");
+            let mut f = program
+                .items
+                .into_iter()
+                .find_map(|item| match item {
+                    Item::Fn(f) if f.is_pub => Some(f),
+                    _ => None,
+                })
+                .expect("an AIPL-implemented builtin source declares its builtin as pub fn");
+            f.name = canonical.to_string();
+            f.test_body = None;
+            f.doc = None;
+            Item::Fn(f)
+        })
+        .collect()
+}
+
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each
 /// normalized (via [`normalize`]) into a [`Signature`] — the same declarations
 /// the checker resolves builtin calls against, reused here so mono's own
 /// return-type inference doesn't hand-duplicate them. A builtin is never
 /// enqueued/specialized like a real [`Generic`], so only its `Signature` is
-/// kept (the body `normalize` produces alongside it is discarded).
+/// kept (the body `normalize` produces alongside it is discarded). The
+/// AIPL-implemented builtins ([`AIPL_BUILTIN_SOURCES`]) aren't in
+/// `BUILTIN_SIGNATURES`; their signatures are folded in from
+/// [`aipl_builtin_generics`] so return-type inference sees them too.
 fn builtin_sigs() -> &'static HashMap<String, Signature> {
     static SIGS: OnceLock<HashMap<String, Signature>> = OnceLock::new();
     SIGS.get_or_init(|| {
         let program =
             aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
-        program
+        let mut sigs: HashMap<String, Signature> = program
             .items
             .into_iter()
             .filter_map(|item| match item {
@@ -3640,7 +3675,11 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
                 }
                 _ => None,
             })
-            .collect()
+            .collect();
+        for (name, g) in aipl_builtin_generics() {
+            sigs.insert(name.clone(), g.sig.clone());
+        }
+        sigs
     })
 }
 

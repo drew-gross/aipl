@@ -2478,7 +2478,10 @@ pub struct Compilation {
 /// Parse [`aipl_syntax::BUILTIN_SIGNATURES`] into the checker's builtin
 /// declarations. The source is a fixed constant, so a parse failure is a
 /// compiler bug. Each is marked `pub` to match the hand-built originals
-/// (visibility is irrelevant to the checker, the only consumer).
+/// (visibility is irrelevant to the checker, the only consumer). The
+/// AIPL-implemented builtins aren't in that constant — their signatures come
+/// straight from their `.aipl` source via [`aipl_mono::aipl_builtin_sig_decls`],
+/// so a builtin's signature lives in exactly one place.
 fn builtin_decls() -> Vec<Item> {
     let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
         .expect("builtin signatures are valid AIPL");
@@ -2492,6 +2495,7 @@ fn builtin_decls() -> Vec<Item> {
             }
             other => other,
         })
+        .chain(aipl_mono::aipl_builtin_sig_decls())
         .collect()
 }
 

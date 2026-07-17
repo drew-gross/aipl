@@ -1138,11 +1138,6 @@ fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_len<T: any>(self: T[]) -> i64 { 0 }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
-// True if `self` is `some(x)` and `pred(x)` holds; `false` for `none` (the
-// predicate is not called). Implemented in AIPL
-// (`aipl-mono/src/builtin_is_some_and.aipl`), not codegen — this declaration
-// still types calls; mono swaps in the real body.
-fn __builtin_is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool { false }
 // Character classification: ASCII whitespace (space/tab/newline/carriage return).
 fn __builtin_is_space(self: char) -> bool { false }
 // Character classification: ASCII decimal digit ('0' through '9').
@@ -1159,10 +1154,10 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
-// True when every element satisfies `pred` (vacuously true for an empty array).
-// Implemented in AIPL (`aipl-mono/src/builtin_all.aipl`), not codegen — this
-// declaration still types calls; mono swaps in the real body.
-fn __builtin_all<T: any>(self: T[], pred: (T) -> bool) -> bool { false }
+// NOTE: `all` and `is_some_and` are *not* declared here — they're implemented in
+// AIPL (`aipl-mono/src/builtin_*.aipl`), which is the single source of both their
+// body and their signature. `aipl_mono::aipl_builtin_sig_decls()` feeds those
+// signatures to the checker and codegen; see `AIPL_BUILTIN_SOURCES` in aipl-mono.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // Reverse the elements of an array or the bytes of a string.
