@@ -99,15 +99,14 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                a
-                --- foo ---
-                new
-                --- bar ---
-                b
+        ) == """
+            a
+            --- foo ---
+            new
+            --- bar ---
+            b
 
-            """,
+        """,
     );
     // Section present: multi-line old body, all of it dropped.
     assert(
@@ -120,12 +119,11 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                --- foo ---
-                new
+        ) == """
+            --- foo ---
+            new
 
-            """,
+        """,
     );
 
     // Section present: the header is the final, unterminated line (no
@@ -137,12 +135,11 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                --- foo ---
-                new
+        ) == """
+            --- foo ---
+            new
 
-            """,
+        """,
     );
     // Section present: old body is the final, unterminated content.
     assert(
@@ -153,12 +150,11 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                --- foo ---
-                new
+        ) == """
+            --- foo ---
+            new
 
-            """,
+        """,
     );
 
     // Section present: adjacent headers — an empty old body (the next line is
@@ -174,14 +170,13 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                --- foo ---
-                new
-                --- bar ---
-                X
+        ) == """
+            --- foo ---
+            new
+            --- bar ---
+            X
 
-            """,
+        """,
     );
 
     // Section missing: appended after stripping trailing newlines.
@@ -193,13 +188,12 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "stdout",
             "hi",
-        )
-            == """
-                code
-                --- stdout ---
-                hi
+        ) == """
+            code
+            --- stdout ---
+            hi
 
-            """,
+        """,
     );
     // Missing, with several trailing newlines to strip first.
     assert(
@@ -212,33 +206,30 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "stdout",
             "hi",
-        )
-            == """
-                code
-                --- stdout ---
-                hi
+        ) == """
+            code
+            --- stdout ---
+            hi
 
-            """,
+        """,
     );
     // Missing, no trailing newline at all.
     assert(
-        fill_or_add_section("code", "stdout", "hi")
-            == """
-                code
-                --- stdout ---
-                hi
+        fill_or_add_section("code", "stdout", "hi") == """
+            code
+            --- stdout ---
+            hi
 
-            """,
+        """,
     );
     // Empty input, section missing.
     assert(
-        fill_or_add_section("", "stdout", "hi")
-            == """
+        fill_or_add_section("", "stdout", "hi") == """
 
-                --- stdout ---
-                hi
+            --- stdout ---
+            hi
 
-            """,
+        """,
     );
 
     // An indented `--- foo ---` line isn't a real header (must start at column
@@ -253,15 +244,14 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
             """,
             "foo",
             "new",
-        )
-            == """
-                code
-                  --- foo ---
-                old
-                --- foo ---
-                new
+        ) == """
+            code
+              --- foo ---
+            old
+            --- foo ---
+            new
 
-            """,
+        """,
     );
 })
 --- performance ---
@@ -270,7 +260,7 @@ deallocations: 83
 reallocations: 28
 bytes allocated: 3141
 instructions executed: 10665
-binary size: 15448
+binary size: 15160
 --- monomorphizations ---
 __enumerate2
 __m2__parse_test_section_header

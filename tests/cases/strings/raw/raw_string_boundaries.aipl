@@ -6,9 +6,8 @@ import { +++, print } from builtins;
 fn main() !prints -> i64 {
     print("[" +++ """""" +++ "]");
     print(
-        "["
-            +++ """
-            """
+        "[" +++ """
+        """
             +++ "]",
     );
     print("[" +++ """kept  """ +++ "]");

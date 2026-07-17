@@ -1,0 +1,41 @@
+import { ==, +++ } from builtins;
+
+fn block() -> str { "b" }
+
+fn main() -> i64 {
+    // A multi-line `"""` operand glues to its operator on the current line
+    // (`lhs == """`) instead of pushing the operator onto its own
+    // continuation line, and the closing delimiter sits at the statement
+    // indent, not one level deeper.
+    let eq = block()
+        == """
+            one
+              two
+        """;
+    // Any operator, not just `==`.
+    let joined = block()
+        +++ """
+            three
+        """;
+    if (eq) { joined.len() } else { 0 }
+}
+--- formatted ---
+import { +++, == } from builtins;
+
+fn block() -> str { "b" }
+
+fn main() -> i64 {
+    // A multi-line `"""` operand glues to its operator on the current line
+    // (`lhs == """`) instead of pushing the operator onto its own
+    // continuation line, and the closing delimiter sits at the statement
+    // indent, not one level deeper.
+    let eq = block() == """
+        one
+          two
+    """;
+    // Any operator, not just `==`.
+    let joined = block() +++ """
+        three
+    """;
+    if (eq) { joined.len() } else { 0 }
+}

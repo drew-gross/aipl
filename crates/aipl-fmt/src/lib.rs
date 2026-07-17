@@ -967,15 +967,33 @@ impl<'s> Walker<'s> {
         while is_binop(self.peek_text()) {
             let op = self.bump().to_string();
             let lead_rhs = self.lead();
+            let no_comment = matches!(&lead_rhs, Doc::Concat(v) if v.is_empty());
             let rhs = self.unary()?;
-            tail.push(concat(vec![Doc::Line, text(op), text(" "), lead_rhs, rhs]));
+            // A multi-line raw block (`"""` string / template) operand glues
+            // to the operator on the current line — `lhs == """` — rather
+            // than pushing the operator onto its own continuation line; it
+            // stays outside the continuation indent so its closing delimiter
+            // aligns with the statement, not one level deeper.
+            if no_comment && matches!(&rhs, Doc::RawBlock(s) if s.contains('\n')) {
+                tail.push(concat(vec![text(" "), text(op), text(" "), rhs]));
+            } else {
+                tail.push(indent(concat(vec![
+                    Doc::Line,
+                    text(op),
+                    text(" "),
+                    lead_rhs,
+                    rhs,
+                ])));
+            }
         }
         let d = if tail.is_empty() {
             first
         } else {
             // Flat: `a + b + c`; broken: continuation lines led by the
             // operator, one indent in.
-            group(concat(vec![first, indent(concat(tail))]))
+            let mut parts = vec![first];
+            parts.extend(tail);
+            group(concat(parts))
         };
         Ok(concat(vec![lead, d]))
     }

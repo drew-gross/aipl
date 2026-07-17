@@ -34,61 +34,55 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     ```
 }.test({
     assert(
-        caret_block("hello world", Span { start: 0, end: 5 }, "input")
-            == """
-                 --> input:1:1
-                  |
-                1 | hello world
-                  | ^^^^^
-            """,
+        caret_block("hello world", Span { start: 0, end: 5 }, "input") == """
+             --> input:1:1
+              |
+            1 | hello world
+              | ^^^^^
+        """,
     );
     assert(
-        caret_block("hello\nworld", Span { start: 6, end: 11 }, "input")
-            == """
-                 --> input:2:1
-                  |
-                2 | world
-                  | ^^^^^
-            """,
+        caret_block("hello\nworld", Span { start: 6, end: 11 }, "input") == """
+             --> input:2:1
+              |
+            2 | world
+              | ^^^^^
+        """,
     );
     assert(
-        caret_block("hello world", Span { start: 6, end: 11 }, "input")
-            == """
-                 --> input:1:7
-                  |
-                1 | hello world
-                  |       ^^^^^
-            """,
+        caret_block("hello world", Span { start: 6, end: 11 }, "input") == """
+             --> input:1:7
+              |
+            1 | hello world
+              |       ^^^^^
+        """,
     );
     // Zero-width span at col 0 gets at least one caret.
     assert(
-        caret_block("hi", Span { start: 0, end: 0 }, "input")
-            == """
-                 --> input:1:1
-                  |
-                1 | hi
-                  | ^
-            """,
+        caret_block("hi", Span { start: 0, end: 0 }, "input") == """
+             --> input:1:1
+              |
+            1 | hi
+              | ^
+        """,
     );
     // Span extending past line end is clamped to the line.
     assert(
-        caret_block("hi\nthere", Span { start: 0, end: 10 }, "input")
-            == """
-                 --> input:1:1
-                  |
-                1 | hi
-                  | ^^
-            """,
+        caret_block("hi\nthere", Span { start: 0, end: 10 }, "input") == """
+             --> input:1:1
+              |
+            1 | hi
+              | ^^
+        """,
     );
     // Real filename appears in output.
     assert(
-        caret_block("hello world", Span { start: 0, end: 5 }, "foo.aipl")
-            == """
-                 --> foo.aipl:1:1
-                  |
-                1 | hello world
-                  | ^^^^^
-            """,
+        caret_block("hello world", Span { start: 0, end: 5 }, "foo.aipl") == """
+             --> foo.aipl:1:1
+              |
+            1 | hello world
+              | ^^^^^
+        """,
     );
 })
 --- performance ---
@@ -97,7 +91,7 @@ deallocations: 83
 reallocations: 26
 bytes allocated: 3022
 instructions executed: 4626
-binary size: 10264
+binary size: 10072
 --- monomorphizations ---
 __enumerate0
 __m1__line_at
