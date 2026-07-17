@@ -36,8 +36,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 111
-binary size: 2584
+instructions executed: 105
+binary size: 2560
 --- monomorphizations ---
 i16v
 i32v

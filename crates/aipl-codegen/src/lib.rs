@@ -2963,9 +2963,14 @@ fn compile_program<M: Module>(
     // definitions.
     let inlined = aipl_mono::inline_single_use(program);
 
+    // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
+    // `check` so diagnostics always report against the unfolded source, and
+    // after inlining so bodies folded here are the ones actually emitted.
+    let folded = aipl_mono::fold_constants(&inlined);
+
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
-    let monomorphized = aipl_mono::monomorphize(&inlined, dbg)?;
+    let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
     // specializations: those lifted lambdas (and any other now-single-use

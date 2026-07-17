@@ -55,8 +55,8 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 130
-instructions executed: 589
-binary size: 6536
+instructions executed: 588
+binary size: 6528
 --- monomorphizations ---
 main
 unwrap2

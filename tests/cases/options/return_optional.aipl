@@ -13,8 +13,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 148
-binary size: 1784
+instructions executed: 146
+binary size: 1776
 --- monomorphizations ---
 __test$divide
 divide

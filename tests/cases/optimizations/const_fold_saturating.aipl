@@ -1,0 +1,19 @@
+import { &&, saturating_add as +, saturating_sub as -, <, == } from builtins;
+
+// `+`/`-` bound to the saturating flavors fold with saturating semantics:
+// MAX + 1 pins at MAX (the wrapping flavor would go negative), and stepping
+// past MIN pins at MIN.
+fn sat() -> bool {
+    ((9223372036854775807 + 1) == 9223372036854775807) && (((0 - 9223372036854775807) - 2) < 0)
+}.test({
+    assert(sat());
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 14
+binary size: 896
+--- monomorphizations ---
+main

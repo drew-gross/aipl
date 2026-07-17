@@ -29,6 +29,9 @@ use std::{
 mod check;
 pub use check::check;
 
+mod fold;
+pub use fold::fold_constants;
+
 use aipl_syntax::{
     ast,
     ast::{

@@ -1,0 +1,51 @@
+import {
+    !,
+    !=,
+    %,
+    &&,
+    *,
+    wrapping_add as +,
+    wrapping_sub as -,
+    /,
+    <,
+    <=,
+    ==,
+    >,
+    >=,
+    ||,
+} from builtins;
+
+// All-constant expressions are folded at compile time — main compiles to a
+// bare constant return (see the instruction count below). The asserts pin the
+// folded values to the run-time semantics they must match.
+fn arith() -> i64 { ((2 + 3) * 10) - ((7 / 2) + (7 % 2)) }.test({
+    assert(arith() == 46);
+})
+
+// i64 wrapping at the boundaries: `+`/`-` here are the wrapping flavors, and
+// codegen's `*` wraps too.
+fn wraps() -> bool { (9223372036854775807 + 1) < 0 }.test({
+    assert(wraps());
+    assert(((0 - 9223372036854775807) - 2) > 0); // wraps past MIN back to MAX
+    assert((3037000500 * 3037000500) < 0); // multiply wraps
+})
+
+// Comparisons fold to bools; boolean ops and unary ops over literals fold too.
+fn bools() -> bool { (1 < 2) && (2 <= 2) && (3 > 2) && (2 >= 2) && (1 == 1) && (1 != 2) }.test({
+    assert(bools());
+    assert(!(false || (true && false)));
+    assert((0 - (0 - 5)) == 5);
+})
+
+fn main() -> i64 { (6 * 7) % 100 }
+--- exit code ---
+42
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 552
+--- monomorphizations ---
+main
