@@ -50,3 +50,24 @@ spread in args e.g. fn foo(self: Span { start, end })
 Cache monomorphizations of the same lambda
 
 structs with type arguments (for custom variant type for lexing)
+
+Lex aipl:
+  New matcher shapes (fit the current data-only design)
+
+  1. Multi-char, asymmetric-close delimiters — raw strings """…""" (lib.rs:2367): open/close are 3 chars, and a lone " or "" inside must not close. Delimited today is single-char, same-char-close only. Wants something like Between(open, close).
+  2. Nesting — block comments /* … /* … */ … */ nest, Rust-style (lib.rs:2219). Needs a depth-tracked variant of Between.
+  3. Escape-aware delimiter scanning — in "…" a \" must not close the string (lib.rs:2404). The close-scan needs to skip \<any> pairs.
+  4. Char-literal shape — 'x' / '\n' (lib.rs:2469): open quote, optional escape, exactly one char, close quote. A same-char Delimited("'") gets simple cases right but '\'' wrong, and can't reject '' (empty) or multi-char.
+
+  New lexer machinery (changes to lex itself)
+
+  5. Matched-but-invalid ⇒ rich lex errors. Today a matcher can only match or decline; declining an unterminated string would fall through to "no rule matched" at the quote — wrong position and no message. tokenize_one produces ~9 distinct errors (unterminated raw string / string / char / template / block comment, unknown escape \x, empty char literal, non-ASCII char literal, more-than-one-char literal, plus overflow "bad number"). Matchers need a third outcome (hard error), and the err payload needs a message + span (a LexError struct — struct payloads already work).
+  6. Trivia side-channel. Skip rules currently drop spans, but the real lexer records every comment span (record_comment, lib.rs:2265 — the formatter depends on this) and every #[allow] span (record_allow, lib.rs:2283 — the lint pass depends on it). lex needs to return skipped/marker spans alongside the tokens (e.g. a result struct { tokens, comments, allows } — needs struct-with-array-fields as a result payload, or a second out-array).
+  7. Template literals — mode-switching re-entrant lexing. The big one. `text {expr} text` (lib.rs:2719) alternates verbatim-text scanning (with its own escape set \\ \ { \n \t \r) and full-rule-set expression lexing inside {…} with brace-depth tracking (tokenize_template_expr, lib.rs:2910), emitting *context-dependent* kinds (STR vs HEAD/MIDDLE/TAIL). Triple-backtick ```` ``` ```` (lib.rs:2964`) adds verbatim (no-escape) text with the raw-string dedent treatment. This doesn't fit "one matcher, one token" at all — it needs sub-lexing or a lexer-mode stack.
+  8. Unicode identifiers and spans. The Rust lexer is char-based: idents use is_alphabetic()/is_alphanumeric() (full Unicode, so héllo lexes today), and error spans use len_utf8. CharRun's char-class strings are byte sets — they can't express "any Unicode letter", and a multi-byte char would be split. Either add a named-class matcher (e.g. Alphabetic) or decide AIPL idents become ASCII-only (a language decision, not a lexer one).
+
+  Deferred by design (value processing, not tokenization)
+
+  9. Token values. Terminal carries processed payloads — escaped string contents, the raw-string dedent (via the already-dogfooded process_raw_string), char byte values, parsed i64 (with overflow reported at lex time, lib.rs:2597). Our tokens are span-only; slicing covers idents/numbers, but string unescaping and the overflow check need a post-pass per kind. process_raw_string can be reused as-is.
+
+  Rough dependency order if you want a sequence: 5 (error machinery) unblocks 1–4 (the new matchers all need hard errors); 6 is independent and small; 7 is the largest and worth its own design pass; 8 needs your call on ASCII vs Unicode first.
