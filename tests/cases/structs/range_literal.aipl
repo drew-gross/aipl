@@ -1,0 +1,38 @@
+import { *, wrapping_add as +, ==, Span, print, to_str } from builtins;
+
+// `start..end` is a range expression: it constructs the builtin `Span`
+// (`Span { start: .., end: .. }`) without spelling the name — so, like
+// slicing, it needs no `Span` import (this file imports it only to write the
+// annotations below). It binds loosest of all infix operators, so bounds can
+// be full expressions: `i + 1..i * 4` is `(i + 1)..(i * 4)`.
+fn width(s: Span) -> i64 { s.end }
+
+fn main() !prints {
+    let s = 1..4;
+    print(s.start.to_str()); // 1
+    print(s.end.to_str()); // 4
+    print(((1..4) == Span { start: 1, end: 4 }).to_str()); // true
+    // A range is an ordinary Span value: pass it around, slice with it.
+    print(width(5..9).to_str()); // 9
+    print("hello, world"[s]); // ell
+    print([10, 20, 30, 40, 50][s].to_str()); // [20, 30, 40]
+    let i = 2;
+    print("hello, world"[i + 1..i * 4]); // lo, w
+}
+--- stdout ---
+1
+4
+true
+9
+ell
+[20, 30, 40]
+lo, w
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 157
+instructions executed: 447
+binary size: 4064
+--- monomorphizations ---
+main

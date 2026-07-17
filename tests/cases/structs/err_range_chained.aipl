@@ -1,0 +1,11 @@
+// `..` is left-associative, so `1..2..3` is `(1..2)..3` — a Span as the
+// start bound of another range, which fails the field type check.
+fn main() {
+    let r = 1..2..3;
+}
+--- errors ---
+error: struct "Span" field "start": expected i64, got Span
+ --> ./tests/cases/structs/err_range_chained.aipl:4:13
+  |
+4 |     let r = 1..2..3;
+  |             ^^^^

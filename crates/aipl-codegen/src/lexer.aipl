@@ -64,9 +64,7 @@ struct LexRules {
 }
 
 // Test-block shorthand for an expected token.
-fn tok(kind: TokenKind, start: i64, end: i64) -> Token {
-    Token { kind: kind, span: Span { start: start, end: end } }
-}
+fn tok(kind: TokenKind, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
 
 pub fn default_rules() -> LexRules {
     LexRules {
@@ -193,7 +191,7 @@ fn matches_at(self: str, at: i64, marker: str) -> bool {
 fn string_token(self: str, start: i64, delim: char) -> Token {
     let content_end = start + 1 + self[start + 1..].count_while(|x| x != delim);
     let end = if (content_end < self.len()) { content_end + 1 } else { content_end };
-    Token { kind: Str, span: Span { start: start, end: end } }
+    Token { kind: Str, span: start..end }
 }
 
 // The end of the number token whose integer part ends at `int_end`: extends
@@ -227,7 +225,7 @@ fn punct_token(self: str, start: i64, rules: LexRules) -> Token {
             set end = start + p.len();
         };
     }
-    Token { kind: Punct, span: Span { start: start, end: end } }
+    Token { kind: Punct, span: start..end }
 }
 
 // The single token starting at `start` (which the caller guarantees is in
@@ -241,13 +239,13 @@ fn next_token(self: str, start: i64, rules: LexRules) -> Token {
     };
     if (rules.ident_start.contains(c)) {
         let end = start + 1 + self[start + 1..].count_while(|x| rules.ident_continue.contains(x));
-        return Token { kind: Ident, span: Span { start: start, end: end } };
+        return Token { kind: Ident, span: start..end };
     };
     if (c.is_digit()) {
         let int_end = start + 1 + self[start + 1..].count_while(is_digit);
         let end = if (rules.floats) { self.number_end(int_end) } else { int_end };
         let kind = if (int_end < end) { Float } else { Int };
-        return Token { kind: kind, span: Span { start: start, end: end } };
+        return Token { kind: kind, span: start..end };
     };
     self.punct_token(start, rules)
 }

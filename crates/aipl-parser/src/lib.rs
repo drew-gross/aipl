@@ -43,7 +43,7 @@ gazelle! {
             // `#` leads a set literal `#{ .. }`; carries a span so an empty
             // `#{}` still has a location for diagnostics (like `[`).
             HASH: _,
-            COMMA, COLON, ARROW, DOT, DOTDOT, SEMI, EQ, QUESTION, FATARROW,
+            COMMA, COLON, ARROW, DOT, SEMI, EQ, QUESTION, FATARROW,
             BANG,
             // `++` — the increment statement `set n++;`. Carries a span so the
             // `+ 1` it desugars to (and the `+` import error it can raise) point
@@ -71,7 +71,12 @@ gazelle! {
             // expression, and the lead of a no-argument lambda (`|| body`) in
             // argument position, where infix-or is impossible. Position
             // disambiguates — exactly like `<`.
-            prec OROR
+            prec OROR,
+            // `..` — the range expression `start..end` (a `Span` constructor).
+            // Lowest precedence, so `a + 1..b * 2` is `(a + 1)..(b * 2)`. Also
+            // appears literally in the open-ended slice postfixes (`[a..]`,
+            // `[..b]`), like `MINUS` appears literally in unary position.
+            prec DOTDOT
         }
 
         program = item* => program;
@@ -285,7 +290,11 @@ gazelle! {
         for_tuple_stmt = FOR LPAREN LET LPAREN match_bindings RPAREN COLON expr RPAREN loop_body => for_tuple_stmt;
         while_stmt = WHILE LPAREN expr RPAREN loop_body => while_stmt;
 
-        expr = term => term | expr binop expr => binop;
+        // `start..end` — a range expression, constructing the builtin `Span`
+        // (`Span { start: .., end: .. }`). Its own production (not a `binop`)
+        // so the builder can desugar to the construct; DOTDOT's precedence
+        // still drives the LR resolution like any infix operator.
+        expr = term => term | expr binop expr => binop | expr DOTDOT expr => range;
         binop = OP => op | MINUS => minus | LANGLE => lt | RANGLE => gt | OROR => or;
 
         term = unary => unary;
@@ -296,11 +305,13 @@ gazelle! {
                 | postfix DOT IDENT => field_access
                 | postfix DOT NUM => tuple_index
                 | postfix DOT IDENT LPAREN args RPAREN => method_call
+                // `recv[index]` — indexing; a closed slice `recv[a..b]` also
+                // arrives here (the index expr is a range), and the builder
+                // folds that literal shape back into a `Slice` node.
                 | postfix LBRACKET expr RBRACKET => index
-                // `recv[start..end]` — string slice. The `..` (DOTDOT) after the
-                // first `expr` distinguishes it from a plain index on one token.
-                | postfix LBRACKET expr DOTDOT expr RBRACKET => slice
                 // `recv[start..]` — open-ended slice (to the receiver's length).
+                // The range production can't match here (no expr after `..`),
+                // so `..` followed by `]` stays unambiguous.
                 | postfix LBRACKET expr DOTDOT RBRACKET => slice_open
                 // `recv[..end]` — open *start* (from 0 to `end`). The `..`
                 // immediately after `[` distinguishes it from the other forms.
@@ -1658,14 +1669,24 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
             }
             aipl::Postfix::Index(obj, _lbracket, index) => {
                 let span = join_spans(&obj.span, &index.span);
+                // `recv[a..b]` — a range literal in index position is the
+                // closed slice form; fold it straight into a `Slice` node
+                // (identical to the historic dedicated production) rather
+                // than constructing a `Span` only to unpack it at runtime.
+                // A range that reaches indexing as a *value* (`recv[s]`, a
+                // call result, ...) stays an `Index` and takes the Span-index
+                // sugar path instead.
+                if let ExprKind::Construct(name, inits) = &index.kind {
+                    if name == "__builtin_Span" && inits.len() == 2 {
+                        let start = inits[0].value.clone();
+                        let end = inits[1].value.clone();
+                        return Ok(Expr::new(
+                            ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
+                            span,
+                        ));
+                    }
+                }
                 Expr::new(ExprKind::Index(Box::new(obj), Box::new(index)), span)
-            }
-            aipl::Postfix::Slice(obj, _lbracket, start, end) => {
-                let span = join_spans(&obj.span, &end.span);
-                Expr::new(
-                    ExprKind::Slice(Box::new(obj), Box::new(start), Some(Box::new(end))),
-                    span,
-                )
             }
             // `recv[start..]` — open end (runs to the receiver's length).
             aipl::Postfix::SliceOpen(obj, _lbracket, start) => {
@@ -2122,6 +2143,31 @@ impl gazelle::Action<aipl::Expr<Self>> for Build {
                 let span = join_spans(&l.span, &r.span);
                 Expr::new(ExprKind::Binop(Box::new(l), op, Box::new(r)), span)
             }
+            // `start..end` — a range expression is sugar for constructing the
+            // builtin `Span` struct. Desugared right here (no name is written,
+            // so no `Span` import is needed — matching slicing, which has
+            // always used `..` unimported). A range that is *syntactically*
+            // the index of `recv[...]` is folded back into a `Slice` node by
+            // the `Index` builder below.
+            aipl::Expr::Range(l, r) => {
+                let span = join_spans(&l.span, &r.span);
+                Expr::new(
+                    ExprKind::Construct(
+                        "__builtin_Span".to_string(),
+                        vec![
+                            FieldInit {
+                                name: "start".to_string(),
+                                value: l,
+                            },
+                            FieldInit {
+                                name: "end".to_string(),
+                                value: r,
+                            },
+                        ],
+                    ),
+                    span,
+                )
+            }
         })
     }
 }
@@ -2559,7 +2605,9 @@ fn tokenize_one<I: Iterator<Item = char>>(
             ('-', '>') => Some(aipl::Terminal::Arrow),
             // `..` — the range separator in a slice `s[a..b]`. Must beat the
             // single-char `.` (field/method access).
-            ('.', '.') => Some(aipl::Terminal::Dotdot),
+            // Range construction binds loosest of all infix operators (below
+            // `||` at 2), so `a + 1..b * 2` is `(a + 1)..(b * 2)`.
+            ('.', '.') => Some(aipl::Terminal::Dotdot(Precedence::Left(1))),
             ('=', '>') => Some(aipl::Terminal::Fatarrow),
             // `++` — increment statement; must beat the single-char `+`.
             ('+', '+') => Some(aipl::Terminal::Plusplus(op_span)),
@@ -3237,8 +3285,8 @@ fn classify(t: &aipl::Terminal<Build>) -> TokenKind {
         | T::Plusplus(_)
         | T::Arrow
         | T::Fatarrow
-        // `..` — the slice range separator.
-        | T::Dotdot
+        // `..` — the slice/range separator (carries its infix precedence).
+        | T::Dotdot(_)
         // `=` (assignment in `let`/`mut`/`set`) is conventionally
         // `keyword.operator.assignment` in TextMate scopes — group it
         // with the other operators rather than with bracket punctuation.

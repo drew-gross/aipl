@@ -1,0 +1,11 @@
+// A range constructs `Span { start: .., end: .. }`, so its bounds must be
+// i64 like the fields they initialize.
+fn main() {
+    let r = "a"..2;
+}
+--- errors ---
+error: struct "Span" field "start": expected i64, got str
+ --> ./tests/cases/structs/err_range_bound_type.aipl:4:13
+  |
+4 |     let r = "a"..2;
+  |             ^^^

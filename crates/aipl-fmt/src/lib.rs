@@ -961,6 +961,21 @@ impl<'s> Walker<'s> {
     // ---------- expressions ----------
 
     fn expr(&mut self) -> Result<Doc, Error> {
+        let mut d = self.binop_expr()?;
+        // `a..b` — range construction, the loosest infix level (spelled
+        // tight, like the slice forms). A `..` directly followed by `]` is
+        // the open-ended slice postfix instead — left for the bracket code
+        // in `postfix`. Left-assoc loop mirrors the grammar (`a..b..c`
+        // parses, even though it can only fail the type check later).
+        while self.peek_text() == ".." && self.peek_text_n(1) != "]" {
+            self.bump();
+            let rhs = self.binop_expr()?;
+            d = concat(vec![d, text(".."), rhs]);
+        }
+        Ok(d)
+    }
+
+    fn binop_expr(&mut self) -> Result<Doc, Error> {
         let lead = self.lead();
         let first = self.unary()?;
         let mut tail = Vec::new();

@@ -1,0 +1,32 @@
+import { wrapping_add as +, * } from builtins;
+
+fn main() -> i64 {
+    // A range expression is spelled tight, like the slice forms.
+    let s = 1 .. 4;
+    let i = 2;
+    // Bounds are full binop expressions (range binds loosest); the operators
+    // inside keep their usual spacing.
+    let t = i+1 .. i*4;
+    // Slice postfixes are unchanged: closed, open-ended, and open-start.
+    let u = "hello, world"[t.start .. t.end];
+    let v = "hello"[s.start ..];
+    let w = "hello"[.. 3];
+    u.len() + v.len() + w.len() + "x"[s].len()
+}
+--- formatted ---
+import { *, wrapping_add as + } from builtins;
+
+fn main() -> i64 {
+    // A range expression is spelled tight, like the slice forms.
+    let s = 1..4;
+    let i = 2;
+
+    // Bounds are full binop expressions (range binds loosest); the operators
+    // inside keep their usual spacing.
+    let t = i + 1..i * 4;
+    // Slice postfixes are unchanged: closed, open-ended, and open-start.
+    let u = "hello, world"[t.start..t.end];
+    let v = "hello"[s.start..];
+    let w = "hello"[..3];
+    u.len() + v.len() + w.len() + "x"[s].len()
+}

@@ -1,0 +1,19 @@
+import { print } from builtins;
+
+// A range expression needs no `Span` import — no name is spelled, matching
+// `..` in slice position (which has always worked unimported).
+fn main() !prints {
+    let r = 2..6;
+    print("hello, world"[r]);
+}
+--- stdout ---
+llo,
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 18
+binary size: 920
+--- monomorphizations ---
+main

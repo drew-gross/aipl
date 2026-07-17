@@ -34,5 +34,8 @@ spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
 lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
-warn/err on bar(|x| x.foo()) or bar(|x| foo(x)) (just use bar(foo))
+warn/err on:
+- bar(|x| x.foo()) or bar(|x| foo(x)) (just use bar(foo))
+- vec[x..x.len()] should just be vec[x..]
 output multiple errors at once
+support rust style field construction when the field and variable name are the same
