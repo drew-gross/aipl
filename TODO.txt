@@ -31,7 +31,6 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 Make x..y syntax for creating spans
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
-leverage defaults in lexer.aipl, remove the fluent API stuff
 lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)

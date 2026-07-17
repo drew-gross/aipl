@@ -19,6 +19,7 @@ import {
     Span,
     contains,
     is_digit,
+    is_some_and,
     is_space,
     len,
     push,
@@ -95,14 +96,13 @@ fn string_token(self: str, start: i64, delim: char) -> Token {
 // every check, so a number at the end of the source ends cleanly.
 fn number_end(self: str, int_end: i64) -> i64 {
     mut end = int_end;
-    if (self[end] == some('.') && self[end + 1].value_or(' ').is_digit()) {
+    if (self[end] == some('.') && self[end + 1].is_some_and(is_digit)) {
         set end = end + 1 + self[end + 1..].count_while(is_digit);
     };
-    let e = self[end].value_or(' ');
-    if (e == 'e' || e == 'E') {
-        let sign = self[end + 1].value_or(' ');
-        let digits = if (sign == '+' || sign == '-') { end + 2 } else { end + 1 };
-        if (self[digits].value_or(' ').is_digit()) {
+    if (self[end].is_some_and(|e| e == 'e' || e == 'E')) {
+        let has_sign = self[end + 1].is_some_and(|sign| sign == '+' || sign == '-');
+        let digits = if (has_sign) { end + 2 } else { end + 1 };
+        if (self[digits].is_some_and(is_digit)) {
             set end = digits + self[digits..].count_while(is_digit);
         };
     };
@@ -147,8 +147,7 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     mut tokens = [];
     mut i = 0;
     while (i < self.len()) {
-        let c = self[i].value_or(' '); // in bounds: always some
-        if (c.is_space()) {
+        if (self[i].is_some_and(is_space)) {
             set i = i + 1;
         } else {
             if (self.matches_at(i, rules.line_comment)) {
@@ -301,13 +300,14 @@ allocations: 137
 deallocations: 137
 reallocations: 65
 bytes allocated: 6232
-instructions executed: 26844
-binary size: 48680
+instructions executed: 26821
+binary size: 48720
 --- monomorphizations ---
-__m1__count_while$char$s0$lam1
-__m1__count_while$char$s0$lam4
-__m1__count_while$char$s0$lam7
+__builtin_is_some_and$char$lam10
+__m1__count_while$char$s0$lam2
+__m1__count_while$char$s0$lam5
 __m1__count_while$char$s0$lam8
+__m1__count_while$char$s0$lam9
 __test$lex
 lex
 main
