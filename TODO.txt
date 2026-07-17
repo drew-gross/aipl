@@ -32,6 +32,7 @@ Make x..y syntax for creating spans
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
 lex json
+- need recursive types for this (auto-boxing with garbage collection?)
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 warn/err on:
@@ -47,3 +48,5 @@ Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not 
 spread in args e.g. fn foo(self: Span { start, end })
 
 Cache monomorphizations of the same lambda
+
+structs with type arguments (for custom variant type for lexing)

@@ -1,13 +1,13 @@
 // A small library for building lexers. `lex` turns source text into a flat
-// `Token[]`, driven by a `LexRules` value describing the language being lexed:
-// which chars form identifiers, which multi-byte punctuation sequences exist,
-// which chars delimit string literals, and what starts a line comment. Rules
-// are plain data (char-class strings and marker lists), so one `lex` serves
-// many languages — see the JSON and AIPL-flavored rule sets in the tests.
-// Every field of `LexRules` has a default, so `LexRules {}` is a minimal
-// starting point (ASCII identifiers, integer literals, single-byte
-// punctuation, whitespace skipped) and each knob is turned on by naming just
-// that field, e.g. `LexRules { floats: true }`.
+// `Token[]`, driven by an ordered `TokenRule[]` describing the language being
+// lexed. Each rule pairs a caller-chosen `kind` label with a `Matcher` — a
+// data-only description of one token shape (a char-class run, a list of fixed
+// spellings, a delimited literal, ...) — so a rule set is plain data and one
+// `lex` serves many languages; see the JSON and AIPL-flavored rule sets in the
+// tests. At each position the *first* rule whose matcher matches wins, so
+// order is priority: put keywords before identifiers, floats before ints.
+// Whitespace and comments are ordinary rules marked `skip: true` — matched and
+// consumed, but producing no token.
 import {
     !,
     !=,
@@ -21,75 +21,114 @@ import {
     contains,
     is_digit,
     is_some_and,
-    is_space,
     len,
     push,
     starts_with,
     value_or,
 } from builtins;
 import { count_while } from "./count_while.aipl";
-import { trim_while } from "./trim_while.aipl";
 
-// The token classes. `lex` classifies each token by its first char, checked in
-// this order: a string delimiter opens a `Str`, an ident-start char opens an
-// `Ident`, a digit opens an `Int` (or a `Float`, when the `floats` rule lets
-// the run extend past a fraction or exponent), and anything else is `Punct`.
-variant TokenKind = Ident | Int | Float | Punct | Str
+// What a token is: the `kind` label of the rule that matched it, and the
+// half-open byte range it covers in the source — the text is recovered by
+// slicing, `src[t.span]`. A byte no rule matches becomes a single-byte token
+// with the empty kind "", so `lex` never fails.
+struct Token { kind: str, span: Span }
 
-// What a token is: its class and the half-open byte range it covers in the
-// source — the text is recovered by slicing, `src[t.span]`.
-struct Token { kind: TokenKind, span: Span }
+// One token shape, as plain data. Char classes are spelled as strings
+// (membership via `contains`) and spellings as string lists; none of them
+// ever match empty input, so `lex` always makes progress.
+//
+// - `CharRun(first, cont)`: a maximal run — a char in `first` opens the token,
+//   chars in `cont` extend it. Identifiers, digit runs, whitespace.
+// - `Exact(spellings)`: one of the listed spellings, verbatim; the longest
+//   one matching wins, in any order. Punctuation and operators.
+// - `Keyword(spellings, boundary)`: like `Exact`, but a spelling only matches
+//   when the char after it is absent or outside `boundary` (the identifier
+//   continue class) — so a keyword rule placed before the identifier rule
+//   claims `if` without biting the front off `iffy`.
+// - `Delimited(delims)`: a char in `delims` opens the token, which runs to
+//   just past the next occurrence of the *same* char (no escapes yet), or to
+//   the end of the source when unterminated. String literals.
+// - `ToEol(marker)`: the `marker` spelling, then everything up to (not
+//   including) the next newline. Line comments — usually `skip: true`.
+// - `Float`: a digit run that extends past a fraction (`.` plus at least one
+//   digit) and/or an exponent (`e`/`E`, an optional sign, at least one
+//   digit), JSON style. A bare digit run does *not* match — put a `Float`
+//   rule ahead of the int rule and each number lexes as the right one.
+variant Matcher =
+    CharRun(str, str)
+    | Exact(str[])
+    | Keyword(str[], str)
+    | Delimited(str)
+    | ToEol(str)
+    | Float
 
-// How to lex a particular language. Char classes are spelled as strings
-// (membership via `contains`), and markers as string lists, so a rule set is
-// plain data. Every field defaults to the minimal setting, so `LexRules {}`
-// lexes ASCII identifiers, integer literals, and single-byte punctuation, and
-// a language turns on just the fields it needs (e.g.
-// `LexRules { string_delims: "\"", floats: true }`); see the tests for rule
-// sets resembling JSON and AIPL.
-struct LexRules {
-    // Chars that may begin / continue an identifier. A char in
-    // `ident_continue` but not `ident_start` (digits, typically) can appear
-    // in an identifier but never starts one. The defaults are ASCII letters
-    // and `_`, plus digits for `ident_continue`.
-    ident_start: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_",
-    ident_continue: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789",
-    // Multi-byte punctuation sequences (e.g. "==", "->"). The longest entry
-    // matching at the current position wins, in any order; a punctuation char
-    // matching no entry is a single-byte `Punct` token. Defaults to none.
-    puncts: str[] = [],
-    // Chars that delimit a string literal: an occurrence opens a `Str` token
-    // that runs to the next occurrence of the *same* char (no escapes yet),
-    // or to the end of the source when unterminated. Defaults to none (off).
-    string_delims: str = "",
-    // The marker that starts a line comment ("" for none). The comment runs
-    // to the end of the line and produces no token, like whitespace. Defaults
-    // to "" (off).
-    line_comment: str = "",
-    // Whether numbers may be floats: when true, a digit run extends past a
-    // fraction (`.` plus at least one digit) and/or an exponent (`e`/`E`, an
-    // optional sign, at least one digit) into a single `Float` token, JSON
-    // style. A bare digit run stays `Int` either way. Defaults to false.
-    floats: bool = false,
-}
+// One prioritized entry of a rule set: the label tokens of this shape carry,
+// the shape itself, and whether matches are consumed without producing a
+// token (whitespace, comments).
+struct TokenRule { kind: str, matcher: Matcher, skip: bool = false }
 
 // Test-block shorthand for an expected token.
-fn tok(kind: TokenKind, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
+fn tok(kind: str, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
 
-// The string token opened by the delimiter `delim` at `start`: it spans to
-// just past the next `delim`, or to the end of the source when unterminated.
-fn string_token(self: str, start: i64, delim: char) -> Token {
-    let content_end = start + 1 + self[start + 1..].count_while(|x| x != delim);
-    let end = if (content_end < self.len()) { content_end + 1 } else { content_end };
-    Token { kind: Str, span: start..end }
+// `CharRun`: length of the maximal run at the start of `self` — a `first`
+// char, then `cont` chars. 0 when the first char isn't in `first`.
+fn char_run_len(self: str, first: str, cont: str) -> i64 {
+    if (self[0].is_some_and(|c| first.contains(c))) {
+        1 + self[1..].count_while(|c| cont.contains(c))
+    } else {
+        0
+    }
 }
 
-// The end of the number token whose integer part ends at `int_end`: extends
-// past a fraction (`.` then at least one digit), then past an exponent (`e`
-// or `E`, an optional sign, then at least one digit). Either part may be
-// absent; `int_end` comes back unchanged when neither matches, meaning the
-// token is a plain `Int`. Out-of-bounds reads come back as ' ', which fails
-// every check, so a number at the end of the source ends cleanly.
+// `Exact`: length of the longest spelling prefixing `self`, 0 when none does.
+// An empty spelling never matches (the `best <` guard excludes it).
+fn longest_prefix(self: str, spellings: str[]) -> i64 {
+    mut best = 0;
+    for (let s : spellings) {
+        if (best < s.len() && self.starts_with(s)) {
+            set best = s.len();
+        };
+    }
+    best
+}
+
+// `Keyword`: like `longest_prefix`, but a spelling only counts when the char
+// after it is absent (end of source) or outside `boundary` — a keyword must
+// not end in the middle of an identifier.
+fn keyword_len(self: str, spellings: str[], boundary: str) -> i64 {
+    mut best = 0;
+    for (let s : spellings) {
+        let bounded = !self[s.len()].is_some_and(|c| boundary.contains(c));
+        if (best < s.len() && bounded && self.starts_with(s)) {
+            set best = s.len();
+        };
+    }
+    best
+}
+
+// `Delimited`: a `delims` char opens the token, which spans to just past the
+// next occurrence of the same char, or to the end of the source when
+// unterminated. 0 when the first char isn't a delimiter.
+fn delimited_len(self: str, delims: str) -> i64 {
+    if (!self[0].is_some_and(|c| delims.contains(c))) {
+        return 0;
+    };
+    let d = self[0].value_or(' '); // in bounds: the guard above saw a char
+    let content_end = 1 + self[1..].count_while(|x| x != d);
+    if (content_end < self.len()) { content_end + 1 } else { content_end }
+}
+
+// `ToEol`: the marker, then everything up to (not including) the next
+// newline. 0 when `self` doesn't start with the (non-empty) marker.
+fn to_eol_len(self: str, marker: str) -> i64 {
+    if (0 < marker.len() && self.starts_with(marker)) { self.count_while(|x| x != '\n') } else { 0 }
+}
+
+// The end of the number whose integer part ends at `int_end`: extends past a
+// fraction (`.` then at least one digit), then past an exponent (`e` or `E`,
+// an optional sign, then at least one digit). Either part may be absent;
+// `int_end` comes back unchanged when neither matches.
 fn number_end(self: str, int_end: i64) -> i64 {
     mut end = int_end;
     if (self[end] == some('.') && self[end + 1].is_some_and(is_digit)) {
@@ -105,218 +144,243 @@ fn number_end(self: str, int_end: i64) -> i64 {
     end
 }
 
-// The punctuation token at `start`: the longest entry of `rules.puncts`
-// matching there, or a single byte when none match.
-fn punct_token(self: str, start: i64, rules: LexRules) -> Token {
-    mut end = start + 1;
-    for (let p : rules.puncts) {
-        if (end < start + p.len() && self[start..].starts_with(p)) {
-            set end = start + p.len();
-        };
+// `Float`: a digit run that extends past a fraction and/or exponent. A bare
+// digit run is 0 (no match) — it belongs to the int rule.
+fn float_len(self: str) -> i64 {
+    let int_end = self.count_while(is_digit);
+    if (int_end == 0) {
+        return 0;
+    };
+    let end = self.number_end(int_end);
+    if (int_end < end) { end } else { 0 }
+}
+
+// How far `m` matches at the start of `self`: the matched length, or 0 for no
+// match. No matcher matches empty input, so a nonzero length always means
+// progress.
+fn match_len(self: str, m: Matcher) -> i64 {
+    match (m) {
+        CharRun(first, cont) => self.char_run_len(first, cont),
+        Exact(spellings) => self.longest_prefix(spellings),
+        Keyword(spellings, boundary) => self.keyword_len(spellings, boundary),
+        Delimited(delims) => self.delimited_len(delims),
+        ToEol(marker) => self.to_eol_len(marker),
+        Float => self.float_len(),
     }
-    Token { kind: Punct, span: start..end }
 }
 
-// The single token starting at `start` (which the caller guarantees is in
-// bounds and neither whitespace nor a comment): classify by the first char —
-// string delimiter, then ident-start, then digit, then punctuation — and
-// extend the token to the end of its class's run.
-fn next_token(self: str, start: i64, rules: LexRules) -> Token {
-    let c = self[start].value_or(' '); // in bounds: always some
-    if (rules.string_delims.contains(c)) {
-        return self.string_token(start, c);
-    };
-    if (rules.ident_start.contains(c)) {
-        let end = start + 1 + self[start + 1..].count_while(|x| rules.ident_continue.contains(x));
-        return Token { kind: Ident, span: start..end };
-    };
-    if (c.is_digit()) {
-        let int_end = start + 1 + self[start + 1..].count_while(is_digit);
-        let end = if (rules.floats) { self.number_end(int_end) } else { int_end };
-        let kind = if (int_end < end) { Float } else { Int };
-        return Token { kind: kind, span: start..end };
-    };
-    self.punct_token(start, rules)
-}
-
-// The source with the leading run the lexer ignores removed: whitespace, then
-// (when `line_comment` is set) a comment marker through end-of-line, repeated —
-// a comment may be followed by more whitespace or another comment. Both are
-// leading runs, so each is dropped with `trim_while`. An empty `line_comment`
-// means comments are off — the length check excludes it, since `starts_with("")`
-// is always true.
-fn trim_ignorable(self: str, rules: LexRules) -> str {
-    let cmt = rules.line_comment;
-    mut rest = self.trim_while(is_space);
-    while (0 < cmt.len() && rest.starts_with(cmt)) {
-        set rest = rest.trim_while(|x| x != '\n').trim_while(is_space);
-    }
-    rest
-}
-
-pub fn lex(self: str, rules: LexRules) -> Token[] {
+pub fn lex(self: str, rules: TokenRule[]) -> Token[] {
     mut tokens = [];
-    mut rest = self.trim_ignorable(rules);
+    mut rest = self;
     while (0 < rest.len()) {
         // `rest` is a suffix of `self`, so its length places the next token.
-        let t = self.next_token(self.len() - rest.len(), rules);
-        set tokens.push(t);
-        set rest = self[t.span.end..].trim_ignorable(rules);
+        let start = self.len() - rest.len();
+        mut n = 0;
+        mut kind = "";
+        mut skip = false;
+
+        // First match wins: once a rule matches (`n` nonzero), later rules
+        // aren't tried.
+        for (let r : rules) {
+            if (n == 0) {
+                set n = rest.match_len(r.matcher);
+                if (0 < n) {
+                    set kind = r.kind;
+                    set skip = r.skip;
+                };
+            };
+        }
+        if (n == 0) {
+            // No rule matched: a single-byte token with the empty kind, so
+            // `lex` never fails and always advances.
+            set n = 1;
+        };
+        if (!skip) {
+            set tokens.push(Token { kind: kind, span: start..start + n });
+        };
+        set rest = rest[n..];
     }
     tokens
 }.doc("""
-    Lexes `self` into a flat token list, as described by `rules`. Whitespace
-    and line comments separate tokens and are dropped; identifiers, number
-    literals (`[0-9]+`, extending into a `Float` past a fraction/exponent when
-    the `floats` rule is on), and listed punctuation are maximal runs; string
-    literals run delimiter to delimiter. Any other byte is a single-char
-    `Punct` token, so `lex` never fails — unrecognized input just comes back
-    as punctuation.
+    Lexes `self` into a flat token list, as described by the ordered `rules`.
+    At each position the first rule whose matcher matches claims the token
+    (so order is priority — keywords before identifiers, floats before
+    ints); a `skip: true` rule consumes its match without producing a token
+    (whitespace, comments). A byte no rule matches becomes a single-byte
+    token with the empty kind "", so `lex` never fails.
 """).test({
-    // --- The default rules: idents, ints, single-byte punctuation. ---
+    // A base rule set: skipped whitespace, `[A-Za-z_][A-Za-z0-9_]*`
+    // identifiers, `[0-9]+` ints.
+    let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
+    let ws = TokenRule { kind: "ws", matcher: CharRun(" \t\n\r", " \t\n\r"), skip: true };
+    let ident = TokenRule { kind: "ident", matcher: CharRun(alpha, alnum) };
+    let int_r = TokenRule { kind: "int", matcher: CharRun("0123456789", "0123456789") };
+    let base = [ws, ident, int_r];
 
     // Empty and all-whitespace input: no tokens.
-    assert(lex("", LexRules {}) == []);
-    assert(lex(" \t\n\r ", LexRules {}) == []);
+    assert(lex("", base) == []);
+    assert(lex(" \t\n\r ", base) == []);
 
-    // Single tokens of each default kind.
-    assert(lex("foo", LexRules {}) == [tok(Ident, 0, 3)]);
-    assert(lex("42", LexRules {}) == [tok(Int, 0, 2)]);
-    assert(lex("+", LexRules {}) == [tok(Punct, 0, 1)]);
+    // Single tokens of each base kind.
+    assert(lex("foo", base) == [tok("ident", 0, 3)]);
+    assert(lex("42", base) == [tok("int", 0, 2)]);
 
     // Idents may contain (but not start with) digits; `_` is a letter here.
-    assert(lex("x1", LexRules {}) == [tok(Ident, 0, 2)]);
-    assert(lex("_x", LexRules {}) == [tok(Ident, 0, 2)]);
-    assert(lex("1x", LexRules {}) == [tok(Int, 0, 1), tok(Ident, 1, 2)]);
+    assert(lex("x1", base) == [tok("ident", 0, 2)]);
+    assert(lex("_x", base) == [tok("ident", 0, 2)]);
+    assert(lex("1x", base) == [tok("int", 0, 1), tok("ident", 1, 2)]);
 
-    // Tokens split on whitespace, with the spans tracking the gaps.
-    assert(lex("foo + 12", LexRules {}) == [tok(Ident, 0, 3), tok(Punct, 4, 5), tok(Int, 6, 8)]);
-
-    // Adjacent tokens need no whitespace: class changes split them.
-    assert(lex("a+1", LexRules {}) == [tok(Ident, 0, 1), tok(Punct, 1, 2), tok(Int, 2, 3)]);
-
-    // Without a puncts entry, runs of punctuation lex one byte at a time.
-    assert(lex("==", LexRules {}) == [tok(Punct, 0, 1), tok(Punct, 1, 2)]);
+    // A byte no rule matches: a single-byte token with the empty kind.
+    assert(lex("a+1", base) == [tok("ident", 0, 1), tok("", 1, 2), tok("int", 2, 3)]);
 
     // Leading/trailing whitespace shifts the span but produces no tokens.
-    assert(lex("  hi  ", LexRules {}) == [tok(Ident, 2, 4)]);
+    assert(lex("  hi  ", base) == [tok("ident", 2, 4)]);
 
     // The token's text is recovered by slicing its span out of the source.
     let src = "foo + 12";
-    match (lex(src, LexRules {})[0]) {
+    match (lex(src, base)[0]) {
         some(t) => assert(src[t.span] == "foo"),
         none => assert(false),
     };
 
-    // --- Custom rules: each knob changes lexing on its own. ---
+    // --- Each matcher on its own. ---
 
-    // Multi-byte punctuation: the longest matching entry wins regardless of
-    // its position in the list, and unlisted punctuation stays single-byte.
-    let ops = LexRules { puncts: ["=", "=>", "=="] };
-    assert(lex("===", ops) == [tok(Punct, 0, 2), tok(Punct, 2, 3)]);
-    assert(lex("=>", ops) == [tok(Punct, 0, 2)]);
-    assert(lex("a=b", ops) == [tok(Ident, 0, 1), tok(Punct, 1, 2), tok(Ident, 2, 3)]);
-    assert(lex("+", ops) == [tok(Punct, 0, 1)]); // unlisted: still one byte
+    // Exact: the longest matching spelling wins regardless of list order,
+    // and an unlisted byte falls through (to the "" kind here).
+    let ops = [ws, TokenRule { kind: "op", matcher: Exact(["=", "=>", "=="]) }, ident];
+    assert(lex("===", ops) == [tok("op", 0, 2), tok("op", 2, 3)]);
+    assert(lex("=>", ops) == [tok("op", 0, 2)]);
+    assert(lex("a=b", ops) == [tok("ident", 0, 1), tok("op", 1, 2), tok("ident", 2, 3)]);
+    assert(lex("+", ops) == [tok("", 0, 1)]); // unlisted: single "" byte
 
-    // String literals: delimiter to matching delimiter, spans include both.
-    let strs = LexRules { string_delims: "\"'" };
-    assert(lex("\"hi\" x", strs) == [tok(Str, 0, 4), tok(Ident, 5, 6)]);
-    assert(lex("''", strs) == [tok(Str, 0, 2)]); // empty string literal
-    assert(lex("'a\"b'", strs) == [tok(Str, 0, 5)]); // other delim is content
-    assert(lex("\"hi", strs) == [tok(Str, 0, 3)]); // unterminated: to the end
+    // Keyword: a spelling only matches when it doesn't end inside an
+    // identifier — `iffy` is one ident even though the keyword rule comes
+    // first, while a boundary (space, `=`, end of source) lets `if` match.
+    let kw = TokenRule { kind: "kw", matcher: Keyword(["if", "let"], alnum) };
+    let kws = [ws, kw, ident, TokenRule { kind: "op", matcher: Exact(["="]) }];
+    assert(lex("iffy", kws) == [tok("ident", 0, 4)]);
+    assert(lex("if fy", kws) == [tok("kw", 0, 2), tok("ident", 3, 5)]);
+    assert(lex("if=", kws) == [tok("kw", 0, 2), tok("op", 2, 3)]);
+    assert(lex("if", kws) == [tok("kw", 0, 2)]); // end of source is a boundary
+    assert(lex("lets", kws) == [tok("ident", 0, 4)]);
 
-    // Line comments: dropped like whitespace, through the end of the line.
-    let cmt = LexRules { line_comment: "//" };
-    assert(lex("a // b\nc", cmt) == [tok(Ident, 0, 1), tok(Ident, 7, 8)]);
+    // Delimited: delimiter to matching delimiter, spans include both.
+    let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'") }, ident];
+    assert(lex("\"hi\" x", strs) == [tok("str", 0, 4), tok("ident", 5, 6)]);
+    assert(lex("''", strs) == [tok("str", 0, 2)]); // empty string literal
+    assert(lex("'a\"b'", strs) == [tok("str", 0, 5)]); // other delim is content
+    assert(lex("\"hi", strs) == [tok("str", 0, 3)]); // unterminated: to the end
+
+    // ToEol with skip: comments are dropped like whitespace, through the end
+    // of the line.
+    let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
+    assert(lex("a // b\nc", cmt) == [tok("ident", 0, 1), tok("ident", 7, 8)]);
     assert(lex("// only", cmt) == []); // comment with no newline: to the end
-    assert(lex("a / b", cmt) == [tok(Ident, 0, 1), tok(Punct, 2, 3), tok(Ident, 4, 5)]);
+    assert(lex("a / b", cmt) == [tok("ident", 0, 1), tok("", 2, 3), tok("ident", 4, 5)]);
 
-    // Floats: a digit run may extend with a fraction and/or an exponent.
-    let flt = LexRules { floats: true };
-    assert(lex("1.5", flt) == [tok(Float, 0, 3)]);
-    assert(lex("42", flt) == [tok(Int, 0, 2)]); // bare digits stay Int
-    assert(lex("1e5", flt) == [tok(Float, 0, 3)]);
-    assert(lex("2E+10", flt) == [tok(Float, 0, 5)]);
-    assert(lex("1.5e-3", flt) == [tok(Float, 0, 6)]);
+    // Float before int: a digit run extends with a fraction and/or exponent,
+    // and a bare run falls through to the int rule.
+    let dot = TokenRule { kind: "dot", matcher: Exact(["."]) };
+    let flt = [ws, TokenRule { kind: "float", matcher: Float }, int_r, ident, dot];
+    assert(lex("1.5", flt) == [tok("float", 0, 3)]);
+    assert(lex("42", flt) == [tok("int", 0, 2)]); // bare digits stay int
+    assert(lex("1e5", flt) == [tok("float", 0, 3)]);
+    assert(lex("2E+10", flt) == [tok("float", 0, 5)]);
+    assert(lex("1.5e-3", flt) == [tok("float", 0, 6)]);
 
     // A fraction needs a digit after the dot, and a number starts with a
     // digit — so neither `1.` nor `.5` is a float.
-    assert(lex("1.", flt) == [tok(Int, 0, 1), tok(Punct, 1, 2)]);
-    assert(lex(".5", flt) == [tok(Punct, 0, 1), tok(Int, 1, 2)]);
+    assert(lex("1.", flt) == [tok("int", 0, 1), tok("dot", 1, 2)]);
+    assert(lex(".5", flt) == [tok("dot", 0, 1), tok("int", 1, 2)]);
 
     // An exponent needs at least one digit, else the `e` is left for the
     // next token (an ident here).
-    assert(lex("1e", flt) == [tok(Int, 0, 1), tok(Ident, 1, 2)]);
-    assert(lex("1e-", flt) == [tok(Int, 0, 1), tok(Ident, 1, 2), tok(Punct, 2, 3)]);
+    assert(lex("1e", flt) == [tok("int", 0, 1), tok("ident", 1, 2)]);
+    assert(lex("1e-", flt) == [tok("int", 0, 1), tok("ident", 1, 2), tok("", 2, 3)]);
     // Only one fraction: a second dot starts a new token.
-    assert(lex("1.2.3", flt) == [tok(Float, 0, 3), tok(Punct, 3, 4), tok(Int, 4, 5)]);
-    // With floats off (the default), a dot always splits the digits.
-    assert(lex("1.5", LexRules {}) == [tok(Int, 0, 1), tok(Punct, 1, 2), tok(Int, 2, 3)]);
+    assert(lex("1.2.3", flt) == [tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)]);
+    // Without a float rule, a dot always splits the digits.
+    assert(lex("1.5", [ws, int_r, dot]) == [tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)]);
 
     // --- Rule sets resembling real languages. ---
 
-    // JSON-flavored rules: strings, floats, and idents for true/false/null.
-    // (A leading `-` on a number stays a `Punct` for the parser to fold in.)
-    let json = LexRules { string_delims: "\"", floats: true };
+    // JSON-flavored rules. (A leading `-` on a number stays a lone `punct`
+    // for the parser to fold in.)
+    let json = [
+        ws,
+        TokenRule { kind: "str", matcher: Delimited("\"") },
+        TokenRule { kind: "float", matcher: Float },
+        int_r,
+        TokenRule { kind: "kw", matcher: Keyword(["true", "false", "null"], alnum) },
+        TokenRule { kind: "punct", matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]) },
+    ];
     let jsrc = """{"pi": 3.14, "n": [1, 2e10, true]}""";
     let jtoks = [
         // `{`, `"pi"`, `:`
-        tok(Punct, 0, 1),
-        tok(Str, 1, 5),
-        tok(Punct, 5, 6),
+        tok("punct", 0, 1),
+        tok("str", 1, 5),
+        tok("punct", 5, 6),
         // `3.14`, `,`
-        tok(Float, 7, 11),
-        tok(Punct, 11, 12),
+        tok("float", 7, 11),
+        tok("punct", 11, 12),
         // `"n"`, `:`, `[`
-        tok(Str, 13, 16),
-        tok(Punct, 16, 17),
-        tok(Punct, 18, 19),
+        tok("str", 13, 16),
+        tok("punct", 16, 17),
+        tok("punct", 18, 19),
         // `1`, `,`, `2e10`, `,`, `true`
-        tok(Int, 19, 20),
-        tok(Punct, 20, 21),
-        tok(Float, 22, 26),
-        tok(Punct, 26, 27),
-        tok(Ident, 28, 32),
+        tok("int", 19, 20),
+        tok("punct", 20, 21),
+        tok("float", 22, 26),
+        tok("punct", 26, 27),
+        tok("kw", 28, 32),
         // `]`, `}`
-        tok(Punct, 32, 33),
-        tok(Punct, 33, 34),
+        tok("punct", 32, 33),
+        tok("punct", 33, 34),
     ];
     assert(lex(jsrc, json) == jtoks);
 
-    // AIPL-flavored rules: multi-byte operators, strings, line comments.
-    let aipl = LexRules { puncts: ["==", "->", "&&"], string_delims: "\"", line_comment: "//" };
+    // AIPL-flavored rules: keywords, multi-byte operators, strings, line
+    // comments.
+    let aipl = [
+        ws,
+        TokenRule { kind: "comment", matcher: ToEol("//"), skip: true },
+        TokenRule { kind: "kw", matcher: Keyword(["fn", "let", "mut", "set"], alnum) },
+        ident,
+        int_r,
+        TokenRule { kind: "str", matcher: Delimited("\"") },
+        TokenRule { kind: "op", matcher: Exact(["==", "->", "&&", "=", ";"]) },
+    ];
     let asrc = "let ok = s == \"hi\"; // check";
     let atoks = [
         // `let`, `ok`, `=`
-        tok(Ident, 0, 3),
-        tok(Ident, 4, 6),
-        tok(Punct, 7, 8),
+        tok("kw", 0, 3),
+        tok("ident", 4, 6),
+        tok("op", 7, 8),
         // `s`, `==`, `"hi"`, `;` — the trailing comment produces nothing
-        tok(Ident, 9, 10),
-        tok(Punct, 11, 13),
-        tok(Str, 14, 18),
-        tok(Punct, 18, 19),
+        tok("ident", 9, 10),
+        tok("op", 11, 13),
+        tok("str", 14, 18),
+        tok("op", 18, 19),
     ];
     assert(lex(asrc, aipl) == atoks);
 })
 --- performance ---
-allocations: 154
-deallocations: 154
-reallocations: 65
-bytes allocated: 6776
-instructions executed: 29690
-binary size: 49608
+allocations: 140
+deallocations: 140
+reallocations: 66
+bytes allocated: 7992
+instructions executed: 72849
+binary size: 92400
 --- monomorphizations ---
-__builtin_is_some_and$char$lam10
-__m1__count_while$char$s0$lam15
+__builtin_is_some_and$char$lam18
+__m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam16
+__m1__count_while$char$s0$lam17
 __m1__count_while$char$s0$lam5
-__m1__count_while$char$s0$lam8
-__m1__count_while$char$s0$lam9
-__m2__trim_while$lam0
 __test$lex
+delimited_len
+float_len
 lex
 main
-next_token
 tok
-trim_ignorable
