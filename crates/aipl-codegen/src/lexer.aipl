@@ -202,7 +202,7 @@ fn string_token(self: str, start: i64, delim: char) -> Token {
 // every check, so a number at the end of the source ends cleanly.
 fn number_end(self: str, int_end: i64) -> i64 {
     mut end = int_end;
-    if (self[end].value_or(' ') == '.' && self[end + 1].value_or(' ').is_digit()) {
+    if (self[end] == some('.') && self[end + 1].value_or(' ').is_digit()) {
         set end = end + 1 + self[end + 1..].count_while(is_digit);
     };
     let e = self[end].value_or(' ');
@@ -413,8 +413,8 @@ allocations: 149
 deallocations: 149
 reallocations: 65
 bytes allocated: 6632
-instructions executed: 29113
-binary size: 62208
+instructions executed: 29285
+binary size: 62264
 --- monomorphizations ---
 __m1__count_while$char$s0$lam1
 __m1__count_while$char$s0$lam4

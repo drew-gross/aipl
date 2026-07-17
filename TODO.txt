@@ -41,3 +41,5 @@ warn/err on:
 output multiple errors at once
 support rust style field construction when the field and variable name are the same
 remove install_parser_hook with lazy loader
+
+Replaceing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
