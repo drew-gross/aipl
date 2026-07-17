@@ -1,0 +1,34 @@
+import { !, <=, ==, is_some_and } from builtins;
+
+// `is_some_and` folds an optional and a predicate into a bool: true only when
+// the value is present and satisfies the predicate. `none` short-circuits to
+// false without calling the predicate. Each check returns a distinct exit code
+// so a failure pinpoints which one broke; all passing exits 0.
+fn main() -> i64 {
+    if (!some(7).is_some_and(|x| x == 7)) {
+        return 1;
+    };
+    if (some(7).is_some_and(|x| x == 8)) {
+        return 2;
+    };
+    if (""[0].is_some_and(|c| c == 'a')) {
+        return 3;
+    }; // none -> false
+    let cap = 5;
+    if (!some(3).is_some_and(|x| x <= cap)) {
+        return 4;
+    }; // captured bound
+    0
+}
+--- stdout ---
+--- exit code ---
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 68
+binary size: 1120
+--- monomorphizations ---
+main

@@ -1,0 +1,41 @@
+import { !, <=, ==, is_some } from builtins;
+
+// The AIPL implementation of the `is_some_and` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_is_some_and`
+// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.is_some_and(pred)`
+// specializes through the ordinary generic / higher-order machinery — the
+// in-file name `is_some_and` is only for this file's own tests, which read
+// exactly like user code.
+pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
+    match (self) {
+        some(x) => pred(x),
+        none => false,
+    }
+}.doc("""
+    True when `self` is `some(x)` and `pred(x)` holds; `false` for `none` (the
+    predicate is not called). Generic over the inner type and callable as a
+    method: `x.is_some_and(pred)`.
+""").test({
+    assert(some(5).is_some_and(|x| x == 5)); // some, predicate holds
+    assert(!some(5).is_some_and(|x| x == 6)); // some, predicate fails
+    assert(!""[0].is_some_and(|c| c == 'a')); // none -> false (char? from index past end)
+    assert(is_some_and(some('a'), |c| c == 'a')); // free-call form, char inner
+    assert(some(9).is_some_and(is_nine)); // a named predicate, no lambda
+    let limit = 3;
+    assert(some(2).is_some_and(|x| x <= limit)); // a captured bound
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 142
+binary size: 2568
+--- monomorphizations ---
+is_nine
+main

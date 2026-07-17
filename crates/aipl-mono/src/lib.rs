@@ -3583,8 +3583,13 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// arguments, lambdas lifted with captures threaded through, `str` receivers
 /// kept in the `str` representation. An entry the program never calls costs
 /// nothing (uninstantiated templates are dropped).
-const AIPL_BUILTIN_SOURCES: &[(&str, &str)] =
-    &[("__builtin_all", include_str!("builtin_all.aipl"))];
+const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
+    ("__builtin_all", include_str!("builtin_all.aipl")),
+    (
+        "__builtin_is_some_and",
+        include_str!("builtin_is_some_and.aipl"),
+    ),
+];
 
 /// [`AIPL_BUILTIN_SOURCES`] parsed and normalized once: canonical builtin name
 /// → generic template. Parsing needs the parser hooks installed, like any
