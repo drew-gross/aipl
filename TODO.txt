@@ -37,6 +37,7 @@ find a way to make sure the code still works even after optimizations (and the t
 warn/err on:
 - bar(|x| x.foo()) or bar(|x| foo(x)) (just use bar(foo))
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
+- unused imports
 output multiple errors at once
 support rust style field construction when the field and variable name are the same
 remove install_parser_hook with lazy loader
@@ -44,3 +45,5 @@ remove install_parser_hook with lazy loader
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
 
 spread in args e.g. fn foo(self: Span { start, end })
+
+Cache monomorphizations of the same lambda

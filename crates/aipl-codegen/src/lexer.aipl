@@ -13,6 +13,7 @@ import {
     !=,
     &&,
     wrapping_add as +,
+    wrapping_sub as -,
     <,
     ==,
     ||,
@@ -27,6 +28,7 @@ import {
     value_or,
 } from builtins;
 import { count_while } from "./count_while.aipl";
+import { trim_while } from "./trim_while.aipl";
 
 // The token classes. `lex` classifies each token by its first char, checked in
 // this order: a string delimiter opens a `Str`, an ident-start char opens an
@@ -74,12 +76,6 @@ struct LexRules {
 // Test-block shorthand for an expected token.
 fn tok(kind: TokenKind, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
 
-// Whether `marker` occurs in `self` starting at byte offset `at`. An empty
-// marker never matches, so a feature whose marker is "" is simply off.
-fn matches_at(self: str, at: i64, marker: str) -> bool {
-    0 < marker.len() && self[at..].starts_with(marker)
-}
-
 // The string token opened by the delimiter `delim` at `start`: it spans to
 // just past the next `delim`, or to the end of the source when unterminated.
 fn string_token(self: str, start: i64, delim: char) -> Token {
@@ -114,7 +110,7 @@ fn number_end(self: str, int_end: i64) -> i64 {
 fn punct_token(self: str, start: i64, rules: LexRules) -> Token {
     mut end = start + 1;
     for (let p : rules.puncts) {
-        if (end < start + p.len() && self.matches_at(start, p)) {
+        if (end < start + p.len() && self[start..].starts_with(p)) {
             set end = start + p.len();
         };
     }
@@ -143,21 +139,29 @@ fn next_token(self: str, start: i64, rules: LexRules) -> Token {
     self.punct_token(start, rules)
 }
 
+// The source with the leading run the lexer ignores removed: whitespace, then
+// (when `line_comment` is set) a comment marker through end-of-line, repeated —
+// a comment may be followed by more whitespace or another comment. Both are
+// leading runs, so each is dropped with `trim_while`. An empty `line_comment`
+// means comments are off — the length check excludes it, since `starts_with("")`
+// is always true.
+fn trim_ignorable(self: str, rules: LexRules) -> str {
+    let cmt = rules.line_comment;
+    mut rest = self.trim_while(is_space);
+    while (0 < cmt.len() && rest.starts_with(cmt)) {
+        set rest = rest.trim_while(|x| x != '\n').trim_while(is_space);
+    }
+    rest
+}
+
 pub fn lex(self: str, rules: LexRules) -> Token[] {
     mut tokens = [];
-    mut i = 0;
-    while (i < self.len()) {
-        if (self[i].is_some_and(is_space)) {
-            set i = i + 1;
-        } else {
-            if (self.matches_at(i, rules.line_comment)) {
-                set i = i + self[i..].count_while(|x| x != '\n');
-            } else {
-                let t = self.next_token(i, rules);
-                set i = t.span.end;
-                set tokens.push(t);
-            };
-        };
+    mut rest = self.trim_ignorable(rules);
+    while (0 < rest.len()) {
+        // `rest` is a suffix of `self`, so its length places the next token.
+        let t = self.next_token(self.len() - rest.len(), rules);
+        set tokens.push(t);
+        set rest = self[t.span.end..].trim_ignorable(rules);
     }
     tokens
 }.doc("""
@@ -296,21 +300,23 @@ pub fn lex(self: str, rules: LexRules) -> Token[] {
     assert(lex(asrc, aipl) == atoks);
 })
 --- performance ---
-allocations: 137
-deallocations: 137
+allocations: 154
+deallocations: 154
 reallocations: 65
-bytes allocated: 6232
-instructions executed: 26821
-binary size: 48720
+bytes allocated: 6776
+instructions executed: 29690
+binary size: 49608
 --- monomorphizations ---
 __builtin_is_some_and$char$lam10
-__m1__count_while$char$s0$lam2
+__m1__count_while$char$s0$lam15
+__m1__count_while$char$s0$lam16
 __m1__count_while$char$s0$lam5
 __m1__count_while$char$s0$lam8
 __m1__count_while$char$s0$lam9
+__m2__trim_while$lam0
 __test$lex
 lex
 main
-matches_at
 next_token
 tok
+trim_ignorable
