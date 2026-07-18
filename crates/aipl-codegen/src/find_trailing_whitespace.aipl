@@ -18,7 +18,7 @@ fn line_end_span(prev: char, prev2: char, boundary: i64, ws_start: i64, line_sta
     let end = if (cr) { boundary - 1 } else { boundary };
     let last = if (cr) { prev2 } else { prev };
     if (end > line_start && (last == ' ' || last == '\t')) {
-        some(Span { start: ws_start, end: end })
+        some(Span { start: ws_start, end })
     } else {
         none
     }

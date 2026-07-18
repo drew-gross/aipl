@@ -79,10 +79,10 @@ variant Matcher =
 struct TokenRule { kind: str, matcher: Matcher, skip: bool = false }
 
 // Test-block shorthands for an expected token / an expected lex error.
-fn tok(kind: str, start: i64, end: i64) -> Token { Token { kind: kind, span: start..end } }
+fn tok(kind: str, start: i64, end: i64) -> Token { Token { kind, span: start..end } }
 
 fn lex_err(message: str, start: i64, end: i64) -> LexError {
-    LexError { message: message, span: start..end }
+    LexError { message, span: start..end }
 }
 
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
@@ -243,7 +243,7 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
             return err(LexError { message: "unexpected character", span: start..start + 1 });
         };
         if (!skip) {
-            set tokens.push(Token { kind: kind, span: start..start + n });
+            set tokens.push(Token { kind, span: start..start + n });
         };
         set rest = rest[n..];
     }

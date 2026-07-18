@@ -1,0 +1,19 @@
+import { == } from builtins;
+
+// A lint: initializing a field with the identifier of the same name (`x: x`)
+// has a shorter spelling — the shorthand `Point { x }`. Lints are ordinary
+// errors, but appending `#[allow]` to the offending line squelches them (see
+// field_init_shorthand_allow.aipl).
+struct Point { x: i64, y: i64 }
+
+fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }.test({
+    assert(make(1, 2).x == 1);
+})
+
+fn main() {}
+--- errors ---
+error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_field_init_shorthand.aipl:9:47
+  |
+9 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }.test({
+  |                                               ^

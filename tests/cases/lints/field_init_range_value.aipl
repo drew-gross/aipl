@@ -1,0 +1,23 @@
+import { ==, Span } from builtins;
+
+// Regression: a range `start..end` desugars to a synthetic `__builtin_Span`
+// construct whose bound identifiers happen to match the Span field names. That
+// is not a user-written `field: field`, so the field-init-shorthand lint must
+// not flag it (the value's preceding source char is the *outer* `span:` colon).
+struct Tok { span: Span }
+
+fn tok(start: i64, end: i64) -> Tok { Tok { span: start..end } }.test({
+    assert(tok(0, 5).span.start == 0);
+    assert(tok(0, 5).span.end == 5);
+})
+
+fn main() {}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 552
+--- monomorphizations ---
+main

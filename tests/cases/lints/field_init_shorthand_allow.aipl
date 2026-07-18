@@ -1,0 +1,23 @@
+import { == } from builtins;
+
+// `#[allow]` squelches the field-init-shorthand lint on its line, so this
+// explicit `x: x` / `y: y` construction compiles as written (see
+// err_field_init_shorthand.aipl for the lint).
+struct Point { x: i64, y: i64 }
+
+fn make(x: i64, y: i64) -> Point {
+    Point { x: x, y: y } #[allow]
+}.test({
+    assert(make(1, 2).x == 1);
+})
+
+fn main() {}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 552
+--- monomorphizations ---
+main
