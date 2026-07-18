@@ -423,7 +423,11 @@ gazelle! {
                     | field_init_list COMMA => present_trailing
                     | _ => empty;
         field_init_list = field_init => first | field_init_list COMMA field_init => rest;
-        field_init = IDENT COLON expr => field_init;
+        // `x: expr`, or the Rust-style shorthand `x` — sugar for `x: x`, where the
+        // value is the identifier of the same name in scope. After the IDENT, a
+        // COLON lookahead selects the explicit form; COMMA/RBRACE the shorthand.
+        field_init = IDENT COLON expr => field_init
+                   | IDENT => field_init_shorthand;
     }
 }
 
@@ -848,8 +852,15 @@ impl gazelle::Action<aipl::FieldInitList<Self>> for Build {
 
 impl gazelle::Action<aipl::FieldInit<Self>> for Build {
     fn build(&mut self, node: aipl::FieldInit<Self>) -> Result<FieldInit, Self::Error> {
-        let aipl::FieldInit::FieldInit((name, _), value) = node;
-        Ok(FieldInit { name, value })
+        Ok(match node {
+            aipl::FieldInit::FieldInit((name, _), value) => FieldInit { name, value },
+            // Shorthand `x` desugars to `x: x` — the value is a reference to the
+            // in-scope identifier of the same name, spanned at the field name.
+            aipl::FieldInit::FieldInitShorthand((name, span)) => {
+                let value = Expr::new(ExprKind::Ident(name.clone()), span);
+                FieldInit { name, value }
+            }
+        })
     }
 }
 

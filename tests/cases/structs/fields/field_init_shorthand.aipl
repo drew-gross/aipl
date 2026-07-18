@@ -1,0 +1,28 @@
+import { wrapping_add as +, == } from builtins;
+
+// Rust-style field shorthand: `Point { x, y }` desugars to `Point { x: x, y: y }`,
+// pulling each value from the same-named binding in scope. Mixable with an
+// explicit `field: expr` init.
+struct Point { x: i64, y: i64 }
+
+fn shift(x: i64, y: i64) -> Point { Point { x, y: y + 1 } }.test({
+    let x = 10;
+    let y = 20;
+    let p = Point { x, y };
+    assert(p.x == 10);
+    assert(p.y == 20);
+    let q = shift(1, 2);
+    assert(q.x == 1);
+    assert(q.y == 3);
+})
+
+fn main() {}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 552
+--- monomorphizations ---
+main

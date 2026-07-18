@@ -1204,9 +1204,15 @@ impl<'s> Walker<'s> {
                     while self.peek_text() != "}" {
                         let lead = self.lead();
                         let fname = self.bump().to_string();
-                        self.expect(":")?;
-                        let value = self.expr()?;
-                        inits.push(concat(vec![lead, text(format!("{fname}: ")), value]));
+                        // `field: value`, or the shorthand `field` (sugar for
+                        // `field: field`) — kept verbatim, not expanded.
+                        if self.peek_text() == ":" {
+                            self.bump();
+                            let value = self.expr()?;
+                            inits.push(concat(vec![lead, text(format!("{fname}: ")), value]));
+                        } else {
+                            inits.push(concat(vec![lead, text(fname)]));
+                        }
                         if self.peek_text() == "," {
                             self.bump();
                         }
