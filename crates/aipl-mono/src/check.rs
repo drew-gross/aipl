@@ -759,12 +759,47 @@ impl Cx<'_> {
             ExprKind::None => Type::Optional(Box::new(Type::NoneInner)),
             ExprKind::Ident(name) => {
                 // A local binding shadows everything; otherwise a bare name may
-                // be a nullary variant constructor (e.g. `Empty`).
+                // be a nullary variant constructor (e.g. `Empty`), or a
+                // function used as a value (`let f = inc;`).
                 if let Some(b) = env.get(name) {
                     b.ty.clone()
                 } else if let Some(vn) = self.ctors.get(name) {
                     self.expect_nullary_ctor(name, vn, span.clone())?;
                     Type::Named(vn.clone())
+                } else if let Some(sig) = self.sigs.get(name.as_str()) {
+                    // A named function as a first-class value: its type is the
+                    // corresponding `Type::Fn`. A runtime function value is a
+                    // bare code address, so v1 restricts it to functions that
+                    // need no closure and no effect accounting: generic
+                    // functions (no single address) and effect-carrying ones
+                    // (indirect calls can't be effect-checked at the call site)
+                    // are rejected.
+                    if sig.is_generic() {
+                        return Err(Error::at(
+                            format!(
+                                "generic function {:?} cannot be used as a value \
+                                 (a function value is a single concrete address)",
+                                display(name)
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                    if !sig.effects.is_empty() {
+                        return Err(Error::at(
+                            format!(
+                                "function {:?} has effects ({}), so it cannot be used as a value \
+                                 (its effects couldn't be accounted for at an indirect call)",
+                                display(name),
+                                sig.effects
+                                    .iter()
+                                    .map(|e| format!("!{e}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                    Type::Fn(sig.param_types(), Box::new(sig.return_type()))
                 } else {
                     return Err(Error::at(
                         format!("unknown identifier {name:?}"),

@@ -1,0 +1,51 @@
+import { *, wrapping_add as +, +++, <, ==, len } from builtins;
+
+// A named function can be used as a first-class *value*: bound to a local and
+// called indirectly. Unlike passing a function to a higher-order function
+// (which the compiler specializes away), the value here is a genuine runtime
+// code address — a `mut` binding can be reassigned and the callee chosen at
+// run time, so nothing is resolved at compile time.
+fn inc(x: i64) -> i64 { x + 1 }
+
+fn dbl(x: i64) -> i64 { x + x }
+
+fn scalar_values() -> i64 {
+    let f = inc;
+    f(10)
+}.test({
+    assert(scalar_values() == 11);
+    // A `mut` fn value reassigned, then called: the callee is a runtime choice.
+    mut g = inc;
+    assert(g(5) == 6);
+    set g = dbl;
+    assert(g(5) == 10);
+})
+
+// Heap arguments and results through an indirect call refcount correctly (a
+// leak or double-free would unbalance the allocation accounting below).
+fn shout(s: str) -> str { s +++ "!" }
+
+fn twice(s: str) -> str { s +++ s }
+
+fn heap_values() -> str {
+    let f = shout;
+    f("hi")
+}.test({
+    assert(heap_values() == "hi!");
+    mut g = shout;
+    set g = twice;
+    assert(g("ab") == "abab");
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 80
+instructions executed: 99
+binary size: 2816
+--- monomorphizations ---
+dbl
+inc
+main
+shout
+twice

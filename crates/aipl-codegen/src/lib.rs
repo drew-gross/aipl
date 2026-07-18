@@ -4617,6 +4617,38 @@ fn build_signature(
     }
 }
 
+/// The declared type of an environment binding.
+fn env_binding_type(b: &EnvBinding) -> Type {
+    match b {
+        EnvBinding::Immut(_, t) => t.clone(),
+        EnvBinding::Mut(_, t, _) => t.borrow().clone(),
+    }
+}
+
+/// A CLIF signature for an *indirect* call through a `(ptys) -> ret` function
+/// value. Must match `build_signature`'s ABI exactly, since the callee was
+/// emitted with that signature: a composite result is returned through a leading
+/// sret pointer, and every parameter (and the scalar result) is an i64.
+fn fn_value_signature<M: Module>(
+    module: &M,
+    ptys: &[Type],
+    ret: &Type,
+    structs: &HashMap<String, TypeDef>,
+) -> Signature {
+    let mut sig = module.make_signature();
+    let returns_composite = sret_size(ret, structs).is_some();
+    if returns_composite {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    for _ in ptys {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    if !is_unit(ret) && !returns_composite {
+        sig.returns.push(AbiParam::new(types::I64));
+    }
+    sig
+}
+
 /// Prepare `program`'s `main` for the AOT entry, which always receives the CLI
 /// arguments as a `str[]` (the runtime passes one). If the user's `main`
 /// declares no parameters, inject a synthetic, ignored one so the entry ABI is
@@ -9436,6 +9468,88 @@ fn emit_arr_contains_seq<M: Module>(
     Ok(builder.ins().stack_load(types::I64, res, 0))
 }
 
+/// Compile an *indirect* call `f(args)` where `f` is a local holding a runtime
+/// function value (a `(ptys) -> ret` code address). Mirrors [`compile_call`]'s
+/// ABI — borrow-retain each heap arg, sret a composite result — but dispatches
+/// through `call_indirect` on the loaded address rather than a known callee. No
+/// effect check: only effect-free functions can become values (enforced by the
+/// checker), so an indirect call performs none.
+fn compile_indirect_call<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    name: &str,
+    ptys: &[Type],
+    ret: &Type,
+    args: &[Expr],
+    span: Span,
+) -> Result<(Value, Type), Error> {
+    let Cx {
+        env,
+        structs,
+        builtins,
+        ..
+    } = cx;
+    if ptys.len() != args.len() {
+        return Err(Error::at(
+            format!(
+                "function value {name:?} expects {} arg(s), got {}",
+                ptys.len(),
+                args.len()
+            ),
+            span.clone(),
+        ));
+    }
+    let (callee_addr, _) = env_load(builder, name, env, span.clone())?;
+    let mut arg_values = Vec::with_capacity(args.len());
+    for (idx, (arg, expected)) in args.iter().zip(ptys).enumerate() {
+        let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
+        let actual = aipl_syntax::flex_int_ty(arg, &actual, expected);
+        expect_type(
+            &actual,
+            expected,
+            &format!("function value {name:?} arg {idx}"),
+            arg.span.clone(),
+        )?;
+        let v = coerce_empty_to_char_array(builder, module, builtins, v, &actual, expected);
+        arg_values.push(v);
+    }
+    // Borrow semantics: retain each heap arg so refcounts stay balanced (the
+    // callee decrements it on return, like a borrowed direct-call parameter).
+    for (v, expected) in arg_values.iter().zip(ptys) {
+        if is_heap(expected) {
+            emit_inc(builder, module, builtins, *v);
+        }
+    }
+    let sret = sret_size(ret, structs).map(|size| {
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            size,
+            3,
+        ));
+        builder.ins().stack_addr(types::I64, slot, 0)
+    });
+    let call_args: Vec<Value> = sret.iter().copied().chain(arg_values).collect();
+    let sig = fn_value_signature(module, ptys, ret, structs);
+    let sigref = builder.import_signature(sig);
+    let inst = builder.ins().call_indirect(sigref, callee_addr, &call_args);
+    let ret_v = if let Some(s) = sret {
+        s
+    } else if is_unit(ret) {
+        builder.ins().iconst(types::I64, 0)
+    } else {
+        builder.inst_results(inst)[0]
+    };
+    if needs_drop(ret, structs) {
+        scopes
+            .last_mut()
+            .expect("scope")
+            .push(Tracked::new(ret_v, ret));
+    }
+    Ok((ret_v, ret.clone()))
+}
+
 fn compile_call<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -9583,6 +9697,16 @@ fn compile_call_expr<M: Module>(
         error_main: _,
         bindings: _,
     } = cx;
+    // A free call whose callee is a local holding a function value is an
+    // indirect call (mono resolved HOF-parameter calls to concrete callees, so
+    // any surviving call through a `Type::Fn` binding is a runtime one).
+    if !style {
+        if let Some(Type::Fn(ptys, ret)) = env.get(name).map(env_binding_type) {
+            return compile_indirect_call(
+                module, builder, cx, scopes, name, &ptys, &ret, args, span,
+            );
+        }
+    }
     Ok(match name {
         "__builtin_wrapping_add"
         | "__builtin_saturating_add"
@@ -11494,7 +11618,9 @@ fn compile_expr<M: Module>(
         }
         ExprKind::Ident(name) => {
             // A local binding shadows everything; an unbound name may be a
-            // nullary variant constructor (e.g. `Empty`).
+            // nullary variant constructor (e.g. `Empty`), or a function used as
+            // a value (`let f = inc;`) — its value is the function's code
+            // address, materialized with `func_addr`.
             if env.contains_key(name) {
                 env_load(builder, name, env, span.clone())?
             } else if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
@@ -11509,6 +11635,18 @@ fn compile_expr<M: Module>(
                     &[],
                     span.clone(),
                 )?
+            } else if let Some(info) = cx
+                .funcs
+                .get(name)
+                .filter(|i| matches!(i.link, FuncLink::User(_)))
+            {
+                let FuncLink::User(id) = info.link else {
+                    unreachable!("filtered to User links")
+                };
+                let fref = module.declare_func_in_func(id, builder.func);
+                let addr = builder.ins().func_addr(types::I64, fref);
+                let ty = Type::Fn(info.params.clone(), Box::new(info.return_ty.clone()));
+                (addr, ty)
             } else {
                 env_load(builder, name, env, span.clone())?
             }

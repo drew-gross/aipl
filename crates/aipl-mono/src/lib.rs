@@ -2958,14 +2958,27 @@ impl Mono<'_> {
             ExprKind::None => (expr.clone(), Type::Optional(Box::new(Type::NoneInner))),
             ExprKind::Ident(name) => {
                 // A bare name is a local binding, or — if unbound — a nullary
-                // variant constructor (e.g. `Empty`), whose type is its variant.
-                let ty = env.get(name).cloned().unwrap_or_else(|| {
-                    self.ctors
-                        .get(name)
-                        .map(|vn| Type::Named(vn.clone()))
-                        .unwrap_or_else(|| Type::Primitive(Primitive::I64))
-                });
-                (expr.clone(), ty)
+                // variant constructor (e.g. `Empty`), or a function used as a
+                // value (`let f = inc;`), whose type is its `Type::Fn` and whose
+                // runtime value (emitted by codegen as a `func_addr`) requires
+                // the referenced function to be emitted.
+                if !env.contains_key(name) && self.concrete.contains_key(name) {
+                    let f = &self.concrete[name];
+                    let ty = Type::Fn(
+                        f.params.iter().map(|p| p.ty.clone()).collect(),
+                        Box::new(f.return_ty.clone().unwrap_or(Type::Unit)),
+                    );
+                    self.enqueue_concrete(name);
+                    (expr.clone(), ty)
+                } else {
+                    let ty = env.get(name).cloned().unwrap_or_else(|| {
+                        self.ctors
+                            .get(name)
+                            .map(|vn| Type::Named(vn.clone()))
+                            .unwrap_or_else(|| Type::Primitive(Primitive::I64))
+                    });
+                    (expr.clone(), ty)
+                }
             }
             ExprKind::Neg(inner) => {
                 let (ri, _) = self.infer(inner, env)?;
@@ -3419,6 +3432,19 @@ impl Mono<'_> {
                         let ret = self.ref_return(&lb.fn_name, &atys);
                         rargs.extend(lb.captures);
                         return Ok((node(ExprKind::Call(lb.fn_name, rargs, false)), ret));
+                    }
+                    // A call through a *runtime function value* held in a local
+                    // (`let f = inc; f(5)`): the callee isn't known here (unlike
+                    // the `cur_lenv` HOF case, which resolves to a concrete
+                    // function), so it stays an indirect call — codegen loads the
+                    // binding's address and `call_indirect`s through it. Detected
+                    // by the callee being an in-scope binding of `Type::Fn`.
+                    if let Some(Type::Fn(_, ret)) = env.get(name).cloned() {
+                        let rargs = args
+                            .iter()
+                            .map(|a| self.infer(a, env).map(|(ra, _)| ra))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        return Ok((node(ExprKind::Call(name.clone(), rargs, false)), *ret));
                     }
                 }
                 // A mutating call used as a *value* (not the RHS of an in-place
