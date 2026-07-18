@@ -59,6 +59,14 @@ struct LexError { message: str, span: Span }
 //   close), `\` plus anything else is a lex error, and "" turns escape
 //   handling off entirely (a backslash is ordinary content). A token still
 //   open at the end of the source is a lex error. String literals.
+// - `Between(open, close)`: the `open` spelling opens the token, which runs to
+//   just past the next *full* occurrence of the `close` spelling. Unlike
+//   `Delimited`, open and close are multi-char and may differ, and the scan
+//   matches the whole `close` — so a partial close inside (a lone `"` or `""`
+//   under a `"""` close) is ordinary content. Contents are verbatim (no escape
+//   processing), which is what raw strings `"""..."""` and non-nesting block
+//   comments `/* ... */` want. Both spellings must be non-empty. A token still
+//   open at the end of the source is a lex error.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -70,6 +78,7 @@ variant Matcher =
     | Exact(str[])
     | Keyword(str[], str)
     | Delimited(str, str)
+    | Between(str, str)
     | ToEol(str)
     | Float
 
@@ -164,6 +173,30 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError 
     ok(i)
 }
 
+// `Between`: the `open` spelling opens the token, which runs to just past the
+// next full occurrence of `close`. ok(0) when `self` doesn't start with
+// `open`. The close scan starts past the open and matches the whole `close`
+// spelling, so a partial close inside (a lone `"`/`""` under a `"""` close) is
+// content, not a terminator, and open/close may be multi-char and differ. No
+// escapes — contents are verbatim. A token still open at the end of the source
+// is a hard error (`at` places the span in the real source).
+fn between_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
+    if (!self.starts_with(open)) {
+        return ok(0);
+    };
+
+    // Scan for the close from just past the open, so an `open`/`close` that
+    // share text (e.g. `"""`/`"""`) can't self-close on the opener.
+    mut i = open.len();
+    while (i < self.len()) {
+        if (self[i..].starts_with(close)) {
+            return ok(i + close.len());
+        };
+        set i = i + 1;
+    }
+    err(LexError { message: "unterminated delimited token", span: at..at + self.len() })
+}
+
 // `ToEol`: the marker, then everything up to (not including) the next
 // newline. 0 when `self` doesn't start with the (non-empty) marker.
 fn to_eol_len(self: str, marker: str) -> i64 {
@@ -211,6 +244,7 @@ fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
         Exact(spellings) => ok(self.longest_prefix(spellings)),
         Keyword(spellings, boundary) => ok(self.keyword_len(spellings, boundary)),
         Delimited(delims, escapes) => self.delimited_len(at, delims, escapes),
+        Between(open, close) => self.between_len(at, open, close),
         ToEol(marker) => ok(self.to_eol_len(marker)),
         Float => ok(self.float_len()),
     }
@@ -357,6 +391,29 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     // unterminated with escapes on (it closed with escapes off, above).
     assert(lex("\"a\\\"", esc) == err(lex_err("unterminated delimited token", 0, 4)));
 
+    // Between: a multi-char open runs to just past the next *full* close; a
+    // partial close inside is content. `q3` is the 3-char spelling `"""`, so
+    // this is the raw-string shape `"""..."""` — a lone `"` or `""` inside
+    // must not close it.
+    let q3 = "\"\"\"";
+    let raw = [ws, TokenRule { kind: "raw", matcher: Between(q3, q3) }, ident];
+    // `"""hi"""` — one token, both triple-quotes included.
+    assert(lex("\"\"\"hi\"\"\"", raw) == ok([tok("raw", 0, 8)]));
+    // `""""""` — the empty raw string: open then immediate close, 6 chars.
+    assert(lex("\"\"\"\"\"\"", raw) == ok([tok("raw", 0, 6)]));
+    // `"""a"b""c"""` — lone `"` and `""` inside are content, not a close.
+    assert(lex("\"\"\"a\"b\"\"c\"\"\"", raw) == ok([tok("raw", 0, 12)]));
+    // A raw string followed by an identifier: the close ends the token exactly.
+    assert(lex("\"\"\"x\"\"\"y", raw) == ok([tok("raw", 0, 7), tok("ident", 7, 8)]));
+    // Unterminated (only two closing quotes) is a hard error at the open.
+    assert(lex("\"\"\"hi\"\"", raw) == err(lex_err("unterminated delimited token", 0, 7)));
+
+    // Between with an asymmetric open/close: non-nesting block comments. A lone
+    // `*` inside doesn't close (the whole `*/` must appear).
+    let blk = [ws, TokenRule { kind: "block", matcher: Between("/*", "*/") }, ident];
+    assert(lex("/* a * b */x", blk) == ok([tok("block", 0, 11), tok("ident", 11, 12)]));
+    assert(lex("/* x", blk) == err(lex_err("unterminated delimited token", 0, 4)));
+
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
@@ -461,18 +518,19 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 230
-deallocations: 230
+allocations: 256
+deallocations: 256
 reallocations: 0
-bytes allocated: 16416
-instructions executed: 89296
-binary size: 115032
+bytes allocated: 17872
+instructions executed: 95895
+binary size: 139344
 --- monomorphizations ---
 __builtin_is_some_and$char$lam18
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam17
 __m1__count_while$char$s0$lam5
 __test$lex
+between_len
 delimited_len
 float_len
 lex
