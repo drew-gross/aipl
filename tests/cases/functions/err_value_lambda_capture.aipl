@@ -1,0 +1,15 @@
+import { *, wrapping_add as +, == } from builtins;
+
+// A lambda used as a value is a bare code address with no environment, so it
+// cannot capture an enclosing local.
+fn main() -> i64 {
+    let n = 5;
+    let f = |x: i64| { x + n };
+    f(10)
+}
+--- errors ---
+error: a lambda used as a value cannot capture local "n" (function values are non-capturing)
+ --> ./tests/cases/functions/err_value_lambda_capture.aipl:7:13
+  |
+7 |     let f = |x: i64| { x + n };
+  |             ^^^^^^^^^^^^^^^^

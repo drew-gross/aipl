@@ -1122,6 +1122,10 @@ impl<'s> Walker<'s> {
         match self.peek_text() {
             "if" => self.if_expr(),
             "match" => self.match_expr(),
+            // A lambda used as a value (`let f = |x: i64| { .. }`). Only the
+            // single-`|` form reaches expression position; `||` there would be a
+            // binary operator. Reuses the argument-position lambda formatter.
+            "|" => self.lambda(),
             "(" => {
                 self.bump();
                 let first = self.expr()?;

@@ -346,7 +346,15 @@ gazelle! {
              | HASH LBRACE brace_body RBRACE => brace_lit
              // Template literal: `` `text {expr} text` `` with 1+ interpolations.
              // The no-interpolation case is emitted as a plain STR by the lexer.
-             | TEMPLATE_HEAD expr template_rest => template_lit;
+             | TEMPLATE_HEAD expr template_rest => template_lit
+             // A lambda used as a *value* (not a call argument): bound to a
+             // local, stored in a struct field, etc. The body must be a
+             // brace-delimited block — a bare-expr body would extend greedily
+             // and clash with trailing operators (`let f = |x: i64| x + 1` is
+             // ambiguous with `(|x| x) + 1`), while a block is self-delimiting.
+             // The `||` no-arg form is excluded (its `OROR` lead clashes with
+             // `||` as a binary operator).
+             | PIPE lambda_params PIPE block => lambda_block;
 
         // The portion of a template literal after the first interpolation.
         // Either the closing tail (`TEMPLATE_TAIL`) or another interpolation
@@ -404,7 +412,6 @@ gazelle! {
         arg = expr => expr | lambda => lambda | OP => op_value
             | IDENT EQ expr => kw_arg;
         lambda = PIPE lambda_params PIPE expr => lambda_expr
-               | PIPE lambda_params PIPE block => lambda_block
                | OROR expr => lambda_noargs
                | OROR block => lambda_noargs_block;
         lambda_params = lambda_param_list => present | _ => empty;
@@ -1765,6 +1772,13 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                     span,
                 )
             }
+            // A lambda in value position with a brace-delimited body
+            // (`let f = |x: i64| { x + 1 }`). Built like an argument-position
+            // lambda.
+            aipl::Atom::LambdaBlock(pipe_span, params, _pipe2, body) => {
+                let span = join_spans(&pipe_span, &body.span);
+                Expr::new(ExprKind::Lambda(params, Box::new(body)), span)
+            }
             aipl::Atom::NoneLit(span) => Expr::new(ExprKind::None, span),
             aipl::Atom::MatchExpr(scrutinee, arms) => {
                 let last_span = arms
@@ -2080,8 +2094,7 @@ fn op_value_lambda(op: char, sp: Span) -> Expr {
 impl gazelle::Action<aipl::Lambda<Self>> for Build {
     fn build(&mut self, node: aipl::Lambda<Self>) -> Result<Expr, Self::Error> {
         let (span, params, body) = match node {
-            aipl::Lambda::LambdaExpr(pipe_span, params, _pipe2, body)
-            | aipl::Lambda::LambdaBlock(pipe_span, params, _pipe2, body) => {
+            aipl::Lambda::LambdaExpr(pipe_span, params, _pipe2, body) => {
                 (join_spans(&pipe_span, &body.span), params, body)
             }
             // `|| body` — no parameters; the `||` token carries no span, so the

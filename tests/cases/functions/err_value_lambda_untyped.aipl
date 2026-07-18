@@ -1,0 +1,14 @@
+import { *, wrapping_add as +, == } from builtins;
+
+// A value lambda's parameters have no expected signature to infer from, so
+// each must be explicitly typed.
+fn main() -> i64 {
+    let f = |x| { x + 1 };
+    f(10)
+}
+--- errors ---
+error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
+ --> ./tests/cases/functions/err_value_lambda_untyped.aipl:6:14
+  |
+6 |     let f = |x| { x + 1 };
+  |              ^

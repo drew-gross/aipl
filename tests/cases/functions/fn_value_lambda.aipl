@@ -1,0 +1,54 @@
+import { *, wrapping_add as +, +++, ==, map } from builtins;
+
+// A lambda and a payload-carrying constructor can both be used as function
+// *values*: bound to a local or stored in a struct field, then called through.
+// Each is lowered to a synthesized non-capturing top-level function whose
+// 8-byte code address is the value — so a value lambda must annotate its
+// parameter types, must not capture an enclosing local, and (in value position)
+// takes a brace-delimited body.
+struct Rule { build: (i64) -> Tok, step: (i64) -> i64 }
+
+variant Tok = Int(i64) | Skip
+
+fn probe() -> i64 {
+    // A lambda bound to a local, called indirectly.
+    let g = |x: i64| { x + 1 };
+    // Lambdas and a bare constructor stored in struct fields.
+    let r = Rule { build: Int, step: |x: i64| { x + x } };
+    g(10) + r.step(20)
+}.test({
+    assert(probe() == 51);
+    // The constructor field builds a variant value; the lambda field transforms.
+    let r = Rule { build: Int, step: |x: i64| { x + x } };
+    assert(r.build(7) == Int(7));
+    assert(r.step(9) == 18);
+
+    // A value lambda is an ordinary argument to a higher-order function too —
+    // there a bare-expr body is still allowed.
+    assert([1, 2, 3].map(|x| x + 10) == [11, 12, 13]);
+})
+
+// Heap arguments and results flow through a value-lambda call, refcounting
+// correctly (a leak or double-free would unbalance the accounting below).
+fn heap_lambda() -> str {
+    let deco = |s: str| { s +++ "!" };
+    deco("hi")
+}.test({
+    assert(heap_lambda() == "hi!");
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 152
+instructions executed: 373
+binary size: 3656
+--- monomorphizations ---
+__lambda_0
+__lambda_1
+__lambda_10
+__lambda_2
+__lambda_4
+__lambda_5
+__map9$own0
+main

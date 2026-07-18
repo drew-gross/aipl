@@ -936,16 +936,55 @@ impl Cx<'_> {
                 // `return` doesn't produce a value — it's a statement, like `set`.
                 Type::Unit
             }
-            // A lambda is only valid as a call argument, where the expected
-            // function type is known (`check_call` handles it). Anywhere else
-            // there's no type to infer its parameters against.
-            ExprKind::Lambda(_, _) => {
-                return Err(Error::at(
-                    "a lambda is only valid as an argument to a function with a matching \
-                     function-typed parameter"
-                        .to_string(),
-                    span.clone(),
-                ));
+            // A lambda used as a *value* (bound to a local, stored in a struct
+            // field, or a lowered payload constructor `Ctor`) becomes a
+            // non-capturing top-level function whose address is the value. In
+            // argument position the expected function type supplies parameter
+            // types and captures are lifted (handled in `check_call`); here
+            // there is neither, so every parameter must be explicitly typed, the
+            // body must be effect-free (an indirect call can't be effect-checked
+            // at the site), and it may not capture an enclosing local.
+            ExprKind::Lambda(params, body) => {
+                let mut ptys = Vec::with_capacity(params.len());
+                let mut env2 = env.clone();
+                for p in params {
+                    let Some(ann) = &p.ty else {
+                        return Err(Error::at(
+                            format!(
+                                "lambda parameter {:?} used as a value must be typed, \
+                                 e.g. `|{}: i64| ...`",
+                                p.name, p.name
+                            ),
+                            p.span.clone(),
+                        ));
+                    };
+                    ptys.push(ann.clone());
+                    env2.insert(
+                        p.name.clone(),
+                        Binding {
+                            ty: ann.clone(),
+                            mutable: false,
+                        },
+                    );
+                }
+                // Reject captures: any free identifier of the body that resolves
+                // to an enclosing local (not a global function/type). Function
+                // values carry no environment, so a capture can't be honored.
+                let tenv: HashMap<String, Type> =
+                    env.iter().map(|(k, b)| (k.clone(), b.ty.clone())).collect();
+                if let Some((cap, _)) = super::free_vars(body, params, &tenv).into_iter().next() {
+                    return Err(Error::at(
+                        format!(
+                            "a lambda used as a value cannot capture local {cap:?} \
+                             (function values are non-capturing)"
+                        ),
+                        span.clone(),
+                    ));
+                }
+                // Effect-free body: check with an empty effect context so any
+                // effectful call inside is reported.
+                let body_ty = self.check_expr(body, &env2, &[])?;
+                Type::Fn(ptys, Box::new(body_ty))
             }
             ExprKind::TupleLit(elems) => {
                 let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());

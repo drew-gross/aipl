@@ -3213,13 +3213,33 @@ impl Mono<'_> {
             // are handled by `specialize_call`. Reaching here means a lambda in
             // a position that isn't supported yet (e.g. a method-call receiver
             // or argument).
-            ExprKind::Lambda(_, _) => {
-                return Err(Error::at(
-                    "a lambda is only supported as an argument to a plain higher-order function \
-                     call, e.g. `map(xs, |x| ..)`"
-                        .to_string(),
-                    span.clone(),
-                ));
+            ExprKind::Lambda(params, body) => {
+                // A lambda used as a *value* (bound to a local, stored in a
+                // field, or a lowered payload constructor): synthesize a
+                // top-level, non-capturing function and yield its address as a
+                // bare-name reference — codegen turns the `Ident` of a user
+                // function into a `func_addr`. The checker has already required
+                // typed parameters, an effect-free body, and no captures.
+                let ptys: Vec<Type> = params
+                    .iter()
+                    .map(|p| p.ty.clone().expect("value lambda parameter is typed"))
+                    .collect();
+                // The synthesized function sees only its parameters (no
+                // captures), exactly as `process` will set it up.
+                let mut penv: Env = HashMap::new();
+                for (p, t) in params.iter().zip(&ptys) {
+                    penv.insert(p.name.clone(), t.clone());
+                }
+                // Drop the internal concat-str sentinel back to plain `str`: the
+                // synthesized function has a materialized `str` return, not a
+                // borrowed concat node (see `decay_concat`).
+                let (_, ret) = self.infer(body, &penv)?;
+                let ret = decay_concat(ret);
+                let fn_name = self.synth_lambda(params, body, &ptys, &ret, &[]);
+                (
+                    node(ExprKind::Ident(fn_name)),
+                    Type::Fn(ptys, Box::new(ret)),
+                )
             }
             ExprKind::Let(name, val, body) => {
                 let (rv, vt) = self.infer(val, env)?;
