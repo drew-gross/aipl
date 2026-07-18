@@ -1,0 +1,54 @@
+import { *, wrapping_add as +, +++, == } from builtins;
+
+// A struct field can hold a function value. It is stored as the function's
+// 8-byte code address (owning nothing, so it needs no drop), and a call
+// written with method syntax — `o.step(x)` — loads the field and calls
+// through it indirectly. A same-named method would take precedence; the field
+// is reached because no `step`/`decorate` function exists.
+struct Ops { step: (i64) -> i64, decorate: (str) -> str }
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+fn dbl(x: i64) -> i64 { x + x }
+
+fn bang(s: str) -> str { s +++ "!" }
+
+// The field call also works on a struct received as a parameter, not just a
+// local — the receiver is any expression of the struct type.
+fn run_step(o: Ops, n: i64) -> i64 { o.step(n) }
+
+fn scalar_field() -> i64 {
+    let o = Ops { step: inc, decorate: bang };
+    o.step(41)
+}.test({
+    assert(scalar_field() == 42);
+    assert(run_step(Ops { step: dbl, decorate: bang }, 21) == 42);
+
+    // Reassigning the whole struct swaps the stored function; the call is a
+    // genuine runtime dispatch through the new field value.
+    mut o = Ops { step: inc, decorate: bang };
+    assert(o.step(10) == 11);
+    set o = Ops { step: dbl, decorate: bang };
+    assert(o.step(10) == 20);
+})
+
+// A heap argument and result through a field call must refcount correctly (a
+// leak or double-free would unbalance the allocation accounting below).
+fn heap_field() -> str {
+    let o = Ops { step: inc, decorate: bang };
+    o.decorate("hi")
+}.test({
+    assert(heap_field() == "hi!");
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 114
+binary size: 2648
+--- monomorphizations ---
+bang
+dbl
+inc
+main

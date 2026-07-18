@@ -107,6 +107,17 @@ impl<'a> Cx<'a> {
             .cloned()
             .or_else(|| self.syn_structs.borrow().get(name).cloned())
     }
+    /// If struct `sn` has a field named `field` holding a function value,
+    /// return its `(param types, return type)`. Used to call through a
+    /// function-valued field with method syntax (`recv.f(args)`).
+    fn struct_fn_field(&self, sn: &str, field: &str) -> Option<(Vec<Type>, Type)> {
+        self.struct_fields(sn)?
+            .into_iter()
+            .find_map(|(n, t, _)| match t {
+                Type::Fn(ptys, ret) if n == field => Some((ptys, *ret)),
+                _ => None,
+            })
+    }
     fn has_struct(&self, name: &str) -> bool {
         self.structs.contains_key(name) || self.syn_structs.borrow().contains_key(name)
     }
@@ -1586,6 +1597,40 @@ impl Cx<'_> {
         // name that *is* a builtin almost always means a forgotten import, so
         // point at the fix.
         let Some(sig) = self.sigs.get(name) else {
+            // A call through a function-valued struct field: `recv.f(rest)`
+            // (stored as `f(recv, rest)`) where `name` isn't a function but
+            // `recv`'s struct has a field `name` holding a function value.
+            // Consulted only after function/method resolution fails, so a real
+            // fn never loses to a same-named field. Type-check the remaining
+            // args against the field's function type and yield its return type;
+            // codegen loads the field and `call_indirect`s through it.
+            if !args.is_empty() {
+                if let Ok(Type::Named(sn)) = self.check_expr(&args[0], env, effects) {
+                    if let Some((ptys, ret)) = self.struct_fn_field(&sn, name) {
+                        let cargs = &args[1..];
+                        if ptys.len() != cargs.len() {
+                            return Err(Error::at(
+                                format!(
+                                    "field {name:?} is a function value expecting {} arg(s), got {}",
+                                    ptys.len(),
+                                    cargs.len()
+                                ),
+                                span.clone(),
+                            ));
+                        }
+                        for (i, (arg, pty)) in cargs.iter().zip(&ptys).enumerate() {
+                            self.check_arg(
+                                arg,
+                                Some(pty),
+                                env,
+                                effects,
+                                &format!("call to field {name:?} arg {i}"),
+                            )?;
+                        }
+                        return Ok(ret);
+                    }
+                }
+            }
             let mut msg = format!("call to undefined fn {:?}", display(name));
             if aipl_syntax::IMPORTABLE_BUILTINS.contains(&name) {
                 msg.push_str(&format!(

@@ -2859,6 +2859,24 @@ impl Mono<'_> {
         }
     }
 
+    /// If `t` is a struct with a field named `field` holding a function value,
+    /// return that function's return type. Used to resolve a call through a
+    /// function-valued struct field (`recv.f(args)`).
+    fn fn_field_ret(&self, t: &Type, field: &str) -> Option<Type> {
+        let Type::Named(sn) = t else {
+            return None;
+        };
+        self.structs
+            .get(sn)
+            .or_else(|| self.syn_structs.get(sn))?
+            .iter()
+            .find(|(n, _, _)| n == field)
+            .and_then(|(_, ft, _)| match ft {
+                Type::Fn(_, ret) => Some((**ret).clone()),
+                _ => None,
+            })
+    }
+
     /// Is `name` a reference to a top-level function usable as a *value* (passed
     /// to a higher-order function)? True for a concrete user function or a
     /// builtin, but not for a name bound as a local in `env` (which shadows any
@@ -3675,6 +3693,36 @@ impl Mono<'_> {
                     };
                     let ret = self.call_return(name, &atys);
                     (node(ExprKind::Call(resolved, rargs, method_style)), ret)
+                } else if !name.starts_with("__builtin_")
+                    && atys
+                        .first()
+                        .and_then(|t| self.fn_field_ret(t, name))
+                        .is_some()
+                {
+                    // A call through a function-valued struct field:
+                    // `recv.f(rest)`, where `f` isn't a function but `recv`
+                    // (`rargs[0]`) is a struct whose field `f` holds a function
+                    // value. Rewrite to `{ let g = recv.f; g(rest) }` — the
+                    // shape codegen already lowers to a `call_indirect`. `rargs`
+                    // is already inferred here, so the receiver isn't
+                    // re-evaluated. Consulted only after function/method
+                    // resolution fails, matching the checker's fallback so a
+                    // real fn never loses to a same-named field.
+                    let ret = self
+                        .fn_field_ret(&atys[0], name)
+                        .expect("fn field checked above");
+                    let k = self.synth;
+                    self.synth += 1;
+                    let tmp = format!("__fldcall${k}");
+                    let mut it = rargs.into_iter();
+                    let recv = it.next().expect("call through a field has a receiver");
+                    let rest: Vec<Expr> = it.collect();
+                    let field = node(ExprKind::Field(Box::new(recv), name.clone()));
+                    let call = node(ExprKind::Call(tmp.clone(), rest, false));
+                    (
+                        node(ExprKind::Let(tmp, Box::new(field), Box::new(call))),
+                        ret,
+                    )
                 } else {
                     // Builtin (`push`, `len`, …) or undefined (codegen reports
                     // the latter).

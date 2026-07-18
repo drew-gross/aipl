@@ -4922,11 +4922,14 @@ fn build_struct_layout(
                 resolve_type_layout(n, decls, layouts, on_stack)?;
             }
             Type::Array(_) => {}
+            // A function value is stored as its 8-byte code address (an i64);
+            // it owns nothing, so like a scalar it needs no drop.
+            Type::Fn(_, _) => {}
             Type::Optional(inner)
                 if is_set_elem(inner) || matches!(inner.as_ref(), Type::Array(_)) => {}
             _ => {
                 return Err(Error::msg(format!(
-                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a struct, a variant, an array, or an optional of (i64, bool, char, str, or an array)",
+                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a function, a struct, a variant, an array, or an optional of (i64, bool, char, str, or an array)",
                     decl.name,
                     f.name,
                     type_name(&f.ty),
