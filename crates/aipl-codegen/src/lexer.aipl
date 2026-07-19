@@ -74,6 +74,13 @@ struct LexError { message: str, span: Span }
 //   `close` must be distinct (a delimiter can't both open and close a level)
 //   and non-empty. A token still open (depth > 0) at the end of the source is a
 //   lex error.
+// - `CharLit(quote, escapes)`: a single-character literal — the `quote`
+//   spelling, then exactly one char (an ordinary char, or a `\X` escape with
+//   X in `escapes`), then the closing `quote`. `'x'`, `'\n'`, `'\''`. Unlike a
+//   `Delimited("'", ..)`, it enforces the one-char shape: an empty literal
+//   (`''`), a multi-char one (`'ab'`), an unknown escape, and a dangling or
+//   unterminated literal are each a distinct hard error. Byte-oriented like the
+//   rest of the library, so a multi-byte char reads as multi-char.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -87,6 +94,7 @@ variant Matcher =
     | Delimited(str, str)
     | Between(str, str)
     | Nested(str, str)
+    | CharLit(str, str)
     | ToEol(str)
     | Float
 
@@ -237,6 +245,57 @@ fn nested_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
     ok(i)
 }
 
+// `CharLit`: a `quote`-delimited one-character literal. Opens with the `quote`
+// spelling, holds exactly one char — a `\X` escape (X in `escapes`, 2 chars) or
+// one ordinary char — then the closing `quote`. ok(0) when `self` doesn't open
+// with `quote`. Distinct hard errors for an empty literal (`''`), a dangling or
+// unterminated one, an unknown escape, and content that isn't exactly one char
+// before the close (`'ab'`). Spans mirror the real lexer's char-literal errors.
+fn char_lit_len(self: str, at: i64, quote: str, escapes: str) -> i64!LexError {
+    if (!self.starts_with(quote)) {
+        return ok(0);
+    };
+    let open = quote.len();
+    let rest = self[open..];
+    // `'` then end of source: nothing between the quotes.
+    if (rest.len() == 0) {
+        return err(LexError { message: "unterminated char literal", span: at..at + self.len() });
+    };
+    // `''`: the closer sits where the single content char should be.
+    if (rest.starts_with(quote)) {
+        return err(LexError { message: "empty char literal", span: at..at + open + quote.len() });
+    };
+    // The content is one char: a `\X` escape (2 chars) or one ordinary char.
+    mut content = 1;
+    if (self[open] == some('\\')) {
+        // The backslash needs an allowed char after it. A backslash at the end
+        // of the source escapes nothing — an unterminated literal, not an
+        // unknown escape.
+        if (!(open + 1 < self.len())) {
+            return err(
+                LexError { message: "unterminated char literal", span: at..at + self.len() },
+            );
+        };
+        if (!self[open + 1].is_some_and(|e| escapes.contains(e))) {
+            return err(
+                LexError { message: "unknown escape sequence", span: at + open..at + open + 2 },
+            );
+        };
+        set content = 2;
+    };
+    // Exactly one char of content, then the closing quote must follow.
+    let close_at = open + content;
+    if (!self[close_at..].starts_with(quote)) {
+        return err(
+            LexError {
+                message: "char literal must contain exactly one character",
+                span: at..at + close_at,
+            },
+        );
+    };
+    ok(close_at + quote.len())
+}
+
 // `ToEol`: the marker, then everything up to (not including) the next
 // newline. 0 when `self` doesn't start with the (non-empty) marker.
 fn to_eol_len(self: str, marker: str) -> i64 {
@@ -286,6 +345,7 @@ fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
         Delimited(delims, escapes) => self.delimited_len(at, delims, escapes),
         Between(open, close) => self.between_len(at, open, close),
         Nested(open, close) => self.nested_len(at, open, close),
+        CharLit(quote, escapes) => self.char_lit_len(at, quote, escapes),
         ToEol(marker) => ok(self.to_eol_len(marker)),
         Float => ok(self.float_len()),
     }
@@ -475,6 +535,25 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
     assert(lex("/* a /* b */", blk) == ok([tok("block", 0, 12)]));
 
+    // CharLit: exactly one char between the quotes — an ordinary char or a `\X`
+    // escape. The one-char shape is enforced, so empty/multi-char/bad-escape
+    // literals are distinct hard errors (a `Delimited("'", ..)` couldn't).
+    let chr = [ws, TokenRule { kind: "char", matcher: CharLit("'", "ntr\\'\"") }, ident];
+    assert(lex("'x'", chr) == ok([tok("char", 0, 3)]));
+    assert(lex("'\\n'", chr) == ok([tok("char", 0, 4)])); // escape is one char
+    assert(lex("'\\''", chr) == ok([tok("char", 0, 4)])); // escaped quote is content
+    assert(lex("'a'b", chr) == ok([tok("char", 0, 3), tok("ident", 3, 4)]));
+    // Empty, multi-char, and unknown-escape literals are rejected.
+    assert(lex("''", chr) == err(lex_err("empty char literal", 0, 2)));
+    assert(
+        lex("'ab'", chr) == err(lex_err("char literal must contain exactly one character", 0, 2)),
+    );
+    assert(lex("'\\q'", chr) == err(lex_err("unknown escape sequence", 1, 3)));
+    // Unterminated: a bare quote, a dangling escape, or a missing closer.
+    assert(lex("'", chr) == err(lex_err("unterminated char literal", 0, 1)));
+    assert(lex("'\\", chr) == err(lex_err("unterminated char literal", 0, 2)));
+    assert(lex("'x", chr) == err(lex_err("char literal must contain exactly one character", 0, 2)));
+
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
@@ -579,19 +658,20 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 300
-deallocations: 300
+allocations: 320
+deallocations: 320
 reallocations: 0
-bytes allocated: 19808
-instructions executed: 102738
-binary size: 161216
+bytes allocated: 20832
+instructions executed: 110094
+binary size: 189760
 --- monomorphizations ---
-__builtin_is_some_and$char$lam18
+__builtin_is_some_and$char$lam21
 __m1__count_while$char$s0$lam10
-__m1__count_while$char$s0$lam17
+__m1__count_while$char$s0$lam20
 __m1__count_while$char$s0$lam5
 __test$lex
 between_len
+char_lit_len
 delimited_len
 float_len
 lex
