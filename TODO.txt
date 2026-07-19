@@ -51,8 +51,6 @@ structs with type arguments (for custom variant type for lexing)
 Lex aipl:
   New matcher shapes (fit the current data-only design)
 
-  1. Multi-char, asymmetric-close delimiters — raw strings """…""" (lib.rs:2367): open/close are 3 chars, and a lone " or "" inside must not close. Delimited today is single-char, same-char-close only. Wants something like Between(open, close).
-  2. Nesting — block comments /* … /* … */ … */ nest, Rust-style (lib.rs:2219). Needs a depth-tracked variant of Between.
   3. Escape-aware delimiter scanning — in "…" a \" must not close the string (lib.rs:2404). The close-scan needs to skip \<any> pairs.
   4. Char-literal shape — 'x' / '\n' (lib.rs:2469): open quote, optional escape, exactly one char, close quote. A same-char Delimited("'") gets simple cases right but '\'' wrong, and can't reject '' (empty) or multi-char.
 

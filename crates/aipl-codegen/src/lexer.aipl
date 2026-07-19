@@ -67,6 +67,13 @@ struct LexError { message: str, span: Span }
 //   processing), which is what raw strings `"""..."""` and non-nesting block
 //   comments `/* ... */` want. Both spellings must be non-empty. A token still
 //   open at the end of the source is a lex error.
+// - `Nested(open, close)`: like `Between`, but depth-tracked — each further
+//   `open` inside raises the nesting depth and the matching `close` lowers it,
+//   so the token ends only at the `close` that balances the outermost `open`.
+//   Rust-style nesting block comments `/* ... /* ... */ ... */`. `open` and
+//   `close` must be distinct (a delimiter can't both open and close a level)
+//   and non-empty. A token still open (depth > 0) at the end of the source is a
+//   lex error.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -79,6 +86,7 @@ variant Matcher =
     | Keyword(str[], str)
     | Delimited(str, str)
     | Between(str, str)
+    | Nested(str, str)
     | ToEol(str)
     | Float
 
@@ -197,6 +205,38 @@ fn between_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
     err(LexError { message: "unterminated delimited token", span: at..at + self.len() })
 }
 
+// `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
+// depth 1; each further `open` raises the depth and each `close` lowers it, so
+// the token ends just past the `close` that returns the depth to 0. ok(0) when
+// `self` doesn't start with `open`. `open` is tested before `close` so an
+// overlap can't misclassify, but the two must be distinct for nesting to mean
+// anything. No escapes — contents are verbatim. Still open (depth > 0) at the
+// end of the source is a hard error (`at` places the span in the real source).
+fn nested_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
+    if (!self.starts_with(open)) {
+        return ok(0);
+    };
+    mut depth = 1;
+    mut i = open.len();
+    while (0 < depth && i < self.len()) {
+        if (self[i..].starts_with(open)) {
+            set depth = depth + 1;
+            set i = i + open.len();
+        } else {
+            if (self[i..].starts_with(close)) {
+                set depth = depth - 1;
+                set i = i + close.len();
+            } else {
+                set i = i + 1;
+            };
+        };
+    }
+    if (0 < depth) {
+        return err(LexError { message: "unterminated delimited token", span: at..at + self.len() });
+    };
+    ok(i)
+}
+
 // `ToEol`: the marker, then everything up to (not including) the next
 // newline. 0 when `self` doesn't start with the (non-empty) marker.
 fn to_eol_len(self: str, marker: str) -> i64 {
@@ -245,6 +285,7 @@ fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
         Keyword(spellings, boundary) => ok(self.keyword_len(spellings, boundary)),
         Delimited(delims, escapes) => self.delimited_len(at, delims, escapes),
         Between(open, close) => self.between_len(at, open, close),
+        Nested(open, close) => self.nested_len(at, open, close),
         ToEol(marker) => ok(self.to_eol_len(marker)),
         Float => ok(self.float_len()),
     }
@@ -414,6 +455,26 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex("/* a * b */x", blk) == ok([tok("block", 0, 11), tok("ident", 11, 12)]));
     assert(lex("/* x", blk) == err(lex_err("unterminated delimited token", 0, 4)));
 
+    // Nested: the depth-tracked `Between`. Rust-style nesting block comments,
+    // where an inner `/* ... */` doesn't end the outer comment — only the
+    // `*/` that balances the first `/*` does.
+    let nest = [ws, TokenRule { kind: "block", matcher: Nested("/*", "*/") }, ident];
+    // No inner open: behaves like `Between`.
+    assert(lex("/* a */x", nest) == ok([tok("block", 0, 7), tok("ident", 7, 8)]));
+
+    // One level of nesting: the first `*/` closes the inner comment, the second
+    // closes the outer — the whole thing is one token.
+    assert(lex("/* a /* b */ c */x", nest) == ok([tok("block", 0, 17), tok("ident", 17, 18)]));
+    // Two levels deep, tightly packed.
+    assert(lex("/* /* */ */x", nest) == ok([tok("block", 0, 11), tok("ident", 11, 12)]));
+
+    // The depth tracking is exactly the difference from `Between`: on the same
+    // input, `Nested` treats the inner `*/` as closing only the inner level, so
+    // the outer comment is still open at end of source — unterminated. `Between`
+    // stops at that first `*/` and lexes a complete (shorter) token.
+    assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
+    assert(lex("/* a /* b */", blk) == ok([tok("block", 0, 12)]));
+
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
@@ -518,12 +579,12 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 256
-deallocations: 256
+allocations: 300
+deallocations: 300
 reallocations: 0
-bytes allocated: 17872
-instructions executed: 95895
-binary size: 139344
+bytes allocated: 19808
+instructions executed: 102738
+binary size: 161216
 --- monomorphizations ---
 __builtin_is_some_and$char$lam18
 __m1__count_while$char$s0$lam10
@@ -536,4 +597,5 @@ float_len
 lex
 lex_err
 main
+nested_len
 tok
