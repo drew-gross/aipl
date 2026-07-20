@@ -1,11 +1,10 @@
 import {
     &&,
     *,
+    wrapping_add as +,
     wrapping_sub as -,
-    <,
     ==,
     >,
-    ||,
     len,
     starts_with,
     to_digit,
@@ -20,32 +19,54 @@ import {
 // body's own builtin calls (`starts_with`, `to_digit`, ...) resolve through
 // this file's imports, loaded like any user file.
 pub fn int_parse(self: str) -> i64? {
-    // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
-    // counterpart, so building -v digit-by-digit covers the full range and
-    // the final negation only happens on the side that can't overflow.
-    let lim = 0 - 922337203685477580;
-    let min = lim * 10 - 8;
     let neg = self.starts_with("-");
-    let digits = if (neg) { self[1..] } else { self };
-    if (digits.len() == 0) {
+    let body = if (neg) { self[1..] } else { self };
+    if (body.len() == 0) {
         return none;
     };
+    // Trim leading zeros so the remaining count is *significant* digits.
+    mut lead = 0;
+    mut counting = true;
+    for (let c : body) {
+        if (counting && c == '0') {
+            set lead = lead + 1;
+        } else {
+            set counting = false;
+        };
+    }
+    let digits = body[lead..];
+
+    // i64::MAX is 19 digits, so 20+ significant digits can never fit — reject
+    // up front. This also bounds the value enough that a *single* wraparound
+    // past i64 is the only overflow mode left below (a 20+ digit run could wrap
+    // more than once and land back on a plausible value — e.g. the 20-digit
+    // "18446744073709551616" wraps to exactly 0 — which the `v > 0` check
+    // would miss).
+    if (digits.len() > 19) {
+        return none;
+    };
+
+    // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
+    // counterpart, so building -v digit-by-digit covers the full range and the
+    // final negation only happens on the side that can't overflow. With leading
+    // zeros trimmed the first digit drives v strictly negative, so any i64
+    // overflow (now necessarily a single wrap) lands positive: `v > 0` detects
+    // it. Leading zeros were trimmed, so `digits` here has no zero-only prefix.
     mut v = 0;
     for (let c : digits) {
         let dv = c.to_digit();
         if (dv == none) {
             return none;
         };
-        let d = dv.value_or(0);
-
-        // Overflow gate before the shift: past `lim` any appended digit
-        // escapes i64; at `lim` only digits up to 8 (i64::MIN's last digit)
-        // still fit.
-        if (v < lim || (v == lim && d > 8)) {
+        set v = v * 10 - dv.value_or(0);
+        if (v > 0) {
             return none;
         };
-        set v = v * 10 - d;
     }
+
+    // The one non-wrapping overflow: a positive value equal to -i64::MIN, whose
+    // negation can't be represented (e.g. "9223372036854775808").
+    let min = (0 - 922337203685477580) * 10 - 8;
     if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
 }.doc("""
     Parse `self` as a decimal integer: an optional leading `-`, then one or
@@ -70,14 +91,39 @@ pub fn int_parse(self: str) -> i64? {
     assert("-9223372036854775808".int_parse() == some(0 - 9223372036854775807 - 1)); // i64::MIN
     assert("-9223372036854775809".int_parse() == none); // one past MIN
     assert("18446744073709551616".int_parse() == none); // far past, guard holds
+
+    // Leading-zero trimming and the 19-significant-digit limit.
+    assert("00000000000000000000000000".int_parse() == some(0)); // all zeros, 26 of them
+    assert("-00000".int_parse() == some(0)); // negative zero, many zeros
+
+    // 30 leading zeros in front of a valid 19-digit i64::MAX: significant count
+    // is 19, so it must still parse despite the long string.
+    assert(
+        "0000000000000000000000000000009223372036854775807".int_parse()
+            == some(9223372036854775807),
+    );
+    // 20 significant digits (the smallest 20-digit number) can never fit.
+    assert("10000000000000000000".int_parse() == none);
+
+    // Exactly 19 nines is 19 digits but exceeds i64::MAX — the wrap check
+    // (not the length check) must reject it.
+    assert("9999999999999999999".int_parse() == none);
+
+    // The wrap-to-zero trap: this 20-digit value negates to exactly -2^64, so a
+    // bare `v > 0` check would miss it — the length>19 guard is what rejects it.
+    assert("18446744073709551616".int_parse() == none);
+    // Same trap with a leading-zero prefix: still 20 significant digits.
+    assert("0018446744073709551616".int_parse() == none);
+    // A huge run of significant digits rejects without needing to parse it all.
+    assert("123456789012345678901234567890".int_parse() == none);
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 13
+deallocations: 13
 reallocations: 0
-bytes allocated: 64
-instructions executed: 6941
-binary size: 7152
+bytes allocated: 416
+instructions executed: 13408
+binary size: 10552
 --- monomorphizations ---
 __test$int_parse
 int_parse

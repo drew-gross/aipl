@@ -48,12 +48,12 @@ fn main() -> i64 {
 --- exit code ---
 0
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 64
-instructions executed: 5284
-binary size: 4392
+bytes allocated: 192
+instructions executed: 6411
+binary size: 4912
 --- monomorphizations ---
 __builtin_int_parse
 main
