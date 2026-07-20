@@ -54,12 +54,12 @@ deallocations: 32
 reallocations: 0
 bytes allocated: 1288
 instructions executed: 5424
-binary size: 8960
+binary size: 8968
 --- monomorphizations ---
-__m2__count_while$char$s0$lam12
-__m2__count_while$char$s0$lam5
-__m5__trim_prefix
-__m6__trim_suffix
+__builtin_count_while$char$s0$lam12
+__builtin_count_while$char$s0$lam5
+__m4__trim_prefix
+__m5__trim_suffix
 __map7$own0
 main
 process_raw_string

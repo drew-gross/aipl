@@ -25,6 +25,7 @@ import {
     ||,
     Span,
     contains,
+    count_while,
     int_parse,
     is_digit,
     is_some_and,
@@ -33,7 +34,6 @@ import {
     starts_with,
     value_or,
 } from builtins;
-import { count_while } from "./count_while.aipl";
 
 // What a token carries beyond its span: the processed *value* of the matched
 // text, computed at lex time by the matcher that claimed it (see each
@@ -1196,15 +1196,15 @@ allocations: 1906
 deallocations: 1906
 reallocations: 0
 bytes allocated: 92936
-instructions executed: 245487
-binary size: 438992
+instructions executed: 245477
+binary size: 438808
 --- monomorphizations ---
+__builtin_count_while$char$s0$lam10
+__builtin_count_while$char$s0$lam11
+__builtin_count_while$char$s0$lam31
+__builtin_count_while$char$s0$lam5
 __builtin_int_parse
 __builtin_is_some_and$char$lam21
-__builtin_trim_while$s0$lam27
-__m1__count_while$char$s0$lam10
-__m1__count_while$char$s0$lam11
-__m1__count_while$char$s0$lam5
 __test$lex
 between_len
 char_lit_len

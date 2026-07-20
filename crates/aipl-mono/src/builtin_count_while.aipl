@@ -1,5 +1,13 @@
 import { !, ++, <=, == } from builtins;
 
+// The AIPL implementation of the `count_while` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_count_while`
+// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count_while(pred)`
+// resolves through the ordinary generic / higher-order machinery — the in-file
+// name `count_while` is only for this file's own tests, which read exactly like
+// user code. Because a builtin's body may call other builtins (loaded through
+// the real loader), this is also the shared helper the `trim_while` builtin and
+// the dogfooded compiler helpers (`dedent`, and `lexer.aipl`) call.
 pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> i64 {
     mut n = 0;
     for (let x : self) {
@@ -29,7 +37,7 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 348
 instructions executed: 658
-binary size: 6104
+binary size: 6120
 --- monomorphizations ---
 count_while$char$lam11
 count_while$i64$lam1

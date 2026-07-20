@@ -3918,6 +3918,10 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_all", include_str!("builtin_all.aipl")),
     (
+        "__builtin_count_while",
+        include_str!("builtin_count_while.aipl"),
+    ),
+    (
         "__builtin_is_some_and",
         include_str!("builtin_is_some_and.aipl"),
     ),

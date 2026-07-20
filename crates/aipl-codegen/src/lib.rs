@@ -2612,7 +2612,6 @@ pub fn build_test_program(program: &Program) -> Program {
 // dependency sources.
 const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
 const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
-const RAW_STRING_COUNT_WHILE_SRC: &str = include_str!("count_while.aipl");
 const RAW_STRING_LINES_SRC: &str = include_str!("lines.aipl");
 const RAW_STRING_TRIM_PREFIX_SRC: &str = include_str!("trim_prefix.aipl");
 const RAW_STRING_TRIM_END_WHILE_SRC: &str = include_str!("trim_end_while.aipl");
@@ -2640,7 +2639,6 @@ const IS_OPERATOR_NAME_SRC: &str = include_str!("is_operator_name.aipl");
 pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./process_raw_string.aipl", RAW_STRING_SRC),
     ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
-    ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
     ("./lines.aipl", RAW_STRING_LINES_SRC),
     ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
     ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),

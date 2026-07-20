@@ -1,5 +1,14 @@
-import { !, ==, filter, is_all_whitespace, join, map, minimum, value_or } from builtins;
-import { count_while } from "./count_while.aipl";
+import {
+    !,
+    ==,
+    count_while,
+    filter,
+    is_all_whitespace,
+    join,
+    map,
+    minimum,
+    value_or,
+} from builtins;
 import { lines } from "./lines.aipl";
 
 pub fn dedent(self: str) -> str {
@@ -55,10 +64,10 @@ deallocations: 35
 reallocations: 0
 bytes allocated: 1641
 instructions executed: 4865
-binary size: 8000
+binary size: 8008
 --- monomorphizations ---
-__m1__count_while$char$s0$lam10
-__m1__count_while$char$s0$lam3
+__builtin_count_while$char$s0$lam10
+__builtin_count_while$char$s0$lam3
 __map5$own0
 dedent
 main

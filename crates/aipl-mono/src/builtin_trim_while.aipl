@@ -1,22 +1,14 @@
-import { !, ++, == } from builtins;
+import { ==, count_while } from builtins;
 
 // The AIPL implementation of the `trim_while` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_trim_while`
 // (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.trim_while(pred)`
 // resolves through the ordinary generic / higher-order machinery — the in-file
 // name `trim_while` is only for this file's own tests, which read exactly like
-// user code. Self-contained (a registered builtin body can't call file-local
-// helpers), so it counts the leading run inline rather than via `count_while`.
-pub fn trim_while(self: str, pred: (char) -> bool) -> str {
-    mut n = 0;
-    for (let c : self) {
-        if (!pred(c)) {
-            return self[n..];
-        };
-        set n++;
-    }
-    self[n..]
-}.doc("""
+// user code. A builtin body may call other builtins (loaded through the real
+// loader), so this drops the leading run via the `count_while` builtin — the
+// complement of `count_while`.
+pub fn trim_while(self: str, pred: (char) -> bool) -> str { self[self.count_while(pred)..] }.doc("""
     Drops the leading run of characters satisfying `pred`, returning the
     remainder (everything from the first character that fails `pred` onward);
     the whole string when `pred` fails immediately, and "" when every character
@@ -35,14 +27,14 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 480
-binary size: 7288
+instructions executed: 466
+binary size: 6080
 --- monomorphizations ---
+__builtin_count_while$char$s0$lam14
+__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam16
+__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam18
+__builtin_count_while$char$s0$lam19
+__builtin_count_while$char$s0$lam20
 main
-trim_while$lam1
-trim_while$lam11
-trim_while$lam13
-trim_while$lam3
-trim_while$lam5
-trim_while$lam7
-trim_while$lam9
