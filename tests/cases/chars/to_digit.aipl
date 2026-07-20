@@ -1,0 +1,47 @@
+import { !, ==, to_digit, value_or } from builtins;
+
+// `to_digit` maps an ASCII decimal digit '0'..'9' to its 0..9 value (`c - '0'`)
+// and yields `none` for any other char — including the chars just outside the
+// digit range, '/' (47) and ':' (58). It's a codegen intrinsic returning an
+// `i64?`. Each check returns a distinct exit code so a failure pinpoints which
+// one broke; all passing exits 0.
+fn main() -> i64 {
+    if (!('0'.to_digit() == some(0))) {
+        return 1;
+    };
+    if (!('8'.to_digit() == some(8))) {
+        return 2;
+    };
+    if (!('9'.to_digit() == some(9))) {
+        return 3;
+    };
+    if (!('/'.to_digit() == none)) {
+        return 4;
+    }; // one below '0'
+    if (!(':'.to_digit() == none)) {
+        return 5;
+    }; // one above '9'
+    if (!('a'.to_digit() == none)) {
+        return 6;
+    };
+    if (!(' '.to_digit() == none)) {
+        return 7;
+    };
+    // The value extracts through the optional like any other `i64?`.
+    if (!('7'.to_digit().value_or(0) == 7)) {
+        return 8;
+    };
+    0
+}
+--- stdout ---
+--- exit code ---
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 237
+binary size: 2016
+--- monomorphizations ---
+main

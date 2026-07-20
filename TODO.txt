@@ -66,3 +66,4 @@ import trim_while/count_while in int_parse
 AIPL-implemented builtin sources are valid AIPL error should include more info
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
+allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl

@@ -1142,6 +1142,8 @@ fn __builtin_is_some<T: any>(self: T?) -> bool { false }
 fn __builtin_is_space(self: char) -> bool { false }
 // Character classification: ASCII decimal digit ('0' through '9').
 fn __builtin_is_digit(self: char) -> bool { false }
+// ASCII decimal digit ('0'..'9') to its 0..9 value, `none` for any other char.
+fn __builtin_to_digit(self: char) -> i64? { none }
 
 // Set ops: membership and union.
 fn __builtin_has<T: any>(self: #{T}, x: T) -> bool { false }
@@ -1303,6 +1305,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "int_parse",
     "is_space",
     "is_digit",
+    "to_digit",
     "value_or",
     "contains",
     "has",

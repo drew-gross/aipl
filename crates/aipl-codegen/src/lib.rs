@@ -10215,6 +10215,51 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, result);
             (b, Type::Primitive(Primitive::Bool))
         }
+        "__builtin_to_digit" => {
+            // `c.to_digit() -> i64?` — an ASCII digit '0'..'9' to its 0..9
+            // value (`c - '0'`), `none` for any other char.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"to_digit\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+                return Err(Error::at(
+                    format!(
+                        "\"to_digit\" is only callable on a char, got {}",
+                        type_name(&recv_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            // Branchless: the `i64?` core is a plain scalar (no heap, no
+            // refcount), so store the present-tag and the value unconditionally
+            // — the value at `OPT_VALUE_OFFSET` is simply ignored when the tag is
+            // 0 (none). Tag = is_digit('0' (48) <= c <= '9' (57)); value = c - 48.
+            let ge_0 = builder
+                .ins()
+                .icmp_imm(IntCC::UnsignedGreaterThanOrEqual, c, 48);
+            let le_9 = builder
+                .ins()
+                .icmp_imm(IntCC::UnsignedLessThanOrEqual, c, 57);
+            let is_digit = builder.ins().band(ge_0, le_9);
+            let tag = builder.ins().uextend(types::I64, is_digit);
+            let value = builder.ins().iadd_imm(c, -48);
+            let opt_ty = Type::Optional(Box::new(Type::Primitive(Primitive::I64)));
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                elem_size_of(&opt_ty, structs) as u32,
+                3,
+            ));
+            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+            builder.ins().store(MemFlags::trusted(), tag, ptr, 0);
+            builder
+                .ins()
+                .store(MemFlags::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
+            (ptr, opt_ty)
+        }
         "__builtin_len" => {
             // `len(a) -> i64` — element/byte count. Reads `a` without consuming
             // it (it stays live in the caller's scope), so no inc/dec.

@@ -1,5 +1,4 @@
 import {
-    !,
     &&,
     *,
     wrapping_sub as -,
@@ -7,10 +6,10 @@ import {
     ==,
     >,
     ||,
-    enumerate,
-    is_digit,
     len,
     starts_with,
+    to_digit,
+    value_or,
 } from builtins;
 
 // The AIPL implementation of the `int_parse` builtin. Monomorphization
@@ -18,8 +17,8 @@ import {
 // (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.int_parse()`
 // resolves through the ordinary machinery — the in-file name `int_parse` is
 // only for this file's own tests, which read exactly like user code. The
-// body's own builtin calls (`starts_with`, `is_digit`, `enumerate`) resolve
-// through this file's imports, loaded like any user file.
+// body's own builtin calls (`starts_with`, `to_digit`, ...) resolve through
+// this file's imports, loaded like any user file.
 pub fn int_parse(self: str) -> i64? {
     // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
     // counterpart, so building -v digit-by-digit covers the full range and
@@ -33,15 +32,11 @@ pub fn int_parse(self: str) -> i64? {
     };
     mut v = 0;
     for (let c : digits) {
-        if (!c.is_digit()) {
+        let dv = c.to_digit();
+        if (dv == none) {
             return none;
         };
-        mut d = 0;
-        for (let (i, dc) : "0123456789".enumerate()) {
-            if (dc == c) {
-                set d = i;
-            };
-        }
+        let d = dv.value_or(0);
 
         // Overflow gate before the shift: past `lim` any appended digit
         // escapes i64; at `lim` only digits up to 8 (i64::MIN's last digit)
@@ -77,14 +72,13 @@ pub fn int_parse(self: str) -> i64? {
     assert("18446744073709551616".int_parse() == none); // far past, guard holds
 })
 --- performance ---
-allocations: 113
-deallocations: 113
-reallocations: 555
-bytes allocated: 3616
-instructions executed: 65160
-binary size: 7968
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 64
+instructions executed: 6941
+binary size: 7152
 --- monomorphizations ---
-__enumerate0
 __test$int_parse
 int_parse
 main
