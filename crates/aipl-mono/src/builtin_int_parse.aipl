@@ -1,13 +1,12 @@
 import {
-    &&,
     *,
-    wrapping_add as +,
     wrapping_sub as -,
     ==,
     >,
     len,
     starts_with,
     to_digit,
+    trim_while,
     value_or,
 } from builtins;
 
@@ -25,16 +24,7 @@ pub fn int_parse(self: str) -> i64? {
         return none;
     };
     // Trim leading zeros so the remaining count is *significant* digits.
-    mut lead = 0;
-    mut counting = true;
-    for (let c : body) {
-        if (counting && c == '0') {
-            set lead = lead + 1;
-        } else {
-            set counting = false;
-        };
-    }
-    let digits = body[lead..];
+    let digits = body.trim_while(|c| c == '0');
 
     // i64::MAX is 19 digits, so 20+ significant digits can never fit — reject
     // up front. This also bounds the value enough that a *single* wraparound
@@ -123,9 +113,10 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 416
-instructions executed: 12649
-binary size: 10552
+instructions executed: 8404
+binary size: 10944
 --- monomorphizations ---
+__builtin_trim_while$s0$lam1
 __test$int_parse
 int_parse
 main

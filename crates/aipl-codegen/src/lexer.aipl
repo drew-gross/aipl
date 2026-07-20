@@ -1196,11 +1196,12 @@ allocations: 1906
 deallocations: 1906
 reallocations: 0
 bytes allocated: 92936
-instructions executed: 246190
-binary size: 438600
+instructions executed: 245487
+binary size: 438992
 --- monomorphizations ---
 __builtin_int_parse
 __builtin_is_some_and$char$lam21
+__builtin_trim_while$s0$lam27
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam11
 __m1__count_while$char$s0$lam5

@@ -1156,11 +1156,11 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
-// NOTE: `all`, `is_some_and`, and `int_parse` are *not* declared here — they're
-// implemented in AIPL (`aipl-mono/src/builtin_*.aipl`), which is the single source
-// of both their body and their signature. `aipl_mono::aipl_builtin_sig_decls()`
-// feeds those signatures to the checker and codegen; see `AIPL_BUILTIN_SOURCES`
-// in aipl-mono.
+// NOTE: `all`, `is_some_and`, `int_parse`, and `trim_while` are *not* declared
+// here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`), which is
+// the single source of both their body and their signature.
+// `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
+// codegen; see `AIPL_BUILTIN_SOURCES` in aipl-mono.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // Reverse the elements of an array or the bytes of a string.
@@ -1306,6 +1306,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "is_space",
     "is_digit",
     "to_digit",
+    "trim_while",
     "value_or",
     "contains",
     "has",

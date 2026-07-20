@@ -22,6 +22,13 @@ of the dev loop. Prefer:
 But always finish a task with one full `cargo test` run as the pre-handoff
 check — targeted runs alone can miss regressions in unrelated areas.
 
+Let the tests do the verifying. Prefer running `cargo test` (targeted, then
+full) over reading generated artifacts, diffs, or output by hand to convince
+yourself a change is correct — the suite already asserts on all of it, so a
+manual pass mostly burns tokens re-checking what a green run guarantees. Only
+drop into manual inspection when a test actually fails and you need to
+understand *why*, or for the rare thing no test covers.
+
 ## Formatting
 Run `cargo fmt` at the end of every task, before handing the change back.
 The pre-handoff sequence is: full `cargo test`, then `cargo fmt`.

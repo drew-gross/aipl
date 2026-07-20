@@ -2614,10 +2614,6 @@ const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
 const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
 const RAW_STRING_COUNT_WHILE_SRC: &str = include_str!("count_while.aipl");
 const RAW_STRING_LINES_SRC: &str = include_str!("lines.aipl");
-// `trim_while` is no longer imported by `process_raw_string` (the no-trailing-
-// whitespace invariant made it unnecessary), but it's kept as a dogfooded helper
-// and still supplied to the engine so it loads alongside the others.
-const RAW_STRING_TRIM_WHILE_SRC: &str = include_str!("trim_while.aipl");
 const RAW_STRING_TRIM_PREFIX_SRC: &str = include_str!("trim_prefix.aipl");
 const RAW_STRING_TRIM_END_WHILE_SRC: &str = include_str!("trim_end_while.aipl");
 const RAW_STRING_TRIM_SUFFIX_SRC: &str = include_str!("trim_suffix.aipl");
@@ -2646,7 +2642,6 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
     ("./count_while.aipl", RAW_STRING_COUNT_WHILE_SRC),
     ("./lines.aipl", RAW_STRING_LINES_SRC),
-    ("./trim_while.aipl", RAW_STRING_TRIM_WHILE_SRC),
     ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
     ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
     ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
