@@ -859,8 +859,9 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     // `*` inside doesn't close (the whole `*/` must appear).
     let blk = [ws, TokenRule { kind: "block", matcher: Between("/*", "*/") }, ident];
     assert(
-        lex("/* a * b */x", blk)
-            == ok(toks([stok("block", 0, 11, " a * b "), tok("ident", 11, 12)])),
+        lex("/* a * b */x", blk) == ok(
+            toks([stok("block", 0, 11, " a * b "), tok("ident", 11, 12)]),
+        ),
     );
     assert(lex("/* x", blk) == err(lex_err("unterminated delimited token", 0, 4)));
 
@@ -874,13 +875,15 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     // One level of nesting: the first `*/` closes the inner comment, the second
     // closes the outer — the whole thing is one token.
     assert(
-        lex("/* a /* b */ c */x", nest)
-            == ok(toks([stok("block", 0, 17, " a /* b */ c "), tok("ident", 17, 18)])),
+        lex("/* a /* b */ c */x", nest) == ok(
+            toks([stok("block", 0, 17, " a /* b */ c "), tok("ident", 17, 18)]),
+        ),
     );
     // Two levels deep, tightly packed.
     assert(
-        lex("/* /* */ */x", nest)
-            == ok(toks([stok("block", 0, 11, " /* */ "), tok("ident", 11, 12)])),
+        lex("/* /* */ */x", nest) == ok(
+            toks([stok("block", 0, 11, " /* */ "), tok("ident", 11, 12)]),
+        ),
     );
 
     // The depth tracking is exactly the difference from `Between`: on the same
@@ -921,38 +924,31 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     // One interpolation: the head spans the open delim through the `{`, the
     // tail starts just past the `}`; the `x` inside is an ordinary ident.
     assert(
-        lex("`a{x}b`", tpls)
-            == ok(
-                toks(
-                    [stok("tpl_head", 0, 3, "a"), tok("ident", 3, 4), stok("tpl_tail", 5, 7, "b")],
-                ),
-            ),
+        lex("`a{x}b`", tpls) == ok(
+            toks([stok("tpl_head", 0, 3, "a"), tok("ident", 3, 4), stok("tpl_tail", 5, 7, "b")]),
+        ),
     );
     // Adjacent interpolations: the segment between them is the middle.
     assert(
-        lex("`{x}{y}`", tpls)
-            == ok(
-                toks(
-                    [
-                        stok("tpl_head", 0, 2, ""),
-                        tok("ident", 2, 3),
-                        stok("tpl_middle", 4, 5, ""),
-                        tok("ident", 5, 6),
-                        stok("tpl_tail", 7, 8, ""),
-                    ],
-                ),
+        lex("`{x}{y}`", tpls) == ok(
+            toks(
+                [
+                    stok("tpl_head", 0, 2, ""),
+                    tok("ident", 2, 3),
+                    stok("tpl_middle", 4, 5, ""),
+                    tok("ident", 5, 6),
+                    stok("tpl_tail", 7, 8, ""),
+                ],
             ),
+        ),
     );
 
     // Inside an interpolation the rule set governs — the skip rule drops
     // whitespace exactly as at top level.
     assert(
-        lex("`a{ x }b`", tpls)
-            == ok(
-                toks(
-                    [stok("tpl_head", 0, 3, "a"), tok("ident", 4, 5), stok("tpl_tail", 7, 9, "b")],
-                ),
-            ),
+        lex("`a{ x }b`", tpls) == ok(
+            toks([stok("tpl_head", 0, 3, "a"), tok("ident", 4, 5), stok("tpl_tail", 7, 9, "b")]),
+        ),
     );
 
     // Text escapes: `\{` doesn't open an interpolation, an escaped delim
@@ -972,33 +968,27 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     let braces = TokenRule { kind: "punct", matcher: Exact(["{", "}"]) };
     let tplb = [ws, tpl, braces, ident, int_r];
     assert(
-        lex("`a{ {x} }b`", tplb)
-            == ok(
-                toks(
-                    [
-                        stok("tpl_head", 0, 3, "a"),
-                        tok("punct", 4, 5),
-                        tok("ident", 5, 6),
-                        tok("punct", 6, 7),
-                        stok("tpl_tail", 9, 11, "b"),
-                    ],
-                ),
+        lex("`a{ {x} }b`", tplb) == ok(
+            toks(
+                [
+                    stok("tpl_head", 0, 3, "a"),
+                    tok("punct", 4, 5),
+                    tok("ident", 5, 6),
+                    tok("punct", 6, 7),
+                    stok("tpl_tail", 9, 11, "b"),
+                ],
             ),
+        ),
     );
 
     // Templates nest: a template inside an interpolation re-enters the same
     // rule — here a no-interpolation inner template between head and tail.
     assert(
-        lex("`a{`x`}b`", tpls)
-            == ok(
-                toks(
-                    [
-                        stok("tpl_head", 0, 3, "a"),
-                        stok("tpl", 3, 6, "x"),
-                        stok("tpl_tail", 7, 9, "b"),
-                    ],
-                ),
+        lex("`a{`x`}b`", tpls) == ok(
+            toks(
+                [stok("tpl_head", 0, 3, "a"), stok("tpl", 3, 6, "x"), stok("tpl_tail", 7, 9, "b")],
             ),
+        ),
     );
 
     // A multi-char delim scans like `Between` (a lone ` inside is content) and
@@ -1009,16 +999,15 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     let tpl2 = [ws, raw3, tpl, ident, int_r];
     assert(lex("```a`b\\c```", tpl2) == ok(toks([stok("rawtpl", 0, 11, "a`b\\c")])));
     assert(
-        lex("```a{x}b```", tpl2)
-            == ok(
-                toks(
-                    [
-                        stok("rawtpl_head", 0, 5, "a"),
-                        tok("ident", 5, 6),
-                        stok("rawtpl_tail", 7, 11, "b"),
-                    ],
-                ),
+        lex("```a{x}b```", tpl2) == ok(
+            toks(
+                [
+                    stok("rawtpl_head", 0, 5, "a"),
+                    tok("ident", 5, 6),
+                    stok("rawtpl_tail", 7, 11, "b"),
+                ],
             ),
+        ),
     );
     assert(lex("`hi`", tpl2) == ok(toks([stok("tpl", 0, 4, "hi")]))); // single-` still lexes
 
@@ -1031,47 +1020,43 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     let allow_t = TokenRule { kind: "allow", matcher: Exact(["#[allow]"]), trivia: true };
     let trv = [ws, cmt_t, allow_t, ident, int_r];
     assert(
-        lex("a // b\nc", trv)
-            == ok(
-                LexResult {
-                    tokens: [tok("ident", 0, 1), tok("ident", 7, 8)],
-                    trivia: [tok("comment", 2, 6)],
-                },
-            ),
+        lex("a // b\nc", trv) == ok(
+            LexResult {
+                tokens: [tok("ident", 0, 1), tok("ident", 7, 8)],
+                trivia: [tok("comment", 2, 6)],
+            },
+        ),
     );
     assert(
-        lex("x #[allow] y", trv)
-            == ok(
-                LexResult {
-                    tokens: [tok("ident", 0, 1), tok("ident", 11, 12)],
-                    trivia: [tok("allow", 2, 10)],
-                },
-            ),
+        lex("x #[allow] y", trv) == ok(
+            LexResult {
+                tokens: [tok("ident", 0, 1), tok("ident", 11, 12)],
+                trivia: [tok("allow", 2, 10)],
+            },
+        ),
     );
     // Multiple trivia rules interleave in source order in the one channel.
     assert(
-        lex("a #[allow] // b\nc", trv)
-            == ok(
-                LexResult {
-                    tokens: [tok("ident", 0, 1), tok("ident", 16, 17)],
-                    trivia: [tok("allow", 2, 10), tok("comment", 11, 15)],
-                },
-            ),
+        lex("a #[allow] // b\nc", trv) == ok(
+            LexResult {
+                tokens: [tok("ident", 0, 1), tok("ident", 16, 17)],
+                trivia: [tok("allow", 2, 10), tok("comment", 11, 15)],
+            },
+        ),
     );
     // Trivia inside a template interpolation rides up through the scan.
     let trvt = [ws, cmt_t, tpl, ident, int_r];
     assert(
-        lex("`a{x // c\n}b`", trvt)
-            == ok(
-                LexResult {
-                    tokens: [
-                        stok("tpl_head", 0, 3, "a"),
-                        tok("ident", 3, 4),
-                        stok("tpl_tail", 11, 13, "b"),
-                    ],
-                    trivia: [tok("comment", 5, 9)],
-                },
-            ),
+        lex("`a{x // c\n}b`", trvt) == ok(
+            LexResult {
+                tokens: [
+                    stok("tpl_head", 0, 3, "a"),
+                    tok("ident", 3, 4),
+                    stok("tpl_tail", 11, 13, "b"),
+                ],
+                trivia: [tok("comment", 5, 9)],
+            },
+        ),
     );
 
     // ToEol with skip: comments are dropped like whitespace, through the end
@@ -1105,8 +1090,9 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     assert(lex("1.2.3", flt) == ok(toks([tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)])));
     // Without a float rule, a dot always splits the digits.
     assert(
-        lex("1.5", [ws, int_r, dot])
-            == ok(toks([tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)])),
+        lex("1.5", [ws, int_r, dot]) == ok(
+            toks([tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)]),
+        ),
     );
 
     // Int: like a digit-run CharRun, but the token carries the parsed
@@ -1161,8 +1147,9 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     // JSON string escapes: `"a\"b"` is one string token, and `\q` is not a
     // JSON escape.
     assert(
-        lex("""["a\"b"]""", json)
-            == ok(toks([tok("punct", 0, 1), stok("str", 1, 7, "a\"b"), tok("punct", 7, 8)])),
+        lex("""["a\"b"]""", json) == ok(
+            toks([tok("punct", 0, 1), stok("str", 1, 7, "a\"b"), tok("punct", 7, 8)]),
+        ),
     );
     assert(lex("""["a\qb"]""", json) == err(lex_err("unknown escape sequence", 3, 5)));
 
@@ -1197,7 +1184,7 @@ deallocations: 1906
 reallocations: 0
 bytes allocated: 92936
 instructions executed: 245477
-binary size: 438808
+binary size: 438408
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam10
 __builtin_count_while$char$s0$lam11

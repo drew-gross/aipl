@@ -54,8 +54,9 @@ pub fn dedent(self: str) -> str {
     assert(dedent("") == "");
     // Long (heap) lines exercise the view/concat paths.
     assert(
-        dedent("        first long line\n        second long line")
-            == "first long line\nsecond long line",
+        dedent(
+            "        first long line\n        second long line",
+        ) == "first long line\nsecond long line",
     );
 })
 --- performance ---
@@ -64,7 +65,7 @@ deallocations: 35
 reallocations: 0
 bytes allocated: 1641
 instructions executed: 4865
-binary size: 8008
+binary size: 8016
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam10
 __builtin_count_while$char$s0$lam3

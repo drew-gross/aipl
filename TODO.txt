@@ -34,9 +34,11 @@ lex json
 - need recursive types for this (auto-boxing with garbage collection?)
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
+
 warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
 - unused imports
+
 output multiple errors at once
 remove install_parser_hook with lazy loader
 
@@ -56,7 +58,7 @@ negative numbers via -123 instead of 0 - 123
 
 optimize enumerate with streams
 import wrapping_mul as *
-AIPL-implemented builtin sources are valid AIPL error should include more info
+"AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
 allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl

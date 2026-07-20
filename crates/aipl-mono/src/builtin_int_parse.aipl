@@ -90,8 +90,9 @@ pub fn int_parse(self: str) -> i64? {
     // 30 leading zeros in front of a valid 19-digit i64::MAX: significant count
     // is 19, so it must still parse despite the long string.
     assert(
-        "0000000000000000000000000000009223372036854775807".int_parse()
-            == some(9223372036854775807),
+        "0000000000000000000000000000009223372036854775807".int_parse() == some(
+            9223372036854775807,
+        ),
     );
     // 20 significant digits (the smallest 20-digit number) can never fit.
     assert("10000000000000000000".int_parse() == none);

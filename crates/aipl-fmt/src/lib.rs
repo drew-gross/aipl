@@ -984,12 +984,15 @@ impl<'s> Walker<'s> {
             let lead_rhs = self.lead();
             let no_comment = matches!(&lead_rhs, Doc::Concat(v) if v.is_empty());
             let rhs = self.unary()?;
-            // A multi-line raw block (`"""` string / template) operand glues
-            // to the operator on the current line — `lhs == """` — rather
-            // than pushing the operator onto its own continuation line; it
-            // stays outside the continuation indent so its closing delimiter
-            // aligns with the statement, not one level deeper.
-            if no_comment && matches!(&rhs, Doc::RawBlock(s) if s.contains('\n')) {
+            // The operator glues to the current line — `lhs == rhs` — rather
+            // than being pushed onto its own indented continuation line. When
+            // the line is too long, the right-hand operand breaks its *own*
+            // structure (a call's argument list, a multi-line `"""` block)
+            // instead, so the closing delimiter aligns with the statement and
+            // the operator stays put. A right operand carrying a leading
+            // comment is the exception: the comment needs its own line, so
+            // that case keeps the break-before-operator layout.
+            if no_comment {
                 tail.push(concat(vec![text(" "), text(op), text(" "), rhs]));
             } else {
                 tail.push(indent(concat(vec![

@@ -12,8 +12,7 @@ pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
                 b
                 c
             """,
-        )
-            == ["a", "b", "c"],
+        ) == ["a", "b", "c"],
     );
     assert(lines("solo") == ["solo"]);
     assert(lines("") == [""]);
@@ -25,8 +24,7 @@ pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
                 b
 
             """,
-        )
-            == ["a", "b", ""],
+        ) == ["a", "b", ""],
     );
     // Every line blank.
     assert(lines("\n\n") == ["", "", ""]);
@@ -37,8 +35,7 @@ pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
                 first long line
                 second long line
             """,
-        )
-            == ["first long line", "second long line"],
+        ) == ["first long line", "second long line"],
     );
 })
 --- performance ---
@@ -47,7 +44,7 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 656
 instructions executed: 689
-binary size: 6176
+binary size: 6144
 --- monomorphizations ---
 lines
 main
