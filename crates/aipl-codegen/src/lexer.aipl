@@ -16,6 +16,7 @@ import {
     !=,
     &&,
     wrapping_add as +,
+    +++,
     wrapping_sub as -,
     <,
     ==,
@@ -81,6 +82,21 @@ struct LexError { message: str, span: Span }
 //   (`''`), a multi-char one (`'ab'`), an unknown escape, and a dangling or
 //   unterminated literal are each a distinct hard error. Byte-oriented like the
 //   rest of the library, so a multi-byte char reads as multi-char.
+// - `Template(delim, escapes)`: a template literal — text with `{expr}`
+//   interpolations. The `delim` spelling opens and closes the literal; it may
+//   be multi-char and scans like `Between` (a lone backtick under a triple-
+//   backtick delim is content). Text segments follow `escapes` as in
+//   `Delimited` (`\{` doesn't interpolate, an escaped delim doesn't close,
+//   `""` turns escapes off — the verbatim raw-template shape). A `{` in text
+//   opens an interpolation, lexed by the full rule set until the balancing
+//   `}` — so skip rules and nested template rules apply inside — with brace
+//   depth tracked and the closing `}` consumed without a token. The emitted
+//   kinds are context-dependent, derived from the rule's kind K: a literal
+//   with no interpolations is one K token; otherwise K_head (the open delim
+//   through the first `{`), each interpolation's tokens under their own
+//   rules' kinds, K_middle for each segment between interpolations, and
+//   K_tail (through the closing delim). The `skip` flag is ignored — a
+//   template always produces tokens.
 // - `ToEol(marker)`: the `marker` spelling, then everything up to (not
 //   including) the next newline. Line comments — usually `skip: true`.
 // - `Float`: a digit run that extends past a fraction (`.` plus at least one
@@ -95,6 +111,7 @@ variant Matcher =
     | Between(str, str)
     | Nested(str, str)
     | CharLit(str, str)
+    | Template(str, str)
     | ToEol(str)
     | Float
 
@@ -332,55 +349,193 @@ fn float_len(self: str) -> i64 {
     if (int_end < end) { end } else { 0 }
 }
 
-// How far `m` matches at the start of `self`: ok with the matched length (0
-// for no match — no matcher matches empty input, so a nonzero length always
-// means progress), or err when the matcher saw invalid input outright. `self`
-// is the unlexed suffix of the source; `at` is its absolute offset, used only
-// to place error spans.
-fn match_len(self: str, at: i64, m: Matcher) -> i64!LexError {
-    match (m) {
-        CharRun(first, cont) => ok(self.char_run_len(first, cont)),
-        Exact(spellings) => ok(self.longest_prefix(spellings)),
-        Keyword(spellings, boundary) => ok(self.keyword_len(spellings, boundary)),
-        Delimited(delims, escapes) => self.delimited_len(at, delims, escapes),
-        Between(open, close) => self.between_len(at, open, close),
-        Nested(open, close) => self.nested_len(at, open, close),
-        CharLit(quote, escapes) => self.char_lit_len(at, quote, escapes),
-        ToEol(marker) => ok(self.to_eol_len(marker)),
-        Float => ok(self.float_len()),
+// One lexing step's outcome: the token(s) the winning rule produced — one
+// usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
+// `Template` — and the position just past the consumed text. `end` staying at
+// the step's start means no rule matched.
+struct StepResult { tokens: Token[], end: i64 }
+
+// A simple (single-token) matcher's outcome: a decline when the matched
+// length `n` is 0, otherwise `n` chars consumed producing the rule's one
+// token — or none when the rule is `skip`.
+fn step_result(r: TokenRule, at: i64, n: i64) -> StepResult {
+    if (n == 0 || r.skip) {
+        return StepResult { tokens: [], end: at + n };
+    };
+    StepResult { tokens: [Token { kind: r.kind, span: at..at + n }], end: at + n }
+}
+
+// One lexing step at absolute position `at`: tries each rule in order (first
+// match wins) and returns the winning rule's outcome — see `StepResult`.
+// Every arm but `Template` computes how far its matcher reaches (0 for no
+// match — no matcher matches empty input, so a nonzero length always means
+// progress) and wraps it via `step_result`; a `Template`'s multi-token run
+// doesn't fit a single length, so its arm builds the outcome directly.
+// Mutually recursive with `template_scan`: an interpolation re-enters this
+// full rule set, so template literals nest.
+fn lex_step(src: str, at: i64, rules: TokenRule[]) -> StepResult!LexError {
+    for (let r : rules) {
+        let res = match (r.matcher) {
+            CharRun(first, cont) => step_result(r, at, src[at..].char_run_len(first, cont)),
+            Exact(spellings) => step_result(r, at, src[at..].longest_prefix(spellings)),
+            Keyword(spellings, boundary) => step_result(
+                r,
+                at,
+                src[at..].keyword_len(spellings, boundary),
+            ),
+            Delimited(delims, escapes) => step_result(
+                r,
+                at,
+                src[at..].delimited_len(at, delims, escapes)?,
+            ),
+            Between(open, close) => step_result(r, at, src[at..].between_len(at, open, close)?),
+            Nested(open, close) => step_result(r, at, src[at..].nested_len(at, open, close)?),
+            CharLit(quote, escapes) => step_result(
+                r,
+                at,
+                src[at..].char_lit_len(at, quote, escapes)?,
+            ),
+            Template(delim, escapes) => template_step(src, at, delim, escapes, r.kind, rules)?,
+            ToEol(marker) => step_result(r, at, src[at..].to_eol_len(marker)),
+            Float => step_result(r, at, src[at..].float_len()),
+        };
+        if (at < res.end) {
+            return ok(res);
+        };
     }
+    ok(StepResult { tokens: [], end: at })
+}
+
+// The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
+// doesn't open with `delim` (mirroring every other matcher's 0), else the
+// literal's whole token run.
+fn template_step(
+    src: str,
+    at: i64,
+    delim: str,
+    escapes: str,
+    kind: str,
+    rules: TokenRule[],
+) -> StepResult!LexError {
+    if (!src[at..].starts_with(delim)) {
+        return ok(StepResult { tokens: [], end: at });
+    };
+    template_scan(src, at, delim, escapes, kind, rules)
+}
+
+// `Template`: scans a whole template literal at `at` (the caller verified the
+// opening `delim`); the result's tokens are the literal's whole run and its
+// `end` sits just past the closing `delim`. A text segment runs until the
+// closing `delim` (matched in full, like `Between`) or a `{`, which ends the
+// segment — as K_head for the first, K_middle after — and opens an
+// interpolation (see `interp_scan`); head/middle spans include their `{`, and
+// the next segment starts just past the interpolation's `}`. The segment
+// reaching the closing `delim` is K_tail — or, when no `{` ever appeared, the
+// whole literal is one plain K token. `escapes` works as in `delimited_len`,
+// including the hard error on an unknown escape and the dangling backslash
+// falling through to run the literal out unterminated.
+fn template_scan(
+    src: str,
+    at: i64,
+    delim: str,
+    escapes: str,
+    kind: str,
+    rules: TokenRule[],
+) -> StepResult!LexError {
+    mut toks = [];
+    mut i = at + delim.len();
+    mut seg_start = at;
+    mut interps = 0;
+    while (i < src.len()) {
+        if (src[i..].starts_with(delim)) {
+            let end = i + delim.len();
+            let k = if (interps == 0) { kind } else { kind +++ "_tail" };
+            set toks.push(Token { kind: k, span: seg_start..end });
+            return ok(StepResult { tokens: toks, end });
+        };
+        let c = src[i].value_or(' '); // in bounds: the loop condition holds
+        if (c == '{') {
+            let k = if (interps == 0) { kind +++ "_head" } else { kind +++ "_middle" };
+            set toks.push(Token { kind: k, span: seg_start..i + 1 });
+            set interps = interps + 1;
+            let interp = interp_scan(src, i + 1, i, rules)?;
+            for (let t : interp.tokens) {
+                set toks.push(t);
+            }
+            set i = interp.end;
+            set seg_start = i;
+        } else {
+            if (c == '\\' && 0 < escapes.len() && i + 1 < src.len()) {
+                if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
+                    return err(LexError { message: "unknown escape sequence", span: i..i + 2 });
+                };
+                set i = i + 2;
+            } else {
+                set i = i + 1;
+            };
+        };
+    }
+    err(LexError { message: "unterminated template literal", span: at..src.len() })
+}
+
+// A template interpolation's `{ ... }` body: lexes expression tokens with the
+// full rule set from `at` (just past the opening `{`, which sits at `open`)
+// until the `}` balancing it; that closing `}` is consumed without a token —
+// it's the template's delimiter, not an expression token. Depth moves by what
+// each step consumed: a step consuming exactly `{` or `}` (a brace lexed as
+// its own token — set/dict literals, blocks) raises/lowers it, while a brace
+// buried inside a bigger token (a delimited string's content, a nested
+// template) doesn't. The result's `end` sits just past the closing `}`.
+fn interp_scan(src: str, at: i64, open: i64, rules: TokenRule[]) -> StepResult!LexError {
+    mut toks = [];
+    mut depth = 1;
+    mut i = at;
+    while (0 < depth) {
+        if (!(i < src.len())) {
+            return err(
+                LexError {
+                    message: "unterminated template literal interpolation",
+                    span: open..open + 1,
+                },
+            );
+        };
+        if (depth == 1 && src[i] == some('}')) {
+            set depth = 0;
+            set i = i + 1;
+        } else {
+            let step = lex_step(src, i, rules)?;
+            if (step.end == i) {
+                return err(LexError { message: "unexpected character", span: i..i + 1 });
+            };
+            for (let t : step.tokens) {
+                set toks.push(t);
+            }
+            if (src[i..step.end] == "{") {
+                set depth = depth + 1;
+            };
+            if (src[i..step.end] == "}") {
+                set depth = depth - 1;
+            };
+            set i = step.end;
+        };
+    }
+    ok(StepResult { tokens: toks, end: i })
 }
 
 pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     mut tokens = [];
-    mut rest = self;
-    while (0 < rest.len()) {
-        // `rest` is a suffix of `self`, so its length places the next token.
-        let start = self.len() - rest.len();
-        mut n = 0;
-        mut kind = "";
-        mut skip = false;
-
-        // First match wins: once a rule matches (`n` nonzero), later rules
-        // aren't tried. A matcher that fails outright aborts the whole lex.
-        for (let r : rules) {
-            if (n == 0) {
-                set n = rest.match_len(start, r.matcher)?;
-                if (0 < n) {
-                    set kind = r.kind;
-                    set skip = r.skip;
-                };
-            };
-        }
-        if (n == 0) {
+    mut pos = 0;
+    while (pos < self.len()) {
+        let step = lex_step(self, pos, rules)?;
+        if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
             // source with the span to show it).
-            return err(LexError { message: "unexpected character", span: start..start + 1 });
+            return err(LexError { message: "unexpected character", span: pos..pos + 1 });
         };
-        if (!skip) {
-            set tokens.push(Token { kind, span: start..start + n });
-        };
-        set rest = rest[n..];
+        for (let t : step.tokens) {
+            set tokens.push(t);
+        }
+        set pos = step.end;
     }
     ok(tokens)
 }.doc("""
@@ -388,10 +543,12 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     At each position the first rule whose matcher matches claims the token
     (so order is priority — keywords before identifiers, floats before
     ints); a `skip: true` rule consumes its match without producing a token
-    (whitespace, comments). Lexing fails with an `err` — a `LexError`
-    carrying a message and the offending span — when a byte matches no rule
-    or a matcher sees invalid input outright (an unterminated `Delimited`
-    token).
+    (whitespace, comments). A `Template` rule emits several tokens per
+    literal — head/middle/tail segments around the tokens of each `{...}`
+    interpolation, which are lexed by this same rule set. Lexing fails with
+    an `err` — a `LexError` carrying a message and the offending span — when
+    a byte matches no rule or a matcher sees invalid input outright (an
+    unterminated `Delimited` token).
 """).test({
     // A base rule set: skipped whitespace, `[A-Za-z_][A-Za-z0-9_]*`
     // identifiers, `[0-9]+` ints.
@@ -554,6 +711,91 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex("'\\", chr) == err(lex_err("unterminated char literal", 0, 2)));
     assert(lex("'x", chr) == err(lex_err("char literal must contain exactly one character", 0, 2)));
 
+    // Template: `text {expr} text`. A literal with no interpolations is one
+    // token of the rule's own kind; with interpolations it becomes kind_head,
+    // the interpolation's tokens (lexed by the full rule set), kind_middle
+    // between interpolations, and kind_tail through the closing delim.
+    let tpl = TokenRule { kind: "tpl", matcher: Template("`", "\\`{ntr") };
+    let tpls = [ws, tpl, ident, int_r];
+    assert(lex("`hi`", tpls) == ok([tok("tpl", 0, 4)]));
+    assert(lex("``", tpls) == ok([tok("tpl", 0, 2)])); // the empty template
+
+    // One interpolation: the head spans the open delim through the `{`, the
+    // tail starts just past the `}`; the `x` inside is an ordinary ident.
+    assert(
+        lex("`a{x}b`", tpls)
+            == ok([tok("tpl_head", 0, 3), tok("ident", 3, 4), tok("tpl_tail", 5, 7)]),
+    );
+    // Adjacent interpolations: the segment between them is the middle.
+    assert(
+        lex("`{x}{y}`", tpls)
+            == ok(
+                [
+                    tok("tpl_head", 0, 2),
+                    tok("ident", 2, 3),
+                    tok("tpl_middle", 4, 5),
+                    tok("ident", 5, 6),
+                    tok("tpl_tail", 7, 8),
+                ],
+            ),
+    );
+
+    // Inside an interpolation the rule set governs — the skip rule drops
+    // whitespace exactly as at top level.
+    assert(
+        lex("`a{ x }b`", tpls)
+            == ok([tok("tpl_head", 0, 3), tok("ident", 4, 5), tok("tpl_tail", 7, 9)]),
+    );
+
+    // Text escapes: `\{` doesn't open an interpolation, an escaped delim
+    // doesn't close, and an unknown escape is a hard error.
+    assert(lex("`a\\{b`", tpls) == ok([tok("tpl", 0, 6)]));
+    assert(lex("`a\\`b`", tpls) == ok([tok("tpl", 0, 6)]));
+    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence", 2, 4)));
+
+    // Unterminated: the text runs out, or an interpolation never closes (that
+    // error points at the interpolation's `{`).
+    assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
+    assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
+
+    // Brace depth: braces lexed as their own tokens inside an interpolation
+    // (via a punct rule here) nest — only the balancing `}` ends it, and that
+    // one alone produces no token.
+    let braces = TokenRule { kind: "punct", matcher: Exact(["{", "}"]) };
+    let tplb = [ws, tpl, braces, ident, int_r];
+    assert(
+        lex("`a{ {x} }b`", tplb)
+            == ok(
+                [
+                    tok("tpl_head", 0, 3),
+                    tok("punct", 4, 5),
+                    tok("ident", 5, 6),
+                    tok("punct", 6, 7),
+                    tok("tpl_tail", 9, 11),
+                ],
+            ),
+    );
+
+    // Templates nest: a template inside an interpolation re-enters the same
+    // rule — here a no-interpolation inner template between head and tail.
+    assert(
+        lex("`a{`x`}b`", tpls)
+            == ok([tok("tpl_head", 0, 3), tok("tpl", 3, 6), tok("tpl_tail", 7, 9)]),
+    );
+
+    // A multi-char delim scans like `Between` (a lone ` inside is content) and
+    // `""` escapes make the text verbatim (a backslash is content) — the
+    // raw-template shape. Order the longer-delim rule first, as with any
+    // prefix-sharing rules.
+    let raw3 = TokenRule { kind: "rawtpl", matcher: Template("```", "") };
+    let tpl2 = [ws, raw3, tpl, ident, int_r];
+    assert(lex("```a`b\\c```", tpl2) == ok([tok("rawtpl", 0, 11)]));
+    assert(
+        lex("```a{x}b```", tpl2)
+            == ok([tok("rawtpl_head", 0, 5), tok("ident", 5, 6), tok("rawtpl_tail", 7, 11)]),
+    );
+    assert(lex("`hi`", tpl2) == ok([tok("tpl", 0, 4)])); // single-` still lexes
+
     // ToEol with skip: comments are dropped like whitespace, through the end
     // of the line.
     let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
@@ -658,12 +900,12 @@ pub fn lex(self: str, rules: TokenRule[]) -> Token[]!LexError {
     assert(lex(asrc, aipl) == ok(atoks));
 })
 --- performance ---
-allocations: 320
-deallocations: 320
+allocations: 1020
+deallocations: 1020
 reallocations: 0
-bytes allocated: 20832
-instructions executed: 110094
-binary size: 189760
+bytes allocated: 50448
+instructions executed: 141480
+binary size: 260672
 --- monomorphizations ---
 __builtin_is_some_and$char$lam21
 __m1__count_while$char$s0$lam10
@@ -674,8 +916,13 @@ between_len
 char_lit_len
 delimited_len
 float_len
+interp_scan
 lex
 lex_err
+lex_step
 main
 nested_len
+step_result
+template_scan
+template_step
 tok

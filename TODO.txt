@@ -49,11 +49,6 @@ Cache monomorphizations of the same lambda
 structs with type arguments (for custom variant type for lexing)
 
 Lex aipl:
-  New matcher shapes (fit the current data-only design)
-
-  3. Escape-aware delimiter scanning — in "…" a \" must not close the string (lib.rs:2404). The close-scan needs to skip \<any> pairs.
-  4. Char-literal shape — 'x' / '\n' (lib.rs:2469): open quote, optional escape, exactly one char, close quote. A same-char Delimited("'") gets simple cases right but '\'' wrong, and can't reject '' (empty) or multi-char.
-
   New lexer machinery (changes to lex itself)
 
   6. Trivia side-channel. Skip rules currently drop spans, but the real lexer records every comment span (record_comment, lib.rs:2265 — the formatter depends on this) and every #[allow] span (record_allow, lib.rs:2283 — the lint pass depends on it). lex needs to return skipped/marker spans alongside the tokens (e.g. a result struct { tokens, comments, allows } — needs struct-with-array-fields as a result payload, or a second out-array).
