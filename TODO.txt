@@ -56,3 +56,4 @@ negative numbers via -123 instead of 0 - 123
 
 make a built in char->int? converter that leverages ascii manipulation ('8' - '0')
 optimize enumerate with streams
+import wrapping_mul as *
