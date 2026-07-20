@@ -51,3 +51,5 @@ structs with type arguments (for custom variant type for lexing)
 Unicode support
 
 str->int parsing builtin
+
+make it so builtins implemented in .aipl can call other builtins

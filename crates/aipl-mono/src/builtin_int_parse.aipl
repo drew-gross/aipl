@@ -1,0 +1,81 @@
+import { !, &&, *, wrapping_add as +, wrapping_sub as -, <, ==, >, || } from builtins;
+
+// The AIPL implementation of the `int_parse` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_int_parse`
+// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.int_parse()`
+// resolves through the ordinary machinery — the in-file name `int_parse` is
+// only for this file's own tests, which read exactly like user code. The body
+// must be self-contained (a registered builtin body can't call other
+// builtins or file helpers), which is why the digit lookup is an inline
+// counter loop rather than `enumerate`/`is_digit`.
+pub fn int_parse(self: str) -> i64? {
+    // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
+    // counterpart, so building -v digit-by-digit covers the full range and
+    // the final negation only happens on the side that can't overflow.
+    let lim = 0 - 922337203685477580;
+    let min = lim * 10 - 8;
+    let neg = self[0] == some('-');
+    let digits = if (neg) { self[1..] } else { self };
+    mut v = 0;
+    mut any = false;
+    for (let c : digits) {
+        mut d = 0 - 1;
+        mut i = 0;
+        for (let dc : "0123456789") {
+            if (dc == c) {
+                set d = i;
+            };
+            set i = i + 1;
+        }
+        if (d < 0) {
+            return none;
+        };
+
+        // Overflow gate before the shift: past `lim` any appended digit
+        // escapes i64; at `lim` only digits up to 8 (i64::MIN's last digit)
+        // still fit.
+        if (v < lim || (v == lim && d > 8)) {
+            return none;
+        };
+        set v = v * 10 - d;
+        set any = true;
+    }
+    if (!any) {
+        return none;
+    };
+    if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
+}.doc("""
+    Parse `self` as a decimal integer: an optional leading `-`, then one or
+    more ASCII digits, nothing else. `none` when the input is empty, a bare
+    `-`, contains any other character (including `+`, spaces, or `_`), or
+    doesn't fit an i64. The full range parses, including i64::MIN. Callable
+    as a method: `s.int_parse()`.
+""").test({
+    assert(int_parse("123") == some(123));
+    assert("123".int_parse() == some(123)); // method form
+    assert("0".int_parse() == some(0));
+    assert("007".int_parse() == some(7)); // leading zeros are fine
+    assert("-45".int_parse() == some(0 - 45));
+    assert("-0".int_parse() == some(0));
+    assert("".int_parse() == none);
+    assert("-".int_parse() == none); // a sign needs at least one digit
+    assert("12a3".int_parse() == none); // no trailing garbage
+    assert("+5".int_parse() == none); // no plus sign
+    assert(" 5".int_parse() == none); // no whitespace
+    assert("9223372036854775807".int_parse() == some(9223372036854775807)); // i64::MAX
+    assert("9223372036854775808".int_parse() == none); // one past MAX
+    assert("-9223372036854775808".int_parse() == some(0 - 9223372036854775807 - 1)); // i64::MIN
+    assert("-9223372036854775809".int_parse() == none); // one past MIN
+    assert("18446744073709551616".int_parse() == none); // far past, guard holds
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 64
+instructions executed: 27157
+binary size: 7384
+--- monomorphizations ---
+__test$int_parse
+int_parse
+main

@@ -17,17 +17,15 @@ import {
     !,
     !=,
     &&,
-    *,
     wrapping_add as +,
     +++,
     wrapping_sub as -,
-    /,
     <,
     ==,
     ||,
     Span,
     contains,
-    enumerate,
+    int_parse,
     is_digit,
     is_some_and,
     len,
@@ -445,31 +443,17 @@ fn unescape(self: str, escapes: str) -> str {
     out +++ self[run_start..]
 }
 
-// The value 0-9 of an ASCII digit char (the caller guarantees `self` is one).
-fn digit_value(self: char) -> i64 {
-    mut v = 0;
-    for (let (i, d) : "0123456789".enumerate()) {
-        if (d == self) {
-            set v = i;
-        };
+// `Int`'s value: the digit run parsed by the `int_parse` builtin. The
+// matcher already guarantees `text` is a nonempty pure digit run, so the
+// only way the parse can decline is overflow — mapped to the lex error here,
+// where the span is known.
+fn int_value(text: str, at: i64) -> TokenValue!LexError {
+    match (text.int_parse()) {
+        some(v) => ok(IntVal(v)),
+        none => err(
+            LexError { message: "integer literal overflows i64", span: at..at + text.len() },
+        ),
     }
-    v
-}
-
-// The digit run `self` as an i64, or an error when the value doesn't fit —
-// the overflow gate runs before each multiply, so the arithmetic can't wrap.
-fn int_parse(self: str, at: i64) -> i64!LexError {
-    mut v = 0;
-    for (let (i, c) : self.enumerate()) {
-        let d = c.digit_value();
-        if ((9223372036854775807 - d) / 10 < v) {
-            return err(
-                LexError { message: "integer literal overflows i64", span: at..at + self.len() },
-            );
-        };
-        set v = v * 10 + d;
-    }
-    ok(v)
 }
 
 // `CharLit`'s value: the one char between the quotes, escape-decoded. `text`
@@ -501,7 +485,7 @@ fn token_value(m: Matcher, text: str, at: i64) -> TokenValue!LexError {
         Template(delim, escapes) => ok(NoValue),
         ToEol(marker) => ok(NoValue),
         Float => ok(NoValue),
-        Int => ok(IntVal(text.int_parse(at)?)),
+        Int => int_value(text, at),
     }
 }
 
@@ -1208,16 +1192,15 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1951
-deallocations: 1951
-reallocations: 226
-bytes allocated: 94376
-instructions executed: 272666
-binary size: 439072
+allocations: 1904
+deallocations: 1904
+reallocations: 0
+bytes allocated: 92872
+instructions executed: 253420
+binary size: 438328
 --- monomorphizations ---
+__builtin_int_parse
 __builtin_is_some_and$char$lam21
-__enumerate29
-__enumerate30
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam11
 __m1__count_while$char$s0$lam5
@@ -1227,7 +1210,6 @@ char_lit_len
 ctok
 delimited_len
 float_len
-int_parse
 interp_scan
 itok
 lex
@@ -1240,6 +1222,5 @@ stok
 template_scan
 template_step
 tok
-token_value
 toks
 unescape

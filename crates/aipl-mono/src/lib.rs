@@ -3918,6 +3918,10 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
         "__builtin_is_some_and",
         include_str!("builtin_is_some_and.aipl"),
     ),
+    (
+        "__builtin_int_parse",
+        include_str!("builtin_int_parse.aipl"),
+    ),
 ];
 
 /// [`AIPL_BUILTIN_SOURCES`] parsed and normalized once: canonical builtin name
