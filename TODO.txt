@@ -47,9 +47,6 @@ spread in args e.g. fn foo(self: Span { start, end })
 Cache monomorphizations of the same lambda
 
 structs with type arguments (for custom variant type for lexing)
-
-  9. Token values. Terminal carries processed payloads — escaped string contents, the raw-string dedent (via the already-dogfooded process_raw_string), char byte values, parsed i64 (with overflow reported at lex time, lib.rs:2597). Our tokens are span-only; slicing covers idents/numbers, but string unescaping and the overflow check need a post-pass per kind. process_raw_string can be reused as-is.
-
-  Rough dependency order if you want a sequence: 5 (error machinery) unblocks 1–4 (the new matchers all need hard errors); 6 is independent and small; 7 is the largest and worth its own design pass; 8 needs your call on ASCII vs Unicode first.
-
+1. A variant can't ride a result payload yet — so value computation splits into a fallible unit-result value_check (the Int overflow gate; !LexError is supported) followed by an infallible token_value. Extending the language to allow variant payloads would collapse the two — a candidate future language task, not smuggled into this one.
+2. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
