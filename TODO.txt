@@ -47,6 +47,7 @@ spread in args e.g. fn foo(self: Span { start, end })
 Cache monomorphizations of the same lambda
 
 structs with type arguments (for custom variant type for lexing)
-1. A variant can't ride a result payload yet — so value computation splits into a fallible unit-result value_check (the Int overflow gate; !LexError is supported) followed by an infallible token_value. Extending the language to allow variant payloads would collapse the two — a candidate future language task, not smuggled into this one.
-2. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
+1. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
+
+str->int parsing builtin

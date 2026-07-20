@@ -456,51 +456,20 @@ fn digit_value(self: char) -> i64 {
     v
 }
 
-// `Int`'s overflow gate: err when the digit run `text` doesn't fit an i64 —
-// caught before the multiply would wrap. Split from `int_parse` because a
-// variant (`TokenValue`) can't ride a result payload yet, so the fallible
-// part returns unit and the value computation is infallible.
-fn int_check(text: str, at: i64) -> !LexError {
+// The digit run `self` as an i64, or an error when the value doesn't fit —
+// the overflow gate runs before each multiply, so the arithmetic can't wrap.
+fn int_parse(self: str, at: i64) -> i64!LexError {
     mut v = 0;
-    for (let (i, c) : text.enumerate()) {
+    for (let (i, c) : self.enumerate()) {
         let d = c.digit_value();
         if ((9223372036854775807 - d) / 10 < v) {
             return err(
-                LexError { message: "integer literal overflows i64", span: at..at + text.len() },
+                LexError { message: "integer literal overflows i64", span: at..at + self.len() },
             );
         };
         set v = v * 10 + d;
     }
-    ok()
-}
-
-// The digit run `text` as an i64. The caller ran `int_check` first, so the
-// arithmetic can't wrap.
-fn int_parse(self: str) -> i64 {
-    mut v = 0;
-    for (let (i, c) : self.enumerate()) {
-        set v = v * 10 + c.digit_value();
-    }
-    v
-}
-
-// The fallible half of value computation: matchers whose value can be
-// invalid even though the text matched — only `Int`'s overflow today —
-// reject here; everything else passes. Run before `token_value`.
-fn value_check(m: Matcher, text: str, at: i64) -> !LexError {
-    match (m) {
-        CharRun(first, cont) => ok(),
-        Exact(spellings) => ok(),
-        Keyword(spellings, boundary) => ok(),
-        Delimited(delims, escapes) => ok(),
-        Between(open, close) => ok(),
-        Nested(open, close) => ok(),
-        CharLit(quote, escapes) => ok(),
-        Template(delim, escapes) => ok(),
-        ToEol(marker) => ok(),
-        Float => ok(),
-        Int => int_check(text, at),
-    }
+    ok(v)
 }
 
 // `CharLit`'s value: the one char between the quotes, escape-decoded. `text`
@@ -516,22 +485,23 @@ fn char_lit_value(text: str, quote: str) -> TokenValue {
 
 // The value a token of matcher `m` carries, computed from its matched `text`
 // (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
-// Infallible: the caller ran `value_check` first. `Template` returns
-// `NoValue` here only because its tokens are built inside `template_scan`,
-// which attaches each segment's value itself.
-fn token_value(m: Matcher, text: str) -> TokenValue {
+// Fallible because a value can be invalid even though the text matched (an
+// `Int` run that overflows). `Template` returns `NoValue` here only because
+// its tokens are built inside `template_scan`, which attaches each segment's
+// value itself.
+fn token_value(m: Matcher, text: str, at: i64) -> TokenValue!LexError {
     match (m) {
-        CharRun(first, cont) => NoValue,
-        Exact(spellings) => NoValue,
-        Keyword(spellings, boundary) => NoValue,
-        Delimited(delims, escapes) => StrVal(text[1..text.len() - 1].unescape(escapes)),
-        Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        CharLit(quote, escapes) => char_lit_value(text, quote),
-        Template(delim, escapes) => NoValue,
-        ToEol(marker) => NoValue,
-        Float => NoValue,
-        Int => IntVal(text.int_parse()),
+        CharRun(first, cont) => ok(NoValue),
+        Exact(spellings) => ok(NoValue),
+        Keyword(spellings, boundary) => ok(NoValue),
+        Delimited(delims, escapes) => ok(StrVal(text[1..text.len() - 1].unescape(escapes))),
+        Between(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
+        Nested(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
+        CharLit(quote, escapes) => ok(char_lit_value(text, quote)),
+        Template(delim, escapes) => ok(NoValue),
+        ToEol(marker) => ok(NoValue),
+        Float => ok(NoValue),
+        Int => ok(IntVal(text.int_parse(at)?)),
     }
 }
 
@@ -559,8 +529,7 @@ fn step_result(r: TokenRule, src: str, at: i64, n: i64) -> StepResult!LexError {
             },
         );
     };
-    value_check(r.matcher, src[at..at + n], at)?;
-    let v = token_value(r.matcher, src[at..at + n]);
+    let v = token_value(r.matcher, src[at..at + n], at)?;
     ok(
         StepResult {
             tokens: [Token { kind: r.kind, span: at..at + n, value: v }],
@@ -1239,17 +1208,16 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1985
-deallocations: 1985
-reallocations: 351
-bytes allocated: 95464
-instructions executed: 282590
-binary size: 440200
+allocations: 1951
+deallocations: 1951
+reallocations: 226
+bytes allocated: 94376
+instructions executed: 272666
+binary size: 439072
 --- monomorphizations ---
-__builtin_is_some_and$char$lam22
-__enumerate12
-__enumerate27
-__enumerate28
+__builtin_is_some_and$char$lam21
+__enumerate29
+__enumerate30
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam11
 __m1__count_while$char$s0$lam5
@@ -1258,9 +1226,8 @@ between_len
 char_lit_len
 ctok
 delimited_len
-digit_value
 float_len
-int_check
+int_parse
 interp_scan
 itok
 lex
@@ -1273,5 +1240,6 @@ stok
 template_scan
 template_step
 tok
+token_value
 toks
 unescape

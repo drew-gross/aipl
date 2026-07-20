@@ -1,0 +1,68 @@
+import { wrapping_add as +, +++, == } from builtins;
+
+// A result payload (either side) may be a variant. Variants ride the same
+// generic composite machinery as struct payloads (struct/variant layout
+// resolution is unified), so construction, `match` binding, `==`, and `?`
+// all work, including refcounting of heap-carrying arms (the str payloads
+// below) — the allocation accounting confirms retain/drop stay in balance.
+variant Shape = Empty | Square(i64) | Named(str)
+
+fn shape(n: i64) -> Shape!str {
+    if (n == 0) { ok(Empty) } else { if (n == 1) { ok(Square(4)) } else { err("unknown shape") } }
+}.test({
+    assert(shape(0) == ok(Empty));
+    assert(shape(1) == ok(Square(4)));
+    assert(shape(9) == err("unknown shape"));
+
+    // The payload binds in a match arm like any other, and matches on
+    // through its own arms.
+    match (shape(1)) {
+        ok(s) => match (s) {
+            Empty => assert(false),
+            Square(side) => assert(side == 4),
+            Named(name) => assert(false),
+        },
+        err(e) => assert(false),
+    };
+})
+
+// A heap-carrying arm as the Ok payload.
+fn label(s: str) -> Shape!str { ok(Named(s +++ "!")) }.test({
+    assert(label("hi") == ok(Named("hi!")));
+})
+
+// Err side: a variant error type.
+variant Fail = NotFound | Parse(str)
+
+fn get(n: i64) -> i64!Fail {
+    if (n == 0) {
+        err(NotFound)
+    } else {
+        if (n == 1) { err(Parse("bad digit")) } else { ok(n + 1) }
+    }
+}.test({
+    assert(get(0) == err(NotFound));
+    assert(get(1) == err(Parse("bad digit")));
+    assert(get(4) == ok(5));
+})
+
+// `?` propagates through a variant-error result.
+fn double(n: i64) -> i64!Fail {
+    let v = get(n)?;
+    ok(v + v)
+}.test({
+    assert(double(4) == ok(10));
+    assert(double(0) == err(NotFound));
+    assert(double(1) == err(Parse("bad digit")));
+})
+
+fn main() {}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 552
+--- monomorphizations ---
+main
