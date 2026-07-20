@@ -48,10 +48,11 @@ pub fn int_parse(self: str) -> i64? {
 
     // Accumulate *negative* so every magnitude fits: i64::MIN has no positive
     // counterpart, so building -v digit-by-digit covers the full range and the
-    // final negation only happens on the side that can't overflow. With leading
-    // zeros trimmed the first digit drives v strictly negative, so any i64
-    // overflow (now necessarily a single wrap) lands positive: `v > 0` detects
-    // it. Leading zeros were trimmed, so `digits` here has no zero-only prefix.
+    // final negation only happens on the side that can't overflow. The
+    // arithmetic wraps (mod 2^64), so the final v is `-N mod 2^64` regardless of
+    // intermediate wrapping — and with N < 10^19 < 2^64 (the >19-digit guard
+    // above), that final value is positive exactly when N > i64::MAX. So one
+    // `v > 0` check *after* the loop detects overflow; it needn't run per digit.
     mut v = 0;
     for (let c : digits) {
         let dv = c.to_digit();
@@ -59,10 +60,10 @@ pub fn int_parse(self: str) -> i64? {
             return none;
         };
         set v = v * 10 - dv.value_or(0);
-        if (v > 0) {
-            return none;
-        };
     }
+    if (v > 0) {
+        return none;
+    };
 
     // The one non-wrapping overflow: a positive value equal to -i64::MIN, whose
     // negation can't be represented (e.g. "9223372036854775808").
@@ -122,7 +123,7 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 416
-instructions executed: 13408
+instructions executed: 12649
 binary size: 10552
 --- monomorphizations ---
 __test$int_parse

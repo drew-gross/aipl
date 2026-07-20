@@ -52,8 +52,8 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 192
-instructions executed: 6411
-binary size: 4912
+instructions executed: 5881
+binary size: 4888
 --- monomorphizations ---
 __builtin_int_parse
 main
