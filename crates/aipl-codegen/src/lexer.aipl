@@ -1196,8 +1196,8 @@ allocations: 1946
 deallocations: 1946
 reallocations: 210
 bytes allocated: 94216
-instructions executed: 268032
-binary size: 438792
+instructions executed: 267948
+binary size: 438808
 --- monomorphizations ---
 __builtin_int_parse
 __builtin_is_some_and$char$lam21

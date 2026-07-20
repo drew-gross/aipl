@@ -9,6 +9,7 @@ import {
     ||,
     enumerate,
     is_digit,
+    len,
     starts_with,
 } from builtins;
 
@@ -27,8 +28,10 @@ pub fn int_parse(self: str) -> i64? {
     let min = lim * 10 - 8;
     let neg = self.starts_with("-");
     let digits = if (neg) { self[1..] } else { self };
+    if (digits.len() == 0) {
+        return none;
+    };
     mut v = 0;
-    mut any = false;
     for (let c : digits) {
         if (!c.is_digit()) {
             return none;
@@ -47,11 +50,7 @@ pub fn int_parse(self: str) -> i64? {
             return none;
         };
         set v = v * 10 - d;
-        set any = true;
     }
-    if (!any) {
-        return none;
-    };
     if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
 }.doc("""
     Parse `self` as a decimal integer: an optional leading `-`, then one or
@@ -82,8 +81,8 @@ allocations: 113
 deallocations: 113
 reallocations: 555
 bytes allocated: 3616
-instructions executed: 65377
-binary size: 7952
+instructions executed: 65160
+binary size: 7968
 --- monomorphizations ---
 __enumerate0
 __test$int_parse

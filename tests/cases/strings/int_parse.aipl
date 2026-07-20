@@ -52,8 +52,8 @@ allocations: 88
 deallocations: 88
 reallocations: 430
 bytes allocated: 2816
-instructions executed: 50576
-binary size: 5176
+instructions executed: 50397
+binary size: 5192
 --- monomorphizations ---
 __builtin_int_parse
 __enumerate0
