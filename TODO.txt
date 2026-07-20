@@ -50,10 +50,19 @@ structs with type arguments (for custom variant type for lexing)
 1. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
 
-int_parse should be able to be faster by detecting error via checking if a wrap happened
+int_parse improvements:
+- check if length of non-zero digits is > 19 - if yes can't ever fit
+- check for overflow with > 0 comparison at the end. If yes, we wrapped. Can't wrap all the way back to negative because of length check.
+- use trim_while after we make it so we can import it.
+- char to digit via builtin instead of .enumerate() loop.
+
 
 negative numbers via -123 instead of 0 - 123
 
 make a built in char->int? converter that leverages ascii manipulation ('8' - '0')
 optimize enumerate with streams
 import wrapping_mul as *
+import trim_while/count_while in int_parse
+AIPL-implemented builtin sources are valid AIPL error should include more info
+make it so builtin .aipl files can contain helper functions
+make it so functions can call functions defined later in the file
