@@ -1,0 +1,60 @@
+import { !, wrapping_sub as -, ==, int_parse } from builtins;
+
+// `int_parse` parses a decimal integer — an optional leading `-`, then one or
+// more ASCII digits, nothing else — as `i64?`: `none` for empty input, a bare
+// sign, any other character, or a value outside i64. It is implemented in
+// AIPL (`aipl-mono/src/builtin_int_parse.aipl`) and its body calls other
+// builtins (`starts_with`, `is_digit`, `enumerate`), so this also exercises
+// the loader pass that lets an AIPL-implemented builtin's body call builtins.
+// Each check returns a distinct exit code so a failure pinpoints which one
+// broke; all passing exits 0.
+fn main() -> i64 {
+    if (!("123".int_parse() == some(123))) {
+        return 1;
+    };
+    if (!("-45".int_parse() == some(0 - 45))) {
+        return 2;
+    };
+    if (!("007".int_parse() == some(7))) {
+        return 3;
+    }; // leading zeros are fine
+    if (!("".int_parse() == none)) {
+        return 4;
+    };
+    if (!("-".int_parse() == none)) {
+        return 5;
+    }; // a sign needs a digit
+    if (!("12a3".int_parse() == none)) {
+        return 6;
+    }; // no trailing garbage
+    if (!("+5".int_parse() == none)) {
+        return 7;
+    }; // no plus sign
+    if (!("9223372036854775807".int_parse() == some(9223372036854775807))) {
+        return 8;
+    }; // i64::MAX
+    if (!("9223372036854775808".int_parse() == none)) {
+        return 9;
+    }; // one past MAX
+    if (!("-9223372036854775808".int_parse() == some(0 - 9223372036854775807 - 1))) {
+        return 10;
+    }; // i64::MIN
+    if (!("-9223372036854775809".int_parse() == none)) {
+        return 11;
+    }; // one past MIN
+    0
+}
+--- stdout ---
+--- exit code ---
+0
+--- performance ---
+allocations: 88
+deallocations: 88
+reallocations: 430
+bytes allocated: 2816
+instructions executed: 50576
+binary size: 5176
+--- monomorphizations ---
+__builtin_int_parse
+__enumerate0
+main

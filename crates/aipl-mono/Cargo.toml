@@ -11,6 +11,10 @@ aipl-syntax = { workspace = true }
 # for builtin calls substitutes the same declared signatures the checker uses,
 # instead of a hand-maintained duplicate.
 aipl-parser = { workspace = true }
+# Loads the AIPL-implemented builtin sources (`AIPL_BUILTIN_SOURCES`) through
+# the real loader, so their `import { .. } from builtins;` resolves and their
+# bodies can call other builtins — same rewriting user code gets.
+aipl-loader = { workspace = true }
 
 [lib]
 path = "src/lib.rs"

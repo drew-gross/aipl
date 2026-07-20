@@ -3897,10 +3897,13 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 ///
 /// Each entry is `(canonical name, source)`. The source declares exactly one
 /// `pub fn` — under the builtin's user-facing spelling, so the file's tests
-/// read like user code — plus any private helpers those tests need. Only the
-/// `pub fn` is registered (under the canonical `__builtin_*` name, which no
-/// user identifier can spell), so its body must be self-contained: no calls to
-/// the file's helpers or to itself. This table is the *single source* of both
+/// read like user code — plus any private helpers those tests need. The source
+/// is run through the real loader ([`load_aipl_builtin_fn`]), so the body may
+/// call *other builtins* the file imports (`import { .. } from builtins;` —
+/// references rewrite to their canonical names exactly as in user code). Only
+/// the `pub fn` is registered (under the canonical `__builtin_*` name, which no
+/// user identifier can spell), so the body still can't call the file's private
+/// helpers or itself. This table is the *single source* of both
 /// the builtin's body and its signature: it is **not** re-declared in
 /// [`BUILTIN_SIGNATURES`]; instead [`aipl_builtin_sig_decls`] extracts the
 /// signature from the same `pub fn` and feeds it to the checker and codegen's
@@ -3924,27 +3927,36 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ),
 ];
 
-/// [`AIPL_BUILTIN_SOURCES`] parsed and normalized once: canonical builtin name
-/// → generic template. Parsing needs the parser hooks installed, like any
-/// in-process parse — which every `monomorphize` caller already satisfies,
-/// having parsed the program it passes in.
+/// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real
+/// loader rather than a bare parse: the file's `import { .. } from builtins;`
+/// resolves and every imported reference in the body rewrites to its canonical
+/// `__builtin_*` name — so a builtin's body calls other builtins with exactly
+/// the spelling and semantics user code gets. Loading (which parses) needs the
+/// parser hooks installed, like any in-process parse — which every caller
+/// already satisfies, having parsed the program it operates on.
+fn load_aipl_builtin_fn(src: &str) -> Function {
+    let program = aipl_loader::load_program_str(src, DebugOptions::default())
+        .expect("AIPL-implemented builtin sources are valid AIPL");
+    program
+        .items
+        .into_iter()
+        .find_map(|item| match item {
+            Item::Fn(f) if f.is_pub => Some(f),
+            _ => None,
+        })
+        .expect("an AIPL-implemented builtin source declares its builtin as pub fn")
+}
+
+/// [`AIPL_BUILTIN_SOURCES`] loaded and normalized once: canonical builtin name
+/// → generic template.
 fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
     static GENERICS: OnceLock<HashMap<String, Generic>> = OnceLock::new();
     GENERICS.get_or_init(|| {
         AIPL_BUILTIN_SOURCES
             .iter()
             .map(|(canonical, src)| {
-                let program = aipl_parser::parse(src)
-                    .expect("AIPL-implemented builtin sources are valid AIPL");
-                let f = program
-                    .items
-                    .iter()
-                    .find_map(|item| match item {
-                        Item::Fn(f) if f.is_pub => Some(f),
-                        _ => None,
-                    })
-                    .expect("an AIPL-implemented builtin source declares its builtin as pub fn");
-                let g = normalize(f).expect("AIPL-implemented builtin signatures normalize");
+                let f = load_aipl_builtin_fn(src);
+                let g = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
                 (canonical.to_string(), g)
             })
             .collect()
@@ -3957,22 +3969,14 @@ fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
 /// (the checker's builtin decls, codegen's call-site signature registry) see an
 /// AIPL-implemented builtin's signature without it being duplicated there — the
 /// `pub fn` in the `.aipl` source is the single source of the signature. The
-/// body is kept (it type-checks — operators are native AST nodes, so no imports
-/// are needed) so the decl is a complete, checkable function.
+/// body is kept (it type-checks — operators are native AST nodes, and calls to
+/// other builtins are already rewritten to their canonical names by the loader)
+/// so the decl is a complete, checkable function.
 pub fn aipl_builtin_sig_decls() -> Vec<Item> {
     AIPL_BUILTIN_SOURCES
         .iter()
         .map(|(canonical, src)| {
-            let program =
-                aipl_parser::parse(src).expect("AIPL-implemented builtin sources are valid AIPL");
-            let mut f = program
-                .items
-                .into_iter()
-                .find_map(|item| match item {
-                    Item::Fn(f) if f.is_pub => Some(f),
-                    _ => None,
-                })
-                .expect("an AIPL-implemented builtin source declares its builtin as pub fn");
+            let mut f = load_aipl_builtin_fn(src);
             f.name = canonical.to_string();
             f.test_body = None;
             f.doc = None;

@@ -1192,15 +1192,16 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1904
-deallocations: 1904
-reallocations: 0
-bytes allocated: 92872
-instructions executed: 253420
-binary size: 438328
+allocations: 1946
+deallocations: 1946
+reallocations: 210
+bytes allocated: 94216
+instructions executed: 268032
+binary size: 438792
 --- monomorphizations ---
 __builtin_int_parse
 __builtin_is_some_and$char$lam21
+__enumerate26
 __m1__count_while$char$s0$lam10
 __m1__count_while$char$s0$lam11
 __m1__count_while$char$s0$lam5

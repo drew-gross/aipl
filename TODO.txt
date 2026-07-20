@@ -50,6 +50,6 @@ structs with type arguments (for custom variant type for lexing)
 1. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
 
-str->int parsing builtin
+int_parse should be able to be faster by detecting error via checking if a wrap happened
 
-make it so builtins implemented in .aipl can call other builtins
+negative numbers via -123 instead of 0 - 123
