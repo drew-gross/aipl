@@ -9163,6 +9163,19 @@ fn variant_ctor(
     structs: &HashMap<String, TypeDef>,
     name: &str,
 ) -> Option<(String, usize, Vec<(u32, Type)>)> {
+    // A generic-variant construction is rewritten by mono to the instance-
+    // qualified form `<ctor>@<instance>` (constructors are shared by name across
+    // instances, so the bare name is ambiguous); resolve it in that one instance.
+    if let Some((ctor, inst)) = name.split_once('@') {
+        let vl = structs.get(inst)?.as_variant()?;
+        let (tag, case) = vl.case(ctor)?;
+        let fields = case
+            .fields
+            .iter()
+            .map(|f| (f.offset, f.ty.clone()))
+            .collect();
+        return Some((inst.to_string(), tag, fields));
+    }
     for (vname, def) in structs {
         if let Some(vl) = def.as_variant() {
             if let Some((tag, case)) = vl.case(name) {

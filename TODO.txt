@@ -48,7 +48,6 @@ spread in args e.g. fn foo(self: Span { start, end })
 
 Cache monomorphizations of the same lambda
 
-structs with type arguments (for custom variant type for lexing)
 1. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
 

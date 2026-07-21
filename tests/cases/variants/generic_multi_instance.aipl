@@ -1,0 +1,46 @@
+import { wrapping_add as +, +++, ==, print, to_str } from builtins;
+
+// A generic variant may now be instantiated at several type arguments in one
+// program. Each instance (`Wrap$i64`, `Wrap$str`) is a distinct monomorphic
+// variant; the shared constructor names (`Val`, `Pair`) resolve to the right
+// instance — by the argument type at a construction, and by the scrutinee type
+// in a `match`. (A nullary constructor, which no argument pins, is resolved
+// only when the template has a single instance — see `generic_option`.)
+variant Wrap<T> = Val(T) | Pair(T, T)
+
+fn combine_i(w: Wrap<i64>) -> i64 {
+    match (w) {
+        Val(v) => v,
+        Pair(a, b) => a + b,
+    }
+}
+
+fn combine_s(w: Wrap<str>) -> str {
+    match (w) {
+        Val(v) => v,
+        Pair(a, b) => a +++ b,
+    }
+}
+
+fn main() !prints {
+    print(to_str(combine_i(Val(5))));
+    print(to_str(combine_i(Pair(2, 3))));
+    print(combine_s(Val("hi")));
+    print(combine_s(Pair("a", "b")));
+}
+--- stdout ---
+5
+5
+hi
+ab
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 157
+binary size: 2464
+--- monomorphizations ---
+combine_i
+combine_s
+main

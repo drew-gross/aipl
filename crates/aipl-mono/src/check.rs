@@ -126,6 +126,12 @@ struct Cx<'a> {
     generic_structs: &'a HashMap<String, StructDecl>,
     /// Generic variant templates by name (`Opt` → its `VariantDecl`).
     generic_variants: &'a HashMap<String, VariantDecl>,
+    /// Constructor name → the *generic* variant template it belongs to. A
+    /// construction of one resolves to a specific instance by inferring the
+    /// template's type arguments from the constructor's payload (or the expected
+    /// type). Its constructors are shared by name across every instance, so they
+    /// aren't in the unique `ctors` map.
+    generic_ctors: &'a HashMap<String, String>,
     sigs: &'a HashMap<String, Signature>,
     /// The declared return type of the function currently being checked (with
     /// type-vars substituted), so a `return value;` can be checked against it.
@@ -295,6 +301,34 @@ impl<'a> Cx<'a> {
         None
     }
 
+    /// The single existing instance of generic-variant template `base`, if
+    /// exactly one has been synthesized (`Opt` → `Opt$i64` when only `Opt<i64>`
+    /// is used). `None` if there are zero or several — the latter being an
+    /// ambiguity a nullary construction can't resolve.
+    fn sole_instance(&self, base: &str) -> Option<String> {
+        let prefix = format!("{base}$");
+        let mut names: Vec<String> = self
+            .variants
+            .keys()
+            .filter(|n| n.starts_with(&prefix))
+            .cloned()
+            .collect();
+        names.extend(
+            self.syn_variants
+                .borrow()
+                .keys()
+                .filter(|n| n.starts_with(&prefix))
+                .cloned(),
+        );
+        names.sort();
+        names.dedup();
+        if names.len() == 1 {
+            names.pop()
+        } else {
+            None
+        }
+    }
+
     /// Register (if new) the monomorphic instance of generic `base` applied to
     /// concrete `args`, returning its synthetic name.
     fn instantiate_generic(&self, base: &str, args: &[Type]) -> Result<String, Error> {
@@ -412,6 +446,94 @@ impl<'a> Cx<'a> {
         }
         Ok(Type::Named(inst))
     }
+
+    /// Infer and check a generic-variant construction `Some(5)` / `Nothing`:
+    /// bind the template's type variables from the constructor's argument types
+    /// (or, when they don't pin every variable, from the expected return type),
+    /// instantiate, and check the arguments against the concrete payload. Returns
+    /// the instance type.
+    fn infer_generic_variant_ctor(
+        &self,
+        base: &str,
+        ctor: &str,
+        args: &[Expr],
+        env: &Env,
+        effects: &[String],
+        span: Span,
+    ) -> Result<Type, Error> {
+        let tmpl = self.generic_variants.get(base).expect("caller checked");
+        let case = tmpl
+            .cases
+            .iter()
+            .find(|c| c.name == ctor)
+            .expect("ctor belongs to this template");
+        if args.len() != case.payload.len() {
+            return Err(Error::at(
+                format!(
+                    "constructor {ctor:?} expects {} argument(s), got {}",
+                    case.payload.len(),
+                    args.len()
+                ),
+                span.clone(),
+            ));
+        }
+        let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+        let mut map: HashMap<String, Type> = HashMap::new();
+        let mut arg_tys: Vec<(Type, Span)> = Vec::with_capacity(args.len());
+        for (arg, pty) in args.iter().zip(&case.payload) {
+            let at = self.check_expr(arg, env, effects)?;
+            self.bind_field(pty, &at, &vars, &mut map);
+            arg_tys.push((at, arg.span.clone()));
+        }
+        // Resolve the type arguments from the constructor's payload. A variable
+        // that no argument pins (a nullary case like `Nothing`) falls back to the
+        // template's sole existing instance when there is exactly one — the
+        // unambiguous common case; with several instances it's a clear error.
+        let sole: Option<Vec<Type>> = if map.len() < tmpl.type_vars.len() {
+            self.sole_instance(base)
+                .and_then(|inst| self.instance_args(&inst).map(|(_, a)| a))
+        } else {
+            None
+        };
+        let type_args: Vec<Type> = tmpl
+            .type_vars
+            .iter()
+            .enumerate()
+            .map(|(i, tv)| {
+                map.get(&tv.name)
+                    .cloned()
+                    .or_else(|| sole.as_ref().map(|a| a[i].clone()))
+                    .ok_or_else(|| {
+                        Error::at(
+                            format!(
+                                "cannot infer type parameter {:?} of generic variant {base:?} \
+                                 — a constructor argument or a single existing instance must \
+                                 determine it",
+                                tv.name
+                            ),
+                            span.clone(),
+                        )
+                    })
+            })
+            .collect::<Result<_, _>>()?;
+        let inst = self.instantiate_generic(base, &type_args)?;
+        // Check each argument against the concrete (substituted) payload type.
+        let cases = self.variant_cases(&inst).expect("just instantiated");
+        let payload = cases
+            .iter()
+            .find(|(n, _)| n == ctor)
+            .map(|(_, p)| p.clone())
+            .expect("ctor present in instance");
+        for ((at, aspan), pty) in arg_tys.iter().zip(&payload) {
+            expect(
+                at,
+                pty,
+                &format!("constructor {ctor:?} argument"),
+                aspan.clone(),
+            )?;
+        }
+        Ok(Type::Named(inst))
+    }
 }
 
 /// Type-check `program`. Returns the first error found, or `Ok` if every
@@ -426,6 +548,11 @@ pub fn check(program: &Program) -> Result<(), Error> {
     let mut generic_structs: HashMap<String, StructDecl> = HashMap::new();
     let mut generic_variants: HashMap<String, VariantDecl> = HashMap::new();
     let mut sigs: HashMap<String, Signature> = HashMap::new();
+    // Pass 1: collect declarations (templates and concrete decls). Constructor
+    // registration is deferred to pass 2, since a *generic-variant instance*
+    // (synthesized by lower_generics, so it appears before its template in the
+    // item list) shares its constructors with the template and every sibling
+    // instance — those are resolved by type, not through the unique `ctors` map.
     for item in &program.items {
         match item {
             Item::Struct(s) if s.is_generic() => {
@@ -441,20 +568,9 @@ pub fn check(program: &Program) -> Result<(), Error> {
                 );
             }
             Item::Variant(v) if v.is_generic() => {
-                // A generic variant's constructors register concretely once it's
-                // instantiated (its instance is an ordinary named variant); the
-                // template itself carries no constructors into `ctors`.
                 generic_variants.insert(v.name.clone(), v.clone());
             }
             Item::Variant(v) => {
-                for c in &v.cases {
-                    if ctors.insert(c.name.clone(), v.name.clone()).is_some() {
-                        return Err(Error::msg(format!(
-                            "duplicate variant constructor {:?}",
-                            c.name
-                        )));
-                    }
-                }
                 variants.insert(
                     v.name.clone(),
                     v.cases
@@ -469,6 +585,27 @@ pub fn check(program: &Program) -> Result<(), Error> {
             Item::Import(_) => {}
         }
     }
+    // A generic-variant template's constructors: `ctor` → template base name. A
+    // construction of one of these resolves to a specific instance by inference.
+    let mut generic_ctors: HashMap<String, String> = HashMap::new();
+    for (base, tmpl) in &generic_variants {
+        for c in &tmpl.cases {
+            generic_ctors.insert(c.name.clone(), base.clone());
+        }
+    }
+    // Pass 2: register the constructors of concrete, *non-instance* variants in
+    // the unique `ctors` map. A generic-variant instance's constructors are
+    // skipped (shared by name; resolved via `generic_ctors` + inference).
+    for (vn, cases) in &variants {
+        if is_variant_instance(vn, &generic_variants) {
+            continue;
+        }
+        for (c, _) in cases {
+            if ctors.insert(c.clone(), vn.clone()).is_some() {
+                return Err(Error::msg(format!("duplicate variant constructor {c:?}")));
+            }
+        }
+    }
 
     let cx = Cx {
         structs: &structs,
@@ -478,6 +615,7 @@ pub fn check(program: &Program) -> Result<(), Error> {
         ctors: &ctors,
         generic_structs: &generic_structs,
         generic_variants: &generic_variants,
+        generic_ctors: &generic_ctors,
         sigs: &sigs,
         current_ret: std::cell::RefCell::new(Type::Unit),
     };
@@ -1101,6 +1239,12 @@ impl Cx<'_> {
                 } else if let Some(vn) = self.ctors.get(name) {
                     self.expect_nullary_ctor(name, vn, span.clone())?;
                     Type::Named(vn.clone())
+                } else if self.generic_ctors.contains_key(name) {
+                    // A nullary constructor of a generic variant (`Nothing`):
+                    // its instance can't be inferred from a (missing) payload, so
+                    // it's resolved from the expected type.
+                    let base = &self.generic_ctors[name];
+                    self.infer_generic_variant_ctor(base, name, &[], env, effects, span.clone())?
                 } else if let Some(sig) = self.sigs.get(name.as_str()) {
                     // A named function as a first-class value: its type is the
                     // corresponding `Type::Fn`. A runtime function value is a
@@ -1777,6 +1921,11 @@ impl Cx<'_> {
                     )?;
                 }
                 return Ok(Type::Named(vn.clone()));
+            }
+            // A constructor of a generic variant template: resolve to a concrete
+            // instance by inferring the type arguments.
+            if let Some(base) = self.generic_ctors.get(name) {
+                return self.infer_generic_variant_ctor(base, name, args, env, effects, span);
             }
         }
         // Integer conversion builtins `i8(x)`/`i32(x)`/`u64(x)`/… — like the
@@ -2872,6 +3021,21 @@ fn merge(a: Type, b: Type) -> Type {
 /// matching it structurally against `arg_ty`. Best-effort: unmatched structure
 /// and conflicts are ignored (the first binding wins), keeping the checker
 /// permissive and leaving the concrete fit to codegen.
+/// Whether `name` is a synthesized generic-*variant* instance (e.g. `Opt$i64`):
+/// its base (before the first `$`) is a generic-variant template. `$` can't
+/// appear in a source name, so this reliably distinguishes instances from
+/// ordinary variants.
+pub(crate) fn is_variant_instance(
+    name: &str,
+    generic_variants: &HashMap<String, VariantDecl>,
+) -> bool {
+    name.contains('$')
+        && name
+            .split('$')
+            .next()
+            .is_some_and(|base| generic_variants.contains_key(base))
+}
+
 /// Every type variable in declaration order, resolved from `map`, or `None` if
 /// any is still unbound.
 pub(crate) fn collect_args(

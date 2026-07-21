@@ -1,0 +1,71 @@
+import { ==, print, to_str } from builtins;
+
+// The lexer-shaped pattern at *two* instances (`Emit$TokA`, `Emit$TokB`): a
+// generic variant carrying constructors, whose shared constructor names
+// (`OfStr`, `OfInt`, `Bare`) resolve to the right instance per construction.
+variant TokA = IdentA(str) | NumA(i64)
+
+variant TokB = WordB(str) | PlusB
+
+variant Emit<K> = OfStr((str) -> K) | OfInt((i64) -> K) | Bare(K)
+
+struct Rule<K> { emit: Emit<K> }
+
+fn run_a(e: Emit<TokA>, s: str, n: i64) -> TokA {
+    match (e) {
+        OfStr(f) => f(s),
+        OfInt(g) => g(n),
+        Bare(k) => k,
+    }
+}
+
+fn run_b(e: Emit<TokB>, s: str, n: i64) -> TokB {
+    match (e) {
+        OfStr(f) => f(s),
+        OfInt(g) => g(n),
+        Bare(k) => k,
+    }
+}
+
+fn show_a(t: TokA) -> str {
+    match (t) {
+        IdentA(w) => w,
+        NumA(v) => to_str(v),
+    }
+}
+
+fn show_b(t: TokB) -> str {
+    match (t) {
+        WordB(w) => w,
+        PlusB => "+",
+    }
+}
+
+fn main() !prints {
+    for (let r : [Rule { emit: OfStr(IdentA) }, Rule { emit: OfInt(NumA) }]) {
+        print(show_a(run_a(r.emit, "aa", 7)));
+    }
+    for (let r : [Rule { emit: OfStr(WordB) }, Rule { emit: Bare(PlusB) }]) {
+        print(show_b(run_b(r.emit, "bb", 0)));
+    }
+}
+--- stdout ---
+aa
+7
+bb
++
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 160
+instructions executed: 627
+binary size: 7368
+--- monomorphizations ---
+__lambda_0
+__lambda_1
+__lambda_2
+__lambda_3
+__lambda_4
+__lambda_5
+main
