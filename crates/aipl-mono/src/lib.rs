@@ -327,6 +327,13 @@ pub fn lower_tuples(program: &Program) -> Program {
                     ..f.clone()
                 })
             }
+            // A generic template's field/payload types may still contain
+            // `Type::Generic` and its own type variables (e.g. a field typed
+            // `Emit<K>`); it isn't monomorphic, so it can't be tuple-lowered.
+            // Each concrete instance (synthesized by `lower_generics`) is an
+            // ordinary named decl and is lowered here like any other.
+            Item::Struct(s) if s.is_generic() => item.clone(),
+            Item::Variant(v) if v.is_generic() => item.clone(),
             Item::Struct(s) => Item::Struct(StructDecl {
                 name: s.name.clone(),
                 type_vars: s.type_vars.clone(),
@@ -3375,6 +3382,106 @@ impl Mono<'_> {
     /// Infer the concrete type arguments of a generic-struct construction
     /// (`Box { value: 5 }`) from its provided field values, then register the
     /// monomorphic instance and return its name.
+    /// Mono twin of the checker's `bind_field`: unify a construction's declared
+    /// field type against the provided value's type, matching a generic-
+    /// application field type (`Emit<K>`) against an already-synthesized instance
+    /// value (`Emit$Tok`) by recovering the instance's type arguments.
+    fn bind_field(
+        &self,
+        field_ty: &Type,
+        value_ty: &Type,
+        vars: &HashSet<&str>,
+        map: &mut HashMap<String, Type>,
+    ) {
+        match (field_ty, value_ty) {
+            (Type::Generic(base, params), Type::Named(inst)) => {
+                if let Some((b, args)) = self.instance_args(inst) {
+                    if b == *base && args.len() == params.len() {
+                        for (p, a) in params.iter().zip(&args) {
+                            self.bind_field(p, a, vars, map);
+                        }
+                    }
+                }
+            }
+            (Type::Generic(b1, ps), Type::Generic(b2, as_))
+                if b1 == b2 && ps.len() == as_.len() =>
+            {
+                for (p, a) in ps.iter().zip(as_) {
+                    self.bind_field(p, a, vars, map);
+                }
+            }
+            (Type::Array(p), Type::Array(a)) => self.bind_field(p, a, vars, map),
+            (Type::Optional(p), Type::Optional(a)) => self.bind_field(p, a, vars, map),
+            (Type::Set(p), Type::Set(a)) => self.bind_field(p, a, vars, map),
+            (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
+                self.bind_field(pk, ak, vars, map);
+                self.bind_field(pv, av, vars, map);
+            }
+            (Type::Result(po, pe), Type::Result(ao, ae)) => {
+                self.bind_field(po, ao, vars, map);
+                self.bind_field(pe, ae, vars, map);
+            }
+            (Type::Fn(ps, pr), Type::Fn(as_, ar)) => {
+                for (p, a) in ps.iter().zip(as_) {
+                    self.bind_field(p, a, vars, map);
+                }
+                self.bind_field(pr, ar, vars, map);
+            }
+            _ => check::collect_var_bindings(field_ty, value_ty, vars, map),
+        }
+    }
+
+    /// Recover the concrete type arguments of a synthesized generic instance
+    /// (`Emit$Tok` → `("Emit", [Tok])`) by unifying its generic template's
+    /// structure against the instance's concrete decl.
+    fn instance_args(&self, inst: &str) -> Option<(String, Vec<Type>)> {
+        for (base, tmpl) in self.generic_structs {
+            if inst.starts_with(&format!("{base}$")) {
+                if let Some(fields) = self
+                    .structs
+                    .get(inst)
+                    .or_else(|| self.syn_structs.get(inst))
+                {
+                    let vars: HashSet<&str> =
+                        tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+                    let mut map = HashMap::new();
+                    for fd in &tmpl.fields {
+                        if let Some((_, ity, _)) = fields.iter().find(|(n, _, _)| *n == fd.name) {
+                            self.bind_field(&fd.ty, ity, &vars, &mut map);
+                        }
+                    }
+                    if let Some(args) = check::collect_args(&tmpl.type_vars, &map) {
+                        return Some((base.clone(), args));
+                    }
+                }
+            }
+        }
+        for (base, tmpl) in self.generic_variants {
+            if inst.starts_with(&format!("{base}$")) {
+                if let Some(cases) = self
+                    .variants
+                    .get(inst)
+                    .or_else(|| self.syn_variants.get(inst))
+                {
+                    let vars: HashSet<&str> =
+                        tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+                    let mut map = HashMap::new();
+                    for c in &tmpl.cases {
+                        if let Some((_, ipayload)) = cases.iter().find(|(n, _)| *n == c.name) {
+                            for (pt, it) in c.payload.iter().zip(ipayload) {
+                                self.bind_field(pt, it, &vars, &mut map);
+                            }
+                        }
+                    }
+                    if let Some(args) = check::collect_args(&tmpl.type_vars, &map) {
+                        return Some((base.clone(), args));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn infer_generic_instance(
         &mut self,
         name: &str,
@@ -3390,9 +3497,9 @@ impl Mono<'_> {
         let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
         for fi in inits {
-            if let Some(fd) = tmpl.fields.iter().find(|f| f.name == fi.name) {
+            if let Some(fd) = tmpl.fields.iter().find(|f| f.name == fi.name).cloned() {
                 let (_, vt) = self.infer(&fi.value, env)?;
-                check::collect_var_bindings(&fd.ty, &decay_concat(vt), &vars, &mut map);
+                self.bind_field(&fd.ty, &decay_concat(vt), &vars, &mut map);
             }
         }
         let args: Vec<Type> = tmpl

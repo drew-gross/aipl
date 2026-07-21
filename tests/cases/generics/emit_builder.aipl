@@ -1,0 +1,51 @@
+import { ==, print, to_str } from builtins;
+
+// The lexer-shaped pattern: a generic variant whose arms carry constructors
+// (`(str) -> K` / `(i64) -> K`) plus a bare `K` value, held in a generic-struct
+// field, applied via `match` + indirect call. The struct's type argument `K` is
+// inferred from the nested generic `Emit<K>` field of the constructed value.
+variant Tok = Ident(str) | Num(i64) | Plus
+
+variant Emit<K> = OfStr((str) -> K) | OfInt((i64) -> K) | Bare(K)
+
+struct Rule<K> { emit: Emit<K> }
+
+fn run(e: Emit<Tok>, s: str, n: i64) -> Tok {
+    match (e) {
+        OfStr(f) => f(s),
+        OfInt(g) => g(n),
+        Bare(k) => k,
+    }
+}
+
+fn show(t: Tok) -> str {
+    match (t) {
+        Ident(w) => w,
+        Num(v) => to_str(v),
+        Plus => "+",
+    }
+}
+
+fn main() !prints {
+    let rules = [Rule { emit: OfStr(Ident) }, Rule { emit: OfInt(Num) }, Rule { emit: Bare(Plus) }];
+    for (let r : rules) {
+        print(show(run(r.emit, "hi", 42)));
+    }
+}
+--- stdout ---
+hi
+42
++
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 104
+instructions executed: 476
+binary size: 4864
+--- monomorphizations ---
+__lambda_0
+__lambda_1
+__lambda_2
+__lambda_3
+main

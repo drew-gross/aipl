@@ -160,6 +160,14 @@ impl<'a> Cx<'a> {
     fn has_variant(&self, name: &str) -> bool {
         self.variants.contains_key(name) || self.syn_variants.borrow().contains_key(name)
     }
+    /// Cases of variant `name` (a source variant or a synthesized generic
+    /// instance).
+    fn variant_cases(&self, name: &str) -> Option<Vec<(String, Vec<Type>)>> {
+        self.variants
+            .get(name)
+            .cloned()
+            .or_else(|| self.syn_variants.borrow().get(name).cloned())
+    }
 
     /// Resolve every `Type::Generic` in `t` to a synthetic monomorphic `Named`
     /// type, registering the instance layout (recursively) into the syn maps.
@@ -187,6 +195,104 @@ impl<'a> Cx<'a> {
             ),
             _ => t.clone(),
         })
+    }
+
+    /// Bind the type variables in `vars` by unifying a construction's declared
+    /// field type against the provided value's type — like
+    /// [`collect_var_bindings`], but also matching a generic-application field
+    /// type (`Emit<K>`) against an already-synthesized instance value
+    /// (`Emit$Tok`) by recovering the instance's type arguments. This is what
+    /// lets `TokenRule { emit: OfInt(..) }` infer `K` from a nested generic field.
+    fn bind_field(
+        &self,
+        field_ty: &Type,
+        value_ty: &Type,
+        vars: &HashSet<&str>,
+        map: &mut HashMap<String, Type>,
+    ) {
+        match (field_ty, value_ty) {
+            (Type::Generic(base, params), Type::Named(inst)) => {
+                if let Some((b, args)) = self.instance_args(inst) {
+                    if b == *base && args.len() == params.len() {
+                        for (p, a) in params.iter().zip(&args) {
+                            self.bind_field(p, a, vars, map);
+                        }
+                    }
+                }
+            }
+            (Type::Generic(b1, ps), Type::Generic(b2, as_))
+                if b1 == b2 && ps.len() == as_.len() =>
+            {
+                for (p, a) in ps.iter().zip(as_) {
+                    self.bind_field(p, a, vars, map);
+                }
+            }
+            (Type::Array(p), Type::Array(a)) => self.bind_field(p, a, vars, map),
+            (Type::Optional(p), Type::Optional(a)) => self.bind_field(p, a, vars, map),
+            (Type::Set(p), Type::Set(a)) => self.bind_field(p, a, vars, map),
+            (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
+                self.bind_field(pk, ak, vars, map);
+                self.bind_field(pv, av, vars, map);
+            }
+            (Type::Result(po, pe), Type::Result(ao, ae)) => {
+                self.bind_field(po, ao, vars, map);
+                self.bind_field(pe, ae, vars, map);
+            }
+            (Type::Fn(ps, pr), Type::Fn(as_, ar)) => {
+                for (p, a) in ps.iter().zip(as_) {
+                    self.bind_field(p, a, vars, map);
+                }
+                self.bind_field(pr, ar, vars, map);
+            }
+            // Leaf (a bare type variable, `char[]`↔`str`, etc.).
+            _ => collect_var_bindings(field_ty, value_ty, vars, map),
+        }
+    }
+
+    /// Recover the concrete type arguments of a synthesized generic instance
+    /// (`Emit$Tok` → `("Emit", [Tok])`) by unifying its generic template's
+    /// structure against the instance's concrete decl. `None` if `inst` isn't a
+    /// generic instance or some type variable can't be pinned.
+    fn instance_args(&self, inst: &str) -> Option<(String, Vec<Type>)> {
+        for (base, tmpl) in self.generic_structs {
+            if inst.starts_with(&format!("{base}$")) {
+                if let Some(inst_fields) = self.struct_fields(inst) {
+                    let vars: HashSet<&str> =
+                        tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+                    let mut map = HashMap::new();
+                    for fd in &tmpl.fields {
+                        if let Some((_, ity, _)) =
+                            inst_fields.iter().find(|(n, _, _)| *n == fd.name)
+                        {
+                            self.bind_field(&fd.ty, ity, &vars, &mut map);
+                        }
+                    }
+                    if let Some(args) = collect_args(&tmpl.type_vars, &map) {
+                        return Some((base.clone(), args));
+                    }
+                }
+            }
+        }
+        for (base, tmpl) in self.generic_variants {
+            if inst.starts_with(&format!("{base}$")) {
+                if let Some(inst_cases) = self.variant_cases(inst) {
+                    let vars: HashSet<&str> =
+                        tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+                    let mut map = HashMap::new();
+                    for c in &tmpl.cases {
+                        if let Some((_, ipayload)) = inst_cases.iter().find(|(n, _)| *n == c.name) {
+                            for (pt, it) in c.payload.iter().zip(ipayload) {
+                                self.bind_field(pt, it, &vars, &mut map);
+                            }
+                        }
+                    }
+                    if let Some(args) = collect_args(&tmpl.type_vars, &map) {
+                        return Some((base.clone(), args));
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Register (if new) the monomorphic instance of generic `base` applied to
@@ -256,7 +362,7 @@ impl<'a> Cx<'a> {
                 ));
             };
             let vt = self.check_expr(&fi.value, env, effects)?;
-            collect_var_bindings(&fd.ty, &vt, &vars, &mut map);
+            self.bind_field(&fd.ty, &vt, &vars, &mut map);
             provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
         }
         // Every field without a default must be provided.
@@ -2766,6 +2872,18 @@ fn merge(a: Type, b: Type) -> Type {
 /// matching it structurally against `arg_ty`. Best-effort: unmatched structure
 /// and conflicts are ignored (the first binding wins), keeping the checker
 /// permissive and leaving the concrete fit to codegen.
+/// Every type variable in declaration order, resolved from `map`, or `None` if
+/// any is still unbound.
+pub(crate) fn collect_args(
+    type_vars: &[aipl_syntax::ast::TypeParam],
+    map: &HashMap<String, Type>,
+) -> Option<Vec<Type>> {
+    type_vars
+        .iter()
+        .map(|tv| map.get(&tv.name).cloned())
+        .collect()
+}
+
 pub(crate) fn collect_var_bindings(
     param_ty: &Type,
     arg_ty: &Type,

@@ -1,0 +1,28 @@
+import { wrapping_add as +, == } from builtins;
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+// A function value is a legal variant payload: stored inline as its 8-byte code
+// address, bound out by a `match`, and called indirectly.
+variant Apply = Fn((i64) -> i64) | Const(i64)
+
+fn eval(a: Apply, x: i64) -> i64 {
+    match (a) {
+        Fn(f) => f(x),
+        Const(c) => c,
+    }
+}.test({
+    assert(eval(Fn(inc), 41) == 42);
+    assert(eval(Const(7), 41) == 7);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 56
+binary size: 1288
+--- monomorphizations ---
+eval
+inc
+main

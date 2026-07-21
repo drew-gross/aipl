@@ -1,0 +1,35 @@
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+fn dec(x: i64) -> i64 { x - 1 }
+
+// A function value is storable in a struct field (as its 8-byte code address)
+// and callable back through the field — including from a field of an array
+// element pulled at runtime, which no monomorphization can specialize away.
+struct Op { f: (i64) -> i64 }
+
+fn apply_first() -> i64 { Op { f: inc }.f(41) }.test({
+    assert(apply_first() == 42);
+})
+
+fn dispatch() -> i64 {
+    mut total = 0;
+    for (let o : [Op { f: inc }, Op { f: dec }]) {
+        set total = total + o.f(100);
+    }
+    total
+}.test({
+    assert(dispatch() == 200); // 101 + 99
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 48
+instructions executed: 126
+binary size: 1800
+--- monomorphizations ---
+dec
+inc
+main

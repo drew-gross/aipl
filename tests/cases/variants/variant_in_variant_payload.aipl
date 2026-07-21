@@ -1,0 +1,31 @@
+import { wrapping_sub as -, == } from builtins;
+
+// A (non-recursive) variant is a legal payload of another variant: stored
+// inline like a struct payload, constructed and matched structurally.
+variant Inner = A(i64) | B
+
+variant Outer = Wrap(Inner) | Empty
+
+fn unwrap_a(o: Outer) -> i64 {
+    match (o) {
+        Wrap(i) => match (i) {
+            A(n) => n,
+            B => 0,
+        },
+        Empty => 0 - 1,
+    }
+}.test({
+    assert(unwrap_a(Wrap(A(5))) == 5);
+    assert(unwrap_a(Wrap(B)) == 0);
+    assert(unwrap_a(Empty) == 0 - 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 92
+binary size: 1536
+--- monomorphizations ---
+main
+unwrap_a

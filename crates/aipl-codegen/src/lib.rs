@@ -4973,19 +4973,23 @@ fn build_variant_layout(
             let ok = match ty {
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
                 Type::Array(_) | Type::Optional(_) => true,
-                Type::Named(n) => match decls.get(n.as_str()) {
-                    Some(TypeDeclRef::Struct(_)) => {
-                        resolve_type_layout(n, decls, layouts, on_stack)?;
-                        true
-                    }
-                    _ => false,
-                },
+                // A function value is an 8-byte code address, stored inline like
+                // a scalar; it owns no heap, so it needs no drop.
+                Type::Fn(_, _) => true,
+                // A struct or another (non-recursive) variant is stored inline;
+                // resolve its layout here so its size is known. `on_stack` cycle
+                // detection reports a genuinely recursive sum type (infinite
+                // size) rather than looping.
+                Type::Named(n) if decls.contains_key(n.as_str()) => {
+                    resolve_type_layout(n, decls, layouts, on_stack)?;
+                    true
+                }
                 _ => false,
             };
             if !ok {
                 return Err(Error::msg(format!(
                     "variant {} case {}: payload type {} is not supported (use i64, bool, char, \
-                     str, an array, an optional, or a struct)",
+                     str, a function, an array, an optional, a struct, or a variant)",
                     v.name,
                     c.name,
                     type_name(ty),
