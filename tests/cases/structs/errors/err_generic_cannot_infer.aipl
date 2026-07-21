@@ -1,0 +1,14 @@
+// A type parameter that appears in no field can never be pinned by a
+// construction (there are no explicit type arguments), so it's an error.
+struct Phantom<T> { tag: str }
+
+fn main() -> i64 {
+    let p = Phantom { tag: "x" };
+    0
+}
+--- errors ---
+error: cannot infer type parameter "T" of generic struct "Phantom" — provide a field whose value determines it
+ --> ./tests/cases/structs/errors/err_generic_cannot_infer.aipl:6:13
+  |
+6 |     let p = Phantom { tag: "x" };
+  |             ^^^^^^^^^^^^^^^^^^

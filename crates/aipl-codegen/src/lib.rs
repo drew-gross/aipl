@@ -2975,6 +2975,11 @@ fn compile_program<M: Module>(
     // through these signatures exactly as it would a user function, with no
     // notion that they're builtin. They're for the checker only — monomorphization
     // and codegen lower the real implementations.
+    // Resolve generic struct/variant type annotations (`Foo<i64>`) to synthetic
+    // monomorphic named structs/variants before anything else, so tuple lowering
+    // and the rest of the pipeline only see ordinary named types.
+    let program = &aipl_mono::lower_generics(program)?;
+
     // Lower tuple type annotations to named synthetic structs before checking
     // and monomorphization so the rest of the pipeline only sees named types.
     let program = &aipl_mono::lower_tuples(program);
@@ -5949,6 +5954,8 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         Type::Fn(_, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
+        // Generic applications are lowered to Named by lower_generics before codegen.
+        Type::Generic(..) => unreachable!("Type::Generic must be lowered before codegen"),
         // `Any`/`EmptyArrayArg`/`NoneLiteralArg` are resolved away by
         // monomorphization (the latter two collapse to `Array`/`Optional` of
         // `NoneInner` — see `subst_vars`) — codegen never sees them directly.
@@ -6419,6 +6426,7 @@ fn emit_rc<M: Module>(
         Type::Fn(_, _) => {}
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
+        Type::Generic(..) => unreachable!("Type::Generic must be lowered before codegen"),
         // Already handled by the `is_str_repr` guard above.
         Type::ConcatStr => unreachable!(),
         // `needs_drop` panics on these (resolved away by monomorphization), so

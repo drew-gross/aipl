@@ -1,0 +1,26 @@
+import { == } from builtins;
+
+// A generic struct may mix a type-parameter field with an ordinary field that
+// carries a default. The default rides along with each instantiation.
+struct Tagged<T> { value: T, tag: str = "none" }
+
+fn default_tag() -> str { Tagged { value: 7 }.tag }.test({
+    assert(default_tag() == "none");
+})
+
+fn custom_tag() -> str { Tagged { value: 7, tag: "seven" }.tag }.test({
+    assert(custom_tag() == "seven");
+})
+
+fn value_through() -> i64 { Tagged { value: 99 }.value }.test({
+    assert(value_through() == 99);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 73
+binary size: 2160
+--- monomorphizations ---
+main

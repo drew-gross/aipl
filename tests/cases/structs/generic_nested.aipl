@@ -1,0 +1,24 @@
+import { == } from builtins;
+
+// A generic struct instance can itself be a type argument to another generic
+// struct: constructing `Wrapper { inner: Box { value: 42 } }` infers the inner
+// instance `Box$i64` first, then the outer `Wrapper$Box$i64`.
+struct Box<T> { value: T }
+
+struct Wrapper<T> { inner: T }
+
+fn deep() -> i64 {
+    let w = Wrapper { inner: Box { value: 42 } };
+    w.inner.value
+}.test({
+    assert(deep() == 42);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 24
+binary size: 952
+--- monomorphizations ---
+main

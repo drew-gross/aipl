@@ -1,0 +1,28 @@
+import { == } from builtins;
+
+// Two type parameters, pinned independently by the two field values. Distinct
+// argument tuples give distinct instances (`Pair$i64$str`, `Pair$bool$i64`).
+struct Pair<A, B> { first: A, second: B }
+
+fn mixed() -> str {
+    let p = Pair { first: 1, second: "x" };
+    p.second
+}.test({
+    assert(mixed() == "x");
+})
+
+fn swapped_kinds() -> i64 {
+    let p = Pair { first: true, second: 42 };
+    p.second
+}.test({
+    assert(swapped_kinds() == 42);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 46
+binary size: 1520
+--- monomorphizations ---
+main

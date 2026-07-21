@@ -124,23 +124,28 @@ gazelle! {
         fn_attr_list = fn_attr => first | fn_attr_list fn_attr => rest;
         fn_attr = DOT IDENT LPAREN block RPAREN => test
                 | DOT IDENT LPAREN STR RPAREN => doc;
-        // Optional `<T: any, U: any>` generic parameter list. The bound is
-        // required syntactically (only `any` is meaningful).
+        // Optional `<T, U: ord>` generic parameter list. A bound is optional —
+        // a bare `T` defaults to the `any` bound; `T: ord` narrows it. After an
+        // `IDENT`, one token of lookahead (`:` → bounded, else → bare) picks the
+        // production.
         type_params = LANGLE type_param_list RANGLE => present | _ => empty;
         type_param_list = type_param => first | type_param_list COMMA type_param => rest;
-        type_param = IDENT COLON IDENT => type_param;
+        type_param = IDENT COLON IDENT => type_param | IDENT => bare;
 
         effects = effect_list => present | _ => empty;
         effect_list = effect => first | effect_list effect => rest;
         effect = BANG IDENT => effect;
 
-        struct_decl = STRUCT IDENT LBRACE fields RBRACE => struct_decl;
+        // An optional `<T: any, ..>` makes the struct generic (a template
+        // monomorphized per concrete use); shares `type_params` with functions.
+        struct_decl = STRUCT IDENT type_params LBRACE fields RBRACE => struct_decl;
 
         // `variant Shape = Circle(i64) | Rect(i64, i64) | Empty` — a sum type.
         // Cases are `|`-separated; each is a bare name (nullary) or a name with
         // a parenthesized positional payload. No terminator: the next item's
-        // leading keyword ends the case list (only `|` continues it).
-        variant_decl = VARIANT IDENT EQ variant_cases => variant_decl;
+        // leading keyword ends the case list (only `|` continues it). An
+        // optional `<T: any, ..>` makes it a generic variant template.
+        variant_decl = VARIANT IDENT type_params EQ variant_cases => variant_decl;
         variant_cases = variant_case => first
                       | variant_cases PIPE variant_case => rest;
         variant_case = IDENT => nullary
@@ -202,6 +207,12 @@ gazelle! {
            // the lookahead is `LBRACKET`.
            | LPAREN ty_args RPAREN LBRACKET RBRACKET => tuple_array_ty;
         base_ty = IDENT => named
+                // `Foo<A, B>` — a use of a generic struct/variant with concrete
+                // type arguments. Only in type position (no expressions here),
+                // so the `<`/`>` are unambiguously generic brackets, not
+                // comparison operators. After an `IDENT`, one token of lookahead
+                // (`<` → generic, else → plain `named`) picks the production.
+                | IDENT LANGLE ty_arg_list RANGLE => generic
                 | base_ty QUESTION => optional
                 | base_ty LBRACKET RBRACKET => array
                 // `#{T}` — a set type. The leading `#` (same sigil as the
@@ -755,15 +766,23 @@ impl gazelle::Action<aipl::ImportNameList<Self>> for Build {
 
 impl gazelle::Action<aipl::StructDecl<Self>> for Build {
     fn build(&mut self, node: aipl::StructDecl<Self>) -> Result<StructDecl, Self::Error> {
-        let aipl::StructDecl::StructDecl((name, _), fields) = node;
-        Ok(StructDecl { name, fields })
+        let aipl::StructDecl::StructDecl((name, _), type_params, fields) = node;
+        Ok(StructDecl {
+            name,
+            type_vars: type_params,
+            fields,
+        })
     }
 }
 
 impl gazelle::Action<aipl::VariantDecl<Self>> for Build {
     fn build(&mut self, node: aipl::VariantDecl<Self>) -> Result<VariantDecl, Self::Error> {
-        let aipl::VariantDecl::VariantDecl((name, _), cases) = node;
-        Ok(VariantDecl { name, cases })
+        let aipl::VariantDecl::VariantDecl((name, _), type_params, cases) = node;
+        Ok(VariantDecl {
+            name,
+            type_vars: type_params,
+            cases,
+        })
     }
 }
 
@@ -1118,15 +1137,25 @@ impl gazelle::Action<aipl::TypeParam<Self>> for Build {
     fn build(&mut self, node: aipl::TypeParam<Self>) -> Result<TypeParam, Self::Error> {
         // `name : bound` — the bound names a constraint on `name` (`any`
         // accepts everything; `ord` accepts comparable scalars), enforced
-        // when the type variable is later resolved by a call.
-        let aipl::TypeParam::TypeParam((name, _), (bound_name, bound_span)) = node;
-        let bound = Bound::from_name(&bound_name).ok_or_else(|| {
-            Error::at(
-                format!("unknown type parameter bound {bound_name:?}; expected \"any\" or \"ord\""),
-                bound_span,
-            )
-        })?;
-        Ok(TypeParam { name, bound })
+        // when the type variable is later resolved by a call. A bare `name`
+        // defaults to the `any` bound.
+        Ok(match node {
+            aipl::TypeParam::Bare((name, _)) => TypeParam {
+                name,
+                bound: Bound::Any,
+            },
+            aipl::TypeParam::TypeParam((name, _), (bound_name, bound_span)) => {
+                let bound = Bound::from_name(&bound_name).ok_or_else(|| {
+                    Error::at(
+                        format!(
+                            "unknown type parameter bound {bound_name:?}; expected \"any\" or \"ord\""
+                        ),
+                        bound_span,
+                    )
+                })?;
+                TypeParam { name, bound }
+            }
+        })
     }
 }
 
@@ -1177,6 +1206,10 @@ impl gazelle::Action<aipl::BaseTy<Self>> for Build {
                 None if name == "any" => Type::Any,
                 None => Type::Named(name),
             },
+            // `Foo<A, B>` — a generic type application. The base name is always
+            // a user struct/variant template (never a primitive), resolved to a
+            // synthetic monomorphic type by mono's `lower_generics` pre-pass.
+            aipl::BaseTy::Generic((name, _), args) => Type::Generic(name, args),
             aipl::BaseTy::Optional(inner) => Type::Optional(Box::new(inner)),
             aipl::BaseTy::Array(inner, _rbracket) => Type::Array(Box::new(inner)),
             aipl::BaseTy::Set(_hash, inner) => Type::Set(Box::new(inner)),

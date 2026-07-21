@@ -1,0 +1,17 @@
+import { == } from builtins;
+
+// A type parameter written without a bound (`<T>`) defaults to the `any`
+// bound, exactly like `<T: any>`.
+fn identity<T>(x: T) -> T { x }.test({
+    assert(identity(5) == 5);
+    assert(identity('a') == 'a');
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 26
+binary size: 1152
+--- monomorphizations ---
+main

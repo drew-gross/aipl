@@ -22,51 +22,75 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast;
 use aipl_syntax::ast::{
-    Expr, ExprKind, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program, Signature,
-    Type,
+    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program,
+    Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
     is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, type_name,
     Error, Span,
 };
 
+/// Mangle a type into a fragment usable inside a synthetic struct/variant name
+/// (all `$`/`!`/nesting flattened to `_`). Shared by [`tuple_struct_name`] and
+/// [`generic_instance_name`] so the two naming schemes agree on how a type is
+/// spelled.
+pub(crate) fn mangle_type(ty: &Type) -> String {
+    match ty {
+        Type::Unit => panic!("Synthetic-type members cannot be unit"),
+        // Tuple/generic members are parsed straight from source syntax; these
+        // are compiler-internal pseudo-types that never appear there.
+        Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => {
+            panic!("Synthetic-type members cannot be a compiler pseudo-type")
+        }
+        Type::Primitive(p) => p.name().into(),
+        Type::Named(n) => n.replace(['$', '!'], "_"),
+        Type::Array(e) => format!("arr_{}", mangle_type(e)),
+        Type::Optional(e) => format!("opt_{}", mangle_type(e)),
+        Type::Set(e) => format!("set_{}", mangle_type(e)),
+        Type::Dict(k, v) => format!("dict_{}_{}", mangle_type(k), mangle_type(v)),
+        Type::Result(ok, err) => format!("res_{}_{}", mangle_type(ok), mangle_type(err)),
+        Type::Fn(ps, ret) => {
+            let args = ps.iter().map(mangle_type).collect::<Vec<_>>().join("_");
+            format!("fn_{}_{}", args, mangle_type(ret))
+        }
+        Type::Tuple(es) => {
+            format!(
+                "tuple_{}",
+                es.iter().map(mangle_type).collect::<Vec<_>>().join("_")
+            )
+        }
+        Type::Generic(name, args) => {
+            format!(
+                "{name}_{}",
+                args.iter().map(mangle_type).collect::<Vec<_>>().join("_")
+            )
+        }
+    }
+}
+
 /// Generate the canonical synthetic-struct name for a tuple with the given
 /// element types. Matches the name produced by mono's `lower_tuples`.
 pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
-    fn mangle(ty: &Type) -> String {
-        match ty {
-            Type::Unit => panic!("Tuple members cannot be unit"),
-            // A tuple type is parsed straight from source syntax (`(A, B)`);
-            // these are compiler-internal pseudo-types that never appear there.
-            Type::Any
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
-            | Type::ConcatStr => {
-                panic!("Tuple members cannot be a compiler pseudo-type")
-            }
-            Type::Primitive(p) => p.name().into(),
-            Type::Named(n) => n.replace(['$', '!'], "_"),
-            Type::Array(e) => format!("arr_{}", mangle(e)),
-            Type::Optional(e) => format!("opt_{}", mangle(e)),
-            Type::Set(e) => format!("set_{}", mangle(e)),
-            Type::Dict(k, v) => format!("dict_{}_{}", mangle(k), mangle(v)),
-            Type::Result(ok, err) => format!("res_{}_{}", mangle(ok), mangle(err)),
-            Type::Fn(ps, ret) => {
-                let args = ps.iter().map(mangle).collect::<Vec<_>>().join("_");
-                format!("fn_{}_{}", args, mangle(ret))
-            }
-            Type::Tuple(es) => {
-                format!(
-                    "tuple_{}",
-                    es.iter().map(mangle).collect::<Vec<_>>().join("_")
-                )
-            }
-        }
-    }
     format!(
         "__tuple${}",
-        elems.iter().map(mangle).collect::<Vec<_>>().join("$")
+        elems.iter().map(mangle_type).collect::<Vec<_>>().join("$")
+    )
+}
+
+/// Canonical synthetic name for a monomorphic instance of the generic
+/// struct/variant `base` applied to concrete `args` — e.g. `Box<i64>` →
+/// `Box$i64`, `Pair<i64, str>` → `Pair$i64$str`. `$` can't appear in a
+/// user-written identifier, so these never collide with source names. Shared
+/// by `lower_generics` (annotation lowering) and the checker/mono construction
+/// inference so both agree on the instance name.
+pub(crate) fn generic_instance_name(base: &str, args: &[Type]) -> String {
+    format!(
+        "{base}${}",
+        args.iter().map(mangle_type).collect::<Vec<_>>().join("$")
     )
 }
 
@@ -86,13 +110,22 @@ type Env = HashMap<String, Binding>;
 
 struct Cx<'a> {
     structs: &'a HashMap<String, Vec<(String, Type, bool)>>,
-    /// Synthetic struct layouts created on-the-fly when a `TupleLit` is seen
-    /// during checking. Looked up alongside `structs` by `struct_fields`.
+    /// Synthetic struct layouts created on-the-fly when a `TupleLit` or a
+    /// generic-struct construction (`Box { value: 5 }`) is seen during checking.
+    /// Looked up alongside `structs` by `struct_fields`.
     syn_structs: std::cell::RefCell<HashMap<String, Vec<(String, Type, bool)>>>,
     /// Variant (sum) types: name → ordered cases `(ctor, payload types)`.
     variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
+    /// Synthetic variant layouts created on-the-fly for a generic-variant
+    /// instance (`Opt$i64`). Looked up alongside `variants`.
+    syn_variants: std::cell::RefCell<HashMap<String, Vec<(String, Vec<Type>)>>>,
     /// Constructor name → the variant it belongs to (for typing `Ctor(..)`).
     ctors: &'a HashMap<String, String>,
+    /// Generic struct templates by name (`Box` → its `StructDecl`), used to
+    /// infer and instantiate a construction `Box { value: 5 }`.
+    generic_structs: &'a HashMap<String, StructDecl>,
+    /// Generic variant templates by name (`Opt` → its `VariantDecl`).
+    generic_variants: &'a HashMap<String, VariantDecl>,
     sigs: &'a HashMap<String, Signature>,
     /// The declared return type of the function currently being checked (with
     /// type-vars substituted), so a `return value;` can be checked against it.
@@ -124,6 +157,155 @@ impl<'a> Cx<'a> {
     fn add_syn_struct(&self, name: String, fields: Vec<(String, Type, bool)>) {
         self.syn_structs.borrow_mut().insert(name, fields);
     }
+    fn has_variant(&self, name: &str) -> bool {
+        self.variants.contains_key(name) || self.syn_variants.borrow().contains_key(name)
+    }
+
+    /// Resolve every `Type::Generic` in `t` to a synthetic monomorphic `Named`
+    /// type, registering the instance layout (recursively) into the syn maps.
+    /// Concrete annotations are already resolved by `lower_generics`; this is the
+    /// on-demand path for instances that only arise from construction inference.
+    fn resolve_generic_ty(&self, t: &Type) -> Result<Type, Error> {
+        Ok(match t {
+            Type::Generic(base, args) => {
+                let args: Vec<Type> = args
+                    .iter()
+                    .map(|a| self.resolve_generic_ty(a))
+                    .collect::<Result<_, _>>()?;
+                Type::Named(self.instantiate_generic(base, &args)?)
+            }
+            Type::Optional(i) => Type::Optional(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Array(i) => Type::Array(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Set(i) => Type::Set(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Dict(k, v) => Type::Dict(
+                Box::new(self.resolve_generic_ty(k)?),
+                Box::new(self.resolve_generic_ty(v)?),
+            ),
+            Type::Result(ok, err) => Type::Result(
+                Box::new(self.resolve_generic_ty(ok)?),
+                Box::new(self.resolve_generic_ty(err)?),
+            ),
+            _ => t.clone(),
+        })
+    }
+
+    /// Register (if new) the monomorphic instance of generic `base` applied to
+    /// concrete `args`, returning its synthetic name.
+    fn instantiate_generic(&self, base: &str, args: &[Type]) -> Result<String, Error> {
+        let name = generic_instance_name(base, args);
+        if self.has_struct(&name) || self.has_variant(&name) {
+            return Ok(name);
+        }
+        if let Some(tmpl) = self.generic_structs.get(base) {
+            let map = crate::bind_type_args(base, &tmpl.type_vars, args)?;
+            // Register a placeholder before recursing so a (mutually) recursive
+            // generic refers to the in-progress name rather than looping.
+            self.add_syn_struct(name.clone(), Vec::new());
+            let mut fields = Vec::with_capacity(tmpl.fields.len());
+            for fd in &tmpl.fields {
+                let ty = self.resolve_generic_ty(&crate::subst_type_params(&fd.ty, &map))?;
+                fields.push((fd.name.clone(), ty, fd.default.is_some()));
+            }
+            self.add_syn_struct(name.clone(), fields);
+        } else if let Some(tmpl) = self.generic_variants.get(base) {
+            let map = crate::bind_type_args(base, &tmpl.type_vars, args)?;
+            self.syn_variants
+                .borrow_mut()
+                .insert(name.clone(), Vec::new());
+            let mut cases = Vec::with_capacity(tmpl.cases.len());
+            for c in &tmpl.cases {
+                let payload = c
+                    .payload
+                    .iter()
+                    .map(|p| self.resolve_generic_ty(&crate::subst_type_params(p, &map)))
+                    .collect::<Result<_, _>>()?;
+                cases.push((c.name.clone(), payload));
+            }
+            self.syn_variants.borrow_mut().insert(name.clone(), cases);
+        } else {
+            return Err(Error::msg(format!(
+                "unknown generic type {base:?} (no such generic struct or variant)"
+            )));
+        }
+        Ok(name)
+    }
+
+    /// Infer and check a generic-struct construction `Box { value: 5 }`: bind the
+    /// template's type variables from the provided field values, then treat it as
+    /// an ordinary construction of the synthesized instance. Returns the instance
+    /// type.
+    fn infer_generic_construct(
+        &self,
+        name: &str,
+        inits: &[FieldInit],
+        env: &Env,
+        effects: &[String],
+        span: Span,
+    ) -> Result<Type, Error> {
+        let tmpl = self.generic_structs.get(name).expect("caller checked");
+        let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
+        let mut map: HashMap<String, Type> = HashMap::new();
+        // Type each provided init (against a real field), collecting type-var
+        // bindings from the value types.
+        let mut provided: HashMap<String, (Type, Span)> = HashMap::new();
+        for fi in inits {
+            let Some(fd) = tmpl.fields.iter().find(|f| f.name == fi.name) else {
+                return Err(Error::at(
+                    format!("struct {name:?} has no field {:?}", fi.name),
+                    fi.value.span.clone(),
+                ));
+            };
+            let vt = self.check_expr(&fi.value, env, effects)?;
+            collect_var_bindings(&fd.ty, &vt, &vars, &mut map);
+            provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
+        }
+        // Every field without a default must be provided.
+        for fd in &tmpl.fields {
+            if fd.default.is_none() && !provided.contains_key(&fd.name) {
+                return Err(Error::at(
+                    format!(
+                        "struct {name:?} field {:?} has no default and was not provided",
+                        fd.name
+                    ),
+                    span.clone(),
+                ));
+            }
+        }
+        // Every type variable must be pinned by some provided field.
+        let args: Vec<Type> = tmpl
+            .type_vars
+            .iter()
+            .map(|tv| {
+                map.get(&tv.name).cloned().ok_or_else(|| {
+                    Error::at(
+                        format!(
+                            "cannot infer type parameter {:?} of generic struct {name:?} \
+                             — provide a field whose value determines it",
+                            tv.name
+                        ),
+                        span.clone(),
+                    )
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        let inst = self.instantiate_generic(name, &args)?;
+        // Check each provided value against its concrete (substituted) field type.
+        let concrete = self.struct_fields(&inst).expect("just instantiated");
+        for fi in inits {
+            let (_, expected, _) = concrete
+                .iter()
+                .find(|(n, _, _)| *n == fi.name)
+                .expect("field validated above");
+            let (vt, vspan) = &provided[&fi.name];
+            expect(
+                vt,
+                expected,
+                &format!("struct {name:?} field {:?}", fi.name),
+                vspan.clone(),
+            )?;
+        }
+        Ok(Type::Named(inst))
+    }
 }
 
 /// Type-check `program`. Returns the first error found, or `Ok` if every
@@ -133,9 +315,16 @@ pub fn check(program: &Program) -> Result<(), Error> {
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
     let mut ctors: HashMap<String, String> = HashMap::new();
+    // Generic templates are kept aside — they have no concrete layout; each use
+    // is instantiated by inference (constructions) or lower_generics (annotations).
+    let mut generic_structs: HashMap<String, StructDecl> = HashMap::new();
+    let mut generic_variants: HashMap<String, VariantDecl> = HashMap::new();
     let mut sigs: HashMap<String, Signature> = HashMap::new();
     for item in &program.items {
         match item {
+            Item::Struct(s) if s.is_generic() => {
+                generic_structs.insert(s.name.clone(), s.clone());
+            }
             Item::Struct(s) => {
                 structs.insert(
                     s.name.clone(),
@@ -144,6 +333,12 @@ pub fn check(program: &Program) -> Result<(), Error> {
                         .map(|f| (f.name.clone(), f.ty.clone(), f.default.is_some()))
                         .collect(),
                 );
+            }
+            Item::Variant(v) if v.is_generic() => {
+                // A generic variant's constructors register concretely once it's
+                // instantiated (its instance is an ordinary named variant); the
+                // template itself carries no constructors into `ctors`.
+                generic_variants.insert(v.name.clone(), v.clone());
             }
             Item::Variant(v) => {
                 for c in &v.cases {
@@ -173,7 +368,10 @@ pub fn check(program: &Program) -> Result<(), Error> {
         structs: &structs,
         syn_structs: std::cell::RefCell::new(HashMap::new()),
         variants: &variants,
+        syn_variants: std::cell::RefCell::new(HashMap::new()),
         ctors: &ctors,
+        generic_structs: &generic_structs,
+        generic_variants: &generic_variants,
         sigs: &sigs,
         current_ret: std::cell::RefCell::new(Type::Unit),
     };
@@ -181,6 +379,12 @@ pub fn check(program: &Program) -> Result<(), Error> {
     // evaluated at construction time with no local variables in scope).
     for item in &program.items {
         if let Item::Struct(s) = item {
+            // A generic template's field types mention its type variables, so
+            // its defaults can't be checked concretely; each instantiation's
+            // (substituted) defaults ride along with the concrete field types.
+            if s.is_generic() {
+                continue;
+            }
             for f in &s.fields {
                 if let Some(default) = &f.default {
                     let dt = cx.check_expr(default, &HashMap::new(), &[])?;
@@ -443,6 +647,14 @@ impl Cx<'_> {
                 }
                 Ok(())
             }
+            // Generic applications are lowered to Named by lower_generics before
+            // check runs; validate the type arguments in case one arrives.
+            Type::Generic(_, args) => {
+                for a in args {
+                    self.check_ty(a, type_params, fname)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -495,6 +707,11 @@ impl Cx<'_> {
             ))),
             Type::Tuple(_) => Err(Error::msg(format!(
                 "fn {fname:?}: tuple types cannot be array or optional elements"
+            ))),
+            // Resolved to a `Named` synthetic struct by lower_generics before
+            // check; a monomorphic instance reaches here as `Named` instead.
+            Type::Generic(..) => Err(Error::msg(format!(
+                "fn {fname:?}: unresolved generic type as array or optional element"
             ))),
         }
     }
@@ -1322,6 +1539,11 @@ impl Cx<'_> {
                     })?
             }
             ExprKind::Construct(name, inits) => {
+                // A construction of a generic struct template (`Box { value: 5 }`)
+                // infers its type arguments from the field values.
+                if self.generic_structs.contains_key(name) {
+                    return self.infer_generic_construct(name, inits, env, effects, span.clone());
+                }
                 let fields = self.structs.get(name).cloned().ok_or_else(|| {
                     let mut msg = format!("unknown struct {name:?}");
                     if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&name.as_str()) {
@@ -2348,6 +2570,12 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
                 .map(|e| subst_typevars(e, type_params))
                 .collect(),
         ),
+        Type::Generic(name, args) => Type::Generic(
+            name.clone(),
+            args.iter()
+                .map(|a| subst_typevars(a, type_params))
+                .collect(),
+        ),
     }
 }
 
@@ -2538,7 +2766,7 @@ fn merge(a: Type, b: Type) -> Type {
 /// matching it structurally against `arg_ty`. Best-effort: unmatched structure
 /// and conflicts are ignored (the first binding wins), keeping the checker
 /// permissive and leaving the concrete fit to codegen.
-fn collect_var_bindings(
+pub(crate) fn collect_var_bindings(
     param_ty: &Type,
     arg_ty: &Type,
     vars: &HashSet<&str>,
@@ -2624,5 +2852,9 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
             Box::new(subst_vars(r, map, vars)),
         ),
         Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| subst_vars(e, map, vars)).collect()),
+        Type::Generic(name, args) => Type::Generic(
+            name.clone(),
+            args.iter().map(|a| subst_vars(a, map, vars)).collect(),
+        ),
     }
 }

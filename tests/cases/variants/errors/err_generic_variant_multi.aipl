@@ -1,0 +1,21 @@
+// A generic variant may currently be instantiated at only one type argument,
+// because its constructors are shared by name across instances.
+variant Opt<T> = Some(T) | Nothing
+
+fn as_int(o: Opt<i64>) -> i64 {
+    match (o) {
+        Some(v) => v,
+        Nothing => 0,
+    }
+}
+
+fn as_str(o: Opt<str>) -> str {
+    match (o) {
+        Some(v) => v,
+        Nothing => "",
+    }
+}
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: generic variant "Opt" is instantiated at more than one type ("Opt$i64" and "Opt$str"); a variant may currently be used at only one type argument (its constructors are shared by name across instances)

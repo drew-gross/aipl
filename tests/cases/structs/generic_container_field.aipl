@@ -1,0 +1,21 @@
+import { ==, len } from builtins;
+
+// A type parameter can appear inside a container field type: `items: T[]`.
+// The element type is pinned by the array's elements, giving `Stack$i64`.
+struct Stack<T> { items: T[] }
+
+fn item_count() -> i64 {
+    let s = Stack { items: [10, 20, 30] };
+    len(s.items)
+}.test({
+    assert(item_count() == 3);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 42
+binary size: 1328
+--- monomorphizations ---
+main

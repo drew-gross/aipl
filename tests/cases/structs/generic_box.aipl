@@ -1,0 +1,27 @@
+import { == } from builtins;
+
+// A generic struct is a template: each construction infers its type argument
+// from the field values, monomorphizing to a distinct instance (`Box$i64`,
+// `Box$str`, `Box$bool`). The type parameter's bound defaults to `any`.
+struct Box<T> { value: T }
+
+fn boxed_int() -> i64 { Box { value: 5 }.value }.test({
+    assert(boxed_int() == 5);
+})
+
+fn boxed_str() -> str { Box { value: "hi" }.value }.test({
+    assert(boxed_str() == "hi");
+})
+
+fn boxed_bool() -> bool { Box { value: true }.value }.test({
+    assert(boxed_bool() == true);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 61
+binary size: 1888
+--- monomorphizations ---
+main

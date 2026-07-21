@@ -454,6 +454,32 @@ impl<'s> Walker<'s> {
 
     // ---------- fn / struct / variant ----------
 
+    /// A `<T, U: ord>` type-parameter list, if the next token is `<`. A bound is
+    /// optional — bare `T` prints as-is, `T: ord` keeps its bound. Shared by
+    /// `fn`, `struct`, and `variant` declarations.
+    fn type_params(&mut self) -> Result<Option<Doc>, Error> {
+        if self.peek_text() != "<" {
+            return Ok(None);
+        }
+        self.bump();
+        let mut tps = Vec::new();
+        while self.peek_text() != ">" {
+            let name = self.bump().to_string();
+            if self.peek_text() == ":" {
+                self.bump();
+                let bound = self.bump();
+                tps.push(text(format!("{name}: {bound}")));
+            } else {
+                tps.push(text(name));
+            }
+            if self.peek_text() == "," {
+                self.bump();
+            }
+        }
+        self.expect(">")?;
+        Ok(Some(self.comma_list_docs(tps, ListStyle::Angles)))
+    }
+
     fn fn_item(&mut self) -> Result<Doc, Error> {
         let mut sig = Vec::new();
         if self.peek_text() == "pub" {
@@ -464,20 +490,8 @@ impl<'s> Walker<'s> {
         sig.push(text("fn "));
         sig.push(text(self.bump())); // name
 
-        if self.peek_text() == "<" {
-            self.bump();
-            let mut tps = Vec::new();
-            while self.peek_text() != ">" {
-                let name = self.bump().to_string();
-                self.expect(":")?;
-                let bound = self.bump();
-                tps.push(text(format!("{name}: {bound}")));
-                if self.peek_text() == "," {
-                    self.bump();
-                }
-            }
-            self.expect(">")?;
-            sig.push(self.comma_list_docs(tps, ListStyle::Angles));
+        if let Some(tps) = self.type_params()? {
+            sig.push(tps);
         }
 
         self.expect("(")?;
@@ -562,6 +576,7 @@ impl<'s> Walker<'s> {
     fn struct_item(&mut self) -> Result<Doc, Error> {
         self.expect("struct")?;
         let name = self.bump().to_string();
+        let tps = self.type_params()?;
         self.expect("{")?;
         let mut fields = Vec::new();
         while self.peek_text() != "}" {
@@ -582,7 +597,9 @@ impl<'s> Walker<'s> {
         }
         self.expect("}")?;
         Ok(concat(vec![
-            text(format!("struct {name} ")),
+            text(format!("struct {name}")),
+            tps.unwrap_or_else(|| text("")),
+            text(" "),
             self.comma_list_docs(fields, ListStyle::SpacedBraces),
         ]))
     }
@@ -590,6 +607,7 @@ impl<'s> Walker<'s> {
     fn variant_item(&mut self) -> Result<Doc, Error> {
         self.expect("variant")?;
         let name = self.bump().to_string();
+        let tps = self.type_params()?;
         self.expect("=")?;
         let mut cases = Vec::new();
         loop {
@@ -623,7 +641,9 @@ impl<'s> Walker<'s> {
             body.push(c.clone());
         }
         Ok(group(concat(vec![
-            text(format!("variant {name} =")),
+            text(format!("variant {name}")),
+            tps.unwrap_or_else(|| text("")),
+            text(" ="),
             indent(concat(vec![Doc::Line, concat(body)])),
         ])))
     }
@@ -687,7 +707,22 @@ impl<'s> Walker<'s> {
             parts.push(text("}"));
             vec![concat(parts)]
         } else {
-            vec![text(self.bump())]
+            let mut parts = vec![text(self.bump())];
+            // `Foo<A, B>` — a generic type application. In type position `<`/`>`
+            // are unambiguously the argument brackets.
+            if self.peek_text() == "<" {
+                self.bump();
+                let mut args = Vec::new();
+                while self.peek_text() != ">" {
+                    args.push(self.ty()?);
+                    if self.peek_text() == "," {
+                        self.bump();
+                    }
+                }
+                self.expect(">")?;
+                parts.push(self.comma_list_docs(args, ListStyle::Angles));
+            }
+            vec![concat(parts)]
         };
         loop {
             match self.peek_text() {

@@ -684,18 +684,22 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
         }),
         Item::Struct(s) => Item::Struct(StructDecl {
             name: view.get(&s.name).cloned().unwrap_or_else(|| s.name.clone()),
+            type_vars: s.type_vars.clone(),
+            // Field types may reference the struct's own type variables (`T`);
+            // pass them so they're left un-rewritten.
             fields: s
                 .fields
                 .iter()
                 .map(|fd| aipl_syntax::ast::FieldDecl {
                     name: fd.name.clone(),
-                    ty: rewrite_type(&fd.ty, view, &[]),
+                    ty: rewrite_type(&fd.ty, view, &s.type_vars),
                     default: fd.default.clone(),
                 })
                 .collect(),
         }),
         Item::Variant(v) => Item::Variant(aipl_syntax::ast::VariantDecl {
             name: view.get(&v.name).cloned().unwrap_or_else(|| v.name.clone()),
+            type_vars: v.type_vars.clone(),
             cases: v
                 .cases
                 .iter()
@@ -704,7 +708,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
                     payload: c
                         .payload
                         .iter()
-                        .map(|t| rewrite_type(t, view, &[]))
+                        .map(|t| rewrite_type(t, view, &v.type_vars))
                         .collect(),
                 })
                 .collect(),
@@ -759,6 +763,21 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
                 .map(|e| rewrite_type(e, view, type_vars))
                 .collect(),
         ),
+        // `Foo<A, B>` — rewrite the template's base name through the view (it's
+        // a user struct/variant), and each type argument recursively.
+        Type::Generic(name, args) => {
+            let base = if type_vars.iter().any(|v| v.name == *name) {
+                name.clone()
+            } else {
+                view.get(name).cloned().unwrap_or_else(|| name.clone())
+            };
+            Type::Generic(
+                base,
+                args.iter()
+                    .map(|a| rewrite_type(a, view, type_vars))
+                    .collect(),
+            )
+        }
     }
 }
 

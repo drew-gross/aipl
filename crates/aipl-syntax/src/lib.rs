@@ -312,6 +312,7 @@ pub mod ast {
             Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
             Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
             Type::Tuple(elems) => elems.iter().any(ty_mentions_any),
+            Type::Generic(_, args) => args.iter().any(ty_mentions_any),
         }
     }
 
@@ -340,7 +341,22 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct StructDecl {
         pub name: String,
+        /// Declared generic type parameters, e.g. `struct Box<T> { .. }` →
+        /// `[TypeParam { name: "T", bound: Any }]`. Empty for an ordinary
+        /// (non-generic) struct. A struct with type parameters is a *template*:
+        /// it has no runtime layout of its own; each concrete use (`Box<i64>`,
+        /// or an inferred `Box { value: 5 }` construction) is monomorphized into
+        /// a synthetic named struct with these variables substituted.
+        pub type_vars: Vec<TypeParam>,
         pub fields: Vec<FieldDecl>,
+    }
+
+    impl StructDecl {
+        /// A struct is generic if it declares type parameters — i.e. it's a
+        /// template that must be monomorphized before codegen sees it.
+        pub fn is_generic(&self) -> bool {
+            !self.type_vars.is_empty()
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -358,7 +374,19 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantDecl {
         pub name: String,
+        /// Declared generic type parameters, e.g. `variant Opt<T> = Some(T) |
+        /// Nothing` → `[TypeParam { name: "T", bound: Any }]`. Empty for an
+        /// ordinary variant. Like [`StructDecl::type_vars`], a variant with type
+        /// parameters is a template monomorphized per concrete instantiation.
+        pub type_vars: Vec<TypeParam>,
         pub cases: Vec<VariantCase>,
+    }
+
+    impl VariantDecl {
+        /// A variant is generic if it declares type parameters.
+        pub fn is_generic(&self) -> bool {
+            !self.type_vars.is_empty()
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -542,6 +570,14 @@ pub mod ast {
         /// `__tuple$A$B$C` before type-checking, so only the parser and the
         /// `lower_tuples` pre-pass ever see this variant.
         Tuple(Vec<Type>),
+        /// `Foo<A, B>` — a use of a generic struct/variant with concrete type
+        /// arguments. Lowered to a synthetic monomorphic named type
+        /// (`Foo$A$B`) by mono's `lower_generics` pre-pass — substituting the
+        /// template's declared type variables with these arguments — before
+        /// type-checking, so only the parser and that pre-pass ever see this
+        /// variant. The `String` is the template's base name; the `Vec` its
+        /// concrete type arguments (never empty).
+        Generic(String, Vec<Type>),
         /// The anonymous generic bound keyword `any`, as written in `any[]`/
         /// `any?` — parsed directly from source. Monomorphization's `normalize`
         /// replaces each occurrence with a synthetic named type variable before
@@ -1226,6 +1262,10 @@ pub fn type_name(t: &Type) -> String {
         Type::Tuple(elems) => {
             let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({es})")
+        }
+        Type::Generic(name, args) => {
+            let as_ = args.iter().map(type_name).collect::<Vec<_>>().join(", ");
+            format!("{name}<{as_}>")
         }
         Type::Any => "any".into(),
         Type::NoneInner => "__none__".into(),
