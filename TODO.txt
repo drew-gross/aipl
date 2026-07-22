@@ -63,3 +63,5 @@ make it so functions can call functions defined later in the file
 allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl
 
 fix how constructor names come into scope
+
+figure out / fix why template literals are peforming worse than concat chains

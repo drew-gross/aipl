@@ -535,7 +535,7 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
 
 // A `LexError` for an `emit` whose value shape doesn't match its option.
 fn emit_mismatch(opt: str, want: str, span: Span) -> LexError {
-    LexError { message: opt +++ " emit expects " +++ want +++ " value", span }
+    LexError { message: `{opt} emit expects {want} value`, span }
 }
 
 // One lexing step's outcome: the token(s) the winning rule produced — one
@@ -1102,7 +1102,7 @@ deallocations: 1181
 reallocations: 0
 bytes allocated: 57584
 instructions executed: 260262
-binary size: 788776
+binary size: 788920
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam29
 __builtin_count_while$char$s0$lam34
