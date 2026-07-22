@@ -312,6 +312,141 @@ pub fn make() -> Bag { Bag { items: [1, 2] } }";
     assert!(e.call_values("make", &[]).is_err());
 }
 
+/// A variant whose cases span a nullary case and scalar/`str`/`char` payloads —
+/// the shape the AIPL lexer's token type (`AiplTok`) uses.
+const VARIANT_SRC: &str = "\
+import { ==, +++ } from builtins;
+variant Token = Eof | Ident(str) | Count(i64) | Mark(char)
+pub fn classify(n: i64) -> Token {
+    if (n == 0) { Eof }
+    else { if (n == 1) { Ident(\"a long ident value\" +++ \"!\") }
+    else { if (n == 2) { Count(42) }
+    else { Mark('Z') } } }
+}
+pub fn describe(t: Token) -> str {
+    match (t) {
+        Eof => \"eof\",
+        Ident(s) => s,
+        Count(n) => \"count\",
+        Mark(c) => \"mark\",
+    }
+}
+pub fn count_of(t: Token) -> i64 {
+    match (t) {
+        Count(n) => n,
+        Eof => 0,
+        Ident(s) => 0,
+        Mark(c) => 0,
+    }
+}
+pub fn maybe_tok(present: bool) -> Token? {
+    if (present) { some(Count(7)) } else { none }
+}";
+
+#[test]
+fn call_values_marshals_variant_return() {
+    // A variant is returned through a hidden sret pointer and marshaled back as
+    // `FfiValue::Variant(case_name, payload)` — the active case's constructor name
+    // plus its payload values in positional order (empty for a nullary case).
+    let e = Engine::compile(VARIANT_SRC).unwrap();
+    use aipl::FfiValue::{Int, Str, Variant};
+
+    // Nullary case: empty payload.
+    assert_eq!(
+        e.call_values("classify", &[Int(0)]).unwrap(),
+        Variant("Eof".into(), vec![])
+    );
+    // `str` payload: a freshly-built heap string, copied out with its retained
+    // reference released.
+    assert_eq!(
+        e.call_values("classify", &[Int(1)]).unwrap(),
+        Variant("Ident".into(), vec![Str("a long ident value!".into())])
+    );
+    // Scalar (i64) payload.
+    assert_eq!(
+        e.call_values("classify", &[Int(2)]).unwrap(),
+        Variant("Count".into(), vec![Int(42)])
+    );
+    // `char` payload rides its codepoint as an `Int`.
+    assert_eq!(
+        e.call_values("classify", &[Int(9)]).unwrap(),
+        Variant("Mark".into(), vec![Int('Z' as i64)])
+    );
+}
+
+#[test]
+fn call_values_marshals_variant_param() {
+    // A variant passed as `FfiValue::Variant` is written into a caller-allocated
+    // buffer (tag at offset 0, payload at each field's offset); the callee gets a
+    // pointer to it — the same ABI as a struct param, on the input side.
+    let e = Engine::compile(VARIANT_SRC).unwrap();
+    use aipl::FfiValue::{Int, Str, Variant};
+
+    // Nullary case round-trips through `describe`.
+    assert_eq!(
+        e.call_values("describe", &[Variant("Eof".into(), vec![])])
+            .unwrap(),
+        Str("eof".into())
+    );
+    // A `str` payload (long enough to be heap, exercising the borrowed-str path).
+    assert_eq!(
+        e.call_values(
+            "describe",
+            &[Variant(
+                "Ident".into(),
+                vec![Str("the identifier text".into())]
+            )]
+        )
+        .unwrap(),
+        Str("the identifier text".into())
+    );
+    // A scalar payload survives the round trip: `count_of(Count(n)) == n`.
+    assert_eq!(
+        e.call_values("count_of", &[Variant("Count".into(), vec![Int(99)])])
+            .unwrap(),
+        Int(99)
+    );
+
+    // Unknown case name is rejected.
+    assert!(e
+        .call_values("describe", &[Variant("Nope".into(), vec![])])
+        .is_err());
+    // Wrong payload arity is rejected.
+    assert!(e
+        .call_values("describe", &[Variant("Ident".into(), vec![])])
+        .is_err());
+    // FfiValue::Variant for a non-variant param is rejected.
+    let e2 = Engine::compile("pub fn id(x: i64) -> i64 { x }").unwrap();
+    assert!(e2
+        .call_values("id", &[Variant("Eof".into(), vec![])])
+        .is_err());
+}
+
+#[test]
+fn call_values_marshals_optional_variant_return() {
+    // `Token?` — an optional whose core is a variant — rides the sret pointer as a
+    // flattened `{ tag, Token }`, marshaled back as `Opt(Some(Variant))` / `Opt(None)`.
+    let e = Engine::compile(VARIANT_SRC).unwrap();
+    use aipl::FfiValue::{Int, Opt, Variant};
+    assert_eq!(
+        e.call_values("maybe_tok", &[Int(1)]).unwrap(),
+        Opt(Some(Box::new(Variant("Count".into(), vec![Int(7)]))))
+    );
+    assert_eq!(e.call_values("maybe_tok", &[Int(0)]).unwrap(), Opt(None));
+}
+
+#[test]
+fn call_values_rejects_variant_with_nonscalar_payload() {
+    // A variant case whose payload isn't scalar/`str` (here an array) can't be
+    // marshaled — the active case is only known at runtime, so `check_ffi_return`
+    // rejects the whole type up front rather than risk mis-reading a case.
+    let src = "\
+variant Bag = Full(i64[]) | Empty
+pub fn make() -> Bag { Full([1, 2]) }";
+    let e = Engine::compile(src).unwrap();
+    assert!(e.call_values("make", &[]).is_err());
+}
+
 #[test]
 fn call_values_validates_variant_against_param_type() {
     let src = "\

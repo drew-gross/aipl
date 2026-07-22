@@ -2442,8 +2442,9 @@ impl TypeDef {
 /// the builtin `Error`) is `Str`; an optional `T?` over a scalar or `str` core
 /// is `Opt`; a `Result` is `Res` (only as a *return* value so far — optionals
 /// and results can't be passed as arguments yet). A `struct` of scalar/`str`
-/// fields is `Struct`, also return-only. Other composites (arrays, sets, dicts,
-/// variants) aren't marshalable yet.
+/// fields is `Struct`, and a `variant` whose active case's payload is all
+/// scalar/`str` is `Variant` — both marshal in *and* out. Other composites
+/// (arrays, sets, dicts) aren't marshalable yet.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FfiValue {
     /// A scalar AIPL value at its `i64` ABI.
@@ -2451,17 +2452,23 @@ pub enum FfiValue {
     /// An AIPL `str` (or the builtin `Error`, which shares its representation).
     Str(String),
     /// An AIPL optional: `Opt(None)` is `none`; `Opt(Some(v))` is `some(v)`
-    /// (nested for `T??`). The inner core is an `Int` or `Str`.
+    /// (nested for `T??`). The inner core is an `Int`, `Str`, `Struct`, or
+    /// `Variant`.
     Opt(Option<Box<FfiValue>>),
     /// An AIPL `Result<ok, err>`: `Res(Ok(v))` for `ok(v)`, `Res(Err(e))` for
     /// `err(e)`. Each side's payload is an `Int` (also standing in for a
-    /// `Unit` side, e.g. `!Error`'s ok case), `Str`, or `Struct` — whatever
-    /// [`check_ffi_return`] accepted for that side.
+    /// `Unit` side, e.g. `!Error`'s ok case), `Str`, `Struct`, or `Variant` —
+    /// whatever [`check_ffi_return`] accepted for that side.
     Res(Result<Box<FfiValue>, Box<FfiValue>>),
     /// An AIPL `struct`: its fields in declaration order, each a `(name, value)`.
     /// Returned through a hidden sret pointer (like an optional). Fields are
     /// scalars (`Int`) or `str` (`Str`) for now — see [`Compilation::call_values`].
     Struct(Vec<(String, FfiValue)>),
+    /// An AIPL `variant` (sum type): the active case's constructor name plus its
+    /// payload values in positional order (empty for a nullary case). Passed and
+    /// returned through a hidden sret pointer, like a struct. Each payload value
+    /// is a scalar (`Int`) or `str` (`Str`) — see [`Compilation::call_values`].
+    Variant(String, Vec<FfiValue>),
 }
 
 pub struct Compilation {
@@ -4047,6 +4054,9 @@ impl Compilation {
         // A `struct` returned directly (not under an optional); read back field by
         // field from the sret buffer.
         let ret_struct = ffi_struct_layout(&info.return_ty, &self.structs);
+        // A `variant` returned directly; read back tag + payload from the sret
+        // buffer (same sret shape as a struct return).
+        let ret_variant = ffi_variant_layout(&info.return_ty, &self.structs);
 
         // Marshal each argument to its `i64` ABI, validating the variant against
         // the parameter type. A heap `str` buffer the host allocates is recorded
@@ -4124,6 +4134,90 @@ impl Compilation {
                                     "fn {name:?} parameter {i}, field {:?} is {}; only \
                                      i64/bool/char fields can be passed in a FfiValue::Struct",
                                     fl_name,
+                                    type_name(fl_ty)
+                                )));
+                            }
+                        }
+                    }
+                    struct_bufs.push(buf);
+                    abi.push(struct_bufs.last().unwrap().as_ptr() as i64);
+                }
+                FfiValue::Variant(case_name, payload) => {
+                    // Collect layout info (clone to end the borrow of self.structs):
+                    // the whole variant's size, and the active case's tag + field
+                    // (offset, ty) specs.
+                    let (buf_size, tag, field_specs) = match ffi_variant_layout(p, &self.structs) {
+                        Some(layout) => match layout.case(case_name) {
+                            Some((tag, case)) => {
+                                let specs = case
+                                    .fields
+                                    .iter()
+                                    .map(|f| (f.offset, f.ty.clone()))
+                                    .collect::<Vec<_>>();
+                                (layout.size as usize, tag, specs)
+                            }
+                            None => {
+                                for (header, content_len) in std::mem::take(&mut to_free) {
+                                    unsafe { free_dynamic_string(header, content_len) };
+                                }
+                                return Err(Error::msg(format!(
+                                    "fn {name:?} parameter {i}: variant {} has no case {:?}",
+                                    type_name(p),
+                                    case_name
+                                )));
+                            }
+                        },
+                        None => {
+                            for (header, content_len) in std::mem::take(&mut to_free) {
+                                unsafe { free_dynamic_string(header, content_len) };
+                            }
+                            return Err(Error::msg(format!(
+                                "fn {name:?} parameter {i} is {}; pass it as the matching FfiValue \
+                                 (Int for i64/bool/char, Str for str, Struct for struct, Variant \
+                                 for variant)",
+                                type_name(p)
+                            )));
+                        }
+                    };
+                    if payload.len() != field_specs.len() {
+                        for (header, content_len) in std::mem::take(&mut to_free) {
+                            unsafe { free_dynamic_string(header, content_len) };
+                        }
+                        return Err(Error::msg(format!(
+                            "fn {name:?} parameter {i}: variant {} case {:?} takes {} payload \
+                             value(s), got {}",
+                            type_name(p),
+                            case_name,
+                            field_specs.len(),
+                            payload.len()
+                        )));
+                    }
+                    // Tag at offset 0, then each payload value at its field offset.
+                    let mut buf = vec![0u8; buf_size];
+                    buf[0..8].copy_from_slice(&(tag as i64).to_ne_bytes());
+                    for (pval, (fl_offset, fl_ty)) in payload.iter().zip(field_specs.iter()) {
+                        let off = *fl_offset as usize;
+                        match pval {
+                            FfiValue::Int(v) if is_ffi_scalar(fl_ty) => {
+                                buf[off..off + 8].copy_from_slice(&v.to_ne_bytes());
+                            }
+                            FfiValue::Str(s) if is_str_repr(fl_ty) => {
+                                let (val, heap) = build_borrowed_str(s.as_bytes());
+                                if let Some(h) = heap {
+                                    to_free.push(h);
+                                }
+                                buf[off..off + 8].copy_from_slice(&val.to_ne_bytes());
+                            }
+                            _ => {
+                                for (header, content_len) in std::mem::take(&mut to_free) {
+                                    unsafe { free_dynamic_string(header, content_len) };
+                                }
+                                return Err(Error::msg(format!(
+                                    "fn {name:?} parameter {i}: variant {} case {:?} payload is \
+                                     {}; only i64/bool/char and str payloads can be passed in a \
+                                     FfiValue::Variant",
+                                    type_name(p),
+                                    case_name,
                                     type_name(fl_ty)
                                 )));
                             }
@@ -4240,6 +4334,33 @@ impl Compilation {
             return Ok(result);
         }
 
+        if let Some(layout) = ret_variant {
+            // Composite (variant) return: like the struct path — a hidden leading
+            // sret pointer, sized to the variant (widest case), read back as a
+            // `{ tag, payload }`.
+            let words = (layout.size as usize).div_ceil(8).max(1);
+            let mut sret_buf = vec![0i64; words];
+            let mut sret_abi = Vec::with_capacity(1 + abi.len());
+            sret_abi.push(sret_buf.as_mut_ptr() as i64);
+            sret_abi.extend_from_slice(&abi);
+            if sret_abi.len() > 6 {
+                for (header, content_len) in to_free {
+                    unsafe { free_dynamic_string(header, content_len) };
+                }
+                return Err(Error::msg(format!(
+                    "fn {name:?} has too many parameters for a variant return; the FFI supports \
+                     up to 5 (plus the hidden return pointer)"
+                )));
+            }
+            // SAFETY: as the struct path, but the buffer is the variant's size.
+            let _ = unsafe { invoke(ptr, &sret_abi) };
+            let result = unsafe { read_ffi_variant(sret_buf.as_ptr() as *const u8, layout) };
+            for (header, content_len) in to_free {
+                unsafe { free_dynamic_string(header, content_len) };
+            }
+            return Ok(result);
+        }
+
         // SAFETY: arity (<= 6) and per-argument types are validated above; every
         // scalar and `str` lowers to one `i64`, so the finalized code matches the
         // transmuted signature.
@@ -4296,6 +4417,18 @@ fn ffi_struct_layout<'a>(
     }
 }
 
+/// The [`VariantLayout`] for `t` if it names a `variant` (not a struct), else
+/// `None` — the FFI's gate for marshaling a variant by tag + payload.
+fn ffi_variant_layout<'a>(
+    t: &Type,
+    structs: &'a HashMap<String, TypeDef>,
+) -> Option<&'a VariantLayout> {
+    match t {
+        Type::Named(n) => structs.get(n).and_then(TypeDef::as_variant),
+        _ => None,
+    }
+}
+
 /// Validate that `ty` can be marshaled back across the embedding FFI as a return
 /// value: a scalar, `str`, `Unit`, a `struct` whose fields are all scalar/`str`,
 /// an optional (possibly nested) whose core is one of those, or a `Result`
@@ -4319,28 +4452,50 @@ fn check_ffi_return(
             check_ffi_return(name, ok, structs)?;
             check_ffi_return(name, err, structs)
         }
-        Type::Named(_) => match ffi_struct_layout(ty, structs) {
-            Some(layout) => match layout
-                .fields
-                .iter()
-                .find(|f| !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty))
-            {
-                Some(f) => Err(Error::msg(format!(
-                    "fn {name:?} returns struct {} whose field {:?} is {}; the FFI can return \
-                     only structs whose fields are all i64/bool/char or str",
-                    type_name(ty),
-                    f.name,
-                    type_name(&f.ty)
-                ))),
-                None => Ok(()),
-            },
-            // A named non-struct (a variant) isn't marshalable yet.
-            None => Err(Error::msg(format!(
-                "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs of \
-                 those, and optionals/results of those",
+        Type::Named(_) => {
+            if let Some(layout) = ffi_struct_layout(ty, structs) {
+                return match layout
+                    .fields
+                    .iter()
+                    .find(|f| !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty))
+                {
+                    Some(f) => Err(Error::msg(format!(
+                        "fn {name:?} returns struct {} whose field {:?} is {}; the FFI can return \
+                         only structs whose fields are all i64/bool/char or str",
+                        type_name(ty),
+                        f.name,
+                        type_name(&f.ty)
+                    ))),
+                    None => Ok(()),
+                };
+            }
+            if let Some(layout) = ffi_variant_layout(ty, structs) {
+                // Every case's payload must be marshalable (scalar/str), since the
+                // active case is only known at runtime.
+                for case in &layout.cases {
+                    if let Some(f) = case
+                        .fields
+                        .iter()
+                        .find(|f| !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty))
+                    {
+                        return Err(Error::msg(format!(
+                            "fn {name:?} returns variant {} whose case {:?} has a payload of type \
+                             {}; the FFI can marshal only variants whose case payloads are all \
+                             i64/bool/char or str",
+                            type_name(ty),
+                            case.name,
+                            type_name(&f.ty)
+                        )));
+                    }
+                }
+                return Ok(());
+            }
+            Err(Error::msg(format!(
+                "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs and \
+                 variants of those, and optionals/results of those",
                 type_name(ty)
-            ))),
-        },
+            )))
+        }
         _ => Err(Error::msg(format!(
             "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs of those, \
              and optionals/results of those",
@@ -4484,6 +4639,11 @@ unsafe fn read_ffi_core(
         let base = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
         return unsafe { read_ffi_struct(base, layout) };
     }
+    if let Some(layout) = ffi_variant_layout(ty, structs) {
+        // The variant (tag + payload) sits inline starting at `OPT_VALUE_OFFSET`.
+        let base = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
+        return unsafe { read_ffi_variant(base, layout) };
+    }
     // `OPT_VALUE_OFFSET` is 8 bytes, i.e. the next `i64` word.
     let raw = unsafe { *buf.add(1) };
     if is_str_repr(ty) {
@@ -4528,6 +4688,41 @@ unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout) -> FfiValue {
         })
         .collect();
     FfiValue::Struct(fields)
+}
+
+/// Read a variant (`layout`) the callee wrote at `base` into an
+/// [`FfiValue::Variant`]. The tag (case index) sits at offset 0; the active
+/// case's payload fields follow from [`VARIANT_PAYLOAD_OFFSET`], each read at its
+/// byte offset — a scalar as an `Int`, a `str` copied out with the reference the
+/// callee retained on return released (mirroring [`read_ffi_struct`]).
+/// `check_ffi_return` has already ensured every case's payload is scalar/`str`.
+///
+/// SAFETY: `base` must point at a `layout`-shaped variant the callee filled, its
+/// tag a valid case index and each `str` payload carrying one retained reference.
+unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout) -> FfiValue {
+    let tag = unsafe { *(base as *const i64) } as usize;
+    let case = layout
+        .cases
+        .get(tag)
+        .expect("variant tag out of range — callee wrote an invalid case index");
+    let fields = case
+        .fields
+        .iter()
+        .map(|f| {
+            let raw = unsafe { *(base.add(f.offset as usize) as *const i64) };
+            if is_str_repr(&f.ty) {
+                let rv = raw as *const u8;
+                let mut tmp = [0u8; 8];
+                let bytes = unsafe { str_bytes(rv, &mut tmp) };
+                let s = String::from_utf8_lossy(bytes).into_owned();
+                aipl_dec(rv);
+                FfiValue::Str(s)
+            } else {
+                FfiValue::Int(raw)
+            }
+        })
+        .collect();
+    FfiValue::Variant(case.name.clone(), fields)
 }
 
 /// Name the user's `main` is exported as in the object file. The Rust
