@@ -40,11 +40,12 @@ import {
 // matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
 // raw strings, template segments) — the library strips the delimiters but leaves
 // escapes verbatim for the rule's `emit` to decode (see `unescape`); `CharVal` a
-// char literal's decoded char (a char's decoding is intrinsic to producing it);
-// `IntVal` an `Int` run's parsed value (overflow is a lex error). Matchers whose
-// text needs no processing (identifiers, punctuation, keywords, comments) carry
-// `NoValue` — slicing the span recovers the text.
-variant TokenValue = NoValue | StrVal(str) | CharVal(char) | IntVal(i64)
+// char literal's decoded char (a char's decoding is intrinsic to producing it).
+// Everything a rule can recover by slicing its span — identifiers, punctuation,
+// keywords, comments, and the `Int`/`Float` numeric runs (whose *parsing* is the
+// rule's `emit`'s job, via the `int_parse` builtin or its own) — carries
+// `NoValue`.
+variant TokenValue = NoValue | StrVal(str) | CharVal(char)
 
 // What a token is: its `kind` — a caller-defined value carrying whatever the
 // matched token means, produced by the rule's `emit` (see `Emit`) — and the
@@ -65,17 +66,16 @@ variant Seg = Plain | Head | Middle | Tail
 // one per shape the matcher's value can take (see `token_value`). `Bare` is a
 // finished kind for a valueless token (punctuation, an operator); `OfText`
 // applies a constructor to the matched text (identifiers, whose text is their
-// content); `OfStr`/`OfChar`/`OfInt` apply a constructor to a `Delimited`/…
-// string, a `CharLit` char, or an `Int` value; `OfSeg` is for a `Template`
-// rule, applied to each segment's text and its position. The chosen option must
-// match the matcher's value shape — an `OfInt` on a `Delimited` matcher, say,
-// is a lex error (see `apply_emit`).
+// content — and numeric `Int`/`Float` runs, whose emit parses the digits itself);
+// `OfStr`/`OfChar` apply a constructor to a `Delimited`/… string or a `CharLit`
+// char; `OfSeg` is for a `Template` rule, applied to each segment's text and its
+// position. The chosen option must match the matcher's value shape — an `OfStr`
+// on an `Int` matcher, say, is a lex error (see `apply_emit`).
 variant Emit<K> =
     Bare(K)
     | OfText((str) -> K)
     | OfStr((str) -> K)
     | OfChar((char) -> K)
-    | OfInt((i64) -> K)
     | OfSeg((str, Seg) -> K)
 
 // Why a lex failed: what went wrong, and the span of the offending source
@@ -147,18 +147,21 @@ struct LexError { message: str, span: Span }
 //   digit) and/or an exponent (`e`/`E`, an optional sign, at least one
 //   digit), JSON style. A bare digit run does *not* match — put a `Float`
 //   rule ahead of the int rule and each number lexes as the right one.
-// - `Int`: a decimal digit run, like `CharRun("0..9", "0..9")` — but the
-//   token carries the parsed `IntVal`, and a run that overflows i64 is a lex
-//   error at lex time rather than a bogus value later.
+// - `Int`: a decimal digit run, like `CharRun("0..9", "0..9")` — a distinct
+//   matcher because a number is not an identifier, but (like `Float`) it carries
+//   no computed value: its text is left *unparsed*, so the rule pairs it with an
+//   `OfText` emit that parses the digits itself (via the `int_parse` builtin, or
+//   its own scanner). Parsing — base, digit separators, and what overflow means —
+//   is the caller's, not the library's.
 //
 // Tokens carry values (see `TokenValue`), computed by the claiming matcher:
 // `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
 // rule's `emit` decodes — escape handling is the caller's, not the library's);
 // `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
-// de-denting is the caller's post-pass); `CharLit` the decoded `CharVal`;
-// `Template` an un-decoded `StrVal` of each segment's text (delimiters, braces
-// excluded); `Int` the parsed `IntVal`. Everything else — and every trivia
-// record — carries `NoValue`. The provided `unescape` decoder maps `\n`/`\t`/`\r`
+// de-denting is the caller's post-pass); `CharLit` the decoded `CharVal`.
+// `Template` (its segments), `Int`/`Float` (their digit text), and everything
+// else — plus every trivia record — carry `NoValue`, so an `OfText` emit recovers
+// the text and interprets it. The provided `unescape` decoder maps `\n`/`\t`/`\r`
 // to the control chars and any other `\X` to X itself; a rule that wants other
 // semantics writes its own `emit` decoder.
 variant Matcher =
@@ -458,19 +461,6 @@ pub fn unescape(self: str) -> str {
     out +++ self[run_start..]
 }
 
-// `Int`'s value: the digit run parsed by the `int_parse` builtin. The
-// matcher already guarantees `text` is a nonempty pure digit run, so the
-// only way the parse can decline is overflow — mapped to the lex error here,
-// where the span is known.
-fn int_value(text: str, at: i64) -> TokenValue!LexError {
-    match (text.int_parse()) {
-        some(v) => ok(IntVal(v)),
-        none => err(
-            LexError { message: "integer literal overflows i64", span: at..at + text.len() },
-        ),
-    }
-}
-
 // `CharLit`'s value: the one char between the quotes, escape-decoded. `text`
 // is the whole matched literal, quotes included and already validated.
 fn char_lit_value(text: str, quote: str) -> TokenValue {
@@ -484,33 +474,35 @@ fn char_lit_value(text: str, quote: str) -> TokenValue {
 
 // The value a token of matcher `m` carries, computed from its matched `text`
 // (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
-// Fallible because a value can be invalid even though the text matched (an
-// `Int` run that overflows). `Template` returns `NoValue` here only because
-// its tokens are built inside `template_scan`, which attaches each segment's
-// value itself.
-fn token_value(m: Matcher, text: str, at: i64) -> TokenValue!LexError {
+// Only the string-valued matchers carry a computed value; everything a rule can
+// recover by slicing its span (`Int`/`Float` numeric runs, identifiers, …) is
+// `NoValue`, so the rule's `emit` interprets the text itself. `Template` returns
+// `NoValue` here only because its tokens are built inside `template_scan`, which
+// attaches each segment's value itself.
+fn token_value(m: Matcher, text: str) -> TokenValue {
     match (m) {
-        CharRun(first, cont) => ok(NoValue),
-        Exact(spellings) => ok(NoValue),
-        Keyword(spellings, boundary) => ok(NoValue),
-        Delimited(delims, escapes) => ok(StrVal(text[1..text.len() - 1])),
-        Between(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
-        Nested(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
-        CharLit(quote, escapes) => ok(char_lit_value(text, quote)),
-        Template(delim, escapes) => ok(NoValue),
-        ToEol(marker) => ok(NoValue),
-        Float => ok(NoValue),
-        Int => int_value(text, at),
+        CharRun(first, cont) => NoValue,
+        Exact(spellings) => NoValue,
+        Keyword(spellings, boundary) => NoValue,
+        Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
+        Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
+        Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
+        CharLit(quote, escapes) => char_lit_value(text, quote),
+        Template(delim, escapes) => NoValue,
+        ToEol(marker) => NoValue,
+        Float => NoValue,
+        Int => NoValue,
     }
 }
 
 // Build a token's kind by applying the rule's `emit` to its matched `text` and
 // matcher-computed `value`. The emit option must agree with the value shape: a
-// `Bare`/`OfText` emit works with any (they ignore the value or take the text),
-// while `OfStr`/`OfChar`/`OfInt` need a `StrVal`/`CharVal`/`IntVal` — a mismatch
-// (or an `OfSeg`, which only a `Template` rule may use) is a lex error at
-// `span`. `token_value` guarantees the shape a well-paired rule produces, so a
-// mismatch means the rule set itself is wrong.
+// `Bare`/`OfText` emit works with any (they ignore the value or take the text —
+// so a numeric `Int`/`Float` run pairs with `OfText` and its emit parses the
+// digits), while `OfStr`/`OfChar` need a `StrVal`/`CharVal` — a mismatch (or an
+// `OfSeg`, which only a `Template` rule may use) is a lex error at `span`.
+// `token_value` guarantees the shape a well-paired rule produces, so a mismatch
+// means the rule set itself is wrong.
 fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexError {
     match (e) {
         Bare(k) => ok(k),
@@ -519,19 +511,11 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
             StrVal(s) => ok(f(s)),
             NoValue => err(emit_mismatch("OfStr", "a string", span)),
             CharVal(c) => err(emit_mismatch("OfStr", "a string", span)),
-            IntVal(n) => err(emit_mismatch("OfStr", "a string", span)),
         },
         OfChar(f) => match (value) {
             CharVal(c) => ok(f(c)),
             NoValue => err(emit_mismatch("OfChar", "a char", span)),
             StrVal(s) => err(emit_mismatch("OfChar", "a char", span)),
-            IntVal(n) => err(emit_mismatch("OfChar", "a char", span)),
-        },
-        OfInt(f) => match (value) {
-            IntVal(n) => ok(f(n)),
-            NoValue => err(emit_mismatch("OfInt", "an int", span)),
-            StrVal(s) => err(emit_mismatch("OfInt", "an int", span)),
-            CharVal(c) => err(emit_mismatch("OfInt", "an int", span)),
         },
         OfSeg(f) => err(
             LexError { message: "an OfSeg emit is only valid on a Template rule", span },
@@ -554,14 +538,13 @@ struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: i64 }
 // length `n` is 0, otherwise `n` chars consumed producing the rule's one
 // token — recorded as trivia for a `trivia` rule, or nothing at all for a
 // `skip` rule. The token's kind comes from the rule's `emit` applied to the
-// matcher-computed value, either of which can fail (an `Int` run that overflows,
-// an emit/value-shape mismatch).
+// matcher-computed value, which can fail on an emit/value-shape mismatch.
 fn step_result<K>(r: TokenRule<K>, src: str, at: i64, n: i64) -> StepResult<K>!LexError {
     if (n == 0 || r.skip) {
         return ok(StepResult { tokens: [], trivia: [], end: at + n });
     };
     let text = src[at..at + n];
-    let v = token_value(r.matcher, text, at)?;
+    let v = token_value(r.matcher, text);
     let kind = apply_emit(r.emit, text, v, at..at + n)?;
     let t = Token { kind, span: at..at + n };
     if (r.trivia) {
@@ -631,7 +614,6 @@ fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
         OfText(f) => err(seg_needs_ofseg(span)),
         OfStr(f) => err(seg_needs_ofseg(span)),
         OfChar(f) => err(seg_needs_ofseg(span)),
-        OfInt(f) => err(seg_needs_ofseg(span)),
     }
 }
 
@@ -782,6 +764,7 @@ variant Kind =
     Ws
     | Ident(str)
     | IntTok(i64)
+    | IntOverflow
     | Digits
     | Op
     | Kw
@@ -819,6 +802,17 @@ fn tpl_kind(text: str, seg: Seg) -> Kind {
 // The `OfStr` emit for the escaped-string test below: the library hands the raw
 // (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
 fn esc_str(text: str) -> Kind { Str(text.unescape()) }
+
+// The `OfText` emit for the `Int` test below: the library hands the raw digit
+// run, so this emit parses it — here with the `int_parse` builtin, mapping an
+// i64 overflow to its own `IntOverflow` kind (a bignum lexer would parse into a
+// wide type instead). Parsing policy is the caller's, not the library's.
+fn int_tok(text: str) -> Kind {
+    match (text.int_parse()) {
+        some(v) => IntTok(v),
+        none => IntOverflow,
+    }
+}
 
 fn rawtpl_kind(text: str, seg: Seg) -> Kind {
     match (seg) {
@@ -875,8 +869,8 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
 
     // Reusable rules. Each pairs a matcher with an `emit` that builds a `Kind`:
-    // `OfText`/`OfStr`/`OfChar`/`OfInt` apply a constructor to the matched
-    // text/value; `Bare` is a fixed kind; a skip rule's emit is never applied.
+    // `OfText`/`OfStr`/`OfChar` apply a constructor to the matched text/value;
+    // `Bare` is a fixed kind; a skip rule's emit is never applied.
     let ws = TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Ws), skip: true };
     let ident = TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Ident) };
     let digits = TokenRule { matcher: CharRun("0123456789", "0123456789"), emit: Bare(Digits) };
@@ -957,14 +951,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("''", chr) == err(lex_err("empty char literal", 0, 2)));
     assert(lex("'\\q'", chr) == err(lex_err("unknown escape sequence", 1, 3)));
 
-    // Int: an `OfInt` emit carries the parsed value; an overflowing run is a lex
-    // error at lex time.
-    let ints = [ws, TokenRule { matcher: Int, emit: OfInt(IntTok) }, ident];
+    // Int: the matcher only claims the digit run; the `OfText` emit (`int_tok`)
+    // parses it. Overflow is no longer a lex error — `int_tok` decides what it
+    // means (here, its own `IntOverflow` kind), so parsing policy is the caller's.
+    let ints = [ws, TokenRule { matcher: Int, emit: OfText(int_tok) }, ident];
     assert(lex("42", ints) == ok(toks([tok(IntTok(42), 0, 2)])));
     assert(lex("0 7", ints) == ok(toks([tok(IntTok(0), 0, 1), tok(IntTok(7), 2, 3)])));
-    assert(
-        lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
-    );
+    assert(lex("9223372036854775808", ints) == ok(toks([tok(IntOverflow, 0, 19)])));
 
     // Float before int: a fraction/exponent extends a digit run; a bare run
     // falls through to the digit rule.
@@ -1069,7 +1062,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ws,
         TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: OfStr(Str) },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
-        TokenRule { matcher: Int, emit: OfInt(IntTok) },
+        TokenRule { matcher: Int, emit: OfText(int_tok) },
         TokenRule { matcher: Keyword(["true", "false", "null"], alnum), emit: Bare(Kw) },
         TokenRule { matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]), emit: Bare(Punct) },
     ];
@@ -1097,7 +1090,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true },
         TokenRule { matcher: Keyword(["fn", "let", "mut", "set"], alnum), emit: Bare(Kw) },
         ident,
-        TokenRule { matcher: Int, emit: OfInt(IntTok) },
+        TokenRule { matcher: Int, emit: OfText(int_tok) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(Str) },
         TokenRule { matcher: Exact(["==", "->", "&&", "=", ";"]), emit: Bare(Op) },
     ];
@@ -1114,19 +1107,19 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1178
-deallocations: 1178
+allocations: 1183
+deallocations: 1183
 reallocations: 0
-bytes allocated: 57464
-instructions executed: 259591
-binary size: 787200
+bytes allocated: 57720
+instructions executed: 256209
+binary size: 781288
 --- monomorphizations ---
+__builtin_count_while$char$s0$lam21
+__builtin_count_while$char$s0$lam26
 __builtin_count_while$char$s0$lam27
-__builtin_count_while$char$s0$lam32
-__builtin_count_while$char$s0$lam33
-__builtin_count_while$char$s0$lam53
+__builtin_count_while$char$s0$lam44
 __builtin_int_parse
-__builtin_is_some_and$char$lam43
+__builtin_is_some_and$char$lam39
 __lambda_0
 __lambda_1
 __lambda_10
@@ -1135,13 +1128,7 @@ __lambda_12
 __lambda_13
 __lambda_14
 __lambda_15
-__lambda_16
-__lambda_17
-__lambda_18
-__lambda_19
 __lambda_2
-__lambda_20
-__lambda_21
 __lambda_3
 __lambda_4
 __lambda_5
@@ -1156,6 +1143,7 @@ delimited_len
 emit_mismatch
 esc_str
 float_len
+int_tok
 interp_scan$Kind
 lex$Kind
 lex_err
