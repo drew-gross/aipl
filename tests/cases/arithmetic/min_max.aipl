@@ -21,8 +21,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 135
-binary size: 2688
+instructions executed: 147
+binary size: 2704
 --- monomorphizations ---
 clamp_low
 main

@@ -41,8 +41,8 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 99
-binary size: 2816
+instructions executed: 113
+binary size: 2840
 --- monomorphizations ---
 dbl
 inc

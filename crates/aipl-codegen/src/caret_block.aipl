@@ -90,8 +90,8 @@ allocations: 83
 deallocations: 83
 reallocations: 26
 bytes allocated: 3022
-instructions executed: 4626
-binary size: 10072
+instructions executed: 6181
+binary size: 10088
 --- monomorphizations ---
 __enumerate0
 __m1__line_at

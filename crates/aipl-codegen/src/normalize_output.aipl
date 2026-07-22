@@ -25,8 +25,8 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 360
-instructions executed: 977
-binary size: 4080
+instructions executed: 1257
+binary size: 4104
 --- monomorphizations ---
 main
 normalize_output

@@ -24,8 +24,8 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 84
-instructions executed: 465
-binary size: 2784
+instructions executed: 620
+binary size: 2800
 --- monomorphizations ---
 count_eq$char$s0
 main

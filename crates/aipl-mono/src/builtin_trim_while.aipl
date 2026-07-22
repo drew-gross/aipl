@@ -27,8 +27,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 466
-binary size: 6080
+instructions executed: 605
+binary size: 6104
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam14
 __builtin_count_while$char$s0$lam15

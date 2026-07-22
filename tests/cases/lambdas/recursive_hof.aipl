@@ -13,8 +13,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 54
-binary size: 1024
+instructions executed: 55
+binary size: 1048
 --- monomorphizations ---
 main
 rec$lam2

@@ -21,8 +21,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 70
-binary size: 1872
+instructions executed: 79
+binary size: 1896
 --- monomorphizations ---
 main
 wrap$i64

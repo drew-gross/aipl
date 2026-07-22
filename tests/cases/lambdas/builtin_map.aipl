@@ -22,8 +22,8 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 616
-instructions executed: 1408
-binary size: 6408
+instructions executed: 2061
+binary size: 6368
 --- monomorphizations ---
 __map11$own0
 main

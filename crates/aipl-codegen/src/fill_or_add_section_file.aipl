@@ -29,7 +29,7 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 74
+instructions executed: 88
 binary size: 10376
 --- monomorphizations ---
 __enumerate2

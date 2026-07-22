@@ -21,7 +21,7 @@ use cranelift::{
     },
     prelude::{
         settings, types, AbiParam, Configurable, FunctionBuilder, FunctionBuilderContext,
-        InstBuilder, IntCC, MemFlags, StackSlotData, StackSlotKind, Value,
+        InstBuilder, IntCC, MemFlagsData, StackSlotData, StackSlotKind, Value,
     },
 };
 use cranelift_jit::{JITBuilder, JITModule};
@@ -5031,11 +5031,11 @@ fn canon_int(builder: &mut FunctionBuilder, v: Value, p: Primitive) -> Value {
     }
     let shift = i64::from(64 - bits);
     if p.int_signed() {
-        let l = builder.ins().ishl_imm(v, shift);
-        builder.ins().sshr_imm(l, shift)
+        let l = builder.ins().ishl_imm_u(v, shift);
+        builder.ins().sshr_imm_u(l, shift)
     } else {
         let mask = (1i64 << bits) - 1;
-        builder.ins().band_imm(v, mask)
+        builder.ins().band_imm_u(v, mask)
     }
 }
 
@@ -5102,8 +5102,8 @@ fn emit_int_addsub(
             let br = builder.ins().bxor(rv, raw);
             builder.ins().band(ar, br)
         };
-        let overflowed = builder.ins().icmp_imm(IntCC::SignedLessThan, both, 0);
-        let is_neg = builder.ins().icmp_imm(IntCC::SignedLessThan, lv, 0);
+        let overflowed = builder.ins().icmp_imm_s(IntCC::SignedLessThan, both, 0);
+        let is_neg = builder.ins().icmp_imm_s(IntCC::SignedLessThan, lv, 0);
         let maxc = builder.ins().iconst(types::I64, i64::MAX);
         let minc = builder.ins().iconst(types::I64, i64::MIN);
         let sat = builder.ins().select(is_neg, minc, maxc);
@@ -5394,7 +5394,7 @@ fn env_load(
     Ok(match binding {
         EnvBinding::Immut(v, t) => (*v, t.clone()),
         EnvBinding::Mut(slot, t, _) => {
-            let v = builder.ins().stack_load(types::I64, *slot, 0);
+            let v = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
             (v, t.borrow().clone())
         }
     })
@@ -5631,7 +5631,7 @@ fn define_fn<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(*v, slot, 0);
+                builder.ins().stack_store(types::I64, *v, slot, 0);
                 env.insert(
                     p.name.clone(),
                     EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), false),
@@ -5696,7 +5696,7 @@ fn define_fn<M: Module>(
         let ret_val = if mutating {
             builder
                 .ins()
-                .stack_load(types::I64, self_slot.expect("mut self slot"), 0)
+                .stack_load(types::I64, types::I64, self_slot.expect("mut self slot"), 0)
         } else if unit_main {
             builder.ins().iconst(types::I64, 0)
         } else if error_main {
@@ -5730,7 +5730,7 @@ fn define_fn<M: Module>(
         } else {
             builder.ins().return_(&[ret_val]);
         }
-        builder.finalize();
+        builder.finalize(module.target_config());
     }
 
     // Tag the function with its real `FuncId` so the printed IR header reads
@@ -5818,16 +5818,36 @@ fn rc_statically_noop(func: &Function, v: Value) -> bool {
             let raw = imm.bits();
             raw == 0 || raw & TAG_MASK as i64 == INLINE_TAG as i64
         }
-        InstructionData::BinaryImm64 {
-            opcode: Opcode::IaddImm,
-            arg,
-            imm,
-        } if imm.bits() == STR_HEADER_SIZE as i64 => {
-            matches!(
-                func.dfg.value_def(arg),
-                ValueDef::Result(def, _)
-                    if func.dfg.insts[def].opcode() == Opcode::SymbolValue
-            )
+        // `iadd_imm` no longer lowers to a single `BinaryImm64`/`IaddImm`
+        // instruction: it materializes the immediate as an `iconst` and emits a
+        // plain `iadd`. So `symbol_value + STR_HEADER_SIZE` now appears as
+        // `iadd(symbol_value, iconst STR_HEADER_SIZE)`.
+        InstructionData::Binary {
+            opcode: Opcode::Iadd,
+            args,
+        } => {
+            let is_symbol = |val: Value| {
+                matches!(
+                    func.dfg.value_def(val),
+                    ValueDef::Result(def, _)
+                        if func.dfg.insts[def].opcode() == Opcode::SymbolValue
+                )
+            };
+            let is_header_const = |val: Value| {
+                matches!(
+                    func.dfg.value_def(val),
+                    ValueDef::Result(def, _)
+                        if matches!(
+                            func.dfg.insts[def],
+                            InstructionData::UnaryImm {
+                                opcode: Opcode::Iconst,
+                                imm,
+                            } if imm.bits() == STR_HEADER_SIZE as i64
+                        )
+                )
+            };
+            let [a, b] = args;
+            (is_symbol(a) && is_header_const(b)) || (is_symbol(b) && is_header_const(a))
         }
         _ => false,
     }
@@ -5865,10 +5885,10 @@ fn emit_char_at<M: Module>(
     let raw = builder.inst_results(inst)[0];
     let slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-    let is_some_b = builder.ins().icmp_imm(IntCC::NotEqual, raw, -1);
+    let is_some_b = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, -1);
     let tag = builder.ins().uextend(types::I64, is_some_b);
-    builder.ins().stack_store(tag, slot, 0);
-    builder.ins().stack_store(raw, slot, 8);
+    builder.ins().stack_store(types::I64, tag, slot, 0);
+    builder.ins().stack_store(types::I64, raw, slot, 8);
     builder.ins().stack_addr(types::I64, slot, 0)
 }
 
@@ -5918,7 +5938,7 @@ fn drop_scope<M: Module>(
     for t in scope {
         let v = match t.owned {
             Owned::Value(v) => v,
-            Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
+            Owned::Slot(slot) => builder.ins().stack_load(types::I64, types::I64, slot, 0),
         };
         emit_drop(builder, module, builtins, structs, v, &t.ty);
     }
@@ -5986,11 +6006,11 @@ fn component(
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
     if is_composite(ty, structs) {
-        builder.ins().iadd_imm(base, offset as i64)
+        builder.ins().iadd_imm_s(base, offset as i64)
     } else {
         builder
             .ins()
-            .load(types::I64, MemFlags::trusted(), base, offset as i32)
+            .load(types::I64, MemFlagsData::trusted(), base, offset as i32)
     }
 }
 
@@ -6007,7 +6027,7 @@ fn store_array_elem(
     if is_composite(src_ty, structs) {
         copy_composite(builder, slot, v, src_ty, structs);
     } else {
-        builder.ins().store(MemFlags::trusted(), v, slot, 0);
+        builder.ins().store(MemFlagsData::trusted(), v, slot, 0);
     }
 }
 
@@ -6032,16 +6052,16 @@ fn emit_build_some(
         Type::Optional(_) => {
             let inner_tag = builder
                 .ins()
-                .load(types::I64, MemFlags::trusted(), x_val, 0);
-            let tag = builder.ins().iadd_imm(inner_tag, 1);
+                .load(types::I64, MemFlagsData::trusted(), x_val, 0);
+            let tag = builder.ins().iadd_imm_s(inner_tag, 1);
             let cv = component(builder, x_val, OPT_VALUE_OFFSET, core, structs);
             (tag, cv)
         }
         // Wrapping a non-optional: it is the core, tag 1.
         _ => (builder.ins().iconst(types::I64, 1), x_val),
     };
-    builder.ins().store(MemFlags::trusted(), tag, slot, 0);
-    let val_addr = builder.ins().iadd_imm(slot, OPT_VALUE_OFFSET as i64);
+    builder.ins().store(MemFlagsData::trusted(), tag, slot, 0);
+    let val_addr = builder.ins().iadd_imm_s(slot, OPT_VALUE_OFFSET as i64);
     store_array_elem(builder, val_addr, core_val, core, structs);
 }
 
@@ -6152,16 +6172,19 @@ fn runtime_elem_size(elem: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
 /// Strip array representation tag bits from a pointer in Cranelift IR.
 /// This is the IR equivalent of `arr_untag` in the runtime.
 fn arr_base(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
-    builder.ins().band_imm(arr_ptr, !(ARR_TAG_MASK as i64))
+    builder.ins().band_imm_u(arr_ptr, !(ARR_TAG_MASK as i64))
 }
 
 /// Load the length of an array (any repr) in Cranelift IR.  Strips the tag
 /// before reading, because tagged pointers are not valid addresses.
 fn load_arr_len(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
     let u = arr_base(builder, arr_ptr);
-    builder
-        .ins()
-        .load(types::I64, MemFlags::trusted(), u, ARR_LEN_OFFSET as i32)
+    builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        u,
+        ARR_LEN_OFFSET as i32,
+    )
 }
 
 fn load_array_elem<M: Module>(
@@ -6177,10 +6200,10 @@ fn load_array_elem<M: Module>(
     // Values are passed through a stack slot (not block params) so that the
     // two-path merge stays compatible with Cranelift's block-arg API.
     let val_slot = i64_slot(builder);
-    let tag = builder.ins().band_imm(arr_ptr, ARR_TAG_MASK as i64);
+    let tag = builder.ins().band_imm_u(arr_ptr, ARR_TAG_MASK as i64);
     let is_heap = builder
         .ins()
-        .icmp_imm(IntCC::Equal, tag, ARR_HEAP_TAG as i64);
+        .icmp_imm_s(IntCC::Equal, tag, ARR_HEAP_TAG as i64);
     let heap_block = builder.create_block();
     let slow_block = builder.create_block();
     let merge = builder.create_block();
@@ -6192,28 +6215,30 @@ fn load_array_elem<M: Module>(
     builder.switch_to_block(heap_block);
     builder.seal_block(heap_block);
     let untagged = arr_base(builder, arr_ptr);
-    let base = builder.ins().iadd_imm(untagged, ARR_ELEMS_OFFSET as i64);
+    let base = builder.ins().iadd_imm_s(untagged, ARR_ELEMS_OFFSET as i64);
     let heap_val = if is_bit_packed(elem) {
-        let byte_off = builder.ins().ushr_imm(idx, 3);
+        let byte_off = builder.ins().ushr_imm_u(idx, 3);
         let byte_addr = builder.ins().iadd(base, byte_off);
         let byte = builder
             .ins()
-            .load(types::I8, MemFlags::trusted(), byte_addr, 0);
+            .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
         let byte = builder.ins().uextend(types::I64, byte);
-        let bit_idx = builder.ins().band_imm(idx, 7);
+        let bit_idx = builder.ins().band_imm_u(idx, 7);
         let shifted = builder.ins().ushr(byte, bit_idx);
-        builder.ins().band_imm(shifted, 1)
+        builder.ins().band_imm_u(shifted, 1)
     } else {
         let stride = elem_size_of(elem, structs);
-        let off = builder.ins().imul_imm(idx, stride);
+        let off = builder.ins().imul_imm_s(idx, stride);
         let addr = builder.ins().iadd(base, off);
         if is_composite(elem, structs) {
             addr
         } else {
-            builder.ins().load(types::I64, MemFlags::trusted(), addr, 0)
+            builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), addr, 0)
         }
     };
-    builder.ins().stack_store(heap_val, val_slot, 0);
+    builder.ins().stack_store(types::I64, heap_val, val_slot, 0);
     builder.ins().jump(merge, &[]);
 
     // Slow path: non-heap repr — call runtime dispatch.
@@ -6233,15 +6258,19 @@ fn load_array_elem<M: Module>(
         if is_composite(elem, structs) {
             addr
         } else {
-            builder.ins().load(types::I64, MemFlags::trusted(), addr, 0)
+            builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), addr, 0)
         }
     };
-    builder.ins().stack_store(slow_val, val_slot, 0);
+    builder.ins().stack_store(types::I64, slow_val, val_slot, 0);
     builder.ins().jump(merge, &[]);
 
     builder.switch_to_block(merge);
     builder.seal_block(merge);
-    builder.ins().stack_load(types::I64, val_slot, 0)
+    builder
+        .ins()
+        .stack_load(types::I64, types::I64, val_slot, 0)
 }
 
 /// Byte `idx` of a str-shaped `char[]` (see `is_char_array`), without
@@ -6388,8 +6417,10 @@ fn emit_rc<M: Module>(
             // k < depth carries no heap, so its garbage value is never touched.
             let depth = opt_depth(ty) as i64;
             let core = opt_core(ty);
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
-            let full = builder.ins().icmp_imm(IntCC::Equal, tag, depth);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
+            let full = builder.ins().icmp_imm_s(IntCC::Equal, tag, depth);
             let then_b = builder.create_block();
             let merge = builder.create_block();
             builder.ins().brif(full, then_b, &[], merge, &[]);
@@ -6405,12 +6436,14 @@ fn emit_rc<M: Module>(
             // tag 1 = Ok, 0 = Err; the 8-byte value at `OPT_VALUE_OFFSET` holds
             // the active payload. Release/retain whichever side is live (and only
             // when that side carries heap).
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
             let rc_side = |b: &mut FunctionBuilder, m: &mut M, want_tag: i64, side: &Type| {
                 if !needs_drop(side, structs) {
                     return;
                 }
-                let is_side = b.ins().icmp_imm(IntCC::Equal, tag, want_tag);
+                let is_side = b.ins().icmp_imm_s(IntCC::Equal, tag, want_tag);
                 let then_b = b.create_block();
                 let merge = b.create_block();
                 b.ins().brif(is_side, then_b, &[], merge, &[]);
@@ -6476,12 +6509,14 @@ fn emit_variant_rc<M: Module>(
     if cases.is_empty() {
         return;
     }
-    let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
+    let tag = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), v, 0);
     let done = builder.create_block();
     for (k, fields) in cases {
         let case_b = builder.create_block();
         let next_b = builder.create_block();
-        let is_k = builder.ins().icmp_imm(IntCC::Equal, tag, k as i64);
+        let is_k = builder.ins().icmp_imm_s(IntCC::Equal, tag, k as i64);
         builder.ins().brif(is_k, case_b, &[], next_b, &[]);
         builder.switch_to_block(case_b);
         builder.seal_block(case_b);
@@ -6535,7 +6570,7 @@ fn emit_arr_starts_ends<M: Module>(
     }
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, res, 0);
+    builder.ins().stack_store(types::I64, zero, res, 0);
     let pre = builder.create_block();
     let merge = builder.create_block();
     builder.ins().brif(fits, pre, &[], merge, &[]);
@@ -6543,23 +6578,23 @@ fn emit_arr_starts_ends<M: Module>(
     builder.switch_to_block(pre);
     builder.seal_block(pre);
     let one = builder.ins().iconst(types::I64, 1);
-    builder.ins().stack_store(one, res, 0); // optimistic: all matched
-                                            // `ends_with` compares `self[la - lb + i]` to `other[i]`; `starts_with`
-                                            // uses offset 0.
+    builder.ins().stack_store(types::I64, one, res, 0); // optimistic: all matched
+                                                        // `ends_with` compares `self[la - lb + i]` to `other[i]`; `starts_with`
+                                                        // uses offset 0.
     let offset = if is_ends {
         builder.ins().isub(la, lb)
     } else {
         zero
     };
     let idx = i64_slot(builder);
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     let header = builder.create_block();
     let body = builder.create_block();
     let exit = builder.create_block();
     builder.ins().jump(header, &[]);
 
     builder.switch_to_block(header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more = builder.ins().icmp(IntCC::SignedLessThan, i, lb);
     builder.ins().brif(more, body, &[], exit, &[]);
 
@@ -6574,12 +6609,12 @@ fn emit_arr_starts_ends<M: Module>(
     builder.ins().brif(ee, cont, &[], neq, &[]);
     builder.switch_to_block(neq);
     builder.seal_block(neq);
-    builder.ins().stack_store(zero, res, 0);
+    builder.ins().stack_store(types::I64, zero, res, 0);
     builder.ins().jump(exit, &[]);
     builder.switch_to_block(cont);
     builder.seal_block(cont);
-    let next = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next, idx, 0);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
     builder.ins().jump(header, &[]);
     builder.seal_block(header);
 
@@ -6588,7 +6623,7 @@ fn emit_arr_starts_ends<M: Module>(
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
-    Ok(builder.ins().stack_load(types::I64, res, 0))
+    Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
 /// Emit a structural equality test for two values of type `ty` and return an
@@ -6635,12 +6670,16 @@ fn emit_eq<M: Module>(
         Type::Optional(_) => {
             let depth = opt_depth(ty) as i64;
             let core = opt_core(ty);
-            let tl = builder.ins().load(types::I64, MemFlags::trusted(), lv, 0);
-            let tr = builder.ins().load(types::I64, MemFlags::trusted(), rv, 0);
+            let tl = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), lv, 0);
+            let tr = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), rv, 0);
             let tags_eq = builder.ins().icmp(IntCC::Equal, tl, tr);
             let res = i64_slot(builder);
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, res, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
             let then_b = builder.create_block();
             let merge = builder.create_block();
             builder.ins().brif(tags_eq, then_b, &[], merge, &[]);
@@ -6648,25 +6687,25 @@ fn emit_eq<M: Module>(
             builder.seal_block(then_b);
             // Tags equal. The cores matter only when the chain is fully `some`
             // (tag == depth); a `none` at some layer makes tag equality decisive.
-            let is_full = builder.ins().icmp_imm(IntCC::Equal, tl, depth);
+            let is_full = builder.ins().icmp_imm_s(IntCC::Equal, tl, depth);
             let core_b = builder.create_block();
             let one_b = builder.create_block();
             builder.ins().brif(is_full, core_b, &[], one_b, &[]);
             builder.switch_to_block(one_b);
             builder.seal_block(one_b);
             let one = builder.ins().iconst(types::I64, 1);
-            builder.ins().stack_store(one, res, 0);
+            builder.ins().stack_store(types::I64, one, res, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(core_b);
             builder.seal_block(core_b);
             let cl = component(builder, lv, OPT_VALUE_OFFSET, core, structs);
             let cr = component(builder, rv, OPT_VALUE_OFFSET, core, structs);
             let ce = emit_eq(module, builder, builtins, structs, cl, cr, core)?;
-            builder.ins().stack_store(ce, res, 0);
+            builder.ins().stack_store(types::I64, ce, res, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, res, 0)
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         Type::Array(elem) => {
             let ll = load_arr_len(builder, lv);
@@ -6679,22 +6718,22 @@ fn emit_eq<M: Module>(
             } else {
                 let res = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 let pre = builder.create_block();
                 let merge = builder.create_block();
                 builder.ins().brif(len_eq, pre, &[], merge, &[]);
                 builder.switch_to_block(pre);
                 builder.seal_block(pre);
                 let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(one, res, 0); // optimistic: all-equal
+                builder.ins().stack_store(types::I64, one, res, 0); // optimistic: all-equal
                 let idx = i64_slot(builder);
-                builder.ins().stack_store(zero, idx, 0);
+                builder.ins().stack_store(types::I64, zero, idx, 0);
                 let header = builder.create_block();
                 let body = builder.create_block();
                 let exit = builder.create_block();
                 builder.ins().jump(header, &[]);
                 builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, idx, 0);
+                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
                 let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
@@ -6707,12 +6746,12 @@ fn emit_eq<M: Module>(
                 builder.ins().brif(ee, cont, &[], neq, &[]);
                 builder.switch_to_block(neq);
                 builder.seal_block(neq);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 builder.ins().jump(exit, &[]);
                 builder.switch_to_block(cont);
                 builder.seal_block(cont);
-                let next = builder.ins().iadd_imm(i, 1);
-                builder.ins().stack_store(next, idx, 0);
+                let next = builder.ins().iadd_imm_s(i, 1);
+                builder.ins().stack_store(types::I64, next, idx, 0);
                 builder.ins().jump(header, &[]);
                 builder.seal_block(header);
                 builder.switch_to_block(exit);
@@ -6720,7 +6759,7 @@ fn emit_eq<M: Module>(
                 builder.ins().jump(merge, &[]);
                 builder.switch_to_block(merge);
                 builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, res, 0)
+                builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
         Type::Set(elem) => {
@@ -6734,32 +6773,32 @@ fn emit_eq<M: Module>(
             } else {
                 let res = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 let pre = builder.create_block();
                 let merge = builder.create_block();
                 builder.ins().brif(len_eq, pre, &[], merge, &[]);
                 builder.switch_to_block(pre);
                 builder.seal_block(pre);
                 let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(one, res, 0);
+                builder.ins().stack_store(types::I64, one, res, 0);
                 let esz = builder
                     .ins()
                     .iconst(types::I64, runtime_elem_size(elem, structs));
                 let idx = i64_slot(builder);
-                builder.ins().stack_store(zero, idx, 0);
+                builder.ins().stack_store(types::I64, zero, idx, 0);
                 let header = builder.create_block();
                 let body = builder.create_block();
                 let exit = builder.create_block();
                 builder.ins().jump(header, &[]);
                 builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, idx, 0);
+                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
                 let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
                 builder.seal_block(body);
                 let el = load_array_elem(module, builder, builtins, lv, i, elem, structs);
                 let xslot = i64_slot(builder);
-                builder.ins().stack_store(el, xslot, 0);
+                builder.ins().stack_store(types::I64, el, xslot, 0);
                 let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
                 let f = builtins.import(module, builder.func, "aipl_set_contains");
                 let str_cmp = builder.ins().iconst(
@@ -6773,12 +6812,12 @@ fn emit_eq<M: Module>(
                 builder.ins().brif(c, cont, &[], missing, &[]);
                 builder.switch_to_block(missing);
                 builder.seal_block(missing);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 builder.ins().jump(exit, &[]);
                 builder.switch_to_block(cont);
                 builder.seal_block(cont);
-                let next = builder.ins().iadd_imm(i, 1);
-                builder.ins().stack_store(next, idx, 0);
+                let next = builder.ins().iadd_imm_s(i, 1);
+                builder.ins().stack_store(types::I64, next, idx, 0);
                 builder.ins().jump(header, &[]);
                 builder.seal_block(header);
                 builder.switch_to_block(exit);
@@ -6786,7 +6825,7 @@ fn emit_eq<M: Module>(
                 builder.ins().jump(merge, &[]);
                 builder.switch_to_block(merge);
                 builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, res, 0)
+                builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
         Type::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
@@ -6798,16 +6837,16 @@ fn emit_eq<M: Module>(
                 .unwrap_or_default();
             let res = i64_slot(builder);
             let one = builder.ins().iconst(types::I64, 1);
-            builder.ins().stack_store(one, res, 0);
+            builder.ins().stack_store(types::I64, one, res, 0);
             for (offset, fty) in fields {
                 let fl = component(builder, lv, offset, &fty, structs);
                 let fr = component(builder, rv, offset, &fty, structs);
                 let fe = emit_eq(module, builder, builtins, structs, fl, fr, &fty)?;
-                let cur = builder.ins().stack_load(types::I64, res, 0);
+                let cur = builder.ins().stack_load(types::I64, types::I64, res, 0);
                 let new = builder.ins().band(cur, fe);
-                builder.ins().stack_store(new, res, 0);
+                builder.ins().stack_store(types::I64, new, res, 0);
             }
-            builder.ins().stack_load(types::I64, res, 0)
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
             // Clone each case's (tag, payload fields) so we don't borrow `structs`
@@ -6827,12 +6866,16 @@ fn emit_eq<M: Module>(
                         .collect()
                 })
                 .unwrap_or_default();
-            let tl = builder.ins().load(types::I64, MemFlags::trusted(), lv, 0);
-            let tr = builder.ins().load(types::I64, MemFlags::trusted(), rv, 0);
+            let tl = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), lv, 0);
+            let tr = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), rv, 0);
             let tags_eq = builder.ins().icmp(IntCC::Equal, tl, tr);
             let res = i64_slot(builder);
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, res, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
             let then_b = builder.create_block();
             let merge = builder.create_block();
             builder.ins().brif(tags_eq, then_b, &[], merge, &[]);
@@ -6841,14 +6884,14 @@ fn emit_eq<M: Module>(
             // Same tag ⇒ equal unless the active case carries a payload to compare;
             // a nullary/no-field case is already equal (res stays 1).
             let one = builder.ins().iconst(types::I64, 1);
-            builder.ins().stack_store(one, res, 0);
+            builder.ins().stack_store(types::I64, one, res, 0);
             for (k, fields) in cases {
                 if fields.is_empty() {
                     continue;
                 }
                 let case_b = builder.create_block();
                 let next_b = builder.create_block();
-                let is_k = builder.ins().icmp_imm(IntCC::Equal, tl, k as i64);
+                let is_k = builder.ins().icmp_imm_s(IntCC::Equal, tl, k as i64);
                 builder.ins().brif(is_k, case_b, &[], next_b, &[]);
                 builder.switch_to_block(case_b);
                 builder.seal_block(case_b);
@@ -6856,9 +6899,9 @@ fn emit_eq<M: Module>(
                     let fl = component(builder, lv, offset, &fty, structs);
                     let fr = component(builder, rv, offset, &fty, structs);
                     let fe = emit_eq(module, builder, builtins, structs, fl, fr, &fty)?;
-                    let cur = builder.ins().stack_load(types::I64, res, 0);
+                    let cur = builder.ins().stack_load(types::I64, types::I64, res, 0);
                     let new = builder.ins().band(cur, fe);
-                    builder.ins().stack_store(new, res, 0);
+                    builder.ins().stack_store(types::I64, new, res, 0);
                 }
                 builder.ins().jump(merge, &[]);
                 builder.switch_to_block(next_b);
@@ -6867,7 +6910,7 @@ fn emit_eq<M: Module>(
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, res, 0)
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         Type::Dict(k, v) => {
             // Equal iff same length and every left pair's key is bound in the
@@ -6886,45 +6929,45 @@ fn emit_eq<M: Module>(
                 let psz = builder.ins().iconst(types::I64, pair_size);
                 let res = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 let pre = builder.create_block();
                 let merge = builder.create_block();
                 builder.ins().brif(len_eq, pre, &[], merge, &[]);
                 builder.switch_to_block(pre);
                 builder.seal_block(pre);
                 let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(one, res, 0); // optimistic
+                builder.ins().stack_store(types::I64, one, res, 0); // optimistic
                 let idx = i64_slot(builder);
-                builder.ins().stack_store(zero, idx, 0);
+                builder.ins().stack_store(types::I64, zero, idx, 0);
                 let header = builder.create_block();
                 let body = builder.create_block();
                 let exit = builder.create_block();
                 builder.ins().jump(header, &[]);
                 builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, idx, 0);
+                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
                 let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
                 builder.seal_block(body);
                 // Address of left pair `i`, its key (offset 0) and value (8).
                 let lv_base = arr_base(builder, lv);
-                let lelems = builder.ins().iadd_imm(lv_base, ARR_ELEMS_OFFSET as i64);
-                let off = builder.ins().imul_imm(i, pair_size);
+                let lelems = builder.ins().iadd_imm_s(lv_base, ARR_ELEMS_OFFSET as i64);
+                let off = builder.ins().imul_imm_s(i, pair_size);
                 let lpair = builder.ins().iadd(lelems, off);
                 let key = component(builder, lpair, 0, k, structs);
                 let kslot = i64_slot(builder);
-                builder.ins().stack_store(key, kslot, 0);
+                builder.ins().stack_store(types::I64, key, kslot, 0);
                 let kptr = builder.ins().stack_addr(types::I64, kslot, 0);
                 let f = builtins.import(module, builder.func, "aipl_dict_get");
                 let inst = builder.ins().call(f, &[rv, kptr, psz, str_cmp]);
                 let rslot = builder.inst_results(inst)[0];
-                let found = builder.ins().icmp_imm(IntCC::NotEqual, rslot, 0);
+                let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
                 let cmp_b = builder.create_block();
                 let missing = builder.create_block();
                 builder.ins().brif(found, cmp_b, &[], missing, &[]);
                 builder.switch_to_block(missing);
                 builder.seal_block(missing);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 builder.ins().jump(exit, &[]);
                 builder.switch_to_block(cmp_b);
                 builder.seal_block(cmp_b);
@@ -6937,12 +6980,12 @@ fn emit_eq<M: Module>(
                 builder.ins().brif(ve, cont, &[], neq, &[]);
                 builder.switch_to_block(neq);
                 builder.seal_block(neq);
-                builder.ins().stack_store(zero, res, 0);
+                builder.ins().stack_store(types::I64, zero, res, 0);
                 builder.ins().jump(exit, &[]);
                 builder.switch_to_block(cont);
                 builder.seal_block(cont);
-                let next = builder.ins().iadd_imm(i, 1);
-                builder.ins().stack_store(next, idx, 0);
+                let next = builder.ins().iadd_imm_s(i, 1);
+                builder.ins().stack_store(types::I64, next, idx, 0);
                 builder.ins().jump(header, &[]);
                 builder.seal_block(header);
                 builder.switch_to_block(exit);
@@ -6950,26 +6993,30 @@ fn emit_eq<M: Module>(
                 builder.ins().jump(merge, &[]);
                 builder.switch_to_block(merge);
                 builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, res, 0)
+                builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
         Type::Result(ok_ty, err_ty) => {
             // Equal iff same tag and the active payload (by that side's type)
             // is equal. tag 1 = Ok, 0 = Err; both payloads live at the value
             // offset.
-            let tl = builder.ins().load(types::I64, MemFlags::trusted(), lv, 0);
-            let tr = builder.ins().load(types::I64, MemFlags::trusted(), rv, 0);
+            let tl = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), lv, 0);
+            let tr = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), rv, 0);
             let tags_eq = builder.ins().icmp(IntCC::Equal, tl, tr);
             let res = i64_slot(builder);
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, res, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
             let cmp_b = builder.create_block();
             let merge = builder.create_block();
             builder.ins().brif(tags_eq, cmp_b, &[], merge, &[]);
             builder.switch_to_block(cmp_b);
             builder.seal_block(cmp_b);
             // Tags equal: compare the live payload by the matching side's type.
-            let is_ok = builder.ins().icmp_imm(IntCC::Equal, tl, 1);
+            let is_ok = builder.ins().icmp_imm_s(IntCC::Equal, tl, 1);
             let ok_b = builder.create_block();
             let err_b = builder.create_block();
             builder.ins().brif(is_ok, ok_b, &[], err_b, &[]);
@@ -6986,7 +7033,7 @@ fn emit_eq<M: Module>(
                 let ro = component(builder, rv, OPT_VALUE_OFFSET, ok_ty, structs);
                 emit_eq(module, builder, builtins, structs, lo, ro, ok_ty)?
             };
-            builder.ins().stack_store(e, res, 0);
+            builder.ins().stack_store(types::I64, e, res, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(err_b);
             builder.seal_block(err_b);
@@ -6997,11 +7044,11 @@ fn emit_eq<M: Module>(
                 let re = component(builder, rv, OPT_VALUE_OFFSET, err_ty, structs);
                 emit_eq(module, builder, builtins, structs, le, re, err_ty)?
             };
-            builder.ins().stack_store(e, res, 0);
+            builder.ins().stack_store(types::I64, e, res, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, res, 0)
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         other => {
             return Err(Error::msg(format!(
@@ -7134,8 +7181,10 @@ fn compile_ctor_eq<M: Module>(
             (tag as i64, fields)
         }
     };
-    let tag = builder.ins().load(types::I64, MemFlags::trusted(), ov, 0);
-    let tag_matches = builder.ins().icmp_imm(IntCC::Equal, tag, expect_tag);
+    let tag = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), ov, 0);
+    let tag_matches = builder.ins().icmp_imm_s(IntCC::Equal, tag, expect_tag);
     // A tagless match (void `ok()`, or a nullary variant case) carries nothing
     // to compare — matching tags alone means equal.
     let eq = if fields.is_empty() {
@@ -7143,7 +7192,7 @@ fn compile_ctor_eq<M: Module>(
     } else {
         let res = i64_slot(builder);
         let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(zero, res, 0);
+        builder.ins().stack_store(types::I64, zero, res, 0);
         let cmp_b = builder.create_block();
         let merge = builder.create_block();
         builder.ins().brif(tag_matches, cmp_b, &[], merge, &[]);
@@ -7174,6 +7223,7 @@ fn compile_ctor_eq<M: Module>(
             scopes.pop().expect("ctor-eq fields scope"),
         );
         builder.ins().stack_store(
+            types::I64,
             fields_eq.expect("fields is non-empty in this branch"),
             res,
             0,
@@ -7181,10 +7231,10 @@ fn compile_ctor_eq<M: Module>(
         builder.ins().jump(merge, &[]);
         builder.switch_to_block(merge);
         builder.seal_block(merge);
-        builder.ins().stack_load(types::I64, res, 0)
+        builder.ins().stack_load(types::I64, types::I64, res, 0)
     };
     let result = if op == 'N' {
-        builder.ins().bxor_imm(eq, 1)
+        builder.ins().bxor_imm_u(eq, 1)
     } else {
         eq
     };
@@ -7200,13 +7250,13 @@ fn emit_scalar_hash(builder: &mut FunctionBuilder, x: Value) -> Value {
         let kc = b.ins().iconst(types::I64, k as i64);
         b.ins().imul(v, kc)
     };
-    let s = builder.ins().ushr_imm(x, 30);
+    let s = builder.ins().ushr_imm_u(x, 30);
     let x = builder.ins().bxor(x, s);
     let x = mul(builder, x, 0xbf58_476d_1ce4_e5b9);
-    let s = builder.ins().ushr_imm(x, 27);
+    let s = builder.ins().ushr_imm_u(x, 27);
     let x = builder.ins().bxor(x, s);
     let x = mul(builder, x, 0x94d0_49bb_1331_11eb);
-    let s = builder.ins().ushr_imm(x, 31);
+    let s = builder.ins().ushr_imm_u(x, 31);
     builder.ins().bxor(x, s)
 }
 
@@ -7241,36 +7291,36 @@ fn emit_seq_hash<M: Module>(
 ) -> Result<Value, Error> {
     let len = load_arr_len(builder, arr);
     let acc = i64_slot(builder);
-    builder.ins().stack_store(seed, acc, 0);
+    builder.ins().stack_store(types::I64, seed, acc, 0);
     let idx = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     let header = builder.create_block();
     let body = builder.create_block();
     let exit = builder.create_block();
     builder.ins().jump(header, &[]);
     builder.switch_to_block(header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
     builder.ins().brif(more, body, &[], exit, &[]);
     builder.switch_to_block(body);
     builder.seal_block(body);
     let el = load_array_elem(module, builder, builtins, arr, i, elem, structs);
     let h = emit_hash(module, builder, builtins, structs, el, elem)?;
-    let cur = builder.ins().stack_load(types::I64, acc, 0);
+    let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
     let new = if commutative {
         builder.ins().iadd(cur, h)
     } else {
         emit_hash_combine(builder, cur, h)
     };
-    builder.ins().stack_store(new, acc, 0);
-    let next = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next, idx, 0);
+    builder.ins().stack_store(types::I64, new, acc, 0);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
     builder.ins().jump(header, &[]);
     builder.seal_block(header);
     builder.switch_to_block(exit);
     builder.seal_block(exit);
-    Ok(builder.ins().stack_load(types::I64, acc, 0))
+    Ok(builder.ins().stack_load(types::I64, types::I64, acc, 0))
 }
 
 /// Structural hash of `v` (static type `ty`) as an i64 — consistent with
@@ -7301,11 +7351,13 @@ fn emit_hash<M: Module>(
             // (tag == depth) — so `none`/`some^k(none)` hash by tag alone.
             let depth = opt_depth(ty) as i64;
             let core = opt_core(ty);
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
             let base = emit_scalar_hash(builder, tag);
             let acc = i64_slot(builder);
-            builder.ins().stack_store(base, acc, 0);
-            let is_full = builder.ins().icmp_imm(IntCC::Equal, tag, depth);
+            builder.ins().stack_store(types::I64, base, acc, 0);
+            let is_full = builder.ins().icmp_imm_s(IntCC::Equal, tag, depth);
             let core_b = builder.create_block();
             let merge = builder.create_block();
             builder.ins().brif(is_full, core_b, &[], merge, &[]);
@@ -7314,11 +7366,11 @@ fn emit_hash<M: Module>(
             let cv = component(builder, v, OPT_VALUE_OFFSET, core, structs);
             let ch = emit_hash(module, builder, builtins, structs, cv, core)?;
             let combined = emit_hash_combine(builder, base, ch);
-            builder.ins().stack_store(combined, acc, 0);
+            builder.ins().stack_store(types::I64, combined, acc, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, acc, 0)
+            builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         Type::Array(elem) => {
             let len = load_arr_len(builder, v);
@@ -7345,15 +7397,15 @@ fn emit_hash<M: Module>(
                 .unwrap_or_default();
             let acc = i64_slot(builder);
             let seed = builder.ins().iconst(types::I64, HASH_SEED);
-            builder.ins().stack_store(seed, acc, 0);
+            builder.ins().stack_store(types::I64, seed, acc, 0);
             for (offset, fty) in fields {
                 let fv = component(builder, v, offset, &fty, structs);
                 let h = emit_hash(module, builder, builtins, structs, fv, &fty)?;
-                let cur = builder.ins().stack_load(types::I64, acc, 0);
+                let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
                 let new = emit_hash_combine(builder, cur, h);
-                builder.ins().stack_store(new, acc, 0);
+                builder.ins().stack_store(types::I64, new, acc, 0);
             }
-            builder.ins().stack_load(types::I64, acc, 0)
+            builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
             let cases: Vec<(usize, Vec<(u32, Type)>)> = structs[n]
@@ -7371,10 +7423,12 @@ fn emit_hash<M: Module>(
                         .collect()
                 })
                 .unwrap_or_default();
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
             let acc = i64_slot(builder);
             let base = emit_scalar_hash(builder, tag);
-            builder.ins().stack_store(base, acc, 0);
+            builder.ins().stack_store(types::I64, base, acc, 0);
             let merge = builder.create_block();
             for (k, fields) in cases {
                 if fields.is_empty() {
@@ -7382,16 +7436,16 @@ fn emit_hash<M: Module>(
                 }
                 let case_b = builder.create_block();
                 let next_b = builder.create_block();
-                let is_k = builder.ins().icmp_imm(IntCC::Equal, tag, k as i64);
+                let is_k = builder.ins().icmp_imm_s(IntCC::Equal, tag, k as i64);
                 builder.ins().brif(is_k, case_b, &[], next_b, &[]);
                 builder.switch_to_block(case_b);
                 builder.seal_block(case_b);
                 for (offset, fty) in fields {
                     let fv = component(builder, v, offset, &fty, structs);
                     let h = emit_hash(module, builder, builtins, structs, fv, &fty)?;
-                    let cur = builder.ins().stack_load(types::I64, acc, 0);
+                    let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
                     let new = emit_hash_combine(builder, cur, h);
-                    builder.ins().stack_store(new, acc, 0);
+                    builder.ins().stack_store(types::I64, new, acc, 0);
                 }
                 builder.ins().jump(merge, &[]);
                 builder.switch_to_block(next_b);
@@ -7400,7 +7454,7 @@ fn emit_hash<M: Module>(
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, acc, 0)
+            builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         Type::Dict(key_ty, val_ty) => {
             // Order-independent over pairs (matching dict `==`): fold each pair's
@@ -7413,23 +7467,23 @@ fn emit_hash<M: Module>(
             } else {
                 let pair_size = 8 + elem_size_of(val_ty, structs);
                 let acc = i64_slot(builder);
-                builder.ins().stack_store(seed, acc, 0);
+                builder.ins().stack_store(types::I64, seed, acc, 0);
                 let idx = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, idx, 0);
+                builder.ins().stack_store(types::I64, zero, idx, 0);
                 let v_base = arr_base(builder, v);
-                let elems = builder.ins().iadd_imm(v_base, ARR_ELEMS_OFFSET as i64);
+                let elems = builder.ins().iadd_imm_s(v_base, ARR_ELEMS_OFFSET as i64);
                 let header = builder.create_block();
                 let body = builder.create_block();
                 let exit = builder.create_block();
                 builder.ins().jump(header, &[]);
                 builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, idx, 0);
+                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
                 let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
                 builder.ins().brif(more, body, &[], exit, &[]);
                 builder.switch_to_block(body);
                 builder.seal_block(body);
-                let off = builder.ins().imul_imm(i, pair_size);
+                let off = builder.ins().imul_imm_s(i, pair_size);
                 let pair = builder.ins().iadd(elems, off);
                 let kv = component(builder, pair, 0, key_ty, structs);
                 let kh = emit_hash(module, builder, builtins, structs, kv, key_ty)?;
@@ -7438,25 +7492,27 @@ fn emit_hash<M: Module>(
                 let pseed = builder.ins().iconst(types::I64, HASH_SEED);
                 let pk = emit_hash_combine(builder, pseed, kh);
                 let ph = emit_hash_combine(builder, pk, vh);
-                let cur = builder.ins().stack_load(types::I64, acc, 0);
+                let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
                 let new = builder.ins().iadd(cur, ph); // commutative over pairs
-                builder.ins().stack_store(new, acc, 0);
-                let next = builder.ins().iadd_imm(i, 1);
-                builder.ins().stack_store(next, idx, 0);
+                builder.ins().stack_store(types::I64, new, acc, 0);
+                let next = builder.ins().iadd_imm_s(i, 1);
+                builder.ins().stack_store(types::I64, next, idx, 0);
                 builder.ins().jump(header, &[]);
                 builder.seal_block(header);
                 builder.switch_to_block(exit);
                 builder.seal_block(exit);
-                builder.ins().stack_load(types::I64, acc, 0)
+                builder.ins().stack_load(types::I64, types::I64, acc, 0)
             }
         }
         Type::Result(ok_ty, err_ty) => {
             // hash(tag) combined with the active payload's hash (by its type).
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), v, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
             let base = emit_scalar_hash(builder, tag);
             let acc = i64_slot(builder);
-            builder.ins().stack_store(base, acc, 0);
-            let is_ok = builder.ins().icmp_imm(IntCC::Equal, tag, 1);
+            builder.ins().stack_store(types::I64, base, acc, 0);
+            let is_ok = builder.ins().icmp_imm_s(IntCC::Equal, tag, 1);
             let ok_b = builder.create_block();
             let err_b = builder.create_block();
             let merge = builder.create_block();
@@ -7470,7 +7526,7 @@ fn emit_hash<M: Module>(
                 let okv = component(builder, v, OPT_VALUE_OFFSET, ok_ty, structs);
                 let h = emit_hash(module, builder, builtins, structs, okv, ok_ty)?;
                 let c = emit_hash_combine(builder, base, h);
-                builder.ins().stack_store(c, acc, 0);
+                builder.ins().stack_store(types::I64, c, acc, 0);
             }
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(err_b);
@@ -7479,12 +7535,12 @@ fn emit_hash<M: Module>(
                 let errv = component(builder, v, OPT_VALUE_OFFSET, err_ty, structs);
                 let h = emit_hash(module, builder, builtins, structs, errv, err_ty)?;
                 let c = emit_hash_combine(builder, base, h);
-                builder.ins().stack_store(c, acc, 0);
+                builder.ins().stack_store(types::I64, c, acc, 0);
             }
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            builder.ins().stack_load(types::I64, acc, 0)
+            builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         other => {
             return Err(Error::msg(format!(
@@ -7792,20 +7848,20 @@ fn define_pair_rc_fn<M: Module>(
         let slot =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(zero, slot, 0);
+        builder.ins().stack_store(types::I64, zero, slot, 0);
         let header = builder.create_block();
         let body = builder.create_block();
         let exit = builder.create_block();
         builder.ins().jump(header, &[]);
 
         builder.switch_to_block(header);
-        let i = builder.ins().stack_load(types::I64, slot, 0);
+        let i = builder.ins().stack_load(types::I64, types::I64, slot, 0);
         let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
         builder.ins().brif(more, body, &[], exit, &[]);
 
         builder.switch_to_block(body);
         builder.seal_block(body);
-        let off = builder.ins().imul_imm(i, pair_size);
+        let off = builder.ins().imul_imm_s(i, pair_size);
         let pair = builder.ins().iadd(elems, off);
         // Key at offset 0 (a scalar/str: `component` loads its 8 bytes), value at
         // offset 8 (a composite is addressed, a scalar/str/array loaded).
@@ -7813,15 +7869,15 @@ fn define_pair_rc_fn<M: Module>(
         emit_rc(&mut builder, module, builtins, structs, kv, key_ty, op);
         let vv = component(&mut builder, pair, 8, val_ty, structs);
         emit_rc(&mut builder, module, builtins, structs, vv, val_ty, op);
-        let next = builder.ins().iadd_imm(i, 1);
-        builder.ins().stack_store(next, slot, 0);
+        let next = builder.ins().iadd_imm_s(i, 1);
+        builder.ins().stack_store(types::I64, next, slot, 0);
         builder.ins().jump(header, &[]);
         builder.seal_block(header);
 
         builder.switch_to_block(exit);
         builder.seal_block(exit);
         builder.ins().return_(&[]);
-        builder.finalize();
+        builder.finalize(module.target_config());
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
     ir_out.push_str(&fix_data_ref_names(
@@ -7864,32 +7920,32 @@ fn define_elem_rc_fn<M: Module>(
         let slot =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(zero, slot, 0);
+        builder.ins().stack_store(types::I64, zero, slot, 0);
         let header = builder.create_block();
         let body = builder.create_block();
         let exit = builder.create_block();
         builder.ins().jump(header, &[]);
 
         builder.switch_to_block(header);
-        let i = builder.ins().stack_load(types::I64, slot, 0);
+        let i = builder.ins().stack_load(types::I64, types::I64, slot, 0);
         let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
         builder.ins().brif(more, body, &[], exit, &[]);
 
         builder.switch_to_block(body);
         builder.seal_block(body);
-        let off = builder.ins().imul_imm(i, esz);
+        let off = builder.ins().imul_imm_s(i, esz);
         let addr = builder.ins().iadd(elems, off);
         let elem_val = component(&mut builder, addr, 0, elem, structs);
         emit_rc(&mut builder, module, builtins, structs, elem_val, elem, op);
-        let next = builder.ins().iadd_imm(i, 1);
-        builder.ins().stack_store(next, slot, 0);
+        let next = builder.ins().iadd_imm_s(i, 1);
+        builder.ins().stack_store(types::I64, next, slot, 0);
         builder.ins().jump(header, &[]);
         builder.seal_block(header);
 
         builder.switch_to_block(exit);
         builder.seal_block(exit);
         builder.ins().return_(&[]);
-        builder.finalize();
+        builder.finalize(module.target_config());
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
     ir_out.push_str(&fix_data_ref_names(
@@ -7947,21 +8003,21 @@ fn sink_bytes<M: Module>(
     n: Value,
 ) {
     if let Sink::Write(cur) = sink {
-        let dst = builder.ins().stack_load(types::I64, cur, 0);
+        let dst = builder.ins().stack_load(types::I64, types::I64, cur, 0);
         let f = cx.builtins.import(module, builder.func, "aipl_write_bytes");
         let inst = builder.ins().call(f, &[dst, src, n]);
         let adv = builder.inst_results(inst)[0];
-        builder.ins().stack_store(adv, cur, 0);
+        builder.ins().stack_store(types::I64, adv, cur, 0);
     }
 }
 
 /// In `Write` mode, write one byte (low 8 bits of `byte`) and advance the cursor.
 fn sink_byte(builder: &mut FunctionBuilder, sink: Sink, byte: Value) {
     if let Sink::Write(cur) = sink {
-        let dst = builder.ins().stack_load(types::I64, cur, 0);
-        builder.ins().istore8(MemFlags::trusted(), byte, dst, 0);
-        let adv = builder.ins().iadd_imm(dst, 1);
-        builder.ins().stack_store(adv, cur, 0);
+        let dst = builder.ins().stack_load(types::I64, types::I64, cur, 0);
+        builder.ins().istore8(MemFlagsData::trusted(), byte, dst, 0);
+        let adv = builder.ins().iadd_imm_s(dst, 1);
+        builder.ins().stack_store(types::I64, adv, cur, 0);
     }
 }
 
@@ -8011,11 +8067,11 @@ fn emit_render<M: Module>(
                 builder.inst_results(inst)[0]
             };
             if let Sink::Write(cur) = sink {
-                let dst = builder.ins().stack_load(types::I64, cur, 0);
+                let dst = builder.ins().stack_load(types::I64, types::I64, cur, 0);
                 let f = b.import(module, builder.func, write_fn);
                 let inst = builder.ins().call(f, &[dst, value]);
                 let adv = builder.inst_results(inst)[0];
-                builder.ins().stack_store(adv, cur, 0);
+                builder.ins().stack_store(types::I64, adv, cur, 0);
             }
             len
         }
@@ -8070,7 +8126,7 @@ fn emit_render<M: Module>(
                 sink_bytes(module, builder, cx, sink, src, content);
                 sink_byte(builder, sink, quote);
             }
-            builder.ins().iadd_imm(content, 2)
+            builder.ins().iadd_imm_s(content, 2)
         }
         // `char[]` is str-shaped (see `is_char_array`) but keeps its own
         // array-bracket rendering (`['a', 'b', 'c']`, not `str`'s `"abc"`) —
@@ -8127,7 +8183,7 @@ fn emit_str_literal<M: Module>(
         .map_err(|e| Error::msg(format!("define lit: {e}")))?;
     let gv = module.declare_data_in_func(data_id, builder.func);
     let base = builder.ins().symbol_value(types::I64, gv);
-    Ok(builder.ins().iadd_imm(base, STR_HEADER_SIZE as i64))
+    Ok(builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64))
 }
 
 /// Build a file-op `Result` value `{tag, value@8}` from a runtime call's raw
@@ -8149,31 +8205,34 @@ fn emit_file_result<M: Module>(
     let ok_b = builder.create_block();
     let err_b = builder.create_block();
     let merge = builder.create_block();
-    let is_ok = builder.ins().icmp_imm(IntCC::NotEqual, raw, 0);
+    let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
     builder.ins().brif(is_ok, ok_b, &[], err_b, &[]);
 
     builder.switch_to_block(ok_b);
     builder.seal_block(ok_b);
     let one = builder.ins().iconst(types::I64, 1);
-    builder.ins().store(MemFlags::trusted(), one, ptr, 0);
+    builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
     let ok_val = if ok_is_value {
         raw
     } else {
         builder.ins().iconst(types::I64, 0)
     };
-    builder
-        .ins()
-        .store(MemFlags::trusted(), ok_val, ptr, OPT_VALUE_OFFSET as i32);
+    builder.ins().store(
+        MemFlagsData::trusted(),
+        ok_val,
+        ptr,
+        OPT_VALUE_OFFSET as i32,
+    );
     builder.ins().jump(merge, &[]);
 
     builder.switch_to_block(err_b);
     builder.seal_block(err_b);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().store(MemFlags::trusted(), zero, ptr, 0);
+    builder.ins().store(MemFlagsData::trusted(), zero, ptr, 0);
     let msg = emit_str_literal(module, builder, cx, err_msg)?;
     builder
         .ins()
-        .store(MemFlags::trusted(), msg, ptr, OPT_VALUE_OFFSET as i32);
+        .store(MemFlagsData::trusted(), msg, ptr, OPT_VALUE_OFFSET as i32);
     builder.ins().jump(merge, &[]);
 
     builder.switch_to_block(merge);
@@ -8193,7 +8252,7 @@ fn emit_error_main_exit_code<M: Module>(
 ) -> Value {
     let tag = builder
         .ins()
-        .load(types::I64, MemFlags::trusted(), result_ptr, 0);
+        .load(types::I64, MemFlagsData::trusted(), result_ptr, 0);
     let ok_b = builder.create_block();
     let err_b = builder.create_block();
     let merge = builder.create_block();
@@ -8209,7 +8268,7 @@ fn emit_error_main_exit_code<M: Module>(
     builder.seal_block(err_b);
     let msg = builder.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        MemFlagsData::trusted(),
         result_ptr,
         OPT_VALUE_OFFSET as i32,
     );
@@ -8237,7 +8296,7 @@ fn emit_render_optional<M: Module>(
 ) -> Result<Value, Error> {
     let tag = builder
         .ins()
-        .load(types::I64, MemFlags::trusted(), slot_ptr, 0);
+        .load(types::I64, MemFlagsData::trusted(), slot_ptr, 0);
     render_opt_level(
         module,
         builder,
@@ -8285,7 +8344,7 @@ fn render_opt_level<M: Module>(
         emit_render(module, builder, cx, core_val, core, sink)?
     } else {
         // A `some` of a shallower optional: same slot, tag one lower.
-        let dec = builder.ins().iadd_imm(tag, -1);
+        let dec = builder.ins().iadd_imm_s(tag, -1);
         render_opt_level(module, builder, cx, slot_ptr, dec, depth - 1, core, sink)?
     };
     let close = emit_lit(module, builder, cx, sink, b")")?;
@@ -8313,7 +8372,7 @@ fn emit_render_result<M: Module>(
 ) -> Result<Value, Error> {
     let tag = builder
         .ins()
-        .load(types::I64, MemFlags::trusted(), slot_ptr, 0);
+        .load(types::I64, MemFlagsData::trusted(), slot_ptr, 0);
     let ok_b = builder.create_block();
     let err_b = builder.create_block();
     let merge = builder.create_block();
@@ -8426,13 +8485,15 @@ fn emit_render_variant<M: Module>(
             )
         })
         .collect();
-    let tag = builder.ins().load(types::I64, MemFlags::trusted(), base, 0);
+    let tag = builder
+        .ins()
+        .load(types::I64, MemFlagsData::trusted(), base, 0);
     let merge = builder.create_block();
     builder.append_block_param(merge, types::I64);
     for (k, (ctor, fields)) in cases.into_iter().enumerate() {
         let case_b = builder.create_block();
         let next_b = builder.create_block();
-        let is_k = builder.ins().icmp_imm(IntCC::Equal, tag, k as i64);
+        let is_k = builder.ins().icmp_imm_s(IntCC::Equal, tag, k as i64);
         builder.ins().brif(is_k, case_b, &[], next_b, &[]);
         builder.switch_to_block(case_b);
         builder.seal_block(case_b);
@@ -8467,9 +8528,9 @@ fn emit_render_variant<M: Module>(
 
 /// Add `v` to the i64 length accumulator in `slot`.
 fn add_len(builder: &mut FunctionBuilder, slot: StackSlot, v: Value) {
-    let cur = builder.ins().stack_load(types::I64, slot, 0);
+    let cur = builder.ins().stack_load(types::I64, types::I64, slot, 0);
     let sum = builder.ins().iadd(cur, v);
-    builder.ins().stack_store(sum, slot, 0);
+    builder.ins().stack_store(types::I64, sum, slot, 0);
 }
 
 /// Render a `char[]` as `['a', 'b', 'c']` (empty: `[]`) — `emit_render_seq`'s
@@ -8488,7 +8549,7 @@ fn emit_render_char_array<M: Module>(
     let len_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, len_slot, 0);
+    builder.ins().stack_store(types::I64, zero, len_slot, 0);
     let open_len = emit_lit(module, builder, cx, sink, b"[")?;
     add_len(builder, len_slot, open_len);
 
@@ -8507,7 +8568,7 @@ fn emit_render_char_array<M: Module>(
     let first_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     let one = builder.ins().iconst(types::I64, 1);
-    builder.ins().stack_store(one, first_slot, 0);
+    builder.ins().stack_store(types::I64, one, first_slot, 0);
 
     let header = builder.create_block();
     let body = builder.create_block();
@@ -8520,13 +8581,15 @@ fn emit_render_char_array<M: Module>(
     let byte_i64 = builder.inst_results(inst)[0];
     let more = builder
         .ins()
-        .icmp_imm(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
+        .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
     builder.ins().brif(more, body, &[], exit, &[]);
 
     builder.switch_to_block(body);
     builder.seal_block(body);
-    let is_first = builder.ins().stack_load(types::I64, first_slot, 0);
-    let is_first_b = builder.ins().icmp_imm(IntCC::NotEqual, is_first, 0);
+    let is_first = builder
+        .ins()
+        .stack_load(types::I64, types::I64, first_slot, 0);
+    let is_first_b = builder.ins().icmp_imm_s(IntCC::NotEqual, is_first, 0);
     let sep_b = builder.create_block();
     let after_sep = builder.create_block();
     builder.ins().brif(is_first_b, after_sep, &[], sep_b, &[]);
@@ -8538,7 +8601,9 @@ fn emit_render_char_array<M: Module>(
     builder.switch_to_block(after_sep);
     builder.seal_block(after_sep);
     let zero_flag = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero_flag, first_slot, 0);
+    builder
+        .ins()
+        .stack_store(types::I64, zero_flag, first_slot, 0);
 
     let elem_len = emit_render(
         module,
@@ -8556,7 +8621,9 @@ fn emit_render_char_array<M: Module>(
     builder.seal_block(exit);
     let close_len = emit_lit(module, builder, cx, sink, b"]")?;
     add_len(builder, len_slot, close_len);
-    Ok(builder.ins().stack_load(types::I64, len_slot, 0))
+    Ok(builder
+        .ins()
+        .stack_load(types::I64, types::I64, len_slot, 0))
 }
 
 /// Render an array (`[a, b, c]`) or set (`{a, b, c}`) — the two share the heap
@@ -8584,13 +8651,13 @@ fn emit_render_seq<M: Module>(
     let len_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, len_slot, 0);
+    builder.ins().stack_store(types::I64, zero, len_slot, 0);
     let open_len = emit_lit(module, builder, cx, sink, &[open])?;
     add_len(builder, len_slot, open_len);
 
     let idx =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     let count = load_arr_len(builder, arr);
 
     let header = builder.create_block();
@@ -8599,14 +8666,14 @@ fn emit_render_seq<M: Module>(
     builder.ins().jump(header, &[]);
 
     builder.switch_to_block(header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more = builder.ins().icmp(IntCC::SignedLessThan, i, count);
     builder.ins().brif(more, body, &[], exit, &[]);
 
     builder.switch_to_block(body);
     builder.seal_block(body);
     // ", " before every element but the first.
-    let is_first = builder.ins().icmp_imm(IntCC::Equal, i, 0);
+    let is_first = builder.ins().icmp_imm_s(IntCC::Equal, i, 0);
     let sep_b = builder.create_block();
     let after_sep = builder.create_block();
     builder.ins().brif(is_first, after_sep, &[], sep_b, &[]);
@@ -8624,8 +8691,8 @@ fn emit_render_seq<M: Module>(
     let elem_len = emit_render(module, builder, cx, elem_val, elem_ty, sink)?;
     add_len(builder, len_slot, elem_len);
 
-    let next = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next, idx, 0);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
     builder.ins().jump(header, &[]);
     builder.seal_block(header);
 
@@ -8633,7 +8700,9 @@ fn emit_render_seq<M: Module>(
     builder.seal_block(exit);
     let close_len = emit_lit(module, builder, cx, sink, &[close])?;
     add_len(builder, len_slot, close_len);
-    Ok(builder.ins().stack_load(types::I64, len_slot, 0))
+    Ok(builder
+        .ins()
+        .stack_load(types::I64, types::I64, len_slot, 0))
 }
 
 /// Render a dict as `{k0: v0, k1: v1, ...}` (empty: `{}`). Mirrors
@@ -8656,16 +8725,16 @@ fn emit_render_dict<M: Module>(
     let len_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, len_slot, 0);
+    builder.ins().stack_store(types::I64, zero, len_slot, 0);
     let open_len = emit_lit(module, builder, cx, sink, b"{")?;
     add_len(builder, len_slot, open_len);
 
     let idx =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     let count = load_arr_len(builder, dict);
     let dict_base = arr_base(builder, dict);
-    let elems = builder.ins().iadd_imm(dict_base, ARR_ELEMS_OFFSET as i64);
+    let elems = builder.ins().iadd_imm_s(dict_base, ARR_ELEMS_OFFSET as i64);
 
     let header = builder.create_block();
     let body = builder.create_block();
@@ -8673,14 +8742,14 @@ fn emit_render_dict<M: Module>(
     builder.ins().jump(header, &[]);
 
     builder.switch_to_block(header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more = builder.ins().icmp(IntCC::SignedLessThan, i, count);
     builder.ins().brif(more, body, &[], exit, &[]);
 
     builder.switch_to_block(body);
     builder.seal_block(body);
     // ", " before every pair but the first.
-    let is_first = builder.ins().icmp_imm(IntCC::Equal, i, 0);
+    let is_first = builder.ins().icmp_imm_s(IntCC::Equal, i, 0);
     let sep_b = builder.create_block();
     let after_sep = builder.create_block();
     builder.ins().brif(is_first, after_sep, &[], sep_b, &[]);
@@ -8692,7 +8761,7 @@ fn emit_render_dict<M: Module>(
     builder.switch_to_block(after_sep);
     builder.seal_block(after_sep);
 
-    let off = builder.ins().imul_imm(i, pair_size);
+    let off = builder.ins().imul_imm_s(i, pair_size);
     let pair = builder.ins().iadd(elems, off);
     let kv = component(builder, pair, 0, key_ty, cx.structs);
     let klen = emit_render(module, builder, cx, kv, key_ty, sink)?;
@@ -8703,8 +8772,8 @@ fn emit_render_dict<M: Module>(
     let vlen = emit_render(module, builder, cx, vv, val_ty, sink)?;
     add_len(builder, len_slot, vlen);
 
-    let next = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next, idx, 0);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
     builder.ins().jump(header, &[]);
     builder.seal_block(header);
 
@@ -8712,7 +8781,9 @@ fn emit_render_dict<M: Module>(
     builder.seal_block(exit);
     let close_len = emit_lit(module, builder, cx, sink, b"}")?;
     add_len(builder, len_slot, close_len);
-    Ok(builder.ins().stack_load(types::I64, len_slot, 0))
+    Ok(builder
+        .ins()
+        .stack_load(types::I64, types::I64, len_slot, 0))
 }
 
 /// The top-level entry for a `to_str(..)` expression: emit a call to the per-type
@@ -8836,7 +8907,9 @@ fn define_tostr_fn<M: Module>(
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let heap_slot =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-        let is_small = builder.ins().icmp_imm(IntCC::SignedLessThanOrEqual, len, 7);
+        let is_small = builder
+            .ins()
+            .icmp_imm_s(IntCC::SignedLessThanOrEqual, len, 7);
 
         let small_block = builder.create_block();
         let big_block = builder.create_block();
@@ -8848,10 +8921,12 @@ fn define_tostr_fn<M: Module>(
         builder.switch_to_block(small_block);
         builder.seal_block(small_block);
         let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(zero, scratch, 0);
+        builder.ins().stack_store(types::I64, zero, scratch, 0);
         let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-        let content_start = builder.ins().iadd_imm(scratch_addr, 1);
-        builder.ins().stack_store(content_start, cursor, 0);
+        let content_start = builder.ins().iadd_imm_s(scratch_addr, 1);
+        builder
+            .ins()
+            .stack_store(types::I64, content_start, cursor, 0);
         builder.ins().jump(write_block, &[]);
 
         builder.switch_to_block(big_block);
@@ -8859,22 +8934,24 @@ fn define_tostr_fn<M: Module>(
         let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
         let inst = builder.ins().call(alloc, &[len]);
         let buf = builder.inst_results(inst)[0];
-        builder.ins().stack_store(buf, cursor, 0);
-        builder.ins().stack_store(buf, heap_slot, 0);
+        builder.ins().stack_store(types::I64, buf, cursor, 0);
+        builder.ins().stack_store(types::I64, buf, heap_slot, 0);
         builder.ins().jump(write_block, &[]);
 
         builder.switch_to_block(write_block);
         builder.seal_block(write_block);
         // One write pass into whichever buffer the cursor was seeded with.
         emit_render(module, &mut builder, cx, value, ty, Sink::Write(cursor))?;
-        let raw = builder.ins().stack_load(types::I64, scratch, 0);
-        let shifted = builder.ins().ishl_imm(len, 2);
-        let tag = builder.ins().bor_imm(shifted, 1);
+        let raw = builder.ins().stack_load(types::I64, types::I64, scratch, 0);
+        let shifted = builder.ins().ishl_imm_u(len, 2);
+        let tag = builder.ins().bor_imm_u(shifted, 1);
         let inline_val = builder.ins().bor(raw, tag);
-        let heap_val = builder.ins().stack_load(types::I64, heap_slot, 0);
+        let heap_val = builder
+            .ins()
+            .stack_load(types::I64, types::I64, heap_slot, 0);
         let result = builder.ins().select(is_small, inline_val, heap_val);
         builder.ins().return_(&[result]);
-        builder.finalize();
+        builder.finalize(module.target_config());
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
     ir_out.push_str(&fix_data_ref_names(
@@ -9132,10 +9209,10 @@ fn bind_match_arm(
                     3,
                 ));
                 let ibase = builder.ins().stack_addr(types::I64, islot, 0);
-                let dec = builder.ins().iadd_imm(tag, -1);
-                builder.ins().store(MemFlags::trusted(), dec, ibase, 0);
+                let dec = builder.ins().iadd_imm_s(tag, -1);
+                builder.ins().store(MemFlagsData::trusted(), dec, ibase, 0);
                 let core_val = component(builder, ptr, OPT_VALUE_OFFSET, core, structs);
-                let va = builder.ins().iadd_imm(ibase, OPT_VALUE_OFFSET as i64);
+                let va = builder.ins().iadd_imm_s(ibase, OPT_VALUE_OFFSET as i64);
                 store_array_elem(builder, va, core_val, core, structs);
                 ibase
             } else {
@@ -9221,11 +9298,11 @@ fn compile_variant<M: Module>(
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3));
     let base = builder.ins().stack_addr(types::I64, slot, 0);
     let tag_v = builder.ins().iconst(types::I64, tag as i64);
-    builder.ins().store(MemFlags::trusted(), tag_v, base, 0);
+    builder.ins().store(MemFlagsData::trusted(), tag_v, base, 0);
     for ((offset, fty), arg) in fields.iter().zip(args) {
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
-        let dst = builder.ins().iadd_imm(base, *offset as i64);
+        let dst = builder.ins().iadd_imm_s(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
         // The variant co-owns each heap payload field — retain on store.
         emit_retain(builder, module, cx.builtins, cx.structs, v, fty);
@@ -9289,8 +9366,8 @@ fn contains_shape(name: &str) -> Option<SeShape> {
 /// value is `5 | (c << 8)`. No allocation, no refcount (see the SSO note). This
 /// is the `__char_to_str` builtin emitted by variadic `char*` specialization.
 fn emit_char_to_str(builder: &mut FunctionBuilder, c: Value) -> Value {
-    let shifted = builder.ins().ishl_imm(c, 8);
-    builder.ins().bor_imm(shifted, 5)
+    let shifted = builder.ins().ishl_imm_u(c, 8);
+    builder.ins().bor_imm_u(shifted, 5)
 }
 
 /// `arr.starts_with(x)` / `arr.ends_with(x)` for a single element `x` of type
@@ -9313,7 +9390,7 @@ fn emit_arr_starts_ends_elem<M: Module>(
     let len = load_arr_len(builder, arr);
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, res, 0);
+    builder.ins().stack_store(types::I64, zero, res, 0);
     let nonempty = builder.ins().icmp(IntCC::SignedGreaterThan, len, zero);
     let chk = builder.create_block();
     let merge = builder.create_block();
@@ -9321,17 +9398,17 @@ fn emit_arr_starts_ends_elem<M: Module>(
     builder.switch_to_block(chk);
     builder.seal_block(chk);
     let idx = if is_ends {
-        builder.ins().iadd_imm(len, -1)
+        builder.ins().iadd_imm_s(len, -1)
     } else {
         zero
     };
     let e = load_array_elem(module, builder, builtins, arr, idx, elem, structs);
     let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
-    builder.ins().stack_store(eq, res, 0);
+    builder.ins().stack_store(types::I64, eq, res, 0);
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
-    Ok(builder.ins().stack_load(types::I64, res, 0))
+    Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
 /// `arr.contains(x)` for a single element `x` of type `elem` — the `$ve`
@@ -9352,9 +9429,9 @@ fn emit_arr_contains_elem<M: Module>(
     let len = load_arr_len(builder, arr);
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, res, 0);
+    builder.ins().stack_store(types::I64, zero, res, 0);
     let idx = i64_slot(builder);
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     let header = builder.create_block();
     let body = builder.create_block();
     let found = builder.create_block();
@@ -9362,7 +9439,7 @@ fn emit_arr_contains_elem<M: Module>(
     builder.ins().jump(header, &[]);
 
     builder.switch_to_block(header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
     builder.ins().brif(more, body, &[], merge, &[]);
 
@@ -9374,19 +9451,19 @@ fn emit_arr_contains_elem<M: Module>(
     builder.ins().brif(eq, found, &[], cont, &[]);
     builder.switch_to_block(cont);
     builder.seal_block(cont);
-    let next = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next, idx, 0);
+    let next = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next, idx, 0);
     builder.ins().jump(header, &[]);
     builder.seal_block(header);
 
     builder.switch_to_block(found);
     builder.seal_block(found);
     let one = builder.ins().iconst(types::I64, 1);
-    builder.ins().stack_store(one, res, 0);
+    builder.ins().stack_store(types::I64, one, res, 0);
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
-    Ok(builder.ins().stack_load(types::I64, res, 0))
+    Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
 /// `arr.contains(other)` for two arrays of element type `elem` — the sequence
@@ -9412,12 +9489,12 @@ fn emit_arr_contains_seq<M: Module>(
     // needle matches, and there's no element type to compare. Skip the loops —
     // `emit_eq` can't lower a `__none__` element.
     if is_none_inner(elem) {
-        let empty = builder.ins().icmp_imm(IntCC::Equal, lb, 0);
+        let empty = builder.ins().icmp_imm_s(IntCC::Equal, lb, 0);
         return Ok(builder.ins().uextend(types::I64, empty));
     }
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
-    builder.ins().stack_store(zero, res, 0);
+    builder.ins().stack_store(types::I64, zero, res, 0);
     // A needle longer than the receiver can't occur in it (and for `lb <= la`
     // the window offsets `0..=la-lb` are valid; `lb == 0` matches at offset 0).
     let fits = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lb, la);
@@ -9429,7 +9506,7 @@ fn emit_arr_contains_seq<M: Module>(
     builder.seal_block(outer_pre);
     let limit = builder.ins().isub(la, lb);
     let start = i64_slot(builder);
-    builder.ins().stack_store(zero, start, 0);
+    builder.ins().stack_store(types::I64, zero, start, 0);
     let idx = i64_slot(builder);
     let outer_header = builder.create_block();
     let outer_body = builder.create_block();
@@ -9440,7 +9517,7 @@ fn emit_arr_contains_seq<M: Module>(
     builder.ins().jump(outer_header, &[]);
 
     builder.switch_to_block(outer_header);
-    let s = builder.ins().stack_load(types::I64, start, 0);
+    let s = builder.ins().stack_load(types::I64, types::I64, start, 0);
     let more_windows = builder.ins().icmp(IntCC::SignedLessThanOrEqual, s, limit);
     builder
         .ins()
@@ -9448,11 +9525,11 @@ fn emit_arr_contains_seq<M: Module>(
 
     builder.switch_to_block(outer_body);
     builder.seal_block(outer_body);
-    builder.ins().stack_store(zero, idx, 0);
+    builder.ins().stack_store(types::I64, zero, idx, 0);
     builder.ins().jump(inner_header, &[]);
 
     builder.switch_to_block(inner_header);
-    let i = builder.ins().stack_load(types::I64, idx, 0);
+    let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
     let more_elems = builder.ins().icmp(IntCC::SignedLessThan, i, lb);
     // The whole needle matched at this window — found.
     builder.ins().brif(more_elems, inner_body, &[], found, &[]);
@@ -9467,26 +9544,26 @@ fn emit_arr_contains_seq<M: Module>(
     builder.ins().brif(ee, inner_cont, &[], next_start, &[]);
     builder.switch_to_block(inner_cont);
     builder.seal_block(inner_cont);
-    let next_i = builder.ins().iadd_imm(i, 1);
-    builder.ins().stack_store(next_i, idx, 0);
+    let next_i = builder.ins().iadd_imm_s(i, 1);
+    builder.ins().stack_store(types::I64, next_i, idx, 0);
     builder.ins().jump(inner_header, &[]);
     builder.seal_block(inner_header);
 
     builder.switch_to_block(next_start);
     builder.seal_block(next_start);
-    let next_s = builder.ins().iadd_imm(s, 1);
-    builder.ins().stack_store(next_s, start, 0);
+    let next_s = builder.ins().iadd_imm_s(s, 1);
+    builder.ins().stack_store(types::I64, next_s, start, 0);
     builder.ins().jump(outer_header, &[]);
     builder.seal_block(outer_header);
 
     builder.switch_to_block(found);
     builder.seal_block(found);
     let one = builder.ins().iconst(types::I64, 1);
-    builder.ins().stack_store(one, res, 0);
+    builder.ins().stack_store(types::I64, one, res, 0);
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
     builder.seal_block(merge);
-    Ok(builder.ins().stack_load(types::I64, res, 0))
+    Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
 /// Compile an *indirect* call `f(args)` where `f` is a local holding a runtime
@@ -9866,7 +9943,7 @@ fn compile_call_expr<M: Module>(
             builder.seal_block(empty_b);
             builder
                 .ins()
-                .store(MemFlags::trusted(), zero, result_ptr, 0);
+                .store(MemFlagsData::trusted(), zero, result_ptr, 0);
             builder.ins().jump(done, &[]);
 
             // Non-empty: acc = elem[0]; then fold elem[1..] keeping the
@@ -9884,23 +9961,25 @@ fn compile_call_expr<M: Module>(
                 3,
             ));
             let acc0 = seq_elem(module, builder, builtins, structs, arr_ptr, zero, &arr_ty);
-            builder.ins().stack_store(acc0, acc_slot, 0);
+            builder.ins().stack_store(types::I64, acc0, acc_slot, 0);
             let one = builder.ins().iconst(types::I64, 1);
-            builder.ins().stack_store(one, i_slot, 0);
+            builder.ins().stack_store(types::I64, one, i_slot, 0);
             let header = builder.create_block();
             let body = builder.create_block();
             let after = builder.create_block();
             builder.ins().jump(header, &[]);
 
             builder.switch_to_block(header);
-            let i = builder.ins().stack_load(types::I64, i_slot, 0);
+            let i = builder.ins().stack_load(types::I64, types::I64, i_slot, 0);
             let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
             builder.ins().brif(more, body, &[], after, &[]);
 
             builder.switch_to_block(body);
             builder.seal_block(body);
             let e = seq_elem(module, builder, builtins, structs, arr_ptr, i, &arr_ty);
-            let acc = builder.ins().stack_load(types::I64, acc_slot, 0);
+            let acc = builder
+                .ins()
+                .stack_load(types::I64, types::I64, acc_slot, 0);
             let cc = if is_min {
                 IntCC::SignedLessThan
             } else {
@@ -9908,15 +9987,17 @@ fn compile_call_expr<M: Module>(
             };
             let take = builder.ins().icmp(cc, e, acc);
             let new_acc = builder.ins().select(take, e, acc);
-            builder.ins().stack_store(new_acc, acc_slot, 0);
-            let inext = builder.ins().iadd_imm(i, 1);
-            builder.ins().stack_store(inext, i_slot, 0);
+            builder.ins().stack_store(types::I64, new_acc, acc_slot, 0);
+            let inext = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, inext, i_slot, 0);
             builder.ins().jump(header, &[]);
             builder.seal_block(header);
 
             builder.switch_to_block(after);
             builder.seal_block(after);
-            let acc = builder.ins().stack_load(types::I64, acc_slot, 0);
+            let acc = builder
+                .ins()
+                .stack_load(types::I64, types::I64, acc_slot, 0);
             emit_build_some(builder, result_ptr, acc, &elem, structs);
             builder.ins().jump(done, &[]);
 
@@ -10132,10 +10213,10 @@ fn compile_call_expr<M: Module>(
             }
             let tag = builder
                 .ins()
-                .load(types::I64, MemFlags::trusted(), opt_ptr, 0);
+                .load(types::I64, MemFlagsData::trusted(), opt_ptr, 0);
             let value = builder
                 .ins()
-                .load(types::I64, MemFlags::trusted(), opt_ptr, 8);
+                .load(types::I64, MemFlagsData::trusted(), opt_ptr, 8);
             // select(tag, value, default): value when tag != 0, else default.
             let result = builder.ins().select(tag, value, default_v);
             // The result is borrowed (from the optional, or it's the default,
@@ -10170,8 +10251,10 @@ fn compile_call_expr<M: Module>(
             }
             // `is_some` is the *outermost* layer: any nonzero tag is `some`
             // (the tag can be > 1 for a nested optional), so normalize to 0/1.
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), ptr, 0);
-            let nz = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), ptr, 0);
+            let nz = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
             let b = builder.ins().uextend(types::I64, nz);
             (b, Type::Primitive(Primitive::Bool))
         }
@@ -10194,10 +10277,10 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             // Check if c is ' ', '\t', '\n', or '\r' (32, 9, 10, 13).
-            let sp = builder.ins().icmp_imm(IntCC::Equal, c, 32);
-            let tab = builder.ins().icmp_imm(IntCC::Equal, c, 9);
-            let lf = builder.ins().icmp_imm(IntCC::Equal, c, 10);
-            let cr = builder.ins().icmp_imm(IntCC::Equal, c, 13);
+            let sp = builder.ins().icmp_imm_s(IntCC::Equal, c, 32);
+            let tab = builder.ins().icmp_imm_s(IntCC::Equal, c, 9);
+            let lf = builder.ins().icmp_imm_s(IntCC::Equal, c, 10);
+            let cr = builder.ins().icmp_imm_s(IntCC::Equal, c, 13);
             let or1 = builder.ins().bor(sp, tab);
             let or2 = builder.ins().bor(lf, cr);
             let result = builder.ins().bor(or1, or2);
@@ -10225,10 +10308,10 @@ fn compile_call_expr<M: Module>(
             // Check if '0' (48) <= c <= '9' (57).
             let ge_0 = builder
                 .ins()
-                .icmp_imm(IntCC::UnsignedGreaterThanOrEqual, c, 48);
+                .icmp_imm_s(IntCC::UnsignedGreaterThanOrEqual, c, 48);
             let le_9 = builder
                 .ins()
-                .icmp_imm(IntCC::UnsignedLessThanOrEqual, c, 57);
+                .icmp_imm_s(IntCC::UnsignedLessThanOrEqual, c, 57);
             let result = builder.ins().band(ge_0, le_9);
             let b = builder.ins().uextend(types::I64, result);
             (b, Type::Primitive(Primitive::Bool))
@@ -10258,13 +10341,13 @@ fn compile_call_expr<M: Module>(
             // 0 (none). Tag = is_digit('0' (48) <= c <= '9' (57)); value = c - 48.
             let ge_0 = builder
                 .ins()
-                .icmp_imm(IntCC::UnsignedGreaterThanOrEqual, c, 48);
+                .icmp_imm_s(IntCC::UnsignedGreaterThanOrEqual, c, 48);
             let le_9 = builder
                 .ins()
-                .icmp_imm(IntCC::UnsignedLessThanOrEqual, c, 57);
+                .icmp_imm_s(IntCC::UnsignedLessThanOrEqual, c, 57);
             let is_digit = builder.ins().band(ge_0, le_9);
             let tag = builder.ins().uextend(types::I64, is_digit);
-            let value = builder.ins().iadd_imm(c, -48);
+            let value = builder.ins().iadd_imm_s(c, -48);
             let opt_ty = Type::Optional(Box::new(Type::Primitive(Primitive::I64)));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -10272,10 +10355,10 @@ fn compile_call_expr<M: Module>(
                 3,
             ));
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            builder.ins().store(MemFlags::trusted(), tag, ptr, 0);
+            builder.ins().store(MemFlagsData::trusted(), tag, ptr, 0);
             builder
                 .ins()
-                .store(MemFlags::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
+                .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
         "__builtin_len" => {
@@ -10417,8 +10500,8 @@ fn compile_call_expr<M: Module>(
                     let res = i64_slot(builder);
                     let tag = builder
                         .ins()
-                        .load(types::I64, MemFlags::trusted(), pat_v, 0);
-                    let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                        .load(types::I64, MemFlagsData::trusted(), pat_v, 0);
+                    let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
                     let some_b = builder.create_block();
                     let none_b = builder.create_block();
                     let merge = builder.create_block();
@@ -10426,13 +10509,13 @@ fn compile_call_expr<M: Module>(
                     builder.switch_to_block(none_b);
                     builder.seal_block(none_b);
                     let one = builder.ins().iconst(types::I64, 1);
-                    builder.ins().stack_store(one, res, 0);
+                    builder.ins().stack_store(types::I64, one, res, 0);
                     builder.ins().jump(merge, &[]);
                     builder.switch_to_block(some_b);
                     builder.seal_block(some_b);
                     let cv = builder.ins().load(
                         types::I64,
-                        MemFlags::trusted(),
+                        MemFlagsData::trusted(),
                         pat_v,
                         OPT_VALUE_OFFSET as i32,
                     );
@@ -10441,11 +10524,11 @@ fn compile_call_expr<M: Module>(
                     let f = builtins.import(module, builder.func, sym);
                     let inst = builder.ins().call(f, &[recv, s]);
                     let r = builder.inst_results(inst)[0];
-                    builder.ins().stack_store(r, res, 0);
+                    builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
                     builder.switch_to_block(merge);
                     builder.seal_block(merge);
-                    builder.ins().stack_load(types::I64, res, 0)
+                    builder.ins().stack_load(types::I64, types::I64, res, 0)
                 }
             } else {
                 // `T[]` pattern — element-wise structural compare. Borrows both
@@ -10486,8 +10569,8 @@ fn compile_call_expr<M: Module>(
                         let res = i64_slot(builder);
                         let tag = builder
                             .ins()
-                            .load(types::I64, MemFlags::trusted(), pat_v, 0);
-                        let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                            .load(types::I64, MemFlagsData::trusted(), pat_v, 0);
+                        let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
                         let some_b = builder.create_block();
                         let none_b = builder.create_block();
                         let merge = builder.create_block();
@@ -10495,7 +10578,7 @@ fn compile_call_expr<M: Module>(
                         builder.switch_to_block(none_b);
                         builder.seal_block(none_b);
                         let one = builder.ins().iconst(types::I64, 1);
-                        builder.ins().stack_store(one, res, 0);
+                        builder.ins().stack_store(types::I64, one, res, 0);
                         builder.ins().jump(merge, &[]);
                         builder.switch_to_block(some_b);
                         builder.seal_block(some_b);
@@ -10503,11 +10586,11 @@ fn compile_call_expr<M: Module>(
                         let r = emit_arr_starts_ends_elem(
                             module, builder, cx, recv, cv, &elem, is_ends,
                         )?;
-                        builder.ins().stack_store(r, res, 0);
+                        builder.ins().stack_store(types::I64, r, res, 0);
                         builder.ins().jump(merge, &[]);
                         builder.switch_to_block(merge);
                         builder.seal_block(merge);
-                        builder.ins().stack_load(types::I64, res, 0)
+                        builder.ins().stack_load(types::I64, types::I64, res, 0)
                     }
                 }
             };
@@ -10551,11 +10634,11 @@ fn compile_call_expr<M: Module>(
                     // Optional `char?`: `none` → false; `some(c)` → window scan.
                     let res = i64_slot(builder);
                     let zero = builder.ins().iconst(types::I64, 0);
-                    builder.ins().stack_store(zero, res, 0);
+                    builder.ins().stack_store(types::I64, zero, res, 0);
                     let tag = builder
                         .ins()
-                        .load(types::I64, MemFlags::trusted(), ndl_v, 0);
-                    let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                        .load(types::I64, MemFlagsData::trusted(), ndl_v, 0);
+                    let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
                     let some_b = builder.create_block();
                     let merge = builder.create_block();
                     builder.ins().brif(is_some, some_b, &[], merge, &[]);
@@ -10563,7 +10646,7 @@ fn compile_call_expr<M: Module>(
                     builder.seal_block(some_b);
                     let cv = builder.ins().load(
                         types::I64,
-                        MemFlags::trusted(),
+                        MemFlagsData::trusted(),
                         ndl_v,
                         OPT_VALUE_OFFSET as i32,
                     );
@@ -10572,11 +10655,11 @@ fn compile_call_expr<M: Module>(
                     let f = builtins.import(module, builder.func, "aipl_str_contains");
                     let inst = builder.ins().call(f, &[recv, s]);
                     let r = builder.inst_results(inst)[0];
-                    builder.ins().stack_store(r, res, 0);
+                    builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
                     builder.switch_to_block(merge);
                     builder.seal_block(merge);
-                    builder.ins().stack_load(types::I64, res, 0)
+                    builder.ins().stack_load(types::I64, types::I64, res, 0)
                 }
             } else {
                 // `T*` needle — element-wise structural compare. Borrows both
@@ -10618,11 +10701,11 @@ fn compile_call_expr<M: Module>(
                         // `none` → false; `some(v)` → single-element scan.
                         let res = i64_slot(builder);
                         let zero = builder.ins().iconst(types::I64, 0);
-                        builder.ins().stack_store(zero, res, 0);
+                        builder.ins().stack_store(types::I64, zero, res, 0);
                         let tag = builder
                             .ins()
-                            .load(types::I64, MemFlags::trusted(), ndl_v, 0);
-                        let is_some = builder.ins().icmp_imm(IntCC::NotEqual, tag, 0);
+                            .load(types::I64, MemFlagsData::trusted(), ndl_v, 0);
+                        let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
                         let some_b = builder.create_block();
                         let merge = builder.create_block();
                         builder.ins().brif(is_some, some_b, &[], merge, &[]);
@@ -10630,11 +10713,11 @@ fn compile_call_expr<M: Module>(
                         builder.seal_block(some_b);
                         let cv = component(builder, ndl_v, OPT_VALUE_OFFSET, &elem, structs);
                         let r = emit_arr_contains_elem(module, builder, cx, recv, cv, &elem)?;
-                        builder.ins().stack_store(r, res, 0);
+                        builder.ins().stack_store(types::I64, r, res, 0);
                         builder.ins().jump(merge, &[]);
                         builder.switch_to_block(merge);
                         builder.seal_block(merge);
-                        builder.ins().stack_load(types::I64, res, 0)
+                        builder.ins().stack_load(types::I64, types::I64, res, 0)
                     }
                 }
             };
@@ -10691,7 +10774,7 @@ fn compile_call_expr<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(x_v, s, 0);
+                builder.ins().stack_store(types::I64, x_v, s, 0);
                 let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
                 let esz = builder
                     .ins()
@@ -10790,7 +10873,7 @@ fn compile_call_expr<M: Module>(
             // An empty dict (`__none__` key/value) holds nothing — always `none`.
             if is_none_inner(&key_ty) {
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, slot, 0);
+                builder.ins().stack_store(types::I64, zero, slot, 0);
                 (sbase, result_ty)
             } else {
                 expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
@@ -10801,7 +10884,7 @@ fn compile_call_expr<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(key_v, ks, 0);
+                builder.ins().stack_store(types::I64, key_v, ks, 0);
                 let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
                 let pair_size = 8 + elem_size_of(&val_ty, structs);
                 let psz = builder.ins().iconst(types::I64, pair_size);
@@ -10812,7 +10895,7 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_dict_get");
                 let inst = builder.ins().call(f, &[dict_ptr, key_ptr, psz, str_cmp]);
                 let vslot = builder.inst_results(inst)[0]; // value addr, or 0
-                let found = builder.ins().icmp_imm(IntCC::NotEqual, vslot, 0);
+                let found = builder.ins().icmp_imm_s(IntCC::NotEqual, vslot, 0);
                 let some_b = builder.create_block();
                 let none_b = builder.create_block();
                 let merge_b = builder.create_block();
@@ -10831,7 +10914,7 @@ fn compile_call_expr<M: Module>(
                 builder.switch_to_block(none_b);
                 builder.seal_block(none_b);
                 let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(zero, slot, 0);
+                builder.ins().stack_store(types::I64, zero, slot, 0);
                 builder.ins().jump(merge_b, &[]);
 
                 builder.switch_to_block(merge_b);
@@ -10876,7 +10959,7 @@ fn compile_call_expr<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(key_v, ks, 0);
+                builder.ins().stack_store(types::I64, key_v, ks, 0);
                 let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
                 let pair_size = 8 + elem_size_of(&val_ty, structs);
                 let psz = builder.ins().iconst(types::I64, pair_size);
@@ -10899,10 +10982,10 @@ fn compile_call_expr<M: Module>(
             let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (e, _) = compile_expr(module, builder, cx, scopes, &args[2])?;
-            let base = builder.ins().iadd_imm(a_ptr, ARR_ELEMS_OFFSET as i64);
-            let off = builder.ins().imul_imm(w, 8);
+            let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
+            let off = builder.ins().imul_imm_s(w, 8);
             let addr = builder.ins().iadd(base, off);
-            builder.ins().store(MemFlags::trusted(), e, addr, 0);
+            builder.ins().store(MemFlagsData::trusted(), e, addr, 0);
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         "__filter_drop" => {
@@ -10922,7 +11005,7 @@ fn compile_call_expr<M: Module>(
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             builder
                 .ins()
-                .store(MemFlags::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
+                .store(MemFlagsData::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         "__map_set" => {
@@ -10940,15 +11023,17 @@ fn compile_call_expr<M: Module>(
             let (i_val, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
             let (new_val, new_ty) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let (old_val, old_ty) = compile_expr(module, builder, cx, scopes, &args[3])?;
-            let base = builder.ins().iadd_imm(a_ptr, ARR_ELEMS_OFFSET as i64);
-            let off = builder.ins().imul_imm(i_val, 8);
+            let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
+            let off = builder.ins().imul_imm_s(i_val, 8);
             let addr = builder.ins().iadd(base, off);
-            builder.ins().store(MemFlags::trusted(), new_val, addr, 0);
+            builder
+                .ins()
+                .store(MemFlagsData::trusted(), new_val, addr, 0);
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
             let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
             builder.ins().store(
-                MemFlags::trusted(),
+                MemFlagsData::trusted(),
                 new_drop,
                 a_ptr,
                 ARR_DROPFN_OFFSET as i32,
@@ -11052,7 +11137,7 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
             };
-            let arr_ptr = builder.ins().stack_load(types::I64, slot, 0);
+            let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, value)?;
             let elem_was_none = is_none_inner(&elem_ty);
             // An empty array (`__none__` element) takes its element type from
@@ -11092,7 +11177,7 @@ fn compile_call_expr<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(x_v, s, 0);
+                builder.ins().stack_store(types::I64, x_v, s, 0);
                 builder.ins().stack_addr(types::I64, s, 0)
             };
             let new_arr_ty = Type::Array(Box::new(result_elem));
@@ -11131,7 +11216,7 @@ fn compile_call_expr<M: Module>(
                 let len_f = builtins.import(module, builder.func, "aipl_str_len");
                 let inst = builder.ins().call(len_f, &[arr_ptr]);
                 let old_len = builder.inst_results(inst)[0];
-                let new_len = builder.ins().iadd_imm(old_len, 1);
+                let new_len = builder.ins().iadd_imm_s(old_len, 1);
                 let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
                 let inst = builder.ins().call(alloc_f, &[new_len]);
                 let buf = builder.inst_results(inst)[0];
@@ -11147,8 +11232,10 @@ fn compile_call_expr<M: Module>(
                 let copy_f = builtins.import(module, builder.func, "aipl_write_bytes");
                 builder.ins().call(copy_f, &[buf, src, old_len]);
                 let dst_addr = builder.ins().iadd(buf, old_len);
-                builder.ins().istore8(MemFlags::trusted(), x_v, dst_addr, 0);
-                builder.ins().stack_store(buf, slot, 0);
+                builder
+                    .ins()
+                    .istore8(MemFlagsData::trusted(), x_v, dst_addr, 0);
+                builder.ins().stack_store(types::I64, buf, slot, 0);
                 if exclusive {
                     // Statically proven unaliased: the old value is already
                     // owned solely by this binding's slot-track (from
@@ -11190,7 +11277,7 @@ fn compile_call_expr<M: Module>(
                     .ins()
                     .call(local, &[arr_ptr, x_ptr, drop_fn, retain_fn, esz]);
                 let new_ptr = builder.inst_results(inst)[0];
-                builder.ins().stack_store(new_ptr, slot, 0);
+                builder.ins().stack_store(types::I64, new_ptr, slot, 0);
             } else {
                 // Possibly shared: `aipl_array_push` copies its arg into a fresh
                 // block, then decs the arg — that dec releases the *slot's* own
@@ -11206,7 +11293,7 @@ fn compile_call_expr<M: Module>(
                     .ins()
                     .call(local, &[arr_ptr, x_ptr, drop_fn, retain_fn, esz]);
                 let new_ptr = builder.inst_results(inst)[0];
-                builder.ins().stack_store(new_ptr, slot, 0);
+                builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                 emit_retain(builder, module, builtins, structs, new_ptr, &new_arr_ty);
                 scopes
                     .last_mut()
@@ -11252,11 +11339,11 @@ fn compile_call_expr<M: Module>(
                 ));
                 let ptr = builder.ins().stack_addr(types::I64, slot, 0);
                 let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().store(MemFlags::trusted(), one, ptr, 0);
+                builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
                 let zero = builder.ins().iconst(types::I64, 0);
                 builder
                     .ins()
-                    .store(MemFlags::trusted(), zero, ptr, OPT_VALUE_OFFSET as i32);
+                    .store(MemFlagsData::trusted(), zero, ptr, OPT_VALUE_OFFSET as i32);
                 // No payload to retain or drop (unit / __none__ never need it).
                 return Ok((ptr, res_ty));
             }
@@ -11304,8 +11391,8 @@ fn compile_call_expr<M: Module>(
             ));
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             let tag = builder.ins().iconst(types::I64, if is_ok { 1 } else { 0 });
-            builder.ins().store(MemFlags::trusted(), tag, ptr, 0);
-            let val_addr = builder.ins().iadd_imm(ptr, OPT_VALUE_OFFSET as i64);
+            builder.ins().store(MemFlagsData::trusted(), tag, ptr, 0);
+            let val_addr = builder.ins().iadd_imm_s(ptr, OPT_VALUE_OFFSET as i64);
             store_array_elem(builder, val_addr, v, &t, structs);
             // The payload (a str) may be heap — co-own it.
             emit_retain(builder, module, builtins, structs, ptr, &res_ty);
@@ -11407,7 +11494,7 @@ fn compile_call_expr<M: Module>(
             // through the call.)
             let old_ty = ty_cell.borrow().clone();
             let old = if mut_binding_owns_slot_ref(&old_ty) {
-                Some(builder.ins().stack_load(types::I64, slot, 0))
+                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
             } else {
                 None
             };
@@ -11417,7 +11504,7 @@ fn compile_call_expr<M: Module>(
                 compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
             // Store the mutated receiver back, and refine the variable's type
             // to it (e.g. a `mut a = []` receiver pinned by the method's self).
-            builder.ins().stack_store(new_self, slot, 0);
+            builder.ins().stack_store(types::I64, new_self, slot, 0);
             if let Some(old) = old {
                 // The slot takes its own reference on the mutated receiver (the
                 // call-return value-track stays as the new version's region
@@ -11588,7 +11675,9 @@ fn compile_expr<M: Module>(
                 for t in scope {
                     let v = match t.owned {
                         Owned::Value(v) => v,
-                        Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
+                        Owned::Slot(slot) => {
+                            builder.ins().stack_load(types::I64, types::I64, slot, 0)
+                        }
                     };
                     emit_drop(builder, module, builtins, structs, v, &t.ty);
                 }
@@ -11676,7 +11765,7 @@ fn compile_expr<M: Module>(
             }
             let gv = module.declare_data_in_func(data_id, builder.func);
             let base = builder.ins().symbol_value(types::I64, gv);
-            let ptr = builder.ins().iadd_imm(base, STR_HEADER_SIZE as i64);
+            let ptr = builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -11729,7 +11818,7 @@ fn compile_expr<M: Module>(
                 3,
             ));
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, slot, 0);
+            builder.ins().stack_store(types::I64, zero, slot, 0);
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             (ptr, Type::Optional(Box::new(Type::NoneInner)))
         }
@@ -11796,12 +11885,16 @@ fn compile_expr<M: Module>(
                         let chunk =
                             builder
                                 .ins()
-                                .load(types::I64, MemFlags::trusted(), v, o as i32);
-                        builder.ins().stack_store(chunk, slot, (offset + o) as i32);
+                                .load(types::I64, MemFlagsData::trusted(), v, o as i32);
+                        builder
+                            .ins()
+                            .stack_store(types::I64, chunk, slot, (offset + o) as i32);
                         o += 8;
                     }
                 } else {
-                    builder.ins().stack_store(v, slot, offset as i32);
+                    builder
+                        .ins()
+                        .stack_store(types::I64, v, slot, offset as i32);
                 }
                 // The struct co-owns each heap field (recursing into an
                 // optional's value) — retain on store.
@@ -11885,7 +11978,7 @@ fn compile_expr<M: Module>(
                 inner.span.clone(),
             )?;
             (
-                builder.ins().bxor_imm(v, 1),
+                builder.ins().bxor_imm_u(v, 1),
                 Type::Primitive(Primitive::Bool),
             )
         }
@@ -12022,7 +12115,7 @@ fn compile_expr<M: Module>(
                     };
                     let eq = emit_eq(module, builder, builtins, structs, lv, rv, &cmp_ty)?;
                     let result = if *op == 'N' {
-                        builder.ins().bxor_imm(eq, 1)
+                        builder.ins().bxor_imm_u(eq, 1)
                     } else {
                         eq
                     };
@@ -12215,7 +12308,7 @@ fn compile_expr<M: Module>(
                 8,
                 3,
             ));
-            builder.ins().stack_store(v, slot, 0);
+            builder.ins().stack_store(types::I64, v, slot, 0);
             // In-place mutation optimization: a heap binding initialized from a
             // fresh literal (an array literal, or a `str` literal for `set s =
             // s + ..`) and never aliased in `body` is "exclusive" — `push` / `+`
@@ -12353,7 +12446,7 @@ fn compile_expr<M: Module>(
                 // still dropped exactly once.
                 if let ExprKind::Binop(l, '+', r) = &value.kind {
                     if matches!(&l.kind, ExprKind::Ident(n) if n == name) {
-                        let s_ptr = builder.ins().stack_load(types::I64, slot, 0);
+                        let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                         let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
                         expect_type(
                             &rt,
@@ -12367,7 +12460,7 @@ fn compile_expr<M: Module>(
                         let local = builtins.import(module, builder.func, "aipl_concat_mut");
                         let inst = builder.ins().call(local, &[s_ptr, rv]);
                         let new_ptr = builder.inst_results(inst)[0];
-                        builder.ins().stack_store(new_ptr, slot, 0);
+                        builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, cx, scopes, body);
                     }
@@ -12383,12 +12476,12 @@ fn compile_expr<M: Module>(
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name)
                 );
                 if trims_self {
-                    let s_ptr = builder.ins().stack_load(types::I64, slot, 0);
+                    let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                     // `aipl_trim_mut` reuses `s` (no dec), so no pre-inc needed.
                     let local = builtins.import(module, builder.func, "aipl_trim_mut");
                     let inst = builder.ins().call(local, &[s_ptr]);
                     let new_ptr = builder.inst_results(inst)[0];
-                    builder.ins().stack_store(new_ptr, slot, 0);
+                    builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                     // No new track — the binding's slot-track owns the result.
                     return compile_expr(module, builder, cx, scopes, body);
                 }
@@ -12413,7 +12506,7 @@ fn compile_expr<M: Module>(
                         _ => None,
                     };
                     if let (Some(other), false) = (other, is_none_inner(elem)) {
-                        let a_ptr = builder.ins().stack_load(types::I64, slot, 0);
+                        let a_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                         let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, other)?;
                         expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
                         // `aipl_set_union_mut` decs `b`; inc first so b's own track
@@ -12433,7 +12526,7 @@ fn compile_expr<M: Module>(
                             .ins()
                             .call(local, &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp]);
                         let new_ptr = builder.inst_results(inst)[0];
-                        builder.ins().stack_store(new_ptr, slot, 0);
+                        builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, cx, scopes, body);
                     }
@@ -12448,7 +12541,7 @@ fn compile_expr<M: Module>(
             // in-place / value-track model).
             let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty);
             let old = if is_str_repr(&expected_ty) || arr_slot_ref {
-                Some(builder.ins().stack_load(types::I64, slot, 0))
+                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
             } else {
                 None
             };
@@ -12463,7 +12556,7 @@ fn compile_expr<M: Module>(
                     // the replaced value. Aliases of the old value keep it alive
                     // through its own creation-scope track.
                     emit_retain(builder, module, builtins, structs, v, &expected_ty);
-                    builder.ins().stack_store(v, slot, 0);
+                    builder.ins().stack_store(types::I64, v, slot, 0);
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                 } else {
                     // `str`: take sole ownership of the new value for the slot,
@@ -12481,11 +12574,11 @@ fn compile_expr<M: Module>(
                         value,
                         cx.owned_params,
                     );
-                    builder.ins().stack_store(v, slot, 0);
+                    builder.ins().stack_store(types::I64, v, slot, 0);
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                 }
             } else {
-                builder.ins().stack_store(v, slot, 0);
+                builder.ins().stack_store(types::I64, v, slot, 0);
             }
             // Body uses the unchanged env; the slot has been updated in-place
             // so subsequent Ident lookups will load the new value.
@@ -12524,7 +12617,7 @@ fn compile_expr<M: Module>(
                 3,
             ));
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, slot, 0);
+            builder.ins().stack_store(types::I64, zero, slot, 0);
 
             let header = builder.create_block();
             let body_block = builder.create_block();
@@ -12535,7 +12628,7 @@ fn compile_expr<M: Module>(
             // fetch the element. `var_value`/`var_ty` are what the body's
             // loop variable binds to.
             builder.switch_to_block(header);
-            let i = builder.ins().stack_load(types::I64, slot, 0);
+            let i = builder.ins().stack_load(types::I64, types::I64, slot, 0);
             let (var_value, var_ty) = match &it_ty {
                 t if *t == Type::Primitive(Primitive::Str) || is_char_array(t) => {
                     // Pull the next byte from the cursor; `-1` signals the end (so
@@ -12544,9 +12637,10 @@ fn compile_expr<M: Module>(
                     let next_f = builtins.import(module, builder.func, "aipl_str_iter_next");
                     let inst = builder.ins().call(next_f, &[str_cursor]);
                     let byte_i64 = builder.inst_results(inst)[0];
-                    let more = builder
-                        .ins()
-                        .icmp_imm(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
+                    let more =
+                        builder
+                            .ins()
+                            .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
                     builder.ins().brif(more, body_block, &[], exit, &[]);
                     (byte_i64, Type::Primitive(Primitive::Char))
                 }
@@ -12621,8 +12715,8 @@ fn compile_expr<M: Module>(
                 cx.structs,
                 scopes.pop().expect("for-body scope"),
             );
-            let next = builder.ins().iadd_imm(i, 1);
-            builder.ins().stack_store(next, slot, 0);
+            let next = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, next, slot, 0);
             builder.ins().jump(header, &[]);
             builder.seal_block(header);
 
@@ -12761,7 +12855,7 @@ fn compile_expr<M: Module>(
                     let len_ok =
                         builder
                             .ins()
-                            .icmp_imm(IntCC::Equal, scrut_len, elems.len() as i64);
+                            .icmp_imm_s(IntCC::Equal, scrut_len, elems.len() as i64);
                     let check = builder.create_block();
                     let next = builder.create_block();
                     builder.ins().brif(len_ok, check, &[], next, &[]);
@@ -12793,7 +12887,9 @@ fn compile_expr<M: Module>(
                 builder.ins().jump(arm_blocks[wildcard], &[]);
                 None
             } else {
-                let tag = builder.ins().load(types::I64, MemFlags::trusted(), ptr, 0);
+                let tag = builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), ptr, 0);
                 // Plan each arm's tag + payload bindings up front (snapshotting the
                 // variant layout so it isn't borrowed across the body compilations).
                 let plan = plan_match(&scrut_ty, arms, structs, scrutinee.span.clone())?;
@@ -12810,9 +12906,10 @@ fn compile_expr<M: Module>(
                         // remaining tag, so it's the final fallthrough.
                         for i in 0..arm_blocks.len() - 1 {
                             let next = builder.create_block();
-                            let hit = builder
-                                .ins()
-                                .icmp_imm(IntCC::Equal, tag, arm_tags[i] as i64);
+                            let hit =
+                                builder
+                                    .ins()
+                                    .icmp_imm_s(IntCC::Equal, tag, arm_tags[i] as i64);
                             builder.ins().brif(hit, arm_blocks[i], &[], next, &[]);
                             builder.switch_to_block(next);
                             builder.seal_block(next);
@@ -12941,8 +13038,8 @@ fn compile_expr<M: Module>(
                 let inst = builder.ins().call(alloc, &[len]);
                 let buf = builder.inst_results(inst)[0];
                 for (i, (v, _)) in vals.into_iter().enumerate() {
-                    let addr = builder.ins().iadd_imm(buf, i as i64);
-                    builder.ins().istore8(MemFlags::trusted(), v, addr, 0);
+                    let addr = builder.ins().iadd_imm_s(buf, i as i64);
+                    builder.ins().istore8(MemFlagsData::trusted(), v, addr, 0);
                 }
                 scopes
                     .last_mut()
@@ -12958,23 +13055,25 @@ fn compile_expr<M: Module>(
             let new_local = builtins.import(module, builder.func, "aipl_array_new");
             let inst = builder.ins().call(new_local, &[len, drop_fn, esz_v]);
             let ptr = builder.inst_results(inst)[0];
-            let elems_base = builder.ins().iadd_imm(ptr, ARR_ELEMS_OFFSET as i64);
+            let elems_base = builder.ins().iadd_imm_s(ptr, ARR_ELEMS_OFFSET as i64);
             if is_bit_packed(&elem) {
                 // Pack 8 bools per byte: build each data byte from its (up to 8)
                 // element bits and store it. Bools carry no heap (no retain).
                 for (j, chunk) in vals.chunks(8).enumerate() {
                     let mut byte = builder.ins().iconst(types::I64, 0);
                     for (k, (v, _)) in chunk.iter().enumerate() {
-                        let bit = builder.ins().ishl_imm(*v, k as i64);
+                        let bit = builder.ins().ishl_imm_u(*v, k as i64);
                         byte = builder.ins().bor(byte, bit);
                     }
-                    let addr = builder.ins().iadd_imm(elems_base, j as i64);
-                    builder.ins().istore8(MemFlags::trusted(), byte, addr, 0);
+                    let addr = builder.ins().iadd_imm_s(elems_base, j as i64);
+                    builder
+                        .ins()
+                        .istore8(MemFlagsData::trusted(), byte, addr, 0);
                 }
             } else {
                 let esz = elem_size_of(&elem, structs);
                 for (i, (v, src_ty)) in vals.into_iter().enumerate() {
-                    let slot = builder.ins().iadd_imm(elems_base, i as i64 * esz);
+                    let slot = builder.ins().iadd_imm_s(elems_base, i as i64 * esz);
                     // Copy the element's own size (a `none` is narrower than a
                     // wider optional element slot — its unread tail is don't-care).
                     store_array_elem(builder, slot, v, &src_ty, structs);
@@ -13041,7 +13140,7 @@ fn compile_expr<M: Module>(
                     8,
                     3,
                 ));
-                builder.ins().stack_store(v, s, 0);
+                builder.ins().stack_store(types::I64, v, s, 0);
                 let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
                 let inst = builder
                     .ins()
@@ -13115,7 +13214,7 @@ fn compile_expr<M: Module>(
                 ));
                 let pbase = builder.ins().stack_addr(types::I64, pbuf, 0);
                 store_array_elem(builder, pbase, kv, &key, structs);
-                let vaddr = builder.ins().iadd_imm(pbase, 8);
+                let vaddr = builder.ins().iadd_imm_s(pbase, 8);
                 store_array_elem(builder, vaddr, vv, &val, structs);
                 let inst = builder
                     .ins()
@@ -13211,7 +13310,7 @@ fn compile_expr<M: Module>(
             let len = load_arr_len(builder, arr_ptr);
             let ge0 = builder
                 .ins()
-                .icmp_imm(IntCC::SignedGreaterThanOrEqual, idx_v, 0);
+                .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, idx_v, 0);
             let lt_len = builder.ins().icmp(IntCC::SignedLessThan, idx_v, len);
             let in_bounds = builder.ins().band(ge0, lt_len);
 
@@ -13241,7 +13340,7 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(out_block);
             builder.seal_block(out_block);
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(zero, slot, 0);
+            builder.ins().stack_store(types::I64, zero, slot, 0);
             builder.ins().jump(merge_block, &[]);
 
             builder.switch_to_block(merge_block);
@@ -13324,7 +13423,9 @@ fn compile_expr<M: Module>(
             }
             let ok_ty = (**ok_in).clone();
             let err_in_ty = (**err_in).clone();
-            let tag = builder.ins().load(types::I64, MemFlags::trusted(), rptr, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), rptr, 0);
             let ok_block = builder.create_block();
             let err_block = builder.create_block();
             // tag 1 = ok → continue; tag 0 = err → early return.
@@ -13343,7 +13444,9 @@ fn compile_expr<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
+                            Owned::Slot(slot) => {
+                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
+                            }
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }
@@ -13361,7 +13464,9 @@ fn compile_expr<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => builder.ins().stack_load(types::I64, slot, 0),
+                            Owned::Slot(slot) => {
+                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
+                            }
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }
@@ -13440,10 +13545,10 @@ fn copy_composite(
     while o < size {
         let chunk = builder
             .ins()
-            .load(types::I64, MemFlags::trusted(), src, o as i32);
+            .load(types::I64, MemFlagsData::trusted(), src, o as i32);
         builder
             .ins()
-            .store(MemFlags::trusted(), chunk, dst, o as i32);
+            .store(MemFlagsData::trusted(), chunk, dst, o as i32);
         o += 8;
     }
 }

@@ -24,7 +24,7 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 520
-instructions executed: 507
+instructions executed: 685
 binary size: 5288
 --- monomorphizations ---
 __test$first

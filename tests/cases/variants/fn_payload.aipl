@@ -20,8 +20,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 56
-binary size: 1288
+instructions executed: 62
+binary size: 1312
 --- monomorphizations ---
 eval
 inc

@@ -24,8 +24,8 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 388
-instructions executed: 772
-binary size: 6416
+instructions executed: 1054
+binary size: 6408
 --- monomorphizations ---
 __builtin_all$char$lam8
 __builtin_all$i64$lam1

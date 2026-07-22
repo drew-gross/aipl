@@ -9,8 +9,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 44
-binary size: 1480
+instructions executed: 47
+binary size: 1504
 --- monomorphizations ---
 classify
 main

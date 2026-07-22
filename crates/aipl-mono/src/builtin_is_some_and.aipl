@@ -34,8 +34,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 142
-binary size: 2568
+instructions executed: 162
+binary size: 2592
 --- monomorphizations ---
 is_nine
 main

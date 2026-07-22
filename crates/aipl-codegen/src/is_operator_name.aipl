@@ -58,8 +58,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1247
-binary size: 6240
+instructions executed: 1279
+binary size: 6264
 --- monomorphizations ---
 is_operator_name
 main

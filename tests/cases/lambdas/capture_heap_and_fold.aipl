@@ -32,8 +32,8 @@ allocations: 6
 deallocations: 6
 reallocations: 2
 bytes allocated: 272
-instructions executed: 392
-binary size: 3744
+instructions executed: 558
+binary size: 3752
 --- monomorphizations ---
 main
 tag$lam4

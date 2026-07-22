@@ -28,8 +28,8 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 367
-instructions executed: 1722
-binary size: 5592
+instructions executed: 2530
+binary size: 5576
 --- monomorphizations ---
 __filter5
 __map1

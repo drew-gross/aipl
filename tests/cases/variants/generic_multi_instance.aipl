@@ -38,8 +38,8 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 157
-binary size: 2464
+instructions executed: 190
+binary size: 2472
 --- monomorphizations ---
 combine_i
 combine_s

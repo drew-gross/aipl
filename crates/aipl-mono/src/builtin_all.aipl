@@ -39,7 +39,7 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 324
-instructions executed: 809
+instructions executed: 1086
 binary size: 7208
 --- monomorphizations ---
 __filter13$own0

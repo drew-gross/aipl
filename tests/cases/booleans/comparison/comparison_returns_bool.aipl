@@ -10,8 +10,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 37
-binary size: 1160
+instructions executed: 41
+binary size: 1184
 --- monomorphizations ---
 main
 not_lt

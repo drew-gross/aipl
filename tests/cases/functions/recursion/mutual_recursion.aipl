@@ -14,8 +14,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1105
-binary size: 1648
+instructions executed: 1109
+binary size: 1664
 --- monomorphizations ---
 is_even
 is_odd

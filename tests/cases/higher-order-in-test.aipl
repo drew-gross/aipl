@@ -33,7 +33,7 @@ allocations: 6
 deallocations: 6
 reallocations: 4
 bytes allocated: 296
-instructions executed: 575
+instructions executed: 802
 binary size: 3056
 --- monomorphizations ---
 filter_evens$lam0

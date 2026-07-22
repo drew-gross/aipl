@@ -12,8 +12,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 76
-binary size: 1488
+instructions executed: 83
+binary size: 1512
 --- monomorphizations ---
 __test$pick
 main

@@ -36,7 +36,7 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 95
-instructions executed: 318
+instructions executed: 402
 binary size: 4120
 --- monomorphizations ---
 label

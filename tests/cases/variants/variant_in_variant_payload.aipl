@@ -24,8 +24,8 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 92
-binary size: 1536
+instructions executed: 106
+binary size: 1552
 --- monomorphizations ---
 main
 unwrap_a
