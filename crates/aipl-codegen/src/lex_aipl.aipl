@@ -6,7 +6,7 @@
 // starter subset, not the full grammar (no char literals, template/raw strings,
 // or the complete operator table yet), and this isn't wired into the compiler —
 // nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
-import { ==, int_parse, value_or } from builtins;
+import { ==, int_parse } from builtins;
 import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
@@ -140,10 +140,15 @@ fn str_lit(text: str) -> AiplTok { StrLit(text.unescape()) }
 
 // Build an `IntLit` from a matched digit run. The `Int` matcher only claims the
 // run; parsing is the caller's job, so this parses it with the `int_parse`
-// builtin. (Scaffolding: an i64 overflow degrades to `0` here via `value_or` —
-// real AIPL will reject it; the point is the *policy* now lives in this emit, not
-// the lexer library.)
-fn int_lit(text: str) -> AiplTok { IntLit(text.int_parse().value_or(0)) }
+// builtin and, as a fallible `TryText` emit, reports an i64 overflow as an error
+// message — the library attaches the literal's span. Parsing policy lives here,
+// in the consumer, not in the lexer library.
+fn int_lit(text: str) -> AiplTok!str {
+    match (text.int_parse()) {
+        some(v) => ok(IntLit(v)),
+        none => err("integer literal overflows i64"),
+    }
+}
 
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
 // whitespace and recorded comments first; keywords before identifiers, so `fn`
@@ -207,7 +212,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
         TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
-        TokenRule { matcher: Int, emit: OfText(int_lit) },
+        TokenRule { matcher: Int, emit: TryText(int_lit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
         TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
     ]
@@ -250,14 +255,23 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
             },
         ),
     );
+
+    // An integer that overflows i64: the `TryText` emit (`int_lit`) reports it,
+    // and the library attaches the literal's span. Overflow policy is the
+    // consumer's — the lexer library never parses ints itself.
+    assert(
+        lex_aipl("99999999999999999999") == err(
+            LexError { message: "integer literal overflows i64", span: 0..20 },
+        ),
+    );
 })
 --- performance ---
-allocations: 176
-deallocations: 176
+allocations: 196
+deallocations: 196
 reallocations: 0
-bytes allocated: 8504
-instructions executed: 39045
-binary size: 147736
+bytes allocated: 9928
+instructions executed: 44266
+binary size: 157528
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam14
 __builtin_count_while$char$s0$lam15
@@ -278,6 +292,7 @@ __m1__lex_step$AiplTok
 __m1__nested_len
 __m1__seg_emit$AiplTok
 __m1__seg_needs_ofseg
+__m1__seg_only
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok

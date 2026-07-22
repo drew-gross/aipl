@@ -71,12 +71,25 @@ variant Seg = Plain | Head | Middle | Tail
 // char; `OfSeg` is for a `Template` rule, applied to each segment's text and its
 // position. The chosen option must match the matcher's value shape — an `OfStr`
 // on an `Int` matcher, say, is a lex error (see `apply_emit`).
+//
+// `TryText`/`TryStr`/`TryChar`/`TrySeg` are the fallible siblings: the function
+// returns `K!str` — a kind, or an error *message*. Interpreting a match can fail
+// (a numeric literal that overflows i64, a string that breaks a content rule),
+// and only the emit knows the rule; when it returns `err(msg)` the library pairs
+// the message with the token's whole span to build a `LexError` (see `apply_emit`).
+// The token span is the right location for a whole-token verdict like overflow; a
+// matcher-level, byte-precise error (an unterminated string, an unknown escape)
+// still comes from scanning, not the emit.
 variant Emit<K> =
     Bare(K)
     | OfText((str) -> K)
     | OfStr((str) -> K)
     | OfChar((char) -> K)
     | OfSeg((str, Seg) -> K)
+    | TryText((str) -> K!str)
+    | TryStr((str) -> K!str)
+    | TryChar((char) -> K!str)
+    | TrySeg((str, Seg) -> K!str)
 
 // Why a lex failed: what went wrong, and the span of the offending source
 // (absolute into the lexed string — slice it to show the offender).
@@ -517,15 +530,44 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
             NoValue => err(emit_mismatch("OfChar", "a char", span)),
             StrVal(s) => err(emit_mismatch("OfChar", "a char", span)),
         },
-        OfSeg(f) => err(
-            LexError { message: "an OfSeg emit is only valid on a Template rule", span },
-        ),
+        OfSeg(f) => err(seg_only(span)),
+        // A fallible emit yields `K!str` — a kind or an error *message*; pair the
+        // message with the token's `span` to make the `LexError` the lexer
+        // surfaces. (Inlined rather than a helper: the checker can't infer the
+        // helper's `K` from a bare type-parameter argument.)
+        TryText(f) => match (f(text)) {
+            ok(k) => ok(k),
+            err(message) => err(LexError { message, span }),
+        },
+        TryStr(f) => match (value) {
+            StrVal(s) => match (f(s)) {
+                ok(k) => ok(k),
+                err(message) => err(LexError { message, span }),
+            },
+            NoValue => err(emit_mismatch("TryStr", "a string", span)),
+            CharVal(c) => err(emit_mismatch("TryStr", "a string", span)),
+        },
+        TryChar(f) => match (value) {
+            CharVal(c) => match (f(c)) {
+                ok(k) => ok(k),
+                err(message) => err(LexError { message, span }),
+            },
+            NoValue => err(emit_mismatch("TryChar", "a char", span)),
+            StrVal(s) => err(emit_mismatch("TryChar", "a char", span)),
+        },
+        TrySeg(f) => err(seg_only(span)),
     }
 }
 
 // A `LexError` for an `emit` whose value shape doesn't match its option.
 fn emit_mismatch(opt: str, want: str, span: Span) -> LexError {
     LexError { message: `{opt} emit expects {want} value`, span }
+}
+
+// A `LexError` for a segment emit (`OfSeg`/`TrySeg`) used on a non-`Template`
+// rule — those only make sense per template segment (see `seg_emit`).
+fn seg_only(span: Span) -> LexError {
+    LexError { message: "an OfSeg/TrySeg emit is only valid on a Template rule", span }
 }
 
 // One lexing step's outcome: the token(s) the winning rule produced — one
@@ -603,22 +645,30 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
     ok(StepResult { tokens: [], trivia: [], end: at })
 }
 
-// Apply a `Template` rule's `emit` to one segment's escape-decoded text and its
-// position. The emit must be an `OfSeg` — a template produces several kinds per
-// literal, one per segment position, which only `OfSeg` can distinguish; any
-// other option is a lex error.
+// Apply a `Template` rule's `emit` to one segment's raw text and its position.
+// The emit must be an `OfSeg` (or its fallible sibling `TrySeg`) — a template
+// produces several kinds per literal, one per segment position, which only a
+// segment emit can distinguish; any other option is a lex error. A `TrySeg` that
+// returns `err(msg)` carries the segment's `span`.
 fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
     match (e) {
         OfSeg(f) => ok(f(text, seg)),
+        TrySeg(f) => match (f(text, seg)) {
+            ok(k) => ok(k),
+            err(message) => err(LexError { message, span }),
+        },
         Bare(k) => err(seg_needs_ofseg(span)),
         OfText(f) => err(seg_needs_ofseg(span)),
         OfStr(f) => err(seg_needs_ofseg(span)),
         OfChar(f) => err(seg_needs_ofseg(span)),
+        TryText(f) => err(seg_needs_ofseg(span)),
+        TryStr(f) => err(seg_needs_ofseg(span)),
+        TryChar(f) => err(seg_needs_ofseg(span)),
     }
 }
 
 fn seg_needs_ofseg(span: Span) -> LexError {
-    LexError { message: "a Template rule needs an OfSeg emit", span }
+    LexError { message: "a Template rule needs an OfSeg/TrySeg emit", span }
 }
 
 // The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
@@ -764,7 +814,6 @@ variant Kind =
     Ws
     | Ident(str)
     | IntTok(i64)
-    | IntOverflow
     | Digits
     | Op
     | Kw
@@ -803,15 +852,36 @@ fn tpl_kind(text: str, seg: Seg) -> Kind {
 // (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
 fn esc_str(text: str) -> Kind { Str(text.unescape()) }
 
-// The `OfText` emit for the `Int` test below: the library hands the raw digit
-// run, so this emit parses it — here with the `int_parse` builtin, mapping an
-// i64 overflow to its own `IntOverflow` kind (a bignum lexer would parse into a
-// wide type instead). Parsing policy is the caller's, not the library's.
-fn int_tok(text: str) -> Kind {
+// The `TryText` emit for the `Int` test below: the library hands the raw digit
+// run, so this emit parses it — here with the `int_parse` builtin, reporting an
+// i64 overflow as an error *message* (the library attaches the token's span).
+// Parsing policy, and what overflow means, is the caller's — a bignum lexer would
+// parse into a wide type and never fail here.
+fn int_tok(text: str) -> Kind!str {
     match (text.int_parse()) {
-        some(v) => IntTok(v),
-        none => IntOverflow,
+        some(v) => ok(IntTok(v)),
+        none => err("integer literal overflows i64"),
     }
+}
+
+// A `TryStr` emit: the escaped-string decoder above, plus a content rule the
+// caller enforces — a string literal may not be empty. A whole-token verdict, so
+// the token's span is the right place for the error.
+fn nonempty_str(text: str) -> Kind!str {
+    let s = text.unescape();
+    if (s.len() == 0) { err("empty string literal") } else { ok(Str(s)) }
+}
+
+// A `TryChar` emit: a char literal may not be a reserved char. Char decoding is
+// the library's (see `CharLit`), so this validates the already-decoded char.
+fn checked_char(c: char) -> Kind!str {
+    if (c == 'q') { err("'q' is a reserved char") } else { ok(Char(c)) }
+}
+
+// A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
+// error carries the whole template's span.
+fn checked_seg(text: str, seg: Seg) -> Kind!str {
+    if (text == "TODO") { err("TODO segment not allowed") } else { ok(tpl_kind(text, seg)) }
 }
 
 fn rawtpl_kind(text: str, seg: Seg) -> Kind {
@@ -925,6 +995,17 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("\"a\\nb\"", esc) == ok(toks([tok(Str("a\nb"), 0, 6)])));
     assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence", 2, 4)));
 
+    // TryStr: a fallible string emit. `nonempty_str` decodes, then enforces a
+    // content rule the *caller* owns — an empty string literal is an error whose
+    // message the library pairs with the token's span. A well-formed one passes.
+    let nes = [
+        ws,
+        TokenRule { matcher: Delimited("\"", "nt\\\""), emit: TryStr(nonempty_str) },
+        ident,
+    ];
+    assert(lex("\"hi\"", nes) == ok(toks([tok(Str("hi"), 0, 4)])));
+    assert(lex("\"\"", nes) == err(lex_err("empty string literal", 0, 2)));
+
     // Between: a raw string `"""..."""` — a lone `"`/`""` inside is content.
     let q3 = "\"\"\"";
     let raw = [ws, TokenRule { matcher: Between(q3, q3), emit: OfStr(Raw) }, ident];
@@ -951,13 +1032,25 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("''", chr) == err(lex_err("empty char literal", 0, 2)));
     assert(lex("'\\q'", chr) == err(lex_err("unknown escape sequence", 1, 3)));
 
-    // Int: the matcher only claims the digit run; the `OfText` emit (`int_tok`)
-    // parses it. Overflow is no longer a lex error — `int_tok` decides what it
-    // means (here, its own `IntOverflow` kind), so parsing policy is the caller's.
-    let ints = [ws, TokenRule { matcher: Int, emit: OfText(int_tok) }, ident];
+    // TryChar: a fallible char emit (`checked_char`) rejects a reserved char; the
+    // library attaches the literal's span to the message.
+    let tchr = [
+        ws,
+        TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: TryChar(checked_char) },
+        ident,
+    ];
+    assert(lex("'x'", tchr) == ok(toks([tok(Char('x'), 0, 3)])));
+    assert(lex("'q'", tchr) == err(lex_err("'q' is a reserved char", 0, 3)));
+
+    // Int: the matcher only claims the digit run; the `TryText` emit (`int_tok`)
+    // parses it. Overflow is a lex error again — but now the *caller* decides that
+    // (the library just attaches the span), so a bignum lexer never fails here.
+    let ints = [ws, TokenRule { matcher: Int, emit: TryText(int_tok) }, ident];
     assert(lex("42", ints) == ok(toks([tok(IntTok(42), 0, 2)])));
     assert(lex("0 7", ints) == ok(toks([tok(IntTok(0), 0, 1), tok(IntTok(7), 2, 3)])));
-    assert(lex("9223372036854775808", ints) == ok(toks([tok(IntOverflow, 0, 19)])));
+    assert(
+        lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
+    );
 
     // Float before int: a fraction/exponent extends a digit run; a bare run
     // falls through to the digit rule.
@@ -1026,6 +1119,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ),
     );
 
+    // TrySeg: a fallible segment emit (`checked_seg`) validates each segment; a
+    // rejected one aborts the lex with the template's span.
+    let tseg = TokenRule { matcher: Template("`", "\\`{ntr"), emit: TrySeg(checked_seg) };
+    let tsegs = [ws, tseg, ident, digits];
+    assert(lex("`hi`", tsegs) == ok(toks([tok(Tpl("hi"), 0, 4)])));
+    assert(lex("`TODO`", tsegs) == err(lex_err("TODO segment not allowed", 0, 6)));
+
     // Trivia: a `trivia: true` rule is consumed like a skip rule, but each match
     // is recorded in the result's side-channel, out of the token stream.
     let cmt_t = TokenRule { matcher: ToEol("//"), emit: Bare(Comment), trivia: true };
@@ -1062,7 +1162,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ws,
         TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: OfStr(Str) },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
-        TokenRule { matcher: Int, emit: OfText(int_tok) },
+        TokenRule { matcher: Int, emit: TryText(int_tok) },
         TokenRule { matcher: Keyword(["true", "false", "null"], alnum), emit: Bare(Kw) },
         TokenRule { matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]), emit: Bare(Punct) },
     ];
@@ -1090,7 +1190,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true },
         TokenRule { matcher: Keyword(["fn", "let", "mut", "set"], alnum), emit: Bare(Kw) },
         ident,
-        TokenRule { matcher: Int, emit: OfText(int_tok) },
+        TokenRule { matcher: Int, emit: TryText(int_tok) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(Str) },
         TokenRule { matcher: Exact(["==", "->", "&&", "=", ";"]), emit: Bare(Op) },
     ];
@@ -1107,12 +1207,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1183
-deallocations: 1183
+allocations: 1226
+deallocations: 1226
 reallocations: 0
-bytes allocated: 57720
-instructions executed: 256209
-binary size: 781288
+bytes allocated: 59952
+instructions executed: 269249
+binary size: 860160
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam21
 __builtin_count_while$char$s0$lam26
@@ -1139,6 +1239,8 @@ __lambda_9
 __test$lex
 between_len
 char_lit_len
+checked_char
+checked_seg
 delimited_len
 emit_mismatch
 esc_str
@@ -1150,9 +1252,11 @@ lex_err
 lex_step$Kind
 main
 nested_len
+nonempty_str
 rawtpl_kind
 seg_emit$Kind
 seg_needs_ofseg
+seg_only
 step_result$Kind
 template_scan$Kind
 template_step$Kind
