@@ -66,3 +66,7 @@ fix how constructor names come into scope
 
 figure out / fix why template literals are peforming worse than concat chains
 improve the highlighter test: correct code should never highlight as a mismatched bracket
+
+For lexer dogfooding:
+- make the FFI able to handle arrays and variants
+- cargo test --test lexer_dogfood -- --ignored report_lexer_differences - make all pass

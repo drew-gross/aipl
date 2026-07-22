@@ -265,13 +265,124 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
         ),
     );
 })
+
+// --- Differential-testing scaffolding (dogfooding bridge) ------------------
+//
+// `lex_aipl_dump` is the FFI entry the Rust `tests/lexer_dogfood.rs` calls to
+// compare this AIPL lexer against the compiler's hand-written Rust lexer over the
+// test corpus. The token *list* can't cross the embedding FFI yet (only scalars,
+// `str`, optionals, results, and flat structs marshal), so instead of returning
+// `LexResult` we serialize it to a canonical `str` the Rust side can diff against
+// its own dump: one line `START END CATEGORY` per token (a lex error becomes the
+// single line `ERR START END`). This is not part of the lexer proper — it exists
+// only so the differences form a burn-down list; nothing here is used to compile.
+
+// A token's coarse category, matching the Rust lexer's `classify` (the
+// operator/punctuation split included), so a matching token dumps identically on
+// both sides and only real divergences surface. Kinds this lexer can't yet
+// produce (`Char`, template segments, `true`/`false`/`none` constants) simply
+// have no arm here — those tokens are exactly the gaps the diff is meant to find.
+fn kind_category(self: AiplTok) -> str {
+    match (self) {
+        // Keywords.
+        Fn => "keyword",
+        Let => "keyword",
+        Mut => "keyword",
+        Set => "keyword",
+        Pub => "keyword",
+        Import => "keyword",
+        From => "keyword",
+        As => "keyword",
+        For => "keyword",
+        While => "keyword",
+        Match => "keyword",
+        Return => "keyword",
+        Struct => "keyword",
+        Variant => "keyword",
+        // Value-bearing tokens.
+        Name(s) => "ident",
+        IntLit(n) => "number",
+        StrLit(s) => "str",
+        // Operators (the same set `classify` scopes as operators).
+        EqEq => "operator",
+        Ne => "operator",
+        Arrow => "operator",
+        FatArrow => "operator",
+        AndAnd => "operator",
+        OrOr => "operator",
+        DotDot => "operator",
+        PlusPlusPlus => "operator",
+        Eq => "operator",
+        Lt => "operator",
+        Gt => "operator",
+        Bang => "operator",
+        Plus => "operator",
+        Minus => "operator",
+        Star => "operator",
+        Slash => "operator",
+        Percent => "operator",
+        // Punctuation.
+        Period => "punct",
+        Comma => "punct",
+        Colon => "punct",
+        Semi => "punct",
+        Question => "punct",
+        LParen => "punct",
+        RParen => "punct",
+        LBrace => "punct",
+        RBrace => "punct",
+        LBracket => "punct",
+        RBracket => "punct",
+        // Never reached: `Space` is skipped and `LineComment` is trivia, so
+        // neither appears in `LexResult.tokens` — but the match must be total.
+        Space => "trivia",
+        LineComment => "trivia",
+    }
+}
+
+// One `START END CATEGORY` line per token.
+fn dump_tokens(res: LexResult<AiplTok>) -> str {
+    mut out = "";
+    for (let t : res.tokens) {
+        let start = t.span.start;
+        let end = t.span.end;
+        let cat = t.kind.kind_category();
+        set out = `{out}{start} {end} {cat}\n`;
+    }
+    out
+}
+
+// A lex error as its own single line `ERR START END` (the message is omitted so a
+// file both lexers reject at the same span counts as agreement, not a diff).
+fn dump_err(e: LexError) -> str {
+    let start = e.span.start;
+    let end = e.span.end;
+    `ERR {start} {end}\n`
+}
+
+// Serialize `lex_aipl(src)` to the canonical dump the Rust differential test
+// diffs against (see the scaffolding note above).
+pub fn lex_aipl_dump(src: str) -> str {
+    match (lex_aipl(src)) {
+        ok(res) => dump_tokens(res),
+        err(e) => dump_err(e),
+    }
+}.test({
+    assert(
+        lex_aipl_dump(
+            "let x = 42;",
+        ) == "0 3 keyword\n4 5 ident\n6 7 operator\n8 10 number\n10 11 punct\n",
+    );
+    // A byte no rule matches makes the whole lex an error (one `ERR` line).
+    assert(lex_aipl_dump("@") == "ERR 0 1\n");
+})
 --- performance ---
-allocations: 196
-deallocations: 196
+allocations: 314
+deallocations: 314
 reallocations: 0
-bytes allocated: 9928
-instructions executed: 44266
-binary size: 157528
+bytes allocated: 15992
+instructions executed: 72806
+binary size: 165000
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam14
 __builtin_count_while$char$s0$lam15
@@ -300,6 +411,7 @@ __test$lex_aipl
 int_lit
 kwd_kind
 lex_aipl
+lex_aipl_dump
 main
 str_lit
 sym_kind
