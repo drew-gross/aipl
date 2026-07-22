@@ -10,14 +10,125 @@ import { == } from builtins;
 import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex } from "./lexer.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
-// (`Name` its text, `IntLit` its value) or nothing (`Space`). A rule's `emit`
-// builds one of these from the matched token (see `aipl_rules`).
+// (`Name` its text, `IntLit` its value) or nothing. Every keyword and every
+// operator/punctuation spelling is its *own* bare arm (`Fn`, `Return`, `Eq`,
+// `Gt`, …) rather than a stringly-typed `Kwd(str)`/`Sym(str)` — so a consumer
+// pattern-matches on the token it means, not on its text. The mapping from a
+// matched spelling to its arm lives in `kwd_kind`/`sym_kind` (see `aipl_rules`).
 //
 // Note: these names deliberately avoid the library's own variant constructors
 // (`Matcher`/`Emit`/`Seg`/`TokenValue`/the test `Kind`), because AIPL variant
 // constructors currently share one global namespace across imported files, so a
-// consumer's kinds can't reuse a library constructor's name.
-variant AiplTok = Space | LineComment | Name(str) | IntLit(i64) | StrLit(str) | Kwd(str) | Sym(str)
+// consumer's kinds can't reuse a library constructor's name. That's why `.` is
+// `Period` here, not `Dot` (the test `Kind`'s float-dot arm already claims it).
+variant AiplTok =
+    Space
+    | LineComment
+    | Name(str)
+    | IntLit(i64)
+    | StrLit(str)
+    | Fn
+    | Let
+    | Mut
+    | Set
+    | Pub
+    | Import
+    | From
+    | As
+    | For
+    | While
+    | Match
+    | Return
+    | Struct
+    | Variant
+    | EqEq
+    | Ne
+    | Arrow
+    | FatArrow
+    | AndAnd
+    | OrOr
+    | DotDot
+    | PlusPlusPlus
+    | Eq
+    | Lt
+    | Gt
+    | Bang
+    | Plus
+    | Minus
+    | Star
+    | Slash
+    | Percent
+    | Period
+    | Comma
+    | Colon
+    | Semi
+    | Question
+    | LParen
+    | RParen
+    | LBrace
+    | RBrace
+    | LBracket
+    | RBracket
+
+// Map a matched keyword spelling to its `AiplTok` arm. The `Keyword` matcher
+// only ever yields a spelling from `keywords` (see `aipl_rules`), so the `_`
+// arm is unreachable — a non-keyword identifier is a `Name`.
+fn kwd_kind(text: str) -> AiplTok {
+    match (text) {
+        "fn" => Fn,
+        "let" => Let,
+        "mut" => Mut,
+        "set" => Set,
+        "pub" => Pub,
+        "import" => Import,
+        "from" => From,
+        "as" => As,
+        "for" => For,
+        "while" => While,
+        "match" => Match,
+        "return" => Return,
+        "struct" => Struct,
+        "variant" => Variant,
+        _ => Name(text),
+    }
+}
+
+// Map a matched operator/punctuation spelling to its `AiplTok` arm. The `Exact`
+// matcher only ever yields a spelling from `operators`, so the `_` arm is
+// unreachable.
+fn sym_kind(text: str) -> AiplTok {
+    match (text) {
+        "==" => EqEq,
+        "!=" => Ne,
+        "->" => Arrow,
+        "=>" => FatArrow,
+        "&&" => AndAnd,
+        "||" => OrOr,
+        ".." => DotDot,
+        "+++" => PlusPlusPlus,
+        "=" => Eq,
+        "<" => Lt,
+        ">" => Gt,
+        "!" => Bang,
+        "+" => Plus,
+        "-" => Minus,
+        "*" => Star,
+        "/" => Slash,
+        "%" => Percent,
+        "." => Period,
+        "," => Comma,
+        ":" => Colon,
+        ";" => Semi,
+        "?" => Question,
+        "(" => LParen,
+        ")" => RParen,
+        "{" => LBrace,
+        "}" => RBrace,
+        "[" => LBracket,
+        "]" => RBracket,
+        _ => Name(text),
+    }
+}
 
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
 // whitespace and recorded comments first; keywords before identifiers, so `fn`
@@ -79,11 +190,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
     [
         TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
-        TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(Kwd) },
+        TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: OfInt(IntLit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(StrLit) },
-        TokenRule { matcher: Exact(operators), emit: OfText(Sym) },
+        TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
     ]
 }
 
@@ -96,11 +207,11 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
         lex_aipl(src) == ok(
             LexResult {
                 tokens: [
-                    Token { kind: Kwd("let"), span: 0..3 },
+                    Token { kind: Let, span: 0..3 },
                     Token { kind: Name("x"), span: 4..5 },
-                    Token { kind: Sym("="), span: 6..7 },
+                    Token { kind: Eq, span: 6..7 },
                     Token { kind: IntLit(42), span: 8..10 },
-                    Token { kind: Sym(";"), span: 10..11 },
+                    Token { kind: Semi, span: 10..11 },
                 ],
                 trivia: [Token { kind: LineComment, span: 12..19 }],
             },
@@ -112,25 +223,21 @@ allocations: 111
 deallocations: 111
 reallocations: 0
 bytes allocated: 5232
-instructions executed: 25504
-binary size: 157832
+instructions executed: 24732
+binary size: 151944
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam15
-__builtin_count_while$char$s0$lam20
-__builtin_count_while$char$s0$lam21
-__builtin_count_while$char$s0$lam41
+__builtin_count_while$char$s0$lam11
+__builtin_count_while$char$s0$lam16
+__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam37
 __builtin_int_parse
-__builtin_is_some_and$char$lam31
+__builtin_is_some_and$char$lam27
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
 __lambda_4
 __lambda_5
-__lambda_6
-__lambda_7
-__lambda_8
-__lambda_9
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
@@ -146,4 +253,6 @@ __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
 __m1__unescape
+kwd_kind
 main
+sym_kind
