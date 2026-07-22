@@ -37,11 +37,13 @@ import {
 
 // What a token carries beyond its span: the processed *value* of the matched
 // text, computed at lex time by the matcher that claimed it (see each
-// matcher's doc). `StrVal` holds delimiter-stripped, escape-decoded text
-// (strings, raw strings, template segments); `CharVal` a char literal's
-// decoded char; `IntVal` an `Int` run's parsed value (overflow is a lex
-// error). Matchers whose text needs no processing (identifiers, punctuation,
-// keywords, comments) carry `NoValue` — slicing the span recovers the text.
+// matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
+// raw strings, template segments) — the library strips the delimiters but leaves
+// escapes verbatim for the rule's `emit` to decode (see `unescape`); `CharVal` a
+// char literal's decoded char (a char's decoding is intrinsic to producing it);
+// `IntVal` an `Int` run's parsed value (overflow is a lex error). Matchers whose
+// text needs no processing (identifiers, punctuation, keywords, comments) carry
+// `NoValue` — slicing the span recovers the text.
 variant TokenValue = NoValue | StrVal(str) | CharVal(char) | IntVal(i64)
 
 // What a token is: its `kind` — a caller-defined value carrying whatever the
@@ -98,7 +100,10 @@ struct LexError { message: str, span: Span }
 //   an allowed char is content (in particular an escaped delimiter does not
 //   close), `\` plus anything else is a lex error, and "" turns escape
 //   handling off entirely (a backslash is ordinary content). A token still
-//   open at the end of the source is a lex error. String literals.
+//   open at the end of the source is a lex error. String literals. `escapes`
+//   governs *scanning* only — the token's value is the delimiter-stripped text
+//   left *un-decoded*, so the rule's `emit` decides what escapes mean (via the
+//   provided `unescape`, or its own decoder).
 // - `Between(open, close)`: the `open` spelling opens the token, which runs to
 //   just past the next *full* occurrence of the `close` spelling. Unlike
 //   `Delimited`, open and close are multi-char and may differ, and the scan
@@ -147,13 +152,15 @@ struct LexError { message: str, span: Span }
 //   error at lex time rather than a bogus value later.
 //
 // Tokens carry values (see `TokenValue`), computed by the claiming matcher:
-// `Delimited` an escape-decoded `StrVal` of the delimiter-stripped contents;
+// `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
+// rule's `emit` decodes — escape handling is the caller's, not the library's);
 // `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
 // de-denting is the caller's post-pass); `CharLit` the decoded `CharVal`;
-// `Template` an escape-decoded `StrVal` of each segment's text (delimiters,
-// braces excluded); `Int` the parsed `IntVal`. Everything else — and every
-// trivia record — carries `NoValue`. Escape decoding maps `\n`/`\t`/`\r` to
-// the control chars and any other allowed `\X` to X itself.
+// `Template` an un-decoded `StrVal` of each segment's text (delimiters, braces
+// excluded); `Int` the parsed `IntVal`. Everything else — and every trivia
+// record — carries `NoValue`. The provided `unescape` decoder maps `\n`/`\t`/`\r`
+// to the control chars and any other `\X` to X itself; a rule that wants other
+// semantics writes its own `emit` decoder.
 variant Matcher =
     CharRun(str, str)
     | Exact(str[])
@@ -428,15 +435,14 @@ fn escape_char(self: char) -> char {
     }
 }
 
-// Escape-decode `self` (a token's delimiter-stripped contents): each `\X`
-// pair becomes its decoded char, everything else is copied verbatim (in
-// whole runs, via slicing). With escapes off ("") the text is already
-// verbatim. A trailing lone backslash can't reach here — the matcher already
-// rejected the token as unterminated.
-fn unescape(self: str, escapes: str) -> str {
-    if (escapes.len() == 0) {
-        return self;
-    };
+// Escape-decode `self` (a token's raw, delimiter-stripped contents): each `\X`
+// pair becomes its decoded char, everything else is copied verbatim (in whole
+// runs, via slicing). A trailing lone backslash can't reach here — the matcher
+// already rejected the token as unterminated. This is the caller-facing decoder:
+// the library hands `Delimited`/`Template` values *un-decoded* (see `token_value`),
+// and a rule's `emit` calls this — or its own decoder — to define what escapes
+// mean. `pub` so a consumer in another file can reach it.
+pub fn unescape(self: str) -> str {
     mut out = "";
     mut run_start = 0;
     mut i = 0;
@@ -487,7 +493,7 @@ fn token_value(m: Matcher, text: str, at: i64) -> TokenValue!LexError {
         CharRun(first, cont) => ok(NoValue),
         Exact(spellings) => ok(NoValue),
         Keyword(spellings, boundary) => ok(NoValue),
-        Delimited(delims, escapes) => ok(StrVal(text[1..text.len() - 1].unescape(escapes))),
+        Delimited(delims, escapes) => ok(StrVal(text[1..text.len() - 1])),
         Between(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
         Nested(open, close) => ok(StrVal(text[open.len()..text.len() - close.len()])),
         CharLit(quote, escapes) => ok(char_lit_value(text, quote)),
@@ -659,8 +665,9 @@ fn template_step<K>(
 // the next segment starts just past the interpolation's `}`. The segment
 // reaching the closing `delim` is `Tail` — or, when no `{` ever appeared, the
 // whole literal is one `Plain` token. Each segment's kind comes from the rule's
-// `OfSeg` emit applied to its decoded text and position. `escapes` works as in
-// `delimited_len`, including the hard error on an unknown escape and the
+// `OfSeg` emit applied to its *raw* (un-decoded) text and position — the emit
+// decodes if it wants to (see `unescape`). `escapes` still governs *scanning*
+// as in `delimited_len`, including the hard error on an unknown escape and the
 // dangling backslash falling through to run the literal out unterminated.
 fn template_scan<K>(
     src: str,
@@ -683,7 +690,7 @@ fn template_scan<K>(
         if (src[i..].starts_with(delim)) {
             let end = i + delim.len();
             let seg = if (interps == 0) { Plain } else { Tail };
-            let content = src[text_start..i].unescape(escapes);
+            let content = src[text_start..i];
             let k = seg_emit(emit, content, seg, seg_start..end)?;
             set toks.push(Token { kind: k, span: seg_start..end });
             return ok(StepResult { tokens: toks, trivia, end });
@@ -691,7 +698,7 @@ fn template_scan<K>(
         let c = src[i].value_or(' '); // in bounds: the loop condition holds
         if (c == '{') {
             let seg = if (interps == 0) { Head } else { Middle };
-            let content = src[text_start..i].unescape(escapes);
+            let content = src[text_start..i];
             let k = seg_emit(emit, content, seg, seg_start..i + 1)?;
             set toks.push(Token { kind: k, span: seg_start..i + 1 });
             set interps = interps + 1;
@@ -796,16 +803,22 @@ variant Kind =
     | RawTplMid(str)
     | RawTplTail(str)
 
-// The `.test` block's template `OfSeg` emits: map a segment's decoded text and
-// position to the matching `Kind` arm.
+// The `.test` block's template `OfSeg` emit: the library hands each segment's
+// *raw* text, so this emit decodes it (via `unescape`) before mapping to a `Kind`
+// arm — escape handling is the caller's job.
 fn tpl_kind(text: str, seg: Seg) -> Kind {
+    let t = text.unescape();
     match (seg) {
-        Plain => Tpl(text),
-        Head => TplHead(text),
-        Middle => TplMid(text),
-        Tail => TplTail(text),
+        Plain => Tpl(t),
+        Head => TplHead(t),
+        Middle => TplMid(t),
+        Tail => TplTail(t),
     }
 }
+
+// The `OfStr` emit for the escaped-string test below: the library hands the raw
+// (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
+fn esc_str(text: str) -> Kind { Str(text.unescape()) }
 
 fn rawtpl_kind(text: str, seg: Seg) -> Kind {
     match (seg) {
@@ -902,14 +915,18 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("if fy", kws) == ok(toks([tok(Kw, 0, 2), tok(Ident("fy"), 3, 5)])));
     assert(lex("if", kws) == ok(toks([tok(Kw, 0, 2)])));
 
-    // Delimited: an `OfStr` emit carries the delimiter-stripped, escape-decoded
-    // contents; an unterminated token is a hard error at its open delimiter.
+    // Delimited: an `OfStr` emit carries the delimiter-stripped contents, left
+    // *un-decoded* — with escapes off ("") that's the whole content verbatim, and
+    // here none of the inputs carry a backslash so `OfStr(Str)` needs no decoding.
+    // An unterminated token is a hard error at its open delimiter.
     let strs = [ws, TokenRule { matcher: Delimited("\"'", ""), emit: OfStr(Str) }, ident];
     assert(lex("\"hi\" x", strs) == ok(toks([tok(Str("hi"), 0, 4), tok(Ident("x"), 5, 6)])));
     assert(lex("''", strs) == ok(toks([tok(Str(""), 0, 2)])));
     assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0, 3)));
 
-    let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: OfStr(Str) }, ident];
+    // With escapes on, `escapes` still governs scanning (an unknown escape is a
+    // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
+    let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: OfStr(esc_str) }, ident];
     assert(lex("\"a\\\"b\"", esc) == ok(toks([tok(Str("a\"b"), 0, 6)])));
     assert(lex("\"a\\nb\"", esc) == ok(toks([tok(Str("a\nb"), 0, 6)])));
     assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence", 2, 4)));
@@ -1097,19 +1114,19 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1181
-deallocations: 1181
+allocations: 1178
+deallocations: 1178
 reallocations: 0
-bytes allocated: 57584
-instructions executed: 260262
-binary size: 788920
+bytes allocated: 57464
+instructions executed: 259591
+binary size: 787200
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam29
-__builtin_count_while$char$s0$lam34
-__builtin_count_while$char$s0$lam35
-__builtin_count_while$char$s0$lam55
+__builtin_count_while$char$s0$lam27
+__builtin_count_while$char$s0$lam32
+__builtin_count_while$char$s0$lam33
+__builtin_count_while$char$s0$lam53
 __builtin_int_parse
-__builtin_is_some_and$char$lam45
+__builtin_is_some_and$char$lam43
 __lambda_0
 __lambda_1
 __lambda_10
@@ -1125,8 +1142,6 @@ __lambda_19
 __lambda_2
 __lambda_20
 __lambda_21
-__lambda_22
-__lambda_23
 __lambda_3
 __lambda_4
 __lambda_5
@@ -1139,6 +1154,7 @@ between_len
 char_lit_len
 delimited_len
 emit_mismatch
+esc_str
 float_len
 interp_scan$Kind
 lex$Kind

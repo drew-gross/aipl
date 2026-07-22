@@ -7,7 +7,7 @@
 // or the complete operator table yet), and this isn't wired into the compiler —
 // nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
 import { == } from builtins;
-import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex } from "./lexer.aipl";
+import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
 // (`Name` its text, `IntLit` its value) or nothing. Every keyword and every
@@ -130,6 +130,14 @@ fn sym_kind(text: str) -> AiplTok {
     }
 }
 
+// Build a `StrLit` from a matched string's contents. The `Delimited` matcher
+// hands the raw (un-decoded) delimiter-stripped text — escape handling is the
+// caller's job — so this decodes AIPL's `\n`/`\t`/`\r`/`\\`/`\"` escapes with the
+// library's `unescape` before wrapping. (A language wanting other escape
+// semantics would decode differently here; the matcher's `escapes` set only
+// governs which `\X` are *accepted* during scanning.)
+fn str_lit(text: str) -> AiplTok { StrLit(text.unescape()) }
+
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
 // whitespace and recorded comments first; keywords before identifiers, so `fn`
 // isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
@@ -193,7 +201,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: OfInt(IntLit) },
-        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(StrLit) },
+        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
         TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
     ]
 }
@@ -217,27 +225,43 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
             },
         ),
     );
+
+    // A string literal with escapes: the source is `s = "a\nb"` (a literal
+    // backslash-`n`, not a newline). The `StrLit` emit decodes it, so the token's
+    // value carries an actual newline — escape handling lives in `str_lit`, not in
+    // the lexer library.
+    let esc = "s = \"a\\nb\"";
+    assert(
+        lex_aipl(esc) == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: Name("s"), span: 0..1 },
+                    Token { kind: Eq, span: 2..3 },
+                    Token { kind: StrLit("a\nb"), span: 4..10 },
+                ],
+                trivia: [],
+            },
+        ),
+    );
 })
 --- performance ---
-allocations: 111
-deallocations: 111
+allocations: 176
+deallocations: 176
 reallocations: 0
-bytes allocated: 5232
-instructions executed: 24732
-binary size: 152080
+bytes allocated: 8504
+instructions executed: 39711
+binary size: 153784
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam11
-__builtin_count_while$char$s0$lam16
-__builtin_count_while$char$s0$lam17
-__builtin_count_while$char$s0$lam37
+__builtin_count_while$char$s0$lam14
+__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam35
+__builtin_count_while$char$s0$lam9
 __builtin_int_parse
-__builtin_is_some_and$char$lam27
+__builtin_is_some_and$char$lam25
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
-__lambda_4
-__lambda_5
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
@@ -252,7 +276,9 @@ __m1__seg_needs_ofseg
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
-__m1__unescape
+__test$lex_aipl
 kwd_kind
+lex_aipl
 main
+str_lit
 sym_kind
