@@ -447,6 +447,112 @@ pub fn make() -> Bag { Full([1, 2]) }";
     assert!(e.call_values("make", &[]).is_err());
 }
 
+/// Array returns over a spread of element types: scalars, `str`, `bool`
+/// (bit-packed), `char` (str-shaped), nested arrays, structs, and variants — the
+/// last being the shape the AIPL lexer needs (a `Token[]` token stream).
+const ARRAY_SRC: &str = "\
+import { == } from builtins;
+struct Span { start: i64, end: i64 }
+variant Token = Eof | Ident(str) | Count(i64)
+pub fn ints(n: i64) -> i64[] { if (n == 0) { [] } else { [10, 20, 30] } }
+pub fn strs() -> str[] { [\"alpha\", \"beta is a longer word\", \"gamma\"] }
+pub fn bools() -> bool[] { [true, false, true, true] }
+pub fn chars() -> char[] { ['a', 'b', 'c'] }
+pub fn nested() -> i64[][] { [[1, 2], [], [3]] }
+pub fn spans() -> Span[] { [Span { start: 1, end: 2 }, Span { start: 3, end: 4 }] }
+pub fn tokens() -> Token[] { [Eof, Ident(\"a heap identifier\"), Count(7)] }
+pub fn maybe(present: bool) -> i64[]? { if (present) { some([1, 2]) } else { none } }";
+
+#[test]
+fn call_values_marshals_array_return() {
+    let e = Engine::compile(ARRAY_SRC).unwrap();
+    use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
+
+    // Scalars, plus the empty-array case (an empty `Array`).
+    assert_eq!(
+        e.call_values("ints", &[Int(1)]).unwrap(),
+        Array(vec![Int(10), Int(20), Int(30)])
+    );
+    assert_eq!(e.call_values("ints", &[Int(0)]).unwrap(), Array(vec![]));
+
+    // `str[]`: each element's bytes copied out (a mix of inline and heap strings);
+    // the block's single reference releases them.
+    assert_eq!(
+        e.call_values("strs", &[]).unwrap(),
+        Array(vec![
+            Str("alpha".into()),
+            Str("beta is a longer word".into()),
+            Str("gamma".into()),
+        ])
+    );
+
+    // `bool[]` is bit-packed; each bit comes back as Int 0/1.
+    assert_eq!(
+        e.call_values("bools", &[]).unwrap(),
+        Array(vec![Int(1), Int(0), Int(1), Int(1)])
+    );
+
+    // `char[]` is str-shaped: decoded to codepoints.
+    assert_eq!(
+        e.call_values("chars", &[]).unwrap(),
+        Array(vec![Int('a' as i64), Int('b' as i64), Int('c' as i64)])
+    );
+
+    // Nested arrays, including an empty inner array.
+    assert_eq!(
+        e.call_values("nested", &[]).unwrap(),
+        Array(vec![
+            Array(vec![Int(1), Int(2)]),
+            Array(vec![]),
+            Array(vec![Int(3)]),
+        ])
+    );
+
+    // Array of structs: each element read inline, field by field.
+    assert_eq!(
+        e.call_values("spans", &[]).unwrap(),
+        Array(vec![
+            Struct(vec![("start".into(), Int(1)), ("end".into(), Int(2))]),
+            Struct(vec![("start".into(), Int(3)), ("end".into(), Int(4))]),
+        ])
+    );
+
+    // Array of variants — the lexer's token-stream shape. The `str` payload is
+    // borrowed from the block (copied out, released with the block).
+    assert_eq!(
+        e.call_values("tokens", &[]).unwrap(),
+        Array(vec![
+            Variant("Eof".into(), vec![]),
+            Variant("Ident".into(), vec![Str("a heap identifier".into())]),
+            Variant("Count".into(), vec![Int(7)]),
+        ])
+    );
+}
+
+#[test]
+fn call_values_marshals_optional_array_return() {
+    // `i64[]?` — an optional whose core is an array — rides the sret pointer, its
+    // present core array read (and released) like a bare array return.
+    let e = Engine::compile(ARRAY_SRC).unwrap();
+    use aipl::FfiValue::{Array, Int, Opt};
+    assert_eq!(
+        e.call_values("maybe", &[Int(1)]).unwrap(),
+        Opt(Some(Box::new(Array(vec![Int(1), Int(2)]))))
+    );
+    assert_eq!(e.call_values("maybe", &[Int(0)]).unwrap(), Opt(None));
+}
+
+#[test]
+fn call_values_rejects_array_argument() {
+    // Arrays marshal *out* but not *in* yet: passing an `Array` argument is a
+    // clear error, not a silent misread.
+    let e = Engine::compile("pub fn len(xs: i64[]) -> i64 { 0 }").unwrap();
+    use aipl::FfiValue::{Array, Int};
+    assert!(e
+        .call_values("len", &[Array(vec![Int(1), Int(2)])])
+        .is_err());
+}
+
 #[test]
 fn call_values_validates_variant_against_param_type() {
     let src = "\

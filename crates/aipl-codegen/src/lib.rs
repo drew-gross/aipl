@@ -2443,8 +2443,9 @@ impl TypeDef {
 /// is `Opt`; a `Result` is `Res` (only as a *return* value so far — optionals
 /// and results can't be passed as arguments yet). A `struct` of scalar/`str`
 /// fields is `Struct`, and a `variant` whose active case's payload is all
-/// scalar/`str` is `Variant` — both marshal in *and* out. Other composites
-/// (arrays, sets, dicts) aren't marshalable yet.
+/// scalar/`str` is `Variant` — both marshal in *and* out. An array of any
+/// marshalable element type comes back as `Array` (return-only for now). Sets and
+/// dicts aren't marshalable yet.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FfiValue {
     /// A scalar AIPL value at its `i64` ABI.
@@ -2469,6 +2470,11 @@ pub enum FfiValue {
     /// returned through a hidden sret pointer, like a struct. Each payload value
     /// is a scalar (`Int`) or `str` (`Str`) — see [`Compilation::call_values`].
     Variant(String, Vec<FfiValue>),
+    /// An AIPL array `T[]`: its elements in order. Each element is marshaled by
+    /// the array's element type — an `Int`/`Str`/`Struct`/`Variant`/`Array`/… as
+    /// appropriate (a `char[]` comes back as an `Array` of `Int` codepoints).
+    /// Return-only for now (arrays can't be passed as arguments yet).
+    Array(Vec<FfiValue>),
 }
 
 pub struct Compilation {
@@ -4268,8 +4274,9 @@ impl Compilation {
             // returns nothing; we transmute through the i64-returning `invoke` and
             // ignore the (unset) return register.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result =
-                unsafe { read_ffi_optional(sret_buf.as_ptr(), &info.return_ty, &self.structs) };
+            let result = unsafe {
+                read_ffi_optional(sret_buf.as_ptr(), &info.return_ty, true, &self.structs)
+            };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4300,7 +4307,7 @@ impl Compilation {
             // SAFETY: as the optional path above.
             let _ = unsafe { invoke(ptr, &sret_abi) };
             let result =
-                unsafe { read_ffi_result(sret_buf.as_ptr(), &info.return_ty, &self.structs) };
+                unsafe { read_ffi_result(sret_buf.as_ptr(), &info.return_ty, true, &self.structs) };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4327,7 +4334,7 @@ impl Compilation {
             }
             // SAFETY: as the optional path, but the buffer is the struct's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result = unsafe { read_ffi_struct(sret_buf.as_ptr() as *const u8, layout) };
+            let result = unsafe { read_ffi_struct(sret_buf.as_ptr() as *const u8, layout, true) };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4354,7 +4361,7 @@ impl Compilation {
             }
             // SAFETY: as the struct path, but the buffer is the variant's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result = unsafe { read_ffi_variant(sret_buf.as_ptr() as *const u8, layout) };
+            let result = unsafe { read_ffi_variant(sret_buf.as_ptr() as *const u8, layout, true) };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4365,6 +4372,16 @@ impl Compilation {
         // scalar and `str` lowers to one `i64`, so the finalized code matches the
         // transmuted signature.
         let r = unsafe { invoke(ptr, &abi) };
+
+        // An array is pointer-like (a single `i64` return, not sret): the callee
+        // handed us one reference on the block, which `read_ffi_array` releases.
+        if let Type::Array(elem) = &info.return_ty {
+            let result = unsafe { read_ffi_array(r, elem, true, &self.structs) };
+            for (header, content_len) in to_free {
+                unsafe { free_dynamic_string(header, content_len) };
+            }
+            return Ok(result);
+        }
 
         let result = if ret_is_str {
             // The callee handed us a reference on the returned `str` (its body
@@ -4431,11 +4448,12 @@ fn ffi_variant_layout<'a>(
 
 /// Validate that `ty` can be marshaled back across the embedding FFI as a return
 /// value: a scalar, `str`, `Unit`, a `struct` whose fields are all scalar/`str`,
-/// an optional (possibly nested) whose core is one of those, or a `Result`
-/// whose `ok`/`err` sides are each independently one of those (so `!Error`,
-/// i.e. `Result<Unit, Error>`, is fine: `Unit` on the ok side, `Error` — a
-/// `str`-repr type — on the err side). Errors name the offending type/field.
-/// (`call_values` then dispatches on the type's shape.)
+/// a `variant` whose case payloads are all scalar/`str`, an array whose element
+/// type is itself marshalable, an optional (possibly nested) whose core is one of
+/// those, or a `Result` whose `ok`/`err` sides are each independently one of
+/// those (so `!Error`, i.e. `Result<Unit, Error>`, is fine: `Unit` on the ok
+/// side, `Error` — a `str`-repr type — on the err side). Errors name the
+/// offending type/field. (`call_values` then dispatches on the type's shape.)
 fn check_ffi_return(
     name: &str,
     ty: &Type,
@@ -4452,6 +4470,10 @@ fn check_ffi_return(
             check_ffi_return(name, ok, structs)?;
             check_ffi_return(name, err, structs)
         }
+        // An array marshals if its element type does (recursively). `char[]` —
+        // whose element is a scalar — is read specially (str-shaped) but validates
+        // the same way.
+        Type::Array(elem) => check_ffi_return(name, elem, structs),
         Type::Named(_) => {
             if let Some(layout) = ffi_struct_layout(ty, structs) {
                 return match layout
@@ -4492,13 +4514,13 @@ fn check_ffi_return(
             }
             Err(Error::msg(format!(
                 "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs and \
-                 variants of those, and optionals/results of those",
+                 variants of those, arrays of those, and optionals/results of those",
                 type_name(ty)
             )))
         }
         _ => Err(Error::msg(format!(
-            "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs of those, \
-             and optionals/results of those",
+            "fn {name:?} returns {}; the FFI supports only i64/bool/char, str, structs and \
+             variants of those, arrays of those, and optionals/results of those",
             type_name(ty)
         ))),
     }
@@ -4555,36 +4577,146 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
     }
 }
 
-/// Read a flattened optional of type `ty` (an `Optional` over a scalar/`str`
-/// core) from the sret buffer `buf` an optional-returning function wrote, into an
-/// [`FfiValue::Opt`]. The layout mirrors codegen: an `i64` tag at offset 0 (`0` =
-/// `none`; `k` = `k` nested `some`s) and the core value at [`OPT_VALUE_OFFSET`].
-/// A present `str` core carries the one reference the callee retained on return
-/// (see the composite-return path in `define_fn`), which we release here.
+// ---------------------------------------------------------------------------
+// FFI return-value readers.
+//
+// Every reader threads an `owned` flag. A value read at the *top level* of a
+// return carries the one reference the callee retained on return (see the
+// composite-return path in `define_fn` / the `Return` path in `compile_expr`):
+// `owned = true` means "this read consumes that reference" — so a `str` read
+// releases it, and an array read `dec`s the block. A value read as a *component
+// of a larger owned value* (an array element, whose reference the block owns) is
+// *borrowed*: `owned = false`, no release — the enclosing value's single
+// top-level release cascades to it.
+// ---------------------------------------------------------------------------
+
+/// Copy a `str`-repr value's bytes into an owned `String`, releasing the callee's
+/// reference when `owned` (a borrowed read leaves it to the enclosing value).
+unsafe fn read_ffi_str_value(raw: i64, owned: bool) -> String {
+    let rv = raw as *const u8;
+    let mut tmp = [0u8; 8];
+    let bytes = unsafe { str_bytes(rv, &mut tmp) };
+    let s = String::from_utf8_lossy(bytes).into_owned();
+    if owned {
+        aipl_dec(rv);
+    }
+    s
+}
+
+/// Read the value of type `ty` whose inline representation begins exactly at
+/// `at`. This is the one place that dispatches an arbitrary marshalable type on
+/// its representation: an inline composite (struct/variant/optional/result) is
+/// read in place; a pointer-like value (scalar/`str`/array) is the 8-byte word at
+/// `at`. Used for array elements and, at byte offset 8, for optional/result
+/// cores (see [`read_ffi_core`]).
+unsafe fn read_ffi_borrowed(
+    at: *const u8,
+    ty: &Type,
+    owned: bool,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
+    if let Some(layout) = ffi_struct_layout(ty, structs) {
+        return unsafe { read_ffi_struct(at, layout, owned) };
+    }
+    if let Some(layout) = ffi_variant_layout(ty, structs) {
+        return unsafe { read_ffi_variant(at, layout, owned) };
+    }
+    match ty {
+        Type::Optional(_) => unsafe { read_ffi_optional(at as *const i64, ty, owned, structs) },
+        Type::Result(_, _) => unsafe { read_ffi_result(at as *const i64, ty, owned, structs) },
+        Type::Array(elem) => {
+            // The 8-byte word is the array value (a tagged block pointer, or — for
+            // `char[]`, which shares `str`'s representation — an inline/heap `str`).
+            let raw = unsafe { *(at as *const i64) };
+            unsafe { read_ffi_array(raw, elem, owned, structs) }
+        }
+        _ if is_str_repr(ty) => {
+            FfiValue::Str(unsafe { read_ffi_str_value(*(at as *const i64), owned) })
+        }
+        _ => FfiValue::Int(unsafe { *(at as *const i64) }),
+    }
+}
+
+/// Read an array value `raw` (of element type `elem`) into an [`FfiValue::Array`]
+/// of its elements in order. `char[]` is special-cased: it shares `str`'s
+/// representation (packed UTF-8 bytes, not an array block), so it's read as its
+/// bytes decoded to codepoints. Every other array is a heap/reversed block —
+/// elements read by *borrowing* (the block owns their references); when `owned`,
+/// the block's own reference is released after the read (`dec` cascades to the
+/// elements), balancing the retain the callee did on return.
+///
+/// SAFETY: `raw` must be a valid array value of element type `elem` (a `char[]`
+/// str value, or a heap/reversed array block whose elements are `elem`-shaped),
+/// carrying one reference when `owned`.
+unsafe fn read_ffi_array(
+    raw: i64,
+    elem: &Type,
+    owned: bool,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
+    // `char[]` is str-shaped: decode the packed bytes to codepoints.
+    if matches!(elem, Type::Primitive(Primitive::Char)) {
+        let chars = unsafe { read_ffi_str_value(raw, owned) }
+            .chars()
+            .map(|c| FfiValue::Int(c as i64))
+            .collect();
+        return FfiValue::Array(chars);
+    }
+    let a = raw as *const u8;
+    // A null pointer stands for an empty array (never allocated).
+    if a.is_null() {
+        return FfiValue::Array(Vec::new());
+    }
+    let len = unsafe { array_len_of(a) };
+    let mut out = Vec::with_capacity(len);
+    if is_bit_packed(elem) {
+        // `bool[]` packs one bit per element.
+        for i in 0..len {
+            out.push(FfiValue::Int(i64::from(unsafe { arr_load_bit(a, i) })));
+        }
+    } else {
+        let stride = elem_size_of(elem, structs) as usize;
+        for i in 0..len {
+            let ep = unsafe { arr_elem_ptr(a, i, stride) };
+            // Elements are borrowed: the block owns their references.
+            out.push(unsafe { read_ffi_borrowed(ep, elem, false, structs) });
+        }
+    }
+    if owned {
+        aipl_array_dec(a);
+    }
+    FfiValue::Array(out)
+}
+
+/// Read a flattened optional of type `ty` into an [`FfiValue::Opt`]. The layout
+/// mirrors codegen: an `i64` tag at offset 0 (`0` = `none`; `k` = `k` nested
+/// `some`s) and the core value at [`OPT_VALUE_OFFSET`]. A present heap core (a
+/// `str` or array) carries the callee's reference when `owned` (see
+/// [`read_ffi_borrowed`]).
 ///
 /// SAFETY: `buf` must point at a `{ i64 tag, core }` the callee filled for an
-/// optional whose core is a scalar, `str`, or struct.
+/// optional whose core is a marshalable type.
 unsafe fn read_ffi_optional(
     buf: *const i64,
     ty: &Type,
+    owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let tag = unsafe { *buf };
-    unsafe { read_ffi_optional_tag(buf, ty, tag, structs) }
+    unsafe { read_ffi_optional_tag(buf, ty, tag, owned, structs) }
 }
 
-/// Read a flattened `Result<ok, err>` from the sret buffer `buf` a
-/// result-returning function wrote, into an [`FfiValue::Res`]. The layout
-/// mirrors codegen: an `i64` tag at offset 0 (`1` = `Ok`, `0` = `Err`) and the
-/// active side's payload at [`OPT_VALUE_OFFSET`] — read with [`read_ffi_core`],
-/// which already reads a `Unit` side (e.g. `!Error`'s ok case) back as a
-/// harmless `Int(0)`.
+/// Read a flattened `Result<ok, err>` from `buf` into an [`FfiValue::Res`]. The
+/// layout mirrors codegen: an `i64` tag at offset 0 (`1` = `Ok`, `0` = `Err`) and
+/// the active side's payload at [`OPT_VALUE_OFFSET`] — read with [`read_ffi_core`],
+/// which reads a `Unit` side (e.g. `!Error`'s ok case) back as a harmless `Int(0)`.
 ///
-/// SAFETY: `buf` must point at a `{ i64 tag, value }` a `Result`-returning
-/// callee filled, with `ok`/`err` each a scalar, `str`, `Unit`, or struct.
+/// SAFETY: `buf` must point at a `{ i64 tag, value }` a `Result`-returning callee
+/// filled, with `ok`/`err` each a marshalable type or `Unit`.
 unsafe fn read_ffi_result(
     buf: *const i64,
     ty: &Type,
+    owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let (ok_ty, err_ty) = match ty {
@@ -4593,10 +4725,12 @@ unsafe fn read_ffi_result(
     };
     let tag = unsafe { *buf };
     if tag == 1 {
-        FfiValue::Res(Ok(Box::new(unsafe { read_ffi_core(buf, ok_ty, structs) })))
+        FfiValue::Res(Ok(Box::new(unsafe {
+            read_ffi_core(buf, ok_ty, owned, structs)
+        })))
     } else {
         FfiValue::Res(Err(Box::new(unsafe {
-            read_ffi_core(buf, err_ty, structs)
+            read_ffi_core(buf, err_ty, owned, structs)
         })))
     }
 }
@@ -4609,6 +4743,7 @@ unsafe fn read_ffi_optional_tag(
     buf: *const i64,
     ty: &Type,
     tag: i64,
+    owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let inner = match ty {
@@ -4619,68 +4754,41 @@ unsafe fn read_ffi_optional_tag(
         return FfiValue::Opt(None);
     }
     let value = if matches!(inner, Type::Optional(_)) {
-        unsafe { read_ffi_optional_tag(buf, inner, tag - 1, structs) }
+        unsafe { read_ffi_optional_tag(buf, inner, tag - 1, owned, structs) }
     } else {
-        unsafe { read_ffi_core(buf, inner, structs) }
+        unsafe { read_ffi_core(buf, inner, owned, structs) }
     };
     FfiValue::Opt(Some(Box::new(value)))
 }
 
-/// Read the present core value at [`OPT_VALUE_OFFSET`] of an optional buffer: a
-/// struct (read inline, field by field), a `str` (bytes copied out and its
-/// retained reference released), or a scalar.
+/// Read the present core value at [`OPT_VALUE_OFFSET`] of an optional/result
+/// buffer — every marshalable core sits inline there, so this is just
+/// [`read_ffi_borrowed`] at byte offset 8.
 unsafe fn read_ffi_core(
     buf: *const i64,
     ty: &Type,
+    owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
-    if let Some(layout) = ffi_struct_layout(ty, structs) {
-        // The struct payload sits inline starting at `OPT_VALUE_OFFSET`.
-        let base = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
-        return unsafe { read_ffi_struct(base, layout) };
-    }
-    if let Some(layout) = ffi_variant_layout(ty, structs) {
-        // The variant (tag + payload) sits inline starting at `OPT_VALUE_OFFSET`.
-        let base = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
-        return unsafe { read_ffi_variant(base, layout) };
-    }
-    // `OPT_VALUE_OFFSET` is 8 bytes, i.e. the next `i64` word.
-    let raw = unsafe { *buf.add(1) };
-    if is_str_repr(ty) {
-        let rv = raw as *const u8;
-        let mut tmp = [0u8; 8];
-        let bytes = unsafe { str_bytes(rv, &mut tmp) };
-        let s = String::from_utf8_lossy(bytes).into_owned();
-        aipl_dec(rv);
-        FfiValue::Str(s)
-    } else {
-        FfiValue::Int(raw)
-    }
+    let at = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
+    unsafe { read_ffi_borrowed(at, ty, owned, structs) }
 }
 
-/// Read a struct (`layout`) the callee wrote into the sret buffer at `base` into
-/// an [`FfiValue::Struct`] — one `(name, value)` per field, in declaration order,
-/// each read at its byte offset. A scalar field is an `Int`; a `str` field's
-/// bytes are copied out and the reference the callee retained on return released
-/// (the composite return retains heap fields — see the `Return` path in
-/// `compile_expr`), mirroring [`read_ffi_core`]. `call_values` has already
+/// Read a struct (`layout`) at `base` into an [`FfiValue::Struct`] — one
+/// `(name, value)` per field, in declaration order, each read at its byte offset
+/// (a heap field is borrowed/released per `owned`). `call_values` has already
 /// rejected any field that isn't a scalar or `str`.
 ///
-/// SAFETY: `base` must point at a `layout`-shaped struct the callee filled, with
-/// each `str` field carrying one retained reference.
-unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout) -> FfiValue {
+/// SAFETY: `base` must point at a `layout`-shaped struct, each heap field
+/// carrying one reference when `owned`.
+unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout, owned: bool) -> FfiValue {
     let fields = layout
         .fields
         .iter()
         .map(|f| {
             let raw = unsafe { *(base.add(f.offset as usize) as *const i64) };
             let value = if is_str_repr(&f.ty) {
-                let rv = raw as *const u8;
-                let mut tmp = [0u8; 8];
-                let bytes = unsafe { str_bytes(rv, &mut tmp) };
-                let s = String::from_utf8_lossy(bytes).into_owned();
-                aipl_dec(rv);
-                FfiValue::Str(s)
+                FfiValue::Str(unsafe { read_ffi_str_value(raw, owned) })
             } else {
                 FfiValue::Int(raw)
             };
@@ -4690,16 +4798,15 @@ unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout) -> FfiValue {
     FfiValue::Struct(fields)
 }
 
-/// Read a variant (`layout`) the callee wrote at `base` into an
-/// [`FfiValue::Variant`]. The tag (case index) sits at offset 0; the active
-/// case's payload fields follow from [`VARIANT_PAYLOAD_OFFSET`], each read at its
-/// byte offset — a scalar as an `Int`, a `str` copied out with the reference the
-/// callee retained on return released (mirroring [`read_ffi_struct`]).
-/// `check_ffi_return` has already ensured every case's payload is scalar/`str`.
+/// Read a variant (`layout`) at `base` into an [`FfiValue::Variant`]. The tag
+/// (case index) sits at offset 0; the active case's payload fields follow from
+/// [`VARIANT_PAYLOAD_OFFSET`], each read at its byte offset (heap payloads
+/// borrowed/released per `owned`). `check_ffi_return` has already ensured every
+/// case's payload is scalar/`str`.
 ///
-/// SAFETY: `base` must point at a `layout`-shaped variant the callee filled, its
-/// tag a valid case index and each `str` payload carrying one retained reference.
-unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout) -> FfiValue {
+/// SAFETY: `base` must point at a `layout`-shaped variant, its tag a valid case
+/// index and each heap payload carrying one reference when `owned`.
+unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout, owned: bool) -> FfiValue {
     let tag = unsafe { *(base as *const i64) } as usize;
     let case = layout
         .cases
@@ -4711,12 +4818,7 @@ unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout) -> FfiValue 
         .map(|f| {
             let raw = unsafe { *(base.add(f.offset as usize) as *const i64) };
             if is_str_repr(&f.ty) {
-                let rv = raw as *const u8;
-                let mut tmp = [0u8; 8];
-                let bytes = unsafe { str_bytes(rv, &mut tmp) };
-                let s = String::from_utf8_lossy(bytes).into_owned();
-                aipl_dec(rv);
-                FfiValue::Str(s)
+                FfiValue::Str(unsafe { read_ffi_str_value(raw, owned) })
             } else {
                 FfiValue::Int(raw)
             }
