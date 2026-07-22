@@ -166,6 +166,62 @@ impl<'a> Cx<'a> {
     fn has_variant(&self, name: &str) -> bool {
         self.variants.contains_key(name) || self.syn_variants.borrow().contains_key(name)
     }
+
+    /// The fields of a struct-typed value: a concrete named struct, or an
+    /// (abstract) generic-struct application `Box<T>` — for the latter the
+    /// template's fields are returned with its type variables substituted by the
+    /// application's arguments (which may still be abstract inside a generic
+    /// function). This is what lets `b.value` type-check where `b: Box<T>`.
+    fn fields_of(&self, ty: &Type) -> Option<Vec<(String, Type, bool)>> {
+        match ty {
+            Type::Named(sn) => self.struct_fields(sn),
+            Type::Generic(base, args) => {
+                let tmpl = self.generic_structs.get(base)?;
+                let map = zip_type_args(&tmpl.type_vars, args);
+                Some(
+                    tmpl.fields
+                        .iter()
+                        .map(|fd| {
+                            (
+                                fd.name.clone(),
+                                crate::subst_type_params(&fd.ty, &map),
+                                fd.default.is_some(),
+                            )
+                        })
+                        .collect(),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    /// The cases of a variant-typed value: a concrete named variant, or an
+    /// (abstract) generic-variant application `Emit<K>` (template cases with its
+    /// type variables substituted). Lets a `match` on such a value resolve.
+    fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
+        match ty {
+            Type::Named(n) => self.variant_cases(n),
+            Type::Generic(base, args) => {
+                let tmpl = self.generic_variants.get(base)?;
+                let map = zip_type_args(&tmpl.type_vars, args);
+                Some(
+                    tmpl.cases
+                        .iter()
+                        .map(|c| {
+                            (
+                                c.name.clone(),
+                                c.payload
+                                    .iter()
+                                    .map(|p| crate::subst_type_params(p, &map))
+                                    .collect(),
+                            )
+                        })
+                        .collect(),
+                )
+            }
+            _ => None,
+        }
+    }
     /// Cases of variant `name` (a source variant or a synthesized generic
     /// instance).
     fn variant_cases(&self, name: &str) -> Option<Vec<(String, Vec<Type>)>> {
@@ -233,9 +289,13 @@ impl<'a> Cx<'a> {
                     self.bind_field(p, a, vars, map);
                 }
             }
-            (Type::Array(p), Type::Array(a)) => self.bind_field(p, a, vars, map),
-            (Type::Optional(p), Type::Optional(a)) => self.bind_field(p, a, vars, map),
-            (Type::Set(p), Type::Set(a)) => self.bind_field(p, a, vars, map),
+            (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
+            (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
+            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => self.bind_field(p, a, vars, map),
             (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
                 self.bind_field(pk, ak, vars, map);
                 self.bind_field(pv, av, vars, map);
@@ -329,6 +389,35 @@ impl<'a> Cx<'a> {
         }
     }
 
+    /// The type arguments a construction of generic `base` should take from the
+    /// *expected* (enclosing function's return) type, when the provided fields
+    /// don't pin every variable — e.g. `StepResult { tokens: [], .. }` in a
+    /// `-> StepResult<K>!LexError` function. Searches the return type for an
+    /// application of `base` (a `Generic` in a generic function, or a synthesized
+    /// `Named` instance once concrete).
+    fn ret_generic_args(&self, base: &str) -> Option<Vec<Type>> {
+        let ret = self.current_ret.borrow().clone();
+        self.find_generic_args(&ret, base)
+    }
+
+    fn find_generic_args(&self, ty: &Type, base: &str) -> Option<Vec<Type>> {
+        match ty {
+            Type::Generic(b, args) if b == base => Some(args.clone()),
+            Type::Named(n) => self
+                .instance_args(n)
+                .filter(|(b, _)| b == base)
+                .map(|(_, a)| a),
+            Type::Optional(i) | Type::Array(i) | Type::Set(i) => self.find_generic_args(i, base),
+            Type::Dict(k, v) => self
+                .find_generic_args(k, base)
+                .or_else(|| self.find_generic_args(v, base)),
+            Type::Result(a, b) => self
+                .find_generic_args(a, base)
+                .or_else(|| self.find_generic_args(b, base)),
+            _ => None,
+        }
+    }
+
     /// Register (if new) the monomorphic instance of generic `base` applied to
     /// concrete `args`, returning its synthetic name.
     fn instantiate_generic(&self, base: &str, args: &[Type]) -> Result<String, Error> {
@@ -411,23 +500,36 @@ impl<'a> Cx<'a> {
                 ));
             }
         }
-        // Every type variable must be pinned by some provided field.
+        // Every type variable must be pinned by a provided field, or — when the
+        // fields don't determine it (an empty `StepResult { tokens: [], .. }`) —
+        // by the enclosing function's expected return type.
+        let expected = self.ret_generic_args(name);
         let args: Vec<Type> = tmpl
             .type_vars
             .iter()
-            .map(|tv| {
-                map.get(&tv.name).cloned().ok_or_else(|| {
-                    Error::at(
-                        format!(
-                            "cannot infer type parameter {:?} of generic struct {name:?} \
-                             — provide a field whose value determines it",
-                            tv.name
-                        ),
-                        span.clone(),
-                    )
-                })
+            .enumerate()
+            .map(|(i, tv)| {
+                map.get(&tv.name)
+                    .cloned()
+                    .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
+                    .ok_or_else(|| {
+                        Error::at(
+                            format!(
+                                "cannot infer type parameter {:?} of generic struct {name:?} \
+                                 — provide a field whose value determines it",
+                                tv.name
+                            ),
+                            span.clone(),
+                        )
+                    })
             })
             .collect::<Result<_, _>>()?;
+        // Inside a generic function the arguments may be abstract (`Box { value:
+        // x }` where `x: T`); keep the construction generic — monomorphization
+        // pins it once `T` is concrete. `bind_field` already checked consistency.
+        if args.iter().any(mentions_typevar) {
+            return Ok(Type::Generic(name.to_string(), args));
+        }
         let inst = self.instantiate_generic(name, &args)?;
         // Check each provided value against its concrete (substituted) field type.
         let concrete = self.struct_fields(&inst).expect("just instantiated");
@@ -854,6 +956,9 @@ impl Cx<'_> {
                         || matches!(p, Type::Named(n) if self.has_struct(n))
                         || matches!(p, Type::Named(n) if self.variants.contains_key(n))
                         || matches!(p, Type::Array(_))
+                        // An (abstract) generic struct/variant `StepResult<K>` —
+                        // a valid payload like any struct/variant.
+                        || matches!(p, Type::Generic(..))
                 };
                 if !payload_ok(ok) && !is_unit(ok) {
                     return Err(Error::msg(format!(
@@ -952,11 +1057,10 @@ impl Cx<'_> {
             Type::Tuple(_) => Err(Error::msg(format!(
                 "fn {fname:?}: tuple types cannot be array or optional elements"
             ))),
-            // Resolved to a `Named` synthetic struct by lower_generics before
-            // check; a monomorphic instance reaches here as `Named` instead.
-            Type::Generic(..) => Err(Error::msg(format!(
-                "fn {fname:?}: unresolved generic type as array or optional element"
-            ))),
+            // An (abstract) generic-struct/variant application `Token<K>` — a
+            // valid element like any struct/variant (a concrete instance reaches
+            // here as `Named`, checked once it's instantiated).
+            Type::Generic(..) => Ok(()),
         }
     }
 
@@ -1084,15 +1188,21 @@ impl Cx<'_> {
                     ))
                 }
             },
-            Type::Named(n) if self.variants.contains_key(n) => match self.case_payload(n, name) {
-                Some(p) => p.to_vec(),
-                None => {
-                    return Err(Error::at(
-                        format!("{n} has no constructor {name:?}"),
-                        arm.span.clone(),
-                    ))
+            // A concrete named variant, or an (abstract) generic-variant
+            // application `Emit<K>` inside a generic function — `cases_of`
+            // resolves both.
+            _ if self.cases_of(st).is_some() => {
+                let cases = self.cases_of(st).expect("just checked");
+                match cases.iter().find(|(c, _)| c == name) {
+                    Some((_, p)) => p.clone(),
+                    None => {
+                        return Err(Error::at(
+                            format!("{} has no constructor {name:?}", tyname(st)),
+                            arm.span.clone(),
+                        ))
+                    }
                 }
-            },
+            }
             other => {
                 return Err(Error::at(
                     format!(
@@ -1162,9 +1272,13 @@ impl Cx<'_> {
         let required: Vec<String> = match st {
             Type::Optional(_) => vec!["some".into(), "none".into()],
             Type::Result(_, _) => vec!["ok".into(), "err".into()],
-            Type::Named(n) if self.variants.contains_key(n) => {
-                self.variants[n].iter().map(|(c, _)| c.clone()).collect()
-            }
+            // A concrete or (abstract) generic variant — every case must appear.
+            _ if self.cases_of(st).is_some() => self
+                .cases_of(st)
+                .expect("just checked")
+                .into_iter()
+                .map(|(c, _)| c)
+                .collect(),
             // A non-matchable scrutinee already errored in `match_arm_bindings`.
             _ => return Ok(()),
         };
@@ -1613,10 +1727,12 @@ impl Cx<'_> {
                         elem_ty = t;
                     }
                 }
-                // A struct or variant element is valid too (must be declared).
+                // A struct or variant element is valid too (must be declared); so
+                // is an (abstract) generic-struct/variant application `Token<K>`.
                 let elem_ok = is_valid_elem(&elem_ty)
                     || matches!(&elem_ty, Type::Named(n)
-                        if self.has_struct(n) || self.variants.contains_key(n));
+                        if self.has_struct(n) || self.variants.contains_key(n))
+                    || matches!(&elem_ty, Type::Generic(..));
                 if !elems.is_empty() && !elem_ok {
                     return Err(Error::at(
                         format!(
@@ -1765,15 +1881,9 @@ impl Cx<'_> {
             }
             ExprKind::Field(obj, fname) => {
                 let ot = self.check_expr(obj, env, effects)?;
-                let Type::Named(sn) = &ot else {
-                    return Err(Error::at(
-                        format!("field access on non-struct value of type {}", tyname(&ot)),
-                        obj.span.clone(),
-                    ));
-                };
-                let fields = self.struct_fields(sn).ok_or_else(|| {
+                let fields = self.fields_of(&ot).ok_or_else(|| {
                     Error::at(
-                        format!("field access on non-struct value of type {}", display(sn)),
+                        format!("field access on non-struct value of type {}", tyname(&ot)),
                         obj.span.clone(),
                     )
                 })?;
@@ -1783,7 +1893,7 @@ impl Cx<'_> {
                     .map(|(_, t, _)| t.clone())
                     .ok_or_else(|| {
                         Error::at(
-                            format!("struct {:?} has no field {fname:?}", display(sn)),
+                            format!("struct {} has no field {fname:?}", tyname(&ot)),
                             span.clone(),
                         )
                     })?
@@ -2230,7 +2340,7 @@ impl Cx<'_> {
                 continue;
             }
             let aty = self.check_expr(arg, env, effects)?;
-            collect_var_bindings(pty, &aty, &vars, &mut map);
+            self.bind_field(pty, &aty, &vars, &mut map);
             atys[i] = aty;
         }
         // Pass 2: function-typed arguments — check against the substituted type.
@@ -2249,7 +2359,7 @@ impl Cx<'_> {
             // The lambda's inferred type can pin a variable that appears only in
             // this function-typed parameter — e.g. `U` in `map<T, U>(self: T[], f:
             // (T) -> U)`, learned from the lambda's body return type.
-            collect_var_bindings(pty, &atys[i], &vars, &mut map);
+            self.bind_field(pty, &atys[i], &vars, &mut map);
         }
         // A bound-constrained type variable (e.g. `<T: ord>`) must resolve to a
         // type that satisfies its bound — the unification above is purely
@@ -2305,7 +2415,17 @@ impl Cx<'_> {
             // as freely interchangeable (see its `is_char_array` rule), so no
             // per-builtin override is needed here to keep e.g. `fn f(s: str)
             // -> str { s.reverse() }` type-checking.
-            Ok(subst_vars(&return_ty, &map, &vars))
+            let ret = subst_vars(&return_ty, &map, &vars);
+            // A generic-struct/variant return (`fn wrap<T>(..) -> Box<T>`) came
+            // back as a `Type::Generic`; once its arguments are concrete at the
+            // call site, resolve it to the synthesized named instance so the rest
+            // of the checker sees an ordinary struct. An abstract one (the call
+            // is inside another generic function) stays generic.
+            if mentions_typevar(&ret) {
+                Ok(ret)
+            } else {
+                self.resolve_generic_ty(&ret)
+            }
         }
     }
 
@@ -2444,7 +2564,7 @@ impl Cx<'_> {
         let mut map: HashMap<String, Type> = HashMap::new();
         let param_types = sig.param_types();
         for (pty, ety) in param_types.iter().zip(expected_params) {
-            collect_var_bindings(pty, ety, &vars, &mut map);
+            self.bind_field(pty, ety, &vars, &mut map);
         }
         let params = param_types
             .iter()
@@ -2774,6 +2894,22 @@ fn is_typevar(t: &Type) -> bool {
     matches!(t, Type::Named(n) if n == "__typevar__")
 }
 
+/// Whether `t` contains the abstract `__typevar__` sentinel anywhere — i.e. it's
+/// not fully concrete. Used to decide whether a generic instantiation can be
+/// pinned to a synthetic named instance now, or must stay a `Type::Generic` (an
+/// abstract application inside a generic function, resolved at monomorphization).
+fn mentions_typevar(t: &Type) -> bool {
+    match t {
+        Type::Named(n) => n == "__typevar__",
+        Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_typevar(i),
+        Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
+        Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
+        Type::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_typevar),
+        _ => false,
+    }
+}
+
 /// Valid element of an array literal: a scalar, `str`, a nested array, an
 /// optional (`T?[]`), or an (abstract) type variable — never a struct.
 /// `none`/`__unknown__` are accepted (they coerce). Used in body position.
@@ -3034,6 +3170,18 @@ pub(crate) fn is_variant_instance(
             .split('$')
             .next()
             .is_some_and(|base| generic_variants.contains_key(base))
+}
+
+/// Map a template's type variables to an application's arguments (positionally).
+pub(crate) fn zip_type_args(
+    type_vars: &[aipl_syntax::ast::TypeParam],
+    args: &[Type],
+) -> HashMap<String, Type> {
+    type_vars
+        .iter()
+        .map(|tv| tv.name.clone())
+        .zip(args.iter().cloned())
+        .collect()
 }
 
 /// Every type variable in declaration order, resolved from `map`, or `None` if

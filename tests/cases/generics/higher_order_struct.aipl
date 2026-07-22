@@ -1,0 +1,28 @@
+import { wrapping_add as +, == } from builtins;
+
+// A generic function may return and take a generic struct instantiated at its
+// own type parameter (`Box<T>`) — "higher-order" generics. The application stays
+// abstract while the function is checked, and is pinned once the caller supplies
+// a concrete type.
+struct Box<T> { value: T }
+
+fn wrap<T>(x: T) -> Box<T> { Box { value: x } }
+
+fn unbox<T>(b: Box<T>) -> T { b.value }
+
+fn round_trip<T>(x: T) -> T { unbox(wrap(x)) }.test({
+    assert(round_trip(5) == 5);
+    assert(round_trip('z') == 'z');
+    assert(unbox(wrap("hi")) == "hi");
+    assert(wrap(3).value + 1 == 4);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 70
+binary size: 1872
+--- monomorphizations ---
+main
+wrap$i64

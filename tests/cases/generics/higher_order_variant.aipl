@@ -1,0 +1,36 @@
+import { wrapping_add as +, wrapping_sub as -, == } from builtins;
+
+// A generic function may match a generic *variant* at its own type parameter and
+// call a function stored in a payload — the shape the lexer's `Emit<K>` uses.
+variant Emit<K> = OfInt((i64) -> K) | Plain(K)
+
+fn apply<K>(e: Emit<K>, n: i64) -> K {
+    match (e) {
+        OfInt(f) => f(n),
+        Plain(k) => k,
+    }
+}
+
+variant Tok = Num(i64) | Bare
+
+fn to_i(t: Tok) -> i64 {
+    match (t) {
+        Num(v) => v,
+        Bare => 0 - 1,
+    }
+}.test({
+    assert(to_i(apply(OfInt(Num), 9)) == 9);
+    assert(to_i(apply(Plain(Bare), 9)) == 0 - 1);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 94
+binary size: 1536
+--- monomorphizations ---
+__lambda_0
+apply$Tok
+main
+to_i

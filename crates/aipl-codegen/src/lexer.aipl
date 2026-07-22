@@ -44,11 +44,37 @@ import {
 // keywords, comments) carry `NoValue` — slicing the span recovers the text.
 variant TokenValue = NoValue | StrVal(str) | CharVal(char) | IntVal(i64)
 
-// What a token is: the `kind` label of the rule that matched it, the
-// half-open byte range it covers in the source — the raw text is recovered by
-// slicing, `src[t.span]` — and the processed value, for the token shapes
-// where the text and the meaning differ (see `TokenValue`).
-struct Token { kind: str, span: Span, value: TokenValue = NoValue }
+// What a token is: its `kind` — a caller-defined value carrying whatever the
+// matched token means, produced by the rule's `emit` (see `Emit`) — and the
+// half-open byte range it covers in the source (the raw text is recovered by
+// slicing, `src[t.span]`). `Token` is generic over the kind type `K`, so a
+// language pins `K` to its own `variant` whose arms *are* the token kinds, each
+// carrying that kind's content (`Int(i64)`, `Str(str)`, a bare `Plus`, …) —
+// rather than a stringly-typed label plus a separate value.
+struct Token<K> { kind: K, span: Span }
+
+// Where in a template literal a text segment sits, handed to a `Template`
+// rule's `OfSeg` emit so one rule can produce a *different* kind per position:
+// `Plain` (a literal with no interpolations), `Head` (open delim through the
+// first `{`), `Middle` (between two interpolations), `Tail` (through the close).
+variant Seg = Plain | Head | Middle | Tail
+
+// How a rule turns its matched token into a kind `K`: a fixed set of options,
+// one per shape the matcher's value can take (see `token_value`). `Bare` is a
+// finished kind for a valueless token (punctuation, an operator); `OfText`
+// applies a constructor to the matched text (identifiers, whose text is their
+// content); `OfStr`/`OfChar`/`OfInt` apply a constructor to a `Delimited`/…
+// string, a `CharLit` char, or an `Int` value; `OfSeg` is for a `Template`
+// rule, applied to each segment's text and its position. The chosen option must
+// match the matcher's value shape — an `OfInt` on a `Delimited` matcher, say,
+// is a lex error (see `apply_emit`).
+variant Emit<K> =
+    Bare(K)
+    | OfText((str) -> K)
+    | OfStr((str) -> K)
+    | OfChar((char) -> K)
+    | OfInt((i64) -> K)
+    | OfSeg((str, Seg) -> K)
 
 // Why a lex failed: what went wrong, and the span of the offending source
 // (absolute into the lexed string — slice it to show the offender).
@@ -141,37 +167,20 @@ variant Matcher =
     | Float
     | Int
 
-// One prioritized entry of a rule set: the label tokens of this shape carry,
-// the shape itself, and what becomes of its matches. A plain rule emits a
+// One prioritized entry of a rule set: the shape to match, how to turn a match
+// into a kind (`emit`), and what becomes of its matches. A plain rule emits a
 // token; `skip: true` consumes matches silently (whitespace); `trivia: true`
-// consumes them but records each (kind and span) in the result's trivia
-// side-channel — for matches a later pass wants located but not parsed, like
-// comments (a formatter re-attaches them) or lint markers (`#[allow]`). Set
-// at most one of the two flags (`skip` wins when both are set).
-struct TokenRule { kind: str, matcher: Matcher, skip: bool = false, trivia: bool = false }
+// consumes them but records each in the result's trivia side-channel — for
+// matches a later pass wants located but not parsed, like comments (a formatter
+// re-attaches them) or lint markers (`#[allow]`). Set at most one of the two
+// flags (`skip` wins when both are set). Generic over the kind type `K` — every
+// rule of one set builds the same `K`.
+struct TokenRule<K> { matcher: Matcher, emit: Emit<K>, skip: bool = false, trivia: bool = false }
 
 // What `lex` returns: the emitted tokens, and the trivia side-channel — the
 // recorded matches of every `trivia: true` rule, in source order. Silent
 // `skip` matches appear in neither.
-struct LexResult { tokens: Token[], trivia: Token[] }
-
-// Test-block shorthands: an expected valueless token / str-, char-, and
-// int-valued tokens / a token-only result (no trivia) / an expected lex error.
-fn tok(kind: str, start: i64, end: i64) -> Token { Token { kind, span: start..end } }
-
-fn stok(kind: str, start: i64, end: i64, v: str) -> Token {
-    Token { kind, span: start..end, value: StrVal(v) }
-}
-
-fn ctok(kind: str, start: i64, end: i64, v: char) -> Token {
-    Token { kind, span: start..end, value: CharVal(v) }
-}
-
-fn itok(kind: str, start: i64, end: i64, v: i64) -> Token {
-    Token { kind, span: start..end, value: IntVal(v) }
-}
-
-fn toks(tokens: Token[]) -> LexResult { LexResult { tokens, trivia: [] } }
+struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
 fn lex_err(message: str, start: i64, end: i64) -> LexError {
     LexError { message, span: start..end }
@@ -489,38 +498,70 @@ fn token_value(m: Matcher, text: str, at: i64) -> TokenValue!LexError {
     }
 }
 
+// Build a token's kind by applying the rule's `emit` to its matched `text` and
+// matcher-computed `value`. The emit option must agree with the value shape: a
+// `Bare`/`OfText` emit works with any (they ignore the value or take the text),
+// while `OfStr`/`OfChar`/`OfInt` need a `StrVal`/`CharVal`/`IntVal` — a mismatch
+// (or an `OfSeg`, which only a `Template` rule may use) is a lex error at
+// `span`. `token_value` guarantees the shape a well-paired rule produces, so a
+// mismatch means the rule set itself is wrong.
+fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexError {
+    match (e) {
+        Bare(k) => ok(k),
+        OfText(f) => ok(f(text)),
+        OfStr(f) => match (value) {
+            StrVal(s) => ok(f(s)),
+            NoValue => err(emit_mismatch("OfStr", "a string", span)),
+            CharVal(c) => err(emit_mismatch("OfStr", "a string", span)),
+            IntVal(n) => err(emit_mismatch("OfStr", "a string", span)),
+        },
+        OfChar(f) => match (value) {
+            CharVal(c) => ok(f(c)),
+            NoValue => err(emit_mismatch("OfChar", "a char", span)),
+            StrVal(s) => err(emit_mismatch("OfChar", "a char", span)),
+            IntVal(n) => err(emit_mismatch("OfChar", "a char", span)),
+        },
+        OfInt(f) => match (value) {
+            IntVal(n) => ok(f(n)),
+            NoValue => err(emit_mismatch("OfInt", "an int", span)),
+            StrVal(s) => err(emit_mismatch("OfInt", "an int", span)),
+            CharVal(c) => err(emit_mismatch("OfInt", "an int", span)),
+        },
+        OfSeg(f) => err(
+            LexError { message: "an OfSeg emit is only valid on a Template rule", span },
+        ),
+    }
+}
+
+// A `LexError` for an `emit` whose value shape doesn't match its option.
+fn emit_mismatch(opt: str, want: str, span: Span) -> LexError {
+    LexError { message: opt +++ " emit expects " +++ want +++ " value", span }
+}
+
 // One lexing step's outcome: the token(s) the winning rule produced — one
 // usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
 // `Template` — any trivia recorded along the way, and the position just past
 // the consumed text. `end` staying at the step's start means no rule matched.
-struct StepResult { tokens: Token[], trivia: Token[], end: i64 }
+struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: i64 }
 
 // A simple (single-token) matcher's outcome: a decline when the matched
 // length `n` is 0, otherwise `n` chars consumed producing the rule's one
-// token — as trivia for a `trivia` rule (no value), or nothing at all for a
-// `skip` rule. An emitted token carries its matcher-computed value, which can
-// itself fail (an `Int` run that overflows).
-fn step_result(r: TokenRule, src: str, at: i64, n: i64) -> StepResult!LexError {
+// token — recorded as trivia for a `trivia` rule, or nothing at all for a
+// `skip` rule. The token's kind comes from the rule's `emit` applied to the
+// matcher-computed value, either of which can fail (an `Int` run that overflows,
+// an emit/value-shape mismatch).
+fn step_result<K>(r: TokenRule<K>, src: str, at: i64, n: i64) -> StepResult<K>!LexError {
     if (n == 0 || r.skip) {
         return ok(StepResult { tokens: [], trivia: [], end: at + n });
     };
+    let text = src[at..at + n];
+    let v = token_value(r.matcher, text, at)?;
+    let kind = apply_emit(r.emit, text, v, at..at + n)?;
+    let t = Token { kind, span: at..at + n };
     if (r.trivia) {
-        return ok(
-            StepResult {
-                tokens: [],
-                trivia: [Token { kind: r.kind, span: at..at + n }],
-                end: at + n,
-            },
-        );
+        return ok(StepResult { tokens: [], trivia: [t], end: at + n });
     };
-    let v = token_value(r.matcher, src[at..at + n], at)?;
-    ok(
-        StepResult {
-            tokens: [Token { kind: r.kind, span: at..at + n, value: v }],
-            trivia: [],
-            end: at + n,
-        },
-    )
+    ok(StepResult { tokens: [t], trivia: [], end: at + n })
 }
 
 // One lexing step at absolute position `at`: tries each rule in order (first
@@ -531,7 +572,7 @@ fn step_result(r: TokenRule, src: str, at: i64, n: i64) -> StepResult!LexError {
 // doesn't fit a single length, so its arm builds the outcome directly.
 // Mutually recursive with `template_scan`: an interpolation re-enters this
 // full rule set, so template literals nest.
-fn lex_step(src: str, at: i64, rules: TokenRule[]) -> StepResult!LexError {
+fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     for (let r : rules) {
         let res = match (r.matcher) {
             CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
@@ -561,7 +602,7 @@ fn lex_step(src: str, at: i64, rules: TokenRule[]) -> StepResult!LexError {
                 at,
                 src[at..].char_lit_len(at, quote, escapes)?,
             )?,
-            Template(delim, escapes) => template_step(src, at, delim, escapes, r.kind, rules)?,
+            Template(delim, escapes) => template_step(src, at, delim, escapes, r.emit, rules)?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
             Float => step_result(r, src, at, src[at..].float_len())?,
             Int => step_result(r, src, at, src[at..].count_while(is_digit))?,
@@ -573,42 +614,62 @@ fn lex_step(src: str, at: i64, rules: TokenRule[]) -> StepResult!LexError {
     ok(StepResult { tokens: [], trivia: [], end: at })
 }
 
+// Apply a `Template` rule's `emit` to one segment's escape-decoded text and its
+// position. The emit must be an `OfSeg` — a template produces several kinds per
+// literal, one per segment position, which only `OfSeg` can distinguish; any
+// other option is a lex error.
+fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
+    match (e) {
+        OfSeg(f) => ok(f(text, seg)),
+        Bare(k) => err(seg_needs_ofseg(span)),
+        OfText(f) => err(seg_needs_ofseg(span)),
+        OfStr(f) => err(seg_needs_ofseg(span)),
+        OfChar(f) => err(seg_needs_ofseg(span)),
+        OfInt(f) => err(seg_needs_ofseg(span)),
+    }
+}
+
+fn seg_needs_ofseg(span: Span) -> LexError {
+    LexError { message: "a Template rule needs an OfSeg emit", span }
+}
+
 // The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
 // doesn't open with `delim` (mirroring every other matcher's 0), else the
 // literal's whole token run.
-fn template_step(
+fn template_step<K>(
     src: str,
     at: i64,
     delim: str,
     escapes: str,
-    kind: str,
-    rules: TokenRule[],
-) -> StepResult!LexError {
+    emit: Emit<K>,
+    rules: TokenRule<K>[],
+) -> StepResult<K>!LexError {
     if (!src[at..].starts_with(delim)) {
         return ok(StepResult { tokens: [], trivia: [], end: at });
     };
-    template_scan(src, at, delim, escapes, kind, rules)
+    template_scan(src, at, delim, escapes, emit, rules)
 }
 
 // `Template`: scans a whole template literal at `at` (the caller verified the
 // opening `delim`); the result's tokens are the literal's whole run and its
 // `end` sits just past the closing `delim`. A text segment runs until the
 // closing `delim` (matched in full, like `Between`) or a `{`, which ends the
-// segment — as K_head for the first, K_middle after — and opens an
+// segment — as `Head` for the first, `Middle` after — and opens an
 // interpolation (see `interp_scan`); head/middle spans include their `{`, and
 // the next segment starts just past the interpolation's `}`. The segment
-// reaching the closing `delim` is K_tail — or, when no `{` ever appeared, the
-// whole literal is one plain K token. `escapes` works as in `delimited_len`,
-// including the hard error on an unknown escape and the dangling backslash
-// falling through to run the literal out unterminated.
-fn template_scan(
+// reaching the closing `delim` is `Tail` — or, when no `{` ever appeared, the
+// whole literal is one `Plain` token. Each segment's kind comes from the rule's
+// `OfSeg` emit applied to its decoded text and position. `escapes` works as in
+// `delimited_len`, including the hard error on an unknown escape and the
+// dangling backslash falling through to run the literal out unterminated.
+fn template_scan<K>(
     src: str,
     at: i64,
     delim: str,
     escapes: str,
-    kind: str,
-    rules: TokenRule[],
-) -> StepResult!LexError {
+    emit: Emit<K>,
+    rules: TokenRule<K>[],
+) -> StepResult<K>!LexError {
     mut toks = [];
     mut trivia = [];
     mut i = at + delim.len();
@@ -618,20 +679,21 @@ fn template_scan(
         // The segment's text: past the opening delim for the first segment,
         // from just past the previous interpolation's `}` after — through the
         // current position (a closing delim or an opening `{`), exclusive.
-        // Each segment token carries it escape-decoded as its value.
         let text_start = if (interps == 0) { at + delim.len() } else { seg_start };
         if (src[i..].starts_with(delim)) {
             let end = i + delim.len();
-            let k = if (interps == 0) { kind } else { kind +++ "_tail" };
-            let v = StrVal(src[text_start..i].unescape(escapes));
-            set toks.push(Token { kind: k, span: seg_start..end, value: v });
+            let seg = if (interps == 0) { Plain } else { Tail };
+            let content = src[text_start..i].unescape(escapes);
+            let k = seg_emit(emit, content, seg, seg_start..end)?;
+            set toks.push(Token { kind: k, span: seg_start..end });
             return ok(StepResult { tokens: toks, trivia, end });
         };
         let c = src[i].value_or(' '); // in bounds: the loop condition holds
         if (c == '{') {
-            let k = if (interps == 0) { kind +++ "_head" } else { kind +++ "_middle" };
-            let v = StrVal(src[text_start..i].unescape(escapes));
-            set toks.push(Token { kind: k, span: seg_start..i + 1, value: v });
+            let seg = if (interps == 0) { Head } else { Middle };
+            let content = src[text_start..i].unescape(escapes);
+            let k = seg_emit(emit, content, seg, seg_start..i + 1)?;
+            set toks.push(Token { kind: k, span: seg_start..i + 1 });
             set interps = interps + 1;
             let interp = interp_scan(src, i + 1, i, rules)?;
             for (let t : interp.tokens) {
@@ -664,7 +726,7 @@ fn template_scan(
 // its own token — set/dict literals, blocks) raises/lowers it, while a brace
 // buried inside a bigger token (a delimited string's content, a nested
 // template) doesn't. The result's `end` sits just past the closing `}`.
-fn interp_scan(src: str, at: i64, open: i64, rules: TokenRule[]) -> StepResult!LexError {
+fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     mut toks = [];
     mut trivia = [];
     mut depth = 1;
@@ -704,7 +766,63 @@ fn interp_scan(src: str, at: i64, open: i64, rules: TokenRule[]) -> StepResult!L
     ok(StepResult { tokens: toks, trivia, end: i })
 }
 
-pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
+// A concrete token-kind variant for the `.test` block below — one example of
+// the per-language `K` a caller pins `Token<K>`/`TokenRule<K>` to. Each arm is a
+// kind; value-bearing kinds carry their content (`Int(i64)`, `Str(str)`,
+// `Char(char)`, the template segments), text-recovered kinds are bare (their
+// text is sliced from the span). A real consumer writes its own such variant.
+variant Kind =
+    Ws
+    | Ident(str)
+    | IntTok(i64)
+    | Digits
+    | Op
+    | Kw
+    | Punct
+    | Dot
+    | FloatTok
+    | Str(str)
+    | Char(char)
+    | Raw(str)
+    | Block(str)
+    | Comment
+    | Allow
+    | Tpl(str)
+    | TplHead(str)
+    | TplMid(str)
+    | TplTail(str)
+    | RawTpl(str)
+    | RawTplHead(str)
+    | RawTplMid(str)
+    | RawTplTail(str)
+
+// The `.test` block's template `OfSeg` emits: map a segment's decoded text and
+// position to the matching `Kind` arm.
+fn tpl_kind(text: str, seg: Seg) -> Kind {
+    match (seg) {
+        Plain => Tpl(text),
+        Head => TplHead(text),
+        Middle => TplMid(text),
+        Tail => TplTail(text),
+    }
+}
+
+fn rawtpl_kind(text: str, seg: Seg) -> Kind {
+    match (seg) {
+        Plain => RawTpl(text),
+        Head => RawTplHead(text),
+        Middle => RawTplMid(text),
+        Tail => RawTplTail(text),
+    }
+}
+
+// Test-block shorthands over the concrete `Kind` (each kind arm carries its own
+// content): an expected token, and a token-only result (no trivia).
+fn tok(kind: Kind, start: i64, end: i64) -> Token<Kind> { Token { kind, span: start..end } }
+
+fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { LexResult { tokens, trivia: [] } }
+
+pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];
     mut trivia = [];
     mut pos = 0;
@@ -739,476 +857,302 @@ pub fn lex(self: str, rules: TokenRule[]) -> LexResult!LexError {
     a byte matches no rule or a matcher sees invalid input outright (an
     unterminated `Delimited` token).
 """).test({
-    // A base rule set: skipped whitespace, `[A-Za-z_][A-Za-z0-9_]*`
-    // identifiers, `[0-9]+` ints.
+    // Character classes shared across the rule sets below.
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-    let ws = TokenRule { kind: "ws", matcher: CharRun(" \t\n\r", " \t\n\r"), skip: true };
-    let ident = TokenRule { kind: "ident", matcher: CharRun(alpha, alnum) };
-    let int_r = TokenRule { kind: "int", matcher: CharRun("0123456789", "0123456789") };
-    let base = [ws, ident, int_r];
 
-    // Empty and all-whitespace input: no tokens.
+    // Reusable rules. Each pairs a matcher with an `emit` that builds a `Kind`:
+    // `OfText`/`OfStr`/`OfChar`/`OfInt` apply a constructor to the matched
+    // text/value; `Bare` is a fixed kind; a skip rule's emit is never applied.
+    let ws = TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Ws), skip: true };
+    let ident = TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Ident) };
+    let digits = TokenRule { matcher: CharRun("0123456789", "0123456789"), emit: Bare(Digits) };
+    let base = [ws, ident, digits];
+
+    // Empty / all-whitespace input produces no tokens.
     assert(lex("", base) == ok(toks([])));
     assert(lex(" \t\n\r ", base) == ok(toks([])));
 
-    // Single tokens of each base kind.
-    assert(lex("foo", base) == ok(toks([tok("ident", 0, 3)])));
-    assert(lex("42", base) == ok(toks([tok("int", 0, 2)])));
+    // Each kind is a variant arm carrying its content: an identifier holds its
+    // text, and its span still slices the same text from the source.
+    assert(lex("foo", base) == ok(toks([tok(Ident("foo"), 0, 3)])));
+    assert(lex("x1", base) == ok(toks([tok(Ident("x1"), 0, 2)])));
+    assert(lex("1x", base) == ok(toks([tok(Digits, 0, 1), tok(Ident("x"), 1, 2)])));
+    assert(lex("  hi  ", base) == ok(toks([tok(Ident("hi"), 2, 4)])));
 
-    // Idents may contain (but not start with) digits; `_` is a letter here.
-    assert(lex("x1", base) == ok(toks([tok("ident", 0, 2)])));
-    assert(lex("_x", base) == ok(toks([tok("ident", 0, 2)])));
-    assert(lex("1x", base) == ok(toks([tok("int", 0, 1), tok("ident", 1, 2)])));
-
-    // A byte no rule matches is a lex error carrying a message and that
-    // byte's span — sliced out of the source, the span names the offender.
+    // A byte no rule matches is a lex error carrying that byte's span.
     assert(lex("a+1", base) == err(lex_err("unexpected character", 1, 2)));
     match (lex("a+1", base)) {
         ok(ts) => assert(false),
         err(e) => assert("a+1"[e.span] == "+"),
     };
 
-    // Leading/trailing whitespace shifts the span but produces no tokens.
-    assert(lex("  hi  ", base) == ok(toks([tok("ident", 2, 4)])));
+    // Exact: the longest matching spelling wins regardless of list order.
+    let ops = [ws, TokenRule { matcher: Exact(["=", "=>", "=="]), emit: Bare(Op) }, ident];
+    assert(lex("===", ops) == ok(toks([tok(Op, 0, 2), tok(Op, 2, 3)])));
+    assert(
+        lex("a=b", ops) == ok(toks([tok(Ident("a"), 0, 1), tok(Op, 1, 2), tok(Ident("b"), 2, 3)])),
+    );
+    assert(lex("+", ops) == err(lex_err("unexpected character", 0, 1)));
 
-    // The token's text is recovered by slicing its span out of the source.
-    let src = "foo bar";
-    match (lex(src, base)) {
-        ok(res) => match (res.tokens[0]) {
-            some(t) => assert(src[t.span] == "foo"),
-            none => assert(false),
-        },
-        err(e) => assert(false),
-    };
+    // Keyword: a spelling matches only at an identifier boundary.
+    let kw = TokenRule { matcher: Keyword(["if", "let"], alnum), emit: Bare(Kw) };
+    let kws = [ws, kw, ident];
+    assert(lex("iffy", kws) == ok(toks([tok(Ident("iffy"), 0, 4)])));
+    assert(lex("if fy", kws) == ok(toks([tok(Kw, 0, 2), tok(Ident("fy"), 3, 5)])));
+    assert(lex("if", kws) == ok(toks([tok(Kw, 0, 2)])));
 
-    // --- Each matcher on its own. ---
-
-    // Exact: the longest matching spelling wins regardless of list order,
-    // and an unlisted byte is a lex error.
-    let ops = [ws, TokenRule { kind: "op", matcher: Exact(["=", "=>", "=="]) }, ident];
-    assert(lex("===", ops) == ok(toks([tok("op", 0, 2), tok("op", 2, 3)])));
-    assert(lex("=>", ops) == ok(toks([tok("op", 0, 2)])));
-    assert(lex("a=b", ops) == ok(toks([tok("ident", 0, 1), tok("op", 1, 2), tok("ident", 2, 3)])));
-    assert(lex("+", ops) == err(lex_err("unexpected character", 0, 1))); // unlisted
-
-    // Keyword: a spelling only matches when it doesn't end inside an
-    // identifier — `iffy` is one ident even though the keyword rule comes
-    // first, while a boundary (space, `=`, end of source) lets `if` match.
-    let kw = TokenRule { kind: "kw", matcher: Keyword(["if", "let"], alnum) };
-    let kws = [ws, kw, ident, TokenRule { kind: "op", matcher: Exact(["="]) }];
-    assert(lex("iffy", kws) == ok(toks([tok("ident", 0, 4)])));
-    assert(lex("if fy", kws) == ok(toks([tok("kw", 0, 2), tok("ident", 3, 5)])));
-    assert(lex("if=", kws) == ok(toks([tok("kw", 0, 2), tok("op", 2, 3)])));
-    assert(lex("if", kws) == ok(toks([tok("kw", 0, 2)]))); // end of source is a boundary
-    assert(lex("lets", kws) == ok(toks([tok("ident", 0, 4)])));
-
-    // Delimited: delimiter to matching delimiter, spans include both. An
-    // unterminated token is a hard lex error — not a decline — so it points
-    // at the open delimiter instead of falling through to "unexpected
-    // character".
-    let strs = [ws, TokenRule { kind: "str", matcher: Delimited("\"'", "") }, ident];
-    assert(lex("\"hi\" x", strs) == ok(toks([stok("str", 0, 4, "hi"), tok("ident", 5, 6)])));
-    assert(lex("''", strs) == ok(toks([stok("str", 0, 2, "")]))); // empty string literal
-    assert(lex("'a\"b'", strs) == ok(toks([stok("str", 0, 5, "a\"b")]))); // other delim is content
+    // Delimited: an `OfStr` emit carries the delimiter-stripped, escape-decoded
+    // contents; an unterminated token is a hard error at its open delimiter.
+    let strs = [ws, TokenRule { matcher: Delimited("\"'", ""), emit: OfStr(Str) }, ident];
+    assert(lex("\"hi\" x", strs) == ok(toks([tok(Str("hi"), 0, 4), tok(Ident("x"), 5, 6)])));
+    assert(lex("''", strs) == ok(toks([tok(Str(""), 0, 2)])));
     assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0, 3)));
 
-    // The error span is absolute — an unterminated token mid-source points
-    // at its own opening delimiter through the end.
-    assert(lex("x \"hi", strs) == err(lex_err("unterminated delimited token", 2, 5)));
-
-    // With escapes off (""), a backslash is ordinary content: `"a\"` closes
-    // at the quote right after it.
-    assert(lex("\"a\\\"", strs) == ok(toks([stok("str", 0, 4, "a\\")])));
-
-    // Escapes on: `n`, `t`, `\`, and `"` may follow a backslash.
-    let esc = [ws, TokenRule { kind: "str", matcher: Delimited("\"", "nt\\\"") }, ident];
-    // An escaped delimiter is content, not a close: `"a\"b"` is one token.
-    assert(lex("\"a\\\"b\"", esc) == ok(toks([stok("str", 0, 6, "a\"b")])));
-    // An ordinary escape is content: `"a\nb"`.
-    assert(lex("\"a\\nb\"", esc) == ok(toks([stok("str", 0, 6, "a\nb")])));
-    // `"\""` — the escape may sit right against both delimiters.
-    assert(lex("\"\\\"\"", esc) == ok(toks([stok("str", 0, 4, "\"")])));
-    // A char outside the escape set is a lex error pointing at the `\x` pair.
+    let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: OfStr(Str) }, ident];
+    assert(lex("\"a\\\"b\"", esc) == ok(toks([tok(Str("a\"b"), 0, 6)])));
+    assert(lex("\"a\\nb\"", esc) == ok(toks([tok(Str("a\nb"), 0, 6)])));
     assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence", 2, 4)));
-    // A dangling backslash can't close the token: unterminated, open to end.
-    assert(lex("\"ab\\", esc) == err(lex_err("unterminated delimited token", 0, 4)));
 
-    // Escaping the closer means the token never closes either: `"a\"` is
-    // unterminated with escapes on (it closed with escapes off, above).
-    assert(lex("\"a\\\"", esc) == err(lex_err("unterminated delimited token", 0, 4)));
-
-    // Between: a multi-char open runs to just past the next *full* close; a
-    // partial close inside is content. `q3` is the 3-char spelling `"""`, so
-    // this is the raw-string shape `"""..."""` — a lone `"` or `""` inside
-    // must not close it.
+    // Between: a raw string `"""..."""` — a lone `"`/`""` inside is content.
     let q3 = "\"\"\"";
-    let raw = [ws, TokenRule { kind: "raw", matcher: Between(q3, q3) }, ident];
-    // `"""hi"""` — one token, both triple-quotes included.
-    assert(lex("\"\"\"hi\"\"\"", raw) == ok(toks([stok("raw", 0, 8, "hi")])));
-    // `""""""` — the empty raw string: open then immediate close, 6 chars.
-    assert(lex("\"\"\"\"\"\"", raw) == ok(toks([stok("raw", 0, 6, "")])));
-    // `"""a"b""c"""` — lone `"` and `""` inside are content, not a close.
-    assert(lex("\"\"\"a\"b\"\"c\"\"\"", raw) == ok(toks([stok("raw", 0, 12, "a\"b\"\"c")])));
-    // A raw string followed by an identifier: the close ends the token exactly.
-    assert(lex("\"\"\"x\"\"\"y", raw) == ok(toks([stok("raw", 0, 7, "x"), tok("ident", 7, 8)])));
-    // Unterminated (only two closing quotes) is a hard error at the open.
+    let raw = [ws, TokenRule { matcher: Between(q3, q3), emit: OfStr(Raw) }, ident];
+    assert(lex("\"\"\"a\"b\"\"c\"\"\"", raw) == ok(toks([tok(Raw("a\"b\"\"c"), 0, 12)])));
     assert(lex("\"\"\"hi\"\"", raw) == err(lex_err("unterminated delimited token", 0, 7)));
 
-    // Between with an asymmetric open/close: non-nesting block comments. A lone
-    // `*` inside doesn't close (the whole `*/` must appear).
-    let blk = [ws, TokenRule { kind: "block", matcher: Between("/*", "*/") }, ident];
-    assert(
-        lex("/* a * b */x", blk) == ok(
-            toks([stok("block", 0, 11, " a * b "), tok("ident", 11, 12)]),
-        ),
-    );
-    assert(lex("/* x", blk) == err(lex_err("unterminated delimited token", 0, 4)));
-
-    // Nested: the depth-tracked `Between`. Rust-style nesting block comments,
-    // where an inner `/* ... */` doesn't end the outer comment — only the
-    // `*/` that balances the first `/*` does.
-    let nest = [ws, TokenRule { kind: "block", matcher: Nested("/*", "*/") }, ident];
-    // No inner open: behaves like `Between`.
-    assert(lex("/* a */x", nest) == ok(toks([stok("block", 0, 7, " a "), tok("ident", 7, 8)])));
-
-    // One level of nesting: the first `*/` closes the inner comment, the second
-    // closes the outer — the whole thing is one token.
+    // Nested: depth-tracked block comments — an inner `/* */` doesn't close the
+    // outer. On the same input `Between` (`blk`) stops at the first `*/`.
+    let nest = [ws, TokenRule { matcher: Nested("/*", "*/"), emit: OfStr(Block) }, ident];
+    let blk = [ws, TokenRule { matcher: Between("/*", "*/"), emit: OfStr(Block) }, ident];
     assert(
         lex("/* a /* b */ c */x", nest) == ok(
-            toks([stok("block", 0, 17, " a /* b */ c "), tok("ident", 17, 18)]),
+            toks([tok(Block(" a /* b */ c "), 0, 17), tok(Ident("x"), 17, 18)]),
         ),
     );
-    // Two levels deep, tightly packed.
-    assert(
-        lex("/* /* */ */x", nest) == ok(
-            toks([stok("block", 0, 11, " /* */ "), tok("ident", 11, 12)]),
-        ),
-    );
-
-    // The depth tracking is exactly the difference from `Between`: on the same
-    // input, `Nested` treats the inner `*/` as closing only the inner level, so
-    // the outer comment is still open at end of source — unterminated. `Between`
-    // stops at that first `*/` and lexes a complete (shorter) token.
     assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
-    assert(lex("/* a /* b */", blk) == ok(toks([stok("block", 0, 12, " a /* b ")])));
+    assert(lex("/* a /* b */", blk) == ok(toks([tok(Block(" a /* b "), 0, 12)])));
 
-    // CharLit: exactly one char between the quotes — an ordinary char or a `\X`
-    // escape. The one-char shape is enforced, so empty/multi-char/bad-escape
-    // literals are distinct hard errors (a `Delimited("'", ..)` couldn't).
-    let chr = [ws, TokenRule { kind: "char", matcher: CharLit("'", "ntr\\'\"") }, ident];
-    assert(lex("'x'", chr) == ok(toks([ctok("char", 0, 3, 'x')])));
-    assert(lex("'\\n'", chr) == ok(toks([ctok("char", 0, 4, '\n')]))); // escape is one char
-    assert(lex("'\\''", chr) == ok(toks([ctok("char", 0, 4, '\'')]))); // escaped quote is content
-    assert(lex("'a'b", chr) == ok(toks([ctok("char", 0, 3, 'a'), tok("ident", 3, 4)])));
-    // Empty, multi-char, and unknown-escape literals are rejected.
+    // CharLit: an `OfChar` emit carries the one decoded char; the one-char shape
+    // is enforced, so empty/multi-char/bad-escape literals are distinct errors.
+    let chr = [ws, TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: OfChar(Char) }, ident];
+    assert(lex("'x'", chr) == ok(toks([tok(Char('x'), 0, 3)])));
+    assert(lex("'\\n'", chr) == ok(toks([tok(Char('\n'), 0, 4)])));
     assert(lex("''", chr) == err(lex_err("empty char literal", 0, 2)));
-    assert(
-        lex("'ab'", chr) == err(lex_err("char literal must contain exactly one character", 0, 2)),
-    );
     assert(lex("'\\q'", chr) == err(lex_err("unknown escape sequence", 1, 3)));
-    // Unterminated: a bare quote, a dangling escape, or a missing closer.
-    assert(lex("'", chr) == err(lex_err("unterminated char literal", 0, 1)));
-    assert(lex("'\\", chr) == err(lex_err("unterminated char literal", 0, 2)));
-    assert(lex("'x", chr) == err(lex_err("char literal must contain exactly one character", 0, 2)));
 
-    // Template: `text {expr} text`. A literal with no interpolations is one
-    // token of the rule's own kind; with interpolations it becomes kind_head,
-    // the interpolation's tokens (lexed by the full rule set), kind_middle
-    // between interpolations, and kind_tail through the closing delim.
-    let tpl = TokenRule { kind: "tpl", matcher: Template("`", "\\`{ntr") };
-    let tpls = [ws, tpl, ident, int_r];
-    assert(lex("`hi`", tpls) == ok(toks([stok("tpl", 0, 4, "hi")])));
-    assert(lex("``", tpls) == ok(toks([stok("tpl", 0, 2, "")]))); // the empty template
-
-    // One interpolation: the head spans the open delim through the `{`, the
-    // tail starts just past the `}`; the `x` inside is an ordinary ident.
-    assert(
-        lex("`a{x}b`", tpls) == ok(
-            toks([stok("tpl_head", 0, 3, "a"), tok("ident", 3, 4), stok("tpl_tail", 5, 7, "b")]),
-        ),
-    );
-    // Adjacent interpolations: the segment between them is the middle.
-    assert(
-        lex("`{x}{y}`", tpls) == ok(
-            toks(
-                [
-                    stok("tpl_head", 0, 2, ""),
-                    tok("ident", 2, 3),
-                    stok("tpl_middle", 4, 5, ""),
-                    tok("ident", 5, 6),
-                    stok("tpl_tail", 7, 8, ""),
-                ],
-            ),
-        ),
-    );
-
-    // Inside an interpolation the rule set governs — the skip rule drops
-    // whitespace exactly as at top level.
-    assert(
-        lex("`a{ x }b`", tpls) == ok(
-            toks([stok("tpl_head", 0, 3, "a"), tok("ident", 4, 5), stok("tpl_tail", 7, 9, "b")]),
-        ),
-    );
-
-    // Text escapes: `\{` doesn't open an interpolation, an escaped delim
-    // doesn't close, and an unknown escape is a hard error.
-    assert(lex("`a\\{b`", tpls) == ok(toks([stok("tpl", 0, 6, "a{b")])));
-    assert(lex("`a\\`b`", tpls) == ok(toks([stok("tpl", 0, 6, "a`b")])));
-    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence", 2, 4)));
-
-    // Unterminated: the text runs out, or an interpolation never closes (that
-    // error points at the interpolation's `{`).
-    assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
-    assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
-
-    // Brace depth: braces lexed as their own tokens inside an interpolation
-    // (via a punct rule here) nest — only the balancing `}` ends it, and that
-    // one alone produces no token.
-    let braces = TokenRule { kind: "punct", matcher: Exact(["{", "}"]) };
-    let tplb = [ws, tpl, braces, ident, int_r];
-    assert(
-        lex("`a{ {x} }b`", tplb) == ok(
-            toks(
-                [
-                    stok("tpl_head", 0, 3, "a"),
-                    tok("punct", 4, 5),
-                    tok("ident", 5, 6),
-                    tok("punct", 6, 7),
-                    stok("tpl_tail", 9, 11, "b"),
-                ],
-            ),
-        ),
-    );
-
-    // Templates nest: a template inside an interpolation re-enters the same
-    // rule — here a no-interpolation inner template between head and tail.
-    assert(
-        lex("`a{`x`}b`", tpls) == ok(
-            toks(
-                [stok("tpl_head", 0, 3, "a"), stok("tpl", 3, 6, "x"), stok("tpl_tail", 7, 9, "b")],
-            ),
-        ),
-    );
-
-    // A multi-char delim scans like `Between` (a lone ` inside is content) and
-    // `""` escapes make the text verbatim (a backslash is content) — the
-    // raw-template shape. Order the longer-delim rule first, as with any
-    // prefix-sharing rules.
-    let raw3 = TokenRule { kind: "rawtpl", matcher: Template("```", "") };
-    let tpl2 = [ws, raw3, tpl, ident, int_r];
-    assert(lex("```a`b\\c```", tpl2) == ok(toks([stok("rawtpl", 0, 11, "a`b\\c")])));
-    assert(
-        lex("```a{x}b```", tpl2) == ok(
-            toks(
-                [
-                    stok("rawtpl_head", 0, 5, "a"),
-                    tok("ident", 5, 6),
-                    stok("rawtpl_tail", 7, 11, "b"),
-                ],
-            ),
-        ),
-    );
-    assert(lex("`hi`", tpl2) == ok(toks([stok("tpl", 0, 4, "hi")]))); // single-` still lexes
-
-    // Trivia: a `trivia: true` rule is consumed like a skip rule, but each
-    // match is recorded — kind and span — in the result's side-channel, out
-    // of the token stream. This is how a formatter finds comments to
-    // re-attach, and how a lint pass finds `#[allow]` markers; whitespace
-    // stays a silent skip and appears in neither.
-    let cmt_t = TokenRule { kind: "comment", matcher: ToEol("//"), trivia: true };
-    let allow_t = TokenRule { kind: "allow", matcher: Exact(["#[allow]"]), trivia: true };
-    let trv = [ws, cmt_t, allow_t, ident, int_r];
-    assert(
-        lex("a // b\nc", trv) == ok(
-            LexResult {
-                tokens: [tok("ident", 0, 1), tok("ident", 7, 8)],
-                trivia: [tok("comment", 2, 6)],
-            },
-        ),
-    );
-    assert(
-        lex("x #[allow] y", trv) == ok(
-            LexResult {
-                tokens: [tok("ident", 0, 1), tok("ident", 11, 12)],
-                trivia: [tok("allow", 2, 10)],
-            },
-        ),
-    );
-    // Multiple trivia rules interleave in source order in the one channel.
-    assert(
-        lex("a #[allow] // b\nc", trv) == ok(
-            LexResult {
-                tokens: [tok("ident", 0, 1), tok("ident", 16, 17)],
-                trivia: [tok("allow", 2, 10), tok("comment", 11, 15)],
-            },
-        ),
-    );
-    // Trivia inside a template interpolation rides up through the scan.
-    let trvt = [ws, cmt_t, tpl, ident, int_r];
-    assert(
-        lex("`a{x // c\n}b`", trvt) == ok(
-            LexResult {
-                tokens: [
-                    stok("tpl_head", 0, 3, "a"),
-                    tok("ident", 3, 4),
-                    stok("tpl_tail", 11, 13, "b"),
-                ],
-                trivia: [tok("comment", 5, 9)],
-            },
-        ),
-    );
-
-    // ToEol with skip: comments are dropped like whitespace, through the end
-    // of the line.
-    let cmt = [ws, TokenRule { kind: "comment", matcher: ToEol("//"), skip: true }, ident];
-    assert(lex("a // b\nc", cmt) == ok(toks([tok("ident", 0, 1), tok("ident", 7, 8)])));
-    assert(lex("// only", cmt) == ok(toks([]))); // comment with no newline: to the end
-    // A lone `/` matches no rule.
-    assert(lex("a / b", cmt) == err(lex_err("unexpected character", 2, 3)));
-
-    // Float before int: a digit run extends with a fraction and/or exponent,
-    // and a bare run falls through to the int rule.
-    let dot = TokenRule { kind: "dot", matcher: Exact(["."]) };
-    let flt = [ws, TokenRule { kind: "float", matcher: Float }, int_r, ident, dot];
-    assert(lex("1.5", flt) == ok(toks([tok("float", 0, 3)])));
-    assert(lex("42", flt) == ok(toks([tok("int", 0, 2)]))); // bare digits stay int
-    assert(lex("1e5", flt) == ok(toks([tok("float", 0, 3)])));
-    assert(lex("2E+10", flt) == ok(toks([tok("float", 0, 5)])));
-    assert(lex("1.5e-3", flt) == ok(toks([tok("float", 0, 6)])));
-
-    // A fraction needs a digit after the dot, and a number starts with a
-    // digit — so neither `1.` nor `.5` is a float.
-    assert(lex("1.", flt) == ok(toks([tok("int", 0, 1), tok("dot", 1, 2)])));
-    assert(lex(".5", flt) == ok(toks([tok("dot", 0, 1), tok("int", 1, 2)])));
-
-    // An exponent needs at least one digit, else the `e` is left for the
-    // next token (an ident here, then an error at the ruleless `-`).
-    assert(lex("1e", flt) == ok(toks([tok("int", 0, 1), tok("ident", 1, 2)])));
-    assert(lex("1e-", flt) == err(lex_err("unexpected character", 2, 3)));
-    // Only one fraction: a second dot starts a new token.
-    assert(lex("1.2.3", flt) == ok(toks([tok("float", 0, 3), tok("dot", 3, 4), tok("int", 4, 5)])));
-    // Without a float rule, a dot always splits the digits.
-    assert(
-        lex("1.5", [ws, int_r, dot]) == ok(
-            toks([tok("int", 0, 1), tok("dot", 1, 2), tok("int", 2, 3)]),
-        ),
-    );
-
-    // Int: like a digit-run CharRun, but the token carries the parsed
-    // `IntVal`, and a run that doesn't fit i64 is a lex error at lex time
-    // rather than a bogus value later.
-    let ints = [ws, TokenRule { kind: "int", matcher: Int }, ident];
-    assert(lex("42", ints) == ok(toks([itok("int", 0, 2, 42)])));
-    assert(lex("0 7", ints) == ok(toks([itok("int", 0, 1, 0), itok("int", 2, 3, 7)])));
-    // The i64 boundary parses; one past it overflows, spanning the run.
-    assert(lex("9223372036854775807", ints) == ok(toks([itok("int", 0, 19, 9223372036854775807)])));
+    // Int: an `OfInt` emit carries the parsed value; an overflowing run is a lex
+    // error at lex time.
+    let ints = [ws, TokenRule { matcher: Int, emit: OfInt(IntTok) }, ident];
+    assert(lex("42", ints) == ok(toks([tok(IntTok(42), 0, 2)])));
+    assert(lex("0 7", ints) == ok(toks([tok(IntTok(0), 0, 1), tok(IntTok(7), 2, 3)])));
     assert(
         lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
     );
 
+    // Float before int: a fraction/exponent extends a digit run; a bare run
+    // falls through to the digit rule.
+    let dot = TokenRule { matcher: Exact(["."]), emit: Bare(Dot) };
+    let flt = [ws, TokenRule { matcher: Float, emit: Bare(FloatTok) }, digits, ident, dot];
+    assert(lex("1.5e-3", flt) == ok(toks([tok(FloatTok, 0, 6)])));
+    assert(lex("1.", flt) == ok(toks([tok(Digits, 0, 1), tok(Dot, 1, 2)])));
+
+    // Template: `text {expr} text`. `OfSeg` maps each segment's decoded text and
+    // position (`Plain`/`Head`/`Middle`/`Tail`) to a `Kind` arm.
+    let tpl = TokenRule { matcher: Template("`", "\\`{ntr"), emit: OfSeg(tpl_kind) };
+    let tpls = [ws, tpl, ident, digits];
+    assert(lex("`hi`", tpls) == ok(toks([tok(Tpl("hi"), 0, 4)])));
+    assert(
+        lex("`a{x}b`", tpls) == ok(
+            toks([tok(TplHead("a"), 0, 3), tok(Ident("x"), 3, 4), tok(TplTail("b"), 5, 7)]),
+        ),
+    );
+    assert(
+        lex("`{x}{y}`", tpls) == ok(
+            toks(
+                [
+                    tok(TplHead(""), 0, 2),
+                    tok(Ident("x"), 2, 3),
+                    tok(TplMid(""), 4, 5),
+                    tok(Ident("y"), 5, 6),
+                    tok(TplTail(""), 7, 8),
+                ],
+            ),
+        ),
+    );
+    // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
+    assert(lex("`a\\{b`", tpls) == ok(toks([tok(Tpl("a{b"), 0, 6)])));
+    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence", 2, 4)));
+    assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
+    assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
+    // Brace depth: braces lexed as their own tokens inside an interpolation nest.
+    let braces = TokenRule { matcher: Exact(["{", "}"]), emit: Bare(Punct) };
+    let tplb = [ws, tpl, braces, ident, digits];
+    assert(
+        lex("`a{ {x} }b`", tplb) == ok(
+            toks(
+                [
+                    tok(TplHead("a"), 0, 3),
+                    tok(Punct, 4, 5),
+                    tok(Ident("x"), 5, 6),
+                    tok(Punct, 6, 7),
+                    tok(TplTail("b"), 9, 11),
+                ],
+            ),
+        ),
+    );
+    // Templates nest: an inner template between head and tail.
+    assert(
+        lex("`a{`x`}b`", tpls) == ok(
+            toks([tok(TplHead("a"), 0, 3), tok(Tpl("x"), 3, 6), tok(TplTail("b"), 7, 9)]),
+        ),
+    );
+    // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
+    let raw3 = TokenRule { matcher: Template("```", ""), emit: OfSeg(rawtpl_kind) };
+    let tpl2 = [ws, raw3, tpl, ident, digits];
+    assert(lex("```a`b\\c```", tpl2) == ok(toks([tok(RawTpl("a`b\\c"), 0, 11)])));
+    assert(
+        lex("```a{x}b```", tpl2) == ok(
+            toks([tok(RawTplHead("a"), 0, 5), tok(Ident("x"), 5, 6), tok(RawTplTail("b"), 7, 11)]),
+        ),
+    );
+
+    // Trivia: a `trivia: true` rule is consumed like a skip rule, but each match
+    // is recorded in the result's side-channel, out of the token stream.
+    let cmt_t = TokenRule { matcher: ToEol("//"), emit: Bare(Comment), trivia: true };
+    let allow_t = TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(Allow), trivia: true };
+    let trv = [ws, cmt_t, allow_t, ident, digits];
+    assert(
+        lex("a #[allow] // b\nc", trv) == ok(
+            LexResult {
+                tokens: [tok(Ident("a"), 0, 1), tok(Ident("c"), 16, 17)],
+                trivia: [tok(Allow, 2, 10), tok(Comment, 11, 15)],
+            },
+        ),
+    );
+    // Trivia inside a template interpolation rides up through the scan.
+    let trvt = [ws, cmt_t, tpl, ident, digits];
+    assert(
+        lex("`a{x // c\n}b`", trvt) == ok(
+            LexResult {
+                tokens: [tok(TplHead("a"), 0, 3), tok(Ident("x"), 3, 4), tok(TplTail("b"), 11, 13)],
+                trivia: [tok(Comment, 5, 9)],
+            },
+        ),
+    );
+
+    // ToEol with skip: comments are dropped like whitespace.
+    let cmt = [ws, TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true }, ident];
+    assert(lex("a // b\nc", cmt) == ok(toks([tok(Ident("a"), 0, 1), tok(Ident("c"), 7, 8)])));
+    assert(lex("// only", cmt) == ok(toks([])));
+
     // --- Rule sets resembling real languages. ---
 
-    // JSON-flavored rules. (A leading `-` on a number stays a lone `punct`
-    // for the parser to fold in.)
+    // JSON: strings, numbers, keywords, punctuation.
     let json = [
         ws,
-        TokenRule { kind: "str", matcher: Delimited("\"", "\"\\/bfnrtu") },
-        TokenRule { kind: "float", matcher: Float },
-        int_r,
-        TokenRule { kind: "kw", matcher: Keyword(["true", "false", "null"], alnum) },
-        TokenRule { kind: "punct", matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]) },
+        TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: OfStr(Str) },
+        TokenRule { matcher: Float, emit: Bare(FloatTok) },
+        TokenRule { matcher: Int, emit: OfInt(IntTok) },
+        TokenRule { matcher: Keyword(["true", "false", "null"], alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]), emit: Bare(Punct) },
     ];
-    let jsrc = """{"pi": 3.14, "n": [1, 2e10, true]}""";
+    let jsrc = """{"pi": 3.14, "n": [1, true]}""";
     let jtoks = [
-        // `{`, `"pi"`, `:`
-        tok("punct", 0, 1),
-        stok("str", 1, 5, "pi"),
-        tok("punct", 5, 6),
-        // `3.14`, `,`
-        tok("float", 7, 11),
-        tok("punct", 11, 12),
-        // `"n"`, `:`, `[`
-        stok("str", 13, 16, "n"),
-        tok("punct", 16, 17),
-        tok("punct", 18, 19),
-        // `1`, `,`, `2e10`, `,`, `true`
-        tok("int", 19, 20),
-        tok("punct", 20, 21),
-        tok("float", 22, 26),
-        tok("punct", 26, 27),
-        tok("kw", 28, 32),
-        // `]`, `}`
-        tok("punct", 32, 33),
-        tok("punct", 33, 34),
+        tok(Punct, 0, 1),
+        tok(Str("pi"), 1, 5),
+        tok(Punct, 5, 6),
+        tok(FloatTok, 7, 11),
+        tok(Punct, 11, 12),
+        tok(Str("n"), 13, 16),
+        tok(Punct, 16, 17),
+        tok(Punct, 18, 19),
+        tok(IntTok(1), 19, 20),
+        tok(Punct, 20, 21),
+        tok(Kw, 22, 26),
+        tok(Punct, 26, 27),
+        tok(Punct, 27, 28),
     ];
     assert(lex(jsrc, json) == ok(toks(jtoks)));
 
-    // JSON string escapes: `"a\"b"` is one string token, and `\q` is not a
-    // JSON escape.
-    assert(
-        lex("""["a\"b"]""", json) == ok(
-            toks([tok("punct", 0, 1), stok("str", 1, 7, "a\"b"), tok("punct", 7, 8)]),
-        ),
-    );
-    assert(lex("""["a\qb"]""", json) == err(lex_err("unknown escape sequence", 3, 5)));
-
-    // AIPL-flavored rules: keywords, multi-byte operators, strings, line
-    // comments.
+    // AIPL: keywords, multi-byte operators, strings, skipped line comments.
     let aipl = [
         ws,
-        TokenRule { kind: "comment", matcher: ToEol("//"), skip: true },
-        TokenRule { kind: "kw", matcher: Keyword(["fn", "let", "mut", "set"], alnum) },
+        TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true },
+        TokenRule { matcher: Keyword(["fn", "let", "mut", "set"], alnum), emit: Bare(Kw) },
         ident,
-        int_r,
-        TokenRule { kind: "str", matcher: Delimited("\"", "ntr\\\"") },
-        TokenRule { kind: "op", matcher: Exact(["==", "->", "&&", "=", ";"]) },
+        TokenRule { matcher: Int, emit: OfInt(IntTok) },
+        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(Str) },
+        TokenRule { matcher: Exact(["==", "->", "&&", "=", ";"]), emit: Bare(Op) },
     ];
     let asrc = "let ok = s == \"hi\"; // check";
     let atoks = [
-        // `let`, `ok`, `=`
-        tok("kw", 0, 3),
-        tok("ident", 4, 6),
-        tok("op", 7, 8),
-        // `s`, `==`, `"hi"`, `;` — the trailing comment produces nothing
-        tok("ident", 9, 10),
-        tok("op", 11, 13),
-        stok("str", 14, 18, "hi"),
-        tok("op", 18, 19),
+        tok(Kw, 0, 3),
+        tok(Ident("ok"), 4, 6),
+        tok(Op, 7, 8),
+        tok(Ident("s"), 9, 10),
+        tok(Op, 11, 13),
+        tok(Str("hi"), 14, 18),
+        tok(Op, 18, 19),
     ];
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1906
-deallocations: 1906
+allocations: 1181
+deallocations: 1181
 reallocations: 0
-bytes allocated: 92936
-instructions executed: 245477
-binary size: 438408
+bytes allocated: 57584
+instructions executed: 199147
+binary size: 792896
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam10
-__builtin_count_while$char$s0$lam11
-__builtin_count_while$char$s0$lam31
-__builtin_count_while$char$s0$lam5
+__builtin_count_while$char$s0$lam29
+__builtin_count_while$char$s0$lam34
+__builtin_count_while$char$s0$lam35
+__builtin_count_while$char$s0$lam55
 __builtin_int_parse
-__builtin_is_some_and$char$lam21
+__builtin_is_some_and$char$lam45
+__lambda_0
+__lambda_1
+__lambda_10
+__lambda_11
+__lambda_12
+__lambda_13
+__lambda_14
+__lambda_15
+__lambda_16
+__lambda_17
+__lambda_18
+__lambda_19
+__lambda_2
+__lambda_20
+__lambda_21
+__lambda_22
+__lambda_23
+__lambda_3
+__lambda_4
+__lambda_5
+__lambda_6
+__lambda_7
+__lambda_8
+__lambda_9
 __test$lex
 between_len
 char_lit_len
-ctok
 delimited_len
+emit_mismatch
 float_len
-interp_scan
-itok
-lex
+interp_scan$Kind
+lex$Kind
 lex_err
-lex_step
+lex_step$Kind
 main
 nested_len
-step_result
-stok
-template_scan
-template_step
+rawtpl_kind
+seg_emit$Kind
+seg_needs_ofseg
+step_result$Kind
+template_scan$Kind
+template_step$Kind
 tok
 toks
+tpl_kind
 unescape

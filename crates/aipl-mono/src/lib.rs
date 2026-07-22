@@ -39,8 +39,8 @@ use aipl_syntax::{
         MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
         VariantCase, VariantDecl,
     },
-    concat_str_ty, is_array_elem, is_concat_str, is_empty_array_arg, is_error, is_none_inner,
-    is_none_literal_arg, is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
+    concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
+    is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
 };
 
 /// Hard cap on the number of generic instances monomorphization will emit.
@@ -428,9 +428,14 @@ fn lt_ty(
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
-        // `lower_generics` runs before `lower_tuples`, resolving every generic
-        // application to a synthetic `Named` type.
-        Type::Generic(..) => unreachable!("Type::Generic resolved before lower_tuples"),
+        // `lower_generics` resolves every *concrete* generic application to a
+        // `Named` type; an abstract one (`Box<T>` over a generic function's own
+        // type variable) is left for monomorphization — pass it through,
+        // lowering any tuple inside its arguments.
+        Type::Generic(name, args) => Type::Generic(
+            name.clone(),
+            args.iter().map(|a| lt_ty(a, fields_map, order)).collect(),
+        ),
     }
 }
 
@@ -605,6 +610,13 @@ struct GenericLowerer {
     synth: Vec<Item>,
     /// Instance names already synthesized (dedup + recursion guard).
     seen: HashSet<String>,
+    /// Type variables that are abstract in the type currently being lowered —
+    /// the enclosing generic function's parameters. A generic application whose
+    /// arguments mention one of these (`Box<T>` inside `fn f<T>(..)`) is *not*
+    /// instantiated: it can't be, `T` has no concrete layout. It's left as a
+    /// `Type::Generic` for the checker to handle abstractly and for
+    /// monomorphization to instantiate once `T` is pinned to a concrete type.
+    abstract_vars: Vec<String>,
 }
 
 impl GenericLowerer {
@@ -627,6 +639,7 @@ impl GenericLowerer {
             variant_templates,
             synth: Vec::new(),
             seen: HashSet::new(),
+            abstract_vars: Vec::new(),
         }
     }
 
@@ -640,7 +653,14 @@ impl GenericLowerer {
                     .iter()
                     .map(|a| self.lower_ty(a))
                     .collect::<Result<_, _>>()?;
-                Type::Named(self.instantiate(base, &args)?)
+                // A generic application over an abstract type variable (an
+                // enclosing generic function's parameter) can't be instantiated
+                // yet — keep it abstract for the checker and monomorphization.
+                if args.iter().any(|a| mentions_var(a, &self.abstract_vars)) {
+                    Type::Generic(base.clone(), args)
+                } else {
+                    Type::Named(self.instantiate(base, &args)?)
+                }
             }
             Type::Optional(i) => Type::Optional(Box::new(self.lower_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.lower_ty(i)?)),
@@ -822,6 +842,11 @@ impl GenericLowerer {
 
 /// Bind a generic template's declared type variables to the concrete `args` of
 /// one instantiation, erroring on an arity mismatch.
+/// Whether `t` mentions any of the type-variable names in `vars`.
+fn mentions_var(t: &Type, vars: &[String]) -> bool {
+    vars.iter().any(|v| ty_mentions(t, v))
+}
+
 fn bind_type_args(
     base: &str,
     type_vars: &[TypeParam],
@@ -848,8 +873,12 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
     let mut lc = GenericLowerer::new(program);
     let mut items: Vec<Item> = Vec::with_capacity(program.items.len());
     for item in &program.items {
+        lc.abstract_vars.clear();
         let lowered = match item {
             Item::Fn(f) => {
+                // The function's own type parameters are abstract while lowering
+                // its signature/body: a `Box<T>` over one of them stays generic.
+                lc.abstract_vars = f.sig.type_var_names();
                 let params = f
                     .sig
                     .params
@@ -1094,6 +1123,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         lambda_envs: HashMap::new(),
         spec_memo: HashMap::new(),
         skip_mut_desugar: false,
+        cur_ret: Type::Unit,
         dbg,
     };
 
@@ -1215,6 +1245,15 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 }
             })
             .collect();
+        // Substituting a generic function's type variables can turn a generic-
+        // application parameter/return (`Emit<K>` → `Emit<Tok>`) concrete;
+        // resolve those to their synthesized named instance (`Emit$Tok`) so
+        // codegen — and `process` below — see only ordinary named types.
+        let mut params = params;
+        for p in &mut params {
+            p.ty = mono.resolve_generic_ty(&p.ty)?;
+        }
+        let return_ty = return_ty.map(|t| mono.resolve_generic_ty(&t)).transpose()?;
         // Resolve any variadic parameters into their concrete shape: retype each
         // and prepend a prologue rebuilding the sequence the body iterates, so
         // `process` (and codegen) see only concrete, non-variadic parameters.
@@ -1666,6 +1705,10 @@ struct Mono<'a> {
     /// instead of desugaring it to copy-and-modify like an expression-position
     /// mutating call.
     skip_mut_desugar: bool,
+    /// Return type of the function currently being processed, for resolving a
+    /// generic construction whose fields don't pin every type variable from the
+    /// expected type (mirrors the checker's `current_ret`).
+    cur_ret: Type,
     dbg: DebugOptions,
 }
 
@@ -1709,6 +1752,7 @@ impl Mono<'_> {
         }
         // Lambdas synthesized while processing this body inherit its effects.
         self.cur_effects = effects.to_vec();
+        self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
         // A lambda-specialized callee carries its function-typed parameters'
         // bindings; an ordinary function has none.
         self.cur_lenv = self.lambda_envs.get(name).cloned().unwrap_or_default();
@@ -1925,7 +1969,7 @@ impl Mono<'_> {
                 continue;
             }
             let (ra, aty) = self.infer(arg, env)?;
-            collect_bindings(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
+            self.bind_generic_or(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
             inferred[i] = Some(ra);
         }
@@ -1948,28 +1992,28 @@ impl Mono<'_> {
         // A `str`-as-`char[]` parameter keeps its `str` type rather than the
         // substituted `char[]`.
         let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
-        let params: Vec<Param> = sig
-            .params
-            .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let ty = subst_vars(&p.ty, &map);
-                let ty = if str_arg[i] && ty == chars {
-                    Type::Primitive(Primitive::Str)
-                } else {
-                    ty
-                };
-                Param {
-                    name: p.name.clone(),
-                    ty,
-                    mutable: p.mutable,
-                    variadic: p.variadic,
-                    default: p.default.clone(),
-                }
-            })
-            .collect();
+        let mut params: Vec<Param> = Vec::with_capacity(sig.params.len());
+        for (i, p) in sig.params.iter().enumerate() {
+            let ty = subst_vars(&p.ty, &map);
+            let ty = if str_arg[i] && ty == chars {
+                Type::Primitive(Primitive::Str)
+            } else {
+                ty
+            };
+            // Substitution turned a generic-application parameter (`Emit<K>`)
+            // into a concrete one (`Emit<Tok>`); resolve it to the synthesized
+            // named instance (`Emit$Tok`) so codegen sees an ordinary type.
+            let ty = self.resolve_generic_ty(&ty)?;
+            params.push(Param {
+                name: p.name.clone(),
+                ty,
+                mutable: p.mutable,
+                variadic: p.variadic,
+                default: p.default.clone(),
+            });
+        }
         let ret = match &sig.return_ty {
-            Some(t) => subst_vars(t, &map),
+            Some(t) => self.resolve_generic_ty(&subst_vars(t, &map))?,
             None => Type::Unit,
         };
         let template = ConcreteTemplate {
@@ -3201,7 +3245,7 @@ impl Mono<'_> {
         let var_set: HashSet<&str> = type_vars.iter().map(String::as_str).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
         for (pty, aty) in param_tys.iter().zip(arg_tys) {
-            collect_bindings(pty, aty, &var_set, &mut map, gname, span.clone())?;
+            self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
         }
         // Fallback pass: any type variable that no concrete arg pinned can
         // still be inferred from an empty-array or bare-`none` argument — the
@@ -3386,6 +3430,57 @@ impl Mono<'_> {
     /// field type against the provided value's type, matching a generic-
     /// application field type (`Emit<K>`) against an already-synthesized instance
     /// value (`Emit$Tok`) by recovering the instance's type arguments.
+    /// Like [`collect_bindings`] (conflict-checking type-variable inference for a
+    /// generic *call*), but also unifies a generic-application parameter (`Box<T>`,
+    /// or `TokenRule<K>[]`) against a synthesized instance argument (`Box$i64`) —
+    /// the higher-order case where a generic function is called with a concrete
+    /// generic value. Leaves fall through to `collect_bindings`, preserving its
+    /// conflict detection and valid-type-argument checks.
+    fn bind_generic_or(
+        &self,
+        pty: &Type,
+        aty: &Type,
+        vars: &HashSet<&str>,
+        map: &mut HashMap<String, Type>,
+        gname: &str,
+        span: Span,
+    ) -> Result<(), Error> {
+        match (pty, aty) {
+            (Type::Generic(base, params), Type::Named(inst)) => {
+                if let Some((b, args)) = self.instance_args(inst) {
+                    if b == *base && args.len() == params.len() {
+                        for (p, a) in params.iter().zip(&args) {
+                            self.bind_generic_or(p, a, vars, map, gname, span.clone())?;
+                        }
+                    }
+                }
+                Ok(())
+            }
+            (Type::Generic(b1, ps), Type::Generic(b2, as_))
+                if b1 == b2 && ps.len() == as_.len() =>
+            {
+                for (p, a) in ps.iter().zip(as_) {
+                    self.bind_generic_or(p, a, vars, map, gname, span.clone())?;
+                }
+                Ok(())
+            }
+            // Recurse into containers to reach a nested generic application (a
+            // `TokenRule<K>[]` argument). A `none`/empty-`[]` element carries no
+            // type (`__none__`) and must not pin anything — fall through to
+            // `collect_bindings`, which skips it (as it did before).
+            (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
+                self.bind_generic_or(p, a, vars, map, gname, span)
+            }
+            (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
+                self.bind_generic_or(p, a, vars, map, gname, span)
+            }
+            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => {
+                self.bind_generic_or(p, a, vars, map, gname, span)
+            }
+            _ => collect_bindings(pty, aty, vars, map, gname, span),
+        }
+    }
+
     fn bind_field(
         &self,
         field_ty: &Type,
@@ -3410,9 +3505,13 @@ impl Mono<'_> {
                     self.bind_field(p, a, vars, map);
                 }
             }
-            (Type::Array(p), Type::Array(a)) => self.bind_field(p, a, vars, map),
-            (Type::Optional(p), Type::Optional(a)) => self.bind_field(p, a, vars, map),
-            (Type::Set(p), Type::Set(a)) => self.bind_field(p, a, vars, map),
+            (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
+            (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
+            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => self.bind_field(p, a, vars, map),
             (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
                 self.bind_field(pk, ak, vars, map);
                 self.bind_field(pv, av, vars, map);
@@ -3584,22 +3683,55 @@ impl Mono<'_> {
                 self.bind_field(&fd.ty, &decay_concat(vt), &vars, &mut map);
             }
         }
+        // Fall back to the enclosing function's return type when the fields don't
+        // pin every variable (an empty `StepResult { tokens: [], .. }`).
+        let expected = self.ret_generic_args(name);
         let args: Vec<Type> = tmpl
             .type_vars
             .iter()
-            .map(|tv| {
-                map.get(&tv.name).cloned().ok_or_else(|| {
-                    Error::at(
-                        format!(
-                            "cannot infer type parameter {:?} of generic struct {name:?}",
-                            tv.name
-                        ),
-                        span.clone(),
-                    )
-                })
+            .enumerate()
+            .map(|(i, tv)| {
+                map.get(&tv.name)
+                    .cloned()
+                    .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
+                    .ok_or_else(|| {
+                        Error::at(
+                            format!(
+                                "cannot infer type parameter {:?} of generic struct {name:?}",
+                                tv.name
+                            ),
+                            span.clone(),
+                        )
+                    })
             })
             .collect::<Result<_, _>>()?;
         self.instantiate_generic(name, &args)
+    }
+
+    /// Type arguments a generic-`base` construction should take from the enclosing
+    /// function's return type when the fields don't pin them (see the checker's
+    /// `ret_generic_args`).
+    fn ret_generic_args(&self, base: &str) -> Option<Vec<Type>> {
+        let ret = self.cur_ret.clone();
+        self.find_generic_args(&ret, base)
+    }
+
+    fn find_generic_args(&self, ty: &Type, base: &str) -> Option<Vec<Type>> {
+        match ty {
+            Type::Generic(b, args) if b == base => Some(args.clone()),
+            Type::Named(n) => self
+                .instance_args(n)
+                .filter(|(b, _)| b == base)
+                .map(|(_, a)| a),
+            Type::Optional(i) | Type::Array(i) | Type::Set(i) => self.find_generic_args(i, base),
+            Type::Dict(k, v) => self
+                .find_generic_args(k, base)
+                .or_else(|| self.find_generic_args(v, base)),
+            Type::Result(a, b) => self
+                .find_generic_args(a, base)
+                .or_else(|| self.find_generic_args(b, base)),
+            _ => None,
+        }
     }
 
     /// If `t` is a struct with a field named `field` holding a function value,
@@ -4601,10 +4733,14 @@ fn bind(
     gname: &str,
     span: Span,
 ) -> Result<(), Error> {
-    if !is_array_elem(ty) {
+    // A type argument may be any value type — a scalar, `str`, an array, an
+    // optional, a struct, or a variant (a generic function can abstract over a
+    // generic struct/variant `K`, higher-order-generics style). Only `()` and a
+    // function type are rejected.
+    if matches!(ty, Type::Unit | Type::Fn(_, _)) {
         return Err(Error::at(
             format!(
-                "\"{}\" in \"{gname}\" resolved to {}, which is not a valid type argument (i64, bool, or char)",
+                "\"{}\" in \"{gname}\" resolved to {}, which is not a valid type argument",
                 display_var(v),
                 type_name(ty)
             ),
