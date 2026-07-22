@@ -61,3 +61,5 @@ import wrapping_mul as *
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
 allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl
+
+update cranelift to avoid flaky failures

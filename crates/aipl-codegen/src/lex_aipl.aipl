@@ -1,0 +1,149 @@
+// A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
+// library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
+// variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
+//
+// Scaffolding only: the keyword / operator / punctuation sets below are a
+// starter subset, not the full grammar (no char literals, template/raw strings,
+// or the complete operator table yet), and this isn't wired into the compiler —
+// nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
+import { == } from builtins;
+import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex } from "./lexer.aipl";
+
+// AIPL's token kinds — each arm is a kind, carrying that kind's content
+// (`Name` its text, `IntLit` its value) or nothing (`Space`). A rule's `emit`
+// builds one of these from the matched token (see `aipl_rules`).
+//
+// Note: these names deliberately avoid the library's own variant constructors
+// (`Matcher`/`Emit`/`Seg`/`TokenValue`/the test `Kind`), because AIPL variant
+// constructors currently share one global namespace across imported files, so a
+// consumer's kinds can't reuse a library constructor's name.
+variant AiplTok = Space | LineComment | Name(str) | IntLit(i64) | StrLit(str) | Kwd(str) | Sym(str)
+
+// The AIPL rule set. Order is priority (the first matching rule wins): skipped
+// whitespace and recorded comments first; keywords before identifiers, so `fn`
+// isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
+// table (`Exact` picks the longest spelling, so `==` beats `=`).
+//
+// TODO(scaffolding): flesh out to the full grammar — the remaining keywords, the
+// complete operator set, char literals (`CharLit`), and template/raw strings
+// (`Template`/`Between` with `OfSeg`/`OfStr`).
+fn aipl_rules() -> TokenRule<AiplTok>[] {
+    let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
+    let keywords = [
+        "fn",
+        "let",
+        "mut",
+        "set",
+        "pub",
+        "import",
+        "from",
+        "as",
+        "for",
+        "while",
+        "match",
+        "return",
+        "struct",
+        "variant",
+    ];
+    let operators = [
+        "==",
+        "!=",
+        "->",
+        "=>",
+        "&&",
+        "||",
+        "..",
+        "+++",
+        "=",
+        "<",
+        ">",
+        "!",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        ".",
+        ",",
+        ":",
+        ";",
+        "?",
+        "(",
+        ")",
+        "{",
+        "}",
+        "[",
+        "]",
+    ];
+    [
+        TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
+        TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
+        TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(Kwd) },
+        TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
+        TokenRule { matcher: Int, emit: OfInt(IntLit) },
+        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(StrLit) },
+        TokenRule { matcher: Exact(operators), emit: OfText(Sym) },
+    ]
+}
+
+// Lex AIPL source into typed `AiplTok` tokens (plus the trivia side-channel).
+fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.test({
+    // A small snippet exercising several kinds; a fuller suite comes with the
+    // real grammar. `let x = 42;` plus a trailing line comment (trivia).
+    let src = "let x = 42; // note";
+    assert(
+        lex_aipl(src) == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: Kwd("let"), span: 0..3 },
+                    Token { kind: Name("x"), span: 4..5 },
+                    Token { kind: Sym("="), span: 6..7 },
+                    Token { kind: IntLit(42), span: 8..10 },
+                    Token { kind: Sym(";"), span: 10..11 },
+                ],
+                trivia: [Token { kind: LineComment, span: 12..19 }],
+            },
+        ),
+    );
+})
+--- performance ---
+allocations: 111
+deallocations: 111
+reallocations: 0
+bytes allocated: 5232
+instructions executed: 19602
+binary size: 159336
+--- monomorphizations ---
+__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam20
+__builtin_count_while$char$s0$lam21
+__builtin_count_while$char$s0$lam41
+__builtin_int_parse
+__builtin_is_some_and$char$lam31
+__lambda_0
+__lambda_1
+__lambda_2
+__lambda_3
+__lambda_4
+__lambda_5
+__lambda_6
+__lambda_7
+__lambda_8
+__lambda_9
+__m1__between_len
+__m1__char_lit_len
+__m1__delimited_len
+__m1__emit_mismatch
+__m1__float_len
+__m1__interp_scan$AiplTok
+__m1__lex$AiplTok
+__m1__lex_step$AiplTok
+__m1__nested_len
+__m1__seg_emit$AiplTok
+__m1__seg_needs_ofseg
+__m1__step_result$AiplTok
+__m1__template_scan$AiplTok
+__m1__template_step$AiplTok
+__m1__unescape
+main
