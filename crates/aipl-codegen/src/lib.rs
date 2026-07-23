@@ -4334,7 +4334,9 @@ impl Compilation {
             }
             // SAFETY: as the optional path, but the buffer is the struct's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result = unsafe { read_ffi_struct(sret_buf.as_ptr() as *const u8, layout, true) };
+            let result = unsafe {
+                read_ffi_struct(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
+            };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4361,7 +4363,9 @@ impl Compilation {
             }
             // SAFETY: as the struct path, but the buffer is the variant's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result = unsafe { read_ffi_variant(sret_buf.as_ptr() as *const u8, layout, true) };
+            let result = unsafe {
+                read_ffi_variant(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
+            };
             for (header, content_len) in to_free {
                 unsafe { free_dynamic_string(header, content_len) };
             }
@@ -4447,13 +4451,15 @@ fn ffi_variant_layout<'a>(
 }
 
 /// Validate that `ty` can be marshaled back across the embedding FFI as a return
-/// value: a scalar, `str`, `Unit`, a `struct` whose fields are all scalar/`str`,
-/// a `variant` whose case payloads are all scalar/`str`, an array whose element
-/// type is itself marshalable, an optional (possibly nested) whose core is one of
-/// those, or a `Result` whose `ok`/`err` sides are each independently one of
-/// those (so `!Error`, i.e. `Result<Unit, Error>`, is fine: `Unit` on the ok
-/// side, `Error` — a `str`-repr type — on the err side). Errors name the
-/// offending type/field. (`call_values` then dispatches on the type's shape.)
+/// value. The rule is recursive: a scalar, `str`, or `Unit`; a `struct` each of
+/// whose fields is marshalable; a `variant` each of whose case payloads is
+/// marshalable; an array whose element type is marshalable; an optional (possibly
+/// nested) whose core is; or a `Result` whose `ok`/`err` sides each independently
+/// are (so `!Error`, i.e. `Result<Unit, Error>`, is fine: `Unit` on the ok side,
+/// `Error` — a `str`-repr type — on the err side). This lets arbitrarily nested
+/// shapes marshal — e.g. `Token<K>[]` where `Token` is `{ kind: K, span: Span }`
+/// (a variant field plus a struct field). Errors name the offending type/field.
+/// (`call_values` then dispatches on the type's shape.)
 fn check_ffi_return(
     name: &str,
     ty: &Type,
@@ -4476,38 +4482,35 @@ fn check_ffi_return(
         Type::Array(elem) => check_ffi_return(name, elem, structs),
         Type::Named(_) => {
             if let Some(layout) = ffi_struct_layout(ty, structs) {
-                return match layout
-                    .fields
-                    .iter()
-                    .find(|f| !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty))
-                {
-                    Some(f) => Err(Error::msg(format!(
-                        "fn {name:?} returns struct {} whose field {:?} is {}; the FFI can return \
-                         only structs whose fields are all i64/bool/char or str",
-                        type_name(ty),
-                        f.name,
-                        type_name(&f.ty)
-                    ))),
-                    None => Ok(()),
-                };
-            }
-            if let Some(layout) = ffi_variant_layout(ty, structs) {
-                // Every case's payload must be marshalable (scalar/str), since the
-                // active case is only known at runtime.
-                for case in &layout.cases {
-                    if let Some(f) = case
-                        .fields
-                        .iter()
-                        .find(|f| !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty))
-                    {
+                // Each field must itself be marshalable — a field may be a nested
+                // struct/variant/array/optional (stored inline), so recurse.
+                for f in &layout.fields {
+                    if check_ffi_return(name, &f.ty, structs).is_err() {
                         return Err(Error::msg(format!(
-                            "fn {name:?} returns variant {} whose case {:?} has a payload of type \
-                             {}; the FFI can marshal only variants whose case payloads are all \
-                             i64/bool/char or str",
+                            "fn {name:?} returns struct {} whose field {:?} is {}; the FFI can't \
+                             marshal that field type",
                             type_name(ty),
-                            case.name,
+                            f.name,
                             type_name(&f.ty)
                         )));
+                    }
+                }
+                return Ok(());
+            }
+            if let Some(layout) = ffi_variant_layout(ty, structs) {
+                // Every case's payload must be marshalable, since the active case
+                // is only known at runtime — recurse (a payload may be composite).
+                for case in &layout.cases {
+                    for f in &case.fields {
+                        if check_ffi_return(name, &f.ty, structs).is_err() {
+                            return Err(Error::msg(format!(
+                                "fn {name:?} returns variant {} whose case {:?} has a payload of \
+                                 type {}; the FFI can't marshal that payload type",
+                                type_name(ty),
+                                case.name,
+                                type_name(&f.ty)
+                            )));
+                        }
                     }
                 }
                 return Ok(());
@@ -4616,10 +4619,10 @@ unsafe fn read_ffi_borrowed(
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     if let Some(layout) = ffi_struct_layout(ty, structs) {
-        return unsafe { read_ffi_struct(at, layout, owned) };
+        return unsafe { read_ffi_struct(at, layout, owned, structs) };
     }
     if let Some(layout) = ffi_variant_layout(ty, structs) {
-        return unsafe { read_ffi_variant(at, layout, owned) };
+        return unsafe { read_ffi_variant(at, layout, owned, structs) };
     }
     match ty {
         Type::Optional(_) => unsafe { read_ffi_optional(at as *const i64, ty, owned, structs) },
@@ -4775,24 +4778,28 @@ unsafe fn read_ffi_core(
 }
 
 /// Read a struct (`layout`) at `base` into an [`FfiValue::Struct`] — one
-/// `(name, value)` per field, in declaration order, each read at its byte offset
-/// (a heap field is borrowed/released per `owned`). `call_values` has already
-/// rejected any field that isn't a scalar or `str`.
+/// `(name, value)` per field, in declaration order, each read (via
+/// [`read_ffi_borrowed`]) at its byte offset. A field may itself be a composite
+/// (a nested struct/variant/array/optional stored inline), so the shape is
+/// arbitrarily deep; heap constituents are borrowed/released per `owned`.
+/// `check_ffi_return` has already rejected any field whose type isn't marshalable.
 ///
-/// SAFETY: `base` must point at a `layout`-shaped struct, each heap field
+/// SAFETY: `base` must point at a `layout`-shaped struct, each heap constituent
 /// carrying one reference when `owned`.
-unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout, owned: bool) -> FfiValue {
+unsafe fn read_ffi_struct(
+    base: *const u8,
+    layout: &StructLayout,
+    owned: bool,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
     let fields = layout
         .fields
         .iter()
         .map(|f| {
-            let raw = unsafe { *(base.add(f.offset as usize) as *const i64) };
-            let value = if is_str_repr(&f.ty) {
-                FfiValue::Str(unsafe { read_ffi_str_value(raw, owned) })
-            } else {
-                FfiValue::Int(raw)
-            };
-            (f.name.clone(), value)
+            let at = unsafe { base.add(f.offset as usize) };
+            (f.name.clone(), unsafe {
+                read_ffi_borrowed(at, &f.ty, owned, structs)
+            })
         })
         .collect();
     FfiValue::Struct(fields)
@@ -4800,13 +4807,19 @@ unsafe fn read_ffi_struct(base: *const u8, layout: &StructLayout, owned: bool) -
 
 /// Read a variant (`layout`) at `base` into an [`FfiValue::Variant`]. The tag
 /// (case index) sits at offset 0; the active case's payload fields follow from
-/// [`VARIANT_PAYLOAD_OFFSET`], each read at its byte offset (heap payloads
-/// borrowed/released per `owned`). `check_ffi_return` has already ensured every
-/// case's payload is scalar/`str`.
+/// [`VARIANT_PAYLOAD_OFFSET`], each read (via [`read_ffi_borrowed`]) at its byte
+/// offset — a payload may itself be a composite stored inline. Heap constituents
+/// are borrowed/released per `owned`. `check_ffi_return` has already ensured every
+/// case's payload is marshalable.
 ///
 /// SAFETY: `base` must point at a `layout`-shaped variant, its tag a valid case
-/// index and each heap payload carrying one reference when `owned`.
-unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout, owned: bool) -> FfiValue {
+/// index and each heap constituent carrying one reference when `owned`.
+unsafe fn read_ffi_variant(
+    base: *const u8,
+    layout: &VariantLayout,
+    owned: bool,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
     let tag = unsafe { *(base as *const i64) } as usize;
     let case = layout
         .cases
@@ -4816,12 +4829,8 @@ unsafe fn read_ffi_variant(base: *const u8, layout: &VariantLayout, owned: bool)
         .fields
         .iter()
         .map(|f| {
-            let raw = unsafe { *(base.add(f.offset as usize) as *const i64) };
-            if is_str_repr(&f.ty) {
-                FfiValue::Str(unsafe { read_ffi_str_value(raw, owned) })
-            } else {
-                FfiValue::Int(raw)
-            }
+            let at = unsafe { base.add(f.offset as usize) };
+            unsafe { read_ffi_borrowed(at, &f.ty, owned, structs) }
         })
         .collect();
     FfiValue::Variant(case.name.clone(), fields)

@@ -302,14 +302,66 @@ pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";
 }
 
 #[test]
-fn call_values_rejects_struct_with_nonscalar_field() {
-    // A struct field that isn't a scalar or `str` (here an array) can't be
-    // marshaled back yet — rejected with a clear error rather than mis-read.
+fn call_values_marshals_nested_composite_struct() {
+    // A struct field may itself be a composite — a nested struct, a variant, or an
+    // array — read inline/recursively. This is the `Token<K>`-shaped case the AIPL
+    // lexer needs: `{ kind: <variant>, span: <struct>, tags: <array> }`.
     let src = "\
-struct Bag { items: i64[] }
-pub fn make() -> Bag { Bag { items: [1, 2] } }";
+struct Span { start: i64, end: i64 }
+variant Kind = Word(str) | Punct
+struct Tok { kind: Kind, span: Span, tags: i64[] }
+pub fn tok(a: i64, b: i64) -> Tok {
+    Tok { kind: Word(\"a heap identifier\"), span: Span { start: a, end: b }, tags: [7, 8] }
+}
+pub fn toks() -> Tok[] {
+    [Tok { kind: Word(\"first\"), span: Span { start: 0, end: 5 }, tags: [] },
+     Tok { kind: Punct, span: Span { start: 5, end: 6 }, tags: [1] }]
+}";
     let e = Engine::compile(src).unwrap();
-    assert!(e.call_values("make", &[]).is_err());
+    use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
+
+    let span = |a, b| Struct(vec![("start".into(), Int(a)), ("end".into(), Int(b))]);
+    let tok = |kind, a, b, tags| {
+        Struct(vec![
+            ("kind".into(), kind),
+            ("span".into(), span(a, b)),
+            ("tags".into(), Array(tags)),
+        ])
+    };
+
+    // A single nested struct with a variant field (str payload), a struct field,
+    // and an array field.
+    assert_eq!(
+        e.call_values("tok", &[Int(3), Int(9)]).unwrap(),
+        tok(
+            Variant("Word".into(), vec![Str("a heap identifier".into())]),
+            3,
+            9,
+            vec![Int(7), Int(8)]
+        )
+    );
+
+    // An array of such structs — the token-stream shape.
+    assert_eq!(
+        e.call_values("toks", &[]).unwrap(),
+        Array(vec![
+            tok(
+                Variant("Word".into(), vec![Str("first".into())]),
+                0,
+                5,
+                vec![]
+            ),
+            tok(Variant("Punct".into(), vec![]), 5, 6, vec![Int(1)]),
+        ])
+    );
+}
+
+#[test]
+fn call_values_rejects_unmarshalable_return() {
+    // A type the FFI still can't marshal (a set) is rejected with a clear error.
+    let src = "pub fn make_set() -> #{i64} { #{1, 2, 3} }";
+    let e = Engine::compile(src).unwrap();
+    assert!(e.call_values("make_set", &[]).is_err());
 }
 
 /// A variant whose cases span a nullary case and scalar/`str`/`char` payloads —
@@ -436,15 +488,23 @@ fn call_values_marshals_optional_variant_return() {
 }
 
 #[test]
-fn call_values_rejects_variant_with_nonscalar_payload() {
-    // A variant case whose payload isn't scalar/`str` (here an array) can't be
-    // marshaled — the active case is only known at runtime, so `check_ffi_return`
-    // rejects the whole type up front rather than risk mis-reading a case.
+fn call_values_marshals_variant_with_composite_payload() {
+    // A variant payload may itself be a composite (here an array), read
+    // recursively — the active case's payload comes back nested.
     let src = "\
 variant Bag = Full(i64[]) | Empty
-pub fn make() -> Bag { Full([1, 2]) }";
+pub fn full() -> Bag { Full([1, 2]) }
+pub fn empty() -> Bag { Empty }";
     let e = Engine::compile(src).unwrap();
-    assert!(e.call_values("make", &[]).is_err());
+    use aipl::FfiValue::{Array, Int, Variant};
+    assert_eq!(
+        e.call_values("full", &[]).unwrap(),
+        Variant("Full".into(), vec![Array(vec![Int(1), Int(2)])])
+    );
+    assert_eq!(
+        e.call_values("empty", &[]).unwrap(),
+        Variant("Empty".into(), vec![])
+    );
 }
 
 /// Array returns over a spread of element types: scalars, `str`, `bool`

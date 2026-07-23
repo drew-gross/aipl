@@ -3,17 +3,20 @@
 //!
 //! A cautious first step toward dogfooding the AIPL lexer *inside* the compiler:
 //! nothing here is wired into compilation. We compile the AIPL lexer once through
-//! the embedding FFI and call `lex_aipl_dump`, which serializes its token stream
-//! to a canonical `START END CATEGORY` dump (a lex error becomes one `ERR START
-//! END` line); the Rust side produces the same dump from `aipl::lex_tokens`.
-//! Comparing the two over the test corpus yields a burn-down list of where the
-//! AIPL lexer still diverges — run `report_lexer_differences` (below) to see it.
+//! the embedding FFI and call `lex_aipl_tokens`, which returns the *actual* token
+//! array — `Token<AiplTok>[]!LexError`, each token's typed `kind` (a variant) and
+//! `span` (a struct) — marshaled directly across the FFI. The Rust side coarsens
+//! each token to a `START END CATEGORY` line (a lex error becomes one `ERR START
+//! END` line) and produces the same shape from `aipl::lex_tokens`. Comparing the
+//! two over the test corpus yields a burn-down list of where the AIPL lexer still
+//! diverges — run `report_lexer_differences` (below) to see it.
 //!
 //! The comparison is at *category + span* granularity (keyword / ident / number /
 //! str / char / constant / operator / punct), matching the Rust lexer's own
-//! `classify`. `BuiltinType` folds into `ident` because that's a highlighter-only
-//! refinement — the Rust *lexer* emits a plain identifier for `i64`/`bool`/etc.,
-//! exactly as the AIPL lexer does — so only genuine lexer divergences remain.
+//! `classify`; `categorize` maps each `AiplTok` case to that granularity.
+//! `BuiltinType` folds into `ident` because that's a highlighter-only refinement —
+//! the Rust *lexer* emits a plain identifier for `i64`/`bool`/etc., exactly as the
+//! AIPL lexer does — so only genuine lexer divergences remain.
 
 use aipl::{Engine, FfiValue};
 use std::collections::BTreeMap;
@@ -24,7 +27,7 @@ const LEXER_AIPL: &str = include_str!("../crates/aipl-codegen/src/lexer.aipl");
 const LEX_AIPL: &str = include_str!("../crates/aipl-codegen/src/lex_aipl.aipl");
 
 /// Compile `lexer.aipl` + `lex_aipl.aipl` into an FFI engine exposing
-/// `lex_aipl_dump`. The trailing `--- performance ---` sections are stripped by
+/// `lex_aipl_tokens`. The trailing `--- performance ---` sections are stripped by
 /// the loader's parse, so the raw `include_str!`d sources load as-is.
 fn compile_lexer() -> Engine {
     aipl::install_parser_hooks();
@@ -32,11 +35,90 @@ fn compile_lexer() -> Engine {
         .expect("compile AIPL lexer for differential test")
 }
 
-/// The AIPL lexer's canonical dump of `src`.
+/// The `(String, FfiValue)` field named `name` in a marshaled struct.
+fn field<'a>(fields: &'a [(String, FfiValue)], name: &str) -> &'a FfiValue {
+    fields
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, v)| v)
+        .unwrap_or_else(|| panic!("struct has no field {name:?}"))
+}
+
+fn as_struct(v: &FfiValue) -> &[(String, FfiValue)] {
+    match v {
+        FfiValue::Struct(fields) => fields,
+        other => panic!("expected a struct, got {other:?}"),
+    }
+}
+
+fn as_int(v: &FfiValue) -> i64 {
+    match v {
+        FfiValue::Int(i) => *i,
+        other => panic!("expected an int, got {other:?}"),
+    }
+}
+
+/// The `(start, end)` of a `Span` struct value.
+fn span_bounds(v: &FfiValue) -> (i64, i64) {
+    let s = as_struct(v);
+    (as_int(field(s, "start")), as_int(field(s, "end")))
+}
+
+/// Coarsen an `AiplTok` variant case name to the category granularity the Rust
+/// lexer's `classify` produces (the operator/punctuation split included), so a
+/// token that agrees dumps identically on both sides and only real divergences
+/// surface. Cases this lexer can't yet produce (`char`, template segments,
+/// `true`/`false`/`none`) simply have no arm — those are the gaps the diff finds.
+fn categorize(case: &str) -> &'static str {
+    match case {
+        "Fn" | "Let" | "Mut" | "Set" | "Pub" | "Import" | "From" | "As" | "For" | "While"
+        | "Match" | "Return" | "Struct" | "Variant" => "keyword",
+        "Name" => "ident",
+        "IntLit" => "number",
+        "StrLit" => "str",
+        "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "DotDot" | "PlusPlusPlus"
+        | "Eq" | "Lt" | "Gt" | "Bang" | "Plus" | "Minus" | "Star" | "Slash" | "Percent" => {
+            "operator"
+        }
+        "Period" | "Comma" | "Colon" | "Semi" | "Question" | "LParen" | "RParen" | "LBrace"
+        | "RBrace" | "LBracket" | "RBracket" => "punct",
+        "Space" | "LineComment" => "trivia",
+        other => panic!("unknown AiplTok case {other:?}"),
+    }
+}
+
+/// The AIPL lexer's canonical dump of `src`, built from the *actual* token array
+/// `lex_aipl_tokens` returns: one `START END CATEGORY` line per token, or a single
+/// `ERR START END` line for a `LexError`.
 fn aipl_dump(engine: &Engine, src: &str) -> String {
-    match engine.call_values("lex_aipl_dump", &[FfiValue::Str(src.to_string())]) {
-        Ok(FfiValue::Str(s)) => s,
-        other => panic!("lex_aipl_dump returned {other:?}"),
+    let res = engine
+        .call_values("lex_aipl_tokens", &[FfiValue::Str(src.to_string())])
+        .expect("call lex_aipl_tokens");
+    match res {
+        // ok: an array of `Token { kind, span }` structs.
+        FfiValue::Res(Ok(tokens)) => {
+            let tokens = match *tokens {
+                FfiValue::Array(ts) => ts,
+                other => panic!("lex_aipl_tokens ok payload not an array: {other:?}"),
+            };
+            let mut out = String::new();
+            for tok in &tokens {
+                let fields = as_struct(tok);
+                let (start, end) = span_bounds(field(fields, "span"));
+                let cat = match field(fields, "kind") {
+                    FfiValue::Variant(case, _) => categorize(case),
+                    other => panic!("token kind not a variant: {other:?}"),
+                };
+                out.push_str(&format!("{start} {end} {cat}\n"));
+            }
+            out
+        }
+        // err: a `LexError { message, span }` struct — only its span is compared.
+        FfiValue::Res(Err(e)) => {
+            let (start, end) = span_bounds(field(as_struct(&e), "span"));
+            format!("ERR {start} {end}\n")
+        }
+        other => panic!("lex_aipl_tokens returned {other:?}"),
     }
 }
 
