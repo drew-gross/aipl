@@ -76,13 +76,12 @@ fn categorize(case: &str) -> &'static str {
         "Name" => "ident",
         "IntLit" => "number",
         "StrLit" | "RawStrLit" => "str",
-        "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "DotDot" | "PlusPlusPlus"
-        | "Eq" | "Lt" | "Gt" | "Bang" | "Plus" | "Minus" | "Star" | "Slash" | "Percent" => {
-            "operator"
-        }
-        "Period" | "Comma" | "Colon" | "Semi" | "Question" | "LParen" | "RParen" | "LBrace"
-        | "RBrace" | "LBracket" | "RBracket" => "punct",
-        "Space" | "LineComment" => "trivia",
+        "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "Pipe" | "DotDot"
+        | "PlusPlusPlus" | "PlusPlus" | "Eq" | "Lt" | "Le" | "Gt" | "Ge" | "Bang" | "Plus"
+        | "Minus" | "Star" | "Slash" | "Percent" => "operator",
+        "Period" | "Comma" | "Colon" | "Semi" | "Question" | "Hash" | "LParen" | "RParen"
+        | "LBrace" | "RBrace" | "LBracket" | "RBracket" => "punct",
+        "Space" | "LineComment" | "AllowMarker" => "trivia",
         other => panic!("unknown AiplTok case {other:?}"),
     }
 }

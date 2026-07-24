@@ -2,9 +2,9 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
-// Scaffolding only: the keyword / operator / punctuation sets below are a
-// starter subset, not the full grammar (no char literals or templates, or the
-// complete operator table yet), and this isn't wired into the compiler —
+// Scaffolding only: the keyword and operator/punctuation tables below are now
+// complete, but the grammar isn't — no char literals, templates, or the
+// `true`/`false`/`none` constants yet — and this isn't wired into the compiler,
 // nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
 import { ==, int_parse } from builtins;
 import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
@@ -24,6 +24,7 @@ import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } f
 variant AiplTok =
     Space
     | LineComment
+    | AllowMarker
     | Name(str)
     | IntLit(i64)
     | StrLit(str)
@@ -51,11 +52,15 @@ variant AiplTok =
     | FatArrow
     | AndAnd
     | OrOr
+    | Pipe
     | DotDot
     | PlusPlusPlus
+    | PlusPlus
     | Eq
     | Lt
+    | Le
     | Gt
+    | Ge
     | Bang
     | Plus
     | Minus
@@ -67,6 +72,7 @@ variant AiplTok =
     | Colon
     | Semi
     | Question
+    | Hash
     | LParen
     | RParen
     | LBrace
@@ -111,11 +117,15 @@ fn sym_kind(text: str) -> AiplTok {
         "=>" => FatArrow,
         "&&" => AndAnd,
         "||" => OrOr,
+        "|" => Pipe,
         ".." => DotDot,
         "+++" => PlusPlusPlus,
+        "++" => PlusPlus,
         "=" => Eq,
         "<" => Lt,
+        "<=" => Le,
         ">" => Gt,
+        ">=" => Ge,
         "!" => Bang,
         "+" => Plus,
         "-" => Minus,
@@ -127,6 +137,7 @@ fn sym_kind(text: str) -> AiplTok {
         ":" => Colon,
         ";" => Semi,
         "?" => Question,
+        "#" => Hash,
         "(" => LParen,
         ")" => RParen,
         "{" => LBrace,
@@ -171,9 +182,9 @@ fn int_lit(text: str) -> AiplTok!str {
 // isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
 // table (`Exact` picks the longest spelling, so `==` beats `=`).
 //
-// TODO(scaffolding): flesh out to the full grammar — the remaining keywords, the
-// complete operator set, char literals (`CharLit`), and template strings
-// (`Template` with `OfSeg`).
+// TODO(scaffolding): flesh out to the full grammar — char literals (`CharLit`),
+// template strings (`Template` with `OfSeg`), and the `true`/`false`/`none`
+// constants.
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
@@ -204,11 +215,15 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         "=>",
         "&&",
         "||",
+        "|",
         "..",
         "+++",
+        "++",
         "=",
         "<",
+        "<=",
         ">",
+        ">=",
         "!",
         "+",
         "-",
@@ -220,6 +235,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         ":",
         ";",
         "?",
+        "#",
         "(",
         ")",
         "{",
@@ -230,6 +246,13 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
     [
         TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
+        // `#[allow]` is the lint-squelch marker: like the Rust lexer, it's
+        // recorded as trivia and kept out of the token stream, not lexed as a
+        // `#` (`Hash`) token. It must precede the operator table (whose `#` would
+        // otherwise claim the leading char); the exact-8-char spelling means a
+        // `#{` dict prefix or a `#[` that isn't `#[allow]` still falls through to
+        // `Hash` + `LBracket`, matching the real lexer.
+        TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(AllowMarker), trivia: true },
         TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: TryText(int_lit) },
@@ -276,6 +299,40 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
                     Token { kind: Name("iffy"), span: 17..21 },
                 ],
                 trivia: [],
+            },
+        ),
+    );
+
+    // The rest of the operator/punctuation table: `<=`/`>=` beat `<`/`>`, `++`
+    // beats `+` (but not `+++`), and `|` is the lambda delimiter. `Exact` always
+    // takes the longest spelling, so the two-char forms win over their one-char
+    // prefixes.
+    assert(
+        lex_aipl("a <= b >= |x| ++") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: Name("a"), span: 0..1 },
+                    Token { kind: Le, span: 2..4 },
+                    Token { kind: Name("b"), span: 5..6 },
+                    Token { kind: Ge, span: 7..9 },
+                    Token { kind: Pipe, span: 10..11 },
+                    Token { kind: Name("x"), span: 11..12 },
+                    Token { kind: Pipe, span: 12..13 },
+                    Token { kind: PlusPlus, span: 14..16 },
+                ],
+                trivia: [],
+            },
+        ),
+    );
+
+    // `#` disambiguation: a bare `#` (the `#{...}` dict prefix) is a `Hash` token,
+    // but `#[allow]` is the lint-squelch marker — recorded as trivia and kept out
+    // of the token stream, matching the Rust lexer.
+    assert(
+        lex_aipl("#{ #[allow]") == ok(
+            LexResult {
+                tokens: [Token { kind: Hash, span: 0..1 }, Token { kind: LBrace, span: 1..2 }],
+                trivia: [Token { kind: AllowMarker, span: 3..11 }],
             },
         ),
     );
@@ -351,12 +408,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 391
-deallocations: 391
+allocations: 712
+deallocations: 712
 reallocations: 0
-bytes allocated: 21392
-instructions executed: 101259
-binary size: 193392
+bytes allocated: 36400
+instructions executed: 173526
+binary size: 212896
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam16
