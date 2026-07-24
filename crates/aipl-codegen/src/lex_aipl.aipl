@@ -2,10 +2,11 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
-// Scaffolding only: the keyword, constant, operator/punctuation, and string /
-// template tables below are now complete, but the grammar isn't — no char
-// literals yet — and this isn't wired into the compiler, nothing dogfoods it. It
-// exists to grow the real AIPL lexer against the library.
+// The token tables below now cover AIPL's whole lexical grammar — keywords,
+// constants, operators/punctuation, strings, char literals, and templates. It
+// still isn't wired into the compiler (nothing dogfoods it yet); it exists to
+// grow the real AIPL lexer against the library, and the differential test
+// (`tests/lexer_dogfood.rs`) tracks where it still diverges from the Rust lexer.
 import { ==, int_parse } from builtins;
 import {
     Emit,
@@ -39,6 +40,7 @@ variant AiplTok =
     | IntLit(i64)
     | StrLit(str)
     | RawStrLit(str)
+    | CharTok(char)
     | TemplateStr(str)
     | TemplateHead(str)
     | TemplateMid(str)
@@ -246,11 +248,9 @@ fn int_lit(text: str) -> AiplTok!str {
 
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
 // whitespace and recorded comments first; keywords before identifiers, so `fn`
-// isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
-// table (`Exact` picks the longest spelling, so `==` beats `=`).
-//
-// TODO(scaffolding): flesh out to the full grammar — the remaining piece is char
-// literals (`CharLit`).
+// isn't swallowed as a `Name`; `Int`, strings, char literals, and templates;
+// then the operator/punctuation table (`Exact` picks the longest spelling, so
+// `==` beats `=`).
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
@@ -334,6 +334,14 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // than an empty `""` plus a stray `"`.
         TokenRule { matcher: Between(q3, q3), emit: OfStr(RawStrLit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
+        // Char literals `'x'`/`'\n'`: the `CharLit` matcher enforces the one-char
+        // shape and decodes the byte itself (the same escape set as a string,
+        // plus `\'`), so `OfChar` applies the bare `CharTok` constructor to it. The
+        // kind is `CharTok`, not `CharLit`/`Char`, because those names are already
+        // the library's `Matcher` constructor and its test `Kind`'s arm (shared
+        // constructor namespace). Its hard errors (empty `''`, `'ab'`, unknown
+        // escape, unterminated) carry byte-precise spans matching the Rust lexer's.
+        TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: OfChar(CharTok) },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
         // whole before the single ``` ` ``` rule bites off the first backtick —
@@ -465,6 +473,24 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
         ),
     );
 
+    // Char literals: an ordinary `'x'` and an escaped `'\n'` (the AIPL source
+    // writes the escape as a literal backslash-`n`), each decoded to its byte.
+    assert(
+        lex_aipl("'x' '\\n'") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: CharTok('x'), span: 0..3 },
+                    Token { kind: CharTok('\n'), span: 4..8 },
+                ],
+                trivia: [],
+            },
+        ),
+    );
+
+    // The one-char shape is enforced: an empty `''` is a hard error whose span
+    // (the two quotes) matches the Rust lexer's `empty char literal` error.
+    assert(lex_aipl("''") == err(LexError { message: "empty char literal", span: 0..2 }));
+
     // A template literal with no interpolation lexes as one `TemplateStr` (the
     // Rust lexer folds it to a plain string) — the whole literal, backticks
     // included, is its span.
@@ -542,23 +568,25 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 1085
-deallocations: 1085
+allocations: 1213
+deallocations: 1213
 reallocations: 0
-bytes allocated: 56640
-instructions executed: 280531
-binary size: 450464
+bytes allocated: 64320
+instructions executed: 313040
+binary size: 468768
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam11
-__builtin_count_while$char$s0$lam16
-__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18
+__builtin_count_while$char$s0$lam19
+__builtin_count_while$char$s0$lam20
 __builtin_int_parse
-__builtin_is_some_and$char$lam28
+__builtin_is_some_and$char$lam30
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
+__lambda_4
+__lambda_5
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
