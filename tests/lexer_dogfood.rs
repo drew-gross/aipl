@@ -67,8 +67,8 @@ fn span_bounds(v: &FfiValue) -> (i64, i64) {
 /// Coarsen an `AiplTok` variant case name to the category granularity the Rust
 /// lexer's `classify` produces (the operator/punctuation split included), so a
 /// token that agrees dumps identically on both sides and only real divergences
-/// surface. Cases this lexer can't yet produce (`char`, template segments)
-/// simply have no arm — those are the gaps the diff finds.
+/// surface. Cases this lexer can't yet produce (`char`) simply have no arm —
+/// those are the gaps the diff finds.
 fn categorize(case: &str) -> &'static str {
     match case {
         "Fn" | "Let" | "Mut" | "Set" | "Pub" | "Import" | "From" | "As" | "For" | "While"
@@ -76,6 +76,10 @@ fn categorize(case: &str) -> &'static str {
         "Name" => "ident",
         "IntLit" => "number",
         "StrLit" | "RawStrLit" => "str",
+        // The Rust lexer's `classify` folds every template-literal piece
+        // (head/middle/tail, and a bare interpolation-free template) into `Str`.
+        "TemplateStr" | "TemplateHead" | "TemplateMid" | "TemplateTail" | "RawTemplateStr"
+        | "RawTemplateHead" | "RawTemplateMid" | "RawTemplateTail" => "str",
         "True" | "False" | "None" => "constant",
         "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "Pipe" | "DotDot"
         | "PlusPlusPlus" | "PlusPlus" | "Eq" | "Lt" | "Le" | "Gt" | "Ge" | "Bang" | "Plus"

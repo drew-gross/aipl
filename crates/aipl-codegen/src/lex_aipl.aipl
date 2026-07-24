@@ -2,12 +2,22 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
-// Scaffolding only: the keyword, constant, and operator/punctuation tables below
-// are now complete, but the grammar isn't — no char literals or templates yet —
-// and this isn't wired into the compiler, nothing dogfoods it. It exists to grow
-// the real AIPL lexer against the library.
+// Scaffolding only: the keyword, constant, operator/punctuation, and string /
+// template tables below are now complete, but the grammar isn't — no char
+// literals yet — and this isn't wired into the compiler, nothing dogfoods it. It
+// exists to grow the real AIPL lexer against the library.
 import { ==, int_parse } from builtins;
-import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
+import {
+    Emit,
+    LexError,
+    LexResult,
+    Matcher,
+    Seg,
+    Token,
+    TokenRule,
+    lex,
+    unescape,
+} from "./lexer.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
 // (`Name` its text, `IntLit` its value) or nothing. Every keyword and every
@@ -29,6 +39,14 @@ variant AiplTok =
     | IntLit(i64)
     | StrLit(str)
     | RawStrLit(str)
+    | TemplateStr(str)
+    | TemplateHead(str)
+    | TemplateMid(str)
+    | TemplateTail(str)
+    | RawTemplateStr(str)
+    | RawTemplateHead(str)
+    | RawTemplateMid(str)
+    | RawTemplateTail(str)
     | True
     | False
     | None
@@ -182,6 +200,38 @@ fn str_lit(text: str) -> AiplTok { StrLit(text.unescape()) }
 // consumer pass, not part of lexing — so the emit is the bare constructor and no
 // helper is needed (see `aipl_rules`).
 
+// The `OfSeg` emit for the `` `...` `` template rule: the `Template` matcher hands
+// each text segment's *raw* text plus its position (`Plain` for an
+// interpolation-free literal, else `Head`/`Middle`/`Tail`), and this maps each to
+// its own `AiplTok` arm — decoding the segment's escapes (`` \` ``/`\{`/`\n`/… as in
+// the `escapes` set below) with `unescape`, exactly as `str_lit` does for a plain
+// string. A `Plain` template folds to the same category as a string (the Rust
+// lexer emits a bare `Str` for an interpolation-free template), but keeps a
+// distinct kind so a consumer still sees it was written as a template.
+fn tpl_kind(text: str, seg: Seg) -> AiplTok {
+    let t = text.unescape();
+    match (seg) {
+        Plain => TemplateStr(t),
+        Head => TemplateHead(t),
+        Middle => TemplateMid(t),
+        Tail => TemplateTail(t),
+    }
+}
+
+// The `OfSeg` emit for the ```` ```...``` ```` raw-template rule: like `tpl_kind`,
+// but the delimiter scans verbatim (empty `escapes`), so the segment text is not
+// decoded — a lone `` ` ``/` `` ` inside is content. AIPL's de-denting of a raw
+// template's combined text (as for a `"""` raw string) is a later consumer pass,
+// not part of lexing, so the value here is the exact bytes.
+fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
+    match (seg) {
+        Plain => RawTemplateStr(text),
+        Head => RawTemplateHead(text),
+        Middle => RawTemplateMid(text),
+        Tail => RawTemplateTail(text),
+    }
+}
+
 // Build an `IntLit` from a matched digit run. The `Int` matcher only claims the
 // run; parsing is the caller's job, so this parses it with the `int_parse`
 // builtin and, as a fallible `TryText` emit, reports an i64 overflow as an error
@@ -199,8 +249,8 @@ fn int_lit(text: str) -> AiplTok!str {
 // isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
 // table (`Exact` picks the longest spelling, so `==` beats `=`).
 //
-// TODO(scaffolding): flesh out to the full grammar — char literals (`CharLit`)
-// and template strings (`Template` with `OfSeg`).
+// TODO(scaffolding): flesh out to the full grammar — the remaining piece is char
+// literals (`CharLit`).
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
@@ -284,6 +334,16 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // than an empty `""` plus a stray `"`.
         TokenRule { matcher: Between(q3, q3), emit: OfStr(RawStrLit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
+        // Template literals. Triple-backtick before single (`Template` declines
+        // unless the source opens with its delim, so ``` ``` ``` must be claimed
+        // whole before the single ``` ` ``` rule bites off the first backtick —
+        // the same longest-delim-first ordering as the raw/plain string rules,
+        // and matching the Rust lexer's triple-before-single check). The raw form
+        // scans verbatim (empty `escapes`); the single form decodes the same
+        // escapes as a string plus `` \` ``/`\{`. Each interpolation re-lexes with
+        // this whole rule set, so templates nest.
+        TokenRule { matcher: Template("```", ""), emit: OfSeg(raw_tpl_kind) },
+        TokenRule { matcher: Template("`", "\\`{ntr"), emit: OfSeg(tpl_kind) },
         TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
     ]
 }
@@ -405,6 +465,40 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
         ),
     );
 
+    // A template literal with no interpolation lexes as one `TemplateStr` (the
+    // Rust lexer folds it to a plain string) — the whole literal, backticks
+    // included, is its span.
+    assert(
+        lex_aipl("`hi`") == ok(
+            LexResult { tokens: [Token { kind: TemplateStr("hi"), span: 0..4 }], trivia: [] },
+        ),
+    );
+
+    // A template with an interpolation `` `a{x}b` ``: the head runs from the
+    // opening backtick through the first `{`, the `{x}` re-lexes with the full
+    // rule set (a lone `Name`), and the tail runs from just past the `}` through
+    // the closing backtick. Head/tail spans include their braces/delimiters.
+    assert(
+        lex_aipl("`a{x}b`") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: TemplateHead("a"), span: 0..3 },
+                    Token { kind: Name("x"), span: 3..4 },
+                    Token { kind: TemplateTail("b"), span: 5..7 },
+                ],
+                trivia: [],
+            },
+        ),
+    );
+
+    // A triple-backtick raw template scans verbatim, so its value is the exact
+    // bytes and it wins over the single-backtick rule (longest delim first).
+    assert(
+        lex_aipl("```hi```") == ok(
+            LexResult { tokens: [Token { kind: RawTemplateStr("hi"), span: 0..8 }], trivia: [] },
+        ),
+    );
+
     // An integer that overflows i64: the `TryText` emit (`int_lit`) reports it,
     // and the library attaches the literal's span. Overflow policy is the
     // consumer's — the lexer library never parses ints itself.
@@ -448,12 +542,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 890
-deallocations: 890
+allocations: 1085
+deallocations: 1085
 reallocations: 0
-bytes allocated: 44760
-instructions executed: 210461
-binary size: 225032
+bytes allocated: 56640
+instructions executed: 280531
+binary size: 450464
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam16
@@ -480,6 +574,7 @@ __m1__seg_only
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
+__m1__unescape
 __test$lex_aipl
 const_kind
 int_lit
@@ -487,5 +582,7 @@ kwd_kind
 lex_aipl
 lex_aipl_tokens
 main
+raw_tpl_kind
 str_lit
 sym_kind
+tpl_kind
