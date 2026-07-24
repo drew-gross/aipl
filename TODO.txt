@@ -42,6 +42,7 @@ warn/err on:
 
 output multiple errors at once
 remove install_parser_hook with lazy loader
+make the vscode extension also auto-format
 
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
 

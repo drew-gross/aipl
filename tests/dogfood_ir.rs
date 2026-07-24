@@ -403,6 +403,111 @@ fn checked_in_ir_loads_and_runs() {
     sanity_check(&checked_in);
 }
 
+/// AIPL source whose entry returns the rich shapes the artifact manifest must
+/// describe beyond flat structs: a generic struct instance holding arrays of
+/// structs whose fields are a variant (with str/i64/char and nullary cases)
+/// and a nested struct, under a result whose err side is itself a struct —
+/// the exact shape of the dogfooded lexer's `LexResult<AiplTok>!LexError`.
+const RICH_TYPES_SRC: &str = r#"
+variant Kind = Space | Name(str) | Num(i64) | Ch(char)
+
+struct Pos { start: i64, end: i64 }
+
+struct Tok<K> { kind: K, pos: Pos }
+
+struct Out<K> { tokens: Tok<K>[], trivia: Tok<K>[] }
+
+struct Lerr { message: str, pos: Pos }
+
+pub fn rich(flag: bool) -> Out<Kind>!Lerr {
+    if (flag) {
+        ok(Out {
+            tokens: [
+                Tok { kind: Name("hello"), pos: Pos { start: 0, end: 5 } },
+                Tok { kind: Num(42), pos: Pos { start: 6, end: 8 } },
+                Tok { kind: Ch('x'), pos: Pos { start: 9, end: 12 } },
+                Tok { kind: Space, pos: Pos { start: 12, end: 13 } },
+            ],
+            trivia: [Tok { kind: Name("t"), pos: Pos { start: 1, end: 2 } }],
+        })
+    } else {
+        err(Lerr { message: "boom", pos: Pos { start: 2, end: 3 } })
+    }
+}
+"#;
+
+/// The artifact manifest round-trips variants, arrays, generic-struct
+/// instances, and nested structs: an entry returning them computes the same
+/// [`FfiValue`] through `from_artifact` (manifest-reconstructed layouts) as
+/// through the live-frontend engine, and the values are the expected ones.
+#[test]
+fn artifact_round_trips_rich_types() {
+    aipl::install_parser_hooks();
+    let sources: &[(&str, &str)] = &[("./rich.aipl", RICH_TYPES_SRC)];
+    let artifact = generate_dogfood_artifact(sources, &["rich"])
+        .unwrap_or_else(|e| panic!("generate rich-types artifact: {e}"));
+    let comp = Compilation::from_artifact(&artifact)
+        .unwrap_or_else(|e| panic!("load rich-types artifact: {e}"));
+
+    let engine = aipl::Engine::compile_sources(sources).expect("frontend-compile rich types");
+
+    let pos = |start, end| {
+        FfiValue::Struct(vec![
+            ("start".to_string(), FfiValue::Int(start)),
+            ("end".to_string(), FfiValue::Int(end)),
+        ])
+    };
+    let tok = |kind, p| FfiValue::Struct(vec![("kind".to_string(), kind), ("pos".to_string(), p)]);
+    let expected_ok = FfiValue::Res(Ok(Box::new(FfiValue::Struct(vec![
+        (
+            "tokens".to_string(),
+            FfiValue::Array(vec![
+                tok(
+                    FfiValue::Variant("Name".to_string(), vec![FfiValue::Str("hello".to_string())]),
+                    pos(0, 5),
+                ),
+                tok(
+                    FfiValue::Variant("Num".to_string(), vec![FfiValue::Int(42)]),
+                    pos(6, 8),
+                ),
+                // A `char` payload rides its scalar ABI: `Int` of the codepoint.
+                tok(
+                    FfiValue::Variant("Ch".to_string(), vec![FfiValue::Int('x' as i64)]),
+                    pos(9, 12),
+                ),
+                tok(FfiValue::Variant("Space".to_string(), vec![]), pos(12, 13)),
+            ]),
+        ),
+        (
+            "trivia".to_string(),
+            FfiValue::Array(vec![tok(
+                FfiValue::Variant("Name".to_string(), vec![FfiValue::Str("t".to_string())]),
+                pos(1, 2),
+            )]),
+        ),
+    ]))));
+    let expected_err = FfiValue::Res(Err(Box::new(FfiValue::Struct(vec![
+        ("message".to_string(), FfiValue::Str("boom".to_string())),
+        ("pos".to_string(), pos(2, 3)),
+    ]))));
+
+    for (comp_name, ok_val, err_val) in [
+        (
+            "artifact",
+            comp.call_values("rich", &[FfiValue::Int(1)]).unwrap(),
+            comp.call_values("rich", &[FfiValue::Int(0)]).unwrap(),
+        ),
+        (
+            "frontend",
+            engine.call_values("rich", &[FfiValue::Int(1)]).unwrap(),
+            engine.call_values("rich", &[FfiValue::Int(0)]).unwrap(),
+        ),
+    ] {
+        assert_eq!(ok_val, expected_ok, "{comp_name} path, ok case");
+        assert_eq!(err_val, expected_err, "{comp_name} path, err case");
+    }
+}
+
 /// Fails if a `.clif.staged` file is present, signalling a staged IR workflow
 /// is in progress. See CLAUDE.md for the full workflow.
 #[test]

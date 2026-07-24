@@ -3332,8 +3332,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
 /// The dogfood-IR tag for an FFI-marshalable entry type. The FFI marshals
 /// scalars, `str`, `Unit` (the empty-payload side of a `Result`), optionals of
 /// those (a trailing `?` per `Optional` layer, e.g. `str?`), results of those
-/// (`{ok}!{err}`, e.g. `unit!Error`), and structs (the bare type name, e.g.
-/// `Span`, whose layout is carried separately on a `; struct` manifest line).
+/// (`{ok}!{err}`, e.g. `unit!Error`), arrays (a trailing `[]`, e.g.
+/// `Token[]`), and structs/variants (the bare type name, e.g. `Span`, whose
+/// layout is carried separately on a `; struct`/`; variant` manifest line).
 /// Anything else can't cross the FFI and is rejected here.
 fn ffi_type_tag(t: &Type) -> Result<String, Error> {
     Ok(match t {
@@ -3344,34 +3345,65 @@ fn ffi_type_tag(t: &Type) -> Result<String, Error> {
         Type::Unit => "unit".to_string(),
         Type::Optional(inner) => format!("{}?", ffi_type_tag(inner)?),
         Type::Result(ok, err) => format!("{}!{}", ffi_type_tag(ok)?, ffi_type_tag(err)?),
+        // An array of results would read back ambiguously (`A!B[]` already
+        // means a result whose err side is an array), so it's rejected; no
+        // other element type contains `!`.
+        Type::Array(elem) if matches!(**elem, Type::Result(_, _)) => {
+            return Err(Error::msg(
+                "dogfood entry type is an array of results; that can't be tagged unambiguously"
+                    .to_string(),
+            ))
+        }
+        Type::Array(elem) => format!("{}[]", ffi_type_tag(elem)?),
         Type::Named(n) => n.clone(),
         _ => {
             return Err(Error::msg(format!(
                 "dogfood entry type {} is not FFI-serializable (only i64/bool/char/str, \
-                 optionals/results of those, and structs)",
+                 optionals/results/arrays of those, and structs/variants)",
                 type_name(t)
             )))
         }
     })
 }
 
-/// Collect the distinct struct type names a type references (itself if
-/// `Named` and not the builtin `Error` — which is str-repr, not a struct —,
-/// or the core of an `Optional`/either side of a `Result`), appending any not
-/// already in `out`. Used to gather the struct layouts a set of dogfood
-/// entries needs serialized.
-fn collect_named_types(t: &Type, out: &mut Vec<String>) {
+/// Collect the distinct struct/variant type names a type references — itself
+/// if `Named` and not the builtin `Error` (which is str-repr, not a struct),
+/// the core of an `Optional`, either side of a `Result`, an array's element —
+/// and, transitively, everything a collected type's own fields (or case
+/// payloads) reference, appending any not already in `out`. The presence
+/// check doubles as the visited set, so a (hypothetical) type cycle can't
+/// recurse forever. Used to gather the layouts a set of dogfood entries needs
+/// serialized.
+fn collect_named_types(t: &Type, structs: &HashMap<String, TypeDef>, out: &mut Vec<String>) {
     match t {
         Type::Named(n) if !is_error(t) => {
-            if !out.iter().any(|s| s == n) {
-                out.push(n.clone());
+            if out.iter().any(|s| s == n) {
+                return;
+            }
+            out.push(n.clone());
+            match structs.get(n) {
+                Some(TypeDef::Struct(s)) => {
+                    for f in &s.fields {
+                        collect_named_types(&f.ty, structs, out);
+                    }
+                }
+                Some(TypeDef::Variant(v)) => {
+                    for case in &v.cases {
+                        for f in &case.fields {
+                            collect_named_types(&f.ty, structs, out);
+                        }
+                    }
+                }
+                // Unknown name: leave it for the emission loop to report.
+                None => {}
             }
         }
-        Type::Optional(inner) => collect_named_types(inner, out),
+        Type::Optional(inner) => collect_named_types(inner, structs, out),
         Type::Result(ok, err) => {
-            collect_named_types(ok, out);
-            collect_named_types(err, out);
+            collect_named_types(ok, structs, out);
+            collect_named_types(err, structs, out);
         }
+        Type::Array(elem) => collect_named_types(elem, structs, out),
         _ => {}
     }
 }
@@ -3380,8 +3412,10 @@ fn collect_named_types(t: &Type, out: &mut Vec<String>) {
 /// trailing `?` is an `Optional` layer over the rest; an unsuffixed tag
 /// containing `!` is a `Result` (`{ok}!{err}`, each side parsed the same way —
 /// `!` can't appear in a bare tag otherwise, since identifiers don't carry it);
-/// a non-keyword tag is a struct type name ([`Type::Named`]) whose layout the
-/// `; struct` lines supply.
+/// then a trailing `[]` is an `Array` layer (after the `!` split, so `A!B[]`
+/// is a result whose err side is an array — arrays of results are never
+/// emitted); a non-keyword tag is a struct/variant type name ([`Type::Named`])
+/// whose layout the `; struct`/`; variant` lines supply.
 fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
     if let Some(base) = tag.strip_suffix('?') {
         return Ok(Type::Optional(Box::new(ffi_type_from_tag(base)?)));
@@ -3391,6 +3425,9 @@ fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
             Box::new(ffi_type_from_tag(ok)?),
             Box::new(ffi_type_from_tag(err)?),
         ));
+    }
+    if let Some(base) = tag.strip_suffix("[]") {
+        return Ok(Type::Array(Box::new(ffi_type_from_tag(base)?)));
     }
     Ok(match tag {
         "i64" => Type::Primitive(Primitive::I64),
@@ -3608,34 +3645,50 @@ pub fn generate_dogfood_artifact(
         let ret = ffi_type_tag(&info.return_ty)?;
         out.push_str(&format!("; entry {name} {id}{sep}{params} -> {ret}\n"));
         for t in info.params.iter().chain(std::iter::once(&info.return_ty)) {
-            collect_named_types(t, &mut referenced_structs);
+            collect_named_types(t, &structs, &mut referenced_structs);
         }
     }
     for sname in &referenced_structs {
-        let layout = structs
-            .get(sname)
-            .and_then(TypeDef::as_struct)
-            .ok_or_else(|| {
-                Error::msg(format!("dogfood entry references unknown struct {sname:?}"))
-            })?;
-        let mut fields = String::new();
-        for f in &layout.fields {
-            if !is_ffi_scalar(&f.ty) && !is_str_repr(&f.ty) {
-                return Err(Error::msg(format!(
-                    "dogfood struct {sname} field {:?} is {}; only i64/bool/char or str \
-                     struct fields can cross the FFI",
-                    f.name,
-                    type_name(&f.ty)
-                )));
+        match structs.get(sname) {
+            Some(TypeDef::Struct(layout)) => {
+                let mut fields = String::new();
+                for f in &layout.fields {
+                    fields.push_str(&format!(
+                        " {}@{}:{}",
+                        f.name,
+                        f.offset,
+                        ffi_type_tag(&f.ty)?
+                    ));
+                }
+                out.push_str(&format!("; struct {sname} {}{fields}\n", layout.size));
             }
-            fields.push_str(&format!(
-                " {}@{}:{}",
-                f.name,
-                f.offset,
-                ffi_type_tag(&f.ty)?
-            ));
+            // `; variant <name> <size> <Case> <Case>(<off>:<tag>,...) ...` —
+            // one whitespace-free token per case (payload fields are
+            // positional, so they carry offset:tag only, comma-separated
+            // inside the parens; a nullary case is the bare name).
+            Some(TypeDef::Variant(layout)) => {
+                let mut cases = String::new();
+                for case in &layout.cases {
+                    if case.fields.is_empty() {
+                        cases.push_str(&format!(" {}", case.name));
+                        continue;
+                    }
+                    let fields = case
+                        .fields
+                        .iter()
+                        .map(|f| Ok(format!("{}:{}", f.offset, ffi_type_tag(&f.ty)?)))
+                        .collect::<Result<Vec<_>, Error>>()?
+                        .join(",");
+                    cases.push_str(&format!(" {}({fields})", case.name));
+                }
+                out.push_str(&format!("; variant {sname} {}{cases}\n", layout.size));
+            }
+            None => {
+                return Err(Error::msg(format!(
+                    "dogfood entry references unknown type {sname:?}"
+                )))
+            }
         }
-        out.push_str(&format!("; struct {sname} {}{fields}\n", layout.size));
     }
     for (id, sym) in &imports {
         out.push_str(&format!("; import {id} {sym}\n"));
@@ -3724,6 +3777,51 @@ impl Compilation {
                 structs.insert(
                     name.to_string(),
                     TypeDef::Struct(StructLayout { fields, size }),
+                );
+            } else if let Some(rest) = body.strip_prefix("variant ") {
+                // `variant <name> <size> <Case> <Case>(<off>:<tag>,...) ...`
+                // (payload fields are positional: offset + type tag, no name).
+                let toks: Vec<&str> = rest.split_whitespace().collect();
+                let name = toks
+                    .first()
+                    .ok_or_else(|| Error::msg("`; variant` line missing name"))?;
+                let size: u32 = toks
+                    .get(1)
+                    .and_then(|s| s.parse().ok())
+                    .ok_or_else(|| Error::msg("`; variant` line missing/invalid size"))?;
+                let mut cases = Vec::new();
+                for ct in &toks[2..] {
+                    let (cname, fields) = match ct.split_once('(') {
+                        None => (ct.to_string(), Vec::new()),
+                        Some((cname, rest)) => {
+                            let inner = rest.strip_suffix(')').ok_or_else(|| {
+                                Error::msg(format!("malformed `; variant` case {ct:?}"))
+                            })?;
+                            let mut fields = Vec::new();
+                            for ft in inner.split(',') {
+                                let (off, tag) = ft.split_once(':').ok_or_else(|| {
+                                    Error::msg(format!("malformed `; variant` field {ft:?}"))
+                                })?;
+                                let offset: u32 = off.parse().map_err(|_| {
+                                    Error::msg(format!("bad `; variant` field offset {ft:?}"))
+                                })?;
+                                fields.push(FieldLayout {
+                                    name: String::new(),
+                                    ty: ffi_type_from_tag(tag)?,
+                                    offset,
+                                });
+                            }
+                            (cname.to_string(), fields)
+                        }
+                    };
+                    cases.push(VariantCaseLayout {
+                        name: cname,
+                        fields,
+                    });
+                }
+                structs.insert(
+                    name.to_string(),
+                    TypeDef::Variant(VariantLayout { cases, size }),
                 );
             } else if let Some(rest) = body.strip_prefix("import ") {
                 let mut it = rest.split_whitespace();
