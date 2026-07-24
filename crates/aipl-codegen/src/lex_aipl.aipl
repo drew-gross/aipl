@@ -2,10 +2,10 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
-// Scaffolding only: the keyword and operator/punctuation tables below are now
-// complete, but the grammar isn't — no char literals, templates, or the
-// `true`/`false`/`none` constants yet — and this isn't wired into the compiler,
-// nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
+// Scaffolding only: the keyword, constant, and operator/punctuation tables below
+// are now complete, but the grammar isn't — no char literals or templates yet —
+// and this isn't wired into the compiler, nothing dogfoods it. It exists to grow
+// the real AIPL lexer against the library.
 import { ==, int_parse } from builtins;
 import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
 
@@ -29,6 +29,9 @@ variant AiplTok =
     | IntLit(i64)
     | StrLit(str)
     | RawStrLit(str)
+    | True
+    | False
+    | None
     | Fn
     | Let
     | Mut
@@ -102,6 +105,20 @@ fn kwd_kind(text: str) -> AiplTok {
         "if" => If,
         "else" => Else,
         "builtins" => Builtins,
+        _ => Name(text),
+    }
+}
+
+// Map a matched constant spelling to its `AiplTok` arm — the counterpart to
+// `kwd_kind` for the constant `Keyword` rule (see `aipl_rules`). Kept separate
+// from `kwd_kind` because constants are their own token category, distinct from
+// keywords (mirroring the Rust lexer). The `_` arm is unreachable — the matcher
+// only yields a spelling from `constants`.
+fn const_kind(text: str) -> AiplTok {
+    match (text) {
+        "true" => True,
+        "false" => False,
+        "none" => None,
         _ => Name(text),
     }
 }
@@ -182,13 +199,13 @@ fn int_lit(text: str) -> AiplTok!str {
 // isn't swallowed as a `Name`; `Int` and strings; then the operator/punctuation
 // table (`Exact` picks the longest spelling, so `==` beats `=`).
 //
-// TODO(scaffolding): flesh out to the full grammar — char literals (`CharLit`),
-// template strings (`Template` with `OfSeg`), and the `true`/`false`/`none`
-// constants.
+// TODO(scaffolding): flesh out to the full grammar — char literals (`CharLit`)
+// and template strings (`Template` with `OfSeg`).
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
     let q3 = "\"\"\"";
+    let constants = ["true", "false", "none"];
     let keywords = [
         "fn",
         "let",
@@ -254,6 +271,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // `Hash` + `LBracket`, matching the real lexer.
         TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(AllowMarker), trivia: true },
         TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
+        // Constants share the keyword path (identifier-boundary matched, so
+        // `trueish` stays a `Name`) but map through `const_kind` to their own
+        // category. Order among the two keyword rules is immaterial — their
+        // spelling sets are disjoint — but both must precede the identifier rule.
+        TokenRule { matcher: Keyword(constants, alnum), emit: OfText(const_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: TryText(int_lit) },
         // Raw strings before the plain string rule: `Between` declines (length 0)
@@ -297,6 +319,24 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
                     Token { kind: Else, span: 3..7 },
                     Token { kind: Builtins, span: 8..16 },
                     Token { kind: Name("iffy"), span: 17..21 },
+                ],
+                trivia: [],
+            },
+        ),
+    );
+
+    // The constant literals get their own kinds, distinct from keywords and from
+    // identifiers. `some`/`ok`/`err` are ordinary `Name`s (constructors, not
+    // constants); `noneish` stays a `Name` (identifier-boundary matched).
+    assert(
+        lex_aipl("true false none some noneish") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: True, span: 0..4 },
+                    Token { kind: False, span: 5..10 },
+                    Token { kind: None, span: 11..15 },
+                    Token { kind: Name("some"), span: 16..20 },
+                    Token { kind: Name("noneish"), span: 21..28 },
                 ],
                 trivia: [],
             },
@@ -408,12 +448,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 712
-deallocations: 712
+allocations: 890
+deallocations: 890
 reallocations: 0
-bytes allocated: 36400
-instructions executed: 173526
-binary size: 212896
+bytes allocated: 44760
+instructions executed: 210461
+binary size: 225032
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam16
@@ -441,6 +481,7 @@ __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
 __test$lex_aipl
+const_kind
 int_lit
 kwd_kind
 lex_aipl
