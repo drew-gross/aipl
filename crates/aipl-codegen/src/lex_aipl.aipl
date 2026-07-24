@@ -42,6 +42,9 @@ variant AiplTok =
     | Return
     | Struct
     | Variant
+    | If
+    | Else
+    | Builtins
     | EqEq
     | Ne
     | Arrow
@@ -90,6 +93,9 @@ fn kwd_kind(text: str) -> AiplTok {
         "return" => Return,
         "struct" => Struct,
         "variant" => Variant,
+        "if" => If,
+        "else" => Else,
+        "builtins" => Builtins,
         _ => Name(text),
     }
 }
@@ -187,6 +193,9 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         "return",
         "struct",
         "variant",
+        "if",
+        "else",
+        "builtins",
     ];
     let operators = [
         "==",
@@ -250,6 +259,23 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
                     Token { kind: Semi, span: 10..11 },
                 ],
                 trivia: [Token { kind: LineComment, span: 12..19 }],
+            },
+        ),
+    );
+
+    // Keywords beyond the starter set. `builtins` is a keyword everywhere (as in
+    // the Rust lexer), not just in a `from builtins;` import; `iffy` still lexes
+    // as a `Name`, since the `Keyword` matcher stops at an identifier boundary.
+    assert(
+        lex_aipl("if else builtins iffy") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: If, span: 0..2 },
+                    Token { kind: Else, span: 3..7 },
+                    Token { kind: Builtins, span: 8..16 },
+                    Token { kind: Name("iffy"), span: 17..21 },
+                ],
+                trivia: [],
             },
         ),
     );
@@ -325,12 +351,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 334
-deallocations: 334
+allocations: 391
+deallocations: 391
 reallocations: 0
-bytes allocated: 17976
-instructions executed: 82682
-binary size: 186384
+bytes allocated: 21392
+instructions executed: 101259
+binary size: 193392
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam16

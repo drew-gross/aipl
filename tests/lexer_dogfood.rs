@@ -72,7 +72,7 @@ fn span_bounds(v: &FfiValue) -> (i64, i64) {
 fn categorize(case: &str) -> &'static str {
     match case {
         "Fn" | "Let" | "Mut" | "Set" | "Pub" | "Import" | "From" | "As" | "For" | "While"
-        | "Match" | "Return" | "Struct" | "Variant" => "keyword",
+        | "Match" | "Return" | "Struct" | "Variant" | "If" | "Else" | "Builtins" => "keyword",
         "Name" => "ident",
         "IntLit" => "number",
         "StrLit" | "RawStrLit" => "str",
