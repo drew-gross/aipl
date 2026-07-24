@@ -121,7 +121,7 @@ fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0
 // the spelling and its `AiplTok` arm are named together — no spelling→arm
 // `match` to keep in sync with a separate spelling list.
 fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
-    TokenRule { matcher: Keyword([spelling], ident_cont()), emit: Bare(kind) }
+    TokenRule { matcher: Keyword(spelling, ident_cont()), emit: Bare(kind) }
 }
 
 // One operator/punctuation rule: match the exact `spelling` (no identifier
@@ -544,12 +544,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 4288
-deallocations: 4288
+allocations: 3948
+deallocations: 3948
 reallocations: 0
-bytes allocated: 216496
-instructions executed: 1131552
-binary size: 590280
+bytes allocated: 202896
+instructions executed: 1084489
+binary size: 589880
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18

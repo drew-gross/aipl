@@ -95,9 +95,9 @@ variant Emit<K> =
 // (absolute into the lexed string — slice it to show the offender).
 struct LexError { message: str, span: Span }
 
-// One token shape, as plain data. Char classes are spelled as strings
-// (membership via `contains`) and spellings as string lists; none of them
-// ever match empty input, so `lex` always makes progress.
+// One token shape, as plain data. Char classes and fixed spellings are both
+// spelled as strings (class membership via `contains`, a spelling matched
+// whole); none of them ever match empty input, so `lex` always makes progress.
 //
 // - `CharRun(first, cont)`: a maximal run — a char in `first` opens the token,
 //   chars in `cont` extend it. Identifiers, digit runs, whitespace.
@@ -106,10 +106,12 @@ struct LexError { message: str, span: Span }
 //   longest first (`==` before `=`), since rule order is the priority mechanism
 //   (a single rule matching a set, with its own longest-wins, would duplicate
 //   that ordering as a second mechanism).
-// - `Keyword(spellings, boundary)`: like `Exact`, but a spelling only matches
+// - `Keyword(spelling, boundary)`: like `Exact`, but the spelling only matches
 //   when the char after it is absent or outside `boundary` (the identifier
 //   continue class) — so a keyword rule placed before the identifier rule
-//   claims `if` without biting the front off `iffy`.
+//   claims `if` without biting the front off `iffy`. One spelling per rule, as
+//   with `Exact`; a shared prefix (`in`/`int`) is resolved by the boundary
+//   check, not rule order, so order among keyword rules doesn't matter.
 // - `Delimited(delims, escapes)`: a char in `delims` opens the token, which
 //   runs to just past the next occurrence of the *same* char. `escapes` is
 //   the set of chars that may follow a backslash inside the token: `\` plus
@@ -183,7 +185,7 @@ struct LexError { message: str, span: Span }
 variant Matcher =
     CharRun(str, str)
     | Exact(str)
-    | Keyword(str[], str)
+    | Keyword(str, str)
     | Delimited(str, str)
     | Between(str, str)
     | Nested(str, str)
@@ -228,21 +230,13 @@ fn exact_len(self: str, spelling: str) -> i64 {
     if (0 < spelling.len() && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
-// `Keyword`: the length of the longest of `spellings` prefixing `self`, but a
-// spelling only counts when the char after it is absent (end of source) or
-// outside `boundary` — a keyword must not end in the middle of an identifier.
-// (Unlike `Exact`, `Keyword` still takes a set: the boundary check, not rule
-// order, is what resolves a prefix like `in`/`int`, so the spellings can share
-// one rule.)
-fn keyword_len(self: str, spellings: str[], boundary: str) -> i64 {
-    mut best = 0;
-    for (let s : spellings) {
-        let bounded = !self[s.len()].is_some_and(|c| boundary.contains(c));
-        if (best < s.len() && bounded && self.starts_with(s)) {
-            set best = s.len();
-        };
-    }
-    best
+// `Keyword`: the length of `spelling` when it prefixes `self`, but only when the
+// char after it is absent (end of source) or outside `boundary` — a keyword must
+// not end in the middle of an identifier. 0 when it doesn't match (or the char
+// after is a boundary char, as in `iffy` for `if`).
+fn keyword_len(self: str, spelling: str, boundary: str) -> i64 {
+    let bounded = !self[spelling.len()].is_some_and(|c| boundary.contains(c));
+    if (0 < spelling.len() && bounded && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
 // `Delimited`: a `delims` char opens the token, which spans to just past the
@@ -496,7 +490,7 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
     match (m) {
         CharRun(first, cont) => NoValue,
         Exact(spelling) => NoValue,
-        Keyword(spellings, boundary) => NoValue,
+        Keyword(spelling, boundary) => NoValue,
         Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
         Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
         Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
@@ -608,11 +602,11 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
         let res = match (r.matcher) {
             CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
             Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
-            Keyword(spellings, boundary) => step_result(
+            Keyword(spelling, boundary) => step_result(
                 r,
                 src,
                 at,
-                src[at..].keyword_len(spellings, boundary),
+                src[at..].keyword_len(spelling, boundary),
             )?,
             Delimited(delims, escapes) => step_result(
                 r,
@@ -980,9 +974,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     );
     assert(lex("+", ops) == err(lex_err("unexpected character", 0, 1)));
 
-    // Keyword: a spelling matches only at an identifier boundary.
-    let kw = TokenRule { matcher: Keyword(["if", "let"], alnum), emit: Bare(Kw) };
-    let kws = [ws, kw, ident];
+    // Keyword: a spelling matches only at an identifier boundary. One spelling
+    // per rule, as with `Exact`; order among keyword rules is immaterial (the
+    // boundary check, not order, keeps `if` out of `iffy`).
+    let kw_if = TokenRule { matcher: Keyword("if", alnum), emit: Bare(Kw) };
+    let kw_let = TokenRule { matcher: Keyword("let", alnum), emit: Bare(Kw) };
+    let kws = [ws, kw_if, kw_let, ident];
     assert(lex("iffy", kws) == ok(toks([tok(Ident("iffy"), 0, 4)])));
     assert(lex("if fy", kws) == ok(toks([tok(Kw, 0, 2), tok(Ident("fy"), 3, 5)])));
     assert(lex("if", kws) == ok(toks([tok(Kw, 0, 2)])));
@@ -1172,7 +1169,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: OfStr(Str) },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: TryText(int_tok) },
-        TokenRule { matcher: Keyword(["true", "false", "null"], alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("false", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("null", alnum), emit: Bare(Kw) },
         TokenRule { matcher: Exact("{"), emit: Bare(Punct) },
         TokenRule { matcher: Exact("}"), emit: Bare(Punct) },
         TokenRule { matcher: Exact("["), emit: Bare(Punct) },
@@ -1203,7 +1202,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let aipl = [
         ws,
         TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true },
-        TokenRule { matcher: Keyword(["fn", "let", "mut", "set"], alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("fn", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("let", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("mut", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("set", alnum), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: TryText(int_tok) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(Str) },
@@ -1226,12 +1228,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1333
-deallocations: 1333
+allocations: 1435
+deallocations: 1435
 reallocations: 0
-bytes allocated: 64056
-instructions executed: 283380
-binary size: 944384
+bytes allocated: 67632
+instructions executed: 295682
+binary size: 983536
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam21
 __builtin_count_while$char$s0$lam26
