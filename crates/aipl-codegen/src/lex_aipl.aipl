@@ -25,8 +25,10 @@ import {
 // (`Name` its text, `IntLit` its value) or nothing. Every keyword and every
 // operator/punctuation spelling is its *own* bare arm (`Fn`, `Return`, `Eq`,
 // `Gt`, …) rather than a stringly-typed `Kwd(str)`/`Sym(str)` — so a consumer
-// pattern-matches on the token it means, not on its text. The mapping from a
-// matched spelling to its arm lives in `kwd_kind`/`sym_kind` (see `aipl_rules`).
+// pattern-matches on the token it means, not on its text. Each spelling has its
+// own one-line `TokenRule` whose `Bare` emit names that arm directly (via the
+// `kw`/`op` helpers in `aipl_rules`) — so a spelling and its kind sit together
+// in one rule, not split across a spelling list and a separate `match`.
 //
 // Note: these names deliberately avoid the library's own variant constructors
 // (`Matcher`/`Emit`/`Seg`/`TokenValue`/the test `Kind`), because AIPL variant
@@ -105,86 +107,30 @@ variant AiplTok =
     | LBracket
     | RBracket
 
-// Map a matched keyword spelling to its `AiplTok` arm. The `Keyword` matcher
-// only ever yields a spelling from `keywords` (see `aipl_rules`), so the `_`
-// arm is unreachable — a non-keyword identifier is a `Name`.
-fn kwd_kind(text: str) -> AiplTok {
-    match (text) {
-        "fn" => Fn,
-        "let" => Let,
-        "mut" => Mut,
-        "set" => Set,
-        "pub" => Pub,
-        "import" => Import,
-        "from" => From,
-        "as" => As,
-        "for" => For,
-        "while" => While,
-        "match" => Match,
-        "return" => Return,
-        "struct" => Struct,
-        "variant" => Variant,
-        "if" => If,
-        "else" => Else,
-        "builtins" => Builtins,
-        _ => Name(text),
-    }
+// Identifier character classes: the chars that may start an identifier (letters
+// and `_`) and those that may continue one (adds digits). A keyword rule uses
+// the continue class as its boundary, so `if` doesn't bite the front off `iffy`
+// (see `kw`), and the identifier rule uses both (see `aipl_rules`).
+fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
+
+fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" }
+
+// One keyword/constant rule: match the exact `spelling` at an identifier
+// boundary (so `fn`/`true` don't split `fnord`/`trueish`) and emit the fixed
+// `kind`. Every keyword and constant is a single `kw` call in `aipl_rules`, so
+// the spelling and its `AiplTok` arm are named together — no spelling→arm
+// `match` to keep in sync with a separate spelling list.
+fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
+    TokenRule { matcher: Keyword([spelling], ident_cont()), emit: Bare(kind) }
 }
 
-// Map a matched constant spelling to its `AiplTok` arm — the counterpart to
-// `kwd_kind` for the constant `Keyword` rule (see `aipl_rules`). Kept separate
-// from `kwd_kind` because constants are their own token category, distinct from
-// keywords (mirroring the Rust lexer). The `_` arm is unreachable — the matcher
-// only yields a spelling from `constants`.
-fn const_kind(text: str) -> AiplTok {
-    match (text) {
-        "true" => True,
-        "false" => False,
-        "none" => None,
-        _ => Name(text),
-    }
-}
-
-// Map a matched operator/punctuation spelling to its `AiplTok` arm. The `Exact`
-// matcher only ever yields a spelling from `operators`, so the `_` arm is
-// unreachable.
-fn sym_kind(text: str) -> AiplTok {
-    match (text) {
-        "==" => EqEq,
-        "!=" => Ne,
-        "->" => Arrow,
-        "=>" => FatArrow,
-        "&&" => AndAnd,
-        "||" => OrOr,
-        "|" => Pipe,
-        ".." => DotDot,
-        "+++" => PlusPlusPlus,
-        "++" => PlusPlus,
-        "=" => Eq,
-        "<" => Lt,
-        "<=" => Le,
-        ">" => Gt,
-        ">=" => Ge,
-        "!" => Bang,
-        "+" => Plus,
-        "-" => Minus,
-        "*" => Star,
-        "/" => Slash,
-        "%" => Percent,
-        "." => Period,
-        "," => Comma,
-        ":" => Colon,
-        ";" => Semi,
-        "?" => Question,
-        "#" => Hash,
-        "(" => LParen,
-        ")" => RParen,
-        "{" => LBrace,
-        "}" => RBrace,
-        "[" => LBracket,
-        "]" => RBracket,
-        _ => Name(text),
-    }
+// One operator/punctuation rule: match the exact `spelling` (no identifier
+// boundary) and emit the fixed `kind`. A single `Exact` over a list picks the
+// longest match on its own, but separate rules are first-match-wins — so
+// `aipl_rules` lists the `op` rules longest spelling first (`==` before `=`) to
+// keep maximal munch.
+fn op(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
+    TokenRule { matcher: Exact([spelling]), emit: Bare(kind) }
 }
 
 // Build a `StrLit` from a matched string's contents. The `Delimited` matcher
@@ -249,98 +195,62 @@ fn int_lit(text: str) -> AiplTok!str {
 }
 
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
-// whitespace and recorded comments first; keywords before identifiers, so `fn`
-// isn't swallowed as a `Name`; `Int`, strings, char literals, and templates;
-// then the operator/punctuation table (`Exact` picks the longest spelling, so
-// `==` beats `=`).
+// whitespace and recorded comments/markers first; then every keyword and
+// constant (each its own `kw` rule) before the identifier rule, so `fn` isn't
+// swallowed as a `Name`; then numbers, strings, char literals, and templates;
+// and finally the operator/punctuation rules — each spelling its own `op` rule,
+// listed longest first so first-match-wins still yields maximal munch (`==`
+// before `=`), since separate rules don't get `Exact`'s automatic longest-match.
 fn aipl_rules() -> TokenRule<AiplTok>[] {
-    let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-    let q3 = "\"\"\"";
-    let constants = ["true", "false", "none"];
-    let keywords = [
-        "fn",
-        "let",
-        "mut",
-        "set",
-        "pub",
-        "import",
-        "from",
-        "as",
-        "for",
-        "while",
-        "match",
-        "return",
-        "struct",
-        "variant",
-        "if",
-        "else",
-        "builtins",
-    ];
-    let operators = [
-        "==",
-        "!=",
-        "->",
-        "=>",
-        "&&",
-        "||",
-        "|",
-        "..",
-        "+++",
-        "++",
-        "=",
-        "<",
-        "<=",
-        ">",
-        ">=",
-        "!",
-        "+",
-        "-",
-        "*",
-        "/",
-        "%",
-        ".",
-        ",",
-        ":",
-        ";",
-        "?",
-        "#",
-        "(",
-        ")",
-        "{",
-        "}",
-        "[",
-        "]",
-    ];
+    let three_quotes = "\"\"\"";
     [
         TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
         // Block comments `/* ... */`, recorded as trivia like line comments.
         // `Nested` is depth-tracked (an inner `/* */` doesn't close the outer),
         // matching the Rust lexer, and reports an unterminated comment as a hard
-        // error spanning the open `/*` to EOF. Must precede the operator table, or
-        // `Exact` would bite off the leading `/` as a `Slash`.
+        // error spanning the open `/*` to EOF. Must precede the `/` operator, or
+        // `op("/", …)` would bite off the leading slash as a `Slash`.
         TokenRule { matcher: Nested("/*", "*/"), emit: Bare(BlockComment), trivia: true },
         // `#[allow]` is the lint-squelch marker: like the Rust lexer, it's
         // recorded as trivia and kept out of the token stream, not lexed as a
-        // `#` (`Hash`) token. It must precede the operator table (whose `#` would
-        // otherwise claim the leading char); the exact-8-char spelling means a
-        // `#{` dict prefix or a `#[` that isn't `#[allow]` still falls through to
-        // `Hash` + `LBracket`, matching the real lexer.
+        // `#` (`Hash`) token. It must precede the `#` operator (whose one-char
+        // spelling would otherwise claim the lead); the exact-8-char match means
+        // a `#{` dict prefix or a `#[` that isn't `#[allow]` still falls through
+        // to `Hash` + `LBracket`, matching the real lexer.
         TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(AllowMarker), trivia: true },
-        TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
-        // Constants share the keyword path (identifier-boundary matched, so
-        // `trueish` stays a `Name`) but map through `const_kind` to their own
-        // category. Order among the two keyword rules is immaterial — their
-        // spelling sets are disjoint — but both must precede the identifier rule.
-        TokenRule { matcher: Keyword(constants, alnum), emit: OfText(const_kind) },
-        TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
+        // Keywords and constants, each its own `kw` rule (identifier-boundary
+        // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
+        // immaterial — the spellings are disjoint — but all must precede the
+        // identifier rule. Constants (`true`/`false`/`none`) get their own kinds,
+        // a distinct category from keywords, mirroring the Rust lexer.
+        kw("fn", Fn),
+        kw("let", Let),
+        kw("mut", Mut),
+        kw("set", Set),
+        kw("pub", Pub),
+        kw("import", Import),
+        kw("from", From),
+        kw("as", As),
+        kw("for", For),
+        kw("while", While),
+        kw("match", Match),
+        kw("return", Return),
+        kw("struct", Struct),
+        kw("variant", Variant),
+        kw("if", If),
+        kw("else", Else),
+        kw("builtins", Builtins),
+        kw("true", True),
+        kw("false", False),
+        kw("none", None),
+        TokenRule { matcher: CharRun(ident_start(), ident_cont()), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: TryText(int_lit) },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
         // than an empty `""` plus a stray `"`.
-        TokenRule { matcher: Between(q3, q3), emit: OfStr(RawStrLit) },
+        TokenRule { matcher: Between(three_quotes, three_quotes), emit: OfStr(RawStrLit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
         // Char literals `'x'`/`'\n'`: the `CharLit` matcher enforces the one-char
         // shape and decodes the byte itself (the same escape set as a string,
@@ -360,7 +270,43 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // this whole rule set, so templates nest.
         TokenRule { matcher: Template("```", ""), emit: OfSeg(raw_tpl_kind) },
         TokenRule { matcher: Template("`", "\\`{ntr"), emit: OfSeg(tpl_kind) },
-        TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
+        // Operators and punctuation, one `op` rule per spelling, longest first so
+        // first-match-wins is maximal munch: the three-char `+++`, then the
+        // two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
+        // before `+`, `||` before `|`, `..` before `.`), then the one-char rest.
+        op("+++", PlusPlusPlus),
+        op("==", EqEq),
+        op("!=", Ne),
+        op("->", Arrow),
+        op("=>", FatArrow),
+        op("&&", AndAnd),
+        op("||", OrOr),
+        op("..", DotDot),
+        op("++", PlusPlus),
+        op("<=", Le),
+        op(">=", Ge),
+        op("=", Eq),
+        op("<", Lt),
+        op(">", Gt),
+        op("!", Bang),
+        op("+", Plus),
+        op("-", Minus),
+        op("*", Star),
+        op("/", Slash),
+        op("%", Percent),
+        op("|", Pipe),
+        op(".", Period),
+        op(",", Comma),
+        op(":", Colon),
+        op(";", Semi),
+        op("?", Question),
+        op("#", Hash),
+        op("(", LParen),
+        op(")", RParen),
+        op("{", LBrace),
+        op("}", RBrace),
+        op("[", LBracket),
+        op("]", RBracket),
     ]
 }
 
@@ -599,12 +545,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 1458
-deallocations: 1458
+allocations: 4866
+deallocations: 4866
 reallocations: 0
-bytes allocated: 76160
-instructions executed: 363907
-binary size: 487792
+bytes allocated: 239616
+instructions executed: 1152943
+binary size: 590576
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18
@@ -635,13 +581,13 @@ __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
 __m1__unescape
 __test$lex_aipl
-const_kind
+ident_cont
 int_lit
-kwd_kind
+kw
 lex_aipl
 lex_aipl_tokens
 main
+op
 raw_tpl_kind
 str_lit
-sym_kind
 tpl_kind
