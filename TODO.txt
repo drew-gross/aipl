@@ -69,4 +69,5 @@ improve the highlighter test: correct code should never highlight as a mismatche
 
 For lexer dogfooding:
 - remove the dump/load stuff when the FFI supports the full lex result
-- cargo test --test lexer_dogfood -- --ignored report_lexer_differences - make all pass
+- Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
+- Match directly on strings

@@ -125,12 +125,11 @@ fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
 }
 
 // One operator/punctuation rule: match the exact `spelling` (no identifier
-// boundary) and emit the fixed `kind`. A single `Exact` over a list picks the
-// longest match on its own, but separate rules are first-match-wins — so
-// `aipl_rules` lists the `op` rules longest spelling first (`==` before `=`) to
-// keep maximal munch.
+// boundary) and emit the fixed `kind`. Each `op` is one rule matching one
+// spelling, and rules are first-match-wins — so `aipl_rules` lists the `op`
+// rules longest spelling first (`==` before `=`) to keep maximal munch.
 fn op(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
-    TokenRule { matcher: Exact([spelling]), emit: Bare(kind) }
+    TokenRule { matcher: Exact(spelling), emit: Bare(kind) }
 }
 
 // Build a `StrLit` from a matched string's contents. The `Delimited` matcher
@@ -218,7 +217,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // spelling would otherwise claim the lead); the exact-8-char match means
         // a `#{` dict prefix or a `#[` that isn't `#[allow]` still falls through
         // to `Hash` + `LBracket`, matching the real lexer.
-        TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(AllowMarker), trivia: true },
+        TokenRule { matcher: Exact("#[allow]"), emit: Bare(AllowMarker), trivia: true },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
@@ -545,12 +544,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 4866
-deallocations: 4866
+allocations: 4288
+deallocations: 4288
 reallocations: 0
-bytes allocated: 239616
-instructions executed: 1152943
-binary size: 590576
+bytes allocated: 216496
+instructions executed: 1131552
+binary size: 590280
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18

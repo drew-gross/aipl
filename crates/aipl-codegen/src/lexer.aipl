@@ -101,8 +101,11 @@ struct LexError { message: str, span: Span }
 //
 // - `CharRun(first, cont)`: a maximal run — a char in `first` opens the token,
 //   chars in `cont` extend it. Identifiers, digit runs, whitespace.
-// - `Exact(spellings)`: one of the listed spellings, verbatim; the longest
-//   one matching wins, in any order. Punctuation and operators.
+// - `Exact(spelling)`: the given spelling, verbatim. Punctuation and operators
+//   — one spelling per rule; when spellings share a prefix, order the rules
+//   longest first (`==` before `=`), since rule order is the priority mechanism
+//   (a single rule matching a set, with its own longest-wins, would duplicate
+//   that ordering as a second mechanism).
 // - `Keyword(spellings, boundary)`: like `Exact`, but a spelling only matches
 //   when the char after it is absent or outside `boundary` (the identifier
 //   continue class) — so a keyword rule placed before the identifier rule
@@ -179,7 +182,7 @@ struct LexError { message: str, span: Span }
 // semantics writes its own `emit` decoder.
 variant Matcher =
     CharRun(str, str)
-    | Exact(str[])
+    | Exact(str)
     | Keyword(str[], str)
     | Delimited(str, str)
     | Between(str, str)
@@ -219,21 +222,18 @@ fn char_run_len(self: str, first: str, cont: str) -> i64 {
     }
 }
 
-// `Exact`: length of the longest spelling prefixing `self`, 0 when none does.
-// An empty spelling never matches (the `best <` guard excludes it).
-fn longest_prefix(self: str, spellings: str[]) -> i64 {
-    mut best = 0;
-    for (let s : spellings) {
-        if (best < s.len() && self.starts_with(s)) {
-            set best = s.len();
-        };
-    }
-    best
+// `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
+// spelling never matches.
+fn exact_len(self: str, spelling: str) -> i64 {
+    if (0 < spelling.len() && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
-// `Keyword`: like `longest_prefix`, but a spelling only counts when the char
-// after it is absent (end of source) or outside `boundary` — a keyword must
-// not end in the middle of an identifier.
+// `Keyword`: the length of the longest of `spellings` prefixing `self`, but a
+// spelling only counts when the char after it is absent (end of source) or
+// outside `boundary` — a keyword must not end in the middle of an identifier.
+// (Unlike `Exact`, `Keyword` still takes a set: the boundary check, not rule
+// order, is what resolves a prefix like `in`/`int`, so the spellings can share
+// one rule.)
 fn keyword_len(self: str, spellings: str[], boundary: str) -> i64 {
     mut best = 0;
     for (let s : spellings) {
@@ -495,7 +495,7 @@ fn char_lit_value(text: str, quote: str) -> TokenValue {
 fn token_value(m: Matcher, text: str) -> TokenValue {
     match (m) {
         CharRun(first, cont) => NoValue,
-        Exact(spellings) => NoValue,
+        Exact(spelling) => NoValue,
         Keyword(spellings, boundary) => NoValue,
         Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
         Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
@@ -607,7 +607,7 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
     for (let r : rules) {
         let res = match (r.matcher) {
             CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
-            Exact(spellings) => step_result(r, src, at, src[at..].longest_prefix(spellings))?,
+            Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
             Keyword(spellings, boundary) => step_result(
                 r,
                 src,
@@ -964,8 +964,16 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         err(e) => assert("a+1"[e.span] == "+"),
     };
 
-    // Exact: the longest matching spelling wins regardless of list order.
-    let ops = [ws, TokenRule { matcher: Exact(["=", "=>", "=="]), emit: Bare(Op) }, ident];
+    // Exact: one spelling per rule. Ordering the rules longest-first makes the
+    // longer spelling win where they share a prefix (`==`/`=>` before `=`) —
+    // rule order is the priority mechanism, so no per-rule spelling set is needed.
+    let ops = [
+        ws,
+        TokenRule { matcher: Exact("=="), emit: Bare(Op) },
+        TokenRule { matcher: Exact("=>"), emit: Bare(Op) },
+        TokenRule { matcher: Exact("="), emit: Bare(Op) },
+        ident,
+    ];
     assert(lex("===", ops) == ok(toks([tok(Op, 0, 2), tok(Op, 2, 3)])));
     assert(
         lex("a=b", ops) == ok(toks([tok(Ident("a"), 0, 1), tok(Op, 1, 2), tok(Ident("b"), 2, 3)])),
@@ -1054,7 +1062,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // Float before int: a fraction/exponent extends a digit run; a bare run
     // falls through to the digit rule.
-    let dot = TokenRule { matcher: Exact(["."]), emit: Bare(Dot) };
+    let dot = TokenRule { matcher: Exact("."), emit: Bare(Dot) };
     let flt = [ws, TokenRule { matcher: Float, emit: Bare(FloatTok) }, digits, ident, dot];
     assert(lex("1.5e-3", flt) == ok(toks([tok(FloatTok, 0, 6)])));
     assert(lex("1.", flt) == ok(toks([tok(Digits, 0, 1), tok(Dot, 1, 2)])));
@@ -1088,8 +1096,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
     assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
     // Brace depth: braces lexed as their own tokens inside an interpolation nest.
-    let braces = TokenRule { matcher: Exact(["{", "}"]), emit: Bare(Punct) };
-    let tplb = [ws, tpl, braces, ident, digits];
+    let lbrace = TokenRule { matcher: Exact("{"), emit: Bare(Punct) };
+    let rbrace = TokenRule { matcher: Exact("}"), emit: Bare(Punct) };
+    let tplb = [ws, tpl, lbrace, rbrace, ident, digits];
     assert(
         lex("`a{ {x} }b`", tplb) == ok(
             toks(
@@ -1129,7 +1138,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // Trivia: a `trivia: true` rule is consumed like a skip rule, but each match
     // is recorded in the result's side-channel, out of the token stream.
     let cmt_t = TokenRule { matcher: ToEol("//"), emit: Bare(Comment), trivia: true };
-    let allow_t = TokenRule { matcher: Exact(["#[allow]"]), emit: Bare(Allow), trivia: true };
+    let allow_t = TokenRule { matcher: Exact("#[allow]"), emit: Bare(Allow), trivia: true };
     let trv = [ws, cmt_t, allow_t, ident, digits];
     assert(
         lex("a #[allow] // b\nc", trv) == ok(
@@ -1164,7 +1173,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: TryText(int_tok) },
         TokenRule { matcher: Keyword(["true", "false", "null"], alnum), emit: Bare(Kw) },
-        TokenRule { matcher: Exact(["{", "}", "[", "]", ":", ",", "-"]), emit: Bare(Punct) },
+        TokenRule { matcher: Exact("{"), emit: Bare(Punct) },
+        TokenRule { matcher: Exact("}"), emit: Bare(Punct) },
+        TokenRule { matcher: Exact("["), emit: Bare(Punct) },
+        TokenRule { matcher: Exact("]"), emit: Bare(Punct) },
+        TokenRule { matcher: Exact(":"), emit: Bare(Punct) },
+        TokenRule { matcher: Exact(","), emit: Bare(Punct) },
+        TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
     ];
     let jsrc = """{"pi": 3.14, "n": [1, true]}""";
     let jtoks = [
@@ -1192,7 +1207,11 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ident,
         TokenRule { matcher: Int, emit: TryText(int_tok) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(Str) },
-        TokenRule { matcher: Exact(["==", "->", "&&", "=", ";"]), emit: Bare(Op) },
+        TokenRule { matcher: Exact("=="), emit: Bare(Op) },
+        TokenRule { matcher: Exact("->"), emit: Bare(Op) },
+        TokenRule { matcher: Exact("&&"), emit: Bare(Op) },
+        TokenRule { matcher: Exact("="), emit: Bare(Op) },
+        TokenRule { matcher: Exact(";"), emit: Bare(Op) },
     ];
     let asrc = "let ok = s == \"hi\"; // check";
     let atoks = [
@@ -1207,12 +1226,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1226
-deallocations: 1226
+allocations: 1333
+deallocations: 1333
 reallocations: 0
-bytes allocated: 59952
-instructions executed: 269249
-binary size: 860160
+bytes allocated: 64056
+instructions executed: 283380
+binary size: 944384
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam21
 __builtin_count_while$char$s0$lam26
