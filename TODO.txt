@@ -55,6 +55,8 @@ int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster
 
 negative numbers via -123 instead of 0 - 123
 
+make for (key, val) work for dicts, and also arrays (key=index)
+
 optimize enumerate with streams
 import wrapping_mul as *
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
@@ -71,3 +73,6 @@ For lexer dogfooding:
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - Match directly on strings
+
+
+Decide if I want bare variant assignment
