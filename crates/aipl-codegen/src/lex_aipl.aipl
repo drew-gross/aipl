@@ -155,13 +155,6 @@ fn unescape(self: str) -> str {
     out +++ self[run_start..]
 }
 
-// Build a `StrLit` from a matched string's contents. The `Delimited` matcher
-// hands the raw (un-decoded) delimiter-stripped text — escape handling is the
-// caller's job — so this decodes AIPL's escapes with `unescape` (above) before
-// wrapping. (The matcher's `escapes` set only governs which `\X` are *accepted*
-// during scanning, not what they mean.)
-fn str_lit(text: str) -> AiplTok { StrLit(text.unescape()) }
-
 // A raw string `"""..."""` is a `Between` token, so its contents are verbatim —
 // no escape decoding — and a lone `"` or `""` inside is content, not a close.
 // That's why it gets its own `RawStrLit` kind rather than reusing `StrLit`: the
@@ -272,7 +265,10 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
         // than an empty `""` plus a stray `"`.
         TokenRule { matcher: Between(three_quotes, three_quotes), emit: OfStr(RawStrLit) },
-        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
+        TokenRule {
+            matcher: Delimited("\"", "ntr\\\""),
+            emit: OfStr(|text: str| StrLit(text.unescape())),
+        },
         // Char literals `'x'`/`'\n'`: the `CharLit` matcher enforces the one-char
         // shape and decodes the byte itself (the same escape set as a string,
         // plus `\'`), so `OfChar` applies the bare `CharTok` constructor to it. The
@@ -571,20 +567,22 @@ deallocations: 3948
 reallocations: 0
 bytes allocated: 202896
 instructions executed: 1084489
-binary size: 589872
+binary size: 591104
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam13
-__builtin_count_while$char$s0$lam18
-__builtin_count_while$char$s0$lam19
+__builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam20
+__builtin_count_while$char$s0$lam21
+__builtin_count_while$char$s0$lam22
 __builtin_int_parse
-__builtin_is_some_and$char$lam30
+__builtin_is_some_and$char$lam32
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
 __lambda_4
 __lambda_5
+__lambda_6
+__lambda_7
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
@@ -609,6 +607,5 @@ lex_aipl_tokens
 main
 op
 raw_tpl_kind
-str_lit
 tpl_kind
 unescape
