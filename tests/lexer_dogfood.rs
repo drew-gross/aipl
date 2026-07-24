@@ -75,7 +75,7 @@ fn categorize(case: &str) -> &'static str {
         | "Match" | "Return" | "Struct" | "Variant" => "keyword",
         "Name" => "ident",
         "IntLit" => "number",
-        "StrLit" => "str",
+        "StrLit" | "RawStrLit" => "str",
         "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "DotDot" | "PlusPlusPlus"
         | "Eq" | "Lt" | "Gt" | "Bang" | "Plus" | "Minus" | "Star" | "Slash" | "Percent" => {
             "operator"

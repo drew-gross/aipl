@@ -3,8 +3,8 @@
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
 // Scaffolding only: the keyword / operator / punctuation sets below are a
-// starter subset, not the full grammar (no char literals, template/raw strings,
-// or the complete operator table yet), and this isn't wired into the compiler —
+// starter subset, not the full grammar (no char literals or templates, or the
+// complete operator table yet), and this isn't wired into the compiler —
 // nothing dogfoods it. It exists to grow the real AIPL lexer against the library.
 import { ==, int_parse } from builtins;
 import { Emit, LexError, LexResult, Matcher, Token, TokenRule, lex, unescape } from "./lexer.aipl";
@@ -27,6 +27,7 @@ variant AiplTok =
     | Name(str)
     | IntLit(i64)
     | StrLit(str)
+    | RawStrLit(str)
     | Fn
     | Let
     | Mut
@@ -138,6 +139,15 @@ fn sym_kind(text: str) -> AiplTok {
 // governs which `\X` are *accepted* during scanning.)
 fn str_lit(text: str) -> AiplTok { StrLit(text.unescape()) }
 
+// A raw string `"""..."""` is a `Between` token, so its contents are verbatim —
+// no escape decoding — and a lone `"` or `""` inside is content, not a close.
+// That's why it gets its own `RawStrLit` kind rather than reusing `StrLit`: the
+// two decode differently (`str_lit` unescapes, this doesn't). The value here is
+// the exact bytes between the delimiters; AIPL's de-denting of a raw string
+// (trimming the surrounding line breaks, stripping the common indent) is a later
+// consumer pass, not part of lexing — so the emit is the bare constructor and no
+// helper is needed (see `aipl_rules`).
+
 // Build an `IntLit` from a matched digit run. The `Int` matcher only claims the
 // run; parsing is the caller's job, so this parses it with the `int_parse`
 // builtin and, as a fallible `TryText` emit, reports an i64 overflow as an error
@@ -156,11 +166,12 @@ fn int_lit(text: str) -> AiplTok!str {
 // table (`Exact` picks the longest spelling, so `==` beats `=`).
 //
 // TODO(scaffolding): flesh out to the full grammar — the remaining keywords, the
-// complete operator set, char literals (`CharLit`), and template/raw strings
-// (`Template`/`Between` with `OfSeg`/`OfStr`).
+// complete operator set, char literals (`CharLit`), and template strings
+// (`Template` with `OfSeg`).
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
+    let q3 = "\"\"\"";
     let keywords = [
         "fn",
         "let",
@@ -213,6 +224,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         TokenRule { matcher: Keyword(keywords, alnum), emit: OfText(kwd_kind) },
         TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Name) },
         TokenRule { matcher: Int, emit: TryText(int_lit) },
+        // Raw strings before the plain string rule: `Between` declines (length 0)
+        // unless the source opens with `"""`, so a single `"` still falls through
+        // to `Delimited` — but a `"""` is claimed here as one raw token rather
+        // than an empty `""` plus a stray `"`.
+        TokenRule { matcher: Between(q3, q3), emit: OfStr(RawStrLit) },
         TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: OfStr(str_lit) },
         TokenRule { matcher: Exact(operators), emit: OfText(sym_kind) },
     ]
@@ -253,6 +269,16 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
                 ],
                 trivia: [],
             },
+        ),
+    );
+
+    // A raw string `"""a"b"""` (the AIPL source here is written with escaped
+    // quotes). `Between` scans to the balancing `"""`, so the lone `"` inside is
+    // content and the value is verbatim — no escape decoding, unlike `StrLit`.
+    let raw = "\"\"\"a\"b\"\"\"";
+    assert(
+        lex_aipl(raw) == ok(
+            LexResult { tokens: [Token { kind: RawStrLit("a\"b"), span: 0..9 }], trivia: [] },
         ),
     );
 
@@ -299,21 +325,23 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 290
-deallocations: 290
+allocations: 334
+deallocations: 334
 reallocations: 0
-bytes allocated: 15304
-instructions executed: 72683
-binary size: 163568
+bytes allocated: 17976
+instructions executed: 82682
+binary size: 186384
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam14
-__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam16
-__builtin_count_while$char$s0$lam9
+__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam18
 __builtin_int_parse
-__builtin_is_some_and$char$lam26
+__builtin_is_some_and$char$lam28
 __lambda_0
 __lambda_1
+__lambda_2
+__lambda_3
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
