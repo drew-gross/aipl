@@ -3,10 +3,11 @@
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 //
 // The token tables below now cover AIPL's whole lexical grammar — keywords,
-// constants, operators/punctuation, strings, char literals, and templates. It
-// still isn't wired into the compiler (nothing dogfoods it yet); it exists to
-// grow the real AIPL lexer against the library, and the differential test
-// (`tests/lexer_dogfood.rs`) tracks where it still diverges from the Rust lexer.
+// constants, operators/punctuation, strings, char literals, templates, and line/
+// block comments. It still isn't wired into the compiler (nothing dogfoods it
+// yet); it exists to grow the real AIPL lexer against the library, and the
+// differential test (`tests/lexer_dogfood.rs`) tracks where it still diverges
+// from the Rust lexer.
 import { ==, int_parse } from builtins;
 import {
     Emit,
@@ -35,6 +36,7 @@ import {
 variant AiplTok =
     Space
     | LineComment
+    | BlockComment
     | AllowMarker
     | Name(str)
     | IntLit(i64)
@@ -313,6 +315,12 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
     [
         TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
+        // Block comments `/* ... */`, recorded as trivia like line comments.
+        // `Nested` is depth-tracked (an inner `/* */` doesn't close the outer),
+        // matching the Rust lexer, and reports an unterminated comment as a hard
+        // error spanning the open `/*` to EOF. Must precede the operator table, or
+        // `Exact` would bite off the leading `/` as a `Slash`.
+        TokenRule { matcher: Nested("/*", "*/"), emit: Bare(BlockComment), trivia: true },
         // `#[allow]` is the lint-squelch marker: like the Rust lexer, it's
         // recorded as trivia and kept out of the token stream, not lexed as a
         // `#` (`Hash`) token. It must precede the operator table (whose `#` would
@@ -445,6 +453,29 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
         ),
     );
 
+    // Block comments are trivia, and `Nested` depth-tracks them, so the inner
+    // `/* */` doesn't close the outer — the whole `/* a /* b */ c */` is one
+    // comment, out of the token stream.
+    assert(
+        lex_aipl("x /* a /* b */ c */ y") == ok(
+            LexResult {
+                tokens: [
+                    Token { kind: Name("x"), span: 0..1 },
+                    Token { kind: Name("y"), span: 20..21 },
+                ],
+                trivia: [Token { kind: BlockComment, span: 2..19 }],
+            },
+        ),
+    );
+
+    // An unterminated block comment is a hard error spanning the open `/*` to the
+    // end of source, matching the Rust lexer.
+    assert(
+        lex_aipl("a /* never closed") == err(
+            LexError { message: "unterminated delimited token", span: 2..17 },
+        ),
+    );
+
     // A string literal with escapes: the source is `s = "a\nb"` (a literal
     // backslash-`n`, not a newline). The `StrLit` emit decodes it, so the token's
     // value carries an actual newline — escape handling lives in `str_lit`, not in
@@ -568,12 +599,12 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
 --- performance ---
-allocations: 1213
-deallocations: 1213
+allocations: 1458
+deallocations: 1458
 reallocations: 0
-bytes allocated: 64320
-instructions executed: 313040
-binary size: 468768
+bytes allocated: 76160
+instructions executed: 363907
+binary size: 487792
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18

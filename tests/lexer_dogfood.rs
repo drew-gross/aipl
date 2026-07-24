@@ -67,9 +67,10 @@ fn span_bounds(v: &FfiValue) -> (i64, i64) {
 /// Coarsen an `AiplTok` variant case name to the category granularity the Rust
 /// lexer's `classify` produces (the operator/punctuation split included), so a
 /// token that agrees dumps identically on both sides and only real divergences
-/// surface. Every arm below now maps to a category; the remaining divergences
-/// aren't missing token *kinds* but mis-lexings — chiefly `/* */` block comments,
-/// which the Rust lexer skips as trivia but this lexer reads as `/` `*` operators.
+/// surface. Every arm below maps to a category and the lexer now covers the whole
+/// grammar; the sole remaining divergence is a non-ASCII char literal, where the
+/// library's byte-oriented `CharLit` flags "more than one character" at a
+/// different span than the Rust lexer's dedicated non-ASCII error.
 fn categorize(case: &str) -> &'static str {
     match case {
         "Fn" | "Let" | "Mut" | "Set" | "Pub" | "Import" | "From" | "As" | "For" | "While"
@@ -88,7 +89,7 @@ fn categorize(case: &str) -> &'static str {
         | "Minus" | "Star" | "Slash" | "Percent" => "operator",
         "Period" | "Comma" | "Colon" | "Semi" | "Question" | "Hash" | "LParen" | "RParen"
         | "LBrace" | "RBrace" | "LBracket" | "RBracket" => "punct",
-        "Space" | "LineComment" | "AllowMarker" => "trivia",
+        "Space" | "LineComment" | "BlockComment" | "AllowMarker" => "trivia",
         other => panic!("unknown AiplTok case {other:?}"),
     }
 }
