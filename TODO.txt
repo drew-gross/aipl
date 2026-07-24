@@ -43,8 +43,6 @@ warn/err on:
 output multiple errors at once
 remove install_parser_hook with lazy loader
 
-when a .aipl test fails the harness should output the command to run just that test
-
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
 
 spread in args e.g. fn foo(self: Span { start, end })

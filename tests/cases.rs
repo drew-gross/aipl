@@ -121,6 +121,16 @@ fn scoped_fill_cmd(ctx: &str) -> String {
     let path = ctx.trim_start_matches('[').trim_end_matches(']');
     format!("AIPL_CASE='{path}' {FILL_CMD}")
 }
+
+/// Build a **scoped** *run* command for one case's failure message: re-run just
+/// the offending case through this harness via `AIPL_CASE` (as opposed to
+/// [`scoped_fill_cmd`], which refreshes its sections). `ctx` is the bracketed
+/// display path (`[cases/foo/bar.aipl]`); stripping the brackets recovers the
+/// exact substring the `AIPL_CASE` filter matches on.
+fn scoped_run_cmd(ctx: &str) -> String {
+    let path = ctx.trim_start_matches('[').trim_end_matches(']');
+    format!("AIPL_CASE='{path}' cargo test --test cases")
+}
 /// The command that runs the ignored perfmon-table refresh ([`refresh_perfmon`]).
 const PERFMON_CMD: &str = "cargo test --test cases -- --ignored refresh_perfmon";
 
@@ -1336,7 +1346,11 @@ fn run_success_case(
                 if !output.status.success() {
                     let errs = normalize_output(&String::from_utf8_lossy(&output.stderr));
                     return Outcome::Fail(format!(
-                        "{ctx}: `aipl check` (in-language tests) failed:\n{report}{errs}"
+                        "{ctx}: `aipl check` (in-language tests) failed:\n{report}{errs}\n\
+                         Run just this case's tests with `aipl check {}`,\n\
+                         or through this harness with `{}`.",
+                        render_path(orig_path),
+                        scoped_run_cmd(ctx),
                     ));
                 }
             }
