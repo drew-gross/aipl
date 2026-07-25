@@ -2395,6 +2395,135 @@ impl Drop for RawStringHookGuard {
     }
 }
 
+/// A token kind produced by the dogfooded AIPL lexer (`lex_aipl.aipl`),
+/// mirrored arm-for-arm from its `AiplTok` variant so the FFI marshaling is a
+/// direct name match. Value-carrying arms hold the decoded value (a string's
+/// unescaped contents, an int literal's value, a char literal's byte); the
+/// `Raw*` string/template arms hold the *verbatim* bytes between the
+/// delimiters — de-denting is the consumer's pass, exactly as in the AIPL
+/// lexer. `Space`/comments/`AllowMarker` only ever appear in
+/// [`LexedOutput::trivia`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LexedTokenKind {
+    Space,
+    LineComment,
+    BlockComment,
+    AllowMarker,
+    Name(String),
+    IntLit(i64),
+    StrLit(String),
+    RawStrLit(String),
+    CharTok(u8),
+    TemplateStr(String),
+    TemplateHead(String),
+    TemplateMid(String),
+    TemplateTail(String),
+    RawTemplateStr(String),
+    RawTemplateHead(String),
+    RawTemplateMid(String),
+    RawTemplateTail(String),
+    True,
+    False,
+    None,
+    Fn,
+    Let,
+    Mut,
+    Set,
+    Pub,
+    Import,
+    From,
+    As,
+    For,
+    While,
+    Match,
+    Return,
+    Struct,
+    Variant,
+    If,
+    Else,
+    Builtins,
+    EqEq,
+    Ne,
+    Arrow,
+    FatArrow,
+    AndAnd,
+    OrOr,
+    Pipe,
+    DotDot,
+    PlusPlusPlus,
+    PlusPlus,
+    Eq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Bang,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Period,
+    Comma,
+    Colon,
+    Semi,
+    Question,
+    Hash,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+}
+
+/// One token from the dogfooded AIPL lexer: its [`LexedTokenKind`] and source
+/// byte span.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LexedToken {
+    pub kind: LexedTokenKind,
+    pub span: Span,
+}
+
+/// What the dogfooded AIPL lexer returns for a whole source: the emitted
+/// token stream, and the trivia side-channel (comments and `#[allow]`
+/// markers, in source order — whitespace is skipped outright and appears in
+/// neither).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LexedOutput {
+    pub tokens: Vec<LexedToken>,
+    pub trivia: Vec<LexedToken>,
+}
+
+/// A hard lex error from the dogfooded AIPL lexer, with the source byte span
+/// it points at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LexedError {
+    pub message: String,
+    pub span: Span,
+}
+
+/// The dogfooded lexer, installed by the compiler (via [`set_lex_hook`]).
+static LEX_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
+    std::sync::OnceLock::new();
+
+/// Install the lexer hook. The compiler points this at the dogfooded AIPL
+/// `lex_aipl`, run through the embedding FFI. First install wins (the hook is
+/// process-global).
+pub fn set_lex_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
+    let _ = LEX_HOOK.set(f);
+}
+
+/// Lex `src` through the installed dogfooded AIPL lexer. There is no native
+/// fallback: this panics if the hook isn't installed (call
+/// `install_parser_hooks` first).
+pub fn lex_aipl(src: &str) -> Result<LexedOutput, LexedError> {
+    let hook = LEX_HOOK
+        .get()
+        .expect("lex hook not installed before lexing (call install_parser_hooks)");
+    hook(src)
+}
+
 fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
     let mut src = Scanner::new(input);
     let mut tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();

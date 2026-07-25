@@ -195,11 +195,19 @@ compiler runs on:
    functions with known inputs; confirms the IR links and computes correctly:
    `cargo test --test dogfood_ir -- --ignored validate_staged_ir`
 
-3. **Review the diff** — compare each `*.clif.staged` to the live `*.clif`
-   manually. Pay extra attention to the **parser-hook engines**
-   (`process_raw_string`, `parse_test_section_header`, `strip_test_sections`,
-   `find_trailing_whitespace`): these functions are active during every parse,
-   so a subtle bug in their IR affects the compiler's own source parsing.
+3. **Validate by running the corpus against the staged IR, not by reading the
+   diff** — the best check of staged IR is running the full test corpus with
+   the compiler using the IR *in its staged location* (every parse exercises
+   the hook engines, so a subtle IR bug surfaces as test failures). The mode
+   that runs the compiler off the `.staged` file doesn't exist yet (TODO.txt:
+   "Make a mode to run the compiler using the staged IR, for validations") —
+   if you reach this step and it's still missing, stop and remind Drew to
+   build it rather than promoting unvalidated IR just to test it. Manual
+   review of the `.staged` vs live diff is only useful when a corpus run
+   fails — then diff to localize, paying attention to the **parser-hook
+   engines** (`process_raw_string`, `parse_test_section_header`,
+   `strip_test_sections`, `find_trailing_whitespace`, `lex_aipl`), which are
+   active during every parse of the compiler's own source.
 
 4. **Promote staged → live** — validates again, copies `*.clif.staged` →
    `*.clif`, deletes the staged files, then fails intentionally so you review

@@ -183,6 +183,102 @@ fn aipl_lexer_matches_rust_on_supported_subset() {
     assert_eq!(rust_dump(src2), aipl_dump(&engine, src2));
 }
 
+/// The installed dogfood lex hook's canonical dump of `src` — same format as
+/// [`aipl_dump`], but through the *production* path: the checked-in
+/// `dogfood.clif` engine plus the FFI marshaling into the mirrored
+/// [`aipl::LexedTokenKind`] (whose arm names match `AiplTok`'s case names, so
+/// their `Debug` head reuses [`categorize`]).
+fn hook_dump(src: &str) -> String {
+    match aipl::lex_aipl(src) {
+        Ok(out) => {
+            let mut s = String::new();
+            for t in &out.tokens {
+                let dbg = format!("{:?}", t.kind);
+                let case = dbg.split('(').next().expect("split never yields nothing");
+                s.push_str(&format!(
+                    "{} {} {}\n",
+                    t.span.start,
+                    t.span.end,
+                    categorize(case)
+                ));
+            }
+            s
+        }
+        Err(e) => format!("ERR {} {}\n", e.span.start, e.span.end),
+    }
+}
+
+/// The production lex path — the checked-in dogfood IR called through the
+/// installed hook, marshaled into the mirrored Rust token types — agrees with
+/// the Rust lexer over the whole corpus at category + span granularity. This
+/// is the hard gate the burn-down report graduated into; unlike the report it
+/// runs on every `cargo test`.
+#[test]
+fn dogfood_lex_hook_matches_rust_lexer_on_corpus() {
+    aipl::install_parser_hooks();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    for sub in ["tests/cases", "examples", "crates"] {
+        collect_aipl(&root.join(sub), &mut files);
+    }
+    files.sort();
+    assert!(
+        files.len() > 400,
+        "corpus went missing? found {} files",
+        files.len()
+    );
+
+    // The one known divergence: the AIPL lexer's byte-oriented `CharLit` spans
+    // a non-ASCII char literal's error differently than the Rust lexer's
+    // dedicated non-ASCII error. Excluded until the error-fidelity pass.
+    let excluded = ["tests/cases/chars/err_non_ascii_char.aipl"];
+
+    for f in &files {
+        let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
+        if excluded.contains(&rel.as_str()) {
+            continue;
+        }
+        let full = fs::read_to_string(f).expect("read case file");
+        let stripped = aipl::strip_test_sections(&full).to_string();
+        assert_eq!(
+            rust_dump(&stripped),
+            hook_dump(&stripped),
+            "dogfood lex hook diverges from the Rust lexer in {rel}"
+        );
+    }
+}
+
+/// The hook's trivia side-channel carries comments and `#[allow]` markers (in
+/// source order) and keeps them out of the token stream; whitespace appears in
+/// neither.
+#[test]
+fn dogfood_lex_hook_returns_trivia() {
+    use aipl::LexedTokenKind as K;
+    aipl::install_parser_hooks();
+    let out = aipl::lex_aipl("x // c\n#[allow] /* b */ y").expect("lexes clean");
+    assert_eq!(
+        out.tokens
+            .iter()
+            .map(|t| (t.kind.clone(), t.span.clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            (K::Name("x".to_string()), 0..1),
+            (K::Name("y".to_string()), 24..25),
+        ],
+    );
+    assert_eq!(
+        out.trivia
+            .iter()
+            .map(|t| (t.kind.clone(), t.span.clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            (K::LineComment, 2..6),
+            (K::AllowMarker, 7..15),
+            (K::BlockComment, 16..23),
+        ],
+    );
+}
+
 /// One dump's first line that differs from the other's, reduced to a burn-down
 /// signature (spans dropped so divergences of the same shape group together).
 struct Divergence {

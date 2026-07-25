@@ -327,8 +327,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
     ]
 }
 
-// Lex AIPL source into typed `AiplTok` tokens (plus the trivia side-channel).
-fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.test({
+// Lex AIPL source into typed `AiplTok` tokens (plus the trivia side-channel:
+// comments and `#[allow]` markers; whitespace is skipped outright). This is the
+// compiler's dogfood entry (see `DOGFOOD_ENTRIES`): the Rust side calls it via
+// the FFI and mirrors the result into its own token types.
+pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.test({
     // A small snippet exercising several kinds; a fuller suite comes with the
     // real grammar. `let x = 42;` plus a trailing line comment (trivia).
     let src = "let x = 42; // note";
@@ -538,9 +541,9 @@ fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.
 // directly (an array of structs whose fields are themselves a variant and a
 // struct). The Rust side coarsens each `kind` to a category and diffs spans,
 // building a burn-down list of the remaining divergences; nothing here is used to
-// compile. `trivia` is dropped: this lexer emits whitespace/comments as ordinary
-// `Space`/`LineComment` tokens (matching the Rust lexer's trivia handling), so the
-// side-channel is always empty.
+// compile. `trivia` is dropped: the differential dump compares only the emitted
+// token stream (the Rust lexer's dump has no comment/marker lines to compare the
+// side-channel against).
 pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     match (lex_aipl(src)) {
         ok(res) => ok(res.tokens),

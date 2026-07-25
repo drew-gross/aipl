@@ -366,6 +366,59 @@ fn sanity_check(artifact: &str) {
         .unwrap();
     assert_eq!(not_op, FfiValue::Int(0));
 
+    // Lexes AIPL source into `LexResult<AiplTok>`: the typed token stream plus
+    // the trivia side-channel (comments and `#[allow]` markers). This is the
+    // richest entry the artifact serves — a result of a generic struct of
+    // arrays of structs whose `kind` field is a variant.
+    let tok = |case: &str, payload: Vec<FfiValue>, s, e| {
+        FfiValue::Struct(vec![
+            (
+                "kind".to_string(),
+                FfiValue::Variant(case.to_string(), payload),
+            ),
+            ("span".to_string(), span(s, e)),
+        ])
+    };
+    let lexed = comp
+        .call_values(
+            "lex_aipl",
+            &[FfiValue::Str("let x = 42; // note".to_string())],
+        )
+        .unwrap();
+    assert_eq!(
+        lexed,
+        FfiValue::Res(Ok(Box::new(FfiValue::Struct(vec![
+            (
+                "tokens".to_string(),
+                FfiValue::Array(vec![
+                    tok("Let", vec![], 0, 3),
+                    tok("Name", vec![FfiValue::Str("x".to_string())], 4, 5),
+                    tok("Eq", vec![], 6, 7),
+                    tok("IntLit", vec![FfiValue::Int(42)], 8, 10),
+                    tok("Semi", vec![], 10, 11),
+                ]),
+            ),
+            (
+                "trivia".to_string(),
+                FfiValue::Array(vec![tok("LineComment", vec![], 12, 19)]),
+            ),
+        ]))))
+    );
+    // A byte no rule matches is a hard `LexError` with its span.
+    let lex_err = comp
+        .call_values("lex_aipl", &[FfiValue::Str("@".to_string())])
+        .unwrap();
+    assert_eq!(
+        lex_err,
+        FfiValue::Res(Err(Box::new(FfiValue::Struct(vec![
+            (
+                "message".to_string(),
+                FfiValue::Str("unexpected character".to_string()),
+            ),
+            ("span".to_string(), span(0, 1)),
+        ]))))
+    );
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 

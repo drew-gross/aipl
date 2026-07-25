@@ -2640,6 +2640,8 @@ const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_fil
 const NORMALIZE_OUTPUT_SRC: &str = include_str!("normalize_output.aipl");
 const INT_FITS_SRC: &str = include_str!("int_fits.aipl");
 const IS_OPERATOR_NAME_SRC: &str = include_str!("is_operator_name.aipl");
+const LEXER_LIB_SRC: &str = include_str!("lexer.aipl");
+const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2676,6 +2678,8 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./normalize_output.aipl", NORMALIZE_OUTPUT_SRC),
     ("./int_fits.aipl", INT_FITS_SRC),
     ("./is_operator_name.aipl", IS_OPERATOR_NAME_SRC),
+    ("./lexer.aipl", LEXER_LIB_SRC),
+    ("./lex_aipl.aipl", LEX_AIPL_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -2696,6 +2700,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "normalize_output",
     "int_fits",
     "is_operator_name",
+    "lex_aipl",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -2925,23 +2930,221 @@ fn is_operator_name(s: &str) -> bool {
     })
 }
 
+/// The parser's lexer hook (see [`install_parser_hooks`]): lex AIPL source
+/// through the dogfooded AIPL `lex_aipl` via the FFI, mirroring the returned
+/// `LexResult<AiplTok>` (the token stream plus the trivia side-channel) into
+/// the parser's [`aipl_parser::LexedOutput`] arm-for-arm, and a `LexError`
+/// into [`aipl_parser::LexedError`]. One FFI crossing per source, not one per
+/// token. No native fallback; panics if the engine can't be built or called,
+/// or if a marshaled shape doesn't match `lex_aipl.aipl`'s types.
+fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
+    use aipl_parser::{LexedError, LexedOutput, LexedToken, LexedTokenKind as K};
+
+    // The `(String, FfiValue)` field named `name` of a marshaled struct.
+    fn field(fields: Vec<(String, FfiValue)>, name: &str) -> FfiValue {
+        fields
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v)
+            .unwrap_or_else(|| panic!("dogfooded lex_aipl(): struct has no field {name:?}"))
+    }
+
+    // A `Span` struct value as a Rust `Span`.
+    fn span_of(v: FfiValue) -> Span {
+        let FfiValue::Struct(fields) = v else {
+            panic!("dogfooded lex_aipl(): expected a Span struct, got {v:?}");
+        };
+        let bound = |name: &str| match fields.iter().find(|(n, _)| n == name) {
+            Some((_, FfiValue::Int(i))) => *i as usize,
+            other => panic!("dogfooded lex_aipl(): Span.{name}: {other:?}"),
+        };
+        bound("start")..bound("end")
+    }
+
+    // An `AiplTok` variant value as the mirrored kind. Value-carrying arms
+    // check their payload shape; everything else must be nullary.
+    fn kind_of(v: FfiValue) -> K {
+        let FfiValue::Variant(case, payload) = v else {
+            panic!("dogfooded lex_aipl(): token kind not a variant: {v:?}");
+        };
+        // The single `str` payload of a value-carrying case.
+        let str_payload = |payload: Vec<FfiValue>| match <[FfiValue; 1]>::try_from(payload) {
+            Ok([FfiValue::Str(s)]) => s,
+            other => panic!("dogfooded lex_aipl(): {case} payload: {other:?}"),
+        };
+        // The single scalar payload of `IntLit`/`CharTok`.
+        let int_payload = |payload: Vec<FfiValue>| match <[FfiValue; 1]>::try_from(payload) {
+            Ok([FfiValue::Int(i)]) => i,
+            other => panic!("dogfooded lex_aipl(): {case} payload: {other:?}"),
+        };
+        match case.as_str() {
+            "Name" => return K::Name(str_payload(payload)),
+            "IntLit" => return K::IntLit(int_payload(payload)),
+            "StrLit" => return K::StrLit(str_payload(payload)),
+            "RawStrLit" => return K::RawStrLit(str_payload(payload)),
+            "CharTok" => return K::CharTok(int_payload(payload) as u8),
+            "TemplateStr" => return K::TemplateStr(str_payload(payload)),
+            "TemplateHead" => return K::TemplateHead(str_payload(payload)),
+            "TemplateMid" => return K::TemplateMid(str_payload(payload)),
+            "TemplateTail" => return K::TemplateTail(str_payload(payload)),
+            "RawTemplateStr" => return K::RawTemplateStr(str_payload(payload)),
+            "RawTemplateHead" => return K::RawTemplateHead(str_payload(payload)),
+            "RawTemplateMid" => return K::RawTemplateMid(str_payload(payload)),
+            "RawTemplateTail" => return K::RawTemplateTail(str_payload(payload)),
+            _ => {}
+        }
+        assert!(
+            payload.is_empty(),
+            "dogfooded lex_aipl(): {case} carries an unexpected payload"
+        );
+        match case.as_str() {
+            "Space" => K::Space,
+            "LineComment" => K::LineComment,
+            "BlockComment" => K::BlockComment,
+            "AllowMarker" => K::AllowMarker,
+            "True" => K::True,
+            "False" => K::False,
+            "None" => K::None,
+            "Fn" => K::Fn,
+            "Let" => K::Let,
+            "Mut" => K::Mut,
+            "Set" => K::Set,
+            "Pub" => K::Pub,
+            "Import" => K::Import,
+            "From" => K::From,
+            "As" => K::As,
+            "For" => K::For,
+            "While" => K::While,
+            "Match" => K::Match,
+            "Return" => K::Return,
+            "Struct" => K::Struct,
+            "Variant" => K::Variant,
+            "If" => K::If,
+            "Else" => K::Else,
+            "Builtins" => K::Builtins,
+            "EqEq" => K::EqEq,
+            "Ne" => K::Ne,
+            "Arrow" => K::Arrow,
+            "FatArrow" => K::FatArrow,
+            "AndAnd" => K::AndAnd,
+            "OrOr" => K::OrOr,
+            "Pipe" => K::Pipe,
+            "DotDot" => K::DotDot,
+            "PlusPlusPlus" => K::PlusPlusPlus,
+            "PlusPlus" => K::PlusPlus,
+            "Eq" => K::Eq,
+            "Lt" => K::Lt,
+            "Le" => K::Le,
+            "Gt" => K::Gt,
+            "Ge" => K::Ge,
+            "Bang" => K::Bang,
+            "Plus" => K::Plus,
+            "Minus" => K::Minus,
+            "Star" => K::Star,
+            "Slash" => K::Slash,
+            "Percent" => K::Percent,
+            "Period" => K::Period,
+            "Comma" => K::Comma,
+            "Colon" => K::Colon,
+            "Semi" => K::Semi,
+            "Question" => K::Question,
+            "Hash" => K::Hash,
+            "LParen" => K::LParen,
+            "RParen" => K::RParen,
+            "LBrace" => K::LBrace,
+            "RBrace" => K::RBrace,
+            "LBracket" => K::LBracket,
+            "RBracket" => K::RBracket,
+            other => panic!("dogfooded lex_aipl(): unknown AiplTok case {other:?}"),
+        }
+    }
+
+    // A `Token<AiplTok>[]` array value as mirrored tokens.
+    fn tokens_of(v: FfiValue) -> Vec<LexedToken> {
+        let FfiValue::Array(elems) = v else {
+            panic!("dogfooded lex_aipl(): expected a token array, got {v:?}");
+        };
+        elems
+            .into_iter()
+            .map(|t| {
+                let FfiValue::Struct(fields) = t else {
+                    panic!("dogfooded lex_aipl(): token not a struct: {t:?}");
+                };
+                // Move both fields out (kind first — field consumes the vec).
+                let mut kind = None;
+                let mut span = None;
+                for (n, v) in fields {
+                    match n.as_str() {
+                        "kind" => kind = Some(v),
+                        "span" => span = Some(v),
+                        other => panic!("dogfooded lex_aipl(): unexpected Token field {other:?}"),
+                    }
+                }
+                LexedToken {
+                    kind: kind_of(kind.expect("dogfooded lex_aipl(): Token missing kind")),
+                    span: span_of(span.expect("dogfooded lex_aipl(): Token missing span")),
+                }
+            })
+            .collect()
+    }
+
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("lex_aipl", &[FfiValue::Str(src.to_string())]) {
+            Ok(FfiValue::Res(Ok(res))) => {
+                let FfiValue::Struct(fields) = *res else {
+                    panic!("dogfooded lex_aipl(): ok payload not a LexResult struct: {res:?}");
+                };
+                let mut tokens = None;
+                let mut trivia = None;
+                for (n, v) in fields {
+                    match n.as_str() {
+                        "tokens" => tokens = Some(v),
+                        "trivia" => trivia = Some(v),
+                        other => {
+                            panic!("dogfooded lex_aipl(): unexpected LexResult field {other:?}")
+                        }
+                    }
+                }
+                Ok(LexedOutput {
+                    tokens: tokens_of(tokens.expect("dogfooded lex_aipl(): missing tokens")),
+                    trivia: tokens_of(trivia.expect("dogfooded lex_aipl(): missing trivia")),
+                })
+            }
+            Ok(FfiValue::Res(Err(e))) => {
+                let FfiValue::Struct(fields) = *e else {
+                    panic!("dogfooded lex_aipl(): err payload not a LexError struct: {e:?}");
+                };
+                let message = match field(fields.clone(), "message") {
+                    FfiValue::Str(s) => s,
+                    other => panic!("dogfooded lex_aipl(): LexError.message: {other:?}"),
+                };
+                let span = span_of(field(fields, "span"));
+                Err(LexedError { message, span })
+            }
+            other => panic!("dogfooded lex_aipl() call: {other:?}"),
+        }
+    })
+}
+
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
 /// processor at [`process_raw_string`], the test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
 /// the trailing-whitespace finder at [`find_trailing_whitespace`], the
 /// assertion-location formatter at [`assert_loc`], the error-renderer's
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
-/// range check at [`int_fits`], and the loader's operator-import gate at
-/// [`is_operator_name`]. Idempotent (first install wins). The compiler's entry
-/// points (the CLI and the embedding [`Compilation`] API's callers) install them;
-/// there are **no native fallbacks**, so any in-process parse (or error render,
-/// literal range-check, or operator-import resolution) must install them first.
+/// range check at [`int_fits`], the loader's operator-import gate at
+/// [`is_operator_name`], and the lexer at [`lex_aipl`]. Idempotent (first
+/// install wins). The compiler's entry points (the CLI and the embedding
+/// [`Compilation`] API's callers) install them; there are **no native
+/// fallbacks**, so any in-process parse (or error render, literal
+/// range-check, or operator-import resolution) must install them first.
 pub fn install_parser_hooks() {
     aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
+    aipl_parser::set_lex_hook(lex_aipl);
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);

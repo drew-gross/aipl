@@ -76,5 +76,8 @@ For lexer dogfooding:
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - Match directly on strings
 
+Make a mode to run the compiler using the staged IR, for validations
+
+have the clir IR include the human readable version of data section strings in comments
 
 Decide if I want bare variant assignment
