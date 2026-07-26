@@ -1,0 +1,65 @@
+import { wrapping_add as +, +++, wrapping_sub as -, ==, print, to_str } from builtins;
+
+// A `str` or array `match` may *destructure* with `[..]` patterns: each element
+// position is a binder (a bare name, bound to that element) or a literal
+// (matched by equality). A `str` is matched as its `char[]` view, so its element
+// binders are `char`. Fixed length — the `_` arm covers every other length.
+
+// Destructure a str: an empty string, a single char, a leading `-` then one
+// more char, any other two chars, else the default. Mixes a string-literal arm
+// (`"hi"`), binder arms, and a literal+binder arm (`['-', d]`).
+fn classify(s: str) -> str {
+    match (s) {
+        "hi" => "greeting",
+        [] => "empty",
+        [c] => "one " +++ c.to_str(),
+        ['-', d] => "neg " +++ d.to_str(),
+        [a, b] => "two " +++ a.to_str() +++ b.to_str(),
+        _ => "many",
+    }
+}
+
+// The same on a real array: binders take the element type (here `i64`).
+fn sum_head(xs: i64[]) -> i64 {
+    match (xs) {
+        [] => 0,
+        [x] => x,
+        [x, y] => x + y,
+        _ => 0 - 1,
+    }
+}
+
+fn main() !prints {
+    print(classify("hi"));
+    print(classify(""));
+    print(classify("q"));
+    print(classify("-5"));
+    print(classify("ab"));
+    print(classify("abc"));
+    print(to_str(sum_head([])));
+    print(to_str(sum_head([7])));
+    print(to_str(sum_head([3, 4])));
+    print(to_str(sum_head([1, 2, 3])))
+}
+--- stdout ---
+greeting
+empty
+one 'q'
+neg '5'
+two 'a''b'
+many
+0
+7
+7
+-1
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 336
+instructions executed: 720
+binary size: 5288
+--- monomorphizations ---
+classify
+main
+sum_head

@@ -258,11 +258,11 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<&str, &[Type]>, scope: &mut Vec<String>) -
                 .iter()
                 .map(|arm| {
                     let bindings = arm.pattern.bindings();
-                    for b in bindings {
+                    for b in &bindings {
                         scope.push(b.clone());
                     }
                     let body = lcr_expr(&arm.body, ctors, scope);
-                    for _ in bindings {
+                    for _ in &bindings {
                         scope.pop();
                     }
                     MatchArm {
@@ -4215,13 +4215,21 @@ impl Mono<'_> {
                 for arm in arms {
                     // Bind the arm's payload from the scrutinee's type: the
                     // optional's element for `some`, or the variant case's
-                    // payload types positionally. String-literal / wildcard arms
-                    // bind nothing.
+                    // payload types positionally. An array/`str` pattern binds each
+                    // identifier element to the element type (`char` for a `str`).
+                    // String-literal / wildcard arms bind nothing.
                     let bind_tys = match &arm.pattern {
                         Pattern::Ctor { name, bindings } => {
                             self.match_payload_tys(&st, name, bindings.len())
                         }
-                        Pattern::Str(_) | Pattern::Array(_) | Pattern::Wildcard => Vec::new(),
+                        Pattern::Array(_) => {
+                            let elem = match &st {
+                                Type::Array(e) => (**e).clone(),
+                                _ => Type::Primitive(Primitive::Char), // str, as char[]
+                            };
+                            vec![elem; arm.pattern.bindings().len()]
+                        }
+                        Pattern::Str(_) | Pattern::Wildcard => Vec::new(),
                     };
                     let mut env2 = env.clone();
                     for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
@@ -5566,9 +5574,8 @@ fn collect_free(
             collect_free(s, bound, env, out, seen);
             for arm in arms {
                 // The arm's pattern bindings are bound within its body.
-                let added: Vec<&String> = arm
-                    .pattern
-                    .bindings()
+                let names = arm.pattern.bindings();
+                let added: Vec<&String> = names
                     .iter()
                     .filter(|b| bound.insert((*b).clone()))
                     .collect();
@@ -6435,7 +6442,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             arms.iter()
                 .map(|a| MatchArm {
                     pattern: a.pattern.clone(),
-                    body: rename_params(&a.body, &without_all(a.pattern.bindings())),
+                    body: rename_params(&a.body, &without_all(&a.pattern.bindings())),
                     span: a.span.clone(),
                 })
                 .collect(),

@@ -1091,6 +1091,45 @@ impl Cx<'_> {
         }
     }
 
+    /// Validate an array/`str` pattern's elements against element type `elem`,
+    /// returning the types its **binder** elements introduce (one `elem` per
+    /// bare-identifier element, in order — matching [`Pattern::bindings`]). A
+    /// non-identifier element must be a literal, type-checked for equality
+    /// against `elem`; it binds nothing. A binder name may not repeat within one
+    /// pattern.
+    fn array_pattern_bind_tys(
+        &self,
+        elems: &[Expr],
+        elem: &Type,
+        env: &Env,
+        effects: &[String],
+    ) -> Result<Vec<Type>, Error> {
+        let mut tys = Vec::new();
+        let mut seen: Vec<&str> = Vec::new();
+        for e in elems {
+            if let ExprKind::Ident(name) = &e.kind {
+                if seen.contains(&name.as_str()) {
+                    return Err(Error::at(
+                        format!("binder {name:?} appears more than once in this pattern"),
+                        e.span.clone(),
+                    ));
+                }
+                seen.push(name);
+                tys.push(elem.clone());
+            } else {
+                if !is_pattern_literal(e) {
+                    return Err(Error::at(
+                        "array-pattern elements must be a binding name or a literal".to_string(),
+                        e.span.clone(),
+                    ));
+                }
+                let et = self.check_expr(e, env, effects)?;
+                expect(&et, elem, "array-pattern element", e.span.clone())?;
+            }
+        }
+        Ok(tys)
+    }
+
     /// The types bound by `arm`'s pattern against scrutinee type `st`. Validates
     /// the constructor is legal for `st` and that the binding count matches.
     fn match_arm_bindings(
@@ -1101,38 +1140,35 @@ impl Cx<'_> {
         env: &Env,
         effects: &[String],
     ) -> Result<Vec<Type>, Error> {
-        // A `str` scrutinee matches string-literal arms (`"foo" => ...`) and a
-        // wildcard (`_ => ...`); neither binds anything. No constructor patterns.
+        // A `str` scrutinee matches string-literal arms (`"foo" => ...`), array
+        // patterns (`[a, 'x'] => ...`, treating the str as a `char[]`), and a
+        // wildcard (`_ => ...`). No constructor patterns.
         if is_str_repr(st) {
             return match &arm.pattern {
                 Pattern::Str(_) | Pattern::Wildcard => Ok(vec![]),
-                Pattern::Ctor { .. } | Pattern::Array(_) => Err(Error::at(
-                    "\"match\" on a str expects string literals or `_`".to_string(),
+                Pattern::Array(elems) => self.array_pattern_bind_tys(
+                    elems,
+                    &Type::Primitive(Primitive::Char),
+                    env,
+                    effects,
+                ),
+                Pattern::Ctor { .. } => Err(Error::at(
+                    "\"match\" on a str expects string literals, `[..]` patterns, or `_`"
+                        .to_string(),
                     arm.span.clone(),
                 )),
             };
         }
-        // An array scrutinee matches array-literal arms (`[e0, ...] => ...`) and a
-        // wildcard; neither binds anything. Each element must be a literal whose
-        // type matches the scrutinee's element type. No constructor patterns.
+        // An array scrutinee matches array patterns (`[e0, ...] => ...`) and a
+        // wildcard. Each element is a binder (bound to the element type) or a
+        // literal (equality) whose type matches the element type. No constructor
+        // patterns.
         if let Type::Array(elem) = st {
             return match &arm.pattern {
-                Pattern::Array(elems) => {
-                    for e in elems {
-                        if !is_pattern_literal(e) {
-                            return Err(Error::at(
-                                "array-pattern elements must be literals".to_string(),
-                                e.span.clone(),
-                            ));
-                        }
-                        let et = self.check_expr(e, env, effects)?;
-                        expect(&et, elem, "array-pattern element", e.span.clone())?;
-                    }
-                    Ok(vec![])
-                }
+                Pattern::Array(elems) => self.array_pattern_bind_tys(elems, elem, env, effects),
                 Pattern::Wildcard => Ok(vec![]),
                 Pattern::Ctor { .. } | Pattern::Str(_) => Err(Error::at(
-                    "\"match\" on an array expects array literals or `_`".to_string(),
+                    "\"match\" on an array expects `[..]` patterns or `_`".to_string(),
                     arm.span.clone(),
                 )),
             };

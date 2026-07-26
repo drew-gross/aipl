@@ -1,6 +1,7 @@
 import { wrapping_add as +, print, to_str } from builtins;
 
-// Array-pattern elements must be literals, not computed expressions.
+// An array-pattern element must be a binder (a bare name) or a literal — not a
+// computed expression like `k + 1`.
 fn code(xs: i64[]) -> i64 {
     let k = 2;
     match (xs) {
@@ -13,8 +14,8 @@ fn main() !prints {
     print(to_str(code([1, 2])));
 }
 --- errors ---
-error: array-pattern elements must be literals
- --> ./tests/cases/arrays/err_match_non_literal.aipl:7:13
+error: array-pattern elements must be a binding name or a literal
+ --> ./tests/cases/arrays/err_match_non_literal.aipl:8:13
   |
-7 |         [1, k + 1] => 1,
+8 |         [1, k + 1] => 1,
   |             ^^^^^

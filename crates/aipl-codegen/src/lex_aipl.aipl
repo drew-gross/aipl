@@ -208,13 +208,10 @@ fn int_lit(text: str) -> AiplTok!str {
 // so the caret underlines the entire bad token. Unknown escapes and unterminated
 // literals are caught earlier, by the matcher's own scan (its `escapes` set).
 fn char_lit_emit(text: str) -> AiplTok!str {
-    let decoded = text.unescape();
-    if (1 < decoded.len()) {
-        return err("char literal must contain exactly one character");
-    };
-    match (decoded[0]) {
-        some(c) => ok(CharTok(c)),
-        none => err("empty char literal"),
+    match (text.unescape()) {
+        [] => err("empty char literal"),
+        [c] => ok(CharTok(c)),
+        _ => err("char literal must contain exactly one character"),
     }
 }
 
@@ -626,8 +623,8 @@ allocations: 4550
 deallocations: 4550
 reallocations: 0
 bytes allocated: 235424
-instructions executed: 1266456
-binary size: 572352
+instructions executed: 1266447
+binary size: 571736
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18

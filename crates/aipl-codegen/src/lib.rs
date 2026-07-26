@@ -13443,101 +13443,114 @@ fn compile_expr<M: Module>(
             builder.append_block_param(merge, types::I64);
             let arm_blocks: Vec<_> = arms.iter().map(|_| builder.create_block()).collect();
 
-            // A `str` scrutinee dispatches by *content equality* — no tag word —
-            // so `plan` is `None` for it (its arms bind nothing); any other
+            // A `str` or array scrutinee dispatches by *value* — no tag word — so
+            // `plan` is `None`; its arms' binders (array-pattern identifier
+            // elements) are read from the scrutinee per-arm below. Any other
             // matchable type dispatches on its tag via a `MatchPlan`.
-            let plan = if is_str_repr(&scrut_ty) {
-                // Compare the scrutinee against each string-literal arm in turn,
-                // routing a match to that arm; the wildcard `_` arm is the final
-                // fallthrough. The scrutinee is *borrowed* (each `aipl_str_eq`
-                // consumes a ref from both operands, so `emit_inc` first); its one
-                // real drop is left to enclosing-scope tracking.
+            let plan = if is_str_repr(&scrut_ty) || matches!(&scrut_ty, Type::Array(_)) {
+                // Route each arm to its block: a `str`-literal arm (`"foo"`, str
+                // scrutinee) by content equality, an array pattern (`[a, 'x', b]`)
+                // by exact length then elementwise equality of its *literal*
+                // elements (its identifier elements are binders — no comparison),
+                // and the `_` arm as the final fallthrough. A `str` is matched as
+                // its bit-identical `char[]` view, so `seq_len`/`seq_elem` take a
+                // `char[]` type. The scrutinee is *borrowed* (each comparison
+                // balances the refs it consumes); its one real drop is left to
+                // enclosing-scope tracking.
+                let seq_ty = match &scrut_ty {
+                    Type::Array(_) => scrut_ty.clone(),
+                    _ => Type::Array(Box::new(Type::Primitive(Primitive::Char))),
+                };
+                let elem_ty: Type = match &seq_ty {
+                    Type::Array(e) => (**e).clone(),
+                    _ => unreachable!("seq_ty is always an array"),
+                };
                 let wildcard = arms
                     .iter()
                     .position(|a| matches!(a.pattern, Pattern::Wildcard))
-                    .expect("a str match has a `_` arm (checked)");
-                for (i, arm) in arms.iter().enumerate() {
-                    let Pattern::Str(lit) = &arm.pattern else {
-                        continue;
-                    };
-                    let lit_expr = Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
-                    let (lit_val, _) = compile_expr(module, builder, cx, scopes, &lit_expr)?;
-                    emit_inc(builder, module, builtins, ptr);
-                    emit_inc(builder, module, builtins, lit_val);
-                    let eq_f = builtins.import(module, builder.func, "aipl_str_eq");
-                    let inst = builder.ins().call(eq_f, &[ptr, lit_val]);
-                    let eq = builder.inst_results(inst)[0];
-                    let next = builder.create_block();
-                    builder.ins().brif(eq, arm_blocks[i], &[], next, &[]);
-                    builder.switch_to_block(next);
-                    builder.seal_block(next);
-                }
-                builder.ins().jump(arm_blocks[wildcard], &[]);
-                None
-            } else if let Type::Array(elem) = &scrut_ty {
-                // An array scrutinee also dispatches by *value* (no tag word): each
-                // arm checks exact length then elementwise equality, with the `_`
-                // arm as the final fallthrough. Arms bind nothing, so `plan` is
-                // `None`.
-                let elem: &Type = elem;
-                let wildcard = arms
-                    .iter()
-                    .position(|a| matches!(a.pattern, Pattern::Wildcard))
-                    .expect("an array match has a `_` arm (checked)");
-                // Compile every pattern element up front in *this* (dominating)
-                // block, so a tracked literal (a heap str / nested array) is defined
-                // where it dominates both the per-arm comparison below and the
-                // enclosing-scope drop. (Scalar literals are plain constants.)
-                let arm_lits: Vec<Vec<Value>> = arms
+                    .expect("a str/array match has a `_` arm (checked)");
+                // Compile each array pattern's *literal* elements up front in this
+                // (dominating) block, so a tracked literal (a heap str / nested
+                // array) is defined where it dominates both the per-arm comparison
+                // and the enclosing-scope drop. Binder (identifier) elements carry
+                // no value here — they're loaded when their arm is taken. Each entry
+                // is `(element index, value)`.
+                let arm_lits: Vec<Vec<(usize, Value)>> = arms
                     .iter()
                     .map(|arm| {
                         let mut vals = Vec::new();
                         if let Pattern::Array(elems) = &arm.pattern {
-                            for e in elems {
+                            for (j, e) in elems.iter().enumerate() {
+                                if matches!(e.kind, ExprKind::Ident(_)) {
+                                    continue; // a binder, not a comparison
+                                }
                                 let (v, _) = compile_expr(module, builder, cx, scopes, e)?;
-                                vals.push(v);
+                                vals.push((j, v));
                             }
                         }
                         Ok(vals)
                     })
                     .collect::<Result<_, Error>>()?;
-                let scrut_len = seq_len(module, builder, builtins, ptr, &scrut_ty);
+                // `seq_len` is only needed by array-pattern arms; a pure
+                // string-literal match (no array arms) skips it, so it compiles
+                // exactly as before this path was unified.
+                let scrut_len = if arms.iter().any(|a| matches!(a.pattern, Pattern::Array(_))) {
+                    Some(seq_len(module, builder, builtins, ptr, &seq_ty))
+                } else {
+                    None
+                };
                 for (i, arm) in arms.iter().enumerate() {
-                    let Pattern::Array(elems) = &arm.pattern else {
-                        continue;
-                    };
-                    // Length must match before any element load (else out of bounds).
-                    let len_ok =
-                        builder
-                            .ins()
-                            .icmp_imm_s(IntCC::Equal, scrut_len, elems.len() as i64);
-                    let check = builder.create_block();
-                    let next = builder.create_block();
-                    builder.ins().brif(len_ok, check, &[], next, &[]);
-                    builder.switch_to_block(check);
-                    builder.seal_block(check);
-                    // Length matches: AND together the elementwise comparisons. The
-                    // scrutinee elements are borrowed; `emit_eq` balances any ref it
-                    // consumes (the `str` arm) with its own incs.
-                    let mut matched = builder.ins().iconst(types::I64, 1);
-                    for j in 0..elems.len() {
-                        let idx = builder.ins().iconst(types::I64, j as i64);
-                        let scrut_elem =
-                            seq_elem(module, builder, builtins, structs, ptr, idx, &scrut_ty);
-                        let eq = emit_eq(
-                            module,
-                            builder,
-                            builtins,
-                            structs,
-                            scrut_elem,
-                            arm_lits[i][j],
-                            elem,
-                        )?;
-                        matched = builder.ins().band(matched, eq);
+                    match &arm.pattern {
+                        Pattern::Str(lit) => {
+                            let lit_expr =
+                                Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
+                            let (lit_val, _) =
+                                compile_expr(module, builder, cx, scopes, &lit_expr)?;
+                            emit_inc(builder, module, builtins, ptr);
+                            emit_inc(builder, module, builtins, lit_val);
+                            let eq_f = builtins.import(module, builder.func, "aipl_str_eq");
+                            let inst = builder.ins().call(eq_f, &[ptr, lit_val]);
+                            let eq = builder.inst_results(inst)[0];
+                            let next = builder.create_block();
+                            builder.ins().brif(eq, arm_blocks[i], &[], next, &[]);
+                            builder.switch_to_block(next);
+                            builder.seal_block(next);
+                        }
+                        Pattern::Array(elems) => {
+                            // Length must match before any element load (else out of
+                            // bounds).
+                            let len_ok = builder.ins().icmp_imm_s(
+                                IntCC::Equal,
+                                scrut_len.expect("an array arm implies scrut_len is computed"),
+                                elems.len() as i64,
+                            );
+                            let check = builder.create_block();
+                            let next = builder.create_block();
+                            builder.ins().brif(len_ok, check, &[], next, &[]);
+                            builder.switch_to_block(check);
+                            builder.seal_block(check);
+                            // AND together the literal elements' comparisons; binder
+                            // elements impose no test. The scrutinee elements are
+                            // borrowed; `emit_eq` balances any ref it consumes.
+                            let mut matched = builder.ins().iconst(types::I64, 1);
+                            for (j, lit_val) in &arm_lits[i] {
+                                let idx = builder.ins().iconst(types::I64, *j as i64);
+                                let scrut_elem =
+                                    seq_elem(module, builder, builtins, structs, ptr, idx, &seq_ty);
+                                let eq = emit_eq(
+                                    module, builder, builtins, structs, scrut_elem, *lit_val,
+                                    &elem_ty,
+                                )?;
+                                matched = builder.ins().band(matched, eq);
+                            }
+                            builder.ins().brif(matched, arm_blocks[i], &[], next, &[]);
+                            builder.switch_to_block(next);
+                            builder.seal_block(next);
+                        }
+                        // The `_` arm is the fallthrough; a ctor can't reach a
+                        // str/array match (checker).
+                        Pattern::Wildcard | Pattern::Ctor { .. } => {}
                     }
-                    builder.ins().brif(matched, arm_blocks[i], &[], next, &[]);
-                    builder.switch_to_block(next);
-                    builder.seal_block(next);
                 }
                 builder.ins().jump(arm_blocks[wildcard], &[]);
                 None
@@ -13580,11 +13593,41 @@ fn compile_expr<M: Module>(
                 builder.switch_to_block(arm_blocks[i]);
                 builder.seal_block(arm_blocks[i]);
                 scopes.push(Vec::new());
-                // Read this arm's payload bindings (borrowed from the scrutinee);
-                // a `str` arm (`plan` is `None`) binds nothing.
+                // Read this arm's payload bindings (borrowed from the scrutinee). A
+                // tag-dispatched arm reads its variant/optional payload; a str/array
+                // arm (`plan` is `None`) reads each array-pattern binder (identifier
+                // element) from the scrutinee at its position.
                 let binds = match &plan {
                     Some((plan, tag)) => bind_match_arm(builder, plan, arm, i, ptr, *tag, structs),
-                    None => Vec::new(),
+                    None => {
+                        if let Pattern::Array(elems) = &arm.pattern {
+                            // A `str` scrutinee is read as its `char[]` view.
+                            let seq_ty = match &scrut_ty {
+                                Type::Array(_) => scrut_ty.clone(),
+                                _ => Type::Array(Box::new(Type::Primitive(Primitive::Char))),
+                            };
+                            let elem_ty: Type = match &seq_ty {
+                                Type::Array(e) => (**e).clone(),
+                                _ => unreachable!("seq_ty is always an array"),
+                            };
+                            elems
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(j, e)| match &e.kind {
+                                    ExprKind::Ident(name) => {
+                                        let idx = builder.ins().iconst(types::I64, j as i64);
+                                        let val = seq_elem(
+                                            module, builder, builtins, structs, ptr, idx, &seq_ty,
+                                        );
+                                        Some((name.clone(), val, elem_ty.clone()))
+                                    }
+                                    _ => None,
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        }
+                    }
                 };
                 let mut arm_env = env.clone();
                 for (name, value, ty) in &binds {

@@ -817,10 +817,13 @@ pub mod ast {
         /// A string-literal pattern `"lit" => body` (matches a `str` scrutinee by
         /// content).
         Str(String),
-        /// An array-literal pattern `[e0, e1, ...] => body` (matches an array
-        /// scrutinee by exact length + elementwise equality). The elements are
-        /// literal expressions (validated by the checker), so they introduce no
-        /// bindings, free variables, or calls.
+        /// An array/`str`-destructuring pattern `[e0, e1, ...] => body` (matches a
+        /// `str` or array scrutinee by exact length, then, per element position,
+        /// either a bound name or a literal-equality check). Each element is a
+        /// bare identifier — a **binder** for the element at that position (typed
+        /// `char` for a `str`, the element type for an array) — or a literal
+        /// expression matched by equality (validated by the checker). An
+        /// all-literal pattern (e.g. `[1, 2]`) still introduces no bindings.
         Array(Vec<Expr>),
         /// The wildcard / default arm `_ => body` (matches anything). Only valid
         /// for a `str` or array match, where it must be the last arm.
@@ -828,12 +831,21 @@ pub mod ast {
     }
 
     impl Pattern {
-        /// The positional binders this pattern introduces (empty except for a
-        /// constructor pattern).
-        pub fn bindings(&self) -> &[String] {
+        /// The positional binders this pattern introduces, in order: a
+        /// constructor pattern's payload binders, or an array/`str` pattern's
+        /// identifier elements (its literal elements bind nothing). Empty for a
+        /// string-literal or wildcard pattern.
+        pub fn bindings(&self) -> Vec<String> {
             match self {
-                Pattern::Ctor { bindings, .. } => bindings,
-                Pattern::Str(_) | Pattern::Array(_) | Pattern::Wildcard => &[],
+                Pattern::Ctor { bindings, .. } => bindings.clone(),
+                Pattern::Array(elems) => elems
+                    .iter()
+                    .filter_map(|e| match &e.kind {
+                        ExprKind::Ident(name) => Some(name.clone()),
+                        _ => None,
+                    })
+                    .collect(),
+                Pattern::Str(_) | Pattern::Wildcard => Vec::new(),
             }
         }
 
