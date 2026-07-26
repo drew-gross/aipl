@@ -22,7 +22,8 @@
 //! anything is off.
 
 use aipl::codegen::{
-    generate_dogfood_artifact, Compilation, DOGFOOD_CLIF_FILE, DOGFOOD_ENTRIES, DOGFOOD_SOURCES,
+    generate_dogfood_artifact, Compilation, DOGFOOD_CLIF_FILE, DOGFOOD_ENTRIES, DOGFOOD_IR_ENV,
+    DOGFOOD_SOURCES,
 };
 use aipl::FfiValue;
 use std::path::PathBuf;
@@ -31,6 +32,18 @@ const FILL_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_dogfood_i
 const FILL_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_staged_ir";
 const VALIDATE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored validate_staged_ir";
 const PROMOTE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored promote_staged_ir";
+
+/// The real validation command: run the whole suite with the compiler itself
+/// linking the staged IR (`AIPL_DOGFOOD_IR`), so every parse in the corpus
+/// exercises the candidate. The path is **absolute** because the cases harness
+/// spawns the compiler as a subprocess whose working directory isn't the repo
+/// root — a relative path wouldn't resolve there.
+fn validate_staged_corpus_cmd() -> String {
+    format!(
+        "AIPL_DOGFOOD_IR={} cargo test",
+        staged_artifact_path().display()
+    )
+}
 
 /// Path to the checked-in `.clif` artifact.
 fn artifact_path() -> PathBuf {
@@ -44,6 +57,22 @@ fn staged_artifact_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("crates/aipl-codegen/src")
         .join(format!("{DOGFOOD_CLIF_FILE}.staged"))
+}
+
+/// The `AIPL_DOGFOOD_IR` override path, if a staged-IR validation run set it.
+fn dogfood_ir_override() -> Option<PathBuf> {
+    match std::env::var(DOGFOOD_IR_ENV) {
+        Ok(p) if !p.is_empty() => Some(PathBuf::from(p)),
+        _ => None,
+    }
+}
+
+/// The dogfood artifact this run should verify against: the `AIPL_DOGFOOD_IR`
+/// override when set (a staged-IR validation run — the compiler is itself
+/// linking that file, so the source-vs-artifact checks must target it too),
+/// else the live checked-in `.clif`.
+fn active_artifact_path() -> PathBuf {
+    dogfood_ir_override().unwrap_or_else(artifact_path)
 }
 
 /// Generate the unified dogfood artifact via the live frontend.
@@ -451,30 +480,35 @@ fn sanity_check(artifact: &str) {
 fn checked_in_ir_is_current() {
     aipl::install_parser_hooks();
     let generated = generate();
-    let path = artifact_path();
+    // In a staged-IR validation run (`AIPL_DOGFOOD_IR` set) the compiler is
+    // linking the staged file, so "current with source" must be checked against
+    // *that* file — the live `.clif` is intentionally behind until promotion.
+    let path = active_artifact_path();
     let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "missing checked-in dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
+            "missing dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
             path.display()
         )
     });
     assert_eq!(
         lf(&generated),
         lf(&checked_in),
-        "checked-in dogfood IR {} is stale. Regenerate with: {FILL_CMD}",
+        "dogfood IR {} is stale. Regenerate with: {FILL_CMD}",
         path.display()
     );
 }
 
-/// The checked-in IR must actually load and compute correctly (independent of
-/// whether it's byte-current with source — that's `checked_in_ir_is_current`).
+/// The dogfood IR the compiler is running on must actually load and compute
+/// correctly (independent of whether it's byte-current with source — that's
+/// `checked_in_ir_is_current`). Targets the `AIPL_DOGFOOD_IR` override when set,
+/// so a staged validation run sanity-checks the staged artifact.
 #[test]
 fn checked_in_ir_loads_and_runs() {
     aipl::install_parser_hooks();
-    let path = artifact_path();
+    let path = active_artifact_path();
     let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "missing checked-in dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
+            "missing dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
             path.display()
         )
     });
@@ -588,8 +622,16 @@ fn artifact_round_trips_rich_types() {
 
 /// Fails if a `.clif.staged` file is present, signalling a staged IR workflow
 /// is in progress. See CLAUDE.md for the full workflow.
+///
+/// Suppressed during a staged-IR validation run (`AIPL_DOGFOOD_IR` set): that
+/// run's whole point is to exercise the corpus against the still-pending staged
+/// file, so the pending file is expected — this check would otherwise turn a
+/// clean validation run red for the very reason it exists.
 #[test]
 fn no_staged_ir_pending() {
+    if dogfood_ir_override().is_some() {
+        return;
+    }
     let staged = staged_artifact_path();
     if staged.exists() {
         panic!(
@@ -618,15 +660,20 @@ fn fill_staged_ir() {
     std::fs::write(&path, &artifact).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
     eprintln!("wrote {}", path.display());
     panic!(
-        "fill_staged_ir wrote staged IR — review the diff vs the live .clif file,\n\
-         then validate with: {VALIDATE_STAGED_CMD}\n\
-         then promote with:  {PROMOTE_STAGED_CMD}"
+        "fill_staged_ir wrote staged IR — then validate it by running the whole\n\
+         suite with the compiler linking the staged file:\n    {}\n\
+         ({VALIDATE_STAGED_CMD} is a faster entry-level pre-check.)\n\
+         Once green, promote with: {PROMOTE_STAGED_CMD}",
+        validate_staged_corpus_cmd()
     );
 }
 
-/// Load and sanity-check `dogfood.clif.staged` without modifying anything. Run
-/// after `fill_staged_ir` to confirm staged IR loads and computes correctly
-/// before promoting it to live.
+/// Entry-level pre-check: load `dogfood.clif.staged` and sanity-call every
+/// entry, without modifying anything. This is the *fast* gate — it confirms the
+/// staged IR links and each entry computes correctly, but it does not exercise
+/// the compiler running on it. The real validation is running the whole corpus
+/// against the staged IR via [`validate_staged_corpus_cmd`] (the compiler links
+/// the staged file through `AIPL_DOGFOOD_IR`), which this message points at.
 ///
 /// See CLAUDE.md for the full staged IR workflow.
 #[test]
@@ -640,7 +687,11 @@ fn validate_staged_ir() {
         )
     });
     sanity_check(&artifact);
-    eprintln!("validated {}", path.display());
+    eprintln!(
+        "entry-level check passed for {}.\nNow run the full corpus against it:\n    {}",
+        path.display(),
+        validate_staged_corpus_cmd()
+    );
 }
 
 /// Promote staged IR to live: validates `dogfood.clif.staged`, copies it to the

@@ -2712,13 +2712,40 @@ pub const DOGFOOD_CLIF: &str = include_str!("dogfood.clif");
 /// The checked-in artifact's filename, for the `dogfood_ir` test.
 pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
 
+/// Env var naming an alternate dogfood-IR artifact to run the compiler against
+/// (see [`dogfood_artifact_text`]). Set it to a `.clif` path — typically
+/// `dogfood.clif.staged` — to validate *candidate* IR: every parse the compiler
+/// does (including its own source) then runs off that file instead of the
+/// baked-in [`DOGFOOD_CLIF`], so `AIPL_DOGFOOD_IR=…staged cargo test` exercises
+/// staged IR across the whole corpus before it's promoted to live. Unset (the
+/// normal case) uses the compiled-in artifact and reads no file.
+pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
+
+/// The dogfood-IR artifact text to link: the file named by [`DOGFOOD_IR_ENV`]
+/// if that env var is set to a non-empty path, else the baked-in
+/// [`DOGFOOD_CLIF`]. Reading the env-named file loudly panics on an I/O error
+/// (a validation run pointed at a missing/unreadable artifact is a mistake to
+/// surface, not to silently fall back from).
+fn dogfood_artifact_text() -> std::borrow::Cow<'static, str> {
+    match std::env::var(DOGFOOD_IR_ENV) {
+        Ok(path) if !path.is_empty() => {
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!("{DOGFOOD_IR_ENV}={path:?}: could not read dogfood IR: {e}")
+            });
+            std::borrow::Cow::Owned(text)
+        }
+        _ => std::borrow::Cow::Borrowed(DOGFOOD_CLIF),
+    }
+}
+
 thread_local! {
-    /// The one dogfood engine, re-linked from the checked-in IR lazily on first
-    /// use per thread. A `Compilation` isn't `Sync`, hence one per thread.
-    /// Re-linking runs no AIPL frontend, so it works even when the frontend
-    /// can't currently compile the dogfooded sources, and never recurses even
-    /// though several of these hooks are themselves invoked from the parser.
-    static DOGFOOD_ENGINE: Compilation = Compilation::from_artifact(DOGFOOD_CLIF)
+    /// The one dogfood engine, re-linked from the checked-in IR (or the
+    /// [`DOGFOOD_IR_ENV`] override) lazily on first use per thread. A
+    /// `Compilation` isn't `Sync`, hence one per thread. Re-linking runs no
+    /// AIPL frontend, so it works even when the frontend can't currently
+    /// compile the dogfooded sources, and never recurses even though several of
+    /// these hooks are themselves invoked from the parser.
+    static DOGFOOD_ENGINE: Compilation = Compilation::from_artifact(&dogfood_artifact_text())
         .expect("dogfood engine builds");
 }
 

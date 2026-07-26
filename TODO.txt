@@ -79,8 +79,8 @@ For lexer dogfooding:
 Lexer errors:
 - Is CharLit really necessary? Can we move responsibilty for erroring on too-long char lit to the caller, then remove it? Add some tests around this.
 
-Make a mode to run the compiler using the staged IR, for validations
-
 have the clir IR include the human readable version of data section strings in comments
 
 Decide if I want bare variant assignment
+
+TODO: garbage collectable types, so we can make a .aipl parser.

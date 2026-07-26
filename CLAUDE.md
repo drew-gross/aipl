@@ -191,20 +191,27 @@ compiler runs on:
    and writes `*.clif.staged` files next to the live `*.clif` files:
    `cargo test --test dogfood_ir -- --ignored fill_staged_ir`
 
-2. **Validate staged IR** — loads each `*.clif.staged` and calls its entry
-   functions with known inputs; confirms the IR links and computes correctly:
+2. **Entry-level pre-check (fast)** — loads each `*.clif.staged` and calls its
+   entry functions with known inputs; confirms the IR links and each entry
+   computes correctly. This does *not* run the compiler on the staged IR — it's
+   just the quick gate before the corpus run:
    `cargo test --test dogfood_ir -- --ignored validate_staged_ir`
 
 3. **Validate by running the corpus against the staged IR, not by reading the
-   diff** — the best check of staged IR is running the full test corpus with
-   the compiler using the IR *in its staged location* (every parse exercises
-   the hook engines, so a subtle IR bug surfaces as test failures). The mode
-   that runs the compiler off the `.staged` file doesn't exist yet (TODO.txt:
-   "Make a mode to run the compiler using the staged IR, for validations") —
-   if you reach this step and it's still missing, stop and remind Drew to
-   build it rather than promoting unvalidated IR just to test it. Manual
-   review of the `.staged` vs live diff is only useful when a corpus run
-   fails — then diff to localize, paying attention to the **parser-hook
+   diff** — the real check is running the whole suite with the compiler itself
+   linking the staged file, via the `AIPL_DOGFOOD_IR` env var (points the
+   dogfood engine at an alternate `.clif` instead of the baked-in one), so every
+   parse in the corpus — including the compiler parsing its own source —
+   exercises the candidate:
+   `AIPL_DOGFOOD_IR=<abs path>/dogfood.clif.staged cargo test`
+   The path **must be absolute** — the cases harness spawns the compiler as a
+   subprocess whose CWD isn't the repo root, so a relative path won't resolve
+   there. (The `fill_staged_ir` / `validate_staged_ir` messages print the exact
+   command with the absolute path filled in.) Under this env var
+   `no_staged_ir_pending` is suppressed and `checked_in_ir_is_current` compares
+   source against the staged file, so a good candidate is a clean green run.
+   Manual review of the `.staged` vs live diff is only worthwhile when this run
+   *fails* — then diff to localize, paying attention to the **parser-hook
    engines** (`process_raw_string`, `parse_test_section_header`,
    `strip_test_sections`, `find_trailing_whitespace`, `lex_aipl`), which are
    active during every parse of the compiler's own source.
@@ -216,10 +223,12 @@ compiler runs on:
 
 5. **Run full suite**: `cargo test`
 
-**Invariant**: `cargo test` always fails while any `*.clif.staged` file exists
-(the `no_staged_ir_pending` test in `tests/dogfood_ir.rs`). This ensures the
-transition is never silently left half-done. To abort a staged workflow, delete
-the `*.clif.staged` files from `crates/aipl-codegen/src/`.
+**Invariant**: a plain `cargo test` always fails while any `*.clif.staged` file
+exists (the `no_staged_ir_pending` test in `tests/dogfood_ir.rs`) — so the
+transition is never silently left half-done. The only exception is the step-3
+validation run, where `AIPL_DOGFOOD_IR` is set and that check is deliberately
+suppressed. To abort a staged workflow, delete the `*.clif.staged` files from
+`crates/aipl-codegen/src/`.
 
 `fill_dogfood_ir` (writes directly to live) is still available for obviously-safe
 regenerations (e.g. a source comment changed the artifact with no logic change),
