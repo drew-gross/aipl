@@ -626,15 +626,15 @@ allocations: 4550
 deallocations: 4550
 reallocations: 0
 bytes allocated: 235424
-instructions executed: 1269275
-binary size: 620544
+instructions executed: 1266422
+binary size: 582864
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18
 __builtin_count_while$char$s0$lam19
 __builtin_count_while$char$s0$lam20
 __builtin_int_parse
-__builtin_is_some_and$char$lam30
+__builtin_is_some_and$char$lam27
 __lambda_0
 __lambda_1
 __lambda_2
@@ -642,7 +642,6 @@ __lambda_3
 __lambda_4
 __lambda_5
 __m1__between_len
-__m1__char_lit_len
 __m1__delimited_len
 __m1__emit_mismatch
 __m1__float_len

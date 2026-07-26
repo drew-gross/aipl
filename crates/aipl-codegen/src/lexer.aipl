@@ -40,13 +40,14 @@ import {
 // matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
 // raw strings, template segments) — the library strips the delimiters but leaves
 // escapes verbatim for the rule's `emit` to decode with its own decoder (escape
-// meaning is a language's policy, not the library's); `CharVal` a char literal's
-// decoded char (a char's decoding is intrinsic to producing it — see `CharLit`).
-// Everything a rule can recover by slicing its span — identifiers, punctuation,
-// keywords, comments, and the `Int`/`Float` numeric runs (whose *parsing* is the
-// rule's `emit`'s job, via the `int_parse` builtin or its own) — carries
-// `NoValue`.
-variant TokenValue = NoValue | StrVal(str) | CharVal(char)
+// meaning is a language's policy, not the library's). Everything a rule can
+// recover by slicing its span — identifiers, punctuation, keywords, comments,
+// and the `Int`/`Float` numeric runs (whose *parsing* is the rule's `emit`'s
+// job, via the `int_parse` builtin or its own) — carries `NoValue`. (A char
+// literal is not a library concern: a consumer that wants one lexes it as a
+// single-quoted `Delimited` string and validates the one-char shape in its
+// `emit` — see `lex_aipl.aipl`.)
+variant TokenValue = NoValue | StrVal(str)
 
 // What a token is: its `kind` — a caller-defined value carrying whatever the
 // matched token means, produced by the rule's `emit` (see `Emit`) — and the
@@ -68,28 +69,27 @@ variant Seg = Plain | Head | Middle | Tail
 // finished kind for a valueless token (punctuation, an operator); `OfText`
 // applies a constructor to the matched text (identifiers, whose text is their
 // content — and numeric `Int`/`Float` runs, whose emit parses the digits itself);
-// `OfStr`/`OfChar` apply a constructor to a `Delimited`/… string or a `CharLit`
-// char; `OfSeg` is for a `Template` rule, applied to each segment's text and its
+// `OfStr` applies a constructor to a `Delimited`/`Between`/`Nested` string;
+// `OfSeg` is for a `Template` rule, applied to each segment's text and its
 // position. The chosen option must match the matcher's value shape — an `OfStr`
 // on an `Int` matcher, say, is a lex error (see `apply_emit`).
 //
-// `TryText`/`TryStr`/`TryChar`/`TrySeg` are the fallible siblings: the function
-// returns `K!str` — a kind, or an error *message*. Interpreting a match can fail
-// (a numeric literal that overflows i64, a string that breaks a content rule),
-// and only the emit knows the rule; when it returns `err(msg)` the library pairs
-// the message with the token's whole span to build a `LexError` (see `apply_emit`).
-// The token span is the right location for a whole-token verdict like overflow; a
-// matcher-level, byte-precise error (an unterminated string, an unknown escape)
-// still comes from scanning, not the emit.
+// `TryText`/`TryStr`/`TrySeg` are the fallible siblings: the function returns
+// `K!str` — a kind, or an error *message*. Interpreting a match can fail (a
+// numeric literal that overflows i64, a string that breaks a content rule — e.g.
+// a single-quoted string that isn't exactly one char, a consumer's char
+// literal), and only the emit knows the rule; when it returns `err(msg)` the
+// library pairs the message with the token's whole span to build a `LexError`
+// (see `apply_emit`). The token span is the right location for a whole-token
+// verdict like overflow; a matcher-level, byte-precise error (an unterminated
+// string, an unknown escape) still comes from scanning, not the emit.
 variant Emit<K> =
     Bare(K)
     | OfText((str) -> K)
     | OfStr((str) -> K)
-    | OfChar((char) -> K)
     | OfSeg((str, Seg) -> K)
     | TryText((str) -> K!str)
     | TryStr((str) -> K!str)
-    | TryChar((char) -> K!str)
     | TrySeg((str, Seg) -> K!str)
 
 // Why a lex failed: what went wrong, and the span of the offending source
@@ -139,13 +139,6 @@ struct LexError { message: str, span: Span }
 //   `close` must be distinct (a delimiter can't both open and close a level)
 //   and non-empty. A token still open (depth > 0) at the end of the source is a
 //   lex error.
-// - `CharLit(quote, escapes)`: a single-character literal — the `quote`
-//   spelling, then exactly one char (an ordinary char, or a `\X` escape with
-//   X in `escapes`), then the closing `quote`. `'x'`, `'\n'`, `'\''`. Unlike a
-//   `Delimited("'", ..)`, it enforces the one-char shape: an empty literal
-//   (`''`), a multi-char one (`'ab'`), an unknown escape, and a dangling or
-//   unterminated literal are each a distinct hard error. Byte-oriented like the
-//   rest of the library, so a multi-byte char reads as multi-char.
 // - `Template(delim, escapes)`: a template literal — text with `{expr}`
 //   interpolations. The `delim` spelling opens and closes the literal; it may
 //   be multi-char and scans like `Between` (a lone backtick under a triple-
@@ -178,13 +171,15 @@ struct LexError { message: str, span: Span }
 // `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
 // rule's `emit` decodes — escape handling is the caller's, not the library's);
 // `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
-// de-denting is the caller's post-pass); `CharLit` the decoded `CharVal`.
-// `Template` (its segments), `Int`/`Float` (their digit text), and everything
-// else — plus every trivia record — carry `NoValue`, so an `OfText` emit recovers
-// the text and interprets it. The library provides no string-escape decoder: what
-// a `\X` means is a language's own policy, so a consumer's `emit` decodes with its
-// own (e.g. `lex_aipl.aipl`'s `unescape`, mapping `\n`/`\t`/`\r` to control chars
-// and any other `\X` to X itself).
+// de-denting is the caller's post-pass). `Template` (its segments), `Int`/`Float`
+// (their digit text), and everything else — plus every trivia record — carry
+// `NoValue`, so an `OfText` emit recovers the text and interprets it. The library
+// provides no string-escape decoder: what a `\X` means is a language's own
+// policy, so a consumer's `emit` decodes with its own (e.g. `lex_aipl.aipl`'s
+// `unescape`, mapping `\n`/`\t`/`\r` to control chars and any other `\X` to X
+// itself). A char literal is likewise not a matcher: a consumer lexes it as a
+// single-quoted `Delimited` string and enforces the one-char shape in a `TryStr`
+// emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
     CharRun(str, str)
     | Exact(str)
@@ -192,7 +187,6 @@ variant Matcher =
     | Delimited(str, str)
     | Between(str, str)
     | Nested(str, str)
-    | CharLit(str, str)
     | Template(str, str)
     | ToEol(str)
     | Float
@@ -341,57 +335,6 @@ fn nested_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
     ok(i)
 }
 
-// `CharLit`: a `quote`-delimited one-character literal. Opens with the `quote`
-// spelling, holds exactly one char — a `\X` escape (X in `escapes`, 2 chars) or
-// one ordinary char — then the closing `quote`. ok(0) when `self` doesn't open
-// with `quote`. Distinct hard errors for an empty literal (`''`), a dangling or
-// unterminated one, an unknown escape, and content that isn't exactly one char
-// before the close (`'ab'`). Spans mirror the real lexer's char-literal errors.
-fn char_lit_len(self: str, at: i64, quote: str, escapes: str) -> i64!LexError {
-    if (!self.starts_with(quote)) {
-        return ok(0);
-    };
-    let open = quote.len();
-    let rest = self[open..];
-    // `'` then end of source: nothing between the quotes.
-    if (rest.len() == 0) {
-        return err(LexError { message: "unterminated char literal", span: at..at + self.len() });
-    };
-    // `''`: the closer sits where the single content char should be.
-    if (rest.starts_with(quote)) {
-        return err(LexError { message: "empty char literal", span: at..at + open + quote.len() });
-    };
-    // The content is one char: a `\X` escape (2 chars) or one ordinary char.
-    mut content = 1;
-    if (self[open] == some('\\')) {
-        // The backslash needs an allowed char after it. A backslash at the end
-        // of the source escapes nothing — an unterminated literal, not an
-        // unknown escape.
-        if (!(open + 1 < self.len())) {
-            return err(
-                LexError { message: "unterminated char literal", span: at..at + self.len() },
-            );
-        };
-        if (!self[open + 1].is_some_and(|e| escapes.contains(e))) {
-            return err(
-                LexError { message: "unknown escape sequence", span: at + open..at + open + 2 },
-            );
-        };
-        set content = 2;
-    };
-    // Exactly one char of content, then the closing quote must follow.
-    let close_at = open + content;
-    if (!self[close_at..].starts_with(quote)) {
-        return err(
-            LexError {
-                message: "char literal must contain exactly one character",
-                span: at..at + close_at,
-            },
-        );
-    };
-    ok(close_at + quote.len())
-}
-
 // `ToEol`: the marker, then everything up to (not including) the next
 // newline. 0 when `self` doesn't start with the (non-empty) marker.
 fn to_eol_len(self: str, marker: str) -> i64 {
@@ -428,31 +371,6 @@ fn float_len(self: str) -> i64 {
     if (int_end < end) { end } else { 0 }
 }
 
-// The char a `\X` escape denotes: `n`/`t`/`r` to the control chars, anything
-// else (`\'`, `\\`, `\"`) to itself. Validity was already checked during
-// matching. This is `CharLit`'s *intrinsic* char decoding (via `char_lit_value`)
-// — which, unlike string decoding, is the library's job: a `CharVal` is a
-// decoded char by construction (see `TokenValue`). String escape decoding, by
-// contrast, is a consumer emit's job and lives with each consumer.
-fn escape_char(self: char) -> char {
-    if (self == 'n') {
-        '\n'
-    } else {
-        if (self == 't') { '\t' } else { if (self == 'r') { '\r' } else { self } }
-    }
-}
-
-// `CharLit`'s value: the one char between the quotes, escape-decoded. `text`
-// is the whole matched literal, quotes included and already validated.
-fn char_lit_value(text: str, quote: str) -> TokenValue {
-    let inner = text[quote.len()..];
-    if (inner[0] == some('\\')) {
-        CharVal(inner[1].value_or(' ').escape_char())
-    } else {
-        CharVal(inner[0].value_or(' '))
-    }
-}
-
 // The value a token of matcher `m` carries, computed from its matched `text`
 // (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
 // Only the string-valued matchers carry a computed value; everything a rule can
@@ -468,7 +386,6 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
         Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
         Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        CharLit(quote, escapes) => char_lit_value(text, quote),
         Template(delim, escapes) => NoValue,
         ToEol(marker) => NoValue,
         Float => NoValue,
@@ -480,10 +397,10 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
 // matcher-computed `value`. The emit option must agree with the value shape: a
 // `Bare`/`OfText` emit works with any (they ignore the value or take the text —
 // so a numeric `Int`/`Float` run pairs with `OfText` and its emit parses the
-// digits), while `OfStr`/`OfChar` need a `StrVal`/`CharVal` — a mismatch (or an
-// `OfSeg`, which only a `Template` rule may use) is a lex error at `span`.
-// `token_value` guarantees the shape a well-paired rule produces, so a mismatch
-// means the rule set itself is wrong.
+// digits), while `OfStr` needs a `StrVal` — a mismatch (or an `OfSeg`, which
+// only a `Template` rule may use) is a lex error at `span`. `token_value`
+// guarantees the shape a well-paired rule produces, so a mismatch means the rule
+// set itself is wrong.
 fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexError {
     match (e) {
         Bare(k) => ok(k),
@@ -491,12 +408,6 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
         OfStr(f) => match (value) {
             StrVal(s) => ok(f(s)),
             NoValue => err(emit_mismatch("OfStr", "a string", span)),
-            CharVal(c) => err(emit_mismatch("OfStr", "a string", span)),
-        },
-        OfChar(f) => match (value) {
-            CharVal(c) => ok(f(c)),
-            NoValue => err(emit_mismatch("OfChar", "a char", span)),
-            StrVal(s) => err(emit_mismatch("OfChar", "a char", span)),
         },
         OfSeg(f) => err(seg_only(span)),
         // A fallible emit yields `K!str` — a kind or an error *message*; pair the
@@ -513,15 +424,6 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
                 err(message) => err(LexError { message, span }),
             },
             NoValue => err(emit_mismatch("TryStr", "a string", span)),
-            CharVal(c) => err(emit_mismatch("TryStr", "a string", span)),
-        },
-        TryChar(f) => match (value) {
-            CharVal(c) => match (f(c)) {
-                ok(k) => ok(k),
-                err(message) => err(LexError { message, span }),
-            },
-            NoValue => err(emit_mismatch("TryChar", "a char", span)),
-            StrVal(s) => err(emit_mismatch("TryChar", "a char", span)),
         },
         TrySeg(f) => err(seg_only(span)),
     }
@@ -595,12 +497,6 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
                 src[at..].between_len(at, open, close)?,
             )?,
             Nested(open, close) => step_result(r, src, at, src[at..].nested_len(at, open, close)?)?,
-            CharLit(quote, escapes) => step_result(
-                r,
-                src,
-                at,
-                src[at..].char_lit_len(at, quote, escapes)?,
-            )?,
             Template(delim, escapes) => template_step(src, at, delim, escapes, r.emit, rules)?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
             Float => step_result(r, src, at, src[at..].float_len())?,
@@ -628,10 +524,8 @@ fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
         Bare(k) => err(seg_needs_ofseg(span)),
         OfText(f) => err(seg_needs_ofseg(span)),
         OfStr(f) => err(seg_needs_ofseg(span)),
-        OfChar(f) => err(seg_needs_ofseg(span)),
         TryText(f) => err(seg_needs_ofseg(span)),
         TryStr(f) => err(seg_needs_ofseg(span)),
-        TryChar(f) => err(seg_needs_ofseg(span)),
     }
 }
 
@@ -775,9 +669,9 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
 
 // A concrete token-kind variant for the `.test` block below — one example of
 // the per-language `K` a caller pins `Token<K>`/`TokenRule<K>` to. Each arm is a
-// kind; value-bearing kinds carry their content (`Int(i64)`, `Str(str)`,
-// `Char(char)`, the template segments), text-recovered kinds are bare (their
-// text is sliced from the span). A real consumer writes its own such variant.
+// kind; value-bearing kinds carry their content (`Int(i64)`, `Str(str)`, the
+// template segments), text-recovered kinds are bare (their text is sliced from
+// the span). A real consumer writes its own such variant.
 variant Kind =
     Ws
     | Ident(str)
@@ -789,7 +683,6 @@ variant Kind =
     | Dot
     | FloatTok
     | Str(str)
-    | Char(char)
     | Raw(str)
     | Block(str)
     | Comment
@@ -872,12 +765,6 @@ fn nonempty_str(text: str) -> Kind!str {
     if (s.len() == 0) { err("empty string literal") } else { ok(Str(s)) }
 }
 
-// A `TryChar` emit: a char literal may not be a reserved char. Char decoding is
-// the library's (see `CharLit`), so this validates the already-decoded char.
-fn checked_char(c: char) -> Kind!str {
-    if (c == 'q') { err("'q' is a reserved char") } else { ok(Char(c)) }
-}
-
 // A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
 // error carries the whole template's span.
 fn checked_seg(text: str, seg: Seg) -> Kind!str {
@@ -939,7 +826,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
 
     // Reusable rules. Each pairs a matcher with an `emit` that builds a `Kind`:
-    // `OfText`/`OfStr`/`OfChar` apply a constructor to the matched text/value;
+    // `OfText`/`OfStr` apply a constructor to the matched text/value;
     // `Bare` is a fixed kind; a skip rule's emit is never applied.
     let ws = TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Ws), skip: true };
     let ident = TokenRule { matcher: CharRun(alpha, alnum), emit: OfText(Ident) };
@@ -1035,23 +922,11 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
     assert(lex("/* a /* b */", blk) == ok(toks([tok(Block(" a /* b "), 0, 12)])));
 
-    // CharLit: an `OfChar` emit carries the one decoded char; the one-char shape
-    // is enforced, so empty/multi-char/bad-escape literals are distinct errors.
-    let chr = [ws, TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: OfChar(Char) }, ident];
-    assert(lex("'x'", chr) == ok(toks([tok(Char('x'), 0, 3)])));
-    assert(lex("'\\n'", chr) == ok(toks([tok(Char('\n'), 0, 4)])));
-    assert(lex("''", chr) == err(lex_err("empty char literal", 0, 2)));
-    assert(lex("'\\q'", chr) == err(lex_err("unknown escape sequence", 1, 3)));
-
-    // TryChar: a fallible char emit (`checked_char`) rejects a reserved char; the
-    // library attaches the literal's span to the message.
-    let tchr = [
-        ws,
-        TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: TryChar(checked_char) },
-        ident,
-    ];
-    assert(lex("'x'", tchr) == ok(toks([tok(Char('x'), 0, 3)])));
-    assert(lex("'q'", tchr) == err(lex_err("'q' is a reserved char", 0, 3)));
+    // Char literals are not a library matcher: a consumer lexes one as a
+    // single-quoted `Delimited` string and enforces the one-char shape in a
+    // `TryStr` emit (see `lex_aipl.aipl`'s `char_lit_emit`). The `Delimited`
+    // single-quote scan and the `TryStr` one-char verdict are exercised by the
+    // string tests above and the `nonempty_str` test below.
 
     // Int: the matcher only claims the digit run; the `TryText` emit (`int_tok`)
     // parses it. Overflow is a lex error again — but now the *caller* decides that
@@ -1234,27 +1109,25 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1435
-deallocations: 1435
+allocations: 1394
+deallocations: 1394
 reallocations: 0
-bytes allocated: 67632
-instructions executed: 295682
-binary size: 983536
+bytes allocated: 65648
+instructions executed: 282270
+binary size: 888328
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam21
-__builtin_count_while$char$s0$lam26
-__builtin_count_while$char$s0$lam27
-__builtin_count_while$char$s0$lam44
+__builtin_count_while$char$s0$lam19
+__builtin_count_while$char$s0$lam24
+__builtin_count_while$char$s0$lam25
+__builtin_count_while$char$s0$lam39
 __builtin_int_parse
-__builtin_is_some_and$char$lam39
+__builtin_is_some_and$char$lam34
 __lambda_0
 __lambda_1
 __lambda_10
 __lambda_11
 __lambda_12
 __lambda_13
-__lambda_14
-__lambda_15
 __lambda_2
 __lambda_3
 __lambda_4
@@ -1265,8 +1138,6 @@ __lambda_8
 __lambda_9
 __test$lex
 between_len
-char_lit_len
-checked_char
 checked_seg
 delimited_len
 emit_mismatch

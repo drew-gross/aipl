@@ -84,3 +84,5 @@ have the clir IR include the human readable version of data section strings in c
 Decide if I want bare variant assignment
 
 TODO: garbage collectable types, so we can make a .aipl parser.
+
+Switch back to multi-file dogfood clifs to make diffs nicer
