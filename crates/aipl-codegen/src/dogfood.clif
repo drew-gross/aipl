@@ -61956,54 +61956,47 @@ function u0:86(i64) -> i64 apple_aarch64 {
     fn2 = u0:12 sig2  ; aipl_dec
 
 block0(v0: i64):
-    v1 = iconst.i64 0x6e05
+    v2 = iconst.i64 0x6e05
     call fn0(v0)
-    v2 = call fn1(v0, v1)  ; v1 = 0x6e05
-    brif v2, block1, block2
+    v3 = call fn1(v0, v2)  ; v2 = 0x6e05
+    brif v3, block2, block6
 
-block1:
-    v4 = iconst.i64 2565
-    jump block3(v4)  ; v4 = 2565
-
-block2:
-    v5 = iconst.i64 0x7405
+block6:
+    v4 = iconst.i64 0x7405
     call fn0(v0)
-    v6 = call fn1(v0, v5)  ; v5 = 0x7405
-    brif v6, block4, block5
-
-block4:
-    v8 = iconst.i64 2309
-    jump block6(v8)  ; v8 = 2309
-
-block5:
-    v9 = iconst.i64 0x7205
-    call fn0(v0)
-    v10 = call fn1(v0, v9)  ; v9 = 0x7205
-    brif v10, block7, block8
+    v5 = call fn1(v0, v4)  ; v4 = 0x7405
+    brif v5, block3, block7
 
 block7:
-    v12 = iconst.i64 3333
-    jump block9(v12)  ; v12 = 3333
+    v6 = iconst.i64 0x7205
+    call fn0(v0)
+    v7 = call fn1(v0, v6)  ; v6 = 0x7205
+    brif v7, block4, block8
 
 block8:
+    jump block5
+
+block2:
+    v8 = iconst.i64 2565
+    jump block1(v8)  ; v8 = 2565
+
+block3:
+    v9 = iconst.i64 2309
+    jump block1(v9)  ; v9 = 2309
+
+block4:
+    v10 = iconst.i64 3333
+    jump block1(v10)  ; v10 = 3333
+
+block5:
     call fn0(v0)
-    jump block9(v0)
+    jump block1(v0)
 
-block9(v11: i64):
-    call fn0(v11)
-    call fn2(v11)
-    jump block6(v11)
-
-block6(v7: i64):
-    call fn0(v7)
-    call fn2(v7)
-    jump block3(v7)
-
-block3(v3: i64):
-    call fn0(v3)
+block1(v1: i64):
+    call fn0(v1)
     call fn2(v0)
-    call fn2(v3)
-    return v3
+    call fn2(v1)
+    return v1
 }
 
 ; source variables:

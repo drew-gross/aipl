@@ -10,10 +10,11 @@ import { &&, wrapping_add as +, +++, <, ==, len } from builtins;
 // already enforced by the matcher's scan (its `escapes` set), so an unknown `\X`
 // never reaches here. `self` is the single char following the backslash.
 pub fn escape_text(self: str) -> str {
-    if (self == "n") {
-        "\n"
-    } else {
-        if (self == "t") { "\t" } else { if (self == "r") { "\r" } else { self } }
+    match (self) {
+        "n" => "\n",
+        "t" => "\t",
+        "r" => "\r",
+        _ => self,
     }
 }.test({
     // The three control-char escapes.
@@ -73,8 +74,8 @@ allocations: 39
 deallocations: 39
 reallocations: 0
 bytes allocated: 1552
-instructions executed: 3761
-binary size: 8704
+instructions executed: 3696
+binary size: 8576
 --- monomorphizations ---
 escape_text
 main
