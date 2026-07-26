@@ -1,8 +1,4 @@
-// AIPL's string-escape decoder, used by `lex_aipl.aipl`'s string/char/template
-// emits to turn a token's raw, delimiter-stripped contents into its value. The
-// lexer library deliberately provides none — what a `\X` means is a language's
-// own policy (see `TokenValue` in `lexer.aipl`) — so it lives here, in the
-// consumer, and is kept in its own file so it can be tested on its own.
+// AIPL's string-escape decoder.
 import { &&, wrapping_add as +, +++, <, ==, len } from builtins;
 
 // Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
