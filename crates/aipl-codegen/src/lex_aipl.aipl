@@ -622,9 +622,9 @@ __m1__seg_only
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
-__m2__strip_test_sections
-__m3__parse_test_section_header
-__m4__unescape
+__m2__unescape
+__m3__strip_test_sections
+__m4__parse_test_section_header
 __test$lex_aipl
 __test$lex_aipl_stripped
 char_lit_emit

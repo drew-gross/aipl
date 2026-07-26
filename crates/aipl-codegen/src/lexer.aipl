@@ -34,6 +34,11 @@ import {
     starts_with,
     value_or,
 } from builtins;
+// The `.test` block's decoding emits need a string-escape decoder. The library
+// deliberately provides none (escape meaning is a language's policy), so the
+// test borrows AIPL's own — the same `unescape` the real lexer uses — rather
+// than keeping a second copy in sync.
+import { unescape } from "./unescape.aipl";
 
 // What a token carries beyond its span: the processed *value* of the matched
 // text, computed at lex time by the matcher that claimed it (see each
@@ -680,41 +685,9 @@ variant Kind =
     | RawTplMid(str)
     | RawTplTail(str)
 
-// A consumer-side escape decoder, written here for the test emits below. The
-// library deliberately does *not* provide one — string escape decoding is a
-// language's own policy, so each consumer writes its own (the real AIPL lexer's
-// lives in `lex_aipl.aipl`). `escape_text` maps a `\X` pair's X to its meaning
-// (`n`/`t`/`r` to control chars, else X itself); `unescape` walks the raw,
-// delimiter-stripped contents applying it, copying everything else verbatim in
-// whole runs. A trailing lone backslash can't reach here — the matcher already
-// rejected the token as unterminated.
-fn escape_text(self: str) -> str {
-    if (self == "n") {
-        "\n"
-    } else {
-        if (self == "t") { "\t" } else { if (self == "r") { "\r" } else { self } }
-    }
-}
-
-fn unescape(self: str) -> str {
-    mut out = "";
-    mut run_start = 0;
-    mut i = 0;
-    while (i < self.len()) {
-        if (self[i] == some('\\') && i + 1 < self.len()) {
-            set out = out +++ self[run_start..i] +++ self[i + 1..i + 2].escape_text();
-            set i = i + 2;
-            set run_start = i;
-        } else {
-            set i = i + 1;
-        };
-    }
-    out +++ self[run_start..]
-}
-
 // The `.test` block's template `OfSeg` emit: the library hands each segment's
-// *raw* text, so this emit decodes it (with the test's own `unescape` above)
-// before mapping to a `Kind` arm — escape handling is the caller's job.
+// *raw* text, so this emit decodes it (with the imported `unescape`) before
+// mapping to a `Kind` arm — escape handling is the caller's job.
 fn tpl_kind(text: str, seg: Seg) -> Kind {
     let t = text.unescape();
     match (seg) {
@@ -1098,8 +1071,8 @@ allocations: 1394
 deallocations: 1394
 reallocations: 0
 bytes allocated: 65648
-instructions executed: 282207
-binary size: 877064
+instructions executed: 282197
+binary size: 876936
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam19
 __builtin_count_while$char$s0$lam24
@@ -1121,6 +1094,7 @@ __lambda_6
 __lambda_7
 __lambda_8
 __lambda_9
+__m1__unescape
 __test$lex
 between_len
 checked_seg
@@ -1145,4 +1119,3 @@ template_step$Kind
 tok
 toks
 tpl_kind
-unescape
