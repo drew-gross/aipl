@@ -189,7 +189,7 @@ fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
 
 // Build an `IntLit` from a matched digit run. The `Int` matcher only claims the
 // run; parsing is the caller's job, so this parses it with the `int_parse`
-// builtin and, as a fallible `TryText` emit, reports an i64 overflow as an error
+// builtin and, as a fallible `Try` emit, reports an i64 overflow as an error
 // message — the library attaches the literal's span. Parsing policy lives here,
 // in the consumer, not in the lexer library.
 fn int_lit(text: str) -> AiplTok!str {
@@ -204,7 +204,7 @@ fn int_lit(text: str) -> AiplTok!str {
 // scan `"..."` strings use) just hands over the un-decoded text between the
 // quotes, and this emit unescapes it and requires exactly one char — so an empty
 // (`''`) or multi-char (`'ab'`, `'multiple'`) literal is a hard error. As a
-// `TryStr` emit the library pairs the message with the *whole* literal's span,
+// `Try` emit the library pairs the message with the *whole* literal's span,
 // so the caret underlines the entire bad token. Unknown escapes and unterminated
 // literals are caught earlier, by the matcher's own scan (its `escapes` set).
 fn char_lit_emit(text: str) -> AiplTok!str {
@@ -268,16 +268,16 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("true", True),
         kw("false", False),
         kw("none", None),
-        TokenRule { matcher: CharRun(ident_start(), ident_cont()), emit: OfText(Name) },
-        TokenRule { matcher: Int, emit: TryText(int_lit) },
+        TokenRule { matcher: CharRun(ident_start(), ident_cont()), emit: Of(Name) },
+        TokenRule { matcher: Int, emit: Try(int_lit) },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
         // than an empty `""` plus a stray `"`.
-        TokenRule { matcher: Between(three_quotes, three_quotes), emit: OfStr(RawStrLit) },
+        TokenRule { matcher: Between(three_quotes, three_quotes), emit: Of(RawStrLit) },
         TokenRule {
             matcher: Delimited("\"", "ntr\\\""),
-            emit: OfStr(|text: str| StrLit(text.unescape())),
+            emit: Of(|text: str| StrLit(text.unescape())),
         },
         // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
         // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
@@ -287,7 +287,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // the consumer, not in a dedicated library matcher; the kind is `CharTok`
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
-        TokenRule { matcher: Delimited("'", "ntr\\'\""), emit: TryStr(char_lit_emit) },
+        TokenRule { matcher: Delimited("'", "ntr\\'\""), emit: Try(char_lit_emit) },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
         // whole before the single ``` ` ``` rule bites off the first backtick —
@@ -544,7 +544,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         ),
     );
 
-    // An integer that overflows i64: the `TryText` emit (`int_lit`) reports it,
+    // An integer that overflows i64: the `Try` emit (`int_lit`) reports it,
     // and the library attaches the literal's span. Overflow policy is the
     // consumer's — the lexer library never parses ints itself.
     assert(
@@ -626,8 +626,8 @@ allocations: 4550
 deallocations: 4550
 reallocations: 0
 bytes allocated: 235424
-instructions executed: 1266422
-binary size: 582864
+instructions executed: 1266456
+binary size: 572352
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam18
@@ -643,7 +643,6 @@ __lambda_4
 __lambda_5
 __m1__between_len
 __m1__delimited_len
-__m1__emit_mismatch
 __m1__float_len
 __m1__interp_scan$AiplTok
 __m1__lex$AiplTok
