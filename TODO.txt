@@ -76,7 +76,7 @@ For lexer dogfooding:
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - switch formatter to dogfood lexer
 - switch prod to dogfood lexer
-- lexer lib seems to know too much about how template literals work
+- lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.
 
 have the clir IR include the human readable version of data section strings in comments
 
@@ -85,6 +85,8 @@ Decide if I want bare variant assignment. Similar: Can a function that returns T
 TODO: garbage collectable types, so we can make a .aipl parser.
 
 Switch back to multi-file dogfood clifs to make diffs nicer
+
+support else if (but only that form)
 
 Nested matching e.g.
     match (opt_of_array) {

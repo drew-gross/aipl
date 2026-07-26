@@ -30,13 +30,15 @@ const STRIP_TEST_SECTIONS_AIPL: &str =
     include_str!("../crates/aipl-codegen/src/strip_test_sections.aipl");
 const PARSE_TEST_SECTION_HEADER_AIPL: &str =
     include_str!("../crates/aipl-codegen/src/parse_test_section_header.aipl");
+const UNESCAPE_AIPL: &str = include_str!("../crates/aipl-codegen/src/unescape.aipl");
 
 /// Compile the AIPL lexer into an FFI engine exposing `lex_aipl_tokens`. Beyond
 /// the lexer itself (`lex_aipl.aipl` + its `lexer.aipl` library) this pulls in
-/// `strip_test_sections.aipl` and its `parse_test_section_header.aipl` dep,
-/// which `lex_aipl.aipl` imports for its `lex_aipl_stripped` entry. The
-/// trailing `--- performance ---` sections are stripped by the loader's parse,
-/// so the raw `include_str!`d sources load as-is.
+/// `strip_test_sections.aipl` (and its `parse_test_section_header.aipl` dep),
+/// which `lex_aipl.aipl` imports for its `lex_aipl_stripped` entry, and
+/// `unescape.aipl`, its escape decoder. The trailing `--- performance ---`
+/// sections are stripped by the loader's parse, so the raw `include_str!`d
+/// sources load as-is.
 fn compile_lexer() -> Engine {
     aipl::install_parser_hooks();
     Engine::compile_sources(&[
@@ -47,6 +49,7 @@ fn compile_lexer() -> Engine {
             "./parse_test_section_header.aipl",
             PARSE_TEST_SECTION_HEADER_AIPL,
         ),
+        ("./unescape.aipl", UNESCAPE_AIPL),
     ])
     .expect("compile AIPL lexer for differential test")
 }

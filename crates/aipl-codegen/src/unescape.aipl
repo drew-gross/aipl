@@ -1,0 +1,81 @@
+// AIPL's string-escape decoder, used by `lex_aipl.aipl`'s string/char/template
+// emits to turn a token's raw, delimiter-stripped contents into its value. The
+// lexer library deliberately provides none — what a `\X` means is a language's
+// own policy (see `TokenValue` in `lexer.aipl`) — so it lives here, in the
+// consumer, and is kept in its own file so it can be tested on its own.
+import { &&, wrapping_add as +, +++, <, ==, len } from builtins;
+
+// Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
+// any other escaped char (`"`, `\`, `` ` ``, `{`) to itself. Validity was
+// already enforced by the matcher's scan (its `escapes` set), so an unknown `\X`
+// never reaches here. `self` is the single char following the backslash.
+pub fn escape_text(self: str) -> str {
+    if (self == "n") {
+        "\n"
+    } else {
+        if (self == "t") { "\t" } else { if (self == "r") { "\r" } else { self } }
+    }
+}.test({
+    // The three control-char escapes.
+    assert(escape_text("n") == "\n");
+    assert(escape_text("t") == "\t");
+    assert(escape_text("r") == "\r");
+    // Every other escaped char decodes to itself.
+    assert(escape_text("\\") == "\\");
+    assert(escape_text("\"") == "\"");
+    assert(escape_text("{") == "{");
+    assert(escape_text("`") == "`");
+})
+
+// Decode every `\X` escape in `self`, copying everything else verbatim. Walks
+// byte-by-byte: at each backslash (with a char after it) splice the run since the
+// last escape plus the decoded `\X`, then resume past it; the trailing run is
+// appended at the end. Copying whole runs by slicing (rather than char-by-char)
+// keeps the common no-escape case a single copy. A trailing lone backslash can't
+// occur — the matcher already rejected such a token as unterminated.
+pub fn unescape(self: str) -> str {
+    mut out = "";
+    mut run_start = 0;
+    mut i = 0;
+    while (i < self.len()) {
+        if (self[i] == some('\\') && i + 1 < self.len()) {
+            set out = out +++ self[run_start..i] +++ self[i + 1..i + 2].escape_text();
+            set i = i + 2;
+            set run_start = i;
+        } else {
+            set i = i + 1;
+        };
+    }
+    out +++ self[run_start..]
+}.test({
+    // No escapes: the input is returned verbatim (the common case, one copy).
+    assert(unescape("") == "");
+    assert(unescape("hello world") == "hello world");
+
+    // The control-char escapes decode (the AIPL source writes each as a literal
+    // backslash-`n`/`t`/`r`; the result carries the actual control char).
+    assert(unescape("\\n") == "\n");
+    assert(unescape("\\t") == "\t");
+    assert(unescape("\\r") == "\r");
+    // An escaped backslash / quote / brace / backtick decodes to the bare char.
+    assert(unescape("\\\\") == "\\");
+    assert(unescape("\\\"") == "\"");
+    assert(unescape("\\{") == "{");
+    // Runs before, between, and after escapes are all preserved.
+    assert(unescape("a\\nb") == "a\nb");
+    assert(unescape("pre\\npost") == "pre\npost");
+    assert(unescape("x\\ny\\tz") == "x\ny\tz");
+    // Adjacent escapes with no plain runs between them.
+    assert(unescape("\\n\\t\\r") == "\n\t\r");
+})
+--- performance ---
+allocations: 39
+deallocations: 39
+reallocations: 0
+bytes allocated: 1552
+instructions executed: 3761
+binary size: 8704
+--- monomorphizations ---
+escape_text
+main
+unescape

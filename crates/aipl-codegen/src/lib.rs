@@ -2642,6 +2642,7 @@ const INT_FITS_SRC: &str = include_str!("int_fits.aipl");
 const IS_OPERATOR_NAME_SRC: &str = include_str!("is_operator_name.aipl");
 const LEXER_LIB_SRC: &str = include_str!("lexer.aipl");
 const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
+const UNESCAPE_SRC: &str = include_str!("unescape.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2680,6 +2681,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./is_operator_name.aipl", IS_OPERATOR_NAME_SRC),
     ("./lexer.aipl", LEXER_LIB_SRC),
     ("./lex_aipl.aipl", LEX_AIPL_SRC),
+    ("./unescape.aipl", UNESCAPE_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
