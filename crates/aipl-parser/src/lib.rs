@@ -3385,7 +3385,27 @@ pub enum TokenKind {
 /// Tokenize `input` and classify each token for syntax-highlighter
 /// verification. Strips test-section markers first (the lexer doesn't
 /// understand them), so the caller only sees AIPL source tokens.
+///
+/// Lexing is dogfooded: the tokens come from the AIPL [`lex_aipl`] via the
+/// installed hook (no native fallback). A [`LexedError`] becomes an
+/// [`Error`] at its span.
 pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
+    let input = strip_test_sections(input);
+    let out = lex_aipl(&input).map_err(|e| Error::at(e.message, e.span))?;
+    Ok(out
+        .tokens
+        .into_iter()
+        .map(|t| (classify_lexed(&t.kind), t.span))
+        .collect())
+}
+
+/// The **native** (hand-written Rust) lexer's classified token dump, kept as
+/// the differential-test reference against the dogfooded AIPL lexer while the
+/// two coexist. [`lex_tokens`] itself now runs the dogfooded lexer, so a test
+/// that wants to compare the two paths must reach the native one here. Retired
+/// (with the native scanner it wraps) once the parser flips to the dogfooded
+/// lexer.
+pub fn lex_tokens_native(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
     let input = strip_test_sections(input);
     let raw = tokenize(input)?;
     Ok(raw.into_iter().map(|(t, sp)| (classify(&t), sp)).collect())
@@ -3480,6 +3500,88 @@ pub fn lex_signatures_and_comments(
         })
         .collect();
     Ok((toks, comments))
+}
+
+/// Coarse-classify a dogfooded-lexer token kind, exactly as [`classify`] does
+/// for the native `Terminal` — including the identifier-text refinement that
+/// scopes the built-in type names (`i64`/`bool`/`char`/…) as `BuiltinType`.
+/// The trivia kinds (`Space`/comments/`AllowMarker`) never appear in the token
+/// stream (they ride the trivia side-channel), so reaching one is a bug.
+fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
+    use LexedTokenKind as K;
+    match k {
+        K::Fn
+        | K::If
+        | K::Else
+        | K::Struct
+        | K::Variant
+        | K::Import
+        | K::From
+        | K::As
+        | K::Pub
+        | K::Let
+        | K::For
+        | K::While
+        | K::Mut
+        | K::Set
+        | K::Match
+        | K::Return
+        | K::Builtins => TokenKind::Keyword,
+        K::True | K::False | K::None => TokenKind::Constant,
+        K::Name(s) => match s.as_str() {
+            "bool" | "char" | "str" | "any" => TokenKind::BuiltinType,
+            _ if aipl_syntax::int_bits(s).is_some() => TokenKind::BuiltinType,
+            _ => TokenKind::Identifier,
+        },
+        K::IntLit(_) => TokenKind::Number,
+        K::StrLit(_)
+        | K::RawStrLit(_)
+        | K::TemplateStr(_)
+        | K::TemplateHead(_)
+        | K::TemplateMid(_)
+        | K::TemplateTail(_)
+        | K::RawTemplateStr(_)
+        | K::RawTemplateHead(_)
+        | K::RawTemplateMid(_)
+        | K::RawTemplateTail(_) => TokenKind::Str,
+        K::CharTok(_) => TokenKind::Char,
+        K::EqEq
+        | K::Ne
+        | K::Arrow
+        | K::FatArrow
+        | K::AndAnd
+        | K::OrOr
+        | K::Pipe
+        | K::DotDot
+        | K::PlusPlusPlus
+        | K::PlusPlus
+        | K::Eq
+        | K::Lt
+        | K::Le
+        | K::Gt
+        | K::Ge
+        | K::Bang
+        | K::Plus
+        | K::Minus
+        | K::Star
+        | K::Slash
+        | K::Percent => TokenKind::Operator,
+        K::Period
+        | K::Comma
+        | K::Colon
+        | K::Semi
+        | K::Question
+        | K::Hash
+        | K::LParen
+        | K::RParen
+        | K::LBrace
+        | K::RBrace
+        | K::LBracket
+        | K::RBracket => TokenKind::Punctuation,
+        K::Space | K::LineComment | K::BlockComment | K::AllowMarker => {
+            unreachable!("trivia kind {k:?} in the token stream")
+        }
+    }
 }
 
 fn classify(t: &aipl::Terminal<Build>) -> TokenKind {

@@ -130,10 +130,13 @@ fn aipl_dump(engine: &Engine, src: &str) -> String {
 }
 
 /// The Rust lexer's canonical dump of `src`, in the same format `lex_aipl_dump`
-/// produces (see the module docs for the `BuiltinType` → `ident` fold).
+/// produces (see the module docs for the `BuiltinType` → `ident` fold). Uses
+/// [`aipl::lex_tokens_native`] — the hand-written Rust lexer — because
+/// `aipl::lex_tokens` now runs the *dogfooded* lexer, which this test exists to
+/// compare *against* the native one.
 fn rust_dump(src: &str) -> String {
     use aipl::TokenKind::*;
-    match aipl::lex_tokens(src) {
+    match aipl::lex_tokens_native(src) {
         Ok(tokens) => {
             let mut out = String::new();
             for (kind, span) in tokens {
