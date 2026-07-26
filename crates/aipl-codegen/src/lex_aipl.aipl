@@ -479,6 +479,18 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // (the two quotes) matches the Rust lexer's `empty char literal` error.
     assert(lex_aipl("''") == err(LexError { message: "empty char literal", span: 0..2 }));
 
+    // A multi-char literal (someone reaching for a string but typing `'...'`) is
+    // rejected. NOTE the span: the lexer takes the first char as the content,
+    // then finds a non-quote where the close should be, so the reported span is
+    // just the opening quote + that first char (`'m`, here 7..9) — *not* the
+    // whole `'multiple'` literal. This narrow caret is arguably surprising (the
+    // mistake spans the whole literal), which is why it's called out here.
+    assert(
+        lex_aipl("oops = 'multiple'") == err(
+            LexError { message: "char literal must contain exactly one character", span: 7..9 },
+        ),
+    );
+
     // A template literal with no interpolation lexes as one `TemplateStr` (the
     // Rust lexer folds it to a plain string) — the whole literal, backticks
     // included, is its span.
@@ -591,12 +603,12 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4238
-deallocations: 4238
+allocations: 4543
+deallocations: 4543
 reallocations: 0
-bytes allocated: 221136
-instructions executed: 1200833
-binary size: 617280
+bytes allocated: 235152
+instructions executed: 1267756
+binary size: 618120
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam20
