@@ -1,15 +1,16 @@
 //! Differential test: the dogfooded AIPL lexer (`lex_aipl.aipl`) vs the compiler's
 //! hand-written Rust lexer.
 //!
-//! A cautious first step toward dogfooding the AIPL lexer *inside* the compiler:
-//! nothing here is wired into compilation. We compile the AIPL lexer once through
-//! the embedding FFI and call `lex_aipl_tokens`, which returns the *actual* token
-//! array — `Token<AiplTok>[]!LexError`, each token's typed `kind` (a variant) and
-//! `span` (a struct) — marshaled directly across the FFI. The Rust side coarsens
-//! each token to a `START END CATEGORY` line (a lex error becomes one `ERR START
-//! END` line) and produces the same shape from `aipl::lex_tokens`. Comparing the
-//! two over the test corpus yields a burn-down list of where the AIPL lexer still
-//! diverges — run `report_lexer_differences` (below) to see it.
+//! The AIPL lexer is now wired into the compiler for the highlighter path
+//! (`aipl::lex_tokens` runs it via the dogfood hook), and this test is what
+//! guards that: [`dogfood_lex_hook_matches_rust_lexer_on_corpus`] compares the
+//! *production* hook path against the native Rust lexer
+//! (`aipl::lex_tokens_native`, retained as the reference until the parser flip
+//! deletes it) over the whole corpus, on every `cargo test`. The older
+//! scaffolding still here — `compile_lexer`/`aipl_dump` (freshly FFI-compiling
+//! `lex_aipl.aipl` and calling `lex_aipl_tokens`) and the `#[ignore]`d
+//! [`report_lexer_differences`] burn-down — tracks the working-tree source
+//! (rather than the checked-in IR) and predates the wiring.
 //!
 //! The comparison is at *category + span* granularity (keyword / ident / number /
 //! str / char / constant / operator / punct), matching the Rust lexer's own
@@ -25,14 +26,29 @@ use std::path::{Path, PathBuf};
 
 const LEXER_AIPL: &str = include_str!("../crates/aipl-codegen/src/lexer.aipl");
 const LEX_AIPL: &str = include_str!("../crates/aipl-codegen/src/lex_aipl.aipl");
+const STRIP_TEST_SECTIONS_AIPL: &str =
+    include_str!("../crates/aipl-codegen/src/strip_test_sections.aipl");
+const PARSE_TEST_SECTION_HEADER_AIPL: &str =
+    include_str!("../crates/aipl-codegen/src/parse_test_section_header.aipl");
 
-/// Compile `lexer.aipl` + `lex_aipl.aipl` into an FFI engine exposing
-/// `lex_aipl_tokens`. The trailing `--- performance ---` sections are stripped by
-/// the loader's parse, so the raw `include_str!`d sources load as-is.
+/// Compile the AIPL lexer into an FFI engine exposing `lex_aipl_tokens`. Beyond
+/// the lexer itself (`lex_aipl.aipl` + its `lexer.aipl` library) this pulls in
+/// `strip_test_sections.aipl` and its `parse_test_section_header.aipl` dep,
+/// which `lex_aipl.aipl` imports for its `lex_aipl_stripped` entry. The
+/// trailing `--- performance ---` sections are stripped by the loader's parse,
+/// so the raw `include_str!`d sources load as-is.
 fn compile_lexer() -> Engine {
     aipl::install_parser_hooks();
-    Engine::compile_sources(&[("./lex_aipl.aipl", LEX_AIPL), ("./lexer.aipl", LEXER_AIPL)])
-        .expect("compile AIPL lexer for differential test")
+    Engine::compile_sources(&[
+        ("./lex_aipl.aipl", LEX_AIPL),
+        ("./lexer.aipl", LEXER_AIPL),
+        ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_AIPL),
+        (
+            "./parse_test_section_header.aipl",
+            PARSE_TEST_SECTION_HEADER_AIPL,
+        ),
+    ])
+    .expect("compile AIPL lexer for differential test")
 }
 
 /// The `(String, FfiValue)` field named `name` in a marshaled struct.

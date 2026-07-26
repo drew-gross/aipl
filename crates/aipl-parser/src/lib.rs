@@ -2507,20 +2507,41 @@ pub struct LexedError {
 static LEX_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
     std::sync::OnceLock::new();
 
-/// Install the lexer hook. The compiler points this at the dogfooded AIPL
+/// The dogfooded strip-then-lex lexer, installed via [`set_lex_stripped_hook`].
+static LEX_STRIPPED_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
+    std::sync::OnceLock::new();
+
+/// Install the raw lexer hook. The compiler points this at the dogfooded AIPL
 /// `lex_aipl`, run through the embedding FFI. First install wins (the hook is
 /// process-global).
 pub fn set_lex_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
     let _ = LEX_HOOK.set(f);
 }
 
-/// Lex `src` through the installed dogfooded AIPL lexer. There is no native
-/// fallback: this panics if the hook isn't installed (call
+/// Install the strip-then-lex hook. The compiler points this at the dogfooded
+/// AIPL `lex_aipl_stripped` (which strips trailing `--- section ---` blocks
+/// then lexes, both dogfooded steps in one FFI crossing). First install wins.
+pub fn set_lex_stripped_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
+    let _ = LEX_STRIPPED_HOOK.set(f);
+}
+
+/// Lex `src` as-is through the installed dogfooded AIPL lexer. There is no
+/// native fallback: this panics if the hook isn't installed (call
 /// `install_parser_hooks` first).
 pub fn lex_aipl(src: &str) -> Result<LexedOutput, LexedError> {
     let hook = LEX_HOOK
         .get()
         .expect("lex hook not installed before lexing (call install_parser_hooks)");
+    hook(src)
+}
+
+/// Strip trailing `--- section ---` test blocks from `src`, then lex — through
+/// the installed dogfooded AIPL `lex_aipl_stripped`. No native fallback: panics
+/// if the hook isn't installed (call `install_parser_hooks` first).
+pub fn lex_aipl_stripped(src: &str) -> Result<LexedOutput, LexedError> {
+    let hook = LEX_STRIPPED_HOOK
+        .get()
+        .expect("strip-lex hook not installed before lexing (call install_parser_hooks)");
     hook(src)
 }
 
@@ -3386,12 +3407,11 @@ pub enum TokenKind {
 /// verification. Strips test-section markers first (the lexer doesn't
 /// understand them), so the caller only sees AIPL source tokens.
 ///
-/// Lexing is dogfooded: the tokens come from the AIPL [`lex_aipl`] via the
-/// installed hook (no native fallback). A [`LexedError`] becomes an
-/// [`Error`] at its span.
+/// Lexing is dogfooded: the section stripping *and* the lexing both happen in
+/// the AIPL [`lex_aipl_stripped`] via one hook crossing (no native fallback).
+/// A [`LexedError`] becomes an [`Error`] at its span.
 pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
-    let input = strip_test_sections(input);
-    let out = lex_aipl(&input).map_err(|e| Error::at(e.message, e.span))?;
+    let out = lex_aipl_stripped(input).map_err(|e| Error::at(e.message, e.span))?;
     Ok(out
         .tokens
         .into_iter()

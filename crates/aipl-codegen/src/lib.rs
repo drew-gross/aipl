@@ -2701,6 +2701,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "int_fits",
     "is_operator_name",
     "lex_aipl",
+    "lex_aipl_stripped",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -2930,14 +2931,18 @@ fn is_operator_name(s: &str) -> bool {
     })
 }
 
-/// The parser's lexer hook (see [`install_parser_hooks`]): lex AIPL source
-/// through the dogfooded AIPL `lex_aipl` via the FFI, mirroring the returned
+/// Marshal a dogfooded lexer entry — one returning `LexResult<AiplTok>!LexError`
+/// — from the dogfood engine: call `entry` on `src` and mirror the returned
 /// `LexResult<AiplTok>` (the token stream plus the trivia side-channel) into
 /// the parser's [`aipl_parser::LexedOutput`] arm-for-arm, and a `LexError`
 /// into [`aipl_parser::LexedError`]. One FFI crossing per source, not one per
 /// token. No native fallback; panics if the engine can't be built or called,
-/// or if a marshaled shape doesn't match `lex_aipl.aipl`'s types.
-fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
+/// or if a marshaled shape doesn't match `lex_aipl.aipl`'s types. Shared by
+/// the raw ([`lex_aipl`]) and section-stripping ([`lex_aipl_stripped`]) hooks.
+fn marshal_lex(
+    entry: &str,
+    src: &str,
+) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
     use aipl_parser::{LexedError, LexedOutput, LexedToken, LexedTokenKind as K};
 
     // The `(String, FfiValue)` field named `name` of a marshaled struct.
@@ -3088,11 +3093,11 @@ fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedErr
             .collect()
     }
 
-    DOGFOOD_ENGINE.with(|comp| {
-        match comp.call_values("lex_aipl", &[FfiValue::Str(src.to_string())]) {
+    DOGFOOD_ENGINE.with(
+        |comp| match comp.call_values(entry, &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Res(Ok(res))) => {
                 let FfiValue::Struct(fields) = *res else {
-                    panic!("dogfooded lex_aipl(): ok payload not a LexResult struct: {res:?}");
+                    panic!("dogfooded {entry}(): ok payload not a LexResult struct: {res:?}");
                 };
                 let mut tokens = None;
                 let mut trivia = None;
@@ -3101,29 +3106,44 @@ fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedErr
                         "tokens" => tokens = Some(v),
                         "trivia" => trivia = Some(v),
                         other => {
-                            panic!("dogfooded lex_aipl(): unexpected LexResult field {other:?}")
+                            panic!("dogfooded {entry}(): unexpected LexResult field {other:?}")
                         }
                     }
                 }
                 Ok(LexedOutput {
-                    tokens: tokens_of(tokens.expect("dogfooded lex_aipl(): missing tokens")),
-                    trivia: tokens_of(trivia.expect("dogfooded lex_aipl(): missing trivia")),
+                    tokens: tokens_of(tokens.expect("dogfooded lex entry: missing tokens")),
+                    trivia: tokens_of(trivia.expect("dogfooded lex entry: missing trivia")),
                 })
             }
             Ok(FfiValue::Res(Err(e))) => {
                 let FfiValue::Struct(fields) = *e else {
-                    panic!("dogfooded lex_aipl(): err payload not a LexError struct: {e:?}");
+                    panic!("dogfooded {entry}(): err payload not a LexError struct: {e:?}");
                 };
                 let message = match field(fields.clone(), "message") {
                     FfiValue::Str(s) => s,
-                    other => panic!("dogfooded lex_aipl(): LexError.message: {other:?}"),
+                    other => panic!("dogfooded {entry}(): LexError.message: {other:?}"),
                 };
                 let span = span_of(field(fields, "span"));
                 Err(LexedError { message, span })
             }
-            other => panic!("dogfooded lex_aipl() call: {other:?}"),
-        }
-    })
+            other => panic!("dogfooded {entry}() call: {other:?}"),
+        },
+    )
+}
+
+/// The parser's raw lexer hook (see [`install_parser_hooks`]): lex `src`
+/// as-is through the dogfooded AIPL `lex_aipl`. Used by the formatter, which
+/// accounts for every byte and must not strip test sections.
+fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
+    marshal_lex("lex_aipl", src)
+}
+
+/// The parser's section-stripping lexer hook (see [`install_parser_hooks`]):
+/// strip trailing `--- section ---` cases-harness blocks, then lex — through
+/// the dogfooded AIPL `lex_aipl_stripped`, which composes both dogfooded steps
+/// in one FFI crossing. Used by the highlighter and the parser.
+fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
+    marshal_lex("lex_aipl_stripped", src)
 }
 
 /// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
@@ -3145,6 +3165,7 @@ pub fn install_parser_hooks() {
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_parser::set_lex_hook(lex_aipl);
+    aipl_parser::set_lex_stripped_hook(lex_aipl_stripped);
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);

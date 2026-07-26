@@ -12,9 +12,9 @@ pub use aipl_syntax::{ast, DebugOptions, Error, Span};
 
 // Lexer + parser surface.
 pub use aipl_parser::{
-    lex_aipl, lex_signatures_and_comments, lex_tokens, lex_tokens_and_comments, lex_tokens_native,
-    parse, parse_test_section_header, strip_test_sections, FmtTokenKind, LexedError, LexedOutput,
-    LexedToken, LexedTokenKind, TokenKind,
+    lex_aipl, lex_aipl_stripped, lex_signatures_and_comments, lex_tokens, lex_tokens_and_comments,
+    lex_tokens_native, parse, parse_test_section_header, strip_test_sections, FmtTokenKind,
+    LexedError, LexedOutput, LexedToken, LexedTokenKind, TokenKind,
 };
 
 // Compiler passes and backends, each re-exported as a module so existing

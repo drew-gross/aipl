@@ -419,6 +419,31 @@ fn sanity_check(artifact: &str) {
         ]))))
     );
 
+    // `lex_aipl_stripped` drops trailing `--- section ---` blocks before lexing
+    // (one FFI crossing for strip + lex), and kept tokens keep their original
+    // spans.
+    let stripped = comp
+        .call_values(
+            "lex_aipl_stripped",
+            &[FfiValue::Str("let x = 1\n--- stdout ---\nfoo".to_string())],
+        )
+        .unwrap();
+    assert_eq!(
+        stripped,
+        FfiValue::Res(Ok(Box::new(FfiValue::Struct(vec![
+            (
+                "tokens".to_string(),
+                FfiValue::Array(vec![
+                    tok("Let", vec![], 0, 3),
+                    tok("Name", vec![FfiValue::Str("x".to_string())], 4, 5),
+                    tok("Eq", vec![], 6, 7),
+                    tok("IntLit", vec![FfiValue::Int(1)], 8, 9),
+                ]),
+            ),
+            ("trivia".to_string(), FfiValue::Array(vec![])),
+        ]))))
+    );
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 
