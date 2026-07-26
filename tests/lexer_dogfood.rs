@@ -247,10 +247,18 @@ fn dogfood_lex_hook_matches_rust_lexer_on_corpus() {
         files.len()
     );
 
-    // The one known divergence: the AIPL lexer's byte-oriented `CharLit` spans
-    // a non-ASCII char literal's error differently than the Rust lexer's
-    // dedicated non-ASCII error. Excluded until the error-fidelity pass.
-    let excluded = ["tests/cases/chars/err_non_ascii_char.aipl"];
+    // The two known divergences are both char-literal errors where the AIPL
+    // lexer now reports the *whole literal's* span (its `char_lit_emit` verdict
+    // carries the whole token span) while the native Rust lexer reports a
+    // narrower one: for `'ab'` Rust underlines only `'a`, and for `'é'` only the
+    // `'é` bytes (its dedicated non-ASCII error). The wider AIPL caret is the
+    // intended improvement; these resolve when the parser flips to the dogfooded
+    // lexer (its span becomes canonical and the fixtures' `--- errors ---` move
+    // with it).
+    let excluded = [
+        "tests/cases/chars/err_multi_char_literal.aipl",
+        "tests/cases/chars/err_non_ascii_char.aipl",
+    ];
 
     for f in &files {
         let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();

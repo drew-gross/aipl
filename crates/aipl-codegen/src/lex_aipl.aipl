@@ -199,6 +199,25 @@ fn int_lit(text: str) -> AiplTok!str {
     }
 }
 
+// Decode and validate a single-quote literal. This is where AIPL *defines* what
+// a char literal is: the `Delimited("'", ..)` matcher (the same escape-aware
+// scan `"..."` strings use) just hands over the un-decoded text between the
+// quotes, and this emit unescapes it and requires exactly one char — so an empty
+// (`''`) or multi-char (`'ab'`, `'multiple'`) literal is a hard error. As a
+// `TryStr` emit the library pairs the message with the *whole* literal's span,
+// so the caret underlines the entire bad token. Unknown escapes and unterminated
+// literals are caught earlier, by the matcher's own scan (its `escapes` set).
+fn char_lit_emit(text: str) -> AiplTok!str {
+    let decoded = text.unescape();
+    if (1 < decoded.len()) {
+        return err("char literal must contain exactly one character");
+    };
+    match (decoded[0]) {
+        some(c) => ok(CharTok(c)),
+        none => err("empty char literal"),
+    }
+}
+
 // The AIPL rule set. Order is priority (the first matching rule wins): skipped
 // whitespace and recorded comments/markers first; then every keyword and
 // constant (each its own `kw` rule) before the identifier rule, so `fn` isn't
@@ -260,14 +279,15 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Delimited("\"", "ntr\\\""),
             emit: OfStr(|text: str| StrLit(text.unescape())),
         },
-        // Char literals `'x'`/`'\n'`: the `CharLit` matcher enforces the one-char
-        // shape and decodes the byte itself (the same escape set as a string,
-        // plus `\'`), so `OfChar` applies the bare `CharTok` constructor to it. The
-        // kind is `CharTok`, not `CharLit`/`Char`, because those names are already
-        // the library's `Matcher` constructor and its test `Kind`'s arm (shared
-        // constructor namespace). Its hard errors (empty `''`, `'ab'`, unknown
-        // escape, unterminated) carry byte-precise spans matching the Rust lexer's.
-        TokenRule { matcher: CharLit("'", "ntr\\'\""), emit: OfChar(CharTok) },
+        // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
+        // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
+        // and `'\n'` work and an escaped quote doesn't close early) hands the
+        // un-decoded inner text to `char_lit_emit`, which decodes it and enforces
+        // the one-char shape. Defining "what a char literal is" thus lives here in
+        // the consumer, not in a dedicated library matcher; the kind is `CharTok`
+        // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
+        // namespace). The escape set matches the string rule plus `\'`.
+        TokenRule { matcher: Delimited("'", "ntr\\'\""), emit: TryStr(char_lit_emit) },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
         // whole before the single ``` ` ``` rule bites off the first backtick —
@@ -480,14 +500,13 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     assert(lex_aipl("''") == err(LexError { message: "empty char literal", span: 0..2 }));
 
     // A multi-char literal (someone reaching for a string but typing `'...'`) is
-    // rejected. NOTE the span: the lexer takes the first char as the content,
-    // then finds a non-quote where the close should be, so the reported span is
-    // just the opening quote + that first char (`'m`, here 7..9) — *not* the
-    // whole `'multiple'` literal. This narrow caret is arguably surprising (the
-    // mistake spans the whole literal), which is why it's called out here.
+    // rejected in `char_lit_emit`, after the `Delimited` scan grabs the whole
+    // `'multiple'` between the quotes. Because the verdict comes from the emit,
+    // the error spans the *entire* literal (7..17 here) — the caret underlines
+    // the whole mistake, not just the opening quote and first char.
     assert(
         lex_aipl("oops = 'multiple'") == err(
-            LexError { message: "char literal must contain exactly one character", span: 7..9 },
+            LexError { message: "char literal must contain exactly one character", span: 7..17 },
         ),
     );
 
@@ -603,27 +622,25 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4543
-deallocations: 4543
+allocations: 4550
+deallocations: 4550
 reallocations: 0
-bytes allocated: 235152
-instructions executed: 1267756
-binary size: 618120
+bytes allocated: 235424
+instructions executed: 1269275
+binary size: 620544
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam13
+__builtin_count_while$char$s0$lam18
+__builtin_count_while$char$s0$lam19
 __builtin_count_while$char$s0$lam20
-__builtin_count_while$char$s0$lam21
-__builtin_count_while$char$s0$lam22
 __builtin_int_parse
-__builtin_is_some_and$char$lam32
+__builtin_is_some_and$char$lam30
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
 __lambda_4
 __lambda_5
-__lambda_6
-__lambda_7
 __m1__between_len
 __m1__char_lit_len
 __m1__delimited_len
@@ -643,6 +660,7 @@ __m2__strip_test_sections
 __m3__parse_test_section_header
 __test$lex_aipl
 __test$lex_aipl_stripped
+char_lit_emit
 ident_cont
 int_lit
 kw
