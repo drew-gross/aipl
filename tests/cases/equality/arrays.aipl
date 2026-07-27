@@ -20,11 +20,11 @@ allocations: 26
 deallocations: 26
 reallocations: 0
 bytes allocated: 1224
-instructions executed: 1788
-binary size: 6880
-  code: 3408
+instructions executed: 1772
+binary size: 6328
+  code: 3144
   data: 488
-  metadata: 2984
+  metadata: 2696
 --- monomorphizations ---
 __test$eq_arrays
 main

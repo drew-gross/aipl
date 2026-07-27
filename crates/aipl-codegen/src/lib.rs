@@ -14034,8 +14034,15 @@ fn compile_expr<M: Module>(
             // literal has element type `__none__` and coerces to any
             // concrete `T[]` (mirrors bare `none`).
             let mut elem_ty: Option<Type> = None;
-            let mut vals = Vec::with_capacity(elems.len());
+            // Each element carries whether it's a fresh temporary we exclusively
+            // own: true when compiling it grew the scope and left its result as the
+            // last-tracked entry (a call result, constructor, …). The store loop
+            // below then *moves* such an element into the array (no retain, no
+            // separate scope-exit drop) instead of co-owning it. A borrowed place
+            // (a bare variable) tracks nothing new, so it's co-owned as before.
+            let mut vals: Vec<(Value, Type, bool)> = Vec::with_capacity(elems.len());
             for el in elems {
+                let before = scopes.last().map_or(0, |s| s.len());
                 let (v, t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
@@ -14055,7 +14062,11 @@ fn compile_expr<M: Module>(
                     }
                     Some(expected) => expect_type(&t, expected, "array element", el.span.clone())?,
                 }
-                vals.push((v, t));
+                let owned_temp = scopes.last().is_some_and(|s| {
+                    s.len() > before
+                        && matches!(s.last(), Some(Tracked { owned: Owned::Value(x), .. }) if *x == v)
+                });
+                vals.push((v, t, owned_temp));
             }
             let elem = elem_ty.unwrap_or(Type::NoneInner);
             let arr_ty = Type::Array(Box::new(elem.clone()));
@@ -14071,7 +14082,7 @@ fn compile_expr<M: Module>(
                 let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
                 let inst = builder.ins().call(alloc, &[len]);
                 let buf = builder.inst_results(inst)[0];
-                for (i, (v, _)) in vals.into_iter().enumerate() {
+                for (i, (v, _, _)) in vals.into_iter().enumerate() {
                     let addr = builder.ins().iadd_imm_s(buf, i as i64);
                     builder.ins().istore8(MemFlagsData::trusted(), v, addr, 0);
                 }
@@ -14095,7 +14106,7 @@ fn compile_expr<M: Module>(
                 // element bits and store it. Bools carry no heap (no retain).
                 for (j, chunk) in vals.chunks(8).enumerate() {
                     let mut byte = builder.ins().iconst(types::I64, 0);
-                    for (k, (v, _)) in chunk.iter().enumerate() {
+                    for (k, (v, _, _)) in chunk.iter().enumerate() {
                         let bit = builder.ins().ishl_imm_u(*v, k as i64);
                         byte = builder.ins().bor(byte, bit);
                     }
@@ -14106,13 +14117,25 @@ fn compile_expr<M: Module>(
                 }
             } else {
                 let esz = elem_size_of(&elem, structs);
-                for (i, (v, src_ty)) in vals.into_iter().enumerate() {
+                let mut moved: Vec<Value> = Vec::new();
+                for (i, (v, src_ty, owned_temp)) in vals.into_iter().enumerate() {
                     let slot = builder.ins().iadd_imm_s(elems_base, i as i64 * esz);
                     // Copy the element's own size (a `none` is narrower than a
                     // wider optional element slot — its unread tail is don't-care).
                     store_array_elem(builder, slot, v, &src_ty, structs);
-                    // The array co-owns each heap element — retain on store.
-                    emit_retain(builder, module, builtins, structs, v, &elem);
+                    if owned_temp {
+                        // Move: the array inherits the temporary's ref, so no retain
+                        // — and untrack it below so it isn't dropped again at scope
+                        // exit (the array's drop-fn releases it).
+                        moved.push(v);
+                    } else {
+                        // Borrowed element: the array co-owns it — retain on store.
+                        emit_retain(builder, module, builtins, structs, v, &elem);
+                    }
+                }
+                if !moved.is_empty() {
+                    let scope = scopes.last_mut().expect("scope");
+                    scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
                 }
             }
             scopes

@@ -48,11 +48,11 @@ allocations: 38
 deallocations: 38
 reallocations: 0
 bytes allocated: 1736
-instructions executed: 2695
-binary size: 15504
-  code: 9180
+instructions executed: 2677
+binary size: 14944
+  code: 8932
   data: 1316
-  metadata: 5008
+  metadata: 4696
 --- monomorphizations ---
 __test$has_header
 has_header
