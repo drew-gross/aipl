@@ -3460,78 +3460,152 @@ pub enum FmtTokenKind {
     TemplateTail,
 }
 
+/// Map a dogfooded-lexer token kind to the formatter's [`FmtTokenKind`]: an
+/// interpolated-template piece (regular *or* raw) keeps its head/middle/tail
+/// position, and every other kind — including all four merged `StrLit` string
+/// forms — folds to `Plain(classify_lexed(..))` (a `StrLit` classifies to
+/// `Str`). Mirrors the native lexer, whose `classify` folds an interpolation-
+/// free template to `Str` and collapses raw template pieces to the same
+/// head/middle/tail as regular ones.
+fn fmt_kind(k: &LexedTokenKind) -> FmtTokenKind {
+    use LexedTokenKind as K;
+    match k {
+        K::TemplateHead(_) | K::RawTemplateHead(_) => FmtTokenKind::TemplateHead,
+        K::TemplateMid(_) | K::RawTemplateMid(_) => FmtTokenKind::TemplateMiddle,
+        K::TemplateTail(_) | K::RawTemplateTail(_) => FmtTokenKind::TemplateTail,
+        other => FmtTokenKind::Plain(classify_lexed(other)),
+    }
+}
+
+/// The comment spans in a dogfooded-lexer run's trivia, in source order — the
+/// line and block comments *and* the `#[allow]` markers. The native tokenizer
+/// records a `#[allow]` in its comment sink too ("so the formatter carries it
+/// through, glued to its line like a trailing comment"), so every trivia record
+/// is a comment for the formatter's purposes. (Whitespace is skipped outright
+/// and never reaches the trivia channel.)
+fn comment_spans(out: &LexedOutput) -> Vec<Span> {
+    out.trivia.iter().map(|t| t.span.clone()).collect()
+}
+
+/// De-dent an interpolated *raw* template's (`` ```...``` ``) segment values for
+/// the signature check, keyed by token index. The lexer de-dents `StrLit`
+/// strings in its emit but *defers* de-denting interpolated raw templates
+/// (their `RawTemplate*` segments carry verbatim bytes), so the formatter does
+/// it here: a template's text segments are de-dented *together* — joined by a
+/// `\0` separator, run through `process_raw_string` as one block (so the common
+/// indent is computed across the whole template, matching how the raw block is
+/// re-laid-out for layout), then split back. That makes the segment signatures
+/// invariant under the formatter's re-indentation. A depth stack groups each
+/// (possibly nested) raw template's own segments. Non-`RawTemplate*` tokens
+/// aren't in the returned map.
+fn dedent_raw_template_values(tokens: &[LexedToken]) -> std::collections::HashMap<usize, String> {
+    use LexedTokenKind as K;
+    struct Group {
+        indices: Vec<usize>,
+        values: Vec<String>,
+    }
+    let mut stack: Vec<Group> = Vec::new();
+    let mut out = std::collections::HashMap::new();
+    for (i, t) in tokens.iter().enumerate() {
+        match &t.kind {
+            K::RawTemplateHead(s) => stack.push(Group {
+                indices: vec![i],
+                values: vec![s.clone()],
+            }),
+            K::RawTemplateMid(s) => {
+                let g = stack
+                    .last_mut()
+                    .expect("RawTemplateMid with no open raw template");
+                g.indices.push(i);
+                g.values.push(s.clone());
+            }
+            K::RawTemplateTail(s) => {
+                let mut g = stack
+                    .pop()
+                    .expect("RawTemplateTail with no open raw template");
+                g.indices.push(i);
+                g.values.push(s.clone());
+                let processed = process_raw_string(&g.values.join("\0"));
+                let pieces: Vec<&str> = processed.split('\0').collect();
+                assert_eq!(
+                    pieces.len(),
+                    g.values.len(),
+                    "process_raw_string must preserve the \\0 segment separators"
+                );
+                for (idx, piece) in g.indices.iter().zip(pieces) {
+                    out.insert(*idx, piece.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Tokenize `input` for the formatter: every token plus the span of every
 /// comment, both in source order (token text is recovered from the span, so
-/// literals stay verbatim). Unlike [`lex_tokens`] the input is taken as-is —
-/// no test-section stripping — because the formatter splits trailing
-/// `--- section ---` blocks off itself and must account for every byte it is
-/// given.
+/// literals stay verbatim). Lexing is dogfooded ([`lex_aipl`], via the installed
+/// hook). Unlike [`lex_tokens`] the input is taken as-is — no test-section
+/// stripping — because the formatter splits trailing `--- section ---` blocks
+/// off itself and must account for every byte it is given.
 #[allow(clippy::type_complexity)]
 pub fn lex_tokens_and_comments(
     input: &str,
 ) -> Result<(Vec<(FmtTokenKind, Span)>, Vec<Span>), Error> {
-    COMMENT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
-    // Disarm the sink on every exit path (including a tokenize error), so a
-    // later plain parse on this thread doesn't keep recording.
-    let result = tokenize(input);
-    let comments = COMMENT_SINK
-        .with(|sink| sink.borrow_mut().take())
-        .expect("comment sink armed above");
-    let raw = result?;
-    let toks = raw
-        .into_iter()
-        .map(|(t, sp)| {
-            use self::aipl::Terminal as T;
-            let kind = match &t {
-                T::TemplateHead(_) => FmtTokenKind::TemplateHead,
-                T::TemplateMiddle(_) => FmtTokenKind::TemplateMiddle,
-                T::TemplateTail(_) => FmtTokenKind::TemplateTail,
-                other => FmtTokenKind::Plain(classify(other)),
-            };
-            (kind, sp)
-        })
+    let out = lex_aipl(input).map_err(|e| Error::at(e.message, e.span))?;
+    let toks = out
+        .tokens
+        .iter()
+        .map(|t| (fmt_kind(&t.kind), t.span.clone()))
         .collect();
-    Ok((toks, comments))
+    Ok((toks, comment_spans(&out)))
 }
 
 /// Tokenize `input` for the formatter's *preservation check*: each token as
 /// `(kind, signature)` plus every comment span. A token's signature is its
-/// **semantic value** — the lexer's processed string for a `"..."`/`"""`
-/// literal or a template `` ` `` piece (i.e. after escape handling and
-/// raw-string de-denting), and the raw source text for everything else. Two
-/// spellings that lex to the same value therefore share a signature, so the
+/// **semantic value** — for a string literal (any of the four delimiter forms,
+/// all now one `StrLit`) or a template piece, the lexer's decoded value (escapes
+/// applied, and a `"""`/```` ``` ```` literal de-dented — done in the lexer's
+/// emit); for everything else, the raw source text (recovered from the span).
+/// Two spellings that lex to the same value therefore share a signature, so the
 /// formatter's value-preserving whitespace edits (re-indenting a raw block's
 /// content or its closing delimiter) don't register as changes, while any real
 /// change to a literal's value does. Input is taken as-is (no section
 /// stripping), like [`lex_tokens_and_comments`].
+///
+/// (An interpolated *raw* template's segment values are still the verbatim
+/// bytes — the lexer defers de-denting those — so re-indenting one is not yet
+/// treated as value-preserving; that resolves when interpolated templates are
+/// de-dented.)
 #[allow(clippy::type_complexity)]
 pub fn lex_signatures_and_comments(
     input: &str,
 ) -> Result<(Vec<(FmtTokenKind, String)>, Vec<Span>), Error> {
-    COMMENT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
-    let result = tokenize(input);
-    let comments = COMMENT_SINK
-        .with(|sink| sink.borrow_mut().take())
-        .expect("comment sink armed above");
-    let raw = result?;
-    let toks = raw
-        .into_iter()
-        .map(|(t, sp)| {
-            use self::aipl::Terminal as T;
-            let (kind, sig) = match &t {
-                T::TemplateHead((v, _)) => (FmtTokenKind::TemplateHead, v.clone()),
-                T::TemplateMiddle((v, _)) => (FmtTokenKind::TemplateMiddle, v.clone()),
-                T::TemplateTail((v, _)) => (FmtTokenKind::TemplateTail, v.clone()),
-                T::Str((v, _)) => (FmtTokenKind::Plain(TokenKind::Str), v.clone()),
-                other => (
-                    FmtTokenKind::Plain(classify(other)),
-                    input[sp.clone()].to_string(),
-                ),
+    use LexedTokenKind as K;
+    let out = lex_aipl(input).map_err(|e| Error::at(e.message, e.span))?;
+    // Interpolated raw-template segments carry verbatim bytes (the lexer defers
+    // de-denting them); de-dent them together here so re-indenting is a no-op
+    // for the check. Every other string/template value is already decoded.
+    let raw_dedent = dedent_raw_template_values(&out.tokens);
+    let toks = out
+        .tokens
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let sig = match &t.kind {
+                K::StrLit(v, _) | K::TemplateHead(v) | K::TemplateMid(v) | K::TemplateTail(v) => {
+                    v.clone()
+                }
+                K::RawTemplateHead(_) | K::RawTemplateMid(_) | K::RawTemplateTail(_) => raw_dedent
+                    .get(&i)
+                    .expect("every RawTemplate* token is de-dented")
+                    .clone(),
+                _ => input[t.span.clone()].to_string(),
             };
-            (kind, sig)
+            (fmt_kind(&t.kind), sig)
         })
         .collect();
-    Ok((toks, comments))
+    Ok((toks, comment_spans(&out)))
 }
 
 /// Coarse-classify a dogfooded-lexer token kind, exactly as [`classify`] does
