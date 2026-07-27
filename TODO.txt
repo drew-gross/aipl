@@ -105,5 +105,3 @@ raw strings in aipl to make tests of unescape look nicer
 make a debugger
 
 some sort of with_capacity option? Use in unescape
-
-make it so you can use ? in a test to fail the test if error (with good message)

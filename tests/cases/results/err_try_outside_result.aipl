@@ -1,13 +1,14 @@
-// `?` can only appear in a function whose return type is a result — there's
-// nowhere to propagate an err otherwise.
+// `?` can only appear where a propagated err has somewhere to go: a
+// result-returning function, an `!Error` main, or a `.test` body. In a plain
+// (non-result) function like this there's nowhere to propagate an err.
 fn bad(x: i64!str) -> i64 { x? }
 
 fn main() {
     bad(ok(1));
 }
 --- errors ---
-error: "?" can only be used in a function that returns a result
- --> ./tests/cases/results/err_try_outside_result.aipl:3:29
+error: "?" can only be used in a function that returns a result, or in a test
+ --> ./tests/cases/results/err_try_outside_result.aipl:4:29
   |
-3 | fn bad(x: i64!str) -> i64 { x? }
+4 | fn bad(x: i64!str) -> i64 { x? }
   |                             ^

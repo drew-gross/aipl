@@ -1847,6 +1847,24 @@ extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
     }
 }
 
+// `?` used inside a `.test` body, applied to an `err`: record the current test
+// as failed and report the error's rendered message (the `?` unwraps `ok` and
+// carries on; on `err` it can't produce a value, so codegen fails the test here
+// and returns early). Same failure bookkeeping as `aipl_assert`.
+extern "C" fn aipl_test_fail(msg: *const u8) {
+    if !TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
+        let mut nbuf = [0u8; 8];
+        let name =
+            unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
+        println!("test {name} ... FAIL");
+    }
+    let mut mbuf = [0u8; 8];
+    println!("  `?` propagated an error: {}", unsafe {
+        test_cstr(msg, &mut mbuf)
+    });
+    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+}
+
 extern "C" fn aipl_test_end() {
     TEST_TOTAL.fetch_add(1, TestOrd::Relaxed);
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
@@ -3582,6 +3600,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_count_insns", aipl_count_insns as *const u8);
     jit_builder.symbol("aipl_str_hash", aipl_str_hash as *const u8);
     jit_builder.symbol("aipl_assert", aipl_assert as *const u8);
+    jit_builder.symbol("aipl_test_fail", aipl_test_fail as *const u8);
     jit_builder.symbol("aipl_test_begin", aipl_test_begin as *const u8);
     jit_builder.symbol("aipl_test_end", aipl_test_end as *const u8);
     jit_builder.symbol("aipl_test_summary", aipl_test_summary as *const u8);
@@ -5828,7 +5847,9 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
     };
     match sym {
         "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_array_dec"
-        | "aipl_arr_inc" | "aipl_count_insns" | "aipl_test_begin" => sig(1, false),
+        | "aipl_arr_inc" | "aipl_count_insns" | "aipl_test_begin" | "aipl_test_fail" => {
+            sig(1, false)
+        }
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
         // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
         "aipl_test_end" => sig(0, false),
@@ -6271,6 +6292,8 @@ fn define_fn<M: Module>(
     let mutating = is_mutating_fn(func);
     let unit_main = is_unit_main(func);
     let error_main = is_error_main(func);
+    // Synthesized `.test` bodies are named `__test$<fn>` (see `synthesize_test_program`).
+    let in_test = func.name.starts_with("__test$");
     build_signature(&mut ctx.func.signature, func, structs);
 
     // Source-variable legend, filled as bindings are created (params + locals) and
@@ -6351,6 +6374,7 @@ fn define_fn<M: Module>(
             ret_ty: &abi_ret,
             sret: sret_val,
             error_main,
+            in_test,
             bindings: &bindings,
         };
         let (body_ret, body_ty) = compile_expr(module, &mut builder, cx, &mut scopes, &func.body)?;
@@ -9564,6 +9588,7 @@ fn define_tostr_fn<M: Module>(
             ret_ty: &unit,
             sret: None,
             error_main: false,
+            in_test: false,
             bindings: &no_bindings,
         };
 
@@ -9684,6 +9709,11 @@ struct Cx<'a> {
     /// is the `i64` exit code, not a result). The `?` operator's early Err return
     /// then prints `error: <msg>` and returns exit code 1 instead of an sret copy.
     error_main: bool,
+    /// Whether the enclosing function is a synthesized `.test` body (name prefixed
+    /// `__test$`). The `?` operator then treats an Err by failing the current test
+    /// (via `aipl_test_fail`) and returning from the unit test function, rather
+    /// than propagating — so a test `?` needs no result/`!Error` enclosing return.
+    in_test: bool,
     /// Sink for a source-variable legend: each named binding (param, `let`,
     /// `let mut`, `for` variable, `match` payload) records `(source name, its CLIF
     /// repr — `v<n>` for a value, `ss<n>` for a `mut` stack slot)`. Emitted as
@@ -10469,6 +10499,7 @@ fn compile_call_expr<M: Module>(
         ret_ty: _,
         sret: _,
         error_main: _,
+        in_test: _,
         bindings: _,
     } = cx;
     // A free call whose callee is a local holding a function value is an
@@ -12323,6 +12354,7 @@ fn compile_expr<M: Module>(
         ret_ty: _,
         sret: _,
         error_main: _,
+        in_test: _,
         bindings: _,
     } = cx;
     let span = expr.span.clone();
@@ -14111,34 +14143,40 @@ fn compile_expr<M: Module>(
                 ));
             };
             // The enclosing context must be able to receive the propagated error:
-            // a result-returning function (early-return its Err via sret), or an
-            // `fn main() -> !Error` (print `error: <msg>` and exit 1).
-            let ret_err = match cx.ret_ty {
-                Type::Result(_, ret_err) => Some(ret_err),
-                _ if cx.error_main => None, // err type is `Error`
-                _ => {
+            // a result-returning function (early-return its Err via sret), an
+            // `fn main() -> !Error` (print `error: <msg>` and exit 1), or a
+            // `.test` body (fail the test with the error's message). A test `?`
+            // never propagates a value out, so it places no constraint on the
+            // err type — skip the coercibility check for it.
+            if !cx.in_test {
+                let ret_err = match cx.ret_ty {
+                    Type::Result(_, ret_err) => Some(ret_err),
+                    _ if cx.error_main => None, // err type is `Error`
+                    _ => {
+                        return Err(Error::at(
+                            "\"?\" can only be used in a function that returns a result, \
+                             or in a test",
+                            span.clone(),
+                        ));
+                    }
+                };
+                // The propagated error must fit the enclosing function's err side
+                // (`Error` for an `!Error` main).
+                let enclosing_err = match ret_err {
+                    Some(e) => (**e).clone(),
+                    None => error_ty(),
+                };
+                if !coercible(err_in, &enclosing_err) {
                     return Err(Error::at(
-                        "\"?\" can only be used in a function that returns a result",
+                        format!(
+                            "\"?\" propagates a {} error, but the enclosing function returns \
+                             errors of type {}",
+                            type_name(err_in),
+                            type_name(&enclosing_err)
+                        ),
                         span.clone(),
                     ));
                 }
-            };
-            // The propagated error must fit the enclosing function's err side
-            // (`Error` for an `!Error` main).
-            let enclosing_err = match ret_err {
-                Some(e) => (**e).clone(),
-                None => error_ty(),
-            };
-            if !coercible(err_in, &enclosing_err) {
-                return Err(Error::at(
-                    format!(
-                        "\"?\" propagates a {} error, but the enclosing function returns \
-                         errors of type {}",
-                        type_name(err_in),
-                        type_name(&enclosing_err)
-                    ),
-                    span.clone(),
-                ));
             }
             let ok_ty = (**ok_in).clone();
             let err_in_ty = (**err_in).clone();
@@ -14153,7 +14191,33 @@ fn compile_expr<M: Module>(
             // --- Err: early return. ---
             builder.switch_to_block(err_block);
             builder.seal_block(err_block);
-            if cx.error_main {
+            if cx.in_test {
+                // `?` on an err inside a `.test` body: render the error to a str,
+                // record the current test as failed with that message, then leave
+                // the (unit-returning) test function. Read the err payload
+                // (borrowed) before the scope drop frees it.
+                let err_val = component(builder, rptr, OPT_VALUE_OFFSET, &err_in_ty, structs);
+                let msg = emit_to_str(module, builder, cx, scopes, err_val, &err_in_ty)?;
+                let f = builtins.import(module, builder.func, "aipl_test_fail");
+                builder.ins().call(f, &[msg]);
+                for scope in scopes.iter() {
+                    for t in scope {
+                        let v = match t.owned {
+                            Owned::Value(v) => v,
+                            Owned::Slot(slot) => {
+                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
+                            }
+                        };
+                        emit_drop(builder, module, builtins, structs, v, &t.ty);
+                    }
+                }
+                builder.ins().return_(&[]);
+                // `emit_to_str` tracked `msg` in the current scope for the drop
+                // above; drop it from the compile-time tracking now so it doesn't
+                // leak into the (dominating) Ok continuation, whose drops would
+                // reference a value defined only in this err block.
+                scopes.last_mut().expect("scope").pop();
+            } else if cx.error_main {
                 // `?` in `fn main() -> !Error`: print `error: <msg>` and exit 1.
                 // Read the err payload (borrowed) before the scope drop frees it.
                 let msg = component(builder, rptr, OPT_VALUE_OFFSET, &err_in_ty, structs);

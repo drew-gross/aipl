@@ -1,0 +1,38 @@
+import { wrapping_add as +, == } from builtins;
+
+// The `?` operator is allowed inside a `.test` body. On an `ok` it unwraps the
+// value in place and the test proceeds; on an `err` it fails the current test
+// with the error's rendered message and stops that test (later asserts don't
+// run). The `--- check ---` section below pins that report.
+
+fn checked(n: i64) -> i64!str { if (n == 0) { err("zero is not allowed") } else { ok(n) } }
+
+// Every `?` hits an `ok`: they unwrap and the test passes (silent).
+fn all_ok() -> i64 { 0 }.test({
+    let x = checked(5)?;
+    let y = checked(10)?;
+    assert(x + y == 15);
+})
+
+// The second `?` hits an `err`: the test fails with the error message and stops,
+// so the `assert(false)` after it never runs.
+fn hits_err() -> i64 { 0 }.test({
+    let x = checked(3)?;
+    let bad = checked(0)?;
+    assert(false);
+})
+
+fn main() {}
+--- check ---
+test hits_err ... FAIL
+  `?` propagated an error: "zero is not allowed"
+2 tests: 1 passed, 1 failed
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 576
+--- monomorphizations ---
+main
