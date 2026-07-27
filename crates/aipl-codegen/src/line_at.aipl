@@ -43,6 +43,9 @@ reallocations: 26
 bytes allocated: 224
 instructions executed: 4148
 binary size: 5040
+  code: 2280
+  data: 793
+  metadata: 1967
 --- monomorphizations ---
 __enumerate0
 line_at

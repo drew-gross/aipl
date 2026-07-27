@@ -33,6 +33,9 @@ reallocations: 0
 bytes allocated: 1032
 instructions executed: 3409
 binary size: 8648
+  code: 5260
+  data: 468
+  metadata: 2920
 --- monomorphizations ---
 __filter9$own0
 __map13$own0

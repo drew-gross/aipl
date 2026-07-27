@@ -15,6 +15,9 @@ reallocations: 0
 bytes allocated: 488
 instructions executed: 574
 binary size: 4784
+  code: 2560
+  data: 243
+  metadata: 1981
 --- monomorphizations ---
 __test$eq_set
 main

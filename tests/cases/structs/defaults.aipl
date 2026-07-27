@@ -48,6 +48,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 383
 binary size: 5424
+  code: 1776
+  data: 917
+  metadata: 2731
 --- monomorphizations ---
 all_defaults
 all_explicit

@@ -45,6 +45,9 @@ reallocations: 3
 bytes allocated: 704
 instructions executed: 2182
 binary size: 7448
+  code: 4136
+  data: 404
+  metadata: 2908
 --- monomorphizations ---
 __map2$own0
 double

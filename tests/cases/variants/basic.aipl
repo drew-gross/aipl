@@ -40,6 +40,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 409
 binary size: 3592
+  code: 1580
+  data: 533
+  metadata: 1479
 --- monomorphizations ---
 area
 main

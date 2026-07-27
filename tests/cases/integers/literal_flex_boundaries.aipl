@@ -38,6 +38,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 115
 binary size: 2584
+  code: 580
+  data: 522
+  metadata: 1482
 --- monomorphizations ---
 i16v
 i32v

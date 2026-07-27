@@ -23,6 +23,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 147
 binary size: 2704
+  code: 688
+  data: 536
+  metadata: 1480
 --- monomorphizations ---
 clamp_low
 main

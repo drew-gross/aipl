@@ -41,6 +41,9 @@ reallocations: 0
 bytes allocated: 568
 instructions executed: 908
 binary size: 6864
+  code: 3268
+  data: 524
+  metadata: 3072
 --- monomorphizations ---
 __test$joined
 __test$sum

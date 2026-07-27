@@ -38,6 +38,9 @@ reallocations: 0
 bytes allocated: 348
 instructions executed: 900
 binary size: 6120
+  code: 2984
+  data: 544
+  metadata: 2592
 --- monomorphizations ---
 count_while$char$lam11
 count_while$i64$lam1

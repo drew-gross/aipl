@@ -40,6 +40,9 @@ reallocations: 0
 bytes allocated: 200
 instructions executed: 293
 binary size: 3464
+  code: 1644
+  data: 27
+  metadata: 1793
 --- monomorphizations ---
 main
 parse

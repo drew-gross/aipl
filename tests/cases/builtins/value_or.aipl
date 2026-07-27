@@ -18,6 +18,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 122
 binary size: 2168
+  code: 588
+  data: 301
+  metadata: 1279
 --- monomorphizations ---
 __test$first_char
 first_char

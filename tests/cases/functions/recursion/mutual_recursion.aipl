@@ -16,6 +16,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 1109
 binary size: 1664
+  code: 404
+  data: 186
+  metadata: 1074
 --- monomorphizations ---
 is_even
 is_odd

@@ -57,6 +57,9 @@ reallocations: 0
 bytes allocated: 130
 instructions executed: 755
 binary size: 6552
+  code: 2996
+  data: 499
+  metadata: 3057
 --- monomorphizations ---
 main
 unwrap2

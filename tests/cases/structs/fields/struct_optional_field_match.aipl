@@ -23,6 +23,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 96
 binary size: 1632
+  code: 392
+  data: 202
+  metadata: 1038
 --- monomorphizations ---
 __test$describe
 describe

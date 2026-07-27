@@ -25,6 +25,9 @@ reallocations: 0
 bytes allocated: 160
 instructions executed: 43
 binary size: 1168
+  code: 328
+  data: 1
+  metadata: 839
 --- monomorphizations ---
 banner
 main

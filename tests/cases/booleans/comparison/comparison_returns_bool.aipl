@@ -12,6 +12,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 41
 binary size: 1184
+  code: 224
+  data: 95
+  metadata: 865
 --- monomorphizations ---
 main
 not_lt

@@ -15,6 +15,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 57
 binary size: 1416
+  code: 300
+  data: 163
+  metadata: 953
 --- monomorphizations ---
 beq
 main

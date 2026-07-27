@@ -23,6 +23,9 @@ reallocations: 0
 bytes allocated: 160
 instructions executed: 42
 binary size: 1384
+  code: 424
+  data: 1
+  metadata: 959
 --- monomorphizations ---
 __m1__framed
 main

@@ -61,6 +61,9 @@ reallocations: 0
 bytes allocated: 160
 instructions executed: 812
 binary size: 7136
+  code: 4520
+  data: 1
+  metadata: 2615
 --- monomorphizations ---
 __lambda_0
 __lambda_1

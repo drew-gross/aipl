@@ -15,6 +15,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 55
 binary size: 1048
+  code: 192
+  data: 52
+  metadata: 804
 --- monomorphizations ---
 main
 rec$lam2

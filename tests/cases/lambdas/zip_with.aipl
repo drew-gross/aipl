@@ -49,6 +49,9 @@ reallocations: 12
 bytes allocated: 352
 instructions executed: 2711
 binary size: 6824
+  code: 4400
+  data: 1
+  metadata: 2423
 --- monomorphizations ---
 __lambda_7
 __zip1

@@ -26,6 +26,9 @@ reallocations: 0
 bytes allocated: 584
 instructions executed: 2322
 binary size: 7072
+  code: 4164
+  data: 426
+  metadata: 2482
 --- monomorphizations ---
 __filter1$own0
 __filter11$own0

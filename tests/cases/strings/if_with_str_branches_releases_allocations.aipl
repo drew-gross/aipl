@@ -13,6 +13,9 @@ reallocations: 0
 bytes allocated: 80
 instructions executed: 51
 binary size: 1808
+  code: 504
+  data: 97
+  metadata: 1207
 --- monomorphizations ---
 main
 pick

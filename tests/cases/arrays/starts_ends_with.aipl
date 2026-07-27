@@ -50,6 +50,9 @@ reallocations: 0
 bytes allocated: 1736
 instructions executed: 2689
 binary size: 15880
+  code: 9540
+  data: 1316
+  metadata: 5024
 --- monomorphizations ---
 __test$has_header
 has_header

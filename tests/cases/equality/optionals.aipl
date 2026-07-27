@@ -23,6 +23,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 227
 binary size: 2272
+  code: 932
+  data: 218
+  metadata: 1122
 --- monomorphizations ---
 __test$eq_opt
 main

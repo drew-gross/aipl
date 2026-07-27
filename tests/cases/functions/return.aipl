@@ -49,6 +49,9 @@ reallocations: 0
 bytes allocated: 264
 instructions executed: 409
 binary size: 2640
+  code: 1164
+  data: 1
+  metadata: 1475
 --- monomorphizations ---
 clamp_low
 first_index_reaching

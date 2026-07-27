@@ -20,6 +20,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 74
 binary size: 1576
+  code: 352
+  data: 203
+  metadata: 1021
 --- monomorphizations ---
 __test$value_or
 main

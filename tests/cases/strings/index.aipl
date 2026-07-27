@@ -16,6 +16,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 255
 binary size: 2432
+  code: 936
+  data: 261
+  metadata: 1235
 --- monomorphizations ---
 __test$at
 at

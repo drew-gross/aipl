@@ -72,6 +72,9 @@ reallocations: 0
 bytes allocated: 1552
 instructions executed: 3696
 binary size: 8560
+  code: 3096
+  data: 1285
+  metadata: 4179
 --- monomorphizations ---
 escape_text
 main

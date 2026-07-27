@@ -48,6 +48,9 @@ reallocations: 0
 bytes allocated: 384
 instructions executed: 848
 binary size: 9640
+  code: 4868
+  data: 863
+  metadata: 3909
 --- monomorphizations ---
 __test$ints
 __test$make_empty

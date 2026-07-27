@@ -1361,19 +1361,12 @@ fn run_success_case(
     // first so a perf mismatch never masks a behavioral regression.
     if let Some(perf) = &spec.performance {
         // `obj_bytes` is the non-instrumented (production) object; its length is
-        // the `binary size` metric — the machine code emitted for the program.
+        // the `binary size` metric — split into code/data/metadata for the report.
+        let sizes = BinSizes::of(&obj_bytes);
         fold_section!(
             outcome,
             run_performance_check(
-                ctx,
-                orig_path,
-                &measured,
-                stem,
-                spec,
-                case_dir,
-                perf,
-                obj_bytes.len() as u64,
-                fill,
+                ctx, orig_path, &measured, stem, spec, case_dir, perf, sizes, fill,
             )
         );
     }
@@ -1394,7 +1387,7 @@ fn run_performance_check(
     spec: &Spec,
     case_dir: &Path,
     expected_body: &str,
-    prod_obj_size: u64,
+    prod_sizes: BinSizes,
     fill: bool,
 ) -> Outcome {
     let obj_bytes =
@@ -1407,18 +1400,11 @@ fn run_performance_check(
                 ))
             }
         };
-    let actual = match measure_perf_stats(
-        ctx,
-        orig_path,
-        &obj_bytes,
-        stem,
-        spec,
-        case_dir,
-        prod_obj_size,
-    ) {
-        Ok(v) => v,
-        Err(msg) => return Outcome::Fail(msg),
-    };
+    let actual =
+        match measure_perf_stats(ctx, orig_path, &obj_bytes, stem, spec, case_dir, prod_sizes) {
+            Ok(v) => v,
+            Err(msg) => return Outcome::Fail(msg),
+        };
 
     // Memory-leak gate: every heap allocation must be paired with a free. Checked
     // even in fill mode so `fill_expected` cannot bake in a leak.
@@ -1452,9 +1438,9 @@ fn run_performance_check(
 
 /// Build the instrumented variant of the case, run it with `AIPL_ALLOC_STATS`
 /// pointed at a temp file, and read back the `PerfStats`. The runtime reports
-/// the five execution counters; `binary size` is the harness-measured
-/// `prod_obj_size` (the production object's byte length), folded in here so the
-/// whole `PerfStats` parses through one path.
+/// the five execution counters; the `binary size` split (`prod_sizes`, measured
+/// by the harness from the production object) is folded in here so the whole
+/// `PerfStats` parses through one path.
 fn measure_perf_stats(
     ctx: &str,
     orig_path: &Path,
@@ -1462,7 +1448,7 @@ fn measure_perf_stats(
     stem: &str,
     spec: &Spec,
     case_dir: &Path,
-    prod_obj_size: u64,
+    prod_sizes: BinSizes,
 ) -> Result<PerfStats, String> {
     let exe = case_dir.join(binary::default_exe_name(&format!("{stem}_instr")));
     if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
@@ -1496,8 +1482,9 @@ fn measure_perf_stats(
         )
     })?;
     // The runtime reports the execution counters; append the (harness-measured)
-    // binary size so the combined text parses into a full `PerfStats`.
-    let contents = format!("{contents}\nbinary size: {prod_obj_size}");
+    // binary size and its code/data/metadata split so the combined text parses
+    // into a full `PerfStats`.
+    let contents = format!("{contents}\n{}", prod_sizes.render());
     parse_perf_stats(&contents)
         .ok_or_else(|| format!("{ctx}: malformed perf stats from runtime:\n{contents}"))
 }
@@ -1517,7 +1504,7 @@ struct PerfStats {
     reallocations: u64,
     bytes_allocated: u64,
     instructions: u64,
-    binary_size: u64,
+    binary_size: BinSizes,
 }
 
 impl PerfStats {
@@ -1525,13 +1512,65 @@ impl PerfStats {
     fn render(&self) -> String {
         format!(
             "allocations: {}\ndeallocations: {}\nreallocations: {}\nbytes allocated: {}\n\
-             instructions executed: {}\nbinary size: {}",
+             instructions executed: {}\n{}",
             self.allocations,
             self.deallocations,
             self.reallocations,
             self.bytes_allocated,
             self.instructions,
-            self.binary_size,
+            self.binary_size.render(),
+        )
+    }
+}
+
+/// The object's `binary size` and where it goes. `code` is the executable
+/// `__text`, `data` the read-only literal sections (string literals, …), and
+/// `metadata` everything else in the object file — headers, the symbol + string
+/// tables, relocations, and padding (i.e. `total - code - data`). The split is
+/// deterministic for a fixed toolchain (like `total` itself) and is often
+/// dominated by `metadata`: AIPL's long mangled symbol names and per-function
+/// relocations cost more than the machine code for small programs.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct BinSizes {
+    total: u64,
+    code: u64,
+    data: u64,
+    metadata: u64,
+}
+
+impl BinSizes {
+    /// Split an object's bytes into code/data/metadata (see the struct docs).
+    fn of(obj_bytes: &[u8]) -> BinSizes {
+        use object::{Object, ObjectSection, SectionKind};
+        let total = obj_bytes.len() as u64;
+        let (mut code, mut data) = (0u64, 0u64);
+        if let Ok(obj) = object::File::parse(obj_bytes) {
+            for sec in obj.sections() {
+                // On-disk byte span (BSS-style sections have none → 0), so
+                // `code + data` never exceeds the file and `metadata` is the rest.
+                let bytes = sec.file_range().map_or(0, |(_, len)| len);
+                match sec.kind() {
+                    SectionKind::Text => code += bytes,
+                    SectionKind::Data | SectionKind::ReadOnlyData | SectionKind::ReadOnlyString => {
+                        data += bytes
+                    }
+                    _ => {}
+                }
+            }
+        }
+        BinSizes {
+            total,
+            code,
+            data,
+            metadata: total.saturating_sub(code + data),
+        }
+    }
+
+    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split.
+    fn render(&self) -> String {
+        format!(
+            "binary size: {}\n  code: {}\n  data: {}\n  metadata: {}",
+            self.total, self.code, self.data, self.metadata,
         )
     }
 }
@@ -1547,6 +1586,9 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     let mut bytes_allocated = None;
     let mut instructions = None;
     let mut binary_size = None;
+    let mut code = None;
+    let mut data = None;
+    let mut metadata = None;
     for line in s.lines() {
         let line = line.trim();
         if let Some(v) = line.strip_prefix("bytes allocated:") {
@@ -1555,6 +1597,12 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             instructions = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("binary size:") {
             binary_size = v.trim().parse().ok();
+        } else if let Some(v) = line.strip_prefix("code:") {
+            code = v.trim().parse().ok();
+        } else if let Some(v) = line.strip_prefix("data:") {
+            data = v.trim().parse().ok();
+        } else if let Some(v) = line.strip_prefix("metadata:") {
+            metadata = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("allocations:") {
             allocations = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("deallocations:") {
@@ -1569,7 +1617,12 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
         reallocations: reallocations?,
         bytes_allocated: bytes_allocated?,
         instructions: instructions?,
-        binary_size: binary_size?,
+        binary_size: BinSizes {
+            total: binary_size?,
+            code: code?,
+            data: data?,
+            metadata: metadata?,
+        },
     })
 }
 

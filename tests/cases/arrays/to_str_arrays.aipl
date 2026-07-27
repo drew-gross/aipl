@@ -30,5 +30,8 @@ reallocations: 2
 bytes allocated: 412
 instructions executed: 2056
 binary size: 7328
+  code: 3844
+  data: 356
+  metadata: 3128
 --- monomorphizations ---
 main

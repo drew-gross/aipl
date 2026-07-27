@@ -26,6 +26,9 @@ reallocations: 0
 bytes allocated: 40
 instructions executed: 263
 binary size: 2904
+  code: 1244
+  data: 204
+  metadata: 1456
 --- monomorphizations ---
 main
 make

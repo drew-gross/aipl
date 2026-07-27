@@ -17,6 +17,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 78
 binary size: 1472
+  code: 348
+  data: 147
+  metadata: 977
 --- monomorphizations ---
 __test$flag
 flag

@@ -33,6 +33,9 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 163
 binary size: 1736
+  code: 540
+  data: 174
+  metadata: 1022
 --- monomorphizations ---
 dx
 main

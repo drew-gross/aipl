@@ -28,6 +28,9 @@ reallocations: 9
 bytes allocated: 320
 instructions executed: 1385
 binary size: 5440
+  code: 2784
+  data: 226
+  metadata: 2430
 --- monomorphizations ---
 main
 tag$lam1

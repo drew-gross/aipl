@@ -42,6 +42,9 @@ reallocations: 0
 bytes allocated: 1568
 instructions executed: 2812
 binary size: 12368
+  code: 7480
+  data: 1067
+  metadata: 3821
 --- monomorphizations ---
 __test$single
 main
