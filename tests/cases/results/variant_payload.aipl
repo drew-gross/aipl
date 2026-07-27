@@ -10,8 +10,8 @@ variant Shape = Empty | Square(i64) | Named(str)
 fn shape(n: i64) -> Shape!str {
     if (n == 0) { ok(Empty) } else { if (n == 1) { ok(Square(4)) } else { err("unknown shape") } }
 }.test({
-    assert(shape(0) == ok(Empty));
-    assert(shape(1) == ok(Square(4)));
+    assert(shape(0)? == Empty);
+    assert(shape(1)? == Square(4));
     assert(shape(9) == err("unknown shape"));
 
     // The payload binds in a match arm like any other, and matches on
@@ -28,7 +28,7 @@ fn shape(n: i64) -> Shape!str {
 
 // A heap-carrying arm as the Ok payload.
 fn label(s: str) -> Shape!str { ok(Named(s +++ "!")) }.test({
-    assert(label("hi") == ok(Named("hi!")));
+    assert(label("hi")? == Named("hi!"));
 })
 
 // Err side: a variant error type.
@@ -43,7 +43,7 @@ fn get(n: i64) -> i64!Fail {
 }.test({
     assert(get(0) == err(NotFound));
     assert(get(1) == err(Parse("bad digit")));
-    assert(get(4) == ok(5));
+    assert(get(4)? == 5);
 })
 
 // `?` propagates through a variant-error result.
@@ -51,7 +51,7 @@ fn double(n: i64) -> i64!Fail {
     let v = get(n)?;
     ok(v + v)
 }.test({
-    assert(double(4) == ok(10));
+    assert(double(4)? == 10);
     assert(double(0) == err(NotFound));
     assert(double(1) == err(Parse("bad digit")));
 })
