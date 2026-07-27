@@ -3455,6 +3455,17 @@ fn compile_program<M: Module>(
         )?;
     }
 
+    // Per-err-type test-fail helpers (`?` inside a `.test`). Each body renders
+    // the err via `emit_to_str`, which requests a `to_str` helper — so drain this
+    // *before* `tostr_pending` below, so those requests are then satisfied.
+    let test_fail_pending = std::mem::take(&mut elem_rc.borrow_mut().test_fail_pending);
+    for (ty, id) in test_fail_pending {
+        define_test_fail_fn(
+            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id, &ty,
+            &mut ir, instrument,
+        )?;
+    }
+
     // Per-type `to_str` rendering helpers. A helper's body renders structurally
     // *inline* (its nested types render in the same function, never calling out
     // to another `to_str` helper) and never inc/decs, so defining one requests no
@@ -9539,6 +9550,107 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
     id
 }
 
+/// Declare (once, cached) the per-err-type `__test_try_fail_<n>(payload)` helper
+/// for `err_ty` — the shared body a test `?` calls on an err. Returns its id; the
+/// body is defined later from `test_fail_pending`.
+fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &Type) -> FuncId {
+    let key = type_name(err_ty);
+    let mut er = cx.elem_rc.borrow_mut();
+    if let Some(id) = er.test_fail_fns.get(&key) {
+        return *id;
+    }
+    let n = er.ctr;
+    er.ctr += 1;
+    let mut sig = module.make_signature();
+    sig.params.push(AbiParam::new(types::I64)); // err payload (scalar/str value, or struct ptr)
+    let id = module
+        .declare_function(&format!("__test_try_fail_{n}"), Linkage::Local, &sig)
+        .expect("declare test-fail helper");
+    er.test_fail_fns.insert(key, id);
+    er.test_fail_pending.push((err_ty.clone(), id));
+    id
+}
+
+/// Define a generated `__test_try_fail_<n>(payload)` helper: render the err
+/// `payload` (of type `err_ty`) to a `str`, report it via `aipl_test_fail`, and
+/// drop the rendered string. Centralizes the "error printing stuff" so each `?`
+/// site in a test only reads the payload and calls this.
+#[allow(clippy::too_many_arguments)]
+fn define_test_fail_fn<M: Module>(
+    module: &mut M,
+    ctx: &mut Context,
+    fbc: &mut FunctionBuilderContext,
+    funcs: &HashMap<String, FuncInfo>,
+    structs: &HashMap<String, TypeDef>,
+    builtins: &Builtins,
+    lit_ctr: &Cell<u32>,
+    elem_rc: &RefCell<ElemRc>,
+    id: FuncId,
+    err_ty: &Type,
+    ir_out: &mut String,
+    instrument: bool,
+) -> Result<(), Error> {
+    builtins.clear_func_cache();
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // payload
+    {
+        let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        builder.seal_block(entry);
+        let payload = builder.block_params(entry)[0];
+
+        let env: Env = HashMap::new();
+        let owned_params: HashSet<String> = HashSet::new();
+        let unit = Type::Unit;
+        let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
+        let cx = Cx {
+            env: &env,
+            funcs,
+            structs,
+            builtins,
+            effects: &[],
+            owned_params: &owned_params,
+            lit_ctr,
+            elem_rc,
+            ret_ty: &unit,
+            sret: None,
+            error_main: false,
+            in_test: false,
+            bindings: &no_bindings,
+        };
+
+        // Render the borrowed payload to a fresh `str`, report it, then release
+        // the rendered string (its sole reference).
+        let msg = emit_to_str(module, &mut builder, cx, &mut scopes, payload, err_ty)?;
+        let f = builtins.import(module, builder.func, "aipl_test_fail");
+        builder.ins().call(f, &[msg]);
+        emit_drop(
+            &mut builder,
+            module,
+            builtins,
+            structs,
+            msg,
+            &Type::Primitive(Primitive::Str),
+        );
+        builder.ins().return_(&[]);
+        builder.finalize(module.target_config());
+    }
+
+    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    if instrument {
+        let count_fn = builtins.id(module, "aipl_count_insns");
+        instrument_insn_count(module, &mut ctx.func, count_fn);
+    }
+    module
+        .define_function(id, ctx)
+        .map_err(|e| Error::msg(format!("define test-fail helper: {e:?}")))?;
+    ctx.clear();
+    Ok(())
+}
+
 /// Define a generated `__to_str_<n>(value) -> str` helper: render `value` of type
 /// `ty` to a fresh `str` and return it. One allocation: a measure pass computes
 /// the total byte length, `aipl_str_alloc` reserves exactly that, and a write
@@ -9742,6 +9854,13 @@ struct ElemRc {
     // IR is generated once instead of inlined at every `to_str` site.
     tostr_fns: HashMap<String, FuncId>,
     tostr_pending: Vec<(Type, FuncId)>,
+    // Per-error-type test-fail helpers: `__test_try_fail_<n>(payload)`. A `?` on
+    // an err inside a `.test` body calls this (passing the err payload) instead
+    // of inlining the render + `aipl_test_fail` + rendered-str drop at every `?`
+    // site — so each site is just "read payload, call helper". Keyed by the err
+    // type's name; `test_fail_pending` lists the ones still to be defined.
+    test_fail_fns: HashMap<String, FuncId>,
+    test_fail_pending: Vec<(Type, FuncId)>,
     ctr: u32,
 }
 
@@ -14194,14 +14313,15 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(err_block);
             builder.seal_block(err_block);
             if cx.in_test {
-                // `?` on an err inside a `.test` body: render the error to a str,
-                // record the current test as failed with that message, then leave
-                // the (unit-returning) test function. Read the err payload
-                // (borrowed) before the scope drop frees it.
+                // `?` on an err inside a `.test` body: read the err payload
+                // (borrowed) and hand it to the shared per-err-type helper, which
+                // renders it and records the current test as failed — keeping this
+                // site to just "read payload, call helper". Then drop the live
+                // scopes and leave the (unit-returning) test function.
                 let err_val = component(builder, rptr, OPT_VALUE_OFFSET, &err_in_ty, structs);
-                let msg = emit_to_str(module, builder, cx, scopes, err_val, &err_in_ty)?;
-                let f = builtins.import(module, builder.func, "aipl_test_fail");
-                builder.ins().call(f, &[msg]);
+                let fail_id = test_fail_func(module, cx, &err_in_ty);
+                let fref = module.declare_func_in_func(fail_id, builder.func);
+                builder.ins().call(fref, &[err_val]);
                 for scope in scopes.iter() {
                     for t in scope {
                         let v = match t.owned {
@@ -14214,11 +14334,6 @@ fn compile_expr<M: Module>(
                     }
                 }
                 builder.ins().return_(&[]);
-                // `emit_to_str` tracked `msg` in the current scope for the drop
-                // above; drop it from the compile-time tracking now so it doesn't
-                // leak into the (dominating) Ok continuation, whose drops would
-                // reference a value defined only in this err block.
-                scopes.last_mut().expect("scope").pop();
             } else if cx.error_main {
                 // `?` in `fn main() -> !Error`: print `error: <msg>` and exit 1.
                 // Read the err payload (borrowed) before the scope drop frees it.
