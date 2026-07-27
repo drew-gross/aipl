@@ -3466,6 +3466,22 @@ fn compile_program<M: Module>(
         )?;
     }
 
+    // Per-type structural-equality helpers. A body compares borrowed values and,
+    // for a composite field/element, calls *that* type's eq helper — so defining
+    // one can enqueue further eq helpers (and nothing else). Drain until empty.
+    loop {
+        let batch = std::mem::take(&mut elem_rc.borrow_mut().eq_pending);
+        if batch.is_empty() {
+            break;
+        }
+        for (ty, id) in batch {
+            define_eq_fn(
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id,
+                &ty, &mut ir, instrument,
+            )?;
+        }
+    }
+
     // Per-type `to_str` rendering helpers. A helper's body renders structurally
     // *inline* (its nested types render in the same function, never calling out
     // to another `to_str` helper) and never inc/decs, so defining one requests no
@@ -7316,7 +7332,7 @@ fn emit_arr_starts_ends<M: Module>(
     let si = builder.ins().iadd(offset, i);
     let el = load_array_elem(module, builder, builtins, self_ptr, si, elem, structs);
     let er = load_array_elem(module, builder, builtins, other_ptr, i, elem, structs);
-    let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
+    let ee = emit_eq(module, builder, cx, el, er, elem)?;
     let cont = builder.create_block();
     let neq = builder.create_block();
     builder.ins().brif(ee, cont, &[], neq, &[]);
@@ -7339,6 +7355,71 @@ fn emit_arr_starts_ends<M: Module>(
     Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
+/// Whether `ty`'s structural equality is emitted through a synthesized per-type
+/// `__eq_<n>` helper (composites) rather than inline (scalars and `str`-shaped
+/// values — `str`/`Error`/`char[]` — which are a single `icmp`/`aipl_str_eq`).
+fn uses_eq_helper(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+    if is_str_shaped(ty) {
+        return false;
+    }
+    match ty {
+        Type::Optional(_)
+        | Type::Array(_)
+        | Type::Set(_)
+        | Type::Dict(_, _)
+        | Type::Result(_, _) => true,
+        Type::Named(n) => structs
+            .get(n)
+            .is_some_and(|d| d.as_struct().is_some() || d.as_variant().is_some()),
+        _ => false,
+    }
+}
+
+/// Emit a structural equality test for two values of type `ty`, returning an
+/// `i64` 0/1. A composite type calls its shared per-type `__eq_<n>(lv, rv)`
+/// helper (generated once — see [`define_eq_fn`]) instead of inlining the whole
+/// comparison at every `==`/`!=` and nested site; a scalar or `str`-shaped value
+/// stays inline via [`emit_eq_body`]. Both operands are borrowed.
+fn emit_eq<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    lv: Value,
+    rv: Value,
+    ty: &Type,
+) -> Result<Value, Error> {
+    if uses_eq_helper(ty, cx.structs) {
+        let id = eq_func(module, cx, ty);
+        let fref = module.declare_func_in_func(id, builder.func);
+        let inst = builder.ins().call(fref, &[lv, rv]);
+        Ok(builder.inst_results(inst)[0])
+    } else {
+        emit_eq_body(module, builder, cx, lv, rv, ty)
+    }
+}
+
+/// Declare (once, cached) the per-type `__eq_<n>(lv, rv) -> i64` helper for `ty`.
+/// Returns its id; the body is defined later from `eq_pending`.
+fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
+    let key = type_name(ty);
+    let mut er = cx.elem_rc.borrow_mut();
+    if let Some(id) = er.eq_fns.get(&key) {
+        return *id;
+    }
+    let n = er.ctr;
+    er.ctr += 1;
+    let mut sig = module.make_signature();
+    sig.params.push(AbiParam::new(types::I64)); // lv
+    sig.params.push(AbiParam::new(types::I64)); // rv
+    sig.returns.push(AbiParam::new(types::I64)); // 0/1
+    let id = module
+        .declare_function(&format!("__eq_{n}"), Linkage::Local, &sig)
+        .expect("declare eq helper");
+    er.eq_fns.insert(key, id);
+    er.eq_pending.push((ty.clone(), id));
+    id
+}
+
 /// Emit a structural equality test for two values of type `ty` and return an
 /// `i64` 0/1. The checker guarantees both operands share `ty` (up to `none`/
 /// empty-collection coercion), so this dispatches purely on `ty`:
@@ -7351,17 +7432,20 @@ fn emit_arr_starts_ends<M: Module>(
 ///   - struct: every field equal
 ///   - variant: same tag, then the active case's payload fields equal
 ///
-/// Both operands are borrowed; `str_eq`'s consumed refs are balanced by the
-/// incs, so no scope tracking is needed.
-fn emit_eq<M: Module>(
+/// Composite recursions route back through [`emit_eq`], so a nested composite
+/// calls its own helper rather than being re-inlined here. Both operands are
+/// borrowed; `str_eq`'s consumed refs are balanced by the incs, so no scope
+/// tracking is needed.
+fn emit_eq_body<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
-    builtins: &Builtins,
-    structs: &HashMap<String, TypeDef>,
+    cx: Cx,
     lv: Value,
     rv: Value,
     ty: &Type,
 ) -> Result<Value, Error> {
+    let builtins = cx.builtins;
+    let structs = cx.structs;
     Ok(match ty {
         // All integer widths (and bool/char) compare by their canonical i64
         // register value — distinct values have distinct canonical reps.
@@ -7413,7 +7497,7 @@ fn emit_eq<M: Module>(
             builder.seal_block(core_b);
             let cl = component(builder, lv, OPT_VALUE_OFFSET, core, structs);
             let cr = component(builder, rv, OPT_VALUE_OFFSET, core, structs);
-            let ce = emit_eq(module, builder, builtins, structs, cl, cr, core)?;
+            let ce = emit_eq(module, builder, cx, cl, cr, core)?;
             builder.ins().stack_store(types::I64, ce, res, 0);
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
@@ -7453,7 +7537,7 @@ fn emit_eq<M: Module>(
                 builder.seal_block(body);
                 let el = load_array_elem(module, builder, builtins, lv, i, elem, structs);
                 let er = load_array_elem(module, builder, builtins, rv, i, elem, structs);
-                let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
+                let ee = emit_eq(module, builder, cx, el, er, elem)?;
                 let cont = builder.create_block();
                 let neq = builder.create_block();
                 builder.ins().brif(ee, cont, &[], neq, &[]);
@@ -7554,7 +7638,7 @@ fn emit_eq<M: Module>(
             for (offset, fty) in fields {
                 let fl = component(builder, lv, offset, &fty, structs);
                 let fr = component(builder, rv, offset, &fty, structs);
-                let fe = emit_eq(module, builder, builtins, structs, fl, fr, &fty)?;
+                let fe = emit_eq(module, builder, cx, fl, fr, &fty)?;
                 let cur = builder.ins().stack_load(types::I64, types::I64, res, 0);
                 let new = builder.ins().band(cur, fe);
                 builder.ins().stack_store(types::I64, new, res, 0);
@@ -7611,7 +7695,7 @@ fn emit_eq<M: Module>(
                 for (offset, fty) in fields {
                     let fl = component(builder, lv, offset, &fty, structs);
                     let fr = component(builder, rv, offset, &fty, structs);
-                    let fe = emit_eq(module, builder, builtins, structs, fl, fr, &fty)?;
+                    let fe = emit_eq(module, builder, cx, fl, fr, &fty)?;
                     let cur = builder.ins().stack_load(types::I64, types::I64, res, 0);
                     let new = builder.ins().band(cur, fe);
                     builder.ins().stack_store(types::I64, new, res, 0);
@@ -7687,7 +7771,7 @@ fn emit_eq<M: Module>(
                 // Right value is at the slot's offset 0; left at the pair's 8.
                 let lval = component(builder, lpair, 8, v, structs);
                 let rval = component(builder, rslot, 0, v, structs);
-                let ve = emit_eq(module, builder, builtins, structs, lval, rval, v)?;
+                let ve = emit_eq(module, builder, cx, lval, rval, v)?;
                 let cont = builder.create_block();
                 let neq = builder.create_block();
                 builder.ins().brif(ve, cont, &[], neq, &[]);
@@ -7744,7 +7828,7 @@ fn emit_eq<M: Module>(
             } else {
                 let lo = component(builder, lv, OPT_VALUE_OFFSET, ok_ty, structs);
                 let ro = component(builder, rv, OPT_VALUE_OFFSET, ok_ty, structs);
-                emit_eq(module, builder, builtins, structs, lo, ro, ok_ty)?
+                emit_eq(module, builder, cx, lo, ro, ok_ty)?
             };
             builder.ins().stack_store(types::I64, e, res, 0);
             builder.ins().jump(merge, &[]);
@@ -7755,7 +7839,7 @@ fn emit_eq<M: Module>(
             } else {
                 let le = component(builder, lv, OPT_VALUE_OFFSET, err_ty, structs);
                 let re = component(builder, rv, OPT_VALUE_OFFSET, err_ty, structs);
-                emit_eq(module, builder, builtins, structs, le, re, err_ty)?
+                emit_eq(module, builder, cx, le, re, err_ty)?
             };
             builder.ins().stack_store(types::I64, e, res, 0);
             builder.ins().jump(merge, &[]);
@@ -7922,7 +8006,7 @@ fn compile_ctor_eq<M: Module>(
         for ((offset, fty), arg) in fields.iter().zip(ctor_args.iter()) {
             let other_field = component(builder, ov, *offset, fty, structs);
             let (cv, _) = compile_expr(module, builder, cx, scopes, arg)?;
-            let feq = emit_eq(module, builder, builtins, structs, other_field, cv, fty)?;
+            let feq = emit_eq(module, builder, cx, other_field, cv, fty)?;
             fields_eq = Some(match fields_eq {
                 None => feq,
                 Some(acc) => builder.ins().band(acc, feq),
@@ -9651,6 +9735,78 @@ fn define_test_fail_fn<M: Module>(
     Ok(())
 }
 
+/// Define a generated `__eq_<n>(lv, rv) -> i64` helper: the structural equality
+/// of two borrowed `ty` values (see [`emit_eq_body`]). Nested composites in the
+/// body call *their* helpers (via [`emit_eq`]), so defining one can request more
+/// eq helpers — the drain loop handles that.
+#[allow(clippy::too_many_arguments)]
+fn define_eq_fn<M: Module>(
+    module: &mut M,
+    ctx: &mut Context,
+    fbc: &mut FunctionBuilderContext,
+    funcs: &HashMap<String, FuncInfo>,
+    structs: &HashMap<String, TypeDef>,
+    builtins: &Builtins,
+    lit_ctr: &Cell<u32>,
+    elem_rc: &RefCell<ElemRc>,
+    id: FuncId,
+    ty: &Type,
+    ir_out: &mut String,
+    instrument: bool,
+) -> Result<(), Error> {
+    builtins.clear_func_cache();
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // lv
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // rv
+    ctx.func.signature.returns.push(AbiParam::new(types::I64)); // 0/1
+    {
+        let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        builder.seal_block(entry);
+        let lv = builder.block_params(entry)[0];
+        let rv = builder.block_params(entry)[1];
+
+        // `emit_eq_body` only reads `builtins`/`structs`/`elem_rc`; the rest of
+        // `Cx` is irrelevant to a borrow-only comparison, so feed trivial values.
+        let env: Env = HashMap::new();
+        let owned_params: HashSet<String> = HashSet::new();
+        let unit = Type::Unit;
+        let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let cx = Cx {
+            env: &env,
+            funcs,
+            structs,
+            builtins,
+            effects: &[],
+            owned_params: &owned_params,
+            lit_ctr,
+            elem_rc,
+            ret_ty: &unit,
+            sret: None,
+            error_main: false,
+            in_test: false,
+            bindings: &no_bindings,
+        };
+
+        let res = emit_eq_body(module, &mut builder, cx, lv, rv, ty)?;
+        builder.ins().return_(&[res]);
+        builder.finalize(module.target_config());
+    }
+
+    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    if instrument {
+        let count_fn = builtins.id(module, "aipl_count_insns");
+        instrument_insn_count(module, &mut ctx.func, count_fn);
+    }
+    module
+        .define_function(id, ctx)
+        .map_err(|e| Error::msg(format!("define eq helper: {e:?}")))?;
+    ctx.clear();
+    Ok(())
+}
+
 /// Define a generated `__to_str_<n>(value) -> str` helper: render `value` of type
 /// `ty` to a fresh `str` and return it. One allocation: a measure pass computes
 /// the total byte length, `aipl_str_alloc` reserves exactly that, and a write
@@ -9861,6 +10017,14 @@ struct ElemRc {
     // type's name; `test_fail_pending` lists the ones still to be defined.
     test_fail_fns: HashMap<String, FuncId>,
     test_fail_pending: Vec<(Type, FuncId)>,
+    // Per-type structural-equality helpers: `__eq_<n>(lv, rv) -> i64`. A `==`/`!=`
+    // (or a nested comparison) on a composite type calls its helper instead of
+    // inlining the whole structural comparison at every site. Keyed by the type's
+    // name; `eq_pending` lists the ones still to be defined. Defining one can
+    // request further helpers (its composite fields/elements), so the drain
+    // loops until `eq_pending` is empty.
+    eq_fns: HashMap<String, FuncId>,
+    eq_pending: Vec<(Type, FuncId)>,
     ctr: u32,
 }
 
@@ -10230,7 +10394,7 @@ fn emit_arr_starts_ends_elem<M: Module>(
         zero
     };
     let e = load_array_elem(module, builder, builtins, arr, idx, elem, structs);
-    let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
+    let eq = emit_eq(module, builder, cx, e, elem_val, elem)?;
     builder.ins().stack_store(types::I64, eq, res, 0);
     builder.ins().jump(merge, &[]);
     builder.switch_to_block(merge);
@@ -10273,7 +10437,7 @@ fn emit_arr_contains_elem<M: Module>(
     builder.switch_to_block(body);
     builder.seal_block(body);
     let e = load_array_elem(module, builder, builtins, arr, i, elem, structs);
-    let eq = emit_eq(module, builder, builtins, structs, e, elem_val, elem)?;
+    let eq = emit_eq(module, builder, cx, e, elem_val, elem)?;
     let cont = builder.create_block();
     builder.ins().brif(eq, found, &[], cont, &[]);
     builder.switch_to_block(cont);
@@ -10366,7 +10530,7 @@ fn emit_arr_contains_seq<M: Module>(
     let si = builder.ins().iadd(s, i);
     let el = load_array_elem(module, builder, builtins, self_ptr, si, elem, structs);
     let er = load_array_elem(module, builder, builtins, other_ptr, i, elem, structs);
-    let ee = emit_eq(module, builder, builtins, structs, el, er, elem)?;
+    let ee = emit_eq(module, builder, cx, el, er, elem)?;
     let inner_cont = builder.create_block();
     builder.ins().brif(ee, inner_cont, &[], next_start, &[]);
     builder.switch_to_block(inner_cont);
@@ -12942,7 +13106,7 @@ fn compile_expr<M: Module>(
                             span.clone(),
                         ));
                     };
-                    let eq = emit_eq(module, builder, builtins, structs, lv, rv, &cmp_ty)?;
+                    let eq = emit_eq(module, builder, cx, lv, rv, &cmp_ty)?;
                     let result = if *op == 'N' {
                         builder.ins().bxor_imm_u(eq, 1)
                     } else {
@@ -13711,10 +13875,8 @@ fn compile_expr<M: Module>(
                                 let idx = builder.ins().iconst(types::I64, *j as i64);
                                 let scrut_elem =
                                     seq_elem(module, builder, builtins, structs, ptr, idx, &seq_ty);
-                                let eq = emit_eq(
-                                    module, builder, builtins, structs, scrut_elem, *lit_val,
-                                    &elem_ty,
-                                )?;
+                                let eq =
+                                    emit_eq(module, builder, cx, scrut_elem, *lit_val, &elem_ty)?;
                                 matched = builder.ins().band(matched, eq);
                             }
                             builder.ins().brif(matched, arm_blocks[i], &[], next, &[]);

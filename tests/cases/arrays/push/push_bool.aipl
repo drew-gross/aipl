@@ -24,11 +24,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 296
-instructions executed: 910
-binary size: 4080
-  code: 2004
+instructions executed: 918
+binary size: 3432
+  code: 1400
   data: 304
-  metadata: 1772
+  metadata: 1728
 --- monomorphizations ---
 __test$appended
 main

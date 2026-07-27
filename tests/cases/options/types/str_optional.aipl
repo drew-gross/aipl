@@ -13,11 +13,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 233
-binary size: 2784
-  code: 996
+instructions executed: 235
+binary size: 2880
+  code: 1060
   data: 297
-  metadata: 1491
+  metadata: 1523
 --- monomorphizations ---
 main
 pick

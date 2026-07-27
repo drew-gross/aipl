@@ -24,11 +24,11 @@ allocations: 2
 deallocations: 2
 reallocations: 4
 bytes allocated: 128
-instructions executed: 582
-binary size: 2280
-  code: 1040
+instructions executed: 584
+binary size: 2360
+  code: 1088
   data: 62
-  metadata: 1178
+  metadata: 1210
 --- monomorphizations ---
 grown
 main

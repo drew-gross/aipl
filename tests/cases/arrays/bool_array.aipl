@@ -22,11 +22,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 66
-instructions executed: 661
-binary size: 2968
-  code: 1376
+instructions executed: 667
+binary size: 3072
+  code: 1408
   data: 273
-  metadata: 1319
+  metadata: 1391
 --- monomorphizations ---
 __test$count_true
 main

@@ -24,11 +24,11 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 520
-instructions executed: 685
-binary size: 5288
-  code: 2620
+instructions executed: 693
+binary size: 5560
+  code: 2792
   data: 186
-  metadata: 2482
+  metadata: 2582
 --- monomorphizations ---
 __test$first
 add_row

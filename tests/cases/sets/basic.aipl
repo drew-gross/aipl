@@ -21,11 +21,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 160
-instructions executed: 282
-binary size: 3256
-  code: 1244
+instructions executed: 284
+binary size: 3344
+  code: 1304
   data: 327
-  metadata: 1685
+  metadata: 1713
 --- monomorphizations ---
 __test$build
 main

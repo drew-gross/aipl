@@ -15,11 +15,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 229
-binary size: 2752
-  code: 900
+instructions executed: 237
+binary size: 2824
+  code: 936
   data: 274
-  metadata: 1578
+  metadata: 1614
 --- monomorphizations ---
 main
 trim_prefix

@@ -109,3 +109,7 @@ some sort of with_capacity option? Use in unescape
 split the test cases into more shards (since some take > 60s)
 
 integate the formatting test into the cases harness
+
+the size is driven by inline construction of large literal values and the lexer's inlined rule table — not by error rendering. If you want to shrink it, the levers are: make large array-literal construction table-driven rather than unrolled.
+
+Make synthesized functions show up in monomorphizations. Ideally by having their creating be driven by the monomorphization process.

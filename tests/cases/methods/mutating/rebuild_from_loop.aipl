@@ -29,11 +29,11 @@ allocations: 6
 deallocations: 6
 reallocations: 9
 bytes allocated: 384
-instructions executed: 1531
-binary size: 3568
-  code: 1784
+instructions executed: 1535
+binary size: 3456
+  code: 1660
   data: 151
-  metadata: 1633
+  metadata: 1645
 --- monomorphizations ---
 double_each
 main

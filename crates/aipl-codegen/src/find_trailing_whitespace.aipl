@@ -82,11 +82,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 4123
-binary size: 6400
-  code: 3308
+instructions executed: 4161
+binary size: 5312
+  code: 2072
   data: 1110
-  metadata: 1982
+  metadata: 2130
 --- monomorphizations ---
 __test$find_trailing_whitespace
 find_trailing_whitespace

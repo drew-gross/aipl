@@ -28,11 +28,11 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 367
-instructions executed: 2530
-binary size: 5576
-  code: 3120
+instructions executed: 2538
+binary size: 4880
+  code: 2464
   data: 377
-  metadata: 2079
+  metadata: 2039
 --- monomorphizations ---
 __filter5
 __map1

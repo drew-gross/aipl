@@ -40,11 +40,11 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 720
-instructions executed: 987
-binary size: 4200
-  code: 2248
+instructions executed: 993
+binary size: 3816
+  code: 1884
   data: 132
-  metadata: 1820
+  metadata: 1800
 --- monomorphizations ---
 __test$addtwo
 addtwo

@@ -53,11 +53,11 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 7181
-binary size: 8968
-  code: 4140
+instructions executed: 7225
+binary size: 8976
+  code: 4112
   data: 696
-  metadata: 4132
+  metadata: 4168
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam12
 __builtin_count_while$char$s0$lam5

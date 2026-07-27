@@ -43,11 +43,11 @@ allocations: 13
 deallocations: 13
 reallocations: 3
 bytes allocated: 704
-instructions executed: 2182
-binary size: 7448
-  code: 4136
+instructions executed: 2192
+binary size: 6912
+  code: 3608
   data: 404
-  metadata: 2908
+  metadata: 2900
 --- monomorphizations ---
 __map2$own0
 double

@@ -48,11 +48,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2154
-binary size: 4120
-  code: 1280
+instructions executed: 2250
+binary size: 4128
+  code: 1252
   data: 930
-  metadata: 1910
+  metadata: 1946
 --- monomorphizations ---
 common_space_prefix
 main

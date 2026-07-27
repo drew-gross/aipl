@@ -38,11 +38,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 409
-binary size: 3592
-  code: 1580
+instructions executed: 419
+binary size: 3336
+  code: 1236
   data: 533
-  metadata: 1479
+  metadata: 1567
 --- monomorphizations ---
 area
 main

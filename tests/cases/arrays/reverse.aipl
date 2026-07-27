@@ -32,11 +32,11 @@ allocations: 20
 deallocations: 20
 reallocations: 0
 bytes allocated: 944
-instructions executed: 872
-binary size: 5712
-  code: 2492
+instructions executed: 880
+binary size: 5784
+  code: 2532
   data: 569
-  metadata: 2651
+  metadata: 2683
 --- monomorphizations ---
 __test$reversed_eq
 __test$reversed_len
