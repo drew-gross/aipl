@@ -2395,14 +2395,29 @@ impl Drop for RawStringHookGuard {
     }
 }
 
+/// The delimiter a [`LexedTokenKind::StrLit`] was written with — the mirror of
+/// `lex_aipl.aipl`'s `StrStyle`. Lets a consumer (the autoformatter) recover the
+/// original spelling from the decoded value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LexedStrStyle {
+    /// `"..."`
+    Quoted,
+    /// `"""..."""` (de-dented)
+    TripleQuoted,
+    /// `` `...` `` (interpolation-free template)
+    Backtick,
+    /// ```` ```...``` ```` (interpolation-free raw template, de-dented)
+    TripleBacktick,
+}
+
 /// A token kind produced by the dogfooded AIPL lexer (`lex_aipl.aipl`),
 /// mirrored arm-for-arm from its `AiplTok` variant so the FFI marshaling is a
-/// direct name match. Value-carrying arms hold the decoded value (a string's
-/// unescaped contents, an int literal's value, a char literal's byte); the
-/// `Raw*` string/template arms hold the *verbatim* bytes between the
-/// delimiters — de-denting is the consumer's pass, exactly as in the AIPL
-/// lexer. `Space`/comments/`AllowMarker` only ever appear in
-/// [`LexedOutput::trivia`].
+/// direct name match. Value-carrying arms hold the decoded value: a `StrLit`'s
+/// escape-decoded (and, for a `Triple`/`TripleBacktick` style, de-dented)
+/// contents plus its delimiter style, an int literal's value, a char literal's
+/// byte. The `RawTemplate*` interpolated-segment arms still hold the *verbatim*
+/// bytes — de-denting those is deferred. `Space`/comments/`AllowMarker` only
+/// ever appear in [`LexedOutput::trivia`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexedTokenKind {
     Space,
@@ -2411,14 +2426,11 @@ pub enum LexedTokenKind {
     AllowMarker,
     Name(String),
     IntLit(i64),
-    StrLit(String),
-    RawStrLit(String),
+    StrLit(String, LexedStrStyle),
     CharTok(u8),
-    TemplateStr(String),
     TemplateHead(String),
     TemplateMid(String),
     TemplateTail(String),
-    RawTemplateStr(String),
     RawTemplateHead(String),
     RawTemplateMid(String),
     RawTemplateTail(String),
@@ -3554,13 +3566,10 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
             _ => TokenKind::Identifier,
         },
         K::IntLit(_) => TokenKind::Number,
-        K::StrLit(_)
-        | K::RawStrLit(_)
-        | K::TemplateStr(_)
+        K::StrLit(_, _)
         | K::TemplateHead(_)
         | K::TemplateMid(_)
         | K::TemplateTail(_)
-        | K::RawTemplateStr(_)
         | K::RawTemplateHead(_)
         | K::RawTemplateMid(_)
         | K::RawTemplateTail(_) => TokenKind::Str,

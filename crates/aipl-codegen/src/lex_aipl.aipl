@@ -3,6 +3,7 @@
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 import { &&, wrapping_add as +, +++, <, ==, int_parse, len } from builtins;
 import { Emit, LexError, LexResult, Matcher, Seg, Token, TokenRule, lex } from "./lexer.aipl";
+import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import { unescape } from "./unescape.aipl";
 
@@ -19,7 +20,18 @@ import { unescape } from "./unescape.aipl";
 // (`Matcher`/`Emit`/`Seg`/`TokenValue`/the test `Kind`), because AIPL variant
 // constructors currently share one global namespace across imported files, so a
 // consumer's kinds can't reuse a library constructor's name. That's why `.` is
-// `Period` here, not `Dot` (the test `Kind`'s float-dot arm already claims it).
+// `Period` here, not `Dot` (the test `Kind`'s float-dot arm already claims it),
+// and why a string literal's delimiter style is `Backtick`, not the library
+// `Matcher`'s `Template`.
+
+// Every string literal — `"..."`, `"""..."""`, and an interpolation-free
+// `` `...` `` / ```` ```...``` ```` template — lexes to one `StrLit` (below)
+// carrying its *decoded* value and the delimiter it was written with, this
+// `StrStyle`. A `Triple`/`TripleBacktick` literal's value is de-dented in the
+// emit; a `Quoted`/`Backtick` one is single-line and only escape-decoded. The
+// style lets the autoformatter recover the original spelling from the value.
+variant StrStyle = Quoted | TripleQuoted | Backtick | TripleBacktick
+
 variant AiplTok =
     Space
     | LineComment
@@ -27,14 +39,11 @@ variant AiplTok =
     | AllowMarker
     | Name(str)
     | IntLit(i64)
-    | StrLit(str)
-    | RawStrLit(str)
+    | StrLit(str, StrStyle)
     | CharTok(char)
-    | TemplateStr(str)
     | TemplateHead(str)
     | TemplateMid(str)
     | TemplateTail(str)
-    | RawTemplateStr(str)
     | RawTemplateHead(str)
     | RawTemplateMid(str)
     | RawTemplateTail(str)
@@ -117,27 +126,18 @@ fn op(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
     TokenRule { matcher: Exact(spelling), emit: Bare(kind) }
 }
 
-// A raw string `"""..."""` is a `Between` token, so its contents are verbatim —
-// no escape decoding — and a lone `"` or `""` inside is content, not a close.
-// That's why it gets its own `RawStrLit` kind rather than reusing `StrLit`: the
-// two decode differently (`str_lit` unescapes, this doesn't). The value here is
-// the exact bytes between the delimiters; AIPL's de-denting of a raw string
-// (trimming the surrounding line breaks, stripping the common indent) is a later
-// consumer pass, not part of lexing — so the emit is the bare constructor and no
-// helper is needed (see `aipl_rules`).
-
 // The `OfSeg` emit for the `` `...` `` template rule: the `Template` matcher hands
 // each text segment's *raw* text plus its position (`Plain` for an
 // interpolation-free literal, else `Head`/`Middle`/`Tail`), and this maps each to
 // its own `AiplTok` arm — decoding the segment's escapes (`` \` ``/`\{`/`\n`/… as in
-// the `escapes` set below) with `unescape`, exactly as `str_lit` does for a plain
-// string. A `Plain` template folds to the same category as a string (the Rust
-// lexer emits a bare `Str` for an interpolation-free template), but keeps a
-// distinct kind so a consumer still sees it was written as a template.
+// the `escapes` set below) with `unescape`, exactly as the `"..."` emit does. An
+// interpolation-free template (`Plain`) folds into `StrLit` (with `Backtick`
+// style) — the same token any other string literal produces — while a template
+// *with* interpolations keeps distinct `TemplateHead`/`Mid`/`Tail` kinds.
 fn tpl_kind(text: str, seg: Seg) -> AiplTok {
     let t = text.unescape();
     match (seg) {
-        Plain => TemplateStr(t),
+        Plain => StrLit(t, Backtick),
         Head => TemplateHead(t),
         Middle => TemplateMid(t),
         Tail => TemplateTail(t),
@@ -145,13 +145,16 @@ fn tpl_kind(text: str, seg: Seg) -> AiplTok {
 }
 
 // The `OfSeg` emit for the ```` ```...``` ```` raw-template rule: like `tpl_kind`,
-// but the delimiter scans verbatim (empty `escapes`), so the segment text is not
-// decoded — a lone `` ` ``/` `` ` inside is content. AIPL's de-denting of a raw
-// template's combined text (as for a `"""` raw string) is a later consumer pass,
-// not part of lexing, so the value here is the exact bytes.
+// but the delimiter scans verbatim (empty `escapes`), so the segment text isn't
+// escape-decoded — a lone `` ` ``/` `` ` inside is content. An interpolation-free
+// raw template (`Plain`) folds into `StrLit` with `TripleBacktick` style,
+// *de-dented* here in the emit (`process_raw_string`, as for a `"""` raw string).
+// A raw template *with* interpolations keeps distinct `RawTemplate*` kinds whose
+// segment values are still the verbatim bytes — de-denting those (across the
+// whole template) is deferred until interpolated templates are handled.
 fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
     match (seg) {
-        Plain => RawTemplateStr(text),
+        Plain => StrLit(process_raw_string(text), TripleBacktick),
         Head => RawTemplateHead(text),
         Middle => RawTemplateMid(text),
         Tail => RawTemplateTail(text),
@@ -241,11 +244,16 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
-        // than an empty `""` plus a stray `"`.
-        TokenRule { matcher: Between(three_quotes, three_quotes), emit: Of(RawStrLit) },
+        // than an empty `""` plus a stray `"`. Its contents are verbatim (no
+        // escapes), but a `"""` literal *is* de-dented — done here in the emit via
+        // the dogfooded `process_raw_string`, so the token carries its final value.
+        TokenRule {
+            matcher: Between(three_quotes, three_quotes),
+            emit: Of(|text: str| StrLit(process_raw_string(text), TripleQuoted)),
+        },
         TokenRule {
             matcher: Delimited("\"", "ntr\\\""),
-            emit: Of(|text: str| StrLit(text.unescape())),
+            emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
         },
         // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
         // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
@@ -422,7 +430,8 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     );
 
     // A string literal with escapes: the source is `s = "a\nb"` (a literal
-    // backslash-`n`, not a newline). The `StrLit` emit decodes it, so the token's
+    // backslash-`n`, not a newline). The `StrLit` emit decodes it (with `Quoted`
+    // style), so the token's
     // value carries an actual newline — escape handling lives in `str_lit`, not in
     // the lexer library.
     let esc = "s = \"a\\nb\"";
@@ -432,7 +441,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
                 tokens: [
                     Token { kind: Name("s"), span: 0..1 },
                     Token { kind: Eq, span: 2..3 },
-                    Token { kind: StrLit("a\nb"), span: 4..10 },
+                    Token { kind: StrLit("a\nb", Quoted), span: 4..10 },
                 ],
                 trivia: [],
             },
@@ -441,11 +450,15 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
 
     // A raw string `"""a"b"""` (the AIPL source here is written with escaped
     // quotes). `Between` scans to the balancing `"""`, so the lone `"` inside is
-    // content and the value is verbatim — no escape decoding, unlike `StrLit`.
+    // content and no escapes are decoded; it lexes to `StrLit` with `TripleQuoted`
+    // style. De-denting a single-line literal is a no-op, so the value is `a"b`.
     let raw = "\"\"\"a\"b\"\"\"";
     assert(
         lex_aipl(raw) == ok(
-            LexResult { tokens: [Token { kind: RawStrLit("a\"b"), span: 0..9 }], trivia: [] },
+            LexResult {
+                tokens: [Token { kind: StrLit("a\"b", TripleQuoted), span: 0..9 }],
+                trivia: [],
+            },
         ),
     );
 
@@ -478,12 +491,12 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         ),
     );
 
-    // A template literal with no interpolation lexes as one `TemplateStr` (the
-    // Rust lexer folds it to a plain string) — the whole literal, backticks
-    // included, is its span.
+    // A template literal with no interpolation lexes as one `StrLit` with
+    // `Backtick` style (the same token any string literal produces) — the whole
+    // literal, backticks included, is its span.
     assert(
         lex_aipl("`hi`") == ok(
-            LexResult { tokens: [Token { kind: TemplateStr("hi"), span: 0..4 }], trivia: [] },
+            LexResult { tokens: [Token { kind: StrLit("hi", Backtick), span: 0..4 }], trivia: [] },
         ),
     );
 
@@ -504,11 +517,15 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         ),
     );
 
-    // A triple-backtick raw template scans verbatim, so its value is the exact
-    // bytes and it wins over the single-backtick rule (longest delim first).
+    // A triple-backtick raw template with no interpolation scans verbatim and
+    // folds into `StrLit` with `TripleBacktick` style (de-dented, a no-op here);
+    // it wins over the single-backtick rule (longest delim first).
     assert(
         lex_aipl("```hi```") == ok(
-            LexResult { tokens: [Token { kind: RawTemplateStr("hi"), span: 0..8 }], trivia: [] },
+            LexResult {
+                tokens: [Token { kind: StrLit("hi", TripleBacktick), span: 0..8 }],
+                trivia: [],
+            },
         ),
     );
 
@@ -590,25 +607,28 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4550
-deallocations: 4550
+allocations: 4556
+deallocations: 4556
 reallocations: 0
-bytes allocated: 235424
-instructions executed: 1266447
-binary size: 571608
+bytes allocated: 247856
+instructions executed: 1164288
+binary size: 493528
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
-__builtin_count_while$char$s0$lam18
-__builtin_count_while$char$s0$lam19
-__builtin_count_while$char$s0$lam20
+__builtin_count_while$char$s0$lam24
+__builtin_count_while$char$s0$lam29
+__builtin_count_while$char$s0$lam30
+__builtin_count_while$char$s0$lam31
+__builtin_count_while$char$s0$lam33
 __builtin_int_parse
-__builtin_is_some_and$char$lam27
+__builtin_is_some_and$char$lam40
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
 __lambda_4
 __lambda_5
+__m10__parse_test_section_header
 __m1__between_len
 __m1__delimited_len
 __m1__float_len
@@ -623,8 +643,11 @@ __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
 __m2__unescape
-__m3__strip_test_sections
-__m4__parse_test_section_header
+__m3__process_raw_string
+__m7__trim_prefix
+__m8__trim_suffix
+__m9__strip_test_sections
+__map15$own0
 __test$lex_aipl
 __test$lex_aipl_stripped
 char_lit_emit

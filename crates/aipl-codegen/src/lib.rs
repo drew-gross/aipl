@@ -2972,7 +2972,7 @@ fn marshal_lex(
     entry: &str,
     src: &str,
 ) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
-    use aipl_parser::{LexedError, LexedOutput, LexedToken, LexedTokenKind as K};
+    use aipl_parser::{LexedError, LexedOutput, LexedStrStyle, LexedToken, LexedTokenKind as K};
 
     // The `(String, FfiValue)` field named `name` of a marshaled struct.
     fn field(fields: Vec<(String, FfiValue)>, name: &str) -> FfiValue {
@@ -3011,17 +3011,36 @@ fn marshal_lex(
             Ok([FfiValue::Int(i)]) => i,
             other => panic!("dogfooded lex_aipl(): {case} payload: {other:?}"),
         };
+        // `StrLit`'s `(str, StrStyle)` payload: the decoded value plus a nested
+        // `StrStyle` variant (nullary), marshaled as `Variant(style_name, [])`.
+        let str_lit_payload = |payload: Vec<FfiValue>| match <[FfiValue; 2]>::try_from(payload) {
+            Ok([FfiValue::Str(s), FfiValue::Variant(style, style_payload)]) => {
+                assert!(
+                    style_payload.is_empty(),
+                    "dogfooded lex_aipl(): StrStyle {style} carries an unexpected payload"
+                );
+                let style = match style.as_str() {
+                    "Quoted" => LexedStrStyle::Quoted,
+                    "TripleQuoted" => LexedStrStyle::TripleQuoted,
+                    "Backtick" => LexedStrStyle::Backtick,
+                    "TripleBacktick" => LexedStrStyle::TripleBacktick,
+                    other => panic!("dogfooded lex_aipl(): unknown StrStyle {other:?}"),
+                };
+                (s, style)
+            }
+            other => panic!("dogfooded lex_aipl(): StrLit payload: {other:?}"),
+        };
         match case.as_str() {
             "Name" => return K::Name(str_payload(payload)),
             "IntLit" => return K::IntLit(int_payload(payload)),
-            "StrLit" => return K::StrLit(str_payload(payload)),
-            "RawStrLit" => return K::RawStrLit(str_payload(payload)),
+            "StrLit" => {
+                let (s, style) = str_lit_payload(payload);
+                return K::StrLit(s, style);
+            }
             "CharTok" => return K::CharTok(int_payload(payload) as u8),
-            "TemplateStr" => return K::TemplateStr(str_payload(payload)),
             "TemplateHead" => return K::TemplateHead(str_payload(payload)),
             "TemplateMid" => return K::TemplateMid(str_payload(payload)),
             "TemplateTail" => return K::TemplateTail(str_payload(payload)),
-            "RawTemplateStr" => return K::RawTemplateStr(str_payload(payload)),
             "RawTemplateHead" => return K::RawTemplateHead(str_payload(payload)),
             "RawTemplateMid" => return K::RawTemplateMid(str_payload(payload)),
             "RawTemplateTail" => return K::RawTemplateTail(str_payload(payload)),

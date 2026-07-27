@@ -24,34 +24,37 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const LEXER_AIPL: &str = include_str!("../crates/aipl-codegen/src/lexer.aipl");
-const LEX_AIPL: &str = include_str!("../crates/aipl-codegen/src/lex_aipl.aipl");
-const STRIP_TEST_SECTIONS_AIPL: &str =
-    include_str!("../crates/aipl-codegen/src/strip_test_sections.aipl");
-const PARSE_TEST_SECTION_HEADER_AIPL: &str =
-    include_str!("../crates/aipl-codegen/src/parse_test_section_header.aipl");
-const UNESCAPE_AIPL: &str = include_str!("../crates/aipl-codegen/src/unescape.aipl");
-
-/// Compile the AIPL lexer into an FFI engine exposing `lex_aipl_tokens`. Beyond
-/// the lexer itself (`lex_aipl.aipl` + its `lexer.aipl` library) this pulls in
-/// `strip_test_sections.aipl` (and its `parse_test_section_header.aipl` dep),
-/// which `lex_aipl.aipl` imports for its `lex_aipl_stripped` entry, and
-/// `unescape.aipl`, its escape decoder. The trailing `--- performance ---`
-/// sections are stripped by the loader's parse, so the raw `include_str!`d
-/// sources load as-is.
+/// Compile the AIPL lexer into an FFI engine exposing `lex_aipl_tokens`. Takes
+/// the lexer's transitive dependency files straight from the canonical
+/// `DOGFOOD_SOURCES` (so their contents never desync a copy here), reordered so
+/// `lex_aipl.aipl` is the callable root. It's the lexer's own dependency closure
+/// rather than *all* of `DOGFOOD_SOURCES` because the other dogfood files (e.g.
+/// `caret_block.aipl`) recurse deeply enough to overflow the default test-thread
+/// stack when compiled. If `lex_aipl.aipl` gains a new import, add its file here
+/// (a missing one fails the compile loudly). Trailing `--- performance ---`
+/// sections are stripped by the loader's parse.
 fn compile_lexer() -> Engine {
     aipl::install_parser_hooks();
-    Engine::compile_sources(&[
-        ("./lex_aipl.aipl", LEX_AIPL),
-        ("./lexer.aipl", LEXER_AIPL),
-        ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_AIPL),
-        (
-            "./parse_test_section_header.aipl",
-            PARSE_TEST_SECTION_HEADER_AIPL,
-        ),
-        ("./unescape.aipl", UNESCAPE_AIPL),
-    ])
-    .expect("compile AIPL lexer for differential test")
+    const LEXER_DEPS: &[&str] = &[
+        "./lex_aipl.aipl",
+        "./lexer.aipl",
+        "./unescape.aipl",
+        "./strip_test_sections.aipl",
+        "./parse_test_section_header.aipl",
+        "./process_raw_string.aipl",
+        "./dedent.aipl",
+        "./lines.aipl",
+        "./trim_prefix.aipl",
+        "./trim_end_while.aipl",
+        "./trim_suffix.aipl",
+    ];
+    let mut sources: Vec<(&str, &str)> = aipl::codegen::DOGFOOD_SOURCES
+        .iter()
+        .copied()
+        .filter(|(name, _)| LEXER_DEPS.contains(name))
+        .collect();
+    sources.sort_by_key(|(name, _)| *name != "./lex_aipl.aipl");
+    Engine::compile_sources(&sources).expect("compile AIPL lexer for differential test")
 }
 
 /// The `(String, FfiValue)` field named `name` in a marshaled struct.
@@ -96,12 +99,15 @@ fn categorize(case: &str) -> &'static str {
         | "Match" | "Return" | "Struct" | "Variant" | "If" | "Else" | "Builtins" => "keyword",
         "Name" => "ident",
         "IntLit" => "number",
-        "StrLit" | "RawStrLit" => "str",
+        // Every string literal — `"..."`, `"""..."""`, and an interpolation-free
+        // `` `...` ``/```` ```...``` ```` template — is one `StrLit` (its
+        // delimiter kept as a style, dropped for this category dump).
+        "StrLit" => "str",
         "CharTok" => "char",
         // The Rust lexer's `classify` folds every template-literal piece
-        // (head/middle/tail, and a bare interpolation-free template) into `Str`.
-        "TemplateStr" | "TemplateHead" | "TemplateMid" | "TemplateTail" | "RawTemplateStr"
-        | "RawTemplateHead" | "RawTemplateMid" | "RawTemplateTail" => "str",
+        // (head/middle/tail) into `Str`.
+        "TemplateHead" | "TemplateMid" | "TemplateTail" | "RawTemplateHead" | "RawTemplateMid"
+        | "RawTemplateTail" => "str",
         "True" | "False" | "None" => "constant",
         "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "Pipe" | "DotDot"
         | "PlusPlusPlus" | "PlusPlus" | "Eq" | "Lt" | "Le" | "Gt" | "Ge" | "Bang" | "Plus"
