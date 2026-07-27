@@ -75,6 +75,28 @@ fn active_artifact_path() -> PathBuf {
     dogfood_ir_override().unwrap_or_else(artifact_path)
 }
 
+/// A dogfood source failed the combined frontend. Pin the offender by parsing
+/// each source on its own, then panic with the rendered error and the exact
+/// command to iterate on just that file. Falls back to the raw error if no
+/// single file reproduces the failure (e.g. a cross-file resolution or codegen
+/// error, not a parse error).
+fn blame_dogfood_failure(err: aipl::Error) -> ! {
+    for (name, src) in DOGFOOD_SOURCES {
+        let stripped = aipl::strip_test_sections(src);
+        let Err(e) = aipl::parse(stripped) else {
+            continue;
+        };
+        // Every dogfood source lives under this crate's `src/` directory.
+        let rel = format!("crates/aipl-codegen/src/{}", name.trim_start_matches("./"));
+        panic!(
+            "dogfood source failed to parse:\n{}\n\n\
+             To test just this file, run:\n    aipl check {rel}",
+            e.render(stripped, &rel),
+        );
+    }
+    panic!("generate dogfood IR: {err}");
+}
+
 /// Generate the unified dogfood artifact via the live frontend.
 ///
 /// Spawns a scoped thread with a 64 MiB stack: some dogfooded `.aipl` files
@@ -92,7 +114,7 @@ fn generate() -> String {
             .stack_size(64 * 1024 * 1024)
             .spawn_scoped(s, || {
                 generate_dogfood_artifact(DOGFOOD_SOURCES, DOGFOOD_ENTRIES)
-                    .unwrap_or_else(|e| panic!("generate dogfood IR: {e}"))
+                    .unwrap_or_else(|e| blame_dogfood_failure(e))
             })
             .expect("spawn scoped thread");
         result = Some(handle.join().expect("generate thread panicked"));

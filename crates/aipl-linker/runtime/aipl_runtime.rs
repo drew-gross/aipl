@@ -2927,6 +2927,13 @@ pub extern "C" fn aipl_assert(cond: i64, _loc: *const u8) {
 }
 
 #[no_mangle]
+pub extern "C" fn aipl_test_fail(_msg: *const u8) {
+    // `?` on an err inside a `.test`: mark the current test failed. The error
+    // message (`_msg`) is only rendered by the JIT runtime under `aipl check`.
+    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+}
+
+#[no_mangle]
 pub extern "C" fn aipl_test_end() {
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
         TEST_FAILED.fetch_add(1, TestOrd::Relaxed);

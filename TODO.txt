@@ -105,3 +105,7 @@ raw strings in aipl to make tests of unescape look nicer
 make a debugger
 
 some sort of with_capacity option? Use in unescape
+
+When a dogfood .aipl file fails to parse the harness should output the command to test just that file
+
+split the test cases into more shards (since some take > 60s)

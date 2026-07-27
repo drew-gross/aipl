@@ -75,7 +75,9 @@ pub fn load_program_sources(sources: &[(&str, &str)], dbg: DebugOptions) -> Resu
         ..Loader::default()
     };
     for (name, src) in sources {
-        loader.register_virtual(PathBuf::from(name), src).unwrap();
+        // Propagate a parse/lint error (don't `unwrap`) so callers can render it
+        // and pin the offending source rather than panicking opaquely.
+        loader.register_virtual(PathBuf::from(name), src)?;
     }
     loader.check_virtual_imports()?;
     loader.flatten(&root)

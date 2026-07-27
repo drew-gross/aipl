@@ -3808,7 +3808,9 @@ pub fn generate_dogfood_artifact(
     entries: &[&str],
 ) -> Result<String, Error> {
     let dbg = DebugOptions::new(false);
-    let program = aipl_loader::load_program_sources(sources, dbg).unwrap();
+    // Propagate a load/parse failure (don't `unwrap`) so the caller can pin the
+    // offending source file and report how to test just it.
+    let program = aipl_loader::load_program_sources(sources, dbg)?;
     let mut module = new_jit_module().unwrap();
     let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false).unwrap();
 

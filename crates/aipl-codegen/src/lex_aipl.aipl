@@ -331,18 +331,16 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // real grammar. `let x = 42;` plus a trailing line comment (trivia).
     let src = "let x = 42; // note";
     assert(
-        lex_aipl(src) == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: Let, span: 0..3 },
-                    Token { kind: Name("x"), span: 4..5 },
-                    Token { kind: Eq, span: 6..7 },
-                    Token { kind: IntLit(42), span: 8..10 },
-                    Token { kind: Semi, span: 10..11 },
-                ],
-                trivia: [Token { kind: LineComment, span: 12..19 }],
-            },
-        ),
+        lex_aipl(src)? == LexResult {
+            tokens: [
+                Token { kind: Let, span: 0..3 },
+                Token { kind: Name("x"), span: 4..5 },
+                Token { kind: Eq, span: 6..7 },
+                Token { kind: IntLit(42), span: 8..10 },
+                Token { kind: Semi, span: 10..11 },
+            ],
+            trivia: [Token { kind: LineComment, span: 12..19 }],
+        },
     );
 
     // Keywords beyond the starter set. `builtins` is a keyword everywhere (as in
@@ -619,8 +617,8 @@ allocations: 4581
 deallocations: 4581
 reallocations: 0
 bytes allocated: 259048
-instructions executed: 1173996
-binary size: 494208
+instructions executed: 1173994
+binary size: 496584
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
