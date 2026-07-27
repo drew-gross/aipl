@@ -109,5 +109,3 @@ some sort of with_capacity option? Use in unescape
 split the test cases into more shards (since some take > 60s)
 
 integate the formatting test into the cases harness
-
-improve early-return cleanup: But the measurement also showed the error-printing was the small part. The bulk of the per-? code — and it grows quadratically with the number of ? in a body — is the standard early-return cleanup: at each ?, the compiler drops every live scrutinee-result temporary, and those accumulate (the 5th ? drops all 5 prior results). This is not test-specific — a normal ? emits the same cleanup. So a .test that chains many ? gets big mostly from that shared mechanism, not from the fail/print logic. Can we fix that with a "goto cleanup" style approach?

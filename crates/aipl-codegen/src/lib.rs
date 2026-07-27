@@ -14256,6 +14256,11 @@ fn compile_expr<M: Module>(
             // `r?` propagates: evaluate the result `r`; on Err, rebuild the
             // enclosing function's Err-result from the same payload and return
             // early; on Ok, yield the unwrapped Ok value.
+            // Snapshot the current scope's tracking depth first: if evaluating the
+            // scrutinee grows it and leaves *its* result as the last-tracked entry,
+            // the scrutinee is a fresh temporary we exclusively own — see the Ok
+            // arm, which then consumes it instead of retaining + deferring its drop.
+            let scope_len_before = scopes.last().map_or(0, |s| s.len());
             let (rptr, rty) = compile_expr(module, builder, cx, scopes, inner)?;
             let Type::Result(ok_in, err_in) = &rty else {
                 return Err(Error::at(
@@ -14379,16 +14384,37 @@ fn compile_expr<M: Module>(
             // --- Ok: unwrap the value and carry on. ---
             builder.switch_to_block(ok_block);
             builder.seal_block(ok_block);
+            // Is the scrutinee a fresh temporary we exclusively own? True when
+            // evaluating it grew the current scope and left its result as the
+            // last-tracked entry (a call result, constructor, retained element
+            // read, …). A borrowed place (e.g. a bare variable) tracks nothing new,
+            // so this is false and we keep the retain-and-defer path below.
+            let owned_temp = scopes.last().is_some_and(|s| {
+                s.len() > scope_len_before
+                    && matches!(s.last(), Some(Tracked { owned: Owned::Value(v), .. }) if *v == rptr)
+            });
+            // Consuming: drop the scrutinee's tracking here rather than leaving it
+            // to be re-dropped (conditionally, on tag) at every later early-return
+            // and at scope exit — the source of the quadratic drop-code growth with
+            // chained `?`. On the Ok path its Err side is absent and its Ok payload
+            // moves into `val`, so there's nothing left to free (the husk is a
+            // function-lifetime stack slot). The Err block, emitted above while the
+            // entry was still tracked, still drops it on that path.
+            if owned_temp {
+                scopes.last_mut().expect("scope").pop();
+            }
             // A void-Ok (`!E`) unwraps to unit — there's no payload to read.
             if is_unit(&ok_ty) {
                 return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));
             }
             let val = component(builder, rptr, OPT_VALUE_OFFSET, &ok_ty, structs);
-            // A heap Ok payload is now a fresh co-owner of the scrutinee's heap
-            // (which still drops its own ref at scope exit) — retain and track it
-            // exactly like a call result.
             if needs_drop(&ok_ty, structs) {
-                emit_retain(builder, module, builtins, structs, val, &ok_ty);
+                // A consumed temporary transfers ownership of its Ok payload to
+                // `val` (no retain — `val` inherits the ref the husk held). A
+                // borrowed scrutinee still owns its payload, so co-own via retain.
+                if !owned_temp {
+                    emit_retain(builder, module, builtins, structs, val, &ok_ty);
+                }
                 scopes
                     .last_mut()
                     .expect("scope")
