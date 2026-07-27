@@ -1,7 +1,7 @@
 // A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
-import { &&, wrapping_add as +, +++, <, ==, int_parse, len } from builtins;
+import { &&, wrapping_add as +, +++, <, ==, int_parse, join, len, split } from builtins;
 import { Emit, LexError, LexResult, Matcher, Seg, Token, TokenRule, lex } from "./lexer.aipl";
 import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
@@ -144,17 +144,25 @@ fn tpl_kind(text: str, seg: Seg) -> AiplTok {
     }
 }
 
+// The segment finalizer for the raw-template rule (the `Template` matcher's
+// `finalize`): de-dent the whole literal's text segments *together*, so the
+// common indent is computed across the entire template — just like a `"""` raw
+// string. The segments are joined by `{` (which can't occur inside a raw
+// segment, since a `{` always opens an interpolation), de-dented as one block
+// via the dogfooded `process_raw_string`, then split back. A no-interpolation
+// raw template is the one-segment case (de-dent that single segment).
+fn dedent_segments(segs: str[]) -> str[] { process_raw_string(segs.join("{")).split("{") }
+
 // The `OfSeg` emit for the ```` ```...``` ```` raw-template rule: like `tpl_kind`,
 // but the delimiter scans verbatim (empty `escapes`), so the segment text isn't
-// escape-decoded — a lone `` ` ``/` `` ` inside is content. An interpolation-free
-// raw template (`Plain`) folds into `StrLit` with `TripleBacktick` style,
-// *de-dented* here in the emit (`process_raw_string`, as for a `"""` raw string).
-// A raw template *with* interpolations keeps distinct `RawTemplate*` kinds whose
-// segment values are still the verbatim bytes — de-denting those (across the
-// whole template) is deferred until interpolated templates are handled.
+// escape-decoded — a lone `` ` ``/` `` ` inside is content. The segments arrive
+// already de-dented (by `dedent_segments`, the rule's `finalize`), so this just
+// wraps them: an interpolation-free raw template (`Plain`) folds into `StrLit`
+// with `TripleBacktick` style, and an interpolated one keeps distinct
+// `RawTemplate*` kinds.
 fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
     match (seg) {
-        Plain => StrLit(process_raw_string(text), TripleBacktick),
+        Plain => StrLit(text, TripleBacktick),
         Head => RawTemplateHead(text),
         Middle => RawTemplateMid(text),
         Tail => RawTemplateTail(text),
@@ -272,8 +280,8 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // scans verbatim (empty `escapes`); the single form decodes the same
         // escapes as a string plus `` \` ``/`\{`. Each interpolation re-lexes with
         // this whole rule set, so templates nest.
-        TokenRule { matcher: Template("```", ""), emit: OfSeg(raw_tpl_kind) },
-        TokenRule { matcher: Template("`", "\\`{ntr"), emit: OfSeg(tpl_kind) },
+        TokenRule { matcher: Template("```", "", dedent_segments), emit: OfSeg(raw_tpl_kind) },
+        TokenRule { matcher: Template("`", "\\`{ntr", |segs: str[]| segs), emit: OfSeg(tpl_kind) },
         // Operators and punctuation, one `op` rule per spelling, longest first so
         // first-match-wins is maximal munch: the three-char `+++`, then the
         // two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
@@ -607,36 +615,38 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4556
-deallocations: 4556
+allocations: 4581
+deallocations: 4581
 reallocations: 0
-bytes allocated: 247856
-instructions executed: 1164288
-binary size: 493528
+bytes allocated: 259048
+instructions executed: 1173996
+binary size: 494208
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam13
-__builtin_count_while$char$s0$lam24
-__builtin_count_while$char$s0$lam29
-__builtin_count_while$char$s0$lam30
+__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam26
 __builtin_count_while$char$s0$lam31
+__builtin_count_while$char$s0$lam32
 __builtin_count_while$char$s0$lam33
+__builtin_count_while$char$s0$lam35
 __builtin_int_parse
-__builtin_is_some_and$char$lam40
+__builtin_is_some_and$char$lam42
 __lambda_0
 __lambda_1
 __lambda_2
 __lambda_3
 __lambda_4
 __lambda_5
+__lambda_6
+__lambda_7
 __m10__parse_test_section_header
 __m1__between_len
 __m1__delimited_len
+__m1__finalize_template$AiplTok
 __m1__float_len
 __m1__interp_scan$AiplTok
 __m1__lex$AiplTok
 __m1__lex_step$AiplTok
 __m1__nested_len
-__m1__seg_emit$AiplTok
 __m1__seg_needs_ofseg
 __m1__seg_only
 __m1__step_result$AiplTok
@@ -647,10 +657,11 @@ __m3__process_raw_string
 __m7__trim_prefix
 __m8__trim_suffix
 __m9__strip_test_sections
-__map15$own0
+__map17$own0
 __test$lex_aipl
 __test$lex_aipl_stripped
 char_lit_emit
+dedent_segments
 ident_cont
 int_lit
 kw

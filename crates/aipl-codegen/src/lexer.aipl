@@ -141,18 +141,22 @@ struct LexError { message: str, span: Span }
 //   `close` must be distinct (a delimiter can't both open and close a level)
 //   and non-empty. A token still open (depth > 0) at the end of the source is a
 //   lex error.
-// - `Template(delim, escapes)`: a template literal — text with `{expr}`
-//   interpolations. The `delim` spelling opens and closes the literal; it may
-//   be multi-char and scans like `Between` (a lone backtick under a triple-
-//   backtick delim is content). Text segments follow `escapes` as in
+// - `Template(delim, escapes, finalize)`: a template literal — text with
+//   `{expr}` interpolations. The `delim` spelling opens and closes the literal;
+//   it may be multi-char and scans like `Between` (a lone backtick under a
+//   triple-backtick delim is content). Text segments follow `escapes` as in
 //   `Delimited` (`\{` doesn't interpolate, an escaped delim doesn't close,
 //   `""` turns escapes off — the verbatim raw-template shape). A `{` in text
 //   opens an interpolation, lexed by the full rule set until the balancing
 //   `}` — so skip rules and nested template rules apply inside — with brace
-//   depth tracked and the closing `}` consumed without a token. The emitted
-//   kinds are context-dependent, derived from the rule's kind K: a literal
-//   with no interpolations is one K token; otherwise K_head (the open delim
-//   through the first `{`), each interpolation's tokens under their own
+//   depth tracked and the closing `}` consumed without a token. `finalize` is a
+//   `(str[]) -> str[]` the caller supplies to post-process a literal's text
+//   segments *as a group* before they're emitted (it must return one text per
+//   input segment) — for a transform that needs the whole literal, like
+//   de-denting a raw template's shared indent; pass an identity for none. The
+//   emitted kinds are context-dependent, derived from the rule's kind K: a
+//   literal with no interpolations is one K token; otherwise K_head (the open
+//   delim through the first `{`), each interpolation's tokens under their own
 //   rules' kinds, K_middle for each segment between interpolations, and
 //   K_tail (through the closing delim). The `skip` flag is ignored — a
 //   template always produces tokens.
@@ -189,7 +193,7 @@ variant Matcher =
     | Delimited(str, str)
     | Between(str, str)
     | Nested(str, str)
-    | Template(str, str)
+    | Template(str, str, (str[]) -> str[])
     | ToEol(str)
     | Float
     | Int
@@ -388,7 +392,7 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
         Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
         Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        Template(delim, escapes) => NoValue,
+        Template(delim, escapes, finalize) => NoValue,
         ToEol(marker) => NoValue,
         Float => NoValue,
         Int => NoValue,
@@ -488,7 +492,15 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
                 src[at..].between_len(at, open, close)?,
             )?,
             Nested(open, close) => step_result(r, src, at, src[at..].nested_len(at, open, close)?)?,
-            Template(delim, escapes) => template_step(src, at, delim, escapes, r.emit, rules)?,
+            Template(delim, escapes, finalize) => template_step(
+                src,
+                at,
+                delim,
+                escapes,
+                finalize,
+                r.emit,
+                rules,
+            )?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
             Float => step_result(r, src, at, src[at..].float_len())?,
             Int => step_result(r, src, at, src[at..].count_while(is_digit))?,
@@ -530,68 +542,63 @@ fn template_step<K>(
     at: i64,
     delim: str,
     escapes: str,
+    finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
 ) -> StepResult<K>!LexError {
     if (!src[at..].starts_with(delim)) {
         return ok(StepResult { tokens: [], trivia: [], end: at });
     };
-    template_scan(src, at, delim, escapes, emit, rules)
+    template_scan(src, at, delim, escapes, finalize, emit, rules)
 }
 
 // `Template`: scans a whole template literal at `at` (the caller verified the
 // opening `delim`); the result's tokens are the literal's whole run and its
 // `end` sits just past the closing `delim`. A text segment runs until the
 // closing `delim` (matched in full, like `Between`) or a `{`, which ends the
-// segment — as `Head` for the first, `Middle` after — and opens an
-// interpolation (see `interp_scan`); head/middle spans include their `{`, and
-// the next segment starts just past the interpolation's `}`. The segment
-// reaching the closing `delim` is `Tail` — or, when no `{` ever appeared, the
-// whole literal is one `Plain` token. Each segment's kind comes from the rule's
-// `OfSeg` emit applied to its *raw* (un-decoded) text and position — the emit
-// decodes if it wants to, with its own decoder. `escapes` still governs *scanning*
-// as in `delimited_len`, including the hard error on an unknown escape and the
-// dangling backslash falling through to run the literal out unterminated.
+// segment and opens an interpolation (see `interp_scan`); head/middle spans
+// include their `{`, and the next segment starts just past the interpolation's
+// `}`. The text segments are collected first (with their spans and the
+// interpolation token runs between them), then handed to `finalize_template` —
+// which post-processes them as a group and emits each. A nested template inside
+// an interpolation is fully lexed (and its own segments finalized) by the
+// recursive `interp_scan`, so each `template_scan` only ever handles its own
+// direct segments. `escapes` still governs *scanning* as in `delimited_len`,
+// including the hard error on an unknown escape and the dangling backslash
+// falling through to run the literal out unterminated.
 fn template_scan<K>(
     src: str,
     at: i64,
     delim: str,
     escapes: str,
+    finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
 ) -> StepResult<K>!LexError {
-    mut toks = [];
-    mut trivia = [];
+    // Raw text of each segment, its span, and the interpolation run that follows
+    // each non-final segment (`interp_runs[k]` comes after segment `k`).
+    mut seg_texts = [];
+    mut seg_spans = [];
+    mut interp_runs = [];
     mut i = at + delim.len();
     mut seg_start = at;
-    mut interps = 0;
     while (i < src.len()) {
         // The segment's text: past the opening delim for the first segment,
         // from just past the previous interpolation's `}` after — through the
         // current position (a closing delim or an opening `{`), exclusive.
-        let text_start = if (interps == 0) { at + delim.len() } else { seg_start };
+        let text_start = if (seg_texts.len() == 0) { at + delim.len() } else { seg_start };
         if (src[i..].starts_with(delim)) {
             let end = i + delim.len();
-            let seg = if (interps == 0) { Plain } else { Tail };
-            let content = src[text_start..i];
-            let k = seg_emit(emit, content, seg, seg_start..end)?;
-            set toks.push(Token { kind: k, span: seg_start..end });
-            return ok(StepResult { tokens: toks, trivia, end });
+            set seg_texts.push(src[text_start..i]);
+            set seg_spans.push(seg_start..end);
+            return finalize_template(finalize, emit, seg_texts, seg_spans, interp_runs, end);
         };
         let c = src[i].value_or(' '); // in bounds: the loop condition holds
         if (c == '{') {
-            let seg = if (interps == 0) { Head } else { Middle };
-            let content = src[text_start..i];
-            let k = seg_emit(emit, content, seg, seg_start..i + 1)?;
-            set toks.push(Token { kind: k, span: seg_start..i + 1 });
-            set interps = interps + 1;
+            set seg_texts.push(src[text_start..i]);
+            set seg_spans.push(seg_start..i + 1);
             let interp = interp_scan(src, i + 1, i, rules)?;
-            for (let t : interp.tokens) {
-                set toks.push(t);
-            }
-            for (let t : interp.trivia) {
-                set trivia.push(t);
-            }
+            set interp_runs.push(interp);
             set i = interp.end;
             set seg_start = i;
         } else {
@@ -606,6 +613,57 @@ fn template_scan<K>(
         };
     }
     err(LexError { message: "unterminated template literal", span: at..src.len() })
+}
+
+// Emit a template literal's tokens: apply the caller's `finalize` to all of its
+// text segments as a group (it returns one finalized text per segment), then
+// emit each finalized segment — its position `Plain` for a lone segment, else
+// `Head`/`Middle`/`Tail` — via the rule's `OfSeg`/`TrySeg` emit, interleaved
+// with the interpolation token runs (`interp_runs[k]` following segment `k`).
+// `end` sits just past the closing delim.
+fn finalize_template<K>(
+    finalize: (str[]) -> str[],
+    emit: Emit<K>,
+    seg_texts: str[],
+    seg_spans: Span[],
+    interp_runs: StepResult<K>[],
+    end: i64,
+) -> StepResult<K>!LexError {
+    let finals = finalize(seg_texts);
+    mut toks = [];
+    mut trivia = [];
+    let n = seg_texts.len();
+    mut k = 0;
+    while (k < n) {
+        // `k` is always in range (0..n), so the `none` fallbacks below are dead.
+        let txt = finals[k].value_or("");
+        let sp = match (seg_spans[k]) {
+            some(s) => s,
+            none => 0..0,
+        };
+        let seg = if (n == 1) {
+            Plain
+        } else {
+            if (k == 0) { Head } else { if (k + 1 == n) { Tail } else { Middle } }
+        };
+        let kind = seg_emit(emit, txt, seg, sp)?;
+        set toks.push(Token { kind, span: sp });
+
+        // The interpolation after segment `k`; an empty run after the final
+        // segment, so the loops below are simply skipped there.
+        let run = match (interp_runs[k]) {
+            some(r) => r,
+            none => StepResult { tokens: [], trivia: [], end: 0 },
+        };
+        for (let t : run.tokens) {
+            set toks.push(t);
+        }
+        for (let t : run.trivia) {
+            set trivia.push(t);
+        }
+        set k = k + 1;
+    }
+    ok(StepResult { tokens: toks, trivia, end })
 }
 
 // A template interpolation's `{ ... }` body: lexes expression tokens with the
@@ -905,7 +963,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // Template: `text {expr} text`. `OfSeg` maps each segment's decoded text and
     // position (`Plain`/`Head`/`Middle`/`Tail`) to a `Kind` arm.
-    let tpl = TokenRule { matcher: Template("`", "\\`{ntr"), emit: OfSeg(tpl_kind) };
+    let tpl = TokenRule {
+        matcher: Template("`", "\\`{ntr", |segs: str[]| segs),
+        emit: OfSeg(tpl_kind),
+    };
     let tpls = [ws, tpl, ident, digits];
     assert(lex("`hi`", tpls) == ok(toks([tok(Tpl("hi"), 0, 4)])));
     assert(
@@ -955,7 +1016,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ),
     );
     // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
-    let raw3 = TokenRule { matcher: Template("```", ""), emit: OfSeg(rawtpl_kind) };
+    let raw3 = TokenRule {
+        matcher: Template("```", "", |segs: str[]| segs),
+        emit: OfSeg(rawtpl_kind),
+    };
     let tpl2 = [ws, raw3, tpl, ident, digits];
     assert(lex("```a`b\\c```", tpl2) == ok(toks([tok(RawTpl("a`b\\c"), 0, 11)])));
     assert(
@@ -966,7 +1030,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // TrySeg: a fallible segment emit (`checked_seg`) validates each segment; a
     // rejected one aborts the lex with the template's span.
-    let tseg = TokenRule { matcher: Template("`", "\\`{ntr"), emit: TrySeg(checked_seg) };
+    let tseg = TokenRule {
+        matcher: Template("`", "\\`{ntr", |segs: str[]| segs),
+        emit: TrySeg(checked_seg),
+    };
     let tsegs = [ws, tseg, ident, digits];
     assert(lex("`hi`", tsegs) == ok(toks([tok(Tpl("hi"), 0, 4)])));
     assert(lex("`TODO`", tsegs) == err(lex_err("TODO segment not allowed", 0, 6)));
@@ -1067,25 +1134,31 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl) == ok(toks(atoks)));
 })
 --- performance ---
-allocations: 1394
-deallocations: 1394
+allocations: 1500
+deallocations: 1500
 reallocations: 0
-bytes allocated: 65648
-instructions executed: 282197
-binary size: 876936
+bytes allocated: 70648
+instructions executed: 286009
+binary size: 876520
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam19
-__builtin_count_while$char$s0$lam24
 __builtin_count_while$char$s0$lam25
-__builtin_count_while$char$s0$lam39
+__builtin_count_while$char$s0$lam30
+__builtin_count_while$char$s0$lam31
+__builtin_count_while$char$s0$lam45
 __builtin_int_parse
-__builtin_is_some_and$char$lam34
+__builtin_is_some_and$char$lam40
 __lambda_0
 __lambda_1
 __lambda_10
 __lambda_11
 __lambda_12
 __lambda_13
+__lambda_14
+__lambda_15
+__lambda_16
+__lambda_17
+__lambda_18
+__lambda_19
 __lambda_2
 __lambda_3
 __lambda_4
@@ -1100,6 +1173,7 @@ between_len
 checked_seg
 delimited_len
 esc_str
+finalize_template$Kind
 float_len
 int_tok
 interp_scan$Kind
@@ -1110,7 +1184,6 @@ main
 nested_len
 nonempty_str
 rawtpl_kind
-seg_emit$Kind
 seg_needs_ofseg
 seg_only
 step_result$Kind

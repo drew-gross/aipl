@@ -3487,61 +3487,6 @@ fn comment_spans(out: &LexedOutput) -> Vec<Span> {
     out.trivia.iter().map(|t| t.span.clone()).collect()
 }
 
-/// De-dent an interpolated *raw* template's (`` ```...``` ``) segment values for
-/// the signature check, keyed by token index. The lexer de-dents `StrLit`
-/// strings in its emit but *defers* de-denting interpolated raw templates
-/// (their `RawTemplate*` segments carry verbatim bytes), so the formatter does
-/// it here: a template's text segments are de-dented *together* — joined by a
-/// `\0` separator, run through `process_raw_string` as one block (so the common
-/// indent is computed across the whole template, matching how the raw block is
-/// re-laid-out for layout), then split back. That makes the segment signatures
-/// invariant under the formatter's re-indentation. A depth stack groups each
-/// (possibly nested) raw template's own segments. Non-`RawTemplate*` tokens
-/// aren't in the returned map.
-fn dedent_raw_template_values(tokens: &[LexedToken]) -> std::collections::HashMap<usize, String> {
-    use LexedTokenKind as K;
-    struct Group {
-        indices: Vec<usize>,
-        values: Vec<String>,
-    }
-    let mut stack: Vec<Group> = Vec::new();
-    let mut out = std::collections::HashMap::new();
-    for (i, t) in tokens.iter().enumerate() {
-        match &t.kind {
-            K::RawTemplateHead(s) => stack.push(Group {
-                indices: vec![i],
-                values: vec![s.clone()],
-            }),
-            K::RawTemplateMid(s) => {
-                let g = stack
-                    .last_mut()
-                    .expect("RawTemplateMid with no open raw template");
-                g.indices.push(i);
-                g.values.push(s.clone());
-            }
-            K::RawTemplateTail(s) => {
-                let mut g = stack
-                    .pop()
-                    .expect("RawTemplateTail with no open raw template");
-                g.indices.push(i);
-                g.values.push(s.clone());
-                let processed = process_raw_string(&g.values.join("\0"));
-                let pieces: Vec<&str> = processed.split('\0').collect();
-                assert_eq!(
-                    pieces.len(),
-                    g.values.len(),
-                    "process_raw_string must preserve the \\0 segment separators"
-                );
-                for (idx, piece) in g.indices.iter().zip(pieces) {
-                    out.insert(*idx, piece.to_string());
-                }
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
 /// Tokenize `input` for the formatter: every token plus the span of every
 /// comment, both in source order (token text is recovered from the span, so
 /// literals stay verbatim). Lexing is dogfooded ([`lex_aipl`], via the installed
@@ -3571,35 +3516,27 @@ pub fn lex_tokens_and_comments(
 /// formatter's value-preserving whitespace edits (re-indenting a raw block's
 /// content or its closing delimiter) don't register as changes, while any real
 /// change to a literal's value does. Input is taken as-is (no section
-/// stripping), like [`lex_tokens_and_comments`].
-///
-/// (An interpolated *raw* template's segment values are still the verbatim
-/// bytes — the lexer defers de-denting those — so re-indenting one is not yet
-/// treated as value-preserving; that resolves when interpolated templates are
-/// de-dented.)
+/// stripping), like [`lex_tokens_and_comments`]. Every string/template value —
+/// including an interpolated raw template's segments — arrives already decoded
+/// and de-dented from the lexer, so re-indenting a raw block is value-preserving.
 #[allow(clippy::type_complexity)]
 pub fn lex_signatures_and_comments(
     input: &str,
 ) -> Result<(Vec<(FmtTokenKind, String)>, Vec<Span>), Error> {
     use LexedTokenKind as K;
     let out = lex_aipl(input).map_err(|e| Error::at(e.message, e.span))?;
-    // Interpolated raw-template segments carry verbatim bytes (the lexer defers
-    // de-denting them); de-dent them together here so re-indenting is a no-op
-    // for the check. Every other string/template value is already decoded.
-    let raw_dedent = dedent_raw_template_values(&out.tokens);
     let toks = out
         .tokens
         .iter()
-        .enumerate()
-        .map(|(i, t)| {
+        .map(|t| {
             let sig = match &t.kind {
-                K::StrLit(v, _) | K::TemplateHead(v) | K::TemplateMid(v) | K::TemplateTail(v) => {
-                    v.clone()
-                }
-                K::RawTemplateHead(_) | K::RawTemplateMid(_) | K::RawTemplateTail(_) => raw_dedent
-                    .get(&i)
-                    .expect("every RawTemplate* token is de-dented")
-                    .clone(),
+                K::StrLit(v, _)
+                | K::TemplateHead(v)
+                | K::TemplateMid(v)
+                | K::TemplateTail(v)
+                | K::RawTemplateHead(v)
+                | K::RawTemplateMid(v)
+                | K::RawTemplateTail(v) => v.clone(),
                 _ => input[t.span.clone()].to_string(),
             };
             (fmt_kind(&t.kind), sig)
