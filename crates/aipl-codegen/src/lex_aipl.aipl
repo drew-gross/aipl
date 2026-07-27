@@ -347,35 +347,31 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // the Rust lexer), not just in a `from builtins;` import; `iffy` still lexes
     // as a `Name`, since the `Keyword` matcher stops at an identifier boundary.
     assert(
-        lex_aipl("if else builtins iffy") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: If, span: 0..2 },
-                    Token { kind: Else, span: 3..7 },
-                    Token { kind: Builtins, span: 8..16 },
-                    Token { kind: Name("iffy"), span: 17..21 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl("if else builtins iffy")? == LexResult {
+            tokens: [
+                Token { kind: If, span: 0..2 },
+                Token { kind: Else, span: 3..7 },
+                Token { kind: Builtins, span: 8..16 },
+                Token { kind: Name("iffy"), span: 17..21 },
+            ],
+            trivia: [],
+        },
     );
 
     // The constant literals get their own kinds, distinct from keywords and from
     // identifiers. `some`/`ok`/`err` are ordinary `Name`s (constructors, not
     // constants); `noneish` stays a `Name` (identifier-boundary matched).
     assert(
-        lex_aipl("true false none some noneish") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: True, span: 0..4 },
-                    Token { kind: False, span: 5..10 },
-                    Token { kind: None, span: 11..15 },
-                    Token { kind: Name("some"), span: 16..20 },
-                    Token { kind: Name("noneish"), span: 21..28 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl("true false none some noneish")? == LexResult {
+            tokens: [
+                Token { kind: True, span: 0..4 },
+                Token { kind: False, span: 5..10 },
+                Token { kind: None, span: 11..15 },
+                Token { kind: Name("some"), span: 16..20 },
+                Token { kind: Name("noneish"), span: 21..28 },
+            ],
+            trivia: [],
+        },
     );
 
     // The rest of the operator/punctuation table: `<=`/`>=` beat `<`/`>`, `++`
@@ -383,48 +379,42 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // takes the longest spelling, so the two-char forms win over their one-char
     // prefixes.
     assert(
-        lex_aipl("a <= b >= |x| ++") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: Name("a"), span: 0..1 },
-                    Token { kind: Le, span: 2..4 },
-                    Token { kind: Name("b"), span: 5..6 },
-                    Token { kind: Ge, span: 7..9 },
-                    Token { kind: Pipe, span: 10..11 },
-                    Token { kind: Name("x"), span: 11..12 },
-                    Token { kind: Pipe, span: 12..13 },
-                    Token { kind: PlusPlus, span: 14..16 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl("a <= b >= |x| ++")? == LexResult {
+            tokens: [
+                Token { kind: Name("a"), span: 0..1 },
+                Token { kind: Le, span: 2..4 },
+                Token { kind: Name("b"), span: 5..6 },
+                Token { kind: Ge, span: 7..9 },
+                Token { kind: Pipe, span: 10..11 },
+                Token { kind: Name("x"), span: 11..12 },
+                Token { kind: Pipe, span: 12..13 },
+                Token { kind: PlusPlus, span: 14..16 },
+            ],
+            trivia: [],
+        },
     );
 
     // `#` disambiguation: a bare `#` (the `#{...}` dict prefix) is a `Hash` token,
     // but `#[allow]` is the lint-squelch marker — recorded as trivia and kept out
     // of the token stream, matching the Rust lexer.
     assert(
-        lex_aipl("#{ #[allow]") == ok(
-            LexResult {
-                tokens: [Token { kind: Hash, span: 0..1 }, Token { kind: LBrace, span: 1..2 }],
-                trivia: [Token { kind: AllowMarker, span: 3..11 }],
-            },
-        ),
+        lex_aipl("#{ #[allow]")? == LexResult {
+            tokens: [Token { kind: Hash, span: 0..1 }, Token { kind: LBrace, span: 1..2 }],
+            trivia: [Token { kind: AllowMarker, span: 3..11 }],
+        },
     );
 
     // Block comments are trivia, and `Nested` depth-tracks them, so the inner
     // `/* */` doesn't close the outer — the whole `/* a /* b */ c */` is one
     // comment, out of the token stream.
     assert(
-        lex_aipl("x /* a /* b */ c */ y") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: Name("x"), span: 0..1 },
-                    Token { kind: Name("y"), span: 20..21 },
-                ],
-                trivia: [Token { kind: BlockComment, span: 2..19 }],
-            },
-        ),
+        lex_aipl("x /* a /* b */ c */ y")? == LexResult {
+            tokens: [
+                Token { kind: Name("x"), span: 0..1 },
+                Token { kind: Name("y"), span: 20..21 },
+            ],
+            trivia: [Token { kind: BlockComment, span: 2..19 }],
+        },
     );
 
     // An unterminated block comment is a hard error spanning the open `/*` to the
@@ -442,16 +432,14 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // the lexer library.
     let esc = "s = \"a\\nb\"";
     assert(
-        lex_aipl(esc) == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: Name("s"), span: 0..1 },
-                    Token { kind: Eq, span: 2..3 },
-                    Token { kind: StrLit("a\nb", Quoted), span: 4..10 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl(esc)? == LexResult {
+            tokens: [
+                Token { kind: Name("s"), span: 0..1 },
+                Token { kind: Eq, span: 2..3 },
+                Token { kind: StrLit("a\nb", Quoted), span: 4..10 },
+            ],
+            trivia: [],
+        },
     );
 
     // A raw string `"""a"b"""` (the AIPL source here is written with escaped
@@ -460,26 +448,22 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // style. De-denting a single-line literal is a no-op, so the value is `a"b`.
     let raw = "\"\"\"a\"b\"\"\"";
     assert(
-        lex_aipl(raw) == ok(
-            LexResult {
-                tokens: [Token { kind: StrLit("a\"b", TripleQuoted), span: 0..9 }],
-                trivia: [],
-            },
-        ),
+        lex_aipl(raw)? == LexResult {
+            tokens: [Token { kind: StrLit("a\"b", TripleQuoted), span: 0..9 }],
+            trivia: [],
+        },
     );
 
     // Char literals: an ordinary `'x'` and an escaped `'\n'` (the AIPL source
     // writes the escape as a literal backslash-`n`), each decoded to its byte.
     assert(
-        lex_aipl("'x' '\\n'") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: CharTok('x'), span: 0..3 },
-                    Token { kind: CharTok('\n'), span: 4..8 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl("'x' '\\n'")? == LexResult {
+            tokens: [
+                Token { kind: CharTok('x'), span: 0..3 },
+                Token { kind: CharTok('\n'), span: 4..8 },
+            ],
+            trivia: [],
+        },
     );
 
     // The one-char shape is enforced: an empty `''` is a hard error whose span
@@ -501,9 +485,10 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // `Backtick` style (the same token any string literal produces) — the whole
     // literal, backticks included, is its span.
     assert(
-        lex_aipl("`hi`") == ok(
-            LexResult { tokens: [Token { kind: StrLit("hi", Backtick), span: 0..4 }], trivia: [] },
-        ),
+        lex_aipl("`hi`")? == LexResult {
+            tokens: [Token { kind: StrLit("hi", Backtick), span: 0..4 }],
+            trivia: [],
+        },
     );
 
     // A template with an interpolation `` `a{x}b` ``: the head runs from the
@@ -511,28 +496,24 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // rule set (a lone `Name`), and the tail runs from just past the `}` through
     // the closing backtick. Head/tail spans include their braces/delimiters.
     assert(
-        lex_aipl("`a{x}b`") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: TemplateHead("a"), span: 0..3 },
-                    Token { kind: Name("x"), span: 3..4 },
-                    Token { kind: TemplateTail("b"), span: 5..7 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl("`a{x}b`")? == LexResult {
+            tokens: [
+                Token { kind: TemplateHead("a"), span: 0..3 },
+                Token { kind: Name("x"), span: 3..4 },
+                Token { kind: TemplateTail("b"), span: 5..7 },
+            ],
+            trivia: [],
+        },
     );
 
     // A triple-backtick raw template with no interpolation scans verbatim and
     // folds into `StrLit` with `TripleBacktick` style (de-dented, a no-op here);
     // it wins over the single-backtick rule (longest delim first).
     assert(
-        lex_aipl("```hi```") == ok(
-            LexResult {
-                tokens: [Token { kind: StrLit("hi", TripleBacktick), span: 0..8 }],
-                trivia: [],
-            },
-        ),
+        lex_aipl("```hi```")? == LexResult {
+            tokens: [Token { kind: StrLit("hi", TripleBacktick), span: 0..8 }],
+            trivia: [],
+        },
     );
 
     // An integer that overflows i64: the `Try` emit (`int_lit`) reports it,
@@ -564,15 +545,13 @@ pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
     }
 }.test({
     assert(
-        lex_aipl_tokens("let x = 42;") == ok(
-            [
-                Token { kind: Let, span: 0..3 },
-                Token { kind: Name("x"), span: 4..5 },
-                Token { kind: Eq, span: 6..7 },
-                Token { kind: IntLit(42), span: 8..10 },
-                Token { kind: Semi, span: 10..11 },
-            ],
-        ),
+        lex_aipl_tokens("let x = 42;")? == [
+            Token { kind: Let, span: 0..3 },
+            Token { kind: Name("x"), span: 4..5 },
+            Token { kind: Eq, span: 6..7 },
+            Token { kind: IntLit(42), span: 8..10 },
+            Token { kind: Semi, span: 10..11 },
+        ],
     );
     // A byte no rule matches makes the whole lex an error, carrying its span.
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
@@ -590,26 +569,22 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     // The `--- stdout ---` marker and everything after it is dropped before
     // lexing; the tokens before it keep their original spans.
     assert(
-        lex_aipl_stripped("let x = 1\n--- stdout ---\nfoo") == ok(
-            LexResult {
-                tokens: [
-                    Token { kind: Let, span: 0..3 },
-                    Token { kind: Name("x"), span: 4..5 },
-                    Token { kind: Eq, span: 6..7 },
-                    Token { kind: IntLit(1), span: 8..9 },
-                ],
-                trivia: [],
-            },
-        ),
+        lex_aipl_stripped("let x = 1\n--- stdout ---\nfoo")? == LexResult {
+            tokens: [
+                Token { kind: Let, span: 0..3 },
+                Token { kind: Name("x"), span: 4..5 },
+                Token { kind: Eq, span: 6..7 },
+                Token { kind: IntLit(1), span: 8..9 },
+            ],
+            trivia: [],
+        },
     );
     // No marker: identical to lexing `src` directly (comments still trivia).
     assert(
-        lex_aipl_stripped("y // c") == ok(
-            LexResult {
-                tokens: [Token { kind: Name("y"), span: 0..1 }],
-                trivia: [Token { kind: LineComment, span: 2..6 }],
-            },
-        ),
+        lex_aipl_stripped("y // c")? == LexResult {
+            tokens: [Token { kind: Name("y"), span: 0..1 }],
+            trivia: [Token { kind: LineComment, span: 2..6 }],
+        },
     );
 })
 --- performance ---
@@ -617,8 +592,8 @@ allocations: 4581
 deallocations: 4581
 reallocations: 0
 bytes allocated: 259048
-instructions executed: 1173994
-binary size: 496584
+instructions executed: 1173963
+binary size: 750752
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
@@ -658,6 +633,7 @@ __m9__strip_test_sections
 __map17$own0
 __test$lex_aipl
 __test$lex_aipl_stripped
+__test$lex_aipl_tokens
 char_lit_emit
 dedent_segments
 ident_cont
