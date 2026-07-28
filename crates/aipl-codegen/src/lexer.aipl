@@ -206,7 +206,19 @@ variant Matcher =
 // re-attaches them) or lint markers (`#[allow]`). Set at most one of the two
 // flags (`skip` wins when both are set). Generic over the kind type `K` — every
 // rule of one set builds the same `K`.
-struct TokenRule<K> { matcher: Matcher, emit: Emit<K>, skip: bool = false, trivia: bool = false }
+// `unterminated` overrides the message used when this rule's token runs off the
+// end of the source (a `Delimited`/`Between`/`Nested`/`Template` scan that never
+// closes). Empty means "use the matcher's built-in default" (a generic
+// "unterminated delimited token" / "unterminated template literal") — so a rule
+// can name its token in the diagnostic (`"unterminated string literal"`) without
+// every rule having to.
+struct TokenRule<K> {
+    matcher: Matcher,
+    emit: Emit<K>,
+    skip: bool = false,
+    trivia: bool = false,
+    unterminated: str = "",
+}
 
 // What `lex` returns: the emitted tokens, and the trivia side-channel — the
 // recorded matches of every `trivia: true` rule, in source order. Silent
@@ -250,7 +262,7 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> i64 {
 // source leaves the token unterminated. A token still open at the end of the
 // source is a hard error (`at` is the token's absolute start, so error spans
 // land in the real source).
-fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError {
+fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64!LexError {
     if (!self[0].is_some_and(|c| delims.contains(c))) {
         return ok(0);
     };
@@ -271,7 +283,10 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError 
             if (c == '\\' && 0 < escapes.len() && i + 1 < self.len()) {
                 if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
                     return err(
-                        LexError { message: "unknown escape sequence", span: at + i..at + i + 2 },
+                        LexError {
+                            message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
+                            span: at + i..at + i + 2,
+                        },
                     );
                 };
                 set i = i + 1;
@@ -280,9 +295,15 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError 
         set i = i + 1;
     }
     if (!closed) {
-        return err(LexError { message: "unterminated delimited token", span: at..at + self.len() });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
     };
     ok(i)
+}
+
+// The message for an unterminated scan: a rule's own `unterminated` override, or
+// the generic default when it left the field empty.
+fn unterminated_msg(msg: str) -> str {
+    if (msg.len() == 0) { "unterminated delimited token" } else { msg }
 }
 
 // `Between`: the `open` spelling opens the token, which runs to just past the
@@ -292,7 +313,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str) -> i64!LexError 
 // content, not a terminator, and open/close may be multi-char and differ. No
 // escapes — contents are verbatim. A token still open at the end of the source
 // is a hard error (`at` places the span in the real source).
-fn between_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
+fn between_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexError {
     if (!self.starts_with(open)) {
         return ok(0);
     };
@@ -306,7 +327,7 @@ fn between_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
         };
         set i = i + 1;
     }
-    err(LexError { message: "unterminated delimited token", span: at..at + self.len() })
+    err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
 }
 
 // `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
@@ -316,7 +337,7 @@ fn between_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
 // overlap can't misclassify, but the two must be distinct for nesting to mean
 // anything. No escapes — contents are verbatim. Still open (depth > 0) at the
 // end of the source is a hard error (`at` places the span in the real source).
-fn nested_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
+fn nested_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexError {
     if (!self.starts_with(open)) {
         return ok(0);
     };
@@ -336,7 +357,7 @@ fn nested_len(self: str, at: i64, open: str, close: str) -> i64!LexError {
         };
     }
     if (0 < depth) {
-        return err(LexError { message: "unterminated delimited token", span: at..at + self.len() });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
     };
     ok(i)
 }
@@ -483,15 +504,20 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
                 r,
                 src,
                 at,
-                src[at..].delimited_len(at, delims, escapes)?,
+                src[at..].delimited_len(at, delims, escapes, r.unterminated)?,
             )?,
             Between(open, close) => step_result(
                 r,
                 src,
                 at,
-                src[at..].between_len(at, open, close)?,
+                src[at..].between_len(at, open, close, r.unterminated)?,
             )?,
-            Nested(open, close) => step_result(r, src, at, src[at..].nested_len(at, open, close)?)?,
+            Nested(open, close) => step_result(
+                r,
+                src,
+                at,
+                src[at..].nested_len(at, open, close, r.unterminated)?,
+            )?,
             Template(delim, escapes, finalize) => template_step(
                 src,
                 at,
@@ -500,6 +526,7 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
                 finalize,
                 r.emit,
                 rules,
+                r.unterminated,
             )?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
             Float => step_result(r, src, at, src[at..].float_len())?,
@@ -545,11 +572,12 @@ fn template_step<K>(
     finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
+    unterminated: str,
 ) -> StepResult<K>!LexError {
     if (!src[at..].starts_with(delim)) {
         return ok(StepResult { tokens: [], trivia: [], end: at });
     };
-    template_scan(src, at, delim, escapes, finalize, emit, rules)
+    template_scan(src, at, delim, escapes, finalize, emit, rules, unterminated)
 }
 
 // `Template`: scans a whole template literal at `at` (the caller verified the
@@ -574,6 +602,7 @@ fn template_scan<K>(
     finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
+    unterminated: str,
 ) -> StepResult<K>!LexError {
     // Raw text of each segment, its span, and the interpolation run that follows
     // each non-final segment (`interp_runs[k]` comes after segment `k`).
@@ -604,7 +633,12 @@ fn template_scan<K>(
         } else {
             if (c == '\\' && 0 < escapes.len() && i + 1 < src.len()) {
                 if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
-                    return err(LexError { message: "unknown escape sequence", span: i..i + 2 });
+                    return err(
+                        LexError {
+                            message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
+                            span: i..i + 2,
+                        },
+                    );
                 };
                 set i = i + 2;
             } else {
@@ -612,7 +646,8 @@ fn template_scan<K>(
             };
         };
     }
-    err(LexError { message: "unterminated template literal", span: at..src.len() })
+    let m = if (unterminated.len() == 0) { "unterminated template literal" } else { unterminated };
+    err(LexError { message: m, span: at..src.len() })
 }
 
 // Emit a template literal's tokens: apply the caller's `finalize` to all of its
@@ -905,7 +940,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: Of(esc_str) }, ident];
     assert(lex("\"a\\\"b\"", esc)? == toks([tok(Str("a\"b"), 0, 6)]));
     assert(lex("\"a\\nb\"", esc)? == toks([tok(Str("a\nb"), 0, 6)]));
-    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence", 2, 4)));
+    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence \\x", 2, 4)));
 
     // Try: a fallible string emit. `nonempty_str` decodes, then enforces a
     // content rule the *caller* owns — an empty string literal is an error whose
@@ -985,7 +1020,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     );
     // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
     assert(lex("`a\\{b`", tpls)? == toks([tok(Tpl("a{b"), 0, 6)]));
-    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence", 2, 4)));
+    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence \\q", 2, 4)));
     assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
     assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
     // Brace depth: braces lexed as their own tokens inside an interpolation nest.
@@ -1124,15 +1159,15 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1500
-deallocations: 1500
+allocations: 1502
+deallocations: 1502
 reallocations: 0
-bytes allocated: 70648
-instructions executed: 264115
-binary size: 2361768
-  code: 1484988
-  data: 7732
-  metadata: 869048
+bytes allocated: 71512
+instructions executed: 266566
+binary size: 2376856
+  code: 1493532
+  data: 7700
+  metadata: 875624
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam25
 __builtin_count_while$char$s0$lam30
@@ -1185,3 +1220,4 @@ template_step$Kind
 tok
 toks
 tpl_kind
+unterminated_msg

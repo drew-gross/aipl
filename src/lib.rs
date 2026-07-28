@@ -13,8 +13,8 @@ pub use aipl_syntax::{ast, DebugOptions, Error, Span};
 // Lexer + parser surface.
 pub use aipl_parser::{
     lex_aipl, lex_aipl_stripped, lex_signatures_and_comments, lex_tokens, lex_tokens_and_comments,
-    lex_tokens_native, parse, parse_test_section_header, strip_test_sections, FmtTokenKind,
-    LexedError, LexedOutput, LexedStrStyle, LexedToken, LexedTokenKind, TokenKind,
+    parse, parse_test_section_header, strip_test_sections, FmtTokenKind, LexedError, LexedOutput,
+    LexedStrStyle, LexedToken, LexedTokenKind, TokenKind,
 };
 
 // Compiler passes and backends, each re-exported as a module so existing
@@ -28,11 +28,13 @@ pub use aipl_mono as mono;
 
 use std::path::Path;
 
-/// Install the compiler's parser hooks (currently: the raw-string de-denter,
-/// the dogfooded-AIPL `dedent` run through the FFI). Call this once before
-/// parsing any source that may contain a `"""` raw string — the de-denter has no
-/// native fallback. The [`Engine`] constructors do this for you; the CLI and test
-/// harnesses call it directly. Idempotent.
+/// Install the compiler's parser hooks: the dogfooded-AIPL lexer, section
+/// stripper, test-section-header parser, trailing-whitespace finder, and the
+/// error-render/checker helpers, each run through the FFI (see
+/// [`codegen::install_parser_hooks`] for the full list). Call this once before
+/// parsing any source — the parser has no native fallback for these. The
+/// [`Engine`] constructors do this for you; the CLI and test harnesses call it
+/// directly. Idempotent.
 pub fn install_parser_hooks() {
     aipl_codegen::install_parser_hooks();
 }

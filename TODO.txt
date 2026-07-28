@@ -74,9 +74,12 @@ improve the highlighter test: correct code should never highlight as a mismatche
 For lexer dogfooding:
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
-- switch formatter to dogfood lexer
-- switch prod to dogfood lexer
 - lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.
+- give LexError an optional secondary span+message (a "note") so the nested
+  unclosed-interpolation error can again point back at the real culprit `{`
+  (dropped when the native lexer was deleted; see
+  tests/cases/strings/err_unclosed_interpolation_nested.aipl). Needs the note
+  threaded across the FFI (marshal_lex, LexedError) and rendered by Error.
 
 have the clir IR include the human readable version of data section strings in comments
 
@@ -115,3 +118,5 @@ the size is driven by inline construction of large literal values and the lexer'
 Make synthesized functions show up in monomorphizations. Ideally by having their creating be driven by the monomorphization process.
 
 Make a more generic retain-elision optimization pass
+
+destination-passing: build elements directly in output slot

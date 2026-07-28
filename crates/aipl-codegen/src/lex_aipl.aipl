@@ -214,7 +214,12 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // matching the Rust lexer, and reports an unterminated comment as a hard
         // error spanning the open `/*` to EOF. Must precede the `/` operator, or
         // `op("/", …)` would bite off the leading slash as a `Slash`.
-        TokenRule { matcher: Nested("/*", "*/"), emit: Bare(BlockComment), trivia: true },
+        TokenRule {
+            matcher: Nested("/*", "*/"),
+            emit: Bare(BlockComment),
+            trivia: true,
+            unterminated: "unterminated block comment",
+        },
         // `#[allow]` is the lint-squelch marker: like the Rust lexer, it's
         // recorded as trivia and kept out of the token stream, not lexed as a
         // `#` (`Hash`) token. It must precede the `#` operator (whose one-char
@@ -258,10 +263,12 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         TokenRule {
             matcher: Between(three_quotes, three_quotes),
             emit: Of(|text: str| StrLit(process_raw_string(text), TripleQuoted)),
+            unterminated: "unterminated raw string literal",
         },
         TokenRule {
             matcher: Delimited("\"", "ntr\\\""),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
+            unterminated: "unterminated string literal",
         },
         // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
         // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
@@ -271,7 +278,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // the consumer, not in a dedicated library matcher; the kind is `CharTok`
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
-        TokenRule { matcher: Delimited("'", "ntr\\'\""), emit: Try(char_lit_emit) },
+        TokenRule {
+            matcher: Delimited("'", "ntr\\'\""),
+            emit: Try(char_lit_emit),
+            unterminated: "unterminated char literal",
+        },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
         // whole before the single ``` ` ``` rule bites off the first backtick —
@@ -280,7 +291,11 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // scans verbatim (empty `escapes`); the single form decodes the same
         // escapes as a string plus `` \` ``/`\{`. Each interpolation re-lexes with
         // this whole rule set, so templates nest.
-        TokenRule { matcher: Template("```", "", dedent_segments), emit: OfSeg(raw_tpl_kind) },
+        TokenRule {
+            matcher: Template("```", "", dedent_segments),
+            emit: OfSeg(raw_tpl_kind),
+            unterminated: "unterminated triple-backtick template literal",
+        },
         TokenRule { matcher: Template("`", "\\`{ntr", |segs: str[]| segs), emit: OfSeg(tpl_kind) },
         // Operators and punctuation, one `op` rule per spelling, longest first so
         // first-match-wins is maximal munch: the three-char `+++`, then the
@@ -421,7 +436,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // end of source, matching the Rust lexer.
     assert(
         lex_aipl("a /* never closed") == err(
-            LexError { message: "unterminated delimited token", span: 2..17 },
+            LexError { message: "unterminated block comment", span: 2..17 },
         ),
     );
 
@@ -591,12 +606,12 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
 allocations: 4581
 deallocations: 4581
 reallocations: 0
-bytes allocated: 259048
-instructions executed: 1016184
-binary size: 382928
-  code: 239404
-  data: 7220
-  metadata: 136304
+bytes allocated: 269288
+instructions executed: 1036754
+binary size: 387592
+  code: 242268
+  data: 7396
+  metadata: 137928
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
@@ -628,6 +643,7 @@ __m1__seg_only
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
+__m1__unterminated_msg
 __m2__unescape
 __m3__process_raw_string
 __m7__trim_prefix

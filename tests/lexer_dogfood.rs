@@ -1,26 +1,20 @@
-//! Differential test: the dogfooded AIPL lexer (`lex_aipl.aipl`) vs the compiler's
-//! hand-written Rust lexer.
+//! Token-level tests for the dogfooded AIPL lexer (`lex_aipl.aipl`).
 //!
-//! The AIPL lexer is now wired into the compiler for the highlighter path
-//! (`aipl::lex_tokens` runs it via the dogfood hook), and this test is what
-//! guards that: [`dogfood_lex_hook_matches_rust_lexer_on_corpus`] compares the
-//! *production* hook path against the native Rust lexer
-//! (`aipl::lex_tokens_native`, retained as the reference until the parser flip
-//! deletes it) over the whole corpus, on every `cargo test`. The older
-//! scaffolding still here — `compile_lexer`/`aipl_dump` (freshly FFI-compiling
-//! `lex_aipl.aipl` and calling `lex_aipl_tokens`) and the `#[ignore]`d
-//! [`report_lexer_differences`] burn-down — tracks the working-tree source
-//! (rather than the checked-in IR) and predates the wiring.
+//! The lexer is now the compiler's *only* lexer — the hand-written Rust scanner
+//! this file once differential-tested against has been deleted. What remains
+//! guards the lexer against itself: [`dogfood_lex_hook_matches_fresh_compile_on_corpus`]
+//! checks that the production path (the checked-in `dogfood.clif` through the
+//! installed hook) agrees with a fresh compile of the working-tree lexer source
+//! over the whole corpus, and [`dogfood_lex_hook_returns_trivia`] checks the
+//! trivia side-channel.
 //!
-//! The comparison is at *category + span* granularity (keyword / ident / number /
-//! str / char / constant / operator / punct), matching the Rust lexer's own
-//! `classify`; `categorize` maps each `AiplTok` case to that granularity.
-//! `BuiltinType` folds into `ident` because that's a highlighter-only refinement —
-//! the Rust *lexer* emits a plain identifier for `i64`/`bool`/etc., exactly as the
-//! AIPL lexer does — so only genuine lexer divergences remain.
+//! The corpus comparison is at *category + span* granularity (keyword / ident /
+//! number / str / char / constant / operator / punct); `categorize` maps each
+//! `AiplTok` case to that granularity, folding the built-in type names
+//! (`i64`/`bool`/…) into `ident` because that is a highlighter-only refinement,
+//! not a lexer distinction.
 
 use aipl::{Engine, FfiValue};
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -86,13 +80,11 @@ fn span_bounds(v: &FfiValue) -> (i64, i64) {
     (as_int(field(s, "start")), as_int(field(s, "end")))
 }
 
-/// Coarsen an `AiplTok` variant case name to the category granularity the Rust
-/// lexer's `classify` produces (the operator/punctuation split included), so a
-/// token that agrees dumps identically on both sides and only real divergences
-/// surface. Every arm below maps to a category and the lexer now covers the whole
-/// grammar; the sole remaining divergence is a non-ASCII char literal, where the
-/// library's byte-oriented `CharLit` flags "more than one character" at a
-/// different span than the Rust lexer's dedicated non-ASCII error.
+/// Coarsen an `AiplTok` variant case name to a category granularity (the
+/// operator/punctuation split included), so a token dumps identically whether it
+/// came from a fresh compile or the production hook and only real divergences
+/// surface. `BuiltinType` isn't a lexer category — `i64`/`bool`/… lex as plain
+/// identifiers — so type names fold into `ident`.
 fn categorize(case: &str) -> &'static str {
     match case {
         "Fn" | "Let" | "Mut" | "Set" | "Pub" | "Import" | "From" | "As" | "For" | "While"
@@ -104,8 +96,7 @@ fn categorize(case: &str) -> &'static str {
         // delimiter kept as a style, dropped for this category dump).
         "StrLit" => "str",
         "CharTok" => "char",
-        // The Rust lexer's `classify` folds every template-literal piece
-        // (head/middle/tail) into `Str`.
+        // A template-literal piece (head/middle/tail) folds into `str`.
         "TemplateHead" | "TemplateMid" | "TemplateTail" | "RawTemplateHead" | "RawTemplateMid"
         | "RawTemplateTail" => "str",
         "True" | "False" | "None" => "constant",
@@ -119,9 +110,9 @@ fn categorize(case: &str) -> &'static str {
     }
 }
 
-/// The AIPL lexer's canonical dump of `src`, built from the *actual* token array
-/// `lex_aipl_tokens` returns: one `START END CATEGORY` line per token, or a single
-/// `ERR START END` line for a `LexError`.
+/// A fresh compile of the lexer source's dump of `src`, built from the *actual*
+/// token array `lex_aipl_tokens` returns: one `START END CATEGORY` line per
+/// token, or a single `ERR START END` line for a `LexError`.
 fn aipl_dump(engine: &Engine, src: &str) -> String {
     let res = engine
         .call_values("lex_aipl_tokens", &[FfiValue::Str(src.to_string())])
@@ -154,63 +145,6 @@ fn aipl_dump(engine: &Engine, src: &str) -> String {
     }
 }
 
-/// The Rust lexer's canonical dump of `src`, in the same format `lex_aipl_dump`
-/// produces (see the module docs for the `BuiltinType` → `ident` fold). Uses
-/// [`aipl::lex_tokens_native`] — the hand-written Rust lexer — because
-/// `aipl::lex_tokens` now runs the *dogfooded* lexer, which this test exists to
-/// compare *against* the native one.
-fn rust_dump(src: &str) -> String {
-    use aipl::TokenKind::*;
-    match aipl::lex_tokens_native(src) {
-        Ok(tokens) => {
-            let mut out = String::new();
-            for (kind, span) in tokens {
-                let cat = match kind {
-                    Keyword => "keyword",
-                    Constant => "constant",
-                    Identifier | BuiltinType => "ident",
-                    Number => "number",
-                    Str => "str",
-                    Char => "char",
-                    Operator => "operator",
-                    Punctuation => "punct",
-                };
-                out.push_str(&format!("{} {} {}\n", span.start, span.end, cat));
-            }
-            out
-        }
-        Err(e) => {
-            let (start, end) = e.span.map(|s| (s.start, s.end)).unwrap_or((0, 0));
-            format!("ERR {start} {end}\n")
-        }
-    }
-}
-
-/// Lex `src` through both lexers on the same (test-section-stripped) input.
-fn both_dumps(engine: &Engine, full: &str) -> (String, String) {
-    let stripped = aipl::strip_test_sections(full).to_string();
-    (rust_dump(&stripped), aipl_dump(engine, &stripped))
-}
-
-/// The scaffolding works, and both lexers agree on a snippet that uses only
-/// tokens the AIPL lexer already supports.
-#[test]
-fn aipl_lexer_matches_rust_on_supported_subset() {
-    let engine = compile_lexer();
-
-    let src = "let x = 42;";
-    assert_eq!(
-        aipl_dump(&engine, src),
-        "0 3 keyword\n4 5 ident\n6 7 operator\n8 10 number\n10 11 punct\n",
-    );
-    assert_eq!(rust_dump(src), aipl_dump(&engine, src));
-
-    // A richer all-supported snippet: keywords, idents (incl. a `BuiltinType`),
-    // an arrow operator, and punctuation.
-    let src2 = "fn f(n: i64) -> i64 { n }";
-    assert_eq!(rust_dump(src2), aipl_dump(&engine, src2));
-}
-
 /// The installed dogfood lex hook's canonical dump of `src` — same format as
 /// [`aipl_dump`], but through the *production* path: the checked-in
 /// `dogfood.clif` engine plus the FFI marshaling into the mirrored
@@ -236,14 +170,46 @@ fn hook_dump(src: &str) -> String {
     }
 }
 
-/// The production lex path — the checked-in dogfood IR called through the
-/// installed hook, marshaled into the mirrored Rust token types — agrees with
-/// the Rust lexer over the whole corpus at category + span granularity. This
-/// is the hard gate the burn-down report graduated into; unlike the report it
-/// runs on every `cargo test`.
+/// Every `.aipl` file under `dir`, recursively.
+fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_aipl(&path, out);
+        } else if path.extension().is_some_and(|e| e == "aipl") {
+            out.push(path);
+        }
+    }
+}
+
+/// The freshly-compiled lexer produces the expected tokens for a small
+/// all-supported snippet, and agrees with the production hook on a richer one
+/// (keywords, idents incl. a `BuiltinType`, an arrow operator, punctuation).
 #[test]
-fn dogfood_lex_hook_matches_rust_lexer_on_corpus() {
-    aipl::install_parser_hooks();
+fn aipl_lexer_dumps_supported_subset() {
+    let engine = compile_lexer();
+
+    let src = "let x = 42;";
+    assert_eq!(
+        aipl_dump(&engine, src),
+        "0 3 keyword\n4 5 ident\n6 7 operator\n8 10 number\n10 11 punct\n",
+    );
+
+    let src2 = "fn f(n: i64) -> i64 { n }";
+    assert_eq!(aipl_dump(&engine, src2), hook_dump(src2));
+}
+
+/// The production lex path (the checked-in dogfood IR through the installed hook,
+/// marshaled into the mirrored Rust token types) agrees with a fresh compile of
+/// the working-tree lexer source over the whole corpus, at category + span
+/// granularity — so a lexer-source change not reflected in the checked-in
+/// `dogfood.clif` is caught here on every `cargo test`.
+#[test]
+fn dogfood_lex_hook_matches_fresh_compile_on_corpus() {
+    let engine = compile_lexer();
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut files = Vec::new();
     for sub in ["tests/cases", "examples", "crates"] {
@@ -256,30 +222,14 @@ fn dogfood_lex_hook_matches_rust_lexer_on_corpus() {
         files.len()
     );
 
-    // The two known divergences are both char-literal errors where the AIPL
-    // lexer now reports the *whole literal's* span (its `char_lit_emit` verdict
-    // carries the whole token span) while the native Rust lexer reports a
-    // narrower one: for `'ab'` Rust underlines only `'a`, and for `'é'` only the
-    // `'é` bytes (its dedicated non-ASCII error). The wider AIPL caret is the
-    // intended improvement; these resolve when the parser flips to the dogfooded
-    // lexer (its span becomes canonical and the fixtures' `--- errors ---` move
-    // with it).
-    let excluded = [
-        "tests/cases/chars/err_multi_char_literal.aipl",
-        "tests/cases/chars/err_non_ascii_char.aipl",
-    ];
-
     for f in &files {
         let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
-        if excluded.contains(&rel.as_str()) {
-            continue;
-        }
         let full = fs::read_to_string(f).expect("read case file");
         let stripped = aipl::strip_test_sections(&full).to_string();
         assert_eq!(
-            rust_dump(&stripped),
+            aipl_dump(&engine, &stripped),
             hook_dump(&stripped),
-            "dogfood lex hook diverges from the Rust lexer in {rel}"
+            "production lex hook diverges from a fresh compile of the lexer source in {rel}"
         );
     }
 }
@@ -312,143 +262,5 @@ fn dogfood_lex_hook_returns_trivia() {
             (K::AllowMarker, 7..15),
             (K::BlockComment, 16..23),
         ],
-    );
-}
-
-/// One dump's first line that differs from the other's, reduced to a burn-down
-/// signature (spans dropped so divergences of the same shape group together).
-struct Divergence {
-    line: usize,
-    rust: String,
-    aipl: String,
-    signature: String,
-}
-
-/// The 3rd field of a dump line is its category; a line may instead be `ERR ...`,
-/// and a missing line (one dump ran out) reads as `EOF`.
-fn tag(line: Option<&str>) -> &str {
-    match line {
-        None => "EOF",
-        Some(l) if l.starts_with("ERR") => "ERR",
-        Some(l) => l.split(' ').nth(2).unwrap_or("?"),
-    }
-}
-
-/// The first line at which `rust` and `aipl` disagree (the caller only calls this
-/// when they aren't identical).
-fn first_divergence(rust: &str, aipl: &str) -> Divergence {
-    let r: Vec<&str> = rust.lines().collect();
-    let a: Vec<&str> = aipl.lines().collect();
-    for i in 0..r.len().max(a.len()) {
-        let (rl, al) = (r.get(i).copied(), a.get(i).copied());
-        if rl != al {
-            let (rt, at) = (tag(rl), tag(al));
-            // Same category but a different line means the token boundaries (spans)
-            // diverged; different categories are a token-kind divergence.
-            let signature = if rt == at {
-                format!("{rt}: span/boundary")
-            } else {
-                format!("{rt} → {at}")
-            };
-            return Divergence {
-                line: i + 1,
-                rust: rl.unwrap_or("<eof>").to_string(),
-                aipl: al.unwrap_or("<eof>").to_string(),
-                signature,
-            };
-        }
-    }
-    unreachable!("first_divergence called on identical dumps")
-}
-
-/// Every `.aipl` file under `dir`, recursively.
-fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_aipl(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aipl") {
-            out.push(path);
-        }
-    }
-}
-
-/// Burn-down report: compare the AIPL and Rust lexers over the whole corpus and
-/// print where (and how) they diverge. `#[ignore]`d — the AIPL lexer is known to
-/// be incomplete, so this is a tracking report, not a pass/fail gate. Run with:
-///   cargo test --test lexer_dogfood -- --ignored report_lexer_differences
-/// It prints the report, then fails intentionally so the output is shown even
-/// without `--nocapture` (mirroring the `fill_expected` helper).
-#[test]
-#[ignore = "differential burn-down report; run explicitly"]
-fn report_lexer_differences() {
-    let engine = compile_lexer();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = Vec::new();
-    for sub in ["tests/cases", "examples", "crates"] {
-        collect_aipl(&root.join(sub), &mut files);
-    }
-    files.sort();
-
-    let mut matching = 0usize;
-    let mut diffs: Vec<(String, Divergence)> = Vec::new();
-    // signature -> (count, first example "file:line")
-    let mut signatures: BTreeMap<String, (usize, String)> = BTreeMap::new();
-
-    for f in &files {
-        let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
-        let full = fs::read_to_string(f).expect("read case file");
-        let (rd, ad) = both_dumps(&engine, &full);
-        if rd == ad {
-            matching += 1;
-            continue;
-        }
-        let div = first_divergence(&rd, &ad);
-        let entry = signatures
-            .entry(div.signature.clone())
-            .or_insert((0, String::new()));
-        entry.0 += 1;
-        if entry.1.is_empty() {
-            entry.1 = format!("{rel}:{}", div.line);
-        }
-        diffs.push((rel, div));
-    }
-
-    let mut report = String::new();
-    report.push_str("=== AIPL lexer vs Rust lexer — differential burn-down ===\n");
-    report.push_str(&format!(
-        "corpus: {} files    matching: {}    differing: {}\n\n",
-        files.len(),
-        matching,
-        diffs.len(),
-    ));
-
-    // Signatures, most common first, as the burn-down categories.
-    report.push_str("--- first-divergence signatures (most common first) ---\n");
-    let mut by_count: Vec<_> = signatures.iter().collect();
-    by_count.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then(a.0.cmp(b.0)));
-    for (sig, (count, example)) in by_count {
-        report.push_str(&format!("  {count:>4}  {sig:<24}  e.g. {example}\n"));
-    }
-
-    // Per-file first divergence (the raw dump lines, spans included).
-    report.push_str("\n--- per-file first divergence ---\n");
-    for (rel, div) in &diffs {
-        report.push_str(&format!(
-            "  {rel}  (line {})  rust=[{}]  aipl=[{}]\n",
-            div.line, div.rust, div.aipl,
-        ));
-    }
-
-    println!("{report}");
-    // Fail intentionally so the report is surfaced (this is a report, not a gate).
-    panic!(
-        "lexer burn-down: {}/{} files match ({} differ) — see report above",
-        matching,
-        files.len(),
-        diffs.len(),
     );
 }

@@ -2,7 +2,6 @@
 //! human-friendly rendering of syntax errors. Produces an [`aipl_syntax::ast`]
 //! tree from source text.
 
-use gazelle::lexer::Scanner;
 use gazelle::Precedence;
 use gazelle_macros::gazelle;
 
@@ -2249,84 +2248,6 @@ fn op_precedence(c: char) -> Precedence {
     }
 }
 
-/// Skip whitespace plus `// line comments` and `/* block comments */`.
-/// Block comments nest, matching Rust's behavior. Returns an error on an
-/// unterminated block comment so the EOF doesn't silently swallow code.
-fn skip_whitespace_and_comments<I: Iterator<Item = char>>(
-    src: &mut Scanner<I>,
-) -> Result<(), Error> {
-    loop {
-        src.skip_whitespace();
-        match (src.peek(), src.peek_n(1)) {
-            (Some('/'), Some('/')) => {
-                let start = src.offset();
-                src.advance();
-                src.advance();
-                while let Some(c) = src.peek() {
-                    if c == '\n' {
-                        break;
-                    }
-                    src.advance();
-                }
-                // The span excludes the terminating newline (a comment's text,
-                // not its line ending); the newline is consumed by the next
-                // `skip_whitespace`.
-                record_comment(start..src.offset());
-            }
-            (Some('/'), Some('*')) => {
-                let start = src.offset();
-                src.advance();
-                src.advance();
-                let mut depth = 1usize;
-                while depth > 0 {
-                    match (src.peek(), src.peek_n(1)) {
-                        (Some('/'), Some('*')) => {
-                            src.advance();
-                            src.advance();
-                            depth += 1;
-                        }
-                        (Some('*'), Some('/')) => {
-                            src.advance();
-                            src.advance();
-                            depth -= 1;
-                        }
-                        (Some(_), _) => {
-                            src.advance();
-                        }
-                        (None, _) => {
-                            return Err(Error::at(
-                                "unterminated block comment",
-                                start..src.offset(),
-                            ));
-                        }
-                    }
-                }
-                record_comment(start..src.offset());
-            }
-            _ => return Ok(()),
-        }
-    }
-}
-
-thread_local! {
-    /// When armed (by [`lex_tokens_and_comments`]), every comment the lexer
-    /// skips is recorded here. A thread-local rather than a parameter so the
-    /// recursive tokenizer plumbing (templates re-enter `tokenize_one`) stays
-    /// untouched; ordinary parses leave it disarmed and pay one cell read per
-    /// comment.
-    static COMMENT_SINK: std::cell::RefCell<Option<Vec<Span>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// Record a skipped comment's span into the armed sink, if any.
-fn record_comment(span: Span) {
-    COMMENT_SINK.with(|sink| {
-        if let Some(v) = sink.borrow_mut().as_mut() {
-            v.push(span);
-        }
-    });
-}
-
 thread_local! {
     /// When armed (by [`parse_with_allows`]), every `#[allow]` lint-squelch
     /// marker's span is recorded here. Same shape as [`COMMENT_SINK`]: plain
@@ -2343,56 +2264,6 @@ fn record_allow(span: Span) {
             v.push(span);
         }
     });
-}
-
-/// Tokenize, pairing each terminal with its source span so the parser can
-/// point a caret at the offending token on a syntax error.
-/// Process the verbatim contents of a `"""..."""` raw string: trim the
-/// surrounding line breaks (the one right after the opening `"""` and the one
-/// right before the closing `"""`), then de-dent by stripping the common
-/// leading-*space* prefix shared by every non-blank line. Raw strings do no
-/// escape processing — their contents are otherwise taken literally.
-///
-/// The whole transform runs through the installed hook (the dogfooded AIPL
-/// `process_raw_string`, via the embedding FFI). There is no native fallback —
-/// the hook must be installed before any `"""` raw string is parsed.
-fn process_raw_string(content: &str) -> String {
-    let hook = RAW_STRING_HOOK
-        .get()
-        .expect("process_raw_string hook not installed before parsing a raw string");
-    assert!(
-        !IN_RAW_STRING_HOOK.with(std::cell::Cell::get),
-        "process_raw_string hook recursed — its compilation must not contain a raw string",
-    );
-    IN_RAW_STRING_HOOK.with(|f| f.set(true));
-    let _reset = RawStringHookGuard;
-    hook(content)
-}
-
-/// The raw-string processor, installed by the compiler (via
-/// [`set_process_raw_string_hook`]).
-static RAW_STRING_HOOK: std::sync::OnceLock<fn(&str) -> String> = std::sync::OnceLock::new();
-
-thread_local! {
-    /// Set while the hook runs, so a re-entrant call — which would mean the
-    /// hook's *own* compilation contained a raw string — aborts loudly instead
-    /// of recursing forever.
-    static IN_RAW_STRING_HOOK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Install the raw-string processor. The compiler points this at the dogfooded
-/// AIPL `process_raw_string`, run through the embedding FFI. First install wins
-/// (the hook is process-global).
-pub fn set_process_raw_string_hook(f: fn(&str) -> String) {
-    let _ = RAW_STRING_HOOK.set(f);
-}
-
-/// Resets the re-entrancy flag even if the hook panics.
-struct RawStringHookGuard;
-impl Drop for RawStringHookGuard {
-    fn drop(&mut self) {
-        IN_RAW_STRING_HOOK.with(|f| f.set(false));
-    }
 }
 
 /// The delimiter a [`LexedTokenKind::StrLit`] was written with — the mirror of
@@ -2415,9 +2286,9 @@ pub enum LexedStrStyle {
 /// direct name match. Value-carrying arms hold the decoded value: a `StrLit`'s
 /// escape-decoded (and, for a `Triple`/`TripleBacktick` style, de-dented)
 /// contents plus its delimiter style, an int literal's value, a char literal's
-/// byte. The `RawTemplate*` interpolated-segment arms still hold the *verbatim*
-/// bytes — de-denting those is deferred. `Space`/comments/`AllowMarker` only
-/// ever appear in [`LexedOutput::trivia`].
+/// byte. The `RawTemplate*` interpolated-segment arms hold their de-dented
+/// value too (their rule's `finalize` is `dedent_segments`).
+/// `Space`/comments/`AllowMarker` only ever appear in [`LexedOutput::trivia`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexedTokenKind {
     Space,
@@ -2557,741 +2428,6 @@ pub fn lex_aipl_stripped(src: &str) -> Result<LexedOutput, LexedError> {
     hook(src)
 }
 
-fn tokenize(input: &str) -> Result<Vec<(aipl::Terminal<Build>, Span)>, Error> {
-    let mut src = Scanner::new(input);
-    let mut tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
-    loop {
-        skip_whitespace_and_comments(&mut src)?;
-        if src.at_end() {
-            break;
-        }
-        tokenize_one(&mut src, &mut tokens)?;
-    }
-    Ok(tokens)
-}
-
-/// Tokenize one token from `src` (whitespace already skipped) and push it
-/// onto `tokens`. Handles all token types including template literals.
-fn tokenize_one<I: Iterator<Item = char>>(
-    src: &mut Scanner<I>,
-    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
-) -> Result<(), Error> {
-    let start = src.offset();
-    let c = src.peek().unwrap();
-
-    // Raw string: `"""..."""`. Contents are taken verbatim (no escapes);
-    // a `"` or `""` may appear inside, only `"""` closes. One surrounding
-    // line break is trimmed and the contents de-dented (see
-    // `process_raw_string`). A normal `"..."` literal is handled below.
-    if c == '"' && src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') {
-        src.advance();
-        src.advance();
-        src.advance(); // opening """
-        let mut raw = String::new();
-        loop {
-            match src.peek() {
-                Some('"') if src.peek_n(1) == Some('"') && src.peek_n(2) == Some('"') => {
-                    src.advance();
-                    src.advance();
-                    src.advance(); // closing """
-                    break;
-                }
-                Some(ch) => {
-                    raw.push(ch);
-                    src.advance();
-                }
-                None => {
-                    return Err(Error::at(
-                        "unterminated raw string literal",
-                        start..src.offset(),
-                    ));
-                }
-            }
-        }
-        let span = start..src.offset();
-        tokens.push((
-            aipl::Terminal::Str((process_raw_string(&raw), span.clone())),
-            span,
-        ));
-        return Ok(());
-    }
-
-    // String literal: `"..."`. Supports the escapes:
-    //   \n  newline    \t  tab      \r  carriage return
-    //   \\  backslash  \"  quote
-    // (no \0: strings are null-terminated at the runtime level)
-    if c == '"' {
-        src.advance(); // opening "
-        let mut s = String::new();
-        loop {
-            match src.peek() {
-                Some('"') => break,
-                Some('\\') => {
-                    let esc_start = src.offset();
-                    src.advance();
-                    match src.peek() {
-                        Some('n') => {
-                            s.push('\n');
-                            src.advance();
-                        }
-                        Some('t') => {
-                            s.push('\t');
-                            src.advance();
-                        }
-                        Some('r') => {
-                            s.push('\r');
-                            src.advance();
-                        }
-                        Some('\\') => {
-                            s.push('\\');
-                            src.advance();
-                        }
-                        Some('"') => {
-                            s.push('"');
-                            src.advance();
-                        }
-                        Some(other) => {
-                            return Err(Error::at(
-                                format!("unknown escape sequence \\{other}"),
-                                esc_start..src.offset() + other.len_utf8(),
-                            ));
-                        }
-                        None => {
-                            return Err(Error::at(
-                                "unterminated string literal",
-                                start..src.offset(),
-                            ));
-                        }
-                    }
-                }
-                Some(ch) => {
-                    s.push(ch);
-                    src.advance();
-                }
-                None => {
-                    return Err(Error::at(
-                        "unterminated string literal",
-                        start..src.offset(),
-                    ));
-                }
-            }
-        }
-        src.advance(); // closing "
-        let span = start..src.offset();
-        tokens.push((aipl::Terminal::Str((s, span.clone())), span));
-        return Ok(());
-    }
-
-    // Char literal: `'x'` or `'\n'`. One byte (ASCII); the same escape
-    // set as strings. Non-ASCII characters (UTF-8 multi-byte) are
-    // rejected so `char` stays a byte-deterministic primitive.
-    if c == '\'' {
-        src.advance(); // opening '
-        let byte = match src.peek() {
-            Some('\\') => {
-                src.advance();
-                let esc_at = src.offset() - 1;
-                let b = match src.peek() {
-                    Some('n') => b'\n',
-                    Some('t') => b'\t',
-                    Some('r') => b'\r',
-                    Some('\\') => b'\\',
-                    Some('\'') => b'\'',
-                    Some('"') => b'"',
-                    Some(other) => {
-                        return Err(Error::at(
-                            format!("unknown escape sequence \\{other}"),
-                            esc_at..src.offset() + other.len_utf8(),
-                        ));
-                    }
-                    None => {
-                        return Err(Error::at("unterminated char literal", start..src.offset()));
-                    }
-                };
-                src.advance();
-                b
-            }
-            Some('\'') => {
-                return Err(Error::at("empty char literal", start..src.offset() + 1));
-            }
-            Some(ch) => {
-                if !ch.is_ascii() {
-                    return Err(Error::at(
-                        format!("non-ASCII character in char literal: {ch:?}"),
-                        start..src.offset() + ch.len_utf8(),
-                    ));
-                }
-                src.advance();
-                ch as u8
-            }
-            None => {
-                return Err(Error::at("unterminated char literal", start..src.offset()));
-            }
-        };
-        match src.peek() {
-            Some('\'') => {
-                src.advance();
-            }
-            _ => {
-                return Err(Error::at(
-                    "char literal must contain exactly one character",
-                    start..src.offset(),
-                ));
-            }
-        }
-        let span = start..src.offset();
-        tokens.push((aipl::Terminal::Char((byte, span.clone())), span));
-        return Ok(());
-    }
-
-    // Triple-backtick template literal: ```text {expr} text```.
-    // Like single-backtick but verbatim (no escape sequences) and with
-    // process_raw_string applied to the combined text segments (de-indent +
-    // surrounding-blank-line strip). Must be checked before single-backtick.
-    if c == '`' && src.peek_n(1) == Some('`') && src.peek_n(2) == Some('`') {
-        return tokenize_triple_template(src, start, tokens);
-    }
-
-    // Template literal: `` `text {expr} text` ``.
-    // A no-interpolation template (no `{`) is emitted as a plain STR.
-    // Otherwise: TEMPLATE_HEAD, then expression tokens (brace-depth tracked),
-    // then TEMPLATE_MIDDLE / TEMPLATE_TAIL until the closing `` ` ``.
-    if c == '`' {
-        return tokenize_template(src, start, tokens);
-    }
-
-    // Identifier or keyword
-    if c.is_alphabetic() || c == '_' {
-        let mut s = String::new();
-        while let Some(ch) = src.peek() {
-            if ch.is_alphanumeric() || ch == '_' {
-                s.push(ch);
-                src.advance();
-            } else {
-                break;
-            }
-        }
-        let span = start..src.offset();
-        let kw = match s.as_str() {
-            "fn" => aipl::Terminal::Fn,
-            "if" => aipl::Terminal::If,
-            "else" => aipl::Terminal::Else,
-            "struct" => aipl::Terminal::Struct,
-            "variant" => aipl::Terminal::Variant,
-            "import" => aipl::Terminal::Import,
-            "from" => aipl::Terminal::From,
-            "as" => aipl::Terminal::As,
-            "pub" => aipl::Terminal::Pub,
-            "let" => aipl::Terminal::Let,
-            "for" => aipl::Terminal::For,
-            "while" => aipl::Terminal::While,
-            "mut" => aipl::Terminal::Mut,
-            "set" => aipl::Terminal::Set,
-            "match" => aipl::Terminal::Match,
-            "return" => aipl::Terminal::Return,
-            "builtins" => aipl::Terminal::Builtins(span.clone()),
-            "none" => aipl::Terminal::None(span.clone()),
-            "true" => aipl::Terminal::True(span.clone()),
-            "false" => aipl::Terminal::False(span.clone()),
-            _ => aipl::Terminal::Ident((s, span.clone())),
-        };
-        tokens.push((kw, span));
-        return Ok(());
-    }
-
-    // Number
-    if c.is_ascii_digit() {
-        let mut s = String::new();
-        while let Some(ch) = src.peek() {
-            if ch.is_ascii_digit() {
-                s.push(ch);
-                src.advance();
-            } else {
-                break;
-            }
-        }
-        let span = start..src.offset();
-        let n: i64 = s
-            .parse()
-            .map_err(|e| Error::at(format!("bad number {s:?}: {e}"), span.clone()))?;
-        tokens.push((aipl::Terminal::Num((n, span.clone())), span));
-        return Ok(());
-    }
-
-    // Three-char operators (must beat two-char and single-char). `+++` is the
-    // string-concatenation binary operator (internal Binop char `'C'`); it must
-    // beat the `++` increment token and the single `+`.
-    if c == '+' && src.peek_n(1) == Some('+') && src.peek_n(2) == Some('+') {
-        let op_span = start..start + 3;
-        src.advance();
-        src.advance();
-        src.advance();
-        tokens.push((
-            aipl::Terminal::Op(('C', op_span), op_precedence('C')),
-            start..src.offset(),
-        ));
-        return Ok(());
-    }
-
-    // `#[allow]` — the lint-squelch marker (see `aipl_syntax::lint`). Not a
-    // token: like a comment it is recorded and skipped, and it squelches every
-    // *lint* error on its line (regular errors are unaffected). Checked ahead
-    // of the single-char `#`, so a `#[` not followed by exactly `allow]` still
-    // lexes as HASH + LBRACKET (a parse error, as ever).
-    if c == '#' {
-        const MARKER: &str = "[allow]";
-        if MARKER
-            .chars()
-            .enumerate()
-            .all(|(i, m)| src.peek_n(i + 1) == Some(m))
-        {
-            for _ in 0..=MARKER.len() {
-                src.advance();
-            }
-            let span = start..src.offset();
-            record_allow(span.clone());
-            // Recorded as a comment too, so the formatter carries it through
-            // (rendered verbatim, glued to its line like a trailing comment).
-            record_comment(span);
-            return Ok(());
-        }
-    }
-
-    // Two-char operators (must beat their single-char counterparts). An
-    // `OP` carries its own span (`(char, Span)`) so it can be used as a
-    // value (`apply(2, 3, +)`) and still point diagnostics at the operator.
-    if let Some(next) = src.peek_n(1) {
-        let op_span = start..start + 2;
-        let pair_tok = match (c, next) {
-            ('-', '>') => Some(aipl::Terminal::Arrow),
-            // `..` — the range separator in a slice `s[a..b]`. Must beat the
-            // single-char `.` (field/method access).
-            // Range construction binds loosest of all infix operators (below
-            // `||` at 2), so `a + 1..b * 2` is `(a + 1)..(b * 2)`.
-            ('.', '.') => Some(aipl::Terminal::Dotdot(Precedence::Left(1))),
-            ('=', '>') => Some(aipl::Terminal::Fatarrow),
-            // `++` — increment statement; must beat the single-char `+`.
-            ('+', '+') => Some(aipl::Terminal::Plusplus(op_span)),
-            ('=', '=') => Some(aipl::Terminal::Op(('E', op_span), op_precedence('E'))),
-            ('!', '=') => Some(aipl::Terminal::Op(('N', op_span), op_precedence('N'))),
-            ('<', '=') => Some(aipl::Terminal::Op(('L', op_span), op_precedence('L'))),
-            ('>', '=') => Some(aipl::Terminal::Op(('G', op_span), op_precedence('G'))),
-            ('&', '&') => Some(aipl::Terminal::Op(('A', op_span), op_precedence('A'))),
-            ('|', '|') => Some(aipl::Terminal::Oror(op_precedence('O'))),
-            _ => None,
-        };
-        if let Some(t) = pair_tok {
-            src.advance();
-            src.advance();
-            tokens.push((t, start..src.offset()));
-            return Ok(());
-        }
-    }
-
-    // Single-char punctuation and operators
-    let tok = match c {
-        '(' => aipl::Terminal::Lparen,
-        ')' => aipl::Terminal::Rparen,
-        '{' => aipl::Terminal::Lbrace,
-        '}' => aipl::Terminal::Rbrace,
-        // `[` carries a span so array-literal expressions (which may
-        // be empty, `[]`, and thus have no element span) can still
-        // point somewhere sensible in errors.
-        '[' => aipl::Terminal::Lbracket(start..start + 1),
-        ']' => aipl::Terminal::Rbracket,
-        '#' => aipl::Terminal::Hash(start..start + 1),
-        ',' => aipl::Terminal::Comma,
-        ':' => aipl::Terminal::Colon,
-        '.' => aipl::Terminal::Dot,
-        ';' => aipl::Terminal::Semi,
-        '=' => aipl::Terminal::Eq,
-        '!' => aipl::Terminal::Bang,
-        '?' => aipl::Terminal::Question,
-        // Single `|` opens/closes a lambda parameter list (`||` for
-        // logical-or is handled by the two-char pass above).
-        '|' => aipl::Terminal::Pipe(start..start + 1),
-        '-' => aipl::Terminal::Minus(Precedence::Left(6)),
-        '+' | '*' | '/' | '%' => {
-            aipl::Terminal::Op((c, start..start + c.len_utf8()), op_precedence(c))
-        }
-        // `<` / `>` are both comparison operators and generic-param
-        // brackets; they carry comparison precedence either way.
-        '<' => aipl::Terminal::Langle(op_precedence('<')),
-        '>' => aipl::Terminal::Rangle(op_precedence('>')),
-        other => {
-            return Err(Error::at(
-                format!("unexpected character {other:?}"),
-                start..start + other.len_utf8(),
-            ));
-        }
-    };
-    src.advance();
-    tokens.push((tok, start..src.offset()));
-    Ok(())
-}
-
-/// Scan a template literal starting at `template_start` (the position of the
-/// opening `` ` ``).  Emits either a plain STR (no interpolations) or a
-/// sequence of TEMPLATE_HEAD, expression tokens, TEMPLATE_MIDDLE/TAIL pairs.
-///
-/// Escapes inside text segments: `\\` `\`` `\{` `\n` `\t` `\r`.
-fn tokenize_template<I: Iterator<Item = char>>(
-    src: &mut Scanner<I>,
-    template_start: usize,
-    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
-) -> Result<(), Error> {
-    src.advance(); // consume opening `
-
-    // Scan the first text segment (before the first `{` or closing `` ` ``).
-    let mut text = String::new();
-    let mut open_brace: Span;
-    loop {
-        match src.peek() {
-            None => {
-                return Err(Error::at(
-                    "unterminated template literal",
-                    template_start..src.offset(),
-                ));
-            }
-            Some('`') => {
-                // No interpolations: emit as a plain STR.
-                src.advance();
-                let span = template_start..src.offset();
-                tokens.push((aipl::Terminal::Str((text, span.clone())), span));
-                return Ok(());
-            }
-            Some('{') => {
-                // First interpolation: emit TEMPLATE_HEAD.
-                let brace_start = src.offset();
-                let head_end = brace_start + 1;
-                src.advance(); // consume {
-                open_brace = brace_start..head_end;
-                let head_span = template_start..head_end;
-                tokens.push((
-                    aipl::Terminal::TemplateHead((text, head_span.clone())),
-                    head_span,
-                ));
-                break;
-            }
-            Some('\\') => {
-                src.advance();
-                match src.peek() {
-                    Some('`') => {
-                        text.push('`');
-                        src.advance();
-                    }
-                    Some('{') => {
-                        text.push('{');
-                        src.advance();
-                    }
-                    Some('n') => {
-                        text.push('\n');
-                        src.advance();
-                    }
-                    Some('t') => {
-                        text.push('\t');
-                        src.advance();
-                    }
-                    Some('r') => {
-                        text.push('\r');
-                        src.advance();
-                    }
-                    Some('\\') => {
-                        text.push('\\');
-                        src.advance();
-                    }
-                    Some(other) => {
-                        let esc = src.offset() - 1;
-                        return Err(Error::at(
-                            format!("unknown escape sequence \\{other}"),
-                            esc..esc + 1 + other.len_utf8(),
-                        ));
-                    }
-                    None => {
-                        return Err(Error::at(
-                            "unterminated template literal",
-                            template_start..src.offset(),
-                        ));
-                    }
-                }
-            }
-            Some(ch) => {
-                text.push(ch);
-                src.advance();
-            }
-        }
-    }
-
-    // HEAD was emitted. Alternate: scan expression tokens, then a text
-    // segment ending in MIDDLE or TAIL.
-    loop {
-        tokenize_template_expr(src, open_brace.clone(), tokens)?;
-
-        let seg_start = src.offset();
-        let mut seg = String::new();
-        loop {
-            match src.peek() {
-                None => {
-                    return Err(Error::at(
-                        "unterminated template literal",
-                        template_start..src.offset(),
-                    ));
-                }
-                Some('`') => {
-                    src.advance(); // consume closing `
-                    let tail_span = seg_start..src.offset();
-                    tokens.push((
-                        aipl::Terminal::TemplateTail((seg, tail_span.clone())),
-                        tail_span,
-                    ));
-                    return Ok(());
-                }
-                Some('{') => {
-                    let brace_start = src.offset();
-                    let mid_end = brace_start + 1;
-                    src.advance(); // consume {
-                    open_brace = brace_start..mid_end;
-                    let mid_span = seg_start..mid_end;
-                    tokens.push((
-                        aipl::Terminal::TemplateMiddle((seg, mid_span.clone())),
-                        mid_span,
-                    ));
-                    break; // continue outer loop: scan next expression
-                }
-                Some('\\') => {
-                    src.advance();
-                    match src.peek() {
-                        Some('`') => {
-                            seg.push('`');
-                            src.advance();
-                        }
-                        Some('{') => {
-                            seg.push('{');
-                            src.advance();
-                        }
-                        Some('n') => {
-                            seg.push('\n');
-                            src.advance();
-                        }
-                        Some('t') => {
-                            seg.push('\t');
-                            src.advance();
-                        }
-                        Some('r') => {
-                            seg.push('\r');
-                            src.advance();
-                        }
-                        Some('\\') => {
-                            seg.push('\\');
-                            src.advance();
-                        }
-                        Some(other) => {
-                            let esc = src.offset() - 1;
-                            return Err(Error::at(
-                                format!("unknown escape sequence \\{other}"),
-                                esc..esc + 1 + other.len_utf8(),
-                            ));
-                        }
-                        None => {
-                            return Err(Error::at(
-                                "unterminated template literal",
-                                template_start..src.offset(),
-                            ));
-                        }
-                    }
-                }
-                Some(ch) => {
-                    seg.push(ch);
-                    src.advance();
-                }
-            }
-        }
-    }
-}
-
-/// Scan the expression tokens inside a `{ .. }` interpolation. The opening
-/// `{` has already been consumed (`open_brace` is its span, for error
-/// reporting). Emits tokens until the matching `}` is reached; that closing
-/// `}` is consumed but NOT emitted (it is the template delimiter, not an
-/// `RBRACE`). Nested `{` / `}` pairs (e.g. from set/dict literals, blocks, or
-/// nested template literals) are depth-tracked so their `LBRACE`/`RBRACE`
-/// tokens are emitted normally.
-///
-/// A missing `}` doesn't necessarily surface as an error *here*: scanning
-/// just keeps consuming subsequent source looking for the closing brace, so a
-/// stray token deep inside (e.g. a `` ` `` that reads as opening some other
-/// template literal) can fail far from the real mistake — often past the
-/// enclosing template literal's own closing delimiter, which then itself
-/// misreports as "unterminated". So every error that can propagate out of
-/// this scan (whether from here directly or from a nested tokenize call) gets
-/// `open_brace` attached as a note, pointing back at the interpolation that
-/// was never actually closed.
-fn tokenize_template_expr<I: Iterator<Item = char>>(
-    src: &mut Scanner<I>,
-    open_brace: Span,
-    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
-) -> Result<(), Error> {
-    let mut depth = 1usize;
-    while depth > 0 {
-        skip_whitespace_and_comments(src)
-            .map_err(|e| e.with_note("in this unclosed interpolation", open_brace.clone()))?;
-        if src.at_end() {
-            return Err(Error::at(
-                "unterminated template literal interpolation",
-                open_brace.clone(),
-            ));
-        }
-        let pos = src.offset();
-        match src.peek().unwrap() {
-            '{' => {
-                depth += 1;
-                src.advance();
-                tokens.push((aipl::Terminal::Lbrace, pos..src.offset()));
-            }
-            '}' => {
-                depth -= 1;
-                src.advance();
-                if depth > 0 {
-                    tokens.push((aipl::Terminal::Rbrace, pos..src.offset()));
-                }
-                // depth == 0: closing } of the interpolation; don't emit it.
-            }
-            _ => {
-                tokenize_one(src, tokens).map_err(|e| {
-                    e.with_note("in this unclosed interpolation", open_brace.clone())
-                })?;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Triple-backtick template literal: ` ```text {expr} text``` `.
-/// Like single-backtick but verbatim content (no escape sequences) and with
-/// `process_raw_string` applied to the combined text segments so that the
-/// leading/trailing blank line is stripped and the common indent is removed —
-/// the same treatment as a `"""..."""` raw string.
-///
-/// Implementation: two phases.
-/// Phase 1 — scan all text segments verbatim, tokenizing each `{...}`
-///   expression into a local sub-buffer.
-/// Phase 2 — join the text segments with `\x00` (a character that cannot
-///   appear in AIPL source), run `process_raw_string` on the joined string,
-///   split back on `\x00` to recover the processed segments, then emit all
-///   tokens (same TEMPLATE_HEAD / TEMPLATE_MIDDLE / TEMPLATE_TAIL terminals
-///   as the single-backtick variant).
-fn tokenize_triple_template<I: Iterator<Item = char>>(
-    src: &mut Scanner<I>,
-    template_start: usize,
-    tokens: &mut Vec<(aipl::Terminal<Build>, Span)>,
-) -> Result<(), Error> {
-    src.advance();
-    src.advance();
-    src.advance(); // opening ```
-
-    // Phase 1: collect text segments and per-expression token buffers.
-    // text_segs[i] = (raw_text, span_start, span_end)
-    // expr_bufs[i] = tokens for the i-th interpolation expression
-    let mut text_segs: Vec<(String, usize, usize)> = Vec::new();
-    let mut expr_bufs: Vec<Vec<(aipl::Terminal<Build>, Span)>> = Vec::new();
-
-    let mut cur_text = String::new();
-    let mut seg_start = src.offset();
-
-    loop {
-        match src.peek() {
-            None => {
-                return Err(Error::at(
-                    "unterminated triple-backtick template literal",
-                    template_start..src.offset(),
-                ));
-            }
-            Some('`') if src.peek_n(1) == Some('`') && src.peek_n(2) == Some('`') => {
-                let seg_end = src.offset();
-                src.advance();
-                src.advance();
-                src.advance(); // consume closing ```
-                text_segs.push((cur_text, seg_start, src.offset()));
-                let _ = seg_end; // span_end is after the closing ```, computed above
-                break;
-            }
-            Some('{') => {
-                let brace_start = src.offset();
-                let seg_end = brace_start + 1; // include the {
-                src.advance(); // consume {
-                text_segs.push((cur_text.clone(), seg_start, seg_end));
-                cur_text = String::new();
-
-                let mut expr_tokens: Vec<(aipl::Terminal<Build>, Span)> = Vec::new();
-                tokenize_template_expr(src, brace_start..seg_end, &mut expr_tokens)?;
-                expr_bufs.push(expr_tokens);
-                seg_start = src.offset();
-            }
-            Some(ch) => {
-                cur_text.push(ch);
-                src.advance();
-            }
-        }
-    }
-
-    // Phase 2: apply process_raw_string to the combined text.
-    // Join with \x00 as a separator that can't appear in source.
-    let combined: String = text_segs
-        .iter()
-        .map(|(t, _, _)| t.as_str())
-        .collect::<Vec<_>>()
-        .join("\x00");
-    let processed = process_raw_string(&combined);
-    let processed_segs: Vec<String> = processed.split('\x00').map(|s| s.to_string()).collect();
-
-    // Defensive: split count must match text_segs count.
-    debug_assert_eq!(
-        processed_segs.len(),
-        text_segs.len(),
-        "process_raw_string must not remove the \\x00 separators"
-    );
-
-    // Phase 3: emit tokens.
-    if expr_bufs.is_empty() {
-        // No interpolations: emit as a plain STR (same as a raw string).
-        let (_, _, span_end) = text_segs[0];
-        let span = template_start..span_end;
-        let s = processed_segs.into_iter().next().unwrap_or_default();
-        tokens.push((aipl::Terminal::Str((s, span.clone())), span));
-        return Ok(());
-    }
-
-    // Emit TEMPLATE_HEAD (first text segment).
-    let (_, _, head_end) = text_segs[0];
-    let head_span = template_start..head_end;
-    tokens.push((
-        aipl::Terminal::TemplateHead((processed_segs[0].clone(), head_span.clone())),
-        head_span,
-    ));
-
-    // Emit alternating expression tokens + MIDDLE / TAIL.
-    let n_exprs = expr_bufs.len();
-    for (i, expr_buf) in expr_bufs.into_iter().enumerate() {
-        tokens.extend(expr_buf);
-
-        let (_, seg_s, seg_e) = text_segs[i + 1];
-        let seg_span = seg_s..seg_e;
-        if i + 1 < n_exprs {
-            tokens.push((
-                aipl::Terminal::TemplateMiddle((processed_segs[i + 1].clone(), seg_span.clone())),
-                seg_span,
-            ));
-        } else {
-            tokens.push((
-                aipl::Terminal::TemplateTail((processed_segs[i + 1].clone(), seg_span.clone())),
-                seg_span,
-            ));
-        }
-    }
-
-    Ok(())
-}
-
 /// If `line` is a `--- name ---` test-section marker, return the trimmed
 /// inner name. Used by the cases test harness to delimit sections; the
 /// compiler treats any such marker as a hard cutoff (see
@@ -3429,18 +2565,6 @@ pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
         .into_iter()
         .map(|t| (classify_lexed(&t.kind), t.span))
         .collect())
-}
-
-/// The **native** (hand-written Rust) lexer's classified token dump, kept as
-/// the differential-test reference against the dogfooded AIPL lexer while the
-/// two coexist. [`lex_tokens`] itself now runs the dogfooded lexer, so a test
-/// that wants to compare the two paths must reach the native one here. Retired
-/// (with the native scanner it wraps) once the parser flips to the dogfooded
-/// lexer.
-pub fn lex_tokens_native(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
-    let input = strip_test_sections(input);
-    let raw = tokenize(input)?;
-    Ok(raw.into_iter().map(|(t, sp)| (classify(&t), sp)).collect())
 }
 
 /// A [`TokenKind`] refined for the formatter: template-literal pieces are kept
@@ -3624,53 +2748,6 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
     }
 }
 
-fn classify(t: &aipl::Terminal<Build>) -> TokenKind {
-    // `aipl` as a bare path is ambiguous here: rustc has to choose between
-    // the crate (this is the aipl crate) and the gazelle-generated module
-    // of the same name. `self::aipl` pins it to the local module.
-    use self::aipl::Terminal as T;
-    match t {
-        T::Fn | T::If | T::Else | T::Struct | T::Variant | T::Import | T::From | T::As | T::Pub
-        | T::Let | T::For | T::While | T::Mut | T::Set | T::Match | T::Return | T::Builtins(_) => {
-            TokenKind::Keyword
-        }
-        T::True(_) | T::False(_) | T::None(_) => TokenKind::Constant,
-        T::Ident((s, _)) => match s.as_str() {
-            "bool" | "char" | "str" | "any" => TokenKind::BuiltinType,
-            _ if aipl_syntax::int_bits(s).is_some() => TokenKind::BuiltinType,
-            _ => TokenKind::Identifier,
-        },
-        T::Num(_) => TokenKind::Number,
-        T::Str(_) | T::TemplateHead(_) | T::TemplateMiddle(_) | T::TemplateTail(_) => {
-            TokenKind::Str
-        }
-        T::Char(_) => TokenKind::Char,
-        T::Op(_, _)
-        | T::Minus(_)
-        | T::Langle(_)
-        | T::Rangle(_)
-        | T::Oror(_)
-        | T::Pipe(_)
-        | T::Bang
-        | T::Plusplus(_)
-        | T::Arrow
-        | T::Fatarrow
-        // `..` — the slice/range separator (carries its infix precedence).
-        | T::Dotdot(_)
-        // `=` (assignment in `let`/`mut`/`set`) is conventionally
-        // `keyword.operator.assignment` in TextMate scopes — group it
-        // with the other operators rather than with bracket punctuation.
-        | T::Eq => TokenKind::Operator,
-        T::Lparen | T::Rparen | T::Lbrace | T::Rbrace | T::Lbracket(_) | T::Rbracket
-        | T::Hash(_) | T::Comma | T::Colon | T::Dot | T::Semi | T::Question => {
-            TokenKind::Punctuation
-        }
-        // gazelle generates a private `__Phantom` variant for its internal
-        // type-parameter use; it's unreachable from real input.
-        _ => unreachable!("gazelle phantom terminal"),
-    }
-}
-
 /// Reject trailing whitespace — a space or tab at the end of any line, including
 /// inside a (multi-line) string literal (string contents aren't exempt). Reports
 /// the first offending run, caret under the whitespace. A `\r` before the newline
@@ -3704,13 +2781,113 @@ pub fn parse_with_allows(input: &str) -> Result<(Program, Vec<Span>), Error> {
     Ok((result?, allows))
 }
 
+/// Convert the dogfooded lexer's token stream into the gazelle `Terminal`
+/// stream the parser consumes — an arm-for-arm mapping. The AIPL lexer already
+/// decoded every string/char/int value and (in its emit) de-dented the `"""` /
+/// ```` ``` ```` literals — interpolated raw-template segments included (that
+/// rule's `finalize` is `dedent_segments`) — so every value maps straight
+/// across, `RawTemplate*` exactly like the regular `Template*`.
+fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
+    use self::aipl::Terminal as T;
+    use LexedTokenKind as K;
+
+    let mut pairs = Vec::with_capacity(out.tokens.len());
+    for t in out.tokens.into_iter() {
+        let span = t.span;
+        let term = match t.kind {
+            K::Fn => T::Fn,
+            K::If => T::If,
+            K::Else => T::Else,
+            K::Struct => T::Struct,
+            K::Variant => T::Variant,
+            K::Import => T::Import,
+            K::From => T::From,
+            K::As => T::As,
+            K::Pub => T::Pub,
+            K::Let => T::Let,
+            K::For => T::For,
+            K::While => T::While,
+            K::Mut => T::Mut,
+            K::Set => T::Set,
+            K::Match => T::Match,
+            K::Return => T::Return,
+            K::Builtins => T::Builtins(span.clone()),
+            K::None => T::None(span.clone()),
+            K::True => T::True(span.clone()),
+            K::False => T::False(span.clone()),
+            K::Name(s) => T::Ident((s, span.clone())),
+            K::IntLit(n) => T::Num((n, span.clone())),
+            K::StrLit(s, _) => T::Str((s, span.clone())),
+            K::CharTok(b) => T::Char((b, span.clone())),
+            K::TemplateHead(s) => T::TemplateHead((s, span.clone())),
+            K::TemplateMid(s) => T::TemplateMiddle((s, span.clone())),
+            K::TemplateTail(s) => T::TemplateTail((s, span.clone())),
+            K::RawTemplateHead(s) => T::TemplateHead((s, span.clone())),
+            K::RawTemplateMid(s) => T::TemplateMiddle((s, span.clone())),
+            K::RawTemplateTail(s) => T::TemplateTail((s, span.clone())),
+            // Operators carrying a `(char-tag, span)` value + infix precedence,
+            // so they can also be used as first-class function values
+            // (`apply(2, 3, +)`) and still point diagnostics at themselves.
+            K::PlusPlusPlus => T::Op(('C', span.clone()), op_precedence('C')),
+            K::EqEq => T::Op(('E', span.clone()), op_precedence('E')),
+            K::Ne => T::Op(('N', span.clone()), op_precedence('N')),
+            K::Le => T::Op(('L', span.clone()), op_precedence('L')),
+            K::Ge => T::Op(('G', span.clone()), op_precedence('G')),
+            K::AndAnd => T::Op(('A', span.clone()), op_precedence('A')),
+            K::Plus => T::Op(('+', span.clone()), op_precedence('+')),
+            K::Star => T::Op(('*', span.clone()), op_precedence('*')),
+            K::Slash => T::Op(('/', span.clone()), op_precedence('/')),
+            K::Percent => T::Op(('%', span.clone()), op_precedence('%')),
+            K::OrOr => T::Oror(op_precedence('O')),
+            K::Lt => T::Langle(op_precedence('<')),
+            K::Gt => T::Rangle(op_precedence('>')),
+            K::Minus => T::Minus(Precedence::Left(6)),
+            K::DotDot => T::Dotdot(Precedence::Left(1)),
+            K::PlusPlus => T::Plusplus(span.clone()),
+            K::Arrow => T::Arrow,
+            K::FatArrow => T::Fatarrow,
+            K::Pipe => T::Pipe(span.clone()),
+            K::Eq => T::Eq,
+            K::Bang => T::Bang,
+            K::Question => T::Question,
+            K::Period => T::Dot,
+            K::Comma => T::Comma,
+            K::Colon => T::Colon,
+            K::Semi => T::Semi,
+            K::Hash => T::Hash(span.clone()),
+            K::LParen => T::Lparen,
+            K::RParen => T::Rparen,
+            K::LBrace => T::Lbrace,
+            K::RBrace => T::Rbrace,
+            K::LBracket => T::Lbracket(span.clone()),
+            K::RBracket => T::Rbracket,
+            k @ (K::Space | K::LineComment | K::BlockComment | K::AllowMarker) => {
+                unreachable!("trivia kind {k:?} in the token stream")
+            }
+        };
+        pairs.push((term, span));
+    }
+    pairs
+}
+
 pub fn parse(input: &str) -> Result<Program, Error> {
     let input = strip_test_sections(input);
     reject_trailing_whitespace(input)?;
     let mut parser = aipl::Parser::<Build>::new();
     let mut actions = Build;
 
-    let pairs = tokenize(input)?;
+    // Lex through the dogfooded AIPL lexer (input already section-stripped), then
+    // map its tokens to the gazelle terminal stream. No native fallback.
+    let out = lex_aipl(input).map_err(|e| Error::at(e.message, e.span))?;
+    // The `#[allow]` lint-squelch markers ride the lexer's trivia side-channel;
+    // feed their spans into the armed `ALLOW_SINK` so `parse_with_allows` (the
+    // loader's lint pass) can drop lint errors squelched on the same line.
+    for t in &out.trivia {
+        if t.kind == LexedTokenKind::AllowMarker {
+            record_allow(t.span.clone());
+        }
+    }
+    let pairs = lexed_to_terminals(out);
     // The exact source text of each token, so the error can name the actual
     // token (`+`, `foo`, `0`) rather than its kind. Index matches push order,
     // which is what `format_error` expects for the offending token.

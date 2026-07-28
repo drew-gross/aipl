@@ -2769,21 +2769,6 @@ thread_local! {
         .expect("dogfood engine builds");
 }
 
-/// Process a raw string's verbatim contents `s` (trim the surrounding line breaks
-/// and de-dent), computed by the dogfooded AIPL `process_raw_string` via the
-/// embedding FFI. This is the parser's raw-string hook (see
-/// [`install_parser_hooks`]). No native fallback: it panics if the known-good
-/// engine can't be built or called, so a regression is loud rather than silently
-/// bypassed.
-pub fn process_raw_string(s: &str) -> String {
-    DOGFOOD_ENGINE.with(|comp| {
-        match comp.call_values("process_raw_string", &[FfiValue::Str(s.to_string())]) {
-            Ok(FfiValue::Str(out)) => out,
-            other => panic!("dogfooded process_raw_string() call: {other:?}"),
-        }
-    })
-}
-
 /// The parser's test-section-header hook (see [`install_parser_hooks`]): whether
 /// `line` is a `--- name ---` marker, and its trimmed inner name — computed by
 /// the dogfooded AIPL `parse_test_section_header` via the FFI. The AIPL returns
@@ -3212,20 +3197,20 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
     marshal_lex("lex_aipl_stripped", src)
 }
 
-/// Point the parser's hooks at the dogfooded AIPL implementations: the raw-string
-/// processor at [`process_raw_string`], the test-section-header parser at
+/// Point the parser's hooks at the dogfooded AIPL implementations: the
+/// test-section-header parser at
 /// [`parse_test_section_header`], the section stripper at [`strip_test_sections`],
 /// the trailing-whitespace finder at [`find_trailing_whitespace`], the
 /// assertion-location formatter at [`assert_loc`], the error-renderer's
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
-/// [`is_operator_name`], and the lexer at [`lex_aipl`]. Idempotent (first
-/// install wins). The compiler's entry points (the CLI and the embedding
-/// [`Compilation`] API's callers) install them; there are **no native
+/// [`is_operator_name`], and the lexer at [`lex_aipl`] (which de-dents `"""` raw
+/// strings itself, in its emit, so there is no separate raw-string hook).
+/// Idempotent (first install wins). The compiler's entry points (the CLI and the
+/// embedding [`Compilation`] API's callers) install them; there are **no native
 /// fallbacks**, so any in-process parse (or error render, literal
 /// range-check, or operator-import resolution) must install them first.
 pub fn install_parser_hooks() {
-    aipl_parser::set_process_raw_string_hook(process_raw_string);
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);

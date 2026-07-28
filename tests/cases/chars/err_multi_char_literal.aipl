@@ -4,4 +4,4 @@ error: char literal must contain exactly one character
  --> ./tests/cases/chars/err_multi_char_literal.aipl:1:18
   |
 1 | fn f() -> char { 'ab' }
-  |                  ^^
+  |                  ^^^^
