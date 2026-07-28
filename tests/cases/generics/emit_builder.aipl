@@ -41,11 +41,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 542
-binary size: 3968
-  code: 2292
+instructions executed: 488
+binary size: 3568
+  code: 2020
   data: 1
-  metadata: 1675
+  metadata: 1547
 --- monomorphizations ---
 __lambda_0
 __lambda_1

@@ -36,11 +36,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 95
-instructions executed: 396
-binary size: 4064
-  code: 1772
+instructions executed: 356
+binary size: 3736
+  code: 1572
   data: 220
-  metadata: 2072
+  metadata: 1944
 --- monomorphizations ---
 label
 main

@@ -10322,12 +10322,18 @@ fn compile_variant<M: Module>(
     let tag_v = builder.ins().iconst(types::I64, tag as i64);
     builder.ins().store(MemFlagsData::trusted(), tag_v, base, 0);
     for ((offset, fty), arg) in fields.iter().zip(args) {
+        let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
         let dst = builder.ins().iadd_imm_s(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
-        // The variant co-owns each heap payload field — retain on store.
-        emit_retain(builder, module, cx.builtins, cx.structs, v, fty);
+        // The variant co-owns each heap payload field. If the field value is a
+        // fresh temporary we own, move it in — skip the retain and untrack it so
+        // scope exit won't drop it (the variant's drop-fn releases it); a
+        // borrowed field is co-owned via retain as before.
+        if !move_owned_temp(scopes, before, v) {
+            emit_retain(builder, module, cx.builtins, cx.structs, v, fty);
+        }
     }
     let vty = Type::Named(vname.to_string());
     if needs_drop(&vty, cx.structs) {
@@ -12896,6 +12902,7 @@ fn compile_expr<M: Module>(
                     )
                 })?;
                 let (offset, fty) = (field.offset, field.ty.clone());
+                let before = scope_depth(scopes);
                 let (v, actual) = compile_expr(module, builder, cx, scopes, &init.value)?;
                 // `expect_type` (not `==`) so a `none` / empty `[]` value
                 // coerces into an optional / array field.
@@ -12927,8 +12934,13 @@ fn compile_expr<M: Module>(
                         .stack_store(types::I64, v, slot, offset as i32);
                 }
                 // The struct co-owns each heap field (recursing into an
-                // optional's value) — retain on store.
-                emit_retain(builder, module, builtins, structs, v, &fty);
+                // optional's value). If the field value is a fresh temporary we
+                // own, move it in — skip the retain and untrack it, so scope exit
+                // won't drop it (the struct's drop-fn releases it). A borrowed
+                // field is co-owned via retain as before.
+                if !move_owned_temp(scopes, before, v) {
+                    emit_retain(builder, module, builtins, structs, v, &fty);
+                }
             }
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             let sty = Type::Named(name.clone());
