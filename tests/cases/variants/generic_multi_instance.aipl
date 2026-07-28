@@ -38,11 +38,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 190
-binary size: 2472
-  code: 1036
+instructions executed: 186
+binary size: 2416
+  code: 1008
   data: 1
-  metadata: 1435
+  metadata: 1407
 --- monomorphizations ---
 combine_i
 combine_s

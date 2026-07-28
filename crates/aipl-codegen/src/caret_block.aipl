@@ -90,11 +90,11 @@ allocations: 83
 deallocations: 83
 reallocations: 26
 bytes allocated: 3022
-instructions executed: 6181
-binary size: 10088
-  code: 3880
+instructions executed: 6169
+binary size: 10032
+  code: 3852
   data: 1784
-  metadata: 4424
+  metadata: 4396
 --- monomorphizations ---
 __enumerate0
 __m1__line_at

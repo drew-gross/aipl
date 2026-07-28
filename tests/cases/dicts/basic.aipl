@@ -46,11 +46,11 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 384
-instructions executed: 860
-binary size: 9752
-  code: 4932
+instructions executed: 858
+binary size: 9640
+  code: 4888
   data: 863
-  metadata: 3957
+  metadata: 3889
 --- monomorphizations ---
 __test$ints
 __test$make_empty

@@ -117,6 +117,4 @@ the size is driven by inline construction of large literal values and the lexer'
 
 Make synthesized functions show up in monomorphizations. Ideally by having their creating be driven by the monomorphization process.
 
-Make a more generic retain-elision optimization pass
-
 destination-passing: build elements directly in output slot

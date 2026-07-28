@@ -51,11 +51,11 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 320
-instructions executed: 8958
-binary size: 7776
-  code: 2892
+instructions executed: 8870
+binary size: 7584
+  code: 2796
   data: 1199
-  metadata: 3685
+  metadata: 3589
 --- monomorphizations ---
 __m1__parse_test_section_header
 main

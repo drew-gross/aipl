@@ -31,11 +31,11 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 543
-instructions executed: 553
-binary size: 5424
-  code: 1680
+instructions executed: 541
+binary size: 5360
+  code: 1652
   data: 948
-  metadata: 2796
+  metadata: 2760
 --- monomorphizations ---
 assert_loc
 main

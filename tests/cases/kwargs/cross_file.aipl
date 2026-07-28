@@ -21,11 +21,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 160
-instructions executed: 42
-binary size: 1384
-  code: 424
+instructions executed: 38
+binary size: 1320
+  code: 396
   data: 1
-  metadata: 959
+  metadata: 923
 --- monomorphizations ---
 __m1__framed
 main

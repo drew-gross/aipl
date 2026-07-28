@@ -6391,6 +6391,7 @@ fn define_fn<M: Module>(
             in_test,
             bindings: &bindings,
         };
+        let body_mark = scope_depth(&scopes);
         let (body_ret, body_ty) = compile_expr(module, &mut builder, cx, &mut scopes, &func.body)?;
         // Enforce the declared return type. For a mutating method or unit
         // `main` that's unit, so a trailing value (an attempt to return one) is
@@ -6421,9 +6422,15 @@ fn define_fn<M: Module>(
             body_ret
         };
 
-        // Hand the caller a ref on the returned value (retaining nested heap
-        // for composites), then release this scope.
-        if needs_drop(&abi_ret, structs) {
+        // Hand the caller a ref on the returned value (retaining nested heap for
+        // composites), then release this scope. When the body's value is a fresh
+        // temporary we own (the common `fn f() -> T { g() }` / `{ T { .. } }`
+        // shape), move it instead: skip the retain and untrack it so `drop_scope`
+        // below won't free it. A `mut self` method, unit `main`, or `error_main`
+        // returns a value other than `body_ret` (its `self` slot / exit code),
+        // which is never the innermost scope's top entry, so the move never fires
+        // there and `body_ret` is still dropped by `drop_scope`.
+        if needs_drop(&abi_ret, structs) && !move_owned_temp(&mut scopes, body_mark, ret_val) {
             emit_retain(&mut builder, module, builtins, structs, ret_val, &abi_ret);
         }
         let function_scope = scopes.pop().expect("function scope present");
@@ -6655,6 +6662,45 @@ fn drop_scope<M: Module>(
             Owned::Slot(slot) => builder.ins().stack_load(types::I64, types::I64, slot, 0),
         };
         emit_drop(builder, module, builtins, structs, v, &t.ty);
+    }
+}
+
+/// Snapshot of the innermost scope's tracking depth, taken *before* evaluating a
+/// subexpression, so a later `owned_temp_since` can tell whether that evaluation
+/// produced a fresh temporary we exclusively own.
+fn scope_depth(scopes: &[Vec<Tracked>]) -> usize {
+    scopes.last().map_or(0, |s| s.len())
+}
+
+/// The shared recognizer behind every retain-elision site. True when `v` is a
+/// fresh temporary we exclusively own: evaluating the subexpression that produced
+/// it grew the innermost scope past `mark` and left `v` itself as the last-tracked
+/// entry (a call result, constructor, `if`/`match` merge, retained element read,
+/// …). A borrowed place — a bare variable, or a component read that tracked
+/// nothing new — yields false. When true, a value about to be handed to a new
+/// owner can be *moved* (its existing ref transfers) instead of being retained now
+/// and dropped later; those two ops cancel, so eliding them is a pure win.
+fn owned_temp_since(scopes: &[Vec<Tracked>], mark: usize, v: Value) -> bool {
+    scopes.last().is_some_and(|s| {
+        s.len() > mark
+            && matches!(s.last(), Some(Tracked { owned: Owned::Value(x), .. }) if *x == v)
+    })
+}
+
+/// If `v` is a fresh owned temporary produced since `mark` (see
+/// `owned_temp_since`), consume its innermost-scope tracking entry and return
+/// true: the caller is moving `v`'s reference into a new owner, so it must skip
+/// the co-owning retain and scope exit will not drop it again. Returns false for
+/// a borrowed `v`, which the caller must retain to co-own as before. Use this at
+/// a single-value hand-off (a `return`, a `?` unwrap); the array-literal store,
+/// which evaluates several elements before moving them, instead captures
+/// `owned_temp_since` per element and batch-removes the moved entries.
+fn move_owned_temp(scopes: &mut [Vec<Tracked>], mark: usize, v: Value) -> bool {
+    if owned_temp_since(scopes, mark, v) {
+        scopes.last_mut().expect("scope").pop();
+        true
+    } else {
+        false
     }
 }
 
@@ -12638,6 +12684,7 @@ fn compile_expr<M: Module>(
             // release *every* live scope (we're leaving the function), then return
             // per the ABI — mirroring the function epilogue. Whatever follows in
             // the block is unreachable, so a fresh (dead) block receives it.
+            let mark = scope_depth(scopes);
             let (rv, rty) = compile_expr(module, builder, cx, scopes, value)?;
             let ret_val = if cx.error_main {
                 // `fn main() -> !Error`: derive the exit code (printing
@@ -12646,7 +12693,12 @@ fn compile_expr<M: Module>(
             } else {
                 rv
             };
-            if needs_drop(cx.ret_ty, structs) {
+            // Hand the caller a ref on the returned value (retaining nested heap
+            // for composites). If `rv` is a fresh temporary we own, move it: skip
+            // the retain and untrack it so the scope drop below won't free it.
+            // (For `error_main`, `ret_val` is the derived exit code — not a tracked
+            // value — so this never fires and the `rv` result is still dropped.)
+            if needs_drop(cx.ret_ty, structs) && !move_owned_temp(scopes, mark, ret_val) {
                 emit_retain(builder, module, builtins, structs, ret_val, cx.ret_ty);
             }
             for scope in scopes.iter() {
@@ -14027,7 +14079,7 @@ fn compile_expr<M: Module>(
             // (a bare variable) tracks nothing new, so it's co-owned as before.
             let mut vals: Vec<(Value, Type, bool)> = Vec::with_capacity(elems.len());
             for el in elems {
-                let before = scopes.last().map_or(0, |s| s.len());
+                let before = scope_depth(scopes);
                 let (v, t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
@@ -14047,10 +14099,7 @@ fn compile_expr<M: Module>(
                     }
                     Some(expected) => expect_type(&t, expected, "array element", el.span.clone())?,
                 }
-                let owned_temp = scopes.last().is_some_and(|s| {
-                    s.len() > before
-                        && matches!(s.last(), Some(Tracked { owned: Owned::Value(x), .. }) if *x == v)
-                });
+                let owned_temp = owned_temp_since(scopes, before, v);
                 vals.push((v, t, owned_temp));
             }
             let elem = elem_ty.unwrap_or(Type::NoneInner);
@@ -14430,7 +14479,7 @@ fn compile_expr<M: Module>(
             // scrutinee grows it and leaves *its* result as the last-tracked entry,
             // the scrutinee is a fresh temporary we exclusively own — see the Ok
             // arm, which then consumes it instead of retaining + deferring its drop.
-            let scope_len_before = scopes.last().map_or(0, |s| s.len());
+            let scope_len_before = scope_depth(scopes);
             let (rptr, rty) = compile_expr(module, builder, cx, scopes, inner)?;
             let Type::Result(ok_in, err_in) = &rty else {
                 return Err(Error::at(
@@ -14554,25 +14603,15 @@ fn compile_expr<M: Module>(
             // --- Ok: unwrap the value and carry on. ---
             builder.switch_to_block(ok_block);
             builder.seal_block(ok_block);
-            // Is the scrutinee a fresh temporary we exclusively own? True when
-            // evaluating it grew the current scope and left its result as the
-            // last-tracked entry (a call result, constructor, retained element
-            // read, …). A borrowed place (e.g. a bare variable) tracks nothing new,
-            // so this is false and we keep the retain-and-defer path below.
-            let owned_temp = scopes.last().is_some_and(|s| {
-                s.len() > scope_len_before
-                    && matches!(s.last(), Some(Tracked { owned: Owned::Value(v), .. }) if *v == rptr)
-            });
-            // Consuming: drop the scrutinee's tracking here rather than leaving it
-            // to be re-dropped (conditionally, on tag) at every later early-return
-            // and at scope exit — the source of the quadratic drop-code growth with
-            // chained `?`. On the Ok path its Err side is absent and its Ok payload
-            // moves into `val`, so there's nothing left to free (the husk is a
-            // function-lifetime stack slot). The Err block, emitted above while the
-            // entry was still tracked, still drops it on that path.
-            if owned_temp {
-                scopes.last_mut().expect("scope").pop();
-            }
+            // Consuming: when the scrutinee is a fresh temporary we own, move it —
+            // drop its tracking here rather than leaving it to be re-dropped
+            // (conditionally, on tag) at every later early-return and at scope exit,
+            // the source of the quadratic drop-code growth with chained `?`. On the
+            // Ok path its Err side is absent and its Ok payload moves into `val`, so
+            // there's nothing left to free (the husk is a function-lifetime stack
+            // slot). The Err block, emitted above while the entry was still tracked,
+            // still drops it on that path.
+            let owned_temp = move_owned_temp(scopes, scope_len_before, rptr);
             // A void-Ok (`!E`) unwraps to unit — there's no payload to read.
             if is_unit(&ok_ty) {
                 return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));

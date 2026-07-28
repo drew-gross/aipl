@@ -45,11 +45,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 247
-binary size: 3232
-  code: 1516
+instructions executed: 239
+binary size: 3168
+  code: 1484
   data: 1
-  metadata: 1715
+  metadata: 1683
 --- monomorphizations ---
 classify
 code

@@ -38,11 +38,11 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 240
-instructions executed: 224
-binary size: 3256
-  code: 1560
+instructions executed: 203
+binary size: 3072
+  code: 1456
   data: 27
-  metadata: 1669
+  metadata: 1589
 --- monomorphizations ---
 greet
 main

@@ -57,11 +57,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 156
-instructions executed: 324
-binary size: 3712
-  code: 1640
+instructions executed: 301
+binary size: 3520
+  code: 1528
   data: 165
-  metadata: 1907
+  metadata: 1827
 --- monomorphizations ---
 describe
 first

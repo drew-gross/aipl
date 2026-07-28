@@ -14,11 +14,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 120
-instructions executed: 216
-binary size: 2760
-  code: 1116
+instructions executed: 194
+binary size: 2672
+  code: 1060
   data: 123
-  metadata: 1521
+  metadata: 1489
 --- monomorphizations ---
 __test$pick
 main
