@@ -26,7 +26,8 @@
 #                                          non-cases test). No section to record
 #                                          from, so a refill would just burn a
 #                                          full corpus run without fixing it.
-#   3. `fill_expected` refreshes every changed section from actual output.
+#   3. `fill_expected`, scoped with `AIPL_CASE` to each mismatched case, refreshes
+#      just those cases' sections from actual output (not the whole corpus).
 #   4. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
 #      artifact -> auto-promote when that run is green.
 #   5. Final `cargo test` confirms green against the live (promoted) artifacts.
@@ -141,12 +142,43 @@ behavioral_changed=0
 grep -qE '`(stdout|stderr|exit code|errors|check)` mismatch|error mismatch' "$STEP_OUT" \
     && behavioral_changed=1
 
+# The exact cases that need refilling. Each mismatch prints `[<display-path>]:
+# `<section>` mismatch` (or `error mismatch`), and that bracketed display path is
+# precisely what `AIPL_CASE` filters on — so we can refill just the failing cases
+# instead of paying for a whole-corpus fill. Dedup: one case may report several
+# mismatched sections, and one scoped fill refreshes all of that case's sections.
+# (Built with a read loop, not `mapfile`, to stay compatible with bash 3.2.)
+fail_cases=()
+while IFS= read -r c; do
+    [ -n "$c" ] && fail_cases+=("$c")
+done < <(grep -oE '\[[^]]+\]: (`[a-z ]+`|error) mismatch' "$STEP_OUT" \
+             | sed -E 's/^\[([^]]+)\].*/\1/' | sort -u)
+
 # --- 3. Refill changed sections ------------------------------------------------
 
 if [ $need_fill -eq 1 ]; then
-    run_step "fill_expected (section refill — full corpus)" \
-        cargo test --test cases -- --ignored fill_expected
-    grep -q 'refresh complete' "$STEP_OUT" || { save_out; fail "fill_expected" "$(tail -40 "$STEP_OUT")"; }
+    # A scoped `AIPL_CASE` fill runs (and refreshes) only the matched case, so we
+    # refill exactly the cases that mismatched instead of the whole corpus. If we
+    # somehow couldn't pin down any case path (unexpected message format), fall
+    # back to a whole-corpus fill so a mismatch is never left unrefreshed.
+    if [ "${#fail_cases[@]}" -eq 0 ]; then
+        run_step "fill_expected (section refill — full corpus, no case path found)" \
+            cargo test --test cases -- --ignored fill_expected
+        grep -q 'refresh complete' "$STEP_OUT" \
+            || { save_out; fail "fill_expected" "$(tail -40 "$STEP_OUT")"; }
+    else
+        # A scoped (`AIPL_CASE`) run diverges with the "filter active" panic, not
+        # the whole-corpus "section refresh complete" message — but the refill
+        # still happens during the run. Success is that scoped summary line
+        # reporting the case was seen (`matched > 0`, else the harness asserts
+        # before printing) with `0 failed` (no unfillable failure slipped in).
+        for case in "${fail_cases[@]}"; do
+            run_step "fill_expected (section refill — $case)" \
+                env AIPL_CASE="$case" cargo test --test cases -- --ignored fill_expected
+            grep -qE '\[filter "[^"]*"\]: [0-9]+ passed, 0 failed,' "$STEP_OUT" \
+                || { save_out; fail "fill_expected ($case)" "$(tail -40 "$STEP_OUT")"; }
+        done
+    fi
 fi
 
 # --- 4. Regenerate + validate + promote dogfood IR -----------------------------
