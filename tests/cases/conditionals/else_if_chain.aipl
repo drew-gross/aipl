@@ -1,0 +1,37 @@
+import { wrapping_sub as -, <, == } from builtins;
+
+// An `if`/`else if`/`else` ladder: each `else` is followed by another `if`
+// (the only brace-less `else` form), and the whole thing is a right-nested
+// `if` in the else position.
+fn classify(n: i64) -> i64 {
+    if (n < 0) { 10 } else if (n == 0) { 20 } else if (n < 10) { 30 } else { 40 }
+}.test({
+    assert(classify(-5) == 10);
+    assert(classify(0) == 20);
+    assert(classify(5) == 30);
+    assert(classify(100) == 40);
+
+    // A ladder with no trailing `else`: statement position, yields unit.
+    mut r = 0;
+    if (5 < 0) {
+        set r = 1;
+    } else if (5 == 0) {
+        set r = 2;
+    } else if (0 < 5) {
+        set r = 3;
+    };
+    assert(r == 3);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 130
+binary size: 1840
+  code: 464
+  data: 258
+  metadata: 1118
+--- monomorphizations ---
+classify
+main

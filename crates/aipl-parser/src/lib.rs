@@ -346,7 +346,7 @@ gazelle! {
              // `(a, b, ...)` — a tuple literal (2+ elements). The COMMA after
              // the first expr unambiguously selects this over `paren`.
              | LPAREN expr COMMA tuple_more RPAREN => tuple_lit
-             | IF LPAREN expr RPAREN block ELSE block => if_else
+             | IF LPAREN expr RPAREN block ELSE else_branch => if_else
              // Else-less `if` (statement position): yields unit, so its `then`
              // block must be unit-typed. Desugars to `if .. {} else {}`.
              | IF LPAREN expr RPAREN block => if_no_else
@@ -365,6 +365,16 @@ gazelle! {
              // The `||` no-arg form is excluded (its `OROR` lead clashes with
              // `||` as a binary operator).
              | PIPE lambda_params PIPE block => lambda_block;
+
+        // What follows `else`: a plain block (`else { .. }`) or a chained
+        // `else if (..) { .. }` — deliberately *only* another `if`, never an
+        // arbitrary expression, so an if/else-if/else ladder is the only
+        // brace-less `else` form. The chain is just a right-nested `if` in the
+        // else position, so it reuses the same dangling-else resolution (shift
+        // toward the nearer `else`) as the top-level `atom` if-productions.
+        else_branch = block => plain
+                    | IF LPAREN expr RPAREN block ELSE else_branch => elif
+                    | IF LPAREN expr RPAREN block => elif_no_else;
 
         // The portion of a template literal after the first interpolation.
         // Either the closing tail (`TEMPLATE_TAIL`) or another interpolation
@@ -495,6 +505,7 @@ impl aipl::Types for Build {
     type TypeParamList = Vec<TypeParam>;
     type TypeParam = TypeParam;
     type Block = Expr;
+    type ElseBranch = Expr;
     type LoopBody = Expr;
     type Function = Function;
     type Item = Item;
@@ -1369,6 +1380,34 @@ impl gazelle::Action<aipl::Block<Self>> for Build {
     fn build(&mut self, node: aipl::Block<Self>) -> Result<Expr, Self::Error> {
         let aipl::Block::Block(body) = node;
         Ok(body)
+    }
+}
+
+impl gazelle::Action<aipl::ElseBranch<Self>> for Build {
+    fn build(&mut self, node: aipl::ElseBranch<Self>) -> Result<Expr, Self::Error> {
+        Ok(match node {
+            // `else { .. }` — the else branch is just its block.
+            aipl::ElseBranch::Plain(block) => block,
+            // `else if (..) { .. } else ..` — a nested if in the else position,
+            // built identically to `Atom::IfElse`.
+            aipl::ElseBranch::Elif(cond, then_b, else_b) => {
+                let span = join_spans(&cond.span, &else_b.span);
+                Expr::new(
+                    ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+            // `else if (..) { .. }` with no trailing else — a nested else-less
+            // if (synthetic unit else), built identically to `Atom::IfNoElse`.
+            aipl::ElseBranch::ElifNoElse(cond, then_b) => {
+                let span = join_spans(&cond.span, &then_b.span);
+                let else_b = Expr::new(ExprKind::Unit, span.clone());
+                Expr::new(
+                    ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+        })
     }
 }
 
