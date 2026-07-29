@@ -122,3 +122,5 @@ the arg contract being different for builtins caused problems for retain elision
 - allow retain elision for some builtins based on their contract
 
 Currently working on moving the formatter to pure AIPL
+
+make a docs renderer

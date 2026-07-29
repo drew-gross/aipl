@@ -1,83 +1,50 @@
 // The content half of the formatter's raw-block re-layout (see `reindent_block`):
-// re-indents a block of text — the lines *between* a raw-string / template atom's
-// delimiters, with no `"""` / ``` ``` ``` framing — so its common indent lands at a
-// chosen column. Split out so `reindent_block` deals only with the delimiters.
-import {
-    !,
-    +++,
-    ==,
-    count_while,
-    filter,
-    is_all_whitespace,
-    join,
-    map,
-    minimum,
-    repeat,
-} from builtins;
+// indents a block of text — the lines *between* a raw-string / template atom's
+// delimiters, with no `"""` / ``` ``` ``` framing — by a chosen column. Split out
+// so `reindent_block` deals only with the delimiters. Assumes the input is already
+// fully dedented (its common indent is 0): it *adds* `target` spaces, it does not
+// rebase an existing indent — `reindent_block` dedents first (via `dedent`).
+import { +++, ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 
 pub fn reindent_contents(self: str, target: i64) -> str {
-    let ls = self.lines();
+    let pad = " ".repeat(target);
 
-    // The common indent is the smallest leading-space run over the non-blank
-    // lines; with no non-blank lines there is nothing to shift (`none`).
-    let common = ls
-        .filter(|l| !l.is_all_whitespace())
-        .map(|l| l.count_while(|c| c == ' '))
-        .minimum();
-
-    // Each line: blank -> empty (its whitespace would be trailing, and de-denting
-    // renders it empty anyway); under a common indent -> shifted so the common
-    // base becomes `target`, keeping its relative extra indent; otherwise verbatim.
-    ls
-        .map(
-            |line| if (line.is_all_whitespace()) {
-                ""
-            } else {
-                match (common) {
-                    some(c) => " ".repeat(target) +++ line[c..],
-                    none => line,
-                }
-            },
-        )
-        .join("\n")
+    // Add `target` spaces to each non-blank line, keeping its own (already
+    // dedented) relative indent. A blank line stays empty — indenting it would
+    // add trailing whitespace (illegal), and a dedented block emits blanks empty.
+    self.lines().map(|line| if (line.is_all_whitespace()) { "" } else { pad +++ line }).join("\n")
 }.doc("""
-    Re-indents a block of text so the common leading-space indent shared by its
-    non-blank lines becomes `target`, while each line keeps its indentation relative
-    to that common base; blank lines are emitted empty. Like `dedent` (which strips
-    the common indent entirely) but re-adds `target` spaces. Value-safe for
-    raw-string contents: the de-denter strips the common indent and renders blank
-    lines empty, so a uniform shift leaves the value unchanged.
+    Indents every non-blank line of `self` by `target` spaces, keeping each line's
+    own relative indentation; blank (empty or all-whitespace) lines are emitted
+    empty. Assumes `self` is already fully dedented — it *adds* indentation, it does
+    not rebase an existing common indent to `target`. `reindent_block` dedents the
+    raw-block content (via `dedent`) before calling this.
 """).test({
-    // A uniform indent is rebased to the target.
-    assert("  a\n  b".reindent_contents(4) == "    a\n    b");
-    // Relative indent is preserved: the deeper line keeps its extra 2 spaces.
-    assert("  a\n    b".reindent_contents(0) == "a\n  b");
-
-    // Blank lines (empty or all-whitespace) are emitted empty and don't constrain
-    // the common indent.
-    assert("  a\n   \n  b".reindent_contents(0) == "a\n\nb");
-    assert("  a\n\n  b".reindent_contents(2) == "  a\n\n  b");
-    // No non-blank lines: nothing to shift, and every blank line is emptied.
-    assert("   \n  ".reindent_contents(4) == "\n");
-    // A single line is shifted to the target.
+    // A dedented block is indented by the target, line for line.
+    assert("a\nb".reindent_contents(4) == "    a\n    b");
+    // Relative indent is preserved: a deeper line keeps its extra 2 spaces.
+    assert("a\n  b".reindent_contents(4) == "    a\n      b");
+    // Blank lines stay empty — indentation is added, not applied to blank lines.
+    assert("a\n\nb".reindent_contents(2) == "  a\n\n  b");
+    // A whitespace-only line is emitted empty, not indented to the target.
+    assert("a\n   \nb".reindent_contents(2) == "  a\n\n  b");
+    // A single line is indented to the target.
     assert("x".reindent_contents(2) == "  x");
-    // Zero common indent and target 0: a no-op on non-blank content.
-    assert("a\nb".reindent_contents(0) == "a\nb");
+    // Target 0 is a no-op.
+    assert("a\n  b".reindent_contents(0) == "a\n  b");
 })
 --- performance ---
-allocations: 39
-deallocations: 39
+allocations: 26
+deallocations: 26
 reallocations: 0
-bytes allocated: 1624
-instructions executed: 4159
-binary size: 7352
-  code: 3076
-  data: 713
-  metadata: 3563
+bytes allocated: 943
+instructions executed: 1161
+binary size: 4648
+  code: 1532
+  data: 605
+  metadata: 2511
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam11
-__builtin_count_while$char$s0$lam3
-__map5$own0
+__map2$own0
 main
 reindent_contents
