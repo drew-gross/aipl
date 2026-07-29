@@ -2,8 +2,30 @@
 
 ## Committing
 Don't ask whether to commit, and don't offer to — I always handle commits
-myself. Finish a task at the green-and-formatted state (see the pre-handoff
-sequence below) and stop there; leave the working tree uncommitted.
+myself. Finish a task at the green-and-formatted state (run the handoff script,
+see below) and stop there; leave the working tree uncommitted.
+
+## Handoff (`scripts/handoff.sh`)
+`scripts/handoff.sh` **is** the pre-handoff validation — run it once, at the
+end of a task, as the whole finish-a-task gate. It runs the finish sequence in
+dependency order and pays for the expensive regeneration steps only when a test
+run proves they're needed: `cargo fmt` + `aipl fmt` the corpus, a discovery
+`cargo test`, then (only if that surfaced fillable staleness) scoped
+`fill_expected` refills of exactly the mismatched cases and the staged
+dogfood-IR regen/validate/promote flow, then a final `cargo test`. It exits 0 on
+green (printing what it refilled/regenerated and flagging behavioral-output
+changes to review in the git diff), or stops with a pointed message naming the
+step and why on any failure a refill can't fix.
+
+**Don't hand-drive the sequence and don't validate before it.** The script is
+the validation, so running a full `cargo test`, a `cargo fmt`, or a section
+refill *before* invoking it just pays for a full-corpus run twice. The only
+thing worth running ahead of the script is a **targeted** test for the code you
+just touched (`cargo test -- name_substring`, `cargo test --test <file>`, or a
+scoped `AIPL_CASE='dir/' cargo test --test cases`) as a fast inner-loop check —
+that's a dev-loop signal, not the handoff gate. When the change is ready, let
+the script do the full verification, formatting, and any regeneration in one
+pass.
 
 ## Shell
 Use the **Bash** tool for everything terminal-side: `cargo build`,
@@ -19,8 +41,10 @@ of the dev loop. Prefer:
   (the cases harness intentionally fails when `AIPL_CASE` is set so a stray
   filter can't be mistaken for a green full suite)
 
-But always finish a task with one full `cargo test` run as the pre-handoff
-check — targeted runs alone can miss regressions in unrelated areas.
+Targeted runs alone can miss regressions in unrelated areas, so they're the
+inner-loop signal, not the finish check — finish a task by running the handoff
+script (see the Handoff section above), which does the full `cargo test` (and
+formatting/regeneration) for you.
 
 Let the tests do the verifying. Prefer running `cargo test` (targeted, then
 full) over reading generated artifacts, diffs, or output by hand to convince
@@ -30,8 +54,10 @@ drop into manual inspection when a test actually fails and you need to
 understand *why*, or for the rare thing no test covers.
 
 ## Formatting
-Run `cargo fmt` at the end of every task, before handing the change back.
-The pre-handoff sequence is: full `cargo test`, then `cargo fmt`.
+Every task ends formatted (`cargo fmt` for Rust, `aipl fmt` for `.aipl`). You
+don't run these by hand as a separate step — the handoff script (see the Handoff
+section above) formats first, then tests, so a single handoff run leaves the
+tree both green and formatted.
 
 ## AIPL source formatting (`aipl fmt`)
 Every checked-in `.aipl` file (outside the formatter's own `tests/fmt/`

@@ -1,5 +1,3 @@
-Add notes on how to use the handoff script to CLAUDE.md
-
 1. No </<= on char — so no '0' <= c range checks; classifiers use string-membership ("0123456789".contains_char(c))
 instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64,
 while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
