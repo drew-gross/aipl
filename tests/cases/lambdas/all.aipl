@@ -24,11 +24,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 388
-instructions executed: 1054
-binary size: 6408
-  code: 3184
+instructions executed: 1038
+binary size: 5840
+  code: 2872
   data: 477
-  metadata: 2747
+  metadata: 2491
 --- monomorphizations ---
 __builtin_all$char$lam8
 __builtin_all$i64$lam1

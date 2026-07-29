@@ -118,3 +118,9 @@ the size is driven by inline construction of large literal values and the lexer'
 Make synthesized functions show up in monomorphizations. Ideally by having their creating be driven by the monomorphization process.
 
 destination-passing: build elements directly in output slot
+
+the arg contract being different for builtins caused problems for retain elision
+- Make retain elision more generic, maybe it should be applied at a lower layer?
+- make the arg contract for builtins more uniform
+- move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
+- allow retain elision for some builtins based on their contract

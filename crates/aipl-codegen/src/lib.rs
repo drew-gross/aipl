@@ -6704,6 +6704,39 @@ fn move_owned_temp(scopes: &mut [Vec<Tracked>], mark: usize, v: Value) -> bool {
     }
 }
 
+/// Hand a heap call argument `v` to a callee. When `moved` — the arg is a fresh
+/// temporary we exclusively own, or a param the callee takes ownership of — move
+/// it: drop its tracking entry so the callee's own accounting frees it exactly
+/// once (a borrowed param decs it on return; an owned param drops the local it's
+/// moved into). Otherwise retain, so the caller keeps its ref and the callee's
+/// return-dec balances the inc. Unlike `move_owned_temp`, the arg's tracking
+/// entry need not be on top (later args are evaluated before the hand-off), so it
+/// is located by value; a fresh temp that somehow isn't tracked is retained to
+/// stay balanced.
+fn hand_off_arg<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    scopes: &mut [Vec<Tracked>],
+    v: Value,
+    moved: bool,
+) {
+    if moved {
+        let scope = scopes.last_mut().expect("scope");
+        match scope
+            .iter()
+            .rposition(|t| matches!(t.owned, Owned::Value(tv) if tv == v))
+        {
+            Some(pos) => {
+                scope.remove(pos);
+            }
+            None => emit_inc(builder, module, builtins, v),
+        }
+    } else {
+        emit_inc(builder, module, builtins, v);
+    }
+}
+
 /// Whether a value of type `ty` owns any heap references that must be released
 /// when it dies. Strings and arrays are heap; a struct/optional needs a drop
 /// iff a component does.
@@ -6901,6 +6934,7 @@ fn coerce_empty_to_char_array<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     builtins: &Builtins,
+    scopes: &mut [Vec<Tracked>],
     v: Value,
     actual: &Type,
     expected: &Type,
@@ -6909,6 +6943,18 @@ fn coerce_empty_to_char_array<M: Module>(
     if is_char_array(expected) && is_empty_placeholder {
         let dec = builtins.import(module, builder.func, "aipl_array_dec");
         builder.ins().call(dec, &[v]);
+        // The empty `[]` was a freshly allocated, tracked temporary; we've just
+        // consumed (dec'd) it in favor of the inline empty-char sentinel, so drop
+        // its tracking entry — otherwise scope exit decs it a second time, a
+        // double-free once its now-freed block is reused.
+        if let Some(scope) = scopes.last_mut() {
+            if let Some(pos) = scope
+                .iter()
+                .rposition(|t| matches!(t.owned, Owned::Value(x) if x == v))
+            {
+                scope.remove(pos);
+            }
+        }
         builder.ins().iconst(types::I64, 1) // pack_inline(&[]): tag (0 << 2) | 1
     } else {
         v
@@ -10629,7 +10675,9 @@ fn compile_indirect_call<M: Module>(
     }
     let (callee_addr, _) = env_load(builder, name, env, span.clone())?;
     let mut arg_values = Vec::with_capacity(args.len());
+    let mut arg_fresh = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(ptys).enumerate() {
+        let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         let actual = aipl_syntax::flex_int_ty(arg, &actual, expected);
         expect_type(
@@ -10638,14 +10686,17 @@ fn compile_indirect_call<M: Module>(
             &format!("function value {name:?} arg {idx}"),
             arg.span.clone(),
         )?;
-        let v = coerce_empty_to_char_array(builder, module, builtins, v, &actual, expected);
+        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
+        arg_fresh.push(owned_temp_since(scopes, before, v));
         arg_values.push(v);
     }
     // Borrow semantics: retain each heap arg so refcounts stay balanced (the
-    // callee decrements it on return, like a borrowed direct-call parameter).
-    for (v, expected) in arg_values.iter().zip(ptys) {
+    // callee decrements it on return, like a borrowed direct-call parameter) —
+    // unless the arg is a fresh temporary we own, which we move in instead
+    // (transfer our sole ref, drop its tracking; the callee's return-dec frees it).
+    for (idx, (v, expected)) in arg_values.iter().zip(ptys).enumerate() {
         if is_heap(expected) {
-            emit_inc(builder, module, builtins, *v);
+            hand_off_arg(builder, module, builtins, scopes, *v, arg_fresh[idx]);
         }
     }
     let sret = sret_size(ret, structs).map(|size| {
@@ -10715,7 +10766,9 @@ fn compile_call<M: Module>(
         }
     }
     let mut arg_values = Vec::with_capacity(args.len());
+    let mut arg_fresh = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(info.params.iter()).enumerate() {
+        let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         // A bare literal argument flexes to a narrow-int parameter (its
         // i64-register value is already canonical when it fits — checker-verified).
@@ -10726,34 +10779,34 @@ fn compile_call<M: Module>(
             &format!("fn {disp:?} arg {idx}"),
             arg.span.clone(),
         )?;
-        let v = coerce_empty_to_char_array(builder, module, builtins, v, &actual, expected);
+        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
+        // Whether this arg is a fresh temporary we exclusively own, captured now
+        // before later args grow the scope past its tracking entry (the hand-off
+        // below runs after all args are evaluated).
+        arg_fresh.push(owned_temp_since(scopes, before, v));
         arg_values.push(v);
     }
-    // Hand each heap (str/array) arg to the callee. A borrowed param is
-    // retained (the callee decs it on return, the caller keeps its own ref). An
-    // *owned* param is moved: the arg is a fresh, uniquely-owned value, so we
-    // transfer our sole reference (no inc) and stop tracking it here — the
-    // callee consumes it. Monomorphization only marks a param owned when the arg
-    // is fresh, so it's the matching tracked value in this scope.
+    // Hand each heap (str/array) arg to the callee. A borrowed param is retained
+    // (the callee decs it on return, the caller keeps its own ref). An *owned*
+    // param, or any arg that is a fresh temporary we own, is instead moved: we
+    // transfer our sole reference (no inc) and stop tracking it, since the callee
+    // accounts for that ref — an owned param via the local it's moved into, a
+    // borrowed param via its return-dec. A fresh temp is anonymous, so it's dead
+    // in the caller after the call.
+    //
+    // The fresh-temp move is restricted to *user* callees: their heap params obey
+    // the uniform borrow protocol (exactly one epilogue dec), so passing our sole
+    // ref is balanced. A builtin's per-argument contract varies (many consume via
+    // "caller pre-incs"; a str concat/rope builds a view that keeps referencing
+    // its operands), so it isn't guaranteed to free exactly the one ref we'd hand
+    // it — retain into builtins as before. (Owned params never apply to builtins.)
     for (idx, (v, expected)) in arg_values.iter().zip(info.params.iter()).enumerate() {
         if !is_heap(expected) {
             continue;
         }
-        if info.owned_params.contains(&idx) {
-            let scope = scopes.last_mut().expect("scope");
-            match scope
-                .iter()
-                .rposition(|t| matches!(t.owned, Owned::Value(tv) if tv == *v))
-            {
-                Some(pos) => {
-                    scope.remove(pos);
-                }
-                // Not separately tracked: retain so refcounts stay balanced.
-                None => emit_inc(builder, module, builtins, *v),
-            }
-        } else {
-            emit_inc(builder, module, builtins, *v);
-        }
+        let is_builtin = matches!(info.link, FuncLink::Builtin(_));
+        let moved = info.owned_params.contains(&idx) || (arg_fresh[idx] && !is_builtin);
+        hand_off_arg(builder, module, builtins, scopes, *v, moved);
     }
     // A composite result (struct or optional) is returned through a caller-
     // provided pointer (sret): allocate a slot of its size and pass its address.

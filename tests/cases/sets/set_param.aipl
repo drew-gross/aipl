@@ -19,11 +19,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 296
-instructions executed: 317
-binary size: 3736
-  code: 1736
+instructions executed: 313
+binary size: 3568
+  code: 1656
   data: 219
-  metadata: 1781
+  metadata: 1693
 --- monomorphizations ---
 main
 member

@@ -40,11 +40,11 @@ allocations: 30
 deallocations: 30
 reallocations: 0
 bytes allocated: 1568
-instructions executed: 2812
-binary size: 12368
-  code: 7480
+instructions executed: 2810
+binary size: 12296
+  code: 7440
   data: 1067
-  metadata: 3821
+  metadata: 3789
 --- monomorphizations ---
 __test$single
 main

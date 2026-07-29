@@ -74,11 +74,11 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 800
-instructions executed: 4009
-binary size: 13560
-  code: 9168
+instructions executed: 3995
+binary size: 13112
+  code: 8944
   data: 93
-  metadata: 4299
+  metadata: 4075
 --- monomorphizations ---
 __lambda_0
 __lambda_10

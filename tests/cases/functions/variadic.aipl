@@ -39,11 +39,11 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 568
-instructions executed: 908
-binary size: 6864
-  code: 3268
+instructions executed: 902
+binary size: 6664
+  code: 3164
   data: 524
-  metadata: 3072
+  metadata: 2976
 --- monomorphizations ---
 __test$joined
 __test$sum
