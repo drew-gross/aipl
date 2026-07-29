@@ -1,0 +1,15 @@
+// Regression test for error-message demangling: a type error that names a
+// generic instance must render it in source form (`Box<i64>[]`), not its
+// internal mangled instance name (`Box$i64[]`). Guards `demangle_named` /
+// `tyname` in aipl-mono's check.rs.
+struct Box<T> { value: T }
+
+fn f() -> i64 { [Box { value: 5 }] }
+
+fn main() {}
+--- errors ---
+error: fn "f": body returns Box<i64>[], but the declared return type is i64
+ --> ./tests/cases/generics/err_instance_name_demangled.aipl:7:17
+  |
+7 | fn f() -> i64 { [Box { value: 5 }] }
+  |                 ^^^^^^^^^^^^^^^
