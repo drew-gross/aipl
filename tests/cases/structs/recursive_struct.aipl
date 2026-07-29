@@ -1,0 +1,68 @@
+import { wrapping_add as +, ==, print, to_str } from builtins;
+
+// A recursive *struct*: `next` refers back to `Tree` through an optional, so a
+// value can't be inline (infinite size). The compiler boxes it — a refcounted
+// heap block with strong (external) and weak (internal) counts. Here `left`/
+// `right` are `Tree?`: `none` ends a branch, `some(child)` is an internal
+// (weak) reference to another boxed node. Freeing the root cascades down every
+// still-reachable child. Balanced allocation counts prove no leak/double-free.
+struct Tree { value: i64, left: Tree?, right: Tree? }
+
+fn total(self: Tree) -> i64 {
+    let l = match (self.left) {
+        some(t) => t.total(),
+        none => 0,
+    };
+    let r = match (self.right) {
+        some(t) => t.total(),
+        none => 0,
+    };
+    self.value + l + r
+}
+
+fn leaf(v: i64) -> Tree { Tree { value: v, left: none, right: none } }
+
+fn main() !prints {
+    let t = Tree {
+        value: 1,
+        left: some(leaf(2)),
+        right: some(Tree { value: 3, left: some(leaf(4)), right: none }),
+    };
+    print(to_str(t.total()));
+    print(to_str(t.value));
+    print(to_str(leaf(7)));
+}.test({
+    assert(leaf(5).total() == 5);
+    assert(leaf(5).value == 5);
+
+    let t = Tree { value: 1, left: some(leaf(2)), right: some(leaf(3)) };
+    assert(t.total() == 6);
+
+    // Structural equality recurses through the optional children.
+    assert(leaf(9) == leaf(9));
+    assert(
+        Tree { value: 1, left: some(leaf(2)), right: none } == Tree {
+            value: 1,
+            left: some(leaf(2)),
+            right: none,
+        },
+    );
+})
+--- stdout ---
+10
+1
+Tree { value: 7, left: none, right: none }
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 419
+instructions executed: 645
+binary size: 6096
+  code: 2764
+  data: 308
+  metadata: 3024
+--- monomorphizations ---
+leaf
+main
+total

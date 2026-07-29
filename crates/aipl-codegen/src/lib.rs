@@ -1612,6 +1612,150 @@ extern "C" fn aipl_arr_inc(ptr: *const u8) {
     }
 }
 
+// ---------- Recursive (boxed) type runtime ----------
+//
+// A value of a *recursive* struct/variant type (one whose declaration reaches
+// itself through struct fields, variant payloads, or optional/result cores) is
+// heap-allocated behind a pointer — stored inline it would have infinite size.
+// The value points at the *payload*, which has exactly the type's usual inline
+// layout (so every payload read is shared with the inline path); a four-word
+// header sits just below it:
+//
+//   [strong: i64][weak: i64][drop_fn: ptr][payload size: i64][payload...]
+//                                                             ^ value
+//
+// Two counts, split by who holds the reference:
+//   - `strong` counts *external* references: locals, array elements, fields of
+//     non-recursive types — every owner outside the value's own recursion
+//     group.
+//   - `weak` counts *internal* references: a field of one boxed value of the
+//     group pointing at another of the same group (a Cons node's tail).
+//
+// Dropping an external reference decrements `strong`; a block whose counts are
+// both zero is unreachable and is freed, releasing its payload via the stored
+// `drop_fn` (a generated per-type function that calls `aipl_rec_dec_weak` on
+// same-group children and the normal drops on everything else) — so death
+// cascades through any contained values that become unreachable in turn. A
+// value still held by a live parent (weak > 0) survives the death of its last
+// external reference and dies when the parent releases it. All AIPL mutation
+// is copy-and-modify, so the reference graph is acyclic and this cascade
+// reclaims every unreachable node.
+//
+// The cascade is iterative, not natively recursive (a million-node list must
+// not need a million stack frames): a dead block is pushed onto a thread-local
+// pending list — its `strong` word, finished at that point, is reused as the
+// intrusive next link — and only the outermost release call drains the list.
+// Mirrors the linker runtime.
+
+const REC_HEADER_SIZE: usize = 32;
+const REC_WEAK_WORD: usize = 1;
+const REC_DROPFN_WORD: usize = 2;
+const REC_SIZE_WORD: usize = 3;
+type RecDropFn = extern "C" fn(*const u8);
+
+/// The header words of the block behind payload pointer `p` (word 0 = strong).
+fn rec_block(p: *const u8) -> *mut i64 {
+    unsafe { p.sub(REC_HEADER_SIZE) as *mut i64 }
+}
+
+fn rec_layout(payload_size: usize) -> std::alloc::Layout {
+    std::alloc::Layout::from_size_align(REC_HEADER_SIZE + payload_size, std::mem::align_of::<i64>())
+        .expect("rec block layout")
+}
+
+/// Allocate a boxed recursive-type value with a `size`-byte payload (strong 1,
+/// weak 0), returning the payload pointer. Codegen stores the tag/fields
+/// immediately after.
+extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
+    let size = size.max(0) as usize;
+    let layout = rec_layout(size);
+    let raw = unsafe { std::alloc::alloc(layout) };
+    if raw.is_null() {
+        std::alloc::handle_alloc_error(layout);
+    }
+    let b = raw as *mut i64;
+    unsafe {
+        std::ptr::write(b, 1); // strong
+        std::ptr::write(b.add(REC_WEAK_WORD), 0);
+        std::ptr::write(b.add(REC_DROPFN_WORD), drop_fn);
+        std::ptr::write(b.add(REC_SIZE_WORD), size as i64);
+        raw.add(REC_HEADER_SIZE)
+    }
+}
+
+extern "C" fn aipl_rec_inc_strong(p: *const u8) {
+    unsafe { *rec_block(p) += 1 }
+}
+
+extern "C" fn aipl_rec_inc_weak(p: *const u8) {
+    unsafe { *rec_block(p).add(REC_WEAK_WORD) += 1 }
+}
+
+extern "C" fn aipl_rec_dec_strong(p: *const u8) {
+    let b = rec_block(p);
+    unsafe {
+        *b -= 1;
+        if *b == 0 && *b.add(REC_WEAK_WORD) == 0 {
+            rec_release(b);
+        }
+    }
+}
+
+extern "C" fn aipl_rec_dec_weak(p: *const u8) {
+    let b = rec_block(p);
+    unsafe {
+        *b.add(REC_WEAK_WORD) -= 1;
+        if *b == 0 && *b.add(REC_WEAK_WORD) == 0 {
+            rec_release(b);
+        }
+    }
+}
+
+thread_local! {
+    /// Dead boxed blocks awaiting drop+free (intrusive list through the
+    /// `strong` word), and whether a drain loop is already running below us on
+    /// the native stack.
+    static REC_PENDING: std::cell::Cell<*mut i64> = const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static REC_DRAINING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Queue the dead block `b` (both counts zero) and, unless a drain is already
+/// running further down the stack, drain the queue: call each block's
+/// `drop_fn` on its payload (which may queue more dead blocks — that's the
+/// cascade) and free it.
+fn rec_release(b: *mut i64) {
+    REC_PENDING.with(|l| {
+        unsafe { *b = l.get() as i64 };
+        l.set(b);
+    });
+    if REC_DRAINING.with(std::cell::Cell::get) {
+        return;
+    }
+    REC_DRAINING.with(|d| d.set(true));
+    loop {
+        let head = REC_PENDING.with(|l| {
+            let h = l.get();
+            if !h.is_null() {
+                l.set(unsafe { *h } as *mut i64);
+            }
+            h
+        });
+        if head.is_null() {
+            break;
+        }
+        unsafe {
+            let drop_fn = *head.add(REC_DROPFN_WORD);
+            if drop_fn != 0 {
+                let f: RecDropFn = std::mem::transmute(drop_fn);
+                f((head as *const u8).add(REC_HEADER_SIZE));
+            }
+            let size = *head.add(REC_SIZE_WORD) as usize;
+            std::alloc::dealloc(head as *mut u8, rec_layout(size));
+        }
+    }
+    REC_DRAINING.with(|d| d.set(false));
+}
+
 /// Copy-and-grow push (value semantics): a fresh array of `a`'s elements plus
 /// the element at `x` (`elem_size` bytes), then drop `a`. Used when the array
 /// may be aliased. `retain_fn` retains the copied elements (the new array
@@ -2383,6 +2527,18 @@ struct FuncInfo {
 struct StructLayout {
     fields: Vec<FieldLayout>,
     size: u32,
+    /// True when this type is *recursive* (its declaration reaches itself
+    /// through struct fields, variant payloads, or optional/result cores).
+    /// Recursive types are heap-allocated ("boxed") behind an 8-byte pointer —
+    /// see the "Recursive (boxed) type runtime" section — so `size` is the
+    /// *payload* size, and everything that stores/copies a value of this type
+    /// handles a pointer instead of `size` inline bytes.
+    boxed: bool,
+    /// Which recursion group (strongly-connected component of the type
+    /// reference graph) this type belongs to. Only meaningful when `boxed`:
+    /// a reference between boxed values of the *same* group is an internal
+    /// (weak-counted) reference; everything else is external (strong).
+    scc: u32,
 }
 
 #[derive(Clone)]
@@ -2408,6 +2564,9 @@ const VARIANT_PAYLOAD_OFFSET: u32 = 8;
 struct VariantLayout {
     cases: Vec<VariantCaseLayout>,
     size: u32,
+    /// Recursive-type flags, exactly as on [`StructLayout`].
+    boxed: bool,
+    scc: u32,
 }
 
 struct VariantCaseLayout {
@@ -2438,6 +2597,21 @@ impl TypeDef {
         match self {
             TypeDef::Struct(s) => s.size,
             TypeDef::Variant(v) => v.size,
+        }
+    }
+    /// Whether values of this type are heap-allocated behind a pointer (a
+    /// recursive type) rather than stored inline. See [`StructLayout::boxed`].
+    fn boxed(&self) -> bool {
+        match self {
+            TypeDef::Struct(s) => s.boxed,
+            TypeDef::Variant(v) => v.boxed,
+        }
+    }
+    /// This type's recursion group id (meaningful only when [`Self::boxed`]).
+    fn scc(&self) -> u32 {
+        match self {
+            TypeDef::Struct(s) => s.scc,
+            TypeDef::Variant(v) => v.scc,
         }
     }
     fn as_struct(&self) -> Option<&StructLayout> {
@@ -3405,6 +3579,18 @@ fn compile_program<M: Module>(
         )?;
     }
 
+    // Per-boxed-type payload drop helpers (`__rec_drop_<n>`), requested by boxed
+    // value construction in the bodies above. A body drops the payload's
+    // contained values; a same-group boxed child just weak-decs (no further
+    // helper), but a non-recursive heap field (a `List[]`) can request an array
+    // element helper — so drain these *before* the element `pending` drain below.
+    let rec_drop_pending = std::mem::take(&mut elem_rc.borrow_mut().rec_drop_pending);
+    for (name, id) in rec_drop_pending {
+        define_rec_drop_fn(
+            module, &mut ctx, &mut fbc, &builtins, &structs, id, &name, &mut ir,
+        )?;
+    }
+
     // Define the array element drop/retain helpers requested above (the build
     // context is free now). New ones can't be requested here — element types are
     // only encountered while compiling function bodies — so a single drain.
@@ -3492,16 +3678,23 @@ fn compile_program<M: Module>(
         }
     }
 
-    // Per-type `to_str` rendering helpers. A helper's body renders structurally
-    // *inline* (its nested types render in the same function, never calling out
-    // to another `to_str` helper) and never inc/decs, so defining one requests no
-    // further helpers — a single drain suffices.
-    let tostr_pending = std::mem::take(&mut elem_rc.borrow_mut().tostr_pending);
-    for (ty, id) in tostr_pending {
-        define_tostr_fn(
-            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id, &ty,
-            &mut ir, instrument,
-        )?;
+    // Per-type `to_str` rendering helpers. A non-recursive type's helper renders
+    // structurally *inline* and requests no further helpers. A *boxed*
+    // (recursive) type's helper instead calls the helper of each nested boxed
+    // child (so it terminates by recursion through calls, not inlining), which
+    // for a *different* boxed type (mutual recursion) enqueues a fresh helper —
+    // so drain until empty, like the eq helpers.
+    loop {
+        let batch = std::mem::take(&mut elem_rc.borrow_mut().tostr_pending);
+        if batch.is_empty() {
+            break;
+        }
+        for (ty, id) in batch {
+            define_tostr_fn(
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id,
+                &ty, &mut ir, instrument,
+            )?;
+        }
     }
 
     let ir = annotate_ir(&ir, module);
@@ -3622,6 +3815,11 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_array_push_mut", aipl_array_push_mut as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
     jit_builder.symbol("aipl_arr_inc", aipl_arr_inc as *const u8);
+    jit_builder.symbol("aipl_rec_alloc", aipl_rec_alloc as *const u8);
+    jit_builder.symbol("aipl_rec_inc_strong", aipl_rec_inc_strong as *const u8);
+    jit_builder.symbol("aipl_rec_dec_strong", aipl_rec_dec_strong as *const u8);
+    jit_builder.symbol("aipl_rec_inc_weak", aipl_rec_inc_weak as *const u8);
+    jit_builder.symbol("aipl_rec_dec_weak", aipl_rec_dec_weak as *const u8);
     jit_builder.symbol("aipl_arr_elem_ptr", aipl_arr_elem_ptr as *const u8);
     jit_builder.symbol("aipl_arr_load_bit", aipl_arr_load_bit as *const u8);
     jit_builder.symbol("aipl_set_contains", aipl_set_contains as *const u8);
@@ -4106,7 +4304,14 @@ impl Compilation {
                 }
                 structs.insert(
                     name.to_string(),
-                    TypeDef::Struct(StructLayout { fields, size }),
+                    // FFI-marshalable types are never recursive (`check_ffi_return`
+                    // rejects boxed types), so the manifest carries no flags.
+                    TypeDef::Struct(StructLayout {
+                        fields,
+                        size,
+                        boxed: false,
+                        scc: 0,
+                    }),
                 );
             } else if let Some(rest) = body.strip_prefix("variant ") {
                 // `variant <name> <size> <Case> <Case>(<off>:<tag>,...) ...`
@@ -4151,7 +4356,12 @@ impl Compilation {
                 }
                 structs.insert(
                     name.to_string(),
-                    TypeDef::Variant(VariantLayout { cases, size }),
+                    TypeDef::Variant(VariantLayout {
+                        cases,
+                        size,
+                        boxed: false,
+                        scc: 0,
+                    }),
                 );
             } else if let Some(rest) = body.strip_prefix("import ") {
                 let mut it = rest.split_whitespace();
@@ -5579,6 +5789,11 @@ fn build_struct_layouts(
         }
     }
 
+    // Detect recursive types: a type that reaches itself through the reference
+    // graph is heap-allocated ("boxed") rather than inline, so its layout can
+    // treat every reference back into its own group as an 8-byte pointer.
+    let rec = recursion_groups(&decls);
+
     let mut layouts: HashMap<String, TypeDef> = HashMap::new();
     let mut on_stack: HashSet<String> = HashSet::new();
     // Sorted so resolution order — and therefore which type a cycle error is
@@ -5586,20 +5801,148 @@ fn build_struct_layouts(
     let mut names: Vec<&str> = decls.keys().copied().collect();
     names.sort_unstable();
     for name in names {
-        resolve_type_layout(name, &decls, &mut layouts, &mut on_stack)?;
+        resolve_type_layout(name, &decls, &mut layouts, &mut on_stack, &rec)?;
     }
     Ok(layouts)
 }
 
+/// The named types `ty` *contains* — reached directly or through
+/// optional/result layers, which store their core inline. Arrays/sets/dicts
+/// are excluded: they are separately refcounted heap blocks, so they already
+/// break the infinite-size chain (and their element references are external,
+/// strong references — see the recursive-type runtime).
+fn contained_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
+    match ty {
+        Type::Named(n) => out.push(n),
+        Type::Optional(inner) => contained_named_types(inner, out),
+        Type::Result(ok, err) => {
+            contained_named_types(ok, out);
+            contained_named_types(err, out);
+        }
+        _ => {}
+    }
+}
+
+/// Compute the *recursion groups*: for every type that is part of a
+/// containment cycle (it reaches itself through struct fields, variant
+/// payloads, or optional/result cores — directly or mutually), map its name to
+/// its cycle's group id (the strongly-connected component of the containment
+/// graph). Types not in any cycle are absent. Members of a group are boxed,
+/// and a reference between boxed values of the same group is an internal
+/// (weak-counted) reference.
+fn recursion_groups(decls: &HashMap<&str, TypeDeclRef>) -> HashMap<String, u32> {
+    // Deterministic node order so group ids are stable across runs.
+    let mut names: Vec<&str> = decls.keys().copied().collect();
+    names.sort_unstable();
+    let index: HashMap<&str, usize> = names.iter().enumerate().map(|(i, n)| (*n, i)).collect();
+    let edges: Vec<Vec<usize>> = names
+        .iter()
+        .map(|n| {
+            let mut refs: Vec<&str> = Vec::new();
+            match decls[n] {
+                TypeDeclRef::Struct(s) => {
+                    for f in &s.fields {
+                        contained_named_types(&f.ty, &mut refs);
+                    }
+                }
+                TypeDeclRef::Variant(v) => {
+                    for c in &v.cases {
+                        for ty in &c.payload {
+                            contained_named_types(ty, &mut refs);
+                        }
+                    }
+                }
+            }
+            // An unknown name (reported later during layout resolution) has no
+            // node; skip it here.
+            refs.iter().filter_map(|r| index.get(r).copied()).collect()
+        })
+        .collect();
+
+    // Tarjan's SCC algorithm (recursive — type graphs are small).
+    struct Scc<'a> {
+        edges: &'a [Vec<usize>],
+        index: Vec<Option<u32>>,
+        lowlink: Vec<u32>,
+        on_stack: Vec<bool>,
+        stack: Vec<usize>,
+        next_index: u32,
+        components: Vec<Vec<usize>>,
+    }
+    impl Scc<'_> {
+        fn visit(&mut self, v: usize) {
+            self.index[v] = Some(self.next_index);
+            self.lowlink[v] = self.next_index;
+            self.next_index += 1;
+            self.stack.push(v);
+            self.on_stack[v] = true;
+            for &w in &self.edges[v] {
+                if self.index[w].is_none() {
+                    self.visit(w);
+                    self.lowlink[v] = self.lowlink[v].min(self.lowlink[w]);
+                } else if self.on_stack[w] {
+                    self.lowlink[v] = self.lowlink[v].min(self.index[w].expect("visited"));
+                }
+            }
+            if self.lowlink[v] == self.index[v].expect("visited") {
+                let mut comp = Vec::new();
+                loop {
+                    let w = self.stack.pop().expect("scc stack");
+                    self.on_stack[w] = false;
+                    comp.push(w);
+                    if w == v {
+                        break;
+                    }
+                }
+                self.components.push(comp);
+            }
+        }
+    }
+    let n = names.len();
+    let mut scc = Scc {
+        edges: &edges,
+        index: vec![None; n],
+        lowlink: vec![0; n],
+        on_stack: vec![false; n],
+        stack: Vec::new(),
+        next_index: 0,
+        components: Vec::new(),
+    };
+    for v in 0..n {
+        if scc.index[v].is_none() {
+            scc.visit(v);
+        }
+    }
+
+    // A type is recursive iff its component has more than one member, or it
+    // contains itself directly (a self-edge).
+    let mut groups: HashMap<String, u32> = HashMap::new();
+    let mut next_group = 0u32;
+    for comp in &scc.components {
+        let cyclic = comp.len() > 1 || edges[comp[0]].contains(&comp[0]);
+        if cyclic {
+            for &v in comp {
+                groups.insert(names[v].to_string(), next_group);
+            }
+            next_group += 1;
+        }
+    }
+    groups
+}
+
 /// Compute (and memoize into `layouts`) the layout of the struct or variant
-/// `name`, recursing into any struct- or variant-typed components first.
-/// `on_stack` tracks the types currently being resolved so a cycle (which
-/// would have infinite size) is reported rather than recursing forever.
+/// `name`, recursing into any struct- or variant-typed components first —
+/// except components of *boxed* (recursive) types, which are 8-byte pointers
+/// regardless of their layout, so they don't need resolving first (they get
+/// their own top-level resolution pass). That skip is what breaks every
+/// containment cycle: `on_stack` is a backstop only, since any remaining
+/// cycle would have been classified boxed by `recursion_groups`.
 fn resolve_type_layout(
     name: &str,
     decls: &HashMap<&str, TypeDeclRef>,
     layouts: &mut HashMap<String, TypeDef>,
     on_stack: &mut HashSet<String>,
+    rec: &HashMap<String, u32>,
 ) -> Result<(), Error> {
     if layouts.contains_key(name) {
         return Ok(());
@@ -5613,16 +5956,16 @@ fn resolve_type_layout(
             TypeDeclRef::Variant(_) => "variant",
         };
         return Err(Error::msg(format!(
-            "{kind} {name}: recursive types have infinite size (a type cannot \
-             contain itself, directly or transitively)"
+            "{kind} {name}: containment cycle not classified as recursive \
+             (compiler bug in recursion_groups)"
         )));
     }
     let def = match decl {
         TypeDeclRef::Struct(s) => {
-            TypeDef::Struct(build_struct_layout(s, decls, layouts, on_stack)?)
+            TypeDef::Struct(build_struct_layout(s, decls, layouts, on_stack, rec)?)
         }
         TypeDeclRef::Variant(v) => {
-            TypeDef::Variant(build_variant_layout(v, decls, layouts, on_stack)?)
+            TypeDef::Variant(build_variant_layout(v, decls, layouts, on_stack, rec)?)
         }
     };
     on_stack.remove(name);
@@ -5637,31 +5980,42 @@ fn build_struct_layout(
     decls: &HashMap<&str, TypeDeclRef>,
     layouts: &mut HashMap<String, TypeDef>,
     on_stack: &mut HashSet<String>,
+    rec: &HashMap<String, u32>,
 ) -> Result<StructLayout, Error> {
     let mut fields = Vec::with_capacity(decl.fields.len());
     let mut offset: u32 = 0;
     for f in &decl.fields {
         // Allowed field types: i64/bool/char (by value), `str` or an array
         // (8-byte refcounted heap pointers), another declared struct or a
-        // variant (stored inline — resolve it here so its size is known), or
-        // an optional of a scalar/str/array (a 16-byte inline `{tag, value}`
-        // composite).
+        // variant (stored inline — resolve it here so its size is known —
+        // unless it's boxed, in which case the field is an 8-byte pointer and
+        // needs no size), or an optional of a scalar/str/array (a 16-byte
+        // inline `{tag, value}` composite).
         match &f.ty {
             Type::Primitive(
                 Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
             ) => {}
             Type::Named(n) if decls.contains_key(n.as_str()) => {
-                resolve_type_layout(n, decls, layouts, on_stack)?;
+                if !rec.contains_key(n.as_str()) {
+                    resolve_type_layout(n, decls, layouts, on_stack, rec)?;
+                }
             }
             Type::Array(_) => {}
             // A function value is stored as its 8-byte code address (an i64);
             // it owns nothing, so like a scalar it needs no drop.
             Type::Fn(_, _) => {}
+            // An optional of a scalar/str/array, or of a *boxed* (recursive)
+            // type — the latter is an 8-byte pointer core, so `Tree?` is a
+            // 16-byte `{tag, ptr}` inline composite (this is how a recursive
+            // struct spells "maybe a child": `left: Tree?`).
             Type::Optional(inner)
-                if is_set_elem(inner) || matches!(inner.as_ref(), Type::Array(_)) => {}
+                if is_set_elem(inner)
+                    || matches!(inner.as_ref(), Type::Array(_))
+                    || matches!(inner.as_ref(), Type::Named(n) if rec.contains_key(n.as_str())) => {
+            }
             _ => {
                 return Err(Error::msg(format!(
-                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a function, a struct, a variant, an array, or an optional of (i64, bool, char, str, or an array)",
+                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a function, a struct, a variant, an array, or an optional of (i64, bool, char, str, an array, or a recursive type)",
                     decl.name,
                     f.name,
                     type_name(&f.ty),
@@ -5682,6 +6036,8 @@ fn build_struct_layout(
     Ok(StructLayout {
         fields,
         size: offset,
+        boxed: rec.contains_key(&decl.name),
+        scc: rec.get(&decl.name).copied().unwrap_or(0),
     })
 }
 
@@ -5693,6 +6049,7 @@ fn build_variant_layout(
     decls: &HashMap<&str, TypeDeclRef>,
     layouts: &mut HashMap<String, TypeDef>,
     on_stack: &mut HashSet<String>,
+    rec: &HashMap<String, u32>,
 ) -> Result<VariantLayout, Error> {
     let mut cases = Vec::with_capacity(v.cases.len());
     let mut max_payload: u32 = 0;
@@ -5701,21 +6058,20 @@ fn build_variant_layout(
         let mut offset = VARIANT_PAYLOAD_OFFSET;
         for ty in &c.payload {
             // A payload field is an array element / inline composite: a scalar,
-            // `str`, an array, an optional, or a struct (resolved here so its
-            // size is known) — never another variant directly (an inline
-            // recursive sum type would have infinite size).
+            // `str`, an array, an optional, or a struct/variant (resolved here
+            // so its size is known — unless boxed, in which case the field is
+            // an 8-byte pointer; that's how a recursive sum type like a list
+            // gets its indirection).
             let ok = match ty {
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
                 Type::Array(_) | Type::Optional(_) => true,
                 // A function value is an 8-byte code address, stored inline like
                 // a scalar; it owns no heap, so it needs no drop.
                 Type::Fn(_, _) => true,
-                // A struct or another (non-recursive) variant is stored inline;
-                // resolve its layout here so its size is known. `on_stack` cycle
-                // detection reports a genuinely recursive sum type (infinite
-                // size) rather than looping.
                 Type::Named(n) if decls.contains_key(n.as_str()) => {
-                    resolve_type_layout(n, decls, layouts, on_stack)?;
+                    if !rec.contains_key(n.as_str()) {
+                        resolve_type_layout(n, decls, layouts, on_stack, rec)?;
+                    }
                     true
                 }
                 _ => false,
@@ -5745,6 +6101,8 @@ fn build_variant_layout(
     Ok(VariantLayout {
         cases,
         size: VARIANT_PAYLOAD_OFFSET + max_payload,
+        boxed: rec.contains_key(&v.name),
+        scc: rec.get(&v.name).copied().unwrap_or(0),
     })
 }
 
@@ -5885,10 +6243,19 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         s
     };
     match sym {
-        "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_array_dec"
-        | "aipl_arr_inc" | "aipl_count_insns" | "aipl_test_begin" | "aipl_test_fail" => {
-            sig(1, false)
-        }
+        "aipl_print"
+        | "aipl_print_error"
+        | "aipl_inc"
+        | "aipl_dec"
+        | "aipl_array_dec"
+        | "aipl_arr_inc"
+        | "aipl_rec_inc_strong"
+        | "aipl_rec_dec_strong"
+        | "aipl_rec_inc_weak"
+        | "aipl_rec_dec_weak"
+        | "aipl_count_insns"
+        | "aipl_test_begin"
+        | "aipl_test_fail" => sig(1, false),
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
         // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
         "aipl_test_end" => sig(0, false),
@@ -5917,7 +6284,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_iter_next"
         | "aipl_read_file_to_string"
         | "aipl_str_reverse" => sig(1, true),
-        "aipl_str_repeat"
+        "aipl_rec_alloc"
+        | "aipl_str_repeat"
         | "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
@@ -6779,6 +7147,10 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         // Already handled by the `is_str_repr` guard above.
         Type::ConcatStr => unreachable!(),
         Type::Named(n) => match structs.get(n) {
+            // A boxed (recursive) value owns its heap block, so it always
+            // drops — and answering without recursing into the fields is what
+            // keeps this terminating on a recursive type.
+            Some(d) if d.boxed() => true,
             Some(TypeDef::Struct(s)) => s.fields.iter().any(|f| needs_drop(&f.ty, structs)),
             // A variant needs cleanup if any case's payload field does.
             Some(TypeDef::Variant(v)) => v
@@ -6808,10 +7180,32 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
 }
 
 /// A composite is stored *inline* and handled by the address of its storage
-/// (struct, optional); scalars / `str` / arrays are 8-byte values.
+/// (struct, optional); scalars / `str` / arrays are 8-byte values. A *boxed*
+/// (recursive) struct/variant is not a composite in this sense: its value is
+/// an 8-byte heap pointer, stored and copied like an array's — though since
+/// that pointer addresses the type's usual payload layout, every layout read
+/// (fields, tag, equality, rendering) is shared with the inline path.
 fn is_composite(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
     matches!(ty, Type::Optional(_) | Type::Result(_, _))
-        || matches!(ty, Type::Named(n) if structs.contains_key(n))
+        || matches!(ty, Type::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
+}
+
+/// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
+/// pointers to a refcounted heap payload. See the "Recursive (boxed) type
+/// runtime" section.
+fn is_boxed(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+    matches!(ty, Type::Named(n) if structs.get(n).is_some_and(TypeDef::boxed))
+}
+
+/// Whether `ty` *contains* (directly or through optional/result layers, which
+/// store their core inline) a reference to a boxed type of recursion group
+/// `scc` — i.e. whether storing a value of `ty` into a boxed value of that
+/// group creates an internal (weak-counted) reference.
+fn contains_scc_ref(ty: &Type, scc: u32, structs: &HashMap<String, TypeDef>) -> bool {
+    let mut refs = Vec::new();
+    contained_named_types(ty, &mut refs);
+    refs.iter()
+        .any(|n| structs.get(*n).is_some_and(|d| d.boxed() && d.scc() == scc))
 }
 
 /// Read the component of type `ty` at `base + offset`: an inline composite is
@@ -7182,6 +7576,26 @@ fn emit_rc<M: Module>(
     ty: &Type,
     op: RcOp,
 ) {
+    emit_rc_w(builder, module, builtins, structs, v, ty, op, None);
+}
+
+/// [`emit_rc`] with a *weak context*: when `weak_scc` is `Some(g)`, the value
+/// being retained/dropped is (about to be / was) held by a field of a boxed
+/// value of recursion group `g`, so a reference to a boxed value of that same
+/// group is internal and counts on the `weak` counter instead of `strong`.
+/// Only boxed-value construction and the generated per-type drop helpers pass
+/// `Some`; everything else goes through `emit_rc`.
+#[allow(clippy::too_many_arguments)]
+fn emit_rc_w<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    v: Value,
+    ty: &Type,
+    op: RcOp,
+    weak_scc: Option<u32>,
+) {
     if !needs_drop(ty, structs) {
         return;
     }
@@ -7221,6 +7635,23 @@ fn emit_rc<M: Module>(
             builder.ins().call(local, &[v]);
         }
         Type::Named(n) => match structs.get(n) {
+            // A boxed (recursive) value counts as one reference to its heap
+            // block — never recursed into here; releasing the payload is the
+            // job of the block's stored drop-fn when the counts reach zero.
+            // Which counter depends on who holds the reference: a field of a
+            // boxed value of the *same* recursion group (`weak_scc` matches)
+            // is internal → weak; everything else is external → strong.
+            Some(d) if d.boxed() => {
+                let internal = weak_scc == Some(d.scc());
+                let sym = match (op, internal) {
+                    (RcOp::Retain, false) => "aipl_rec_inc_strong",
+                    (RcOp::Drop, false) => "aipl_rec_dec_strong",
+                    (RcOp::Retain, true) => "aipl_rec_inc_weak",
+                    (RcOp::Drop, true) => "aipl_rec_dec_weak",
+                };
+                let local = builtins.import(module, builder.func, sym);
+                builder.ins().call(local, &[v]);
+            }
             Some(TypeDef::Struct(_)) => {
                 // Recurse over the struct's heap-bearing fields. Clone the field
                 // list so we don't borrow `structs` across the recursive calls.
@@ -7231,14 +7662,14 @@ fn emit_rc<M: Module>(
                 for (offset, fty) in fields {
                     if needs_drop(&fty, structs) {
                         let fv = component(builder, v, offset, &fty, structs);
-                        emit_rc(builder, module, builtins, structs, fv, &fty, op);
+                        emit_rc_w(builder, module, builtins, structs, fv, &fty, op, weak_scc);
                     }
                 }
             }
             // A variant: dispatch on the runtime tag, then recurse over the
             // active case's heap fields (only that case's payload is live).
             Some(TypeDef::Variant(_)) => {
-                emit_variant_rc(builder, module, builtins, structs, v, n, op);
+                emit_variant_rc(builder, module, builtins, structs, v, n, op, weak_scc);
             }
             None => {}
         },
@@ -7258,7 +7689,9 @@ fn emit_rc<M: Module>(
             builder.switch_to_block(then_b);
             builder.seal_block(then_b);
             let core_v = component(builder, v, OPT_VALUE_OFFSET, core, structs);
-            emit_rc(builder, module, builtins, structs, core_v, core, op);
+            emit_rc_w(
+                builder, module, builtins, structs, core_v, core, op, weak_scc,
+            );
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
@@ -7281,7 +7714,7 @@ fn emit_rc<M: Module>(
                 b.switch_to_block(then_b);
                 b.seal_block(then_b);
                 let sv = component(b, v, OPT_VALUE_OFFSET, side, structs);
-                emit_rc(b, m, builtins, structs, sv, side, op);
+                emit_rc_w(b, m, builtins, structs, sv, side, op, weak_scc);
                 b.ins().jump(merge, &[]);
                 b.switch_to_block(merge);
                 b.seal_block(merge);
@@ -7316,6 +7749,7 @@ fn emit_variant_rc<M: Module>(
     v: Value,
     name: &str,
     op: RcOp,
+    weak_scc: Option<u32>,
 ) {
     // Clone (tag, heap fields) per case so we don't borrow `structs` across the
     // recursive `emit_rc` calls. Skip cases with no heap payload.
@@ -7353,7 +7787,7 @@ fn emit_variant_rc<M: Module>(
         builder.seal_block(case_b);
         for (offset, fty) in fields {
             let fv = component(builder, v, offset, &fty, structs);
-            emit_rc(builder, module, builtins, structs, fv, &fty, op);
+            emit_rc_w(builder, module, builtins, structs, fv, &fty, op, weak_scc);
         }
         builder.ins().jump(done, &[]);
         builder.switch_to_block(next_b);
@@ -7362,6 +7796,128 @@ fn emit_variant_rc<M: Module>(
     builder.ins().jump(done, &[]);
     builder.switch_to_block(done);
     builder.seal_block(done);
+}
+
+/// Drop the *contents* of a boxed (recursive) value's payload at `payload_ptr`
+/// — the struct's fields, or a variant's active case's fields — without
+/// touching the box itself (the runtime is already freeing it). Same-group
+/// boxed references are weak-dec'd (the internal-reference discipline);
+/// everything else drops normally. This is the body of a boxed type's
+/// `__rec_drop_<n>` helper.
+fn emit_boxed_payload_drop<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    payload_ptr: Value,
+    name: &str,
+) {
+    let scc = Some(structs[name].scc());
+    match &structs[name] {
+        TypeDef::Struct(_) => {
+            let fields: Vec<(u32, Type)> = structs[name]
+                .as_struct()
+                .map(|l| l.fields.iter().map(|f| (f.offset, f.ty.clone())).collect())
+                .unwrap_or_default();
+            for (offset, fty) in fields {
+                if needs_drop(&fty, structs) {
+                    let fv = component(builder, payload_ptr, offset, &fty, structs);
+                    emit_rc_w(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        fv,
+                        &fty,
+                        RcOp::Drop,
+                        scc,
+                    );
+                }
+            }
+        }
+        TypeDef::Variant(_) => {
+            emit_variant_rc(
+                builder,
+                module,
+                builtins,
+                structs,
+                payload_ptr,
+                name,
+                RcOp::Drop,
+                scc,
+            );
+        }
+    }
+}
+
+/// Declare (once, cached) the `__rec_drop_<n>(payload_ptr)` helper for boxed
+/// type `name`; the body is defined later from `rec_drop_pending`.
+fn rec_drop_func<M: Module>(module: &mut M, elem_rc: &RefCell<ElemRc>, name: &str) -> FuncId {
+    let mut er = elem_rc.borrow_mut();
+    if let Some(id) = er.rec_drop_fns.get(name) {
+        return *id;
+    }
+    let n = er.ctr;
+    er.ctr += 1;
+    let mut sig = module.make_signature();
+    sig.params.push(AbiParam::new(types::I64)); // payload ptr
+    let id = module
+        .declare_function(&format!("__rec_drop_{n}"), Linkage::Local, &sig)
+        .expect("declare rec-drop helper");
+    er.rec_drop_fns.insert(name.to_string(), id);
+    er.rec_drop_pending.push((name.to_string(), id));
+    id
+}
+
+/// The drop-fn address (as an i64 value) to bake into a boxed value's block
+/// header, declaring the per-type helper on first use.
+fn rec_drop_fn_addr<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    elem_rc: &RefCell<ElemRc>,
+    name: &str,
+) -> Value {
+    let id = rec_drop_func(module, elem_rc, name);
+    let fref = module.declare_func_in_func(id, builder.func);
+    builder.ins().func_addr(types::I64, fref)
+}
+
+/// Define a generated `__rec_drop_<n>(payload_ptr)` helper: drop the boxed
+/// type's payload contents (see [`emit_boxed_payload_drop`]) and return.
+#[allow(clippy::too_many_arguments)]
+fn define_rec_drop_fn<M: Module>(
+    module: &mut M,
+    ctx: &mut Context,
+    fbc: &mut FunctionBuilderContext,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    id: FuncId,
+    name: &str,
+    ir_out: &mut String,
+) -> Result<(), Error> {
+    builtins.clear_func_cache();
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // payload ptr
+    {
+        let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        builder.seal_block(entry);
+        let payload = builder.block_params(entry)[0];
+        emit_boxed_payload_drop(&mut builder, module, builtins, structs, payload, name);
+        builder.ins().return_(&[]);
+        builder.finalize(module.target_config());
+    }
+    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ir_out.push_str(&fix_data_ref_names(
+        &ctx.func,
+        &format!("{}\n", ctx.func.display()),
+    ));
+    module
+        .define_function(id, ctx)
+        .map_err(|e| Error::msg(format!("define rec drop fn: {e}")))?;
+    module.clear_context(ctx);
+    Ok(())
 }
 
 /// A fresh 8-byte, 8-aligned stack slot — used by `emit_eq` to carry a running
@@ -8289,6 +8845,16 @@ fn emit_hash<M: Module>(
                 emit_seq_hash(module, builder, builtins, structs, v, elem, seed, true)?
             }
         }
+        // Hashing inlines the structure, which can't terminate on a recursive
+        // type; a per-type hash helper (like `to_str`/`eq`) would be needed.
+        // Recursive types aren't valid set/dict keys yet, so reject rather than
+        // loop the compiler.
+        Type::Named(_) if is_boxed(ty, structs) => {
+            return Err(Error::msg(format!(
+                "hash: hashing recursive type {} is not yet supported",
+                type_name(ty)
+            )));
+        }
         Type::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
             let fields: Vec<(u32, Type)> = structs[n]
                 .as_struct()
@@ -8580,7 +9146,10 @@ fn elem_size_of(ty: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
         Type::Result(ok, err) => {
             OPT_VALUE_OFFSET as i64 + elem_size_of(ok, structs).max(elem_size_of(err, structs))
         }
-        Type::Named(n) => structs.get(n).map_or(8, |t| t.size() as i64),
+        // A boxed (recursive) type is an 8-byte pointer element.
+        Type::Named(n) => structs
+            .get(n)
+            .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 }),
         _ => 8,
     }
 }
@@ -9037,12 +9606,15 @@ fn emit_render<M: Module>(
         Type::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
         Type::Optional(_) => emit_render_optional(module, builder, cx, value, ty, sink)?,
         Type::Result(ok, err) => emit_render_result(module, builder, cx, value, ok, err, sink)?,
-        Type::Named(n) if cx.structs.get(n).and_then(TypeDef::as_struct).is_some() => {
-            emit_render_struct(module, builder, cx, value, n, sink)?
+        // A boxed (recursive) type is rendered by calling its own `to_str`
+        // helper and splicing the result — so the recursion runs through
+        // function calls (terminating at a base case) instead of inlining the
+        // structure into itself forever. The helper's own body renders one
+        // level inline (`define_tostr_fn` enters `emit_render_named` directly).
+        Type::Named(_) if is_boxed(ty, cx.structs) => {
+            emit_render_boxed(module, builder, cx, value, ty, sink)?
         }
-        Type::Named(n) if cx.structs.get(n).and_then(TypeDef::as_variant).is_some() => {
-            emit_render_variant(module, builder, cx, value, n, sink)?
-        }
+        Type::Named(_) => emit_render_named(module, builder, cx, value, ty, sink)?,
         other => {
             return Err(Error::msg(format!(
                 "to_str: rendering {} is not yet supported",
@@ -9050,6 +9622,73 @@ fn emit_render<M: Module>(
             )));
         }
     })
+}
+
+/// Render a declared `Named` type (struct or variant) *inline*, dispatching on
+/// which it is. `value` addresses the `{tag, payload}`/fields layout (a stack
+/// slot for an inline value, or the heap payload pointer for a boxed one — both
+/// read identically). Used for a non-boxed type directly by `emit_render`, and
+/// as the entry level of a boxed type's `to_str` helper.
+fn emit_render_named<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    value: Value,
+    ty: &Type,
+    sink: Sink,
+) -> Result<Value, Error> {
+    let Type::Named(n) = ty else {
+        unreachable!("emit_render_named called with a non-Named type");
+    };
+    if cx.structs.get(n).and_then(TypeDef::as_struct).is_some() {
+        emit_render_struct(module, builder, cx, value, n, sink)
+    } else {
+        emit_render_variant(module, builder, cx, value, n, sink)
+    }
+}
+
+/// Render a boxed (recursive) value by calling its cached `to_str` helper and
+/// splicing the resulting string's bytes (unquoted) into the sink. The helper
+/// recurses through nested boxed children via further helper calls, so a
+/// linked structure renders without inlining itself. Called in both the
+/// measure and write passes; it rebuilds the string each pass (rendering isn't
+/// on any hot path). The temporary string is dropped after use.
+fn emit_render_boxed<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    value: Value,
+    ty: &Type,
+    sink: Sink,
+) -> Result<Value, Error> {
+    let b = cx.builtins;
+    let id = tostr_func(module, cx, ty);
+    let fref = module.declare_func_in_func(id, builder.func);
+    let inst = builder.ins().call(fref, &[value]);
+    let s = builder.inst_results(inst)[0];
+    let len = {
+        let f = b.import(module, builder.func, "aipl_str_len");
+        let inst = builder.ins().call(f, &[s]);
+        builder.inst_results(inst)[0]
+    };
+    if let Sink::Write(_) = sink {
+        let scratch =
+            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+        let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
+        let f = b.import(module, builder.func, "aipl_str_data");
+        let inst = builder.ins().call(f, &[s, scratch_addr]);
+        let src = builder.inst_results(inst)[0];
+        sink_bytes(module, builder, cx, sink, src, len);
+    }
+    emit_drop(
+        builder,
+        module,
+        b,
+        cx.structs,
+        s,
+        &Type::Primitive(Primitive::Str),
+    );
+    Ok(len)
 }
 
 /// Materialize a fresh static string literal (`[STATIC_REFCOUNT][bytes][NUL]`)
@@ -9964,8 +10603,21 @@ fn define_tostr_fn<M: Module>(
             bindings: &no_bindings,
         };
 
+        // A boxed (recursive) type's helper renders its top level *inline* (via
+        // `emit_render_named`) so that nested boxed children — rendered by
+        // `emit_render` — route back through *this same* helper by call rather
+        // than inlining the structure into itself. A non-boxed type renders
+        // straight through `emit_render`.
+        let render = |module: &mut M, builder: &mut FunctionBuilder, sink| {
+            if is_boxed(ty, structs) {
+                emit_render_named(module, builder, cx, value, ty, sink)
+            } else {
+                emit_render(module, builder, cx, value, ty, sink)
+            }
+        };
+
         // Pass 1: measure the total length.
-        let len = emit_render(module, &mut builder, cx, value, ty, Sink::Measure)?;
+        let len = render(module, &mut builder, Sink::Measure)?;
 
         // SSO: a result of <= 7 bytes is built *inline* (no allocation). The write
         // target is chosen per branch — a zeroed 8-byte stack scratch (content at
@@ -10014,7 +10666,7 @@ fn define_tostr_fn<M: Module>(
         builder.switch_to_block(write_block);
         builder.seal_block(write_block);
         // One write pass into whichever buffer the cursor was seeded with.
-        emit_render(module, &mut builder, cx, value, ty, Sink::Write(cursor))?;
+        render(module, &mut builder, Sink::Write(cursor))?;
         let raw = builder.ins().stack_load(types::I64, types::I64, scratch, 0);
         let shifted = builder.ins().ishl_imm_u(len, 2);
         let tag = builder.ins().bor_imm_u(shifted, 1);
@@ -10127,6 +10779,16 @@ struct ElemRc {
     // loops until `eq_pending` is empty.
     eq_fns: HashMap<String, FuncId>,
     eq_pending: Vec<(Type, FuncId)>,
+    // Per-boxed-type payload drop helpers: `__rec_drop_<n>(payload_ptr)`. Stored
+    // in each boxed block's header and called by the runtime when the block is
+    // freed; it releases the payload's contained values (weak-dec'ing same-group
+    // children, normal-dropping everything else). Keyed by the boxed type's
+    // name. Defining one recurses only through function calls (never re-inlining
+    // a recursive type), so a single drain suffices — but a body may request
+    // *other* generated helpers (an array element helper for a `List[]` field),
+    // so it's drained before those.
+    rec_drop_fns: HashMap<String, FuncId>,
+    rec_drop_pending: Vec<(String, FuncId)>,
     ctr: u32,
 }
 
@@ -10386,10 +11048,27 @@ fn compile_variant<M: Module>(
             span.clone(),
         ));
     }
+    let vty = Type::Named(vname.to_string());
     let size = cx.structs[vname].size();
-    let slot =
-        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3));
-    let base = builder.ins().stack_addr(types::I64, slot, 0);
+    // A boxed (recursive) variant lives on the heap behind a refcounted block;
+    // a normal one lives in a fresh stack slot. Either way `base` addresses the
+    // `{tag, payload}` layout, so tag/field stores are identical below.
+    let boxed = cx.structs[vname].boxed();
+    let base = if boxed {
+        let size_v = builder.ins().iconst(types::I64, size as i64);
+        let drop_fn = rec_drop_fn_addr(builder, module, cx.elem_rc, vname);
+        let f = cx.builtins.import(module, builder.func, "aipl_rec_alloc");
+        let inst = builder.ins().call(f, &[size_v, drop_fn]);
+        builder.inst_results(inst)[0]
+    } else {
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            size,
+            3,
+        ));
+        builder.ins().stack_addr(types::I64, slot, 0)
+    };
+    let scc = boxed.then(|| cx.structs[vname].scc());
     let tag_v = builder.ins().iconst(types::I64, tag as i64);
     builder.ins().store(MemFlagsData::trusted(), tag_v, base, 0);
     for ((offset, fty), arg) in fields.iter().zip(args) {
@@ -10398,15 +11077,30 @@ fn compile_variant<M: Module>(
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
         let dst = builder.ins().iadd_imm_s(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
-        // The variant co-owns each heap payload field. If the field value is a
-        // fresh temporary we own, move it in — skip the retain and untrack it so
-        // scope exit won't drop it (the variant's drop-fn releases it); a
-        // borrowed field is co-owned via retain as before.
-        if !move_owned_temp(scopes, before, v) {
+        // An *internal* field — one that (through optional/result layers) refers
+        // to a boxed value of this same recursion group — is a weak reference:
+        // retain it weakly and keep its strong-drop tracking, so the net at scope
+        // exit converts the argument's external (strong) reference into the
+        // parent's internal (weak) one. The move optimization would cancel both
+        // and leave the child strong-pinned, so it's disabled for these.
+        let internal = scc.is_some_and(|g| contains_scc_ref(fty, g, cx.structs));
+        if internal {
+            emit_rc_w(
+                builder,
+                module,
+                cx.builtins,
+                cx.structs,
+                v,
+                fty,
+                RcOp::Retain,
+                scc,
+            );
+        } else if !move_owned_temp(scopes, before, v) {
+            // The variant co-owns each external heap payload field. A fresh temp
+            // is moved in (skip retain, untrack); a borrow is co-owned via retain.
             emit_retain(builder, module, cx.builtins, cx.structs, v, fty);
         }
     }
-    let vty = Type::Named(vname.to_string());
     if needs_drop(&vty, cx.structs) {
         scopes
             .last_mut()
@@ -12967,7 +13661,19 @@ fn compile_expr<M: Module>(
                     span.clone(),
                 ));
             }
-            let slot = alloc_struct_slot(builder, layout);
+            // A boxed (recursive) struct lives on a refcounted heap block,
+            // addressed by the returned pointer; a normal one in a fresh stack
+            // slot. Only the store target and the return value differ.
+            let boxed = structs[name].boxed();
+            let scc = boxed.then(|| structs[name].scc());
+            let slot = (!boxed).then(|| alloc_struct_slot(builder, layout));
+            let heap = boxed.then(|| {
+                let size_v = builder.ins().iconst(types::I64, layout.size as i64);
+                let drop_fn = rec_drop_fn_addr(builder, module, cx.elem_rc, name);
+                let f = builtins.import(module, builder.func, "aipl_rec_alloc");
+                let inst = builder.ins().call(f, &[size_v, drop_fn]);
+                builder.inst_results(inst)[0]
+            });
             for init in field_inits {
                 let field = layout.field(&init.name).ok_or_else(|| {
                     Error::at(
@@ -12990,38 +13696,71 @@ fn compile_expr<M: Module>(
                     &format!("struct {:?} field {:?}", display_name(name), init.name),
                     init.value.span.clone(),
                 )?;
-                // A scalar/heap field is an 8-byte value; an optional field is
-                // a 16-byte inline composite, so copy its bytes from the source
-                // slot rather than storing the pointer.
-                if is_composite(&fty, structs) {
-                    let size = field_size(&fty, structs);
-                    let mut o = 0u32;
-                    while o < size {
-                        let chunk =
+                match (slot, heap) {
+                    // Boxed: store into the heap payload via the block pointer.
+                    (_, Some(base)) => {
+                        let dst = builder.ins().iadd_imm_s(base, offset as i64);
+                        store_array_elem(builder, dst, v, &fty, structs);
+                    }
+                    // Non-boxed: store into the stack slot. A scalar/heap field is
+                    // an 8-byte value; an optional field is a 16-byte inline
+                    // composite, so copy its bytes from the source slot.
+                    (Some(slot), _) => {
+                        if is_composite(&fty, structs) {
+                            let size = field_size(&fty, structs);
+                            let mut o = 0u32;
+                            while o < size {
+                                let chunk = builder.ins().load(
+                                    types::I64,
+                                    MemFlagsData::trusted(),
+                                    v,
+                                    o as i32,
+                                );
+                                builder.ins().stack_store(
+                                    types::I64,
+                                    chunk,
+                                    slot,
+                                    (offset + o) as i32,
+                                );
+                                o += 8;
+                            }
+                        } else {
                             builder
                                 .ins()
-                                .load(types::I64, MemFlagsData::trusted(), v, o as i32);
-                        builder
-                            .ins()
-                            .stack_store(types::I64, chunk, slot, (offset + o) as i32);
-                        o += 8;
+                                .stack_store(types::I64, v, slot, offset as i32);
+                        }
                     }
-                } else {
-                    builder
-                        .ins()
-                        .stack_store(types::I64, v, slot, offset as i32);
+                    (None, None) => unreachable!("a struct is either boxed or slot-backed"),
                 }
-                // The struct co-owns each heap field (recursing into an
-                // optional's value). If the field value is a fresh temporary we
-                // own, move it in — skip the retain and untrack it, so scope exit
-                // won't drop it (the struct's drop-fn releases it). A borrowed
-                // field is co-owned via retain as before.
-                if !move_owned_temp(scopes, before, v) {
+                // The struct co-owns each heap field. An *internal* field (one
+                // referring to a boxed value of this same recursion group) is a
+                // weak reference — retain it weakly, keep its strong-drop
+                // tracking, and disable the move (see `compile_variant`); an
+                // external field is moved-in when fresh, else co-owned via retain.
+                // `scc` is `None` for a non-boxed struct, so `internal` is always
+                // false there and the original move/retain path is unchanged.
+                let internal = scc.is_some_and(|g| contains_scc_ref(&fty, g, structs));
+                if internal {
+                    emit_rc_w(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        v,
+                        &fty,
+                        RcOp::Retain,
+                        scc,
+                    );
+                } else if !move_owned_temp(scopes, before, v) {
                     emit_retain(builder, module, builtins, structs, v, &fty);
                 }
             }
-            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             let sty = Type::Named(name.clone());
+            let ptr = match (slot, heap) {
+                (_, Some(base)) => base,
+                (Some(slot), _) => builder.ins().stack_addr(types::I64, slot, 0),
+                (None, None) => unreachable!("a struct is either boxed or slot-backed"),
+            };
             if needs_drop(&sty, structs) {
                 scopes
                     .last_mut()
@@ -14737,18 +15476,23 @@ fn alloc_struct_slot(builder: &mut FunctionBuilder, layout: &StructLayout) -> St
 fn field_size(ty: &Type, structs: &HashMap<String, TypeDef>) -> u32 {
     match ty {
         Type::Optional(_) => elem_size_of(ty, structs) as u32,
-        Type::Named(n) => structs.get(n).map_or(8, |t| t.size()),
+        // A boxed (recursive) type is stored as an 8-byte pointer; only a
+        // non-boxed struct/variant is inlined at its full size.
+        Type::Named(n) => structs
+            .get(n)
+            .map_or(8, |t| if t.boxed() { 8 } else { t.size() }),
         _ => 8,
     }
 }
 
 /// Size in bytes of a value returned/passed by hidden pointer (sret), or `None`
 /// if it's a plain 8-byte value. Both optionals (`{tag, value}`, possibly
-/// nested) and structs are returned this way — uniformly, by pointer.
+/// nested) and structs are returned this way — uniformly, by pointer. A boxed
+/// (recursive) type is a plain 8-byte pointer value, like an array.
 fn sret_size(ty: &Type, structs: &HashMap<String, TypeDef>) -> Option<u32> {
     match ty {
         Type::Optional(_) | Type::Result(_, _) => Some(elem_size_of(ty, structs) as u32),
-        Type::Named(n) => structs.get(n).map(|t| t.size()),
+        Type::Named(n) => structs.get(n).and_then(|t| (!t.boxed()).then(|| t.size())),
         _ => None,
     }
 }

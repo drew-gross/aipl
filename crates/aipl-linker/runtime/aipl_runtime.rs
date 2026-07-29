@@ -1993,6 +1993,123 @@ pub extern "C" fn aipl_arr_inc(ptr: *const u8) {
     }
 }
 
+// ---------- Recursive (boxed) type runtime ----------
+//
+// A value of a *recursive* struct/variant type is heap-allocated behind a
+// pointer; the value points at the *payload* (the type's usual inline layout)
+// and a four-word header sits just below it:
+//
+//   [strong: i64][weak: i64][drop_fn: ptr][payload size: i64][payload...]
+//                                                             ^ value
+//
+// `strong` counts external references (locals, array elements, fields of
+// non-recursive types); `weak` counts internal ones (a field of one boxed
+// value of the recursion group pointing at another of the same group). A block
+// is freed when both reach zero, releasing its payload via the stored
+// `drop_fn` (a generated per-type function: `aipl_rec_dec_weak` for
+// same-group children, normal drops for everything else) — so death cascades
+// through contained values that become unreachable in turn. The cascade is
+// iterative: dead blocks are pushed onto a pending list (the finished
+// `strong` word doubles as the intrusive next link) drained only by the
+// outermost release call, so a long list never needs deep native recursion.
+// Mirrors the JIT runtime in `aipl-codegen`; see it for the full description.
+
+const REC_HEADER_SIZE: usize = 32;
+const REC_WEAK_WORD: usize = 1;
+const REC_DROPFN_WORD: usize = 2;
+const REC_SIZE_WORD: usize = 3;
+type RecDropFn = extern "C" fn(*const u8);
+
+/// The header words of the block behind payload pointer `p` (word 0 = strong).
+fn rec_block(p: *const u8) -> *mut i64 {
+    unsafe { p.sub(REC_HEADER_SIZE) as *mut i64 }
+}
+
+/// Allocate a boxed recursive-type value with a `size`-byte payload (strong 1,
+/// weak 0), returning the payload pointer. Codegen stores the tag/fields
+/// immediately after.
+#[no_mangle]
+pub extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
+    let size = if size < 0 { 0 } else { size as usize };
+    unsafe {
+        let raw = rt_alloc(REC_HEADER_SIZE + size) as *mut u8;
+        if raw.is_null() {
+            abort();
+        }
+        let b = raw as *mut i64;
+        *b = 1; // strong
+        *b.add(REC_WEAK_WORD) = 0;
+        *b.add(REC_DROPFN_WORD) = drop_fn;
+        *b.add(REC_SIZE_WORD) = size as i64;
+        raw.add(REC_HEADER_SIZE)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_rec_inc_strong(p: *const u8) {
+    unsafe { *rec_block(p) += 1 }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_rec_inc_weak(p: *const u8) {
+    unsafe { *rec_block(p).add(REC_WEAK_WORD) += 1 }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_rec_dec_strong(p: *const u8) {
+    let b = rec_block(p);
+    unsafe {
+        *b -= 1;
+        if *b == 0 && *b.add(REC_WEAK_WORD) == 0 {
+            rec_release(b);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl_rec_dec_weak(p: *const u8) {
+    let b = rec_block(p);
+    unsafe {
+        *b.add(REC_WEAK_WORD) -= 1;
+        if *b == 0 && *b.add(REC_WEAK_WORD) == 0 {
+            rec_release(b);
+        }
+    }
+}
+
+// Dead boxed blocks awaiting drop+free (intrusive list through the `strong`
+// word), and whether a drain loop is already running below us on the native
+// stack. The AOT runtime is single-threaded, so plain statics are fine (the
+// JIT runtime, whose host process is multi-threaded, uses thread-locals).
+static mut REC_PENDING: *mut i64 = core::ptr::null_mut();
+static mut REC_DRAINING: bool = false;
+
+/// Queue the dead block `b` (both counts zero) and, unless a drain is already
+/// running further down the stack, drain the queue: call each block's
+/// `drop_fn` on its payload (which may queue more dead blocks — that's the
+/// cascade) and free it.
+fn rec_release(b: *mut i64) {
+    unsafe {
+        *b = REC_PENDING as i64;
+        REC_PENDING = b;
+        if REC_DRAINING {
+            return;
+        }
+        REC_DRAINING = true;
+        while !REC_PENDING.is_null() {
+            let head = REC_PENDING;
+            REC_PENDING = *head as *mut i64;
+            let drop_fn = *head.add(REC_DROPFN_WORD);
+            if drop_fn != 0 {
+                let f: RecDropFn = core::mem::transmute(drop_fn);
+                f((head as *const u8).add(REC_HEADER_SIZE));
+            }
+            rt_free(head as *mut c_void);
+        }
+        REC_DRAINING = false;
+    }
+}
+
 /// Copy-and-grow push (value semantics): returns a fresh array holding `a`'s
 /// elements followed by the `elem_size`-byte element at `x`, then drops `a`.
 /// Repr-aware element pointer for use from AOT-compiled code.

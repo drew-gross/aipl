@@ -1,0 +1,86 @@
+import { !=, wrapping_add as +, ==, print, to_str } from builtins;
+
+// A recursive sum type: its payload refers back to itself, so it can't be
+// stored inline (infinite size). The compiler detects the containment cycle
+// and boxes it — values live on a refcounted heap block that keeps a *strong*
+// count (external references: locals, arguments) and a *weak* count (internal
+// references: one node's tail pointing at another node of the same type).
+// Dropping the last external reference frees the head and cascades the frees
+// down the (now-unreachable) tail. Shared tails survive until their last
+// holder is gone. A leak or double-free would unbalance the allocation counts
+// asserted below.
+variant List = Cons(i64, List) | Nil
+
+fn sum(self: List) -> i64 {
+    match (self) {
+        Cons(x, rest) => x + rest.sum(),
+        Nil => 0,
+    }
+}
+
+fn len(self: List) -> i64 {
+    match (self) {
+        Cons(_, rest) => 1 + rest.len(),
+        Nil => 0,
+    }
+}
+
+fn prepend(self: List, x: i64) -> List { Cons(x, self) }
+
+fn main() !prints {
+    let l = Cons(1, Cons(2, Cons(3, Nil)));
+    print(to_str(l));
+    print(to_str(l.sum()));
+    print(to_str(l.len()));
+
+    // A shared tail: `a` and `b` both point at `shared`. `shared`'s block is
+    // held by the local plus two internal (weak) references from the heads.
+    let shared = Cons(20, Cons(30, Nil));
+    let a = shared.prepend(1);
+    let b = shared.prepend(9);
+    print(to_str(a));
+    print(to_str(b));
+    print(to_str(a == b));
+    print(to_str(a == Cons(1, Cons(20, Cons(30, Nil)))));
+    print(to_str(a != b));
+}.test({
+    assert(Cons(1, Cons(2, Nil)).sum() == 3);
+    assert(Cons(1, Cons(2, Cons(3, Nil))).len() == 3);
+    assert(Nil.len() == 0);
+    assert(Nil.sum() == 0);
+
+    // Structural equality recurses through the whole spine.
+    assert(Cons(1, Cons(2, Nil)) == Cons(1, Cons(2, Nil)));
+    assert(Cons(1, Cons(2, Nil)) != Cons(1, Cons(9, Nil)));
+    assert(Cons(1, Nil) != Nil);
+
+    // Building on top of a shared tail doesn't disturb it.
+    let tail = Cons(2, Cons(3, Nil));
+    assert(tail.prepend(1) == Cons(1, Cons(2, Cons(3, Nil))));
+    assert(tail.prepend(9) == Cons(9, Cons(2, Cons(3, Nil))));
+    assert(tail.len() == 2);
+})
+--- stdout ---
+Cons(1, Cons(2, Cons(3, Nil)))
+6
+3
+Cons(1, Cons(20, Cons(30, Nil)))
+Cons(9, Cons(20, Cons(30, Nil)))
+false
+true
+true
+--- performance ---
+allocations: 33
+deallocations: 33
+reallocations: 0
+bytes allocated: 1409
+instructions executed: 4282
+binary size: 6256
+  code: 2956
+  data: 167
+  metadata: 3133
+--- monomorphizations ---
+len
+main
+prepend
+sum

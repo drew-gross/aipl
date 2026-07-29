@@ -1,0 +1,49 @@
+import { wrapping_add as +, ==, print, to_str } from builtins;
+
+// A containment cycle that runs through *both* a struct and a variant: `S`
+// stores a `V`, and `V`'s `Node` case stores an `S`. The two form one
+// recursion group, so both are boxed (heap-allocated with strong/weak
+// refcounts) and the cycle is broken by indirection rather than rejected. The
+// `Leaf` case is the non-recursive base that makes values constructible.
+struct S { tag: i64, child: V }
+
+variant V = Node(S) | Leaf
+
+fn depth(self: S) -> i64 {
+    match (self.child) {
+        Node(inner) => 1 + inner.depth(),
+        Leaf => 0,
+    }
+}
+
+fn main() !prints {
+    let leaf = S { tag: 1, child: Leaf };
+    let nested = S { tag: 2, child: Node(S { tag: 3, child: Leaf }) };
+    print(to_str(leaf.depth()));
+    print(to_str(nested.depth()));
+    print(to_str(nested));
+}.test({
+    assert(S { tag: 1, child: Leaf }.depth() == 0);
+    assert(S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }.depth() == 1);
+
+    // Structural equality crosses the struct/variant boundary.
+    assert(S { tag: 1, child: Leaf } == S { tag: 1, child: Leaf });
+    assert(S { tag: 1, child: Leaf } == S { tag: 9, child: Leaf } == false);
+})
+--- stdout ---
+0
+1
+S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 621
+instructions executed: 1299
+binary size: 5080
+  code: 2156
+  data: 214
+  metadata: 2710
+--- monomorphizations ---
+depth
+main

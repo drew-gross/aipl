@@ -1,4 +1,4 @@
-TODOs:
+Add notes on how to use the handoff script to CLAUDE.md
 
 1. No </<= on char — so no '0' <= c range checks; classifiers use string-membership ("0123456789".contains_char(c))
 instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64,
@@ -161,3 +161,5 @@ Recommendation
 - If the want is architectural unification (one full-token stream feeding both formatting and the preservation check): that's a real, self-contained refactor — maybe a day's work — but note it weakens one safety property. Today the check cross-validates: format via spelling, verify via values, independently. Unifying makes that more circular. And it only lets the """ case (not templates) consume dedented values, so reindent_block stays dual-mode regardless.
 
 My honest read: the dual-stream, span-driven design is well-chosen for a spelling-preserving formatter with interpolated templates — the "operate on parser tokens" model doesn't cleanly fit. If you want, I can prototype the targeted version (raw """ fed from value; reindent_block split so the """ branch is dedent-free while templates keep the source path) so you can see the shape and decide — but I'd want your go-ahead before touching the formatter core.
+
+Make sure recursive with backpointer structs work e.g. graphs (but also need to figure out how those work in a value-oriented langauge)

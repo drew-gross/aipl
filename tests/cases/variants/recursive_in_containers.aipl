@@ -1,0 +1,63 @@
+import { wrapping_add as +, ==, len, print, to_str } from builtins;
+
+// A boxed (recursive) value can be stored in ordinary containers. From a
+// container's view the reference is *external*, so it is strong-counted like
+// any heap value: an array element, a non-recursive struct field, an optional
+// core. Dropping the container releases those strong references (and cascades
+// the frees). Balanced allocation counts prove the external-reference paths
+// don't leak or double-free.
+variant List = Cons(i64, List) | Nil
+
+struct Holder { name: str, list: List }
+
+fn sumall(self: List) -> i64 {
+    match (self) {
+        Cons(x, r) => x + r.sumall(),
+        Nil => 0,
+    }
+}
+
+fn main() !prints {
+    let lists = [Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil];
+    print(to_str(lists));
+    print(to_str(lists.len()));
+
+    let h = Holder { name: "xs", list: Cons(5, Cons(6, Nil)) };
+    print(to_str(h));
+    print(to_str(h.list.sumall()));
+
+    let maybe = some(Cons(7, Nil));
+    print(to_str(maybe));
+}.test({
+    // Array of boxed values.
+    let lists = [Cons(1, Nil), Cons(2, Cons(3, Nil))];
+    assert(lists.len() == 2);
+    assert(lists == [Cons(1, Nil), Cons(2, Cons(3, Nil))]);
+
+    // Boxed field of a non-recursive struct.
+    let h = Holder { name: "xs", list: Cons(5, Cons(6, Nil)) };
+    assert(h.list.sumall() == 11);
+    assert(h == Holder { name: "xs", list: Cons(5, Cons(6, Nil)) });
+
+    // Boxed core of an optional.
+    assert(some(Cons(7, Nil)) == some(Cons(7, Nil)));
+})
+--- stdout ---
+[Cons(1, Nil), Cons(2, Cons(3, Nil)), Nil]
+3
+Holder { name: "xs", list: Cons(5, Cons(6, Nil)) }
+11
+some(Cons(7, Nil))
+--- performance ---
+allocations: 31
+deallocations: 31
+reallocations: 0
+bytes allocated: 1333
+instructions executed: 3898
+binary size: 8848
+  code: 4348
+  data: 389
+  metadata: 4111
+--- monomorphizations ---
+main
+sumall
