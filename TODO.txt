@@ -127,7 +127,7 @@ Currently working on moving the formatter to pure AIPL
 
 make a docs renderer
 
-Maybe address this later and unify formatter and parser lexing:
+Maybe address this later and unify formatter and parser lexing (maybe allow formatter to rewrite string literals for fewest escapes?):
 
 Why the formatter isn't already a thin wrapper
 

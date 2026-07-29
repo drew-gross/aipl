@@ -76,26 +76,26 @@ pub fn reindent_block(self: str, base: i64) -> str {
     assert("a\nb".reindent_block(0) == "a\nb");
 
     // Bare-opening triple-quote: content shifted to base + 4 (here 4), closing to
-    // base (here 0). A 2-space content indent becomes 4.
-    assert("\"\"\"\n  x\n\"\"\"".reindent_block(0) == "\"\"\"\n    x\n\"\"\"");
+    // base (here 0). A 2-space content indent becomes 4. (A single-backtick
+    // template spells the `"""`-bearing operand without `\"` escaping.)
+    assert(`"""\n  x\n"""`.reindent_block(0) == `"""\n    x\n"""`);
     // Relative indent is preserved: the deeper line keeps its extra 2 spaces.
-    assert("\"\"\"\n  a\n    b\n\"\"\"".reindent_block(0) == "\"\"\"\n    a\n      b\n\"\"\"");
+    assert(`"""\n  a\n    b\n"""`.reindent_block(0) == `"""\n    a\n      b\n"""`);
     // A blank content line is emitted empty (no trailing whitespace).
-    assert(
-        "\"\"\"\n  a\n   \n    b\n\"\"\"".reindent_block(0) == "\"\"\"\n    a\n\n      b\n\"\"\"",
-    );
+    assert(`"""\n  a\n   \n    b\n"""`.reindent_block(0) == `"""\n    a\n\n      b\n"""`);
 
     // A non-zero base offsets both content (base + 4) and the closing delimiter.
-    assert("\"\"\"\nx\n\"\"\"".reindent_block(4) == "\"\"\"\n        x\n    \"\"\"");
+    assert(`"""\nx\n"""`.reindent_block(4) == `"""\n        x\n    """`);
     // Empty content (only opening + closing) collapses cleanly.
-    assert("\"\"\"\n\"\"\"".reindent_block(0) == "\"\"\"\n\"\"\"");
+    assert(`"""\n"""`.reindent_block(0) == `"""\n"""`);
 
-    // Triple-backtick template, bare opening: same content re-indentation.
+    // Triple-backtick template, bare opening: same content re-indentation. (The
+    // ```-bearing operand needs no escaping inside a plain `"..."` string.)
     assert("```\n      y\n```".reindent_block(0) == "```\n    y\n```");
 
     // Content-bearing opening line (not a bare delimiter): content is left
     // byte-for-byte; only the closing delimiter moves to `base`.
-    assert("\"\"\"hi\n  x\n      \"\"\"".reindent_block(2) == "\"\"\"hi\n  x\n  \"\"\"");
+    assert(`"""hi\n  x\n      """`.reindent_block(2) == `"""hi\n  x\n  """`);
 })
 --- performance ---
 allocations: 88
@@ -103,10 +103,10 @@ deallocations: 88
 reallocations: 0
 bytes allocated: 3580
 instructions executed: 5099
-binary size: 12512
+binary size: 12440
   code: 5600
-  data: 1304
-  metadata: 5608
+  data: 1228
+  metadata: 5612
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam3
