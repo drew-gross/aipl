@@ -78,54 +78,29 @@ pub fn raw_block(s: impl Into<String>) -> Doc {
 /// A content-bearing opening line keeps its content byte-for-byte (only the
 /// closing line moves), and a single-backtick template — not de-dented — never
 /// matches a bare triple delimiter, so it is left entirely alone.
+///
+/// Dogfooded: the AIPL `reindent_block` (`crates/aipl-codegen/src/reindent_block.aipl`),
+/// run through the embedding FFI via the installed hook. There is **no native
+/// fallback**: it panics if the hook isn't installed, so install it (via
+/// `aipl::install_parser_hooks`) before formatting.
 pub fn reindent_block(s: &str, base: usize) -> String {
-    let lines: Vec<&str> = s.split('\n').collect();
-    if lines.len() < 2 {
-        return s.to_string();
-    }
-    let closing = lines[lines.len() - 1].trim_start();
-    if closing != "\"\"\"" && closing != "```" {
-        return s.to_string();
-    }
-    let opening = lines[0];
-    let content = &lines[1..lines.len() - 1];
-    // Content re-indentation applies to a bare-delimiter `"""` / ``` ``` ```
-    // block (its opening line is exactly the delimiter).
-    let common = if opening == "\"\"\"" || opening == "```" {
-        content
-            .iter()
-            .filter(|l| !l.trim().is_empty())
-            .map(leading_spaces)
-            .min()
-    } else {
-        None
-    };
-    let target = base + INDENT;
-    let mut out = String::from(opening);
-    for line in content {
-        out.push('\n');
-        if line.trim().is_empty() {
-            // A blank content line is emitted empty — its whitespace would be
-            // trailing (illegal), and `dedent` renders it empty anyway.
-        } else if let Some(c) = common {
-            // Uniform shift: drop the common indent, add the target, keeping
-            // this line's extra (relative) indent.
-            out.push_str(&" ".repeat(target));
-            out.push_str(&line[c..]);
-        } else {
-            out.push_str(line);
-        }
-    }
-    out.push('\n');
-    out.push_str(&" ".repeat(base));
-    out.push_str(closing);
-    out
+    let hook = REINDENT_BLOCK_HOOK
+        .get()
+        .expect("reindent-block hook not installed before formatting (call install_parser_hooks)");
+    hook(s, base)
 }
 
-/// Count of leading space characters (not tabs — matching `dedent`, which
-/// counts only spaces).
-fn leading_spaces(line: &&str) -> usize {
-    line.len() - line.trim_start_matches(' ').len()
+/// The raw-block re-layout, installed by the compiler (via
+/// [`set_reindent_block_hook`]) to dogfood the AIPL `reindent_block`. Required —
+/// see [`reindent_block`].
+static REINDENT_BLOCK_HOOK: std::sync::OnceLock<fn(&str, usize) -> String> =
+    std::sync::OnceLock::new();
+
+/// Install the raw-block re-layout. The compiler points this at the dogfooded
+/// AIPL `reindent_block`, run through the embedding FFI. First install wins (the
+/// hook is process-global).
+pub fn set_reindent_block_hook(f: fn(&str, usize) -> String) {
+    let _ = REINDENT_BLOCK_HOOK.set(f);
 }
 
 pub fn concat(docs: Vec<Doc>) -> Doc {

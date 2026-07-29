@@ -89,8 +89,6 @@ TODO: garbage collectable types, so we can make a .aipl parser.
 
 Switch back to multi-file dogfood clifs to make diffs nicer
 
-support else if (but only that form)
-
 Nested matching e.g.
     match (opt_of_array) {
         some([]) => ...,
@@ -122,3 +120,5 @@ the arg contract being different for builtins caused problems for retain elision
 - make the arg contract for builtins more uniform
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
+
+Currently working on moving the formatter to pure AIPL

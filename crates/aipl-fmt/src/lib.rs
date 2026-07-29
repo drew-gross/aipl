@@ -24,6 +24,12 @@
 
 mod doc;
 
+/// Install the dogfooded AIPL `reindent_block` as the formatter's raw-block
+/// re-layout (see [`doc::reindent_block`]). The compiler calls this from
+/// `install_parser_hooks`; there is no native fallback, so formatting a source
+/// with a multi-line raw-string / template atom requires it first.
+pub use doc::set_reindent_block_hook;
+
 use std::collections::VecDeque;
 
 use aipl_parser::{lex_signatures_and_comments, lex_tokens_and_comments, FmtTokenKind, TokenKind};

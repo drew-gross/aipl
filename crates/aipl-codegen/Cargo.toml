@@ -14,6 +14,9 @@ aipl-parser = { workspace = true }
 # `count_while` module import) the embedded `dedent.aipl` the compiler dogfoods
 # via the FFI to de-dent raw strings.
 aipl-loader = { workspace = true }
+# Used to install the dogfooded `reindent_block` into the formatter's hook (the
+# formatter's raw-block re-layout, dogfooded via the FFI); `install_parser_hooks`.
+aipl-fmt = { workspace = true }
 cranelift = { workspace = true }
 cranelift-jit = { workspace = true }
 cranelift-module = { workspace = true }

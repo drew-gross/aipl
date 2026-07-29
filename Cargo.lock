@@ -37,6 +37,7 @@ dependencies = [
 name = "aipl-codegen"
 version = "0.1.0"
 dependencies = [
+ "aipl-fmt",
  "aipl-loader",
  "aipl-mono",
  "aipl-parser",

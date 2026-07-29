@@ -2661,6 +2661,7 @@ const IS_OPERATOR_NAME_SRC: &str = include_str!("is_operator_name.aipl");
 const LEXER_LIB_SRC: &str = include_str!("lexer.aipl");
 const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
 const UNESCAPE_SRC: &str = include_str!("unescape.aipl");
+const REINDENT_BLOCK_SRC: &str = include_str!("reindent_block.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2700,6 +2701,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./lexer.aipl", LEXER_LIB_SRC),
     ("./lex_aipl.aipl", LEX_AIPL_SRC),
     ("./unescape.aipl", UNESCAPE_SRC),
+    ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -2722,6 +2724,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "is_operator_name",
     "lex_aipl",
     "lex_aipl_stripped",
+    "reindent_block",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -2807,6 +2810,24 @@ fn strip_test_sections(src: &str) -> String {
         match comp.call_values("strip_test_sections", &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Str(kept)) => kept,
             other => panic!("dogfooded strip_test_sections() call: {other:?}"),
+        }
+    })
+}
+
+/// The formatter's raw-block re-layout hook (see [`install_parser_hooks`]): given
+/// the verbatim raw-string / template atom `s` and the column `base` its opening
+/// delimiter sits at, returns the atom with its closing delimiter (and, for a
+/// bare-delimiter block, its content) re-aligned around `base` — computed by the
+/// dogfooded AIPL `reindent_block` via the FFI (`base` marshaled as an
+/// [`FfiValue::Int`]). No native fallback; panics if it can't be built or called.
+fn reindent_block(s: &str, base: usize) -> String {
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values(
+            "reindent_block",
+            &[FfiValue::Str(s.to_string()), FfiValue::Int(base as i64)],
+        ) {
+            Ok(FfiValue::Str(out)) => out,
+            other => panic!("dogfooded reindent_block() call: {other:?}"),
         }
     })
 }
@@ -3205,7 +3226,8 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
 /// [`is_operator_name`], and the lexer at [`lex_aipl`] (which de-dents `"""` raw
-/// strings itself, in its emit, so there is no separate raw-string hook).
+/// strings itself, in its emit, so there is no separate raw-string hook), and the
+/// formatter's raw-block re-layout at [`reindent_block`].
 /// Idempotent (first install wins). The compiler's entry points (the CLI and the
 /// embedding [`Compilation`] API's callers) install them; there are **no native
 /// fallbacks**, so any in-process parse (or error render, literal
@@ -3220,6 +3242,7 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
+    aipl_fmt::set_reindent_block_hook(reindent_block);
 }
 
 /// Compile every function in `program` into `module`. When `main_export_name`
