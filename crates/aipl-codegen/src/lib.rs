@@ -2662,7 +2662,7 @@ const LEXER_LIB_SRC: &str = include_str!("lexer.aipl");
 const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
 const UNESCAPE_SRC: &str = include_str!("unescape.aipl");
 const REINDENT_BLOCK_SRC: &str = include_str!("reindent_block.aipl");
-const REINDENT_CONTENTS_SRC: &str = include_str!("reindent_contents.aipl");
+const INDENT_SRC: &str = include_str!("indent.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2703,7 +2703,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./lex_aipl.aipl", LEX_AIPL_SRC),
     ("./unescape.aipl", UNESCAPE_SRC),
     ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
-    ("./reindent_contents.aipl", REINDENT_CONTENTS_SRC),
+    ("./indent.aipl", INDENT_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the

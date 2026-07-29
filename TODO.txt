@@ -97,6 +97,8 @@ Nested matching e.g.
         none => ...,
     }
 
+indent.aipl optimization: pre-reserve target*lines + self.len() space
+
 rest/spread in match
 
 raw strings in aipl to make tests of unescape look nicer
@@ -124,3 +126,38 @@ the arg contract being different for builtins caused problems for retain elision
 Currently working on moving the formatter to pure AIPL
 
 make a docs renderer
+
+Maybe address this later and unify formatter and parser lexing:
+
+Why the formatter isn't already a thin wrapper
+
+The parser consumes decoded token values (StrLit(value, style)) because it only builds an AST — it never reproduces source. The formatter has the opposite obligation: reproduce every token's source spelling byte-for-byte. That's lossy from the value:
+
+- literals_verbatim.aipl: "escaped\tstring\n" must round-trip as those escapes, not as a literal tab + newline. From the decoded value you can't know whether a tab came from \t or a literal tab.
+- So for identifiers, operators, numbers, and string/char/template spellings, the Walker slices &self.src[span]. That span-slicing is correct and can't go away.
+
+lex_tokens_and_comments is already a wrapper around lex_aipl (line 2663) — it just projects each LexedToken { kind, span } down to (fmt_kind, span), dropping the value. lex_signatures_and_comments keeps the value instead. The lexer already carries both value and span in one stream; the two entry points each throw one half away.
+
+What you'd actually be changing
+
+Your goal (reindent_block assumes dedented content) needs the raw-block Doc built from the token's de-dented value instead of &self.src[start..end]. Concretely:
+
+1. Have the Walker hold full LexedTokens (or extend FmtTokenKind to carry the literal value), so a """ atom can read its StrLit(dedented_value, TripleQuoted).
+2. Build raw_block(...) from that value; reindent_block drops dedent() and the delimiter-parsing, becoming a pure "frame dedented content with delim / reindent_contents(base+4) / base+delim."
+3. Retire lex_signatures_and_comments by having the preservation check reuse the unified stream.
+
+The blocker that limits this: interpolated templates
+
+Raw-block reindentation covers both """ strings and ``` templates (see triple_align.aipl). A triple-backtick template's value isn't a single string — it's head/mid/tail **segments around interpolation expressions** ({name}). template_verbatim slices source (line 1496) precisely to preserve the interpolation expressions' spelling. You cannot reconstruct that from the decoded segment values. So:
+
+- The value-feeding trick works for """ strings but not for templates.
+- reindent_block must keep handling templates from source text, which is non-dedented → it still needs dedent() for that path.
+
+Net: the dedent is intrinsic to re-indenting a raw block from source spelling. You can relocate it (hoist into the Walker — the "dedent upstream" option, which would also require exposing the dogfooded dedent to aipl-fmt, currently only wired into codegen's engine), but you can't remove it as long as the formatting path works from source — which templates force it to.
+
+Recommendation
+
+- If the real want is just to tidy reindent_block: not worth a lexer refactor. The current content.dedent().reindent_contents(base+4) is honest about what it does, and templates would reintroduce the dedent anyway.
+- If the want is architectural unification (one full-token stream feeding both formatting and the preservation check): that's a real, self-contained refactor — maybe a day's work — but note it weakens one safety property. Today the check cross-validates: format via spelling, verify via values, independently. Unifying makes that more circular. And it only lets the """ case (not templates) consume dedented values, so reindent_block stays dual-mode regardless.
+
+My honest read: the dual-stream, span-driven design is well-chosen for a spelling-preserving formatter with interpolated templates — the "operate on parser tokens" model doesn't cleanly fit. If you want, I can prototype the targeted version (raw """ fed from value; reindent_block split so the """ branch is dedent-free while templates keep the source path) so you can see the shape and decide — but I'd want your go-ahead before touching the formatter core.

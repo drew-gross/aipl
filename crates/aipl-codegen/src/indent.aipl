@@ -7,7 +7,7 @@
 import { +++, ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 
-pub fn reindent_contents(self: str, target: i64) -> str {
+pub fn indent(self: str, target: i64) -> str {
     let pad = " ".repeat(target);
 
     // Add `target` spaces to each non-blank line, keeping its own (already
@@ -18,33 +18,33 @@ pub fn reindent_contents(self: str, target: i64) -> str {
     Indents every non-blank line of `self` by `target` spaces, keeping each line's
     own relative indentation; blank (empty or all-whitespace) lines are emitted
     empty. Assumes `self` is already fully dedented — it *adds* indentation, it does
-    not rebase an existing common indent to `target`. `reindent_block` dedents the
-    raw-block content (via `dedent`) before calling this.
+    not rebase an existing common indent to `target`. The inverse of `dedent`;
+    `reindent_block` dedents the raw-block content before calling this.
 """).test({
     // A dedented block is indented by the target, line for line.
-    assert("a\nb".reindent_contents(4) == "    a\n    b");
+    assert("a\nb".indent(4) == "    a\n    b");
     // Relative indent is preserved: a deeper line keeps its extra 2 spaces.
-    assert("a\n  b".reindent_contents(4) == "    a\n      b");
+    assert("a\n  b".indent(4) == "    a\n      b");
     // Blank lines stay empty — indentation is added, not applied to blank lines.
-    assert("a\n\nb".reindent_contents(2) == "  a\n\n  b");
+    assert("a\n\nb".indent(2) == "  a\n\n  b");
     // A whitespace-only line is emitted empty, not indented to the target.
-    assert("a\n   \nb".reindent_contents(2) == "  a\n\n  b");
+    assert("a\n   \nb".indent(2) == "  a\n\n  b");
     // A single line is indented to the target.
-    assert("x".reindent_contents(2) == "  x");
+    assert("x".indent(2) == "  x");
     // Target 0 is a no-op.
-    assert("a\n  b".reindent_contents(0) == "a\n  b");
+    assert("a\n  b".indent(0) == "a\n  b");
 })
 --- performance ---
 allocations: 26
 deallocations: 26
 reallocations: 0
 bytes allocated: 943
-instructions executed: 1161
-binary size: 4648
-  code: 1532
-  data: 605
-  metadata: 2511
+instructions executed: 1159
+binary size: 4496
+  code: 1536
+  data: 506
+  metadata: 2454
 --- monomorphizations ---
 __map2$own0
+indent
 main
-reindent_contents

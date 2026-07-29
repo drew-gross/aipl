@@ -20,8 +20,8 @@ import {
     value_or,
 } from builtins;
 import { dedent } from "./dedent.aipl";
+import { indent } from "./indent.aipl";
 import { lines } from "./lines.aipl";
-import { reindent_contents } from "./reindent_contents.aipl";
 
 pub fn reindent_block(self: str, base: i64) -> str {
     let ls = self.lines();
@@ -44,15 +44,15 @@ pub fn reindent_block(self: str, base: i64) -> str {
     // Reattach the delimiters around the content. Content lines (between the
     // delimiters) exist only when n > 2. A bare-delimiter opening (its line is
     // exactly the delimiter) rebases the content one level (INDENT = 4) deeper
-    // than the delimiters: `dedent` strips its common indent, then
-    // `reindent_contents` re-adds `base + 4`. A content-bearing opening keeps its
-    // content byte-for-byte. The closing is re-indented to `base`; empty content
-    // collapses to just opening + closing.
+    // than the delimiters: `dedent` strips its common indent, then `indent`
+    // re-adds `base + 4`. A content-bearing opening keeps its content
+    // byte-for-byte. The closing is re-indented to `base`; empty content collapses
+    // to just opening + closing.
     mut out = opening;
     if (n > 2) {
         let content = ls[1..n - 1].join("\n");
         let body = if (opening == "\"\"\"" || opening == "```") {
-            content.dedent().reindent_contents(base + 4)
+            content.dedent().indent(base + 4)
         } else {
             content
         };
@@ -65,7 +65,7 @@ pub fn reindent_block(self: str, base: i64) -> str {
     followed by a bare triple-quote / triple-backtick delimiter (the inert blank
     closing line); otherwise the atom is returned unchanged. For a bare-opening block
     (its opening line is exactly the delimiter), the content is `dedent`-ed and then
-    re-indented (via `reindent_contents`) so its common indent becomes `base + 4` —
+    re-indented (via `indent`) so its common indent becomes `base + 4` —
     one level deeper than the delimiters — while each line keeps its indentation
     relative to that common base. A content-bearing opening keeps its content
     byte-for-byte; only the closing delimiter moves.
