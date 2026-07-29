@@ -702,10 +702,16 @@ fn compiler_aipl_files_are_tested_and_pass_check() {
             .arg(f)
             .output()
             .expect("spawn aipl check");
+        // Show the command to re-run just this file's check (relative to the repo
+        // root, so it's copy-pasteable) rather than making the reader rediscover
+        // which file the whole-corpus test tripped on.
+        let rel = f.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(f);
         assert!(
             out.status.success(),
-            "`aipl check {}` failed:\n{}{}",
+            "`aipl check {}` failed — re-run just this check with:\n    \
+             cargo run -q -- check {}\n\n{}{}",
             f.display(),
+            rel.display(),
             String::from_utf8_lossy(&out.stdout),
             String::from_utf8_lossy(&out.stderr),
         );

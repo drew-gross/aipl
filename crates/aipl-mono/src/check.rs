@@ -2907,6 +2907,41 @@ fn display(name: &str) -> &str {
     name.strip_prefix("__builtin_").unwrap_or(name)
 }
 
+/// Strip a single internal name-mangling prefix for display: the reserved
+/// `__builtin_`, or the loader's per-file module prefix `__m<index>__` (added to
+/// every non-root file's top-level names). Neither can appear in a user-written
+/// identifier, so this only ever strips compiler-internal decoration.
+fn strip_mangle_prefix(s: &str) -> &str {
+    let s = s.strip_prefix("__builtin_").unwrap_or(s);
+    if let Some(rest) = s.strip_prefix("__m") {
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if digits > 0 && rest[digits..].starts_with("__") {
+            return &rest[digits + 2..];
+        }
+    }
+    s
+}
+
+/// Render a (possibly mangled) named type for diagnostics. Strips the module /
+/// `__builtin_` prefixes (see [`strip_mangle_prefix`]) and turns a generic
+/// instance's mangled name back into source-like form: `Box$i64` → `Box<i64>`,
+/// `Pair$i64$str` → `Pair<i64, str>`, a synthetic tuple `__tuple$i64$str` →
+/// `(i64, str)`. Nested instances were already flattened to `_` when mangled
+/// (see [`mangle_type`]), so those don't fully round-trip, but the common
+/// single-level case reads cleanly.
+fn demangle_named(n: &str) -> String {
+    let mut parts = n.split('$');
+    let base = strip_mangle_prefix(parts.next().unwrap_or(n));
+    let args: Vec<&str> = parts.map(strip_mangle_prefix).collect();
+    if args.is_empty() {
+        base.to_string()
+    } else if base == "__tuple" {
+        format!("({})", args.join(", "))
+    } else {
+        format!("{base}<{}>", args.join(", "))
+    }
+}
+
 /// A type the checker can't pin down (e.g. a generic call's type-variable
 /// result that we don't instantiate here). It coerces with anything, so the
 /// checker stays permissive rather than reporting a false mismatch.
@@ -3018,10 +3053,10 @@ fn tyname(t: &Type) -> String {
         Type::Array(inner) if is_typevar(inner) => "an array of a type parameter".to_string(),
         Type::Set(inner) if is_typevar(inner) => "a set of a type parameter".to_string(),
         Type::Named(n) if n == "__unknown__" => "_".to_string(),
-        // A builtin type (e.g. `Span`) is internally named with the reserved
-        // `__builtin_` prefix (see `display`) so a user's own type can never
-        // collide with it — strip it back off for diagnostics.
-        Type::Named(n) => display(n).to_string(),
+        // A builtin type (`Span`), a per-file name (`__m1__LexError`), or a
+        // generic instance (`Token$AiplTok`) carries internal mangling — render
+        // it back to source-like form for diagnostics.
+        Type::Named(n) => demangle_named(n),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
         Type::Set(inner) => format!("#{{{}}}", tyname(inner)),

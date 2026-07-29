@@ -553,12 +553,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
 // compile. `trivia` is dropped: the differential dump compares only the emitted
 // token stream (the Rust lexer's dump has no comment/marker lines to compare the
 // side-channel against).
-pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError {
-    match (lex_aipl(src)) {
-        ok(res) => ok(res.tokens),
-        err(e) => err(e),
-    }
-}.test({
+pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError { ok(lex_aipl(src)?.tokens) }.test({
     assert(
         lex_aipl_tokens("let x = 42;")? == [
             Token { kind: Let, span: 0..3 },
@@ -607,11 +602,11 @@ allocations: 4581
 deallocations: 4581
 reallocations: 0
 bytes allocated: 269288
-instructions executed: 757156
-binary size: 198536
-  code: 124104
+instructions executed: 757081
+binary size: 198296
+  code: 123964
   data: 7396
-  metadata: 67036
+  metadata: 66936
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
