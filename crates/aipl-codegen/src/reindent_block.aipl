@@ -4,7 +4,6 @@
 // bare-delimiter block, its content) around the column the atom opened at. `base`
 // is that column (the opening line's indent).
 import {
-    !,
     !=,
     &&,
     wrapping_add as +,
@@ -12,18 +11,16 @@ import {
     wrapping_sub as -,
     <,
     ==,
+    >,
     ||,
-    count_while,
-    filter,
-    is_all_whitespace,
+    join,
     len,
-    map,
-    minimum,
     repeat,
     trim,
     value_or,
 } from builtins;
 import { lines } from "./lines.aipl";
+import { reindent_contents } from "./reindent_contents.aipl";
 
 pub fn reindent_block(self: str, base: i64) -> str {
     let ls = self.lines();
@@ -42,50 +39,34 @@ pub fn reindent_block(self: str, base: i64) -> str {
     };
 
     let opening = ls[0].value_or("");
-    let content = ls[1..n - 1];
 
-    // Content re-indentation applies only to a bare-delimiter block (the opening
-    // line is exactly the delimiter). The common indent is the smallest
-    // leading-space run over the non-blank content lines; with no non-blank
-    // content lines there is nothing to shift (`none`, matching the `else`).
-    let common = if (opening == "\"\"\"" || opening == "```") {
-        content.filter(|l| !l.is_all_whitespace()).map(|l| l.count_while(|c| c == ' ')).minimum()
-    } else {
-        none
-    };
-    // One indentation level (INDENT = 4) deeper than the delimiters.
-    let target = base + 4;
-
-    // Rebuild line by line, mirroring the closing/content rules: a blank content
-    // line is emitted empty (its whitespace would be trailing, and de-denting
-    // renders it empty anyway); under a common indent each non-blank line is
-    // shifted so the common base becomes `target`, keeping its relative extra
-    // indent; otherwise the line is verbatim. Finally the closing re-indented to
-    // `base`. Empty content collapses to just opening + closing.
+    // Reattach the delimiters around the content. Content lines (between the
+    // delimiters) exist only when n > 2. A bare-delimiter opening (its line is
+    // exactly the delimiter) rebases the content one level (INDENT = 4) deeper
+    // than the delimiters via `reindent_contents`; a content-bearing opening
+    // keeps it byte-for-byte. The closing is re-indented to `base`; empty content
+    // collapses to just opening + closing.
     mut out = opening;
-    for (let line : content) {
-        let piece = if (line.is_all_whitespace()) {
-            ""
+    if (n > 2) {
+        let content = ls[1..n - 1].join("\n");
+        let body = if (opening == "\"\"\"" || opening == "```") {
+            content.reindent_contents(base + 4)
         } else {
-            match (common) {
-                some(c) => " ".repeat(target) +++ line[c..],
-                none => line,
-            }
+            content
         };
-        set out = out +++ "\n" +++ piece;
-    }
+        set out = out +++ "\n" +++ body;
+    };
     out +++ "\n" +++ " ".repeat(base) +++ closing
 }.doc("""
     Re-lays-out a multi-line raw-string / template atom around `base` columns. The
     closing-delimiter line is re-indented to `base` — but only when it is whitespace
     followed by a bare triple-quote / triple-backtick delimiter (the inert blank
     closing line); otherwise the atom is returned unchanged. For a bare-opening block
-    (its opening line is exactly the delimiter), every non-blank content line is
-    shifted so the block's common indent becomes `base + 4` — one level deeper than
-    the delimiters — while each line keeps its indentation relative to that common
-    base. Content shifting is value-safe: the de-denter strips the common leading
-    space, so moving every non-blank line by the same amount leaves the value
-    unchanged; blank lines stay empty.
+    (its opening line is exactly the delimiter), the content is rebased via
+    `reindent_contents` so its common indent becomes `base + 4` — one level deeper
+    than the delimiters — while each line keeps its indentation relative to that
+    common base. A content-bearing opening keeps its content byte-for-byte; only the
+    closing delimiter moves.
 """).test({
     // Fewer than two lines: nothing to re-lay-out.
     assert("only".reindent_block(0) == "only");
@@ -115,18 +96,19 @@ pub fn reindent_block(self: str, base: i64) -> str {
     assert("\"\"\"hi\n  x\n      \"\"\"".reindent_block(2) == "\"\"\"hi\n  x\n  \"\"\"");
 })
 --- performance ---
-allocations: 78
-deallocations: 78
+allocations: 85
+deallocations: 85
 reallocations: 0
-bytes allocated: 3111
-instructions executed: 4289
-binary size: 10920
-  code: 4676
-  data: 1305
-  metadata: 4939
+bytes allocated: 3398
+instructions executed: 4426
+binary size: 11696
+  code: 5084
+  data: 1304
+  metadata: 5308
 --- monomorphizations ---
+__builtin_count_while$char$s0$lam11
 __builtin_count_while$char$s0$lam3
-__builtin_count_while$char$s0$lam7
+__m1__lines
 __map5$own0
 main
 reindent_block
