@@ -24,9 +24,9 @@ fn probe() -> bool { true }.test({
     assert(u32(1000000000) - u32(4000000000) == 0);
 
     // 64-bit signed: a large underflow saturates toward i64::MIN, which stays
-    // very negative (a wrapping sub would flip it positive). i64::MIN itself has
-    // no literal (its magnitude exceeds i64::MAX), so compare instead.
-    assert(-9000000000000000000 - 9000000000000000000 < -9000000000000000000);
+    // very negative (a wrapping sub would flip it positive) — it pins at exactly
+    // i64::MIN, now writable as a literal.
+    assert(-9000000000000000000 - 9000000000000000000 == -9223372036854775808);
     // Unsigned 64-bit underflow floors at 0.
     assert(u64(3) - u64(9) == 0);
 })

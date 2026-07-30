@@ -55,9 +55,9 @@ pub fn int_parse(self: str) -> i64? {
         return none;
     };
 
-    // The one non-wrapping overflow: a positive value equal to -i64::MIN, whose
-    // negation can't be represented (e.g. "9223372036854775808").
-    let min = (0 - 922337203685477580) * 10 - 8;
+    // The one non-wrapping overflow: `v` reached exactly i64::MIN, whose
+    // negation (-i64::MIN) has no i64 representation (e.g. "9223372036854775808").
+    let min = -9223372036854775808;
     if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
 }.doc("""
     Parse `self` as a decimal integer: an optional leading `-`, then one or
@@ -70,7 +70,7 @@ pub fn int_parse(self: str) -> i64? {
     assert("123".int_parse() == some(123)); // method form
     assert("0".int_parse() == some(0));
     assert("007".int_parse() == some(7)); // leading zeros are fine
-    assert("-45".int_parse() == some(0 - 45));
+    assert("-45".int_parse() == some(-45));
     assert("-0".int_parse() == some(0));
     assert("".int_parse() == none);
     assert("-".int_parse() == none); // a sign needs at least one digit
@@ -79,7 +79,7 @@ pub fn int_parse(self: str) -> i64? {
     assert(" 5".int_parse() == none); // no whitespace
     assert("9223372036854775807".int_parse() == some(9223372036854775807)); // i64::MAX
     assert("9223372036854775808".int_parse() == none); // one past MAX
-    assert("-9223372036854775808".int_parse() == some(0 - 9223372036854775807 - 1)); // i64::MIN
+    assert("-9223372036854775808".int_parse() == some(-9223372036854775808)); // i64::MIN
     assert("-9223372036854775809".int_parse() == none); // one past MIN
     assert("18446744073709551616".int_parse() == none); // far past, guard holds
 
@@ -115,9 +115,9 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 416
 instructions executed: 11067
-binary size: 9648
+binary size: 9632
   code: 3236
-  data: 2241
+  data: 2225
   metadata: 4171
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam2

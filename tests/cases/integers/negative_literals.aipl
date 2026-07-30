@@ -1,0 +1,41 @@
+import { <, == } from builtins;
+
+// A negative integer literal lexes as a single token: in prefix position (the
+// start of an expression, or after a token that can't end a value) the leading
+// `-` binds to the digits rather than parsing as the subtraction operator. So a
+// negative constant needs no `-` operator import (this file imports none), and
+// it reaches the full i64 range — including i64::MIN, whose magnitude exceeds
+// i64::MAX and so can't be written as a positive literal and then negated.
+fn probe() -> bool { true }.test({
+    // A plain constant, not a unary-minus expression — no `-` imported.
+    assert(-1234 == -1234);
+    assert(-1 < 0);
+    assert(-1 < 1);
+
+    // i64::MIN, reachable only because the `-` and digits parse together. It sits
+    // below MIN + 1, confirming it parsed to the real most-negative value.
+    assert(-9223372036854775808 < -9223372036854775807);
+
+    // Usable wherever a literal is: after `[`/`,`, as a call argument, as the
+    // value of a `{ }` block / return.
+    let xs = [-1, -2, -3];
+    assert(xs[1] == some(-2));
+    assert(id(-7) == -7);
+    assert(neg_one() == -1);
+})
+
+fn id(x: i64) -> i64 { x }
+
+fn neg_one() -> i64 { -1 }
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 134
+binary size: 2304
+  code: 684
+  data: 331
+  metadata: 1289
+--- monomorphizations ---
+main

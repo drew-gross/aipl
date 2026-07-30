@@ -147,9 +147,19 @@ fn body_respects_operator_precedence() {
 }
 
 #[test]
-fn unary_minus_in_body() {
+fn negative_literal_in_body() {
+    // `-5` is a single negative-literal token: in prefix position the sign lexes
+    // into the number, so the body is `num(-5)`, not unary minus applied to `5`.
     let p = parse("fn f() { -5 }").unwrap();
-    assert_eq!(fn_item(&p, 0).body, neg(num(5)));
+    assert_eq!(fn_item(&p, 0).body, num(-5));
+}
+
+#[test]
+fn unary_minus_on_non_literal() {
+    // A `-` before a non-digit is still the unary-minus operator (the sign rule
+    // only claims `-` immediately followed by digits).
+    let p = parse("fn f(x: i64) { -x }").unwrap();
+    assert_eq!(fn_item(&p, 0).body, neg(ident("x")));
 }
 
 #[test]
