@@ -169,11 +169,11 @@ fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
     }
 }
 
-// Build an `IntLit` from a matched digit run. The `Int` matcher only claims the
-// run; parsing is the caller's job, so this parses it with the `int_parse`
-// builtin and, as a fallible `Try` emit, reports an i64 overflow as an error
-// message — the library attaches the literal's span. Parsing policy lives here,
-// in the consumer, not in the lexer library.
+// Build an `IntLit` from a matched integer run (an optional leading `-` then
+// digits). The `Int` matcher only claims the run; parsing is the caller's job, so
+// this parses it — sign and all — with the `int_parse` builtin and, as a fallible
+// `Try` emit, reports an i64 overflow as an error message — the library attaches
+// the literal's span. Parsing policy lives here, in the consumer, not the library.
 fn int_lit(text: str) -> AiplTok!str {
     match (text.int_parse()) {
         some(v) => ok(IntLit(v)),
@@ -253,17 +253,15 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("false", False),
         kw("none", None),
         TokenRule { matcher: CharRun(ident_start(), ident_cont()), emit: Of(Name) },
-        // A negative integer literal `-123`: the leading `-` is scanned into the
-        // token, so `int_lit` parses the whole `-digits` string and the full i64
-        // range is reachable (i64::MIN, whose magnitude a bare digit run can't
-        // spell as a positive literal). `SignedInt` matches only a `-`
-        // *immediately* followed by a digit, so it declines on `- ` and `-x` and
-        // `op("-", Minus)` below claims those (subtraction / unary minus) — the
-        // rule order is the whole disambiguation. Consequence: a value minus a
-        // number must be spaced (`a - 5`); `a-5` lexes `a` then the literal `-5`.
-        // Before the bare `Int` rule (disjoint — sign vs. digit — so their order
-        // is only for reading) and before the `-` operator rule.
-        TokenRule { matcher: SignedInt, emit: Try(int_lit) },
+        // Integer literals, signed or unsigned: `Int` matches a digit run with an
+        // optional leading `-`, and `int_lit` parses the whole thing (so `-123` is
+        // one token and the full i64 range is reachable — i64::MIN's magnitude a
+        // bare digit run can't spell as a positive literal). The `-` is consumed
+        // only when a digit *immediately* follows, so `Int` declines on `- ` and
+        // `-x` and `op("-", Minus)` below claims those (subtraction / unary minus).
+        // Placing `Int` before that operator rule is the whole disambiguation.
+        // Consequence: a value minus a number must be spaced (`a - 5`); `a-5` lexes
+        // `a` then the literal `-5`.
         TokenRule { matcher: Int, emit: Try(int_lit) },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
@@ -609,24 +607,24 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4651
-deallocations: 4651
+allocations: 4595
+deallocations: 4595
 reallocations: 0
-bytes allocated: 273288
-instructions executed: 768191
-binary size: 201296
-  code: 125924
+bytes allocated: 269736
+instructions executed: 759151
+binary size: 198704
+  code: 124228
   data: 7396
-  metadata: 67976
+  metadata: 67080
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
 __builtin_count_while$char$s0$lam31
-__builtin_count_while$char$s0$lam32
+__builtin_count_while$char$s0$lam33
 __builtin_count_while$char$s0$lam34
 __builtin_count_while$char$s0$lam36
 __builtin_int_parse
-__builtin_is_some_and$char$lam33
+__builtin_is_some_and$char$lam32
 __lambda_0
 __lambda_1
 __lambda_2

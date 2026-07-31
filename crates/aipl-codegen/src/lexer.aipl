@@ -166,24 +166,20 @@ struct LexError { message: str, span: Span }
 //   digit) and/or an exponent (`e`/`E`, an optional sign, at least one
 //   digit), JSON style. A bare digit run does *not* match — put a `Float`
 //   rule ahead of the int rule and each number lexes as the right one.
-// - `Int`: a decimal digit run, like `CharRun("0..9", "0..9")` — a distinct
+// - `Int`: a decimal digit run with an *optional* leading `-` — a distinct
 //   matcher because a number is not an identifier, but (like `Float`) it carries
 //   no computed value: its text is left *unparsed*, so the rule pairs it with an
-//   `Of`/`Try` emit that parses the digits itself (via the `int_parse` builtin,
-//   or its own scanner). Parsing — base, digit separators, and what overflow
-//   means — is the caller's, not the library's.
-// - `SignedInt`: a `-` *immediately* followed by a decimal digit run — a
-//   negative integer literal claimed as one token. Like `Int` it carries no
-//   value (the emit parses the whole `-digits` text), but scanning the sign
-//   *into* the token is what lets the emit reach the full signed range: a bare
-//   `Int` run can only spell magnitudes up to the type's max, so the most-negative
-//   value (an i64's `-9223372036854775808`) is expressible only when the `-` and
-//   digits parse together. It declines when the char after `-` isn't a digit (a
-//   space or a letter), so listing it before a `-` operator rule is the whole
-//   disambiguation: `-5` is a literal, `- 5` and `-x` fall through to the `-`
-//   operator (subtraction / unary minus). Whitespace *after* the `-` thus marks
-//   the operator; `-5` is never subtraction — a value minus a number must be
-//   spelled `a - 5`.
+//   `Of`/`Try` emit that parses the digits (and any sign) itself (via the
+//   `int_parse` builtin, or its own scanner). Parsing — base, digit separators,
+//   and what overflow means — is the caller's, not the library's. The `-` is
+//   consumed only when a digit *immediately* follows it, so `- 5`/`-x` (a space or
+//   a letter after the `-`) don't match and are left for a `-` operator rule. Rule
+//   order alone then decides the reading: `Int` before a `-` operator makes `-5` a
+//   signed literal (and `a - 5` still subtraction, since the `- 5` there has a
+//   space); the operator before `Int` makes every `-` the operator and `Int`
+//   unsigned. Scanning the sign *into* the token is also what lets the emit reach
+//   the full signed range — an i64's `-9223372036854775808` overflows as a
+//   positive literal, so it's only expressible with the `-` and digits together.
 //
 // Tokens carry values (see `TokenValue`), computed by the claiming matcher:
 // `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
@@ -209,7 +205,6 @@ variant Matcher =
     | ToEol(str)
     | Float
     | Int
-    | SignedInt
 
 // One prioritized entry of a rule set: the shape to match, how to turn a match
 // into a kind (`emit`), and what becomes of its matches. A plain rule emits a
@@ -411,17 +406,18 @@ fn float_len(self: str) -> i64 {
     if (int_end < end) { end } else { 0 }
 }
 
-// `SignedInt`: the length of a leading `-` then a digit run — `1 +` the run. 0
-// (no match) unless a `-` is *immediately* followed by at least one digit, so a
-// `-` before a space or a letter is left for a `-` operator rule. That decline is
-// the entire sign-vs-operator disambiguation: place a `SignedInt` rule before the
-// `-` operator rule and `-5` is a literal while `- 5`/`-x` are the operator.
-fn signed_int_len(self: str) -> i64 {
-    if (self[0] == some('-') && self[1].is_some_and(is_digit)) {
-        1 + self[1..].count_while(is_digit)
-    } else {
-        0
-    }
+// `Int`: the length of an optional leading `-` then a digit run. 0 (no match)
+// when there's no digit run — including a `-` *not* immediately followed by a
+// digit (a `-` before a space or a letter is left for a `-` operator rule, so
+// `- 5`/`-x` don't match). That decline is the entire sign-vs-operator
+// disambiguation: with an `Int` rule before the `-` operator rule, `-5` is a
+// signed literal while `- 5`/`-x` are the operator; put the operator first and
+// every `-` is the operator and `Int` is unsigned.
+fn int_len(self: str) -> i64 {
+    let signed = self[0] == some('-') && self[1].is_some_and(is_digit);
+    let start = if (signed) { 1 } else { 0 };
+    let digits = self[start..].count_while(is_digit);
+    if (digits == 0) { 0 } else { start + digits }
 }
 
 // The value a token of matcher `m` carries, computed from its matched `text`
@@ -443,7 +439,6 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         ToEol(marker) => NoValue,
         Float => NoValue,
         Int => NoValue,
-        SignedInt => NoValue,
     }
 }
 
@@ -557,8 +552,7 @@ fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
             )?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
             Float => step_result(r, src, at, src[at..].float_len())?,
-            Int => step_result(r, src, at, src[at..].count_while(is_digit))?,
-            SignedInt => step_result(r, src, at, src[at..].signed_int_len())?,
+            Int => step_result(r, src, at, src[at..].int_len())?,
         };
         if (at < res.end) {
             return ok(res);
@@ -1005,56 +999,45 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // single-quote scan and the `Try` one-char verdict are exercised by the
     // string tests above and the `nonempty_str` test below.
 
-    // Int: the matcher only claims the digit run; the `Try` emit (`int_tok`)
-    // parses it. Overflow is a lex error again — but now the *caller* decides that
-    // (the library just attaches the span), so a bignum lexer never fails here.
-    let ints = [ws, TokenRule { matcher: Int, emit: Try(int_tok) }, ident];
+    // Int: one matcher for both unsigned and signed literals — a digit run with an
+    // *optional* leading `-`. The `Try` emit (`int_tok`) parses it; overflow is a
+    // lex error the *caller* decides (the library just attaches the span), so a
+    // bignum lexer never fails here.
+    let minus = TokenRule { matcher: Exact("-"), emit: Bare(Op) };
+    let ints = [ws, TokenRule { matcher: Int, emit: Try(int_tok) }, ident, minus];
     assert(lex("42", ints)? == toks([tok(IntTok(42), 0, 2)]));
     assert(lex("0 7", ints)? == toks([tok(IntTok(0), 0, 1), tok(IntTok(7), 2, 3)]));
     assert(
         lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
     );
 
-    // SignedInt: a `-` *immediately* followed by digits is one negative-literal
-    // token. The matcher declines when the next char isn't a digit, so listing it
-    // before the `-` operator rule is the whole disambiguation — no context, no
-    // previous-token lookback. `int_tok` parses the whole `-digits` text, so the
-    // full i64 range (incl. i64::MIN, which a bare `Int` run can't spell) is
-    // reachable.
-    let minus = TokenRule { matcher: Exact("-"), emit: Bare(Op) };
-    let signed = [
-        ws,
-        TokenRule { matcher: SignedInt, emit: Try(int_tok) },
-        TokenRule { matcher: Int, emit: Try(int_tok) },
-        ident,
-        minus,
-    ];
-    // `-` glued to digits → one negative literal, wherever it appears.
-    assert(lex("-5", signed)? == toks([tok(IntTok(-5), 0, 2)]));
-    assert(lex("a -5", signed)? == toks([tok(Ident("a"), 0, 1), tok(IntTok(-5), 2, 4)]));
+    // `-` glued to digits → one signed literal, wherever it appears (the `Int`
+    // rule is before the `-` operator rule).
+    assert(lex("-5", ints)? == toks([tok(IntTok(-5), 0, 2)]));
+    assert(lex("a -5", ints)? == toks([tok(Ident("a"), 0, 1), tok(IntTok(-5), 2, 4)]));
 
-    // A space after `-` makes it the operator (subtraction); the digits are a
-    // separate `Int`. This is the whole rule: `- 5` is the operator, `-5` isn't.
+    // A space after `-` makes `Int` decline, so the operator rule claims the `-`
+    // and the digits are a separate `Int`: `- 5` is the operator, `-5` isn't.
     assert(
-        lex("a - 5", signed)? == toks([tok(Ident("a"), 0, 1), tok(Op, 2, 3), tok(IntTok(5), 4, 5)]),
+        lex("a - 5", ints)? == toks([tok(Ident("a"), 0, 1), tok(Op, 2, 3), tok(IntTok(5), 4, 5)]),
     );
     assert(
-        lex("5 - 3", signed)? == toks([tok(IntTok(5), 0, 1), tok(Op, 2, 3), tok(IntTok(3), 4, 5)]),
+        lex("5 - 3", ints)? == toks([tok(IntTok(5), 0, 1), tok(Op, 2, 3), tok(IntTok(3), 4, 5)]),
     );
 
-    // `-` before a non-digit (a letter) also declines → the operator rule takes
-    // the `-` and the letters are a separate identifier (unary minus, `-x`).
-    assert(lex("-b", signed)? == toks([tok(Op, 0, 1), tok(Ident("b"), 1, 2)]));
+    // `-` before a non-digit (a letter) also declines → the operator rule takes it
+    // and the letters are a separate identifier (so a consumer gets unary `-x`).
+    assert(lex("-b", ints)? == toks([tok(Op, 0, 1), tok(Ident("b"), 1, 2)]));
 
-    // The full range, sign scanned into the token: i64::MIN parses (a positive
-    // `Int` run of the same magnitude would overflow), one past it does not.
+    // Optional sign reaches the full range: i64::MIN parses (a positive run of the
+    // same magnitude would overflow), one past it does not.
     assert(
-        lex("-9223372036854775808", signed)? == toks(
+        lex("-9223372036854775808", ints)? == toks(
             [tok(IntTok(0 - 9223372036854775807 - 1), 0, 20)],
         ),
     );
     assert(
-        lex("-9223372036854775809", signed) == err(lex_err("integer literal overflows i64", 0, 20)),
+        lex("-9223372036854775809", ints) == err(lex_err("integer literal overflows i64", 0, 20)),
     );
 
     // The rule composes anywhere the full rule set runs, including a template
@@ -1062,7 +1045,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let tpls_signed = [
         ws,
         TokenRule { matcher: Template("`", "\\`{ntr", |segs: str[]| segs), emit: OfSeg(tpl_kind) },
-        TokenRule { matcher: SignedInt, emit: Try(int_tok) },
+        TokenRule { matcher: Int, emit: Try(int_tok) },
         ident,
         digits,
         minus,
@@ -1245,22 +1228,22 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1685
-deallocations: 1685
+allocations: 1678
+deallocations: 1678
 reallocations: 0
-bytes allocated: 80312
-instructions executed: 277660
-binary size: 1759208
-  code: 1101908
+bytes allocated: 79768
+instructions executed: 276213
+binary size: 1755304
+  code: 1099412
   data: 8764
-  metadata: 648536
+  metadata: 647128
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam27
 __builtin_count_while$char$s0$lam32
-__builtin_count_while$char$s0$lam33
+__builtin_count_while$char$s0$lam34
 __builtin_count_while$char$s0$lam47
 __builtin_int_parse
-__builtin_is_some_and$char$lam34
+__builtin_is_some_and$char$lam33
 __lambda_0
 __lambda_1
 __lambda_10
