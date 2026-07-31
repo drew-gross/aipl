@@ -1,0 +1,35 @@
+import { wrapping_add as +, ==, value_or } from builtins;
+
+// An optional may carry a *boxed* (recursive) variant payload the same way it
+// carries a str or array: the value is an 8-byte heap pointer that fits the
+// optional slot, so `value_or` unwraps it directly (a `select`), no `match`
+// needed. The `some` arm owns its list; the `none` arm falls back to a default.
+variant List = Nil | Cons(i64, List)
+
+fn sum(self: List) -> i64 {
+    match (self) {
+        Nil => 0,
+        Cons(x, rest) => x + rest.sum(),
+    }
+}
+
+fn pick(b: bool) -> List? { if (b) { some(Cons(1, Cons(2, Nil))) } else { none } }.test({
+    let present = pick(true).value_or(Nil);
+    assert(present.sum() == 3); // 1 + 2
+    let absent = pick(false).value_or(Cons(9, Nil));
+    assert(absent.sum() == 9); // default used
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 336
+instructions executed: 212
+binary size: 2920
+  code: 1164
+  data: 93
+  metadata: 1663
+--- monomorphizations ---
+main
+pick
+sum

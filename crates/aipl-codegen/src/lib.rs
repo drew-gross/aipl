@@ -12085,11 +12085,18 @@ fn compile_call_expr<M: Module>(
                 )?;
                 inner
             };
-            if !is_array_elem(&result_ty) {
+            // The select-based lowering below moves a single 8-byte payload out
+            // of the optional. That fits any 8-byte value: a scalar/str/array
+            // (`is_array_elem`) or a boxed (recursive) struct/variant, which is a
+            // heap pointer (`is_boxed`). An *inline* struct/variant, a tuple, or a
+            // nested optional stores its payload wider than 8 bytes and still
+            // needs `match` to unwrap.
+            if !is_array_elem(&result_ty) && !is_boxed(&result_ty, structs) {
                 return Err(Error::at(
                     format!(
-                        "value_or's value must be a scalar, str, or array, not {} (use match to \
-                         unwrap a nested optional)",
+                        "value_or's value must be a scalar, str, array, or boxed (recursive) \
+                         type, not {} (use match to unwrap an inline struct/variant or nested \
+                         optional)",
                         type_name(&result_ty)
                     ),
                     span.clone(),

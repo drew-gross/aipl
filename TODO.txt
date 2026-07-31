@@ -66,7 +66,6 @@ make it so functions can call functions defined later in the file
 allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl
 
 to fix:
-- value_or can't unwrap a variant optional
 - The AIPL formatter can't keep comments between variant arms
 - reassigning a recursive-variant accumulator inside a for loop (set acc = WCons(d, acc)) silently loses the mutation
 
