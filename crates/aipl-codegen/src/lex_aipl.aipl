@@ -611,11 +611,11 @@ allocations: 4595
 deallocations: 4595
 reallocations: 0
 bytes allocated: 269736
-instructions executed: 759151
-binary size: 198432
-  code: 124228
+instructions executed: 759056
+binary size: 198264
+  code: 124092
   data: 7068
-  metadata: 67136
+  metadata: 67104
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26

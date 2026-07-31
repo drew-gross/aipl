@@ -64,6 +64,7 @@ import wrapping_mul as *
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
 allow ? for optional in optional returning functions, use to simplify builtin_int_parse.aipl
+make a fold builtin (can simplify builtin_in_parse)
 
 to fix:
 - The AIPL formatter can't keep comments between variant arms

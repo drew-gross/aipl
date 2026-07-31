@@ -1900,16 +1900,20 @@ impl Cx<'_> {
                 result
             }
             ExprKind::Try(inner) => {
-                // `expr?` requires a result `T!E` and yields the Ok type `T`. The
-                // constraint that the enclosing fn returns `_!E` (so the
-                // early-returned Err fits) is enforced in codegen, where the
-                // return type is in scope.
+                // `expr?` unwraps a result `T!E` (yielding `T`) or an optional
+                // `T?` (yielding `T`). The constraint that the enclosing fn
+                // returns `_!E` / an optional (so the early-returned Err / `none`
+                // fits) is enforced in codegen, where the return type is in scope.
                 let it = self.check_expr(inner, env, effects)?;
                 match it {
                     Type::Result(ok, _) => (*ok).clone(),
+                    Type::Optional(inner) => (*inner).clone(),
                     other => {
                         return Err(Error::at(
-                            format!("\"?\" requires a result (T!E), got {}", tyname(&other)),
+                            format!(
+                                "\"?\" requires a result (T!E) or an optional (T?), got {}",
+                                tyname(&other)
+                            ),
                             span.clone(),
                         ));
                     }

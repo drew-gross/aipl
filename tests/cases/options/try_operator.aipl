@@ -1,0 +1,34 @@
+import { wrapping_add as +, +++, ==, value_or } from builtins;
+
+// The postfix `?` unwraps an optional inside a function that itself returns one:
+// `some` continues with the inner value, `none` early-returns `none` — the value
+// analog of `?`-propagates-`err` on a result. Chaining threads the first `none`
+// straight out. The `str` payload exercises refcounting on both paths (the perf
+// section's balanced alloc/dealloc counts are the check).
+fn bang(o: str?) -> str? {
+    let s = o?;
+    some(s +++ "!")
+}
+
+fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
+    assert(bang(some("hi")) == some("hi!")); // some: unwrap and continue
+    assert(bang(none) == none); // none: early return
+    assert(add2(some(3), some(4)) == some(7)); // both some
+    assert(add2(some(3), none) == none); // second none propagates
+    assert(add2(none, some(4)) == none); // first none propagates
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 40
+instructions executed: 319
+binary size: 3304
+  code: 1400
+  data: 287
+  metadata: 1617
+--- monomorphizations ---
+__test$add2
+add2
+bang
+main

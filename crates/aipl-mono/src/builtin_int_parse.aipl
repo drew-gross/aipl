@@ -45,11 +45,7 @@ pub fn int_parse(self: str) -> i64? {
     // `v > 0` check *after* the loop detects overflow; it needn't run per digit.
     mut v = 0;
     for (let c : digits) {
-        let dv = c.to_digit();
-        if (dv == none) {
-            return none;
-        };
-        set v = v * 10 - dv.value_or(0);
+        set v = v * 10 - c.to_digit()?;
     }
     if (v > 0) {
         return none;
@@ -114,11 +110,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 416
-instructions executed: 11067
-binary size: 9816
-  code: 3236
+instructions executed: 8623
+binary size: 9776
+  code: 3200
   data: 2185
-  metadata: 4395
+  metadata: 4391
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam2
 __test$int_parse

@@ -15376,9 +15376,73 @@ fn compile_expr<M: Module>(
             // arm, which then consumes it instead of retaining + deferring its drop.
             let scope_len_before = scope_depth(scopes);
             let (rptr, rty) = compile_expr(module, builder, cx, scopes, inner)?;
+
+            // An optional operand: `expr?` unwraps `some`, or early-returns `none`
+            // from the enclosing (optional-returning) function — the value analog
+            // of the `?`-propagates-`err` behaviour below. Optionals share the
+            // result's `{tag, value@8}` layout (tag != 0 = some, 0 = none), so the
+            // branch structure mirrors the Ok/Err split; only the early-returned
+            // husk differs (a fresh `none`, tag 0, carries no payload).
+            if let Type::Optional(inner_ty) = &rty {
+                let val_ty = (**inner_ty).clone();
+                if !matches!(cx.ret_ty, Type::Optional(_)) {
+                    return Err(Error::at(
+                        "\"?\" on an optional can only be used in a function that returns an \
+                         optional"
+                            .to_string(),
+                        span.clone(),
+                    ));
+                }
+                let tag = builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), rptr, 0);
+                let some_block = builder.create_block();
+                let none_block = builder.create_block();
+                // tag != 0 = some → continue; tag 0 = none → early return.
+                builder.ins().brif(tag, some_block, &[], none_block, &[]);
+
+                // --- none: drop live scopes and return a fresh `none`. ---
+                builder.switch_to_block(none_block);
+                builder.seal_block(none_block);
+                for scope in scopes.iter() {
+                    for t in scope {
+                        let v = match t.owned {
+                            Owned::Value(v) => v,
+                            Owned::Slot(slot) => {
+                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
+                            }
+                        };
+                        emit_drop(builder, module, builtins, structs, v, &t.ty);
+                    }
+                }
+                let sret = cx.sret.expect("optional-returning fn has an sret pointer");
+                let zero = builder.ins().iconst(types::I64, 0);
+                builder.ins().store(MemFlagsData::trusted(), zero, sret, 0);
+                builder.ins().return_(&[]);
+
+                // --- some: unwrap the value and carry on (mirrors the Ok arm). ---
+                builder.switch_to_block(some_block);
+                builder.seal_block(some_block);
+                let owned_temp = move_owned_temp(scopes, scope_len_before, rptr);
+                let val = component(builder, rptr, OPT_VALUE_OFFSET, &val_ty, structs);
+                if needs_drop(&val_ty, structs) {
+                    if !owned_temp {
+                        emit_retain(builder, module, builtins, structs, val, &val_ty);
+                    }
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(val, &val_ty));
+                }
+                return Ok((val, val_ty));
+            }
+
             let Type::Result(ok_in, err_in) = &rty else {
                 return Err(Error::at(
-                    format!("\"?\" operand must be a result, got {}", type_name(&rty)),
+                    format!(
+                        "\"?\" operand must be a result or an optional, got {}",
+                        type_name(&rty)
+                    ),
                     inner.span.clone(),
                 ));
             };

@@ -4040,11 +4040,12 @@ impl Mono<'_> {
                 )
             }
             ExprKind::Try(inner) => {
-                // `expr?` yields the Ok type of `expr`'s result; codegen emits
-                // the unwrap / early-return-Err.
+                // `expr?` yields the Ok type of a result, or the inner type of an
+                // optional; codegen emits the unwrap / early-return of `err`/`none`.
                 let (rin, it) = self.infer(inner, env)?;
                 let ok = match it {
                     Type::Result(ok, _) => *ok,
+                    Type::Optional(inner) => *inner,
                     _ => Type::NoneInner,
                 };
                 (node(ExprKind::Try(Box::new(rin))), ok)
