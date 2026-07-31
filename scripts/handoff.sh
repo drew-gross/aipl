@@ -100,7 +100,15 @@ fi
 
 # --- 2. Discovery test ---------------------------------------------------------
 
-run_step "cargo test (discovery)" cargo test
+# `--no-fail-fast` so the discovery run executes *every* test binary and reports
+# all remediable staleness in one pass. Plain `cargo test` stops at the first
+# failing binary, and `cases` runs (alphabetically) before `dogfood_ir` — so a
+# change that makes both the per-case `--- performance ---` sections and
+# `dogfood.clif` stale would die inside `cases`, `need_ir` would stay 0, the
+# staged-IR regen (step 4) would be skipped, and the final run would then fail on
+# `checked_in_ir_is_current` with the IR never regenerated. Running all binaries
+# surfaces the section mismatches *and* the IR gate together.
+run_step "cargo test (discovery)" cargo test --no-fail-fast
 if [ $? -eq 0 ]; then
     printf '\n%sHANDOFF OK%s (green with no regeneration needed)\n' "$green$bold" "$off" >&2
     exit 0
