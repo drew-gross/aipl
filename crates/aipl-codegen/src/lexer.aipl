@@ -172,16 +172,18 @@ struct LexError { message: str, span: Span }
 //   `Of`/`Try` emit that parses the digits itself (via the `int_parse` builtin,
 //   or its own scanner). Parsing — base, digit separators, and what overflow
 //   means — is the caller's, not the library's.
-// - `SignedInt`: a leading `-` then a decimal digit run — a negative integer
-//   literal claimed as one token. Like `Int` it carries no value (the emit
-//   parses the whole `-digits` text), but scanning the sign *into* the token is
-//   what lets the emit reach the full signed range: a bare `Int` run can only
-//   spell magnitudes up to the type's max, so the most-negative value (an i64's
-//   `-9223372036854775808`) is expressible only when the `-` and digits parse
-//   together. Whether a `-` is a *sign* or the subtraction operator depends on
-//   the previous token, not on rule order — so gate a `SignedInt` rule with a
-//   `cond` (see `Cond`/`TokenRule.cond`) that accepts only prefix positions, and
-//   binary subtraction falls through to a `-` operator rule.
+// - `SignedInt`: a `-` *immediately* followed by a decimal digit run — a
+//   negative integer literal claimed as one token. Like `Int` it carries no
+//   value (the emit parses the whole `-digits` text), but scanning the sign
+//   *into* the token is what lets the emit reach the full signed range: a bare
+//   `Int` run can only spell magnitudes up to the type's max, so the most-negative
+//   value (an i64's `-9223372036854775808`) is expressible only when the `-` and
+//   digits parse together. It declines when the char after `-` isn't a digit (a
+//   space or a letter), so listing it before a `-` operator rule is the whole
+//   disambiguation: `-5` is a literal, `- 5` and `-x` fall through to the `-`
+//   operator (subtraction / unary minus). Whitespace *after* the `-` thus marks
+//   the operator; `-5` is never subtraction — a value minus a number must be
+//   spelled `a - 5`.
 //
 // Tokens carry values (see `TokenValue`), computed by the claiming matcher:
 // `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
@@ -209,27 +211,6 @@ variant Matcher =
     | Int
     | SignedInt
 
-// A rule's precondition on the *previous* emitted token — the hook for a rule
-// that depends on lexing context, which rule order alone can't express.
-// `Anytime` (the default) always applies. `After(p)` applies only when `p`
-// returns true for the previous significant token's kind — `none` at the start
-// of input, and left unchanged across skipped whitespace and trivia, so a comment
-// between two tokens doesn't reset the context. The motivating use is a
-// leading-sign numeric literal (`SignedInt`): a `-` opens a negative literal in
-// *prefix* position (at the start, or after a token that doesn't end a value) but
-// is binary subtraction after one that does — a split only the previous token
-// reveals. Generic over the kind `K`, like the rest of a rule set.
-variant Cond<K> = Anytime | After((K?) -> bool)
-
-// Whether a rule carrying condition `c` may match at a position whose previous
-// emitted token kind is `prev` (`none` at the start of input).
-fn cond_allows<K>(c: Cond<K>, prev: K?) -> bool {
-    match (c) {
-        Anytime => true,
-        After(p) => p(prev),
-    }
-}
-
 // One prioritized entry of a rule set: the shape to match, how to turn a match
 // into a kind (`emit`), and what becomes of its matches. A plain rule emits a
 // token; `skip: true` consumes matches silently (whitespace); `trivia: true`
@@ -244,16 +225,12 @@ fn cond_allows<K>(c: Cond<K>, prev: K?) -> bool {
 // "unterminated delimited token" / "unterminated template literal") — so a rule
 // can name its token in the diagnostic (`"unterminated string literal"`) without
 // every rule having to.
-// `cond` gates the rule on the previous emitted token (see `Cond`); the default
-// `Anytime` matches regardless of context, so a rule opts into context-sensitivity
-// only when it needs it (a leading-sign numeric literal).
 struct TokenRule<K> {
     matcher: Matcher,
     emit: Emit<K>,
     skip: bool = false,
     trivia: bool = false,
     unterminated: str = "",
-    cond: Cond<K> = Anytime,
 }
 
 // What `lex` returns: the emitted tokens, and the trivia side-channel — the
@@ -436,9 +413,9 @@ fn float_len(self: str) -> i64 {
 
 // `SignedInt`: the length of a leading `-` then a digit run — `1 +` the run. 0
 // (no match) unless a `-` is *immediately* followed by at least one digit, so a
-// bare `-` (the subtraction operator) is left for a `-` operator rule. This only
-// measures the shape; whether a `-` here is a sign at all is the rule's `cond`'s
-// call, from the previous token.
+// `-` before a space or a letter is left for a `-` operator rule. That decline is
+// the entire sign-vs-operator disambiguation: place a `SignedInt` rule before the
+// `-` operator rule and `-5` is a literal while `- 5`/`-x` are the operator.
 fn signed_int_len(self: str) -> i64 {
     if (self[0] == some('-') && self[1].is_some_and(is_digit)) {
         1 + self[1..].count_while(is_digit)
@@ -532,69 +509,59 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: i64, n: i64) -> StepResult<K>!L
 }
 
 // One lexing step at absolute position `at`: tries each rule in order (first
-// match wins) and returns the winning rule's outcome — see `StepResult`. `prev`
-// is the previous emitted token's kind (`none` at the start of input); a rule
-// whose `cond` rejects `prev` is skipped without even running its matcher, so a
-// context-gated rule (a leading-sign literal) can decline in-place and let a
-// later rule claim the text. Every arm but `Template` computes how far its
-// matcher reaches (0 for no match — no matcher matches empty input, so a nonzero
-// length always means progress) and wraps it via `step_result`; a `Template`'s
-// multi-token run doesn't fit a single length, so its arm builds the outcome
-// directly. Mutually recursive with `template_scan`: an interpolation re-enters
-// this full rule set, so template literals nest.
-fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[], prev: K?) -> StepResult<K>!LexError {
+// match wins) and returns the winning rule's outcome — see `StepResult`. Every
+// arm but `Template` computes how far its matcher reaches (0 for no match — no
+// matcher matches empty input, so a nonzero length always means progress) and
+// wraps it via `step_result`; a `Template`'s multi-token run doesn't fit a single
+// length, so its arm builds the outcome directly. Mutually recursive with
+// `template_scan`: an interpolation re-enters this full rule set, so template
+// literals nest.
+fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     for (let r : rules) {
-        if (cond_allows(r.cond, prev)) {
-            let res = match (r.matcher) {
-                CharRun(first, cont) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].char_run_len(first, cont),
-                )?,
-                Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
-                Keyword(spelling, boundary) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].keyword_len(spelling, boundary),
-                )?,
-                Delimited(delims, escapes) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].delimited_len(at, delims, escapes, r.unterminated)?,
-                )?,
-                Between(open, close) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].between_len(at, open, close, r.unterminated)?,
-                )?,
-                Nested(open, close) => step_result(
-                    r,
-                    src,
-                    at,
-                    src[at..].nested_len(at, open, close, r.unterminated)?,
-                )?,
-                Template(delim, escapes, finalize) => template_step(
-                    src,
-                    at,
-                    delim,
-                    escapes,
-                    finalize,
-                    r.emit,
-                    rules,
-                    r.unterminated,
-                )?,
-                ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
-                Float => step_result(r, src, at, src[at..].float_len())?,
-                Int => step_result(r, src, at, src[at..].count_while(is_digit))?,
-                SignedInt => step_result(r, src, at, src[at..].signed_int_len())?,
-            };
-            if (at < res.end) {
-                return ok(res);
-            };
+        let res = match (r.matcher) {
+            CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
+            Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
+            Keyword(spelling, boundary) => step_result(
+                r,
+                src,
+                at,
+                src[at..].keyword_len(spelling, boundary),
+            )?,
+            Delimited(delims, escapes) => step_result(
+                r,
+                src,
+                at,
+                src[at..].delimited_len(at, delims, escapes, r.unterminated)?,
+            )?,
+            Between(open, close) => step_result(
+                r,
+                src,
+                at,
+                src[at..].between_len(at, open, close, r.unterminated)?,
+            )?,
+            Nested(open, close) => step_result(
+                r,
+                src,
+                at,
+                src[at..].nested_len(at, open, close, r.unterminated)?,
+            )?,
+            Template(delim, escapes, finalize) => template_step(
+                src,
+                at,
+                delim,
+                escapes,
+                finalize,
+                r.emit,
+                rules,
+                r.unterminated,
+            )?,
+            ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
+            Float => step_result(r, src, at, src[at..].float_len())?,
+            Int => step_result(r, src, at, src[at..].count_while(is_digit))?,
+            SignedInt => step_result(r, src, at, src[at..].signed_int_len())?,
+        };
+        if (at < res.end) {
+            return ok(res);
         };
     }
     ok(StepResult { tokens: [], trivia: [], end: at })
@@ -775,10 +742,6 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
     mut trivia = [];
     mut depth = 1;
     mut i = at;
-
-    // The interpolation body opens fresh: just past the `{`, a `-` is a sign, so
-    // start with no previous token (as at the start of input).
-    mut prev = none;
     while (0 < depth) {
         if (!(i < src.len())) {
             return err(
@@ -792,13 +755,12 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
             set depth = 0;
             set i = i + 1;
         } else {
-            let step = lex_step(src, i, rules, prev)?;
+            let step = lex_step(src, i, rules)?;
             if (step.end == i) {
                 return err(LexError { message: "unexpected character", span: i..i + 1 });
             };
             for (let t : step.tokens) {
                 set toks.push(t);
-                set prev = some(t.kind);
             }
             for (let t : step.trivia) {
                 set trivia.push(t);
@@ -905,14 +867,9 @@ fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { LexResult { tokens, trivia: 
 pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];
     mut trivia = [];
-
-    // The previous emitted token's kind, for a rule's `cond` (see `lex_step`).
-    // Only real tokens advance it — skipped whitespace and trivia leave it be, so
-    // context carries across a comment between two tokens.
-    mut prev = none;
     mut pos = 0;
     while (pos < self.len()) {
-        let step = lex_step(self, pos, rules, prev)?;
+        let step = lex_step(self, pos, rules)?;
         if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
             // source with the span to show it).
@@ -920,7 +877,6 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         };
         for (let t : step.tokens) {
             set tokens.push(t);
-            set prev = some(t.kind);
         }
         for (let t : step.trivia) {
             set trivia.push(t);
@@ -1059,42 +1015,35 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
     );
 
-    // SignedInt + cond: a `-` then digits is one negative-literal token, but only
-    // in *prefix* position — which the rule's `cond` decides from the previous
-    // token. `after_op` treats a `-` as a sign at the start of input or right
-    // after an operator, and as subtraction after a value (a number or an
-    // identifier), so the `SignedInt` rule declines there and the `-` operator
-    // rule claims it. `int_tok` parses the whole `-digits` text, so the full i64
-    // range — including i64::MIN, whose magnitude a bare `Int` run can't spell —
-    // is reachable.
-    let after_op = |prev: Kind?| { prev == none || prev == some(Op) };
+    // SignedInt: a `-` *immediately* followed by digits is one negative-literal
+    // token. The matcher declines when the next char isn't a digit, so listing it
+    // before the `-` operator rule is the whole disambiguation — no context, no
+    // previous-token lookback. `int_tok` parses the whole `-digits` text, so the
+    // full i64 range (incl. i64::MIN, which a bare `Int` run can't spell) is
+    // reachable.
     let minus = TokenRule { matcher: Exact("-"), emit: Bare(Op) };
     let signed = [
         ws,
-        TokenRule { matcher: SignedInt, emit: Try(int_tok), cond: After(after_op) },
+        TokenRule { matcher: SignedInt, emit: Try(int_tok) },
         TokenRule { matcher: Int, emit: Try(int_tok) },
         ident,
         minus,
     ];
-    // Prefix position (start, or after an operator) → one signed token.
+    // `-` glued to digits → one negative literal, wherever it appears.
     assert(lex("-5", signed)? == toks([tok(IntTok(-5), 0, 2)]));
+    assert(lex("a -5", signed)? == toks([tok(Ident("a"), 0, 1), tok(IntTok(-5), 2, 4)]));
+
+    // A space after `-` makes it the operator (subtraction); the digits are a
+    // separate `Int`. This is the whole rule: `- 5` is the operator, `-5` isn't.
     assert(
-        lex("a - -5", signed)? == toks(
-            [tok(Ident("a"), 0, 1), tok(Op, 2, 3), tok(IntTok(-5), 4, 6)],
-        ),
+        lex("a - 5", signed)? == toks([tok(Ident("a"), 0, 1), tok(Op, 2, 3), tok(IntTok(5), 4, 5)]),
+    );
+    assert(
+        lex("5 - 3", signed)? == toks([tok(IntTok(5), 0, 1), tok(Op, 2, 3), tok(IntTok(3), 4, 5)]),
     );
 
-    // After a value → binary subtraction: the sign rule declines, the `-`
-    // operator claims the `-`, and the digits are a separate `Int`.
-    assert(
-        lex("a-5", signed)? == toks([tok(Ident("a"), 0, 1), tok(Op, 1, 2), tok(IntTok(5), 2, 3)]),
-    );
-    assert(
-        lex("5-3", signed)? == toks([tok(IntTok(5), 0, 1), tok(Op, 1, 2), tok(IntTok(3), 2, 3)]),
-    );
-
-    // A bare `-` (no digit after) is never a sign, even in prefix position — the
-    // matcher declines and the operator rule takes it.
+    // `-` before a non-digit (a letter) also declines → the operator rule takes
+    // the `-` and the letters are a separate identifier (unary minus, `-x`).
     assert(lex("-b", signed)? == toks([tok(Op, 0, 1), tok(Ident("b"), 1, 2)]));
 
     // The full range, sign scanned into the token: i64::MIN parses (a positive
@@ -1108,12 +1057,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("-9223372036854775809", signed) == err(lex_err("integer literal overflows i64", 0, 20)),
     );
 
-    // Inside a template interpolation the body opens fresh (as at the start of
-    // input), so a leading `-` there is a sign too.
+    // The rule composes anywhere the full rule set runs, including a template
+    // interpolation.
     let tpls_signed = [
         ws,
         TokenRule { matcher: Template("`", "\\`{ntr", |segs: str[]| segs), emit: OfSeg(tpl_kind) },
-        TokenRule { matcher: SignedInt, emit: Try(int_tok), cond: After(after_op) },
+        TokenRule { matcher: SignedInt, emit: Try(int_tok) },
         ident,
         digits,
         minus,
@@ -1296,22 +1245,22 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1684
-deallocations: 1684
+allocations: 1685
+deallocations: 1685
 reallocations: 0
-bytes allocated: 82184
-instructions executed: 300400
-binary size: 1781976
-  code: 1118000
-  data: 8812
-  metadata: 655164
+bytes allocated: 80312
+instructions executed: 277660
+binary size: 1759208
+  code: 1101908
+  data: 8764
+  metadata: 648536
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam28
+__builtin_count_while$char$s0$lam27
+__builtin_count_while$char$s0$lam32
 __builtin_count_while$char$s0$lam33
-__builtin_count_while$char$s0$lam34
-__builtin_count_while$char$s0$lam48
+__builtin_count_while$char$s0$lam47
 __builtin_int_parse
-__builtin_is_some_and$char$lam35
+__builtin_is_some_and$char$lam34
 __lambda_0
 __lambda_1
 __lambda_10
@@ -1327,7 +1276,6 @@ __lambda_19
 __lambda_2
 __lambda_20
 __lambda_21
-__lambda_22
 __lambda_3
 __lambda_4
 __lambda_5

@@ -1,11 +1,11 @@
 import { <, == } from builtins;
 
-// A negative integer literal lexes as a single token: in prefix position (the
-// start of an expression, or after a token that can't end a value) the leading
-// `-` binds to the digits rather than parsing as the subtraction operator. So a
-// negative constant needs no `-` operator import (this file imports none), and
-// it reaches the full i64 range — including i64::MIN, whose magnitude exceeds
-// i64::MAX and so can't be written as a positive literal and then negated.
+// A negative integer literal lexes as a single token: a `-` immediately followed
+// by digits binds them into one literal (a space after the `-` would make it the
+// subtraction operator instead). So a negative constant needs no `-` operator
+// import (this file imports none), and it reaches the full i64 range — including
+// i64::MIN, whose magnitude exceeds i64::MAX and so can't be written as a positive
+// literal and then negated.
 fn probe() -> bool { true }.test({
     // A plain constant, not a unary-minus expression — no `-` imported.
     assert(-1234 == -1234);

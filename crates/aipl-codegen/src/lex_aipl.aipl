@@ -1,8 +1,8 @@
 // A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
-import { !, &&, wrapping_add as +, +++, <, ==, int_parse, join, len, split } from builtins;
-import { Cond, Emit, LexError, LexResult, Matcher, Seg, Token, TokenRule, lex } from "./lexer.aipl";
+import { &&, wrapping_add as +, +++, <, ==, int_parse, join, len, split } from builtins;
+import { Emit, LexError, LexResult, Matcher, Seg, Token, TokenRule, lex } from "./lexer.aipl";
 import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import { unescape } from "./unescape.aipl";
@@ -181,97 +181,6 @@ fn int_lit(text: str) -> AiplTok!str {
     }
 }
 
-// Whether a token *ends* a value — so a `-` right after it is binary subtraction,
-// not the sign of a negative literal. `true` for names, the literal kinds (int,
-// string, char, and the `true`/`false`/`none` constants), a template tail, a
-// closing `)`/`]`/`}`, and a postfix `?`; `false` for everything else (operators,
-// open brackets, separators, keywords), after which a `-` opens a negative
-// literal. AIPL `match` has no `|`-grouping or `_` for a variant, so every
-// `AiplTok` case is listed — in declaration order, so a new token kind added to
-// the variant forces a `true`/`false` decision right here (get it wrong and a `-`
-// after the new kind is mis-lexed).
-fn is_value_end(self: AiplTok) -> bool {
-    match (self) {
-        Space => false,
-        LineComment => false,
-        BlockComment => false,
-        AllowMarker => false,
-        Name(n) => true,
-        IntLit(v) => true,
-        StrLit(s, style) => true,
-        CharTok(c) => true,
-        TemplateHead(t) => false,
-        TemplateMid(t) => false,
-        TemplateTail(t) => true,
-        RawTemplateHead(t) => false,
-        RawTemplateMid(t) => false,
-        RawTemplateTail(t) => true,
-        True => true,
-        False => true,
-        None => true,
-        Fn => false,
-        Let => false,
-        Mut => false,
-        Set => false,
-        Pub => false,
-        Import => false,
-        From => false,
-        As => false,
-        For => false,
-        While => false,
-        Match => false,
-        Return => false,
-        Struct => false,
-        Variant => false,
-        If => false,
-        Else => false,
-        Builtins => false,
-        EqEq => false,
-        Ne => false,
-        Arrow => false,
-        FatArrow => false,
-        AndAnd => false,
-        OrOr => false,
-        Pipe => false,
-        DotDot => false,
-        PlusPlusPlus => false,
-        PlusPlus => false,
-        Eq => false,
-        Lt => false,
-        Le => false,
-        Gt => false,
-        Ge => false,
-        Bang => false,
-        Plus => false,
-        Minus => false,
-        Star => false,
-        Slash => false,
-        Percent => false,
-        Period => false,
-        Comma => false,
-        Colon => false,
-        Semi => false,
-        Question => true,
-        Hash => false,
-        LParen => false,
-        RParen => true,
-        LBrace => false,
-        RBrace => true,
-        LBracket => false,
-        RBracket => true,
-    }
-}
-
-// The `cond` for the `SignedInt` rule: a `-` is a sign (opening a negative
-// literal) rather than the subtraction operator exactly in prefix position — at
-// the very start of input (`none`), or after a token that doesn't end a value.
-fn prefix_pos(prev: AiplTok?) -> bool {
-    match (prev) {
-        none => true,
-        some(k) => !k.is_value_end(),
-    }
-}
-
 // Decode and validate a single-quote literal. This is where AIPL *defines* what
 // a char literal is: the `Delimited("'", ..)` matcher (the same escape-aware
 // scan `"..."` strings use) just hands over the un-decoded text between the
@@ -347,12 +256,14 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // A negative integer literal `-123`: the leading `-` is scanned into the
         // token, so `int_lit` parses the whole `-digits` string and the full i64
         // range is reachable (i64::MIN, whose magnitude a bare digit run can't
-        // spell as a positive literal). Gated by `prefix_pos` so the `-` is a
-        // sign only where a value can't precede it — after a value, the rule
-        // declines and `op("-", Minus)` below claims the `-` as subtraction.
-        // Before the bare `Int` rule (they're disjoint — sign vs. digit — so the
-        // order is only for reading), and before the `-` operator rule.
-        TokenRule { matcher: SignedInt, emit: Try(int_lit), cond: After(prefix_pos) },
+        // spell as a positive literal). `SignedInt` matches only a `-`
+        // *immediately* followed by a digit, so it declines on `- ` and `-x` and
+        // `op("-", Minus)` below claims those (subtraction / unary minus) — the
+        // rule order is the whole disambiguation. Consequence: a value minus a
+        // number must be spaced (`a - 5`); `a-5` lexes `a` then the literal `-5`.
+        // Before the bare `Int` rule (disjoint — sign vs. digit — so their order
+        // is only for reading) and before the `-` operator rule.
+        TokenRule { matcher: SignedInt, emit: Try(int_lit) },
         TokenRule { matcher: Int, emit: Try(int_lit) },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
@@ -698,15 +609,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4623
-deallocations: 4623
+allocations: 4651
+deallocations: 4651
 reallocations: 0
-bytes allocated: 293192
-instructions executed: 813342
-binary size: 209264
-  code: 132304
+bytes allocated: 273288
+instructions executed: 768191
+binary size: 201296
+  code: 125924
   data: 7396
-  metadata: 69564
+  metadata: 67976
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26
@@ -758,6 +669,5 @@ lex_aipl_stripped
 lex_aipl_tokens
 main
 op
-prefix_pos
 raw_tpl_kind
 tpl_kind
