@@ -1,0 +1,358 @@
+// A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL:
+// the formatter builds a `Doc` tree describing *possible* layouts and `print_doc`
+// picks one — each `Group` renders on one line ("flat") when it fits within the
+// width limit, and breaks at its `Line`/`SoftLine` points otherwise. This is the
+// port of the Rust `aipl-fmt` `doc.rs`; `format_source` (the formatter proper)
+// builds the tree and calls `print_doc` here.
+//
+// The printer is written as a tail-recursive walk over a `Work` cons-list (the
+// explicit work-stack the Rust version keeps in a `Vec`), so it never recurses
+// on the native stack proportionally to document size; output is accumulated as
+// a `str[]` and joined once at the end. `fits` looks ahead over the same
+// cons-list — the list *is* the "rest of the line" the Rust `fits` reads off the
+// work stack.
+import {
+    !,
+    !=,
+    wrapping_add as +,
+    +++,
+    wrapping_sub as -,
+    <,
+    ==,
+    >,
+    contains,
+    ends_with,
+    is_space,
+    join,
+    len,
+    map,
+    push,
+    repeat,
+    split,
+    value_or,
+} from builtins;
+import { reindent_block } from "./reindent_block.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+// Number of spaces per indentation level.
+// (`INDENT` in the Rust `doc.rs`; inlined as the literal 4 below since AIPL has
+// no module constants.)
+
+variant Doc =
+    Text(str)
+    | Concat(Doc[])
+    | Line
+    | SoftLine
+    | HardLine
+    | BlankLine
+    | Indent(Doc)
+    | Group(bool, Doc)
+    | IfBroken(str)
+    | BreakParent
+    | RawBlock(str)
+
+// Doc arms, in order: `Text` verbatim literal (multi-line forces a break);
+// `Concat` a sequence; `Line` (space/newline), `SoftLine` (nothing/newline),
+// `HardLine` (always newline), `BlankLine` (always a blank line); `Indent` one
+// deeper level; `Group(forced, inner)` flat-if-fits (`forced` = can-never-flat);
+// `IfBroken` text only when the group breaks; `BreakParent` a zero-width
+// force-break; `RawBlock` a verbatim multi-line atom re-aligned via `reindent_block`.
+
+// The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
+// frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
+variant Work = WNil | WCons(i64, bool, Doc, Work)
+
+// ---------- constructors ----------
+
+fn text(self: str) -> Doc { Text(self) }
+
+fn concat(self: Doc[]) -> Doc { Concat(self) }
+
+fn indent(self: Doc) -> Doc { Indent(self) }
+
+fn raw_block(self: str) -> Doc { RawBlock(self) }
+
+// Wrap `self` in a group, pre-computing whether it is forced to break. Forcing
+// is what makes a multi-statement block, or any construct holding a line
+// comment, lay out vertically no matter the width.
+fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
+
+// ---------- forcing ----------
+
+// Whether `self` contains content that can never render flat: a hard/blank line,
+// a break-parent, or multi-line verbatim text. Recurses through nested groups —
+// a forced inner group means the outer can't be flat either.
+fn has_hard(self: Doc) -> bool {
+    match (self) {
+        Text(s) => s.contains("\n"),
+        RawBlock(s) => s.contains("\n"),
+        Concat(ds) => any_hard(ds),
+        Line => false,
+        SoftLine => false,
+        IfBroken(_) => false,
+        HardLine => true,
+        BlankLine => true,
+        BreakParent => true,
+        Indent(inner) => inner.has_hard(),
+        Group(forced, _) => forced,
+    }
+}
+
+fn any_hard(ds: Doc[]) -> bool {
+    mut found = false;
+    for (let d : ds) {
+        if (d.has_hard()) {
+            set found = true;
+        };
+    }
+    found
+}
+
+// ---------- printing ----------
+
+// Render `doc` at the given width limit. Lines are indented with spaces;
+// trailing whitespace is stripped from every line and a final newline is
+// preserved when present (the Rust `print`'s belt-and-braces cleanup).
+fn print_doc(doc: Doc, width: i64) -> str {
+    let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
+    cleanup(pieces.join(""))
+}
+
+// The main layout loop: pop a frame, emit for its `Doc`, push any children, and
+// tail-recurse on the rest. `col` is the current column; `sp` (inside each
+// frame) is the indentation, in spaces, that a line break under that frame lands
+// at.
+fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
+    match (work) {
+        WNil => acc,
+        WCons(sp, flat, d, rest) => match (d) {
+            Text(s) => go(width, col_after(col, s), rest, acc.pushed(s)),
+            RawBlock(s) => go_raw(width, col, sp, s, rest, acc),
+            Concat(ds) => go(width, col, prepend(ds, sp, flat, rest), acc),
+            Line => if (flat) {
+                go(width, col + 1, rest, acc.pushed(" "))
+            } else {
+                go(width, sp, rest, acc.pushed(newline_str(sp)))
+            },
+            SoftLine => if (flat) {
+                go(width, col, rest, acc)
+            } else {
+                go(width, sp, rest, acc.pushed(newline_str(sp)))
+            },
+            HardLine => go(width, sp, rest, acc.pushed(newline_str(sp))),
+            BlankLine => go(width, sp, rest, acc.pushed(blank_str(sp))),
+            Indent(inner) => go(width, col, WCons(sp + 4, flat, inner, rest), acc),
+            Group(forced, inner) => go(
+                width,
+                col,
+                WCons(sp, group_flat(forced, width, col, sp, inner, rest), inner, rest),
+                acc,
+            ),
+            IfBroken(s) => if (flat) {
+                go(width, col, rest, acc)
+            } else {
+                go(width, col + s.len(), rest, acc.pushed(s))
+            },
+            BreakParent => go(width, col, rest, acc),
+        },
+    }
+}
+
+// A `RawBlock`: re-lay-out the atom around its frame's indent, then emit it and
+// continue. Split out so the atom is computed once (a match arm is a single
+// expression).
+fn go_raw(width: i64, col: i64, sp: i64, s: str, rest: Work, acc: str[]) -> str[] {
+    let rendered = s.reindent_block(sp);
+    go(width, col_after(col, rendered), rest, acc.pushed(rendered))
+}
+
+// Decide a group's mode: forced groups always break; otherwise the group is flat
+// exactly when its content — laid out flat, followed by the rest of the line —
+// fits in the remaining width.
+fn group_flat(forced: bool, width: i64, col: i64, sp: i64, inner: Doc, rest: Work) -> bool {
+    if (forced) { false } else { fits(sat(width - col), WCons(sp, true, inner, rest)) }
+}
+
+// Would the pending work — the flat candidate followed by the outer frames, each
+// in its own mode — stay within `budget` columns? Walks until the budget is
+// exhausted (no) or the line provably ends at a break point (yes).
+fn fits(budget: i64, work: Work) -> bool {
+    if (budget < 0) {
+        false
+    } else {
+        match (work) {
+            WNil => true,
+            WCons(sp, flat, d, rest) => match (d) {
+                Text(s) => fits_atom(budget, s, flat, rest),
+                RawBlock(s) => fits_atom(budget, s, flat, rest),
+                Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
+                Line => if (flat) { fits(budget - 1, rest) } else { true },
+                SoftLine => if (flat) { fits(budget, rest) } else { true },
+                HardLine => true,
+                BlankLine => true,
+                Indent(inner) => fits(budget, WCons(sp, flat, inner, rest)),
+                Group(forced, inner) => if (forced) {
+                    !flat
+                } else {
+                    fits(budget, WCons(sp, flat, inner, rest))
+                },
+                IfBroken(s) => if (flat) {
+                    fits(budget, rest)
+                } else {
+                    fits(budget - s.len(), rest)
+                },
+                BreakParent => if (flat) { false } else { fits(budget, rest) },
+            },
+        }
+    }
+}
+
+// A `Text`/`RawBlock` atom in `fits`: a multi-line atom can't sit on a flat line
+// (so it only "fits" when the surrounding content is already broken); a
+// single-line atom just consumes its width.
+fn fits_atom(budget: i64, s: str, flat: bool, rest: Work) -> bool {
+    if (s.contains("\n")) { !flat } else { fits(budget - s.len(), rest) }
+}
+
+// ---------- helpers ----------
+
+// Prepend an array of children onto the work-list so `ds[0]` is processed first,
+// each carrying the parent frame's indent and mode. Written as an ordinary
+// (non-tail) recursion that threads `rest` through unchanged and wraps each
+// child around the recursive result: reassigning a recursive-variant accumulator
+// — whether by a `for`-loop `set` or a tail-call parameter — corrupts it, but
+// wrapping the returned subtree is sound. Recursion depth is one child, so it
+// stays shallow.
+fn prepend(ds: Doc[], sp: i64, flat: bool, rest: Work) -> Work {
+    cons_children(ds, 0, sp, flat, rest)
+}
+
+fn cons_children(ds: Doc[], i: i64, sp: i64, flat: bool, rest: Work) -> Work {
+    if (i == ds.len()) {
+        rest
+    } else {
+        WCons(sp, flat, doc_at(ds, i), cons_children(ds, i + 1, sp, flat, rest))
+    }
+}
+
+// `ds[i]` unwrapped: array indexing yields an optional, and `i` is always in
+// range here, so the `none` arm is dead.
+fn doc_at(ds: Doc[], i: i64) -> Doc {
+    match (ds[i]) {
+        some(d) => d,
+        none => BreakParent,
+    }
+}
+
+// Append one emitted piece to the output accumulator.
+fn pushed(self: str[], piece: str) -> str[] {
+    mut a = self;
+    set a.push(piece);
+    a
+}
+
+// The column just past `text` when appended at column `col`: the length of its
+// last line for multi-line text, else `col + width`.
+fn col_after(col: i64, text: str) -> i64 {
+    let parts = text.split("\n");
+    let n = parts.len();
+    if (n < 2) { col + text.len() } else { parts[n - 1].value_or("").len() }
+}
+
+// A line break landing at indentation `sp`: a newline plus `sp` spaces.
+fn newline_str(sp: i64) -> str { "\n" +++ " ".repeat(sp) }
+
+// A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
+// blank line's own trailing spaces are removed by `cleanup`).
+fn blank_str(sp: i64) -> str { "\n\n" +++ " ".repeat(sp) }
+
+// `max(0, x)` — the saturating remaining-width the Rust printer computes with
+// `usize::saturating_sub`.
+fn sat(x: i64) -> i64 { if (x < 0) { 0 } else { x } }
+
+// Strip trailing whitespace from every line and preserve a final newline when
+// the rendered text had one (mirrors `str::lines().map(trim_end).join("\n")`).
+fn cleanup(out: str) -> str {
+    let ended = out.ends_with("\n");
+    let raw = out.split("\n");
+
+    // `lines()` drops exactly one trailing empty when the text ends in a newline;
+    // `split` keeps it, so drop it here to match.
+    let lines = if (ended) { raw[0..raw.len() - 1] } else { raw };
+    let body = lines.map(|line| line.trim_end_while(is_space)).join("\n");
+    body +++ if (ended) { "\n" } else { "" }
+}.test({
+    // Plain text is emitted verbatim.
+    assert(print_doc(text("hello"), 100) == "hello");
+    assert(print_doc(concat([text("a"), text("b")]), 100) == "ab");
+
+    // A group that fits stays flat: `Line` becomes a space, `SoftLine` nothing.
+    let list = group(
+        concat(
+            [
+                text("("),
+                indent(concat([SoftLine, text("a"), text(","), Line, text("b")])),
+                SoftLine,
+                text(")"),
+            ],
+        ),
+    );
+    assert(print_doc(list, 100) == "(a, b)");
+
+    // The same group, too wide to fit, breaks at every `Line`/`SoftLine`, one
+    // element per indented line.
+    assert(print_doc(list, 5) == "(\n    a,\n    b\n)");
+
+    // A `HardLine` forces the break even with width to spare.
+    assert(print_doc(group(concat([text("a"), HardLine, text("b")])), 100) == "a\nb");
+
+    // `IfBroken` text appears only when the group breaks.
+    let arr = group(
+        concat(
+            [text("["), indent(concat([SoftLine, text("x"), IfBroken(",")])), SoftLine, text("]")],
+        ),
+    );
+    assert(print_doc(arr, 100) == "[x]");
+    assert(print_doc(arr, 2) == "[\n    x,\n]");
+
+    // `BlankLine` separates with a truly-empty line (its trailing spaces are
+    // cleaned away).
+    assert(print_doc(concat([text("a"), BlankLine, text("b")]), 100) == "a\n\nb");
+
+    // A multi-line `RawBlock` is re-aligned around its column: a bare-opening
+    // `"""` block's content is re-indented one level deeper than the delimiters.
+    let raw = concat([text("x = "), raw_block(`"""\n  hi\n"""`)]);
+    assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
+})
+--- performance ---
+allocations: 283
+deallocations: 283
+reallocations: 0
+bytes allocated: 16060
+instructions executed: 19646
+binary size: 28024
+  code: 15416
+  data: 842
+  metadata: 11766
+--- monomorphizations ---
+__builtin_count_while$char$s0$lam16
+__builtin_count_while$char$s0$lam6
+__m1__reindent_block
+__m3__lines
+__map14$own0
+__map8$own0
+col_after
+concat
+cons_children
+fits
+fits_atom
+go
+group
+has_hard
+indent
+main
+newline_str
+prepend
+print_doc
+pushed
+text
