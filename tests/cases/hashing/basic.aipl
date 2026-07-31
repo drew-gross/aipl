@@ -49,10 +49,10 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 704
 instructions executed: 2638
-binary size: 13112
+binary size: 13240
   code: 8668
   data: 957
-  metadata: 3487
+  metadata: 3615
 --- monomorphizations ---
 h
 hs

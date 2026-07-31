@@ -3568,14 +3568,16 @@ fn compile_program<M: Module>(
 
     // One counter across all functions so synthesized literal names are unique.
     let lit_ctr = Cell::new(0u32);
+    // Static string literals interned by content across the whole compilation.
+    let str_data = RefCell::new(StrLiterals::default());
     // Per-element-type array drop/retain helpers, generated on demand while
     // compiling and defined afterward (below).
     let elem_rc = RefCell::new(ElemRc::default());
     for (id, f) in decls {
         dbg.trace("codegen", format_args!("define `{}`", f.name));
         define_fn(
-            module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &elem_rc,
-            &mut ir, instrument,
+            module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+            &elem_rc, &mut ir, instrument,
         )?;
     }
 
@@ -3657,8 +3659,8 @@ fn compile_program<M: Module>(
     let test_fail_pending = std::mem::take(&mut elem_rc.borrow_mut().test_fail_pending);
     for (ty, id) in test_fail_pending {
         define_test_fail_fn(
-            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id, &ty,
-            &mut ir, instrument,
+            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data, &elem_rc,
+            id, &ty, &mut ir, instrument,
         )?;
     }
 
@@ -3672,8 +3674,8 @@ fn compile_program<M: Module>(
         }
         for (ty, id) in batch {
             define_eq_fn(
-                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id,
-                &ty, &mut ir, instrument,
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+                &elem_rc, id, &ty, &mut ir, instrument,
             )?;
         }
     }
@@ -3691,8 +3693,8 @@ fn compile_program<M: Module>(
         }
         for (ty, id) in batch {
             define_tostr_fn(
-                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &elem_rc, id,
-                &ty, &mut ir, instrument,
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+                &elem_rc, id, &ty, &mut ir, instrument,
             )?;
         }
     }
@@ -6676,6 +6678,7 @@ fn define_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
+    str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     ir_out: &mut String,
     instrument: bool,
@@ -6777,6 +6780,7 @@ fn define_fn<M: Module>(
             effects: &func.effects,
             owned_params: &owned_params,
             lit_ctr,
+            str_data,
             elem_rc,
             ret_ty: &abi_ret,
             sret: sret_val,
@@ -10409,6 +10413,7 @@ fn define_test_fail_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
+    str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     err_ty: &Type,
@@ -10438,6 +10443,7 @@ fn define_test_fail_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
+            str_data,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -10489,6 +10495,7 @@ fn define_eq_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
+    str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     ty: &Type,
@@ -10522,6 +10529,7 @@ fn define_eq_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
+            str_data,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -10562,6 +10570,7 @@ fn define_tostr_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
+    str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     ty: &Type,
@@ -10595,6 +10604,7 @@ fn define_tostr_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
+            str_data,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -10696,6 +10706,75 @@ fn define_tostr_fn<M: Module>(
     Ok(())
 }
 
+/// FNV-1a 64-bit hash of `bytes`, computed at compile time (the runtime
+/// [`aipl_str_hash`] is the same fold over a live string's bytes). Used to name
+/// static string-literal data symbols by content — see [`StrLiterals`].
+fn fnv1a_64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325; // offset basis
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3); // FNV-1a prime
+    }
+    h
+}
+
+/// Interns static string-literal data objects by content across a whole
+/// compilation. Identical literals — the same struct-field default materialized
+/// at many construction sites, or the same text repeated anywhere — share one
+/// data object (so the binary carries each distinct literal once). The symbol
+/// name is a content hash (`__str_<hash>`), so a literal keeps its name when
+/// unrelated source above it changes; the old span-based `__str_<start>_<end>`
+/// name shifted on every earlier edit, churning the whole data section (and the
+/// checked-in dogfood IR) for a change that touched none of the literals.
+///
+/// `used_names` guards the astronomically rare case of two *different* contents
+/// hashing to the same name: the second is disambiguated with a numeric suffix
+/// so it can never silently alias the first literal's bytes.
+#[derive(Default)]
+struct StrLiterals {
+    by_content: HashMap<Box<[u8]>, DataId>,
+    used_names: HashSet<String>,
+}
+
+impl StrLiterals {
+    /// The data object for `content`, declaring and defining it on first sight
+    /// and reusing it thereafter. `define` builds the static string bytes for a
+    /// freshly-declared object; it is not called on a cache hit.
+    fn intern<M: Module>(
+        &mut self,
+        module: &mut M,
+        content: &[u8],
+        define: impl FnOnce() -> Box<[u8]>,
+    ) -> Result<DataId, Error> {
+        if let Some(&id) = self.by_content.get(content) {
+            return Ok(id);
+        }
+        // Distinct content, not yet interned. Pick a content-hash name unique to
+        // it: on a hash collision with a different literal, extend the name until
+        // free so `declare_data` mints a new object rather than aliasing.
+        let base = format!("__str_{:016x}", fnv1a_64(content));
+        let mut name = base.clone();
+        let mut n: u32 = 0;
+        while self.used_names.contains(&name) {
+            n += 1;
+            name = format!("{base}_{n}");
+        }
+        let id = module
+            .declare_data(&name, Linkage::Local, false, false)
+            .map_err(|e| Error::msg(format!("declare data: {e}")))?;
+        let mut desc = DataDescription::new();
+        // 8-byte align so the i64 header words read safely.
+        desc.set_align(8);
+        desc.define(define());
+        module
+            .define_data(id, &desc)
+            .map_err(|e| Error::msg(format!("define data: {e}")))?;
+        self.by_content.insert(content.into(), id);
+        self.used_names.insert(name);
+        Ok(id)
+    }
+}
+
 /// Read-only context threaded through `compile_expr` unchanged on almost every
 /// recursive call. Bundling it keeps the call sites short; the only field that
 /// varies (when a binding comes into scope) is `env`, set via
@@ -10716,6 +10795,9 @@ struct Cx<'a> {
     /// Global counter for unique names of the static string literals `to_str`
     /// synthesizes (separators, struct/field labels, `some(`/`none`).
     lit_ctr: &'a Cell<u32>,
+    /// Content-interned static string-literal data objects (see [`StrLiterals`]),
+    /// shared across every function in the compilation.
+    str_data: &'a RefCell<StrLiterals>,
     /// On-demand cache of per-element-type array drop/retain helper functions
     /// (for element types the fixed runtime helpers don't cover — structs and
     /// struct/optional combinations). Declared here when first needed and
@@ -11589,6 +11671,7 @@ fn compile_call_expr<M: Module>(
         effects: _,
         owned_params: _,
         lit_ctr: _,
+        str_data: _,
         elem_rc: _,
         ret_ty: _,
         sret: _,
@@ -13444,6 +13527,7 @@ fn compile_expr<M: Module>(
         effects: _,
         owned_params: _,
         lit_ctr: _,
+        str_data: _,
         elem_rc: _,
         ret_ty: _,
         sret: _,
@@ -13532,45 +13616,20 @@ fn compile_expr<M: Module>(
                 ));
             }
             // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
-            // into the data section. Pointer points past the 8-byte header.
-            // A source literal's span.clone() is unique, so it names the symbol; a
-            // *synthesized* literal carries the dummy span.clone() (0,0) and several may
-            // share it (e.g. the `check` driver's test names), so disambiguate
-            // those with a counter. Real literals keep their span.clone()-based name so
-            // object layout (and the `binary size` perf metric) is unchanged.
-            let data_name = if span.start == 0 && span.end == 0 {
-                let n = cx.lit_ctr.get();
-                cx.lit_ctr.set(n + 1);
-                format!("__str_synth_{n}")
-            } else {
-                format!("__str_{}_{}", span.start, span.end)
-            };
-            let data_id = module
-                .declare_data(&data_name, Linkage::Local, false, false)
-                .map_err(|e| Error::msg(format!("declare data: {e}")))?;
-            // Static string layout: [len: i64][refcount = STATIC][bytes][NUL];
-            // the pointer points past both header words.
-            let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
-            bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
-            bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-            bytes.extend_from_slice(content);
-            bytes.push(0);
-            let mut desc = DataDescription::new();
-            // 8-byte align so the i64 header words read safely.
-            desc.set_align(8);
-            desc.define(bytes.into_boxed_slice());
-            // A struct-field default that is a string literal is materialized at
-            // every construction site omitting that field, each carrying the
-            // default expression's original span — so the span-derived symbol name
-            // repeats across sites. The bytes are identical (same span ⇒ same
-            // source literal) and `declare_data` already returned the existing id,
-            // so a repeat `define_data` is redundant: tolerate the duplicate and
-            // reuse the first definition. (The synth path uses unique counter names,
-            // so it never hits this.)
-            match module.define_data(data_id, &desc) {
-                Ok(()) | Err(cranelift_module::ModuleError::DuplicateDefinition(_)) => {}
-                Err(e) => return Err(Error::msg(format!("define data: {e}"))),
-            }
+            // into the data section. Pointer points past the 8-byte header. The
+            // data object is interned by content (see `StrLiterals`), so the same
+            // literal — a struct-field default materialized at many sites, or any
+            // repeated text — shares one object and one content-hash symbol name.
+            let data_id = cx.str_data.borrow_mut().intern(module, content, || {
+                // Static string layout: [len: i64][refcount = STATIC][bytes][NUL];
+                // the pointer points past both header words.
+                let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
+                bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
+                bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
+                bytes.extend_from_slice(content);
+                bytes.push(0);
+                bytes.into_boxed_slice()
+            })?;
             let gv = module.declare_data_in_func(data_id, builder.func);
             let base = builder.ins().symbol_value(types::I64, gv);
             let ptr = builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64);

@@ -39,10 +39,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 297
-binary size: 5208
+binary size: 5368
   code: 1684
   data: 953
-  metadata: 2571
+  metadata: 2731
 --- monomorphizations ---
 first_char
 main

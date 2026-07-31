@@ -20,10 +20,10 @@ deallocations: 5
 reallocations: 0
 bytes allocated: 296
 instructions executed: 313
-binary size: 3568
+binary size: 3600
   code: 1656
   data: 219
-  metadata: 1693
+  metadata: 1725
 --- monomorphizations ---
 main
 member

@@ -23,10 +23,10 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 616
 instructions executed: 2071
-binary size: 5864
+binary size: 5904
   code: 3120
   data: 313
-  metadata: 2431
+  metadata: 2471
 --- monomorphizations ---
 __map11$own0
 main

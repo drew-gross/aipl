@@ -12,10 +12,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 32
 instructions executed: 30
-binary size: 1168
+binary size: 1176
   code: 232
   data: 37
-  metadata: 899
+  metadata: 907
 --- monomorphizations ---
 __test$g
 g$EmptyArray

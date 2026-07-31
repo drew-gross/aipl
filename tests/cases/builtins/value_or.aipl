@@ -17,10 +17,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 122
-binary size: 2168
+binary size: 2224
   code: 588
   data: 301
-  metadata: 1279
+  metadata: 1335
 --- monomorphizations ---
 __test$first_char
 first_char

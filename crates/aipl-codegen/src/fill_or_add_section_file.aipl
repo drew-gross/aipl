@@ -30,10 +30,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 88
-binary size: 9752
+binary size: 9784
   code: 4984
   data: 358
-  metadata: 4410
+  metadata: 4442
 --- monomorphizations ---
 __enumerate2
 __m1__contains_section

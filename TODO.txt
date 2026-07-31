@@ -86,7 +86,9 @@ Decide if I want bare variant assignment. Similar: Can a function that returns T
 
 TODO: garbage collectable types, so we can make a .aipl parser.
 
-Switch back to multi-file dogfood clifs to make diffs nicer
+improve dogfooding:
+- stop using global function ids.
+- go back to one .clif file per .aipl file
 
 Nested matching e.g.
     match (opt_of_array) {

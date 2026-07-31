@@ -46,10 +46,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 133
-binary size: 2616
+binary size: 2680
   code: 704
   data: 337
-  metadata: 1575
+  metadata: 1639
 --- monomorphizations ---
 bang
 dbl

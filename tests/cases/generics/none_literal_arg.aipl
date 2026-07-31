@@ -17,10 +17,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 32
-binary size: 1200
+binary size: 1216
   code: 216
   data: 85
-  metadata: 899
+  metadata: 915
 --- monomorphizations ---
 __test$is_present
 is_present$NoneLiteral

@@ -612,10 +612,10 @@ deallocations: 4595
 reallocations: 0
 bytes allocated: 269736
 instructions executed: 759151
-binary size: 198704
+binary size: 198432
   code: 124228
-  data: 7396
-  metadata: 67080
+  data: 7068
+  metadata: 67136
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam15
 __builtin_count_while$char$s0$lam26

@@ -59,10 +59,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1279
-binary size: 6264
+binary size: 6448
   code: 1940
   data: 1218
-  metadata: 3106
+  metadata: 3290
 --- monomorphizations ---
 is_operator_name
 main

@@ -48,10 +48,10 @@ deallocations: 22
 reallocations: 0
 bytes allocated: 888
 instructions executed: 1542
-binary size: 8056
+binary size: 8016
   code: 3856
-  data: 580
-  metadata: 3620
+  data: 514
+  metadata: 3646
 --- monomorphizations ---
 __test$below
 __test$nothing

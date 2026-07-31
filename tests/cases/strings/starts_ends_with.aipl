@@ -43,10 +43,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 303
-binary size: 6320
+binary size: 6512
   code: 1920
   data: 1279
-  metadata: 3121
+  metadata: 3313
 --- monomorphizations ---
 __test$is_dotfile
 is_dotfile

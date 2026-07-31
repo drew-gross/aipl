@@ -10,10 +10,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 43
-binary size: 1160
+binary size: 1184
   code: 216
   data: 81
-  metadata: 863
+  metadata: 887
 --- monomorphizations ---
 is_a
 main

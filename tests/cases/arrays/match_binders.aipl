@@ -58,10 +58,10 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 336
 instructions executed: 700
-binary size: 4952
+binary size: 4960
   code: 2500
   data: 26
-  metadata: 2426
+  metadata: 2434
 --- monomorphizations ---
 classify
 main

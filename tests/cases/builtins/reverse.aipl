@@ -23,10 +23,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 580
 instructions executed: 653
-binary size: 5656
+binary size: 5760
   code: 2296
   data: 618
-  metadata: 2742
+  metadata: 2846
 --- monomorphizations ---
 arr_rev
 main

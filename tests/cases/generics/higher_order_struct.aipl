@@ -22,10 +22,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 79
-binary size: 1896
+binary size: 1936
   code: 452
   data: 242
-  metadata: 1202
+  metadata: 1242
 --- monomorphizations ---
 main
 wrap$i64

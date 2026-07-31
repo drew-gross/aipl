@@ -42,8 +42,8 @@ bytes allocated: 943
 instructions executed: 1159
 binary size: 4496
   code: 1536
-  data: 506
-  metadata: 2454
+  data: 474
+  metadata: 2486
 --- monomorphizations ---
 __map2$own0
 indent

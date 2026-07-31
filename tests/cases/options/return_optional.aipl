@@ -14,10 +14,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 167
-binary size: 1824
+binary size: 1856
   code: 604
   data: 194
-  metadata: 1026
+  metadata: 1058
 --- monomorphizations ---
 __test$divide
 divide

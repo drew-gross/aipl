@@ -26,10 +26,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 68
 instructions executed: 1313
-binary size: 3464
+binary size: 3520
   code: 1736
   data: 310
-  metadata: 1418
+  metadata: 1474
 --- monomorphizations ---
 __test$packed
 main

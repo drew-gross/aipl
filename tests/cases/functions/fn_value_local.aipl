@@ -42,10 +42,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 80
 instructions executed: 109
-binary size: 2720
+binary size: 2784
   code: 780
   data: 293
-  metadata: 1647
+  metadata: 1711
 --- monomorphizations ---
 dbl
 inc

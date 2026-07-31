@@ -12,9 +12,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 19
-binary size: 944
+binary size: 952
   code: 144
   data: 40
-  metadata: 760
+  metadata: 768
 --- monomorphizations ---
 main

@@ -46,10 +46,10 @@ deallocations: 19
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1459
-binary size: 12224
+binary size: 12368
   code: 6776
   data: 857
-  metadata: 4591
+  metadata: 4735
 --- monomorphizations ---
 __test$array_values
 __test$optional_values

@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1109
-binary size: 1664
+binary size: 1704
   code: 404
   data: 186
-  metadata: 1074
+  metadata: 1114
 --- monomorphizations ---
 is_even
 is_odd

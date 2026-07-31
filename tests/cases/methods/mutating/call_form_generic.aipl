@@ -17,10 +17,10 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 208
 instructions executed: 407
-binary size: 2544
+binary size: 2560
   code: 1060
   data: 88
-  metadata: 1396
+  metadata: 1412
 --- monomorphizations ---
 append$i64
 main

@@ -44,10 +44,10 @@ deallocations: 13
 reallocations: 3
 bytes allocated: 704
 instructions executed: 2192
-binary size: 6912
+binary size: 6976
   code: 3608
   data: 404
-  metadata: 2900
+  metadata: 2964
 --- monomorphizations ---
 __map2$own0
 double

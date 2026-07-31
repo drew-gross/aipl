@@ -49,10 +49,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 2250
-binary size: 4128
+binary size: 4232
   code: 1252
   data: 930
-  metadata: 1946
+  metadata: 2050
 --- monomorphizations ---
 common_space_prefix
 main

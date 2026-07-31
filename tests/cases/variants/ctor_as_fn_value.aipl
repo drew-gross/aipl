@@ -37,10 +37,10 @@ deallocations: 19
 reallocations: 10
 bytes allocated: 936
 instructions executed: 1870
-binary size: 8080
+binary size: 8128
   code: 4508
   data: 411
-  metadata: 3161
+  metadata: 3209
 --- monomorphizations ---
 main
 pair_up$lam11

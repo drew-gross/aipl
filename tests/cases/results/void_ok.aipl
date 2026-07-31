@@ -46,10 +46,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 261
-binary size: 3336
+binary size: 3360
   code: 1488
   data: 131
-  metadata: 1717
+  metadata: 1741
 --- monomorphizations ---
 check_positive
 describe

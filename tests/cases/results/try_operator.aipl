@@ -38,8 +38,8 @@ bytes allocated: 0
 instructions executed: 302
 binary size: 3000
   code: 1124
-  data: 298
-  metadata: 1578
+  data: 271
+  metadata: 1605
 --- monomorphizations ---
 main
 parse_pos

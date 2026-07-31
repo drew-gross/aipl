@@ -38,10 +38,10 @@ deallocations: 16
 reallocations: 1
 bytes allocated: 817
 instructions executed: 2818
-binary size: 8288
+binary size: 8336
   code: 4632
   data: 468
-  metadata: 3188
+  metadata: 3236
 --- monomorphizations ---
 __map1$own0
 __map10$own0

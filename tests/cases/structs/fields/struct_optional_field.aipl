@@ -25,10 +25,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 219
-binary size: 2728
+binary size: 2752
   code: 1132
   data: 204
-  metadata: 1392
+  metadata: 1416
 --- monomorphizations ---
 main
 make

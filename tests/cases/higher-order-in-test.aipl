@@ -34,10 +34,10 @@ deallocations: 6
 reallocations: 4
 bytes allocated: 296
 instructions executed: 802
-binary size: 2704
+binary size: 2728
   code: 1156
   data: 190
-  metadata: 1358
+  metadata: 1382
 --- monomorphizations ---
 filter_evens$lam0
 main

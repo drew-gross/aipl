@@ -30,10 +30,10 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 480
 instructions executed: 1250
-binary size: 5128
+binary size: 5160
   code: 2660
   data: 200
-  metadata: 2268
+  metadata: 2300
 --- monomorphizations ---
 __test$grid3
 main

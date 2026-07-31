@@ -43,10 +43,10 @@ deallocations: 17
 reallocations: 0
 bytes allocated: 936
 instructions executed: 880
-binary size: 6856
+binary size: 6936
   code: 3392
   data: 419
-  metadata: 3045
+  metadata: 3125
 --- monomorphizations ---
 empty_set
 main

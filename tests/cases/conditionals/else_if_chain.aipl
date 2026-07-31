@@ -28,10 +28,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 130
-binary size: 1840
+binary size: 1896
   code: 464
   data: 258
-  metadata: 1118
+  metadata: 1174
 --- monomorphizations ---
 classify
 main

@@ -21,10 +21,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 62
-binary size: 1312
+binary size: 1328
   code: 304
   data: 107
-  metadata: 901
+  metadata: 917
 --- monomorphizations ---
 eval
 inc

@@ -18,10 +18,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 78
-binary size: 1592
+binary size: 1632
   code: 368
   data: 198
-  metadata: 1026
+  metadata: 1066
 --- monomorphizations ---
 is_present$char
 main

@@ -23,10 +23,10 @@ deallocations: 6
 reallocations: 6
 bytes allocated: 288
 instructions executed: 758
-binary size: 2984
+binary size: 3000
   code: 1424
   data: 137
-  metadata: 1423
+  metadata: 1439
 --- monomorphizations ---
 main
 map$lam2
