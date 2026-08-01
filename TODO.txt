@@ -70,9 +70,6 @@ to fix:
 - The AIPL formatter can't keep comments between variant arms
 - reassigning a recursive-variant accumulator inside a for loop (set acc = WCons(d, acc)) silently loses the mutation
 
-fully scoped:
-Lets fix how varants and constructor names come into scope. Desired state: if you have a variant "variant V = A | B" and you import { V }, you construct the arms via V.A(...) and V.B(...). But you can also import { A } directly, and then use A(...) to get a value of type V (note: you'll also need to import V if you want to name it in the source, if you don't need to name it you don't need to import it). In the file where V is defined, you can always just use A directly. This way, no names ever come into scope without being explicitly imported, and you can't get accidental conflicts.
-
 figure out / fix why template literals are peforming worse than concat chains
 improve the highlighter test: correct code should never highlight as a mismatched bracket
 
