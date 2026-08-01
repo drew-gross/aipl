@@ -1,0 +1,55 @@
+// A variant's constructors come into scope by explicit import: `import { Circle }`
+// lets you write `Circle(..)`, and importing the variant `Shape` lets you qualify
+// a case as `Shape.Rect(..)` / `Shape.Empty`. Patterns resolve the same way — a
+// bare imported `Circle(r)`, or a qualified `Shape.Empty`. The defining file uses
+// its own cases directly (see `area` in the companion), with no import needed.
+import { wrapping_add as +, print, to_str } from builtins;
+import { Circle, Rect, Shape, area } from "./shapes.aipl";
+
+fn describe(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r, // imported constructor pattern
+        Rect(w, h) => w + h, // imported constructor pattern
+        Shape.Empty => 0, // qualified pattern
+    }
+}
+
+fn main() !prints {
+    let a = Circle(5); // imported constructor
+    let b = Shape.Rect(3, 4); // qualified call
+    let e = Shape.Empty; // qualified nullary
+    print(a.area().to_str()); // 5
+    print(b.area().to_str()); // 7
+    print(e.area().to_str()); // 0
+    print(describe(b).to_str()); // 7
+}
+--- file: shapes.aipl ---
+import { wrapping_add as + } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+pub fn area(self: Shape) -> i64 {
+    match (self) {
+        Circle(r) => r,
+        Rect(w, h) => w + h,
+        Empty => 0,
+    }
+}
+--- stdout ---
+5
+7
+0
+7
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 209
+binary size: 1712
+  code: 640
+  data: 1
+  metadata: 1071
+--- monomorphizations ---
+__m1__area
+main

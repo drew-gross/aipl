@@ -706,6 +706,10 @@ pub fn check(program: &Program) -> Result<(), Error> {
             if ctors.insert(c.clone(), vn.clone()).is_some() {
                 return Err(Error::msg(format!("duplicate variant constructor {c:?}")));
             }
+            // The loader rewrites an in-scope constructor reference to the
+            // variant-qualified `Case@Variant`; register that alongside the bare
+            // name so it types to the same variant.
+            ctors.insert(format!("{c}@{vn}"), vn.clone());
         }
     }
 
@@ -1199,8 +1203,11 @@ impl Cx<'_> {
                 ))
             }
         };
+        // A pattern constructor may be variant-qualified (`Case@Variant`); the
+        // scrutinee's type fixes the variant, so resolve against the bare case.
+        let bare: &str = name.split('@').next().unwrap_or(name);
         let payload: Vec<Type> = match st {
-            Type::Optional(inner) => match name.as_str() {
+            Type::Optional(inner) => match bare {
                 "some" => vec![(**inner).clone()],
                 "none" => vec![],
                 other => {
@@ -1212,7 +1219,7 @@ impl Cx<'_> {
                     ))
                 }
             },
-            Type::Result(ok, err) => match name.as_str() {
+            Type::Result(ok, err) => match bare {
                 // A void-Ok result (`!E`) binds nothing in its `ok` arm.
                 "ok" if is_unit(ok) => vec![],
                 "ok" => vec![(**ok).clone()],
@@ -1229,11 +1236,11 @@ impl Cx<'_> {
             // resolves both.
             _ if self.cases_of(st).is_some() => {
                 let cases = self.cases_of(st).expect("just checked");
-                match cases.iter().find(|(c, _)| c == name) {
+                match cases.iter().find(|(c, _)| c.as_str() == bare) {
                     Some((_, p)) => p.clone(),
                     None => {
                         return Err(Error::at(
-                            format!("{} has no constructor {name:?}", tyname(st)),
+                            format!("{} has no constructor {bare:?}", tyname(st)),
                             arm.span.clone(),
                         ))
                     }
@@ -1324,9 +1331,12 @@ impl Cx<'_> {
             let Pattern::Ctor { name, .. } = &arm.pattern else {
                 continue;
             };
-            if !seen.insert(name.as_str()) {
+            // Patterns may be variant-qualified (`Case@Variant`); compare against
+            // the bare case names the variant declares.
+            let bare = name.split('@').next().unwrap_or(name);
+            if !seen.insert(bare) {
                 return Err(Error::at(
-                    format!("duplicate \"{name}\" arm"),
+                    format!("duplicate \"{bare}\" arm"),
                     arm.span.clone(),
                 ));
             }
@@ -1387,7 +1397,8 @@ impl Cx<'_> {
                 if let Some(b) = env.get(name) {
                     b.ty.clone()
                 } else if let Some(vn) = self.ctors.get(name) {
-                    self.expect_nullary_ctor(name, vn, span.clone())?;
+                    let bare = name.split('@').next().unwrap_or(name);
+                    self.expect_nullary_ctor(bare, vn, span.clone())?;
                     Type::Named(vn.clone())
                 } else if self.generic_ctors.contains_key(name) {
                     // A nullary constructor of a generic variant (`Nothing`):
@@ -2049,11 +2060,14 @@ impl Cx<'_> {
         // the case's payload type; the result is the variant type.
         if !env.contains_key(name) {
             if let Some(vn) = self.ctors.get(name) {
-                let payload = self.case_payload(vn, name).unwrap_or(&[]).to_vec();
+                // A constructor reference may be variant-qualified (`Case@Variant`);
+                // the case's payload is keyed by the bare case name.
+                let bare = name.split('@').next().unwrap_or(name);
+                let payload = self.case_payload(vn, bare).unwrap_or(&[]).to_vec();
                 if args.len() != payload.len() {
                     return Err(Error::at(
                         format!(
-                            "constructor {name:?} expects {} argument(s), got {}",
+                            "constructor {bare:?} expects {} argument(s), got {}",
                             payload.len(),
                             args.len()
                         ),
@@ -2066,7 +2080,7 @@ impl Cx<'_> {
                     expect(
                         &at,
                         pty,
-                        &format!("constructor {name:?} argument"),
+                        &format!("constructor {bare:?} argument"),
                         arg.span.clone(),
                     )?;
                 }

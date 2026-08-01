@@ -409,6 +409,12 @@ gazelle! {
         // wildcard `_ => body` arrives as a `nullary_arm` (since `_` lexes as an
         // identifier) and is recognized downstream.
         match_arm = IDENT LPAREN match_bindings RPAREN FATARROW expr => ctor_arm
+                  // `V.A(b0, ..) => body` / `V.A => body` — a variant-qualified
+                  // constructor pattern. After the leading IDENT, one token of
+                  // lookahead (`.` → qualified, `(` → ctor_arm, `=>` → nullary)
+                  // picks the production.
+                  | IDENT DOT IDENT LPAREN match_bindings RPAREN FATARROW expr => qualified_ctor_arm
+                  | IDENT DOT IDENT FATARROW expr => qualified_nullary_arm
                   | IDENT FATARROW expr => nullary_arm
                   | NONE FATARROW expr => none_arm
                   | STR FATARROW expr => str_arm
@@ -2013,6 +2019,25 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
         Ok(match node {
             aipl::MatchArm::CtorArm((name, span), bindings, body) => MatchArm {
                 pattern: Pattern::Ctor { name, bindings },
+                body,
+                span,
+            },
+            // `V.A(b0, ..) => body` — a variant-qualified constructor pattern. The
+            // dotted name is carried through as `V.A`; the loader resolves it to
+            // the qualified constructor (like `V.A(..)` in expression position).
+            aipl::MatchArm::QualifiedCtorArm((v, span), (a, _), bindings, body) => MatchArm {
+                pattern: Pattern::Ctor {
+                    name: format!("{v}.{a}"),
+                    bindings,
+                },
+                body,
+                span,
+            },
+            aipl::MatchArm::QualifiedNullaryArm((v, span), (a, _), body) => MatchArm {
+                pattern: Pattern::Ctor {
+                    name: format!("{v}.{a}"),
+                    bindings: Vec::new(),
+                },
                 body,
                 span,
             },

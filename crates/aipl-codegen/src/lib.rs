@@ -10976,7 +10976,15 @@ fn plan_match(
             let mut payloads = Vec::with_capacity(arms.len());
             let mut seen = HashSet::new();
             for arm in arms {
-                let name = arm.pattern.ctor_name().unwrap_or("");
+                // A pattern constructor may be variant-qualified (`Case@Variant`);
+                // the scrutinee's type fixes the variant, so match on the bare case.
+                let name = arm
+                    .pattern
+                    .ctor_name()
+                    .unwrap_or("")
+                    .split('@')
+                    .next()
+                    .unwrap_or("");
                 let (tag, case) = vl.case(name).ok_or_else(|| {
                     Error::at(format!("{n} has no constructor {name:?}"), arm.span.clone())
                 })?;

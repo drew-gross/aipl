@@ -1359,7 +1359,13 @@ impl<'s> Walker<'s> {
             self.expect("]")?;
             return Ok(self.comma_list_docs(elems, ListStyle::Brackets));
         }
-        let name = self.bump().to_string();
+        let mut name = self.bump().to_string();
+        // A variant-qualified constructor pattern `V.A` / `V.A(ids)`.
+        if self.peek_text() == "." {
+            self.bump();
+            let case = self.bump();
+            name = format!("{name}.{case}");
+        }
         if self.peek_text() == "(" {
             self.bump();
             let mut ids = Vec::new();

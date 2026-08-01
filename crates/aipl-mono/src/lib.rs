@@ -60,18 +60,21 @@ const INSTANTIATION_LIMIT: usize = 10_000;
 /// `Empty` is already a value, not a function — and any binding in scope with
 /// the constructor's name shadows it, like everywhere else.
 pub fn lower_ctor_refs(program: &Program) -> Program {
-    // Payload-carrying constructors: name → payload types (arity >= 1).
-    let ctors: HashMap<&str, &[Type]> = program
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            Item::Variant(v) => Some(&v.cases),
-            _ => None,
-        })
-        .flatten()
-        .filter(|c| !c.payload.is_empty())
-        .map(|c| (c.name.as_str(), c.payload.as_slice()))
-        .collect();
+    // Payload-carrying constructors: name → payload types (arity >= 1). Keyed by
+    // both the bare case name and the loader's variant-qualified form
+    // `Case@Variant`, so a qualified reference used as a value is wrapped too.
+    let mut ctors: HashMap<String, &[Type]> = HashMap::new();
+    for item in &program.items {
+        if let Item::Variant(v) = item {
+            for c in &v.cases {
+                if c.payload.is_empty() {
+                    continue;
+                }
+                ctors.insert(c.name.clone(), c.payload.as_slice());
+                ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
+            }
+        }
+    }
     if ctors.is_empty() {
         return program.clone();
     }
@@ -129,7 +132,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
 /// [`lower_ctor_refs`]'s expression walk. `scope` is the stack of bindings in
 /// scope (a name is pushed for the subexpressions it covers and popped after),
 /// so a shadowed constructor name is left alone.
-fn lcr_expr(e: &Expr, ctors: &HashMap<&str, &[Type]>, scope: &mut Vec<String>) -> Expr {
+fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>) -> Expr {
     use ExprKind as K;
     let rw = |k: ExprKind| Expr::new(k, e.span.clone());
     match &e.kind {
@@ -1064,6 +1067,11 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         }
         for (c, _) in cases {
             ctors.insert(c.clone(), vn.clone());
+            // The loader rewrites an in-scope constructor reference to the
+            // variant-qualified form `Case@Variant`; register that too so it
+            // resolves to the same variant (bare `Case` stays for as-yet
+            // unqualified references).
+            ctors.insert(format!("{c}@{vn}"), vn.clone());
         }
     }
 
@@ -3338,6 +3346,9 @@ impl Mono<'_> {
     /// variant case's payload positionally, else a permissive `i64` fill (the
     /// checker has already validated the pattern).
     fn match_payload_tys(&self, scrut: &Type, ctor: &str, n: usize) -> Vec<Type> {
+        // A pattern constructor may be variant-qualified (`Case@Variant`); the
+        // scrutinee's type already fixes the variant, so match on the bare case.
+        let ctor = ctor.split('@').next().unwrap_or(ctor);
         match scrut {
             Type::Optional(inner) if ctor == "some" => vec![(**inner).clone()],
             // A void-Ok (`!E`) binds nothing in its `ok` arm.

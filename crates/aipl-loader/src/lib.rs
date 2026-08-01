@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use aipl_parser::parse_with_allows;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
-    MatchArm, Param, Program, Signature, StructDecl, Type, TypeParam,
+    MatchArm, Param, Pattern, Program, Signature, StructDecl, Type, TypeParam,
 };
 use aipl_syntax::{builtin_canonical, DebugOptions, Error, Span};
 
@@ -294,6 +294,8 @@ impl Loader {
         // (structs/variants). A non-`pub` function is file-private.
         let mut local_views: HashMap<&PathBuf, HashMap<String, String>> = HashMap::new();
         let mut importables: HashMap<&PathBuf, HashSet<String>> = HashMap::new();
+        // A variant's global name → its case names, for resolving `V.A` paths.
+        let mut ctor_cases: HashMap<String, Vec<String>> = HashMap::new();
         for (path, file) in &self.files {
             let is_root = path == root;
             let mut view = HashMap::new();
@@ -315,6 +317,42 @@ impl Loader {
                 if importable {
                     exports.insert(name);
                 }
+            }
+            // A variant's cases become importable constructors bound to the
+            // variant-qualified global `Case@VariantGlobal`. The defining file
+            // gets each case in its own view (so `A` works there directly);
+            // other files reach it via `import { A }` or `V.A`. A case name that
+            // isn't unique in the file (two variants share it, or it collides
+            // with a fn/type) is left out of the bare view — reachable only as
+            // `V.A` — so a bare use can never silently pick one.
+            let mut case_target: HashMap<String, String> = HashMap::new();
+            let mut ambiguous: HashSet<String> = HashSet::new();
+            for item in &file.items {
+                if let Item::Variant(v) = item {
+                    // Generic variants keep their existing (unscoped) constructor
+                    // handling for now — the monomorphizer resolves their cases per
+                    // instance, so per-import scoping there is future work.
+                    if !v.type_vars.is_empty() {
+                        continue;
+                    }
+                    let vglobal = mangle(is_root, file.index, &v.name);
+                    let cases: Vec<String> = v.cases.iter().map(|c| c.name.clone()).collect();
+                    for c in &cases {
+                        if view.contains_key(c) || case_target.contains_key(c) {
+                            ambiguous.insert(c.clone());
+                        } else {
+                            case_target.insert(c.clone(), format!("{c}@{vglobal}"));
+                        }
+                    }
+                    ctor_cases.insert(vglobal, cases);
+                }
+            }
+            for (case, qualified) in case_target {
+                if ambiguous.contains(&case) {
+                    continue;
+                }
+                view.insert(case.clone(), qualified);
+                exports.insert(case);
             }
             local_views.insert(path, view);
             importables.insert(path, exports);
@@ -484,7 +522,7 @@ impl Loader {
                         }
                     }
                 }
-                merged.push(rewrite_item(item, view, is_root)?);
+                merged.push(rewrite_item(item, view, &ctor_cases, is_root)?);
             }
         }
         // Resolve keyword arguments (and fill omitted keyword parameters from
@@ -626,7 +664,46 @@ pub fn unmangled_name(name: &str) -> &str {
 /// dropped rather than carried into the merged [`Program`], so `aipl check`'s
 /// test driver (`build_test_program`) only ever runs the tests that belong to
 /// the file it was pointed at, not every test reachable through its imports.
-fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> Result<Item, Error> {
+/// Resolve a match pattern's constructor name to its variant-qualified global —
+/// the pattern analog of the construction rewriting in [`rewrite_expr`]. A bare
+/// `A` resolves through the file's `view` (an imported or same-file case); a
+/// `V.A` path resolves `V` to its variant and qualifies its case. Builtin
+/// constructors (`some`/`ok`/`err`/`none`) and non-constructor patterns are left
+/// as-is; an out-of-scope constructor is left bare for the checker to reject.
+fn resolve_pattern(pat: &Pattern, view: &HashMap<String, String>, sc: &Scope) -> Pattern {
+    let Pattern::Ctor { name, bindings } = pat else {
+        return pat.clone();
+    };
+    if matches!(name.as_str(), "some" | "ok" | "err" | "none") {
+        return pat.clone();
+    }
+    let resolved = if let Some((v, a)) = name.split_once('.') {
+        view.get(v)
+            .filter(|g| {
+                sc.ctor_cases
+                    .get(*g)
+                    .is_some_and(|cs| cs.iter().any(|c| c == a))
+            })
+            .map(|g| format!("{a}@{g}"))
+    } else {
+        // A view entry that is a constructor is `Case@Variant` (only ctors carry
+        // `@`); a same-named function/type resolves to a plain mangled name and
+        // is not a valid pattern here, so leave it bare for the checker.
+        view.get(name).filter(|t| t.contains('@')).cloned()
+    };
+    Pattern::Ctor {
+        name: resolved.unwrap_or_else(|| name.clone()),
+        bindings: bindings.clone(),
+    }
+}
+
+fn rewrite_item(
+    item: &Item,
+    view: &HashMap<String, String>,
+    ctor_cases: &HashMap<String, Vec<String>>,
+    is_root: bool,
+) -> Result<Item, Error> {
+    let sc = &Scope { ctor_cases };
     Ok(match item {
         Item::Fn(f) => Item::Fn(Function {
             name: view.get(&f.name).cloned().unwrap_or_else(|| f.name.clone()),
@@ -653,7 +730,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
                         default: p
                             .default
                             .as_ref()
-                            .map(|d| rewrite_expr(d, view, &HashSet::new())),
+                            .map(|d| rewrite_expr(d, view, sc, &HashSet::new())),
                     })
                     .collect(),
                 effects: f.sig.effects.clone(),
@@ -668,6 +745,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
             body: rewrite_expr(
                 &f.body,
                 view,
+                sc,
                 &f.sig.params.iter().map(|p| p.name.clone()).collect(),
             ),
             // Rewrite global references inside the `.test({ .. })` body too (it
@@ -677,7 +755,7 @@ fn rewrite_item(item: &Item, view: &HashMap<String, String>, is_root: bool) -> R
             test_body: if is_root {
                 f.test_body
                     .as_ref()
-                    .map(|tb| rewrite_expr(tb, view, &std::collections::HashSet::new()))
+                    .map(|tb| rewrite_expr(tb, view, sc, &std::collections::HashSet::new()))
             } else {
                 None
             },
@@ -799,7 +877,19 @@ fn is_builtin_type(s: &str) -> bool {
 /// name as a value (e.g. `map(xs, double)`), while a local variable of the same
 /// name still resolves to the local. Names introduced by a binder are added to
 /// `locals` for that binder's sub-scope only.
-fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<String>) -> Expr {
+/// Constructor-resolution context for [`rewrite_expr`], alongside the file's
+/// `view`: `ctor_cases` maps a variant's global name to its case names, for
+/// resolving `V.A` paths.
+struct Scope<'a> {
+    ctor_cases: &'a HashMap<String, Vec<String>>,
+}
+
+fn rewrite_expr(
+    e: &Expr,
+    view: &HashMap<String, String>,
+    sc: &Scope,
+    locals: &HashSet<String>,
+) -> Expr {
     // Extend `locals` with a freshly-bound name for a nested scope.
     let with = |name: &str| -> HashSet<String> {
         let mut s = locals.clone();
@@ -820,23 +910,67 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
             Some(mangled) if !locals.contains(name) => ExprKind::Ident(mangled.clone()),
             _ => e.kind.clone(),
         },
-        ExprKind::Call(name, args, method_style) => ExprKind::Call(
-            view.get(name).cloned().unwrap_or_else(|| name.clone()),
-            args.iter().map(|a| rewrite_expr(a, view, locals)).collect(),
-            *method_style,
-        ),
+        ExprKind::Call(name, args, method_style) => {
+            // `V.A(args)` — a variant-qualified constructor call. It parses as a
+            // method call whose receiver is the variant *type* name `V`; detect a
+            // non-local `V` the view resolves to a variant with a case `name`, and
+            // rewrite to the qualified constructor `A@Vglobal` (dropping the type
+            // receiver). Anything else is an ordinary call / method call.
+            let qualified = if *method_style {
+                args.first().and_then(|first| match &first.kind {
+                    ExprKind::Ident(recv) if !locals.contains(recv) => view
+                        .get(recv)
+                        .filter(|g| sc.ctor_cases.get(*g).is_some_and(|cs| cs.contains(name)))
+                        .cloned(),
+                    _ => None,
+                })
+            } else {
+                None
+            };
+            match qualified {
+                Some(vglobal) => ExprKind::Call(
+                    format!("{name}@{vglobal}"),
+                    args[1..]
+                        .iter()
+                        .map(|a| rewrite_expr(a, view, sc, locals))
+                        .collect(),
+                    false,
+                ),
+                None => ExprKind::Call(
+                    view.get(name).cloned().unwrap_or_else(|| name.clone()),
+                    args.iter()
+                        .map(|a| rewrite_expr(a, view, sc, locals))
+                        .collect(),
+                    *method_style,
+                ),
+            }
+        }
         ExprKind::Construct(name, fields) => ExprKind::Construct(
             view.get(name).cloned().unwrap_or_else(|| name.clone()),
             fields
                 .iter()
                 .map(|fi| FieldInit {
                     name: fi.name.clone(),
-                    value: rewrite_expr(&fi.value, view, locals),
+                    value: rewrite_expr(&fi.value, view, sc, locals),
                 })
                 .collect(),
         ),
         ExprKind::Field(obj, field) => {
-            ExprKind::Field(Box::new(rewrite_expr(obj, view, locals)), field.clone())
+            // `V.A` — a nullary variant-qualified constructor used as a value
+            // (`V.Empty`), the no-argument analog of the `V.A(args)` call above.
+            let qualified = match &obj.kind {
+                ExprKind::Ident(recv) if !locals.contains(recv) => view
+                    .get(recv)
+                    .filter(|g| sc.ctor_cases.get(*g).is_some_and(|cs| cs.contains(field)))
+                    .cloned(),
+                _ => None,
+            };
+            match qualified {
+                Some(vglobal) => ExprKind::Ident(format!("{field}@{vglobal}")),
+                None => {
+                    ExprKind::Field(Box::new(rewrite_expr(obj, view, sc, locals)), field.clone())
+                }
+            }
         }
         ExprKind::Match(scrutinee, arms) => {
             // The arm bindings (e.g. `v` in `some(v)`, `w`/`h` in `Rect(w, h)`)
@@ -850,19 +984,22 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                         arm_locals.insert(b.clone());
                     }
                     MatchArm {
-                        pattern: arm.pattern.clone(),
-                        body: rewrite_expr(&arm.body, view, &arm_locals),
+                        pattern: resolve_pattern(&arm.pattern, view, sc),
+                        body: rewrite_expr(&arm.body, view, sc, &arm_locals),
                         span: arm.span.clone(),
                     }
                 })
                 .collect();
-            ExprKind::Match(Box::new(rewrite_expr(scrutinee, view, locals)), new_arms)
+            ExprKind::Match(
+                Box::new(rewrite_expr(scrutinee, view, sc, locals)),
+                new_arms,
+            )
         }
-        ExprKind::Neg(inner) => ExprKind::Neg(Box::new(rewrite_expr(inner, view, locals))),
-        ExprKind::Not(inner) => ExprKind::Not(Box::new(rewrite_expr(inner, view, locals))),
+        ExprKind::Neg(inner) => ExprKind::Neg(Box::new(rewrite_expr(inner, view, sc, locals))),
+        ExprKind::Not(inner) => ExprKind::Not(Box::new(rewrite_expr(inner, view, sc, locals))),
         ExprKind::Binop(l, op, r) => {
-            let lhs = rewrite_expr(l, view, locals);
-            let rhs = rewrite_expr(r, view, locals);
+            let lhs = rewrite_expr(l, view, sc, locals);
+            let rhs = rewrite_expr(r, view, sc, locals);
             // A binary operator imported as one of the file's own functions
             // (`import { my_add as + } from "./x"`) desugars to a call to that
             // function — the view maps the operator spelling to its
@@ -885,84 +1022,92 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
             }
         }
         ExprKind::If(cond, then_b, else_b) => ExprKind::If(
-            Box::new(rewrite_expr(cond, view, locals)),
-            Box::new(rewrite_expr(then_b, view, locals)),
-            Box::new(rewrite_expr(else_b, view, locals)),
+            Box::new(rewrite_expr(cond, view, sc, locals)),
+            Box::new(rewrite_expr(then_b, view, sc, locals)),
+            Box::new(rewrite_expr(else_b, view, sc, locals)),
         ),
         // `name` binds a local for `body` (but not for `value`).
         ExprKind::Let(name, value, body) => ExprKind::Let(
             name.clone(),
-            Box::new(rewrite_expr(value, view, locals)),
-            Box::new(rewrite_expr(body, view, &with(name))),
+            Box::new(rewrite_expr(value, view, sc, locals)),
+            Box::new(rewrite_expr(body, view, sc, &with(name))),
         ),
         ExprKind::LetMut(name, value, body) => ExprKind::LetMut(
             name.clone(),
-            Box::new(rewrite_expr(value, view, locals)),
-            Box::new(rewrite_expr(body, view, &with(name))),
+            Box::new(rewrite_expr(value, view, sc, locals)),
+            Box::new(rewrite_expr(body, view, sc, &with(name))),
         ),
         // `set lhs = value; body` — the LHS is rooted at a binding from an
         // enclosing `let mut` (always a local, never an imported alias), so it
         // needs no rewriting; the name stays a local in both `value` and `body`.
         ExprKind::Assign(lhs, value, body) => ExprKind::Assign(
             lhs.clone(),
-            Box::new(rewrite_expr(value, view, locals)),
-            Box::new(rewrite_expr(body, view, locals)),
+            Box::new(rewrite_expr(value, view, sc, locals)),
+            Box::new(rewrite_expr(body, view, sc, locals)),
         ),
         ExprKind::For(var, iterable, body) => ExprKind::For(
             var.clone(),
-            Box::new(rewrite_expr(iterable, view, locals)),
-            Box::new(rewrite_expr(body, view, &with(var))),
+            Box::new(rewrite_expr(iterable, view, sc, locals)),
+            Box::new(rewrite_expr(body, view, sc, &with(var))),
         ),
         // `while` binds nothing; both condition and body see the same scope.
         ExprKind::While(cond, body) => ExprKind::While(
-            Box::new(rewrite_expr(cond, view, locals)),
-            Box::new(rewrite_expr(body, view, locals)),
+            Box::new(rewrite_expr(cond, view, sc, locals)),
+            Box::new(rewrite_expr(body, view, sc, locals)),
         ),
         ExprKind::ArrayLit(elems) => ExprKind::ArrayLit(
             elems
                 .iter()
-                .map(|e| rewrite_expr(e, view, locals))
+                .map(|e| rewrite_expr(e, view, sc, locals))
                 .collect(),
         ),
         ExprKind::SetLit(elems) => ExprKind::SetLit(
             elems
                 .iter()
-                .map(|e| rewrite_expr(e, view, locals))
+                .map(|e| rewrite_expr(e, view, sc, locals))
                 .collect(),
         ),
         ExprKind::TupleLit(elems) => ExprKind::TupleLit(
             elems
                 .iter()
-                .map(|e| rewrite_expr(e, view, locals))
+                .map(|e| rewrite_expr(e, view, sc, locals))
                 .collect(),
         ),
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
                 .iter()
-                .map(|(k, v)| (rewrite_expr(k, view, locals), rewrite_expr(v, view, locals)))
+                .map(|(k, v)| {
+                    (
+                        rewrite_expr(k, view, sc, locals),
+                        rewrite_expr(v, view, sc, locals),
+                    )
+                })
                 .collect(),
         ),
         ExprKind::Index(obj, index) => ExprKind::Index(
-            Box::new(rewrite_expr(obj, view, locals)),
-            Box::new(rewrite_expr(index, view, locals)),
+            Box::new(rewrite_expr(obj, view, sc, locals)),
+            Box::new(rewrite_expr(index, view, sc, locals)),
         ),
         ExprKind::Slice(obj, start, end) => ExprKind::Slice(
-            Box::new(rewrite_expr(obj, view, locals)),
-            Box::new(rewrite_expr(start, view, locals)),
+            Box::new(rewrite_expr(obj, view, sc, locals)),
+            Box::new(rewrite_expr(start, view, sc, locals)),
             end.as_ref()
-                .map(|e| Box::new(rewrite_expr(e, view, locals))),
+                .map(|e| Box::new(rewrite_expr(e, view, sc, locals))),
         ),
-        ExprKind::Try(e) => ExprKind::Try(Box::new(rewrite_expr(e, view, locals))),
+        ExprKind::Try(e) => ExprKind::Try(Box::new(rewrite_expr(e, view, sc, locals))),
         // The keyword name refers to the callee's parameter, not a global —
         // only the value is rewritten.
-        ExprKind::KwArg(name, value) => {
-            ExprKind::KwArg(name.clone(), Box::new(rewrite_expr(value, view, locals)))
-        }
-        ExprKind::Seq(first, rest) => ExprKind::Seq(
-            Box::new(rewrite_expr(first, view, locals)),
-            Box::new(rewrite_expr(rest, view, locals)),
+        ExprKind::KwArg(name, value) => ExprKind::KwArg(
+            name.clone(),
+            Box::new(rewrite_expr(value, view, sc, locals)),
         ),
-        ExprKind::Return(value) => ExprKind::Return(Box::new(rewrite_expr(value, view, locals))),
+        ExprKind::Seq(first, rest) => ExprKind::Seq(
+            Box::new(rewrite_expr(first, view, sc, locals)),
+            Box::new(rewrite_expr(rest, view, sc, locals)),
+        ),
+        ExprKind::Return(value) => {
+            ExprKind::Return(Box::new(rewrite_expr(value, view, sc, locals)))
+        }
         // Lambda params are locals in the body; their optional type annotations
         // may reference structs, so rewrite those through the view.
         ExprKind::Lambda(params, body) => {
@@ -979,7 +1124,7 @@ fn rewrite_expr(e: &Expr, view: &HashMap<String, String>, locals: &HashSet<Strin
                         span: p.span.clone(),
                     })
                     .collect(),
-                Box::new(rewrite_expr(body, view, &inner)),
+                Box::new(rewrite_expr(body, view, sc, &inner)),
             )
         }
     };
