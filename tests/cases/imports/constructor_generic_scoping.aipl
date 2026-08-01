@@ -1,0 +1,31 @@
+// A generic variant scopes its constructors by import just like a concrete one:
+// `import { Some }` brings the constructor into scope (its instance is inferred
+// from the argument), and importing the variant `Opt` lets you write its nullary
+// case as `Opt.Nothing`.
+import { print, to_str } from builtins;
+import { Opt, Some, unwrap_or } from "./opt.aipl";
+
+fn main() !prints {
+    print(unwrap_or(Some(7), 0).to_str()); // imported generic constructor
+    print(unwrap_or(Opt.Nothing, 9).to_str()); // qualified generic nullary
+}
+--- file: opt.aipl ---
+variant Opt<T> = Some(T) | Nothing
+
+pub fn unwrap_or(o: Opt<i64>, d: i64) -> i64 { match (o) { Some(v) => v, Nothing => d } }
+--- stdout ---
+7
+9
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 102
+binary size: 1376
+  code: 428
+  data: 1
+  metadata: 947
+--- monomorphizations ---
+__m1__unwrap_or
+main

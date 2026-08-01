@@ -3,6 +3,7 @@
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 import { &&, wrapping_add as +, +++, <, ==, int_parse, join, len, split } from builtins;
 import {
+    Bare,
     Between,
     CharRun,
     Delimited,
@@ -16,6 +17,8 @@ import {
     Matcher,
     Middle,
     Nested,
+    Of,
+    OfSeg,
     Plain,
     Seg,
     Tail,
@@ -23,6 +26,7 @@ import {
     ToEol,
     Token,
     TokenRule,
+    Try,
     lex,
 } from "./lexer.aipl";
 import { process_raw_string } from "./process_raw_string.aipl";

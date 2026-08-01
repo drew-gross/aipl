@@ -329,12 +329,9 @@ impl Loader {
             let mut ambiguous: HashSet<String> = HashSet::new();
             for item in &file.items {
                 if let Item::Variant(v) = item {
-                    // Generic variants keep their existing (unscoped) constructor
-                    // handling for now — the monomorphizer resolves their cases per
-                    // instance, so per-import scoping there is future work.
-                    if !v.type_vars.is_empty() {
-                        continue;
-                    }
+                    // Both concrete and generic variants scope their constructors
+                    // by import; for a generic variant the qualified `Case@Template`
+                    // is later re-qualified to the chosen instance by the monomorphizer.
                     let vglobal = mangle(is_root, file.index, &v.name);
                     let cases: Vec<String> = v.cases.iter().map(|c| c.name.clone()).collect();
                     for c in &cases {

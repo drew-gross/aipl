@@ -11079,45 +11079,23 @@ fn bind_match_arm(
 }
 
 /// If `name` is a variant constructor, return its `(variant, tag, payload
-/// fields)`. Every in-scope non-generic constructor arrives variant-qualified as
-/// `<ctor>@<variant>` (the loader rewrites references to that form), so a bare
-/// name resolves only against *generic-variant instances* (whose constructors
-/// mono leaves unqualified, shared by name across instances). A bare name for a
-/// non-generic variant does not resolve — it was never brought into scope.
+/// fields)`. Every constructor arrives variant-qualified as `<ctor>@<variant>` —
+/// the loader rewrites each in-scope reference to that form (`A@Shape`), and the
+/// monomorphizer rewrites a generic constructor to its instance (`Some@Opt$i64`).
+/// A bare name never resolves: it was never brought into scope.
 fn variant_ctor(
     structs: &HashMap<String, TypeDef>,
     name: &str,
 ) -> Option<(String, usize, Vec<(u32, Type)>)> {
-    // The qualified form `<ctor>@<variant>`: a non-generic case (`A@Shape`) or a
-    // generic-variant construction mono rewrote to its instance (`Some@Option$i64`).
-    if let Some((ctor, inst)) = name.split_once('@') {
-        let vl = structs.get(inst)?.as_variant()?;
-        let (tag, case) = vl.case(ctor)?;
-        let fields = case
-            .fields
-            .iter()
-            .map(|f| (f.offset, f.ty.clone()))
-            .collect();
-        return Some((inst.to_string(), tag, fields));
-    }
-    // A bare name: only a generic-variant *instance* (name contains `$`) shares
-    // its constructors by bare name — e.g. a nullary `Nothing` resolved by type.
-    for (vname, def) in structs {
-        if !vname.contains('$') {
-            continue;
-        }
-        if let Some(vl) = def.as_variant() {
-            if let Some((tag, case)) = vl.case(name) {
-                let fields = case
-                    .fields
-                    .iter()
-                    .map(|f| (f.offset, f.ty.clone()))
-                    .collect();
-                return Some((vname.clone(), tag, fields));
-            }
-        }
-    }
-    None
+    let (ctor, inst) = name.split_once('@')?;
+    let vl = structs.get(inst)?.as_variant()?;
+    let (tag, case) = vl.case(ctor)?;
+    let fields = case
+        .fields
+        .iter()
+        .map(|f| (f.offset, f.ty.clone()))
+        .collect();
+    Some((inst.to_string(), tag, fields))
 }
 
 /// Build a variant value `Ctor(args..)` in a fresh stack slot: store the tag,

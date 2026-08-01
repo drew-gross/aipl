@@ -563,16 +563,18 @@ impl<'a> Cx<'a> {
         effects: &[String],
         span: Span,
     ) -> Result<Type, Error> {
+        // `ctor` is the variant-qualified `Case@Template`; cases are named bare.
+        let bare = ctor.split('@').next().unwrap_or(ctor);
         let tmpl = self.generic_variants.get(base).expect("caller checked");
         let case = tmpl
             .cases
             .iter()
-            .find(|c| c.name == ctor)
+            .find(|c| c.name == bare)
             .expect("ctor belongs to this template");
         if args.len() != case.payload.len() {
             return Err(Error::at(
                 format!(
-                    "constructor {ctor:?} expects {} argument(s), got {}",
+                    "constructor {bare:?} expects {} argument(s), got {}",
                     case.payload.len(),
                     args.len()
                 ),
@@ -623,14 +625,14 @@ impl<'a> Cx<'a> {
         let cases = self.variant_cases(&inst).expect("just instantiated");
         let payload = cases
             .iter()
-            .find(|(n, _)| n == ctor)
+            .find(|(n, _)| n == bare)
             .map(|(_, p)| p.clone())
             .expect("ctor present in instance");
         for ((at, aspan), pty) in arg_tys.iter().zip(&payload) {
             expect(
                 at,
                 pty,
-                &format!("constructor {ctor:?} argument"),
+                &format!("constructor {bare:?} argument"),
                 aspan.clone(),
             )?;
         }
@@ -692,7 +694,10 @@ pub fn check(program: &Program) -> Result<(), Error> {
     let mut generic_ctors: HashMap<String, String> = HashMap::new();
     for (base, tmpl) in &generic_variants {
         for c in &tmpl.cases {
-            generic_ctors.insert(c.name.clone(), base.clone());
+            // Keyed by the loader's variant-qualified name `Case@Template`, like
+            // non-generic constructors — a generic constructor is addressable only
+            // when brought into scope.
+            generic_ctors.insert(format!("{}@{}", c.name, base), base.clone());
         }
     }
     // Pass 2: register the constructors of concrete, *non-instance* variants in

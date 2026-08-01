@@ -66,20 +66,14 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
     let mut ctors: HashMap<String, &[Type]> = HashMap::new();
     for item in &program.items {
         if let Item::Variant(v) = item {
-            // Non-generic constructors are referenced only by their loader-assigned
-            // variant-qualified name `Case@Variant`; generic-variant constructors
-            // stay unscoped (resolved per instance by the monomorphizer), so they
-            // keep their bare-name key.
-            let generic = !v.type_vars.is_empty();
+            // Every in-scope constructor is referenced by its loader-assigned
+            // variant-qualified name `Case@Variant` (generic templates included —
+            // the monomorphizer re-qualifies those to their instance).
             for c in &v.cases {
                 if c.payload.is_empty() {
                     continue;
                 }
-                if generic {
-                    ctors.insert(c.name.clone(), c.payload.as_slice());
-                } else {
-                    ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
-                }
+                ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
             }
         }
     }
@@ -1058,12 +1052,14 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         }
     }
 
-    // A generic-variant template's constructors: `ctor` → template base. Built
-    // before the unique `ctors` map so instance constructors can be skipped.
+    // A generic-variant template's constructors, keyed by the loader's
+    // variant-qualified name `Case@Template` → the template base. (Like
+    // non-generic constructors, generic ones are addressed only when in scope;
+    // the loader rewrites every reference to the qualified form.)
     let mut generic_ctors: HashMap<String, String> = HashMap::new();
     for (base, tmpl) in &generic_variants {
         for c in &tmpl.cases {
-            generic_ctors.insert(c.name.clone(), base.clone());
+            generic_ctors.insert(format!("{}@{}", c.name, base), base.clone());
         }
     }
     // Register the constructors of concrete, non-instance variants. A generic-
@@ -3630,11 +3626,14 @@ impl Mono<'_> {
         span: &Span,
     ) -> Result<(Expr, Type), Error> {
         let base = self.generic_ctors[ctor].clone();
+        // `ctor` is the variant-qualified `Case@Template`; the template's cases
+        // are named by the bare case.
+        let bare = ctor.split('@').next().unwrap_or(ctor);
         let tmpl = self.generic_variants[&base].clone();
         let case = tmpl
             .cases
             .iter()
-            .find(|c| c.name == ctor)
+            .find(|c| c.name == bare)
             .expect("ctor belongs to this template")
             .clone();
         let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
@@ -3673,7 +3672,7 @@ impl Mono<'_> {
             })
             .collect::<Result<_, _>>()?;
         let inst = self.instantiate_generic(&base, &type_args)?;
-        let qualified = format!("{ctor}@{inst}");
+        let qualified = format!("{bare}@{inst}");
         Ok((
             Expr::new(ExprKind::Call(qualified, rargs, false), span.clone()),
             Type::Named(inst),
@@ -3867,6 +3866,12 @@ impl Mono<'_> {
             ExprKind::Char(_) => (expr.clone(), Type::Primitive(Primitive::Char)),
             ExprKind::None => (expr.clone(), Type::Optional(Box::new(Type::NoneInner))),
             ExprKind::Ident(name) => {
+                // A nullary constructor of a generic variant (`Nothing@Opt`):
+                // resolve its instance (from the sole existing one) and rewrite to
+                // the instance-qualified form, exactly like the call form above.
+                if !env.contains_key(name) && self.generic_ctors.contains_key(name) {
+                    return self.infer_generic_variant_ctor(name, &[], env, &span);
+                }
                 // A bare name is a local binding, or — if unbound — a nullary
                 // variant constructor (e.g. `Empty`), or a function used as a
                 // value (`let f = inc;`), whose type is its `Type::Fn` and whose
