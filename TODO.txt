@@ -58,6 +58,10 @@ negative numbers via -123 instead of 0 - 123
 
 make for (key, val) work for dicts, and also arrays (key=index)
 
+error improvements:
+- import suggestions when missing an import
+- from` its defining file -> list the filename
+
 optimize enumerate with streams
 import wrapping_mul as *
 "AIPL-implemented builtin sources are valid AIPL" error should include more info

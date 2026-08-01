@@ -703,12 +703,11 @@ pub fn check(program: &Program) -> Result<(), Error> {
             continue;
         }
         for (c, _) in cases {
-            if ctors.insert(c.clone(), vn.clone()).is_some() {
-                return Err(Error::msg(format!("duplicate variant constructor {c:?}")));
-            }
-            // The loader rewrites an in-scope constructor reference to the
-            // variant-qualified `Case@Variant`; register that alongside the bare
-            // name so it types to the same variant.
+            // Constructors are addressed only by their variant-qualified name:
+            // the loader rewrites every in-scope reference to `Case@Variant`, so
+            // bare case names may repeat across variants without colliding, and a
+            // bare (unqualified) reference no longer resolves — it means the
+            // constructor wasn't brought into scope.
             ctors.insert(format!("{c}@{vn}"), vn.clone());
         }
     }
@@ -1075,6 +1074,18 @@ impl Cx<'_> {
             .iter()
             .find(|(c, _)| c == ctor)
             .map(|(_, p)| p.as_slice())
+    }
+
+    /// Whether `name` is the bare name of some variant's constructor (used only
+    /// to hint, on an undefined-name error, that a constructor needs importing).
+    fn is_ctor_name(&self, name: &str) -> bool {
+        self.variants
+            .values()
+            .any(|cases| cases.iter().any(|(c, _)| c == name))
+            || self
+                .generic_variants
+                .values()
+                .any(|v| v.cases.iter().any(|c| c.name == name))
     }
 
     /// A bare-name (nullary) constructor must have an empty payload.
@@ -2316,6 +2327,12 @@ impl Cx<'_> {
             if aipl_syntax::IMPORTABLE_BUILTINS.contains(&name) {
                 msg.push_str(&format!(
                     " — \"{name}\" is a builtin; import it with `import {{ {name} }} from builtins;`"
+                ));
+            } else if self.is_ctor_name(name) {
+                msg.push_str(&format!(
+                    " — \"{name}\" is a variant constructor that isn't in scope; import it with \
+                     `import {{ {name} }} from` its defining file, or write it qualified as \
+                     `Variant.{name}`"
                 ));
             }
             return Err(Error::at(msg, span.clone()));

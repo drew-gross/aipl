@@ -66,12 +66,20 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
     let mut ctors: HashMap<String, &[Type]> = HashMap::new();
     for item in &program.items {
         if let Item::Variant(v) = item {
+            // Non-generic constructors are referenced only by their loader-assigned
+            // variant-qualified name `Case@Variant`; generic-variant constructors
+            // stay unscoped (resolved per instance by the monomorphizer), so they
+            // keep their bare-name key.
+            let generic = !v.type_vars.is_empty();
             for c in &v.cases {
                 if c.payload.is_empty() {
                     continue;
                 }
-                ctors.insert(c.name.clone(), c.payload.as_slice());
-                ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
+                if generic {
+                    ctors.insert(c.name.clone(), c.payload.as_slice());
+                } else {
+                    ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
+                }
             }
         }
     }
@@ -1066,11 +1074,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             continue;
         }
         for (c, _) in cases {
-            ctors.insert(c.clone(), vn.clone());
-            // The loader rewrites an in-scope constructor reference to the
-            // variant-qualified form `Case@Variant`; register that too so it
-            // resolves to the same variant (bare `Case` stays for as-yet
-            // unqualified references).
+            // Only the variant-qualified name resolves — the loader rewrites every
+            // in-scope reference to `Case@Variant`; a bare case reaching here means
+            // the constructor wasn't imported.
             ctors.insert(format!("{c}@{vn}"), vn.clone());
         }
     }

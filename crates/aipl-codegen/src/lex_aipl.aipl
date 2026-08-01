@@ -2,7 +2,29 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 import { &&, wrapping_add as +, +++, <, ==, int_parse, join, len, split } from builtins;
-import { Emit, LexError, LexResult, Matcher, Seg, Token, TokenRule, lex } from "./lexer.aipl";
+import {
+    Between,
+    CharRun,
+    Delimited,
+    Emit,
+    Exact,
+    Head,
+    Int,
+    Keyword,
+    LexError,
+    LexResult,
+    Matcher,
+    Middle,
+    Nested,
+    Plain,
+    Seg,
+    Tail,
+    Template,
+    ToEol,
+    Token,
+    TokenRule,
+    lex,
+} from "./lexer.aipl";
 import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import { unescape } from "./unescape.aipl";

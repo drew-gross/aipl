@@ -1,0 +1,35 @@
+// Two different variants, defined in different files, may reuse the same
+// constructor name (`A`): every in-scope reference is variant-qualified
+// internally, so there is no collision. `import { A as ColorA }` disambiguates at
+// the use site, and `Size.A` names the other one directly.
+import { wrapping_add as +, print, to_str } from builtins;
+import { Color, A as ColorA, hue } from "./color.aipl";
+import { Size, size_rank } from "./size.aipl";
+
+fn main() !prints {
+    let c = ColorA; // Color's A, via import alias
+    let s = Size.A; // Size's A, qualified
+    print((c.hue() + s.size_rank()).to_str()); // 1 + 10 == 11
+}
+--- file: color.aipl ---
+variant Color = A | B
+
+pub fn hue(self: Color) -> i64 { match (self) { A => 1, B => 2 } }
+--- file: size.aipl ---
+variant Size = A | C
+
+pub fn size_rank(self: Size) -> i64 { match (self) { A => 10, C => 20 } }
+--- stdout ---
+11
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 58
+binary size: 1208
+  code: 364
+  data: 1
+  metadata: 843
+--- monomorphizations ---
+main
