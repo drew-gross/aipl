@@ -1,0 +1,72 @@
+import { !, +++, ==, >, filter, len, wrapping_add as +, wrapping_sub as - } from builtins;
+
+// The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
+// (see `builtin_left_fold.aipl`). Monomorphization registers this function under
+// the canonical name `__builtin_right_fold` (see `AIPL_BUILTIN_SOURCES` in
+// `lib.rs`), so a user's `xs.right_fold(init, f)` specializes through the
+// ordinary generic / higher-order machinery.
+//
+// Walks the indices backwards rather than folding over a reversed copy, so
+// nothing is allocated. `self[i]` yields an optional and `i` is always in range,
+// so the `none` arm is dead — it just hands the accumulator back unchanged.
+pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
+    mut acc = init;
+    mut i = self.len();
+    while (i > 0) {
+        set i = i - 1;
+        set acc = match (self[i]) {
+            some(x) => f(x, acc),
+            none => acc,
+        };
+    }
+    acc
+}.doc("""
+    Combine the elements right to left, starting from `init`: for `[a, b, c]`,
+    `f(a, f(b, f(c, init)))` — note the combiner takes the element first, the
+    accumulator second, the mirror of `left_fold`. Generic over both the element
+    and accumulator types and callable as a method:
+    `xs.right_fold(Nil, |x, acc| Cons(x, acc))`.
+
+    Prefer `left_fold` (imported as plain `fold`) unless the right-to-left order
+    matters — building a cons list front-to-back from an array is the standard
+    case where it does.
+""").test({
+    assert([1, 2, 3].right_fold(0, |x, acc| x + acc) == 6); // sum: order-agnostic
+    assert(right_fold([2, 3], 1, |x, acc| x + acc) == 6); // free-call form
+    // Empty (a typed empty from `filter`) folds to its init untouched.
+    assert([1, 2].filter(is_big).right_fold(7, add) == 7);
+
+    // Right-associative: the order of combination is visible in a string, and is
+    // the reverse of what `left_fold` builds.
+    assert(["a", "b", "c"].right_fold("", |s, acc| acc +++ s) == "cba");
+    assert(["a", "b", "c"].right_fold("", |s, acc| s +++ acc) == "abc");
+    // The accumulator type need not match the element type.
+    assert(['x', 'y'].right_fold(0, |c, acc| acc + 1) == 2);
+    assert([1, 2, 3].right_fold(0, add) == 6); // a named combiner, no lambda
+    let bump = 10;
+    assert([1, 2].right_fold(0, |x, acc| x + acc + bump) == 23); // a captured value
+})
+
+fn add(x: i64, acc: i64) -> i64 { x + acc }.test({
+    assert(add(1, 2) == 3);
+})
+
+fn is_big(self: i64) -> bool { self == 99 }.test({
+    assert(!is_big(1));
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 627
+instructions executed: 1653
+binary size: 7296
+  code: 3596
+  data: 740
+  metadata: 2960
+--- monomorphizations ---
+__filter4$own0
+add
+is_big
+main
+right_fold$i64$i64$lam5

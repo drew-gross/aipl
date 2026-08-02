@@ -1,0 +1,61 @@
+import { !, +++, ==, filter, wrapping_add as + } from builtins;
+
+// The AIPL implementation of the `left_fold` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_left_fold` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.left_fold(init, f)`
+// specializes through the ordinary generic / higher-order machinery — the
+// in-file name `left_fold` is only for this file's own tests, which read exactly
+// like user code.
+pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
+    mut acc = init;
+    for (let x : self) {
+        set acc = f(acc, x);
+    }
+    acc
+}.doc("""
+    Combine the elements left to right, starting from `init`: for `[a, b, c]`,
+    `f(f(f(init, a), b), c)`. Generic over both the element and accumulator types
+    and callable as a method: `xs.left_fold(0, |acc, x| acc + x)`.
+
+    Import it as plain `fold` — `import { left_fold as fold } from builtins;` — in
+    the usual case where a file folds in only one direction; spell it `left_fold`
+    only in a file that also imports `right_fold`, where the two need telling
+    apart.
+""").test({
+    assert([1, 2, 3].left_fold(0, |acc, x| acc + x) == 6); // sum
+    assert([1, 2, 3].left_fold(10, |acc, x| acc + x) == 16); // from a nonzero init
+    assert(left_fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form
+    // Left-associative: the order of combination is visible in a string.
+    assert(["a", "b", "c"].left_fold("", |acc, s| acc +++ s) == "abc");
+    // The accumulator type need not match the element type.
+    assert(['x', 'y'].left_fold(0, |acc, c| acc + 1) == 2);
+    assert([1, 2, 3].left_fold(0, add) == 6); // a named combiner, no lambda
+    // Empty (a typed empty from `filter`) folds to its init untouched.
+    assert([1, 2].filter(is_big).left_fold(5, add) == 5);
+    let bump = 10;
+    assert([1, 2].left_fold(0, |acc, x| acc + x + bump) == 23); // a captured value
+})
+
+fn add(acc: i64, x: i64) -> i64 { acc + x }.test({
+    assert(add(1, 2) == 3);
+})
+
+fn is_big(self: i64) -> bool { self == 99 }.test({
+    assert(!is_big(1));
+})
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 507
+instructions executed: 1140
+binary size: 6032
+  code: 2664
+  data: 724
+  metadata: 2644
+--- monomorphizations ---
+__filter11$own0
+add
+is_big
+left_fold$i64$i64$lam10
+main

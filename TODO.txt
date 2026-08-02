@@ -64,7 +64,7 @@ error improvements:
 - import suggestions when missing an import
 - from` its defining file -> list the filename
 
-optimize enumerate/reverse with streams
+optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
@@ -75,6 +75,8 @@ Separate pre-existing bug I hit and did not fix: struct Tree { label: i64, kids:
 
 figure out / fix why template literals are peforming worse than concat chains
 improve the highlighter test: correct code should never highlight as a mismatched bracket
+
+make try_left_fold and try_right_fold for use in builtin_int_parse
 
 For lexer dogfooding:
 - remove the dump/load stuff when the FFI supports the full lex result

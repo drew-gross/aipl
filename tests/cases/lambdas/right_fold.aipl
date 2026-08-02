@@ -1,0 +1,50 @@
+import { !=, +++, ==, left_fold, right_fold, wrapping_add as + } from builtins;
+
+// `xs.right_fold(init, f)` mirrors `left_fold`: it combines right to left, so
+// `[a, b, c]` folds to `f(a, f(b, f(c, init)))` — and the combiner takes the
+// element *first*, the accumulator second, the opposite of `left_fold`.
+//
+// This file imports both directions, so it spells the left one `left_fold`
+// rather than aliasing it to plain `fold` (see `fold.aipl` for the usual
+// single-direction spelling).
+//
+// `right_fold` walks the indices backwards instead of folding over a reversed
+// copy, so it allocates nothing — which is the point of having it rather than
+// writing `xs.reverse().fold(..)`.
+variant List = Cons(i64, List) | Nil
+
+// The motivating case: build a cons list that keeps the array's order. The left
+// fold would come out reversed.
+fn to_list(xs: i64[]) -> List { xs.right_fold(Nil, Cons) }
+
+fn to_list_keeps_order() -> List { to_list([1, 2]) }.test({
+    assert(to_list([1, 2, 3]) == Cons(1, Cons(2, Cons(3, Nil))));
+    assert(to_list([]) == Nil);
+    assert(to_list([1, 2]) != Cons(2, Cons(1, Nil)));
+
+    // Direction is visible in a string: same combiner, mirrored result.
+    assert(["a", "b", "c"].right_fold("", |s, acc| acc +++ s) == "cba");
+    assert(["a", "b", "c"].left_fold("", |acc, s| acc +++ s) == "abc");
+
+    // Or, the other way round: appending the accumulator *after* the element in
+    // a right fold rebuilds the original order.
+    assert(["a", "b", "c"].right_fold("", |s, acc| s +++ acc) == "abc");
+
+    assert(right_fold([2, 3], 1, |x, acc| x + acc) == 6); // free-call form
+    let bump = 10;
+    assert([1, 2].right_fold(0, |x, acc| x + acc + bump) == 23); // a capture
+})
+--- performance ---
+allocations: 30
+deallocations: 30
+reallocations: 0
+bytes allocated: 1488
+instructions executed: 1852
+binary size: 8136
+  code: 4028
+  data: 655
+  metadata: 3453
+--- monomorphizations ---
+__test$to_list_keeps_order
+main
+to_list

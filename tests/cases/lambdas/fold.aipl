@@ -1,0 +1,47 @@
+import { +++, ==, filter, left_fold as fold, wrapping_add as + } from builtins;
+
+// `xs.fold(init, f)` combines the elements left to right — `[a, b, c]` folds to
+// `f(f(f(init, a), b), c)`, with the accumulator first and the element second.
+// It's implemented in AIPL itself (`builtin_left_fold.aipl`) and specializes
+// like a user generic, over the element and accumulator types independently.
+//
+// Import convention: bring `left_fold` in as plain `fold`, as here — one fold
+// direction per file is the usual case. Spell it out as `left_fold` only in a
+// file that imports `right_fold` too, so the pair reads as a pair (see
+// `right_fold.aipl`).
+fn sum(xs: i64[]) -> i64 { xs.fold(0, |acc, x| acc + x) }
+
+fn is_big(self: i64) -> bool { self == 99 }
+
+fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({
+    assert(sum([1, 2, 3]) == 6);
+    assert(sum([]) == 0); // empty folds to the init
+    assert([1, 2, 3].fold(10, |acc, x| acc + x) == 16); // a nonzero init
+    assert(fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form
+    assert([1, 2].filter(is_big).fold(5, |acc, x| acc + x) == 5); // typed empty
+
+    // Left-associative: the order of combination is visible in a string.
+    assert(["a", "b", "c"].fold("", |acc, s| acc +++ s) == "abc");
+
+    // The accumulator type is independent of the element type.
+    assert(['x', 'y', 'z'].fold(0, |acc, c| acc + 1) == 3);
+    assert("hey".fold(0, |acc, c| acc + 1) == 3); // a str receiver folds its chars
+
+    let bump = 10;
+    assert([1, 2].fold(0, |acc, x| acc + x + bump) == 23); // a captured value
+})
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 484
+instructions executed: 1078
+binary size: 5736
+  code: 2608
+  data: 641
+  metadata: 2487
+--- monomorphizations ---
+__filter4$own0
+__test$sums_an_array
+main
+sum

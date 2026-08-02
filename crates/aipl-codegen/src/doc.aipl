@@ -27,7 +27,7 @@ import {
     map,
     push,
     repeat,
-    reverse,
+    right_fold,
     split,
     value_or,
     wrapping_add as +,
@@ -204,13 +204,9 @@ fn fits_atom(budget: i64, s: str, flat: bool, rest: Work) -> bool {
 // ---------- helpers ----------
 
 // Prepend an array of children onto the work-list so `ds[0]` is processed first:
-// fold from the back, each frame carrying the parent's indent and mode.
+// a right fold over `ds`, each frame carrying the parent's indent and mode.
 fn prepend(ds: Doc[], sp: i64, flat: bool, rest: Work) -> Work {
-    mut work = rest;
-    for (let d : ds.reverse()) {
-        set work = WCons(sp, flat, d, work);
-    }
-    work
+    ds.right_fold(rest, |d, work| WCons(sp, flat, d, work))
 }
 
 // Append one emitted piece to the output accumulator.
@@ -294,23 +290,23 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 303
-deallocations: 303
+allocations: 283
+deallocations: 283
 reallocations: 0
-bytes allocated: 17020
-instructions executed: 17390
-binary size: 28960
-  code: 15872
+bytes allocated: 16060
+instructions executed: 20472
+binary size: 29064
+  code: 16012
   data: 842
-  metadata: 12246
+  metadata: 12210
 --- monomorphizations ---
 __builtin_any$Doc$lam3
-__builtin_count_while$char$s0$lam17
-__builtin_count_while$char$s0$lam7
+__builtin_count_while$char$s0$lam11
+__builtin_count_while$char$s0$lam21
 __m1__reindent_block
 __m3__lines
-__map15$own0
-__map9$own0
+__map13$own0
+__map19$own0
 col_after
 fits
 fits_atom
