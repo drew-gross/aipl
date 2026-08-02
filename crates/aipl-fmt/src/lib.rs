@@ -613,8 +613,12 @@ impl<'s> Walker<'s> {
         let name = self.bump().to_string();
         let tps = self.type_params()?;
         self.expect("=")?;
-        let mut cases = Vec::new();
+        // Each case carries its own leading comments (rendered on their own
+        // lines *before* the case's `|`) and any same-line trailing comment, so
+        // a comment written between two arms stays between them.
+        let mut cases: Vec<(Doc, Doc)> = Vec::new();
         loop {
+            let lead = self.lead();
             let cname = self.bump().to_string();
             let mut c = vec![text(cname)];
             if self.peek_text() == "(" {
@@ -629,7 +633,8 @@ impl<'s> Walker<'s> {
                 self.expect(")")?;
                 c.push(self.comma_list_docs(tys, ListStyle::TyParens));
             }
-            cases.push(concat(c));
+            c.push(self.trailing_comment());
+            cases.push((lead, concat(c)));
             if self.peek_text() == "|" {
                 self.bump();
             } else {
@@ -637,10 +642,12 @@ impl<'s> Walker<'s> {
             }
         }
         // Flat: `variant V = A | B(i64)`. Broken: one case per line, the
-        // separator `|` leading each continuation.
-        let mut body = vec![cases[0].clone()];
-        for c in &cases[1..] {
+        // separator `|` leading each continuation. A leading comment sits above
+        // its case — and, being a hard line, forces the broken layout.
+        let mut body = vec![cases[0].0.clone(), cases[0].1.clone()];
+        for (lead, c) in &cases[1..] {
             body.push(Doc::Line);
+            body.push(lead.clone());
             body.push(text("| "));
             body.push(c.clone());
         }

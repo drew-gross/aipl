@@ -72,7 +72,6 @@ allow ? for optional in optional returning functions, use to simplify builtin_in
 make a fold builtin (can simplify builtin_in_parse)
 
 to fix:
-- The AIPL formatter can't keep comments between variant arms
 - reassigning a recursive-variant accumulator inside a for loop (set acc = WCons(d, acc)) silently loses the mutation
 
 figure out / fix why template literals are peforming worse than concat chains
