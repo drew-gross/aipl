@@ -64,13 +64,8 @@ variant Work = WNil | WCons(i64, bool, Doc, Work)
 
 // ---------- constructors ----------
 
-fn text(self: str) -> Doc { Text(self) }
-
-fn concat(self: Doc[]) -> Doc { Concat(self) }
-
-fn indent(self: Doc) -> Doc { Indent(self) }
-
-fn raw_block(self: str) -> Doc { RawBlock(self) }
+// `Text`/`Concat`/`Indent`/`RawBlock` are constructed directly at the call site;
+// only `group` needs a helper, since it derives its `forced` flag.
 
 // Wrap `self` in a group, pre-computing whether it is forced to break. Forcing
 // is what makes a multi-statement block, or any construct holding a line
@@ -283,17 +278,17 @@ fn cleanup(out: str) -> str {
     body +++ if (ended) { "\n" } else { "" }
 }.test({
     // Plain text is emitted verbatim.
-    assert(print_doc(text("hello"), 100) == "hello");
-    assert(print_doc(concat([text("a"), text("b")]), 100) == "ab");
+    assert(print_doc(Text("hello"), 100) == "hello");
+    assert(print_doc(Concat([Text("a"), Text("b")]), 100) == "ab");
 
     // A group that fits stays flat: `Line` becomes a space, `SoftLine` nothing.
     let list = group(
-        concat(
+        Concat(
             [
-                text("("),
-                indent(concat([SoftLine, text("a"), text(","), Line, text("b")])),
+                Text("("),
+                Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
                 SoftLine,
-                text(")"),
+                Text(")"),
             ],
         ),
     );
@@ -304,12 +299,12 @@ fn cleanup(out: str) -> str {
     assert(print_doc(list, 5) == "(\n    a,\n    b\n)");
 
     // A `HardLine` forces the break even with width to spare.
-    assert(print_doc(group(concat([text("a"), HardLine, text("b")])), 100) == "a\nb");
+    assert(print_doc(group(Concat([Text("a"), HardLine, Text("b")])), 100) == "a\nb");
 
     // `IfBroken` text appears only when the group breaks.
     let arr = group(
-        concat(
-            [text("["), indent(concat([SoftLine, text("x"), IfBroken(",")])), SoftLine, text("]")],
+        Concat(
+            [Text("["), Indent(Concat([SoftLine, Text("x"), IfBroken(",")])), SoftLine, Text("]")],
         ),
     );
     assert(print_doc(arr, 100) == "[x]");
@@ -317,11 +312,11 @@ fn cleanup(out: str) -> str {
 
     // `BlankLine` separates with a truly-empty line (its trailing spaces are
     // cleaned away).
-    assert(print_doc(concat([text("a"), BlankLine, text("b")]), 100) == "a\n\nb");
+    assert(print_doc(Concat([Text("a"), BlankLine, Text("b")]), 100) == "a\n\nb");
 
     // A multi-line `RawBlock` is re-aligned around its column: a bare-opening
     // `"""` block's content is re-indented one level deeper than the delimiters.
-    let raw = concat([text("x = "), raw_block(`"""\n  hi\n"""`)]);
+    let raw = Concat([Text("x = "), RawBlock(`"""\n  hi\n"""`)]);
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
@@ -329,11 +324,11 @@ allocations: 283
 deallocations: 283
 reallocations: 0
 bytes allocated: 16060
-instructions executed: 19646
-binary size: 28024
-  code: 15416
+instructions executed: 19546
+binary size: 29064
+  code: 16048
   data: 842
-  metadata: 11766
+  metadata: 12174
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam16
 __builtin_count_while$char$s0$lam6
@@ -342,17 +337,14 @@ __m3__lines
 __map14$own0
 __map8$own0
 col_after
-concat
 cons_children
 fits
 fits_atom
 go
 group
 has_hard
-indent
 main
 newline_str
 prepend
 print_doc
 pushed
-text
