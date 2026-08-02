@@ -1,4 +1,4 @@
-import { wrapping_add as +, wrapping_sub as -, ==, value_or } from builtins;
+import { ==, value_or, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // Unwrap optionals with the `value_or` builtin (present → value, else default).
 

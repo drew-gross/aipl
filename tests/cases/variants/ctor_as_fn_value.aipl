@@ -1,4 +1,4 @@
-import { wrapping_mul as *, wrapping_add as +, ==, map, push } from builtins;
+import { ==, map, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
 // A payload-carrying variant constructor can be passed as a function value,
 // anywhere a named function can: `xs.map(Circle)` means `xs.map(|x| Circle(x))`.

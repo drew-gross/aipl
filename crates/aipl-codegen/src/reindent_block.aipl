@@ -6,9 +6,7 @@
 import {
     !=,
     &&,
-    wrapping_add as +,
     +++,
-    wrapping_sub as -,
     <,
     ==,
     >,
@@ -18,6 +16,8 @@ import {
     repeat,
     trim,
     value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
 } from builtins;
 import { dedent } from "./dedent.aipl";
 import { indent } from "./indent.aipl";

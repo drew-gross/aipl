@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, execute_program, print } from builtins;
+import { +++, execute_program, print, wrapping_add as + } from builtins;
 
 // A launch failure (program not found) is `err(message)` — the only case
 // that's `err` rather than `ok(ExecResult)`.

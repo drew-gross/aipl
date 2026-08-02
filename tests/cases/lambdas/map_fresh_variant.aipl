@@ -1,4 +1,4 @@
-import { wrapping_mul as *, ==, map } from builtins;
+import { ==, map, wrapping_mul as * } from builtins;
 
 // map over a *fresh array literal* producing a variant. The in-place reuse
 // optimization (see map_in_place.aipl) must not apply: a variant is a

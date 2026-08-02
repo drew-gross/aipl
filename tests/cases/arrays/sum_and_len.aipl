@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, len } from builtins;
+import { ==, len, wrapping_add as + } from builtins;
 
 // Array literal, passing an array to a function, for-each iteration,
 // and len().

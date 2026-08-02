@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, len } from builtins;
+import { ==, len, wrapping_add as + } from builtins;
 
 // `bool[]` is bit-packed — 8 elements per byte (like `std::vector<bool>`) — but
 // presents exactly the ordinary array interface. This literal spans two bytes

@@ -1,6 +1,4 @@
 import {
-    wrapping_mul as *,
-    wrapping_sub as -,
     ==,
     >,
     len,
@@ -8,6 +6,8 @@ import {
     to_digit,
     trim_while,
     value_or,
+    wrapping_mul as *,
+    wrapping_sub as -,
 } from builtins;
 
 // The AIPL implementation of the `int_parse` builtin. Monomorphization

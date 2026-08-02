@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, push } from builtins;
+import { ==, push, wrapping_add as + } from builtins;
 
 // A generic that iterates the array elements (binding each as the concrete
 // element type per instance) and counts them. Exercises element-level body

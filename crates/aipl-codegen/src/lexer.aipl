@@ -17,9 +17,7 @@ import {
     !,
     !=,
     &&,
-    wrapping_add as +,
     +++,
-    wrapping_sub as -,
     <,
     ==,
     ||,
@@ -33,6 +31,8 @@ import {
     push,
     starts_with,
     value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
 } from builtins;
 // The `.test` block's decoding emits need a string-escape decoder. The library
 // deliberately provides none (escape meaning is a language's policy), so the

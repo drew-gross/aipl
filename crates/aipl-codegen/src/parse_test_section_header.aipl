@@ -1,4 +1,4 @@
-import { !, &&, wrapping_sub as -, ==, >=, ends_with, len, starts_with, trim } from builtins;
+import { !, &&, ==, >=, ends_with, len, starts_with, trim, wrapping_sub as - } from builtins;
 
 pub fn parse_test_section_header(line: str) -> str? {
     if (!line.starts_with("---")) {

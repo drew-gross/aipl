@@ -1,4 +1,4 @@
-import { wrapping_mul as *, wrapping_add as +, ==, len, map } from builtins;
+import { ==, len, map, wrapping_add as +, wrapping_mul as * } from builtins;
 
 // A local binding may share a name with a global function or imported builtin.
 // The local shadows the global, so a bare reference resolves to the value, not

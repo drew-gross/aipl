@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { ==, wrapping_add as + } from builtins;
 
 fn inc(x: i64) -> i64 { x + 1 }
 

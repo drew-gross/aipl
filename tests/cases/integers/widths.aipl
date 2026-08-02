@@ -1,12 +1,12 @@
 import {
-    wrapping_mul as *,
-    wrapping_add as +,
-    wrapping_sub as -,
     /,
     ==,
     >,
     print,
     to_str,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
 } from builtins;
 
 // Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.

@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, wrapping_sub as -, ==, print, to_str } from builtins;
+import { +++, ==, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // A `str` or array `match` may *destructure* with `[..]` patterns: each element
 // position is a binder (a bare name, bound to that element) or a literal

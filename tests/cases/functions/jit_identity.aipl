@@ -1,4 +1,4 @@
-import { wrapping_add as +, wrapping_sub as -, == } from builtins;
+import { ==, wrapping_add as +, wrapping_sub as - } from builtins;
 
 fn id(x: i64) -> i64 { x }.test({
     assert(id(7) == 7);

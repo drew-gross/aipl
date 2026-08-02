@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, execute_program, print, to_str } from builtins;
+import { +++, execute_program, print, to_str, wrapping_add as + } from builtins;
 
 // `execute_program(program, args = [...]) -> ExecResult!Error` spawns
 // `program` with `args` (argv-style, no shell) and waits for it, capturing

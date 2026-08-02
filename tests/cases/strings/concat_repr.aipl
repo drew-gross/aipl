@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, ==, len, print, to_str } from builtins;
+import { +++, ==, len, print, to_str, wrapping_add as + } from builtins;
 
 // Every `str + str` builds the *concatenated-string* representation — a lazy
 // rope of two str pointers, materialized (and memoized) only when its bytes are

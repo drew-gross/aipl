@@ -14,9 +14,7 @@
 import {
     !,
     !=,
-    wrapping_add as +,
     +++,
-    wrapping_sub as -,
     <,
     ==,
     >,
@@ -30,6 +28,8 @@ import {
     repeat,
     split,
     value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
 } from builtins;
 import { reindent_block } from "./reindent_block.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

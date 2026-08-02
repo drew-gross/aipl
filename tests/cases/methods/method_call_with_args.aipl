@@ -1,4 +1,4 @@
-import { wrapping_mul as *, == } from builtins;
+import { ==, wrapping_mul as * } from builtins;
 
 fn times(self: i64, factor: i64) -> i64 { self * factor }.test({
     assert(7.times(6) == 42);

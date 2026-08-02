@@ -1,4 +1,4 @@
-import { wrapping_add as +, print, to_str } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 fn main() !prints {
     let my_tuple = (1, "two", 3);

@@ -10,7 +10,7 @@ fn main() !prints {
     print(t);
 }
 --- formatted ---
-import { wrapping_add as +, print } from builtins;
+import { print, wrapping_add as + } from builtins;
 
 fn main() !prints {
     let raw = """

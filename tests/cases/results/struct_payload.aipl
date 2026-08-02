@@ -1,4 +1,4 @@
-import { &&, wrapping_add as +, +++, ==, print, to_str } from builtins;
+import { &&, +++, ==, print, to_str, wrapping_add as + } from builtins;
 
 // A result's Ok/Err payload may be a struct (in addition to scalar/str/unit):
 // `elem_size_of`/`store_array_elem`/`emit_rc` already size, copy, and refcount

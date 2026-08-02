@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { ==, wrapping_add as + } from builtins;
 
 // Count 'a's by walking with `s[i]`; stop when indexing returns none
 // (past end of string).

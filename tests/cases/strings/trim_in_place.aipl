@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, ==, trim } from builtins;
+import { +++, ==, trim, wrapping_add as + } from builtins;
 
 // `trim` on a uniquely-owned (never-aliased) string reuses its buffer: it
 // shifts the content to the front and reallocs down in place, rather than

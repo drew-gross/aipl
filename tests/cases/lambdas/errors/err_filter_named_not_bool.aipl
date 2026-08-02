@@ -1,4 +1,4 @@
-import { wrapping_mul as *, filter, print, to_str } from builtins;
+import { filter, print, to_str, wrapping_mul as * } from builtins;
 
 // A named function passed to `filter` must return bool.
 fn twice(x: i64) -> i64 { x * 2 }

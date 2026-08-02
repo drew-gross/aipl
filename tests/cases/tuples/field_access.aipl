@@ -1,4 +1,4 @@
-import { wrapping_add as +, print, to_str } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 fn main() !prints {
     let pair = (10, 20);

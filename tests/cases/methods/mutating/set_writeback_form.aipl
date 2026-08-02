@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, push } from builtins;
+import { ==, push, wrapping_add as + } from builtins;
 
 // `set recv.f(args)` is the writeback form of a mutating method call: it mutates
 // `recv` in place. It works for the builtin `push` and for user `mut self`

@@ -12,7 +12,8 @@
 //! Style (see the repo discussion): 4-space indent; width-limited groups that
 //! either fit on one line or block-indent one element per line with a
 //! trailing comma; imports hoisted to the top (builtins first, then paths
-//! sorted; names within a list sorted, operators first); exactly one blank
+//! sorted; names within a list sorted by imported name, operators first);
+//! exactly one blank
 //! line between top-level items; call-site keyword arguments spelled tight
 //! (`f(1, k=1)`) but declaration defaults spaced (`k: i64 = 1`). String,
 //! char, number, and template literals — and everything inside a template's
@@ -413,21 +414,19 @@ impl<'s> Walker<'s> {
         let mut names: Vec<(u8, String, String)> = Vec::new();
         while self.peek_text() != "}" {
             let first = self.bump().to_string();
-            let rendered;
-            let local;
-            if self.peek_text() == "as" {
+            let rendered = if self.peek_text() == "as" {
                 self.bump();
                 let alias = self.bump().to_string();
-                rendered = format!("{first} as {alias}");
-                local = alias;
+                format!("{first} as {alias}")
             } else {
-                rendered = first.clone();
-                local = first;
-            }
-            // Operators sort ahead of plain names, each bucket alphabetical
-            // by the locally-bound name.
-            let bucket = u8::from(!aipl_syntax::is_operator_name(&local));
-            names.push((bucket, local, rendered));
+                first.clone()
+            };
+            // Operators sort ahead of plain names, each bucket alphabetical by
+            // the *imported* name — the one on the left of an `as`. So
+            // `wrapping_add as +` sorts under `w`, next to the function it
+            // actually imports, rather than among the operator spellings.
+            let bucket = u8::from(!aipl_syntax::is_operator_name(&first));
+            names.push((bucket, first, rendered));
             if self.peek_text() == "," {
                 self.bump();
             }

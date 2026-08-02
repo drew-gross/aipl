@@ -1,7 +1,7 @@
 // A keyword parameter's default may itself call a function with keyword
 // parameters — the loader expands defaults recursively (`shifted(1)` fills
 // `by = base()`, whose call fills `x = 7`).
-import { wrapping_add as +, print, to_str } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 fn base(x: i64 = 7) -> i64 { x }
 

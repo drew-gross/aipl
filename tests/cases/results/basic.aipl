@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, /, ==, print, to_str } from builtins;
+import { +++, /, ==, print, to_str, wrapping_add as + } from builtins;
 
 // A result `T!E` is `ok(v)` or `err(e)` — an inline `{tag, value}` (tag 1 = ok,
 // 0 = err), matched like an optional. `ok`/`err` are constructors like

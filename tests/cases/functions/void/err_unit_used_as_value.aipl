@@ -1,4 +1,4 @@
-import { wrapping_add as +, print } from builtins;
+import { print, wrapping_add as + } from builtins;
 
 // `print` returns nothing, so its result can't be used as a value.
 fn main() !prints -> i64 { print("hi") + 1 }

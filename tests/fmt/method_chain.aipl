@@ -11,7 +11,7 @@ fn f(some_long_receiver_name: i64[]) -> i64 {
 }
 fn one_call(a: i64, b: i64, c: i64, d: i64, e: i64) -> i64 { a }
 --- formatted ---
-import { !, wrapping_add as +, <, ==, filter, len, map, minimum, value_or } from builtins;
+import { !, <, ==, filter, len, map, minimum, value_or, wrapping_add as + } from builtins;
 
 fn f(some_long_receiver_name: i64[]) -> i64 {
     // Short chain that fits stays on one line.

@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { ==, wrapping_add as + } from builtins;
 
 // A user function may reuse a builtin's name freely: since the builtin
 // is only in scope when imported (and here it isn't), `len` resolves to

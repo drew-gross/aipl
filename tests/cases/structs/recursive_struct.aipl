@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, print, to_str } from builtins;
+import { ==, print, to_str, wrapping_add as + } from builtins;
 
 // A recursive *struct*: `next` refers back to `Tree` through an optional, so a
 // value can't be inline (infinite size). The compiler boxes it — a refcounted

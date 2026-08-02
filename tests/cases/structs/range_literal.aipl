@@ -1,4 +1,4 @@
-import { wrapping_mul as *, wrapping_add as +, ==, Span, print, to_str } from builtins;
+import { ==, Span, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 // `start..end` is a range expression: it constructs the builtin `Span`
 // (`Span { start: .., end: .. }`) without spelling the name — so, like

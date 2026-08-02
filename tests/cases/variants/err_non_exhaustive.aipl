@@ -1,4 +1,4 @@
-import { wrapping_mul as *, print, to_str } from builtins;
+import { print, to_str, wrapping_mul as * } from builtins;
 
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 

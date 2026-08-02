@@ -2,8 +2,8 @@
 // constructor name (`A`): every in-scope reference is variant-qualified
 // internally, so there is no collision. `import { A as ColorA }` disambiguates at
 // the use site, and `Size.A` names the other one directly.
-import { wrapping_add as +, print, to_str } from builtins;
-import { Color, A as ColorA, hue } from "./color.aipl";
+import { print, to_str, wrapping_add as + } from builtins;
+import { A as ColorA, Color, hue } from "./color.aipl";
 import { Size, size_rank } from "./size.aipl";
 
 fn main() !prints {

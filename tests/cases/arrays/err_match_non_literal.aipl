@@ -1,4 +1,4 @@
-import { wrapping_add as +, print, to_str } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 // An array-pattern element must be a binder (a bare name) or a literal — not a
 // computed expression like `k + 1`.

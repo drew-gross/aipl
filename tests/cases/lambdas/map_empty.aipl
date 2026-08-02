@@ -1,4 +1,4 @@
-import { wrapping_mul as *, wrapping_add as +, ==, len, map, to_str } from builtins;
+import { ==, len, map, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
 // Mapping an empty array yields an empty array: the lambda never runs, so the
 // (possibly unknown) element type is never observed — only the empty result is.

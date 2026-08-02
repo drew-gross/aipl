@@ -1,4 +1,4 @@
-import { wrapping_mul as *, ==, map, to_str } from builtins;
+import { ==, map, to_str, wrapping_mul as * } from builtins;
 
 // A lint: `|x| to_str(x)` (or the method form `|x| x.to_str()`) only forwards
 // its argument to a single call, so the lambda is redundant — pass `to_str`

@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, ==, push, to_str, trim } from builtins;
+import { +++, ==, push, to_str, trim, wrapping_add as + } from builtins;
 
 // `reduce` folds an array with a binary function and a seed.
 fn reduce(xs: i64[], seed: i64, f: (i64, i64) -> i64) -> i64 {

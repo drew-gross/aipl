@@ -1,7 +1,5 @@
 import {
-    wrapping_add as +,
     +++,
-    wrapping_sub as -,
     ==,
     contains_key,
     get,
@@ -9,6 +7,8 @@ import {
     print,
     to_str,
     value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
 } from builtins;
 
 // Exercises the `aipl check` path (run by the cases harness on every `.test`

@@ -1,4 +1,4 @@
-import { &&, wrapping_add as +, ==, push } from builtins;
+import { &&, ==, push, wrapping_add as + } from builtins;
 
 // Regression for the latent ownership bug: a *non-exclusive* `mut` array grown
 // by a mutating call inside a loop must stay correct. The fresh per-iteration

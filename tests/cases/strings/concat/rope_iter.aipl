@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, ==, print, to_str } from builtins;
+import { +++, ==, print, to_str, wrapping_add as + } from builtins;
 
 // Iterating a rope's chars (`for c in s`) streams its leaves via a small
 // stack-allocated cursor — no flattened buffer. Building this 18-byte rope and

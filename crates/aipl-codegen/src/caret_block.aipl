@@ -8,8 +8,6 @@
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
 import {
-    wrapping_add as +,
-    wrapping_sub as -,
     ==,
     Span,
     len,
@@ -17,6 +15,8 @@ import {
     min,
     repeat,
     to_str,
+    wrapping_add as +,
+    wrapping_sub as -,
 } from builtins;
 import { line_at } from "./line_at.aipl";
 

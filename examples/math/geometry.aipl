@@ -1,4 +1,4 @@
-import { wrapping_mul as *, wrapping_add as + } from builtins;
+import { wrapping_add as +, wrapping_mul as * } from builtins;
 
 // Imported by examples/imports.aipl. Only the names listed in that
 // file's `import { ... }` clause are visible from the importer;
