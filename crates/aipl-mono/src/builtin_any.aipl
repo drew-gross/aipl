@@ -1,0 +1,60 @@
+import { !, ==, >, filter } from builtins;
+
+// The AIPL implementation of the `any` builtin — the dual of `all` (see
+// `builtin_all.aipl`). Monomorphization registers this function under the
+// canonical name `__builtin_any` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
+// user's `xs.any(pred)` specializes through the ordinary generic / higher-order
+// machinery — the in-file name `any` is only for this file's own tests, which
+// read exactly like user code.
+pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
+    for (let x : self) {
+        if (pred(x)) {
+            return true;
+        };
+    }
+    false
+}.doc("""
+    True when at least one element satisfies `pred`, short-circuiting at the first
+    element that does; an empty array is false. Generic over the element type and
+    callable as a method: `xs.any(pred)`.
+""").test({
+    assert([1, 2, 9].any(|x| x > 5)); // 9 satisfies it
+    assert(![2, 4, 6].any(|x| x > 6)); // none does -> false
+    assert(any([5, 4], |x| x == 4)); // free-call form
+    assert(['a', 'b'].any(|c| c == 'b')); // any comparable element type
+    assert("abc".any(|c| c == 'b')); // a str receiver iterates its chars
+    assert(!"aaa".any(|c| c == 'b'));
+    assert([8, 9].any(is_nine)); // a named predicate, no lambda
+    // False on an empty array (a typed empty from `filter`).
+    assert(![1, 2].filter(is_nine).any(|x| x == 99));
+    let limit = 3;
+    assert([1, 5].any(|x| x > limit)); // a captured bound
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 323
+instructions executed: 929
+binary size: 6680
+  code: 3244
+  data: 589
+  metadata: 2847
+--- monomorphizations ---
+__filter13$own0
+any$char$lam7
+any$char$s0$lam11
+any$char$s0$lam9
+any$i64$lam1
+any$i64$lam12
+any$i64$lam15
+any$i64$lam18
+any$i64$lam3
+any$i64$lam5
+is_nine
+main

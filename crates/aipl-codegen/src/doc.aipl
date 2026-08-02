@@ -18,6 +18,7 @@ import {
     <,
     ==,
     >,
+    any,
     contains,
     ends_with,
     is_space,
@@ -81,7 +82,7 @@ fn has_hard(self: Doc) -> bool {
     match (self) {
         Text(s) => s.contains("\n"),
         RawBlock(s) => s.contains("\n"),
-        Concat(ds) => any_hard(ds),
+        Concat(ds) => ds.any(has_hard),
         Line => false,
         SoftLine => false,
         IfBroken(_) => false,
@@ -91,16 +92,6 @@ fn has_hard(self: Doc) -> bool {
         Indent(inner) => inner.has_hard(),
         Group(forced, _) => forced,
     }
-}
-
-fn any_hard(ds: Doc[]) -> bool {
-    mut found = false;
-    for (let d : ds) {
-        if (d.has_hard()) {
-            set found = true;
-        };
-    }
-    found
 }
 
 // ---------- printing ----------
@@ -324,18 +315,19 @@ allocations: 283
 deallocations: 283
 reallocations: 0
 bytes allocated: 16060
-instructions executed: 19546
-binary size: 29064
-  code: 16048
+instructions executed: 19478
+binary size: 29272
+  code: 16144
   data: 842
-  metadata: 12174
+  metadata: 12286
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam16
-__builtin_count_while$char$s0$lam6
+__builtin_any$Doc$lam3
+__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam7
 __m1__reindent_block
 __m3__lines
-__map14$own0
-__map8$own0
+__map15$own0
+__map9$own0
 col_after
 cons_children
 fits

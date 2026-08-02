@@ -1,0 +1,42 @@
+import { !, <, ==, >, any, filter } from builtins;
+
+// `arr.any(pred)` is true when at least one element satisfies `pred`
+// (short-circuits at the first that does; an empty array is false) — the dual of
+// `all`. A higher-order builtin like `filter`/`map`: the lambda is lifted,
+// captures threaded through. Like `all`, `any` is implemented in AIPL itself
+// (`builtin_any.aipl`) and specializes like a user generic.
+fn is_neg(self: i64) -> bool { self < 0 }
+
+fn has_big(xs: i64[]) -> bool { xs.any(|x| x > 10) }.test({
+    assert([1, 2, 9].any(|x| x > 5)); // 9 satisfies it
+    assert(![2, 4, 6].any(|x| x > 6)); // none does -> false
+    assert(any([5, 4], |x| x == 4)); // free-call form
+    assert([1, -2].any(is_neg)); // a named predicate, no lambda
+    assert(['a', 'b'].any(|c| c == 'b')); // any comparable element type
+    // False on an empty array (a typed empty from `filter`).
+    assert(![1, 2].filter(|x| x > 100).any(|x| x < 100));
+    // Method-chain helper + a captured bound.
+    assert(has_big([1, 20, 3]));
+    assert(!has_big([1, 2, 3]));
+})
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 387
+instructions executed: 933
+binary size: 5728
+  code: 2788
+  data: 436
+  metadata: 2504
+--- monomorphizations ---
+__builtin_any$char$lam8
+__builtin_any$i64$lam1
+__builtin_any$i64$lam12
+__builtin_any$i64$lam14
+__builtin_any$i64$lam3
+__builtin_any$i64$lam5
+__builtin_any$i64$lam6
+__filter10$own0
+has_big
+main
