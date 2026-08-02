@@ -42,7 +42,7 @@ fn calls_reach_private_helpers_within_the_program() {
     // `pub` gates cross-file *imports*, not host FFI calls — the host compiled
     // the whole program, so it can call any function, and callees resolve.
     let src = "\
-import { *, wrapping_add as + } from builtins;
+import { wrapping_mul as *, wrapping_add as + } from builtins;
 fn helper(n: i64) -> i64 { n * 10 }
 pub fn entry(n: i64) -> i64 { helper(n) + 1 }";
     let e = Engine::compile(src).unwrap();

@@ -3,7 +3,7 @@ import {
     !=,
     %,
     &&,
-    *,
+    wrapping_mul as *,
     wrapping_add as +,
     wrapping_sub as -,
     /,

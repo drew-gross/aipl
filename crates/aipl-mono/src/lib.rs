@@ -4598,6 +4598,7 @@ impl Mono<'_> {
                         | "__builtin_saturating_add"
                         | "__builtin_wrapping_sub"
                         | "__builtin_saturating_sub"
+                        | "__builtin_wrapping_mul"
                 ) && atys.len() == 2
                 {
                     // `+`/`-` resolved to an integer arithmetic builtin

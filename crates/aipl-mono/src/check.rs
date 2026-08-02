@@ -2179,6 +2179,7 @@ impl Cx<'_> {
         if let Some(op) = match name {
             "__builtin_wrapping_add" | "__builtin_saturating_add" => Some("+"),
             "__builtin_wrapping_sub" | "__builtin_saturating_sub" => Some("-"),
+            "__builtin_wrapping_mul" => Some("*"),
             _ => None,
         } {
             if args.len() == 2 {

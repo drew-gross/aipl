@@ -154,6 +154,7 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
                 "__builtin_saturating_add" => a.saturating_add(*b),
                 "__builtin_wrapping_sub" => a.wrapping_sub(*b),
                 "__builtin_saturating_sub" => a.saturating_sub(*b),
+                "__builtin_wrapping_mul" => a.wrapping_mul(*b),
                 _ => return None,
             };
             Some(ExprKind::Num(n))

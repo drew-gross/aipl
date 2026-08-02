@@ -9,7 +9,7 @@ fn main() !prints {
 --- stdout ---
 51
 --- file: util.aipl ---
-import { *, wrapping_add as + } from builtins;
+import { wrapping_mul as *, wrapping_add as + } from builtins;
 fn helper(n: i64) -> i64 { n * 10 }
 pub fn entry(n: i64) -> i64 { helper(n) + 1 }
 --- performance ---

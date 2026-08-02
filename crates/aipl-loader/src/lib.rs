@@ -456,20 +456,26 @@ impl Loader {
                     }
                     canonical_impl.to_string()
                 } else if aipl_syntax::is_operator_name(&n.name) {
-                    // Operators with pluggable semantics (`+`, `-`) have no bare
-                    // form — you must pick a flavor and alias it. Everything else
-                    // (`==`, `*`, `+++`, …) is a bare builtin operator.
+                    // Operators with pluggable semantics (`+`, `-`, `*`) have no
+                    // bare form — you must pick a flavor and alias it. Everything
+                    // else (`==`, `/`, `+++`, …) is a bare builtin operator.
+                    // `saturating` is optional: `*` currently offers only
+                    // `wrapping_mul`.
                     if let Some((verb, wrapping, saturating)) = match n.name.as_str() {
-                        "+" => Some(("add", "wrapping_add", "saturating_add")),
-                        "-" => Some(("subtract", "wrapping_sub", "saturating_sub")),
+                        "+" => Some(("add", "wrapping_add", Some("saturating_add"))),
+                        "-" => Some(("subtract", "wrapping_sub", Some("saturating_sub"))),
+                        "*" => Some(("multiply", "wrapping_mul", None)),
                         _ => None,
                     } {
+                        let sat = saturating
+                            .map(|s| format!(" or `{s} as {}`", n.name))
+                            .unwrap_or_default();
                         return Err(Error::at(
                             format!(
                                 "the \"{}\" operator has no bare form; pick a semantics and \
-                                 import it aliased, e.g. `{wrapping} as {}` or `{saturating} as {}` \
-                                 from builtins ({verb})",
-                                n.name, n.name, n.name
+                                 import it aliased, e.g. `{wrapping} as {}`{sat} from builtins \
+                                 ({verb})",
+                                n.name, n.name
                             ),
                             n.span.clone(),
                         ));
@@ -539,12 +545,13 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         if view.contains_key(spelling) {
             Ok(())
         } else {
-            // The `+` operator has no bare spelling — it's the `wrapping_add`
-            // builtin aliased to `+`.
-            let hint = if spelling == "+" {
-                "wrapping_add as +".to_string()
-            } else {
-                spelling.to_string()
+            // The pluggable-semantics operators (`+`/`-`/`*`) have no bare
+            // spelling — each is a `wrapping_*` builtin aliased to the operator.
+            let hint = match spelling {
+                "+" => "wrapping_add as +".to_string(),
+                "-" => "wrapping_sub as -".to_string(),
+                "*" => "wrapping_mul as *".to_string(),
+                _ => spelling.to_string(),
             };
             Err(Error::at(
                 format!("operator \"{spelling}\" must be imported: add `import {{ {hint} }} from builtins;`"),

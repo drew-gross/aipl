@@ -2,7 +2,7 @@
 // desugars to passing the binary lambda `|lhs, rhs| lhs + rhs`. It reuses all
 // the lambda machinery — the receiver is monomorphized per operator. The
 // operator must still be imported (the desugared `+`/`*` is gated like any use).
-import { *, wrapping_add as +, print, to_str } from builtins;
+import { wrapping_mul as *, wrapping_add as +, print, to_str } from builtins;
 
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 

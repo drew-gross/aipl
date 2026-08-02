@@ -1,4 +1,4 @@
-import { !=, *, ==, >, filter, map } from builtins;
+import { !=, wrapping_mul as *, ==, >, filter, map } from builtins;
 
 // When `filter` receives a freshly-allocated, uniquely-owned array (an array
 // literal, or a call result like `xs.map(..)`), it filters in place: kept

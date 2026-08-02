@@ -7,11 +7,11 @@ import { framed } from "./frame.aipl";
 
 fn main() !prints {
     print(framed("hi"));
-    print(framed("hi", edge="*"));
+    print(framed("hi", edge="wrapping_mul as *"));
 }
 --- stdout ---
 |hi|
-*hi*
+wrapping_mul as *hiwrapping_mul as *
 --- file: frame.aipl ---
 import { +++ } from builtins;
 fn default_edge() -> str { "|" }
@@ -21,11 +21,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 160
-instructions executed: 38
-binary size: 1320
-  code: 396
-  data: 1
-  metadata: 923
+instructions executed: 40
+binary size: 1416
+  code: 404
+  data: 35
+  metadata: 977
 --- monomorphizations ---
 __m1__framed
 main

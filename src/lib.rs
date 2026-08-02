@@ -83,7 +83,7 @@ impl Engine {
     ///     ("calc.aipl", "import { square } from \"mathlib.aipl\";\n\
     ///                    import { wrapping_add as + } from builtins;\n\
     ///                    pub fn sum_of_squares(a: i64, b: i64) -> i64 { square(a) + square(b) }"),
-    ///     ("mathlib.aipl", "import { * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
+    ///     ("mathlib.aipl", "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
     /// ])?;
     /// engine.call("sum_of_squares", &[3, 4])?;
     /// # Ok::<(), aipl::Error>(())

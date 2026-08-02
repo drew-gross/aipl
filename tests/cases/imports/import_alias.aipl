@@ -9,7 +9,7 @@ fn main() !prints {
     print(greeting()); // imported under its own name, alongside aliases
 }
 --- file: util.aipl ---
-import { * } from builtins;
+import { wrapping_mul as * } from builtins;
 pub fn helper(n: i64) -> i64 { n * 2 }
 pub fn greeting() -> str { "hi" }
 --- stdout ---

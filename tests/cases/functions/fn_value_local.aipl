@@ -1,4 +1,4 @@
-import { *, wrapping_add as +, +++, <, ==, len } from builtins;
+import { wrapping_mul as *, wrapping_add as +, +++, <, ==, len } from builtins;
 
 // A named function can be used as a first-class *value*: bound to a local and
 // called indirectly. Unlike passing a function to a higher-order function

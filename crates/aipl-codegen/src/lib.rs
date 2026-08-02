@@ -11686,13 +11686,14 @@ fn compile_call_expr<M: Module>(
         "__builtin_wrapping_add"
         | "__builtin_saturating_add"
         | "__builtin_wrapping_sub"
-        | "__builtin_saturating_sub" => {
-            // `a + b` / `a - b` resolved (in the loader) to their bound integer
-            // arithmetic builtin. Both operands are the same integer type
+        | "__builtin_saturating_sub"
+        | "__builtin_wrapping_mul" => {
+            // `a + b` / `a - b` / `a * b` resolved (in the loader) to their bound
+            // integer arithmetic builtin. Both operands are the same integer type
             // (checker-verified); a bare literal flexes to the other's width. The
-            // flavor (wrapping/saturating) and operation (add/sub) are the only
-            // differences — see `emit_int_addsub`. Scalar ints carry no refcount,
-            // so there's nothing to track.
+            // flavor (wrapping/saturating) and operation (add/sub/mul) are the only
+            // differences — see `emit_int_addsub` (multiply is wrapping-only).
+            // Scalar ints carry no refcount, so there's nothing to track.
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("{name:?} expects 2 arguments, got {}", args.len()),
@@ -11721,9 +11722,16 @@ fn compile_call_expr<M: Module>(
                     Primitive::I64
                 }
             };
-            let sub = name.ends_with("_sub");
-            let saturating = name.starts_with("__builtin_saturating_");
-            let out = emit_int_addsub(builder, lv, rv, p, sub, saturating);
+            let out = if name.ends_with("_mul") {
+                // Wrapping multiply: compute in i64 and re-canonicalize to the
+                // width (dropping any out-of-range bits), like wrapping add/sub.
+                let raw = builder.ins().imul(lv, rv);
+                canon_int(builder, raw, p)
+            } else {
+                let sub = name.ends_with("_sub");
+                let saturating = name.starts_with("__builtin_saturating_");
+                emit_int_addsub(builder, lv, rv, p, sub, saturating)
+            };
             (out, Type::Primitive(p))
         }
         "__builtin_to_str" => {

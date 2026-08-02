@@ -964,6 +964,7 @@ pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static str)> {
         "saturating_add" => Some(("+", "__builtin_saturating_add")),
         "wrapping_sub" => Some(("-", "__builtin_wrapping_sub")),
         "saturating_sub" => Some(("-", "__builtin_saturating_sub")),
+        "wrapping_mul" => Some(("*", "__builtin_wrapping_mul")),
         _ => None,
     }
 }

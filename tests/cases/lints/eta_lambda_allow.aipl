@@ -1,4 +1,4 @@
-import { *, ==, map, to_str } from builtins;
+import { wrapping_mul as *, ==, map, to_str } from builtins;
 
 // `#[allow]` squelches the eta-lambda lint on its line, so this forwarding
 // lambda compiles and runs as written (see err_eta_lambda.aipl for the lint).

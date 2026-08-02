@@ -1,4 +1,4 @@
-import { *, wrapping_add as +, ==, map, to_str } from builtins;
+import { wrapping_mul as *, wrapping_add as +, ==, map, to_str } from builtins;
 
 // `map` is a builtin: no user definition needed. It desugars to an inline loop
 // in the enclosing scope, so lambdas (including capturing ones) just work.

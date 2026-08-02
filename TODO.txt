@@ -38,6 +38,9 @@ warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
 - unused imports
 
+formatter improvements
+- sort imports
+
 output multiple errors at once
 remove install_parser_hook with lazy loader
 make the vscode extension also auto-format
@@ -54,8 +57,6 @@ Unicode support
 
 int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
 
-negative numbers via -123 instead of 0 - 123
-
 make for (key, val) work for dicts, and also arrays (key=index)
 
 error improvements:
@@ -63,7 +64,6 @@ error improvements:
 - from` its defining file -> list the filename
 
 optimize enumerate with streams
-import wrapping_mul as *
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
