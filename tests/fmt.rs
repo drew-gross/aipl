@@ -184,7 +184,7 @@ fn corpus_formats_idempotently_and_losslessly() {
     let mut formatted_count = 0usize;
     for path in &files {
         let src = std::fs::read_to_string(path).unwrap();
-        let prefix = aipl::strip_test_sections(&src);
+        let (prefix, sections) = aipl::split_test_sections(&src);
         if aipl::parse(prefix).is_err() {
             continue; // an error-case fixture; nothing to format
         }
@@ -215,7 +215,6 @@ fn corpus_formats_idempotently_and_losslessly() {
             failures.push(format!("[{ctx}] token fingerprint changed"));
         }
         // Trailing sections ride along byte-for-byte.
-        let sections = &src[prefix.len()..];
         if !sections.is_empty() && !once.ends_with(sections) {
             failures.push(format!("[{ctx}] trailing sections were not preserved"));
         }
