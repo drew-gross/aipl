@@ -27,6 +27,7 @@ import {
     map,
     push,
     repeat,
+    reverse,
     split,
     value_or,
     wrapping_add as +,
@@ -202,32 +203,14 @@ fn fits_atom(budget: i64, s: str, flat: bool, rest: Work) -> bool {
 
 // ---------- helpers ----------
 
-// Prepend an array of children onto the work-list so `ds[0]` is processed first,
-// each carrying the parent frame's indent and mode. Written as an ordinary
-// (non-tail) recursion that threads `rest` through unchanged and wraps each
-// child around the recursive result: reassigning a recursive-variant accumulator
-// — whether by a `for`-loop `set` or a tail-call parameter — corrupts it, but
-// wrapping the returned subtree is sound. Recursion depth is one child, so it
-// stays shallow.
+// Prepend an array of children onto the work-list so `ds[0]` is processed first:
+// fold from the back, each frame carrying the parent's indent and mode.
 fn prepend(ds: Doc[], sp: i64, flat: bool, rest: Work) -> Work {
-    cons_children(ds, 0, sp, flat, rest)
-}
-
-fn cons_children(ds: Doc[], i: i64, sp: i64, flat: bool, rest: Work) -> Work {
-    if (i == ds.len()) {
-        rest
-    } else {
-        WCons(sp, flat, doc_at(ds, i), cons_children(ds, i + 1, sp, flat, rest))
+    mut work = rest;
+    for (let d : ds.reverse()) {
+        set work = WCons(sp, flat, d, work);
     }
-}
-
-// `ds[i]` unwrapped: array indexing yields an optional, and `i` is always in
-// range here, so the `none` arm is dead.
-fn doc_at(ds: Doc[], i: i64) -> Doc {
-    match (ds[i]) {
-        some(d) => d,
-        none => BreakParent,
-    }
+    work
 }
 
 // Append one emitted piece to the output accumulator.
@@ -311,15 +294,15 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 283
-deallocations: 283
+allocations: 303
+deallocations: 303
 reallocations: 0
-bytes allocated: 16060
-instructions executed: 19478
-binary size: 29272
-  code: 16144
+bytes allocated: 17020
+instructions executed: 17390
+binary size: 28960
+  code: 15872
   data: 842
-  metadata: 12286
+  metadata: 12246
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam17
@@ -329,7 +312,6 @@ __m3__lines
 __map15$own0
 __map9$own0
 col_after
-cons_children
 fits
 fits_atom
 go

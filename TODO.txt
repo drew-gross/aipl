@@ -64,7 +64,7 @@ error improvements:
 - import suggestions when missing an import
 - from` its defining file -> list the filename
 
-optimize enumerate with streams
+optimize enumerate/reverse with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
@@ -172,3 +172,22 @@ Recommendation
 My honest read: the dual-stream, span-driven design is well-chosen for a spelling-preserving formatter with interpolated templates — the "operate on parser tokens" model doesn't cleanly fit. If you want, I can prototype the targeted version (raw """ fed from value; reindent_block split so the """ branch is dedent-free while templates keep the source path) so you can see the shape and decide — but I'd want your go-ahead before touching the formatter core.
 
 Make sure recursive with backpointer structs work e.g. graphs (but also need to figure out how those work in a value-oriented langauge)
+
+formatter adjustment
+    let list = group(
+        Concat(
+            [
+                Text("("),
+                Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
+                SoftLine,
+                Text(")"),
+            ],
+        ),
+    );
+    becomes
+    let list = group(Concat([
+        Text("("),
+        Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
+        SoftLine,
+        Text(")"),
+    ]));
