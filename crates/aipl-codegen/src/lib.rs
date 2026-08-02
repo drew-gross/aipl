@@ -6780,7 +6780,7 @@ fn define_fn<M: Module>(
                 // that replaces it inside a loop body stays owned across
                 // iterations; the entry value-track below still keeps the entry
                 // version alive to fn exit for borrows.
-                if mut_binding_owns_slot_ref(&p.ty) {
+                if mut_binding_owns_slot_ref(&p.ty, structs) {
                     emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
                     scopes[0].push(Tracked::slot(slot, &p.ty));
                 }
@@ -7348,12 +7348,16 @@ fn is_char_array(ty: &Type) -> bool {
 /// *loop* body: the per-iteration region track dies with the iteration, but the
 /// slot's own reference carries the current value across iterations.
 ///
-/// Only non-`char[]` arrays for now: `char[]` is str-shaped (different rc entry
-/// points and an inline representation that isn't a pointer), `str` has its own
-/// established slot model, and sets/dicts keep the value-track model until a
-/// case demands otherwise.
-fn mut_binding_owns_slot_ref(ty: &Type) -> bool {
-    matches!(ty, Type::Array(_)) && !is_char_array(ty)
+/// Non-`char[]` arrays and boxed (recursive) declared types: both are plain
+/// refcounted pointers, and both can be replaced from a nested scope
+/// (`set acc = Cons(x, acc)` in a loop body), where the value-track model alone
+/// would free the new value at the inner scope's exit and leave the slot
+/// dangling. `char[]` is str-shaped (different rc entry points and an inline
+/// representation that isn't a pointer), `str` has its own established slot
+/// model, and sets/dicts keep the value-track model until a case demands
+/// otherwise.
+fn mut_binding_owns_slot_ref(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+    (matches!(ty, Type::Array(_)) && !is_char_array(ty)) || is_boxed(ty, structs)
 }
 
 /// Whether `ty`'s runtime value is str-shaped: a real `str`/`Error`/concat-str
@@ -13411,7 +13415,7 @@ fn compile_call_expr<M: Module>(
             // retains it for the callee's own drop — so the snapshot stays live
             // through the call.)
             let old_ty = ty_cell.borrow().clone();
-            let old = if mut_binding_owns_slot_ref(&old_ty) {
+            let old = if mut_binding_owns_slot_ref(&old_ty, structs) {
                 Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
             } else {
                 None
@@ -14318,7 +14322,7 @@ fn compile_expr<M: Module>(
                     scope.pop(); // the literal's value-track (just pushed)
                 }
                 scope.push(Tracked::slot(slot, &t));
-            } else if mut_binding_owns_slot_ref(&t) {
+            } else if mut_binding_owns_slot_ref(&t, structs) {
                 // A non-exclusive `mut` array: the slot takes its *own* reference
                 // on the current value (see `mut_binding_owns_slot_ref`), released
                 // by this slot-track at scope exit or by the mutation that
@@ -14491,7 +14495,7 @@ fn compile_expr<M: Module>(
             // value: `set s = f(s)` reads `s` but never writes it, so the
             // snapshot holds. Sets/dicts and scalars keep the plain store (their
             // in-place / value-track model).
-            let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty);
+            let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty, structs);
             let old = if is_str_repr(&expected_ty) || arr_slot_ref {
                 Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
             } else {

@@ -1,0 +1,127 @@
+import { !=, ==, print, to_str, wrapping_add as + } from builtins;
+
+// Reassigning a `mut` binding of a *boxed* (recursive) type from inside a
+// nested scope — the classic `set acc = Cons(x, acc)` fold in a `for` body.
+//
+// The binding's slot holds one strong reference of its own on whatever value it
+// currently points at (see `mut_binding_owns_slot_ref`), taken at declaration
+// and re-taken on every `set`, with the replaced value released right after. So
+// the value assigned inside the loop body outlives that body: it is *not* the
+// inner scope's value-track that keeps it alive. Under the plain value-track
+// model the new value was freed at the end of each iteration and the slot was
+// left dangling — the accumulator read back as empty, or the walk crashed.
+//
+// Any leak or double-free here would unbalance the allocation counts asserted
+// below.
+variant List = Cons(i64, List) | Nil
+
+// Boxed the other way: a struct that reaches itself through an optional field.
+struct Node { v: i64, next: Node? }
+
+fn len(self: List) -> i64 {
+    match (self) {
+        Cons(_, rest) => 1 + rest.len(),
+        Nil => 0,
+    }
+}
+
+fn sum(self: List) -> i64 {
+    match (self) {
+        Cons(x, rest) => x + rest.sum(),
+        Nil => 0,
+    }
+}
+
+fn chain(self: Node) -> i64 {
+    match (self.next) {
+        some(n) => 1 + n.chain(),
+        none => 1,
+    }
+}
+
+// The fold that motivated this: each iteration wraps the previous accumulator.
+fn reversed(xs: i64[]) -> List {
+    mut acc = Nil;
+    for (let x : xs) {
+        set acc = Cons(x, acc);
+    }
+    acc
+}
+
+// A `set` that *replaces* rather than extends: the previous value must be
+// released (not leaked) as the slot takes the new one.
+fn last_only(xs: i64[]) -> List {
+    mut acc = Nil;
+    for (let x : xs) {
+        set acc = Cons(x, Nil);
+    }
+    acc
+}
+
+// The same reassignment one scope down, in an `if` body rather than a loop.
+fn conditional() -> List {
+    mut acc = Cons(1, Nil);
+    if (1 == 1) {
+        set acc = Cons(7, acc);
+    };
+    acc
+}
+
+// A boxed accumulator grown in a nested scope while an earlier version is still
+// borrowed: `first` names the pre-loop value, which stays valid because its
+// creation-scope track outlives the loop.
+fn borrow_survives() -> i64 {
+    mut acc = Cons(5, Nil);
+    let first = acc;
+    for (let x : [1, 2]) {
+        set acc = Cons(x, acc);
+    }
+    first.len() + acc.len()
+}
+
+// A boxed *struct* accumulator folds the same way.
+fn nodes(xs: i64[]) -> Node {
+    mut n = Node { v: 0, next: none };
+    for (let x : xs) {
+        set n = Node { v: x, next: some(n) };
+    }
+    n
+}
+
+fn main() !prints {
+    print(to_str(reversed([1, 2, 3])));
+    print(to_str(last_only([1, 2, 3])));
+    print(to_str(conditional()));
+}.test({
+    assert(reversed([1, 2, 3]) == Cons(3, Cons(2, Cons(1, Nil))));
+    assert(reversed([1, 2, 3]).len() == 3);
+    assert(reversed([]).len() == 0);
+    assert(last_only([1, 2, 3]) == Cons(3, Nil));
+    assert(conditional() == Cons(7, Cons(1, Nil)));
+    assert(borrow_survives() == 4); // 1 + 3
+    // A longer fold: every iteration's value has to survive its own iteration.
+    mut long = Nil;
+    for (let x : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+        set long = Cons(x, long);
+    }
+    assert(long.len() == 10);
+    assert(long.sum() == 55);
+    assert(nodes([1, 2, 3]).v == 3);
+    assert(nodes([1, 2, 3]).chain() == 4);
+})
+--- stdout ---
+Cons(3, Cons(2, Cons(1, Nil)))
+Cons(3, Nil)
+Cons(7, Cons(1, Nil))
+--- performance ---
+allocations: 27
+deallocations: 27
+reallocations: 0
+bytes allocated: 1260
+instructions executed: 2375
+binary size: 4800
+  code: 2180
+  data: 117
+  metadata: 2503
+--- monomorphizations ---
+main
