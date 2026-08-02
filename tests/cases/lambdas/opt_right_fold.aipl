@@ -1,0 +1,34 @@
+import { +++, ==, opt_left_fold, opt_right_fold, wrapping_add as + } from builtins;
+
+// `xs.opt_right_fold(init, f)` mirrors `opt_left_fold`: it combines right to
+// left, takes the element first and the accumulator second, and yields `none` as
+// soon as a combiner does. Unlike the left fold it really does stop — walking
+// backwards is index-driven anyway, so the `while` condition carries the exit.
+//
+// This file imports both directions, so it spells the left one `opt_left_fold`
+// rather than aliasing it to plain `opt_fold` (see `opt_fold.aipl`).
+variant List = Cons(i64, List) | Nil
+
+// Build a list that keeps the array's order, rejecting any negative element.
+fn to_list(xs: i64[]) -> List? {
+    xs.opt_right_fold(Nil, |x, rest| if (x == 0) { none } else { some(Cons(x, rest)) })
+}
+
+fn to_list_keeps_order() -> List? { to_list([1, 2]) }.test({
+    assert(to_list([1, 2, 3]) == some(Cons(1, Cons(2, Cons(3, Nil)))));
+    assert(to_list([]) == some(Nil)); // empty folds to `some(init)`
+    assert(to_list([1, 0, 3]) == none); // the rejected element ends it
+
+    // An all-`some` fold is exactly what `right_fold` would produce, and the
+    // direction is visible in a string.
+    assert(["a", "b", "c"].opt_right_fold("", |s, acc| some(acc +++ s)) == some("cba"));
+    assert(["a", "b", "c"].opt_left_fold("", |acc, s| some(acc +++ s)) == some("abc"));
+
+    assert(opt_right_fold([2, 3], 1, |x, acc| some(x + acc)) == some(6)); // free-call form
+    let bump = 10;
+    assert([1, 2].opt_right_fold(0, |x, acc| some(x + acc + bump)) == some(23)); // a capture
+})
+--- performance ---
+?
+--- monomorphizations ---
+?

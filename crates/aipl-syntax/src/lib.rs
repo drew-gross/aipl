@@ -1349,6 +1349,8 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "any",
     "left_fold",
     "right_fold",
+    "opt_left_fold",
+    "opt_right_fold",
     "zip_with",
     "trim",
     "is_all_whitespace",

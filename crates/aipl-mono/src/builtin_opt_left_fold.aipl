@@ -1,0 +1,94 @@
+import {
+    !,
+    +++,
+    <,
+    ==,
+    filter,
+    is_some,
+    len,
+    to_digit,
+    value_or,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a
+// fallible combiner. Monomorphization registers this function under the
+// canonical name `__builtin_opt_left_fold` (see `AIPL_BUILTIN_SOURCES` in
+// `lib.rs`), so a user's `xs.opt_left_fold(init, f)` specializes through the
+// ordinary generic / higher-order machinery.
+//
+// `f` is not called again once a step has failed, so the fold's *work* stops at
+// the first `none` — but the walk itself continues (AIPL has no `break`). That
+// keeps the plain `for`, whose element access streams a `str` receiver through
+// the char cursor; an index-driven `while` that really exits early reads
+// `self[i]` per element, which costs far more than the leftover `if (ok)` ticks.
+// The accumulator stays a plain `A` — the `ok` flag, not an `A?` threaded
+// through the loop, carries the failure. A `mut` binding of an *optional* (a
+// composite) reassigned from inside a loop body is currently miscompiled: the
+// body's scope releases the new value's heap components while the binding still
+// points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
+// binding goes through the slot-owned-reference model instead, which is correct
+// across scopes.
+pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? {
+    mut acc = init;
+    mut ok = true;
+    for (let x : self) {
+        let step = if (ok) { f(acc, x) } else { none };
+
+        // Once a step has failed, `step` is `none` every time after, so `ok`
+        // stays false without an explicit `ok &&`.
+        set ok = step.is_some();
+        set acc = step.value_or(acc);
+    }
+    if (ok) { some(acc) } else { none }
+}.doc("""
+    Combine the elements left to right with a *fallible* combiner, starting from
+    `init`: `f` returns `A?`, and the first `none` ends the fold with `none` —
+    the remaining elements are never visited. All-`some` folds to `some(result)`,
+    exactly as `left_fold` would; an empty array folds to `some(init)`.
+
+    Since the combiner's body may use `?`, a fold that can fail reads as one
+    expression: `s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))`.
+
+    Import it as plain `opt_fold` — `import { opt_left_fold as opt_fold } from
+    builtins;` — in the usual case where a file folds in only one direction;
+    spell it `opt_left_fold` only in a file that also imports `opt_right_fold`.
+""").test({
+    // All-`some`: the same result `left_fold` would give.
+    assert([1, 2, 3].opt_left_fold(0, |acc, x| some(acc + x)) == some(6));
+    assert(opt_left_fold([2, 3], 1, |acc, x| some(acc + x)) == some(6)); // free-call
+    assert([1, 2, 3].opt_left_fold(0, add) == some(6)); // a named combiner
+
+    // Empty (a typed empty from `filter`) folds to `some(init)`, untouched.
+    assert([1, 2].filter(is_big).opt_left_fold(7, add) == some(7));
+
+    // A heap accumulator (`str`) is carried across iterations intact.
+    assert(["a", "b", "c"].opt_left_fold("", |acc, s| some(acc +++ s)) == some("abc"));
+
+    // The first `none` ends it — including when the very first element fails.
+    assert(
+        [1, 2, 3].opt_left_fold(0, |acc, x| if (x == 2) { none } else { some(acc + x) }) == none,
+    );
+    assert([1, 2].opt_left_fold(0, |acc, x| none) == none);
+
+    // `?` inside the combiner is what makes a fallible fold a one-liner: this
+    // parses a digit run, failing on the first non-digit.
+    assert(['1', '2', '7'].opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == some(127));
+    assert(['1', 'x'].opt_left_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == none);
+
+    let bump = 10;
+    assert([1, 2].opt_left_fold(0, |acc, x| some(acc + x + bump)) == some(23)); // a capture
+})
+
+fn add(acc: i64, x: i64) -> i64? { some(acc + x) }.test({
+    assert(add(1, 2) == some(3));
+})
+
+fn is_big(self: i64) -> bool { self == 99 }.test({
+    assert(!is_big(1));
+})
+--- performance ---
+?
+--- monomorphizations ---
+?

@@ -4854,6 +4854,14 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
         include_str!("builtin_right_fold.aipl"),
     ),
     (
+        "__builtin_opt_left_fold",
+        include_str!("builtin_opt_left_fold.aipl"),
+    ),
+    (
+        "__builtin_opt_right_fold",
+        include_str!("builtin_opt_right_fold.aipl"),
+    ),
+    (
         "__builtin_count_while",
         include_str!("builtin_count_while.aipl"),
     ),

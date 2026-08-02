@@ -1,0 +1,42 @@
+import {
+    +++,
+    ==,
+    opt_left_fold as opt_fold,
+    to_digit,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// `xs.opt_fold(init, f)` is `fold` with a *fallible* combiner: `f` returns `A?`,
+// and a `none` result makes the whole fold `none`. Because `?` works inside the
+// combiner, a fold that can fail reads as one expression — this is how
+// `int_parse` accumulates its digits.
+//
+// Import convention matches `fold`: bring `opt_left_fold` in as plain `opt_fold`
+// unless the file also imports `opt_right_fold` (see `opt_right_fold.aipl`).
+fn digits_to_int(s: str) -> i64? { s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) }
+
+fn parses_a_digit_run() -> i64? { digits_to_int("127") }.test({
+    assert(digits_to_int("127") == some(127));
+    assert(digits_to_int("0") == some(0));
+    assert(digits_to_int("") == some(0)); // empty folds to `some(init)`
+    assert(digits_to_int("12a3") == none); // the first non-digit ends it
+    assert(digits_to_int("a") == none); // ... including the very first element
+
+    // An all-`some` fold is exactly what `left_fold` would produce.
+    assert([1, 2, 3].opt_fold(0, |acc, x| some(acc + x)) == some(6));
+    assert(opt_fold([2, 3], 1, |acc, x| some(acc + x)) == some(6)); // free-call form
+
+    // A heap accumulator survives the iteration it was built in.
+    assert(["a", "b", "c"].opt_fold("", |acc, s| some(acc +++ s)) == some("abc"));
+
+    // A combiner that fails on a value, not on a `?`.
+    assert([1, 2, 3].opt_fold(0, |acc, x| if (x == 2) { none } else { some(acc + x) }) == none);
+
+    let bump = 10;
+    assert([1, 2].opt_fold(0, |acc, x| some(acc + x + bump)) == some(23)); // a capture
+})
+--- performance ---
+?
+--- monomorphizations ---
+?

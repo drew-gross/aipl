@@ -1,0 +1,88 @@
+import {
+    !,
+    &&,
+    +++,
+    ==,
+    >,
+    filter,
+    is_some,
+    len,
+    value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+// The AIPL implementation of the `opt_right_fold` builtin: `right_fold` with a
+// fallible combiner, and the mirror of `opt_left_fold` (see
+// `builtin_opt_left_fold.aipl`). Monomorphization registers this function under
+// the canonical name `__builtin_opt_right_fold` (see `AIPL_BUILTIN_SOURCES` in
+// `lib.rs`).
+//
+// Walks the indices backwards, stopping at the first `none` — AIPL has no
+// `break`, so the short-circuit lives in the `while` condition. Nothing is
+// allocated (no reversed copy). `self[i]` yields an optional and `i` is always
+// in range, so that inner `none` arm is dead.
+//
+// The accumulator stays a plain `A` — the `ok` flag, not an `A?` threaded
+// through the loop, carries the failure. A `mut` binding of an *optional* (a
+// composite) reassigned from inside a loop body is currently miscompiled: the
+// body's scope releases the new value's heap components while the binding still
+// points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
+// binding goes through the slot-owned-reference model instead, which is correct
+// across scopes.
+pub fn opt_right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A?) -> A? {
+    mut acc = init;
+    mut ok = true;
+    mut i = self.len();
+    while (ok && i > 0) {
+        set i = i - 1;
+        let step = match (self[i]) {
+            some(x) => f(x, acc),
+            none => none,
+        };
+        set acc = step.value_or(acc);
+        set ok = step.is_some();
+    }
+    if (ok) { some(acc) } else { none }
+}.doc("""
+    Combine the elements right to left with a *fallible* combiner, starting from
+    `init`: `f` takes the element first and the accumulator second (the mirror of
+    `opt_left_fold`) and returns `A?`; the first `none` ends the fold with `none`,
+    and the elements to its left are never visited. An empty array folds to
+    `some(init)`.
+
+    Prefer `opt_left_fold` (imported as plain `opt_fold`) unless the right-to-left
+    order matters.
+""").test({
+    // All-`some`: the same result `right_fold` would give.
+    assert([1, 2, 3].opt_right_fold(0, |x, acc| some(x + acc)) == some(6));
+    assert(opt_right_fold([2, 3], 1, |x, acc| some(x + acc)) == some(6)); // free-call
+    assert([1, 2, 3].opt_right_fold(0, add) == some(6)); // a named combiner
+
+    // Empty (a typed empty from `filter`) folds to `some(init)`, untouched.
+    assert([1, 2].filter(is_big).opt_right_fold(7, add) == some(7));
+
+    // Direction is visible in a string, and mirrors `opt_left_fold`.
+    assert(["a", "b", "c"].opt_right_fold("", |s, acc| some(acc +++ s)) == some("cba"));
+
+    // The first `none` — counting from the *right* — ends it.
+    assert(
+        [1, 2, 3].opt_right_fold(0, |x, acc| if (x == 2) { none } else { some(x + acc) }) == none,
+    );
+    assert([1, 2].opt_right_fold(0, |x, acc| none) == none);
+
+    let bump = 10;
+    assert([1, 2].opt_right_fold(0, |x, acc| some(x + acc + bump)) == some(23)); // a capture
+})
+
+fn add(x: i64, acc: i64) -> i64? { some(x + acc) }.test({
+    assert(add(1, 2) == some(3));
+})
+
+fn is_big(self: i64) -> bool { self == 99 }.test({
+    assert(!is_big(1));
+})
+--- performance ---
+?
+--- monomorphizations ---
+?
