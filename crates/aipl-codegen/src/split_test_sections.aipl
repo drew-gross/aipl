@@ -1,0 +1,68 @@
+import { !=, wrapping_add as +, ++, <, ==, len } from builtins;
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+
+pub fn split_test_sections(src: str) -> (str, str) {
+    // Like `strip_test_sections`, but returns both halves. Walk byte-by-byte
+    // (`s[i]` / slicing / len are all byte-indexed), tracking the start of the
+    // current line. At each line break, test the line just ended for a
+    // `--- name ---` marker; the first marker line is the cutoff — everything
+    // before it is the main source, everything from it on is the test sections.
+    mut line_start = 0;
+    mut i = 0;
+    while (i < src.len()) {
+        if (src[i] == some('\n')) {
+            if (parse_test_section_header(src[line_start..i]) != none) {
+                return (src[..line_start], src[line_start..]);
+            };
+            set line_start = i + 1;
+        };
+        set i++;
+    }
+
+    // The final line has no trailing newline; if it's a marker, split there.
+    // (When `src` ends in `\n`, `line_start == len` and the trailing empty line
+    // is never a marker, so this returns all of `src` with no sections.)
+    if (parse_test_section_header(src[line_start..]) != none) {
+        (src[..line_start], src[line_start..])
+    } else {
+        (src, "")
+    }
+}.doc("""
+    Splits `src` at the first `--- name ---` test-section marker line into
+    `(main, sections)`: the source before the marker, and the marker plus
+    everything after it. When there is no marker, `sections` is empty and `main`
+    is all of `src`. The counterpart of `strip_test_sections`, which returns only
+    the `main` half. (`parse_test_section_header` classifies each line.)
+""").test({
+    // No marker: everything is main, sections empty.
+    assert(split_test_sections("fn main() {}\n") == ("fn main() {}\n", ""));
+    assert(split_test_sections("") == ("", ""));
+    // A marker line splits there.
+    assert(split_test_sections("code\n--- stdout ---\nfoo") == ("code\n", "--- stdout ---\nfoo"));
+    assert(split_test_sections("a\nb\n--- c ---\nd") == ("a\nb\n", "--- c ---\nd"));
+    // A marker as the very first line: main empty.
+    assert(split_test_sections("--- x ---") == ("", "--- x ---"));
+    assert(split_test_sections("--- x ---\nbody") == ("", "--- x ---\nbody"));
+    // CRLF: the `\r` before the newline is trimmed by the marker check.
+    assert(split_test_sections("a\r\n--- c ---\r\n") == ("a\r\n", "--- c ---\r\n"));
+    // A non-marker dashed line (only two dashes) doesn't split.
+    assert(split_test_sections("-- not a marker --\ncode") == ("-- not a marker --\ncode", ""));
+    // An indented marker line doesn't split — a header must start at column 0.
+    assert(
+        split_test_sections("code\n  --- stdout ---\nfoo") == ("code\n  --- stdout ---\nfoo", ""),
+    );
+})
+--- performance ---
+allocations: 15
+deallocations: 15
+reallocations: 0
+bytes allocated: 480
+instructions executed: 9340
+binary size: 9120
+  code: 3572
+  data: 1316
+  metadata: 4232
+--- monomorphizations ---
+__m1__parse_test_section_header
+main
+split_test_sections

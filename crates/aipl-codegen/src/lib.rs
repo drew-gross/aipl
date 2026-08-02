@@ -2823,6 +2823,7 @@ const RAW_STRING_TRIM_END_WHILE_SRC: &str = include_str!("trim_end_while.aipl");
 const RAW_STRING_TRIM_SUFFIX_SRC: &str = include_str!("trim_suffix.aipl");
 const PARSE_TEST_SECTION_HEADER_SRC: &str = include_str!("parse_test_section_header.aipl");
 const STRIP_TEST_SECTIONS_SRC: &str = include_str!("strip_test_sections.aipl");
+const SPLIT_TEST_SECTIONS_SRC: &str = include_str!("split_test_sections.aipl");
 const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespace.aipl");
 const ASSERT_LOC_SRC: &str = include_str!("assert_loc.aipl");
 const LINE_AT_SRC: &str = include_str!("line_at.aipl");
@@ -2858,6 +2859,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
         PARSE_TEST_SECTION_HEADER_SRC,
     ),
     ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
+    ("./split_test_sections.aipl", SPLIT_TEST_SECTIONS_SRC),
     (
         "./find_trailing_whitespace.aipl",
         FIND_TRAILING_WHITESPACE_SRC,
@@ -2889,6 +2891,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "process_raw_string",
     "parse_test_section_header",
     "strip_test_sections",
+    "split_test_sections",
     "find_trailing_whitespace",
     "assert_loc",
     "line_at",
@@ -2986,6 +2989,28 @@ fn strip_test_sections(src: &str) -> String {
         match comp.call_values("strip_test_sections", &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Str(kept)) => kept,
             other => panic!("dogfooded strip_test_sections() call: {other:?}"),
+        }
+    })
+}
+
+/// The formatter's split-test-sections hook (see [`install_parser_hooks`]):
+/// splits `src` into `(main, sections)` at the first `--- name ---` marker line
+/// — computed by the dogfooded AIPL `split_test_sections` via the FFI. The AIPL
+/// returns a `(str, str)` tuple, which lowers to a two-field struct marshaled as
+/// [`FfiValue::Struct`] with fields `_0` (the main source) and `_1` (the
+/// sections). Both are byte-substrings of `src`. No native fallback; panics if it
+/// can't be built or called.
+fn split_test_sections(src: &str) -> (String, String) {
+    fn field(fields: &[(String, FfiValue)], name: &str) -> String {
+        match fields.iter().find(|(n, _)| n == name) {
+            Some((_, FfiValue::Str(s))) => s.clone(),
+            other => panic!("dogfooded split_test_sections() field {name:?}: {other:?}"),
+        }
+    }
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("split_test_sections", &[FfiValue::Str(src.to_string())]) {
+            Ok(FfiValue::Struct(fields)) => (field(&fields, "_0"), field(&fields, "_1")),
+            other => panic!("dogfooded split_test_sections() call: {other:?}"),
         }
     })
 }
@@ -3411,6 +3436,7 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
 pub fn install_parser_hooks() {
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
+    aipl_parser::set_split_test_sections_hook(split_test_sections);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_parser::set_lex_hook(lex_aipl);

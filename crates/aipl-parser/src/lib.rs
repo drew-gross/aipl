@@ -2562,6 +2562,36 @@ pub fn set_strip_test_sections_hook(f: fn(&str) -> String) {
     let _ = STRIP_TEST_SECTIONS_HOOK.set(f);
 }
 
+/// Split `src` into `(main, sections)` at the first `--- name ---` test-section
+/// marker line — the counterpart of [`strip_test_sections`] that also returns the
+/// stripped-off sections (empty when there are none). Dogfooded via the AIPL
+/// `split_test_sections` through the embedding FFI; both halves are byte-
+/// substrings of `src`, so they're re-borrowed from it. No native fallback —
+/// panics if the hook isn't installed (call `install_parser_hooks` first).
+pub fn split_test_sections(src: &str) -> (&str, &str) {
+    let hook = SPLIT_TEST_SECTIONS_HOOK.get().expect(
+        "split-test-sections hook not installed before parsing (call install_parser_hooks)",
+    );
+    // The main half ends on a line boundary, so its byte length is a valid char
+    // boundary at which to re-borrow both halves from `src`.
+    let cut = hook(src).0.len().min(src.len());
+    (&src[..cut], &src[cut..])
+}
+
+/// The section splitter, installed by the compiler (via
+/// [`set_split_test_sections_hook`]) to dogfood the AIPL `split_test_sections`.
+/// Required — see [`split_test_sections`]. Returns `(main, sections)`, both
+/// byte-substrings of its input.
+static SPLIT_TEST_SECTIONS_HOOK: std::sync::OnceLock<fn(&str) -> (String, String)> =
+    std::sync::OnceLock::new();
+
+/// Install the section splitter. The compiler points this at the dogfooded AIPL
+/// `split_test_sections`, run through the embedding FFI. First install wins (the
+/// hook is process-global).
+pub fn set_split_test_sections_hook(f: fn(&str) -> (String, String)) {
+    let _ = SPLIT_TEST_SECTIONS_HOOK.set(f);
+}
+
 /// The [`Span`] of the first line's trailing space/tab run in `src`, or `None`
 /// if no line has any — the locator for [`reject_trailing_whitespace`].
 /// Dogfooded: the AIPL `find_trailing_whitespace`, run through the embedding FFI

@@ -62,12 +62,11 @@ pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
     // Split off the trailing test sections: they are re-attached verbatim
     // from the *original* text (an expected-output body may contain
     // whitespace the cleanup below must not touch).
-    let prefix_len = aipl_parser::strip_test_sections(src).len();
-    let sections = &src[prefix_len..];
+    let (code, sections) = aipl_parser::split_test_sections(src);
 
     // Remove trailing whitespace per line before lexing, so every span the
     // walker copies verbatim refers to the cleaned text.
-    let cleaned = clean_trailing_whitespace(&src[..prefix_len]);
+    let cleaned = clean_trailing_whitespace(code);
 
     // Validate with the real parser first: its errors are the good ones, and
     // anything it accepts the walker below must handle.
