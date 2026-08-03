@@ -62,7 +62,7 @@ variant Doc =
 
 // The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 // frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
-variant Work = WNil | WCons(i64, bool, Doc, Work)
+variant Work = WNil | WCons(u64, bool, Doc, Work)
 
 // ---------- constructors ----------
 
@@ -100,8 +100,8 @@ fn has_hard(self: Doc) -> bool {
 // Render `doc` at the given width limit. Lines are indented with spaces;
 // trailing whitespace is stripped from every line and a final newline is
 // preserved when present (the Rust `print`'s belt-and-braces cleanup).
-fn print_doc(doc: Doc, width: i64) -> str {
-    let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
+fn print_doc(doc: Doc, width: u64) -> str {
+    let pieces = go(width, u64(0), WCons(u64(0), false, doc, WNil), []);
     cleanup(pieces.join(""))
 }
 
@@ -109,7 +109,7 @@ fn print_doc(doc: Doc, width: i64) -> str {
 // tail-recurse on the rest. `col` is the current column; `sp` (inside each
 // frame) is the indentation, in spaces, that a line break under that frame lands
 // at.
-fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
+fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
     match (work) {
         WNil => acc,
         WCons(sp, flat, d, rest) => match (d) {
@@ -117,7 +117,7 @@ fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
             RawBlock(s) => go_raw(width, col, sp, s, rest, acc),
             Concat(ds) => go(width, col, prepend(ds, sp, flat, rest), acc),
             Line => if (flat) {
-                go(width, col + 1, rest, acc.pushed(" "))
+                go(width, col + u64(1), rest, acc.pushed(" "))
             } else {
                 go(width, sp, rest, acc.pushed(newline_str(sp)))
             },
@@ -128,7 +128,7 @@ fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
             },
             HardLine => go(width, sp, rest, acc.pushed(newline_str(sp))),
             BlankLine => go(width, sp, rest, acc.pushed(blank_str(sp))),
-            Indent(inner) => go(width, col, WCons(sp + 4, flat, inner, rest), acc),
+            Indent(inner) => go(width, col, WCons(sp + u64(4), flat, inner, rest), acc),
             Group(forced, inner) => go(
                 width,
                 col,
@@ -138,7 +138,7 @@ fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
             IfBroken(s) => if (flat) {
                 go(width, col, rest, acc)
             } else {
-                go(width, col + s.len(), rest, acc.pushed(s))
+                go(width, col + u64(s.len()), rest, acc.pushed(s))
             },
             BreakParent => go(width, col, rest, acc),
         },
@@ -148,8 +148,8 @@ fn go(width: i64, col: i64, work: Work, acc: str[]) -> str[] {
 // A `RawBlock`: re-lay-out the atom around its frame's indent, then emit it and
 // continue. Split out so the atom is computed once (a match arm is a single
 // expression).
-fn go_raw(width: i64, col: i64, sp: i64, s: str, rest: Work, acc: str[]) -> str[] {
-    let rendered = s.reindent_block(sp);
+fn go_raw(width: u64, col: u64, sp: u64, s: str, rest: Work, acc: str[]) -> str[] {
+    let rendered = s.reindent_block(i64(sp));
     go(width, col_after(col, rendered), rest, acc.pushed(rendered))
 }
 
@@ -158,8 +158,8 @@ fn go_raw(width: i64, col: i64, sp: i64, s: str, rest: Work, acc: str[]) -> str[
 // fits in the remaining width. The remaining width is an *unsigned* subtraction,
 // so a line already past the limit floors at 0 rather than going negative — the
 // same thing the Rust printer gets from `usize::saturating_sub`.
-fn group_flat(forced: bool, width: i64, col: i64, sp: i64, inner: Doc, rest: Work) -> bool {
-    if (forced) { false } else { fits(u64(width) - u64(col), WCons(sp, true, inner, rest)) }
+fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -> bool {
+    if (forced) { false } else { fits(width - col, WCons(sp, true, inner, rest)) }
 }
 
 // Would the pending work — the flat candidate followed by the outer frames, each
@@ -214,7 +214,7 @@ fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
 
 // Prepend an array of children onto the work-list so `ds[0]` is processed first:
 // a right fold over `ds`, each frame carrying the parent's indent and mode.
-fn prepend(ds: Doc[], sp: i64, flat: bool, rest: Work) -> Work {
+fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
     ds.right_fold(rest, |d, work| WCons(sp, flat, d, work))
 }
 
@@ -227,18 +227,18 @@ fn pushed(self: str[], piece: str) -> str[] {
 
 // The column just past `text` when appended at column `col`: the length of its
 // last line for multi-line text, else `col + width`.
-fn col_after(col: i64, text: str) -> i64 {
+fn col_after(col: u64, text: str) -> u64 {
     let parts = text.split("\n");
     let n = parts.len();
-    if (n < 2) { col + text.len() } else { parts[n - 1].value_or("").len() }
+    if (n < 2) { col + u64(text.len()) } else { u64(parts[n - 1].value_or("").len()) }
 }
 
 // A line break landing at indentation `sp`: a newline plus `sp` spaces.
-fn newline_str(sp: i64) -> str { "\n" +++ " ".repeat(sp) }
+fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(i64(sp)) }
 
 // A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
 // blank line's own trailing spaces are removed by `cleanup`).
-fn blank_str(sp: i64) -> str { "\n\n" +++ " ".repeat(sp) }
+fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(i64(sp)) }
 
 // Strip trailing whitespace from every line and preserve a final newline when
 // the rendered text had one (mirrors `str::lines().map(trim_end).join("\n")`).

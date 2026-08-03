@@ -6020,9 +6020,8 @@ fn build_struct_layout(
         // needs no size), or an optional of a scalar/str/array (a 16-byte
         // inline `{tag, value}` composite).
         match &f.ty {
-            Type::Primitive(
-                Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
-            ) => {}
+            // Every scalar: any integer width, `bool`, `char`, `str`.
+            _ if is_set_elem(&f.ty) => {}
             Type::Named(n) if decls.contains_key(n.as_str()) => {
                 if !rec.contains_key(n.as_str()) {
                     resolve_type_layout(n, decls, layouts, on_stack, rec)?;
@@ -6043,7 +6042,7 @@ fn build_struct_layout(
             }
             _ => {
                 return Err(Error::msg(format!(
-                    "struct {}: field {} has type {}, but struct fields must be i64, bool, char, str, a function, a struct, a variant, an array, or an optional of (i64, bool, char, str, an array, or a recursive type)",
+                    "struct {}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
                     decl.name,
                     f.name,
                     type_name(&f.ty),
@@ -6106,8 +6105,9 @@ fn build_variant_layout(
             };
             if !ok {
                 return Err(Error::msg(format!(
-                    "variant {} case {}: payload type {} is not supported (use i64, bool, char, \
-                     str, a function, an array, an optional, a struct, or a variant)",
+                    "variant {} case {}: payload type {} is not supported (use an integer \
+                     (i8..i64, u8..u64), bool, char, str, a function, an array, an optional, a \
+                     struct, or a variant)",
                     v.name,
                     c.name,
                     type_name(ty),
@@ -13071,7 +13071,7 @@ fn compile_call_expr<M: Module>(
                 if !ok {
                     return Err(Error::at(
                         format!(
-                            "\"push\" element must be i64, bool, char, str, or an array, got {}",
+                            "\"push\" element must be an integer (i8..i64, u8..u64), bool, char, str, or an array, got {}",
                             type_name(&x_ty)
                         ),
                         value.span.clone(),
@@ -13335,9 +13335,8 @@ fn compile_call_expr<M: Module>(
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             match &t {
-                Type::Primitive(
-                    Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
-                ) => {}
+                // Every scalar: any integer width, `bool`, `char`, `str`.
+                _ if is_set_elem(&t) => {}
                 // A struct (`Point?`) is stored inline, as is a nested optional
                 // (`some(some(..))` → `T??`) and an array.
                 Type::Named(n) if structs.contains_key(n) => {}
@@ -15015,7 +15014,7 @@ fn compile_expr<M: Module>(
                         if !ok {
                             return Err(Error::at(
                                 format!(
-                                    "array elements must be i64, bool, char, str, or an array, got {}",
+                                    "array elements must be an integer (i8..i64, u8..u64), bool, char, str, or an array, got {}",
                                     type_name(&t)
                                 ),
                                 el.span.clone(),
@@ -15120,7 +15119,7 @@ fn compile_expr<M: Module>(
                         if !is_set_elem(&t) {
                             return Err(Error::at(
                                 format!(
-                                    "set elements must be i64, bool, char, or str, got {}",
+                                    "set elements must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                                     type_name(&t)
                                 ),
                                 el.span.clone(),
@@ -15190,7 +15189,7 @@ fn compile_expr<M: Module>(
                         if !is_dict_key(&kt) {
                             return Err(Error::at(
                                 format!(
-                                    "dict keys must be i64, bool, char, or str, got {}",
+                                    "dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                                     type_name(&kt)
                                 ),
                                 k.span.clone(),

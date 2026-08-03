@@ -932,7 +932,7 @@ impl Cx<'_> {
                     Ok(())
                 } else {
                     Err(Error::msg(format!(
-                        "fn {fname:?}: a set element must be i64, bool, char, or str, got {}",
+                        "fn {fname:?}: a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                         tyname(inner)
                     )))
                 }
@@ -943,7 +943,7 @@ impl Cx<'_> {
             Type::Dict(k, v) => {
                 if !(is_dict_key(k) || is_abstract_scalar_ty(k, type_params)) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a dict key must be i64, bool, char, or str, got {}",
+                        "fn {fname:?}: a dict key must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                         tyname(k)
                     )));
                 }
@@ -970,13 +970,13 @@ impl Cx<'_> {
                 };
                 if !payload_ok(ok) && !is_unit(ok) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Ok payload must be i64, bool, char, str, a struct, a variant, an array, or unit (\"!E\"), got {}",
+                        "fn {fname:?}: a result Ok payload must be an integer (i8..i64, u8..u64), bool, char, str, a struct, a variant, an array, or unit (\"!E\"), got {}",
                         tyname(ok)
                     )));
                 }
                 if !payload_ok(err) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Err payload must be i64, bool, char, str, Error, a struct, a variant, or an array, got {}",
+                        "fn {fname:?}: a result Err payload must be an integer (i8..i64, u8..u64), bool, char, str, Error, a struct, a variant, or an array, got {}",
                         tyname(err)
                     )));
                 }
@@ -1799,8 +1799,8 @@ impl Cx<'_> {
                 if !elems.is_empty() && !elem_ok {
                     return Err(Error::at(
                         format!(
-                            "array elements must be i64, bool, char, str, an array, an optional, \
-                             or a struct, got {}",
+                            "array elements must be an integer (i8..i64, u8..u64), bool, char, \
+                             str, an array, an optional, or a struct, got {}",
                             tyname(&elem_ty)
                         ),
                         span.clone(),
@@ -1823,7 +1823,7 @@ impl Cx<'_> {
                 if !elems.is_empty() && !is_set_elem(&elem_ty) {
                     return Err(Error::at(
                         format!(
-                            "set elements must be i64, bool, char, or str, got {}",
+                            "set elements must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                             tyname(&elem_ty)
                         ),
                         span.clone(),
@@ -1852,7 +1852,7 @@ impl Cx<'_> {
                     if !is_dict_key(&key_ty) {
                         return Err(Error::at(
                             format!(
-                                "dict keys must be i64, bool, char, or str, got {}",
+                                "dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                                 tyname(&key_ty)
                             ),
                             span.clone(),
@@ -1864,7 +1864,7 @@ impl Cx<'_> {
                     if !val_ok {
                         return Err(Error::at(
                             format!(
-                                "dict values must be i64, bool, char, str, an array, an optional, \
+                                "dict values must be an integer (i8..i64, u8..u64), bool, char, str, an array, an optional, \
                                  or a struct, got {}",
                                 tyname(&val_ty)
                             ),

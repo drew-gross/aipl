@@ -1,0 +1,110 @@
+import {
+    !,
+    !=,
+    +++,
+    <,
+    ==,
+    contains_key,
+    get,
+    has,
+    len,
+    print,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+// The sized integer types (`i8`..`i64`, `u8`..`u64`) are storable *inside*
+// aggregates, not just as locals and parameters: struct fields, variant
+// payloads, array/set elements, dict keys and values, and optional cores all
+// take them. Each occupies an 8-byte slot holding the width-canonicalized
+// value, exactly like an `i64` — so layout, refcounting (none: no heap), and
+// equality are unchanged; only the value's own canonicalization differs.
+//
+// The interesting case throughout is a `u64` above `i64::MAX`: it must survive
+// a round trip through the aggregate and render unsigned.
+struct P { w: u32, b: u8, big: u64 }
+
+variant W = WNil | WC(u64, bool, W)
+
+fn top(self: W) -> u64 {
+    match (self) {
+        WNil => u64(0),
+        WC(sp, _, _) => sp,
+    }
+}
+
+// The value that motivated this: a printer's indent column, carried through a
+// recursive work-list as an unsigned width.
+fn deepest(self: W) -> u64 {
+    match (self) {
+        WNil => u64(0),
+        WC(sp, _, rest) => if (sp < rest.deepest()) { rest.deepest() } else { sp },
+    }
+}
+
+fn main() !prints {
+    let umax = u64(0) - u64(1); // 18446744073709551615, by wraparound
+    let p = P { w: u32(5), b: u8(9), big: umax };
+    print(to_str(p));
+    print(to_str([u32(1), u32(4294967295)]));
+    print(to_str(WC(u64(7), true, WNil)));
+}.test({
+    let umax = u64(0) - u64(1);
+
+    // Struct fields, including a `u64` past `i64::MAX`.
+    let p = P { w: u32(5), b: u8(9), big: umax };
+    assert(p.w == u32(5));
+    assert(p.b == u8(9));
+    assert(p.big == umax);
+    assert(to_str(p) == "P { w: 5, b: 9, big: 18446744073709551615 }");
+    assert(p == P { w: u32(5), b: u8(9), big: umax });
+    assert(p != P { w: u32(5), b: u8(9), big: u64(0) });
+
+    // Variant payloads — the case that blocked an unsigned work-list.
+    assert(WC(u64(7), true, WNil).top() == u64(7));
+    assert(WC(u64(2), true, WC(u64(9), false, WNil)).deepest() == u64(9));
+    assert(to_str(WC(u64(7), true, WNil)) == "WC(7, true, WNil)");
+    assert(WC(u64(7), true, WNil) == WC(u64(7), true, WNil));
+
+    // Array elements: indexing, length, rendering, equality.
+    let xs = [u32(1), u32(2), u32(4294967295)];
+    assert(xs.len() == 3);
+    assert(xs[2].value_or(u32(0)) == u32(4294967295));
+    assert(to_str(xs) == "[1, 2, 4294967295]");
+    assert(xs == [u32(1), u32(2), u32(4294967295)]);
+    assert([umax] == [umax]);
+
+    // Optionals.
+    assert(some(u32(3)).value_or(u32(0)) == u32(3));
+    assert(some(umax).value_or(u64(0)) == umax);
+
+    // Sets and dicts — the scalar rules follow the same predicate.
+    let s = #{u8(1), u8(2)};
+    assert(s.has(u8(2)));
+    assert(!s.has(u8(3)));
+    let d = #{u16(1): u8(7)};
+    assert(d.contains_key(u16(1)));
+    assert(d.get(u16(1)).value_or(u8(0)) == u8(7));
+
+    // Narrow widths keep their canonicalization through a field.
+    let narrow = P { w: u32(5), b: u8(200) + u8(100), big: u64(0) };
+    assert(narrow.b == u8(44)); // 300 wraps to 44 in 8 bits
+})
+--- stdout ---
+P { w: 5, b: 9, big: 18446744073709551615 }
+[1, 4294967295]
+WC(7, true, WNil)
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 302
+instructions executed: 726
+binary size: 6056
+  code: 2632
+  data: 427
+  metadata: 2997
+--- monomorphizations ---
+main

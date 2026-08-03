@@ -1288,26 +1288,32 @@ pub fn type_name(t: &Type) -> String {
     }
 }
 
-/// Valid array element types: the 8-byte value types — primitives, `str`,
-/// and (nested) arrays, which are themselves 8-byte heap pointers. Structs
-/// and optionals are inline composites wider than 8 bytes and aren't yet
-/// supported as elements.
+/// Valid array element types: the 8-byte value types — every integer width
+/// (`i8`..`i64`, `u8`..`u64`, each stored canonicalized in an 8-byte slot like
+/// `i64`), `bool`, `char`, `str`, and (nested) arrays, which are themselves
+/// 8-byte heap pointers. Structs and optionals are inline composites wider than
+/// 8 bytes and aren't yet supported as elements.
 pub fn is_array_elem(t: &Type) -> bool {
-    matches!(
-        t,
-        Type::Primitive(Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str)
-    ) || matches!(t, Type::Array(_))
+    is_int_ty(t)
+        || matches!(
+            t,
+            Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str) | Type::Array(_)
+        )
 }
 
-/// Valid set element types: the scalar value types `i64`, `bool`, `char`, and
-/// `str`. Scalars compare by value; `str` compares by content (see the set
-/// runtime). Nested containers (arrays/sets/optionals/structs) are not yet
-/// supported as set elements.
+/// Valid set element types: the scalar value types — every integer width
+/// (`i8`..`i64`, `u8`..`u64`), `bool`, `char`, and `str`. Scalars compare by
+/// value; `str` compares by content (see the set runtime). Nested containers
+/// (arrays/sets/optionals/structs) are not yet supported as set elements.
+///
+/// Also the "storable scalar" test behind struct fields and variant payloads,
+/// which hold exactly these inline.
 pub fn is_set_elem(t: &Type) -> bool {
-    matches!(
-        t,
-        Type::Primitive(Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str)
-    )
+    is_int_ty(t)
+        || matches!(
+            t,
+            Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
+        )
 }
 
 /// Valid dict *key* types: the same scalar/`str` types a set holds (keys are
