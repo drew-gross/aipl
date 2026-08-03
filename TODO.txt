@@ -173,7 +173,9 @@ My honest read: the dual-stream, span-driven design is well-chosen for a spellin
 
 Make sure recursive with backpointer structs work e.g. graphs (but also need to figure out how those work in a value-oriented langauge)
 
-unsigned ints
+make a strip_trailing_whitespace if I can figure out a good name for it (that isn't confusing between all lines and one line)
+
+One limit worth flagging: I could not take the unsigned domain further. Work carries the indent column, and variant payloads reject sized ints — "variant W case WC: payload type u64 is not supported" — the same restriction that blocks struct fields and array elements. So width/col/sp stay i64 and get converted at the boundary. That's the aggregate gap from the scoping question, and it's what you'd need to close before the whole printer could be unsigned end to end. <--- fix this limit
 
 PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working
 tree, full-suite gate never passed. Stopped after test cases started taking far too

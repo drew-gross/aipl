@@ -28,10 +28,10 @@ import {
     push,
     repeat,
     right_fold,
+    saturating_sub as -,
     split,
     value_or,
     wrapping_add as +,
-    wrapping_sub as -,
 } from builtins;
 import { reindent_block } from "./reindent_block.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
@@ -155,50 +155,59 @@ fn go_raw(width: i64, col: i64, sp: i64, s: str, rest: Work, acc: str[]) -> str[
 
 // Decide a group's mode: forced groups always break; otherwise the group is flat
 // exactly when its content — laid out flat, followed by the rest of the line —
-// fits in the remaining width.
+// fits in the remaining width. The remaining width is an *unsigned* subtraction,
+// so a line already past the limit floors at 0 rather than going negative — the
+// same thing the Rust printer gets from `usize::saturating_sub`.
 fn group_flat(forced: bool, width: i64, col: i64, sp: i64, inner: Doc, rest: Work) -> bool {
-    if (forced) { false } else { fits(sat(width - col), WCons(sp, true, inner, rest)) }
+    if (forced) { false } else { fits(u64(width) - u64(col), WCons(sp, true, inner, rest)) }
 }
 
 // Would the pending work — the flat candidate followed by the outer frames, each
 // in its own mode — stay within `budget` columns? Walks until the budget is
 // exhausted (no) or the line provably ends at a break point (yes).
-fn fits(budget: i64, work: Work) -> bool {
-    if (budget < 0) {
-        false
-    } else {
-        match (work) {
-            WNil => true,
-            WCons(sp, flat, d, rest) => match (d) {
-                Text(s) => fits_atom(budget, s, flat, rest),
-                RawBlock(s) => fits_atom(budget, s, flat, rest),
-                Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
-                Line => if (flat) { fits(budget - 1, rest) } else { true },
-                SoftLine => if (flat) { fits(budget, rest) } else { true },
-                HardLine => true,
-                BlankLine => true,
-                Indent(inner) => fits(budget, WCons(sp, flat, inner, rest)),
-                Group(forced, inner) => if (forced) {
-                    !flat
-                } else {
-                    fits(budget, WCons(sp, flat, inner, rest))
-                },
-                IfBroken(s) => if (flat) {
-                    fits(budget, rest)
-                } else {
-                    fits(budget - s.len(), rest)
-                },
-                BreakParent => if (flat) { false } else { fits(budget, rest) },
+//
+// The budget is *unsigned*: it can't go negative, so an overrun is an explicit
+// "doesn't fit" comparison in `fits_after` rather than a sign check on a
+// wrapped-around remainder.
+fn fits(budget: u64, work: Work) -> bool {
+    match (work) {
+        WNil => true,
+        WCons(sp, flat, d, rest) => match (d) {
+            Text(s) => fits_atom(budget, s, flat, rest),
+            RawBlock(s) => fits_atom(budget, s, flat, rest),
+            Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
+            Line => if (flat) { fits_after(budget, u64(1), rest) } else { true },
+            SoftLine => if (flat) { fits(budget, rest) } else { true },
+            HardLine => true,
+            BlankLine => true,
+            Indent(inner) => fits(budget, WCons(sp, flat, inner, rest)),
+            Group(forced, inner) => if (forced) {
+                !flat
+            } else {
+                fits(budget, WCons(sp, flat, inner, rest))
             },
-        }
+            IfBroken(s) => if (flat) {
+                fits(budget, rest)
+            } else {
+                fits_after(budget, u64(s.len()), rest)
+            },
+            BreakParent => if (flat) { false } else { fits(budget, rest) },
+        },
     }
+}
+
+// Spend `n` of the remaining columns and keep walking — or give up when `n`
+// doesn't fit. The check has to come *before* the subtraction: on an unsigned
+// budget `budget - n` floors at 0, which would hide the overrun.
+fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
+    if (n > budget) { false } else { fits(budget - n, rest) }
 }
 
 // A `Text`/`RawBlock` atom in `fits`: a multi-line atom can't sit on a flat line
 // (so it only "fits" when the surrounding content is already broken); a
 // single-line atom just consumes its width.
-fn fits_atom(budget: i64, s: str, flat: bool, rest: Work) -> bool {
-    if (s.contains("\n")) { !flat } else { fits(budget - s.len(), rest) }
+fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
+    if (s.contains("\n")) { !flat } else { fits_after(budget, u64(s.len()), rest) }
 }
 
 // ---------- helpers ----------
@@ -230,10 +239,6 @@ fn newline_str(sp: i64) -> str { "\n" +++ " ".repeat(sp) }
 // A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
 // blank line's own trailing spaces are removed by `cleanup`).
 fn blank_str(sp: i64) -> str { "\n\n" +++ " ".repeat(sp) }
-
-// `max(0, x)` — the saturating remaining-width the Rust printer computes with
-// `usize::saturating_sub`.
-fn sat(x: i64) -> i64 { if (x < 0) { 0 } else { x } }
 
 // Strip trailing whitespace from every line and preserve a final newline when
 // the rendered text had one (mirrors `str::lines().map(trim_end).join("\n")`).
@@ -291,11 +296,11 @@ allocations: 283
 deallocations: 283
 reallocations: 0
 bytes allocated: 16060
-instructions executed: 20472
-binary size: 29064
-  code: 16012
+instructions executed: 20405
+binary size: 29192
+  code: 16104
   data: 842
-  metadata: 12210
+  metadata: 12246
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam11
@@ -306,6 +311,7 @@ __map13$own0
 __map19$own0
 col_after
 fits
+fits_after
 fits_atom
 go
 group
