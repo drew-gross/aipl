@@ -33,39 +33,33 @@ fn main() !prints {
     print(to_str(wrap3(wrap2(some(8))))); // some(some(some(8)))
 
     // Matching peels one `some` per level; a `none` at a level stops the peel.
-    print(
-        to_str(
-            match (none2()) {
-                some(i) => match (i) {
-                    some(v) => v,
-                    none => -1,
-                },
-                none => -2,
+    print(to_str(
+        match (none2()) {
+            some(i) => match (i) {
+                some(v) => v,
+                none => -1,
             },
-        ),
-    ); // -2
-    print(
-        to_str(
-            match (wrap2(none)) {
-                some(i) => match (i) {
-                    some(v) => v,
-                    none => -1,
-                },
-                none => -2,
+            none => -2,
+        },
+    )); // -2
+    print(to_str(
+        match (wrap2(none)) {
+            some(i) => match (i) {
+                some(v) => v,
+                none => -1,
             },
-        ),
-    ); // -1
-    print(
-        to_str(
-            match (wrap2(some(5))) {
-                some(i) => match (i) {
-                    some(v) => v,
-                    none => -1,
-                },
-                none => -2,
+            none => -2,
+        },
+    )); // -1
+    print(to_str(
+        match (wrap2(some(5))) {
+            some(i) => match (i) {
+                some(v) => v,
+                none => -1,
             },
-        ),
-    ); // 5
+            none => -2,
+        },
+    )); // 5
 
     // str?? — `none` at each level allocates nothing and stays balanced; the
     // heap core is touched only at the full tag.

@@ -19,22 +19,20 @@ fn main() !prints {
 
     // if/else merge — a deep none in one branch, a concrete chain in the other.
     let cond = true;
-    print(
-        to_str(if (cond) { some(some(some(7))) } else { some(some(none)) }),
-    ); // some(some(some(7)))
+    print(to_str(
+        if (cond) { some(some(some(7))) } else { some(some(none)) },
+    )); // some(some(some(7)))
     print(to_str(if (cond) { some(some(none)) } else { some(some(some(7))) })); // some(some(none))
 
     // match arm merge — the none arm's deep none takes the some arm's concrete
     // type. (`xs[0]` is `i64???`; unwrapping once binds `inner : i64??`.)
     let xs = [some(some(9))];
-    print(
-        to_str(
-            match (xs[0]) {
-                some(inner) => inner,
-                none => some(none),
-            },
-        ),
-    ); // some(some(9))
+    print(to_str(
+        match (xs[0]) {
+            some(inner) => inner,
+            none => some(none),
+        },
+    )); // some(some(9))
 }
 --- stdout ---
 some(some(none))

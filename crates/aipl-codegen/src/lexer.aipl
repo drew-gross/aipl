@@ -290,12 +290,10 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
             // close the token.
             if (c == '\\' && 0 < escapes.len() && i + 1 < self.len()) {
                 if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
-                    return err(
-                        LexError {
-                            message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
-                            span: at + i..at + i + 2,
-                        },
-                    );
+                    return err(LexError {
+                        message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
+                        span: at + i..at + i + 2,
+                    });
                 };
                 set i = i + 1;
             };
@@ -655,12 +653,10 @@ fn template_scan<K>(
         } else {
             if (c == '\\' && 0 < escapes.len() && i + 1 < src.len()) {
                 if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
-                    return err(
-                        LexError {
-                            message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
-                            span: i..i + 2,
-                        },
-                    );
+                    return err(LexError {
+                        message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
+                        span: i..i + 2,
+                    });
                 };
                 set i = i + 2;
             } else {
@@ -738,12 +734,10 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
     mut i = at;
     while (0 < depth) {
         if (!(i < src.len())) {
-            return err(
-                LexError {
-                    message: "unterminated template literal interpolation",
-                    span: open..open + 1,
-                },
-            );
+            return err(LexError {
+                message: "unterminated template literal interpolation",
+                span: open..open + 1,
+            });
         };
         if (depth == 1 && src[i] == some('}')) {
             set depth = 0;
@@ -986,9 +980,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let nest = [ws, TokenRule { matcher: Nested("/*", "*/"), emit: Of(Block) }, ident];
     let blk = [ws, TokenRule { matcher: Between("/*", "*/"), emit: Of(Block) }, ident];
     assert(
-        lex("/* a /* b */ c */x", nest)? == toks(
-            [tok(Block(" a /* b */ c "), 0, 17), tok(Ident("x"), 17, 18)],
-        ),
+        lex("/* a /* b */ c */x", nest)? == toks([
+            tok(Block(" a /* b */ c "), 0, 17),
+            tok(Ident("x"), 17, 18),
+        ]),
     );
     assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
     assert(lex("/* a /* b */", blk)? == toks([tok(Block(" a /* b "), 0, 12)]));
@@ -1032,9 +1027,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // Optional sign reaches the full range: i64::MIN parses (a positive run of the
     // same magnitude would overflow), one past it does not.
     assert(
-        lex("-9223372036854775808", ints)? == toks(
-            [tok(IntTok(0 - 9223372036854775807 - 1), 0, 20)],
-        ),
+        lex("-9223372036854775808", ints)? == toks([
+            tok(IntTok(0 - 9223372036854775807 - 1), 0, 20),
+        ]),
     );
     assert(
         lex("-9223372036854775809", ints) == err(lex_err("integer literal overflows i64", 0, 20)),
@@ -1051,9 +1046,11 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         minus,
     ];
     assert(
-        lex("`v{-5}`", tpls_signed)? == toks(
-            [tok(TplHead("v"), 0, 3), tok(IntTok(-5), 3, 5), tok(TplTail(""), 6, 7)],
-        ),
+        lex("`v{-5}`", tpls_signed)? == toks([
+            tok(TplHead("v"), 0, 3),
+            tok(IntTok(-5), 3, 5),
+            tok(TplTail(""), 6, 7),
+        ]),
     );
 
     // Float before int: a fraction/exponent extends a digit run; a bare run
@@ -1072,20 +1069,20 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let tpls = [ws, tpl, ident, digits];
     assert(lex("`hi`", tpls)? == toks([tok(Tpl("hi"), 0, 4)]));
     assert(
-        lex("`a{x}b`", tpls)? == toks(
-            [tok(TplHead("a"), 0, 3), tok(Ident("x"), 3, 4), tok(TplTail("b"), 5, 7)],
-        ),
+        lex("`a{x}b`", tpls)? == toks([
+            tok(TplHead("a"), 0, 3),
+            tok(Ident("x"), 3, 4),
+            tok(TplTail("b"), 5, 7),
+        ]),
     );
     assert(
-        lex("`{x}{y}`", tpls)? == toks(
-            [
-                tok(TplHead(""), 0, 2),
-                tok(Ident("x"), 2, 3),
-                tok(TplMid(""), 4, 5),
-                tok(Ident("y"), 5, 6),
-                tok(TplTail(""), 7, 8),
-            ],
-        ),
+        lex("`{x}{y}`", tpls)? == toks([
+            tok(TplHead(""), 0, 2),
+            tok(Ident("x"), 2, 3),
+            tok(TplMid(""), 4, 5),
+            tok(Ident("y"), 5, 6),
+            tok(TplTail(""), 7, 8),
+        ]),
     );
     // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
     assert(lex("`a\\{b`", tpls)? == toks([tok(Tpl("a{b"), 0, 6)]));
@@ -1097,21 +1094,21 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let rbrace = TokenRule { matcher: Exact("}"), emit: Bare(Punct) };
     let tplb = [ws, tpl, lbrace, rbrace, ident, digits];
     assert(
-        lex("`a{ {x} }b`", tplb)? == toks(
-            [
-                tok(TplHead("a"), 0, 3),
-                tok(Punct, 4, 5),
-                tok(Ident("x"), 5, 6),
-                tok(Punct, 6, 7),
-                tok(TplTail("b"), 9, 11),
-            ],
-        ),
+        lex("`a{ {x} }b`", tplb)? == toks([
+            tok(TplHead("a"), 0, 3),
+            tok(Punct, 4, 5),
+            tok(Ident("x"), 5, 6),
+            tok(Punct, 6, 7),
+            tok(TplTail("b"), 9, 11),
+        ]),
     );
     // Templates nest: an inner template between head and tail.
     assert(
-        lex("`a{`x`}b`", tpls)? == toks(
-            [tok(TplHead("a"), 0, 3), tok(Tpl("x"), 3, 6), tok(TplTail("b"), 7, 9)],
-        ),
+        lex("`a{`x`}b`", tpls)? == toks([
+            tok(TplHead("a"), 0, 3),
+            tok(Tpl("x"), 3, 6),
+            tok(TplTail("b"), 7, 9),
+        ]),
     );
     // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
     let raw3 = TokenRule {
@@ -1121,9 +1118,11 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let tpl2 = [ws, raw3, tpl, ident, digits];
     assert(lex("```a`b\\c```", tpl2)? == toks([tok(RawTpl("a`b\\c"), 0, 11)]));
     assert(
-        lex("```a{x}b```", tpl2)? == toks(
-            [tok(RawTplHead("a"), 0, 5), tok(Ident("x"), 5, 6), tok(RawTplTail("b"), 7, 11)],
-        ),
+        lex("```a{x}b```", tpl2)? == toks([
+            tok(RawTplHead("a"), 0, 5),
+            tok(Ident("x"), 5, 6),
+            tok(RawTplTail("b"), 7, 11),
+        ]),
     );
 
     // TrySeg: a fallible segment emit (`checked_seg`) validates each segment; a
@@ -1232,18 +1231,19 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 274940
-binary size: 1754408
-  code: 1099276
-  data: 8092
-  metadata: 647040
+instructions executed: 277103
+binary size: 1754864
+  code: 1099560
+  data: 8132
+  metadata: 647172
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam27
 __builtin_count_while$char$s0$lam32
 __builtin_count_while$char$s0$lam34
-__builtin_count_while$char$s0$lam47
+__builtin_count_while$char$s0$lam49
 __builtin_int_parse
 __builtin_is_some_and$char$lam33
+__builtin_opt_left_fold$char$i64$s0$lam38
 __lambda_0
 __lambda_1
 __lambda_10
@@ -1260,6 +1260,7 @@ __lambda_2
 __lambda_20
 __lambda_21
 __lambda_3
+__lambda_37
 __lambda_4
 __lambda_5
 __lambda_6

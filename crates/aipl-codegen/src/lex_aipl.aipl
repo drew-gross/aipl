@@ -470,9 +470,10 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // An unterminated block comment is a hard error spanning the open `/*` to the
     // end of source, matching the Rust lexer.
     assert(
-        lex_aipl("a /* never closed") == err(
-            LexError { message: "unterminated block comment", span: 2..17 },
-        ),
+        lex_aipl("a /* never closed") == err(LexError {
+            message: "unterminated block comment",
+            span: 2..17,
+        }),
     );
 
     // A string literal with escapes: the source is `s = "a\nb"` (a literal
@@ -526,9 +527,10 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // the error spans the *entire* literal (7..17 here) — the caret underlines
     // the whole mistake, not just the opening quote and first char.
     assert(
-        lex_aipl("oops = 'multiple'") == err(
-            LexError { message: "char literal must contain exactly one character", span: 7..17 },
-        ),
+        lex_aipl("oops = 'multiple'") == err(LexError {
+            message: "char literal must contain exactly one character",
+            span: 7..17,
+        }),
     );
 
     // A template literal with no interpolation lexes as one `StrLit` with
@@ -570,9 +572,10 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // and the library attaches the literal's span. Overflow policy is the
     // consumer's — the lexer library never parses ints itself.
     assert(
-        lex_aipl("99999999999999999999") == err(
-            LexError { message: "integer literal overflows i64", span: 0..20 },
-        ),
+        lex_aipl("99999999999999999999") == err(LexError {
+            message: "integer literal overflows i64",
+            span: 0..20,
+        }),
     );
 })
 
@@ -637,22 +640,24 @@ allocations: 4595
 deallocations: 4595
 reallocations: 0
 bytes allocated: 269736
-instructions executed: 759056
-binary size: 198264
-  code: 124092
-  data: 7068
-  metadata: 67104
+instructions executed: 759259
+binary size: 198720
+  code: 124376
+  data: 7100
+  metadata: 67244
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam15
-__builtin_count_while$char$s0$lam26
-__builtin_count_while$char$s0$lam31
+__builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam28
 __builtin_count_while$char$s0$lam33
-__builtin_count_while$char$s0$lam34
+__builtin_count_while$char$s0$lam35
 __builtin_count_while$char$s0$lam36
+__builtin_count_while$char$s0$lam38
 __builtin_int_parse
-__builtin_is_some_and$char$lam32
+__builtin_is_some_and$char$lam34
+__builtin_opt_left_fold$char$i64$s0$lam13
 __lambda_0
 __lambda_1
+__lambda_12
 __lambda_2
 __lambda_3
 __lambda_4
@@ -679,7 +684,7 @@ __m3__process_raw_string
 __m7__trim_prefix
 __m8__trim_suffix
 __m9__strip_test_sections
-__map17$own0
+__map19$own0
 __test$lex_aipl
 __test$lex_aipl_stripped
 __test$lex_aipl_tokens

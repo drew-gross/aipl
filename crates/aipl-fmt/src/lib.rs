@@ -930,14 +930,12 @@ impl<'s> Walker<'s> {
                         ]));
                     }
                     self.expect("(")?;
+                    let hug = self.hugs_sole_arg();
                     let args = self.call_args_until(")")?;
                     self.expect(")")?;
                     self.expect(";")?;
-                    return Ok(concat(vec![
-                        text(format!("set {path}")),
-                        self.comma_list_docs(args, ListStyle::Parens),
-                        text(";"),
-                    ]));
+                    let list = self.call_arg_list(args, hug);
+                    return Ok(concat(vec![text(format!("set {path}")), list, text(";")]));
                 }
                 self.expect("=")?;
                 let value = self.expr()?;
@@ -1086,12 +1084,11 @@ impl<'s> Walker<'s> {
                     let member = self.bump().to_string();
                     if self.peek_text() == "(" {
                         self.bump();
+                        let hug = self.hugs_sole_arg();
                         let args = self.call_args_until(")")?;
                         self.expect(")")?;
-                        let d = concat(vec![
-                            text(format!(".{member}")),
-                            self.comma_list_docs(args, ListStyle::Parens),
-                        ]);
+                        let list = self.call_arg_list(args, hug);
+                        let d = concat(vec![text(format!(".{member}")), list]);
                         segs.push((true, d));
                     } else {
                         segs.push((false, text(format!(".{member}"))));
@@ -1240,12 +1237,11 @@ impl<'s> Walker<'s> {
                 let name = self.bump().to_string();
                 if self.peek_text() == "(" {
                     self.bump();
+                    let hug = self.hugs_sole_arg();
                     let args = self.call_args_until(")")?;
                     self.expect(")")?;
-                    Ok(concat(vec![
-                        text(name),
-                        self.comma_list_docs(args, ListStyle::Parens),
-                    ]))
+                    let list = self.call_arg_list(args, hug);
+                    Ok(concat(vec![text(name), list]))
                 } else if self.peek_text() == "{" {
                     // Struct construction `Name { field: value, .. }`.
                     self.bump();
@@ -1508,6 +1504,83 @@ impl<'s> Walker<'s> {
     }
 
     // ---------- shared list machinery ----------
+
+    /// Whether the call whose `(` was just consumed takes exactly one argument
+    /// that *is* a bracketed construct — a nested call, an array, a struct
+    /// literal, or a set/dict literal — filling the parens end to end.
+    ///
+    /// Such a call is *hugged*: the argument's own brackets carry the break, so
+    /// the nesting costs one indent level instead of one per layer.
+    ///
+    /// ```text
+    /// group(Concat([          //  not:  group(
+    ///     Text("("),          //            Concat(
+    ///     SoftLine,           //                [
+    /// ]))                     //                    Text("("),
+    /// ```
+    ///
+    /// A pure lookahead over the token stream — no parse state — so every call
+    /// site can ask before parsing its arguments. Declines when a comment sits
+    /// before the argument (it needs its own line, above the whole call).
+    fn hugs_sole_arg(&self) -> bool {
+        let ident = matches!(
+            self.peek_kind(),
+            Some(FmtTokenKind::Plain(TokenKind::Identifier))
+        );
+        // The candidate's opening bracket: `[`/`#{` open directly, `name(` and
+        // `name {` one token in.
+        let open_at = match self.peek_text() {
+            "[" | "#{" => self.pos,
+            _ if ident && matches!(self.peek_text_n(1), "(" | "{") => self.pos + 1,
+            _ => return false,
+        };
+        if self.comments.front().is_some_and(|c| {
+            self.toks
+                .get(self.pos)
+                .is_some_and(|(_, sp)| c.start < sp.start)
+        }) {
+            return false;
+        }
+        let tok = |i: usize| {
+            self.toks
+                .get(i)
+                .map(|(_, sp)| &self.src[sp.clone()])
+                .unwrap_or("")
+        };
+        // Walk to the bracket that closes `open_at`.
+        let mut depth = 0usize;
+        let mut i = open_at;
+        while i < self.toks.len() {
+            match tok(i) {
+                "(" | "[" | "{" | "#{" => depth += 1,
+                ")" | "]" | "}" => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        // Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that
+        // runs all the way to the call's own `)` — otherwise the argument is a
+        // larger expression that merely starts with a bracketed one. Source
+        // that is *already* broken has a trailing comma after the argument, so
+        // step over one.
+        let after = if tok(i + 1) == "," { i + 2 } else { i + 1 };
+        depth == 0 && i > open_at + 1 && tok(after) == ")"
+    }
+
+    /// The `(..)` of a call: hugged when [`Self::hugs_sole_arg`] approved,
+    /// otherwise the ordinary comma list.
+    fn call_arg_list(&mut self, args: Vec<Doc>, hug: bool) -> Doc {
+        let mut args = args;
+        if hug && args.len() == 1 {
+            return concat(vec![text("("), args.remove(0), text(")")]);
+        }
+        self.comma_list_docs(args, ListStyle::Parens)
+    }
 
     /// Wrap pre-rendered list items in the agreed one-line-or-block shape.
     fn comma_list_docs(&mut self, items: Vec<Doc>, style: ListStyle) -> Doc {

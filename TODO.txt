@@ -173,25 +173,6 @@ My honest read: the dual-stream, span-driven design is well-chosen for a spellin
 
 Make sure recursive with backpointer structs work e.g. graphs (but also need to figure out how those work in a value-oriented langauge)
 
-formatter adjustment
-    let list = group(
-        Concat(
-            [
-                Text("("),
-                Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
-                SoftLine,
-                Text(")"),
-            ],
-        ),
-    );
-    becomes
-    let list = group(Concat([
-        Text("("),
-        Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
-        SoftLine,
-        Text(")"),
-    ]));
-
 PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working
 tree, full-suite gate never passed. Stopped after test cases started taking far too
 long and an infinite loop was suspected.

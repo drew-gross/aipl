@@ -1,0 +1,90 @@
+import { wrapping_add as +, ==, len } from builtins;
+struct Cfg { name: str, tags: str[] }
+variant Doc = Text(str) | Concat(Doc[]) | Line
+fn group(self: Doc) -> Doc { self }
+fn take(d: Doc, e: Doc) -> Doc { d }
+fn sizes(xs: i64[]) -> i64 { xs.len() }
+fn named(c: Cfg) -> str { c.name }
+fn main() {
+    // A single bracketed argument hugs, however deep the nesting.
+    let list = group(Concat([Text("("), Text("aaaaaaaaaaaaaaaaaaaaaa"), Line, Text("bbbbbbbbbbbbbbbbbbbbbbbb"), Text(")")]));
+    // Already-broken source (trailing comma after the argument) hugs too.
+    let again = group(
+        Concat(
+            [
+                Text("("),
+                Text("aaaaaaaaaaaaaaaaaaaaaa"),
+                Line,
+                Text("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                Text(")"),
+            ],
+        ),
+    );
+    // A struct literal argument hugs on the same rule.
+    let name = named(Cfg { name: "a name long enough to force the whole call to break", tags: ["alpha", "beta"] });
+    // A method-call segment hugs its sole bracketed argument as well.
+    let n = [1, 2].sizes([111111111, 222222222, 333333333, 444444444, 555555555, 666666666, 777777]);
+    // Not hugged: two arguments.
+    let c2 = take(Text("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Text("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"));
+    // Not hugged: the argument only *starts* bracketed, it isn't the whole thing.
+    let m = sizes([1111111111, 2222222222, 3333333333, 4444444444, 5555555555, 66666666] + [7777]);
+    // Not hugged: nothing inside to hug.
+    let e = sizes([]);
+}
+--- formatted ---
+import { ==, len, wrapping_add as + } from builtins;
+
+struct Cfg { name: str, tags: str[] }
+
+variant Doc = Text(str) | Concat(Doc[]) | Line
+
+fn group(self: Doc) -> Doc { self }
+
+fn take(d: Doc, e: Doc) -> Doc { d }
+
+fn sizes(xs: i64[]) -> i64 { xs.len() }
+
+fn named(c: Cfg) -> str { c.name }
+
+fn main() {
+    // A single bracketed argument hugs, however deep the nesting.
+    let list = group(Concat([
+        Text("("),
+        Text("aaaaaaaaaaaaaaaaaaaaaa"),
+        Line,
+        Text("bbbbbbbbbbbbbbbbbbbbbbbb"),
+        Text(")"),
+    ]));
+    // Already-broken source (trailing comma after the argument) hugs too.
+    let again = group(Concat([
+        Text("("),
+        Text("aaaaaaaaaaaaaaaaaaaaaa"),
+        Line,
+        Text("bbbbbbbbbbbbbbbbbbbbbbbb"),
+        Text(")"),
+    ]));
+    // A struct literal argument hugs on the same rule.
+    let name = named(Cfg {
+        name: "a name long enough to force the whole call to break",
+        tags: ["alpha", "beta"],
+    });
+    // A method-call segment hugs its sole bracketed argument as well.
+    let n = [1, 2].sizes([
+        111111111,
+        222222222,
+        333333333,
+        444444444,
+        555555555,
+        666666666,
+        777777,
+    ]);
+    // Not hugged: two arguments.
+    let c2 = take(
+        Text("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+        Text("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    );
+    // Not hugged: the argument only *starts* bracketed, it isn't the whole thing.
+    let m = sizes([1111111111, 2222222222, 3333333333, 4444444444, 5555555555, 66666666] + [7777]);
+    // Not hugged: nothing inside to hug.
+    let e = sizes([]);
+}

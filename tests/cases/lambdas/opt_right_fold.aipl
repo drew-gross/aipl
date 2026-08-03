@@ -29,6 +29,22 @@ fn to_list_keeps_order() -> List? { to_list([1, 2]) }.test({
     assert([1, 2].opt_right_fold(0, |x, acc| some(x + acc + bump)) == some(23)); // a capture
 })
 --- performance ---
-?
+allocations: 25
+deallocations: 25
+reallocations: 0
+bytes allocated: 1264
+instructions executed: 2744
+binary size: 10920
+  code: 6128
+  data: 630
+  metadata: 4162
 --- monomorphizations ---
-?
+__builtin_opt_left_fold$str$str$s1$lam3
+__builtin_opt_right_fold$i64$List$lam10
+__builtin_opt_right_fold$i64$i64$lam5
+__builtin_opt_right_fold$i64$i64$lam8
+__builtin_opt_right_fold$str$str$s1$lam1
+__lambda_9
+__test$to_list_keeps_order
+main
+to_list

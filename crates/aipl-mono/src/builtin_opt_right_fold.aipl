@@ -83,6 +83,27 @@ fn is_big(self: i64) -> bool { self == 99 }.test({
     assert(!is_big(1));
 })
 --- performance ---
-?
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 536
+instructions executed: 2403
+binary size: 10112
+  code: 5900
+  data: 854
+  metadata: 3358
 --- monomorphizations ---
-?
+__filter5$own0
+__lambda_10
+__lambda_8
+__test$opt_right_fold
+add
+is_big
+main
+opt_right_fold$i64$i64$lam1
+opt_right_fold$i64$i64$lam11
+opt_right_fold$i64$i64$lam14
+opt_right_fold$i64$i64$lam3
+opt_right_fold$i64$i64$lam4
+opt_right_fold$i64$i64$lam9
+opt_right_fold$str$str$s1$lam7

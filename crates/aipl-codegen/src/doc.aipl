@@ -252,16 +252,12 @@ fn cleanup(out: str) -> str {
     assert(print_doc(Concat([Text("a"), Text("b")]), 100) == "ab");
 
     // A group that fits stays flat: `Line` becomes a space, `SoftLine` nothing.
-    let list = group(
-        Concat(
-            [
-                Text("("),
-                Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
-                SoftLine,
-                Text(")"),
-            ],
-        ),
-    );
+    let list = group(Concat([
+        Text("("),
+        Indent(Concat([SoftLine, Text("a"), Text(","), Line, Text("b")])),
+        SoftLine,
+        Text(")"),
+    ]));
     assert(print_doc(list, 100) == "(a, b)");
 
     // The same group, too wide to fit, breaks at every `Line`/`SoftLine`, one
@@ -272,11 +268,12 @@ fn cleanup(out: str) -> str {
     assert(print_doc(group(Concat([Text("a"), HardLine, Text("b")])), 100) == "a\nb");
 
     // `IfBroken` text appears only when the group breaks.
-    let arr = group(
-        Concat(
-            [Text("["), Indent(Concat([SoftLine, Text("x"), IfBroken(",")])), SoftLine, Text("]")],
-        ),
-    );
+    let arr = group(Concat([
+        Text("["),
+        Indent(Concat([SoftLine, Text("x"), IfBroken(",")])),
+        SoftLine,
+        Text("]"),
+    ]));
     assert(print_doc(arr, 100) == "[x]");
     assert(print_doc(arr, 2) == "[\n    x,\n]");
 
