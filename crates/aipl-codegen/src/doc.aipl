@@ -149,7 +149,7 @@ fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
 // continue. Split out so the atom is computed once (a match arm is a single
 // expression).
 fn go_raw(width: u64, col: u64, sp: u64, s: str, rest: Work, acc: str[]) -> str[] {
-    let rendered = s.reindent_block(i64(sp));
+    let rendered = s.reindent_block(sp);
     go(width, col_after(col, rendered), rest, acc.pushed(rendered))
 }
 

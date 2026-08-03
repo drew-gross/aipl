@@ -3884,7 +3884,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
 }
 
 /// The dogfood-IR tag for an FFI-marshalable entry type. The FFI marshals
-/// scalars, `str`, `Unit` (the empty-payload side of a `Result`), optionals of
+/// scalars (any integer width, `bool`, `char`), `str`, `Unit` (the empty-payload side of a `Result`), optionals of
 /// those (a trailing `?` per `Optional` layer, e.g. `str?`), results of those
 /// (`{ok}!{err}`, e.g. `unit!Error`), arrays (a trailing `[]`, e.g.
 /// `Token[]`), and structs/variants (the bare type name, e.g. `Span`, whose
@@ -3892,10 +3892,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
 /// Anything else can't cross the FFI and is rejected here.
 fn ffi_type_tag(t: &Type) -> Result<String, Error> {
     Ok(match t {
-        Type::Primitive(Primitive::I64) => "i64".to_string(),
-        Type::Primitive(Primitive::Bool) => "bool".to_string(),
-        Type::Primitive(Primitive::Char) => "char".to_string(),
-        Type::Primitive(Primitive::Str) => "str".to_string(),
+        // Every scalar the FFI marshals — any integer width (`i64`, `u64`, `u8`,
+        // …), `bool`, `char` — plus `str`. The tag is the type's own spelling,
+        // which `ffi_type_from_tag` reads back with `Primitive::from_name`.
+        Type::Primitive(p) if is_ffi_scalar(t) || is_str_repr(t) => p.name().to_string(),
         Type::Unit => "unit".to_string(),
         Type::Optional(inner) => format!("{}?", ffi_type_tag(inner)?),
         Type::Result(ok, err) => format!("{}!{}", ffi_type_tag(ok)?, ffi_type_tag(err)?),
@@ -3983,13 +3983,16 @@ fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
     if let Some(base) = tag.strip_suffix("[]") {
         return Ok(Type::Array(Box::new(ffi_type_from_tag(base)?)));
     }
-    Ok(match tag {
-        "i64" => Type::Primitive(Primitive::I64),
-        "bool" => Type::Primitive(Primitive::Bool),
-        "char" => Type::Primitive(Primitive::Char),
-        "str" => Type::Primitive(Primitive::Str),
-        "unit" => Type::Unit,
-        _ => Type::Named(tag.to_string()),
+    if tag == "unit" {
+        return Ok(Type::Unit);
+    }
+    // A primitive spelling (`i64`, `u32`, `bool`, `char`, `str`, …) is that
+    // primitive; anything else names a struct/variant. A user type can't collide
+    // here: in type position the parser already resolves a primitive spelling to
+    // the primitive, so a declaration of that name is unreachable as a type.
+    Ok(match Primitive::from_name(tag) {
+        Some(p) => Type::Primitive(p),
+        None => Type::Named(tag.to_string()),
     })
 }
 
@@ -5083,12 +5086,12 @@ impl Compilation {
     }
 }
 
-/// Whether `t` is a scalar the embedding FFI can marshal as a bare `i64`.
+/// Whether `t` is a scalar the embedding FFI can marshal as a bare `i64` — any
+/// integer width (each already canonicalized into an `i64` register at the ABI),
+/// `bool`, or `char`. A `u64` past `i64::MAX` round-trips by bit pattern, so the
+/// host sees it as a negative [`FfiValue::Int`].
 fn is_ffi_scalar(t: &Type) -> bool {
-    matches!(
-        t,
-        Type::Primitive(Primitive::I64 | Primitive::Bool | Primitive::Char)
-    )
+    is_int_ty(t) || matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
 }
 
 /// The [`StructLayout`] for `t` if it names a `struct` (not a variant), else

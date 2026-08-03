@@ -5196,8 +5196,13 @@ fn merge(a: Type, b: Type) -> Type {
     }
 }
 
-/// Names that can't be used as a type-parameter name.
-const RESERVED_TYPE_NAMES: &[&str] = &["i64", "bool", "char", "str", "any"];
+/// Names that can't be used as a type-parameter name: every primitive spelling
+/// (all integer widths, `bool`, `char`, `str`) plus `any`. In type position the
+/// parser resolves these to the primitive, so a type parameter named after one
+/// could never be referenced.
+const RESERVED_TYPE_NAMES: &[&str] = &[
+    "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "bool", "char", "str", "any",
+];
 
 /// A function is generic if it declares type parameters or uses anonymous
 /// `any` in a parameter.

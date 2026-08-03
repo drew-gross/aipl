@@ -17,7 +17,7 @@
 ; entry is_operator_name 44 str -> bool
 ; entry lex_aipl 55 str -> __m18__LexResult$__m19__AiplTok!__m18__LexError
 ; entry lex_aipl_stripped 57 str -> __m18__LexResult$__m19__AiplTok!__m18__LexError
-; entry reindent_block 86 str i64 -> str
+; entry reindent_block 86 str u64 -> str
 ; struct __tuple$str$str 16 _0@0:str _1@8:str
 ; struct __builtin_Span 16 start@0:i64 end@8:i64
 ; struct __m11__LineAt 24 line@0:i64 line_start@8:i64 line_end@16:i64

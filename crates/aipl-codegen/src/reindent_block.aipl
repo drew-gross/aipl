@@ -2,7 +2,9 @@
 // FFI (see `install_parser_hooks`) when emitting a verbatim `"""..."""` raw string
 // or triple-backtick template atom, to align its closing delimiter (and, for a
 // bare-delimiter block, its content) around the column the atom opened at. `base`
-// is that column (the opening line's indent).
+// is that column (the opening line's indent) — unsigned, matching the `usize` the
+// Rust caller holds; it is converted at the two `indent`/`repeat` calls, whose
+// builtin signatures take an `i64` count.
 import {
     !=,
     &&,
@@ -23,7 +25,7 @@ import { dedent } from "./dedent.aipl";
 import { indent } from "./indent.aipl";
 import { lines } from "./lines.aipl";
 
-pub fn reindent_block(self: str, base: i64) -> str {
+pub fn reindent_block(self: str, base: u64) -> str {
     let ls = self.lines();
     let n = ls.len();
     // A single-line atom (no interior newline) has nothing to re-lay-out.
@@ -52,13 +54,13 @@ pub fn reindent_block(self: str, base: i64) -> str {
     if (n > 2) {
         let content = ls[1..n - 1].join("\n");
         let body = if (opening == "\"\"\"" || opening == "```") {
-            content.dedent().indent(base + 4)
+            content.dedent().indent(i64(base) + 4)
         } else {
             content
         };
         set out = out +++ "\n" +++ body;
     };
-    out +++ "\n" +++ " ".repeat(base) +++ closing
+    out +++ "\n" +++ " ".repeat(i64(base)) +++ closing
 }.doc("""
     Re-lays-out a multi-line raw-string / template atom around `base` columns. The
     closing-delimiter line is re-indented to `base` — but only when it is whitespace
@@ -105,8 +107,8 @@ bytes allocated: 3580
 instructions executed: 5099
 binary size: 12592
   code: 5600
-  data: 1228
-  metadata: 5764
+  data: 1229
+  metadata: 5763
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam13
 __builtin_count_while$char$s0$lam3

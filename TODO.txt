@@ -181,6 +181,8 @@ len should return unsigned int
 
 narrower ints should take up less space
 
+add units to the language
+
 tools for debugging infinite loops
 
 PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working
