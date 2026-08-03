@@ -52,8 +52,10 @@ impl Default for FmtOptions {
     }
 }
 
-/// Format AIPL source to the canonical style. The input's trailing
-/// `--- section ---` blocks (if any) are preserved byte-for-byte; trailing
+/// Format AIPL source to the canonical style. The output always ends in
+/// exactly one newline (an empty program formats to just that). The input's
+/// trailing `--- section ---` blocks (if any) are preserved byte-for-byte —
+/// they follow that newline, and whatever they end with is theirs; trailing
 /// whitespace in the source portion is removed (the language rejects it, so
 /// fixing it can't change an accepted program's meaning).
 ///
@@ -90,13 +92,14 @@ pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
         ));
     }
 
+    // Exactly one trailing newline, always — including for an empty program.
+    // `doc::print` only preserves one if the layout happened to end with it,
+    // so normalize here: this is the formatter's guarantee, not the printer's.
     let mut out = doc::print(&d, opts.max_width);
     while out.ends_with('\n') {
         out.pop();
     }
-    if !out.is_empty() {
-        out.push('\n');
-    }
+    out.push('\n');
 
     // Safety net: the output must contain exactly the input's tokens and
     // comments (imports may be reordered, so compare as multisets). Any
@@ -104,9 +107,6 @@ pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
     verify_same_tokens(&cleaned, &out)?;
 
     if !sections.is_empty() {
-        if out.is_empty() {
-            out.push('\n');
-        }
         out.push_str(sections);
     }
     Ok(out)

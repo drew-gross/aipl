@@ -389,6 +389,30 @@ fn cli_fmt_and_check() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// The output always ends in exactly one newline, whatever the input did —
+/// a missing one is added, extras collapse to one, and an empty program
+/// formats to just that newline. Trailing `--- section ---` blocks are the
+/// exception: they ride along verbatim after it.
+#[test]
+fn always_ends_with_one_newline() {
+    setup();
+    let opts = FmtOptions::default();
+    let fmt = |src: &str| format_source(src, &opts).unwrap();
+
+    assert_eq!(fmt("fn main() {}"), "fn main() {}\n"); // none in the input
+    assert_eq!(fmt("fn main() {}\n\n\n"), "fn main() {}\n"); // extras collapse
+    assert_eq!(fmt(""), "\n"); // an empty program is still a newline
+    assert_eq!(fmt("\n\n"), "\n"); // ... as is a blank one
+    assert_eq!(fmt("// just a comment"), "// just a comment\n");
+
+    // The code half still ends with its newline when sections follow, and the
+    // sections keep their own bytes.
+    assert_eq!(
+        fmt("fn main() {}\n--- stdout ---\nhi\n"),
+        "fn main() {}\n--- stdout ---\nhi\n"
+    );
+}
+
 #[test]
 fn width_is_configurable() {
     setup();
