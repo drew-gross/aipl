@@ -21,7 +21,7 @@
 //! with user functions. Uninstantiated generic templates are simply dropped.
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     slice::from_ref,
     sync::OnceLock,
 };
@@ -1086,9 +1086,14 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     // Builtins implemented in AIPL join the generic templates under their
     // canonical `__builtin_*` names (which no user identifier can spell, so
     // nothing collides). Calls to them then specialize exactly like calls to
-    // a user generic.
-    for (name, g) in aipl_builtin_generics() {
-        generics.insert(name.clone(), g.clone());
+    // a user generic. Only the ones `program` can actually reach are pulled in —
+    // an unreachable one would be dropped as an uninstantiated template anyway,
+    // and parsing its source is the expensive part.
+    for name in aipl_builtin_demand(program) {
+        let g = &aipl_builtin(name)
+            .expect("a demanded name is an AIPL_BUILTIN_SOURCES entry")
+            .generic;
+        generics.insert(name.to_string(), g.clone());
     }
 
     // Own a copy of each concrete function so the demand-driven driver can pull
@@ -4899,24 +4904,93 @@ fn load_aipl_builtin_fn(src: &str) -> Function {
         .expect("an AIPL-implemented builtin source declares its builtin as pub fn")
 }
 
-/// [`AIPL_BUILTIN_SOURCES`] loaded and normalized once: canonical builtin name
-/// → generic template.
-fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
-    static GENERICS: OnceLock<HashMap<String, Generic>> = OnceLock::new();
-    GENERICS.get_or_init(|| {
+/// One [`AIPL_BUILTIN_SOURCES`] entry, loaded on first use: the generic
+/// template mono specializes calls through, and the signature-only declaration
+/// the checker and codegen's call-site registry resolve against (`.test`/`doc`
+/// stripped, renamed to the canonical `__builtin_*` name). Both come from the
+/// same `pub fn`, so a builtin's signature still lives in exactly one place.
+struct AiplBuiltin {
+    generic: Generic,
+    decl: Item,
+}
+
+/// [`AIPL_BUILTIN_SOURCES`] as a lookup by canonical name, each entry paired
+/// with an empty slot for its loaded form. Building this map parses *nothing*
+/// — the slot fills on the entry's first [`aipl_builtin`] lookup — so the cost
+/// of a builtin's source is paid only by a program that actually reaches it
+/// (see [`aipl_builtin_demand`]). Loading every entry eagerly used to dominate
+/// compile time: the sources total ~28 KB and the parser runs them through the
+/// dogfooded AIPL lexer.
+fn aipl_builtin_slots() -> &'static HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)> {
+    static SLOTS: OnceLock<HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)>> =
+        OnceLock::new();
+    SLOTS.get_or_init(|| {
         AIPL_BUILTIN_SOURCES
             .iter()
-            .map(|(canonical, src)| {
-                let f = load_aipl_builtin_fn(src);
-                let g = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
-                (canonical.to_string(), g)
-            })
+            .map(|(canonical, src)| (*canonical, (*src, OnceLock::new())))
             .collect()
     })
 }
 
-/// Signature-only AST declarations for the [`AIPL_BUILTIN_SOURCES`] builtins,
-/// under their canonical `__builtin_*` names, with `.test`/`doc` stripped. These
+/// The AIPL-implemented builtin named `canonical`, loading and normalizing its
+/// source on first request and reusing it thereafter. `None` if `canonical`
+/// isn't one of them (a native builtin, or a user function).
+fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
+    let (src, slot) = aipl_builtin_slots().get(canonical)?;
+    Some(slot.get_or_init(|| {
+        let f = load_aipl_builtin_fn(src);
+        let generic = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
+        let mut decl = f;
+        decl.name = canonical.to_string();
+        decl.test_body = None;
+        decl.doc = None;
+        AiplBuiltin {
+            generic,
+            decl: Item::Fn(decl),
+        }
+    }))
+}
+
+/// The AIPL-implemented builtins `program` can reach: every canonical
+/// `__builtin_*` name it calls or references, plus — transitively — the ones
+/// *those* builtins' bodies reach (`int_parse` calls `trim_while`, and so on).
+/// The loader has already rewritten every imported reference to its canonical
+/// name, so a plain walk over call and identifier names finds them all.
+///
+/// Only these get parsed. Returning the names rather than the loaded builtins
+/// keeps the callers (mono's `generics` map, codegen's decl list) free to look
+/// each one up in whatever form they need.
+pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
+    /// Record the builtin `e` names, if it names one and it's new. `pending`
+    /// collects the newly-seen ones, whose own bodies still need scanning.
+    fn discover(e: &Expr, needed: &mut BTreeSet<&'static str>, pending: &mut Vec<&'static str>) {
+        let name = match &e.kind {
+            ExprKind::Call(name, _, _) | ExprKind::Ident(name) => name,
+            _ => return,
+        };
+        if let Some((canonical, _)) = aipl_builtin_slots().get_key_value(name.as_str()) {
+            if needed.insert(canonical) {
+                pending.push(canonical);
+            }
+        }
+    }
+
+    let mut needed: BTreeSet<&'static str> = BTreeSet::new();
+    let mut pending: Vec<&'static str> = Vec::new();
+    aipl_syntax::each_expr(program, &mut |e| discover(e, &mut needed, &mut pending));
+    while let Some(name) = pending.pop() {
+        let body = &aipl_builtin(name)
+            .expect("a name only enters `pending` from the slot map")
+            .generic
+            .body;
+        aipl_syntax::each_subexpr(body, &mut |e| discover(e, &mut needed, &mut pending));
+    }
+    needed
+}
+
+/// Signature-only AST declarations for the AIPL-implemented builtins in
+/// `needed` (an [`aipl_builtin_demand`] result), under their canonical
+/// `__builtin_*` names, with `.test`/`doc` stripped. These
 /// let a consumer that would otherwise read [`aipl_syntax::BUILTIN_SIGNATURES`]
 /// (the checker's builtin decls, codegen's call-site signature registry) see an
 /// AIPL-implemented builtin's signature without it being duplicated there — the
@@ -4924,15 +4998,14 @@ fn aipl_builtin_generics() -> &'static HashMap<String, Generic> {
 /// body is kept (it type-checks — operators are native AST nodes, and calls to
 /// other builtins are already rewritten to their canonical names by the loader)
 /// so the decl is a complete, checkable function.
-pub fn aipl_builtin_sig_decls() -> Vec<Item> {
-    AIPL_BUILTIN_SOURCES
+pub fn aipl_builtin_sig_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
+    needed
         .iter()
-        .map(|(canonical, src)| {
-            let mut f = load_aipl_builtin_fn(src);
-            f.name = canonical.to_string();
-            f.test_body = None;
-            f.doc = None;
-            Item::Fn(f)
+        .map(|name| {
+            aipl_builtin(name)
+                .expect("a demanded name is an AIPL_BUILTIN_SOURCES entry")
+                .decl
+                .clone()
         })
         .collect()
 }
@@ -4944,14 +5017,14 @@ pub fn aipl_builtin_sig_decls() -> Vec<Item> {
 /// enqueued/specialized like a real [`Generic`], so only its `Signature` is
 /// kept (the body `normalize` produces alongside it is discarded). The
 /// AIPL-implemented builtins ([`AIPL_BUILTIN_SOURCES`]) aren't in
-/// `BUILTIN_SIGNATURES`; their signatures are folded in from
-/// [`aipl_builtin_generics`] so return-type inference sees them too.
+/// `BUILTIN_SIGNATURES` at all — [`builtin_sig`] falls back to their own source
+/// so return-type inference still sees them.
 fn builtin_sigs() -> &'static HashMap<String, Signature> {
     static SIGS: OnceLock<HashMap<String, Signature>> = OnceLock::new();
     SIGS.get_or_init(|| {
         let program =
             aipl_parser::parse(BUILTIN_SIGNATURES).expect("builtin signatures are valid AIPL");
-        let mut sigs: HashMap<String, Signature> = program
+        program
             .items
             .into_iter()
             .filter_map(|item| match item {
@@ -4962,12 +5035,18 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
                 }
                 _ => None,
             })
-            .collect();
-        for (name, g) in aipl_builtin_generics() {
-            sigs.insert(name.clone(), g.sig.clone());
-        }
-        sigs
+            .collect()
     })
+}
+
+/// The declared signature of the builtin `name`: from [`BUILTIN_SIGNATURES`]
+/// for a native builtin, or from its own `.aipl` source for an
+/// AIPL-implemented one (loaded on demand — a program that never mentions the
+/// builtin never parses it). `None` if `name` isn't a builtin at all.
+fn builtin_sig(name: &str) -> Option<&'static Signature> {
+    builtin_sigs()
+        .get(name)
+        .or_else(|| aipl_builtin(name).map(|b| &b.generic.sig))
 }
 
 /// If `param_ty` binds type variable `v` (directly, or nested in a container:
@@ -5016,7 +5095,7 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// declared there (an internal/synthetic name, or one of `builtin_return`'s
 /// own special cases).
 fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
-    let sig = builtin_sigs().get(name)?;
+    let sig = builtin_sig(name)?;
     let mut map: HashMap<String, Type> = HashMap::new();
     for tp in &sig.type_vars {
         // Prefer the first parameter whose argument concretely pins `v`;

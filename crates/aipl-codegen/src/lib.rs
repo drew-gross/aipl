@@ -7,7 +7,7 @@
 
 use std::{
     cell::{Cell, RefCell},
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     path::Path,
     rc::Rc,
 };
@@ -2687,31 +2687,45 @@ pub struct Compilation {
 /// AIPL-implemented builtins aren't in that constant — their signatures come
 /// straight from their `.aipl` source via [`aipl_mono::aipl_builtin_sig_decls`],
 /// so a builtin's signature lives in exactly one place.
-fn builtin_decls() -> Vec<Item> {
-    let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
-        .expect("builtin signatures are valid AIPL");
-    program
-        .items
-        .into_iter()
-        .map(|item| match item {
-            Item::Fn(mut f) => {
-                f.is_pub = true;
-                Item::Fn(f)
-            }
-            other => other,
-        })
-        .chain(aipl_mono::aipl_builtin_sig_decls())
+fn builtin_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
+    native_builtin_decls()
+        .iter()
+        .cloned()
+        .chain(aipl_mono::aipl_builtin_sig_decls(needed))
         .collect()
+}
+
+/// The [`BUILTIN_SIGNATURES`] half of [`builtin_decls`], parsed once. Every
+/// compile reads it three times (checker decls, the call-site signature
+/// registry, the struct decls), and it is a fixed constant, so the parse is
+/// cached rather than repeated.
+fn native_builtin_decls() -> &'static [Item] {
+    static DECLS: std::sync::OnceLock<Vec<Item>> = std::sync::OnceLock::new();
+    DECLS.get_or_init(|| {
+        let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
+            .expect("builtin signatures are valid AIPL");
+        program
+            .items
+            .into_iter()
+            .map(|item| match item {
+                Item::Fn(mut f) => {
+                    f.is_pub = true;
+                    Item::Fn(f)
+                }
+                other => other,
+            })
+            .collect()
+    })
 }
 
 /// The `struct` declarations among [`BUILTIN_SIGNATURES`] (e.g. `__builtin_Span`,
 /// `__builtin_ExecResult`) — the builtin *types*, as opposed to the builtin
 /// function signatures that make up the rest of that constant.
 fn builtin_struct_decls() -> Vec<StructDecl> {
-    builtin_decls()
-        .into_iter()
+    native_builtin_decls()
+        .iter()
         .filter_map(|item| match item {
-            Item::Struct(s) => Some(s),
+            Item::Struct(s) => Some(s.clone()),
             _ => None,
         })
         .collect()
@@ -3470,6 +3484,13 @@ fn compile_program<M: Module>(
     // codegen as one. Prepend them to the actual compiled program (not just
     // the checker-only view below) so `build_struct_layouts` and mono's own
     // struct table see them regardless of which file (if any) imports them.
+    //
+    // The AIPL-implemented builtins this program can reach, computed once here
+    // and passed to everything that needs their declarations. Each one costs a
+    // parse of its `.aipl` source, so the ones the program never mentions are
+    // never loaded. Taken from the program as handed in — the lowering passes
+    // below rewrite expressions but never introduce a new builtin call.
+    let needed = aipl_mono::aipl_builtin_demand(program);
     let program = &Program {
         items: builtin_struct_decls()
             .into_iter()
@@ -3510,7 +3531,7 @@ fn compile_program<M: Module>(
     // harmlessly — the checker's struct map is a plain overwrite-on-insert, not an
     // error, on a duplicate name).
     let lowered_builtins = aipl_mono::lower_tuples(&Program {
-        items: builtin_decls(),
+        items: builtin_decls(&needed),
     });
     let check_program = Program {
         items: lowered_builtins
@@ -3551,7 +3572,7 @@ fn compile_program<M: Module>(
 
     // Register builtin signatures/types so user code can `print("...")`. The
     // actual `aipl_*` imports are declared lazily on first use (see `Builtins`).
-    let builtins = register_builtins(&mut funcs);
+    let builtins = register_builtins(&mut funcs, &needed);
 
     // Monomorphization has already split each function into the instances the
     // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
@@ -6378,7 +6399,10 @@ impl Builtins {
     }
 }
 
-fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
+fn register_builtins(
+    funcs: &mut HashMap<String, FuncInfo>,
+    needed: &BTreeSet<&'static str>,
+) -> Builtins {
     // Record the call-site-resolved builtins in `funcs` for type-checking and
     // method resolution. None are *declared* here — each `aipl_*` import is
     // declared lazily by `Builtins::id` on first reference (see the `Builtins`
@@ -6409,7 +6433,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
     // runtime symbol is given here (mostly `__builtin_X` -> `aipl_X`, but e.g.
     // `split` -> `aipl_str_split`). Each is intercepted by a custom codegen arm, so
     // this `funcs` entry is only for call-site arg type-checking / method resolution.
-    let decls = builtin_decls();
+    let decls = builtin_decls(needed);
     let sig: HashMap<&str, &AstFn> = decls
         .iter()
         .filter_map(|it| match it {

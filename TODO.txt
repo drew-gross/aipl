@@ -187,6 +187,13 @@ The test sharding strategy isn't working so hot anymore each shard takes a long 
 
 make repeat and indent accept unsigned int
 
+more retain elision (for arguments to functions that don't change the ref count)
+
+dead code elimination
+constant folding
+loop invariant/match invariant code motion
+the lexer still wants a real dispatch structure — a first-char jump table over rules rather than a linear scan — since it's the thing every parse in the corpus pays for.
+
 tools for debugging infinite loops
 
 PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working

@@ -1423,6 +1423,94 @@ pub fn builtin_type_canonical(name: &str) -> Option<String> {
     }
 }
 
+/// Visit every expression in `program` — function bodies, `.test` blocks, and
+/// keyword-parameter / struct-field default expressions — pre-order.
+pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
+    for item in &program.items {
+        match item {
+            ast::Item::Fn(func) => {
+                for p in &func.sig.params {
+                    if let Some(d) = &p.default {
+                        each_subexpr(d, f);
+                    }
+                }
+                each_subexpr(&func.body, f);
+                if let Some(t) = &func.test_body {
+                    each_subexpr(t, f);
+                }
+            }
+            ast::Item::Struct(s) => {
+                for field in &s.fields {
+                    if let Some(d) = &field.default {
+                        each_subexpr(d, f);
+                    }
+                }
+            }
+            ast::Item::Variant(_) | ast::Item::Import(_) => {}
+        }
+    }
+}
+
+/// Visit `e` and every expression nested inside it, pre-order.
+pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
+    use ast::ExprKind as K;
+    f(e);
+    match &e.kind {
+        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {}
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+            for a in args {
+                each_subexpr(a, f);
+            }
+        }
+        K::Construct(_, inits) => {
+            for init in inits {
+                each_subexpr(&init.value, f);
+            }
+        }
+        K::DictLit(pairs) => {
+            for (k, v) in pairs {
+                each_subexpr(k, f);
+                each_subexpr(v, f);
+            }
+        }
+        K::Binop(a, _, b)
+        | K::Seq(a, b)
+        | K::Index(a, b)
+        | K::Let(_, a, b)
+        | K::LetMut(_, a, b)
+        | K::For(_, a, b)
+        | K::While(a, b) => {
+            each_subexpr(a, f);
+            each_subexpr(b, f);
+        }
+        K::Assign(a, b, c) | K::If(a, b, c) => {
+            each_subexpr(a, f);
+            each_subexpr(b, f);
+            each_subexpr(c, f);
+        }
+        K::Neg(x)
+        | K::Not(x)
+        | K::Field(x, _)
+        | K::Try(x)
+        | K::Return(x)
+        | K::KwArg(_, x)
+        | K::Lambda(_, x) => each_subexpr(x, f),
+        K::Match(scrutinee, arms) => {
+            each_subexpr(scrutinee, f);
+            for arm in arms {
+                each_subexpr(&arm.body, f);
+            }
+        }
+        K::Slice(a, b, c) => {
+            each_subexpr(a, f);
+            each_subexpr(b, f);
+            if let Some(c) = c {
+                each_subexpr(c, f);
+            }
+        }
+    }
+}
+
 /// Lints: *squelchable* errors. AIPL has no warnings — every diagnostic is an
 /// error and fails the compile — but the errors this module produces (and only
 /// these) can be squelched by appending `#[allow]` to the offending line. The
@@ -1435,8 +1523,8 @@ pub fn builtin_type_canonical(name: &str) -> Option<String> {
 /// file right after parsing (the markers come from the lexer via
 /// `parse_with_allows`), so lints fire before type checking.
 pub mod lint {
-    use super::ast::{Expr, ExprKind, Item, Program};
-    use super::{Error, Span};
+    use super::ast::{Expr, ExprKind, Program};
+    use super::{each_expr, Error, Span};
 
     /// Run every lint over `program` — function bodies, `.test` blocks, and
     /// keyword-parameter / struct-field default expressions — then drop the
@@ -1568,92 +1656,6 @@ pub mod lint {
                 ),
                 init.value.span.clone(),
             ));
-        }
-    }
-
-    /// Visit every expression in the program, pre-order.
-    fn each_expr(program: &Program, f: &mut impl FnMut(&Expr)) {
-        for item in &program.items {
-            match item {
-                Item::Fn(func) => {
-                    for p in &func.sig.params {
-                        if let Some(d) = &p.default {
-                            walk(d, f);
-                        }
-                    }
-                    walk(&func.body, f);
-                    if let Some(t) = &func.test_body {
-                        walk(t, f);
-                    }
-                }
-                Item::Struct(s) => {
-                    for field in &s.fields {
-                        if let Some(d) = &field.default {
-                            walk(d, f);
-                        }
-                    }
-                }
-                Item::Variant(_) | Item::Import(_) => {}
-            }
-        }
-    }
-
-    fn walk(e: &Expr, f: &mut impl FnMut(&Expr)) {
-        use ExprKind as K;
-        f(e);
-        match &e.kind {
-            K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {}
-            K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
-                for a in args {
-                    walk(a, f);
-                }
-            }
-            K::Construct(_, inits) => {
-                for init in inits {
-                    walk(&init.value, f);
-                }
-            }
-            K::DictLit(pairs) => {
-                for (k, v) in pairs {
-                    walk(k, f);
-                    walk(v, f);
-                }
-            }
-            K::Binop(a, _, b)
-            | K::Seq(a, b)
-            | K::Index(a, b)
-            | K::Let(_, a, b)
-            | K::LetMut(_, a, b)
-            | K::For(_, a, b)
-            | K::While(a, b) => {
-                walk(a, f);
-                walk(b, f);
-            }
-            K::Assign(a, b, c) | K::If(a, b, c) => {
-                walk(a, f);
-                walk(b, f);
-                walk(c, f);
-            }
-            K::Neg(x)
-            | K::Not(x)
-            | K::Field(x, _)
-            | K::Try(x)
-            | K::Return(x)
-            | K::KwArg(_, x)
-            | K::Lambda(_, x) => walk(x, f),
-            K::Match(scrutinee, arms) => {
-                walk(scrutinee, f);
-                for arm in arms {
-                    walk(&arm.body, f);
-                }
-            }
-            K::Slice(a, b, c) => {
-                walk(a, f);
-                walk(b, f);
-                if let Some(c) = c {
-                    walk(c, f);
-                }
-            }
         }
     }
 }
