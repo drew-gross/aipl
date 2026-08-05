@@ -1,0 +1,52 @@
+import { print, to_digit, value_or_err } from builtins;
+
+// `value_or_err` turns an optional into a result: `some(v)` -> `ok(v)`, `none`
+// -> `err(e)`. Unlike `value_or`, which substitutes a default and forgets that
+// anything was missing, it keeps the absence as a failure the caller can report.
+
+// Its main use is in front of `?`: each step's `none` becomes a message and
+// leaves the function, so the body reads as the happy path alone. Without it,
+// every step would need its own `match` on the optional.
+fn first_digit(s: str) -> i64!str {
+    ok(s[0].value_or_err("empty input")?.to_digit().value_or_err("not a digit")?)
+}
+
+fn describe(r: i64!str) -> str {
+    match (r) {
+        ok(v) => `digit {v}`,
+        err(e) => `error: {e}`,
+    }
+}
+
+fn main() !prints {
+    print(describe(first_digit("42"))); // some -> ok, carrying the value
+    print(describe(first_digit(""))); // the first `?` fires
+    print(describe(first_digit("x"))); // the second one does
+
+    // The error is any type, not just a message — here an i64 code. And the
+    // result is an ordinary value, so it needn't be propagated with `?`.
+    let code = match (""[0].value_or_err(404)) {
+        ok(c) => 0,
+        err(n) => n,
+    };
+    print(`code {code}`);
+}
+--- stdout ---
+digit 4
+error: empty input
+error: not a digit
+code 404
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 190
+instructions executed: 432
+binary size: 4032
+  code: 2012
+  data: 61
+  metadata: 1959
+--- monomorphizations ---
+describe
+first_digit
+main

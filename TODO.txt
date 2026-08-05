@@ -138,6 +138,8 @@ make a docs renderer
 
 Maybe address this later and unify formatter and parser lexing (maybe allow formatter to rewrite string literals for fewest escapes?):
 
+none.value_or_err doesn't type check. Maybe it should? Unclear.
+
 Why the formatter isn't already a thin wrapper
 
 The parser consumes decoded token values (StrLit(value, style)) because it only builds an AST — it never reproduces source. The formatter has the opposite obligation: reproduce every token's source spelling byte-for-byte. That's lossy from the value:

@@ -1205,7 +1205,8 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
-// NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, and `trim_while` are
+// NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, `trim_while`, and
+// `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -1373,6 +1374,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "trim_while",
     "count_while",
     "value_or",
+    "value_or_err",
     "contains",
     "has",
     "read_file_to_string",

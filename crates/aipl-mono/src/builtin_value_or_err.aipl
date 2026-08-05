@@ -1,0 +1,113 @@
+import { ==, to_digit } from builtins;
+
+// The AIPL implementation of the `value_or_err` builtin: the bridge from the
+// optional world to the result world, and the `value_or` sibling that keeps a
+// message about the failure instead of erasing it. Monomorphization registers
+// this function under the canonical name `__builtin_value_or_err` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.value_or_err(e)`
+// specializes through the ordinary generic machinery — the in-file name
+// `value_or_err` is only for this file's own tests, which read exactly like
+// user code.
+//
+// The error is a plain value, so it's evaluated whether or not it's used (like
+// `value_or`'s default). Its main use is in front of `?`:
+// `let v = maybe(x).value_or_err("no value")?;`
+pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
+    match (self) {
+        some(v) => ok(v),
+        none => err(e),
+    }
+}.doc("""
+    Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes
+    `err(e)`. Generic over both the value and the error type, and callable as a
+    method: `x.value_or_err(e)`. `e` is evaluated either way. Pairs with `?` to
+    give a `none` a message and propagate it out of a result-returning function.
+""").test({
+    // some -> ok, none -> err(e).
+    assert(unwrap(maybe_int(true).value_or_err("absent"), 0) == 7);
+    assert(unwrap(maybe_int(false).value_or_err("absent"), -1) == -1);
+    assert(message(maybe_int(true).value_or_err("absent")) == "");
+    assert(message(maybe_int(false).value_or_err("absent")) == "absent");
+
+    // Free-call form.
+    assert(unwrap(value_or_err(maybe_int(true), "absent"), 0) == 7);
+
+    // A str value — a heap payload on the ok side, refcounted like any other.
+    assert(unwrap_str(maybe_str(true).value_or_err("absent"), "?") == "hi");
+    assert(unwrap_str(maybe_str(false).value_or_err("absent"), "?") == "?");
+
+    // The error type is generic too: an i64 code reads back as an i64.
+    assert(code(""[0].value_or_err(404)) == 404); // none -> err(404)
+    assert(code("a"[0].value_or_err(404)) == 0); // some('a') -> ok
+
+    // In front of `?`: the err propagates out of the enclosing function.
+    assert(unwrap(digit_of("7"), -1) == 7);
+    assert(message(digit_of("x")) == "not a digit");
+})
+
+// `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`
+// early carrying a message, so the body reads as the happy path alone.
+fn digit_of(s: str) -> i64!str {
+    ok(s[0].value_or_err("empty")?.to_digit().value_or_err("not a digit")?)
+}.test({
+    assert(unwrap(digit_of("42"), -1) == 4); // first char only
+    assert(message(digit_of("")) == "empty"); // the first `?` fires
+    assert(message(digit_of("x")) == "not a digit"); // the second one does
+})
+
+// Test helpers. The optionals come from functions rather than a bare `none`
+// literal so each one's element type is pinned by a declared return type.
+fn maybe_int(present: bool) -> i64? { if (present) { some(7) } else { none } }
+
+fn maybe_str(present: bool) -> str? { if (present) { some("hi") } else { none } }
+
+// Reading one side of a result at a time, since `==` doesn't span the two.
+fn unwrap(r: i64!str, default: i64) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => default,
+    }
+}
+
+fn unwrap_str(r: str!str, default: str) -> str {
+    match (r) {
+        ok(v) => v,
+        err(e) => default,
+    }
+}
+
+fn message(r: i64!str) -> str {
+    match (r) {
+        ok(v) => "",
+        err(e) => e,
+    }
+}
+
+fn code(r: char!i64) -> i64 {
+    match (r) {
+        ok(v) => 0,
+        err(e) => e,
+    }
+}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1211
+binary size: 9152
+  code: 4064
+  data: 1179
+  metadata: 3909
+--- monomorphizations ---
+code
+digit_of
+main
+maybe_int
+maybe_str
+message
+unwrap
+unwrap_str
+value_or_err$char$i64
+value_or_err$i64$str
+value_or_err$str$str

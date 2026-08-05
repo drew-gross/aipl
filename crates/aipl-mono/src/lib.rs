@@ -4882,6 +4882,10 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
         "__builtin_trim_while",
         include_str!("builtin_trim_while.aipl"),
     ),
+    (
+        "__builtin_value_or_err",
+        include_str!("builtin_value_or_err.aipl"),
+    ),
 ];
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real

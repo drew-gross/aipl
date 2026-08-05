@@ -1,7 +1,18 @@
 // A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
-import { &&, +++, <, ==, int_parse, join, len, split, wrapping_add as + } from builtins;
+import {
+    &&,
+    +++,
+    <,
+    ==,
+    int_parse,
+    join,
+    len,
+    split,
+    value_or_err,
+    wrapping_add as +,
+} from builtins;
 import {
     Bare,
     Between,
@@ -200,11 +211,10 @@ fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
 // this parses it — sign and all — with the `int_parse` builtin and, as a fallible
 // `Try` emit, reports an i64 overflow as an error message — the library attaches
 // the literal's span. Parsing policy lives here, in the consumer, not the library.
+// `int_parse`'s `none` becomes that message via `value_or_err`, and `?` hands it
+// straight back as this emit's `err`.
 fn int_lit(text: str) -> AiplTok!str {
-    match (text.int_parse()) {
-        some(v) => ok(IntLit(v)),
-        none => err("integer literal overflows i64"),
-    }
+    ok(IntLit(text.int_parse().value_or_err("integer literal overflows i64")?))
 }
 
 // Decode and validate a single-quote literal. This is where AIPL *defines* what
@@ -640,11 +650,11 @@ allocations: 4595
 deallocations: 4595
 reallocations: 0
 bytes allocated: 269736
-instructions executed: 759259
-binary size: 198720
-  code: 124376
+instructions executed: 759119
+binary size: 198560
+  code: 124296
   data: 7100
-  metadata: 67244
+  metadata: 67164
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam17
 __builtin_count_while$char$s0$lam28
