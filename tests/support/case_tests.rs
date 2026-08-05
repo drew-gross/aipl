@@ -560,6 +560,7 @@ case_tests! {
     crates_aipl_codegen_src_walker = "crates/aipl-codegen/src/walker",
     crates_aipl_mono_src_builtin_all = "crates/aipl-mono/src/builtin_all",
     crates_aipl_mono_src_builtin_any = "crates/aipl-mono/src/builtin_any",
+    crates_aipl_mono_src_builtin_count = "crates/aipl-mono/src/builtin_count",
     crates_aipl_mono_src_builtin_count_while = "crates/aipl-mono/src/builtin_count_while",
     crates_aipl_mono_src_builtin_int_parse = "crates/aipl-mono/src/builtin_int_parse",
     crates_aipl_mono_src_builtin_is_some_and = "crates/aipl-mono/src/builtin_is_some_and",

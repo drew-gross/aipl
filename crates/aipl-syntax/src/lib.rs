@@ -1415,6 +1415,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "is_digit",
     "to_digit",
     "trim_while",
+    "count",
     "count_while",
     "value_or",
     "value_or_err",

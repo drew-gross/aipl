@@ -112,6 +112,8 @@ instead of err_message use x == err(...)
 
 use template literals more than concat
 
+actually make push be a more normal function that does mutation the same way other functions do
+
 errors should contain stack traces
 first we need some actual infra for stack traces
 

@@ -1,0 +1,58 @@
+import { ++, ==, wrapping_add as + } from builtins;
+
+// The AIPL implementation of the `count` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_count` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count(x)` resolves
+// through the ordinary generic machinery — the in-file name `count` is only for
+// this file's own tests, which read exactly like user code.
+//
+// The counterpart of `count_while`, which counts a *leading run* matching a
+// predicate; this counts *every* element equal to a value, anywhere. Unsigned,
+// like `len`: a count is never negative.
+pub fn count<T: any>(self: T[], x: T) -> u64 {
+    mut n = u64(0);
+    for (let e : self) {
+        if (e == x) {
+            set n++;
+        };
+    }
+    n
+}.doc("""
+    Counts how many elements of `self` equal `x`, comparing with `==` (so strings
+    and chars compare by value). Generic over the element type and callable as a
+    method: `xs.count(x)`. A `str` receiver counts bytes, since `str` and `char[]`
+    share a representation: `s.count('\\n')` is the number of newlines in `s`.
+
+    See `count_while` for the leading-run-matching-a-predicate form.
+""").test({
+    assert([1, 2, 3, 2].count(2) == u64(2));
+    assert([1, 2, 3].count(9) == u64(0)); // absent
+    assert([].count(1) == u64(0)); // empty
+    assert([7, 7, 7].count(7) == u64(3)); // every element
+    assert(count([2, 2], 2) == u64(2)); // function-call form too
+
+    // Generic over the element type — the same definition serves char and str,
+    // and comparison is by value, not identity.
+    assert(['a', 'b', 'a'].count('a') == u64(2));
+    assert(["go", "stop", "go"].count("go") == u64(2));
+
+    // A `str` receiver counts bytes: `str` and `char[]` share a representation.
+    assert("a\nb\nc".count('\n') == u64(2));
+    assert("abc".count('\n') == u64(0));
+    assert("".count('\n') == u64(0));
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 332
+instructions executed: 1226
+binary size: 4664
+  code: 1852
+  data: 587
+  metadata: 2225
+--- monomorphizations ---
+__test$count
+count$char$s0
+count$i64
+main

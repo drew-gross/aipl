@@ -10,7 +10,7 @@
 // same shape `lexer.aipl`'s `StepResult` uses for its `end`. Reading the cursor
 // (`peek`, `at_end`, …) takes `W` by value and returns just the answer; advancing
 // it (`bump`, `expect`, `lead`, …) returns a carrier holding the moved-on `W`.
-import { !, &&, <, <=, ==, Span, contains, len, push, wrapping_add as + } from builtins;
+import { !, &&, <, <=, ==, Span, contains, count, len, push, wrapping_add as + } from builtins;
 import { BlankLine, BreakParent, Concat, Doc, HardLine, Text } from "./doc.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
@@ -156,19 +156,7 @@ fn next_start(self: W) -> i64 {
 
 // Whether the source between two offsets holds a blank line (two newlines).
 // (`lo`/`hi` where the Rust version says `from`/`to` — `from` is a keyword.)
-fn gap_has_blank(self: W, lo: i64, hi: i64) -> bool { 2 <= self.src[lo..hi].newline_count() }
-
-// Newlines in `self` — `str::matches('\n').count()` in the Rust version. Spelled
-// out because the `count_while` builtin stops at the first non-match.
-fn newline_count(self: str) -> u64 {
-    mut n = u64(0);
-    for (let c : self) {
-        if (c == '\n') {
-            set n = n + 1;
-        };
-    }
-    n
-}
+fn gap_has_blank(self: W, lo: i64, hi: i64) -> bool { 2 <= self.src[lo..hi].count('\n') }
 
 // Whether two offsets sit on the same source line.
 fn same_line(self: W, lo: i64, hi: i64) -> bool { !self.src[lo..hi].contains("\n") }
@@ -313,8 +301,6 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert(w.same_line(6, 8));
     assert(!w.same_line(0, 8)); // spans the newline after `// hi`
     assert(!w.gap_has_blank(0, 8)); // one newline is not a blank line
-    assert("a\n\nb".newline_count() == 2);
-    assert("abc".newline_count() == 0);
 
     // --- lead --------------------------------------------------------------
     // The leading `// hi` is drained and emitted with a hard line after it (the
@@ -329,6 +315,8 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     // A blank line after a comment is preserved as a `BlankLine` separator.
     let blank_src = "// hi\n\nfn f() {}";
     let bw = new_walker(blank_src, [FmtTok { kind: Keyword, span: 7..9 }], [0..5]);
+    // Two newlines in the gap after `// hi` — that *is* a blank line.
+    assert(bw.gap_has_blank(5, 7));
     assert(bw.lead().doc == Concat([Text("// hi"), BlankLine]));
 
     // --- trailing_comment ---------------------------------------------------
@@ -364,11 +352,11 @@ allocations: 67
 deallocations: 67
 reallocations: 0
 bytes allocated: 3295
-instructions executed: 10637
-binary size: 38272
-  code: 19744
-  data: 2620
-  metadata: 15908
+instructions executed: 10505
+binary size: 38064
+  code: 19716
+  data: 2556
+  metadata: 15792
 --- monomorphizations ---
 __test$pushed
 at_end
@@ -380,7 +368,6 @@ lead
 lead_loop
 main
 new_walker
-newline_count
 next_start
 peek
 peek_kind
