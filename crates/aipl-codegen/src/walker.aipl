@@ -94,13 +94,6 @@ fn peek_text_n(self: W, n: u64) -> str {
 
 fn peek_text(self: W) -> str { self.peek_text_n(0) }
 
-fn peek_kind(self: W) -> FmtKind? {
-    match (self.peek()) {
-        some(t) => some(t.kind),
-        none => none,
-    }
-}
-
 fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
 
 // Consume the token at the cursor, returning its text. The caller has already
@@ -278,7 +271,7 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     // --- token primitives -----------------------------------------------
     assert(w.peek_text() == "fn");
     assert(w.peek_text_n(1) == "f");
-    assert(w.peek_kind() == some(Keyword));
+    assert(w.peek()?.kind == Keyword);
     assert(!w.at_end());
 
     // `bump` advances and hands back the consumed text.
@@ -296,7 +289,7 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     }
     assert(end.at_end());
     assert(end.peek_text() == "");
-    assert(end.peek_kind() == none);
+    assert(end.peek() == none);
     assert(end.bump().text == "");
 
     // --- expect ----------------------------------------------------------
@@ -365,11 +358,11 @@ allocations: 72
 deallocations: 72
 reallocations: 0
 bytes allocated: 3480
-instructions executed: 10867
-binary size: 39336
-  code: 20412
-  data: 2676
-  metadata: 16248
+instructions executed: 10796
+binary size: 39592
+  code: 20524
+  data: 2660
+  metadata: 16408
 --- monomorphizations ---
 __test$pushed
 at_end
@@ -382,7 +375,6 @@ main
 new_walker
 next_start
 peek
-peek_kind
 peek_text
 peek_text_n
 pushed

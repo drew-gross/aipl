@@ -6,7 +6,7 @@ fn bad(o: i64?) -> i64 { o? + 1 }
 
 fn main() -> i64 { bad(some(5)) }
 --- errors ---
-error: "?" on an optional can only be used in a function that returns an optional
+error: "?" on an optional can only be used in a function that returns an optional, or in a test
  --> ./tests/cases/options/err_try_on_optional_needs_optional_return.aipl:5:26
   |
 5 | fn bad(o: i64?) -> i64 { o? + 1 }

@@ -3051,6 +3051,13 @@ pub extern "C" fn aipl_test_fail(_msg: *const u8) {
 }
 
 #[no_mangle]
+pub extern "C" fn aipl_test_fail_none() {
+    // `?` on a `none` inside a `.test`: mark the current test failed. The
+    // report is only printed by the JIT runtime under `aipl check`.
+    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+}
+
+#[no_mangle]
 pub extern "C" fn aipl_test_end() {
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
         TEST_FAILED.fetch_add(1, TestOrd::Relaxed);

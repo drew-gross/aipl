@@ -60,6 +60,9 @@ int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster
 
 make for (key, val) work for dicts, and also arrays (key=index)
 
+line numbers on test assertion failures, err/none propagations, etc.
+get claude to reorganize my todos
+
 error improvements:
 - import suggestions when missing an import
 - from its defining file -> list the filename
