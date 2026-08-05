@@ -70,22 +70,29 @@
 //! The runner walks `tests/cases/` recursively so cases can be grouped
 //! into subdirectories.
 //!
-//! For fast iteration, set `AIPL_CASE` to a path substring to run just the
-//! matching case(s) and skip the rest:
-//!   `AIPL_CASE=some_value cargo test --test cases`
-//!   `AIPL_CASE=options/ cargo test --test cases`
-//! A filtered run *always fails on purpose* — cargo hides passing tests'
-//! output, and failing also ensures a forgotten filter isn't mistaken for a
-//! green full suite. The output (and any real failures) is printed regardless.
+//! Every case is its own `#[test]`, named after its display path with the
+//! separators flattened (`cases/options/some_value` -> `cases_options_some_value`)
+//! — so libtest runs them in parallel, reports each by name, and its own filter
+//! is the fast-iteration tool:
+//!   `cargo test --test cases -- cases_options_some_value`
+//!   `cargo test --test cases -- cases_options`
+//! The test functions are checked in ([`CASE_TESTS_FILE`]) rather than discovered
+//! at run time, since `#[test]` is a compile-time thing; [`every_case_has_a_test`]
+//! fails if that list and the case files on disk have drifted apart, and names the
+//! helper that regenerates it.
 //!
 //! Two author-helper "refresh" modes are `#[ignore]`d tests (a normal `cargo
 //! test` skips them; opt in by name):
 //!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
 //!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
 //!     `performance`/`monomorphizations`/`check`/`errors`/`expect file`) with the
-//!     actual output. Combine with `AIPL_CASE` to target a subset.
+//!     actual output. Set `AIPL_CASE` to a path substring to target a subset —
+//!     this is the one mode that still reads it, since it is a single test and
+//!     libtest's filter can't reach inside it.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
+//!   - `cargo test --test cases -- --ignored fill_case_tests` — regenerate the
+//!     per-case `#[test]` list after adding or removing a case file.
 //!
 //! Each diverges (fails) when done so its summary is visible. The relevant
 //! failure messages (e.g. a `performance` mismatch) name the command to run.
@@ -123,14 +130,19 @@ fn scoped_fill_cmd(ctx: &str) -> String {
 }
 
 /// Build a **scoped** *run* command for one case's failure message: re-run just
-/// the offending case through this harness via `AIPL_CASE` (as opposed to
-/// [`scoped_fill_cmd`], which refreshes its sections). `ctx` is the bracketed
-/// display path (`[cases/foo/bar.aipl]`); stripping the brackets recovers the
-/// exact substring the `AIPL_CASE` filter matches on.
+/// the offending case (as opposed to [`scoped_fill_cmd`], which refreshes its
+/// sections). Each case is its own `#[test]`, so this is libtest's own name
+/// filter. `ctx` is the bracketed display path (`[cases/foo/bar]`).
 fn scoped_run_cmd(ctx: &str) -> String {
     let path = ctx.trim_start_matches('[').trim_end_matches(']');
-    format!("AIPL_CASE='{path}' cargo test --test cases")
+    format!(
+        "cargo test --test cases -- {}",
+        test_name_for(path.trim_end_matches(".aipl"))
+    )
 }
+
+/// The command that regenerates the per-case `#[test]` list ([`fill_case_tests`]).
+const CASE_TESTS_CMD: &str = "cargo test --test cases -- --ignored fill_case_tests";
 /// The command that runs the ignored perfmon-table refresh ([`refresh_perfmon`]).
 const PERFMON_CMD: &str = "cargo test --test cases -- --ignored refresh_perfmon";
 
@@ -297,24 +309,31 @@ macro_rules! fold_section {
     };
 }
 
-// The full case suite is the slowest part of the dev loop, so it's split into
-// `NUM_SHARDS` independent `#[test]` functions that libtest runs in parallel
-// (one per worker thread). Each shard handles the cases whose index is
-// `≡ shard (mod NUM_SHARDS)` — a round-robin partition that balances well
-// regardless of per-directory size. A filtered (`AIPL_CASE`) or fill-mode
-// run is consolidated into shard 0 alone, preserving the
-// single-shot dev-iteration semantics (one summary, one intentional failure).
-macro_rules! case_shards {
-    ($($name:ident = $idx:literal),+ $(,)?) => {
-        const NUM_SHARDS: usize = [$($idx),+].len();
+// One `#[test]` per case: libtest runs them in parallel on its own thread pool,
+// reports each by name, and filters them by name — so a failure points at the
+// case directly and a focused re-run needs no bespoke filter env var. The
+// invocation lists every case's test name alongside its display path, and
+// doubles as the declared set `every_case_has_a_test` checks the tree against.
+macro_rules! case_tests {
+    ($($name:ident = $display:literal),+ $(,)?) => {
+        /// Every case with a `#[test]`, as `(test name, display path)`. Kept in
+        /// the same order as the generated list, which is sorted by display path.
+        const DECLARED_CASES: &[(&str, &str)] = &[$((stringify!($name), $display)),+];
         $(
             #[test]
             fn $name() {
-                on_big_stack(|| run_shard($idx, false));
+                on_big_stack(|| run_one($display));
             }
         )+
     };
 }
+
+/// The checked-in [`case_tests!`] invocation — one `#[test]` per case. It lives
+/// in its own file (and outside `tests/`'s top level, so cargo doesn't compile
+/// it as a test target of its own) to keep this harness readable at 500+ cases.
+/// Regenerate it with the `fill_case_tests` helper.
+const CASE_TESTS_FILE: &str = "tests/support/case_tests.rs";
+include!("support/case_tests.rs");
 
 /// Run `f` on a 256 MB-stack worker, like the `aipl` CLI: compiling a library
 /// case's synthesized `.test` driver (and debug codegen generally) recurses
@@ -330,23 +349,121 @@ fn on_big_stack<F: FnOnce() + Send + 'static>(f: F) {
         .expect("worker panicked");
 }
 
-case_shards! {
-    cases_shard_00 = 0,
-    cases_shard_01 = 1,
-    cases_shard_02 = 2,
-    cases_shard_03 = 3,
-    cases_shard_04 = 4,
-    cases_shard_05 = 5,
-    cases_shard_06 = 6,
-    cases_shard_07 = 7,
-    cases_shard_08 = 8,
-    cases_shard_09 = 9,
-    cases_shard_10 = 10,
-    cases_shard_11 = 11,
-    cases_shard_12 = 12,
-    cases_shard_13 = 13,
-    cases_shard_14 = 14,
-    cases_shard_15 = 15,
+/// The `#[test]` name for the case at display path `display`: every run of
+/// non-alphanumerics collapses to one `_` (`cases/strings/raw/raw_string` ->
+/// `cases_strings_raw_raw_string`). Shared by the generator and by
+/// [`every_case_has_a_test`], so the two can never disagree on the mapping.
+fn test_name_for(display: &str) -> String {
+    let mut out = String::with_capacity(display.len());
+    for c in display.chars() {
+        match c.to_ascii_lowercase() {
+            c @ ('a'..='z' | '0'..='9') => out.push(c),
+            _ if out.ends_with('_') => {}
+            _ => out.push('_'),
+        }
+    }
+    out.trim_matches('_').to_string()
+}
+
+/// Run the single case at display path `display`, panicking with the harness's
+/// own message on a failure. A `display` with no matching file on disk means the
+/// checked-in list is stale — [`every_case_has_a_test`] reports that properly, so
+/// here it's just a pointed panic.
+fn run_one(display: &str) {
+    let (cases, out_root) = setup_cases();
+    let (path, root, prefix, stage) = cases
+        .iter()
+        .find(|c| case_display(c) == display)
+        .unwrap_or_else(|| {
+            panic!(
+                "no case file for {display:?} — the {CASE_TESTS_FILE} list is stale; \
+                 regenerate it with `{CASE_TESTS_CMD}`"
+            )
+        });
+    let rel_with_prefix = Path::new(prefix).join(path.strip_prefix(root).unwrap_or(path));
+    match run_case(path, &rel_with_prefix, out_root, *stage, false) {
+        Outcome::Pass => {}
+        Outcome::Filled(msg) => panic!("unexpected fill outside fill mode: {msg}"),
+        Outcome::Fail(msg) => panic!("{msg}"),
+    }
+}
+
+/// The display path of a discovered case (`cases/arithmetic/division`) — the
+/// name its `#[test]` is derived from, with `/` separators on every platform.
+fn case_display((path, root, prefix, _): &CaseFile) -> String {
+    Path::new(prefix)
+        .join(path.strip_prefix(root).unwrap_or(path))
+        .with_extension("")
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// Guard for the checked-in per-case `#[test]` list: since `#[test]` functions
+/// are compile-time and case files are discovered at run time, the two can drift
+/// — a new `.aipl` case would otherwise be silently *never run*, which is the
+/// failure mode this whole arrangement has to rule out. Fails when a case has no
+/// test (or a test names a case that no longer exists), and when two cases
+/// collide on one test name.
+#[test]
+fn every_case_has_a_test() {
+    let (cases, _) = setup_cases();
+    let on_disk: Vec<(String, String)> = cases
+        .iter()
+        .map(|c| {
+            let display = case_display(c);
+            (test_name_for(&display), display)
+        })
+        .collect();
+
+    // A collision would make one case shadow another in the generated list, so
+    // it has to be an error rather than something the regenerate helper papers
+    // over by dropping a case.
+    let mut by_name: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (name, display) in &on_disk {
+        by_name.entry(name).or_default().push(display);
+    }
+    let collisions: Vec<String> = by_name
+        .iter()
+        .filter(|(_, ds)| ds.len() > 1)
+        .map(|(name, ds)| format!("  {name} <- {}", ds.join(", ")))
+        .collect();
+    assert!(
+        collisions.is_empty(),
+        "{} case(s) map to the same `#[test]` name — rename one of each pair:\n{}",
+        collisions.len(),
+        collisions.join("\n"),
+    );
+
+    let declared: HashSet<&str> = DECLARED_CASES.iter().map(|(_, d)| *d).collect();
+    let found: HashSet<&str> = on_disk.iter().map(|(_, d)| d.as_str()).collect();
+    let mut missing: Vec<&&str> = found.difference(&declared).collect();
+    let mut stale: Vec<&&str> = declared.difference(&found).collect();
+    missing.sort();
+    stale.sort();
+    if missing.is_empty() && stale.is_empty() {
+        return;
+    }
+    let list = |label: &str, items: &[&&str]| {
+        if items.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\n{} {label}:\n{}",
+                items.len(),
+                items
+                    .iter()
+                    .map(|d| format!("  {d} ({})", test_name_for(d)))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        }
+    };
+    panic!(
+        "{CASE_TESTS_FILE} is out of date — it declares a `#[test]` per case, and \
+         a case with no test never runs.{}{}\n\nRegenerate with `{CASE_TESTS_CMD}`.",
+        list("case(s) with no `#[test]`", &missing),
+        list("declared `#[test]`(s) with no case file", &stale),
+    );
 }
 
 // The two author-helper "refresh" modes are `#[ignore]`d tests rather than env
@@ -365,9 +482,47 @@ case_shards! {
 #[test]
 #[ignore = "author helper — run: cargo test --test cases -- --ignored fill_expected"]
 fn fill_expected() {
-    // Reuses the normal run on shard 0 (fill mode consolidates onto one shard),
-    // passing `fill = true` down the call chain.
-    on_big_stack(|| run_shard(0, true));
+    on_big_stack(run_fill);
+}
+
+/// Author helper: rewrite [`CASE_TESTS_FILE`] from the cases on disk, so a newly
+/// added (or deleted) `.aipl` case gets (or loses) its `#[test]`. Run with:
+///   cargo test --test cases -- --ignored fill_case_tests
+#[test]
+#[ignore = "author helper — run: cargo test --test cases -- --ignored fill_case_tests"]
+fn fill_case_tests() {
+    let (cases, _) = setup_cases();
+    let mut body = String::from(
+        "// @generated by `cargo test --test cases -- --ignored fill_case_tests`.\n\
+         // One `#[test]` per case file, sorted by display path. Do not edit by hand:\n\
+         // add or remove a `.aipl` case and regenerate. `every_case_has_a_test`\n\
+         // fails when this list and the tree disagree.\n\
+         case_tests! {\n",
+    );
+    let mut rows: Vec<(String, String)> = cases
+        .iter()
+        .map(|c| {
+            let display = case_display(c);
+            (test_name_for(&display), display)
+        })
+        .collect();
+    rows.sort_by(|a, b| a.1.cmp(&b.1));
+    for (name, display) in &rows {
+        body.push_str(&format!("    {name} = {display:?},\n"));
+    }
+    body.push_str("}\n");
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(CASE_TESTS_FILE);
+    fs::create_dir_all(path.parent().expect("case-tests dir")).expect("mkdir case-tests dir");
+    fs::write(&path, body).expect("write case tests");
+    // Diverges like the other author helpers: cargo hides passing tests' output,
+    // and the next `cargo test` has to recompile against the new list anyway.
+    panic!(
+        "wrote {} `#[test]`(s) to {}. Failing intentionally so this is visible — \
+         re-run `cargo test` to compile and run the regenerated list.",
+        rows.len(),
+        path.display(),
+    );
 }
 
 /// Perf-monitor refresh: measure non-deterministic metrics (wall-clock, build
@@ -388,24 +543,29 @@ fn refresh_perfmon() {
 type CaseFile = (PathBuf, PathBuf, &'static str, bool);
 
 /// Shared harness setup: install parser hooks, resolve the output dir, and
-/// collect every case across `tests/cases/`, `examples/`, and `crates/`.
-fn setup_cases() -> (Vec<CaseFile>, PathBuf) {
-    // Raw-string cases de-dent through the dogfooded AIPL `dedent` (FFI), which
-    // the parser reaches via a hook with no native fallback — install it before
-    // any case is compiled in-process.
-    aipl::install_parser_hooks();
+/// collect every case across `tests/cases/`, `examples/`, and `crates/`. Done
+/// once per process and shared: with one `#[test]` per case this is called 500+
+/// times, and the directory walk (and the hook install) is the same every time.
+fn setup_cases() -> &'static (Vec<CaseFile>, PathBuf) {
+    static SETUP: std::sync::OnceLock<(Vec<CaseFile>, PathBuf)> = std::sync::OnceLock::new();
+    SETUP.get_or_init(|| {
+        // Raw-string cases de-dent through the dogfooded AIPL `dedent` (FFI), which
+        // the parser reaches via a hook with no native fallback — install it before
+        // any case is compiled in-process.
+        aipl::install_parser_hooks();
 
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("aipl-cases");
-    fs::create_dir_all(&out_root).expect("mkdir cases output");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("aipl-cases");
+        fs::create_dir_all(&out_root).expect("mkdir cases output");
 
-    let cases = collect_all_cases(
-        &root.join("tests").join("cases"),
-        &root.join("examples"),
-        &root.join("crates"),
-    );
-    assert!(!cases.is_empty(), "no .aipl test cases found");
-    (cases, out_root)
+        let cases = collect_all_cases(
+            &root.join("tests").join("cases"),
+            &root.join("examples"),
+            &root.join("crates"),
+        );
+        assert!(!cases.is_empty(), "no .aipl test cases found");
+        (cases, out_root)
+    })
 }
 
 /// Entry point for the ignored `refresh_perfmon` test.
@@ -494,37 +654,30 @@ fn check_or_fill(
     }
 }
 
-fn run_shard(shard: usize, fill: bool) {
+/// Entry point for the ignored [`fill_expected`] helper: one serial pass over
+/// every case, refreshing each section whose body differs from the actual output.
+/// Unlike a normal run this is a single test, so it collects results rather than
+/// panicking per case — and `AIPL_CASE` is the only way to scope it, since
+/// libtest's own filter can't reach inside one test.
+fn run_fill() {
     let (cases, out_root) = setup_cases();
 
     // Optional substring filter for fast iteration on one (or a few) cases:
-    //   AIPL_CASE=some_value cargo test --test cases
+    //   AIPL_CASE=some_value cargo test --test cases -- --ignored fill_expected
     // matches against the case's display path (e.g. `cases/options/some_value`),
     // with `/` separators regardless of platform.
     let filter = std::env::var("AIPL_CASE").ok().filter(|s| !s.is_empty());
-    // A filtered or fill run is a focused dev iteration: run the whole suite on
-    // shard 0 (single summary / single intentional failure) and skip the rest.
-    // (Only shard 0 ever fills — the ignored `fill_expected` test invokes
-    // `run_shard(0, true)`; the parallel shards pass `fill = false`.)
-    let whole = filter.is_some() || fill;
-    if whole && shard != 0 {
-        return;
-    }
 
-    // Run every case this shard owns, collecting failures rather than stopping
-    // at the first, so one run surfaces all broken cases at once.
     let mut passed = 0usize;
     let mut matched = 0usize;
     let mut failures: Vec<String> = Vec::new();
-    // Sections refreshed in fill mode (empty on a normal run).
     let mut refreshed: Vec<String> = Vec::new();
-    for (i, (path, root, prefix, stage)) in cases.iter().enumerate() {
-        // Round-robin partition (skipped when a focused run owns everything).
-        if !whole && i % NUM_SHARDS != shard {
-            continue;
-        }
-        let rel = path.strip_prefix(root).unwrap_or(path);
-        let rel_with_prefix = Path::new(prefix).join(rel);
+    for (path, root, prefix, stage) in cases {
+        let rel_with_prefix = Path::new(prefix).join(path.strip_prefix(root).unwrap_or(path));
+        // Matched against the display path *with* its `.aipl` extension — the
+        // exact text a per-case mismatch message brackets, so a failure's
+        // `AIPL_CASE='<path>'` suggestion can be pasted back verbatim (which is
+        // what `scripts/handoff.sh` does to refill just the stale cases).
         if let Some(f) = &filter {
             let name = rel_with_prefix.to_string_lossy().replace('\\', "/");
             if !name.contains(f.as_str()) {
@@ -532,7 +685,7 @@ fn run_shard(shard: usize, fill: bool) {
             }
         }
         matched += 1;
-        match run_case(path, &rel_with_prefix, &out_root, *stage, fill) {
+        match run_case(path, &rel_with_prefix, out_root, *stage, true) {
             Outcome::Pass => passed += 1,
             Outcome::Filled(msg) => refreshed.push(msg),
             Outcome::Fail(msg) => failures.push(msg),
@@ -540,7 +693,7 @@ fn run_shard(shard: usize, fill: bool) {
     }
 
     // A filter that matches nothing is almost always a typo — fail loudly
-    // rather than silently "passing" with zero cases run.
+    // rather than silently "refreshing" zero cases.
     if let Some(f) = &filter {
         assert!(
             matched > 0,
@@ -549,7 +702,8 @@ fn run_shard(shard: usize, fill: bool) {
         );
     }
 
-    // Summary, always printed (use `--nocapture` to see it on success).
+    // Summary. The filtered wording is a parsed contract — `scripts/handoff.sh`
+    // greps it to confirm a scoped refill ran clean — so keep it as it reads.
     match &filter {
         Some(f) => eprintln!(
             "\n=== test cases [filter {f:?}]: {passed} passed, {} failed, {} refreshed ({matched} of {} matched) ===",
@@ -558,7 +712,7 @@ fn run_shard(shard: usize, fill: bool) {
             cases.len(),
         ),
         None => eprintln!(
-            "\n=== test cases [shard {shard}/{NUM_SHARDS}]: {passed} passed, {} failed, {} refreshed ({matched} of {} total) ===",
+            "\n=== test cases [fill_expected]: {passed} passed, {} failed, {} refreshed ({matched} of {} total) ===",
             failures.len(),
             refreshed.len(),
             cases.len(),
@@ -575,39 +729,20 @@ fn run_shard(shard: usize, fill: bool) {
         for failure in &failures {
             eprintln!("\n{failure}");
         }
-    }
-
-    // A filtered run always fails on purpose. Two reasons: cargo captures the
-    // output of *passing* tests, so failing is the only way to see what ran;
-    // and it guards against a forgotten `AIPL_CASE` making a partial run look
-    // like a green full suite.
-    if let Some(f) = &filter {
         panic!(
-            "AIPL_CASE filter {f:?} active: ran {matched} of {} case(s) \
-             ({passed} passed, {} failed). Failing intentionally so the output \
-             is visible and a forgotten filter isn't mistaken for a full pass — \
-             unset AIPL_CASE to run the whole suite.",
-            cases.len(),
+            "{} of {matched} case(s) failed in a way no refill can fix (see summary above)",
             failures.len(),
         );
     }
-    if !failures.is_empty() {
-        panic!(
-            "shard {shard}: {} of {matched} run test case(s) failed (see summary above)",
-            failures.len(),
-        );
-    }
-    // Fill mode diverges when clean too: cargo hides passing tests' output, so
-    // failing is the only way to show what was refreshed, and it ensures a fill
-    // run is never mistaken for a normal green suite.
-    if fill {
-        panic!(
-            "section refresh complete: {} case(s) refreshed, {passed} \
-             already-current, {matched} case(s) seen. Failing intentionally so the \
-             summary above is visible — this is not a normal test run (`{FILL_CMD}`).",
-            refreshed.len(),
-        );
-    }
+    // Diverges when clean too: cargo hides passing tests' output, so failing is
+    // the only way to show what was refreshed, and it ensures a fill run is never
+    // mistaken for a normal green suite.
+    panic!(
+        "section refresh complete: {} case(s) refreshed, {passed} \
+         already-current, {matched} case(s) seen. Failing intentionally so the \
+         summary above is visible — this is not a normal test run (`{FILL_CMD}`).",
+        refreshed.len(),
+    );
 }
 
 fn collect_cases(dir: &Path, out: &mut Vec<PathBuf>) {

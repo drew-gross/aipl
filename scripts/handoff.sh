@@ -14,10 +14,10 @@
 #      up front means a formatting-only fix never costs a second full `cargo test`.
 #   2. Discovery `cargo test`. Three outcomes:
 #        - green                       -> done.
-#        - only fillable staleness      -> remediate (steps 3-4), then re-confirm.
-#          (any section mismatch or       Refreshing a section is always
-#           IR staleness)                  recoverable — `git reset --hard HEAD` —
-#                                          so even behavioral sections (stdout /
+#        - only fillable staleness      -> remediate (steps 3-5), then re-confirm.
+#          (a section mismatch, a         Refreshing a section is always
+#           drifted per-case #[test]      recoverable — `git reset --hard HEAD` —
+#           list, or IR staleness)        so even behavioral sections (stdout /
 #                                          exit code / errors / check) are refilled
 #                                          and the git diff is the review surface,
 #                                          flagged at the end.
@@ -26,11 +26,13 @@
 #                                          non-cases test). No section to record
 #                                          from, so a refill would just burn a
 #                                          full corpus run without fixing it.
-#   3. `fill_expected`, scoped with `AIPL_CASE` to each mismatched case, refreshes
+#   3. `fill_case_tests` regenerates the checked-in per-case `#[test]` list when a
+#      case file was added or removed. First, so a new case can reach step 4.
+#   4. `fill_expected`, scoped with `AIPL_CASE` to each mismatched case, refreshes
 #      just those cases' sections from actual output (not the whole corpus).
-#   4. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
+#   5. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
 #      artifact -> auto-promote when that run is green.
-#   5. Final `cargo test` confirms green against the live (promoted) artifacts.
+#   6. Final `cargo test` confirms green against the live (promoted) artifacts.
 #
 # Exit status: 0 = handoff green; 1 = stopped (message says at which step and why).
 
@@ -123,10 +125,13 @@ unfillable+='|\(in-language tests\) failed:|Abort trap|SIGSEGV|SIGABRT'
 if grep -qE "$unfillable" "$STEP_OUT"; then
     fail "cargo test (failure a refill can't fix)" "$(grep -nE "$unfillable" "$STEP_OUT" | head -20)"
 fi
-# Any FAILED test that isn't a case shard (a shard's fillable mismatches are
-# handled below) or a known IR-staleness gate is a real test failure.
+# Any FAILED test that isn't a per-case test (each case is its own `#[test]`,
+# named `<prefix>_<display path>` for the three case roots — their fillable
+# mismatches are handled below), the case-list gate, or a known IR-staleness gate
+# is a real test failure. The unfillable grep above has already stopped on a case
+# that genuinely broke, so what reaches here is a stale section.
 bad="$(grep -oE 'test [A-Za-z0-9_:]+ \.\.\. FAILED' "$STEP_OUT" | awk '{print $2}' \
-       | grep -vE '^(cases_shard_[0-9]+|checked_in_ir_is_current|no_staged_ir_pending)$' \
+       | grep -vE '^((cases|examples|crates)_.*|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending)$' \
        || true)"
 if [ -n "$bad" ]; then
     fail "cargo test (failing test)" "$bad"
@@ -134,11 +139,13 @@ fi
 
 # What (fillable) staleness did we see? A backtick-section mismatch (any of
 # stdout / exit code / stderr / errors / check / performance / monomorphizations)
-# or an error-fixture mismatch is refilled; the two IR gates trigger an IR regen.
-need_fill=0; need_ir=0
+# or an error-fixture mismatch is refilled; the two IR gates trigger an IR regen;
+# a drifted per-case `#[test]` list is regenerated.
+need_fill=0; need_ir=0; need_case_tests=0
 grep -qE '`[a-z ]+` mismatch|error mismatch' "$STEP_OUT" && need_fill=1
 grep -qE '(checked_in_ir_is_current|no_staged_ir_pending) \.\.\. FAILED' "$STEP_OUT" && need_ir=1
-if [ $need_fill -eq 0 ] && [ $need_ir -eq 0 ]; then
+grep -qE 'every_case_has_a_test \.\.\. FAILED' "$STEP_OUT" && need_case_tests=1
+if [ $need_fill -eq 0 ] && [ $need_ir -eq 0 ] && [ $need_case_tests -eq 0 ]; then
     fail "cargo test (unrecognized failure)" "$(tail -40 "$STEP_OUT")"
 fi
 
@@ -162,7 +169,20 @@ while IFS= read -r c; do
 done < <(grep -oE '\[[^]]+\]: (`[a-z ]+`|error) mismatch' "$STEP_OUT" \
              | sed -E 's/^\[([^]]+)\].*/\1/' | sort -u)
 
-# --- 3. Refill changed sections ------------------------------------------------
+# --- 3. Regenerate the per-case `#[test]` list ---------------------------------
+
+# Before the refills: a case added without its `#[test]` never ran in discovery,
+# so regenerating first gives the fill step (and the final run) a chance to see
+# it. A brand-new case whose sections are also unrecorded will still fail the
+# final run — that's one more handoff, not a wrong answer.
+if [ $need_case_tests -eq 1 ]; then
+    run_step "fill_case_tests (per-case #[test] list)" \
+        cargo test --test cases -- --ignored fill_case_tests
+    grep -qE 'wrote [0-9]+ `#\[test\]`' "$STEP_OUT" \
+        || { save_out; fail "fill_case_tests" "$(tail -40 "$STEP_OUT")"; }
+fi
+
+# --- 4. Refill changed sections ------------------------------------------------
 
 if [ $need_fill -eq 1 ]; then
     # A scoped `AIPL_CASE` fill runs (and refreshes) only the matched case, so we
@@ -189,7 +209,7 @@ if [ $need_fill -eq 1 ]; then
     fi
 fi
 
-# --- 4. Regenerate + validate + promote dogfood IR -----------------------------
+# --- 5. Regenerate + validate + promote dogfood IR -----------------------------
 
 if [ $need_ir -eq 1 ]; then
     run_step "fill_staged_ir" cargo test --test dogfood_ir -- --ignored fill_staged_ir
@@ -210,7 +230,7 @@ if [ $need_ir -eq 1 ]; then
     grep -q 'promoted' "$STEP_OUT" || { save_out; fail "promote_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 fi
 
-# --- 5. Final confirmation against the live artifacts --------------------------
+# --- 6. Final confirmation against the live artifacts --------------------------
 
 run_step "cargo test (final)" cargo test
 if [ $? -ne 0 ]; then
@@ -224,6 +244,7 @@ fi
 printf '\n%sHANDOFF OK%s\n' "$green$bold" "$off" >&2
 [ $need_fill -eq 1 ] && printf '  refilled sections: %s\n' "$changed_sections" >&2
 [ $need_ir -eq 1 ] && printf '  regenerated + promoted dogfood IR\n' >&2
+[ $need_case_tests -eq 1 ] && printf '  regenerated the per-case #[test] list\n' >&2
 if [ $behavioral_changed -eq 1 ]; then
     printf '%s  ! behavioral output changed — review the git diff before committing%s\n' \
         "$bold" "$off" >&2

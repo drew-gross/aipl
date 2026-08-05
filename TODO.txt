@@ -183,8 +183,6 @@ narrower ints should take up less space
 
 add units to the language
 
-The test sharding strategy isn't working so hot anymore each shard takes a long time. Lets switch strategies: Have one test for each test case file, and a separate test that ensures that for every test case file there is a rust test that runs it.
-
 make repeat and indent accept unsigned int
 
 more retain elision (for arguments to functions that don't change the ref count)

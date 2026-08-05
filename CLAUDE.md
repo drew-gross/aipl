@@ -22,7 +22,7 @@ the validation, so running a full `cargo test`, a `cargo fmt`, or a section
 refill *before* invoking it just pays for a full-corpus run twice. The only
 thing worth running ahead of the script is a **targeted** test for the code you
 just touched (`cargo test -- name_substring`, `cargo test --test <file>`, or a
-scoped `AIPL_CASE='dir/' cargo test --test cases`) as a fast inner-loop check —
+scoped `cargo test --test cases -- cases_generics`) as a fast inner-loop check —
 that's a dev-loop signal, not the handoff gate. When the change is ready, let
 the script do the full verification, formatting, and any regeneration in one
 pass.
@@ -30,16 +30,18 @@ pass.
 ## Shell
 Use the **Bash** tool for everything terminal-side: `cargo build`,
 `cargo test`, `cargo fmt`, `git`, env-var-prefixed runs
-(`AIPL_CASE='x' cargo test ...`), file operations.
+(`AIPL_CASE='x' cargo test ... --ignored fill_expected`), file operations.
 
 ## Test cadence
 Avoid running the full test suite during development — it is the slowest part
 of the dev loop. Prefer:
 - A single test by file: `cargo test --test mono`
 - A single test by name: `cargo test -- name_substring`
-- A filtered case run: `AIPL_CASE='generics/' cargo test --test cases`
-  (the cases harness intentionally fails when `AIPL_CASE` is set so a stray
-  filter can't be mistaken for a green full suite)
+- A filtered case run: `cargo test --test cases -- cases_generics`
+  (every case is its own `#[test]`, named after its display path with the
+  separators flattened — `cases/generics/ord_bound` is `cases_generics_ord_bound`
+  — so libtest's own name filter scopes a run, and it reports how many it ran
+  and how many it filtered out)
 
 Targeted runs alone can miss regressions in unrelated areas, so they're the
 inner-loop signal, not the finish check — finish a task by running the handoff
@@ -120,6 +122,15 @@ language features. To check an exact string value from a case, `print` it
 compare with `==` and return a distinguishing exit code. Reserve `tests/*.rs`
 for things the cases framework genuinely can't express (e.g. asserting on a
 parser/loader API directly).
+
+**Adding or deleting a case file needs one extra step.** Every case gets its own
+`#[test]`, and `#[test]` is compile-time while cases are discovered at run time
+— so the list lives in the checked-in `tests/support/case_tests.rs`. After adding
+or removing a `.aipl` case, regenerate it:
+`cargo test --test cases -- --ignored fill_case_tests`. You don't have to
+remember: the `every_case_has_a_test` test fails when the list and the tree
+disagree (in either direction) and prints that command. It's a hard failure
+precisely because a case with no `#[test]` would otherwise never run.
 
 ## Operators must be imported
 Operators are not ambient — a file that uses `==`, `<`, `&&`, unary `-`/`!`, etc.
