@@ -299,13 +299,11 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert(end.bump().text == "");
 
     // --- expect ----------------------------------------------------------
-    assert(w.expect("fn").is_ok_text("fn"));
+    assert(w.expect("fn")?.text == "fn");
     // A mismatch names both sides, quoted, like the Rust `{:?}`.
-    assert(w.expect("struct").err_message() == "formatter: expected \"struct\", found \"fn\"");
+    assert(w.expect("struct").err_message() == `formatter: expected "struct", found "fn"`);
     // Past the end the message picks up the span-less marker.
-    assert(
-        end.expect("}").err_message() == "formatter: expected \"}\", found \"\" (at end of input)",
-    );
+    assert(end.expect("}").err_message() == `formatter: expected "}", found "" (at end of input)`);
 
     // --- source gaps -------------------------------------------------------
     // The first comment starts at 0, before the first token at 6.
@@ -354,14 +352,6 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 
-// Test-only: whether an `expect` succeeded with the given consumed text.
-fn is_ok_text(self: WStr!FmtError, want: str) -> bool {
-    match (self) {
-        ok(s) => s.text == want,
-        err(_) => false,
-    }
-}
-
 // Test-only: the message of a failed `expect` (`""` when it succeeded).
 fn err_message(self: WStr!FmtError) -> str {
     match (self) {
@@ -374,11 +364,11 @@ allocations: 67
 deallocations: 67
 reallocations: 0
 bytes allocated: 3295
-instructions executed: 10670
-binary size: 35312
-  code: 18456
-  data: 2372
-  metadata: 14484
+instructions executed: 10637
+binary size: 38272
+  code: 19744
+  data: 2620
+  metadata: 15908
 --- monomorphizations ---
 __test$pushed
 at_end
