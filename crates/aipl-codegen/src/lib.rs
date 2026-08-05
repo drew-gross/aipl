@@ -11223,6 +11223,8 @@ fn compile_variant<M: Module>(
     for ((offset, fty), arg) in fields.iter().zip(args) {
         let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
+        // A bare literal takes the payload field's int type.
+        let actual = aipl_syntax::flex_int_ty(arg, &actual, fty);
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
         let dst = builder.ins().iadd_imm_s(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
@@ -13835,6 +13837,8 @@ fn compile_expr<M: Module>(
                 if name == "__builtin_Span" {
                     expect_len_operand(&actual, &ctx, init.value.span.clone())?;
                 } else {
+                    // A bare literal takes the field's int type.
+                    let actual = aipl_syntax::flex_int_ty(&init.value, &actual, &fty);
                     expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
                 match (slot, heap) {
@@ -14228,6 +14232,11 @@ fn compile_expr<M: Module>(
             // Branch types must agree, with one twist: if one branch is
             // bare `none` (Optional(__none__)) and the other is a concrete
             // Optional(T), the result type is the concrete one.
+            //
+            // A bare integer literal in one branch also takes the other's int
+            // type (`if (b) { u8_val } else { 9 }`), matching the checker.
+            let then_ty = aipl_syntax::flex_int_ty(then_e, &then_ty, &else_ty);
+            let else_ty = aipl_syntax::flex_int_ty(else_e, &else_ty, &then_ty);
             let merged_ty = merge_types(&then_ty, &else_ty).ok_or_else(|| {
                 Error::at(
                     format!(
@@ -14546,6 +14555,8 @@ fn compile_expr<M: Module>(
                 None
             };
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
+            // A bare literal takes the binding's int type.
+            let t = aipl_syntax::flex_int_ty(value, &t, &expected_ty);
             expect_type(&t, &expected_ty, "set", value.span.clone())?;
             if let Some(old) = old {
                 if arr_slot_ref {

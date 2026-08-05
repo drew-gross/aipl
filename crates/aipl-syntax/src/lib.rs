@@ -910,6 +910,44 @@ pub fn const_int(e: &ast::Expr) -> Option<i64> {
     }
 }
 
+/// Collect every integer value a *purely literal* expression can produce into
+/// `out`, returning whether `e` is one. An integer literal keeps its
+/// flexibility through the constructs that merely pass a value along — a
+/// block's tail, a binding's body, an assignment's continuation, and every arm
+/// of an `if`/`match` — so
+///
+/// ```text
+/// fn f() -> u8 { let x = compute(); 200 }
+/// fn g(b: bool) -> u8 { if (b) { 1 } else { 200 } }
+/// ```
+///
+/// flex exactly like the bare `fn f() -> u8 { 200 }`. Every branch must itself
+/// be literal (one non-literal arm makes the whole expression non-flexible, and
+/// the ordinary merge rules take over), and *all* collected values must fit the
+/// target — checked by the caller, so the diagnostic can name the offender.
+pub fn flex_int_values(e: &ast::Expr, out: &mut Vec<i64>) -> bool {
+    match &e.kind {
+        ast::ExprKind::Num(_) | ast::ExprKind::Neg(_) => match const_int(e) {
+            Some(v) => {
+                out.push(v);
+                true
+            }
+            None => false,
+        },
+        // Value-passing wrappers: only the tail decides the type.
+        ast::ExprKind::Seq(_, tail)
+        | ast::ExprKind::Let(_, _, tail)
+        | ast::ExprKind::LetMut(_, _, tail)
+        | ast::ExprKind::Assign(_, _, tail) => flex_int_values(tail, out),
+        // Every branch must be literal for the whole to stay flexible.
+        ast::ExprKind::If(_, a, b) => flex_int_values(a, out) && flex_int_values(b, out),
+        ast::ExprKind::Match(_, arms) => {
+            !arms.is_empty() && arms.iter().all(|arm| flex_int_values(&arm.body, out))
+        }
+        _ => false,
+    }
+}
+
 /// Whether the integer value `v` (an `i64` literal) is representable in integer
 /// type `name`. `u64` accepts any non-negative value (a literal can't exceed
 /// `i64::MAX`, which fits `u64`). Computed by the dogfooded AIPL `int_fits` via
@@ -942,7 +980,7 @@ pub fn set_int_fits_hook(f: fn(i64, &str) -> bool) {
 /// non-integer targets are left unchanged.
 pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
     if let Type::Primitive(p) = other {
-        if p.is_int() && ety != other && const_int(e).is_some() {
+        if p.is_int() && ety != other && flex_int_values(e, &mut Vec::new()) {
             return other.clone();
         }
     }

@@ -101,7 +101,7 @@ fn has_hard(self: Doc) -> bool {
 // trailing whitespace is stripped from every line and a final newline is
 // preserved when present (the Rust `print`'s belt-and-braces cleanup).
 fn print_doc(doc: Doc, width: u64) -> str {
-    let pieces = go(width, u64(0), WCons(u64(0), false, doc, WNil), []);
+    let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
     cleanup(pieces.join(""))
 }
 
@@ -117,7 +117,7 @@ fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
             RawBlock(s) => go_raw(width, col, sp, s, rest, acc),
             Concat(ds) => go(width, col, prepend(ds, sp, flat, rest), acc),
             Line => if (flat) {
-                go(width, col + u64(1), rest, acc.pushed(" "))
+                go(width, col + 1, rest, acc.pushed(" "))
             } else {
                 go(width, sp, rest, acc.pushed(newline_str(sp)))
             },
@@ -128,7 +128,7 @@ fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
             },
             HardLine => go(width, sp, rest, acc.pushed(newline_str(sp))),
             BlankLine => go(width, sp, rest, acc.pushed(blank_str(sp))),
-            Indent(inner) => go(width, col, WCons(sp + u64(4), flat, inner, rest), acc),
+            Indent(inner) => go(width, col, WCons(sp + 4, flat, inner, rest), acc),
             Group(forced, inner) => go(
                 width,
                 col,
@@ -176,7 +176,7 @@ fn fits(budget: u64, work: Work) -> bool {
             Text(s) => fits_atom(budget, s, flat, rest),
             RawBlock(s) => fits_atom(budget, s, flat, rest),
             Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
-            Line => if (flat) { fits_after(budget, u64(1), rest) } else { true },
+            Line => if (flat) { fits_after(budget, 1, rest) } else { true },
             SoftLine => if (flat) { fits(budget, rest) } else { true },
             HardLine => true,
             BlankLine => true,

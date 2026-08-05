@@ -1,0 +1,99 @@
+import { ==, print, to_str, wrapping_add as + } from builtins;
+
+// A bare integer literal adapts to whatever integer type the context expects,
+// as long as its value fits — no `u8(..)` / `u64(..)` conversion needed. The
+// literal itself is always the same 64-bit constant; only its *static type*
+// bends to the target, so this is purely a type-level convenience.
+//
+// Flexing reaches through the constructs that merely pass a value along: a
+// block's tail, an early `return`, and every arm of an `if`. A literal that
+// does *not* fit is still a compile error (see `errors/err_literal_too_big`).
+
+struct Pair { a: u64, b: u8 }
+
+variant Tagged = Wrapped(u64, bool)
+
+// The two contexts that already worked: a call argument and a bare-literal
+// function body.
+fn takes_u64(x: u64) -> u64 { x }
+
+fn ret_u8() -> u8 { 200 }
+
+// A literal in *tail* position, behind a binding, flexes like a bare one.
+fn tail_after_let() -> u8 {
+    let ignored = 1;
+    200
+}
+
+// ...and so does one returned early from a branch.
+fn early_return(b: bool) -> u8 {
+    if (b) {
+        return 250;
+    };
+    1
+}
+
+// When one `if` branch is a narrow int and the other a literal, the literal
+// takes the branch type rather than forcing both to `i64`.
+fn merged(m: u8, b: bool) -> u8 { if (b) { m } else { 9 } }
+
+// Both branches literal: they flex together to the declared return type.
+fn both_branches(b: bool) -> u8 { if (b) { 1 } else { 200 } }
+
+fn main() !prints {
+    print(takes_u64(3).to_str());
+    print(ret_u8().to_str());
+    print(tail_after_let().to_str());
+    print(early_return(true).to_str());
+    print(merged(u8(3), false).to_str());
+    print(both_branches(false).to_str());
+
+    // Struct field initializers take the field's type.
+    let p = Pair { a: 2, b: 200 };
+    print(p.a.to_str());
+    print(p.b.to_str());
+
+    // So do variant constructor payloads — including where the constructor is
+    // inferred rather than driven by a declared return type.
+    let t = Wrapped(9, true);
+    print(
+        match (t) {
+            Wrapped(n, _) => n,
+        }.to_str(),
+    );
+
+    // `set` to an existing mut binding takes that binding's type.
+    mut m = u8(0);
+    set m = 7;
+    print(m.to_str());
+
+    // Arithmetic against a `u64` needs no cast on the literal operand.
+    let big = takes_u64(40);
+    print((big + 2).to_str());
+}
+--- stdout ---
+3
+200
+200
+250
+9
+200
+2
+200
+9
+7
+42
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 451
+binary size: 3128
+  code: 1396
+  data: 1
+  metadata: 1731
+--- monomorphizations ---
+early_return
+main
+takes_u64

@@ -242,8 +242,7 @@ self-inflicted: two long serial sweeps plus that leaked process pegging a core.
 Next step: re-run the case suite under the new codegen watching for a case that
 hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
-
-make it so that int literals can adapt to any type of int (as long as it fits)
+implement vec.back(), use it to simplify trim_suffix
 
 Reasons dec.aipl uses a cons list:
     1. fits borrows the stack in Rust; AIPL has no references.

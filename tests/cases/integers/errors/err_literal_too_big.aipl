@@ -1,0 +1,13 @@
+// Literal flexing is bounded by the target type: a literal that does not fit
+// is a compile error, not a silent wrap. The message names the offending value;
+// the span covers the whole `if`, since that is the expression being flexed to
+// the declared `u8` return.
+fn f(b: bool) -> u8 { if (b) { 1 } else { 300 } }
+
+fn main() {}
+--- errors ---
+error: integer literal 300 does not fit in u8
+ --> ./tests/cases/integers/errors/err_literal_too_big.aipl:5:27
+  |
+5 | fn f(b: bool) -> u8 { if (b) { 1 } else { 300 } }
+  |                           ^^^^^^^^^^^^^^^^^^^

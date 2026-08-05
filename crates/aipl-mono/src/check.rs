@@ -1509,6 +1509,10 @@ impl Cx<'_> {
                 )?;
                 let tt = self.check_expr(t, env, effects)?;
                 let et = self.check_expr(e, env, effects)?;
+                // One branch a bare literal, the other a narrow int: the literal
+                // takes the other's type (`if (b) { u8_val } else { 9 }`).
+                let tt = self.flex_int(t, &tt, &et)?;
+                let et = self.flex_int(e, &et, &tt)?;
                 if coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
                     return Err(Error::at(
                         format!(
@@ -1740,6 +1744,8 @@ impl Cx<'_> {
                         })?;
                 }
                 let vt = self.check_expr(val, env, effects)?;
+                // A bare literal takes the binding's (or field's) int type.
+                let vt = self.flex_int(val, &vt, &expected)?;
                 expect(&vt, &expected, "set", val.span.clone())?;
                 self.check_expr(body, env, effects)?
             }
@@ -1985,6 +1991,8 @@ impl Cx<'_> {
                     if name == "__builtin_Span" {
                         expect_len_operand(&vt, &ctx, fi.value.span.clone())?;
                     } else {
+                        // A bare literal takes the field's int type.
+                        let vt = self.flex_int(&fi.value, &vt, expected)?;
                         expect(&vt, expected, &ctx, fi.value.span.clone())?;
                     }
                 }
@@ -2731,17 +2739,24 @@ impl Cx<'_> {
     /// without an explicit conversion (`i8_val + 1`, `f(200)` where `f` takes a
     /// `u8`, `fn g() -> u8 { 200 }`). A literal that doesn't fit is an error.
     /// Non-literals and non-integer targets are returned unchanged.
+    ///
+    /// "Literal" reaches through the value-passing constructs (a block's tail,
+    /// an `if`/`match` whose arms are all literals) — see
+    /// [`aipl_syntax::flex_int_values`].
     fn flex_int(&self, e: &Expr, ety: &Type, other: &Type) -> Result<Type, Error> {
         if let Type::Primitive(p) = other {
             if p.is_int() && ety != other {
-                if let Some(v) = aipl_syntax::const_int(e) {
-                    if aipl_syntax::int_fits(v, p.name()) {
-                        return Ok(other.clone());
+                let mut vs = Vec::new();
+                if aipl_syntax::flex_int_values(e, &mut vs) {
+                    match vs.iter().find(|v| !aipl_syntax::int_fits(**v, p.name())) {
+                        None => return Ok(other.clone()),
+                        Some(v) => {
+                            return Err(Error::at(
+                                format!("integer literal {v} does not fit in {}", p.name()),
+                                e.span.clone(),
+                            ));
+                        }
                     }
-                    return Err(Error::at(
-                        format!("integer literal {v} does not fit in {}", p.name()),
-                        e.span.clone(),
-                    ));
                 }
             }
         }
