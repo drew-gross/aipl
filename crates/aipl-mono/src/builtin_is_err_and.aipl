@@ -1,0 +1,91 @@
+import { !, ==, value_or_err } from builtins;
+
+// The AIPL implementation of the `is_err_and` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_is_err_and` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.is_err_and(pred)`
+// specializes through the ordinary generic / higher-order machinery — the
+// in-file name `is_err_and` is only for this file's own tests, which read
+// exactly like user code.
+//
+// The result-world mirror of `is_some_and`. It exists mainly for tests that
+// assert on a failure: `==` doesn't span the two sides of a result, so without
+// it every such assertion needs a hand-written `match` helper per error type.
+pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
+    match (self) {
+        ok(_) => false,
+        err(e) => pred(e),
+    }
+}.doc("""
+    True when `self` is `err(e)` and `pred(e)` holds; `false` for `ok` (the
+    predicate is not called). The result-world mirror of `is_some_and`, generic
+    over both the ok and error types and callable as a method:
+    `r.is_err_and(pred)`.
+""").test({
+    // err: the predicate runs on the error payload.
+    assert(digit_of("x").is_err_and(|e| e == "not a digit"));
+    assert(!digit_of("x").is_err_and(|e| e == "some other message"));
+    // ok: always false, and the predicate is not called.
+    assert(!digit_of("7").is_err_and(|e| e == "not a digit"));
+
+    // Free-call form.
+    assert(is_err_and(digit_of(""), |e| e == "empty"));
+
+    // A named predicate, no lambda.
+    assert(digit_of("x").is_err_and(is_not_a_digit));
+
+    // A captured value.
+    let want = "empty";
+    assert(digit_of("").is_err_and(|e| e == want));
+
+    // The error type is generic: an i64 code reads back as an i64.
+    assert(""[0].value_or_err(404).is_err_and(|c| c == 404));
+    assert(!"a"[0].value_or_err(404).is_err_and(|c| c == 404));
+
+    // A struct error — the shape the formatter's `FmtError` uses, where the
+    // assertion wants one field out of the payload.
+    assert(check_len("hi").is_err_and(|e| e.reason == "too short"));
+    assert(check_len("hi").is_err_and(|e| e.at == 2));
+    assert(!check_len("hello").is_err_and(|e| e.reason == "too short"));
+})
+
+struct LenError { reason: str, at: i64 }
+
+// A result whose error side is a struct, so the tests above cover reading a
+// single field out of a multi-field payload.
+fn check_len(s: str) -> str!LenError {
+    if (s == "hi") { err(LenError { reason: "too short", at: 2 }) } else { ok(s) }
+}.test({
+    assert(!check_len("hello").is_err_and(|e| e.at == 2));
+    assert(check_len("hi").is_err_and(|e| e.at == 2));
+})
+
+fn is_not_a_digit(self: str) -> bool { self == "not a digit" }.test({
+    assert(is_not_a_digit("not a digit"));
+    assert(!is_not_a_digit("empty"));
+})
+
+// Two ways to fail, so the tests can tell one error message from another.
+fn digit_of(s: str) -> i64!str {
+    let c = s[0].value_or_err("empty")?;
+    if (c == '7') { ok(7) } else { err("not a digit") }
+}.test({
+    assert(!digit_of("7").is_err_and(|e| e == "empty"));
+    assert(digit_of("").is_err_and(|e| e == "empty"));
+    assert(digit_of("x").is_err_and(|e| e == "not a digit"));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1370
+binary size: 10768
+  code: 4464
+  data: 1571
+  metadata: 4733
+--- monomorphizations ---
+__builtin_value_or_err$char$i64
+check_len
+digit_of
+is_not_a_digit
+main

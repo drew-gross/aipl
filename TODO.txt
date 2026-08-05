@@ -106,7 +106,6 @@ Nested matching e.g.
         none => ...,
     }
 
-implement vec.count(0)
 implement is_ok_and and is_err
 instead of err_message use x == err(...)
 

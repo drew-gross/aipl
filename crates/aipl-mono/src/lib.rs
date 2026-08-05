@@ -4872,6 +4872,10 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
         include_str!("builtin_count_while.aipl"),
     ),
     (
+        "__builtin_is_err_and",
+        include_str!("builtin_is_err_and.aipl"),
+    ),
+    (
         "__builtin_is_some_and",
         include_str!("builtin_is_some_and.aipl"),
     ),

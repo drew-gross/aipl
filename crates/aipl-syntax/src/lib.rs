@@ -1410,6 +1410,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "push",
     "is_some",
     "is_some_and",
+    "is_err_and",
     "int_parse",
     "is_space",
     "is_digit",
