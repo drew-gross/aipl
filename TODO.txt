@@ -241,3 +241,34 @@ vs 2.66s — ~1-2.7s per case is normal). Some of the observed slowness was
 self-inflicted: two long serial sweeps plus that leaked process pegging a core.
 Next step: re-run the case suite under the new codegen watching for a case that
 hangs, and check for stray spinning `aipl` processes before blaming the suite.
+
+
+make it so that int literals can adapt to any type of int (as long as it fits)
+
+Reasons dec.aipl uses a cons list:
+    1. fits borrows the stack in Rust; AIPL has no references.
+
+    This is the real driver. The Rust fits takes the outer work stack by reference (doc.rs:241):
+
+    fn fits(budget: usize, candidate: &Doc, rest: &[(usize, Mode, &Doc)]) -> bool
+
+    …and then has to rebuild it anyway to push the candidate: rest.iter().map(|(_, m, d)| (*m, *d)).collect() (doc.rs:245) — an O(depth) clone on every group, affordable only because the elements are small Copy tuples of borrowed &Doc.
+
+    AIPL has no borrows; everything passed is an owned/refcounted value. A cons-list tail is shared by pointer, so the AIPL version seeds the lookahead in O(1) with no copy at all (doc.aipl:162):
+
+    aipl
+    fits(width - col, WCons(sp, true, inner, rest))
+
+    The list is "the rest of the line" — the same structure the printer holds, reused rather than reconstructed. That's strictly better than what the Rust code does, and it only works because the tail is persistent.
+
+    2. There is no pop builtin.
+
+    crates/aipl-syntax/src/lib.rs:1367 has push, but nothing pops. The only way to shrink an array is a slice, and xs[start..end] is documented as "a fresh heap array copying the element range" (aipl-codegen/src/lib.rs:13511). So while let Some(x) = stack.pop() has no direct translation — emulating it via slicing makes the printer quadratic in document size.
+
+    3. The loop is recursion, so the stack has to be a value.
+
+    go and fits are tail-recursive with the work list as a parameter, where Rust uses while let over a mut local. AIPL does have while (tests/cases/loops/while_loop.aipl), but the functional formulation needs a persistent stack, and WCons gives one where push is a single allocation sharing the existing tail. prepend (doc.aipl:217) is then just a right_fold conses onto that tail, matching Rust's reverse-order push loop.
+
+    Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
+
+    One caveat on the file's own header comment: it claims the tail-recursive form means it "never recurses on the native stack proportionally to document size." I don't see return_call anywhere in codegen, so guaranteed tail-call elimination doesn't appear to be implemented — that claim may depend on Cranelift happening to optimize the self-call, or it may just be aspirational. The cons-list rationale stands either way; the native-stack part of that comment is worth verifying if you care about it.

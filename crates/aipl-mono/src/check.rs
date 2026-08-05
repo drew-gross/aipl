@@ -1883,12 +1883,7 @@ impl Cx<'_> {
                 if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
                     return self.slice_receiver_ty(&ot, obj.span.clone());
                 }
-                expect(
-                    &it,
-                    &Type::Primitive(Primitive::I64),
-                    "array index",
-                    idx.span.clone(),
-                )?;
+                expect_len_operand(&it, "array index", idx.span.clone())?;
                 let elem = match ot {
                     Type::Array(inner) => *inner,
                     // `s[i]` on a `str` is the byte at `i` as a `char?`.
@@ -1907,23 +1902,14 @@ impl Cx<'_> {
                 let ot = self.check_expr(obj, env, effects)?;
                 let result = self.slice_receiver_ty(&ot, obj.span.clone())?;
                 let st = self.check_expr(start, env, effects)?;
-                expect(
-                    &st,
-                    &Type::Primitive(Primitive::I64),
-                    "slice start",
-                    start.span.clone(),
-                )?;
+                expect_len_operand(&st, "slice start", start.span.clone())?;
                 // An open-ended `recv[start..]` has no end expression — it runs to
                 // the receiver's length.
                 if let Some(end) = end {
                     let et = self.check_expr(end, env, effects)?;
-                    expect(
-                        &et,
-                        &Type::Primitive(Primitive::I64),
-                        "slice end",
-                        end.span.clone(),
-                    )?;
+                    expect_len_operand(&et, "slice end", end.span.clone())?;
                 }
+
                 result
             }
             ExprKind::Try(inner) => {
@@ -1992,12 +1978,15 @@ impl Cx<'_> {
                             )
                         })?;
                     let vt = self.check_expr(&fi.value, env, effects)?;
-                    expect(
-                        &vt,
-                        expected,
-                        &format!("struct {:?} field {:?}", display(name), fi.name),
-                        fi.value.span.clone(),
-                    )?;
+                    let ctx = format!("struct {:?} field {:?}", display(name), fi.name);
+                    // `start..end` desugars to a `__builtin_Span` construction, so
+                    // its two fields are slice bounds by another name — accept
+                    // either signedness there, exactly as `xs[a..b]` does.
+                    if name == "__builtin_Span" {
+                        expect_len_operand(&vt, &ctx, fi.value.span.clone())?;
+                    } else {
+                        expect(&vt, expected, &ctx, fi.value.span.clone())?;
+                    }
                 }
                 // Every field without a default must be provided.
                 for (fname, _, has_default) in &fields {
@@ -2161,14 +2150,14 @@ impl Cx<'_> {
             });
         }
         // `s.len()` / `len(s)` on a set, dict, or string: the builtin `len`
-        // signature is `(self: T[]) -> i64`, which doesn't unify with `#{T}` /
+        // signature is `(self: T[]) -> u64`, which doesn't unify with `#{T}` /
         // `#{K: V}` / `str`, so dispatch those receivers here. (An array receiver
         // falls through to the generic signature below.) For a string `len` is the
         // byte length.
         if name == "__builtin_len" && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             if matches!(t, Type::Set(_) | Type::Dict(_, _)) || is_str_repr(&t) {
-                return Ok(Type::Primitive(Primitive::I64));
+                return Ok(Type::Primitive(Primitive::U64));
             }
         }
         // `a + b` / `a - b` resolve (in the loader) to a call to the file's bound
@@ -3233,6 +3222,25 @@ fn expect(actual: &Type, expected: &Type, ctx: &str, span: Span) -> Result<(), E
             span.clone(),
         )
     })
+}
+
+/// A length-like operand — an index, a slice bound, a `Span` field, or a
+/// capacity — accepted as `i64` *or* `u64`. Both signednesses are accepted
+/// because the two natural sources disagree — an integer literal or a loop
+/// counter is `i64`, while `len()` is `u64` — and requiring one would force a
+/// conversion on every `xs[xs.len() - 1]` or every `xs[i]`. Codegen clamps
+/// bounds to `[0, len]` regardless, so a negative `i64` and a huge `u64` are
+/// already handled identically; the width is the same 64-bit register either
+/// way, so nothing is lost by accepting both. Any narrower integer still needs
+/// an explicit conversion, as before.
+fn expect_len_operand(actual: &Type, ctx: &str, span: Span) -> Result<(), Error> {
+    if matches!(
+        actual,
+        Type::Primitive(Primitive::I64) | Type::Primitive(Primitive::U64)
+    ) {
+        return Ok(());
+    }
+    expect(actual, &Type::Primitive(Primitive::I64), ctx, span)
 }
 
 /// Merge two branch/arm types with the same coercions (permissive). A

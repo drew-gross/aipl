@@ -2,7 +2,7 @@ import { !, ==, has, len } from builtins;
 
 // The `#{T}` set type as a parameter and return type, plus passing a set across
 // calls (exercises set ownership/refcounting).
-fn count(xs: #{i64}) -> i64 { len(xs) }.test({
+fn count(xs: #{i64}) -> u64 { len(xs) }.test({
     assert(count(#{10, 20, 30, 10}) == 3);
 })
 

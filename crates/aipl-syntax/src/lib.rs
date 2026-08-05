@@ -1185,7 +1185,12 @@ fn __builtin_max(self: i64, other: i64) -> i64 { self }
 // case for these two names.
 fn __builtin_minimum<T: ord>(self: T[]) -> T? { none }
 fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
-fn __builtin_len<T: any>(self: T[]) -> i64 { 0 }
+// Element/byte count. Unsigned: a length is never negative, so `u64` keeps
+// `len`-derived arithmetic (`a.len() - b.len()`, capacity math) in the
+// saturating-at-zero unsigned world rather than silently going negative.
+// Index/slice bounds accept either signedness, so `xs[xs.len() - 1]` still
+// works without a conversion.
+fn __builtin_len<T: any>(self: T[]) -> u64 { u64(0) }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
 // Character classification: ASCII whitespace (space/tab/newline/carriage return).
 fn __builtin_is_space(self: char) -> bool { false }

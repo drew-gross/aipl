@@ -6645,6 +6645,23 @@ fn expect_type(actual: &Type, expected: &Type, context: &str, span: Span) -> Res
     ))
 }
 
+/// A length-like operand — an index, a slice bound, a `Span` field, or a
+/// capacity — accepted as `i64` *or* `u64`. Mirrors the checker's
+/// `expect_len_operand`: an integer literal or loop counter is `i64` while
+/// `len()` is `u64`, and requiring one signedness would force a conversion on
+/// every `xs[xs.len() - 1]` or every `xs[i]`. Both occupy the same 64-bit
+/// register and bounds are clamped to `[0, len]` either way, so a negative
+/// `i64` and an out-of-range `u64` already behave identically.
+fn expect_len_operand(actual: &Type, context: &str, span: Span) -> Result<(), Error> {
+    if matches!(
+        actual,
+        Type::Primitive(Primitive::I64) | Type::Primitive(Primitive::U64)
+    ) {
+        return Ok(());
+    }
+    expect_type(actual, &Type::Primitive(Primitive::I64), context, span)
+}
+
 /// Reject binding a unit value (the result of a function that returns
 /// nothing) to a name. Such a value can't be stored or used; the call
 /// belongs in statement position instead (`print(x);`, not
@@ -12311,7 +12328,7 @@ fn compile_call_expr<M: Module>(
             (ptr, opt_ty)
         }
         "__builtin_len" => {
-            // `len(a) -> i64` — element/byte count. Reads `a` without consuming
+            // `len(a) -> u64` — element/byte count. Reads `a` without consuming
             // it (it stays live in the caller's scope), so no inc/dec.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -12340,7 +12357,7 @@ fn compile_call_expr<M: Module>(
                     args[0].span.clone(),
                 ));
             };
-            (len, Type::Primitive(Primitive::I64))
+            (len, Type::Primitive(Primitive::U64))
         }
         "__builtin_reverse" => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
@@ -13009,12 +13026,9 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (cap, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            expect_type(
-                &t,
-                &Type::Primitive(Primitive::I64),
-                "with_capacity capacity",
-                args[0].span.clone(),
-            )?;
+            // A capacity is a count: `map`'s desugar feeds it `len()` (`u64`),
+            // while hand-written calls pass an `i64` literal.
+            expect_len_operand(&t, "with_capacity capacity", args[0].span.clone())?;
             // Element type unknown here (`__none__`); the drop-fn and element
             // size are settled by the first `push`. `map`/`filter` only pre-size
             // 8-byte-element outputs (optional outputs use a plain `[]`).
@@ -13813,12 +13827,16 @@ fn compile_expr<M: Module>(
                 let (v, actual) = compile_expr(module, builder, cx, scopes, &init.value)?;
                 // `expect_type` (not `==`) so a `none` / empty `[]` value
                 // coerces into an optional / array field.
-                expect_type(
-                    &actual,
-                    &fty,
-                    &format!("struct {:?} field {:?}", display_name(name), init.name),
-                    init.value.span.clone(),
-                )?;
+                let ctx = format!("struct {:?} field {:?}", display_name(name), init.name);
+                // `start..end` desugars to a `__builtin_Span` construction, so its
+                // two fields are slice bounds by another name — accept either
+                // signedness there, exactly as `xs[a..b]` does. Both are the same
+                // 64-bit register, so the store is unaffected.
+                if name == "__builtin_Span" {
+                    expect_len_operand(&actual, &ctx, init.value.span.clone())?;
+                } else {
+                    expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
+                }
                 match (slot, heap) {
                     // Boxed: store into the heap payload via the block pointer.
                     (_, Some(base)) => {
@@ -15311,12 +15329,7 @@ fn compile_expr<M: Module>(
                 );
             }
 
-            expect_type(
-                &idx_t,
-                &Type::Primitive(Primitive::I64),
-                "index",
-                index.span.clone(),
-            )?;
+            expect_len_operand(&idx_t, "index", index.span.clone())?;
 
             // `s[i]` on a `str` (or a str-shaped `char[]`, see `is_char_array`)
             // yields `char?` — the byte at `i`, via the runtime `aipl_char_at`.
@@ -15402,21 +15415,11 @@ fn compile_expr<M: Module>(
             // (str / char[] / array) and ownership notes.
             let (s_v, s_ty) = compile_expr(module, builder, cx, scopes, obj)?;
             let (a_v, a_t) = compile_expr(module, builder, cx, scopes, start)?;
-            expect_type(
-                &a_t,
-                &Type::Primitive(Primitive::I64),
-                "slice start",
-                start.span.clone(),
-            )?;
+            expect_len_operand(&a_t, "slice start", start.span.clone())?;
             let b_v = match end {
                 Some(end) => {
                     let (b_v, b_t) = compile_expr(module, builder, cx, scopes, end)?;
-                    expect_type(
-                        &b_t,
-                        &Type::Primitive(Primitive::I64),
-                        "slice end",
-                        end.span.clone(),
-                    )?;
+                    expect_len_operand(&b_t, "slice end", end.span.clone())?;
                     Some(b_v)
                 }
                 None => None,

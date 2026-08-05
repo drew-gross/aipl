@@ -2,7 +2,7 @@ import { !, !=, +++, ==, has, len, wrapping_add as + } from builtins;
 
 // Sets of strings: deduplicated and tested for membership by *content* (not
 // pointer identity), and freed/retained like a `str[]`.
-fn distinct(xs: #{str}) -> i64 { len(xs) }.test({
+fn distinct(xs: #{str}) -> u64 { len(xs) }.test({
     assert(distinct(#{"apple", "banana", "apple", "cherry"}) == 3);
 })
 

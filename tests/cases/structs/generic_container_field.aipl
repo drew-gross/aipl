@@ -4,7 +4,7 @@ import { ==, len } from builtins;
 // The element type is pinned by the array's elements, giving `Stack$i64`.
 struct Stack<T> { items: T[] }
 
-fn item_count() -> i64 {
+fn item_count() -> u64 {
     let s = Stack { items: [10, 20, 30] };
     len(s.items)
 }.test({

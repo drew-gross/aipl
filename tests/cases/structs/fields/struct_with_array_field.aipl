@@ -12,7 +12,7 @@ fn make() -> Tags {
     let t = make();
     assert(t.names[0].value_or("?") == "a");
     assert(t.names[1].value_or("?") == "b");
-    assert(t.id * 10 + len(t.names) == 72);
+    assert(t.id * 10 + i64(len(t.names)) == 72);
 })
 --- performance ---
 allocations: 2
@@ -22,7 +22,7 @@ bytes allocated: 88
 instructions executed: 200
 binary size: 3040
   code: 1144
-  data: 186
-  metadata: 1710
+  data: 191
+  metadata: 1705
 --- monomorphizations ---
 main

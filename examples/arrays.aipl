@@ -39,5 +39,5 @@ fn main() -> i64 {
     // sum(xs) = 15, len(xs) = 5; out-of-bounds index is `none`.
     let missing = xs[99].value_or(0);
     // 15 + 5 + 0 - 20 = 0
-    sum(xs) + len(xs) + missing - 20
+    sum(xs) + i64(len(xs)) + missing - 20
 }

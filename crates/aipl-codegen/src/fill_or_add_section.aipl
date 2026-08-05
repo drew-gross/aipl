@@ -33,7 +33,7 @@ fn fill_section(contents: str, section: str, body: str) -> str {
             set line_start = i + 1;
         };
     }
-    if (line_start < contents.len()) {
+    if (line_start < i64(contents.len())) {
         let line = contents[line_start..];
         let hdr = parse_test_section_header(line);
         if (!(skipping && hdr == none)) {

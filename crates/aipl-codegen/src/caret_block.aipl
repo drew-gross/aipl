@@ -25,7 +25,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     let col = span.start - line_start;
     let underline_len = max(min(span.end, line_end) - span.start, 1);
     let line_no = line + 1;
-    let blank = " ".repeat(line_no.to_str().len());
+    let blank = " ".repeat(i64(line_no.to_str().len()));
     ```
         {blank}--> {filename}:{line_no}:{col + 1}
         {blank} |

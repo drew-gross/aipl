@@ -3,7 +3,7 @@ import { ==, len, push } from builtins;
 // Builtins are usable once imported, with the same `import { .. }`
 // syntax as files — just `from builtins` instead of a path.
 
-fn pushed_len() -> i64 {
+fn pushed_len() -> u64 {
     mut xs = [1, 2];
     set xs.push(3);
     len(xs)

@@ -138,7 +138,7 @@ fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
             IfBroken(s) => if (flat) {
                 go(width, col, rest, acc)
             } else {
-                go(width, col + u64(s.len()), rest, acc.pushed(s))
+                go(width, col + s.len(), rest, acc.pushed(s))
             },
             BreakParent => go(width, col, rest, acc),
         },
@@ -189,7 +189,7 @@ fn fits(budget: u64, work: Work) -> bool {
             IfBroken(s) => if (flat) {
                 fits(budget, rest)
             } else {
-                fits_after(budget, u64(s.len()), rest)
+                fits_after(budget, s.len(), rest)
             },
             BreakParent => if (flat) { false } else { fits(budget, rest) },
         },
@@ -207,7 +207,7 @@ fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
 // (so it only "fits" when the surrounding content is already broken); a
 // single-line atom just consumes its width.
 fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
-    if (s.contains("\n")) { !flat } else { fits_after(budget, u64(s.len()), rest) }
+    if (s.contains("\n")) { !flat } else { fits_after(budget, s.len(), rest) }
 }
 
 // ---------- helpers ----------
@@ -230,7 +230,7 @@ fn pushed(self: str[], piece: str) -> str[] {
 fn col_after(col: u64, text: str) -> u64 {
     let parts = text.split("\n");
     let n = parts.len();
-    if (n < 2) { col + u64(text.len()) } else { u64(parts[n - 1].value_or("").len()) }
+    if (n < 2) { col + text.len() } else { parts[n - 1].value_or("").len() }
 }
 
 // A line break landing at indentation `sp`: a newline plus `sp` spaces.
@@ -296,11 +296,11 @@ allocations: 283
 deallocations: 283
 reallocations: 0
 bytes allocated: 16060
-instructions executed: 20405
-binary size: 29192
-  code: 16104
+instructions executed: 20397
+binary size: 29144
+  code: 16060
   data: 842
-  metadata: 12246
+  metadata: 12242
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam11

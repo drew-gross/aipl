@@ -7,8 +7,8 @@ pub fn strip_test_sections(src: str) -> str {
     // for a `--- name ---` marker; the first marker line is the cutoff, and we
     // return everything before it. A trailing `\r` (CRLF) needs no special
     // handling — `parse_test_section_header` trims it before matching.
-    mut line_start = 0;
-    mut i = 0;
+    mut line_start = u64(0);
+    mut i = u64(0);
     while (i < src.len()) {
         if (src[i] == some('\n')) {
             if (parse_test_section_header(src[line_start..i]) != none) {
