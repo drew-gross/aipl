@@ -507,6 +507,7 @@ case_tests! {
     cases_syntax_err_param_missing_type = "cases/syntax/err_param_missing_type",
     cases_syntax_err_unexpected_token_in_expr = "cases/syntax/err_unexpected_token_in_expr",
     cases_syntax_err_unterminated_block_comment = "cases/syntax/err_unterminated_block_comment",
+    cases_syntax_range_precedence = "cases/syntax/range_precedence",
     cases_syntax_trailing_commas = "cases/syntax/trailing_commas",
     cases_tests_all_tests_in_file_run = "cases/tests/all_tests_in_file_run",
     cases_tests_asserts = "cases/tests/asserts",

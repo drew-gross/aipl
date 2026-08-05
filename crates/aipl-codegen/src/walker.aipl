@@ -306,7 +306,7 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
         w.expect("struct").is_err_and(|e| e.message == `formatter: expected "struct", found "fn"`),
     );
     // The span points at the offending token.
-    assert(w.expect("struct").is_err_and(|e| e.span == (6..8)));
+    assert(w.expect("struct").is_err_and(|e| e.span == 6..8));
     // Past the end the message picks up the span-less marker.
     assert(
         end

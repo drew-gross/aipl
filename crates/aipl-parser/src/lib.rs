@@ -72,7 +72,9 @@ gazelle! {
             // disambiguates — exactly like `<`.
             prec OROR,
             // `..` — the range expression `start..end` (a `Span` constructor).
-            // Lowest precedence, so `a + 1..b * 2` is `(a + 1)..(b * 2)`. Also
+            // Binds tighter than `==`/`!=` (so `span == 1..2` compares against
+            // the whole range) but looser than comparison and arithmetic (so
+            // `a + 1..b * 2` is `(a + 1)..(b * 2)`) — see `op_precedence`. Also
             // appears literally in the open-ended slice postfixes (`[a..]`,
             // `[..b]`), like `MINUS` appears literally in unary position.
             prec DOTDOT
@@ -2298,11 +2300,18 @@ impl gazelle::Action<aipl::Expr<Self>> for Build {
 //   '==' / '!='   => 'E' / 'N'
 //   '<=' / '>='   => 'L' / 'G'
 //   '<' / '>' / '+' / '*' / '/' keep their literal chars
+// Levels, loosest to tightest:
+//   1 `||`  2 `&&`  3 `==` `!=`  4 `..`  5 `<` `>` `<=` `>=`
+//   6 `+` `+++` (and unary/binary `-`)  7 `*` `/` `%`
+// `..` (level 4, see the `DotDot` token below) sits *above* equality so a range
+// on the right of a comparison groups as one operand — `span == 1..2` is
+// `span == (1..2)`, not `(span == 1)..2` — and *below* the arithmetic so
+// `a + 1..b * 2` is still `(a + 1)..(b * 2)`.
 fn op_precedence(c: char) -> Precedence {
     match c {
-        'O' => Precedence::Left(2),
-        'A' => Precedence::Left(3),
-        'E' | 'N' => Precedence::Left(4),
+        'O' => Precedence::Left(1),
+        'A' => Precedence::Left(2),
+        'E' | 'N' => Precedence::Left(3),
         '<' | '>' | 'L' | 'G' => Precedence::Left(5),
         // `+` (integer add) and `'C'` (`+++`, string concat) share additive
         // precedence.
@@ -2936,7 +2945,9 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             K::Lt => T::Langle(op_precedence('<')),
             K::Gt => T::Rangle(op_precedence('>')),
             K::Minus => T::Minus(Precedence::Left(6)),
-            K::DotDot => T::Dotdot(Precedence::Left(1)),
+            // Level 4 — tighter than `==`, looser than `<` and the arithmetic;
+            // see `op_precedence` for the whole table.
+            K::DotDot => T::Dotdot(Precedence::Left(4)),
             K::PlusPlus => T::Plusplus(span.clone()),
             K::Arrow => T::Arrow,
             K::FatArrow => T::Fatarrow,
