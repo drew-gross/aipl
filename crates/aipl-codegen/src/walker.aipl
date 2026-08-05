@@ -10,7 +10,7 @@
 // same shape `lexer.aipl`'s `StepResult` uses for its `end`. Reading the cursor
 // (`peek`, `at_end`, …) takes `W` by value and returns just the answer; advancing
 // it (`bump`, `expect`, `lead`, …) returns a carrier holding the moved-on `W`.
-import { !, &&, +++, <, <=, ==, Span, contains, len, push, wrapping_add as + } from builtins;
+import { !, &&, <, <=, ==, Span, contains, len, push, wrapping_add as + } from builtins;
 import { BlankLine, BreakParent, Concat, Doc, HardLine, Text } from "./doc.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
@@ -117,18 +117,14 @@ fn expect(self: W, want: str) -> WStr!FmtError {
     if (self.peek_text() == want) {
         ok(self.bump())
     } else {
-        err(
-            self.err_here(
-                "formatter: expected " +++ quoted(want) +++ ", found " +++ quoted(self.peek_text()),
-            ),
-        )
+        err(self.err_here(`formatter: expected {quoted(want)}, found {quoted(self.peek_text())}`))
     }
 }
 
 // `"x"` — the Rust walker's `{:?}` on a `&str`. Only ever applied to token text,
 // which is why this needs no escaping: a token that *contains* a quote is a
 // string literal, and those are never `expect`ed.
-fn quoted(s: str) -> str { "\"" +++ s +++ "\"" }
+fn quoted(s: str) -> str { `"{s}"` }
 
 // An error at the cursor. Past the last token there is no span to point at, so
 // the message says so and the span collapses to EOF — the AIPL stand-in for the
@@ -137,7 +133,7 @@ fn err_here(self: W, msg: str) -> FmtError {
     match (self.peek()) {
         some(t) => FmtError { message: msg, span: t.span },
         none => FmtError {
-            message: msg +++ " (at end of input)",
+            message: `{msg} (at end of input)`,
             span: i64(self.src.len())..i64(self.src.len()),
         },
     }
@@ -374,15 +370,15 @@ fn err_message(self: WStr!FmtError) -> str {
     }
 }
 --- performance ---
-allocations: 71
-deallocations: 71
+allocations: 67
+deallocations: 67
 reallocations: 0
-bytes allocated: 3448
-instructions executed: 10658
-binary size: 35104
-  code: 18344
+bytes allocated: 3295
+instructions executed: 10670
+binary size: 35312
+  code: 18456
   data: 2372
-  metadata: 14388
+  metadata: 14484
 --- monomorphizations ---
 __test$pushed
 at_end

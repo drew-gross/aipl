@@ -107,6 +107,8 @@ Nested matching e.g.
     }
 
 implement vec.count(0)
+implement is_ok_and and is_err
+instead of err_message use x == err(...)
 
 indent.aipl optimization: pre-reserve target*lines + self.len() space
 
