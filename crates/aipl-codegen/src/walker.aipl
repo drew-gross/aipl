@@ -1,0 +1,407 @@
+// The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust
+// `aipl-fmt` `Walker` (`crates/aipl-fmt/src/lib.rs`). It walks the token stream
+// `lex_aipl` produces — not the AST, since the parser desugars as it builds
+// (template literals, `set n++`, destructuring), so an AST can't be printed back
+// faithfully — and builds a `Doc` layout tree for `print_doc` to lay out.
+//
+// The Rust walker is a `&mut self` cursor over `(toks, pos, comments, last_end)`.
+// AIPL values have no references, so the cursor travels as a `W` *value* that
+// every step returns alongside its result — the `W…` carrier structs below, the
+// same shape `lexer.aipl`'s `StepResult` uses for its `end`. Reading the cursor
+// (`peek`, `at_end`, …) takes `W` by value and returns just the answer; advancing
+// it (`bump`, `expect`, `lead`, …) returns a carrier holding the moved-on `W`.
+import { !, &&, +++, <, <=, ==, Span, contains, len, push, wrapping_add as + } from builtins;
+import { BlankLine, BreakParent, Concat, Doc, HardLine, Text } from "./doc.aipl";
+
+// What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
+// `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
+// which token *text* alone cannot distinguish — an empty segment's `TplMid` is
+// the single character `{`, identical to a brace.
+variant FmtKind =
+    Keyword
+    | Constant
+    | BuiltinType
+    | Ident
+    | Num
+    | StrTok
+    | CharTok
+    | Op
+    | Punct
+    | TplHead
+    | TplMid
+    | TplTail
+
+// One token: what it is, and where it sits in the source. The text is recovered
+// from the span (`src[span]`) rather than stored, exactly as the Rust walker
+// slices `&self.src[sp]` — so every literal, comment and paren stays verbatim.
+struct FmtTok { kind: FmtKind, span: Span }
+
+// The walker's whole state. `src`/`toks`/`comments` are the immutable inputs;
+// `pos`/`cpos`/`last_end` are the cursor the Rust version mutates in place.
+struct W {
+    src: str,
+    toks: FmtTok[],
+    comments: Span[],
+    pos: u64,
+    // Index of the next undrained comment. The Rust walker pops from a
+    // `VecDeque`; an index needs no queue (and AIPL arrays have no `pop`).
+    cpos: u64,
+    // End offset of the last consumed token or comment — what the blank-line and
+    // same-line (trailing comment) decisions measure from.
+    last_end: i64,
+}
+
+// Cursor-advancing steps return the moved-on `W` beside their result.
+struct WDoc { w: W, doc: Doc }
+
+struct WStr { w: W, text: str }
+
+// A formatter failure. Mirrors `lexer.aipl`'s `LexError`; the Rust walker's
+// span-less `Error::msg` case (past the last token) becomes a message carrying
+// "(at end of input)" with an empty span at EOF — see `err_here`.
+struct FmtError { message: str, span: Span }
+
+fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
+    W { src, toks, comments, pos: 0, cpos: 0, last_end: 0 }
+}
+
+// ---------- token primitives ----------
+
+// The token at the cursor, or `none` past the end.
+fn peek(self: W) -> FmtTok? { self.toks[self.pos] }
+
+// Source text of the token `n` past the cursor; `""` past the end. A `Span`
+// index is slice sugar, so `src[span]` is the token's verbatim text.
+fn peek_text_n(self: W, n: u64) -> str {
+    match (self.toks[self.pos + n]) {
+        some(t) => self.src[t.span],
+        none => "",
+    }
+}
+
+fn peek_text(self: W) -> str { self.peek_text_n(0) }
+
+fn peek_kind(self: W) -> FmtKind? {
+    match (self.peek()) {
+        some(t) => some(t.kind),
+        none => none,
+    }
+}
+
+fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
+
+// Consume the token at the cursor, returning its text. The caller has already
+// dispatched on it; comments before it must have been drained (else the final
+// not-carried check in the driver fails).
+fn bump(self: W) -> WStr {
+    match (self.peek()) {
+        some(t) => self.bump_tok(t),
+        // Past the end there is nothing to consume: the cursor stays put and the
+        // text is empty, matching `peek_text`. The Rust version indexes and would
+        // panic; every caller dispatches on `peek_text` first, so neither runs.
+        none => WStr { w: self, text: "" },
+    }
+}
+
+// Step over `t` (already known to be the token at the cursor). Split out because
+// a match arm is a single expression — it cannot open a statement block.
+fn bump_tok(self: W, t: FmtTok) -> WStr {
+    mut w = self;
+    set w.pos = w.pos + 1;
+    set w.last_end = t.span.end;
+    WStr { w, text: self.src[t.span] }
+}
+
+// Consume the next token, which must read exactly `want`.
+fn expect(self: W, want: str) -> WStr!FmtError {
+    if (self.peek_text() == want) {
+        ok(self.bump())
+    } else {
+        err(
+            self.err_here(
+                "formatter: expected " +++ quoted(want) +++ ", found " +++ quoted(self.peek_text()),
+            ),
+        )
+    }
+}
+
+// `"x"` — the Rust walker's `{:?}` on a `&str`. Only ever applied to token text,
+// which is why this needs no escaping: a token that *contains* a quote is a
+// string literal, and those are never `expect`ed.
+fn quoted(s: str) -> str { "\"" +++ s +++ "\"" }
+
+// An error at the cursor. Past the last token there is no span to point at, so
+// the message says so and the span collapses to EOF — the AIPL stand-in for the
+// Rust `Error::msg` (span-less) case.
+fn err_here(self: W, msg: str) -> FmtError {
+    match (self.peek()) {
+        some(t) => FmtError { message: msg, span: t.span },
+        none => FmtError {
+            message: msg +++ " (at end of input)",
+            span: i64(self.src.len())..i64(self.src.len()),
+        },
+    }
+}
+
+// ---------- source gaps ----------
+
+// Where the next syntactic entity begins: the next comment or token, whichever
+// comes first. Past both, the end of the source.
+fn next_start(self: W) -> i64 {
+    let tok = match (self.peek()) {
+        some(t) => t.span.start,
+        none => i64(self.src.len()),
+    };
+    match (self.comments[self.cpos]) {
+        some(c) => if (c.start < tok) { c.start } else { tok },
+        none => tok,
+    }
+}
+
+// Whether the source between two offsets holds a blank line (two newlines).
+// (`lo`/`hi` where the Rust version says `from`/`to` — `from` is a keyword.)
+fn gap_has_blank(self: W, lo: i64, hi: i64) -> bool { 2 <= self.src[lo..hi].newline_count() }
+
+// Newlines in `self` — `str::matches('\n').count()` in the Rust version. Spelled
+// out because the `count_while` builtin stops at the first non-match.
+fn newline_count(self: str) -> u64 {
+    mut n = u64(0);
+    for (let c : self) {
+        if (c == '\n') {
+            set n = n + 1;
+        };
+    }
+    n
+}
+
+// Whether two offsets sit on the same source line.
+fn same_line(self: W, lo: i64, hi: i64) -> bool { !self.src[lo..hi].contains("\n") }
+
+// ---------- comments ----------
+
+// Drain the comments before the next token, each on its own line — so a
+// mid-list line comment forces the enclosing group to break (a comment can never
+// be flattened onto one line). A blank line *after* a comment is preserved: it
+// marks the comment as standalone rather than attached to what follows.
+fn lead(self: W) -> WDoc {
+    // Past the last token every remaining comment is "before" it, which is what
+    // flushes a file's trailing comments; `next_start` still bounds each gap.
+    let limit = match (self.peek()) {
+        some(t) => t.span.start,
+        none => i64(self.src.len()) + 1,
+    };
+    lead_loop(self, limit, [])
+}
+
+fn lead_loop(w: W, limit: i64, acc: Doc[]) -> WDoc {
+    match (w.comments[w.cpos]) {
+        none => WDoc { w, doc: Concat(acc) },
+        some(c) => if (limit <= c.start) {
+            WDoc { w, doc: Concat(acc) }
+        } else {
+            let stepped = w.take_comment(c);
+            let next = stepped.next_start();
+
+            // `next` can precede `c.end` only if a later entity started inside
+            // this comment, which the lexer cannot produce; `max` in the Rust
+            // version guards the same impossible case.
+            let gap_end = if (next < c.end) { c.end } else { next };
+            let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
+            lead_loop(stepped, limit, acc.pushed(Text(w.src[c])).pushed(sep))
+        },
+    }
+}
+
+// A trailing comment on the same line as whatever just ended, rendered as
+// ` // ...` glued to the current line plus a `BreakParent`, so no group flattens
+// anything after it onto the comment's line. It must also come *before* the next
+// unconsumed token: a comment ending a source line whose earlier tokens are still
+// pending (e.g. after the `}` closing an inline block) belongs to a later flush
+// point, not this one.
+fn trailing_comment(self: W) -> WDoc {
+    let next_tok = match (self.peek()) {
+        some(t) => t.span.start,
+        none => i64(self.src.len()) + 1,
+    };
+    match (self.comments[self.cpos]) {
+        none => WDoc { w: self, doc: Concat([]) },
+        some(c) => if (c.start < next_tok && self.same_line(self.last_end, c.start)) {
+            WDoc {
+                w: self.take_comment(c),
+                doc: Concat([Text(" "), Text(self.src[c]), BreakParent]),
+            }
+        } else {
+            WDoc { w: self, doc: Concat([]) }
+        },
+    }
+}
+
+// Consume comment `c`: step past it and mark it as the last thing emitted. The
+// Rust `pop_front` + `last_end` update, as one move.
+fn take_comment(self: W, c: Span) -> W {
+    mut w = self;
+    set w.cpos = w.cpos + 1;
+    set w.last_end = c.end;
+    w
+}
+
+// Append one `Doc` to an accumulator (AIPL's `push` mutates, so this is the
+// expression form the folds above want).
+fn pushed(self: Doc[], d: Doc) -> Doc[] {
+    mut a = self;
+    set a.push(d);
+    a
+}.test({
+    // --- fixtures -------------------------------------------------------
+    // `fn f() {}` with a leading line comment and a trailing one, so the
+    // primitives below have real spans to walk. Offsets are byte-exact:
+    //
+    //   0         1         2         3
+    //   0123456789012345678901234567890123456789
+    //   // hi\nfn f() {} // tail\n
+    let src = "// hi\nfn f() {} // tail\n";
+    let toks = [
+        FmtTok { kind: Keyword, span: 6..8 },
+        // fn
+        FmtTok { kind: Ident, span: 9..10 },
+        // f
+        FmtTok { kind: Punct, span: 10..11 },
+        // (
+        FmtTok { kind: Punct, span: 11..12 },
+        // )
+        FmtTok { kind: Punct, span: 13..14 },
+        // {
+        FmtTok { kind: Punct, span: 14..15 },
+    ];
+    // }
+
+    let comments = [0..5, 16..23];
+    let w = new_walker(src, toks, comments);
+
+    // --- token primitives -----------------------------------------------
+    assert(w.peek_text() == "fn");
+    assert(w.peek_text_n(1) == "f");
+    assert(w.peek_kind() == some(Keyword));
+    assert(!w.at_end());
+
+    // `bump` advances and hands back the consumed text.
+    let b = w.bump();
+    assert(b.text == "fn");
+    assert(b.w.peek_text() == "f");
+    assert(b.w.last_end == 8);
+    // The original `w` is untouched — the cursor is a value, not a mutation.
+    assert(w.peek_text() == "fn");
+
+    // Walking off the end is inert rather than a panic, and `at_end` reports it.
+    mut end = w;
+    for (let _ : "123456") {
+        set end = end.bump().w;
+    }
+    assert(end.at_end());
+    assert(end.peek_text() == "");
+    assert(end.peek_kind() == none);
+    assert(end.bump().text == "");
+
+    // --- expect ----------------------------------------------------------
+    assert(w.expect("fn").is_ok_text("fn"));
+    // A mismatch names both sides, quoted, like the Rust `{:?}`.
+    assert(w.expect("struct").err_message() == "formatter: expected \"struct\", found \"fn\"");
+    // Past the end the message picks up the span-less marker.
+    assert(
+        end.expect("}").err_message() == "formatter: expected \"}\", found \"\" (at end of input)",
+    );
+
+    // --- source gaps -------------------------------------------------------
+    // The first comment starts at 0, before the first token at 6.
+    assert(w.next_start() == 0);
+    // Once it is drained, the next entity is the `fn` token.
+    assert(w.take_comment(0..5).next_start() == 6);
+    assert(w.same_line(6, 8));
+    assert(!w.same_line(0, 8)); // spans the newline after `// hi`
+    assert(!w.gap_has_blank(0, 8)); // one newline is not a blank line
+    assert("a\n\nb".newline_count() == 2);
+    assert("abc".newline_count() == 0);
+
+    // --- lead --------------------------------------------------------------
+    // The leading `// hi` is drained and emitted with a hard line after it (the
+    // gap to `fn` holds a single newline, so no blank line).
+    let l = w.lead();
+    assert(l.doc == Concat([Text("// hi"), HardLine]));
+    assert(l.w.cpos == 1);
+    assert(l.w.last_end == 5);
+    // At the `fn` token there is no *leading* comment left, so `lead` is empty.
+    assert(l.w.lead().doc == Concat([]));
+
+    // A blank line after a comment is preserved as a `BlankLine` separator.
+    let blank_src = "// hi\n\nfn f() {}";
+    let bw = new_walker(blank_src, [FmtTok { kind: Keyword, span: 7..9 }], [0..5]);
+    assert(bw.lead().doc == Concat([Text("// hi"), BlankLine]));
+
+    // --- trailing_comment ---------------------------------------------------
+    // With the leading comment drained the cursor sits at `fn` (offset 6), and
+    // `// tail` (16) comes *after* that still-unconsumed token — so it belongs to
+    // a later flush point, not this one.
+    assert(l.w.trailing_comment().doc == Concat([]));
+    // After consuming through `}` (end 15), `// tail` at 16 is on that line.
+    mut through = w.lead().w;
+    for (let _ : "123456") {
+        set through = through.bump().w;
+    }
+    assert(through.last_end == 15);
+    let tc = through.trailing_comment();
+    assert(tc.doc == Concat([Text(" "), Text("// tail"), BreakParent]));
+    assert(tc.w.cpos == 2);
+    // Drained exactly once — a second call finds nothing left.
+    assert(tc.w.trailing_comment().doc == Concat([]));
+
+    // --- pushed -------------------------------------------------------------
+    assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
+})
+
+// Test-only: whether an `expect` succeeded with the given consumed text.
+fn is_ok_text(self: WStr!FmtError, want: str) -> bool {
+    match (self) {
+        ok(s) => s.text == want,
+        err(_) => false,
+    }
+}
+
+// Test-only: the message of a failed `expect` (`""` when it succeeded).
+fn err_message(self: WStr!FmtError) -> str {
+    match (self) {
+        ok(_) => "",
+        err(e) => e.message,
+    }
+}
+--- performance ---
+allocations: 71
+deallocations: 71
+reallocations: 0
+bytes allocated: 3448
+instructions executed: 10658
+binary size: 35104
+  code: 18344
+  data: 2372
+  metadata: 14388
+--- monomorphizations ---
+__test$pushed
+at_end
+bump
+err_message
+expect
+gap_has_blank
+lead
+lead_loop
+main
+new_walker
+newline_count
+next_start
+peek
+peek_kind
+peek_text
+peek_text_n
+pushed
+quoted
+same_line
+take_comment
+trailing_comment

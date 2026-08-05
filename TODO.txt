@@ -106,6 +106,8 @@ Nested matching e.g.
         none => ...,
     }
 
+implement vec.count(0)
+
 indent.aipl optimization: pre-reserve target*lines + self.len() space
 
 rest/spread in match
@@ -131,8 +133,6 @@ the arg contract being different for builtins caused problems for retain elision
 - make the arg contract for builtins more uniform
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
-
-Currently working on moving the formatter to pure AIPL
 
 make a docs renderer
 

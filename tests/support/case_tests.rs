@@ -557,6 +557,7 @@ case_tests! {
     crates_aipl_codegen_src_trim_prefix = "crates/aipl-codegen/src/trim_prefix",
     crates_aipl_codegen_src_trim_suffix = "crates/aipl-codegen/src/trim_suffix",
     crates_aipl_codegen_src_unescape = "crates/aipl-codegen/src/unescape",
+    crates_aipl_codegen_src_walker = "crates/aipl-codegen/src/walker",
     crates_aipl_mono_src_builtin_all = "crates/aipl-mono/src/builtin_all",
     crates_aipl_mono_src_builtin_any = "crates/aipl-mono/src/builtin_any",
     crates_aipl_mono_src_builtin_count_while = "crates/aipl-mono/src/builtin_count_while",
