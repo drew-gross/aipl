@@ -834,8 +834,12 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         // alike; only the user-facing `examples/` are exempt. Author a new case
         // with a `?` body and run the fill helper to capture the measured
         // allocation counts.
+        // `fill` mode falls through both gates: a missing required section is
+        // *created* by the fill below (`fill_or_add_section_file` appends one
+        // that isn't there), so a brand-new case is finished in a single pass
+        // rather than erroring here and needing a second run.
         let exempt = rel.starts_with("examples");
-        if !exempt && spec.performance.is_none() {
+        if !exempt && !fill && spec.performance.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- performance ---` section. Add one with a \
                  `?` body and run `{}` to fill in the measured \
@@ -845,14 +849,14 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         }
         // A `--- monomorphizations ---` section is likewise mandatory for every
         // running test case (same gate as performance — examples are exempt).
-        if !exempt && spec.monomorphizations.is_none() {
+        if !exempt && !fill && spec.monomorphizations.is_none() {
             return Outcome::Fail(format!(
                 "{ctx}: missing required `--- monomorphizations ---` section. Add one with a \
                  `?` body and run `{}` to fill in the emitted instances.",
                 scoped_fill_cmd(&ctx)
             ));
         }
-        run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, fill)
+        run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, fill, !exempt)
     }
 }
 
@@ -1299,6 +1303,11 @@ fn run_success_case(
     spec: &Spec,
     case_dir: &Path,
     fill: bool,
+    // Whether `--- performance ---`/`--- monomorphizations ---` are mandatory
+    // for this case (false only for the exempt `examples/`). In fill mode this
+    // is what authorizes *creating* an absent one, so a fill never adds those
+    // sections to an example.
+    require_metrics: bool,
 ) -> Outcome {
     let program = match loader::load_program(src_path, debug_opts()) {
         Ok(p) => p,
@@ -1352,7 +1361,8 @@ fn run_success_case(
     let mut outcome = Outcome::Pass;
     // The monomorphized instances emitted into this binary, pinned by an optional
     // `--- monomorphizations ---` section. Read before `emit` consumes `obj_comp`.
-    if let Some(expected) = &spec.monomorphizations {
+    if spec.monomorphizations.is_some() || (fill && require_metrics) {
+        let expected = spec.monomorphizations.as_deref().unwrap_or("");
         let actual = obj_comp.monomorphized_fns().join("\n");
         fold_section!(
             outcome,
@@ -1494,7 +1504,8 @@ fn run_success_case(
 
     // Allocation accounting, if requested. Correctness (above) is checked
     // first so a perf mismatch never masks a behavioral regression.
-    if let Some(perf) = &spec.performance {
+    if spec.performance.is_some() || (fill && require_metrics) {
+        let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — split into code/data/metadata for the report.
         let sizes = BinSizes::of(&obj_bytes);

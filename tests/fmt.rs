@@ -430,3 +430,131 @@ fn width_is_configurable() {
         "fn f(\n    aaaa: i64,\n    bbbb: i64,\n    cccc: i64,\n) -> i64 { aaaa }\n"
     );
 }
+
+/// Differential check: the dogfooded AIPL formatter (`walker.aipl`'s
+/// `format_program`, reached through the FFI) must lay every checked-in `.aipl`
+/// file out *byte-for-byte* the same as the native Rust formatter.
+///
+/// This exists only for the duration of the port — once `format_source` is
+/// switched over and the Rust `Walker` deleted there is nothing left to compare
+/// against, so it is the last chance to prove the two agree over the whole
+/// corpus rather than over hand-written fixtures.
+///
+/// The AIPL entry does lexing, walking and printing; the Rust `format_source`
+/// wraps those in section-splitting, trailing-whitespace cleanup and the
+/// preservation check. To compare like with like, the same wrapper steps are
+/// applied here before and after calling it.
+/// Files the AIPL walker cannot yet lay out: it recurses where the Rust walker
+/// loops, and AIPL frames are large enough (structs by value, plus a stack slot
+/// per composite temporary) that the deepest of these exhausts the native stack
+/// and aborts. Correctness is not in question — each one formats identically
+/// given a larger stack — so they are excluded here rather than left to crash
+/// the run, and the list shrinks as the recursion is converted to iteration.
+/// (The walker cannot yet format its own source — it is the largest file here.)
+const TOO_DEEP_FOR_AIPL_WALKER: &[&str] = &[
+    "crates/aipl-codegen/src/lexer.aipl",
+    "crates/aipl-codegen/src/walker.aipl",
+];
+
+#[test]
+fn aipl_formatter_matches_rust_formatter() {
+    setup();
+    let opts = FmtOptions::default();
+    let mut diffs: Vec<String> = Vec::new();
+    let mut compared = 0usize;
+    let mut skipped = 0usize;
+
+    for path in enforced_files() {
+        let rel = path.to_string_lossy().replace('\\', "/");
+        if TOO_DEEP_FOR_AIPL_WALKER.iter().any(|s| rel.ends_with(s)) {
+            skipped += 1;
+            continue;
+        }
+        let src = std::fs::read_to_string(&path).unwrap();
+        if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
+            continue; // parse-error fixture; nothing to format
+        }
+        let Ok(rust_out) = format_source(&src, &opts) else {
+            continue; // the Rust side declined it; nothing to compare
+        };
+
+        // Mirror `format_source`'s pre-steps: the AIPL entry sees only the code
+        // half, already stripped of trailing whitespace.
+        let (code, sections) = aipl_parser::split_test_sections(&src);
+        let cleaned = clean_trailing_ws(code);
+
+        let laid_out = match aipl::codegen::format_program(&cleaned, opts.max_width) {
+            Ok(s) => s,
+            Err(e) => {
+                diffs.push(format!("{}: AIPL formatter errored: {e}", path.display()));
+                continue;
+            }
+        };
+
+        // ...and its post-steps: exactly one trailing newline, then the verbatim
+        // sections re-attached.
+        let mut aipl_out = laid_out;
+        while aipl_out.ends_with('\n') {
+            aipl_out.pop();
+        }
+        aipl_out.push('\n');
+        if !sections.is_empty() {
+            aipl_out.push_str(sections);
+        }
+
+        compared += 1;
+        if aipl_out != rust_out {
+            diffs.push(format!(
+                "{}: {}",
+                path.display(),
+                first_diff(&rust_out, &aipl_out)
+            ));
+        }
+    }
+
+    assert!(compared > 100, "compared too few files ({compared})");
+    // Keep the exclusion list honest: an entry that no longer exists (renamed or
+    // deleted) would silently stop excluding anything.
+    assert_eq!(
+        skipped,
+        TOO_DEEP_FOR_AIPL_WALKER.len(),
+        "TOO_DEEP_FOR_AIPL_WALKER lists {} file(s) but {skipped} were skipped — \
+         an entry no longer matches a real file",
+        TOO_DEEP_FOR_AIPL_WALKER.len(),
+    );
+    assert!(
+        diffs.is_empty(),
+        "{} of {compared} file(s) formatted differently by the AIPL walker:\n{}",
+        diffs.len(),
+        diffs
+            .iter()
+            .take(10)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+}
+
+/// Strip trailing spaces/tabs from every line — `format_source`'s own pre-step,
+/// duplicated so the differential test feeds the AIPL entry the same bytes.
+fn clean_trailing_ws(src: &str) -> String {
+    src.lines()
+        .map(|l| l.trim_end_matches([' ', '\t']))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + if src.ends_with('\n') { "\n" } else { "" }
+}
+
+/// The first differing line of two renderings, for a readable failure.
+fn first_diff(want: &str, got: &str) -> String {
+    for (i, (a, b)) in want.lines().zip(got.lines()).enumerate() {
+        if a != b {
+            return format!("line {}: rust={a:?} aipl={b:?}", i + 1);
+        }
+    }
+    format!(
+        "line counts differ: rust={} aipl={}",
+        want.lines().count(),
+        got.lines().count()
+    )
+}

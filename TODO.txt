@@ -30,18 +30,12 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
 lex json
-- need recursive types for this (auto-boxing with garbage collection?)
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
 warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
 - unused imports
-
-That did surface a real gap, though: need_fill matches `<section>` mismatch but not missing required <section> section, so a brand-new case always costs a second handoff cycle. The message carries the same [<display-path>]: prefix the AIPL_CASE extraction already parses, so closing it is a two-grep change. I haven't touched it — it's outside what you asked and that script is your gate — but it's a papercut I've hit on nearly every case added this session.
-
-formatter improvements
-- sort imports
 
 output multiple errors at once
 remove install_parser_hook with lazy loader

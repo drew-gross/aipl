@@ -141,6 +141,25 @@ fn sanity_check(artifact: &str) {
         ])
     };
 
+    // The formatter entry: source in, laid-out source out. Canonical input is a
+    // fixed point, so this also checks the walker round-trips rather than merely
+    // returning something.
+    let formatted = comp
+        .call_values(
+            "format_program",
+            &[
+                FfiValue::Str("fn  f (  a : i64 )->i64{ a }".to_string()),
+                FfiValue::Int(100),
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        formatted,
+        FfiValue::Res(Ok(Box::new(FfiValue::Str(
+            "fn f(a: i64) -> i64 { a }".to_string()
+        ))))
+    );
+
     let out = comp
         .call_values(
             "process_raw_string",

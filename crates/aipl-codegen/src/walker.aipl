@@ -49,6 +49,8 @@ import {
     print_doc,
 } from "./doc.aipl";
 import { is_operator_name } from "./is_operator_name.aipl";
+import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
+import { LexResult, Token } from "./lexer.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 // `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -306,6 +308,148 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     set parts.push(edge);
     set parts.push(Text(s.close));
     group(Concat(parts))
+}
+
+// ---------- entry point ----------
+
+// Format `src` at `width`, from source text to laid-out source text: lex it,
+// walk the tokens into a `Doc`, then print. This is the whole formatter as far
+// as the Rust side is concerned — arrays cannot cross the FFI as arguments, so
+// the token stream is produced here rather than marshalled in.
+//
+// The caller still owns the surrounding steps that are not layout: splitting off
+// trailing `--- section ---` blocks, stripping trailing whitespace, validating
+// with the real parser, and the token-preservation check.
+pub fn format_program(src: str, width: u64) -> str!FmtError {
+    let lexed = lex_for_fmt(src)?;
+    let w = new_walker(src, fmt_toks(lexed.tokens, []), trivia_spans(lexed.trivia, []));
+    let d = w.program()?;
+
+    // Every comment must have been carried into the output; one left behind
+    // would silently vanish from the formatted source.
+    match (d.w.comments[d.w.cpos]) {
+        none => ok(print_doc(d.doc, width)),
+        some(c) => err(FmtError {
+            message: "formatter: comment was not carried into the output (formatter bug)",
+            span: c,
+        }),
+    }
+}
+
+// `lex_aipl`'s failure as a `FmtError`. The two carry the same shape, but `?`
+// propagates only the enclosing function's error type, so the sides are bridged
+// here rather than at every call.
+fn lex_for_fmt(src: str) -> LexResult<AiplTok>!FmtError {
+    match (lex_aipl(src)) {
+        ok(l) => ok(l),
+        err(e) => err(FmtError { message: e.message, span: e.span }),
+    }
+}
+
+// The lexer's tokens as the walker's own `(kind, span)` pairs.
+fn fmt_toks(toks: Token<AiplTok>[], acc: FmtTok[]) -> FmtTok[] {
+    mut out = acc;
+    for (let t : toks) {
+        set out.push(FmtTok { kind: fmt_kind(t.kind), span: t.span });
+    }
+    out
+}
+
+// Trivia is comments and `#[allow]` markers only — whitespace is a `skip` rule,
+// so it never reaches the trivia stream.
+fn trivia_spans(trivia: Token<AiplTok>[], acc: Span[]) -> Span[] {
+    mut out = acc;
+    for (let t : trivia) {
+        set out.push(t.span);
+    }
+    out
+}
+
+// A lexer token kind as the kind the walker dispatches on. The interpolated
+// template pieces (regular *or* raw) keep their head/middle/tail position, which
+// token text alone cannot recover; everything else folds to its syntactic class.
+fn fmt_kind(k: AiplTok) -> FmtKind {
+    match (k) {
+        TemplateHead(_) => TplHead,
+        RawTemplateHead(_) => TplHead,
+        TemplateMid(_) => TplMid,
+        RawTemplateMid(_) => TplMid,
+        TemplateTail(_) => TplTail,
+        RawTemplateTail(_) => TplTail,
+        Fn => Keyword,
+        If => Keyword,
+        Else => Keyword,
+        Struct => Keyword,
+        Variant => Keyword,
+        Import => Keyword,
+        From => Keyword,
+        As => Keyword,
+        Pub => Keyword,
+        Let => Keyword,
+        For => Keyword,
+        While => Keyword,
+        Mut => Keyword,
+        Set => Keyword,
+        Match => Keyword,
+        Return => Keyword,
+        Builtins => Keyword,
+        True => Constant,
+        False => Constant,
+        None => Constant,
+        // A name is a builtin *type* or an ordinary identifier.
+        Name(n) => if (is_builtin_type_name(n)) { BuiltinType } else { Ident },
+        IntLit(_) => Num,
+        StrLit(_, _) => StrTok,
+        CharTok(_) => CharTok,
+        EqEq => Op,
+        Ne => Op,
+        Arrow => Op,
+        FatArrow => Op,
+        AndAnd => Op,
+        OrOr => Op,
+        Pipe => Op,
+        DotDot => Op,
+        PlusPlusPlus => Op,
+        PlusPlus => Op,
+        Eq => Op,
+        Lt => Op,
+        Le => Op,
+        Gt => Op,
+        Ge => Op,
+        Bang => Op,
+        Plus => Op,
+        Minus => Op,
+        Star => Op,
+        Slash => Op,
+        Percent => Op,
+        Period => Punct,
+        Comma => Punct,
+        Colon => Punct,
+        Semi => Punct,
+        Question => Punct,
+        Hash => Punct,
+        LParen => Punct,
+        RParen => Punct,
+        LBrace => Punct,
+        RBrace => Punct,
+        LBracket => Punct,
+        RBracket => Punct,
+        // Trivia never reaches the token stream (whitespace is skipped, comments
+        // go to the trivia sink); classify them harmlessly rather than diverge.
+        Space => Punct,
+        LineComment => Punct,
+        BlockComment => Punct,
+        AllowMarker => Punct,
+    }
+}
+
+// The lexically-identifier names the highlighter scopes as types.
+fn is_builtin_type_name(n: str) -> bool {
+    n == "bool" || n == "char" || n == "str" || n == "any" || n.is_int_type_name()
+}
+
+fn is_int_type_name(self: str) -> bool {
+    self == "i8" || self == "i16" || self == "i32" || self == "i64" || self == "u8" || self == "u16" || self == "u32" || self == "u64"
 }
 
 // ---------- small shared helpers ----------
@@ -770,24 +914,34 @@ fn program(self: W) -> WDoc!FmtError {
     ok(WDoc { w: p.w, doc: Concat(out) })
 }
 
-fn program_items(self: W, imports: ImportEntry[], items: Doc[]) -> WProgram!FmtError {
-    if (self.at_end()) {
-        return ok(WProgram { w: self, imports, items });
-    };
-    let l = self.lead();
-    if (l.w.at_end()) {
-        // Comments after the last item.
-        return ok(WProgram { w: l.w, imports, items: items.pushed(l.doc) });
-    };
-    if (l.w.peek_text() == "import") {
-        let im = l.w.import_item()?;
-        let tc = im.w.trailing_comment();
-        let e = ImportEntry { key: im.key, doc: Concat([l.doc, im.doc, tc.doc]) };
-        return tc.w.program_items(imports.pushed_import(e), items);
-    };
-    let it = l.w.item()?;
-    let tc = it.w.trailing_comment();
-    tc.w.program_items(imports, items.pushed(Concat([l.doc, it.doc, tc.doc])))
+fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!FmtError {
+    mut w = self;
+    mut imports = imports0;
+    mut items = items0;
+    while (!w.at_end()) {
+        let l = w.lead();
+        set w = l.w;
+        if (w.at_end()) {
+            // Comments after the last item.
+            set items = items.pushed(l.doc);
+        } else {
+            if (w.peek_text() == "import") {
+                let im = w.import_item()?;
+                let tc = im.w.trailing_comment();
+                set imports = imports.pushed_import(ImportEntry {
+                    key: im.key,
+                    doc: Concat([l.doc, im.doc, tc.doc]),
+                });
+                set w = tc.w;
+            } else {
+                let it = w.item()?;
+                let tc = it.w.trailing_comment();
+                set items = items.pushed(Concat([l.doc, it.doc, tc.doc]));
+                set w = tc.w;
+            };
+        };
+    }
+    ok(WProgram { w, imports, items })
 }
 
 // The imports in hoist order. AIPL has no `<` on strings, so the only ordering
@@ -1016,42 +1170,49 @@ fn block_layout(self: W) -> WDoc!FmtError {
     })
 }
 
-fn block_entries(self: W, entries: Doc[], prev_end: u64) -> WEntries!FmtError {
-    // Comments before the next statement (or the closing brace).
-    let l = self.lead();
-    let had_lead = !l.doc.is_empty_doc();
-    let after_lead = if (had_lead) {
-        let blank = l.w.gap_has_blank(prev_end, max_u64(prev_end, l.w.last_end));
-        WEntries {
-            w: l.w,
-            entries: entries.pushed(sep_entry(blank, 0 < entries.len())).pushed(l.doc),
+// A loop rather than recursion: the depth would otherwise be one frame per
+// statement, and AIPL frames are large enough (structs by value, plus a stack
+// slot per composite temporary) that a big function body exhausts the native
+// stack. The same reasoning applies to `program_items`.
+fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError {
+    mut w = self;
+    mut entries = entries0;
+    mut prev_end = prev_end0;
+    mut open = true;
+    while (open) {
+        // Comments before the next statement (or the closing brace).
+        let l = w.lead();
+        let had_lead = !l.doc.is_empty_doc();
+        set w = l.w;
+        if (had_lead) {
+            let blank = w.gap_has_blank(prev_end, max_u64(prev_end, w.last_end));
+            set entries = entries.pushed(sep_entry(blank, 0 < entries.len())).pushed(l.doc);
+
             // `lead` already ends with a line break per comment; the next entry
             // continues under it.
-            prev_end: l.w.last_end,
-        }
-    } else {
-        WEntries { w: l.w, entries, prev_end }
-    };
-    if (after_lead.w.peek_text() == "}") {
-        // Drop the line break `lead` left dangling before `}` — the closing edge
-        // supplies it.
-        let trimmed = if (had_lead) {
-            after_lead.entries.trim_last_break()
-        } else {
-            after_lead.entries
+            set prev_end = w.last_end;
         };
-        return ok(WEntries { w: after_lead.w, entries: trimmed, prev_end: after_lead.prev_end });
-    };
-    let start = after_lead.w.next_start();
-    let stmt = after_lead.w.statement()?;
-    let with_sep = if (had_lead) {
-        after_lead.entries
-    } else {
-        let blank = after_lead.w.gap_has_blank(after_lead.prev_end, start);
-        after_lead.entries.pushed(sep_entry(blank, 0 < after_lead.entries.len()))
-    };
-    let tc = stmt.w.trailing_comment();
-    tc.w.block_entries(with_sep.pushed(stmt.doc).pushed(tc.doc), tc.w.last_end)
+        if (w.peek_text() == "}") {
+            // Drop the line break `lead` left dangling before `}` — the closing
+            // edge supplies it.
+            if (had_lead) {
+                set entries = entries.trim_last_break();
+            };
+            set open = false;
+        } else {
+            let start = w.next_start();
+            let stmt = w.statement()?;
+            if (!had_lead) {
+                let blank = w.gap_has_blank(prev_end, start);
+                set entries = entries.pushed(sep_entry(blank, 0 < entries.len()));
+            };
+            let tc = stmt.w.trailing_comment();
+            set entries = entries.pushed(stmt.doc).pushed(tc.doc);
+            set w = tc.w;
+            set prev_end = tc.w.last_end;
+        };
+    }
+    ok(WEntries { w, entries, prev_end })
 }
 
 fn trim_last_break(self: Doc[]) -> Doc[] {
@@ -1064,15 +1225,18 @@ fn trim_last_break(self: Doc[]) -> Doc[] {
 
 fn max_u64(a: u64, b: u64) -> u64 { if (a < b) { b } else { a } }
 
-// Whether any token in `[lo, hi)` is a `;`.
+// Whether any token in `[lo, hi)` is a `;`. A loop, not recursion: this scans
+// every token of a block, so on a large one the recursive form ran the native
+// stack out (AIPL does not guarantee tail-call elimination).
 fn range_has_semi(self: W, lo: u64, hi: u64) -> bool {
-    if (hi <= lo) {
-        return false;
-    };
-    if (self.tok_text(lo) == ";") {
-        return true;
-    };
-    self.range_has_semi(lo + 1, hi)
+    mut i = lo;
+    while (i < hi) {
+        if (self.tok_text(i) == ";") {
+            return true;
+        };
+        set i = i + 1;
+    }
+    false
 }
 
 // One statement (consuming its `;`) or the block's trailing expression.
@@ -1836,25 +2000,33 @@ fn hugs_sole_arg(self: W) -> bool {
         return false;
     };
     let open_at = if (direct) { self.pos } else { self.pos + 1 };
-    match (self.hug_close(open_at, u64(0))) {
+    match (self.hug_close(open_at)) {
         none => false,
         some(close) => self.hug_fills_call(open_at, close),
     }
 }
 
-// Index of the bracket closing the one at `i`, or `none` if unbalanced.
-fn hug_close(self: W, i: u64, depth: u64) -> u64? {
-    if (self.toks.len() <= i) {
-        return none;
-    };
-    let t = self.tok_text(i);
-    if (t == "(" || t == "[" || t == "{" || t == "#{") {
-        return self.hug_close(i + 1, depth + 1);
-    };
-    if (t == ")" || t == "]" || t == "}") {
-        return if (depth <= 1) { some(i) } else { self.hug_close(i + 1, depth - 1) };
-    };
-    self.hug_close(i + 1, depth)
+// Index of the bracket closing the one at `start`, or `none` if unbalanced. A
+// loop for the same reason as `range_has_semi`: it walks token by token to the
+// match, which on a large construct is far too deep to recurse.
+fn hug_close(self: W, start: u64) -> u64? {
+    mut i = start;
+    mut depth = u64(0);
+    while (i < self.toks.len()) {
+        let t = self.tok_text(i);
+        if (t == "(" || t == "[" || t == "{" || t == "#{") {
+            set depth = depth + 1;
+        } else {
+            if (t == ")" || t == "]" || t == "}") {
+                if (depth <= 1) {
+                    return some(i);
+                };
+                set depth = depth - 1;
+            };
+        };
+        set i = i + 1;
+    }
+    none
 }
 
 // Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that runs all
@@ -1963,6 +2135,39 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     assert(walker_of("< T >").type_params().rendered(100)? == "<T>");
     assert(walker_of("< T : any >").type_params().rendered(100)? == "<T: any>");
     assert(walker_of("< T , U : ord >").type_params().rendered(100)? == "<T, U: ord>");
+
+    // --- end to end, on real source ---------------------------------------------
+    // `format_program` lexes for itself, so these are genuine AIPL programs, not
+    // space-separated fixtures — the first thing here to exercise real token
+    // kinds and spans.
+    assert(format_program("fn main() {}", 100)? == "fn main() {}");
+    // Already-canonical source is a fixed point.
+    assert(
+        format_program("fn f(a: i64) -> i64 { a + 1 }", 100)? == "fn f(a: i64) -> i64 { a + 1 }",
+    );
+    // Messy input is normalized: spacing, indentation, and a trailing comma.
+    assert(
+        format_program(
+            "fn  f (  a : i64 ,b:str )  ->bool{c}",
+            100,
+        )? == "fn f(a: i64, b: str) -> bool { c }",
+    );
+    assert(format_program("fn f() {\n\n\n    g();\n}", 100)? == "fn f() {\n    g();\n}");
+    // Imports hoist above items, builtins first, names sorted.
+    assert(
+        format_program(
+            "fn f() {}\nimport { b, a } from builtins;",
+            100,
+        )? == "import { a, b } from builtins;\n\nfn f() {}",
+    );
+    // A comment is carried, not dropped.
+    assert(format_program("// hi\nfn f() {}", 100)? == "// hi\nfn f() {}");
+    // A string literal keeps its bytes verbatim, spacing inside untouched.
+    assert(format_program(`fn f() -> str \{ "a  b" }`, 100)? == `fn f() -> str \{ "a  b" }`);
+    // A lex error surfaces as a formatter error rather than a panic.
+    assert(
+        format_program(`fn f() -> str \{ "unterminated }`, 100).is_err_and(|e| 0 < e.message.len()),
+    );
 
     // --- expressions ------------------------------------------------------------
     assert(walker_of("a").expr().rendered(100)? == "a");
@@ -2381,24 +2586,44 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 --- performance ---
-allocations: 9913
-deallocations: 9913
-reallocations: 577
-bytes allocated: 566281
-instructions executed: 1518481
-binary size: 2665840
-  code: 1506744
-  data: 22580
-  metadata: 1136516
+allocations: 20527
+deallocations: 20527
+reallocations: 593
+bytes allocated: 1018544
+instructions executed: 2831328
+binary size: 2948024
+  code: 1681272
+  data: 25116
+  metadata: 1241636
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam13
-__builtin_count_while$char$s0$lam21
-__builtin_count_while$char$s0$lam31
-__enumerate10
-__enumerate11
+__builtin_any$__m1__Doc$lam23
+__builtin_count_while$char$s0$lam33
+__builtin_count_while$char$s0$lam51
+__builtin_count_while$char$s0$lam56
+__builtin_count_while$char$s0$lam58
+__builtin_count_while$char$s0$lam60
+__builtin_count_while$char$s0$lam61
+__builtin_int_parse
+__builtin_is_some_and$char$lam57
+__builtin_opt_left_fold$char$i64$s0$lam45
 __enumerate12
-__enumerate32
-__enumerate6
+__enumerate13
+__enumerate22
+__enumerate75
+__enumerate8
+__lambda_14
+__lambda_15
+__lambda_16
+__lambda_17
+__lambda_18
+__lambda_19
+__lambda_20
+__lambda_21
+__lambda_44
+__m10__unescape
+__m11__process_raw_string
+__m12__trim_prefix
+__m13__trim_suffix
 __m1__col_after
 __m1__fits
 __m1__fits_after
@@ -2411,9 +2636,32 @@ __m1__prepend
 __m1__print_doc
 __m1__pushed
 __m2__reindent_block
+__m3__dedent
 __m4__lines
-__map23$own0
-__map29$own0
+__m8__char_lit_emit
+__m8__dedent_segments
+__m8__ident_cont
+__m8__int_lit
+__m8__kw
+__m8__op
+__m8__raw_tpl_kind
+__m8__tpl_kind
+__m9__between_len
+__m9__delimited_len
+__m9__finalize_template$__m8__AiplTok
+__m9__float_len
+__m9__interp_scan$__m8__AiplTok
+__m9__lex$__m8__AiplTok
+__m9__lex_step$__m8__AiplTok
+__m9__nested_len
+__m9__seg_needs_ofseg
+__m9__seg_only
+__m9__step_result$__m8__AiplTok
+__m9__template_scan$__m8__AiplTok
+__m9__template_step$__m8__AiplTok
+__m9__unterminated_msg
+__map35$own0
+__map41$own0
 __test$pushed
 __test$walker_of
 array_atom
@@ -2444,11 +2692,13 @@ err_here
 expect
 expr
 extended
+fmt_toks
 fn_attrs
 fn_effects
 fn_item
 fn_return
 for_stmt
+format_program
 gap_has_blank
 hug_close
 hugs_sole_arg
@@ -2521,6 +2771,7 @@ tok_text
 toks_of
 trailing_comment
 trim_last_break
+trivia_spans
 tuple_binder
 tuple_rest
 ty

@@ -2957,6 +2957,8 @@ const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
 const UNESCAPE_SRC: &str = include_str!("unescape.aipl");
 const REINDENT_BLOCK_SRC: &str = include_str!("reindent_block.aipl");
 const INDENT_SRC: &str = include_str!("indent.aipl");
+const DOC_SRC: &str = include_str!("doc.aipl");
+const WALKER_SRC: &str = include_str!("walker.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -2999,6 +3001,8 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./unescape.aipl", UNESCAPE_SRC),
     ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
     ("./indent.aipl", INDENT_SRC),
+    ("./doc.aipl", DOC_SRC),
+    ("./walker.aipl", WALKER_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -3023,6 +3027,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "lex_aipl",
     "lex_aipl_stripped",
     "reindent_block",
+    "format_program",
 ];
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
@@ -3178,6 +3183,49 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
                 other => panic!("dogfooded find_trailing_whitespace() some(_): {other:?}"),
             },
             other => panic!("dogfooded find_trailing_whitespace() call: {other:?}"),
+        }
+    })
+}
+
+/// Lay `src` out at `width` — the dogfooded AIPL formatter (`walker.aipl`'s
+/// `format_program`) via the FFI. `src` must already be the *code* half of a
+/// file, with trailing `--- section ---` blocks split off and per-line trailing
+/// whitespace removed; the caller re-attaches the sections and normalizes the
+/// final newline. Errors come back as the AIPL `FmtError` struct and are
+/// rebuilt as a spanned [`Error`]. No native fallback; panics if the engine
+/// can't be built or called.
+pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
+    fn err_of(v: FfiValue) -> Error {
+        let FfiValue::Struct(fields) = v else {
+            panic!("dogfooded format_program(): err side is not a struct: {v:?}");
+        };
+        let get = |k: &str| fields.iter().find(|(n, _)| n == k).map(|(_, v)| v);
+        let msg = match get("message") {
+            Some(FfiValue::Str(m)) => m.clone(),
+            other => panic!("dogfooded format_program(): FmtError.message: {other:?}"),
+        };
+        match get("span") {
+            Some(FfiValue::Struct(sp)) => {
+                let at = |k: &str| match sp.iter().find(|(n, _)| n == k) {
+                    Some((_, FfiValue::Int(v))) => *v as usize,
+                    other => panic!("dogfooded format_program(): Span.{k}: {other:?}"),
+                };
+                Error::at(msg, at("start")..at("end"))
+            }
+            other => panic!("dogfooded format_program(): FmtError.span: {other:?}"),
+        }
+    }
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values(
+            "format_program",
+            &[FfiValue::Str(src.to_string()), FfiValue::Int(width as i64)],
+        ) {
+            Ok(FfiValue::Res(Ok(v))) => match *v {
+                FfiValue::Str(out) => Ok(out),
+                other => panic!("dogfooded format_program(): ok side is not a str: {other:?}"),
+            },
+            Ok(FfiValue::Res(Err(e))) => Err(err_of(*e)),
+            other => panic!("dogfooded format_program() call: {other:?}"),
         }
     })
 }

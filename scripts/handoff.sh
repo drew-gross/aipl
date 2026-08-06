@@ -173,10 +173,13 @@ fi
 
 # What (fillable) staleness did we see? A backtick-section mismatch (any of
 # stdout / exit code / stderr / errors / check / performance / monomorphizations)
-# or an error-fixture mismatch is refilled; the two IR gates trigger an IR regen;
-# a drifted per-case `#[test]` list is regenerated.
+# or an error-fixture mismatch is refilled; so is a *missing* required section,
+# which is what a brand-new case reports — `fill_expected` creates one that isn't
+# there, so a new case finishes in this same pass. The two IR gates trigger an IR
+# regen; a drifted per-case `#[test]` list is regenerated.
 need_fill=0; need_ir=0; need_case_tests=0
-grep -qE '`[a-z ]+` mismatch|error mismatch' "$STEP_OUT" && need_fill=1
+grep -qE '`[a-z ]+` mismatch|error mismatch|missing required `--- [a-z ]+ ---` section' \
+    "$STEP_OUT" && need_fill=1
 failed_tests "$STEP_OUT" | grep -qE '^(checked_in_ir_is_current|no_staged_ir_pending)$' && need_ir=1
 failed_tests "$STEP_OUT" | grep -qx 'every_case_has_a_test' && need_case_tests=1
 if [ $need_fill -eq 0 ] && [ $need_ir -eq 0 ] && [ $need_case_tests -eq 0 ]; then
@@ -200,8 +203,28 @@ grep -qE '`(stdout|stderr|exit code|errors|check)` mismatch|error mismatch' "$ST
 fail_cases=()
 while IFS= read -r c; do
     [ -n "$c" ] && fail_cases+=("$c")
-done < <(grep -oE '\[[^]]+\]: (`[a-z ]+`|error) mismatch' "$STEP_OUT" \
+done < <(grep -oE '\[[^]]+\]: ((`[a-z ]+`|error) mismatch|missing required)' "$STEP_OUT" \
              | sed -E 's/^\[([^]]+)\].*/\1/' | sort -u)
+
+# Cases added since the checked-in `#[test]` list was generated. These are the
+# reason a brand-new case used to cost a second handoff: with no `#[test]` yet,
+# the discovery run never *executed* them, so their unrecorded sections went
+# unseen and `need_fill` stayed 0 — the final run (after step 3 declares them)
+# was the first thing to notice. `every_case_has_a_test` already names them, so
+# fold them into the fill set and finish them in this pass. Only the
+# "with no `#[test]`" half: the other half lists *deleted* cases, which have no
+# file left to fill.
+while IFS= read -r c; do
+    if [ -n "$c" ]; then
+        fail_cases+=("$c")
+        need_fill=1
+    fi
+done < <(awk '
+    /case\(s\) with no `#\[test\]`:/  { grab = 1; next }
+    /declared `#\[test\]`\(s\) with no case file:/ { grab = 0 }
+    /^[[:space:]]*$/                  { grab = 0 }
+    grab                              { print }
+' "$STEP_OUT" | sed -E 's/^[[:space:]]*([^ ]+) \([A-Za-z0-9_]+\)$/\1/' | sort -u)
 
 # --- 3. Regenerate the per-case `#[test]` list ---------------------------------
 
@@ -276,7 +299,14 @@ fi
 # --- Report --------------------------------------------------------------------
 
 printf '\n%sHANDOFF OK%s\n' "$green$bold" "$off" >&2
-[ $need_fill -eq 1 ] && printf '  refilled sections: %s\n' "$changed_sections" >&2
+if [ $need_fill -eq 1 ]; then
+    if [ -n "$changed_sections" ]; then
+        printf '  refilled sections: %s\n' "$changed_sections" >&2
+    else
+        # Only *missing* sections (a brand-new case) — nothing mismatched.
+        printf '  filled in missing section(s) for a new case\n' >&2
+    fi
+fi
 [ $need_ir -eq 1 ] && printf '  regenerated + promoted dogfood IR\n' >&2
 [ $need_case_tests -eq 1 ] && printf '  regenerated the per-case #[test] list\n' >&2
 if [ $behavioral_changed -eq 1 ]; then
