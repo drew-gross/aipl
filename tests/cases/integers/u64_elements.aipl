@@ -1,0 +1,76 @@
+import {
+    ==,
+    len,
+    print,
+    push,
+    sort,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+// `u64` works as an array and optional element, not just as a scalar. Both
+// 64-bit integers fit because an element slot is 8 bytes and a 64-bit value
+// needs no re-canonicalization when loaded — only the *interpretation* differs,
+// and everything that reads one (rendering, comparison, `sort`) dispatches on
+// signedness. The narrow widths (`i8`..`i32`, `u8`..`u32`) still don't fit: their
+// slots would have to be truncated and re-extended, so they stay scalar-only
+// (see `err_narrow_int_element`).
+
+fn sum(xs: u64[]) -> u64 {
+    mut total = u64(0);
+    for (let x : xs) {
+        set total = total + x;
+    }
+    total
+}.test({
+    assert(sum([u64(1), u64(2), u64(3)]) == u64(6));
+    assert(sum([]) == u64(0));
+})
+
+fn first(xs: u64[]) -> u64? { xs[0] }.test({
+    assert(first([u64(7)]) == some(u64(7)));
+    assert(first([]) == none);
+    assert(first([]).value_or(u64(99)) == u64(99));
+})
+
+fn grown() -> u64[] {
+    mut xs = [u64(1)];
+    set xs.push(u64(2));
+    xs
+}.test({
+    assert(grown() == [u64(1), u64(2)]);
+    assert(grown().len() == u64(2));
+})
+
+// The value that distinguishes unsigned from signed: `u64::MAX` shares its bit
+// pattern with `-1`. It must *render* as a huge number and *sort* last.
+fn u64_max() -> u64 { u64(0) - u64(1) }.test({
+    assert(u64_max().to_str() == "18446744073709551615");
+    assert([u64_max(), u64(1)].sort() == [u64(1), u64_max()]);
+    // The signed contrast: the same bit pattern as `i64` sorts first.
+    assert([0 - 1, 1].sort() == [0 - 1, 1]);
+})
+
+fn main() !prints {
+    print(to_str([u64(3), u64(1), u64(2)].sort()));
+    print(to_str([u64_max()]));
+    print(sum([u64(1), u64(2)]).to_str());
+}
+--- stdout ---
+[1, 2, 3]
+[18446744073709551615]
+3
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 265
+instructions executed: 730
+binary size: 3160
+  code: 1524
+  data: 67
+  metadata: 1569
+--- monomorphizations ---
+main

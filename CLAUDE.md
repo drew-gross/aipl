@@ -10,12 +10,20 @@ see below) and stop there; leave the working tree uncommitted.
 end of a task, as the whole finish-a-task gate. It runs the finish sequence in
 dependency order and pays for the expensive regeneration steps only when a test
 run proves they're needed: `cargo fmt` + `aipl fmt` the corpus, a discovery
-`cargo test`, then (only if that surfaced fillable staleness) scoped
+run, then (only if that surfaced fillable staleness) scoped
 `fill_expected` refills of exactly the mismatched cases and the staged
-dogfood-IR regen/validate/promote flow, then a final `cargo test`. It exits 0 on
+dogfood-IR regen/validate/promote flow, then a final run. It exits 0 on
 green (printing what it refilled/regenerated and flagging behavioral-output
 changes to review in the git diff), or stops with a pointed message naming the
 step and why on any failure a refill can't fix.
+
+The script runs the suite with **`cargo nextest`** (each test in its own
+process; requires `cargo install cargo-nextest`). Two consequences it handles
+for you: nextest defaults to fail-fast, so every whole-suite run there passes
+`--no-fail-fast`; and nextest doesn't run doctests, so the script runs
+`cargo test --doc` as its own step. Your own inner-loop runs can use either
+runner — the cadence commands below are written for `cargo test`, and
+`cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
 **Don't hand-drive the sequence and don't validate before it.** The script is
 the validation, so running a full `cargo test`, a `cargo fmt`, or a section

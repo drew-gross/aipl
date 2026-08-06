@@ -7,7 +7,7 @@
 //   {pad} |
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
-import { <, <=, ==, Span, len, repeat, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+import { <, ==, Span, len, repeat, saturating_sub as -, to_str, wrapping_add as + } from builtins;
 import { line_at } from "./line_at.aipl";
 
 pub fn caret_block(source: str, span: Span, filename: str) -> str {
@@ -15,12 +15,13 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     let col = span.start - line_start;
 
     // The underline runs from the error's start to the earlier of its end and the
-    // line's end, and is at least one column wide. Spelled out rather than
-    // `max(min(..) - start, 1)`: offsets are unsigned now, so an end at or before
-    // the start would *wrap* the subtraction to a huge value that `max` would then
-    // happily pick, where on signed offsets it merely went negative.
+    // line's end, and is at least one column wide. `-` is `saturating_sub`, so an
+    // empty or backwards span yields 0 rather than wrapping around on these
+    // unsigned offsets — the zero check below then widens it to 1. (`stop` stands
+    // in for `min`, which is still `i64`-only.)
     let stop = if (line_end < span.end) { line_end } else { span.end };
-    let underline_len = if (stop <= span.start) { 1 } else { stop - span.start };
+    let width = stop - span.start;
+    let underline_len = if (width == 0) { 1 } else { width };
     let line_no = line + 1;
     let blank = " ".repeat(line_no.to_str().len());
     ```
@@ -87,11 +88,11 @@ allocations: 83
 deallocations: 83
 reallocations: 26
 bytes allocated: 3022
-instructions executed: 6169
-binary size: 10024
-  code: 3852
+instructions executed: 6235
+binary size: 10064
+  code: 3896
   data: 1720
-  metadata: 4452
+  metadata: 4448
 --- monomorphizations ---
 __enumerate0
 __m1__line_at

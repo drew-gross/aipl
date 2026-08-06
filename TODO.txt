@@ -66,12 +66,18 @@ line numbers on test assertion failures, err/none propagations, etc.
 get claude to reorganize my todos
 
 only i64 among integers can be an array element <--- really? fix this
+u64? isn't a supported optional element type. <--- really? fix this
 A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at first — char[] shares the str representation and has no array length field, so array_len_of read garbage. Routed str-shaped receivers to a separate aipl_str_sort, mirroring how reverse splits the same cases.
 The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
 
 error improvements:
 - import suggestions when missing an import
 - from its defining file -> list the filename
+
+make the handoff script give intermediat output (via tee?)
+
+- Match patterns don't support | grouping, so every Doc arm is spelled out (matching doc.aipl's existing style).
+- \{ is a template-literal escape only; inside a plain string it's an error.
 
 optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
@@ -84,6 +90,8 @@ figure out / fix why template literals are peforming worse than concat chains
 improve the highlighter test: correct code should never highlight as a mismatched bracket
 
 make try_left_fold and try_right_fold for use when the lambda returns an error
+
+stop still stands in for min, which is i64-only. Making min/max generic over ord would let that line read as the Rust original does — happy to do it if you want, but not assuming.
 
 For lexer dogfooding:
 - remove the dump/load stuff when the FFI supports the full lex result

@@ -11,8 +11,8 @@
 # Order & why:
 #   1. Format first — `cargo fmt` (Rust) + the `format_corpus` helper (every
 #      checked-in `.aipl`). Formatting is cheap and *span-shifting*, so doing it
-#      up front means a formatting-only fix never costs a second full `cargo test`.
-#   2. Discovery `cargo test`. Three outcomes:
+#      up front means a formatting-only fix never costs a second full test run.
+#   2. Discovery run. Three outcomes:
 #        - green                       -> done.
 #        - only fillable staleness      -> remediate (steps 3-5), then re-confirm.
 #          (a section mismatch, a         Refreshing a section is always
@@ -32,7 +32,17 @@
 #      just those cases' sections from actual output (not the whole corpus).
 #   5. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
 #      artifact -> auto-promote when that run is green.
-#   6. Final `cargo test` confirms green against the live (promoted) artifacts.
+#   6. Final run confirms green against the live (promoted) artifacts.
+#
+# Test runner: `cargo nextest`, which runs each test in its own process (so one
+# crashing case can't take the binary down with it) and reports a stable
+# `FAIL [..] (n/m) <binary> <test>` line per failure — what the greps below parse.
+# Two nextest differences this script has to account for:
+#   - It *defaults to fail-fast*, the opposite of `cargo test`, so every
+#     whole-suite run below passes `--no-fail-fast` explicitly.
+#   - It does not run doctests at all. There are real ones here, so step 1b runs
+#     `cargo test --doc` separately rather than let that coverage vanish.
+# `--color never` keeps the captured output greppable.
 #
 # Exit status: 0 = handoff green; 1 = stopped (message says at which step and why).
 
@@ -48,6 +58,22 @@ STEP_OUT_SAVED="$STEP_OUT"
 trap 'rm -f "$STEP_OUT"' EXIT
 
 bold=$'\033[1m'; red=$'\033[31m'; green=$'\033[32m'; dim=$'\033[2m'; off=$'\033[0m'
+
+# The whole suite. `--no-fail-fast` because nextest cancels on the first failure
+# by default and this script needs to see *all* remediable staleness in one pass
+# (see the discovery step).
+NEXTEST=(cargo nextest run --color never --no-fail-fast)
+
+# One `#[ignore]`d author helper, by exact name. nextest selects ignored tests
+# with `--run-ignored only` rather than libtest's `-- --ignored <name>`.
+helper() { cargo nextest run --color never --run-ignored only -E "test(=$1)"; }
+
+# Test names from nextest's per-failure summary lines:
+#     FAIL [   0.007s] (1/1) aipl::dogfood_ir validate_staged_ir
+# The status column also carries abnormal exits (SIGSEGV/ABORT/TIMEOUT), which
+# `unfillable` below keys on separately. Deduped because nextest prints each
+# failure twice — once inline as it happens, once in the closing summary.
+failed_tests() { awk '/^ *(FAIL|SIGSEGV|ABORT|TIMEOUT|LEAK-FAIL) \[/ {print $NF}' "$1" | sort -u; }
 
 banner() { printf '\n%s==> %s%s\n' "$bold" "$*" "$off" >&2; }
 
@@ -67,13 +93,13 @@ fail() {
 }
 
 # A leftover staged artifact means a previous IR workflow was interrupted; a plain
-# `cargo test` fails on `no_staged_ir_pending` until it's resolved. Don't guess.
+# plain suite run fails on `no_staged_ir_pending` until it's resolved. Don't guess.
 if [ -e "$STAGED" ]; then
     STEP_OUT_SAVED="$STAGED"
     fail "startup" "A staged dogfood-IR artifact already exists:
     $STAGED
 Resolve the interrupted workflow first — promote it
-    cargo test --test dogfood_ir -- --ignored promote_staged_ir
+    cargo nextest run --run-ignored only -E 'test(=promote_staged_ir)'
 or discard it
     rm '$STAGED'"
 fi
@@ -85,13 +111,18 @@ run_step "cargo fmt (Rust)" cargo fmt
 
 # Compile everything (incl. every test binary) so a compile error surfaces here
 # cleanly rather than buried in a test run's output.
-run_step "cargo test --no-run (compile check)" cargo test --no-run
+run_step "nextest --no-run (compile check)" cargo nextest run --no-run --color never
 [ $? -eq 0 ] || { save_out; fail "compile" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
+
+# nextest does not run doctests. Run them here so switching runners didn't
+# silently drop them; they're a couple of seconds.
+run_step "cargo test --doc (nextest skips doctests)" cargo test --doc
+[ $? -eq 0 ] || { save_out; fail "doctests" "$(grep -nE '^(error|test .* FAILED)' "$STEP_OUT" | head -20)"; }
 
 # `format_corpus` rewrites any mis-formatted `.aipl` in place, then fails on
 # purpose to show its summary — so its non-zero exit is expected; a genuine
 # formatter error prints "format failed:".
-run_step "aipl fmt (format_corpus)" cargo test --test fmt -- --ignored format_corpus
+run_step "aipl fmt (format_corpus)" helper format_corpus
 if grep -q 'format failed:' "$STEP_OUT"; then
     save_out; fail "aipl fmt" "$(grep -n 'format failed:' "$STEP_OUT")"
 fi
@@ -102,15 +133,15 @@ fi
 
 # --- 2. Discovery test ---------------------------------------------------------
 
-# `--no-fail-fast` so the discovery run executes *every* test binary and reports
-# all remediable staleness in one pass. Plain `cargo test` stops at the first
-# failing binary, and `cases` runs (alphabetically) before `dogfood_ir` — so a
-# change that makes both the per-case `--- performance ---` sections and
-# `dogfood.clif` stale would die inside `cases`, `need_ir` would stay 0, the
-# staged-IR regen (step 4) would be skipped, and the final run would then fail on
-# `checked_in_ir_is_current` with the IR never regenerated. Running all binaries
-# surfaces the section mismatches *and* the IR gate together.
-run_step "cargo test (discovery)" cargo test --no-fail-fast
+# `--no-fail-fast` (baked into $NEXTEST) so the discovery run executes *every*
+# test and reports all remediable staleness in one pass. Stopping at the first
+# failure would be actively wrong here: a change that makes both the per-case
+# `--- performance ---` sections and `dogfood.clif` stale would cancel inside
+# `cases`, `need_ir` would stay 0, the staged-IR regen (step 5) would be skipped,
+# and the final run would then fail on `checked_in_ir_is_current` with the IR
+# never regenerated. Running everything surfaces the section mismatches *and* the
+# IR gate together.
+run_step "nextest (discovery)" "${NEXTEST[@]}"
 if [ $? -eq 0 ]; then
     printf '\n%sHANDOFF OK%s (green with no regeneration needed)\n' "$green$bold" "$off" >&2
     exit 0
@@ -122,19 +153,22 @@ save_out  # keep the discovery output for any failure message below
 # Stop rather than burn a full-corpus refill that won't help.
 unfillable='(load|compile|emit|link|spawn|instrumented compile) failed:'
 unfillable+='|\(in-language tests\) failed:|Abort trap|SIGSEGV|SIGABRT'
+# nextest reports an abnormal exit in its status column rather than as a signal
+# name in the output, so key on those too.
+unfillable+='|^ *(SIGSEGV|ABORT|TIMEOUT) \['
 if grep -qE "$unfillable" "$STEP_OUT"; then
-    fail "cargo test (failure a refill can't fix)" "$(grep -nE "$unfillable" "$STEP_OUT" | head -20)"
+    fail "nextest (failure a refill can't fix)" "$(grep -nE "$unfillable" "$STEP_OUT" | head -20)"
 fi
 # Any FAILED test that isn't a per-case test (each case is its own `#[test]`,
 # named `<prefix>_<display path>` for the three case roots — their fillable
 # mismatches are handled below), the case-list gate, or a known IR-staleness gate
 # is a real test failure. The unfillable grep above has already stopped on a case
 # that genuinely broke, so what reaches here is a stale section.
-bad="$(grep -oE 'test [A-Za-z0-9_:]+ \.\.\. FAILED' "$STEP_OUT" | awk '{print $2}' \
+bad="$(failed_tests "$STEP_OUT" \
        | grep -vE '^((cases|examples|crates)_.*|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending)$' \
        || true)"
 if [ -n "$bad" ]; then
-    fail "cargo test (failing test)" "$bad"
+    fail "nextest (failing test)" "$bad"
 fi
 
 # What (fillable) staleness did we see? A backtick-section mismatch (any of
@@ -143,10 +177,10 @@ fi
 # a drifted per-case `#[test]` list is regenerated.
 need_fill=0; need_ir=0; need_case_tests=0
 grep -qE '`[a-z ]+` mismatch|error mismatch' "$STEP_OUT" && need_fill=1
-grep -qE '(checked_in_ir_is_current|no_staged_ir_pending) \.\.\. FAILED' "$STEP_OUT" && need_ir=1
-grep -qE 'every_case_has_a_test \.\.\. FAILED' "$STEP_OUT" && need_case_tests=1
+failed_tests "$STEP_OUT" | grep -qE '^(checked_in_ir_is_current|no_staged_ir_pending)$' && need_ir=1
+failed_tests "$STEP_OUT" | grep -qx 'every_case_has_a_test' && need_case_tests=1
 if [ $need_fill -eq 0 ] && [ $need_ir -eq 0 ] && [ $need_case_tests -eq 0 ]; then
-    fail "cargo test (unrecognized failure)" "$(tail -40 "$STEP_OUT")"
+    fail "nextest (unrecognized failure)" "$(tail -40 "$STEP_OUT")"
 fi
 
 # Distinct sections that changed (for the review note), and whether any are
@@ -176,8 +210,7 @@ done < <(grep -oE '\[[^]]+\]: (`[a-z ]+`|error) mismatch' "$STEP_OUT" \
 # it. A brand-new case whose sections are also unrecorded will still fail the
 # final run — that's one more handoff, not a wrong answer.
 if [ $need_case_tests -eq 1 ]; then
-    run_step "fill_case_tests (per-case #[test] list)" \
-        cargo test --test cases -- --ignored fill_case_tests
+    run_step "fill_case_tests (per-case #[test] list)" helper fill_case_tests
     grep -qE 'wrote [0-9]+ `#\[test\]`' "$STEP_OUT" \
         || { save_out; fail "fill_case_tests" "$(tail -40 "$STEP_OUT")"; }
 fi
@@ -191,7 +224,7 @@ if [ $need_fill -eq 1 ]; then
     # back to a whole-corpus fill so a mismatch is never left unrefreshed.
     if [ "${#fail_cases[@]}" -eq 0 ]; then
         run_step "fill_expected (section refill — full corpus, no case path found)" \
-            cargo test --test cases -- --ignored fill_expected
+            helper fill_expected
         grep -q 'refresh complete' "$STEP_OUT" \
             || { save_out; fail "fill_expected" "$(tail -40 "$STEP_OUT")"; }
     else
@@ -202,7 +235,8 @@ if [ $need_fill -eq 1 ]; then
         # before printing) with `0 failed` (no unfillable failure slipped in).
         for case in "${fail_cases[@]}"; do
             run_step "fill_expected (section refill — $case)" \
-                env AIPL_CASE="$case" cargo test --test cases -- --ignored fill_expected
+                env AIPL_CASE="$case" cargo nextest run --color never \
+                    --run-ignored only -E 'test(=fill_expected)'
             grep -qE '\[filter "[^"]*"\]: [0-9]+ passed, 0 failed,' "$STEP_OUT" \
                 || { save_out; fail "fill_expected ($case)" "$(tail -40 "$STEP_OUT")"; }
         done
@@ -212,30 +246,30 @@ fi
 # --- 5. Regenerate + validate + promote dogfood IR -----------------------------
 
 if [ $need_ir -eq 1 ]; then
-    run_step "fill_staged_ir" cargo test --test dogfood_ir -- --ignored fill_staged_ir
+    run_step "fill_staged_ir" helper fill_staged_ir
     grep -qE 'wrote .*\.staged' "$STEP_OUT" || { save_out; fail "fill_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 
-    run_step "validate_staged_ir (entry-level pre-check)" \
-        cargo test --test dogfood_ir -- --ignored validate_staged_ir
+    run_step "validate_staged_ir (entry-level pre-check)" helper validate_staged_ir
     [ $? -eq 0 ] || { save_out; fail "validate_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 
-    run_step "staged-IR corpus run (AIPL_DOGFOOD_IR)" env AIPL_DOGFOOD_IR="$STAGED" cargo test
+    run_step "staged-IR corpus run (AIPL_DOGFOOD_IR)" \
+        env AIPL_DOGFOOD_IR="$STAGED" "${NEXTEST[@]}"
     if [ $? -ne 0 ]; then
         save_out
         fail "staged-IR corpus run (candidate IR is wrong — diff .staged vs live)" \
             "$(grep -nE 'mismatch|FAILED|Abort' "$STEP_OUT" | head -20)"
     fi
 
-    run_step "promote_staged_ir" cargo test --test dogfood_ir -- --ignored promote_staged_ir
+    run_step "promote_staged_ir" helper promote_staged_ir
     grep -q 'promoted' "$STEP_OUT" || { save_out; fail "promote_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 fi
 
 # --- 6. Final confirmation against the live artifacts --------------------------
 
-run_step "cargo test (final)" cargo test
+run_step "nextest (final)" "${NEXTEST[@]}"
 if [ $? -ne 0 ]; then
     save_out
-    fail "cargo test (final — regeneration didn't settle)" \
+    fail "nextest (final — regeneration didn't settle)" \
         "$(grep -nE 'mismatch|FAILED|Abort' "$STEP_OUT" | head -20)"
 fi
 

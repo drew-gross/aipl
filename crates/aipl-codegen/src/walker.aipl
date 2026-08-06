@@ -17,6 +17,7 @@ import {
     <,
     <=,
     ==,
+    ||,
     Span,
     contains,
     count,
@@ -25,8 +26,11 @@ import {
     join,
     len,
     push,
+    saturating_sub as -,
     sort,
     split,
+    starts_with,
+    value_or,
     wrapping_add as +,
 } from builtins;
 import {
@@ -38,6 +42,7 @@ import {
     IfBroken,
     Indent,
     Line,
+    RawBlock,
     SoftLine,
     Text,
     group,
@@ -108,12 +113,7 @@ fn peek(self: W) -> FmtTok? { self.toks[self.pos] }
 
 // Source text of the token `n` past the cursor; `""` past the end. A `Span`
 // index is slice sugar, so `src[span]` is the token's verbatim text.
-fn peek_text_n(self: W, n: u64) -> str {
-    match (self.toks[self.pos + n]) {
-        some(t) => self.src[t.span],
-        none => "",
-    }
-}
+fn peek_text_n(self: W, n: u64) -> str { self.tok_text(self.pos + n) }
 
 fn peek_text(self: W) -> str { self.peek_text_n(0) }
 
@@ -308,6 +308,126 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     group(Concat(parts))
 }
 
+// ---------- small shared helpers ----------
+
+// Source text of token `i`; `""` past the end.
+fn tok_text(self: W, i: u64) -> str {
+    match (self.toks[i]) {
+        some(t) => self.src[t.span],
+        none => "",
+    }
+}
+
+// Whether the token at the cursor has kind `k`.
+fn peek_is(self: W, k: FmtKind) -> bool {
+    match (self.peek()) {
+        some(t) => t.kind == k,
+        none => false,
+    }
+}
+
+// Whether an undrained comment sits before the token at the cursor.
+fn comment_before_cursor(self: W) -> bool {
+    match (self.comments[self.cpos]) {
+        none => false,
+        some(c) => match (self.peek()) {
+            some(t) => c.start < t.span.start,
+            none => false,
+        },
+    }
+}
+
+// Step past one token, recording where it ended. `bump` without the text.
+fn advance(self: W, end: u64) -> W {
+    mut w = self;
+    set w.pos = w.pos + 1;
+    set w.last_end = end;
+    w
+}
+
+fn skip_comment(self: W) -> W {
+    mut w = self;
+    set w.cpos = w.cpos + 1;
+    w
+}
+
+// Whether `d` is the empty `Concat` that `lead`/`trailing_comment` hand back when
+// there was no comment — the "nothing here" doc.
+fn is_empty_doc(self: Doc) -> bool {
+    match (self) {
+        Concat(ds) => ds.len() == u64(0),
+        Text(_) => false,
+        RawBlock(_) => false,
+        IfBroken(_) => false,
+        Indent(_) => false,
+        Group(_, _) => false,
+        Line => false,
+        SoftLine => false,
+        HardLine => false,
+        BlankLine => false,
+        BreakParent => false,
+    }
+}
+
+// Separator between block entries: nothing before the first, otherwise a hard
+// line — doubled when the source had a blank line there.
+fn sep_entry(blank: bool, not_first: bool) -> Doc {
+    if (!not_first) { Concat([]) } else { if (blank) { BlankLine } else { HardLine } }
+}
+
+// Drop a trailing `HardLine`/`BlankLine` from a `Concat` — the line break `lead`
+// leaves dangling when the closing `}` follows and supplies its own.
+fn without_trailing_break(self: Doc) -> Doc {
+    match (self) {
+        Concat(ds) => Concat(ds.drop_trailing_break()),
+        Text(_) => self,
+        RawBlock(_) => self,
+        IfBroken(_) => self,
+        Indent(_) => self,
+        Group(_, _) => self,
+        Line => self,
+        SoftLine => self,
+        HardLine => self,
+        BlankLine => self,
+        BreakParent => self,
+    }
+}
+
+fn drop_trailing_break(self: Doc[]) -> Doc[] {
+    let n = self.len();
+    if (n == 0) {
+        return self;
+    };
+    if (self[n - 1].value_or(Concat([])).is_line_break()) { self[0..n - 1] } else { self }
+}
+
+// A break `lead` may have left at the end of its docs.
+fn is_line_break(self: Doc) -> bool {
+    match (self) {
+        HardLine => true,
+        BlankLine => true,
+        Concat(_) => false,
+        Text(_) => false,
+        RawBlock(_) => false,
+        IfBroken(_) => false,
+        Indent(_) => false,
+        Group(_, _) => false,
+        Line => false,
+        SoftLine => false,
+        BreakParent => false,
+    }
+}
+
+// Replace the last element of `self` — how the block builder rewrites the entry
+// it just pushed (AIPL has no `last_mut`).
+fn with_last(self: Doc[], d: Doc) -> Doc[] {
+    let n = self.len();
+    if (n == 0) {
+        return self.pushed(d);
+    };
+    self[0..n - 1].pushed(d)
+}
+
 // ---------- imports ----------
 
 // One import, plus the key `program` will order it by.
@@ -380,6 +500,12 @@ fn sorted_import_names(keys: str[]) -> Doc[] {
 // What `program` orders imports by: builtins first, then paths alphabetically.
 // Same encoding trick as the names above — a bucket digit ahead of the text.
 fn import_key(source: str) -> str { if (source == "builtins") { "0" } else { `1{source}` } }
+
+fn pushed_seg(self: Seg[], x: Seg) -> Seg[] {
+    mut a = self;
+    set a.push(x);
+    a
+}
 
 fn pushed_str(self: str[], x: str) -> str[] {
     mut a = self;
@@ -612,6 +738,902 @@ fn pushed_case(self: VCase[], c: VCase) -> VCase[] {
     a
 }
 
+// ---------- blocks & statements ----------
+
+// A block's entries, plus the offset the next blank-line decision measures from.
+struct WEntries { w: W, entries: Doc[], prev_end: u64 }
+
+// A `{ .. }` block as its own independently-breaking group.
+fn block(self: W) -> WDoc!FmtError {
+    let b = self.block_layout()?;
+    ok(WDoc { w: b.w, doc: group(b.doc) })
+}
+
+// A `{ .. }` block: statements (`;`-terminated) plus an optional trailing
+// expression. `{}` when empty, `{ expr }` when a lone trailing expression fits,
+// one statement per line otherwise. *Not* wrapped in a group, so a caller can
+// place several blocks under one shared group (an `if`/`else` breaks both
+// branches together) — `block` is the grouped form.
+fn block_layout(self: W) -> WDoc!FmtError {
+    let opened = self.expect("{")?.w;
+    let body_start = opened.pos;
+    let e = opened.block_entries([], opened.last_end)?;
+
+    // A block containing any statement (a `;` anywhere inside it — nested ones
+    // form their own block first, so the distinction doesn't matter) always lays
+    // out one line per statement. Only a pure single-expression body may stay
+    // flat.
+    let has_stmt = e.w.range_has_semi(body_start, e.w.pos);
+    let closed = e.w.expect("}")?.w;
+    if (e.entries.len() == 0) {
+        return ok(WDoc { w: closed, doc: Text("{}") });
+    };
+    let edge = if (has_stmt) { HardLine } else { Line };
+    ok(WDoc {
+        w: closed,
+        doc: Concat([Text("{"), Indent(Concat([edge].extended(e.entries))), edge, Text("}")]),
+    })
+}
+
+fn block_entries(self: W, entries: Doc[], prev_end: u64) -> WEntries!FmtError {
+    // Comments before the next statement (or the closing brace).
+    let l = self.lead();
+    let had_lead = !l.doc.is_empty_doc();
+    let after_lead = if (had_lead) {
+        let blank = l.w.gap_has_blank(prev_end, max_u64(prev_end, l.w.last_end));
+        WEntries {
+            w: l.w,
+            entries: entries.pushed(sep_entry(blank, 0 < entries.len())).pushed(l.doc),
+            // `lead` already ends with a line break per comment; the next entry
+            // continues under it.
+            prev_end: l.w.last_end,
+        }
+    } else {
+        WEntries { w: l.w, entries, prev_end }
+    };
+    if (after_lead.w.peek_text() == "}") {
+        // Drop the line break `lead` left dangling before `}` — the closing edge
+        // supplies it.
+        let trimmed = if (had_lead) {
+            after_lead.entries.trim_last_break()
+        } else {
+            after_lead.entries
+        };
+        return ok(WEntries { w: after_lead.w, entries: trimmed, prev_end: after_lead.prev_end });
+    };
+    let start = after_lead.w.next_start();
+    let stmt = after_lead.w.statement()?;
+    let with_sep = if (had_lead) {
+        after_lead.entries
+    } else {
+        let blank = after_lead.w.gap_has_blank(after_lead.prev_end, start);
+        after_lead.entries.pushed(sep_entry(blank, 0 < after_lead.entries.len()))
+    };
+    let tc = stmt.w.trailing_comment();
+    tc.w.block_entries(with_sep.pushed(stmt.doc).pushed(tc.doc), tc.w.last_end)
+}
+
+fn trim_last_break(self: Doc[]) -> Doc[] {
+    let n = self.len();
+    if (n == 0) {
+        return self;
+    };
+    self.with_last(self[n - 1].value_or(Concat([])).without_trailing_break())
+}
+
+fn max_u64(a: u64, b: u64) -> u64 { if (a < b) { b } else { a } }
+
+// Whether any token in `[lo, hi)` is a `;`.
+fn range_has_semi(self: W, lo: u64, hi: u64) -> bool {
+    if (hi <= lo) {
+        return false;
+    };
+    if (self.tok_text(lo) == ";") {
+        return true;
+    };
+    self.range_has_semi(lo + 1, hi)
+}
+
+// One statement (consuming its `;`) or the block's trailing expression.
+fn statement(self: W) -> WDoc!FmtError {
+    let t = self.peek_text();
+    if (t == "let") {
+        return self.let_stmt();
+    };
+    if (t == "mut") {
+        return self.mut_stmt();
+    };
+    if (t == "set") {
+        return self.set_stmt();
+    };
+    if (t == "return") {
+        let v = self.bump().w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc { w: done, doc: Concat([Text("return "), v.doc, Text(";")]) });
+    };
+    if (t == "for") {
+        return self.for_stmt();
+    };
+    if (t == "while") {
+        return self.while_stmt();
+    };
+    let e = self.expr()?;
+    if (e.w.peek_text() != ";") {
+        // The block's trailing (value) expression.
+        return ok(e);
+    };
+    ok(WDoc { w: e.w.bump().w, doc: Concat([e.doc, Text(";")]) })
+}
+
+// `let x = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
+fn let_stmt(self: W) -> WDoc!FmtError {
+    let kw = self.bump().w;
+    if (kw.peek_text() == "(") {
+        let ids = kw.bump().w.ident_list(")", []);
+        let v = ids.w.expect(")")?.w.expect("=")?.w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc {
+            w: done,
+            doc: Concat([Text(`let ({ids.names.join(", ")}) = `), v.doc, Text(";")]),
+        });
+    };
+    let n = kw.bump();
+    if (n.w.peek_text() == "{") {
+        let ids = n.w.bump().w.ident_list("}", []);
+        let v = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc {
+            w: done,
+            doc: Concat([Text(`let {n.text} \{ {ids.names.join(", ")} } = `), v.doc, Text(";")]),
+        });
+    };
+    let v = n.w.expect("=")?.w.expr()?;
+    let done = v.w.expect(";")?.w;
+    ok(WDoc { w: done, doc: Concat([Text(`let {n.text} = `), v.doc, Text(";")]) })
+}
+
+fn mut_stmt(self: W) -> WDoc!FmtError {
+    let n = self.bump().w.bump();
+    let v = n.w.expect("=")?.w.expr()?;
+    let done = v.w.expect(";")?.w;
+    ok(WDoc { w: done, doc: Concat([Text(`mut {n.text} = `), v.doc, Text(";")]) })
+}
+
+// `set n = e;`, `set n++;`, `set recv.f.g = e;`, or the writeback form
+// `set recv.method(args);`.
+fn set_stmt(self: W) -> WDoc!FmtError {
+    let n = self.bump().w.bump();
+    if (n.w.peek_text() == "++") {
+        let done = n.w.bump().w.expect(";")?.w;
+        return ok(WDoc { w: done, doc: Text(`set {n.text}++;`) });
+    };
+    if (n.w.peek_text() == ".") {
+        return n.w.set_member(n.text);
+    };
+    let v = n.w.expect("=")?.w.expr()?;
+    let done = v.w.expect(";")?.w;
+    ok(WDoc { w: done, doc: Concat([Text(`set {n.text} = `), v.doc, Text(";")]) })
+}
+
+// After `set recv`, a `.`-led path: the token after the last member (`(` vs `=`)
+// picks between a mutating-method writeback and a field assignment.
+fn set_member(self: W, name: str) -> WDoc!FmtError {
+    let p = self.member_path(name);
+    if (p.w.peek_text() == "=") {
+        let v = p.w.bump().w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc { w: done, doc: Concat([Text(`set {p.text} = `), v.doc, Text(";")]) });
+    };
+    let opened = p.w.expect("(")?.w;
+    let hug = opened.hugs_sole_arg();
+    let args = opened.call_args_until(")", [])?;
+    let done = args.w.expect(")")?.w.expect(";")?.w;
+    ok(WDoc {
+        w: done,
+        doc: Concat([Text(`set {p.text}`), call_arg_list(args.docs, hug), Text(";")]),
+    })
+}
+
+fn member_path(self: W, acc: str) -> WStr {
+    if (self.peek_text() != ".") {
+        return WStr { w: self, text: acc };
+    };
+    let m = self.bump().w.bump();
+    m.w.member_path(`{acc}.{m.text}`)
+}
+
+fn for_stmt(self: W) -> WDoc!FmtError {
+    let opened = self.bump().w.expect("(")?.w.expect("let")?.w;
+    let binder = if (opened.peek_text() == "(") {
+        opened.tuple_binder()
+    } else {
+        let b = opened.bump();
+        WStr { w: b.w, text: b.text }
+    };
+    let it = binder.w.expect(":")?.w.expr()?;
+    let body = it.w.expect(")")?.w.block()?;
+    ok(WDoc {
+        w: body.w,
+        doc: Concat([Text(`for (let {binder.text} : `), it.doc, Text(") "), body.doc]),
+    })
+}
+
+fn tuple_binder(self: W) -> WStr {
+    let ids = self.bump().w.ident_list(")", []);
+
+    // The `)` here closes the binder; `for_stmt`'s own `expect(")")` closes the
+    // header, so consume this one.
+    match (ids.w.expect(")")) {
+        ok(s) => WStr { w: s.w, text: `({ids.names.join(", ")})` },
+        err(_) => WStr { w: ids.w, text: `({ids.names.join(", ")})` },
+    }
+}
+
+fn while_stmt(self: W) -> WDoc!FmtError {
+    let cond = self.bump().w.expect("(")?.w.expr()?;
+    let body = cond.w.expect(")")?.w.block()?;
+    ok(WDoc { w: body.w, doc: Concat([Text("while ("), cond.doc, Text(") "), body.doc]) })
+}
+
+// A bare comma-separated identifier list up to (not consuming) `end` — binder
+// names and constructor-pattern bindings, which are names rather than types.
+struct WNames { w: W, names: str[] }
+
+fn ident_list(self: W, end: str, acc: str[]) -> WNames {
+    if (self.peek_text() == end || self.at_end()) {
+        return WNames { w: self, names: acc };
+    };
+    let n = self.bump();
+    let stepped = if (n.w.peek_text() == ",") { n.w.bump().w } else { n.w };
+    stepped.ident_list(end, acc.pushed_str(n.text))
+}
+
+// ---------- expressions ----------
+
+// One postfix segment, tagged so a long chain can break before each *call*
+// rather than exploding an inner argument list.
+struct Seg { is_call: bool, doc: Doc }
+
+struct WSegs { w: W, segs: Seg[] }
+
+// `a..b` — range construction, spelled tight like the slice forms. A `..`
+// directly followed by `]` is the open-ended slice postfix instead, left for the
+// bracket code in `postfix`. Left-assoc, mirroring the grammar (`a..b..c` parses,
+// even though it can only fail the type check later).
+fn expr(self: W) -> WDoc!FmtError {
+    let first = self.binop_expr()?;
+    first.w.range_tail(first.doc)
+}
+
+fn range_tail(self: W, acc: Doc) -> WDoc!FmtError {
+    if (!(self.peek_text() == ".." && self.peek_text_n(1) != "]")) {
+        return ok(WDoc { w: self, doc: acc });
+    };
+    let rhs = self.bump().w.binop_expr()?;
+    rhs.w.range_tail(Concat([acc, Text(".."), rhs.doc]))
+}
+
+fn binop_expr(self: W) -> WDoc!FmtError {
+    let l = self.lead();
+    let first = l.w.unary()?;
+    let tail = first.w.binop_tail([])?;
+
+    // Flat: `a + b + c`; broken: continuation lines led by the operator, one
+    // indent in. No operator at all means no group to make.
+    let d = if (tail.docs.len() == 0) {
+        first.doc
+    } else {
+        group(Concat([first.doc].extended(tail.docs)))
+    };
+    ok(WDoc { w: tail.w, doc: Concat([l.doc, d]) })
+}
+
+fn binop_tail(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (!is_binop(self.peek_text())) {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let op = self.bump();
+    let lead_rhs = op.w.lead();
+    let rhs = lead_rhs.w.unary()?;
+
+    // The operator glues to the current line — `lhs == rhs` — rather than being
+    // pushed onto its own indented continuation line. When the line is too long
+    // the right operand breaks its *own* structure (a call's argument list, a
+    // multi-line `"""` block) instead, so the closing delimiter aligns with the
+    // statement and the operator stays put. A right operand carrying a leading
+    // comment is the exception: the comment needs its own line, so that case
+    // keeps the break-before-operator layout.
+    let seg = if (lead_rhs.doc.is_empty_doc()) {
+        Concat([Text(" "), Text(op.text), Text(" "), rhs.doc])
+    } else {
+        Indent(Concat([Line, Text(op.text), Text(" "), lead_rhs.doc, rhs.doc]))
+    };
+    rhs.w.binop_tail(acc.pushed(seg))
+}
+
+fn is_binop(t: str) -> bool {
+    t == "+" || t == "+++" || t == "-" || t == "*" || t == "/" || t == "%" || t == "==" || t == "!=" || t == "<" || t == ">" || t == "<=" || t == ">=" || t == "&&" || t == "||"
+}
+
+fn unary(self: W) -> WDoc!FmtError {
+    if (self.peek_text() == "-" || self.peek_text() == "!") {
+        let op = self.bump();
+        let rest = op.w.unary()?;
+        return ok(WDoc { w: rest.w, doc: Concat([Text(op.text), rest.doc]) });
+    };
+    self.postfix()
+}
+
+fn postfix(self: W) -> WDoc!FmtError {
+    let head = self.atom()?;
+    let segs = head.w.postfix_segs([])?;
+    if (segs.segs.len() == 0) {
+        return ok(WDoc { w: segs.w, doc: head.doc });
+    };
+
+    // A "member chain" (2+ method calls) becomes one group that, when it can't
+    // fit, breaks before every call segment — the receiver ends up alone on the
+    // first line and each `.method(..)` starts its own indented line. Fewer than
+    // two calls: no chain break (a lone call's own argument list may still break).
+    if (call_count(segs.segs) < 2) {
+        return ok(WDoc { w: segs.w, doc: Concat([head.doc].extended(seg_docs(segs.segs))) });
+    };
+    ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
+}
+
+fn postfix_segs(self: W, acc: Seg[]) -> WSegs!FmtError {
+    let t = self.peek_text();
+    if (t == ".") {
+        return self.dot_seg(acc);
+    };
+    if (t == "[") {
+        return self.index_seg(acc);
+    };
+    if (t == "?") {
+        return self.bump().w.postfix_segs(acc.pushed_seg(Seg { is_call: false, doc: Text("?") }));
+    };
+    ok(WSegs { w: self, segs: acc })
+}
+
+// `.member` or `.method(args)` — field access glues to its left; a call is
+// tagged so the chain layout can break before it.
+fn dot_seg(self: W, acc: Seg[]) -> WSegs!FmtError {
+    let m = self.bump().w.bump();
+    if (m.w.peek_text() != "(") {
+        return m.w.postfix_segs(acc.pushed_seg(Seg { is_call: false, doc: Text(`.{m.text}`) }));
+    };
+    let hug = m.w.bump().w.hugs_sole_arg();
+    let args = m.w.bump().w.call_args_until(")", [])?;
+    let closed = args.w.expect(")")?.w;
+    let seg = Seg {
+        is_call: true,
+        doc: Concat([Text(`.{m.text}`), call_arg_list(args.docs, hug)]),
+    };
+    closed.postfix_segs(acc.pushed_seg(seg))
+}
+
+// `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
+fn index_seg(self: W, acc: Seg[]) -> WSegs!FmtError {
+    let opened = self.bump().w;
+    let inner = if (opened.peek_text() == "..") {
+        opened.slice_to()?
+    } else {
+        opened.index_or_from()?
+    };
+    let closed = inner.w.expect("]")?.w;
+    let seg = Seg {
+        is_call: false,
+        doc: Concat([Text("[")].extended(inner.docs).pushed(Text("]"))),
+    };
+    closed.postfix_segs(acc.pushed_seg(seg))
+}
+
+// `[..b]` — open-ended on the left.
+fn slice_to(self: W) -> WDocs!FmtError {
+    let e = self.bump().w.expr()?;
+    ok(WDocs { w: e.w, docs: [Text(".."), e.doc] })
+}
+
+// `[i]`, `[a..b]`, or `[a..]`.
+fn index_or_from(self: W) -> WDocs!FmtError {
+    let a = self.expr()?;
+    if (a.w.peek_text() != "..") {
+        return ok(WDocs { w: a.w, docs: [a.doc] });
+    };
+    let dots = a.w.bump().w;
+    if (dots.peek_text() == "]") {
+        return ok(WDocs { w: dots, docs: [a.doc, Text("..")] });
+    };
+    let b = dots.expr()?;
+    ok(WDocs { w: b.w, docs: [a.doc, Text(".."), b.doc] })
+}
+
+fn call_count(segs: Seg[]) -> u64 {
+    mut n = u64(0);
+    for (let s : segs) {
+        if (s.is_call) {
+            set n = n + 1;
+        };
+    }
+    n
+}
+
+fn seg_docs(segs: Seg[]) -> Doc[] {
+    mut out = [];
+    for (let s : segs) {
+        set out.push(s.doc);
+    }
+    out
+}
+
+// The chain layout: a `SoftLine` before every call segment, so a break puts each
+// `.method(..)` on its own line while field access stays glued.
+fn chain_docs(segs: Seg[]) -> Doc[] {
+    mut out = [];
+    for (let s : segs) {
+        if (s.is_call) {
+            set out.push(SoftLine);
+        };
+        set out.push(s.doc);
+    }
+    out
+}
+
+// ---------- atoms ----------
+
+fn atom(self: W) -> WDoc!FmtError {
+    // Kind-dispatched forms first: a template literal is copied verbatim, and a
+    // string / number / char / constant is its own text.
+    if (self.peek_is(TplHead)) {
+        return self.template_verbatim();
+    };
+    if (self.peek_is(StrTok)) {
+        return ok(self.bump().str_atom());
+    };
+    if (self.peek_is(Num) || self.peek_is(CharTok) || self.peek_is(Constant)) {
+        let b = self.bump();
+        return ok(WDoc { w: b.w, doc: Text(b.text) });
+    };
+    let t = self.peek_text();
+    if (t == "if") {
+        return self.if_expr();
+    };
+    if (t == "match") {
+        return self.match_expr();
+    };
+
+    // A lambda used as a value (`let f = |x: i64| { .. }`). Only the single-`|`
+    // form reaches expression position; `||` there would be a binary operator.
+    if (t == "|") {
+        return self.lambda();
+    };
+    if (t == "(") {
+        return self.paren_atom();
+    };
+    if (t == "[") {
+        return self.array_atom();
+    };
+    if (t == "#") {
+        return self.set_or_dict_atom();
+    };
+    self.name_atom()
+}
+
+// A `"""..."""` raw string is a `RawBlock` so its closing delimiter aligns under
+// the opening one; a plain `"..."` string is ordinary verbatim text.
+fn str_atom(self: WStr) -> WDoc {
+    let d = if (self.text.starts_with(`"""`)) { RawBlock(self.text) } else { Text(self.text) };
+    WDoc { w: self.w, doc: d }
+}
+
+// `(e)` — a parenthesized expression, or a tuple literal when a comma follows.
+fn paren_atom(self: W) -> WDoc!FmtError {
+    let first = self.bump().w.expr()?;
+    if (first.w.peek_text() != ",") {
+        let closed = first.w.expect(")")?.w;
+        return ok(WDoc { w: closed, doc: Concat([Text("("), first.doc, Text(")")]) });
+    };
+    let rest = first.w.tuple_rest([first.doc])?;
+    let closed = rest.w.expect(")")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(rest.docs, Parens) })
+}
+
+fn tuple_rest(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() != ",") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let stepped = self.bump().w;
+    // A trailing comma before `)` ends the tuple rather than starting an element.
+    if (stepped.peek_text() == ")") {
+        return ok(WDocs { w: stepped, docs: acc });
+    };
+    let e = stepped.expr()?;
+    e.w.tuple_rest(acc.pushed(e.doc))
+}
+
+fn array_atom(self: W) -> WDoc!FmtError {
+    let elems = self.bump().w.call_args_until("]", [])?;
+    let closed = elems.w.expect("]")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(elems.docs, Brackets) })
+}
+
+// `#{a, b}` (set) / `#{k: v}` (dict), and the empty-dict spelling `#{:}`.
+fn set_or_dict_atom(self: W) -> WDoc!FmtError {
+    let opened = self.bump().w.expect("{")?.w;
+    if (opened.peek_text() == ":") {
+        let closed = opened.bump().w.expect("}")?.w;
+        return ok(WDoc { w: closed, doc: Text("#{:}") });
+    };
+    let entries = opened.dict_entries([])?;
+    let closed = entries.w.expect("}")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(entries.docs, HashBraces) })
+}
+
+fn dict_entries(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == "}") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let k = l.w.expr()?;
+    let e = if (k.w.peek_text() == ":") {
+        k.w.dict_value(l.doc, k.doc)?
+    } else {
+        WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
+    };
+    let stepped = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
+    stepped.dict_entries(acc.pushed(e.doc))
+}
+
+fn dict_value(self: W, lead: Doc, k: Doc) -> WDoc!FmtError {
+    let v = self.bump().w.expr()?;
+    ok(WDoc { w: v.w, doc: Concat([lead, k, Text(": "), v.doc]) })
+}
+
+// An identifier-led atom: a bare name, a call `f(..)`, or a struct construction
+// `Name { field: value, .. }`.
+fn name_atom(self: W) -> WDoc!FmtError {
+    if (!(self.peek_is(Ident) || self.peek_is(BuiltinType) || self.peek_is(Keyword))) {
+        return err(
+            self.err_here(`formatter: expected an expression, found {quoted(self.peek_text())}`),
+        );
+    };
+    let n = self.bump();
+    if (n.w.peek_text() == "(") {
+        let hug = n.w.bump().w.hugs_sole_arg();
+        let args = n.w.bump().w.call_args_until(")", [])?;
+        let closed = args.w.expect(")")?.w;
+        return ok(WDoc { w: closed, doc: Concat([Text(n.text), call_arg_list(args.docs, hug)]) });
+    };
+    if (n.w.peek_text() == "{") {
+        return n.w.bump().w.struct_atom(n.text);
+    };
+    ok(WDoc { w: n.w, doc: Text(n.text) })
+}
+
+fn struct_atom(self: W, name: str) -> WDoc!FmtError {
+    let inits = self.struct_inits([])?;
+    let closed = inits.w.expect("}")?.w;
+    if (inits.docs.len() == 0) {
+        return ok(WDoc { w: closed, doc: Text(`{name} \{}`) });
+    };
+    ok(WDoc {
+        w: closed,
+        doc: Concat([Text(`{name} `), comma_list_docs(inits.docs, SpacedBraces)]),
+    })
+}
+
+fn struct_inits(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == "}") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let f = l.w.bump();
+
+    // `field: value`, or the shorthand `field` (sugar for `field: field`) — kept
+    // verbatim, not expanded.
+    let e = if (f.w.peek_text() == ":") {
+        f.w.struct_field_value(l.doc, f.text)?
+    } else {
+        WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
+    };
+    let stepped = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
+    stepped.struct_inits(acc.pushed(e.doc))
+}
+
+fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
+    let v = self.bump().w.expr()?;
+    ok(WDoc { w: v.w, doc: Concat([lead, Text(`{fname}: `), v.doc]) })
+}
+
+// ---------- if / match / lambda / templates ----------
+
+fn if_expr(self: W) -> WDoc!FmtError {
+    let cond = self.expect("if")?.w.expect("(")?.w.expr()?;
+    let closed = cond.w.expect(")")?.w;
+
+    // The branches share one group (via the ungrouped `block_layout`), so they
+    // break *together*: an `if`/`else` is either all on one line or both blocks
+    // broken — never one inline and the other split. A trailing `else if` stays
+    // its own group so a fitting tail can remain inline.
+    let then_b = closed.block_layout()?;
+    let head = [Text("if ("), cond.doc, Text(") "), then_b.doc];
+    if (then_b.w.peek_text() != "else") {
+        return ok(WDoc { w: then_b.w, doc: group(Concat(head)) });
+    };
+    let stepped = then_b.w.bump().w;
+    let tail = if (stepped.peek_text() == "if") {
+        stepped.if_expr()?
+    } else {
+        stepped.block_layout()?
+    };
+    ok(WDoc { w: tail.w, doc: group(Concat(head.pushed(Text(" else ")).pushed(tail.doc))) })
+}
+
+fn match_expr(self: W) -> WDoc!FmtError {
+    let scrut = self.expect("match")?.w.expect("(")?.w.expr()?;
+    let opened = scrut.w.expect(")")?.w.expect("{")?.w;
+    let arms = opened.match_arms([])?;
+    let closed = arms.w.expect("}")?.w;
+    let head = Concat([Text("match ("), scrut.doc, Text(") ")]);
+    if (arms.docs.len() == 0) {
+        return ok(WDoc { w: closed, doc: Concat([head, Text("{}")]) });
+    };
+
+    // A `match` always lays out one arm per line (hard breaks), never collapsing
+    // onto a single line even when it would fit — and those hard breaks force any
+    // enclosing group (a `let` value, a call argument) to break around it too.
+    mut inner = [];
+    for (let a : arms.docs) {
+        set inner.push(HardLine);
+        set inner.push(a);
+    }
+    ok(WDoc {
+        w: closed,
+        doc: Concat([head, Text("{"), Indent(Concat(inner)), HardLine, Text("}")]),
+    })
+}
+
+fn match_arms(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == "}") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let pat = l.w.pattern()?;
+    let body = pat.w.expect("=>")?.w.expr()?;
+    let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
+    // A same-line `// comment` after the arm rides on its line.
+    let tc = stepped.trailing_comment();
+    let arm = Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]);
+    tc.w.match_arms(acc.pushed(arm))
+}
+
+fn pattern(self: W) -> WDoc!FmtError {
+    if (self.peek_is(StrTok)) {
+        let b = self.bump();
+        return ok(WDoc { w: b.w, doc: Text(b.text) });
+    };
+    if (self.peek_text() == "[") {
+        let elems = self.bump().w.call_args_until("]", [])?;
+        let closed = elems.w.expect("]")?.w;
+        return ok(WDoc { w: closed, doc: comma_list_docs(elems.docs, Brackets) });
+    };
+    let n = self.bump();
+    // A variant-qualified constructor pattern `V.A` / `V.A(ids)`.
+    let q = if (n.w.peek_text() == ".") { n.w.qualified_case(n.text) } else { n };
+    if (q.w.peek_text() != "(") {
+        return ok(WDoc { w: q.w, doc: Text(q.text) });
+    };
+    let ids = q.w.bump().w.ident_list(")", []);
+    let closed = ids.w.expect(")")?.w;
+    ok(WDoc { w: closed, doc: Text(`{q.text}({ids.names.join(", ")})`) })
+}
+
+fn qualified_case(self: W, name: str) -> WStr {
+    let c = self.bump().w.bump();
+    WStr { w: c.w, text: `{name}.{c.text}` }
+}
+
+// Call-argument (or array-element) list up to `end`.
+fn call_args_until(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == end) {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let a = l.w.call_arg()?;
+    let stepped = if (a.w.peek_text() == ",") { a.w.bump().w } else { a.w };
+    stepped.call_args_until(end, acc.pushed(Concat([l.doc, a.doc])))
+}
+
+// One argument, plus the arg-only forms — keyword arguments (`k=1`, spelled
+// tight), lambdas, and bare operator values (`apply(2, 3, +)`).
+fn call_arg(self: W) -> WDoc!FmtError {
+    // `k = expr` -> tight `k=expr` (`==` is one token, so a lone `=` after an
+    // identifier is unambiguous).
+    if (self.peek_is(Ident) && self.peek_text_n(1) == "=") {
+        let n = self.bump();
+        let v = n.w.bump().w.expr()?;
+        return ok(WDoc { w: v.w, doc: Concat([Text(`{n.text}=`), v.doc]) });
+    };
+    if (self.peek_text() == "|" || self.peek_text() == "||") {
+        return self.lambda();
+    };
+
+    // A bare operator passed as a value: an operator token immediately followed
+    // by `,` or a closing bracket.
+    if (self.peek_is(Op) && is_arg_end(self.peek_text_n(1))) {
+        let b = self.bump();
+        return ok(WDoc { w: b.w, doc: Text(b.text) });
+    };
+    self.expr()
+}
+
+fn is_arg_end(t: str) -> bool { t == "," || t == ")" || t == "]" }
+
+fn lambda(self: W) -> WDoc!FmtError {
+    let params = if (self.peek_text() == "||") {
+        WDocs { w: self.bump().w, docs: [] }
+    } else {
+        let opened = self.expect("|")?.w;
+        let ps = opened.lambda_params([])?;
+        WDocs { w: ps.w.expect("|")?.w, docs: ps.docs }
+    };
+    let body = if (params.w.peek_text() == "{") { params.w.block()? } else { params.w.expr()? };
+    mut d = [Text("|")];
+    for (let (i, p) : params.docs.enumerate()) {
+        if (0 < i) {
+            set d.push(Text(", "));
+        };
+        set d.push(p);
+    }
+    set d.push(Text("| "));
+    set d.push(body.doc);
+    ok(WDoc { w: body.w, doc: Concat(d) })
+}
+
+fn lambda_params(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == "|") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let n = self.bump();
+    let p = if (n.w.peek_text() == ":") {
+        n.w.lambda_param_ty(n.text)?
+    } else {
+        WDoc { w: n.w, doc: Text(n.text) }
+    };
+    let stepped = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
+    stepped.lambda_params(acc.pushed(p.doc))
+}
+
+fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
+    let t = self.bump().w.ty()?;
+    ok(WDoc { w: t.w, doc: Concat([Text(`{name}: `), t.doc]) })
+}
+
+// Copy a template literal verbatim, from its head through the matching tail
+// (interpolation contents included — the formatter does not reach inside
+// templates).
+fn template_verbatim(self: W) -> WDoc!FmtError {
+    match (self.peek()) {
+        none => err(self.err_here("formatter: unterminated template literal in token stream")),
+        some(t) => self.template_scan(t.span.start, u64(0)),
+    }
+}
+
+fn template_scan(self: W, start: u64, depth: u64) -> WDoc!FmtError {
+    match (self.peek()) {
+        none => err(FmtError {
+            message: "formatter: unterminated template literal in token stream",
+            span: start..self.src.len(),
+        }),
+        some(t) => self.template_step(start, depth, t),
+    }
+}
+
+fn template_step(self: W, start: u64, depth: u64, t: FmtTok) -> WDoc!FmtError {
+    let stepped = self.advance(t.span.end);
+    match (t.kind) {
+        TplHead => stepped.template_scan(start, depth + 1),
+        TplTail => if (depth <= 1) {
+            // A triple-backtick template is a raw block (its closing ``` aligns
+            // under the opening); a single-backtick one has no own-line closing
+            // delimiter, so `reindent_block` leaves it untouched.
+            ok(WDoc {
+                w: stepped.drop_comments_before(t.span.end),
+                doc: RawBlock(self.src[start..t.span.end]),
+            })
+        } else {
+            stepped.template_scan(start, depth - 1)
+        },
+        TplMid => stepped.template_scan(start, depth),
+        Keyword => stepped.template_scan(start, depth),
+        Constant => stepped.template_scan(start, depth),
+        BuiltinType => stepped.template_scan(start, depth),
+        Ident => stepped.template_scan(start, depth),
+        Num => stepped.template_scan(start, depth),
+        StrTok => stepped.template_scan(start, depth),
+        CharTok => stepped.template_scan(start, depth),
+        Op => stepped.template_scan(start, depth),
+        Punct => stepped.template_scan(start, depth),
+    }
+}
+
+// Comments inside interpolations came through the comment stream; they are
+// inside the verbatim copy already, so drop them rather than double-emitting.
+fn drop_comments_before(self: W, end: u64) -> W {
+    match (self.comments[self.cpos]) {
+        none => self,
+        some(c) => if (c.start < end) {
+            self.skip_comment().drop_comments_before(end)
+        } else {
+            self
+        },
+    }
+}
+
+// ---------- call-argument layout ----------
+
+// Whether the call whose `(` was just consumed takes exactly one argument that
+// *is* a bracketed construct — a nested call, an array, a struct literal, or a
+// set/dict literal — filling the parens end to end. Such a call is *hugged*: the
+// argument's own brackets carry the break, so the nesting costs one indent level
+// instead of one per layer. Pure lookahead over the token stream, no parse state.
+fn hugs_sole_arg(self: W) -> bool {
+    // Declines when a comment sits before the argument: it needs its own line,
+    // above the whole call.
+    if (self.comment_before_cursor()) {
+        return false;
+    };
+
+    // The candidate's opening bracket: `[`/`#{` open directly, `name(`/`name {`
+    // one token in.
+    let t = self.peek_text();
+    let direct = t == "[" || t == "#{";
+    let indirect = self.peek_is(Ident) && (self.peek_text_n(1) == "(" || self.peek_text_n(
+        1,
+    ) == "{");
+    if (!direct && !indirect) {
+        return false;
+    };
+    let open_at = if (direct) { self.pos } else { self.pos + 1 };
+    match (self.hug_close(open_at, u64(0))) {
+        none => false,
+        some(close) => self.hug_fills_call(open_at, close),
+    }
+}
+
+// Index of the bracket closing the one at `i`, or `none` if unbalanced.
+fn hug_close(self: W, i: u64, depth: u64) -> u64? {
+    if (self.toks.len() <= i) {
+        return none;
+    };
+    let t = self.tok_text(i);
+    if (t == "(" || t == "[" || t == "{" || t == "#{") {
+        return self.hug_close(i + 1, depth + 1);
+    };
+    if (t == ")" || t == "]" || t == "}") {
+        return if (depth <= 1) { some(i) } else { self.hug_close(i + 1, depth - 1) };
+    };
+    self.hug_close(i + 1, depth)
+}
+
+// Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that runs all
+// the way to the call's own `)` — otherwise the argument is a larger expression
+// that merely *starts* with a bracketed one. Source that is already broken has a
+// trailing comma after the argument, so step over one.
+fn hug_fills_call(self: W, open_at: u64, close: u64) -> bool {
+    let after = if (self.tok_text(close + 1) == ",") { close + 2 } else { close + 1 };
+    open_at + 1 < close && self.tok_text(after) == ")"
+}
+
+// The `(..)` of a call: hugged when `hugs_sole_arg` approved, else the ordinary
+// comma list.
+fn call_arg_list(args: Doc[], hug: bool) -> Doc {
+    if (hug && args.len() == 1) {
+        return Concat([Text("("), args[0].value_or(Concat([])), Text(")")]);
+    };
+    comma_list_docs(args, Parens)
+}
+
 // ---------- test support ----------
 
 // Tokenize `src` by splitting on single spaces — one token per run of non-space
@@ -700,6 +1722,116 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     assert(walker_of("< T >").type_params().rendered(100)? == "<T>");
     assert(walker_of("< T : any >").type_params().rendered(100)? == "<T: any>");
     assert(walker_of("< T , U : ord >").type_params().rendered(100)? == "<T, U: ord>");
+
+    // --- expressions ------------------------------------------------------------
+    assert(walker_of("a").expr().rendered(100)? == "a");
+    assert(walker_of("a + b").expr().rendered(100)? == "a + b");
+    assert(walker_of("a + b * c").expr().rendered(100)? == "a + b * c");
+    assert(walker_of("! a").expr().rendered(100)? == "!a");
+    assert(walker_of("- a").expr().rendered(100)? == "-a");
+    assert(walker_of("a .. b").expr().rendered(100)? == "a..b");
+
+    // Postfix: field access and `?` glue; a lone call keeps its own list.
+    assert(walker_of("a . b").expr().rendered(100)? == "a.b");
+    assert(walker_of("a ?").expr().rendered(100)? == "a?");
+    assert(walker_of("f ( x )").expr().rendered(100)? == "f(x)");
+    assert(walker_of("f ( )").expr().rendered(100)? == "f()");
+    assert(walker_of("a . f ( x )").expr().rendered(100)? == "a.f(x)");
+    assert(walker_of("xs [ i ]").expr().rendered(100)? == "xs[i]");
+    assert(walker_of("xs [ a .. b ]").expr().rendered(100)? == "xs[a..b]");
+    assert(walker_of("xs [ a .. ]").expr().rendered(100)? == "xs[a..]");
+    assert(walker_of("xs [ .. b ]").expr().rendered(100)? == "xs[..b]");
+
+    // Two or more calls form a chain that breaks before each call when too wide.
+    assert(walker_of("a . f ( ) . g ( )").expr().rendered(100)? == "a.f().g()");
+    assert(walker_of("a . f ( ) . g ( )").expr().rendered(5)? == "a\n    .f()\n    .g()");
+
+    // Literals and containers.
+    assert(walker_of("( a )").expr().rendered(100)? == "(a)");
+    assert(walker_of("( a , b )").expr().rendered(100)? == "(a, b)");
+    assert(walker_of("[ a , b ]").expr().rendered(100)? == "[a, b]");
+    assert(walker_of("[ ]").expr().rendered(100)? == "[]");
+    assert(walker_of("# { a , b }").expr().rendered(100)? == "#{a, b}");
+    assert(walker_of("# { k : v }").expr().rendered(100)? == "#{k: v}");
+    assert(walker_of("# { : }").expr().rendered(100)? == "#{:}");
+
+    // Struct construction, including the field shorthand.
+    assert(walker_of("S { a : 1 , b }").expr().rendered(100)? == "S { a: 1, b }");
+    assert(walker_of("S { }").expr().rendered(100)? == "S {}");
+
+    // Keyword arguments spell tight; a bare operator passes as a value.
+    assert(walker_of("f ( 1 , k = 2 )").expr().rendered(100)? == "f(1, k=2)");
+    assert(walker_of("apply ( 2 , 3 , + )").expr().rendered(100)? == "apply(2, 3, +)");
+
+    // Lambdas.
+    assert(walker_of("| x | x").expr().rendered(100)? == "|x| x");
+    assert(walker_of("| x : i64 | x").expr().rendered(100)? == "|x: i64| x");
+    assert(walker_of("f ( | | x )").expr().rendered(100)? == "f(|| x)");
+
+    // --- if / match ---------------------------------------------------------
+    assert(walker_of("if ( c ) { a }").expr().rendered(100)? == "if (c) { a }");
+    assert(
+        walker_of("if ( c ) { a } else { b }").expr().rendered(100)? == "if (c) { a } else { b }",
+    );
+    // Both branches break together, never one inline and the other split.
+    assert(
+        walker_of("if ( c ) { a } else { b }")
+            .expr()
+            .rendered(5)? == "if (c) {\n    a\n} else {\n    b\n}",
+    );
+    // A match is always one arm per line, even when it would fit.
+    assert(
+        walker_of("match ( v ) { A => 1 , }")
+            .expr()
+            .rendered(100)? == "match (v) {\n    A => 1,\n}",
+    );
+    assert(
+        walker_of("match ( v ) { A ( x ) => x , B => 2 , }")
+            .expr()
+            .rendered(100)? == "match (v) {\n    A(x) => x,\n    B => 2,\n}",
+    );
+
+    // --- statements & blocks --------------------------------------------------
+    assert(walker_of("{ }").block().rendered(100)? == "{}");
+    assert(walker_of("{ a }").block().rendered(100)? == "{ a }");
+    // Any `;` forces one statement per line.
+    assert(walker_of("{ f ( ) ; }").block().rendered(100)? == "{\n    f();\n}");
+    assert(walker_of("{ let x = 1 ; x }").block().rendered(100)? == "{\n    let x = 1;\n    x\n}");
+    assert(walker_of("{ mut x = 1 ; x }").block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
+    assert(walker_of("{ set x = 1 ; }").block().rendered(100)? == "{\n    set x = 1;\n}");
+    assert(walker_of("{ set x ++ ; }").block().rendered(100)? == "{\n    set x++;\n}");
+    assert(walker_of("{ set a . b = 1 ; }").block().rendered(100)? == "{\n    set a.b = 1;\n}");
+    assert(
+        walker_of("{ set xs . push ( 1 ) ; }")
+            .block()
+            .rendered(100)? == "{\n    set xs.push(1);\n}",
+    );
+    assert(walker_of("{ return 1 ; }").block().rendered(100)? == "{\n    return 1;\n}");
+    // Destructuring binders.
+    assert(
+        walker_of("{ let ( a , b ) = p ; }").block().rendered(100)? == "{\n    let (a, b) = p;\n}",
+    );
+    assert(
+        walker_of("{ let S { a , b } = p ; }")
+            .block()
+            .rendered(100)? == "{\n    let S { a, b } = p;\n}",
+    );
+    // Loops.
+    assert(
+        walker_of("{ while ( c ) { f ( ) ; } }")
+            .block()
+            .rendered(100)? == "{\n    while (c) {\n        f();\n    }\n}",
+    );
+    assert(
+        walker_of("{ for ( let x : xs ) { f ( ) ; } }")
+            .block()
+            .rendered(100)? == "{\n    for (let x : xs) {\n        f();\n    }\n}",
+    );
+    assert(
+        walker_of("{ for ( let ( i , x ) : xs ) { f ( ) ; } }")
+            .block()
+            .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}",
+    );
 
     // --- imports --------------------------------------------------------------
     // Names are sorted, and the braces get inner spaces when flat.
@@ -900,20 +2032,21 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 --- performance ---
-allocations: 3130
-deallocations: 3130
-reallocations: 230
-bytes allocated: 178641
-instructions executed: 414642
-binary size: 443872
-  code: 244636
-  data: 10100
-  metadata: 189136
+allocations: 7322
+deallocations: 7322
+reallocations: 458
+bytes allocated: 409453
+instructions executed: 1140306
+binary size: 1918464
+  code: 1083536
+  data: 18004
+  metadata: 816924
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam11
 __builtin_count_while$char$s0$lam19
 __builtin_count_while$char$s0$lam29
 __enumerate10
+__enumerate30
 __enumerate6
 __m1__col_after
 __m1__fits
@@ -932,44 +2065,108 @@ __map21$own0
 __map27$own0
 __test$pushed
 __test$walker_of
+array_atom
 array_suffixes
 at
 at_end
+atom
 base_ty
+binop_expr
+binop_tail
+block
+block_entries
+block_layout
 bump
+call_arg
+call_arg_list
+call_args_until
+chain_docs
 comma_list_docs
+dict_entries
+dict_value
 dict_value_ty
+dot_seg
+drop_comments_before
+drop_trailing_break
+err_here
 expect
+expr
 extended
+for_stmt
 gap_has_blank
+hug_close
+hugs_sole_arg
+ident_list
+if_expr
 import_item
 import_names
+index_or_from
+index_seg
+is_empty_doc
+is_line_break
+lambda
+lambda_param_ty
+lambda_params
 lead
 lead_loop
+let_stmt
 main
+match_arms
+match_expr
+member_path
+mut_stmt
+name_atom
 named_ty
 new_walker
 next_start
+paren_atom
 paren_ty
+pattern
 peek
+peek_is
 peek_text
 peek_text_n
+postfix
+postfix_segs
 pushed
+pushed_seg
+pushed_str
 quoted
+range_has_semi
+range_tail
 rendered
 same_line
+seg_docs
+sep_entry
+set_member
+set_or_dict_atom
 set_or_dict_ty
+set_stmt
+slice_to
 sorted_import_names
+statement
+struct_atom
+struct_field_value
+struct_inits
 take_comment
+template_scan
+tok_text
 toks_of
 trailing_comment
+trim_last_break
+tuple_binder
+tuple_rest
 ty
 ty_list
 type_param_list
 type_params
 type_suffixes
+unary
 variant_body
 variant_cases
 variant_item
 variant_payload
 walker_of
+while_stmt
+with_last
+without_trailing_break

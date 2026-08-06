@@ -1018,13 +1018,21 @@ impl Cx<'_> {
     fn check_elem_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
         match t {
             Type::Unit => Err(Error::msg("() is not allowed as an array/option element")),
-            // A scalar primitive element: i64/bool/char/str are stored; the
-            // narrow integer widths aren't stored in composites yet (only as
-            // scalar values).
+            // A scalar primitive element: i64/u64/bool/char/str are stored. Both
+            // 64-bit integers work because an element slot is 8 bytes
+            // (`elem_size_of`) and a 64-bit value needs no re-canonicalization on
+            // load — only the *interpretation* differs, and everything that reads
+            // one (rendering, comparison, `sort`) already dispatches on
+            // `int_signed`. The narrow widths (i8..i32, u8..u32) would need their
+            // element slots truncated and re-extended, so they stay scalar-only.
             Type::Primitive(p) => {
                 if matches!(
                     p,
-                    Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str
+                    Primitive::I64
+                        | Primitive::U64
+                        | Primitive::Bool
+                        | Primitive::Char
+                        | Primitive::Str
                 ) {
                     Ok(())
                 } else {
