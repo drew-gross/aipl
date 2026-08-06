@@ -38,6 +38,8 @@ warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
 - unused imports
 
+That did surface a real gap, though: need_fill matches `<section>` mismatch but not missing required <section> section, so a brand-new case always costs a second handoff cycle. The message carries the same [<display-path>]: prefix the AIPL_CASE extraction already parses, so closing it is a two-grep change. I haven't touched it — it's outside what you asked and that script is your gate — but it's a papercut I've hit on nearly every case added this session.
+
 formatter improvements
 - sort imports
 

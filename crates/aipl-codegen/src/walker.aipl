@@ -738,6 +738,247 @@ fn pushed_case(self: VCase[], c: VCase) -> VCase[] {
     a
 }
 
+// ---------- program & items ----------
+
+// One hoisted import: the statement, and the key `program` orders it by.
+struct ImportEntry { key: str, doc: Doc }
+
+struct WProgram { w: W, imports: ImportEntry[], items: Doc[] }
+
+// A whole file: header comments, then the hoisted imports, then the items.
+fn program(self: W) -> WDoc!FmtError {
+    // File-header comments (before the first item) stay at the very top, even
+    // though the imports below may be reordered. That is exactly what `lead`
+    // does — drain every comment before the first token — so it runs up front,
+    // before any import can claim them.
+    let h = self.lead();
+    let p = h.w.program_items([], [])?;
+    mut out = [h.doc];
+    for (let (i, d) : sorted_imports(p.imports).enumerate()) {
+        if (0 < i) {
+            set out.push(HardLine);
+        };
+        set out.push(d);
+    }
+    let had_imports = 0 < p.imports.len();
+    for (let (i, d) : p.items.enumerate()) {
+        if (0 < i || had_imports) {
+            set out.push(BlankLine);
+        };
+        set out.push(d);
+    }
+    ok(WDoc { w: p.w, doc: Concat(out) })
+}
+
+fn program_items(self: W, imports: ImportEntry[], items: Doc[]) -> WProgram!FmtError {
+    if (self.at_end()) {
+        return ok(WProgram { w: self, imports, items });
+    };
+    let l = self.lead();
+    if (l.w.at_end()) {
+        // Comments after the last item.
+        return ok(WProgram { w: l.w, imports, items: items.pushed(l.doc) });
+    };
+    if (l.w.peek_text() == "import") {
+        let im = l.w.import_item()?;
+        let tc = im.w.trailing_comment();
+        let e = ImportEntry { key: im.key, doc: Concat([l.doc, im.doc, tc.doc]) };
+        return tc.w.program_items(imports.pushed_import(e), items);
+    };
+    let it = l.w.item()?;
+    let tc = it.w.trailing_comment();
+    tc.w.program_items(imports, items.pushed(Concat([l.doc, it.doc, tc.doc])))
+}
+
+// The imports in hoist order. AIPL has no `<` on strings, so the only ordering
+// primitive is the `sort` builtin over a `str[]`: sort the keys, then walk the
+// sorted keys picking, for each, the matching import that hasn't been taken yet.
+// Two imports from the same source share a key, and the rank counting below
+// hands them out in source order — the stability Rust's `sort_by` gives for free.
+fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
+    sorted_pick(entries, entry_keys(entries).sort(), u64(0), [])
+}
+
+fn entry_keys(entries: ImportEntry[]) -> str[] {
+    mut ks = [];
+    for (let e : entries) {
+        set ks.push(e.key);
+    }
+    ks
+}
+
+fn sorted_pick(entries: ImportEntry[], keys: str[], i: u64, acc: Doc[]) -> Doc[] {
+    if (keys.len() <= i) {
+        return acc;
+    };
+    let k = keys[i].value_or("");
+
+    // How many earlier *sorted* slots already carried this key — i.e. which
+    // same-key import this slot should take.
+    let rank = keys[0..i].count(k);
+    sorted_pick(entries, keys, i + 1, acc.pushed(nth_with_key(entries, k, rank)))
+}
+
+// The `n`-th entry (0-based, in source order) whose key is `k`.
+fn nth_with_key(entries: ImportEntry[], k: str, n: u64) -> Doc {
+    mut seen = u64(0);
+    for (let e : entries) {
+        if (e.key == k) {
+            if (seen == n) {
+                return e.doc;
+            };
+            set seen = seen + 1;
+        };
+    }
+    Concat([])
+}
+
+fn pushed_import(self: ImportEntry[], e: ImportEntry) -> ImportEntry[] {
+    mut a = self;
+    set a.push(e);
+    a
+}
+
+fn item(self: W) -> WDoc!FmtError {
+    let t = self.peek_text();
+    if (t == "pub" || t == "fn") {
+        return self.fn_item();
+    };
+    if (t == "struct") {
+        return self.struct_item();
+    };
+    if (t == "variant") {
+        return self.variant_item();
+    };
+    err(self.err_here(`formatter: expected an item (fn/struct/variant/import), found {quoted(t)}`))
+}
+
+fn fn_item(self: W) -> WDoc!FmtError {
+    let head = if (self.peek_text() == "pub") {
+        WDocs { w: self.bump().w, docs: [Text("pub ")] }
+    } else {
+        WDocs { w: self, docs: [] }
+    };
+    let n = head.w.expect("fn")?.w.bump();
+    let tps = n.w.type_params()?;
+    let params = tps.w.expect("(")?.w.params_until(")", [])?;
+    let closed = params.w.expect(")")?.w;
+    let sig = head.docs
+        .pushed(Text("fn "))
+        .pushed(Text(n.text))
+        .pushed(tps.doc)
+        .pushed(comma_list_docs(params.docs, Parens));
+    let effs = closed.fn_effects(sig);
+    let ret = if (effs.w.peek_text() == "->") {
+        effs.w.fn_return(effs.docs)?
+    } else {
+        WDocs { w: effs.w, docs: effs.docs }
+    };
+    let body = ret.w.block()?;
+    let attrs = body.w.fn_attrs(ret.docs.pushed(Text(" ")).pushed(body.doc))?;
+    ok(WDoc { w: attrs.w, doc: Concat(attrs.docs) })
+}
+
+// `!prints`, `!reads`, … — a run of effect annotations after the parameters.
+fn fn_effects(self: W, acc: Doc[]) -> WDocs {
+    if (self.peek_text() != "!") {
+        return WDocs { w: self, docs: acc };
+    };
+    let e = self.bump().w.bump();
+    e.w.fn_effects(acc.pushed(Text(` !{e.text}`)))
+}
+
+fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
+    let t = self.bump().w.ty()?;
+    ok(WDocs { w: t.w, docs: acc.pushed(Text(" -> ")).pushed(t.doc) })
+}
+
+// `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
+// the corpus writes them.
+fn fn_attrs(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() != ".") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let a = self.bump().w.bump();
+    let opened = a.w.expect("(")?.w;
+
+    // A `.test` body is a block; a `.doc` argument is its string verbatim — a
+    // `"""` raw block aligns its closing delimiter under the opening one.
+    let arg = if (opened.peek_text() == "{") { opened.block()? } else { opened.bump().str_atom() };
+    let closed = arg.w.expect(")")?.w;
+    closed.fn_attrs(acc.pushed(Text(`.{a.text}(`)).pushed(arg.doc).pushed(Text(")")))
+}
+
+// Parameters of a fn declaration, up to (not consuming) `end`.
+fn params_until(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == end) {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let m = if (l.w.peek_text() == "mut") {
+        WDocs { w: l.w.bump().w, docs: [l.doc, Text("mut ")] }
+    } else {
+        WDocs { w: l.w, docs: [l.doc] }
+    };
+    let n = m.w.bump();
+    let t = n.w.expect(":")?.w.ty()?;
+    let typed = m.docs.pushed(Text(n.text)).pushed(Text(": ")).pushed(t.doc);
+    // The variadic marker.
+    let v = if (t.w.peek_text() == "*") {
+        WDocs { w: t.w.bump().w, docs: typed.pushed(Text("*")) }
+    } else {
+        WDocs { w: t.w, docs: typed }
+    };
+
+    // A keyword parameter's declaration default keeps spaces around `=`, unlike
+    // a call-site keyword argument.
+    let d = if (v.w.peek_text() == "=") {
+        v.w.spaced_default(v.docs)?
+    } else {
+        WDocs { w: v.w, docs: v.docs }
+    };
+    let stepped = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
+    stepped.params_until(end, acc.pushed(Concat(d.docs)))
+}
+
+fn spaced_default(self: W, acc: Doc[]) -> WDocs!FmtError {
+    let e = self.bump().w.expr()?;
+    ok(WDocs { w: e.w, docs: acc.pushed(Text(" = ")).pushed(e.doc) })
+}
+
+fn struct_item(self: W) -> WDoc!FmtError {
+    let n = self.expect("struct")?.w.bump();
+    let tps = n.w.type_params()?;
+    let fields = tps.w.expect("{")?.w.struct_fields([])?;
+    let closed = fields.w.expect("}")?.w;
+    ok(WDoc {
+        w: closed,
+        doc: Concat([
+            Text(`struct {n.text}`),
+            tps.doc,
+            Text(" "),
+            comma_list_docs(fields.docs, SpacedBraces),
+        ]),
+    })
+}
+
+fn struct_fields(self: W, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == "}") {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let l = self.lead();
+    let f = l.w.bump();
+    let t = f.w.expect(":")?.w.ty()?;
+    let base = [l.doc, Text(f.text), Text(": "), t.doc];
+    let d = if (t.w.peek_text() == "=") {
+        t.w.spaced_default(base)?
+    } else {
+        WDocs { w: t.w, docs: base }
+    };
+    let stepped = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
+    stepped.struct_fields(acc.pushed(Concat(d.docs)))
+}
+
 // ---------- blocks & statements ----------
 
 // A block's entries, plus the offset the next blank-line decision measures from.
@@ -1833,6 +2074,114 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}",
     );
 
+    // --- items ------------------------------------------------------------------
+    assert(walker_of("struct S { a : i64 }").struct_item().rendered(100)? == "struct S { a: i64 }");
+    assert(walker_of("struct S { }").struct_item().rendered(100)? == "struct S {}");
+    assert(
+        walker_of("struct S < T > { a : T , b : str }")
+            .struct_item()
+            .rendered(100)? == "struct S<T> { a: T, b: str }",
+    );
+    // A field default keeps spaces around `=`.
+    assert(
+        walker_of("struct S { a : i64 = 1 }")
+            .struct_item()
+            .rendered(100)? == "struct S { a: i64 = 1 }",
+    );
+
+    assert(walker_of("fn f ( ) { }").fn_item().rendered(100)? == "fn f() {}");
+    assert(walker_of("pub fn f ( ) { }").fn_item().rendered(100)? == "pub fn f() {}");
+    assert(walker_of("fn f ( ) -> i64 { 1 }").fn_item().rendered(100)? == "fn f() -> i64 { 1 }");
+    assert(
+        walker_of("fn f ( a : i64 , b : str ) -> bool { c }")
+            .fn_item()
+            .rendered(100)? == "fn f(a: i64, b: str) -> bool { c }",
+    );
+    // `mut` receiver, variadic marker, and a declaration default.
+    assert(
+        walker_of("fn f ( mut self : i64 [ ] , x : i64 = 1 ) { }")
+            .fn_item()
+            .rendered(100)? == "fn f(mut self: i64[], x: i64 = 1) {}",
+    );
+    assert(walker_of("fn f ( xs : i64 * ) { }").fn_item().rendered(100)? == "fn f(xs: i64*) {}");
+    // Effects, type params, and a statement body.
+    assert(
+        walker_of("fn f ( ) ! prints { g ( ) ; }")
+            .fn_item()
+            .rendered(100)? == "fn f() !prints {\n    g();\n}",
+    );
+    assert(
+        walker_of("fn f < T : any > ( x : T ) -> T { x }")
+            .fn_item()
+            .rendered(100)? == "fn f<T: any>(x: T) -> T { x }",
+    );
+    // Attributes glue to the closing brace.
+    assert(
+        walker_of(`fn f ( ) \{ } . doc ( "d" )`).fn_item().rendered(100)? == `fn f() \{}.doc("d")`,
+    );
+    assert(
+        walker_of("fn f ( ) { } . test ( { g ( ) ; } )")
+            .fn_item()
+            .rendered(100)? == "fn f() {}.test({\n    g();\n})",
+    );
+
+    // --- program ------------------------------------------------------------
+    // Items are separated by exactly one blank line.
+    assert(
+        walker_of("fn a ( ) { } fn b ( ) { }").program().rendered(100)? == "fn a() {}\n\nfn b() {}",
+    );
+
+    // Imports hoist above the items, builtins before paths, each on its own line
+    // and separated from the first item by a blank line.
+    assert(
+        walker_of(`import \{ x } from "./m.aipl" ; import \{ b , a } from builtins ; fn f ( ) \{ }`)
+            .program()
+            .rendered(
+                100,
+            )? == `import \{ a, b } from builtins;\nimport \{ x } from "./m.aipl";\n\nfn f() \{}`,
+    );
+    // A struct and a variant are items too.
+    assert(
+        walker_of("struct S { a : i64 } variant V = A | B")
+            .program()
+            .rendered(100)? == "struct S { a: i64 }\n\nvariant V = A | B",
+    );
+    assert(walker_of("").program().rendered(100)? == "");
+
+    // Comments: a file-header comment stays at the very top (above the hoisted
+    // imports), and a comment attached to an item rides with it. `walker_of`
+    // has no comments of its own, so this one is built by hand.
+    let csrc = "// hdr\nfn a() {}\n// on b\nfn b() {}";
+    let ctoks = [
+        FmtTok { kind: Keyword, span: 7..9 },
+        // fn
+        FmtTok { kind: Ident, span: 10..11 },
+        // a
+        FmtTok { kind: Punct, span: 11..12 },
+        // (
+        FmtTok { kind: Punct, span: 12..13 },
+        // )
+        FmtTok { kind: Punct, span: 14..15 },
+        // {
+        FmtTok { kind: Punct, span: 15..16 },
+        // }
+        FmtTok { kind: Keyword, span: 25..27 },
+        // fn
+        FmtTok { kind: Ident, span: 28..29 },
+        // b
+        FmtTok { kind: Punct, span: 29..30 },
+        // (
+        FmtTok { kind: Punct, span: 30..31 },
+        // )
+        FmtTok { kind: Punct, span: 32..33 },
+        // {
+        FmtTok { kind: Punct, span: 33..34 },
+    ];
+    // }
+
+    let cw = new_walker(csrc, ctoks, [0..6, 17..24]);
+    assert(cw.program().rendered(100)? == "// hdr\nfn a() {}\n\n// on b\nfn b() {}");
+
     // --- imports --------------------------------------------------------------
     // Names are sorted, and the braces get inner spaces when flat.
     assert(
@@ -2032,21 +2381,23 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 --- performance ---
-allocations: 7322
-deallocations: 7322
-reallocations: 458
-bytes allocated: 409453
-instructions executed: 1140306
-binary size: 1918464
-  code: 1083536
-  data: 18004
-  metadata: 816924
+allocations: 9913
+deallocations: 9913
+reallocations: 577
+bytes allocated: 566281
+instructions executed: 1518481
+binary size: 2665840
+  code: 1506744
+  data: 22580
+  metadata: 1136516
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam11
-__builtin_count_while$char$s0$lam19
-__builtin_count_while$char$s0$lam29
+__builtin_any$__m1__Doc$lam13
+__builtin_count_while$char$s0$lam21
+__builtin_count_while$char$s0$lam31
 __enumerate10
-__enumerate30
+__enumerate11
+__enumerate12
+__enumerate32
 __enumerate6
 __m1__col_after
 __m1__fits
@@ -2061,8 +2412,8 @@ __m1__print_doc
 __m1__pushed
 __m2__reindent_block
 __m4__lines
-__map21$own0
-__map27$own0
+__map23$own0
+__map29$own0
 __test$pushed
 __test$walker_of
 array_atom
@@ -2088,10 +2439,15 @@ dict_value_ty
 dot_seg
 drop_comments_before
 drop_trailing_break
+entry_keys
 err_here
 expect
 expr
 extended
+fn_attrs
+fn_effects
+fn_item
+fn_return
 for_stmt
 gap_has_blank
 hug_close
@@ -2104,6 +2460,7 @@ index_or_from
 index_seg
 is_empty_doc
 is_line_break
+item
 lambda
 lambda_param_ty
 lambda_params
@@ -2119,6 +2476,8 @@ name_atom
 named_ty
 new_walker
 next_start
+nth_with_key
+params_until
 paren_atom
 paren_ty
 pattern
@@ -2128,6 +2487,8 @@ peek_text
 peek_text_n
 postfix
 postfix_segs
+program
+program_items
 pushed
 pushed_seg
 pushed_str
@@ -2144,10 +2505,16 @@ set_or_dict_ty
 set_stmt
 slice_to
 sorted_import_names
+sorted_imports
+sorted_pick
+spaced_default
 statement
+str_atom
 struct_atom
 struct_field_value
+struct_fields
 struct_inits
+struct_item
 take_comment
 template_scan
 tok_text
