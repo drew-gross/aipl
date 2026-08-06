@@ -1267,7 +1267,12 @@ pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
 }
 
 /// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
-/// Returns `""` for `n <= 0`. Consumes `s` (callers pre-inc).
+/// Consumes `s` (callers pre-inc).
+///
+/// `n` is unsigned at the language level but arrives in the same 64-bit register,
+/// so it is read here as `i64`: the `n <= 0` guard yields `""` for zero and —
+/// reading as negative — for any `u64` past `i64::MAX`, which could never be
+/// allocated anyway.
 #[no_mangle]
 pub extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
     unsafe {

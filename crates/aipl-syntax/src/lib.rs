@@ -1200,8 +1200,10 @@ fn __builtin_to_str<T: any>(self: T) -> str { "" }
 // Structural hash, consistent with `==`.
 fn __builtin_hash<T: any>(self: T) -> i64 { 0 }
 fn __builtin_trim(self: str) -> str { self }
-// Concatenate `self` with itself `n` times; returns `""` for `n <= 0`.
-fn __builtin_repeat(self: str, n: i64) -> str { "" }
+// Concatenate `self` with itself `n` times; returns `""` for `n == 0`. The count
+// is unsigned, matching `len`: a repeat count is never negative, and its usual
+// source is length/column arithmetic (`" ".repeat(indent)`).
+fn __builtin_repeat(self: str, n: u64) -> str { "" }
 // True if every byte is ASCII whitespace (or the string is empty).
 fn __builtin_is_all_whitespace(self: str) -> bool { false }
 // True if `self` begins / ends with the argument — `str` bytes or `T[]`

@@ -49,6 +49,8 @@ dead store elimination optimization pass
 
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
 
+integer type conversions: should return none when out of range
+
 spread in args e.g. fn foo(self: Span { start, end })
 
 Cache monomorphizations of the same lambda

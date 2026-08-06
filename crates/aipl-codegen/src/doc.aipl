@@ -234,11 +234,11 @@ fn col_after(col: u64, text: str) -> u64 {
 }
 
 // A line break landing at indentation `sp`: a newline plus `sp` spaces.
-fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(i64(sp)) }
+fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(sp) }
 
 // A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
 // blank line's own trailing spaces are removed by `cleanup`).
-fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(i64(sp)) }
+fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 
 // Strip trailing whitespace from every line and preserve a final newline when
 // the rendered text had one (mirrors `str::lines().map(trim_end).join("\n")`).

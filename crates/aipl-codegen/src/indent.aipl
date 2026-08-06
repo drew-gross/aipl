@@ -7,7 +7,7 @@
 import { +++, ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 
-pub fn indent(self: str, target: i64) -> str {
+pub fn indent(self: str, target: u64) -> str {
     let pad = " ".repeat(target);
 
     // Add `target` spaces to each non-blank line, keeping its own (already
