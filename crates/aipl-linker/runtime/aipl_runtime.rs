@@ -1291,6 +1291,101 @@ pub extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
     }
 }
 
+/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
+/// 8-byte scalar, so the only question is how to read the word: as a signed
+/// integer, as an unsigned one (`u8`..`u64`, and `char` — a byte value), or as a
+/// `str` pointer to compare lexicographically by bytes.
+const SORT_KIND_STR: i64 = 2;
+const SORT_KIND_UNSIGNED: i64 = 1;
+
+/// Order `words` in place. Mirrors the JIT runtime's `sort_words` byte-for-byte,
+/// which is why it uses `sort_unstable_by` — the stable sorts need an allocation,
+/// and this runtime is `#![no_std]`. Unstable is enough: `ord` elements are
+/// compared by value, so equal ones are indistinguishable.
+fn sort_words(words: &mut [i64], kind: i64) {
+    match kind {
+        SORT_KIND_STR => words.sort_unstable_by(|x, y| {
+            let mut xb = [0u8; 8];
+            let mut yb = [0u8; 8];
+            let (xs, ys) = unsafe {
+                (
+                    str_bytes(*x as *const u8, &mut xb),
+                    str_bytes(*y as *const u8, &mut yb),
+                )
+            };
+            xs.cmp(ys)
+        }),
+        SORT_KIND_UNSIGNED => words.sort_unstable_by(|x, y| (*x as u64).cmp(&(*y as u64))),
+        _ => words.sort_unstable(),
+    }
+}
+
+/// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
+/// Consumes `a` (callers pre-inc) and co-owns the elements it copies. Unlike
+/// `aipl_arr_reverse` this cannot be a lazy view: the order is not a function of
+/// the index. Mirrors the JIT runtime's `aipl_arr_sort`.
+#[no_mangle]
+pub extern "C" fn aipl_arr_sort(
+    a: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    kind: i64,
+) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
+    if a.is_null() {
+        return a;
+    }
+    unsafe {
+        let len = array_len(a);
+        let raw = array_alloc(len, len, drop_fn, elem_size) as *const u8;
+        if len > 0 {
+            let es = elem_size.max(8) as usize;
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            let src = a.add(ARR_ELEMS_OFFSET);
+            memcpy(dst as *mut c_void, src as *const c_void, len * es);
+            // The new array co-owns every element. Done before the sort because
+            // reordering words neither creates nor destroys a reference.
+            elem_rc(retain_fn, dst, len);
+            let words = core::slice::from_raw_parts_mut(dst as *mut i64, len);
+            sort_words(words, kind);
+        }
+        aipl_array_dec(a);
+        raw
+    }
+}
+
+/// `s.sort() -> str` — a fresh `str` with the bytes in ascending order. The
+/// str-shaped counterpart of `aipl_arr_sort`, for a `str` or `char[]` receiver
+/// (the two share a representation, so neither is a real array block).
+/// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_sort`.
+#[no_mangle]
+pub extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
+    unsafe {
+        let mut sbuf = [0u8; 8];
+        let bytes = str_bytes(s, &mut sbuf);
+        let n = bytes.len();
+        // Copy into a buffer, sort it there, then build the result — the same
+        // stack-for-short / heap-for-long split `aipl_str_reverse` uses.
+        let result = if n == 0 {
+            make_str(&[])
+        } else if n <= 128 {
+            let mut tmp = [0u8; 128];
+            tmp[..n].copy_from_slice(bytes);
+            tmp[..n].sort_unstable();
+            make_str(&tmp[..n])
+        } else {
+            let raw = rt_str_buf(n);
+            let dst = raw.add(STR_HEADER_SIZE) as *mut u8;
+            memcpy(dst as *mut c_void, bytes.as_ptr() as *const c_void, n);
+            core::slice::from_raw_parts_mut(dst, n).sort_unstable();
+            raw.add(STR_HEADER_SIZE)
+        };
+        aipl_dec(s);
+        result
+    }
+}
+
 /// `xs.reverse() -> T[]` — new array with elements in reverse order.
 /// O(1): returns a reversed-view repr wrapping `a`.
 /// Transfers ownership of `a` into the view (no drop, no retain on `a`).

@@ -12,6 +12,7 @@
 // it (`bump`, `expect`, `lead`, …) returns a carrier holding the moved-on `W`.
 import {
     !,
+    !=,
     &&,
     <,
     <=,
@@ -19,12 +20,30 @@ import {
     Span,
     contains,
     count,
+    enumerate,
     is_err_and,
+    join,
     len,
     push,
+    sort,
+    split,
     wrapping_add as +,
 } from builtins;
-import { BlankLine, BreakParent, Concat, Doc, HardLine, Text } from "./doc.aipl";
+import {
+    BlankLine,
+    BreakParent,
+    Concat,
+    Doc,
+    HardLine,
+    IfBroken,
+    Indent,
+    Line,
+    SoftLine,
+    Text,
+    group,
+    print_doc,
+} from "./doc.aipl";
+import { is_operator_name } from "./is_operator_name.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 // `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -68,6 +87,10 @@ struct W {
 struct WDoc { w: W, doc: Doc }
 
 struct WStr { w: W, text: str }
+
+// A step that produces *several* docs (a comma list's items, a run of type
+// suffixes) rather than one.
+struct WDocs { w: W, docs: Doc[] }
 
 // A formatter failure. Mirrors `lexer.aipl`'s `LexError`; the Rust walker's
 // span-less `Error::msg` case (past the last token) becomes a message carrying
@@ -235,6 +258,529 @@ fn take_comment(self: W, c: Span) -> W {
     w
 }
 
+// ---------- comma lists ----------
+
+// The bracket pair (and flat-mode edge spacing) of a comma list. Braces that read
+// as words get inner spaces when flat (`{ a, b }`); the rest hug their contents
+// (`(a, b)`, `[a]`, `#{a}`, `<T: any>`). Type-position lists (`TyParens`,
+// `Angles`) take no trailing comma when broken — the grammar doesn't allow one
+// there.
+variant ListStyle = Parens | Brackets | HashBraces | SpacedBraces | Angles | TyParens
+
+// A style's brackets and the two layout bits, unpacked. The Rust version returns
+// a 4-tuple from a `match`; a struct names the bits at the use site.
+struct ListShape { open: str, close: str, spaced: bool, trailing: bool }
+
+fn shape(self: ListStyle) -> ListShape {
+    match (self) {
+        Parens => ListShape { open: "(", close: ")", spaced: false, trailing: true },
+        Brackets => ListShape { open: "[", close: "]", spaced: false, trailing: true },
+        HashBraces => ListShape { open: "#{", close: "}", spaced: false, trailing: true },
+        SpacedBraces => ListShape { open: "{", close: "}", spaced: true, trailing: true },
+        Angles => ListShape { open: "<", close: ">", spaced: false, trailing: false },
+        TyParens => ListShape { open: "(", close: ")", spaced: false, trailing: false },
+    }
+}
+
+// A bracketed comma list that either fits on one line or breaks to one item per
+// indented line with a trailing comma. Width decisions happen at print time, so
+// this only describes both layouts.
+fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
+    let s = style.shape();
+    if (items.len() == 0) {
+        return Text(`{s.open}{s.close}`);
+    };
+    let edge = if (s.spaced) { Line } else { SoftLine };
+    mut inner = [edge];
+    for (let (i, item) : items.enumerate()) {
+        if (0 < i) {
+            set inner.push(Text(","));
+            set inner.push(Line);
+        };
+        set inner.push(item);
+    }
+    mut parts = [Text(s.open), Indent(Concat(inner))];
+    if (s.trailing) {
+        set parts.push(IfBroken(","));
+    };
+    set parts.push(edge);
+    set parts.push(Text(s.close));
+    group(Concat(parts))
+}
+
+// ---------- imports ----------
+
+// One import, plus the key `program` will order it by.
+struct WImport { w: W, key: str, doc: Doc }
+
+struct WKeys { w: W, keys: str[] }
+
+// `import { a, b as c } from "path";` — the imported names sorted, the statement
+// rendered, and the hoist key.
+fn import_item(self: W) -> WImport!FmtError {
+    let names = self.expect("import")?.w.expect("{")?.w.import_names([])?;
+    let src = names.w.expect("}")?.w.expect("from")?.w.bump();
+    let done = src.w.expect(";")?.w;
+    let list = comma_list_docs(sorted_import_names(names.keys), SpacedBraces);
+    ok(WImport {
+        w: done,
+        key: import_key(src.text),
+        doc: Concat([Text("import "), list, Text(" from "), Text(src.text), Text(";")]),
+    })
+}
+
+fn import_names(self: W, acc: str[]) -> WKeys!FmtError {
+    if (self.peek_text() == "}") {
+        return ok(WKeys { w: self, keys: acc });
+    };
+    let first = self.bump();
+    let r = if (first.w.peek_text() == "as") {
+        first.w.import_alias(first.text)
+    } else {
+        WStr { w: first.w, text: first.text }
+    };
+    let stepped = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
+    stepped.import_names(acc.pushed_str(encode_import_name(first.text, r.text)))
+}
+
+// `name as alias` — the spelling written when an import is renamed.
+fn import_alias(self: W, first: str) -> WStr {
+    let a = self.bump().w.bump();
+    WStr { w: a.w, text: `{first} as {a.text}` }
+}
+
+// Operators sort ahead of plain names, each bucket alphabetical by the *imported*
+// name — the one to the left of an `as` — so `wrapping_add as +` sorts under `w`,
+// next to the function it actually imports, rather than among the operator
+// spellings.
+//
+// AIPL has no `<` on strings: the only ordering primitive is the `sort` builtin
+// over a `str[]`. So the sort key is *encoded into* the string — a bucket digit,
+// the imported name, a space, then the rendered spelling. A space (32) is below
+// every character that can appear in an import name, so it terminates the key and
+// the resulting order matches Rust's `(bucket, first, rendered)` tuple sort.
+fn encode_import_name(first: str, rendered: str) -> str {
+    let bucket = if (first.is_operator_name()) { "0" } else { "1" };
+    `{bucket}{first} {rendered}`
+}
+
+// The rendered spelling back out of an encoded key: everything past the first
+// space. Rejoined because a renamed import's spelling contains spaces of its own
+// (`wrapping_add as +`).
+fn decode_import_name(key: str) -> str { key.split(" ")[1..].join(" ") }
+
+fn sorted_import_names(keys: str[]) -> Doc[] {
+    mut out = [];
+    for (let k : keys.sort()) {
+        set out.push(Text(decode_import_name(k)));
+    }
+    out
+}
+
+// What `program` orders imports by: builtins first, then paths alphabetically.
+// Same encoding trick as the names above — a bucket digit ahead of the text.
+fn import_key(source: str) -> str { if (source == "builtins") { "0" } else { `1{source}` } }
+
+fn pushed_str(self: str[], x: str) -> str[] {
+    mut a = self;
+    set a.push(x);
+    a
+}
+
+// ---------- types ----------
+
+// A type. Handles the three shapes the grammar allows at this level: a bare `!E`
+// void-ok result, a parenthesized function/tuple type, and a base type optionally
+// followed by `!E`.
+fn ty(self: W) -> WDoc!FmtError {
+    if (self.peek_text() == "!") {
+        let inner = self.bump().w.base_ty()?;
+        return ok(WDoc { w: inner.w, doc: Concat([Text("!"), inner.doc]) });
+    };
+    if (self.peek_text() == "(") {
+        return self.paren_ty();
+    };
+    let base = self.base_ty()?;
+    if (base.w.peek_text() == "!") {
+        let e = base.w.bump().w.base_ty()?;
+        return ok(WDoc { w: e.w, doc: Concat([base.doc, Text("!"), e.doc]) });
+    };
+    ok(base)
+}
+
+// `(A, B) -> R` (function type), `(A, B)` (tuple), or `(A, B)[]` (tuple array).
+// Which one is only known after the closing paren.
+fn paren_ty(self: W) -> WDoc!FmtError {
+    let args = self.bump().w.ty_list(")", [])?;
+    let closed = args.w.expect(")")?.w;
+    let list = comma_list_docs(args.docs, TyParens);
+    if (closed.peek_text() == "->") {
+        let r = closed.bump().w.ty()?;
+        return ok(WDoc { w: r.w, doc: Concat([list, Text(" -> "), r.doc]) });
+    };
+    let arrs = closed.array_suffixes([]);
+    ok(WDoc { w: arrs.w, doc: Concat([list].extended(arrs.docs)) })
+}
+
+// Comma-separated types up to (not consuming) `end`.
+fn ty_list(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
+    if (self.peek_text() == end) {
+        return ok(WDocs { w: self, docs: acc });
+    };
+    let t = self.ty()?;
+    let stepped = if (t.w.peek_text() == ",") { t.w.bump().w } else { t.w };
+    stepped.ty_list(end, acc.pushed(t.doc))
+}
+
+// A base type — a set/dict `#{..}` or a (possibly generic) name — plus any run of
+// `?` / `[]` suffixes.
+fn base_ty(self: W) -> WDoc!FmtError {
+    let head = if (self.peek_text() == "#") { self.set_or_dict_ty()? } else { self.named_ty()? };
+    let suf = head.w.type_suffixes([]);
+    ok(WDoc { w: suf.w, doc: Concat([head.doc].extended(suf.docs)) })
+}
+
+// `#{T}` (set) or `#{K: V}` (dict) — the `:` decides which.
+fn set_or_dict_ty(self: W) -> WDoc!FmtError {
+    let k = self.bump().w.expect("{")?.w.ty()?;
+    let rest = if (k.w.peek_text() == ":") {
+        k.w.dict_value_ty()?
+    } else {
+        WDocs { w: k.w, docs: [] }
+    };
+    let closed = rest.w.expect("}")?.w;
+    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc].extended(rest.docs).pushed(Text("}"))) })
+}
+
+// The `: V` half of a dict type.
+fn dict_value_ty(self: W) -> WDocs!FmtError {
+    let v = self.bump().w.ty()?;
+    ok(WDocs { w: v.w, docs: [Text(": "), v.doc] })
+}
+
+// A type name, plus `<A, B>` type arguments when applied. In type position `<`/`>`
+// are unambiguously the argument brackets.
+fn named_ty(self: W) -> WDoc!FmtError {
+    let n = self.bump();
+    if (n.w.peek_text() != "<") {
+        return ok(WDoc { w: n.w, doc: Text(n.text) });
+    };
+    let args = n.w.bump().w.ty_list(">", [])?;
+    let closed = args.w.expect(">")?.w;
+    ok(WDoc { w: closed, doc: Concat([Text(n.text), comma_list_docs(args.docs, Angles)]) })
+}
+
+// A run of `?` (optional) and `[]` (array) suffixes, in source order.
+fn type_suffixes(self: W, acc: Doc[]) -> WDocs {
+    if (self.peek_text() == "?") {
+        return self.bump().w.type_suffixes(acc.pushed(Text("?")));
+    };
+    if (self.peek_text() == "[" && self.peek_text_n(1) == "]") {
+        return self.bump().w.bump().w.type_suffixes(acc.pushed(Text("[]")));
+    };
+    WDocs { w: self, docs: acc }
+}
+
+// A run of `[]` alone — what may follow a parenthesized tuple type.
+fn array_suffixes(self: W, acc: Doc[]) -> WDocs {
+    if (self.peek_text() == "[" && self.peek_text_n(1) == "]") {
+        return self.bump().w.bump().w.array_suffixes(acc.pushed(Text("[]")));
+    };
+    WDocs { w: self, docs: acc }
+}
+
+// ---------- type parameters ----------
+
+// A `<T, U: ord>` type-parameter list, or an empty `Text` when the declaration has
+// none. (The Rust version returns `Option<Doc>` and every caller unwraps it to an
+// empty text, so this collapses the two.) A bound is optional — bare `T` prints
+// as-is, `T: ord` keeps its bound. Shared by `fn`, `struct` and `variant`.
+fn type_params(self: W) -> WDoc!FmtError {
+    if (self.peek_text() != "<") {
+        return ok(WDoc { w: self, doc: Text("") });
+    };
+    let tps = self.bump().w.type_param_list([]);
+    let closed = tps.w.expect(">")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(tps.docs, Angles) })
+}
+
+fn type_param_list(self: W, acc: Doc[]) -> WDocs {
+    if (self.peek_text() == ">") {
+        return WDocs { w: self, docs: acc };
+    };
+    let n = self.bump();
+    let p = if (n.w.peek_text() == ":") {
+        n.w.param_bound(n.text)
+    } else {
+        WDoc { w: n.w, doc: Text(n.text) }
+    };
+    let stepped = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
+    stepped.type_param_list(acc.pushed(p.doc))
+}
+
+// `T: ord` — the `: bound` half of a type parameter.
+fn param_bound(self: W, name: str) -> WDoc {
+    let b = self.bump().w.bump();
+    WDoc { w: b.w, doc: Text(`{name}: {b.text}`) }
+}
+
+// ---------- variant ----------
+
+// One variant case: its leading comments (rendered above it) and the case itself.
+struct VCase { lead: Doc, body: Doc }
+
+struct WCases { w: W, cases: VCase[] }
+
+// `variant V = A | B(i64)`. Flat when it fits; broken to one case per line with a
+// leading `| `. A case's leading comment sits above it and, being a hard line,
+// forces the broken layout.
+fn variant_item(self: W) -> WDoc!FmtError {
+    let n = self.expect("variant")?.w.bump();
+    let tps = n.w.type_params()?;
+    let cs = tps.w.expect("=")?.w.variant_cases([])?;
+    ok(WDoc {
+        w: cs.w,
+        doc: group(Concat([
+            Text(`variant {n.text}`),
+            tps.doc,
+            Text(" ="),
+            Indent(Concat([Line, Concat(variant_body(cs.cases))])),
+        ])),
+    })
+}
+
+// Each case carries its own leading comments and any same-line trailing comment,
+// so a comment written between two arms stays between them.
+fn variant_cases(self: W, acc: VCase[]) -> WCases!FmtError {
+    let l = self.lead();
+    let n = l.w.bump();
+    let payload = if (n.w.peek_text() == "(") {
+        n.w.variant_payload()?
+    } else {
+        WDoc { w: n.w, doc: Text("") }
+    };
+    let tc = payload.w.trailing_comment();
+    let grown = acc.pushed_case(VCase {
+        lead: l.doc,
+        body: Concat([Text(n.text), payload.doc, tc.doc]),
+    });
+    if (tc.w.peek_text() == "|") {
+        tc.w.bump().w.variant_cases(grown)
+    } else {
+        ok(WCases { w: tc.w, cases: grown })
+    }
+}
+
+// A case's `(A, B)` payload types.
+fn variant_payload(self: W) -> WDoc!FmtError {
+    let tys = self.bump().w.ty_list(")", [])?;
+    let closed = tys.w.expect(")")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(tys.docs, TyParens) })
+}
+
+// The cases laid out: the first sits inline after `=`; each later one is preceded
+// by a `Line` and its `| ` separator, with its leading comments above it.
+fn variant_body(cases: VCase[]) -> Doc[] {
+    mut out = [];
+    for (let (i, c) : cases.enumerate()) {
+        if (0 < i) {
+            set out.push(Line);
+        };
+        set out.push(c.lead);
+        if (0 < i) {
+            set out.push(Text("| "));
+        };
+        set out.push(c.body);
+    }
+    out
+}
+
+// ---------- accumulator helpers ----------
+
+// Append every element of `more` to `self`.
+fn extended(self: Doc[], more: Doc[]) -> Doc[] {
+    mut a = self;
+    for (let d : more) {
+        set a.push(d);
+    }
+    a
+}
+
+fn pushed_case(self: VCase[], c: VCase) -> VCase[] {
+    mut a = self;
+    set a.push(c);
+    a
+}
+
+// ---------- test support ----------
+
+// Tokenize `src` by splitting on single spaces — one token per run of non-space
+// characters, each span pointing at the real text. Lets a test write the source
+// it means (`"# { str : i64 }"`, one space between real tokens) instead of
+// hand-computing byte offsets. Every token gets kind `Ident`: the walkers in this
+// file dispatch on token *text*, not kind.
+fn toks_of(src: str) -> FmtTok[] {
+    mut out = [];
+    mut start = u64(0);
+    mut i = u64(0);
+    while (i < src.len()) {
+        if (src[i] == some(' ')) {
+            if (start < i) {
+                set out.push(FmtTok { kind: Ident, span: i64(start)..i64(i) });
+            };
+            set start = i + 1;
+        };
+        set i = i + 1;
+    }
+    if (start < i) {
+        set out.push(FmtTok { kind: Ident, span: i64(start)..i64(i) });
+    };
+    out
+}
+
+// A walker over `src` tokenized by `toks_of`, with no comments.
+fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
+    // `toks_of` splits on single spaces, spans pointing at the real text.
+    let w = walker_of("a bc d");
+    assert(w.peek_text() == "a");
+    assert(w.peek_text_n(1) == "bc");
+    assert(w.peek_text_n(2) == "d");
+    assert(w.peek_text_n(3) == "");
+    assert(walker_of("").at_end());
+
+    // --- types ------------------------------------------------------------
+    // A bare name, and the `?` / `[]` suffix runs, in source order.
+    assert(walker_of("i64").ty().rendered(100)? == "i64");
+    assert(walker_of("i64 ?").ty().rendered(100)? == "i64?");
+    assert(walker_of("i64 [ ]").ty().rendered(100)? == "i64[]");
+    assert(walker_of("i64 [ ] [ ]").ty().rendered(100)? == "i64[][]");
+    assert(walker_of("i64 ? [ ]").ty().rendered(100)? == "i64?[]");
+    assert(walker_of("i64 [ ] ?").ty().rendered(100)? == "i64[]?");
+
+    // Set and dict types.
+    assert(walker_of("# { str }").ty().rendered(100)? == "#{str}");
+    assert(walker_of("# { str : i64 }").ty().rendered(100)? == "#{str: i64}");
+    assert(walker_of("# { str : i64 } [ ]").ty().rendered(100)? == "#{str: i64}[]");
+
+    // Generic application — `<`/`>` are unambiguously argument brackets here.
+    assert(walker_of("Box < i64 >").ty().rendered(100)? == "Box<i64>");
+    assert(walker_of("Map < str , i64 >").ty().rendered(100)? == "Map<str, i64>");
+    // An `Angles` list takes no trailing comma even when broken.
+    assert(walker_of("Map < str , i64 >").ty().rendered(1)? == "Map<\n    str,\n    i64\n>");
+
+    // Results: `T!E`, and the void-ok `!E`.
+    assert(walker_of("i64 ! str").ty().rendered(100)? == "i64!str");
+    assert(walker_of("! Error").ty().rendered(100)? == "!Error");
+
+    // Parenthesized: function type, tuple, tuple array.
+    assert(walker_of("( i64 , str ) -> bool").ty().rendered(100)? == "(i64, str) -> bool");
+    assert(walker_of("( i64 , str )").ty().rendered(100)? == "(i64, str)");
+    assert(walker_of("( i64 , str ) [ ]").ty().rendered(100)? == "(i64, str)[]");
+    // A function type nests on the right.
+    assert(walker_of("( i64 ) -> ( str ) -> bool").ty().rendered(100)? == "(i64) -> (str) -> bool");
+
+    // --- comma lists --------------------------------------------------------
+    // Empty renders as just the brackets; no indent machinery.
+    assert(print_doc(comma_list_docs([], Parens), 100) == "()");
+    assert(print_doc(comma_list_docs([], SpacedBraces), 100) == "{}");
+    // Flat: `SpacedBraces` pads, the rest hug.
+    assert(print_doc(comma_list_docs([Text("a"), Text("b")], Parens), 100) == "(a, b)");
+    assert(print_doc(comma_list_docs([Text("a"), Text("b")], SpacedBraces), 100) == "{ a, b }");
+    assert(print_doc(comma_list_docs([Text("a")], Brackets), 100) == "[a]");
+    assert(print_doc(comma_list_docs([Text("a")], HashBraces), 100) == "#{a}");
+    // Broken: one per line, trailing comma only where the grammar allows it.
+    assert(print_doc(comma_list_docs([Text("a"), Text("b")], Parens), 1) == "(\n    a,\n    b,\n)");
+    assert(
+        print_doc(comma_list_docs([Text("a"), Text("b")], TyParens), 1) == "(\n    a,\n    b\n)",
+    );
+
+    // --- type parameters ----------------------------------------------------
+    // Absent is an empty doc, so a caller can concatenate it unconditionally.
+    assert(walker_of("(").type_params().rendered(100)? == "");
+    assert(walker_of("< T >").type_params().rendered(100)? == "<T>");
+    assert(walker_of("< T : any >").type_params().rendered(100)? == "<T: any>");
+    assert(walker_of("< T , U : ord >").type_params().rendered(100)? == "<T, U: ord>");
+
+    // --- imports --------------------------------------------------------------
+    // Names are sorted, and the braces get inner spaces when flat.
+    assert(
+        walker_of("import { b , a } from builtins ;")
+            .import_item()?.doc
+            .at(100) == "import { a, b } from builtins;",
+    );
+    // Operators sort ahead of plain names.
+    assert(
+        walker_of("import { len , == , ! } from builtins ;")
+            .import_item()?.doc
+            .at(100) == "import { !, ==, len } from builtins;",
+    );
+
+    // A renamed import sorts under the name it *imports* (`w`), not its operator
+    // spelling — so it lands after `len`, not among the operators.
+    assert(
+        walker_of("import { wrapping_add as + , len , == } from builtins ;")
+            .import_item()?.doc
+            .at(100) == "import { ==, len, wrapping_add as + } from builtins;",
+    );
+
+    // A prefix sorts before the longer name extending it (the encoded key's space
+    // terminator is below every identifier character).
+    assert(
+        walker_of("import { ab , a } from builtins ;")
+            .import_item()?.doc
+            .at(100) == "import { a, ab } from builtins;",
+    );
+    // A path import keeps its quoted source verbatim.
+    assert(
+        walker_of(`import \{ x } from "./m.aipl" ;`)
+            .import_item()?.doc
+            .at(100) == `import \{ x } from "./m.aipl";`,
+    );
+    // Too wide: one name per line with a trailing comma.
+    assert(
+        walker_of("import { b , a } from builtins ;")
+            .import_item()?.doc
+            .at(5) == "import {\n    a,\n    b,\n} from builtins;",
+    );
+    // The hoist key puts builtins ahead of every path.
+    assert(walker_of("import { x } from builtins ;").import_item()?.key == "0");
+    assert(walker_of(`import \{ x } from "./m.aipl" ;`).import_item()?.key == `1"./m.aipl"`);
+
+    // --- variant ------------------------------------------------------------
+    assert(walker_of("variant V = A").variant_item().rendered(100)? == "variant V = A");
+    assert(walker_of("variant V = A | B").variant_item().rendered(100)? == "variant V = A | B");
+    assert(
+        walker_of("variant V = A | B ( i64 )")
+            .variant_item()
+            .rendered(100)? == "variant V = A | B(i64)",
+    );
+    assert(
+        walker_of("variant V = A ( i64 , str )")
+            .variant_item()
+            .rendered(100)? == "variant V = A(i64, str)",
+    );
+    // Generic variant.
+    assert(
+        walker_of("variant Opt < T > = Some ( T ) | Nil")
+            .variant_item()
+            .rendered(100)? == "variant Opt<T> = Some(T) | Nil",
+    );
+
+    // Too wide to fit: one case per line, `|` leading each continuation, indented
+    // one level under the `=`.
+    assert(
+        walker_of("variant V = A | B").variant_item().rendered(5)? == "variant V =\n    A\n    | B",
+    );
+})
+
+// Render what a walker step produced at the given width — the round trip a
+// formatter test actually cares about.
+fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self?.doc, width)) }
+
+// Render a `Doc` directly — the `WDoc`-free form, for steps that hand back
+// something other than a plain `WDoc`.
+fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
+
 // Append one `Doc` to an accumulator (AIPL's `push` mutates, so this is the
 // expression form the folds above want).
 fn pushed(self: Doc[], d: Doc) -> Doc[] {
@@ -354,31 +900,76 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 --- performance ---
-allocations: 72
-deallocations: 72
-reallocations: 0
-bytes allocated: 3480
-instructions executed: 10796
-binary size: 39592
-  code: 20524
-  data: 2660
-  metadata: 16408
+allocations: 3130
+deallocations: 3130
+reallocations: 230
+bytes allocated: 178641
+instructions executed: 414642
+binary size: 443872
+  code: 244636
+  data: 10100
+  metadata: 189136
 --- monomorphizations ---
+__builtin_any$__m1__Doc$lam11
+__builtin_count_while$char$s0$lam19
+__builtin_count_while$char$s0$lam29
+__enumerate10
+__enumerate6
+__m1__col_after
+__m1__fits
+__m1__fits_after
+__m1__fits_atom
+__m1__go
+__m1__group
+__m1__has_hard
+__m1__newline_str
+__m1__prepend
+__m1__print_doc
+__m1__pushed
+__m2__reindent_block
+__m4__lines
+__map21$own0
+__map27$own0
 __test$pushed
+__test$walker_of
+array_suffixes
+at
 at_end
+base_ty
 bump
+comma_list_docs
+dict_value_ty
 expect
+extended
 gap_has_blank
+import_item
+import_names
 lead
 lead_loop
 main
+named_ty
 new_walker
 next_start
+paren_ty
 peek
 peek_text
 peek_text_n
 pushed
 quoted
+rendered
 same_line
+set_or_dict_ty
+sorted_import_names
 take_comment
+toks_of
 trailing_comment
+ty
+ty_list
+type_param_list
+type_params
+type_suffixes
+variant_body
+variant_cases
+variant_item
+variant_payload
+walker_of

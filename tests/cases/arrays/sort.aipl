@@ -1,0 +1,78 @@
+import { &&, ==, len, print, sort, to_str } from builtins;
+
+// `xs.sort()` returns a *fresh* array with the same elements in ascending order.
+// It does not mutate the receiver (like `reverse`, and unlike `push`).
+//
+// The element type must satisfy the `ord` bound — an integer, a `char`, or a
+// `str`. Ordering is by value: integers numerically (respecting signedness),
+// chars and strings by byte. Unlike `reverse`, the result cannot be a lazy view
+// — the order isn't a function of the index — so it is materialized.
+//
+// Only `i64`, `char` and `str` elements are exercised below because those are the
+// only `ord` types that can currently *be* array elements: `u64[]`/`u8[]`/`i32[]`
+// are all rejected ("not yet supported as an array/optional element"). The
+// runtime still distinguishes signed from unsigned words, so that stays correct
+// if narrow elements are allowed later.
+
+fn sorted_ints() -> i64[] { [3, 1, 2].sort() }.test({
+    assert(sorted_ints() == [1, 2, 3]);
+    // Already sorted, reverse sorted, duplicates, single, empty.
+    assert([1, 2, 3].sort() == [1, 2, 3]);
+    assert([3, 2, 1].sort() == [1, 2, 3]);
+    assert([2, 1, 2, 1].sort() == [1, 1, 2, 2]);
+    assert([7].sort() == [7]);
+    assert([].sort().len() == u64(0));
+})
+
+// Signed integers order numerically, not by their bit pattern.
+fn negatives() -> i64[] { [3, -5, 0, -1].sort() }.test({
+    assert(negatives() == [-5, -1, 0, 3]);
+})
+
+// Strings order lexicographically by byte.
+fn names() -> str[] { ["pear", "apple", "fig"].sort() }.test({
+    assert(names() == ["apple", "fig", "pear"]);
+    // A prefix sorts before the longer string that extends it.
+    assert(["ab", "a", "abc"].sort() == ["a", "ab", "abc"]);
+    // Uppercase sorts before lowercase (byte order, not locale).
+    assert(["b", "A", "a"].sort() == ["A", "a", "b"]);
+})
+
+// `char[]` and `str` share a representation, so both sort their bytes and each
+// keeps its own type.
+fn chars() -> char[] { ['c', 'a', 'b'].sort() }.test({
+    assert(chars() == ['a', 'b', 'c']);
+    assert("cba".sort() == "abc");
+    assert("".sort() == "");
+})
+
+// The receiver is untouched — `sort` builds a new array.
+fn does_not_mutate() -> bool {
+    let xs = [3, 1, 2];
+    let ys = xs.sort();
+    xs == [3, 1, 2] && ys == [1, 2, 3]
+}.test({
+    assert(does_not_mutate());
+})
+
+fn main() !prints {
+    print(to_str(sorted_ints()));
+    print(to_str(names()));
+    print(to_str(chars()));
+}
+--- stdout ---
+[1, 2, 3]
+["apple", "fig", "pear"]
+['a', 'b', 'c']
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 343
+instructions executed: 1208
+binary size: 5344
+  code: 2672
+  data: 211
+  metadata: 2461
+--- monomorphizations ---
+main

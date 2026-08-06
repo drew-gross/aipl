@@ -224,9 +224,11 @@ pub mod ast {
         pub fn accepts(&self, ty: &Type) -> bool {
             match self {
                 Bound::Any => true,
-                Bound::Ord => {
-                    matches!(ty, Type::Primitive(p) if p.is_int() || *p == Primitive::Char)
-                }
+                Bound::Ord => matches!(
+                    ty,
+                    Type::Primitive(p)
+                        if p.is_int() || *p == Primitive::Char || *p == Primitive::Str
+                ),
             }
         }
     }
@@ -1258,6 +1260,9 @@ fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
+// Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
+// str), enforced generically by the checker's bound-checking.
+fn __builtin_sort<T: ord>(self: T[]) -> T[] { [] }
 // Pair each element with its index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
 fn __builtin_enumerate<T: any>(self: T[]) -> (i64, T)[] { [] }
 fn some<T: any>(x: T) -> T? { none }
@@ -1434,6 +1439,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "minimum",
     "maximum",
     "reverse",
+    "sort",
     "enumerate",
     "repeat",
 ];

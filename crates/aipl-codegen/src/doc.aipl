@@ -72,7 +72,7 @@ variant Work = WNil | WCons(u64, bool, Doc, Work)
 // Wrap `self` in a group, pre-computing whether it is forced to break. Forcing
 // is what makes a multi-statement block, or any construct holding a line
 // comment, lay out vertically no matter the width.
-fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
+pub fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
 
 // ---------- forcing ----------
 
@@ -100,7 +100,7 @@ fn has_hard(self: Doc) -> bool {
 // Render `doc` at the given width limit. Lines are indented with spaces;
 // trailing whitespace is stripped from every line and a final newline is
 // preserved when present (the Rust `print`'s belt-and-braces cleanup).
-fn print_doc(doc: Doc, width: u64) -> str {
+pub fn print_doc(doc: Doc, width: u64) -> str {
     let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
     cleanup(pieces.join(""))
 }

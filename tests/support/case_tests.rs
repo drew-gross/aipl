@@ -52,6 +52,7 @@ case_tests! {
     cases_arrays_reverse = "cases/arrays/reverse",
     cases_arrays_slice = "cases/arrays/slice",
     cases_arrays_slice_span = "cases/arrays/slice_span",
+    cases_arrays_sort = "cases/arrays/sort",
     cases_arrays_starts_ends_with = "cases/arrays/starts_ends_with",
     cases_arrays_str_array = "cases/arrays/str_array",
     cases_arrays_sum_and_len = "cases/arrays/sum_and_len",

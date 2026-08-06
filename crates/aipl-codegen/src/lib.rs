@@ -837,6 +837,20 @@ extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
     result
 }
 
+/// `s.sort() -> str` — a fresh `str` with the bytes in ascending order. The
+/// str-shaped counterpart of [`aipl_arr_sort`], for a `str` or `char[]` receiver
+/// (the two share a representation, so neither is a real array block).
+/// Consumes `s` (callers pre-inc). Mirrors the linker runtime.
+extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
+    let mut sb = [0u8; 8];
+    let bytes = unsafe { str_bytes(s, &mut sb) };
+    let mut sorted: Vec<u8> = bytes.to_vec();
+    sorted.sort_unstable();
+    let result = make_str(&sorted);
+    aipl_dec(s);
+    result
+}
+
 /// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
 /// Returns `""` for `n <= 0`. Consumes `s` (callers pre-inc). Mirrors the linker runtime.
 extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
@@ -854,6 +868,78 @@ extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
     };
     aipl_dec(s);
     result
+}
+
+/// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
+/// 8-byte scalar, so the only question is how to read the word: as a signed
+/// integer, as an unsigned one (`u8`..`u64`, and `char` — a byte value), or as a
+/// `str` pointer to compare lexicographically by bytes.
+const SORT_KIND_SIGNED: i64 = 0;
+const SORT_KIND_UNSIGNED: i64 = 1;
+const SORT_KIND_STR: i64 = 2;
+
+/// `xs.sort() -> T[]` — a fresh array with the same elements in ascending order.
+/// Consumes `xs` (callers pre-inc) and co-owns the elements it copies.
+///
+/// Unlike [`aipl_arr_reverse`] this cannot be a lazy view: the order isn't a
+/// function of the index, so the result has to be materialized. Only `ord`
+/// element types reach here and all of them are 8-byte scalars, so the block is
+/// a flat run of words and sorting is a permutation of those words — which moves
+/// no ownership, hence the single blanket retain before sorting.
+///
+/// Mirrors `aipl_arr_sort` in the linker runtime.
+extern "C" fn aipl_arr_sort(
+    a: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+    kind: i64,
+) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
+    if a.is_null() {
+        return a;
+    }
+    let len = unsafe { array_len_of(a) };
+    let raw = alloc_array(len, len, drop_fn, elem_size);
+    unsafe {
+        let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        if len > 0 {
+            let src = a.add(ARR_ELEMS_OFFSET);
+            std::ptr::copy_nonoverlapping(src, dst, len * elem_size.max(8) as usize);
+            // The new array co-owns every element. Done before the sort because
+            // reordering words neither creates nor destroys a reference.
+            elem_rc(retain_fn, dst, len);
+            let words = std::slice::from_raw_parts_mut(dst as *mut i64, len);
+            sort_words(words, kind);
+        }
+    }
+    aipl_array_dec(a);
+    raw
+}
+
+/// Order `words` in place by [`SORT_KIND_SIGNED`]/`_UNSIGNED`/`_STR`. Shared by
+/// both runtimes' `aipl_arr_sort`; kept byte-for-byte identical, which is why it
+/// uses `sort_unstable_by` — the stable sorts need an allocation, and the linker
+/// runtime is `#![no_std]`. Unstable is enough here: `ord` elements are compared
+/// by value, so equal ones are indistinguishable.
+fn sort_words(words: &mut [i64], kind: i64) {
+    match kind {
+        SORT_KIND_STR => words.sort_unstable_by(|x, y| {
+            let mut xb = [0u8; 8];
+            let mut yb = [0u8; 8];
+            let (xs, ys) = unsafe {
+                (
+                    str_bytes(*x as *const u8, &mut xb),
+                    str_bytes(*y as *const u8, &mut yb),
+                )
+            };
+            xs.cmp(ys)
+        }),
+        SORT_KIND_UNSIGNED => words.sort_unstable_by(|x, y| (*x as u64).cmp(&(*y as u64))),
+        // SORT_KIND_SIGNED, and anything unexpected (codegen only ever emits the
+        // three above).
+        _ => words.sort_unstable(),
+    }
 }
 
 /// `xs.reverse() -> T[]` — O(1): returns a reversed-view repr wrapping `xs`.
@@ -3863,6 +3949,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_repeat", aipl_str_repeat as *const u8);
     jit_builder.symbol("aipl_str_reverse", aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
+    jit_builder.symbol("aipl_arr_sort", aipl_arr_sort as *const u8);
+    jit_builder.symbol("aipl_str_sort", aipl_str_sort as *const u8);
     jit_builder.symbol("aipl_str_slice", aipl_str_slice as *const u8);
     jit_builder.symbol("aipl_arr_slice", aipl_arr_slice as *const u8);
     jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
@@ -6350,7 +6438,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_hash"
         | "aipl_str_iter_next"
         | "aipl_read_file_to_string"
-        | "aipl_str_reverse" => sig(1, true),
+        | "aipl_str_reverse"
+        | "aipl_str_sort" => sig(1, true),
         "aipl_rec_alloc"
         | "aipl_str_repeat"
         | "aipl_str_eq"
@@ -6373,7 +6462,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
             sig(4, true)
         }
-        "aipl_array_push" | "aipl_array_push_mut" => sig(5, true),
+        "aipl_array_push" | "aipl_array_push_mut" | "aipl_arr_sort" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
         other => panic!("unknown builtin import symbol {other:?}"),
@@ -12375,6 +12464,93 @@ fn compile_call_expr<M: Module>(
                 ));
             };
             (len, Type::Primitive(Primitive::U64))
+        }
+        "__builtin_sort" => {
+            // `xs.sort() -> T[]` — a fresh array, elements ascending. Consumes
+            // `self` (callers pre-inc). The `ord` bound has already restricted the
+            // element type to an integer, `char`, or `str`; which of those decides
+            // how the runtime reads each 8-byte word.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"sort\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // A `str` (or a str-shaped `char[]`) is not an array block — it has no
+            // length field and its elements are bytes — so it sorts through the
+            // str path, exactly as `reverse` splits these cases. A `str` receiver
+            // keeps `str`; a `char[]` keeps its nominal type.
+            if is_str_repr(&t) || is_char_array(&t) {
+                emit_inc(builder, module, builtins, ptr);
+                let f = builtins.import(module, builder.func, "aipl_str_sort");
+                let inst = builder.ins().call(f, &[ptr]);
+                let out = builder.inst_results(inst)[0];
+                let out_ty = if is_char_array(&t) {
+                    t.clone()
+                } else {
+                    Type::Primitive(Primitive::Str)
+                };
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(out, &out_ty));
+                return Ok((out, out_ty));
+            }
+            let Type::Array(elem) = &t else {
+                return Err(Error::at(
+                    format!("\"sort\" expects an array, got {}", type_name(&t)),
+                    args[0].span.clone(),
+                ));
+            };
+            let elem = (**elem).clone();
+            // Only `i64` and `str` actually reach here today: `char[]` took the
+            // str path above, and no narrow or unsigned integer is a legal array
+            // element yet (`u64[]`/`u8[]`/`i32[]` are all rejected — see
+            // `is_array_elem`). The unsigned arm is kept anyway so that widening
+            // element support later cannot silently sort unsigned words as signed.
+            let kind = match &elem {
+                Type::Primitive(Primitive::Str) => SORT_KIND_STR,
+                // A `char` is a byte value, so it orders as an unsigned word.
+                Type::Primitive(Primitive::Char) => SORT_KIND_UNSIGNED,
+                Type::Primitive(p) if p.is_int() => {
+                    if p.int_signed() {
+                        SORT_KIND_SIGNED
+                    } else {
+                        SORT_KIND_UNSIGNED
+                    }
+                }
+                // An untyped empty literal (`[].sort()`) never has an element to
+                // compare, so any kind does; it stays empty either way.
+                _ if is_none_inner(&elem) => SORT_KIND_SIGNED,
+                other => {
+                    return Err(Error::at(
+                        format!(
+                            "\"sort\" needs comparable elements (an integer, char, or str), got {}",
+                            type_name(other)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
+            };
+            emit_inc(builder, module, builtins, ptr);
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&elem, structs));
+            let kind_v = builder.ins().iconst(types::I64, kind);
+            let f = builtins.import(module, builder.func, "aipl_arr_sort");
+            let inst = builder
+                .ins()
+                .call(f, &[ptr, drop_fn, retain_fn, esz, kind_v]);
+            let out = builder.inst_results(inst)[0];
+            let arr_ty = Type::Array(Box::new(elem));
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(out, &arr_ty));
+            (out, arr_ty)
         }
         "__builtin_reverse" => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with

@@ -63,6 +63,10 @@ make for (key, val) work for dicts, and also arrays (key=index)
 line numbers on test assertion failures, err/none propagations, etc.
 get claude to reorganize my todos
 
+only i64 among integers can be an array element <--- really? fix this
+A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at first — char[] shares the str representation and has no array length field, so array_len_of read garbage. Routed str-shaped receivers to a separate aipl_str_sort, mirroring how reverse splits the same cases.
+The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
+
 error improvements:
 - import suggestions when missing an import
 - from its defining file -> list the filename
