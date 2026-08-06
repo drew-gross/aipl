@@ -15511,7 +15511,9 @@ fn compile_expr<M: Module>(
                     .ok_or_else(|| {
                         Error::at("Span struct layout missing (compiler bug)", span.clone())
                     })?;
-                let i64_ty = Type::Primitive(Primitive::I64);
+                // `Span`'s bounds are `u64` (a byte offset is never negative);
+                // both signednesses read the same 8-byte scalar here.
+                let bound_ty = Type::Primitive(Primitive::U64);
                 let mut bound = |field: &str| -> Result<Value, Error> {
                     let f = layout.field(field).ok_or_else(|| {
                         Error::at(
@@ -15519,7 +15521,7 @@ fn compile_expr<M: Module>(
                             span.clone(),
                         )
                     })?;
-                    Ok(component(builder, idx_v, f.offset, &i64_ty, structs))
+                    Ok(component(builder, idx_v, f.offset, &bound_ty, structs))
                 };
                 let a_v = bound("start")?;
                 let b_v = bound("end")?;

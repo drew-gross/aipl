@@ -3,9 +3,12 @@ import { ==, Span, print, to_str, wrapping_add as +, wrapping_mul as * } from bu
 // `start..end` is a range expression: it constructs the builtin `Span`
 // (`Span { start: .., end: .. }`) without spelling the name — so, like
 // slicing, it needs no `Span` import (this file imports it only to write the
-// annotations below). It binds loosest of all infix operators, so bounds can
-// be full expressions: `i + 1..i * 4` is `(i + 1)..(i * 4)`.
-fn width(s: Span) -> i64 { s.end }
+// annotations below). It binds looser than comparison and arithmetic, so bounds
+// can be full expressions: `i + 1..i * 4` is `(i + 1)..(i * 4)`; but tighter than
+// `==`, so `s == 1..4` compares against the whole range.
+//
+// Its bounds are `u64` — a byte offset or index is never negative.
+fn width(s: Span) -> u64 { s.end }
 
 fn main() !prints {
     let s = 1..4;

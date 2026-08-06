@@ -80,7 +80,7 @@ struct W {
     cpos: u64,
     // End offset of the last consumed token or comment — what the blank-line and
     // same-line (trailing comment) decisions measure from.
-    last_end: i64,
+    last_end: u64,
 }
 
 // Cursor-advancing steps return the moved-on `W` beside their result.
@@ -163,7 +163,7 @@ fn err_here(self: W, msg: str) -> FmtError {
         some(t) => FmtError { message: msg, span: t.span },
         none => FmtError {
             message: `{msg} (at end of input)`,
-            span: i64(self.src.len())..i64(self.src.len()),
+            span: self.src.len()..self.src.len(),
         },
     }
 }
@@ -172,10 +172,10 @@ fn err_here(self: W, msg: str) -> FmtError {
 
 // Where the next syntactic entity begins: the next comment or token, whichever
 // comes first. Past both, the end of the source.
-fn next_start(self: W) -> i64 {
+fn next_start(self: W) -> u64 {
     let tok = match (self.peek()) {
         some(t) => t.span.start,
-        none => i64(self.src.len()),
+        none => self.src.len(),
     };
     match (self.comments[self.cpos]) {
         some(c) => if (c.start < tok) { c.start } else { tok },
@@ -185,10 +185,10 @@ fn next_start(self: W) -> i64 {
 
 // Whether the source between two offsets holds a blank line (two newlines).
 // (`lo`/`hi` where the Rust version says `from`/`to` — `from` is a keyword.)
-fn gap_has_blank(self: W, lo: i64, hi: i64) -> bool { 2 <= self.src[lo..hi].count('\n') }
+fn gap_has_blank(self: W, lo: u64, hi: u64) -> bool { 2 <= self.src[lo..hi].count('\n') }
 
 // Whether two offsets sit on the same source line.
-fn same_line(self: W, lo: i64, hi: i64) -> bool { !self.src[lo..hi].contains("\n") }
+fn same_line(self: W, lo: u64, hi: u64) -> bool { !self.src[lo..hi].contains("\n") }
 
 // ---------- comments ----------
 
@@ -201,12 +201,12 @@ fn lead(self: W) -> WDoc {
     // flushes a file's trailing comments; `next_start` still bounds each gap.
     let limit = match (self.peek()) {
         some(t) => t.span.start,
-        none => i64(self.src.len()) + 1,
+        none => self.src.len() + 1,
     };
     lead_loop(self, limit, [])
 }
 
-fn lead_loop(w: W, limit: i64, acc: Doc[]) -> WDoc {
+fn lead_loop(w: W, limit: u64, acc: Doc[]) -> WDoc {
     match (w.comments[w.cpos]) {
         none => WDoc { w, doc: Concat(acc) },
         some(c) => if (limit <= c.start) {
@@ -234,7 +234,7 @@ fn lead_loop(w: W, limit: i64, acc: Doc[]) -> WDoc {
 fn trailing_comment(self: W) -> WDoc {
     let next_tok = match (self.peek()) {
         some(t) => t.span.start,
-        none => i64(self.src.len()) + 1,
+        none => self.src.len() + 1,
     };
     match (self.comments[self.cpos]) {
         none => WDoc { w: self, doc: Concat([]) },
@@ -626,14 +626,14 @@ fn toks_of(src: str) -> FmtTok[] {
     while (i < src.len()) {
         if (src[i] == some(' ')) {
             if (start < i) {
-                set out.push(FmtTok { kind: Ident, span: i64(start)..i64(i) });
+                set out.push(FmtTok { kind: Ident, span: start..i });
             };
             set start = i + 1;
         };
         set i = i + 1;
     }
     if (start < i) {
-        set out.push(FmtTok { kind: Ident, span: i64(start)..i64(i) });
+        set out.push(FmtTok { kind: Ident, span: start..i });
     };
     out
 }

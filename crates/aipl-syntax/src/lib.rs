@@ -1172,7 +1172,7 @@ pub fn is_error(t: &Type) -> bool {
 /// receiver-style builtins are method-callable (`xs.map(..)`, `opt.value_or(..)`).
 pub const BUILTIN_SIGNATURES: &str = r#"
 // A half-open byte range `[start, end)`, e.g. a source-text location.
-struct __builtin_Span { start: i64, end: i64 }
+struct __builtin_Span { start: u64, end: u64 }
 // A finished child process's captured output and exit status.
 struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
 
@@ -1266,7 +1266,7 @@ fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 // str), enforced generically by the checker's bound-checking.
 fn __builtin_sort<T: ord>(self: T[]) -> T[] { [] }
 // Pair each element with its index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
-fn __builtin_enumerate<T: any>(self: T[]) -> (i64, T)[] { [] }
+fn __builtin_enumerate<T: any>(self: T[]) -> (u64, T)[] { [] }
 fn some<T: any>(x: T) -> T? { none }
 
 // Test-runner hooks. `__assert(cond, loc)` is what `assert(cond)` lowers to

@@ -3092,10 +3092,23 @@ impl Mono<'_> {
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
 
         // Body:
-        //   mut $i = 0;
+        //   mut $i = u64(0);
         //   mut $out = [];
         //   for (let $e : $arr) { set $out.push(($i, $e)); set $i = $i + 1; }
         //   $out
+        //
+        // The counter is seeded `u64(0)`, not `0`: an index is unsigned, and a
+        // `mut` binding takes its type from its initializer with no way to widen
+        // it later — a bare `0` would pin `$i` to `i64` and the tuple below with
+        // it.
+        let zero_u64 = Expr::new(
+            ExprKind::Call(
+                "u64".to_string(),
+                vec![Expr::new(ExprKind::Num(0), span.clone())],
+                false,
+            ),
+            span.clone(),
+        );
         let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span.clone());
         let push = set_push(id("$out"), tuple, span.clone());
         let incr = Expr::new(
@@ -3121,7 +3134,7 @@ impl Mono<'_> {
         let enumerate_body = Expr::new(
             ExprKind::LetMut(
                 "$i".to_string(),
-                Box::new(Expr::new(ExprKind::Num(0), span.clone())),
+                Box::new(zero_u64),
                 Box::new(Expr::new(
                     ExprKind::LetMut(
                         "$out".to_string(),
@@ -3139,9 +3152,9 @@ impl Mono<'_> {
 
         let enumerate_name = format!("__enumerate{}", self.synth);
         self.synth += 1;
-        // Return type: (i64, T)[]. The tuple struct is registered by TupleLit
+        // Return type: (u64, T)[]. The tuple struct is registered by TupleLit
         // inference when the synthesized body is compiled.
-        let tuple_name = check::tuple_struct_name(&[Type::Primitive(Primitive::I64), elem.clone()]);
+        let tuple_name = check::tuple_struct_name(&[Type::Primitive(Primitive::U64), elem.clone()]);
         let ret = Type::Array(Box::new(Type::Named(tuple_name)));
         self.concrete.insert(
             enumerate_name.clone(),
