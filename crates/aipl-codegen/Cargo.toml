@@ -16,7 +16,6 @@ aipl-parser = { workspace = true }
 aipl-loader = { workspace = true }
 # Used to install the dogfooded `reindent_block` into the formatter's hook (the
 # formatter's raw-block re-layout, dogfooded via the FFI); `install_parser_hooks`.
-aipl-fmt = { workspace = true }
 cranelift = { workspace = true }
 cranelift-jit = { workspace = true }
 cranelift-module = { workspace = true }

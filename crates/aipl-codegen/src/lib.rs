@@ -3139,24 +3139,6 @@ fn split_test_sections(src: &str) -> (String, String) {
     })
 }
 
-/// The formatter's raw-block re-layout hook (see [`install_parser_hooks`]): given
-/// the verbatim raw-string / template atom `s` and the column `base` its opening
-/// delimiter sits at, returns the atom with its closing delimiter (and, for a
-/// bare-delimiter block, its content) re-aligned around `base` — computed by the
-/// dogfooded AIPL `reindent_block` via the FFI (`base` marshaled as an
-/// [`FfiValue::Int`]). No native fallback; panics if it can't be built or called.
-fn reindent_block(s: &str, base: usize) -> String {
-    DOGFOOD_ENGINE.with(|comp| {
-        match comp.call_values(
-            "reindent_block",
-            &[FfiValue::Str(s.to_string()), FfiValue::Int(base as i64)],
-        ) {
-            Ok(FfiValue::Str(out)) => out,
-            other => panic!("dogfooded reindent_block() call: {other:?}"),
-        }
-    })
-}
-
 /// The parser's trailing-whitespace hook (see [`install_parser_hooks`]): the
 /// [`Span`] of the first line's trailing space/tab run, or `None` if no line has
 /// any — computed by the dogfooded AIPL `find_trailing_whitespace`
@@ -3611,7 +3593,6 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
-    aipl_fmt::set_reindent_block_hook(reindent_block);
 }
 
 /// Compile every function in `program` into `module`. When `main_export_name`

@@ -155,11 +155,14 @@ the arg contract being different for builtins caused problems for retain elision
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
 
+dogfood.clif is relinked on every compiler run. Can we cache this cost or eliminate it or something?
+
 make a docs renderer
 
 Maybe address this later and unify formatter and parser lexing (maybe allow formatter to rewrite string literals for fewest escapes?):
 
 none.value_or_err doesn't type check. Maybe it should? Unclear.
+Known limitation recorded in #7: cross-iteration struct aliases still see the newer value, since the per-set buffer is a reused stack slot. <--- fix this
 
 value_or can't unwrap struct optionals — needs match. <--- fix this
 Narrowed precisely: a struct holding both a recursive-variant field and an array field breaks the compiler. <--- fix this
