@@ -59,7 +59,11 @@ STAGED="$REPO/crates/aipl-codegen/src/dogfood.clif.staged"
 STAGED_FMT="$REPO/crates/aipl-codegen/src/fmt.clif.staged"
 STEP_OUT="$(mktemp -t handoff-step.XXXXXX)"
 STEP_OUT_SAVED="$STEP_OUT"
-trap 'rm -f "$STEP_OUT"' EXIT
+# Per-step wall-clock, so a slow handoff can be attributed to a step rather than
+# guessed at. Written as `seconds<TAB>label` and reported at exit.
+TIMINGS="$(mktemp -t handoff-times.XXXXXX)"
+SCRIPT_START=$SECONDS
+trap 'rm -f "$STEP_OUT" "$TIMINGS"' EXIT
 
 bold=$'\033[1m'; red=$'\033[31m'; green=$'\033[32m'; dim=$'\033[2m'; off=$'\033[0m'
 
@@ -81,8 +85,28 @@ failed_tests() { awk '/^ *(FAIL|SIGSEGV|ABORT|TIMEOUT|LEAK-FAIL) \[/ {print $NF}
 
 banner() { printf '\n%s==> %s%s\n' "$bold" "$*" "$off" >&2; }
 
-# Run a labelled step, capturing combined output to $STEP_OUT. Caller inspects $?.
-run_step() { banner "$1"; shift; "$@" >"$STEP_OUT" 2>&1; }
+# Run a labelled step, capturing combined output to $STEP_OUT. Caller inspects $?,
+# so the command's status is passed through untouched.
+run_step() {
+    banner "$1"
+    local label="$1"; shift
+    local start=$SECONDS
+    "$@" >"$STEP_OUT" 2>&1
+    local rc=$?
+    local secs=$((SECONDS - start))
+    printf '%s    (%ss)%s\n' "$dim" "$secs" "$off" >&2
+    printf '%s\t%s\n' "$secs" "$label" >>"$TIMINGS"
+    return $rc
+}
+
+# Where the wall-clock went, slowest first. Printed on success *and* failure —
+# a handoff that stops late has still spent the time, and that's worth seeing.
+timing_report() {
+    [ -s "$TIMINGS" ] || return 0
+    printf '\n%stime: %ss total%s\n' "$dim" "$((SECONDS - SCRIPT_START))" "$off" >&2
+    sort -rn "$TIMINGS" | awk -F'\t' -v d="$dim" -v o="$off" \
+        '$1 > 0 { printf "%s  %5ds  %s%s\n", d, $1, $2, o }' >&2
+}
 
 # Preserve the current step's output past the next step / the EXIT trap, so a
 # failure message can point the reader at the full log.
@@ -93,6 +117,7 @@ fail() {
     printf '\n%sHANDOFF FAILED at: %s%s\n' "$red$bold" "$1" "$off" >&2
     if [ -n "${2:-}" ]; then printf '%s\n' "$2" >&2; fi
     printf '%s(full output: %s)%s\n' "$dim" "$STEP_OUT_SAVED" "$off" >&2
+    timing_report
     exit 1
 }
 
@@ -148,6 +173,7 @@ fi
 run_step "nextest (discovery)" "${NEXTEST[@]}"
 if [ $? -eq 0 ]; then
     printf '\n%sHANDOFF OK%s (green with no regeneration needed)\n' "$green$bold" "$off" >&2
+    timing_report
     exit 0
 fi
 save_out  # keep the discovery output for any failure message below
@@ -319,4 +345,5 @@ if [ $behavioral_changed -eq 1 ]; then
     printf '%s    (git reset --hard HEAD undoes the refill if it recorded a regression)%s\n' \
         "$dim" "$off" >&2
 fi
+timing_report
 exit 0

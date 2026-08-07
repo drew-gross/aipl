@@ -124,8 +124,6 @@ instead of err_message use x == err(...)
 
 use template literals more than concat
 
-Why does the handoff script take so long? The full test suite is down to only a few minutes but handoff is taking tens of minutes
-
 sorted_import_names should be implemented in terms of map
 extended should just use concat at the call site
 
