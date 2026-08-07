@@ -155,9 +155,9 @@ the arg contract being different for builtins caused problems for retain elision
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
 
-dogfood.clif is relinked on every compiler run. Can we cache this cost or eliminate it or something?
-
 make a docs renderer
+
+cache the compiled module on disk instead of using clif ir (expensive to parse)
 
 Maybe address this later and unify formatter and parser lexing (maybe allow formatter to rewrite string literals for fewest escapes?):
 

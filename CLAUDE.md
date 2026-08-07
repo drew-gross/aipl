@@ -244,11 +244,11 @@ compiler runs on:
 
 3. **Validate by running the corpus against the staged IR, not by reading the
    diff** — the real check is running the whole suite with the compiler itself
-   linking the staged file, via the `AIPL_DOGFOOD_IR` env var (points the
-   dogfood engine at an alternate `.clif` instead of the baked-in one), so every
-   parse in the corpus — including the compiler parsing its own source —
-   exercises the candidate:
-   `AIPL_DOGFOOD_IR=<abs path>/dogfood.clif.staged cargo test`
+   linking the staged files, via the `AIPL_DOGFOOD_IR` and `AIPL_FMT_IR` env
+   vars (each points one engine at an alternate `.clif` instead of the baked-in
+   one), so every parse in the corpus — including the compiler parsing its own
+   source — exercises the candidates:
+   `AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged AIPL_FMT_IR=<abs>/fmt.clif.staged cargo test`
    The path **must be absolute** — the cases harness spawns the compiler as a
    subprocess whose CWD isn't the repo root, so a relative path won't resolve
    there. (The `fill_staged_ir` / `validate_staged_ir` messages print the exact

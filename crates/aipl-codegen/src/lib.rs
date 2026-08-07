@@ -3001,8 +3001,6 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./unescape.aipl", UNESCAPE_SRC),
     ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
     ("./indent.aipl", INDENT_SRC),
-    ("./doc.aipl", DOC_SRC),
-    ("./walker.aipl", WALKER_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -3026,9 +3024,53 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "is_operator_name",
     "lex_aipl",
     "lex_aipl_stripped",
-    "reindent_block",
-    "format_program",
 ];
+
+/// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
+/// plus everything they import — which includes the lexer, since
+/// `format_program` tokenizes for itself. That overlaps [`DOGFOOD_SOURCES`]
+/// heavily, and deliberately so: the two artifacts are linked independently, and
+/// keeping each self-contained is what lets an ordinary compile link only the
+/// parser half.
+///
+/// Splitting them matters because re-linking is not free — it is ~2.4s for the
+/// combined artifact, paid once per process, and the formatter is over two
+/// thirds of it. An ordinary compile never formats, so it should never pay for
+/// the walker; `aipl fmt` links this one on top and is an explicit user action.
+pub const FMT_SOURCES: &[(&str, &str)] = &[
+    ("./process_raw_string.aipl", RAW_STRING_SRC),
+    ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
+    ("./lines.aipl", RAW_STRING_LINES_SRC),
+    ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
+    ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
+    ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
+    (
+        "./parse_test_section_header.aipl",
+        PARSE_TEST_SECTION_HEADER_SRC,
+    ),
+    ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
+    ("./split_test_sections.aipl", SPLIT_TEST_SECTIONS_SRC),
+    ("./is_operator_name.aipl", IS_OPERATOR_NAME_SRC),
+    ("./lexer.aipl", LEXER_LIB_SRC),
+    ("./lex_aipl.aipl", LEX_AIPL_SRC),
+    ("./unescape.aipl", UNESCAPE_SRC),
+    ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
+    ("./indent.aipl", INDENT_SRC),
+    ("./doc.aipl", DOC_SRC),
+    ("./walker.aipl", WALKER_SRC),
+];
+
+/// The formatter engine's single FFI entry.
+pub const FMT_ENTRIES: &[&str] = &["format_program"];
+
+/// The checked-in formatter IR, and its filename for the `dogfood_ir` test.
+pub const FMT_CLIF: &str = include_str!("fmt.clif");
+pub const FMT_CLIF_FILE: &str = "fmt.clif";
+
+/// Env var naming an alternate *formatter* artifact — the [`DOGFOOD_IR_ENV`]
+/// twin. A staged-IR validation run sets both, since the two artifacts are
+/// regenerated and promoted together.
+pub const FMT_IR_ENV: &str = "AIPL_FMT_IR";
 
 /// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
 /// [`DOGFOOD_ENTRIES`], re-linked at runtime instead of recompiling from
@@ -3053,14 +3095,22 @@ pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
 /// (a validation run pointed at a missing/unreadable artifact is a mistake to
 /// surface, not to silently fall back from).
 fn dogfood_artifact_text() -> std::borrow::Cow<'static, str> {
-    match std::env::var(DOGFOOD_IR_ENV) {
+    artifact_text(DOGFOOD_IR_ENV, DOGFOOD_CLIF)
+}
+
+/// The formatter artifact text, on the same rules.
+fn fmt_artifact_text() -> std::borrow::Cow<'static, str> {
+    artifact_text(FMT_IR_ENV, FMT_CLIF)
+}
+
+fn artifact_text(env: &str, baked_in: &'static str) -> std::borrow::Cow<'static, str> {
+    match std::env::var(env) {
         Ok(path) if !path.is_empty() => {
-            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-                panic!("{DOGFOOD_IR_ENV}={path:?}: could not read dogfood IR: {e}")
-            });
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{env}={path:?}: could not read IR: {e}"));
             std::borrow::Cow::Owned(text)
         }
-        _ => std::borrow::Cow::Borrowed(DOGFOOD_CLIF),
+        _ => std::borrow::Cow::Borrowed(baked_in),
     }
 }
 
@@ -3073,6 +3123,11 @@ thread_local! {
     /// these hooks are themselves invoked from the parser.
     static DOGFOOD_ENGINE: Compilation = Compilation::from_artifact(&dogfood_artifact_text())
         .expect("dogfood engine builds");
+
+    /// The formatter engine, built lazily and separately — so a compile that
+    /// never formats never links the walker. See [`FMT_SOURCES`].
+    static FMT_ENGINE: Compilation = Compilation::from_artifact(&fmt_artifact_text())
+        .expect("formatter engine builds");
 }
 
 /// The parser's test-section-header hook (see [`install_parser_hooks`]): whether
@@ -3197,7 +3252,7 @@ pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
             other => panic!("dogfooded format_program(): FmtError.span: {other:?}"),
         }
     }
-    DOGFOOD_ENGINE.with(|comp| {
+    FMT_ENGINE.with(|comp| {
         match comp.call_values(
             "format_program",
             &[FfiValue::Str(src.to_string()), FfiValue::Int(width as i64)],

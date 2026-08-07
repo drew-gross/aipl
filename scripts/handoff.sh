@@ -52,7 +52,11 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 # The dogfood-IR corpus run spawns the compiler as a subprocess whose CWD isn't
 # the repo root, so this path must be absolute.
+# Two artifacts are staged and promoted together: the parser-hook engine and the
+# formatter engine (see FMT_SOURCES in aipl-codegen). Either one pending means an
+# interrupted workflow.
 STAGED="$REPO/crates/aipl-codegen/src/dogfood.clif.staged"
+STAGED_FMT="$REPO/crates/aipl-codegen/src/fmt.clif.staged"
 STEP_OUT="$(mktemp -t handoff-step.XXXXXX)"
 STEP_OUT_SAVED="$STEP_OUT"
 trap 'rm -f "$STEP_OUT"' EXIT
@@ -94,14 +98,14 @@ fail() {
 
 # A leftover staged artifact means a previous IR workflow was interrupted; a plain
 # plain suite run fails on `no_staged_ir_pending` until it's resolved. Don't guess.
-if [ -e "$STAGED" ]; then
+if [ -e "$STAGED" ] || [ -e "$STAGED_FMT" ]; then
     STEP_OUT_SAVED="$STAGED"
-    fail "startup" "A staged dogfood-IR artifact already exists:
-    $STAGED
+    fail "startup" "A staged IR artifact already exists:
+    $STAGED / $STAGED_FMT
 Resolve the interrupted workflow first — promote it
     cargo nextest run --run-ignored only -E 'test(=promote_staged_ir)'
 or discard it
-    rm '$STAGED'"
+    rm -f '$STAGED' '$STAGED_FMT'"
 fi
 
 # --- 1. Format (cheap, up front, span-shifting) --------------------------------
@@ -275,8 +279,8 @@ if [ $need_ir -eq 1 ]; then
     run_step "validate_staged_ir (entry-level pre-check)" helper validate_staged_ir
     [ $? -eq 0 ] || { save_out; fail "validate_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 
-    run_step "staged-IR corpus run (AIPL_DOGFOOD_IR)" \
-        env AIPL_DOGFOOD_IR="$STAGED" "${NEXTEST[@]}"
+    run_step "staged-IR corpus run (AIPL_DOGFOOD_IR + AIPL_FMT_IR)" \
+        env AIPL_DOGFOOD_IR="$STAGED" AIPL_FMT_IR="$STAGED_FMT" "${NEXTEST[@]}"
     if [ $? -ne 0 ]; then
         save_out
         fail "staged-IR corpus run (candidate IR is wrong — diff .staged vs live)" \

@@ -23,7 +23,7 @@
 
 use aipl::codegen::{
     generate_dogfood_artifact, Compilation, DOGFOOD_CLIF_FILE, DOGFOOD_ENTRIES, DOGFOOD_IR_ENV,
-    DOGFOOD_SOURCES,
+    DOGFOOD_SOURCES, FMT_CLIF_FILE, FMT_ENTRIES, FMT_IR_ENV, FMT_SOURCES,
 };
 use aipl::FfiValue;
 use std::path::PathBuf;
@@ -40,39 +40,86 @@ const PROMOTE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored prom
 /// root — a relative path wouldn't resolve there.
 fn validate_staged_corpus_cmd() -> String {
     format!(
-        "AIPL_DOGFOOD_IR={} cargo test",
-        staged_artifact_path().display()
+        "AIPL_DOGFOOD_IR={} AIPL_FMT_IR={} cargo test",
+        staged_path_of(&ARTIFACTS[0]).display(),
+        staged_path_of(&ARTIFACTS[1]).display(),
     )
 }
 
-/// Path to the checked-in `.clif` artifact.
-fn artifact_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("crates/aipl-codegen/src")
-        .join(DOGFOOD_CLIF_FILE)
+/// One checked-in artifact: the sources it is generated from, the FFI entries it
+/// must export, its filename, and the env var that overrides it for a staged
+/// run. There are two — the parser-hook engine and the formatter engine — linked
+/// independently so an ordinary compile never pays to link the walker.
+struct Artifact {
+    file: &'static str,
+    env: &'static str,
+    sources: &'static [(&'static str, &'static str)],
+    entries: &'static [&'static str],
 }
 
-/// Path to the staged (candidate) `.clif.staged` artifact.
-fn staged_artifact_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("crates/aipl-codegen/src")
-        .join(format!("{DOGFOOD_CLIF_FILE}.staged"))
+const ARTIFACTS: &[Artifact] = &[
+    Artifact {
+        file: DOGFOOD_CLIF_FILE,
+        env: DOGFOOD_IR_ENV,
+        sources: DOGFOOD_SOURCES,
+        entries: DOGFOOD_ENTRIES,
+    },
+    Artifact {
+        file: FMT_CLIF_FILE,
+        env: FMT_IR_ENV,
+        sources: FMT_SOURCES,
+        entries: FMT_ENTRIES,
+    },
+];
+
+fn src_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("crates/aipl-codegen/src")
 }
 
-/// The `AIPL_DOGFOOD_IR` override path, if a staged-IR validation run set it.
-fn dogfood_ir_override() -> Option<PathBuf> {
-    match std::env::var(DOGFOOD_IR_ENV) {
+/// Path to a checked-in `.clif` artifact.
+fn artifact_path_of(a: &Artifact) -> PathBuf {
+    src_dir().join(a.file)
+}
+
+/// Path to a staged (candidate) `.clif.staged` artifact.
+fn staged_path_of(a: &Artifact) -> PathBuf {
+    src_dir().join(format!("{}.staged", a.file))
+}
+
+/// An artifact's override path, if a staged-IR validation run set its env var.
+fn ir_override(a: &Artifact) -> Option<PathBuf> {
+    match std::env::var(a.env) {
         Ok(p) if !p.is_empty() => Some(PathBuf::from(p)),
         _ => None,
     }
 }
 
-/// The dogfood artifact this run should verify against: the `AIPL_DOGFOOD_IR`
-/// override when set (a staged-IR validation run — the compiler is itself
-/// linking that file, so the source-vs-artifact checks must target it too),
-/// else the live checked-in `.clif`.
+/// The artifact this run should verify against: the env override when set (a
+/// staged-IR validation run — the compiler is itself linking that file, so the
+/// source-vs-artifact checks must target it too), else the live checked-in one.
+fn active_path_of(a: &Artifact) -> PathBuf {
+    ir_override(a).unwrap_or_else(|| artifact_path_of(a))
+}
+
+/// The parser artifact — the one the single-artifact helpers below still mean.
+fn dogfood() -> &'static Artifact {
+    &ARTIFACTS[0]
+}
+
+fn artifact_path() -> PathBuf {
+    artifact_path_of(dogfood())
+}
+
+fn staged_artifact_path() -> PathBuf {
+    staged_path_of(dogfood())
+}
+
+fn dogfood_ir_override() -> Option<PathBuf> {
+    ir_override(dogfood())
+}
+
 fn active_artifact_path() -> PathBuf {
-    dogfood_ir_override().unwrap_or_else(artifact_path)
+    active_path_of(dogfood())
 }
 
 /// A dogfood source failed the combined frontend. Pin the offender by parsing
@@ -102,8 +149,8 @@ fn blame_dogfood_failure(err: aipl::Error) -> ! {
 /// Spawns a scoped thread with a 64 MiB stack: some dogfooded `.aipl` files
 /// (e.g. `caret_block.aipl`) trigger deep recursion in the compiler that
 /// overflows the default test-framework stack (8 MiB on macOS).
-fn generate() -> String {
-    for (path, _) in DOGFOOD_SOURCES {
+fn generate_for(a: &Artifact) -> String {
+    for (path, _) in a.sources {
         if !path.starts_with("./") {
             panic!("non-relative path: {path:?}")
         }
@@ -113,13 +160,18 @@ fn generate() -> String {
         let handle = std::thread::Builder::new()
             .stack_size(64 * 1024 * 1024)
             .spawn_scoped(s, || {
-                generate_dogfood_artifact(DOGFOOD_SOURCES, DOGFOOD_ENTRIES)
+                generate_dogfood_artifact(a.sources, a.entries)
                     .unwrap_or_else(|e| blame_dogfood_failure(e))
             })
             .expect("spawn scoped thread");
         result = Some(handle.join().expect("generate thread panicked"));
     });
     result.unwrap()
+}
+
+/// The parser artifact, for the callers that still mean just that one.
+fn generate() -> String {
+    generate_for(dogfood())
 }
 
 /// Normalize line endings so a CRLF checkout (git `autocrlf`) compares equal to
@@ -130,20 +182,22 @@ fn lf(s: &str) -> String {
 
 /// Round-trip sanity: load the artifact through `from_artifact` and call every
 /// entry, so `fill` never writes IR that won't link or compute correctly.
-fn sanity_check(artifact: &str) {
+/// Entry-level check for one artifact: load it and call its entries with known
+/// inputs, so a candidate that links but computes the wrong thing is caught
+/// before the full corpus run.
+fn sanity_check_of(a: &Artifact, artifact: &str) {
+    if a.file == FMT_CLIF_FILE {
+        sanity_check_fmt(artifact);
+    } else {
+        sanity_check(artifact);
+    }
+}
+
+/// The formatter artifact's single entry. Messy input on purpose, so this proves
+/// the walker round-trips rather than merely returning something.
+fn sanity_check_fmt(artifact: &str) {
     let comp = Compilation::from_artifact(artifact)
-        .unwrap_or_else(|e| panic!("load regenerated {DOGFOOD_CLIF_FILE}: {e}"));
-
-    let span = |start, end| {
-        FfiValue::Struct(vec![
-            ("start".to_string(), FfiValue::Int(start)),
-            ("end".to_string(), FfiValue::Int(end)),
-        ])
-    };
-
-    // The formatter entry: source in, laid-out source out. Canonical input is a
-    // fixed point, so this also checks the walker round-trips rather than merely
-    // returning something.
+        .unwrap_or_else(|e| panic!("load regenerated {FMT_CLIF_FILE}: {e}"));
     let formatted = comp
         .call_values(
             "format_program",
@@ -159,6 +213,18 @@ fn sanity_check(artifact: &str) {
             "fn f(a: i64) -> i64 { a }".to_string()
         ))))
     );
+}
+
+fn sanity_check(artifact: &str) {
+    let comp = Compilation::from_artifact(artifact)
+        .unwrap_or_else(|e| panic!("load regenerated {DOGFOOD_CLIF_FILE}: {e}"));
+
+    let span = |start, end| {
+        FfiValue::Struct(vec![
+            ("start".to_string(), FfiValue::Int(start)),
+            ("end".to_string(), FfiValue::Int(end)),
+        ])
+    };
 
     let out = comp
         .call_values(
@@ -520,23 +586,25 @@ fn sanity_check(artifact: &str) {
 #[test]
 fn checked_in_ir_is_current() {
     aipl::install_parser_hooks();
-    let generated = generate();
-    // In a staged-IR validation run (`AIPL_DOGFOOD_IR` set) the compiler is
-    // linking the staged file, so "current with source" must be checked against
-    // *that* file — the live `.clif` is intentionally behind until promotion.
-    let path = active_artifact_path();
-    let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        panic!(
-            "missing dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
+    for a in ARTIFACTS {
+        let generated = generate_for(a);
+        // In a staged-IR validation run the compiler is linking the staged file,
+        // so "current with source" must be checked against *that* file — the
+        // live `.clif` is intentionally behind until promotion.
+        let path = active_path_of(a);
+        let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "missing IR {}: {e}\nGenerate it with: {FILL_CMD}",
+                path.display()
+            )
+        });
+        assert_eq!(
+            lf(&generated),
+            lf(&checked_in),
+            "IR {} is stale. Regenerate with: {FILL_CMD}",
             path.display()
-        )
-    });
-    assert_eq!(
-        lf(&generated),
-        lf(&checked_in),
-        "dogfood IR {} is stale. Regenerate with: {FILL_CMD}",
-        path.display()
-    );
+        );
+    }
 }
 
 /// The dogfood IR the compiler is running on must actually load and compute
@@ -670,18 +738,20 @@ fn artifact_round_trips_rich_types() {
 /// clean validation run red for the very reason it exists.
 #[test]
 fn no_staged_ir_pending() {
-    if dogfood_ir_override().is_some() {
-        return;
-    }
-    let staged = staged_artifact_path();
-    if staged.exists() {
-        panic!(
-            "staged IR pending for: {}\n\
-             Validate with:  {VALIDATE_STAGED_CMD}\n\
-             Then promote:   {PROMOTE_STAGED_CMD}\n\
-             To abort:       delete the .staged file.",
-            staged.display()
-        );
+    for a in ARTIFACTS {
+        if ir_override(a).is_some() {
+            continue;
+        }
+        let staged = staged_path_of(a);
+        if staged.exists() {
+            panic!(
+                "staged IR pending for: {}\n\
+                 Validate with:  {VALIDATE_STAGED_CMD}\n\
+                 Then promote:   {PROMOTE_STAGED_CMD}\n\
+                 To abort:       delete the .staged file.",
+                staged.display()
+            );
+        }
     }
 }
 
@@ -695,14 +765,17 @@ fn no_staged_ir_pending() {
 #[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
 fn fill_staged_ir() {
     aipl::install_parser_hooks();
-    let artifact = generate();
-    sanity_check(&artifact);
-    let path = staged_artifact_path();
-    std::fs::write(&path, &artifact).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
-    eprintln!("wrote {}", path.display());
+    for a in ARTIFACTS {
+        let artifact = generate_for(a);
+        sanity_check_of(a, &artifact);
+        let path = staged_path_of(a);
+        std::fs::write(&path, &artifact)
+            .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+        eprintln!("wrote {}", path.display());
+    }
     panic!(
         "fill_staged_ir wrote staged IR — then validate it by running the whole\n\
-         suite with the compiler linking the staged file:\n    {}\n\
+         suite with the compiler linking the staged files:\n    {}\n\
          ({VALIDATE_STAGED_CMD} is a faster entry-level pre-check.)\n\
          Once green, promote with: {PROMOTE_STAGED_CMD}",
         validate_staged_corpus_cmd()
@@ -720,17 +793,19 @@ fn fill_staged_ir() {
 #[test]
 #[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
 fn validate_staged_ir() {
-    let path = staged_artifact_path();
-    let artifact = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        panic!(
-            "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
-            path.display()
-        )
-    });
-    sanity_check(&artifact);
+    for a in ARTIFACTS {
+        let path = staged_path_of(a);
+        let artifact = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
+                path.display()
+            )
+        });
+        sanity_check_of(a, &artifact);
+        eprintln!("entry-level check passed for {}.", path.display());
+    }
     eprintln!(
-        "entry-level check passed for {}.\nNow run the full corpus against it:\n    {}",
-        path.display(),
+        "Now run the full corpus against them:\n    {}",
         validate_staged_corpus_cmd()
     );
 }
@@ -743,22 +818,24 @@ fn validate_staged_ir() {
 #[test]
 #[ignore = "author helper — see CLAUDE.md for staged IR workflow"]
 fn promote_staged_ir() {
-    let staged = staged_artifact_path();
-    let artifact = std::fs::read_to_string(&staged).unwrap_or_else(|e| {
-        panic!(
-            "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
-            staged.display()
-        )
-    });
-    sanity_check(&artifact);
-    let live = artifact_path();
-    std::fs::write(&live, &artifact)
-        .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
-    std::fs::remove_file(&staged)
-        .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
-    eprintln!("promoted {} → {}", staged.display(), live.display());
+    for a in ARTIFACTS {
+        let staged = staged_path_of(a);
+        let artifact = std::fs::read_to_string(&staged).unwrap_or_else(|e| {
+            panic!(
+                "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
+                staged.display()
+            )
+        });
+        sanity_check_of(a, &artifact);
+        let live = artifact_path_of(a);
+        std::fs::write(&live, &artifact)
+            .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
+        std::fs::remove_file(&staged)
+            .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
+        eprintln!("promoted {} → {}", staged.display(), live.display());
+    }
     panic!(
-        "promote_staged_ir updated the live .clif file — review the diff,\n\
+        "promote_staged_ir updated the live .clif files — review the diff,\n\
          then run `cargo test` to confirm the suite is green before committing."
     );
 }
@@ -767,14 +844,17 @@ fn promote_staged_ir() {
 #[ignore = "author helper — run: cargo test --test dogfood_ir -- --ignored fill_dogfood_ir"]
 fn fill_dogfood_ir() {
     aipl::install_parser_hooks();
-    let artifact = generate();
-    // Never write IR that won't link or run.
-    sanity_check(&artifact);
-    let path = artifact_path();
-    std::fs::write(&path, &artifact).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
-    eprintln!("wrote {}", path.display());
+    for a in ARTIFACTS {
+        let artifact = generate_for(a);
+        // Never write IR that won't link or run.
+        sanity_check_of(a, &artifact);
+        let path = artifact_path_of(a);
+        std::fs::write(&path, &artifact)
+            .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+        eprintln!("wrote {}", path.display());
+    }
     panic!(
-        "fill_dogfood_ir regenerated the checked-in dogfood IR — review the diff, \
+        "fill_dogfood_ir regenerated the checked-in IR — review the diff, \
          then re-run the suite normally to confirm it's green."
     );
 }
