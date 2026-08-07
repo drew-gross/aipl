@@ -101,27 +101,6 @@ fn active_path_of(a: &Artifact) -> PathBuf {
     ir_override(a).unwrap_or_else(|| artifact_path_of(a))
 }
 
-/// The parser artifact — the one the single-artifact helpers below still mean.
-fn dogfood() -> &'static Artifact {
-    &ARTIFACTS[0]
-}
-
-fn artifact_path() -> PathBuf {
-    artifact_path_of(dogfood())
-}
-
-fn staged_artifact_path() -> PathBuf {
-    staged_path_of(dogfood())
-}
-
-fn dogfood_ir_override() -> Option<PathBuf> {
-    ir_override(dogfood())
-}
-
-fn active_artifact_path() -> PathBuf {
-    active_path_of(dogfood())
-}
-
 /// A dogfood source failed the combined frontend. Pin the offender by parsing
 /// each source on its own, then panic with the rendered error and the exact
 /// command to iterate on just that file. Falls back to the raw error if no
@@ -167,11 +146,6 @@ fn generate_for(a: &Artifact) -> String {
         result = Some(handle.join().expect("generate thread panicked"));
     });
     result.unwrap()
-}
-
-/// The parser artifact, for the callers that still mean just that one.
-fn generate() -> String {
-    generate_for(dogfood())
 }
 
 /// Normalize line endings so a CRLF checkout (git `autocrlf`) compares equal to
@@ -607,21 +581,23 @@ fn checked_in_ir_is_current() {
     }
 }
 
-/// The dogfood IR the compiler is running on must actually load and compute
+/// Every checked-in artifact the compiler runs on must actually load and compute
 /// correctly (independent of whether it's byte-current with source — that's
-/// `checked_in_ir_is_current`). Targets the `AIPL_DOGFOOD_IR` override when set,
-/// so a staged validation run sanity-checks the staged artifact.
+/// `checked_in_ir_is_current`). Targets each artifact's env override when set,
+/// so a staged validation run sanity-checks the staged files.
 #[test]
 fn checked_in_ir_loads_and_runs() {
     aipl::install_parser_hooks();
-    let path = active_artifact_path();
-    let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        panic!(
-            "missing dogfood IR {}: {e}\nGenerate it with: {FILL_CMD}",
-            path.display()
-        )
-    });
-    sanity_check(&checked_in);
+    for a in ARTIFACTS {
+        let path = active_path_of(a);
+        let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "missing IR {}: {e}\nGenerate it with: {FILL_CMD}",
+                path.display()
+            )
+        });
+        sanity_check_of(a, &checked_in);
+    }
 }
 
 /// AIPL source whose entry returns the rich shapes the artifact manifest must

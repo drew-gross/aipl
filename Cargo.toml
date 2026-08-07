@@ -8,6 +8,21 @@ license = "MIT"
 [workspace]
 members = ["crates/*"]
 
+# Warnings are errors, workspace-wide. Set here (rather than via `RUSTFLAGS`)
+# because `[lints]` applies only to the crates in this workspace — `RUSTFLAGS`
+# would also deny warnings inside dependencies, where we cannot fix them.
+# Member crates opt in with `[lints] workspace = true`.
+[workspace.lints.rust]
+warnings = "deny"
+
+# `warnings = "deny"` reaches rustdoc too. A genuinely unresolved link is a real
+# error and stays denied; linking a *private* item from public docs is deliberate
+# here — these docs explain internals and cross-reference them on purpose, and
+# the alternatives (widening visibility, or dropping the reference) are both
+# worse than a link that only resolves in `--document-private-items`.
+[workspace.lints.rustdoc]
+private_intra_doc_links = "allow"
+
 # Centralized dependency versions. Member crates opt in with
 # `<dep> = { workspace = true }`; bump a version here and every crate
 # that uses it follows. Internal path crates live here too so the path is

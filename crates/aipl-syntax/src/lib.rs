@@ -587,7 +587,7 @@ pub mod ast {
         Any,
         /// The placeholder element/inner of an untyped `none`, empty array
         /// literal (`[]`), or empty set/dict literal (`#{}`/`#{:}`) — coerces to
-        /// any element/inner type at the use site (see [`is_none_inner`]).
+        /// any element/inner type at the use site (see [`crate::is_none_inner`]).
         NoneInner,
         /// Monomorphization-only: the pseudo-type a generic's type variable is
         /// bound to when the only argument that could pin it is an empty array
@@ -600,7 +600,7 @@ pub mod ast {
         NoneLiteralArg,
         /// A `str` produced by `+`-concatenating two strings — distinguished
         /// from a plain `str` so codegen can specialize a lazy-concat
-        /// representation for it (see [`is_concat_str`]). Only meaningful as
+        /// representation for it (see [`crate::is_concat_str`]). Only meaningful as
         /// the type of a scalar value flowing to a `str` parameter; decays to
         /// a plain `str` once it's placed into any other container/context.
         ConcatStr,
@@ -1574,7 +1574,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
 /// parse errors, ...) take no notice of `#[allow]`.
 ///
 /// A lint flags code that is *legal but has a clearly better spelling*; its
-/// message must name that better spelling. The loader runs [`check`] on every
+/// message must name that better spelling. The loader runs `aipl_mono::check` on every
 /// file right after parsing (the markers come from the lexer via
 /// `parse_with_allows`), so lints fire before type checking.
 pub mod lint {

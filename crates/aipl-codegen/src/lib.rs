@@ -3631,8 +3631,9 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
 /// [`is_operator_name`], and the lexer at [`lex_aipl`] (which de-dents `"""` raw
-/// strings itself, in its emit, so there is no separate raw-string hook), and the
-/// formatter's raw-block re-layout at [`reindent_block`].
+/// strings itself, in its emit, so there is no separate raw-string hook).
+/// (The formatter needs no hook: it is dogfooded end to end through
+/// [`format_program`], and its printer imports `reindent_block.aipl` directly.)
 /// Idempotent (first install wins). The compiler's entry points (the CLI and the
 /// embedding [`Compilation`] API's callers) install them; there are **no native
 /// fallbacks**, so any in-process parse (or error render, literal
@@ -4825,7 +4826,7 @@ impl Compilation {
     }
 
     /// Whether `name` takes exactly one `str[]` parameter — i.e. it wants the
-    /// CLI arguments. Used by the driver to choose [`run_cli`] over the
+    /// CLI arguments. Used by the driver to choose its `run_cli` path over the
     /// integer-argument `run_*` forms.
     pub fn takes_cli_args(&self, name: &str) -> bool {
         self.funcs
