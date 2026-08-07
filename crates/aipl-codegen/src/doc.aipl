@@ -131,7 +131,7 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
     while (running) {
         let st = go_step(width, col, work);
         if (st.emits) {
-            set acc = acc.pushed(st.emit);
+            set acc.push(st.emit);
         };
         set col = st.col;
         set work = st.work;
@@ -273,13 +273,6 @@ fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
     ds.right_fold(rest, |d, work| WCons(sp, flat, d, work))
 }
 
-// Append one emitted piece to the output accumulator.
-fn pushed(self: str[], piece: str) -> str[] {
-    mut a = self;
-    set a.push(piece);
-    a
-}
-
 // The column just past `text` when appended at column `col`: the length of its
 // last line for multi-line text, else `col + width`.
 fn col_after(col: u64, text: str) -> u64 {
@@ -351,11 +344,11 @@ allocations: 292
 deallocations: 292
 reallocations: 0
 bytes allocated: 16708
-instructions executed: 24786
-binary size: 30448
-  code: 16928
+instructions executed: 24242
+binary size: 30304
+  code: 16848
   data: 842
-  metadata: 12678
+  metadata: 12614
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam11

@@ -603,7 +603,7 @@ fn import_names(self: W, acc0: str[]) -> WKeys!FmtError {
         } else {
             WStr { w: first.w, text: first.text }
         };
-        set acc = acc.pushed_str(encode_import_name(first.text, r.text));
+        set acc.push(encode_import_name(first.text, r.text));
         set w = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
     }
     ok(WKeys { w, keys: acc })
@@ -646,18 +646,6 @@ fn sorted_import_names(keys: str[]) -> Doc[] {
 // What `program` orders imports by: builtins first, then paths alphabetically.
 // Same encoding trick as the names above — a bucket digit ahead of the text.
 fn import_key(source: str) -> str { if (source == "builtins") { "0" } else { `1{source}` } }
-
-fn pushed_seg(self: Seg[], x: Seg) -> Seg[] {
-    mut a = self;
-    set a.push(x);
-    a
-}
-
-fn pushed_str(self: str[], x: str) -> str[] {
-    mut a = self;
-    set a.push(x);
-    a
-}
 
 // ---------- types ----------
 
@@ -853,10 +841,7 @@ fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
             WDoc { w: n.w, doc: Text("") }
         };
         let tc = payload.w.trailing_comment();
-        set acc = acc.pushed_case(VCase {
-            lead: l.doc,
-            body: Concat([Text(n.text), payload.doc, tc.doc]),
-        });
+        set acc.push(VCase { lead: l.doc, body: Concat([Text(n.text), payload.doc, tc.doc]) });
         if (tc.w.peek_text() == "|") {
             set w = tc.w.bump().w;
         } else {
@@ -899,12 +884,6 @@ fn extended(self: Doc[], more: Doc[]) -> Doc[] {
     for (let d : more) {
         set a.push(d);
     }
-    a
-}
-
-fn pushed_case(self: VCase[], c: VCase) -> VCase[] {
-    mut a = self;
-    set a.push(c);
     a
 }
 
@@ -954,10 +933,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
             if (w.peek_text() == "import") {
                 let im = w.import_item()?;
                 let tc = im.w.trailing_comment();
-                set imports = imports.pushed_import(ImportEntry {
-                    key: im.key,
-                    doc: Concat([l.doc, im.doc, tc.doc]),
-                });
+                set imports.push(ImportEntry { key: im.key, doc: Concat([l.doc, im.doc, tc.doc]) });
                 set w = tc.w;
             } else {
                 let it = w.item()?;
@@ -1014,12 +990,6 @@ fn nth_with_key(entries: ImportEntry[], k: str, n: u64) -> Doc {
         };
     }
     Concat([])
-}
-
-fn pushed_import(self: ImportEntry[], e: ImportEntry) -> ImportEntry[] {
-    mut a = self;
-    set a.push(e);
-    a
 }
 
 fn item(self: W) -> WDoc!FmtError {
@@ -1434,7 +1404,7 @@ fn ident_list(self: W, end: str, acc0: str[]) -> WNames {
     mut acc = acc0;
     while (!(w.peek_text() == end || w.at_end())) {
         let n = w.bump();
-        set acc = acc.pushed_str(n.text);
+        set acc.push(n.text);
         set w = if (n.w.peek_text() == ",") { n.w.bump().w } else { n.w };
     }
     WNames { w, names: acc }
@@ -1549,16 +1519,16 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
         let t = w.peek_text();
         if (t == ".") {
             let d = w.dot_seg()?;
-            set acc = acc.pushed_seg(d.seg);
+            set acc.push(d.seg);
             set w = d.w;
         } else {
             if (t == "[") {
                 let d = w.index_seg()?;
-                set acc = acc.pushed_seg(d.seg);
+                set acc.push(d.seg);
                 set w = d.w;
             } else {
                 if (t == "?") {
-                    set acc = acc.pushed_seg(Seg { is_call: false, doc: Text("?") });
+                    set acc.push(Seg { is_call: false, doc: Text("?") });
                     set w = w.bump().w;
                 } else {
                     set more = false;
@@ -2569,8 +2539,11 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 
-// Append one `Doc` to an accumulator (AIPL's `push` mutates, so this is the
-// expression form the folds above want).
+// Append one `Doc` to an accumulator and yield the result. AIPL's `push`
+// mutates in place and yields nothing, so a *statement* accumulator wants
+// `set acc.push(d)` and needs no helper; this exists only for the places that
+// need a `Doc[]` in expression position — chained (`.pushed(a).pushed(b)`) or
+// built inline, as `fn_head` and `comma_list_docs` do above.
 fn pushed(self: Doc[], d: Doc) -> Doc[] {
     mut a = self;
     set a.push(d);
@@ -2692,11 +2665,11 @@ allocations: 20646
 deallocations: 20646
 reallocations: 593
 bytes allocated: 1027112
-instructions executed: 3055448
-binary size: 2965680
-  code: 1691040
+instructions executed: 3039140
+binary size: 2964520
+  code: 1690360
   data: 25116
-  metadata: 1249524
+  metadata: 1249044
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam23
 __builtin_count_while$char$s0$lam33
@@ -2839,8 +2812,6 @@ postfix_segs
 program
 program_items
 pushed
-pushed_seg
-pushed_str
 quoted
 range_has_semi
 range_tail
