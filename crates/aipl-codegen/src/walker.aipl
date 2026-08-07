@@ -25,6 +25,7 @@ import {
     is_err_and,
     join,
     len,
+    map,
     push,
     saturating_sub as -,
     sort,
@@ -635,13 +636,7 @@ fn encode_import_name(first: str, rendered: str) -> str {
 // (`wrapping_add as +`).
 fn decode_import_name(key: str) -> str { key.split(" ")[1..].join(" ") }
 
-fn sorted_import_names(keys: str[]) -> Doc[] {
-    mut out = [];
-    for (let k : keys.sort()) {
-        set out.push(Text(decode_import_name(k)));
-    }
-    out
-}
+fn sorted_import_names(keys: str[]) -> Doc[] { keys.sort().map(|k| Text(decode_import_name(k))) }
 
 // What `program` orders imports by: builtins first, then paths alphabetically.
 // Same encoding trick as the names above — a bucket digit ahead of the text.
@@ -2663,38 +2658,38 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
 --- performance ---
 allocations: 20646
 deallocations: 20646
-reallocations: 593
-bytes allocated: 1027112
-instructions executed: 3039140
-binary size: 2964520
-  code: 1690360
+reallocations: 573
+bytes allocated: 1027272
+instructions executed: 3039118
+binary size: 2964664
+  code: 1690540
   data: 25116
-  metadata: 1249044
+  metadata: 1249008
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam23
-__builtin_count_while$char$s0$lam33
-__builtin_count_while$char$s0$lam51
-__builtin_count_while$char$s0$lam56
+__builtin_any$__m1__Doc$lam25
+__builtin_count_while$char$s0$lam35
+__builtin_count_while$char$s0$lam53
 __builtin_count_while$char$s0$lam58
 __builtin_count_while$char$s0$lam60
-__builtin_count_while$char$s0$lam61
+__builtin_count_while$char$s0$lam62
+__builtin_count_while$char$s0$lam63
 __builtin_int_parse
-__builtin_is_some_and$char$lam57
-__builtin_opt_left_fold$char$i64$s0$lam45
+__builtin_is_some_and$char$lam59
+__builtin_opt_left_fold$char$i64$s0$lam47
 __enumerate12
 __enumerate13
-__enumerate22
-__enumerate75
+__enumerate24
+__enumerate77
 __enumerate8
-__lambda_14
-__lambda_15
 __lambda_16
 __lambda_17
 __lambda_18
 __lambda_19
 __lambda_20
 __lambda_21
-__lambda_44
+__lambda_22
+__lambda_23
+__lambda_46
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2734,8 +2729,8 @@ __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
-__map35$own0
-__map41$own0
+__map37$own0
+__map43$own0
 __test$pushed
 __test$walker_of
 array_atom
@@ -2824,7 +2819,6 @@ set_or_dict_atom
 set_or_dict_ty
 set_stmt
 slice_to
-sorted_import_names
 sorted_imports
 sorted_pick
 spaced_default
