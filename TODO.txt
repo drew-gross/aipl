@@ -161,6 +161,9 @@ Maybe address this later and unify formatter and parser lexing (maybe allow form
 
 none.value_or_err doesn't type check. Maybe it should? Unclear.
 
+value_or can't unwrap struct optionals — needs match. <--- fix this
+Narrowed precisely: a struct holding both a recursive-variant field and an array field breaks the compiler. <--- fix this
+
 Why the formatter isn't already a thin wrapper
 
 The parser consumes decoded token values (StrLit(value, style)) because it only builds an AST — it never reproduces source. The formatter has the opposite obligation: reproduce every token's source spelling byte-for-byte. That's lossy from the value:

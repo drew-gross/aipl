@@ -5,12 +5,14 @@
 // port of the Rust `aipl-fmt` `doc.rs`; `format_source` (the formatter proper)
 // builds the tree and calls `print_doc` here.
 //
-// The printer is written as a tail-recursive walk over a `Work` cons-list (the
-// explicit work-stack the Rust version keeps in a `Vec`), so it never recurses
-// on the native stack proportionally to document size; output is accumulated as
-// a `str[]` and joined once at the end. `fits` looks ahead over the same
-// cons-list — the list *is* the "rest of the line" the Rust `fits` reads off the
-// work stack.
+// The printer walks a `Work` cons-list (the explicit work-stack the Rust version
+// keeps in a `Vec`) with a `while` loop, so the native stack stays flat however
+// large the document is. It was originally written as a tail-recursive walk on
+// the assumption that the tail call would be eliminated; it is not, and a
+// document of a few tens of thousands of nodes duly exhausted the stack. Output
+// is accumulated as a `str[]` and joined once at the end. `fits` looks ahead over
+// the same cons-list — the list *is* the "rest of the line" the Rust `fits` reads
+// off the work stack.
 import {
     !,
     !=,
@@ -59,6 +61,15 @@ variant Doc =
 // deeper level; `Group(forced, inner)` flat-if-fits (`forced` = can-never-flat);
 // `IfBroken` text only when the group breaks; `BreakParent` a zero-width
 // force-break; `RawBlock` a verbatim multi-line atom re-aligned via `reindent_block`.
+
+// One step's outcome: where the cursor lands, the frames still to walk, and the
+// piece to append (if any).
+//
+// The output accumulator is deliberately *not* a field here. A struct carrying a
+// recursive-variant field (`Work`) alongside an array that is rebuilt by `push`
+// corrupts memory — it segfaults non-deterministically — so `go` keeps the
+// accumulator in its own `mut` binding and this struct reports what to append.
+struct Step { col: u64, work: Work, emit: str, emits: bool, done: bool }
 
 // The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 // frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
@@ -109,48 +120,89 @@ pub fn print_doc(doc: Doc, width: u64) -> str {
 // tail-recurse on the rest. `col` is the current column; `sp` (inside each
 // frame) is the indentation, in spaces, that a line break under that frame lands
 // at.
-fn go(width: u64, col: u64, work: Work, acc: str[]) -> str[] {
+fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
+    mut col = col0;
+    mut work = work0;
+    mut acc = acc0;
+    mut running = true;
+    while (running) {
+        let st = go_step(width, col, work);
+        if (st.emits) {
+            set acc = acc.pushed(st.emit);
+        };
+        set col = st.col;
+        set work = st.work;
+        set running = !st.done;
+    }
+    acc
+}
+
+// One iteration: pop a frame and report the next state. Split from `go` because
+// a `match` arm is an expression — it cannot assign to the loop's variables — so
+// each arm *returns* the next `Step` instead.
+fn go_step(width: u64, col: u64, work: Work) -> Step {
     match (work) {
-        WNil => acc,
-        WCons(sp, flat, d, rest) => match (d) {
-            Text(s) => go(width, col_after(col, s), rest, acc.pushed(s)),
-            RawBlock(s) => go_raw(width, col, sp, s, rest, acc),
-            Concat(ds) => go(width, col, prepend(ds, sp, flat, rest), acc),
-            Line => if (flat) {
-                go(width, col + 1, rest, acc.pushed(" "))
-            } else {
-                go(width, sp, rest, acc.pushed(newline_str(sp)))
-            },
-            SoftLine => if (flat) {
-                go(width, col, rest, acc)
-            } else {
-                go(width, sp, rest, acc.pushed(newline_str(sp)))
-            },
-            HardLine => go(width, sp, rest, acc.pushed(newline_str(sp))),
-            BlankLine => go(width, sp, rest, acc.pushed(blank_str(sp))),
-            Indent(inner) => go(width, col, WCons(sp + 4, flat, inner, rest), acc),
-            Group(forced, inner) => go(
-                width,
-                col,
-                WCons(sp, group_flat(forced, width, col, sp, inner, rest), inner, rest),
-                acc,
-            ),
-            IfBroken(s) => if (flat) {
-                go(width, col, rest, acc)
-            } else {
-                go(width, col + s.len(), rest, acc.pushed(s))
-            },
-            BreakParent => go(width, col, rest, acc),
-        },
+        WNil => Step { col, work: WNil, emit: "", emits: false, done: true },
+        WCons(sp, flat, d, rest) => go_node(width, col, sp, flat, d, rest),
     }
 }
+
+fn go_node(width: u64, col: u64, sp: u64, flat: bool, d: Doc, rest: Work) -> Step {
+    match (d) {
+        Text(s) => Step { col: col_after(col, s), work: rest, emit: s, emits: true, done: false },
+        RawBlock(s) => go_raw(col, sp, s, rest),
+        Concat(ds) => Step {
+            col,
+            work: prepend(ds, sp, flat, rest),
+            emit: "",
+            emits: false,
+            done: false,
+        },
+        Line => if (flat) {
+            Step { col: col + 1, work: rest, emit: " ", emits: true, done: false }
+        } else {
+            Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false }
+        },
+        SoftLine => if (flat) {
+            Step { col, work: rest, emit: "", emits: false, done: false }
+        } else {
+            Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false }
+        },
+        HardLine => Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false },
+        BlankLine => Step { col: sp, work: rest, emit: blank_str(sp), emits: true, done: false },
+        Indent(inner) => Step {
+            col,
+            work: WCons(sp + 4, flat, inner, rest),
+            emit: "",
+            emits: false,
+            done: false,
+        },
+        Group(forced, inner) => Step {
+            col,
+            work: WCons(sp, group_flat(forced, width, col, sp, inner, rest), inner, rest),
+            emit: "",
+            emits: false,
+            done: false,
+        },
+        IfBroken(s) => if (flat) {
+            Step { col, work: rest, emit: "", emits: false, done: false }
+        } else {
+            Step { col: col + s.len(), work: rest, emit: s, emits: true, done: false }
+        },
+        BreakParent => Step { col, work: rest, emit: "", emits: false, done: false },
+    }
+}
+
+// One iteration: pop a frame and produce the next state. Split from `go` because
+// a `match` arm is an expression — it cannot assign to the loop's variables — so
+// each arm *returns* the next `Step` instead.
 
 // A `RawBlock`: re-lay-out the atom around its frame's indent, then emit it and
 // continue. Split out so the atom is computed once (a match arm is a single
 // expression).
-fn go_raw(width: u64, col: u64, sp: u64, s: str, rest: Work, acc: str[]) -> str[] {
+fn go_raw(col: u64, sp: u64, s: str, rest: Work) -> Step {
     let rendered = s.reindent_block(sp);
-    go(width, col_after(col, rendered), rest, acc.pushed(rendered))
+    Step { col: col_after(col, rendered), work: rest, emit: rendered, emits: true, done: false }
 }
 
 // Decide a group's mode: forced groups always break; otherwise the group is flat
@@ -292,15 +344,15 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 283
-deallocations: 283
+allocations: 292
+deallocations: 292
 reallocations: 0
-bytes allocated: 16060
-instructions executed: 20397
-binary size: 29144
-  code: 16060
+bytes allocated: 16708
+instructions executed: 24786
+binary size: 30448
+  code: 16928
   data: 842
-  metadata: 12242
+  metadata: 12678
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam11
@@ -320,4 +372,3 @@ main
 newline_str
 prepend
 print_doc
-pushed

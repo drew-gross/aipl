@@ -208,23 +208,23 @@ fn lead(self: W) -> WDoc {
     lead_loop(self, limit, [])
 }
 
-fn lead_loop(w: W, limit: u64, acc: Doc[]) -> WDoc {
-    match (w.comments[w.cpos]) {
-        none => WDoc { w, doc: Concat(acc) },
-        some(c) => if (limit <= c.start) {
-            WDoc { w, doc: Concat(acc) }
-        } else {
-            let stepped = w.take_comment(c);
-            let next = stepped.next_start();
+fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -> WDoc {
+    mut w = w0;
+    mut acc = acc0;
+    while (w.comment_starts_before(limit)) {
+        let c = w.cur_comment();
+        let stepped = w.take_comment(c);
+        let next = stepped.next_start();
 
-            // `next` can precede `c.end` only if a later entity started inside
-            // this comment, which the lexer cannot produce; `max` in the Rust
-            // version guards the same impossible case.
-            let gap_end = if (next < c.end) { c.end } else { next };
-            let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
-            lead_loop(stepped, limit, acc.pushed(Text(w.src[c])).pushed(sep))
-        },
+        // `next` can precede `c.end` only if a later entity started inside this
+        // comment, which the lexer cannot produce; `max` in the Rust version
+        // guards the same impossible case.
+        let gap_end = if (next < c.end) { c.end } else { next };
+        let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
+        set acc = acc.pushed(Text(w.src[c])).pushed(sep);
+        set w = stepped;
     }
+    WDoc { w, doc: Concat(acc) }
 }
 
 // A trailing comment on the same line as whatever just ended, rendered as
@@ -593,18 +593,20 @@ fn import_item(self: W) -> WImport!FmtError {
     })
 }
 
-fn import_names(self: W, acc: str[]) -> WKeys!FmtError {
-    if (self.peek_text() == "}") {
-        return ok(WKeys { w: self, keys: acc });
-    };
-    let first = self.bump();
-    let r = if (first.w.peek_text() == "as") {
-        first.w.import_alias(first.text)
-    } else {
-        WStr { w: first.w, text: first.text }
-    };
-    let stepped = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
-    stepped.import_names(acc.pushed_str(encode_import_name(first.text, r.text)))
+fn import_names(self: W, acc0: str[]) -> WKeys!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let first = w.bump();
+        let r = if (first.w.peek_text() == "as") {
+            first.w.import_alias(first.text)
+        } else {
+            WStr { w: first.w, text: first.text }
+        };
+        set acc = acc.pushed_str(encode_import_name(first.text, r.text));
+        set w = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
+    }
+    ok(WKeys { w, keys: acc })
 }
 
 // `name as alias` — the spelling written when an import is renamed.
@@ -693,13 +695,15 @@ fn paren_ty(self: W) -> WDoc!FmtError {
 }
 
 // Comma-separated types up to (not consuming) `end`.
-fn ty_list(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == end) {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let t = self.ty()?;
-    let stepped = if (t.w.peek_text() == ",") { t.w.bump().w } else { t.w };
-    stepped.ty_list(end, acc.pushed(t.doc))
+fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != end) {
+        let t = w.ty()?;
+        set acc = acc.pushed(t.doc);
+        set w = if (t.w.peek_text() == ",") { t.w.bump().w } else { t.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 // A base type — a set/dict `#{..}` or a (possibly generic) name — plus any run of
@@ -741,22 +745,35 @@ fn named_ty(self: W) -> WDoc!FmtError {
 }
 
 // A run of `?` (optional) and `[]` (array) suffixes, in source order.
-fn type_suffixes(self: W, acc: Doc[]) -> WDocs {
-    if (self.peek_text() == "?") {
-        return self.bump().w.type_suffixes(acc.pushed(Text("?")));
-    };
-    if (self.peek_text() == "[" && self.peek_text_n(1) == "]") {
-        return self.bump().w.bump().w.type_suffixes(acc.pushed(Text("[]")));
-    };
-    WDocs { w: self, docs: acc }
+fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
+    mut w = self;
+    mut acc = acc0;
+    mut more = true;
+    while (more) {
+        if (w.peek_text() == "?") {
+            set acc = acc.pushed(Text("?"));
+            set w = w.bump().w;
+        } else {
+            if (w.peek_text() == "[" && w.peek_text_n(1) == "]") {
+                set acc = acc.pushed(Text("[]"));
+                set w = w.bump().w.bump().w;
+            } else {
+                set more = false;
+            };
+        };
+    }
+    WDocs { w, docs: acc }
 }
 
 // A run of `[]` alone — what may follow a parenthesized tuple type.
-fn array_suffixes(self: W, acc: Doc[]) -> WDocs {
-    if (self.peek_text() == "[" && self.peek_text_n(1) == "]") {
-        return self.bump().w.bump().w.array_suffixes(acc.pushed(Text("[]")));
-    };
-    WDocs { w: self, docs: acc }
+fn array_suffixes(self: W, acc0: Doc[]) -> WDocs {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == "[" && w.peek_text_n(1) == "]") {
+        set acc = acc.pushed(Text("[]"));
+        set w = w.bump().w.bump().w;
+    }
+    WDocs { w, docs: acc }
 }
 
 // ---------- type parameters ----------
@@ -774,18 +791,20 @@ fn type_params(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(tps.docs, Angles) })
 }
 
-fn type_param_list(self: W, acc: Doc[]) -> WDocs {
-    if (self.peek_text() == ">") {
-        return WDocs { w: self, docs: acc };
-    };
-    let n = self.bump();
-    let p = if (n.w.peek_text() == ":") {
-        n.w.param_bound(n.text)
-    } else {
-        WDoc { w: n.w, doc: Text(n.text) }
-    };
-    let stepped = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
-    stepped.type_param_list(acc.pushed(p.doc))
+fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != ">") {
+        let n = w.bump();
+        let p = if (n.w.peek_text() == ":") {
+            n.w.param_bound(n.text)
+        } else {
+            WDoc { w: n.w, doc: Text(n.text) }
+        };
+        set acc = acc.pushed(p.doc);
+        set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
+    }
+    WDocs { w, docs: acc }
 }
 
 // `T: ord` — the `: bound` half of a type parameter.
@@ -821,24 +840,31 @@ fn variant_item(self: W) -> WDoc!FmtError {
 
 // Each case carries its own leading comments and any same-line trailing comment,
 // so a comment written between two arms stays between them.
-fn variant_cases(self: W, acc: VCase[]) -> WCases!FmtError {
-    let l = self.lead();
-    let n = l.w.bump();
-    let payload = if (n.w.peek_text() == "(") {
-        n.w.variant_payload()?
-    } else {
-        WDoc { w: n.w, doc: Text("") }
-    };
-    let tc = payload.w.trailing_comment();
-    let grown = acc.pushed_case(VCase {
-        lead: l.doc,
-        body: Concat([Text(n.text), payload.doc, tc.doc]),
-    });
-    if (tc.w.peek_text() == "|") {
-        tc.w.bump().w.variant_cases(grown)
-    } else {
-        ok(WCases { w: tc.w, cases: grown })
+fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    mut more = true;
+    while (more) {
+        let l = w.lead();
+        let n = l.w.bump();
+        let payload = if (n.w.peek_text() == "(") {
+            n.w.variant_payload()?
+        } else {
+            WDoc { w: n.w, doc: Text("") }
+        };
+        let tc = payload.w.trailing_comment();
+        set acc = acc.pushed_case(VCase {
+            lead: l.doc,
+            body: Concat([Text(n.text), payload.doc, tc.doc]),
+        });
+        if (tc.w.peek_text() == "|") {
+            set w = tc.w.bump().w;
+        } else {
+            set w = tc.w;
+            set more = false;
+        };
     }
+    ok(WCases { w, cases: acc })
 }
 
 // A case's `(A, B)` payload types.
@@ -961,16 +987,19 @@ fn entry_keys(entries: ImportEntry[]) -> str[] {
     ks
 }
 
-fn sorted_pick(entries: ImportEntry[], keys: str[], i: u64, acc: Doc[]) -> Doc[] {
-    if (keys.len() <= i) {
-        return acc;
-    };
-    let k = keys[i].value_or("");
+fn sorted_pick(entries: ImportEntry[], keys: str[], from0: u64, acc0: Doc[]) -> Doc[] {
+    mut i = from0;
+    mut acc = acc0;
+    while (i < keys.len()) {
+        let k = keys[i].value_or("");
 
-    // How many earlier *sorted* slots already carried this key — i.e. which
-    // same-key import this slot should take.
-    let rank = keys[0..i].count(k);
-    sorted_pick(entries, keys, i + 1, acc.pushed(nth_with_key(entries, k, rank)))
+        // How many earlier *sorted* slots already carried this key — i.e. which
+        // same-key import this slot should take.
+        let rank = keys[0..i].count(k);
+        set acc = acc.pushed(nth_with_key(entries, k, rank));
+        set i = i + 1;
+    }
+    acc
 }
 
 // The `n`-th entry (0-based, in source order) whose key is `k`.
@@ -1034,12 +1063,15 @@ fn fn_item(self: W) -> WDoc!FmtError {
 }
 
 // `!prints`, `!reads`, … — a run of effect annotations after the parameters.
-fn fn_effects(self: W, acc: Doc[]) -> WDocs {
-    if (self.peek_text() != "!") {
-        return WDocs { w: self, docs: acc };
-    };
-    let e = self.bump().w.bump();
-    e.w.fn_effects(acc.pushed(Text(` !{e.text}`)))
+fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == "!") {
+        let e = w.bump().w.bump();
+        set acc = acc.pushed(Text(` !{e.text}`));
+        set w = e.w;
+    }
+    WDocs { w, docs: acc }
 }
 
 fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
@@ -1049,50 +1081,58 @@ fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
 
 // `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
 // the corpus writes them.
-fn fn_attrs(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() != ".") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let a = self.bump().w.bump();
-    let opened = a.w.expect("(")?.w;
+fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == ".") {
+        let a = w.bump().w.bump();
+        let opened = a.w.expect("(")?.w;
 
-    // A `.test` body is a block; a `.doc` argument is its string verbatim — a
-    // `"""` raw block aligns its closing delimiter under the opening one.
-    let arg = if (opened.peek_text() == "{") { opened.block()? } else { opened.bump().str_atom() };
-    let closed = arg.w.expect(")")?.w;
-    closed.fn_attrs(acc.pushed(Text(`.{a.text}(`)).pushed(arg.doc).pushed(Text(")")))
+        // A `.test` body is a block; a `.doc` argument is its string verbatim —
+        // a `"""` raw block aligns its closing delimiter under the opening one.
+        let arg = if (opened.peek_text() == "{") {
+            opened.block()?
+        } else {
+            opened.bump().str_atom()
+        };
+        set acc = acc.pushed(Text(`.{a.text}(`)).pushed(arg.doc).pushed(Text(")"));
+        set w = arg.w.expect(")")?.w;
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 // Parameters of a fn declaration, up to (not consuming) `end`.
-fn params_until(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == end) {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let m = if (l.w.peek_text() == "mut") {
-        WDocs { w: l.w.bump().w, docs: [l.doc, Text("mut ")] }
-    } else {
-        WDocs { w: l.w, docs: [l.doc] }
-    };
-    let n = m.w.bump();
-    let t = n.w.expect(":")?.w.ty()?;
-    let typed = m.docs.pushed(Text(n.text)).pushed(Text(": ")).pushed(t.doc);
-    // The variadic marker.
-    let v = if (t.w.peek_text() == "*") {
-        WDocs { w: t.w.bump().w, docs: typed.pushed(Text("*")) }
-    } else {
-        WDocs { w: t.w, docs: typed }
-    };
+fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != end) {
+        let l = w.lead();
+        let m = if (l.w.peek_text() == "mut") {
+            WDocs { w: l.w.bump().w, docs: [l.doc, Text("mut ")] }
+        } else {
+            WDocs { w: l.w, docs: [l.doc] }
+        };
+        let n = m.w.bump();
+        let t = n.w.expect(":")?.w.ty()?;
+        let typed = m.docs.pushed(Text(n.text)).pushed(Text(": ")).pushed(t.doc);
+        // The variadic marker.
+        let v = if (t.w.peek_text() == "*") {
+            WDocs { w: t.w.bump().w, docs: typed.pushed(Text("*")) }
+        } else {
+            WDocs { w: t.w, docs: typed }
+        };
 
-    // A keyword parameter's declaration default keeps spaces around `=`, unlike
-    // a call-site keyword argument.
-    let d = if (v.w.peek_text() == "=") {
-        v.w.spaced_default(v.docs)?
-    } else {
-        WDocs { w: v.w, docs: v.docs }
-    };
-    let stepped = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
-    stepped.params_until(end, acc.pushed(Concat(d.docs)))
+        // A keyword parameter's declaration default keeps spaces around `=`,
+        // unlike a call-site keyword argument.
+        let d = if (v.w.peek_text() == "=") {
+            v.w.spaced_default(v.docs)?
+        } else {
+            WDocs { w: v.w, docs: v.docs }
+        };
+        set acc = acc.pushed(Concat(d.docs));
+        set w = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn spaced_default(self: W, acc: Doc[]) -> WDocs!FmtError {
@@ -1116,21 +1156,23 @@ fn struct_item(self: W) -> WDoc!FmtError {
     })
 }
 
-fn struct_fields(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == "}") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let f = l.w.bump();
-    let t = f.w.expect(":")?.w.ty()?;
-    let base = [l.doc, Text(f.text), Text(": "), t.doc];
-    let d = if (t.w.peek_text() == "=") {
-        t.w.spaced_default(base)?
-    } else {
-        WDocs { w: t.w, docs: base }
-    };
-    let stepped = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
-    stepped.struct_fields(acc.pushed(Concat(d.docs)))
+fn struct_fields(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let l = w.lead();
+        let f = l.w.bump();
+        let t = f.w.expect(":")?.w.ty()?;
+        let base = [l.doc, Text(f.text), Text(": "), t.doc];
+        let d = if (t.w.peek_text() == "=") {
+            t.w.spaced_default(base)?
+        } else {
+            WDocs { w: t.w, docs: base }
+        };
+        set acc = acc.pushed(Concat(d.docs));
+        set w = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 // ---------- blocks & statements ----------
@@ -1339,12 +1381,15 @@ fn set_member(self: W, name: str) -> WDoc!FmtError {
     })
 }
 
-fn member_path(self: W, acc: str) -> WStr {
-    if (self.peek_text() != ".") {
-        return WStr { w: self, text: acc };
-    };
-    let m = self.bump().w.bump();
-    m.w.member_path(`{acc}.{m.text}`)
+fn member_path(self: W, acc0: str) -> WStr {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == ".") {
+        let m = w.bump().w.bump();
+        set acc = `{acc}.{m.text}`;
+        set w = m.w;
+    }
+    WStr { w, text: acc }
 }
 
 fn for_stmt(self: W) -> WDoc!FmtError {
@@ -1384,13 +1429,15 @@ fn while_stmt(self: W) -> WDoc!FmtError {
 // names and constructor-pattern bindings, which are names rather than types.
 struct WNames { w: W, names: str[] }
 
-fn ident_list(self: W, end: str, acc: str[]) -> WNames {
-    if (self.peek_text() == end || self.at_end()) {
-        return WNames { w: self, names: acc };
-    };
-    let n = self.bump();
-    let stepped = if (n.w.peek_text() == ",") { n.w.bump().w } else { n.w };
-    stepped.ident_list(end, acc.pushed_str(n.text))
+fn ident_list(self: W, end: str, acc0: str[]) -> WNames {
+    mut w = self;
+    mut acc = acc0;
+    while (!(w.peek_text() == end || w.at_end())) {
+        let n = w.bump();
+        set acc = acc.pushed_str(n.text);
+        set w = if (n.w.peek_text() == ",") { n.w.bump().w } else { n.w };
+    }
+    WNames { w, names: acc }
 }
 
 // ---------- expressions ----------
@@ -1401,6 +1448,8 @@ struct Seg { is_call: bool, doc: Doc }
 
 struct WSegs { w: W, segs: Seg[] }
 
+struct WSeg { w: W, seg: Seg }
+
 // `a..b` — range construction, spelled tight like the slice forms. A `..`
 // directly followed by `]` is the open-ended slice postfix instead, left for the
 // bracket code in `postfix`. Left-assoc, mirroring the grammar (`a..b..c` parses,
@@ -1410,12 +1459,15 @@ fn expr(self: W) -> WDoc!FmtError {
     first.w.range_tail(first.doc)
 }
 
-fn range_tail(self: W, acc: Doc) -> WDoc!FmtError {
-    if (!(self.peek_text() == ".." && self.peek_text_n(1) != "]")) {
-        return ok(WDoc { w: self, doc: acc });
-    };
-    let rhs = self.bump().w.binop_expr()?;
-    rhs.w.range_tail(Concat([acc, Text(".."), rhs.doc]))
+fn range_tail(self: W, acc0: Doc) -> WDoc!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == ".." && w.peek_text_n(1) != "]") {
+        let rhs = w.bump().w.binop_expr()?;
+        set acc = Concat([acc, Text(".."), rhs.doc]);
+        set w = rhs.w;
+    }
+    ok(WDoc { w, doc: acc })
 }
 
 fn binop_expr(self: W) -> WDoc!FmtError {
@@ -1433,27 +1485,30 @@ fn binop_expr(self: W) -> WDoc!FmtError {
     ok(WDoc { w: tail.w, doc: Concat([l.doc, d]) })
 }
 
-fn binop_tail(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (!is_binop(self.peek_text())) {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let op = self.bump();
-    let lead_rhs = op.w.lead();
-    let rhs = lead_rhs.w.unary()?;
+fn binop_tail(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (is_binop(w.peek_text())) {
+        let op = w.bump();
+        let lead_rhs = op.w.lead();
+        let rhs = lead_rhs.w.unary()?;
 
-    // The operator glues to the current line — `lhs == rhs` — rather than being
-    // pushed onto its own indented continuation line. When the line is too long
-    // the right operand breaks its *own* structure (a call's argument list, a
-    // multi-line `"""` block) instead, so the closing delimiter aligns with the
-    // statement and the operator stays put. A right operand carrying a leading
-    // comment is the exception: the comment needs its own line, so that case
-    // keeps the break-before-operator layout.
-    let seg = if (lead_rhs.doc.is_empty_doc()) {
-        Concat([Text(" "), Text(op.text), Text(" "), rhs.doc])
-    } else {
-        Indent(Concat([Line, Text(op.text), Text(" "), lead_rhs.doc, rhs.doc]))
-    };
-    rhs.w.binop_tail(acc.pushed(seg))
+        // The operator glues to the current line — `lhs == rhs` — rather than
+        // being pushed onto its own indented continuation line. When the line is
+        // too long the right operand breaks its *own* structure (a call's
+        // argument list, a multi-line `"""` block) instead, so the closing
+        // delimiter aligns with the statement and the operator stays put. A right
+        // operand carrying a leading comment is the exception: the comment needs
+        // its own line, so that case keeps the break-before-operator layout.
+        let seg = if (lead_rhs.doc.is_empty_doc()) {
+            Concat([Text(" "), Text(op.text), Text(" "), rhs.doc])
+        } else {
+            Indent(Concat([Line, Text(op.text), Text(" "), lead_rhs.doc, rhs.doc]))
+        };
+        set acc = acc.pushed(seg);
+        set w = rhs.w;
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn is_binop(t: str) -> bool {
@@ -1486,39 +1541,52 @@ fn postfix(self: W) -> WDoc!FmtError {
     ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
 }
 
-fn postfix_segs(self: W, acc: Seg[]) -> WSegs!FmtError {
-    let t = self.peek_text();
-    if (t == ".") {
-        return self.dot_seg(acc);
-    };
-    if (t == "[") {
-        return self.index_seg(acc);
-    };
-    if (t == "?") {
-        return self.bump().w.postfix_segs(acc.pushed_seg(Seg { is_call: false, doc: Text("?") }));
-    };
-    ok(WSegs { w: self, segs: acc })
+fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    mut more = true;
+    while (more) {
+        let t = w.peek_text();
+        if (t == ".") {
+            let d = w.dot_seg()?;
+            set acc = acc.pushed_seg(d.seg);
+            set w = d.w;
+        } else {
+            if (t == "[") {
+                let d = w.index_seg()?;
+                set acc = acc.pushed_seg(d.seg);
+                set w = d.w;
+            } else {
+                if (t == "?") {
+                    set acc = acc.pushed_seg(Seg { is_call: false, doc: Text("?") });
+                    set w = w.bump().w;
+                } else {
+                    set more = false;
+                };
+            };
+        };
+    }
+    ok(WSegs { w, segs: acc })
 }
 
 // `.member` or `.method(args)` — field access glues to its left; a call is
 // tagged so the chain layout can break before it.
-fn dot_seg(self: W, acc: Seg[]) -> WSegs!FmtError {
+fn dot_seg(self: W) -> WSeg!FmtError {
     let m = self.bump().w.bump();
     if (m.w.peek_text() != "(") {
-        return m.w.postfix_segs(acc.pushed_seg(Seg { is_call: false, doc: Text(`.{m.text}`) }));
+        return ok(WSeg { w: m.w, seg: Seg { is_call: false, doc: Text(`.{m.text}`) } });
     };
     let hug = m.w.bump().w.hugs_sole_arg();
     let args = m.w.bump().w.call_args_until(")", [])?;
     let closed = args.w.expect(")")?.w;
-    let seg = Seg {
-        is_call: true,
-        doc: Concat([Text(`.{m.text}`), call_arg_list(args.docs, hug)]),
-    };
-    closed.postfix_segs(acc.pushed_seg(seg))
+    ok(WSeg {
+        w: closed,
+        seg: Seg { is_call: true, doc: Concat([Text(`.{m.text}`), call_arg_list(args.docs, hug)]) },
+    })
 }
 
 // `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
-fn index_seg(self: W, acc: Seg[]) -> WSegs!FmtError {
+fn index_seg(self: W) -> WSeg!FmtError {
     let opened = self.bump().w;
     let inner = if (opened.peek_text() == "..") {
         opened.slice_to()?
@@ -1526,11 +1594,13 @@ fn index_seg(self: W, acc: Seg[]) -> WSegs!FmtError {
         opened.index_or_from()?
     };
     let closed = inner.w.expect("]")?.w;
-    let seg = Seg {
-        is_call: false,
-        doc: Concat([Text("[")].extended(inner.docs).pushed(Text("]"))),
-    };
-    closed.postfix_segs(acc.pushed_seg(seg))
+    ok(WSeg {
+        w: closed,
+        seg: Seg {
+            is_call: false,
+            doc: Concat([Text("[")].extended(inner.docs).pushed(Text("]"))),
+        },
+    })
 }
 
 // `[..b]` — open-ended on the left.
@@ -1643,17 +1713,22 @@ fn paren_atom(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(rest.docs, Parens) })
 }
 
-fn tuple_rest(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() != ",") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let stepped = self.bump().w;
-    // A trailing comma before `)` ends the tuple rather than starting an element.
-    if (stepped.peek_text() == ")") {
-        return ok(WDocs { w: stepped, docs: acc });
-    };
-    let e = stepped.expr()?;
-    e.w.tuple_rest(acc.pushed(e.doc))
+fn tuple_rest(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() == ",") {
+        let stepped = w.bump().w;
+
+        // A trailing comma before `)` ends the tuple rather than starting an
+        // element.
+        if (stepped.peek_text() == ")") {
+            return ok(WDocs { w: stepped, docs: acc });
+        };
+        let e = stepped.expr()?;
+        set acc = acc.pushed(e.doc);
+        set w = e.w;
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn array_atom(self: W) -> WDoc!FmtError {
@@ -1674,19 +1749,21 @@ fn set_or_dict_atom(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(entries.docs, HashBraces) })
 }
 
-fn dict_entries(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == "}") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let k = l.w.expr()?;
-    let e = if (k.w.peek_text() == ":") {
-        k.w.dict_value(l.doc, k.doc)?
-    } else {
-        WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
-    };
-    let stepped = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
-    stepped.dict_entries(acc.pushed(e.doc))
+fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let l = w.lead();
+        let k = l.w.expr()?;
+        let e = if (k.w.peek_text() == ":") {
+            k.w.dict_value(l.doc, k.doc)?
+        } else {
+            WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
+        };
+        set acc = acc.pushed(e.doc);
+        set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn dict_value(self: W, lead: Doc, k: Doc) -> WDoc!FmtError {
@@ -1727,22 +1804,24 @@ fn struct_atom(self: W, name: str) -> WDoc!FmtError {
     })
 }
 
-fn struct_inits(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == "}") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let f = l.w.bump();
+fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let l = w.lead();
+        let f = l.w.bump();
 
-    // `field: value`, or the shorthand `field` (sugar for `field: field`) — kept
-    // verbatim, not expanded.
-    let e = if (f.w.peek_text() == ":") {
-        f.w.struct_field_value(l.doc, f.text)?
-    } else {
-        WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
-    };
-    let stepped = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
-    stepped.struct_inits(acc.pushed(e.doc))
+        // `field: value`, or the shorthand `field` (sugar for `field: field`) —
+        // kept verbatim, not expanded.
+        let e = if (f.w.peek_text() == ":") {
+            f.w.struct_field_value(l.doc, f.text)?
+        } else {
+            WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
+        };
+        set acc = acc.pushed(e.doc);
+        set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
@@ -1798,18 +1877,20 @@ fn match_expr(self: W) -> WDoc!FmtError {
     })
 }
 
-fn match_arms(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == "}") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let pat = l.w.pattern()?;
-    let body = pat.w.expect("=>")?.w.expr()?;
-    let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
-    // A same-line `// comment` after the arm rides on its line.
-    let tc = stepped.trailing_comment();
-    let arm = Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]);
-    tc.w.match_arms(acc.pushed(arm))
+fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let l = w.lead();
+        let pat = l.w.pattern()?;
+        let body = pat.w.expect("=>")?.w.expr()?;
+        let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
+        // A same-line `// comment` after the arm rides on its line.
+        let tc = stepped.trailing_comment();
+        set acc = acc.pushed(Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]));
+        set w = tc.w;
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn pattern(self: W) -> WDoc!FmtError {
@@ -1839,14 +1920,16 @@ fn qualified_case(self: W, name: str) -> WStr {
 }
 
 // Call-argument (or array-element) list up to `end`.
-fn call_args_until(self: W, end: str, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == end) {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let l = self.lead();
-    let a = l.w.call_arg()?;
-    let stepped = if (a.w.peek_text() == ",") { a.w.bump().w } else { a.w };
-    stepped.call_args_until(end, acc.pushed(Concat([l.doc, a.doc])))
+fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != end) {
+        let l = w.lead();
+        let a = l.w.call_arg()?;
+        set acc = acc.pushed(Concat([l.doc, a.doc]));
+        set w = if (a.w.peek_text() == ",") { a.w.bump().w } else { a.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 // One argument, plus the arg-only forms — keyword arguments (`k=1`, spelled
@@ -1895,18 +1978,20 @@ fn lambda(self: W) -> WDoc!FmtError {
     ok(WDoc { w: body.w, doc: Concat(d) })
 }
 
-fn lambda_params(self: W, acc: Doc[]) -> WDocs!FmtError {
-    if (self.peek_text() == "|") {
-        return ok(WDocs { w: self, docs: acc });
-    };
-    let n = self.bump();
-    let p = if (n.w.peek_text() == ":") {
-        n.w.lambda_param_ty(n.text)?
-    } else {
-        WDoc { w: n.w, doc: Text(n.text) }
-    };
-    let stepped = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
-    stepped.lambda_params(acc.pushed(p.doc))
+fn lambda_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "|") {
+        let n = w.bump();
+        let p = if (n.w.peek_text() == ":") {
+            n.w.lambda_param_ty(n.text)?
+        } else {
+            WDoc { w: n.w, doc: Text(n.text) }
+        };
+        set acc = acc.pushed(p.doc);
+        set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
@@ -1924,54 +2009,71 @@ fn template_verbatim(self: W) -> WDoc!FmtError {
     }
 }
 
-fn template_scan(self: W, start: u64, depth: u64) -> WDoc!FmtError {
-    match (self.peek()) {
-        none => err(FmtError {
-            message: "formatter: unterminated template literal in token stream",
-            span: start..self.src.len(),
-        }),
-        some(t) => self.template_step(start, depth, t),
-    }
-}
-
-fn template_step(self: W, start: u64, depth: u64, t: FmtTok) -> WDoc!FmtError {
-    let stepped = self.advance(t.span.end);
-    match (t.kind) {
-        TplHead => stepped.template_scan(start, depth + 1),
-        TplTail => if (depth <= 1) {
-            // A triple-backtick template is a raw block (its closing ``` aligns
-            // under the opening); a single-backtick one has no own-line closing
-            // delimiter, so `reindent_block` leaves it untouched.
-            ok(WDoc {
-                w: stepped.drop_comments_before(t.span.end),
-                doc: RawBlock(self.src[start..t.span.end]),
-            })
+fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
+    mut w = self;
+    mut depth = depth0;
+    while (!w.at_end()) {
+        let t = w.cur_tok();
+        let stepped = w.advance(t.span.end);
+        if (t.kind == TplHead) {
+            set depth = depth + 1;
         } else {
-            stepped.template_scan(start, depth - 1)
-        },
-        TplMid => stepped.template_scan(start, depth),
-        Keyword => stepped.template_scan(start, depth),
-        Constant => stepped.template_scan(start, depth),
-        BuiltinType => stepped.template_scan(start, depth),
-        Ident => stepped.template_scan(start, depth),
-        Num => stepped.template_scan(start, depth),
-        StrTok => stepped.template_scan(start, depth),
-        CharTok => stepped.template_scan(start, depth),
-        Op => stepped.template_scan(start, depth),
-        Punct => stepped.template_scan(start, depth),
+            if (t.kind == TplTail) {
+                if (depth <= 1) {
+                    // A triple-backtick template is a raw block (its closing ```
+                    // aligns under the opening); a single-backtick one has no
+                    // own-line closing delimiter, so `reindent_block` leaves it
+                    // untouched.
+                    return ok(WDoc {
+                        w: stepped.drop_comments_before(t.span.end),
+                        doc: RawBlock(self.src[start..t.span.end]),
+                    });
+                };
+                set depth = depth - 1;
+            };
+        };
+        set w = stepped;
     }
+    err(FmtError {
+        message: "formatter: unterminated template literal in token stream",
+        span: start..self.src.len(),
+    })
 }
 
 // Comments inside interpolations came through the comment stream; they are
 // inside the verbatim copy already, so drop them rather than double-emitting.
 fn drop_comments_before(self: W, end: u64) -> W {
+    mut w = self;
+    while (w.comment_starts_before(end)) {
+        set w = w.skip_comment();
+    }
+    w
+}
+
+// The next undrained comment. Callers test `comment_starts_before` first, so the
+// empty fallback is unreachable — `value_or` cannot unwrap a struct optional, so
+// this is the `match` form.
+fn cur_comment(self: W) -> Span {
     match (self.comments[self.cpos]) {
-        none => self,
-        some(c) => if (c.start < end) {
-            self.skip_comment().drop_comments_before(end)
-        } else {
-            self
-        },
+        none => 0..0,
+        some(c) => c,
+    }
+}
+
+// The token at the cursor. Callers test `at_end` first, so the fallback is
+// unreachable (same `match`-not-`value_or` reason as `cur_comment`).
+fn cur_tok(self: W) -> FmtTok {
+    match (self.peek()) {
+        none => FmtTok { kind: Punct, span: 0..0 },
+        some(t) => t,
+    }
+}
+
+// Whether the next undrained comment begins before `end`.
+fn comment_starts_before(self: W, end: u64) -> bool {
+    match (self.comments[self.cpos]) {
+        none => false,
+        some(c) => c.start < end,
     }
 }
 
@@ -2586,15 +2688,15 @@ fn pushed(self: Doc[], d: Doc) -> Doc[] {
     assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
 })
 --- performance ---
-allocations: 20527
-deallocations: 20527
+allocations: 20646
+deallocations: 20646
 reallocations: 593
-bytes allocated: 1018544
-instructions executed: 2831328
-binary size: 2948024
-  code: 1681272
+bytes allocated: 1027112
+instructions executed: 2975542
+binary size: 2944464
+  code: 1678896
   data: 25116
-  metadata: 1241636
+  metadata: 1240452
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam23
 __builtin_count_while$char$s0$lam33
@@ -2634,7 +2736,6 @@ __m1__has_hard
 __m1__newline_str
 __m1__prepend
 __m1__print_doc
-__m1__pushed
 __m2__reindent_block
 __m3__dedent
 __m4__lines
@@ -2681,11 +2782,11 @@ call_arg_list
 call_args_until
 chain_docs
 comma_list_docs
+comment_starts_before
 dict_entries
 dict_value
 dict_value_ty
 dot_seg
-drop_comments_before
 drop_trailing_break
 entry_keys
 err_here
@@ -2694,7 +2795,6 @@ expr
 extended
 fmt_toks
 fn_attrs
-fn_effects
 fn_item
 fn_return
 for_stmt
@@ -2720,7 +2820,6 @@ let_stmt
 main
 match_arms
 match_expr
-member_path
 mut_stmt
 name_atom
 named_ty

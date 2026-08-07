@@ -444,32 +444,14 @@ fn width_is_configurable() {
 /// wraps those in section-splitting, trailing-whitespace cleanup and the
 /// preservation check. To compare like with like, the same wrapper steps are
 /// applied here before and after calling it.
-/// Files the AIPL walker cannot yet lay out: it recurses where the Rust walker
-/// loops, and AIPL frames are large enough (structs by value, plus a stack slot
-/// per composite temporary) that the deepest of these exhausts the native stack
-/// and aborts. Correctness is not in question — each one formats identically
-/// given a larger stack — so they are excluded here rather than left to crash
-/// the run, and the list shrinks as the recursion is converted to iteration.
-/// (The walker cannot yet format its own source — it is the largest file here.)
-const TOO_DEEP_FOR_AIPL_WALKER: &[&str] = &[
-    "crates/aipl-codegen/src/lexer.aipl",
-    "crates/aipl-codegen/src/walker.aipl",
-];
-
 #[test]
 fn aipl_formatter_matches_rust_formatter() {
     setup();
     let opts = FmtOptions::default();
     let mut diffs: Vec<String> = Vec::new();
     let mut compared = 0usize;
-    let mut skipped = 0usize;
 
     for path in enforced_files() {
-        let rel = path.to_string_lossy().replace('\\', "/");
-        if TOO_DEEP_FOR_AIPL_WALKER.iter().any(|s| rel.ends_with(s)) {
-            skipped += 1;
-            continue;
-        }
         let src = std::fs::read_to_string(&path).unwrap();
         if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
             continue; // parse-error fixture; nothing to format
@@ -513,15 +495,6 @@ fn aipl_formatter_matches_rust_formatter() {
     }
 
     assert!(compared > 100, "compared too few files ({compared})");
-    // Keep the exclusion list honest: an entry that no longer exists (renamed or
-    // deleted) would silently stop excluding anything.
-    assert_eq!(
-        skipped,
-        TOO_DEEP_FOR_AIPL_WALKER.len(),
-        "TOO_DEEP_FOR_AIPL_WALKER lists {} file(s) but {skipped} were skipped — \
-         an entry no longer matches a real file",
-        TOO_DEEP_FOR_AIPL_WALKER.len(),
-    );
     assert!(
         diffs.is_empty(),
         "{} of {compared} file(s) formatted differently by the AIPL walker:\n{}",
@@ -557,4 +530,21 @@ fn first_diff(want: &str, got: &str) -> String {
         want.lines().count(),
         got.lines().count()
     )
+}
+
+/// Author helper: lay out the file named by `AIPL_FMT_PROBE` with the AIPL
+/// formatter and report which way it went. Handy for measuring how much native
+/// stack the walker needs on a given file — pair it with `RUST_MIN_STACK`.
+#[test]
+#[ignore = "author helper — measures AIPL walker stack depth"]
+fn aipl_fmt_probe() {
+    setup();
+    let path = std::env::var("AIPL_FMT_PROBE").expect("AIPL_FMT_PROBE");
+    let src = std::fs::read_to_string(&path).unwrap();
+    let (code, _) = aipl_parser::split_test_sections(&src);
+    let cleaned = clean_trailing_ws(code);
+    match aipl::codegen::format_program(&cleaned, 100) {
+        Ok(_) => eprintln!("PROBE-OK"),
+        Err(e) => eprintln!("PROBE-ERR {e}"),
+    }
 }
