@@ -2692,11 +2692,11 @@ allocations: 20646
 deallocations: 20646
 reallocations: 593
 bytes allocated: 1027112
-instructions executed: 2975542
-binary size: 2944464
-  code: 1678896
+instructions executed: 3055448
+binary size: 2965680
+  code: 1691040
   data: 25116
-  metadata: 1240452
+  metadata: 1249524
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam23
 __builtin_count_while$char$s0$lam33

@@ -14631,6 +14631,22 @@ fn compile_expr<M: Module>(
                     .last_mut()
                     .expect("scope")
                     .push(Tracked::slot(slot, &t));
+            } else if is_composite(&t, structs) {
+                // A composite (inline struct / optional / result) `mut` binding:
+                // the slot takes its own reference on the value's heap-bearing
+                // fields, released by this slot-track at scope exit or by the
+                // `set` that replaces it — the same ownership the array arm above
+                // gives, which `set` relies on to release the outgoing value
+                // without double-freeing one the value-track still owns.
+                //
+                // The slot keeps pointing at the value's *own* storage rather
+                // than a copy, so an alias taken before a later `set` still sees
+                // the value it was bound to.
+                emit_retain(builder, module, builtins, structs, v, &t);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::slot(slot, &t));
             }
             let mut new_env = env.clone();
             cx.bindings
@@ -14832,6 +14848,41 @@ fn compile_expr<M: Module>(
                     builder.ins().stack_store(types::I64, v, slot, 0);
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                 }
+            } else if is_composite(&expected_ty, structs) {
+                // Copy the incoming composite into a buffer belonging to this
+                // `set`, and point the slot there.
+                //
+                // The value is usually the hidden-sret buffer of the call that
+                // produced it, and a call site inside a loop reuses one buffer
+                // every iteration — so pointing the binding straight at it makes
+                // the next `set recv = f(recv)` read its argument out of the very
+                // buffer the call is writing into. The copy breaks that: the
+                // binding's storage is distinct from any callee's scratch.
+                //
+                // Ownership mirrors the array arm: retain the incoming fields
+                // before releasing the outgoing ones, since `set s = f(s)` hands
+                // back a value built from `s`'s own fields and dropping first
+                // could free one the new value still holds.
+                let size = field_size(&expected_ty, structs);
+                let buf = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    size,
+                    3,
+                ));
+                let buf_addr = builder.ins().stack_addr(types::I64, buf, 0);
+                let old_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+                // Retain, then release, then overwrite — in that order. Retain
+                // first because `set s = f(s)` hands back a value built from
+                // `s`'s own fields, so releasing first could free one the new
+                // value still holds. Release *before* the copy because on the
+                // second and later trips through a loop this buffer already *is*
+                // the outgoing value's storage (one buffer per `set` site), and
+                // copying first would leave the drop reading — and freeing — the
+                // fields just written.
+                emit_retain(builder, module, builtins, structs, v, &expected_ty);
+                emit_drop(builder, module, builtins, structs, old_ptr, &expected_ty);
+                copy_composite(builder, buf_addr, v, &expected_ty, structs);
+                builder.ins().stack_store(types::I64, buf_addr, slot, 0);
             } else {
                 builder.ins().stack_store(types::I64, v, slot, 0);
             }

@@ -65,10 +65,13 @@ variant Doc =
 // One step's outcome: where the cursor lands, the frames still to walk, and the
 // piece to append (if any).
 //
-// The output accumulator is deliberately *not* a field here. A struct carrying a
-// recursive-variant field (`Work`) alongside an array that is rebuilt by `push`
-// corrupts memory — it segfaults non-deterministically — so `go` keeps the
-// accumulator in its own `mut` binding and this struct reports what to append.
+// The output accumulator is deliberately *not* a field here: `go` keeps it in
+// its own `mut` binding and this struct reports what to append. That began as a
+// workaround for a codegen bug (a `mut` struct reassigned from a call on itself
+// in a loop aliased the call's sret buffer — see
+// `tests/cases/structs/mut_struct_reassigned_in_loop`), now fixed. It stays
+// because threading one accumulator is clearer than copying it through every
+// arm.
 struct Step { col: u64, work: Work, emit: str, emits: bool, done: bool }
 
 // The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`

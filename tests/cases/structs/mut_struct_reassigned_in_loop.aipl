@@ -1,0 +1,77 @@
+import { !, ==, len, print, push } from builtins;
+
+// Regression test for corruption of a `mut` *struct* binding reassigned from a
+// call on itself inside a loop. The `mut str` sibling of this bug is
+// `strings/mut_str_reassigned_in_loop`.
+//
+// A struct-returning call gets one hidden-sret buffer **per call site**, and a
+// `mut` binding of composite type holds a *pointer* to its value rather than the
+// value inline. So after the first iteration of
+//
+//     while (!s.done) { set s = step(s); }
+//
+// `s` points *at* that sret buffer, and the next iteration's call reads its
+// argument out of the very buffer it is writing its result into. The IR for
+// `run` shows it plainly: an 8-byte slot holds `s`, while the 24-byte sret
+// buffer is allocated once in the entry block and re-addressed on every trip
+// through the loop body.
+//
+// Two sequential `set s = step(s);` statements are fine — separate call sites
+// get separate sret buffers, so nothing aliases. The trigger is a loop plus a
+// callee that rebuilds a refcounted field; it needs no variant, no matched
+// payload, no helper fn and no empty initial array, and it reproduces under AOT
+// as well as the JIT, so it is codegen rather than the harness.
+//
+// One iteration is deliberate. It corrupts `acc`'s length quietly — the count
+// comes back as whatever the reused buffer happened to hold, varying run to run
+// — whereas letting the loop run longer (`done: 2 <= s.acc.len()`) turns the
+// same corruption into a segfault. The result is reported as a *classification*
+// rather than the raw count so this case's output stays deterministic in both
+// the broken and the fixed state.
+//
+// The fix: a composite `mut` binding's slot owns its value's fields, and `set`
+// copies the incoming value into a buffer belonging to that `set` before
+// repointing the slot — retain the incoming fields, release the outgoing ones,
+// then copy. See the `LetMut`/`Assign` composite arms in `aipl-codegen`.
+//
+// `doc.aipl`'s printer no longer needs its workaround: it keeps its output
+// accumulator in a `mut` binding outside the state struct — that is now a
+// stylistic choice rather than a necessity.
+
+struct St { acc: str[], done: bool }
+
+fn pushed(self: str[], x: str) -> str[] {
+    mut a = self;
+    set a.push(x);
+    a
+}
+
+fn step(s: St) -> St { St { acc: s.acc.pushed("k"), done: true } }
+
+fn run() -> u64 {
+    mut s = St { acc: [], done: false };
+    while (!s.done) {
+        set s = step(s);
+    }
+    s.acc.len()
+}
+
+fn main() !prints {
+    // Exactly one iteration runs, pushing exactly one element.
+    print(if (run() == u64(1)) { "one element" } else { "corrupted" });
+}
+--- stdout ---
+one element
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 72
+instructions executed: 114
+binary size: 1952
+  code: 636
+  data: 59
+  metadata: 1257
+--- monomorphizations ---
+main
+run
