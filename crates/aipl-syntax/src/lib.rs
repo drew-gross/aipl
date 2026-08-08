@@ -1298,6 +1298,13 @@ fn __assert(cond: bool, loc: str) {}
 fn __test_begin(name: str) {}
 fn __test_end() {}
 fn __test_summary() -> i64 { 0 }
+// Internal: emitted by the compiler for array-literal spreads (`[..xs, y]`).
+// `reserve` sizes the accumulator for the whole literal up front and makes it
+// uniquely owned; `append`/`concat` then write into that reserved capacity in
+// place. Named `__aipl_*` (not `__builtin_*`) so no import can name them.
+fn __aipl_arr_reserve<T: any>(self: T[], extra: u64) -> T[] { self }
+fn __aipl_arr_append<T: any>(self: T[], x: T) -> T[] { self }
+fn __aipl_arr_concat<T: any>(self: T[], other: T[]) -> T[] { self }
 // Internal: emitted by the compiler for template-literal concatenation.
 fn __aipl_concat(a: str, b: str) -> str { "" }
 // Internal: emitted for each interpolation in a template literal.

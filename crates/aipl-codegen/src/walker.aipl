@@ -2614,23 +2614,23 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20424
-deallocations: 20424
-reallocations: 677
-bytes allocated: 1005296
-instructions executed: 3032732
-binary size: 2972728
-  code: 1695072
+allocations: 20315
+deallocations: 20315
+reallocations: 634
+bytes allocated: 999016
+instructions executed: 3029926
+binary size: 2978520
+  code: 1698824
   data: 25044
-  metadata: 1252612
+  metadata: 1254652
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam32
 __builtin_count_while$char$s0$lam42
 __builtin_count_while$char$s0$lam60
 __builtin_count_while$char$s0$lam65
 __builtin_count_while$char$s0$lam67
-__builtin_count_while$char$s0$lam71
-__builtin_count_while$char$s0$lam72
+__builtin_count_while$char$s0$lam73
+__builtin_count_while$char$s0$lam74
 __builtin_int_parse
 __builtin_is_some_and$char$lam66
 __builtin_opt_left_fold$char$i64$s0$lam54
@@ -2638,7 +2638,7 @@ __enumerate16
 __enumerate17
 __enumerate31
 __enumerate8
-__enumerate88
+__enumerate90
 __lambda_20
 __lambda_21
 __lambda_22

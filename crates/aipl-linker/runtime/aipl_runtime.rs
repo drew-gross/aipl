@@ -2597,6 +2597,134 @@ pub extern "C" fn aipl_set_insert(
     aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size)
 }
 
+/// Make `a` uniquely owned with room for `extra` more elements, so the appends
+/// an array-literal spread emits afterwards are plain in-place writes. Two
+/// cases, mirroring `aipl_set_union_mut` vs `aipl_set_union`:
+///
+/// - refcount 1 (nothing else can observe the block): keep it. Already-large
+///   enough capacity is returned untouched; otherwise `realloc` to exactly what
+///   is needed — the header and elements move with the block, so no element is
+///   re-retained and there is no old block to free.
+/// - shared: allocate one right-sized block, copy the elements in and retain
+///   each, then release the input.
+///
+/// Either way the result has refcount 1 and capacity for `old_len + extra`.
+/// Sizing is exact rather than doubling: the spread knows its final length up
+/// front. Mirrors `aipl_arr_reserve` in codegen.
+#[no_mangle]
+pub extern "C" fn aipl_arr_reserve(
+    a: *const u8,
+    extra: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    unsafe {
+        let a = aipl_arr_ensure_heap(a);
+        let elem_size = core::cmp::max(elem_size, 8) as usize;
+        let old_len = if a.is_null() { 0 } else { array_len(a) };
+        let want = old_len + if extra > 0 { extra as usize } else { 0 };
+        let need_bytes = want * elem_size;
+        if !a.is_null() {
+            let cap_bytes = array_cap_bytes(a);
+            let rc = *header_of(a);
+            if rc == 1 {
+                if need_bytes <= cap_bytes {
+                    *(a.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
+                    return a;
+                }
+                let block = a.sub(HEADER_SIZE) as *mut c_void;
+                let raw = rt_realloc(block, HEADER_SIZE + ARR_ELEMS_OFFSET + need_bytes) as *mut u8;
+                if raw.is_null() {
+                    abort();
+                }
+                let data = raw.add(HEADER_SIZE);
+                *(data.add(ARR_CAP_OFFSET) as *mut i64) = need_bytes as i64;
+                *(data.add(ARR_DROPFN_OFFSET) as *mut i64) = drop_fn;
+                return data as *const u8;
+            }
+        }
+        let raw = array_alloc(
+            old_len,
+            core::cmp::max(want, 1),
+            drop_fn,
+            elem_size as i64,
+        );
+        let dst = raw.add(ARR_ELEMS_OFFSET);
+        if old_len > 0 && !a.is_null() {
+            let src = a.add(ARR_ELEMS_OFFSET);
+            memcpy(
+                dst as *mut c_void,
+                src as *const c_void,
+                old_len * elem_size,
+            );
+            elem_rc(retain_fn, dst, old_len);
+        }
+        aipl_array_dec(a);
+        raw as *const u8
+    }
+}
+
+/// Append every element of `src` to `dst`, which `aipl_arr_reserve` has already
+/// made uniquely owned and large enough — so this is a single `memcpy` plus one
+/// retain pass, never a reallocation. Consumes (decs) `src`; `dst` keeps its
+/// identity. Mirrors `aipl_arr_extend` in codegen.
+#[no_mangle]
+pub extern "C" fn aipl_arr_extend(
+    dst: *const u8,
+    src: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    unsafe {
+        let src_heap = aipl_arr_ensure_heap(src);
+        if elem_size == ELEM_BITPACKED {
+            // Bit-packed `bool[]` opts out of the pre-sized path (`reserve` is a
+            // no-op for it), so `dst` may be shared: append one bit at a time
+            // with the *copying* push, which is correct either way.
+            let add = if src_heap.is_null() {
+                0
+            } else {
+                array_len(src_heap)
+            };
+            let mut out = dst;
+            let mut i = 0;
+            while i < add {
+                let bit = i64::from(arr_load_bit_rt(src_heap, i));
+                out = aipl_array_push(
+                    out,
+                    &bit as *const i64 as *const u8,
+                    drop_fn,
+                    retain_fn,
+                    ELEM_BITPACKED,
+                );
+                i += 1;
+            }
+            aipl_array_dec(src_heap);
+            return out;
+        }
+        let elem_size = core::cmp::max(elem_size, 8) as usize;
+        let add = if src_heap.is_null() {
+            0
+        } else {
+            array_len(src_heap)
+        };
+        if add == 0 || dst.is_null() {
+            aipl_array_dec(src_heap);
+            return dst;
+        }
+        let dst_len = array_len(dst);
+        let at = dst.add(ARR_ELEMS_OFFSET).add(dst_len * elem_size) as *mut u8;
+        let from = src_heap.add(ARR_ELEMS_OFFSET);
+        memcpy(at as *mut c_void, from as *const c_void, add * elem_size);
+        elem_rc(retain_fn, at, add);
+        *(dst as *mut i64) = (dst_len + add) as i64;
+        aipl_array_dec(src_heap);
+        dst
+    }
+}
+
 /// Read element `i` of set/array `src` as an i64 (bit-unpacked `bool` when
 /// `elem_size == 0`, else the 8-byte value). Repr-aware. Mirrors codegen's `read_set_elem`.
 unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {

@@ -31,8 +31,13 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
-  optimize spreading by preallocating the full size
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
+  optimize the bit packed and rope representations as well
+
+optimizations:
+  make functions that generate an array accept a write target under the hood, which is a pre-allocated span. For spreads this can generate directly into the destination buffer, probably has applications elsewhere also.
+  make array reserve grow geometrically
+  make arrays work sorta like strings i.e. have a rope representation
 
 start writing some profiling tools in aipl:
   !clock effect
@@ -286,6 +291,9 @@ Next step: re-run the case suite under the new codegen watching for a case that
 hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
 implement vec.back(), use it to simplify trim_suffix
+
+walker.aipl:
+  the import sorting is wack, lets add a sort by predicate to make it more normal
 
 Reasons dec.aipl uses a cons list:
     1. fits borrows the stack in Rust; AIPL has no references.

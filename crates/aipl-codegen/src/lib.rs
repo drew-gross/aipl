@@ -2025,6 +2025,133 @@ extern "C" fn aipl_array_push_mut(
     data
 }
 
+/// Make `a` uniquely owned with room for `extra` more elements, so the appends
+/// an array-literal spread emits afterwards are plain in-place writes. Two
+/// cases, mirroring `aipl_set_union_mut` vs `aipl_set_union`:
+///
+/// - refcount 1 (nothing else can observe the block): keep it. Already-large
+///   enough capacity is returned untouched; otherwise `realloc` to exactly what
+///   is needed — the header and elements move with the block, so no element is
+///   re-retained and there is no old block to free.
+/// - shared: allocate one right-sized block, copy the elements in and retain
+///   each (the source keeps its own refs), then release the input.
+///
+/// Either way the result has refcount 1 and capacity for `old_len + extra`, so
+/// `aipl_array_push_mut` / `aipl_arr_extend` can write straight into it. Sizing
+/// is exact rather than doubling: the spread knows its final length up front.
+/// Mirrors `aipl_arr_reserve` in the linker runtime.
+extern "C" fn aipl_arr_reserve(
+    a: *const u8,
+    extra: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let a = aipl_arr_ensure_heap(a);
+    let elem_size = elem_size.max(8) as usize;
+    let old_len = if a.is_null() {
+        0
+    } else {
+        unsafe { array_len_of(a) }
+    };
+    let want = old_len + extra.max(0) as usize;
+    let need_bytes = want * elem_size;
+    if !a.is_null() {
+        let (cap_bytes, rc) = unsafe { (array_cap_bytes_of(a), *header_of(a)) };
+        if rc == 1 {
+            if need_bytes <= cap_bytes {
+                unsafe { std::ptr::write(a.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn) };
+                return a;
+            }
+            unsafe {
+                let block = a.sub(HEADER_SIZE) as *mut u8;
+                let old_layout = std::alloc::Layout::from_size_align(
+                    array_block_size(cap_bytes),
+                    std::mem::align_of::<i64>(),
+                )
+                .expect("array layout");
+                let raw = std::alloc::realloc(block, old_layout, array_block_size(need_bytes));
+                if raw.is_null() {
+                    std::alloc::handle_alloc_error(old_layout);
+                }
+                let data = raw.add(HEADER_SIZE);
+                std::ptr::write(data.add(ARR_CAP_OFFSET) as *mut i64, need_bytes as i64);
+                std::ptr::write(data.add(ARR_DROPFN_OFFSET) as *mut i64, drop_fn);
+                return data as *const u8;
+            }
+        }
+    }
+    let raw = alloc_array(old_len, want.max(1), drop_fn, elem_size as i64);
+    unsafe {
+        let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        if old_len > 0 && !a.is_null() {
+            let src = a.add(ARR_ELEMS_OFFSET);
+            std::ptr::copy_nonoverlapping(src, dst, old_len * elem_size);
+            elem_rc(retain_fn, dst, old_len);
+        }
+    }
+    aipl_array_dec(a);
+    raw
+}
+
+/// Append every element of `src` to `dst`, which `aipl_arr_reserve` has already
+/// made uniquely owned and large enough — so this is a single `memcpy` plus one
+/// retain pass, never a reallocation. Consumes (decs) `src`; `dst` keeps its
+/// identity. Mirrors `aipl_arr_extend` in the linker runtime.
+extern "C" fn aipl_arr_extend(
+    dst: *const u8,
+    src: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let src_heap = aipl_arr_ensure_heap(src);
+    if elem_size == ELEM_BITPACKED {
+        // Bit-packed `bool[]` opts out of the pre-sized path (`reserve` is a
+        // no-op for it), so `dst` may be shared: append one bit at a time with
+        // the *copying* push, which is correct either way.
+        let add = if src_heap.is_null() {
+            0
+        } else {
+            unsafe { array_len_of(src_heap) }
+        };
+        let mut out = dst;
+        for i in 0..add {
+            let bit = i64::from(aipl_arr_load_bit(src_heap, i as i64) != 0);
+            out = aipl_array_push(
+                out,
+                &bit as *const i64 as *const u8,
+                drop_fn,
+                retain_fn,
+                ELEM_BITPACKED,
+            );
+        }
+        aipl_array_dec(src_heap);
+        return out;
+    }
+    let elem_size = elem_size.max(8) as usize;
+    let add = if src_heap.is_null() {
+        0
+    } else {
+        unsafe { array_len_of(src_heap) }
+    };
+    if add == 0 || dst.is_null() {
+        aipl_array_dec(src_heap);
+        return dst;
+    }
+    unsafe {
+        let dst_len = array_len_of(dst);
+        let elems = dst.add(ARR_ELEMS_OFFSET) as *mut u8;
+        let at = elems.add(dst_len * elem_size);
+        let from = src_heap.add(ARR_ELEMS_OFFSET);
+        std::ptr::copy_nonoverlapping(from, at, add * elem_size);
+        elem_rc(retain_fn, at, add);
+        std::ptr::write(dst as *mut i64, (dst_len + add) as i64);
+    }
+    aipl_array_dec(src_heap);
+    dst
+}
+
 /// Executed-instruction counter hook. Codegen emits one call per basic block
 /// (arg = the block's instruction count). The JIT path never reports perf
 /// counts (those come from the AOT instrumented runtime), so this is a no-op
@@ -4054,6 +4181,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
     jit_builder.symbol("aipl_array_push", aipl_array_push as *const u8);
     jit_builder.symbol("aipl_array_push_mut", aipl_array_push_mut as *const u8);
+    jit_builder.symbol("aipl_arr_reserve", aipl_arr_reserve as *const u8);
+    jit_builder.symbol("aipl_arr_extend", aipl_arr_extend as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
     jit_builder.symbol("aipl_arr_inc", aipl_arr_inc as *const u8);
     jit_builder.symbol("aipl_rec_alloc", aipl_rec_alloc as *const u8);
@@ -6552,7 +6681,11 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
             sig(4, true)
         }
-        "aipl_array_push" | "aipl_array_push_mut" | "aipl_arr_sort" => sig(5, true),
+        "aipl_array_push"
+        | "aipl_array_push_mut"
+        | "aipl_arr_sort"
+        | "aipl_arr_reserve"
+        | "aipl_arr_extend" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
         other => panic!("unknown builtin import symbol {other:?}"),
@@ -13326,6 +13459,163 @@ fn compile_call_expr<M: Module>(
                 .expect("scope")
                 .push(Tracked::new(ptr, &arr_ty));
             (ptr, arr_ty)
+        }
+        // Array-literal spread. `[..a, b, ..c]` lowers to
+        //   mut $s = __aipl_arr_reserve(a, 1 + len(c));
+        //   set $s = __aipl_arr_append($s, b);
+        //   set $s = __aipl_arr_concat($s, c);
+        // `reserve` returns a *uniquely owned* block already sized for the whole
+        // literal, so the appends after it are plain in-place writes that never
+        // reallocate and never consult the static exclusivity analysis. All
+        // three consume their array argument, so a borrowed one is retained
+        // first (the same compensating pre-inc `aipl_array_push` needs).
+        //
+        // Only the generic 8-byte-element representation takes this path.
+        // `char[]` is str-shaped and `bool[]` is bit-packed; both keep the
+        // ordinary push lowering, which `arr_reserve` degrades to by handing
+        // its argument straight back (see the `is_char_array`/`is_bit_packed`
+        // guards below).
+        "__aipl_arr_reserve" | "__aipl_arr_append" | "__aipl_arr_concat" => {
+            let before = scope_depth(scopes);
+            let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let arr_owned = owned_temp_since(scopes, before, arr_ptr);
+            let elem = match &arr_ty {
+                Type::Array(inner) => (**inner).clone(),
+                _ => Type::NoneInner,
+            };
+            // Representations with their own append lowering opt out: hand the
+            // array back untouched and let the plain `push` path handle them.
+            // Representation dispatch. `char[]` is str-shaped and `bool[]` is
+            // bit-packed; neither pre-sizes, so `reserve` hands the array back
+            // untouched and their appends stay on the existing lowering.
+            if is_char_array(&arr_ty) {
+                if name == "__aipl_arr_reserve" {
+                    return Ok((arr_ptr, arr_ty));
+                }
+                // `str` has no in-place growable form: build a fresh buffer of
+                // the combined length and copy both sides in. `aipl_str_len` /
+                // `aipl_str_data` only *borrow*, so neither side is retained.
+                let len_f = builtins.import(module, builder.func, "aipl_str_len");
+                let inst = builder.ins().call(len_f, &[arr_ptr]);
+                let old_len = builder.inst_results(inst)[0];
+                let (tail, add_len) = if name == "__aipl_arr_concat" {
+                    let (src, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
+                    let inst = builder.ins().call(len_f, &[src]);
+                    (Some(src), builder.inst_results(inst)[0])
+                } else {
+                    let (x_v, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
+                    (None, x_v)
+                };
+                let new_len = if tail.is_some() {
+                    builder.ins().iadd(old_len, add_len)
+                } else {
+                    builder.ins().iadd_imm_s(old_len, 1)
+                };
+                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
+                let inst = builder.ins().call(alloc_f, &[new_len]);
+                let buf = builder.inst_results(inst)[0];
+                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
+                let data_f = builtins.import(module, builder.func, "aipl_str_data");
+                let copy_f = builtins.import(module, builder.func, "aipl_write_bytes");
+                let inst = builder.ins().call(data_f, &[arr_ptr, scratch_addr]);
+                let src0 = builder.inst_results(inst)[0];
+                builder.ins().call(copy_f, &[buf, src0, old_len]);
+                let at = builder.ins().iadd(buf, old_len);
+                match tail {
+                    Some(src) => {
+                        let inst = builder.ins().call(data_f, &[src, scratch_addr]);
+                        let src1 = builder.inst_results(inst)[0];
+                        builder.ins().call(copy_f, &[at, src1, add_len]);
+                    }
+                    None => {
+                        builder
+                            .ins()
+                            .istore8(MemFlagsData::trusted(), add_len, at, 0);
+                    }
+                }
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(buf, &arr_ty));
+                return Ok((buf, arr_ty));
+            }
+            let packed = is_bit_packed(&elem);
+            if packed && name == "__aipl_arr_reserve" {
+                return Ok((arr_ptr, arr_ty));
+            }
+            // All three consume their array argument. A borrowed one needs a
+            // compensating pre-inc (the same one `aipl_array_push` needs); an
+            // owned temporary is *moved* in instead — its scope track has to go,
+            // or the block is dropped twice once the result's track drops it.
+            let mut moved: Vec<Value> = Vec::new();
+            if arr_owned {
+                moved.push(arr_ptr);
+            } else {
+                emit_retain(builder, module, builtins, structs, arr_ptr, &arr_ty);
+            }
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&elem, structs));
+            let out = if name == "__aipl_arr_reserve" {
+                let (extra, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
+                let local = builtins.import(module, builder.func, "aipl_arr_reserve");
+                let inst = builder
+                    .ins()
+                    .call(local, &[arr_ptr, extra, drop_fn, retain_fn, esz]);
+                builder.inst_results(inst)[0]
+            } else if name == "__aipl_arr_concat" {
+                let mark = scope_depth(scopes);
+                let (src, src_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+                if owned_temp_since(scopes, mark, src) {
+                    moved.push(src);
+                } else {
+                    emit_retain(builder, module, builtins, structs, src, &src_ty);
+                }
+                let local = builtins.import(module, builder.func, "aipl_arr_extend");
+                let inst = builder
+                    .ins()
+                    .call(local, &[arr_ptr, src, drop_fn, retain_fn, esz]);
+                builder.inst_results(inst)[0]
+            } else {
+                // One element. After `reserve` the block is uniquely owned with
+                // spare capacity, so `push_mut` is a plain write; a bit-packed
+                // array never reserved, so it takes the copying push.
+                let (x_v, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
+                let sym = if packed {
+                    "aipl_array_push"
+                } else {
+                    "aipl_array_push_mut"
+                };
+                // The runtime reads `elem_size` bytes from an address: a
+                // composite element already is one, a scalar/pointer is spilled.
+                let x_slot = if is_composite(&elem, structs) {
+                    x_v
+                } else {
+                    let sl = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        8,
+                        3,
+                    ));
+                    builder.ins().stack_store(types::I64, x_v, sl, 0);
+                    builder.ins().stack_addr(types::I64, sl, 0)
+                };
+                let local = builtins.import(module, builder.func, sym);
+                let inst = builder
+                    .ins()
+                    .call(local, &[arr_ptr, x_slot, drop_fn, retain_fn, esz]);
+                builder.inst_results(inst)[0]
+            };
+            let scope = scopes.last_mut().expect("scope");
+            scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
+            scope.push(Tracked::new(out, &arr_ty));
+            (out, arr_ty)
         }
         "__builtin_push" => {
             // The in-place writeback form: the receiver is `args[0]`, a mutable

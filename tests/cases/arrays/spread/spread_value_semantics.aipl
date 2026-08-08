@@ -17,12 +17,12 @@ fn with_extra(xs: i64[]) -> i64[] { [..xs, 99] }.test({
 --- monomorphizations ---
 main
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 848
-instructions executed: 1104
-binary size: 3904
-  code: 1756
+bytes allocated: 488
+instructions executed: 1139
+binary size: 4752
+  code: 2208
   data: 249
-  metadata: 1899
+  metadata: 2295

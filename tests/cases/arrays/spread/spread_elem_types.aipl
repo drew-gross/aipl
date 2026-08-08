@@ -22,12 +22,12 @@ fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
 empty
 main
 --- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 2
-bytes allocated: 549
-instructions executed: 836
-binary size: 6168
-  code: 2892
+allocations: 17
+deallocations: 17
+reallocations: 3
+bytes allocated: 574
+instructions executed: 892
+binary size: 7264
+  code: 3404
   data: 416
-  metadata: 2860
+  metadata: 3444

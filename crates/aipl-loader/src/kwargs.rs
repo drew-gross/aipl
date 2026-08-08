@@ -165,30 +165,37 @@ struct Expander {
 
 impl Expander {
     /// Rewrite an array literal containing one or more `..xs` elements into a
-    /// block that builds the array by appending, in source order:
+    /// block that builds the array in one pre-sized allocation:
     ///
     /// ```text
     /// [..a, b, ..c, d]
-    ///   =>  mut $s = a;                        // seed
-    ///       set $s.push(b);                    // plain element
-    ///       for (let $e : c) { set $s.push($e); }   // spread
-    ///       set $s.push(d);
+    ///   =>  mut $s = __aipl_arr_reserve(a, 2 + len(c));
+    ///       set $s = __aipl_arr_append($s, b);
+    ///       set $s = __aipl_arr_concat($s, c);
+    ///       set $s = __aipl_arr_append($s, d);
     ///       $s
     /// ```
     ///
-    /// The seed matters. Starting from `[]` would leave the accumulator's
-    /// element type as the untyped-empty `__none__`, which codegen refuses to
-    /// grow with a `char` (see `arrays/push/err_push_char_from_empty`), so
-    /// `[..cs, 'x']` on a `char[]` would break. Seeding instead with the
-    /// *leading run* of the literal — the first spread's operand when the
-    /// literal opens with `..`, otherwise an array literal of the plain
-    /// elements before the first spread — always starts from a typed array.
-    /// Seeding from a spread operand is the ordinary copy-on-write idiom
-    /// (`mut ys = xs; set ys.push(x)`), so the source array keeps value
-    /// semantics.
+    /// The literal's final length is known here — a constant for the plain
+    /// elements plus a `len` call per spread — so `reserve` sizes the buffer
+    /// exactly once instead of growing it. `reserve` also hands back a
+    /// *uniquely owned* block (reusing the seed's allocation when its refcount
+    /// is 1, else copying into a right-sized one), which is what lets the
+    /// appends after it write in place without consulting the static
+    /// exclusivity analysis — that analysis does not recognize this shape, so
+    /// a push-based build copied the whole accumulator per element.
     ///
-    /// `push` is emitted under its canonical `__builtin_push` name: this runs
-    /// after import resolution, so spread syntax needs no `import { push }`.
+    /// The seed is the literal's leading run: the first spread's operand when
+    /// the literal opens with `..`, otherwise an array literal of the plain
+    /// elements before the first spread. Seeding from `[]` instead would leave
+    /// the element type as the untyped-empty `__none__`, which codegen refuses
+    /// to grow with a `char` (see `arrays/push/err_push_char_from_empty`).
+    ///
+    /// The intrinsics are emitted under canonical `__builtin_*` names, after
+    /// import resolution — so spread syntax needs no `import { push }`. They
+    /// are also emitted unconditionally: this pass runs before type checking,
+    /// so it cannot know the element representation. Codegen does, and routes
+    /// `char[]`/`bool[]` back to the ordinary push lowering.
     fn desugar_spread(&mut self, elems: Vec<Expr>, span: Span) -> ExprKind {
         let k = self.spreads;
         self.spreads += 1;
@@ -208,11 +215,39 @@ impl Expander {
             }
         };
 
-        // `set <acc> = <acc>.push(<value>);` then `rest` — the in-place
-        // writeback form, so the accumulator grows without a copy per element.
-        let push_onto = |value: Expr, rest: Expr, span: &Span| {
+        // How much `rest` adds: one per plain element, `len(operand)` per
+        // spread, summed left to right onto the constant.
+        let plain = rest
+            .iter()
+            .filter(|x| !matches!(x.kind, ExprKind::Spread(_)))
+            .count();
+        let mut extra = node(ExprKind::Call(
+            "u64".to_string(),
+            vec![node(ExprKind::Num(plain as i64))],
+            false,
+        ));
+        for elem in rest {
+            let ExprKind::Spread(inner) = &elem.kind else {
+                continue;
+            };
+            let len = Expr::new(
+                ExprKind::Call("__builtin_len".to_string(), vec![(**inner).clone()], true),
+                elem.span.clone(),
+            );
+            extra = Expr::new(
+                ExprKind::Call(
+                    "__builtin_wrapping_add".to_string(),
+                    vec![extra, len],
+                    false,
+                ),
+                elem.span.clone(),
+            );
+        }
+
+        // `set <acc> = <intrinsic>(<acc>, <arg>);` then `rest`.
+        let step = |f: &str, arg: Expr, rest: Expr, span: &Span| {
             let call = Expr::new(
-                ExprKind::Call("__builtin_push".to_string(), vec![acc_ref(), value], true),
+                ExprKind::Call(f.to_string(), vec![acc_ref(), arg], false),
                 span.clone(),
             );
             Expr::new(
@@ -225,28 +260,17 @@ impl Expander {
         let body = rest.iter().rev().fold(acc_ref(), |rest, elem| {
             let espan = &elem.span;
             match &elem.kind {
-                // `for (let $e : xs) { set $s.push($e); }` — a `For` yields no
-                // value, so it is sequenced ahead of the rest.
                 ExprKind::Spread(inner) => {
-                    let item = format!("__spread_item${k}");
-                    let body = push_onto(
-                        Expr::new(ExprKind::Ident(item.clone()), espan.clone()),
-                        Expr::new(ExprKind::Unit, espan.clone()),
-                        espan,
-                    );
-                    let loop_ = Expr::new(
-                        ExprKind::For(item, Box::new((**inner).clone()), Box::new(body)),
-                        espan.clone(),
-                    );
-                    Expr::new(
-                        ExprKind::Seq(Box::new(loop_), Box::new(rest)),
-                        espan.clone(),
-                    )
+                    step("__aipl_arr_concat", (**inner).clone(), rest, espan)
                 }
-                _ => push_onto(elem.clone(), rest, espan),
+                _ => step("__aipl_arr_append", elem.clone(), rest, espan),
             }
         });
-        ExprKind::LetMut(acc, Box::new(seed), Box::new(body))
+        let reserved = Expr::new(
+            ExprKind::Call("__aipl_arr_reserve".to_string(), vec![seed, extra], false),
+            span.clone(),
+        );
+        ExprKind::LetMut(acc, Box::new(reserved), Box::new(body))
     }
 
     /// The expanded default expressions of `name`'s keyword parameters, in
