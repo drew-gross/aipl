@@ -14717,7 +14717,8 @@ fn compile_expr<M: Module>(
                 ExprKind::Call(f, cargs, true)
                     if !cargs.is_empty()
                         && matches!(&cargs[0].kind, ExprKind::Ident(recv) if recv == name)
-                        && (f == "__builtin_push" || funcs.get(f).is_some_and(|i| i.is_mutating))
+                        && (aipl_mono::builtin_is_mutating(f)
+                            || funcs.get(f).is_some_and(|i| i.is_mutating))
             );
             if is_writeback_call {
                 compile_expr(module, builder, cx, scopes, value)?;

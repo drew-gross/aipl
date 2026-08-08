@@ -1077,11 +1077,14 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         }
     }
 
-    // The builtin `push` mutates its receiver (`mut self`), so it joins the
-    // mutating set: an expression-position `v.push(x)` (method or free form)
-    // copy-and-modifies like a user mutating method, while `set v.push(x)`
-    // writes back in place.
-    mutating.insert("__builtin_push".to_string());
+    // Builtins declared with a `mut self` receiver join the mutating set too —
+    // they aren't `Item::Fn`s in `program`, so the loop above never sees them.
+    // Membership buys the same treatment as a user mutating method: an
+    // expression-position `v.f(x)` (method or free form) copy-and-modifies,
+    // while `set v.f(x)` writes back in place. Derived from the signature table
+    // rather than naming `push`, so a future mutating builtin is picked up here
+    // automatically.
+    mutating.extend(mutating_builtins().map(str::to_string));
 
     // Builtins implemented in AIPL join the generic templates under their
     // canonical `__builtin_*` names (which no user identifier can spell, so
@@ -5061,6 +5064,30 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
     })
 }
 
+/// Names of the builtins declared with a `mut self` receiver. They follow the
+/// mutating-method convention: `set v.f(x)` writes back in place, and every
+/// other position copy-and-modifies. Derived from [`BUILTIN_SIGNATURES`] so no
+/// call site has to name them — `push` is the only one today, but adding
+/// another needs no change here or in codegen.
+///
+/// Only native builtins are considered: [`AIPL_BUILTIN_SOURCES`] are parsed on
+/// demand (a program that never mentions one never loads it), so probing them
+/// from a hot predicate would be the wrong trade — and none of them is
+/// mutating.
+pub fn mutating_builtins() -> impl Iterator<Item = &'static str> {
+    builtin_sigs()
+        .iter()
+        .filter(|(_, sig)| sig.is_mutating())
+        .map(|(name, _)| name.as_str())
+}
+
+/// `true` if `name` is one of [`mutating_builtins`].
+pub fn builtin_is_mutating(name: &str) -> bool {
+    builtin_sigs()
+        .get(name)
+        .is_some_and(|sig| sig.is_mutating())
+}
+
 /// The declared signature of the builtin `name`: from [`BUILTIN_SIGNATURES`]
 /// for a native builtin, or from its own `.aipl` source for an
 /// AIPL-implemented one (loaded on demand — a program that never mentions the
@@ -5118,6 +5145,20 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// own special cases).
 fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     let sig = builtin_sig(name)?;
+    // A mutating builtin (`mut self`) is *declared* void — it mutates in place
+    // — but a call yields the mutated receiver, exactly like a user mutating
+    // method (the same rule `check::return_ty_of` applies). The in-place `set`
+    // writeback discards it; expression position gets the copy-and-modify
+    // result. Deriving this from `is_mutating` rather than naming the builtin
+    // means a future `mut self` builtin needs no arm here.
+    if sig.is_mutating() {
+        return Some(
+            arg_tys
+                .first()
+                .cloned()
+                .unwrap_or(Type::Primitive(Primitive::I64)),
+        );
+    }
     let mut map: HashMap<String, Type> = HashMap::new();
     for tp in &sig.type_vars {
         // Prefer the first parameter whose argument concretely pins `v`;
@@ -5177,16 +5218,6 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                 Some(Type::Array(inner)) => Type::Array(inner.clone()),
                 _ => Type::Array(Box::new(Type::NoneInner)),
             })
-        }
-        // Declared void (it mutates `self` in place); mono treats the call as
-        // yielding the array it was given (first effective arg).
-        "__builtin_push" => {
-            return Some(
-                arg_tys
-                    .first()
-                    .cloned()
-                    .unwrap_or(Type::Primitive(Primitive::I64)),
-            )
         }
         // some(x) wraps the value's type. Not expressible via plain signature
         // substitution: a concat-str argument must decay to plain `str` before
@@ -6708,7 +6739,10 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                 let recv = &args[0];
                 let recv_bad = if is_n(recv) {
                     match fname.as_str() {
-                        "__builtin_push" => iterating,
+                        // A mutating builtin updates its receiver in place
+                        // rather than aliasing it — safe unless we're iterating
+                        // that very binding.
+                        f if builtin_is_mutating(f) => iterating,
                         "__builtin_len" | "__builtin_to_str" | "__builtin_trim" => false,
                         _ => true,
                     }
@@ -6779,17 +6813,18 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     {
                         iterating || rec(&cargs[1])
                     }
-                    // `set a = a.push(x)` (the `set a.push(x)` writeback form)
-                    // grows `a` in place — safe unless we're iterating `a`, or the
-                    // pushed value aliases `a`. Keeping `a` exclusive routes `push`
-                    // through the in-place path (a per-iteration copy in a loop
-                    // would free the live buffer — see `set self = out`).
+                    // `set a = a.f(x)` (the `set a.f(x)` writeback form) for a
+                    // mutating builtin updates `a` in place — safe unless we're
+                    // iterating `a`, or an argument aliases `a` (it would be read
+                    // while `a` is rewritten). Keeping `a` exclusive routes the
+                    // mutation through the in-place path (a per-iteration copy in
+                    // a loop would free the live buffer — see `set self = out`).
                     ExprKind::Call(f, cargs, _)
-                        if f == "__builtin_push"
-                            && cargs.len() == 2
+                        if builtin_is_mutating(f)
+                            && !cargs.is_empty()
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
                     {
-                        iterating || is_n(&cargs[1]) || rec(&cargs[1])
+                        iterating || cargs[1..].iter().any(|a| is_n(a) || rec(a))
                     }
                     _ => true,
                 }

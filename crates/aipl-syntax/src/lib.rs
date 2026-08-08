@@ -273,9 +273,12 @@ pub mod ast {
             self.return_ty.clone().unwrap_or(Type::Unit)
         }
 
-        /// `true` for a mutating method (`fn f(mut self: T, ...)`): it returns
-        /// nothing to the user, mutates its receiver, and must be called as
-        /// `v.f(...)`.
+        /// `true` for a mutating method (`fn f(mut self: T, ...)`). It is
+        /// *declared* void, but a call yields the mutated receiver, so the
+        /// effective return type is the receiver's — see
+        /// `check::return_ty_of`. Written `set v.f(...)` it mutates `v` in
+        /// place; in any other position (including the free call `f(v, ...)`)
+        /// it is copy-and-modify, yielding a fresh value and leaving `v` alone.
         pub fn is_mutating(&self) -> bool {
             self.params.first().is_some_and(|p| p.mutable)
         }
