@@ -28,7 +28,18 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 - Synergy: inlining exposes retain/release pairs across the old call boundary —
   refcount elision after inlining likely beats the call-overhead win itself.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
-spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
+
+Spreading:
+  spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
+  optimize spreading by preallocating the full size
+  go through and use spreads in the places that it makes sense in the existing corpus
+  add some tests for spreads that demonstrate the error message when you try to mix types in a spread
+
+start writing some profiling tools in aipl:
+  !clock effect
+  shimable clock, mostly for tests
+  all effects should be shimmable actually
+
 lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)

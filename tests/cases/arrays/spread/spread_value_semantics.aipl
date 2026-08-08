@@ -1,0 +1,28 @@
+import { ==, len, push } from builtins;
+
+// A spread copies: growing the result never writes through to the array that
+// was spread, even though `[..xs, ..]` starts the build *from* `xs` — the
+// ordinary copy-on-grow idiom.
+fn with_extra(xs: i64[]) -> i64[] { [..xs, 99] }.test({
+    mut base = [1];
+    set base.push(2);
+    assert(with_extra(base) == [1, 2, 99]);
+    assert(base == [1, 2]); // untouched
+
+    // Several appends after the seed — enough to force a reallocation had the
+    // buffer been shared with `base`.
+    assert([..base, 3, 4, 5, 6, 7, 8] == [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert(base == [1, 2]);
+})
+--- monomorphizations ---
+main
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 848
+instructions executed: 1104
+binary size: 3904
+  code: 1756
+  data: 249
+  metadata: 1899

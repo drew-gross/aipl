@@ -1,0 +1,33 @@
+import { ==, join, len, push } from builtins;
+
+// Spread works for every element representation, not just `i64`. `char[]` is
+// the interesting one: it is str-shaped, so the build has to start from a
+// typed array rather than an untyped empty literal.
+struct P { x: i64 }
+
+fn empty() -> i64[] { [] }
+
+fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
+    assert(chars() == ['a', 'b', 'c']);
+    assert([..["x", "y"], "z"].join("-") == "x-y-z");
+    assert([..[true], false] == [true, false]);
+    assert([..[P { x: 1 }], P { x: 2 }] == [P { x: 1 }, P { x: 2 }]);
+
+    // An empty operand contributes nothing.
+    assert([..empty(), 1] == [1]);
+    assert([1, ..empty()] == [1]);
+    assert([..empty()] == empty());
+})
+--- monomorphizations ---
+empty
+main
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 2
+bytes allocated: 549
+instructions executed: 836
+binary size: 6168
+  code: 2892
+  data: 416
+  metadata: 2860

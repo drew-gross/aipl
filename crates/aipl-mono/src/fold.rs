@@ -64,6 +64,7 @@ fn fold_expr(e: &Expr) -> Expr {
     let f = |x: &Expr| Box::new(fold_expr(x));
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)

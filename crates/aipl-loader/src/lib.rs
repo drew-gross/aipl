@@ -573,9 +573,11 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
             require("!", e.span.clone())?;
             check_operators(x, view)?;
         }
-        ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) | ExprKind::KwArg(_, x) => {
-            check_operators(x, view)?
-        }
+        ExprKind::Field(x, _)
+        | ExprKind::Try(x)
+        | ExprKind::Return(x)
+        | ExprKind::KwArg(_, x)
+        | ExprKind::Spread(x) => check_operators(x, view)?,
         // An `Assign` LHS is a place (idents/fields only), so it can't
         // contain an operator — only the value and body need walking.
         ExprKind::Seq(a, b)
@@ -1099,6 +1101,7 @@ fn rewrite_expr(
                 .map(|e| Box::new(rewrite_expr(e, view, sc, locals))),
         ),
         ExprKind::Try(e) => ExprKind::Try(Box::new(rewrite_expr(e, view, sc, locals))),
+        ExprKind::Spread(e) => ExprKind::Spread(Box::new(rewrite_expr(e, view, sc, locals))),
         // The keyword name refers to the callee's parameter, not a global —
         // only the value is rewritten.
         ExprKind::KwArg(name, value) => ExprKind::KwArg(

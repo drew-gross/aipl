@@ -738,7 +738,18 @@ pub mod ast {
         /// `[e0, e1, ...]` — an array literal. Element types must all
         /// agree (and be a primitive). An empty `[]` has element type
         /// `__none__` and coerces to any `T[]`, like bare `none`.
+        ///
+        /// An element may be a [`ExprKind::Spread`], which splices an array's
+        /// elements in rather than nesting it. Mono's `infer` rewrites any
+        /// literal containing one into a seed-and-append block, so every pass
+        /// after mono sees only plain elements.
         ArrayLit(Vec<Expr>),
+        /// `..xs` inside an array literal — splice `xs`'s elements into the
+        /// literal at this position. Legal *only* as a direct element of
+        /// [`ExprKind::ArrayLit`]; the parser rejects it anywhere else (a call
+        /// argument, an array pattern), so it never reaches the checker on its
+        /// own. Mono desugars it away, so codegen never sees one.
+        Spread(Box<Expr>),
         /// `#{e0, e1, ...}` — a set literal. Elements must share one type
         /// (i64/bool/char/str); duplicates are dropped at construction (by value
         /// for scalars, by content for `str`) so the value holds each distinct
@@ -1085,7 +1096,9 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             out.insert("!".to_string());
             collect_operators(x, out);
         }
-        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) => collect_operators(x, out),
+        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) | K::Spread(x) => {
+            collect_operators(x, out)
+        }
         // An `Assign` LHS is a place (idents/fields only), so it can't
         // contain an operator — only the value and body need walking.
         K::Seq(a, b)
@@ -1557,6 +1570,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         | K::Try(x)
         | K::Return(x)
         | K::KwArg(_, x)
+        | K::Spread(x)
         | K::Lambda(_, x) => each_subexpr(x, f),
         K::Match(scrutinee, arms) => {
             each_subexpr(scrutinee, f);

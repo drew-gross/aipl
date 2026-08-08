@@ -1,0 +1,17 @@
+// An array *pattern* has no rest form — `..` there is rejected the same way it
+// is in a call argument list.
+import { == } from builtins;
+
+fn main() -> i64 {
+    let a = [1];
+    match (a) {
+        [..a] => 1,
+        _ => 0,
+    }
+}
+--- errors ---
+error: `..` spread is only allowed in an array literal, not in an array pattern
+ --> ./tests/cases/arrays/spread/err_spread_in_pattern.aipl:8:12
+  |
+8 |         [..a] => 1,
+  |            ^

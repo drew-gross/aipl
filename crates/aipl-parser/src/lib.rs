@@ -437,8 +437,15 @@ gazelle! {
         // desugars to a binary lambda. A keyword argument is unambiguous too:
         // `=` (EQ) never follows an expression, so after an IDENT the EQ
         // lookahead selects this production over reducing the IDENT to an atom.
+        // `..xs` — an array-literal spread. It rides on `arg` (rather than a
+        // dedicated array-element rule) so `expr` stays reachable from exactly
+        // one place here; a second path to `expr` is what blew the LR tables up
+        // for the block grammar. `DOTDOT` can't begin any other arg form, so
+        // it's an unambiguous lead. The builder rejects it outside an array
+        // literal — `args` is shared with calls and array patterns.
         arg = expr => expr | lambda => lambda | OP => op_value
-            | IDENT EQ expr => kw_arg;
+            | IDENT EQ expr => kw_arg
+            | DOTDOT expr => spread;
         lambda = PIPE lambda_params PIPE expr => lambda_expr
                | OROR expr => lambda_noargs
                | OROR block => lambda_noargs_block;
@@ -1591,6 +1598,7 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
             // as `recv.method(args)` parses in expression position; the enclosing
             // `set` is what makes it write the (mutated) result back into `recv`.
             aipl::AssignStmt::SetCallStmt((recv, recv_span), (method, method_span), args) => {
+                reject_spread(&args, "a method call")?;
                 let last = args.last().map(|a| a.span.clone()).unwrap_or(method_span);
                 let span = join_spans(&recv_span, &last);
                 let mut all = Vec::with_capacity(args.len() + 1);
@@ -1755,6 +1763,7 @@ impl gazelle::Action<aipl::Postfix<Self>> for Build {
                 Expr::new(ExprKind::Field(Box::new(obj), format!("_{n}")), span)
             }
             aipl::Postfix::MethodCall(obj, (name, name_span), args) => {
+                reject_spread(&args, "a method call")?;
                 let last = args.last().map(|a| a.span.clone()).unwrap_or(name_span);
                 let span = join_spans(&obj.span, &last);
                 // Method call: fold the receiver in as `args[0]` and flag the
@@ -1819,6 +1828,7 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             aipl::Atom::CharLit((b, span)) => Expr::new(ExprKind::Char(b), span),
             aipl::Atom::Ident((s, span)) => Expr::new(ExprKind::Ident(s), span),
             aipl::Atom::Call((name, name_span), args) => {
+                reject_spread(&args, "a call argument list")?;
                 let span = match args.last() {
                     Some(a) => join_spans(&name_span, &a.span),
                     None => name_span,
@@ -2073,11 +2083,14 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
             },
             // `[e0, e1, ...] => body`: an array-literal pattern (for an array
             // scrutinee). The elements are validated as literals by the checker.
-            aipl::MatchArm::ArrayArm(span, elems, body) => MatchArm {
-                pattern: Pattern::Array(elems),
-                body,
-                span,
-            },
+            aipl::MatchArm::ArrayArm(span, elems, body) => {
+                reject_spread(&elems, "an array pattern")?;
+                MatchArm {
+                    pattern: Pattern::Array(elems),
+                    body,
+                    span,
+                }
+            }
         })
     }
 }
@@ -2166,7 +2179,28 @@ impl gazelle::Action<aipl::Arg<Self>> for Build {
                 let span = join_spans(&name_span, &value.span);
                 Expr::new(ExprKind::KwArg(name, Box::new(value)), span)
             }
+            // `..xs`. `DOTDOT` carries no span, so the node takes the operand's
+            // — errors point at what is being spread. Only an array literal
+            // accepts one; every other `args` consumer calls `reject_spread`.
+            aipl::Arg::Spread(e) => {
+                let span = e.span.clone();
+                Expr::new(ExprKind::Spread(Box::new(e)), span)
+            }
         })
+    }
+}
+
+/// Reject a spread element that isn't a direct element of an array literal.
+/// `args` is shared by calls, the mutating-writeback statement, and array
+/// patterns, so the grammar admits `..x` in all of them; only the array-literal
+/// builder leaves it in place.
+fn reject_spread(args: &[Expr], context: &str) -> Result<(), Error> {
+    match args.iter().find(|a| matches!(a.kind, ExprKind::Spread(_))) {
+        Some(a) => Err(Error::at(
+            format!("`..` spread is only allowed in an array literal, not in {context}"),
+            a.span.clone(),
+        )),
+        None => Ok(()),
     }
 }
 
@@ -3104,7 +3138,8 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::Field(x, _)
         | ExprKind::Try(x)
         | ExprKind::Return(x)
-        | ExprKind::KwArg(_, x) => bake_asserts(x, src),
+        | ExprKind::KwArg(_, x)
+        | ExprKind::Spread(x) => bake_asserts(x, src),
         ExprKind::Construct(_, inits) => {
             for fi in inits {
                 bake_asserts(&mut fi.value, src);

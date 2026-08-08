@@ -1,0 +1,46 @@
+import { ==, len, push } from builtins;
+
+// `..xs` inside an array literal splices `xs`'s elements in at that position,
+// rather than nesting the array. Spreads mix freely with plain elements, and
+// the operand can be any array expression — a binding, a call, or another
+// literal.
+fn tail() -> i64[] { [3, 4] }
+
+fn five() -> i64 { 5 }
+
+fn joined(a: i64[]) -> i64[] { [..a, ..tail(), five(), 6] }.test({
+    let a = [1, 2];
+    assert(joined(a) == [1, 2, 3, 4, 5, 6]);
+
+    // A spread on its own is a copy; leading and trailing positions both work.
+    assert([..a] == [1, 2]);
+    assert([0, ..a] == [0, 1, 2]);
+    assert([..a, 3] == [1, 2, 3]);
+
+    // Spreading a literal, and nesting a spread inside a spread operand.
+    assert([..[7, 8], 9] == [7, 8, 9]);
+    assert([..a, ..[..a, 99]] == [1, 2, 1, 2, 99]);
+
+    // The same array may be spread twice; it is read, never consumed.
+    assert([..a, ..a] == [1, 2, 1, 2]);
+    assert(a == [1, 2]);
+
+    // Several spreads in one literal, with and without a plain element ahead
+    // of them — each splice is its own loop over the operand.
+    let b = [3];
+    assert([0, ..a, ..b] == [0, 1, 2, 3]);
+    assert([0, ..a, ..b, ..a] == [0, 1, 2, 3, 1, 2]);
+    assert([..a, ..b, ..a] == [1, 2, 3, 1, 2]);
+})
+--- monomorphizations ---
+main
+--- performance ---
+allocations: 32
+deallocations: 32
+reallocations: 8
+bytes allocated: 1888
+instructions executed: 3917
+binary size: 8856
+  code: 4916
+  data: 613
+  metadata: 3327

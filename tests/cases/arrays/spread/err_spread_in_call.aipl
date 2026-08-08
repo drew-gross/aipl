@@ -1,0 +1,16 @@
+// `..` is array-literal syntax, not a general argument form: an array cannot be
+// spread into a call's argument list. The grammar hangs the spread off the
+// shared argument rule (so `expr` stays reachable from one place), so it is the
+// parser that rejects the misuse.
+fn takes(xs: i64[]) -> u64 { 0 }
+
+fn main() {
+    let a = [1];
+    takes(..a);
+}
+--- errors ---
+error: `..` spread is only allowed in an array literal, not in a call argument list
+ --> ./tests/cases/arrays/spread/err_spread_in_call.aipl:9:13
+  |
+9 |     takes(..a);
+  |             ^

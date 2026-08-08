@@ -247,6 +247,7 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>)
         K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, ctors, scope)))),
         K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, ctors, scope)))),
         K::KwArg(name, x) => rw(K::KwArg(name.clone(), Box::new(lcr_expr(x, ctors, scope)))),
+        K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         K::Lambda(params, body) => {
             for p in params {
                 scope.push(p.name.clone());
@@ -449,6 +450,7 @@ fn lt_ty(
 fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<String>) -> Expr {
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Lambda(params, body) => {
             let new_params: Vec<LambdaParam> = params
                 .iter()
@@ -769,6 +771,7 @@ impl GenericLowerer {
                 e.kind.clone()
             }
             K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             K::Neg(x) => K::Neg(b(self, x)?),
             K::Not(x) => K::Not(b(self, x)?),
             K::Field(x, f) => K::Field(b(self, x)?, f.clone()),
@@ -3880,6 +3883,7 @@ impl Mono<'_> {
         let node = |kind| Expr::new(kind, span.clone());
         Ok(match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => (expr.clone(), Type::Unit),
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
@@ -5694,6 +5698,7 @@ fn collect_free(
 ) {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Ident(n) => {
             if !bound.contains(n) && !seen.contains(n) {
                 if let Some(t) = env.get(n) {
@@ -5858,6 +5863,7 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
 fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String, usize>) {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Ident(n) => {
             if !bound.contains(n) {
                 *counts.entry(n.clone()).or_insert(0) += 1;
@@ -6233,6 +6239,7 @@ fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
 fn children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -6365,6 +6372,7 @@ fn replace_call(
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -6524,6 +6532,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
         ExprKind::Call(name, args, m) => ExprKind::Call(
             sub(name),
@@ -6703,6 +6712,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
     let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail);
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Ident(n) => n == name && !tail,
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -6865,6 +6875,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
     let c = |x: &Expr| count_ident(name, x);
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Ident(n) => usize::from(n == name),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -6914,6 +6925,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
 fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::LetMut(y, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
             Some((y.as_str(), body))
         }

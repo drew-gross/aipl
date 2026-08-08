@@ -1408,6 +1408,7 @@ impl Cx<'_> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+            ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => Type::Unit,
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),

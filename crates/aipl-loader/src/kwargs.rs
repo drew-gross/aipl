@@ -45,6 +45,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         fns,
         defaults: HashMap::new(),
         expanding: Vec::new(),
+        spreads: 0,
     };
 
     let items = program
@@ -157,9 +158,97 @@ struct Expander {
     /// Functions whose defaults are currently being expanded, for cycle
     /// detection (a stack, so the error can show the cycle).
     expanding: Vec<String>,
+    /// Serial number for the synthetic bindings `desugar_spread` introduces, so
+    /// nested array literals each get their own accumulator.
+    spreads: usize,
 }
 
 impl Expander {
+    /// Rewrite an array literal containing one or more `..xs` elements into a
+    /// block that builds the array by appending, in source order:
+    ///
+    /// ```text
+    /// [..a, b, ..c, d]
+    ///   =>  mut $s = a;                        // seed
+    ///       set $s.push(b);                    // plain element
+    ///       for (let $e : c) { set $s.push($e); }   // spread
+    ///       set $s.push(d);
+    ///       $s
+    /// ```
+    ///
+    /// The seed matters. Starting from `[]` would leave the accumulator's
+    /// element type as the untyped-empty `__none__`, which codegen refuses to
+    /// grow with a `char` (see `arrays/push/err_push_char_from_empty`), so
+    /// `[..cs, 'x']` on a `char[]` would break. Seeding instead with the
+    /// *leading run* of the literal — the first spread's operand when the
+    /// literal opens with `..`, otherwise an array literal of the plain
+    /// elements before the first spread — always starts from a typed array.
+    /// Seeding from a spread operand is the ordinary copy-on-write idiom
+    /// (`mut ys = xs; set ys.push(x)`), so the source array keeps value
+    /// semantics.
+    ///
+    /// `push` is emitted under its canonical `__builtin_push` name: this runs
+    /// after import resolution, so spread syntax needs no `import { push }`.
+    fn desugar_spread(&mut self, elems: Vec<Expr>, span: Span) -> ExprKind {
+        let k = self.spreads;
+        self.spreads += 1;
+        let acc = format!("__spread${k}");
+        let node = |kind| Expr::new(kind, span.clone());
+        let acc_ref = || node(ExprKind::Ident(acc.clone()));
+
+        // The seed, and the elements still to be appended after it.
+        let (seed, rest) = match &elems[0].kind {
+            ExprKind::Spread(inner) => ((**inner).clone(), &elems[1..]),
+            _ => {
+                let n = elems
+                    .iter()
+                    .position(|x| matches!(x.kind, ExprKind::Spread(_)))
+                    .unwrap_or(elems.len());
+                (node(ExprKind::ArrayLit(elems[..n].to_vec())), &elems[n..])
+            }
+        };
+
+        // `set <acc> = <acc>.push(<value>);` then `rest` — the in-place
+        // writeback form, so the accumulator grows without a copy per element.
+        let push_onto = |value: Expr, rest: Expr, span: &Span| {
+            let call = Expr::new(
+                ExprKind::Call("__builtin_push".to_string(), vec![acc_ref(), value], true),
+                span.clone(),
+            );
+            Expr::new(
+                ExprKind::Assign(Box::new(acc_ref()), Box::new(call), Box::new(rest)),
+                span.clone(),
+            )
+        };
+
+        // Fold the trailing elements in from the right onto the block's value.
+        let body = rest.iter().rev().fold(acc_ref(), |rest, elem| {
+            let espan = &elem.span;
+            match &elem.kind {
+                // `for (let $e : xs) { set $s.push($e); }` — a `For` yields no
+                // value, so it is sequenced ahead of the rest.
+                ExprKind::Spread(inner) => {
+                    let item = format!("__spread_item${k}");
+                    let body = push_onto(
+                        Expr::new(ExprKind::Ident(item.clone()), espan.clone()),
+                        Expr::new(ExprKind::Unit, espan.clone()),
+                        espan,
+                    );
+                    let loop_ = Expr::new(
+                        ExprKind::For(item, Box::new((**inner).clone()), Box::new(body)),
+                        espan.clone(),
+                    );
+                    Expr::new(
+                        ExprKind::Seq(Box::new(loop_), Box::new(rest)),
+                        espan.clone(),
+                    )
+                }
+                _ => push_onto(elem.clone(), rest, espan),
+            }
+        });
+        ExprKind::LetMut(acc, Box::new(seed), Box::new(body))
+    }
+
     /// The expanded default expressions of `name`'s keyword parameters, in
     /// declaration order. Memoized; errors on a cycle of defaults.
     fn expanded_defaults(&mut self, name: &str) -> Result<Vec<Expr>, Error> {
@@ -475,7 +564,20 @@ impl Expander {
                 Box::new(self.expand_expr(cond, locals)?),
                 Box::new(self.expand_expr(body, locals)?),
             ),
-            ExprKind::ArrayLit(elems) => ExprKind::ArrayLit(self.expand_all(elems, locals)?),
+            // A literal with no `..` element keeps its exact shape (and so its
+            // exact codegen); one *with* a spread becomes a seed-and-append
+            // block — see `desugar_spread`.
+            ExprKind::ArrayLit(elems) => {
+                let expanded = self.expand_all(elems, locals)?;
+                if expanded
+                    .iter()
+                    .any(|x| matches!(x.kind, ExprKind::Spread(_)))
+                {
+                    self.desugar_spread(expanded, e.span.clone())
+                } else {
+                    ExprKind::ArrayLit(expanded)
+                }
+            }
             ExprKind::SetLit(elems) => ExprKind::SetLit(self.expand_all(elems, locals)?),
             ExprKind::TupleLit(elems) => ExprKind::TupleLit(self.expand_all(elems, locals)?),
             ExprKind::DictLit(pairs) => ExprKind::DictLit(
@@ -496,6 +598,7 @@ impl Expander {
                     .transpose()?,
             ),
             ExprKind::Try(x) => ExprKind::Try(Box::new(self.expand_expr(x, locals)?)),
+            ExprKind::Spread(x) => ExprKind::Spread(Box::new(self.expand_expr(x, locals)?)),
             ExprKind::Seq(a, b) => ExprKind::Seq(
                 Box::new(self.expand_expr(a, locals)?),
                 Box::new(self.expand_expr(b, locals)?),

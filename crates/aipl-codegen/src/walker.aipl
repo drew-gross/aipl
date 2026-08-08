@@ -1980,6 +1980,15 @@ fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 // One argument, plus the arg-only forms — keyword arguments (`k=1`, spelled
 // tight), lambdas, and bare operator values (`apply(2, 3, +)`).
 fn call_arg(self: W) -> WDoc!FmtError {
+    // `..xs` — an array-literal spread, spelled tight against its operand. The
+    // grammar hangs it off the shared argument rule, so it is accepted here and
+    // rejected by the parser anywhere but an array literal; the formatter only
+    // has to lay it out.
+    if (self.peek_text() == "..") {
+        let v = self.bump().w.expr()?;
+        return ok(WDoc { w: v.w, doc: Concat([Text(".."), v.doc]) });
+    };
+
     // `k = expr` -> tight `k=expr` (`==` is one token, so a lone `=` after an
     // identifier is unambiguous).
     if (self.peek_is(Ident) && self.peek_text_n(1) == "=") {
@@ -2618,11 +2627,11 @@ allocations: 20562
 deallocations: 20562
 reallocations: 578
 bytes allocated: 1013056
-instructions executed: 3033679
-binary size: 2969464
-  code: 1692768
+instructions executed: 3034460
+binary size: 2971904
+  code: 1694256
   data: 25044
-  metadata: 1251652
+  metadata: 1252604
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam44
 __builtin_count_while$char$s0$lam56
