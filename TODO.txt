@@ -122,6 +122,8 @@ Nested matching e.g.
 implement is_ok_and and is_err
 instead of err_message use x == err(...)
 
+set k++;
+
 use template literals more than concat
 
 extended should just use concat at the call site

@@ -432,7 +432,12 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 // with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
     let lexed = lex_for_fmt(src)?;
-    let w = new_walker(src, fmt_toks(lexed.tokens, []), trivia_spans(lexed.trivia, []));
+
+    // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
+    // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
+    // never reaches the trivia stream, and only its spans are kept.
+    let toks = lexed.tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.span });
+    let w = new_walker(src, toks, lexed.trivia.map(|t| t.span));
     let d = w.program()?;
 
     // Every comment must have been carried into the output; one left behind
@@ -454,25 +459,6 @@ fn lex_for_fmt(src: str) -> LexResult<AiplTok>!FmtError {
         ok(l) => ok(l),
         err(e) => err(FmtError { message: e.message, span: e.span }),
     }
-}
-
-// The lexer's tokens as the walker's own `(kind, span)` pairs.
-fn fmt_toks(toks: Token<AiplTok>[], acc: FmtTok[]) -> FmtTok[] {
-    mut out = acc;
-    for (let t : toks) {
-        set out.push(FmtTok { kind: fmt_kind(t.kind), span: t.span });
-    }
-    out
-}
-
-// Trivia is comments and `#[allow]` markers only — whitespace is a `skip` rule,
-// so it never reaches the trivia stream.
-fn trivia_spans(trivia: Token<AiplTok>[], acc: Span[]) -> Span[] {
-    mut out = acc;
-    for (let t : trivia) {
-        set out.push(t.span);
-    }
-    out
 }
 
 // A lexer token kind as the kind the walker dispatches on. The interpolated
@@ -1056,15 +1042,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
 // Two imports from the same source share a key, and the rank counting below
 // hands them out in source order — the stability Rust's `sort_by` gives for free.
 fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
-    sorted_pick(entries, entry_keys(entries).sort(), u64(0), [])
-}
-
-fn entry_keys(entries: ImportEntry[]) -> str[] {
-    mut ks = [];
-    for (let e : entries) {
-        set ks.push(e.key);
-    }
-    ks
+    sorted_pick(entries, entries.map(|e| e.key).sort(), u64(0), [])
 }
 
 fn sorted_pick(entries: ImportEntry[], keys: str[], from0: u64, acc0: Doc[]) -> Doc[] {
@@ -1614,7 +1592,7 @@ fn postfix(self: W) -> WDoc!FmtError {
     // first line and each `.method(..)` starts its own indented line. Fewer than
     // two calls: no chain break (a lone call's own argument list may still break).
     if (call_count(segs.segs) < 2) {
-        return ok(WDoc { w: segs.w, doc: Concat([head.doc].extended(seg_docs(segs.segs))) });
+        return ok(WDoc { w: segs.w, doc: Concat([head.doc].extended(segs.segs.map(|s| s.doc))) });
     };
     ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
 }
@@ -1706,14 +1684,6 @@ fn call_count(segs: Seg[]) -> u64 {
         };
     }
     n
-}
-
-fn seg_docs(segs: Seg[]) -> Doc[] {
-    mut out = [];
-    for (let s : segs) {
-        set out.push(s.doc);
-    }
-    out
 }
 
 // The chain layout: a `SoftLine` before every call segment, so a break puts each
@@ -2644,40 +2614,40 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20639
-deallocations: 20639
-reallocations: 573
-bytes allocated: 1026912
-instructions executed: 3033975
-binary size: 2969856
-  code: 1692896
+allocations: 20562
+deallocations: 20562
+reallocations: 578
+bytes allocated: 1013056
+instructions executed: 3033679
+binary size: 2969464
+  code: 1692768
   data: 25044
-  metadata: 1251916
+  metadata: 1251652
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam38
-__builtin_count_while$char$s0$lam50
-__builtin_count_while$char$s0$lam68
-__builtin_count_while$char$s0$lam73
-__builtin_count_while$char$s0$lam75
-__builtin_count_while$char$s0$lam77
-__builtin_count_while$char$s0$lam78
+__builtin_any$__m1__Doc$lam44
+__builtin_count_while$char$s0$lam56
+__builtin_count_while$char$s0$lam74
+__builtin_count_while$char$s0$lam79
+__builtin_count_while$char$s0$lam81
+__builtin_count_while$char$s0$lam85
+__builtin_count_while$char$s0$lam86
 __builtin_int_parse
-__builtin_is_some_and$char$lam74
-__builtin_opt_left_fold$char$i64$s0$lam62
-__enumerate18
-__enumerate19
-__enumerate36
+__builtin_is_some_and$char$lam80
+__builtin_opt_left_fold$char$i64$s0$lam68
+__enumerate104
+__enumerate22
+__enumerate23
+__enumerate42
 __enumerate8
-__enumerate96
-__lambda_22
-__lambda_23
-__lambda_24
-__lambda_25
 __lambda_26
 __lambda_27
 __lambda_28
 __lambda_29
-__lambda_61
+__lambda_30
+__lambda_31
+__lambda_32
+__lambda_33
+__lambda_67
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2717,8 +2687,8 @@ __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
-__map52$own0
 __map58$own0
+__map64$own0
 __test$new_walker
 __test$walker_of
 array_atom
@@ -2744,12 +2714,10 @@ dict_value
 dict_value_ty
 dot_seg
 drop_trailing_break
-entry_keys
 err_here
 expect
 expr
 extended
-fmt_toks
 fn_attrs
 fn_item
 fn_return
@@ -2799,7 +2767,6 @@ range_has_semi
 range_tail
 rendered
 same_line
-seg_docs
 sep_entry
 set_member
 set_or_dict_atom
@@ -2822,7 +2789,6 @@ tok_text
 toks_of
 trailing_comment
 trim_last_break
-trivia_spans
 tuple_binder
 tuple_rest
 ty
