@@ -769,7 +769,7 @@ fn paren_ty(self: W) -> WDoc!FmtError {
         return ok(WDoc { w: r.w, doc: Concat([list, Text(" -> "), r.doc]) });
     };
     let arrs = closed.array_suffixes([]);
-    ok(WDoc { w: arrs.w, doc: Concat([list].extended(arrs.docs)) })
+    ok(WDoc { w: arrs.w, doc: Concat([list, ..arrs.docs]) })
 }
 
 // Comma-separated types up to (not consuming) `end`.
@@ -789,7 +789,7 @@ fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 fn base_ty(self: W) -> WDoc!FmtError {
     let head = if (self.peek_text() == "#") { self.set_or_dict_ty()? } else { self.named_ty()? };
     let suf = head.w.type_suffixes([]);
-    ok(WDoc { w: suf.w, doc: Concat([head.doc].extended(suf.docs)) })
+    ok(WDoc { w: suf.w, doc: Concat([head.doc, ..suf.docs]) })
 }
 
 // `#{T}` (set) or `#{K: V}` (dict) — the `:` decides which.
@@ -801,7 +801,7 @@ fn set_or_dict_ty(self: W) -> WDoc!FmtError {
         WDocs { w: k.w, docs: [] }
     };
     let closed = rest.w.expect("}")?.w;
-    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc].extended(rest.docs).push(Text("}"))) })
+    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc, ..rest.docs, Text("}")]) })
 }
 
 // The `: V` half of a dict type.
@@ -966,17 +966,6 @@ fn variant_body(cases: VCase[]) -> Doc[] {
     out
 }
 
-// ---------- accumulator helpers ----------
-
-// Append every element of `more` to `self`.
-fn extended(self: Doc[], more: Doc[]) -> Doc[] {
-    mut a = self;
-    for (let d : more) {
-        set a.push(d);
-    }
-    a
-}
-
 // ---------- program & items ----------
 
 // One hoisted import: the statement, and the key `program` orders it by.
@@ -1098,11 +1087,13 @@ fn fn_item(self: W) -> WDoc!FmtError {
     let tps = n.w.type_params()?;
     let params = tps.w.expect("(")?.w.params_until(")", [])?;
     let closed = params.w.expect(")")?.w;
-    let sig = head.docs
-        .push(Text("fn "))
-        .push(Text(n.text))
-        .push(tps.doc)
-        .push(comma_list_docs(params.docs, Parens));
+    let sig = [
+        ..head.docs,
+        Text("fn "),
+        Text(n.text),
+        tps.doc,
+        comma_list_docs(params.docs, Parens),
+    ];
     let effs = closed.fn_effects(sig);
     let ret = if (effs.w.peek_text() == "->") {
         effs.w.fn_return(effs.docs)?
@@ -1110,7 +1101,7 @@ fn fn_item(self: W) -> WDoc!FmtError {
         WDocs { w: effs.w, docs: effs.docs }
     };
     let body = ret.w.block()?;
-    let attrs = body.w.fn_attrs(ret.docs.push(Text(" ")).push(body.doc))?;
+    let attrs = body.w.fn_attrs([..ret.docs, Text(" "), body.doc])?;
     ok(WDoc { w: attrs.w, doc: Concat(attrs.docs) })
 }
 
@@ -1128,7 +1119,7 @@ fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
 
 fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
     let t = self.bump().w.ty()?;
-    ok(WDocs { w: t.w, docs: acc.push(Text(" -> ")).push(t.doc) })
+    ok(WDocs { w: t.w, docs: [..acc, Text(" -> "), t.doc] })
 }
 
 // `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
@@ -1168,7 +1159,7 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
         };
         let n = m.w.bump();
         let t = n.w.expect(":")?.w.ty()?;
-        let typed = m.docs.push(Text(n.text)).push(Text(": ")).push(t.doc);
+        let typed = [..m.docs, Text(n.text), Text(": "), t.doc];
         // The variadic marker.
         let v = if (t.w.peek_text() == "*") {
             WDocs { w: t.w.bump().w, docs: typed.push(Text("*")) }
@@ -1191,7 +1182,7 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 
 fn spaced_default(self: W, acc: Doc[]) -> WDocs!FmtError {
     let e = self.bump().w.expr()?;
-    ok(WDocs { w: e.w, docs: acc.push(Text(" = ")).push(e.doc) })
+    ok(WDocs { w: e.w, docs: [..acc, Text(" = "), e.doc] })
 }
 
 fn struct_item(self: W) -> WDoc!FmtError {
@@ -1262,7 +1253,7 @@ fn block_layout(self: W) -> WDoc!FmtError {
     let edge = if (has_stmt) { HardLine } else { Line };
     ok(WDoc {
         w: closed,
-        doc: Concat([Text("{"), Indent(Concat([edge].extended(e.entries))), edge, Text("}")]),
+        doc: Concat([Text("{"), Indent(Concat([edge, ..e.entries])), edge, Text("}")]),
     })
 }
 
@@ -1536,7 +1527,7 @@ fn binop_expr(self: W) -> WDoc!FmtError {
     let d = if (tail.docs.len() == 0) {
         first.doc
     } else {
-        group(Concat([first.doc].extended(tail.docs)))
+        group(Concat([first.doc, ..tail.docs]))
     };
     ok(WDoc { w: tail.w, doc: Concat([l.doc, d]) })
 }
@@ -1592,7 +1583,7 @@ fn postfix(self: W) -> WDoc!FmtError {
     // first line and each `.method(..)` starts its own indented line. Fewer than
     // two calls: no chain break (a lone call's own argument list may still break).
     if (call_count(segs.segs) < 2) {
-        return ok(WDoc { w: segs.w, doc: Concat([head.doc].extended(segs.segs.map(|s| s.doc))) });
+        return ok(WDoc { w: segs.w, doc: Concat([head.doc, ..segs.segs.map(|s| s.doc)]) });
     };
     ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
 }
@@ -1652,7 +1643,7 @@ fn index_seg(self: W) -> WSeg!FmtError {
     let closed = inner.w.expect("]")?.w;
     ok(WSeg {
         w: closed,
-        seg: Seg { is_call: false, doc: Concat([Text("[")].extended(inner.docs).push(Text("]"))) },
+        seg: Seg { is_call: false, doc: Concat([Text("["), ..inner.docs, Text("]")]) },
     })
 }
 
@@ -1895,7 +1886,7 @@ fn if_expr(self: W) -> WDoc!FmtError {
     } else {
         stepped.block_layout()?
     };
-    ok(WDoc { w: tail.w, doc: group(Concat(head.push(Text(" else ")).push(tail.doc))) })
+    ok(WDoc { w: tail.w, doc: group(Concat([..head, Text(" else "), tail.doc])) })
 }
 
 fn match_expr(self: W) -> WDoc!FmtError {
@@ -2623,40 +2614,40 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20562
-deallocations: 20562
-reallocations: 578
-bytes allocated: 1013056
-instructions executed: 3034460
-binary size: 2971904
-  code: 1694256
+allocations: 20424
+deallocations: 20424
+reallocations: 677
+bytes allocated: 1005296
+instructions executed: 3032732
+binary size: 2972728
+  code: 1695072
   data: 25044
-  metadata: 1252604
+  metadata: 1252612
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam44
-__builtin_count_while$char$s0$lam56
-__builtin_count_while$char$s0$lam74
-__builtin_count_while$char$s0$lam79
-__builtin_count_while$char$s0$lam81
-__builtin_count_while$char$s0$lam85
-__builtin_count_while$char$s0$lam86
+__builtin_any$__m1__Doc$lam32
+__builtin_count_while$char$s0$lam42
+__builtin_count_while$char$s0$lam60
+__builtin_count_while$char$s0$lam65
+__builtin_count_while$char$s0$lam67
+__builtin_count_while$char$s0$lam71
+__builtin_count_while$char$s0$lam72
 __builtin_int_parse
-__builtin_is_some_and$char$lam80
-__builtin_opt_left_fold$char$i64$s0$lam68
-__enumerate104
-__enumerate22
-__enumerate23
-__enumerate42
+__builtin_is_some_and$char$lam66
+__builtin_opt_left_fold$char$i64$s0$lam54
+__enumerate16
+__enumerate17
+__enumerate31
 __enumerate8
+__enumerate88
+__lambda_20
+__lambda_21
+__lambda_22
+__lambda_23
+__lambda_24
+__lambda_25
 __lambda_26
 __lambda_27
-__lambda_28
-__lambda_29
-__lambda_30
-__lambda_31
-__lambda_32
-__lambda_33
-__lambda_67
+__lambda_53
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2696,8 +2687,8 @@ __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
-__map58$own0
-__map64$own0
+__map44$own0
+__map50$own0
 __test$new_walker
 __test$walker_of
 array_atom
@@ -2726,7 +2717,6 @@ drop_trailing_break
 err_here
 expect
 expr
-extended
 fn_attrs
 fn_item
 fn_return

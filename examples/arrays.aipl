@@ -9,6 +9,8 @@ import { >, len, push, value_or, wrapping_add as +, wrapping_sub as - } from bui
 //   - `len(xs)`       returns the element count
 //   - `xs.push(x)`    appends `x` to the array variable `xs` in place
 //                     (`xs` must be `mut`); copies of `xs` are unaffected
+//   - `[..xs, y]`     splices `xs`'s elements into a new literal, so this is
+//                     `xs` with `y` appended; `xs` itself is untouched
 //   - `for (let x : xs) { ... }` iterates the elements in order
 
 fn sum(xs: i64[]) -> i64 {

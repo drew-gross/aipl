@@ -32,7 +32,6 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
   optimize spreading by preallocating the full size
-  go through and use spreads in the places that it makes sense in the existing corpus
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
 
 start writing some profiling tools in aipl:
