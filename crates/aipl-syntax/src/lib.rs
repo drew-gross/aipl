@@ -682,10 +682,15 @@ pub mod ast {
         /// is stored exactly as the free call `f(recv, a, b)`. The flag is the
         /// one bit that distinguishes the two surface forms, and it is
         /// semantically load-bearing: only a `self`-function may be called
-        /// method-style, a mutating method *requires* method syntax (and a
-        /// mutable variable receiver), and the free-call form of a mutating
-        /// builtin (`push`) is rejected. Non-mutating calls are otherwise
-        /// indifferent to it (`x.to_str()` ≡ `to_str(x)`).
+        /// method-style, and the in-place writeback form of a mutating method
+        /// (`set recv.f(..)`) requires method syntax on a mutable variable.
+        /// A mutating method called anywhere *else* — including the free-call
+        /// form `f(recv, ..)` — is copy-and-modify: mono rewrites it to copy
+        /// the receiver, mutate the copy, and yield it (see the `mutating`
+        /// desugar in `aipl-mono`), so both `xs.push(x)` and `push(xs, x)` in
+        /// expression position yield a fresh array and leave `xs` alone.
+        /// Non-mutating calls are indifferent to the flag
+        /// (`x.to_str()` ≡ `to_str(x)`).
         Call(String, Vec<Expr>, bool),
         Binop(Box<Expr>, char, Box<Expr>),
         Neg(Box<Expr>),

@@ -13328,20 +13328,17 @@ fn compile_call_expr<M: Module>(
             (ptr, arr_ty)
         }
         "__builtin_push" => {
-            // `push` mutates an array in place, so it must be written as a
-            // method call (`xs.push(x)`) on a *mutable* array variable: the
-            // receiver is `args[0]` and the grown array is stored back into it.
+            // The in-place writeback form: the receiver is `args[0]`, a mutable
+            // array variable, and the grown array is stored back into its slot.
             // Value semantics are kept — a possibly-shared array is copied
             // first (the old block, still referenced elsewhere, is untouched);
             // an exclusive one is grown in place.
-            if !style {
-                return Err(Error::at(
-                    "\"push\" modifies an array in place; call it as a method on a \
-                     mutable array variable: \"xs.push(x)\""
-                        .to_string(),
-                    span.clone(),
-                ));
-            }
+            //
+            // This is the only shape that reaches codegen. `push` is a mutating
+            // method, so every *other* position — the free call `push(xs, x)`
+            // and any expression-position `xs.push(x)` — was already rewritten
+            // by mono into `{ mut t = xs; set t.push(x); t }`, i.e. back into
+            // this form on a fresh local.
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"push\" expects 1 argument, got {}", args.len() - 1),

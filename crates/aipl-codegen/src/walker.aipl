@@ -107,7 +107,115 @@ struct FmtError { message: str, span: Span }
 
 fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
     W { src, toks, comments, pos: 0, cpos: 0, last_end: 0 }
-}
+}.test({
+    // --- fixtures -------------------------------------------------------
+    // `fn f() {}` with a leading line comment and a trailing one, so the
+    // primitives below have real spans to walk. Offsets are byte-exact:
+    //
+    //   0         1         2         3
+    //   0123456789012345678901234567890123456789
+    //   // hi\nfn f() {} // tail\n
+    let src = "// hi\nfn f() {} // tail\n";
+    let toks = [
+        FmtTok { kind: Keyword, span: 6..8 },
+        // fn
+        FmtTok { kind: Ident, span: 9..10 },
+        // f
+        FmtTok { kind: Punct, span: 10..11 },
+        // (
+        FmtTok { kind: Punct, span: 11..12 },
+        // )
+        FmtTok { kind: Punct, span: 13..14 },
+        // {
+        FmtTok { kind: Punct, span: 14..15 },
+    ];
+    // }
+
+    let comments = [0..5, 16..23];
+    let w = new_walker(src, toks, comments);
+
+    // --- token primitives -----------------------------------------------
+    assert(w.peek_text() == "fn");
+    assert(w.peek_text_n(1) == "f");
+    assert(w.peek()?.kind == Keyword);
+    assert(!w.at_end());
+
+    // `bump` advances and hands back the consumed text.
+    let b = w.bump();
+    assert(b.text == "fn");
+    assert(b.w.peek_text() == "f");
+    assert(b.w.last_end == 8);
+    // The original `w` is untouched — the cursor is a value, not a mutation.
+    assert(w.peek_text() == "fn");
+
+    // Walking off the end is inert rather than a panic, and `at_end` reports it.
+    mut end = w;
+    for (let _ : "123456") {
+        set end = end.bump().w;
+    }
+    assert(end.at_end());
+    assert(end.peek_text() == "");
+    assert(end.peek() == none);
+    assert(end.bump().text == "");
+
+    // --- expect ----------------------------------------------------------
+    assert(w.expect("fn")?.text == "fn");
+    // A mismatch names both sides, quoted, like the Rust `{:?}`.
+    assert(
+        w.expect("struct").is_err_and(|e| e.message == `formatter: expected "struct", found "fn"`),
+    );
+    // The span points at the offending token.
+    assert(w.expect("struct").is_err_and(|e| e.span == 6..8));
+    // Past the end the message picks up the span-less marker.
+    assert(
+        end
+            .expect("}")
+            .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
+    );
+
+    // --- source gaps -------------------------------------------------------
+    // The first comment starts at 0, before the first token at 6.
+    assert(w.next_start() == 0);
+    // Once it is drained, the next entity is the `fn` token.
+    assert(w.take_comment(0..5).next_start() == 6);
+    assert(w.same_line(6, 8));
+    assert(!w.same_line(0, 8)); // spans the newline after `// hi`
+    assert(!w.gap_has_blank(0, 8)); // one newline is not a blank line
+
+    // --- lead --------------------------------------------------------------
+    // The leading `// hi` is drained and emitted with a hard line after it (the
+    // gap to `fn` holds a single newline, so no blank line).
+    let l = w.lead();
+    assert(l.doc == Concat([Text("// hi"), HardLine]));
+    assert(l.w.cpos == 1);
+    assert(l.w.last_end == 5);
+    // At the `fn` token there is no *leading* comment left, so `lead` is empty.
+    assert(l.w.lead().doc == Concat([]));
+
+    // A blank line after a comment is preserved as a `BlankLine` separator.
+    let blank_src = "// hi\n\nfn f() {}";
+    let bw = new_walker(blank_src, [FmtTok { kind: Keyword, span: 7..9 }], [0..5]);
+    // Two newlines in the gap after `// hi` — that *is* a blank line.
+    assert(bw.gap_has_blank(5, 7));
+    assert(bw.lead().doc == Concat([Text("// hi"), BlankLine]));
+
+    // --- trailing_comment ---------------------------------------------------
+    // With the leading comment drained the cursor sits at `fn` (offset 6), and
+    // `// tail` (16) comes *after* that still-unconsumed token — so it belongs to
+    // a later flush point, not this one.
+    assert(l.w.trailing_comment().doc == Concat([]));
+    // After consuming through `}` (end 15), `// tail` at 16 is on that line.
+    mut through = w.lead().w;
+    for (let _ : "123456") {
+        set through = through.bump().w;
+    }
+    assert(through.last_end == 15);
+    let tc = through.trailing_comment();
+    assert(tc.doc == Concat([Text(" "), Text("// tail"), BreakParent]));
+    assert(tc.w.cpos == 2);
+    // Drained exactly once — a second call finds nothing left.
+    assert(tc.w.trailing_comment().doc == Concat([]));
+})
 
 // ---------- token primitives ----------
 
@@ -222,7 +330,8 @@ fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -> WDoc {
         // guards the same impossible case.
         let gap_end = if (next < c.end) { c.end } else { next };
         let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
-        set acc = acc.pushed(Text(w.src[c])).pushed(sep);
+        set acc.push(Text(w.src[c]));
+        set acc.push(sep);
         set w = stepped;
     }
     WDoc { w, doc: Concat(acc) }
@@ -568,9 +677,9 @@ fn is_line_break(self: Doc) -> bool {
 fn with_last(self: Doc[], d: Doc) -> Doc[] {
     let n = self.len();
     if (n == 0) {
-        return self.pushed(d);
+        return self.push(d);
     };
-    self[0..n - 1].pushed(d)
+    self[0..n - 1].push(d)
 }
 
 // ---------- imports ----------
@@ -683,7 +792,7 @@ fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut acc = acc0;
     while (w.peek_text() != end) {
         let t = w.ty()?;
-        set acc = acc.pushed(t.doc);
+        set acc.push(t.doc);
         set w = if (t.w.peek_text() == ",") { t.w.bump().w } else { t.w };
     }
     ok(WDocs { w, docs: acc })
@@ -706,7 +815,7 @@ fn set_or_dict_ty(self: W) -> WDoc!FmtError {
         WDocs { w: k.w, docs: [] }
     };
     let closed = rest.w.expect("}")?.w;
-    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc].extended(rest.docs).pushed(Text("}"))) })
+    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc].extended(rest.docs).push(Text("}"))) })
 }
 
 // The `: V` half of a dict type.
@@ -734,11 +843,11 @@ fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
     mut more = true;
     while (more) {
         if (w.peek_text() == "?") {
-            set acc = acc.pushed(Text("?"));
+            set acc.push(Text("?"));
             set w = w.bump().w;
         } else {
             if (w.peek_text() == "[" && w.peek_text_n(1) == "]") {
-                set acc = acc.pushed(Text("[]"));
+                set acc.push(Text("[]"));
                 set w = w.bump().w.bump().w;
             } else {
                 set more = false;
@@ -753,7 +862,7 @@ fn array_suffixes(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
     while (w.peek_text() == "[" && w.peek_text_n(1) == "]") {
-        set acc = acc.pushed(Text("[]"));
+        set acc.push(Text("[]"));
         set w = w.bump().w.bump().w;
     }
     WDocs { w, docs: acc }
@@ -784,7 +893,7 @@ fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
         } else {
             WDoc { w: n.w, doc: Text(n.text) }
         };
-        set acc = acc.pushed(p.doc);
+        set acc.push(p.doc);
         set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
     }
     WDocs { w, docs: acc }
@@ -923,7 +1032,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
         set w = l.w;
         if (w.at_end()) {
             // Comments after the last item.
-            set items = items.pushed(l.doc);
+            set items.push(l.doc);
         } else {
             if (w.peek_text() == "import") {
                 let im = w.import_item()?;
@@ -933,7 +1042,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
             } else {
                 let it = w.item()?;
                 let tc = it.w.trailing_comment();
-                set items = items.pushed(Concat([l.doc, it.doc, tc.doc]));
+                set items.push(Concat([l.doc, it.doc, tc.doc]));
                 set w = tc.w;
             };
         };
@@ -967,7 +1076,7 @@ fn sorted_pick(entries: ImportEntry[], keys: str[], from0: u64, acc0: Doc[]) -> 
         // How many earlier *sorted* slots already carried this key — i.e. which
         // same-key import this slot should take.
         let rank = keys[0..i].count(k);
-        set acc = acc.pushed(nth_with_key(entries, k, rank));
+        set acc.push(nth_with_key(entries, k, rank));
         set i = i + 1;
     }
     acc
@@ -1012,10 +1121,10 @@ fn fn_item(self: W) -> WDoc!FmtError {
     let params = tps.w.expect("(")?.w.params_until(")", [])?;
     let closed = params.w.expect(")")?.w;
     let sig = head.docs
-        .pushed(Text("fn "))
-        .pushed(Text(n.text))
-        .pushed(tps.doc)
-        .pushed(comma_list_docs(params.docs, Parens));
+        .push(Text("fn "))
+        .push(Text(n.text))
+        .push(tps.doc)
+        .push(comma_list_docs(params.docs, Parens));
     let effs = closed.fn_effects(sig);
     let ret = if (effs.w.peek_text() == "->") {
         effs.w.fn_return(effs.docs)?
@@ -1023,7 +1132,7 @@ fn fn_item(self: W) -> WDoc!FmtError {
         WDocs { w: effs.w, docs: effs.docs }
     };
     let body = ret.w.block()?;
-    let attrs = body.w.fn_attrs(ret.docs.pushed(Text(" ")).pushed(body.doc))?;
+    let attrs = body.w.fn_attrs(ret.docs.push(Text(" ")).push(body.doc))?;
     ok(WDoc { w: attrs.w, doc: Concat(attrs.docs) })
 }
 
@@ -1033,7 +1142,7 @@ fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
     mut acc = acc0;
     while (w.peek_text() == "!") {
         let e = w.bump().w.bump();
-        set acc = acc.pushed(Text(` !{e.text}`));
+        set acc.push(Text(` !{e.text}`));
         set w = e.w;
     }
     WDocs { w, docs: acc }
@@ -1041,7 +1150,7 @@ fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
 
 fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
     let t = self.bump().w.ty()?;
-    ok(WDocs { w: t.w, docs: acc.pushed(Text(" -> ")).pushed(t.doc) })
+    ok(WDocs { w: t.w, docs: acc.push(Text(" -> ")).push(t.doc) })
 }
 
 // `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
@@ -1060,7 +1169,9 @@ fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             opened.bump().str_atom()
         };
-        set acc = acc.pushed(Text(`.{a.text}(`)).pushed(arg.doc).pushed(Text(")"));
+        set acc.push(Text(`.{a.text}(`));
+        set acc.push(arg.doc);
+        set acc.push(Text(")"));
         set w = arg.w.expect(")")?.w;
     }
     ok(WDocs { w, docs: acc })
@@ -1079,10 +1190,10 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
         };
         let n = m.w.bump();
         let t = n.w.expect(":")?.w.ty()?;
-        let typed = m.docs.pushed(Text(n.text)).pushed(Text(": ")).pushed(t.doc);
+        let typed = m.docs.push(Text(n.text)).push(Text(": ")).push(t.doc);
         // The variadic marker.
         let v = if (t.w.peek_text() == "*") {
-            WDocs { w: t.w.bump().w, docs: typed.pushed(Text("*")) }
+            WDocs { w: t.w.bump().w, docs: typed.push(Text("*")) }
         } else {
             WDocs { w: t.w, docs: typed }
         };
@@ -1094,7 +1205,7 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             WDocs { w: v.w, docs: v.docs }
         };
-        set acc = acc.pushed(Concat(d.docs));
+        set acc.push(Concat(d.docs));
         set w = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
     }
     ok(WDocs { w, docs: acc })
@@ -1102,7 +1213,7 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 
 fn spaced_default(self: W, acc: Doc[]) -> WDocs!FmtError {
     let e = self.bump().w.expr()?;
-    ok(WDocs { w: e.w, docs: acc.pushed(Text(" = ")).pushed(e.doc) })
+    ok(WDocs { w: e.w, docs: acc.push(Text(" = ")).push(e.doc) })
 }
 
 fn struct_item(self: W) -> WDoc!FmtError {
@@ -1134,7 +1245,7 @@ fn struct_fields(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             WDocs { w: t.w, docs: base }
         };
-        set acc = acc.pushed(Concat(d.docs));
+        set acc.push(Concat(d.docs));
         set w = if (d.w.peek_text() == ",") { d.w.bump().w } else { d.w };
     }
     ok(WDocs { w, docs: acc })
@@ -1193,7 +1304,8 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
         set w = l.w;
         if (had_lead) {
             let blank = w.gap_has_blank(prev_end, max_u64(prev_end, w.last_end));
-            set entries = entries.pushed(sep_entry(blank, 0 < entries.len())).pushed(l.doc);
+            set entries.push(sep_entry(blank, 0 < entries.len()));
+            set entries.push(l.doc);
 
             // `lead` already ends with a line break per comment; the next entry
             // continues under it.
@@ -1211,10 +1323,11 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
             let stmt = w.statement()?;
             if (!had_lead) {
                 let blank = w.gap_has_blank(prev_end, start);
-                set entries = entries.pushed(sep_entry(blank, 0 < entries.len()));
+                set entries.push(sep_entry(blank, 0 < entries.len()));
             };
             let tc = stmt.w.trailing_comment();
-            set entries = entries.pushed(stmt.doc).pushed(tc.doc);
+            set entries.push(stmt.doc);
+            set entries.push(tc.doc);
             set w = tc.w;
             set prev_end = tc.w.last_end;
         };
@@ -1470,7 +1583,7 @@ fn binop_tail(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             Indent(Concat([Line, Text(op.text), Text(" "), lead_rhs.doc, rhs.doc]))
         };
-        set acc = acc.pushed(seg);
+        set acc.push(seg);
         set w = rhs.w;
     }
     ok(WDocs { w, docs: acc })
@@ -1561,10 +1674,7 @@ fn index_seg(self: W) -> WSeg!FmtError {
     let closed = inner.w.expect("]")?.w;
     ok(WSeg {
         w: closed,
-        seg: Seg {
-            is_call: false,
-            doc: Concat([Text("[")].extended(inner.docs).pushed(Text("]"))),
-        },
+        seg: Seg { is_call: false, doc: Concat([Text("[")].extended(inner.docs).push(Text("]"))) },
     })
 }
 
@@ -1690,7 +1800,7 @@ fn tuple_rest(self: W, acc0: Doc[]) -> WDocs!FmtError {
             return ok(WDocs { w: stepped, docs: acc });
         };
         let e = stepped.expr()?;
-        set acc = acc.pushed(e.doc);
+        set acc.push(e.doc);
         set w = e.w;
     }
     ok(WDocs { w, docs: acc })
@@ -1725,7 +1835,7 @@ fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             WDoc { w: k.w, doc: Concat([l.doc, k.doc]) }
         };
-        set acc = acc.pushed(e.doc);
+        set acc.push(e.doc);
         set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
     }
     ok(WDocs { w, docs: acc })
@@ -1783,7 +1893,7 @@ fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
         };
-        set acc = acc.pushed(e.doc);
+        set acc.push(e.doc);
         set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
     }
     ok(WDocs { w, docs: acc })
@@ -1815,7 +1925,7 @@ fn if_expr(self: W) -> WDoc!FmtError {
     } else {
         stepped.block_layout()?
     };
-    ok(WDoc { w: tail.w, doc: group(Concat(head.pushed(Text(" else ")).pushed(tail.doc))) })
+    ok(WDoc { w: tail.w, doc: group(Concat(head.push(Text(" else ")).push(tail.doc))) })
 }
 
 fn match_expr(self: W) -> WDoc!FmtError {
@@ -1852,7 +1962,7 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
         let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
         // A same-line `// comment` after the arm rides on its line.
         let tc = stepped.trailing_comment();
-        set acc = acc.pushed(Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]));
+        set acc.push(Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]));
         set w = tc.w;
     }
     ok(WDocs { w, docs: acc })
@@ -1891,7 +2001,7 @@ fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     while (w.peek_text() != end) {
         let l = w.lead();
         let a = l.w.call_arg()?;
-        set acc = acc.pushed(Concat([l.doc, a.doc]));
+        set acc.push(Concat([l.doc, a.doc]));
         set w = if (a.w.peek_text() == ",") { a.w.bump().w } else { a.w };
     }
     ok(WDocs { w, docs: acc })
@@ -1953,7 +2063,7 @@ fn lambda_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
         } else {
             WDoc { w: n.w, doc: Text(n.text) }
         };
-        set acc = acc.pushed(p.doc);
+        set acc.push(p.doc);
         set w = if (p.w.peek_text() == ",") { p.w.bump().w } else { p.w };
     }
     ok(WDocs { w, docs: acc })
@@ -2533,163 +2643,41 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // Render a `Doc` directly — the `WDoc`-free form, for steps that hand back
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
-
-// Append one `Doc` to an accumulator and yield the result. AIPL's `push`
-// mutates in place and yields nothing, so a *statement* accumulator wants
-// `set acc.push(d)` and needs no helper; this exists only for the places that
-// need a `Doc[]` in expression position — chained (`.pushed(a).pushed(b)`) or
-// built inline, as `fn_head` and `comma_list_docs` do above.
-fn pushed(self: Doc[], d: Doc) -> Doc[] {
-    mut a = self;
-    set a.push(d);
-    a
-}.test({
-    // --- fixtures -------------------------------------------------------
-    // `fn f() {}` with a leading line comment and a trailing one, so the
-    // primitives below have real spans to walk. Offsets are byte-exact:
-    //
-    //   0         1         2         3
-    //   0123456789012345678901234567890123456789
-    //   // hi\nfn f() {} // tail\n
-    let src = "// hi\nfn f() {} // tail\n";
-    let toks = [
-        FmtTok { kind: Keyword, span: 6..8 },
-        // fn
-        FmtTok { kind: Ident, span: 9..10 },
-        // f
-        FmtTok { kind: Punct, span: 10..11 },
-        // (
-        FmtTok { kind: Punct, span: 11..12 },
-        // )
-        FmtTok { kind: Punct, span: 13..14 },
-        // {
-        FmtTok { kind: Punct, span: 14..15 },
-    ];
-    // }
-
-    let comments = [0..5, 16..23];
-    let w = new_walker(src, toks, comments);
-
-    // --- token primitives -----------------------------------------------
-    assert(w.peek_text() == "fn");
-    assert(w.peek_text_n(1) == "f");
-    assert(w.peek()?.kind == Keyword);
-    assert(!w.at_end());
-
-    // `bump` advances and hands back the consumed text.
-    let b = w.bump();
-    assert(b.text == "fn");
-    assert(b.w.peek_text() == "f");
-    assert(b.w.last_end == 8);
-    // The original `w` is untouched — the cursor is a value, not a mutation.
-    assert(w.peek_text() == "fn");
-
-    // Walking off the end is inert rather than a panic, and `at_end` reports it.
-    mut end = w;
-    for (let _ : "123456") {
-        set end = end.bump().w;
-    }
-    assert(end.at_end());
-    assert(end.peek_text() == "");
-    assert(end.peek() == none);
-    assert(end.bump().text == "");
-
-    // --- expect ----------------------------------------------------------
-    assert(w.expect("fn")?.text == "fn");
-    // A mismatch names both sides, quoted, like the Rust `{:?}`.
-    assert(
-        w.expect("struct").is_err_and(|e| e.message == `formatter: expected "struct", found "fn"`),
-    );
-    // The span points at the offending token.
-    assert(w.expect("struct").is_err_and(|e| e.span == 6..8));
-    // Past the end the message picks up the span-less marker.
-    assert(
-        end
-            .expect("}")
-            .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
-    );
-
-    // --- source gaps -------------------------------------------------------
-    // The first comment starts at 0, before the first token at 6.
-    assert(w.next_start() == 0);
-    // Once it is drained, the next entity is the `fn` token.
-    assert(w.take_comment(0..5).next_start() == 6);
-    assert(w.same_line(6, 8));
-    assert(!w.same_line(0, 8)); // spans the newline after `// hi`
-    assert(!w.gap_has_blank(0, 8)); // one newline is not a blank line
-
-    // --- lead --------------------------------------------------------------
-    // The leading `// hi` is drained and emitted with a hard line after it (the
-    // gap to `fn` holds a single newline, so no blank line).
-    let l = w.lead();
-    assert(l.doc == Concat([Text("// hi"), HardLine]));
-    assert(l.w.cpos == 1);
-    assert(l.w.last_end == 5);
-    // At the `fn` token there is no *leading* comment left, so `lead` is empty.
-    assert(l.w.lead().doc == Concat([]));
-
-    // A blank line after a comment is preserved as a `BlankLine` separator.
-    let blank_src = "// hi\n\nfn f() {}";
-    let bw = new_walker(blank_src, [FmtTok { kind: Keyword, span: 7..9 }], [0..5]);
-    // Two newlines in the gap after `// hi` — that *is* a blank line.
-    assert(bw.gap_has_blank(5, 7));
-    assert(bw.lead().doc == Concat([Text("// hi"), BlankLine]));
-
-    // --- trailing_comment ---------------------------------------------------
-    // With the leading comment drained the cursor sits at `fn` (offset 6), and
-    // `// tail` (16) comes *after* that still-unconsumed token — so it belongs to
-    // a later flush point, not this one.
-    assert(l.w.trailing_comment().doc == Concat([]));
-    // After consuming through `}` (end 15), `// tail` at 16 is on that line.
-    mut through = w.lead().w;
-    for (let _ : "123456") {
-        set through = through.bump().w;
-    }
-    assert(through.last_end == 15);
-    let tc = through.trailing_comment();
-    assert(tc.doc == Concat([Text(" "), Text("// tail"), BreakParent]));
-    assert(tc.w.cpos == 2);
-    // Drained exactly once — a second call finds nothing left.
-    assert(tc.w.trailing_comment().doc == Concat([]));
-
-    // --- pushed -------------------------------------------------------------
-    assert([Text("a")].pushed(Text("b")) == [Text("a"), Text("b")]);
-})
 --- performance ---
-allocations: 20646
-deallocations: 20646
+allocations: 20639
+deallocations: 20639
 reallocations: 573
-bytes allocated: 1027272
-instructions executed: 3039118
-binary size: 2964664
-  code: 1690540
-  data: 25116
-  metadata: 1249008
+bytes allocated: 1026912
+instructions executed: 3033975
+binary size: 2969856
+  code: 1692896
+  data: 25044
+  metadata: 1251916
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam25
-__builtin_count_while$char$s0$lam35
-__builtin_count_while$char$s0$lam53
-__builtin_count_while$char$s0$lam58
-__builtin_count_while$char$s0$lam60
-__builtin_count_while$char$s0$lam62
-__builtin_count_while$char$s0$lam63
+__builtin_any$__m1__Doc$lam38
+__builtin_count_while$char$s0$lam50
+__builtin_count_while$char$s0$lam68
+__builtin_count_while$char$s0$lam73
+__builtin_count_while$char$s0$lam75
+__builtin_count_while$char$s0$lam77
+__builtin_count_while$char$s0$lam78
 __builtin_int_parse
-__builtin_is_some_and$char$lam59
-__builtin_opt_left_fold$char$i64$s0$lam47
-__enumerate12
-__enumerate13
-__enumerate24
-__enumerate77
+__builtin_is_some_and$char$lam74
+__builtin_opt_left_fold$char$i64$s0$lam62
+__enumerate18
+__enumerate19
+__enumerate36
 __enumerate8
-__lambda_16
-__lambda_17
-__lambda_18
-__lambda_19
-__lambda_20
-__lambda_21
+__enumerate96
 __lambda_22
 __lambda_23
-__lambda_46
+__lambda_24
+__lambda_25
+__lambda_26
+__lambda_27
+__lambda_28
+__lambda_29
+__lambda_61
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2729,9 +2717,9 @@ __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
-__map37$own0
-__map43$own0
-__test$pushed
+__map52$own0
+__map58$own0
+__test$new_walker
 __test$walker_of
 array_atom
 array_suffixes
@@ -2806,7 +2794,6 @@ postfix
 postfix_segs
 program
 program_items
-pushed
 quoted
 range_has_semi
 range_tail
