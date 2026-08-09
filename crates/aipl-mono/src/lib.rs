@@ -4869,6 +4869,7 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// nothing (uninstantiated templates are dropped).
 const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_all", include_str!("builtin_all.aipl")),
+    ("__builtin_sort_by", include_str!("builtin_sort_by.aipl")),
     ("__builtin_any", include_str!("builtin_any.aipl")),
     (
         "__builtin_left_fold",

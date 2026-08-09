@@ -2938,6 +2938,11 @@ impl Cx<'_> {
                 if same_int {
                     return Ok(Type::Primitive(Primitive::Bool));
                 }
+                // `str` orders lexicographically by bytes (see `aipl_str_cmp`),
+                // matching the order `sort` imposes on a `str[]`.
+                if is_str_repr(lt) && is_str_repr(rt) {
+                    return Ok(Type::Primitive(Primitive::Bool));
+                }
                 expect(
                     lt,
                     &Type::Primitive(Primitive::I64),

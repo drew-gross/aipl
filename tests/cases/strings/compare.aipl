@@ -1,0 +1,38 @@
+import { !, <, <=, ==, >, >= } from builtins;
+
+// `str` compares lexicographically by bytes — the same order the `sort` builtin
+// imposes on a `str[]`, so a sort by a derived `str` key agrees with `<`.
+fn main() {}.test({
+    assert("a" < "b");
+    assert(!("b" < "a"));
+    assert(!("a" < "a"));
+    assert("a" <= "a");
+    assert("b" > "a");
+    assert("a" >= "a");
+
+    // A prefix precedes the longer string it prefixes.
+    assert("ab" < "b");
+    assert("a" < "ab");
+    assert("" < "a");
+    assert(!("" < ""));
+
+    // Byte order, not case-insensitive: uppercase sorts ahead of lowercase.
+    assert("Z" < "a");
+
+    // Long enough to be heap-allocated rather than inline, so both `str`
+    // representations are covered.
+    assert("longstring_here_x" < "longstring_here_y");
+    assert(!("longstring_here_y" < "longstring_here_x"));
+})
+--- monomorphizations ---
+main
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 4
+binary size: 576
+  code: 48
+  data: 1
+  metadata: 527

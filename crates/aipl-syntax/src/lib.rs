@@ -1470,6 +1470,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "maximum",
     "reverse",
     "sort",
+    "sort_by",
     "enumerate",
     "repeat",
 ];

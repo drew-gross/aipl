@@ -2301,6 +2301,23 @@ unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
 
 /// `str == str`: content-compare, then decrement both inputs (it consumes a ref
 /// from each, like the other str-taking builtins; callers pre-inc). Returns 1/0.
+/// Lexicographic byte comparison of two `str`s: negative, zero, or positive
+/// like `memcmp`. Backs the ordering operators (`<`, `<=`, `>`, `>=`) on `str`,
+/// using the same byte order `sort` already imposes on a `str[]`. Repr-aware
+/// via `str_bytes`. Unlike `aipl_str_eq` this only *borrows* both inputs (no
+/// dec), so codegen emits no compensating pre-inc. Mirrors `aipl_str_cmp` in
+/// the linker runtime.
+extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
+    let mut ab = [0u8; 8];
+    let mut bb = [0u8; 8];
+    let (x, y) = unsafe { (str_bytes(a, &mut ab), str_bytes(b, &mut bb)) };
+    match x.cmp(y) {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
 extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
     let eq = unsafe { rt_str_eq(a, b) };
     aipl_dec(a);
@@ -4149,6 +4166,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         aipl_str_is_all_whitespace as *const u8,
     );
     jit_builder.symbol("aipl_str_eq", aipl_str_eq as *const u8);
+    jit_builder.symbol("aipl_str_cmp", aipl_str_cmp as *const u8);
     jit_builder.symbol("aipl_str_starts_with", aipl_str_starts_with as *const u8);
     jit_builder.symbol("aipl_str_contains", aipl_str_contains as *const u8);
     jit_builder.symbol("aipl_str_ends_with", aipl_str_ends_with as *const u8);
@@ -6662,6 +6680,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_rec_alloc"
         | "aipl_str_repeat"
         | "aipl_str_eq"
+        | "aipl_str_cmp"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
         | "aipl_str_contains"
@@ -14695,6 +14714,26 @@ fn compile_expr<M: Module>(
                     (result, Type::Primitive(Primitive::Bool))
                 }
                 '<' | '>' | 'L' | 'G' => {
+                    // `str` orders lexicographically by bytes — the same order
+                    // `sort` gives a `str[]` — via a runtime compare whose
+                    // sign is then tested against zero.
+                    if is_str_repr(&lt) && is_str_repr(&rt) {
+                        let f = builtins.import(module, builder.func, "aipl_str_cmp");
+                        let inst = builder.ins().call(f, &[lv, rv]);
+                        let c = builder.inst_results(inst)[0];
+                        let zero = builder.ins().iconst(types::I64, 0);
+                        let cc = match op {
+                            '<' => IntCC::SignedLessThan,
+                            '>' => IntCC::SignedGreaterThan,
+                            'L' => IntCC::SignedLessThanOrEqual,
+                            _ => IntCC::SignedGreaterThanOrEqual,
+                        };
+                        let b = builder.ins().icmp(cc, c, zero);
+                        return Ok((
+                            builder.ins().uextend(types::I64, b),
+                            Type::Primitive(Primitive::Bool),
+                        ));
+                    }
                     // Unsigned integers compare with the unsigned predicates;
                     // signed ones (and i64) with the signed predicates. Operands
                     // are kept canonically sign-/zero-extended, so an i64-register

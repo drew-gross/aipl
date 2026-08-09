@@ -2412,6 +2412,33 @@ unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
     })
 }
 
+/// Lexicographic byte comparison of two `str`s: negative, zero, or positive
+/// like `memcmp`. Backs the ordering operators (`<`, `<=`, `>`, `>=`) on `str`,
+/// using the same byte order `sort` already imposes on a `str[]`. Unlike
+/// `aipl_str_eq` this only *borrows* both inputs (no dec), so codegen emits no
+/// compensating pre-inc. Mirrors the JIT `aipl_str_cmp`.
+#[no_mangle]
+pub extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
+    let mut ab = [0u8; 8];
+    let mut bb = [0u8; 8];
+    let (x, y) = unsafe { (str_bytes(a, &mut ab), str_bytes(b, &mut bb)) };
+    let n = if x.len() < y.len() { x.len() } else { y.len() };
+    let mut i = 0;
+    while i < n {
+        if x[i] != y[i] {
+            return if x[i] < y[i] { -1 } else { 1 };
+        }
+        i += 1;
+    }
+    if x.len() == y.len() {
+        0
+    } else if x.len() < y.len() {
+        -1
+    } else {
+        1
+    }
+}
+
 /// `str == str`: content-compare, then decrement both inputs (consumes a ref
 /// from each; callers pre-inc). Returns 1/0. Mirrors the JIT `aipl_str_eq`.
 #[no_mangle]

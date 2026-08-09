@@ -1,0 +1,95 @@
+import { !, &&, <, ==, len, wrapping_add as + } from builtins;
+
+// The AIPL implementation of the `sort_by` builtin. Monomorphization registers
+// this under the canonical name `__builtin_sort_by` (see `AIPL_BUILTIN_SOURCES`
+// in `lib.rs`), so a user's `xs.sort_by(less)` resolves through the ordinary
+// generic / higher-order machinery — the in-file name `sort_by` is only for
+// this file's own tests, which read exactly like user code.
+//
+// Insertion sort: each element is spliced into the already-sorted prefix at the
+// first position it `less`-precedes, the splice being an array-literal spread —
+// one pre-sized allocation per element (see the loader's `desugar_spread`).
+//
+// The sort is *stable*: `insert_at` stops at the first `y` with `less(x, y)`, so
+// an `x` equal to `y` (neither precedes the other) walks past it and lands
+// after. Callers rely on this — the formatter hoists imports by key and expects
+// two imports sharing a key to stay in source order.
+//
+// KNOWN LIMITATION: the comparator's two parameters share one type variable
+// (`(T, T) -> bool`), and mono's lambda specialization only pins the *first*
+// from the element type — the second arrives as `__none__`. That is harmless
+// for `i64` (which `__none__` meets) but makes `xs.sort_by(|a, b| a.key < b.key)`
+// on a struct array, or a `str` comparison, fail to type. Until that is fixed,
+// `sort_by` is usable for integer elements; sorting records by a field still
+// needs the encode-a-key-into-a-str trick (see `walker.aipl`'s imports).
+//
+// Insertion sort is quadratic. That is the deliberate trade for a definition
+// this small and obviously-stable: its callers sort import lists and other
+// short sequences. Sorting a large array by its natural order should still use
+// the native `sort` builtin.
+pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
+    mut out = [];
+    for (let x : self) {
+        // The first position in `out` that `x` precedes, or the end. Scanning
+        // stops there rather than at the first *non*-preceding element, so an
+        // `x` equal to what is already placed walks past it — that is what
+        // makes the sort stable. (A `count_while` would read better, but a
+        // function-typed parameter cannot be captured into a nested lambda.)
+        mut k = u64(0);
+        mut placed = false;
+        while (!placed && k < out.len()) {
+            let step = match (out[k]) {
+                some(y) => less(x, y),
+                none => true,
+            };
+            if (step) {
+                set placed = true;
+            } else {
+                set k = k + u64(1);
+            };
+        }
+        set out = [..out[0..k], x, ..out[k..]];
+    }
+    out
+}.doc("""
+    Sorts by a caller-supplied `less` predicate: `less(a, b)` is true when `a`
+    must come before `b`. Stable — elements neither of which precedes the other
+    keep their input order. Generic over the element type and callable as a
+    method: `xs.sort_by(|a, b| a.key < b.key)`.
+""").test({
+    // Ascending and descending over the same input.
+    assert([3, 1, 2].sort_by(|a, b| a < b) == [1, 2, 3]);
+    assert([3, 1, 2].sort_by(|a, b| b < a) == [3, 2, 1]);
+
+    // Already sorted, reversed, and single/empty inputs.
+    assert([1, 2, 3].sort_by(|a, b| a < b) == [1, 2, 3]);
+    assert([3, 2, 1].sort_by(|a, b| a < b) == [1, 2, 3]);
+    assert([1].sort_by(|a, b| a < b) == [1]);
+    assert(len([1, 2].sort_by(|a, b| a < b)) == 2);
+
+    // Duplicates are kept, not collapsed.
+    assert([2, 1, 2, 1].sort_by(|a, b| a < b) == [1, 1, 2, 2]);
+
+    // Function-call form too.
+    assert(sort_by([2, 1], |a, b| a < b) == [1, 2]);
+})
+--- monomorphizations ---
+main
+sort_by$i64$lam1
+sort_by$i64$lam11
+sort_by$i64$lam13
+sort_by$i64$lam15
+sort_by$i64$lam3
+sort_by$i64$lam5
+sort_by$i64$lam7
+sort_by$i64$lam9
+--- performance ---
+allocations: 86
+deallocations: 86
+reallocations: 21
+bytes allocated: 3312
+instructions executed: 5757
+binary size: 17240
+  code: 10648
+  data: 570
+  metadata: 6022
