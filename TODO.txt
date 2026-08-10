@@ -292,6 +292,23 @@ hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
 implement vec.back(), use it to simplify trim_suffix
 
+Blocked: sort_by fails on struct arrays — exactly the walker's use:
+
+xs.sort_by(|a, b| a.key < b.key)
+error: field access on non-struct value of type __none__
+                                     ^ (b)
+
+optimize string comparison by comparing more than one byte at a time
+
+The comparator's second parameter doesn't get its type bound. (T, T) -> bool binds a from the element type but leaves b as __none__. zip_with's (T, U) -> V works, so two-parameter lambdas are fine in general — it's specifically two parameters sharing one type variable that bind_field doesn't propagate. That's a checker/mono inference fix, not something I can hack around in the builtin.
+
+walker.aipl:
+  finish implementing the operator sorting
+  make operators sort last so we can just use regular sort order for imports
+
+test procedure improvements:
+  figureout why listing takes so long in nextest
+
 Reasons dec.aipl uses a cons list:
     1. fits borrows the stack in Rust; AIPL has no references.
 
