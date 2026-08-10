@@ -1,0 +1,12 @@
+# The checked-in dogfood IR (`dogfood.clif`, `fmt.clif`) is generated — it is
+# regenerated from the `.aipl` sources by the staged-IR workflow, never edited by
+# hand. A regeneration rewrites thousands of lines, which buries the handful of
+# source lines that caused it.
+#
+# `-diff` treats these as binary for diffing, so `git diff` / `show` / `log -p`
+# collapse each to a one-line "Binary files ... differ". That still shows *that*
+# the artifact moved — a stale `.clif` is a real signal, and `checked_in_ir_is_current`
+# asserts on it — while keeping the source change readable.
+#
+# To read one anyway: `git diff --text -- '*.clif'`.
+*.clif -diff
