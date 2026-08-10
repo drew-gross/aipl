@@ -1,4 +1,7 @@
-import { !, &&, <, ==, len, wrapping_add as + } from builtins;
+import { !, &&, <, ==, len, map, wrapping_add as + } from builtins;
+
+// Test fixture: a record sorted by one of its fields.
+struct E { key: str, tag: str }
 
 // The AIPL implementation of the `sort_by` builtin. Monomorphization registers
 // this under the canonical name `__builtin_sort_by` (see `AIPL_BUILTIN_SOURCES`
@@ -15,20 +18,16 @@ import { !, &&, <, ==, len, wrapping_add as + } from builtins;
 // after. Callers rely on this — the formatter hoists imports by key and expects
 // two imports sharing a key to stay in source order.
 //
-// KNOWN LIMITATION: the comparator's two parameters share one type variable
-// (`(T, T) -> bool`), and mono's lambda specialization only pins the *first*
-// from the element type — the second arrives as `__none__`. That is harmless
-// for `i64` (which `__none__` meets) but makes `xs.sort_by(|a, b| a.key < b.key)`
-// on a struct array, or a `str` comparison, fail to type. Until that is fixed,
-// `sort_by` is usable for integer elements; sorting records by a field still
-// needs the encode-a-key-into-a-str trick (see `walker.aipl`'s imports).
-//
 // Insertion sort is quadratic. That is the deliberate trade for a definition
 // this small and obviously-stable: its callers sort import lists and other
 // short sequences. Sorting a large array by its natural order should still use
 // the native `sort` builtin.
 pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
-    mut out = [];
+    // Seed from an *empty slice of the input*, not `[]`: an untyped empty
+    // literal has element type `__none__`, so `out[k]` below would hand the
+    // comparator a `__none__` second argument and fail to type against a real
+    // `T` (it only slipped through for `i64`, which `__none__` meets).
+    mut out = self[0..0];
     for (let x : self) {
         // The first position in `out` that `x` precedes, or the end. Scanning
         // stops there rather than at the first *non*-preceding element, so an
@@ -70,26 +69,27 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // Duplicates are kept, not collapsed.
     assert([2, 1, 2, 1].sort_by(|a, b| a < b) == [1, 1, 2, 2]);
 
+    // `str` elements, using the ordering operators added for them.
+    assert(["b", "a", "c"].sort_by(|a, b| a < b) == ["a", "b", "c"]);
+
+    // Sorting records by a field — the shape the formatter uses to hoist
+    // imports. Equal keys keep their source order, which is the stability
+    // callers depend on.
+    let es = [E { key: "b", tag: "b1" }, E { key: "a", tag: "a1" }, E { key: "b", tag: "b2" }];
+    assert(es.sort_by(|x, y| x.key < y.key).map(|e| e.tag) == ["a1", "b1", "b2"]);
+
     // Function-call form too.
     assert(sort_by([2, 1], |a, b| a < b) == [1, 2]);
 })
 --- monomorphizations ---
 main
-sort_by$i64$lam1
-sort_by$i64$lam11
-sort_by$i64$lam13
-sort_by$i64$lam15
-sort_by$i64$lam3
-sort_by$i64$lam5
-sort_by$i64$lam7
-sort_by$i64$lam9
 --- performance ---
-allocations: 86
-deallocations: 86
-reallocations: 21
-bytes allocated: 3312
-instructions executed: 5757
-binary size: 17240
-  code: 10648
-  data: 570
-  metadata: 6022
+allocations: 111
+deallocations: 111
+reallocations: 27
+bytes allocated: 4352
+instructions executed: 7847
+binary size: 22704
+  code: 13864
+  data: 754
+  metadata: 8086

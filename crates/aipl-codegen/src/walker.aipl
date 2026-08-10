@@ -28,7 +28,7 @@ import {
     map,
     push,
     saturating_sub as -,
-    sort,
+    sort_by,
     split,
     starts_with,
     value_or,
@@ -673,7 +673,10 @@ fn with_last(self: Doc[], d: Doc) -> Doc[] {
 // One import, plus the key `program` will order it by.
 struct WImport { w: W, key: str, doc: Doc }
 
-struct WKeys { w: W, keys: str[] }
+// One imported name: what it sorts by, and how it is spelled in the output.
+struct ImportName { key: str, rendered: str }
+
+struct WKeys { w: W, names: ImportName[] }
 
 // `import { a, b as c } from "path";` — the imported names sorted, the statement
 // rendered, and the hoist key.
@@ -681,7 +684,7 @@ fn import_item(self: W) -> WImport!FmtError {
     let names = self.expect("import")?.w.expect("{")?.w.import_names([])?;
     let src = names.w.expect("}")?.w.expect("from")?.w.bump();
     let done = src.w.expect(";")?.w;
-    let list = comma_list_docs(sorted_import_names(names.keys), SpacedBraces);
+    let list = comma_list_docs(sorted_import_names(names.names), SpacedBraces);
     ok(WImport {
         w: done,
         key: import_key(src.text),
@@ -689,7 +692,7 @@ fn import_item(self: W) -> WImport!FmtError {
     })
 }
 
-fn import_names(self: W, acc0: str[]) -> WKeys!FmtError {
+fn import_names(self: W, acc0: ImportName[]) -> WKeys!FmtError {
     mut w = self;
     mut acc = acc0;
     while (w.peek_text() != "}") {
@@ -699,10 +702,10 @@ fn import_names(self: W, acc0: str[]) -> WKeys!FmtError {
         } else {
             WStr { w: first.w, text: first.text }
         };
-        set acc.push(encode_import_name(first.text, r.text));
+        set acc.push(ImportName { key: import_name_key(first.text), rendered: r.text });
         set w = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
     }
-    ok(WKeys { w, keys: acc })
+    ok(WKeys { w, names: acc })
 }
 
 // `name as alias` — the spelling written when an import is renamed.
@@ -714,24 +717,15 @@ fn import_alias(self: W, first: str) -> WStr {
 // Operators sort ahead of plain names, each bucket alphabetical by the *imported*
 // name — the one to the left of an `as` — so `wrapping_add as +` sorts under `w`,
 // next to the function it actually imports, rather than among the operator
-// spellings.
-//
-// AIPL has no `<` on strings: the only ordering primitive is the `sort` builtin
-// over a `str[]`. So the sort key is *encoded into* the string — a bucket digit,
-// the imported name, a space, then the rendered spelling. A space (32) is below
-// every character that can appear in an import name, so it terminates the key and
-// the resulting order matches Rust's `(bucket, first, rendered)` tuple sort.
-fn encode_import_name(first: str, rendered: str) -> str {
+// spellings. A bucket digit ahead of the name gives that in one `str` compare.
+fn import_name_key(first: str) -> str {
     let bucket = if (first.is_operator_name()) { "0" } else { "1" };
-    `{bucket}{first} {rendered}`
+    `{bucket}{first}`
 }
 
-// The rendered spelling back out of an encoded key: everything past the first
-// space. Rejoined because a renamed import's spelling contains spaces of its own
-// (`wrapping_add as +`).
-fn decode_import_name(key: str) -> str { key.split(" ")[1..].join(" ") }
-
-fn sorted_import_names(keys: str[]) -> Doc[] { keys.sort().map(|k| Text(decode_import_name(k))) }
+fn sorted_import_names(names: ImportName[]) -> Doc[] {
+    names.sort_by(|a, b| a.key < b.key).map(|n| Text(n.rendered))
+}
 
 // What `program` orders imports by: builtins first, then paths alphabetically.
 // Same encoding trick as the names above — a bucket digit ahead of the text.
@@ -1025,42 +1019,10 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
     ok(WProgram { w, imports, items })
 }
 
-// The imports in hoist order. AIPL has no `<` on strings, so the only ordering
-// primitive is the `sort` builtin over a `str[]`: sort the keys, then walk the
-// sorted keys picking, for each, the matching import that hasn't been taken yet.
-// Two imports from the same source share a key, and the rank counting below
-// hands them out in source order — the stability Rust's `sort_by` gives for free.
+// The imports in hoist order. Two imports from the same source share a key;
+// `sort_by` is stable, so they stay in source order.
 fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
-    sorted_pick(entries, entries.map(|e| e.key).sort(), u64(0), [])
-}
-
-fn sorted_pick(entries: ImportEntry[], keys: str[], from0: u64, acc0: Doc[]) -> Doc[] {
-    mut i = from0;
-    mut acc = acc0;
-    while (i < keys.len()) {
-        let k = keys[i].value_or("");
-
-        // How many earlier *sorted* slots already carried this key — i.e. which
-        // same-key import this slot should take.
-        let rank = keys[0..i].count(k);
-        set acc.push(nth_with_key(entries, k, rank));
-        set i = i + 1;
-    }
-    acc
-}
-
-// The `n`-th entry (0-based, in source order) whose key is `k`.
-fn nth_with_key(entries: ImportEntry[], k: str, n: u64) -> Doc {
-    mut seen = u64(0);
-    for (let e : entries) {
-        if (e.key == k) {
-            if (seen == n) {
-                return e.doc;
-            };
-            set seen = seen + 1;
-        };
-    }
-    Concat([])
+    entries.sort_by(|a, b| a.key < b.key).map(|e| e.doc)
 }
 
 fn item(self: W) -> WDoc!FmtError {
@@ -2614,40 +2576,40 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20315
-deallocations: 20315
-reallocations: 634
-bytes allocated: 999016
-instructions executed: 3029926
-binary size: 2978520
-  code: 1698824
+allocations: 20319
+deallocations: 20319
+reallocations: 657
+bytes allocated: 999010
+instructions executed: 3033475
+binary size: 2980752
+  code: 1700392
   data: 25044
-  metadata: 1254652
+  metadata: 1255316
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam32
-__builtin_count_while$char$s0$lam42
-__builtin_count_while$char$s0$lam60
-__builtin_count_while$char$s0$lam65
-__builtin_count_while$char$s0$lam67
-__builtin_count_while$char$s0$lam73
-__builtin_count_while$char$s0$lam74
+__builtin_any$__m1__Doc$lam36
+__builtin_count_while$char$s0$lam46
+__builtin_count_while$char$s0$lam64
+__builtin_count_while$char$s0$lam69
+__builtin_count_while$char$s0$lam71
+__builtin_count_while$char$s0$lam77
+__builtin_count_while$char$s0$lam78
 __builtin_int_parse
-__builtin_is_some_and$char$lam66
-__builtin_opt_left_fold$char$i64$s0$lam54
-__enumerate16
-__enumerate17
-__enumerate31
+__builtin_is_some_and$char$lam70
+__builtin_opt_left_fold$char$i64$s0$lam58
+__enumerate20
+__enumerate21
+__enumerate35
 __enumerate8
-__enumerate90
-__lambda_20
-__lambda_21
-__lambda_22
-__lambda_23
-__lambda_24
-__lambda_25
+__enumerate94
 __lambda_26
 __lambda_27
-__lambda_53
+__lambda_28
+__lambda_29
+__lambda_30
+__lambda_31
+__lambda_32
+__lambda_33
+__lambda_57
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2687,8 +2649,8 @@ __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
-__map44$own0
-__map50$own0
+__map48$own0
+__map54$own0
 __test$new_walker
 __test$walker_of
 array_atom
@@ -2748,7 +2710,6 @@ name_atom
 named_ty
 new_walker
 next_start
-nth_with_key
 params_until
 paren_atom
 paren_ty
@@ -2772,8 +2733,6 @@ set_or_dict_atom
 set_or_dict_ty
 set_stmt
 slice_to
-sorted_imports
-sorted_pick
 spaced_default
 statement
 str_atom

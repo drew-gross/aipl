@@ -300,11 +300,17 @@ error: field access on non-struct value of type __none__
 
 optimize string comparison by comparing more than one byte at a time
 
+sort optimization:
+  make sort_by a builtin so it can be faster
+  make stable_sort and unstable_sort (qsort)
+  get rid of the mut out = self[0..0] workaround
+
 The comparator's second parameter doesn't get its type bound. (T, T) -> bool binds a from the element type but leaves b as __none__. zip_with's (T, U) -> V works, so two-parameter lambdas are fine in general — it's specifically two parameters sharing one type variable that bind_field doesn't propagate. That's a checker/mono inference fix, not something I can hack around in the builtin.
 
 walker.aipl:
   finish implementing the operator sorting
   make operators sort last so we can just use regular sort order for imports
+  make imports sort operator last (i.e. just use string order)
 
 test procedure improvements:
   figureout why listing takes so long in nextest
