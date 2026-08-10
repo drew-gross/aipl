@@ -292,11 +292,7 @@ hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
 implement vec.back(), use it to simplify trim_suffix
 
-Blocked: sort_by fails on struct arrays — exactly the walker's use:
-
-xs.sort_by(|a, b| a.key < b.key)
-error: field access on non-struct value of type __none__
-                                     ^ (b)
+Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
 optimize string comparison by comparing more than one byte at a time
 

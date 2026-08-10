@@ -671,7 +671,7 @@ fn with_last(self: Doc[], d: Doc) -> Doc[] {
 // ---------- imports ----------
 
 // One import, plus the key `program` will order it by.
-struct WImport { w: W, key: str, doc: Doc }
+struct WImport { w: W, source: str, doc: Doc }
 
 // One imported name: what it sorts by, and how it is spelled in the output.
 struct ImportName { name: str, rendered: str }
@@ -687,7 +687,7 @@ fn import_item(self: W) -> WImport!FmtError {
     let list = comma_list_docs(sorted_import_names(names.names), SpacedBraces);
     ok(WImport {
         w: done,
-        key: import_key(src.text),
+        source: src.text,
         doc: Concat([Text("import "), list, Text(" from "), Text(src.text), Text(";")]),
     })
 }
@@ -728,9 +728,13 @@ fn sorted_import_names(names: ImportName[]) -> Doc[] {
     names.sort_by(|a, b| import_name_precedes(a.name, b.name)).map(|n| Text(n.rendered))
 }
 
-// What `program` orders imports by: builtins first, then paths alphabetically.
-// Same encoding trick as the names above — a bucket digit ahead of the text.
-fn import_key(source: str) -> str { if (source == "builtins") { "0" } else { `1{source}` } }
+// What `program` orders imports by: `builtins` ahead of every path import, then
+// paths in ordinary `str` order. Like the name ordering above, a comparator
+// states this directly rather than packing a bucket digit into a sort key.
+fn import_source_precedes(a: str, b: str) -> bool {
+    let a_builtins = a == "builtins";
+    if (a_builtins != (b == "builtins")) { a_builtins } else { a < b }
+}
 
 // ---------- types ----------
 
@@ -964,7 +968,7 @@ fn variant_body(cases: VCase[]) -> Doc[] {
 // ---------- program & items ----------
 
 // One hoisted import: the statement, and the key `program` orders it by.
-struct ImportEntry { key: str, doc: Doc }
+struct ImportEntry { source: str, doc: Doc }
 
 struct WProgram { w: W, imports: ImportEntry[], items: Doc[] }
 
@@ -1007,7 +1011,10 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
             if (w.peek_text() == "import") {
                 let im = w.import_item()?;
                 let tc = im.w.trailing_comment();
-                set imports.push(ImportEntry { key: im.key, doc: Concat([l.doc, im.doc, tc.doc]) });
+                set imports.push(ImportEntry {
+                    source: im.source,
+                    doc: Concat([l.doc, im.doc, tc.doc]),
+                });
                 set w = tc.w;
             } else {
                 let it = w.item()?;
@@ -1023,7 +1030,7 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
 // The imports in hoist order. Two imports from the same source share a key;
 // `sort_by` is stable, so they stay in source order.
 fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
-    entries.sort_by(|a, b| a.key < b.key).map(|e| e.doc)
+    entries.sort_by(|a, b| import_source_precedes(a.source, b.source)).map(|e| e.doc)
 }
 
 fn item(self: W) -> WDoc!FmtError {
@@ -2539,8 +2546,8 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .at(5) == "import {\n    a,\n    b,\n} from builtins;",
     );
     // The hoist key puts builtins ahead of every path.
-    assert(walker_of("import { x } from builtins ;").import_item()?.key == "0");
-    assert(walker_of(`import \{ x } from "./m.aipl" ;`).import_item()?.key == `1"./m.aipl"`);
+    assert(walker_of("import { x } from builtins ;").import_item()?.source == "builtins");
+    assert(walker_of(`import \{ x } from "./m.aipl" ;`).import_item()?.source == `"./m.aipl"`);
 
     // --- variant ------------------------------------------------------------
     assert(walker_of("variant V = A").variant_item().rendered(100)? == "variant V = A");
@@ -2577,15 +2584,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20316
-deallocations: 20316
+allocations: 20310
+deallocations: 20310
 reallocations: 657
-bytes allocated: 998874
-instructions executed: 3033487
-binary size: 2980560
-  code: 1700320
-  data: 25044
-  metadata: 1255196
+bytes allocated: 998706
+instructions executed: 3033378
+binary size: 2980392
+  code: 1700200
+  data: 25060
+  metadata: 1255132
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
