@@ -1,4 +1,4 @@
-import { ==, print } from builtins;
+import { print, == } from builtins;
 
 // The `_` arm must be last — arms after it can never run.
 fn label(s: str) -> str {

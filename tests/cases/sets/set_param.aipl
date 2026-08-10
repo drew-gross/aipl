@@ -1,4 +1,4 @@
-import { !, ==, has, len } from builtins;
+import { has, len, !, == } from builtins;
 
 // The `#{T}` set type as a parameter and return type, plus passing a set across
 // calls (exercises set ownership/refcounting).

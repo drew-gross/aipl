@@ -1,4 +1,4 @@
-import { !, &&, +++, <, ==, ||, enumerate, len, wrapping_add as + } from builtins;
+import { enumerate, len, wrapping_add as +, !, &&, +++, <, ==, || } from builtins;
 import { lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

@@ -1,4 +1,4 @@
-import { ==, map, push, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+import { map, push, to_str, wrapping_add as +, wrapping_mul as *, == } from builtins;
 
 // Plain named functions — no captures, just regular `fn`s.
 fn double(x: i64) -> i64 { x * 2 }.test({

@@ -1,4 +1,4 @@
-import { ==, len, push, value_or } from builtins;
+import { len, push, value_or, == } from builtins;
 
 // Explicitly-written nested type annotations: `str[][]` as a parameter and
 // return type, `str[]` as the element. The recursive type grammar parses

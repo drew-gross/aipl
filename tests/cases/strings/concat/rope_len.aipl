@@ -1,4 +1,4 @@
-import { +++, len, print, to_str, wrapping_add as + } from builtins;
+import { len, print, to_str, wrapping_add as +, +++ } from builtins;
 
 // A rope stores its total length at its root (summed once at construction from
 // its children's stored lengths), so `len` is O(1) and never materializes the

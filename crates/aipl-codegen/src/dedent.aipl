@@ -1,6 +1,4 @@
 import {
-    !,
-    ==,
     count_while,
     filter,
     is_all_whitespace,
@@ -8,6 +6,8 @@ import {
     map,
     minimum,
     value_or,
+    !,
+    ==,
 } from builtins;
 import { lines } from "./lines.aipl";
 

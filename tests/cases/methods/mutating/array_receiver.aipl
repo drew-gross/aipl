@@ -1,4 +1,4 @@
-import { ==, push } from builtins;
+import { push, == } from builtins;
 
 // A mutating method whose receiver is an array; it `push`es inside, and the
 // growth is reflected in the caller's variable.

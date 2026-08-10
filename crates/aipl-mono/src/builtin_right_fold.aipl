@@ -1,4 +1,4 @@
-import { !, +++, ==, >, filter, len, wrapping_add as +, wrapping_sub as - } from builtins;
+import { filter, len, wrapping_add as +, wrapping_sub as -, !, +++, ==, > } from builtins;
 
 // The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
 // (see `builtin_left_fold.aipl`). Monomorphization registers this function under

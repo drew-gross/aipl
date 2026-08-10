@@ -1,4 +1,4 @@
-import { +++, ==, value_or, wrapping_add as + } from builtins;
+import { value_or, wrapping_add as +, +++, == } from builtins;
 
 // The postfix `?` unwraps an optional inside a function that itself returns one:
 // `some` continues with the inner value, `none` early-returns `none` — the value

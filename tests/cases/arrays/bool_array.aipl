@@ -1,4 +1,4 @@
-import { ==, len, wrapping_add as + } from builtins;
+import { len, wrapping_add as +, == } from builtins;
 
 // bool[] as a first-class array: literals, `len`, indexing (an optional
 // element), and for-each iteration.

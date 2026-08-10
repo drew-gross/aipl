@@ -1,4 +1,4 @@
-import { !=, ==, print, to_str, wrapping_add as + } from builtins;
+import { print, to_str, wrapping_add as +, !=, == } from builtins;
 
 // A recursive sum type: its payload refers back to itself, so it can't be
 // stored inline (infinite size). The compiler detects the containment cycle

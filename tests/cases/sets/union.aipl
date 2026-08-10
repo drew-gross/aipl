@@ -1,4 +1,4 @@
-import { ==, has, len, union } from builtins;
+import { has, len, union, == } from builtins;
 
 // `a.union(b)` is the set of all distinct elements of both (overlap deduped).
 // `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;

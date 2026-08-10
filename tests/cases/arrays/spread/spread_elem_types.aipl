@@ -1,4 +1,4 @@
-import { ==, join, len, push } from builtins;
+import { join, len, push, == } from builtins;
 
 // Spread works for every element representation, not just `i64`. `char[]` is
 // the interesting one: it is str-shaped, so the build has to start from a

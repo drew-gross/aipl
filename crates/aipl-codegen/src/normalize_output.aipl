@@ -3,7 +3,7 @@
 // child program's stdout/stderr against the expected sections, and `aipl check`
 // exercises it via the `.test` block below. Collapsing CRLF to LF matters on
 // Windows, where libc text-mode stdout rewrites the runtime's `\n` to `\r\n`.
-import { ==, ||, join, split } from builtins;
+import { join, split, ==, || } from builtins;
 import { trim_end_while } from "./trim_end_while.aipl";
 
 pub fn normalize_output(self: str) -> str {

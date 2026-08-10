@@ -1,4 +1,4 @@
-import { !, ==, >, filter } from builtins;
+import { filter, !, ==, > } from builtins;
 
 // The AIPL implementation of the `any` builtin — the dual of `all` (see
 // `builtin_all.aipl`). Monomorphization registers this function under the

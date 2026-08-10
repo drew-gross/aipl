@@ -1,4 +1,4 @@
-import { !, <=, ==, is_some_and } from builtins;
+import { is_some_and, !, <=, == } from builtins;
 
 // `is_some_and` folds an optional and a predicate into a bool: true only when
 // the value is present and satisfies the predicate. `none` short-circuits to

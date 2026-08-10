@@ -14,7 +14,7 @@ fn main() -> i64 {
     u.len() + v.len() + w.len() + "x"[s].len()
 }
 --- formatted ---
-import { *, wrapping_add as + } from builtins;
+import { wrapping_add as +, * } from builtins;
 
 fn main() -> i64 {
     // A range expression is spelled tight, like the slice forms.

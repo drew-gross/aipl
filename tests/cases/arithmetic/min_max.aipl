@@ -1,4 +1,4 @@
-import { ==, max, min, wrapping_sub as - } from builtins;
+import { max, min, wrapping_sub as -, == } from builtins;
 
 // `min`/`max` return the smaller / larger of two `i64`s. Callable free
 // (`min(a, b)`) or as a method (`a.max(b)`); a bare literal operand flexes to

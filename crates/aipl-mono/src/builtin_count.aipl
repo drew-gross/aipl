@@ -1,4 +1,4 @@
-import { ++, ==, wrapping_add as + } from builtins;
+import { wrapping_add as +, ++, == } from builtins;
 
 // The AIPL implementation of the `count` builtin. Monomorphization registers
 // this function under the canonical name `__builtin_count` (see

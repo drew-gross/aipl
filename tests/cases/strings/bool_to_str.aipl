@@ -1,4 +1,4 @@
-import { +++, ==, print, push, to_str, wrapping_add as + } from builtins;
+import { print, push, to_str, wrapping_add as +, +++, == } from builtins;
 
 // `to_str` renders a scalar bool; `to_str` renders a bool[] as
 // `[true, false]` (and `[]` when empty). Both return fresh refcounted strings.

@@ -1,4 +1,4 @@
-import { ==, value_or } from builtins;
+import { value_or, == } from builtins;
 
 // The `value_or` builtin unwraps an optional, falling back to a default.
 // Works as a method (`opt.value_or(d)`) or a free call (`value_or(opt, d)`),

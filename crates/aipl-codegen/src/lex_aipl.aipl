@@ -2,16 +2,16 @@
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
 import {
-    &&,
-    +++,
-    <,
-    ==,
     int_parse,
     join,
     len,
     split,
     value_or_err,
     wrapping_add as +,
+    &&,
+    +++,
+    <,
+    ==,
 } from builtins;
 import {
     Bare,

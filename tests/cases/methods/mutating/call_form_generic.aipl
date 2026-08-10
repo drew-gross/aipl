@@ -1,4 +1,4 @@
-import { ==, push } from builtins;
+import { push, == } from builtins;
 
 // A generic mutating function (`mut self: any[]`) used in copy-and-modify call
 // form. Monomorphization desugars the call to `.append(..)` on a copy and

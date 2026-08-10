@@ -1,4 +1,4 @@
-import { ==, push } from builtins;
+import { push, == } from builtins;
 
 // `xs.push(x)` appends to `xs` in place: the same variable holds the longer
 // array afterward (no reassignment needed).

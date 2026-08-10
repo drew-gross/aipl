@@ -1,4 +1,4 @@
-import { ==, len } from builtins;
+import { len, == } from builtins;
 
 // A type parameter can appear inside a container field type: `items: T[]`.
 // The element type is pinned by the array's elements, giving `Stack$i64`.

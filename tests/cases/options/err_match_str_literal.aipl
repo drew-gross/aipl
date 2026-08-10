@@ -1,4 +1,4 @@
-import { ==, print, to_str } from builtins;
+import { print, to_str, == } from builtins;
 
 // A string-literal pattern only matches a `str` scrutinee, not an optional.
 fn label(x: i64?) -> str {

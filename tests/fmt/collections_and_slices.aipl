@@ -16,7 +16,7 @@ fn main() -> i64 {
     xs.len() + sl.len() + t.0
 }
 --- formatted ---
-import { ==, len, wrapping_add as + } from builtins;
+import { len, wrapping_add as +, == } from builtins;
 
 fn main() -> i64 {
     let xs = [1, 2, 3];

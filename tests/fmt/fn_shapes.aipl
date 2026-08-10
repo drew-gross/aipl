@@ -16,7 +16,7 @@ fn destructure(p: Point) -> i64 {
 }
 fn set_use(i: i64, c: char) {}
 --- formatted ---
-import { ==, enumerate, push, wrapping_add as + } from builtins;
+import { enumerate, push, wrapping_add as +, == } from builtins;
 
 pub fn generic<T: any, U: ord>(xs: T[], y: U, rest: i64*) -> i64 { 0 }
 

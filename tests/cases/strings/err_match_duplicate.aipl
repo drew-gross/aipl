@@ -1,4 +1,4 @@
-import { ==, print } from builtins;
+import { print, == } from builtins;
 
 // A repeated string-literal arm is dead code.
 fn label(s: str) -> str {

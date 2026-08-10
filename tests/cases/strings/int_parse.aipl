@@ -1,4 +1,4 @@
-import { !, ==, int_parse, wrapping_sub as - } from builtins;
+import { int_parse, wrapping_sub as -, !, == } from builtins;
 
 // `int_parse` parses a decimal integer — an optional leading `-`, then one or
 // more ASCII digits, nothing else — as `i64?`: `none` for empty input, a bare

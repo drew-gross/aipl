@@ -1,4 +1,4 @@
-import { ==, print, to_str, wrapping_mul as * } from builtins;
+import { print, to_str, wrapping_mul as *, == } from builtins;
 
 // A `.test({ .. })` block is compiled and run only by `aipl check`; `run` and
 // `build` (this harness) ignore it entirely. This fixture just confirms a

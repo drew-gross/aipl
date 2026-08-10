@@ -1,8 +1,4 @@
 import {
-    !,
-    +++,
-    <,
-    ==,
     filter,
     is_some,
     len,
@@ -10,6 +6,10 @@ import {
     value_or,
     wrapping_add as +,
     wrapping_mul as *,
+    !,
+    +++,
+    <,
+    ==,
 } from builtins;
 
 // The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a

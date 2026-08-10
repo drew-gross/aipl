@@ -1,4 +1,4 @@
-import { ==, print } from builtins;
+import { print, == } from builtins;
 
 // Function values have no runtime identity — equality on them is rejected.
 fn apply(f: (i64) -> i64) -> bool { f == f }

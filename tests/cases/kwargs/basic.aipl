@@ -1,4 +1,4 @@
-import { ==, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+import { print, to_str, wrapping_add as +, wrapping_mul as *, == } from builtins;
 
 fn scaled(n: i64, bump: i64 = 100, scale: i64 = 2) -> i64 { (n + bump) * scale }.test({
     assert(scaled(1) == 202);

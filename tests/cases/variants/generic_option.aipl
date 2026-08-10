@@ -1,4 +1,4 @@
-import { ==, print, to_str } from builtins;
+import { print, to_str, == } from builtins;
 
 // A generic variant. Used at a single type argument here (`Opt<i64>`), its
 // instance `Opt$i64` is an ordinary variant whose constructors resolve like

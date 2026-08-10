@@ -1,4 +1,4 @@
-import { ==, print, to_str, write_string_to_file } from builtins;
+import { print, to_str, write_string_to_file, == } from builtins;
 
 // `write_string_to_file(path, contents) -> !str` writes `contents` to `path`,
 // returning `ok()` on success and `err(message)` on any failure. It carries the

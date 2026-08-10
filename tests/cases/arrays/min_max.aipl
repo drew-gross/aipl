@@ -1,4 +1,4 @@
-import { ==, >, filter, maximum, minimum, value_or } from builtins;
+import { filter, maximum, minimum, value_or, ==, > } from builtins;
 
 // `arr.minimum()` / `arr.maximum()` return the smallest / largest element as
 // `T?` — `none` for an empty array. (Distinct from the two-argument scalar

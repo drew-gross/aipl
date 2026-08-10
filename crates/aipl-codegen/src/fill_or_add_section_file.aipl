@@ -1,4 +1,4 @@
-import { ==, read_file_to_string, write_string_to_file } from builtins;
+import { read_file_to_string, write_string_to_file, == } from builtins;
 import { fill_or_add_section } from "./fill_or_add_section.aipl";
 
 pub fn fill_or_add_section_file(

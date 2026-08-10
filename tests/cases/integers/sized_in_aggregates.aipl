@@ -1,9 +1,4 @@
 import {
-    !,
-    !=,
-    +++,
-    <,
-    ==,
     contains_key,
     get,
     has,
@@ -13,6 +8,11 @@ import {
     value_or,
     wrapping_add as +,
     wrapping_sub as -,
+    !,
+    !=,
+    +++,
+    <,
+    ==,
 } from builtins;
 
 // The sized integer types (`i8`..`i64`, `u8`..`u64`) are storable *inside*

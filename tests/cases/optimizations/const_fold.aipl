@@ -1,4 +1,7 @@
 import {
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
     !,
     !=,
     %,
@@ -10,9 +13,6 @@ import {
     >,
     >=,
     ||,
-    wrapping_add as +,
-    wrapping_mul as *,
-    wrapping_sub as -,
 } from builtins;
 
 // All-constant expressions are folded at compile time — main compiles to a

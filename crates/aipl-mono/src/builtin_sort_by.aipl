@@ -1,4 +1,4 @@
-import { !, &&, <, ==, len, map, wrapping_add as + } from builtins;
+import { len, map, wrapping_add as +, !, &&, <, == } from builtins;
 
 // Test fixture: a record sorted by one of its fields.
 struct E { key: str, tag: str }

@@ -32,7 +32,7 @@ fn main() {
     let e = sizes([]);
 }
 --- formatted ---
-import { ==, len, wrapping_add as + } from builtins;
+import { len, wrapping_add as +, == } from builtins;
 
 struct Cfg { name: str, tags: str[] }
 

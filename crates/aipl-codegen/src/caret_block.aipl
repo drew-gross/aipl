@@ -7,7 +7,7 @@
 //   {pad} |
 //   {line_no} | <source line>
 //   {pad} | <indent>^^^
-import { <, ==, Span, len, repeat, saturating_sub as -, to_str, wrapping_add as + } from builtins;
+import { Span, len, repeat, saturating_sub as -, to_str, wrapping_add as +, <, == } from builtins;
 import { line_at } from "./line_at.aipl";
 
 pub fn caret_block(source: str, span: Span, filename: str) -> str {

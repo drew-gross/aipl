@@ -1,4 +1,4 @@
-import { ==, push } from builtins;
+import { push, == } from builtins;
 
 // Copy-and-modify call form on an array receiver: `extend(xs, ..)` copies the
 // array, grows the copy, and yields it; the original `xs` keeps its length.

@@ -1,4 +1,4 @@
-import { &&, <, ==, saturating_add as +, saturating_sub as - } from builtins;
+import { saturating_add as +, saturating_sub as -, &&, <, == } from builtins;
 
 // `+`/`-` bound to the saturating flavors fold with saturating semantics:
 // MAX + 1 pins at MAX (the wrapping flavor would go negative), and stepping

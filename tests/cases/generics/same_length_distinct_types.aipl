@@ -1,4 +1,4 @@
-import { ==, len } from builtins;
+import { len, == } from builtins;
 
 // Each `any[]` parameter is its own type variable, so the two arrays may
 // have different element types. `same_length` is specialized on the pair

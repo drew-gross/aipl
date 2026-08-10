@@ -1,4 +1,4 @@
-import { !, ==, has, len } from builtins;
+import { has, len, !, == } from builtins;
 
 // Sets of bool and char (the other two scalar element types). A bool set holds
 // at most {true, false}; chars behave like array char elements.

@@ -1,4 +1,4 @@
-import { !, ==, to_digit, value_or } from builtins;
+import { to_digit, value_or, !, == } from builtins;
 
 // `to_digit` maps an ASCII decimal digit '0'..'9' to its 0..9 value (`c - '0'`)
 // and yields `none` for any other char — including the chars just outside the

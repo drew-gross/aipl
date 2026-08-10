@@ -1,4 +1,4 @@
-import { +++, ==, to_str, wrapping_add as + } from builtins;
+import { to_str, wrapping_add as +, +++, == } from builtins;
 
 // Variant cases with heap payloads (`str`): construction retains them and the
 // per-variant drop releases only the active case's fields. Used in an array, so

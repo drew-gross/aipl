@@ -6,7 +6,7 @@
 // lambda in different effect contexts. The fix ensures lambdas always
 // start with `effects: Vec::new()`, letting the type checker determine
 // which effects are actually needed from their body.
-import { %, ==, push, wrapping_add as + } from builtins;
+import { push, wrapping_add as +, %, == } from builtins;
 
 fn is_even(x: i64) -> bool { x % 2 == 0 }
 

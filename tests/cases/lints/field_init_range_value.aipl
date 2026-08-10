@@ -1,4 +1,4 @@
-import { ==, Span } from builtins;
+import { Span, == } from builtins;
 
 // Regression: a range `start..end` desugars to a synthetic `__builtin_Span`
 // construct whose bound identifiers happen to match the Span field names. That

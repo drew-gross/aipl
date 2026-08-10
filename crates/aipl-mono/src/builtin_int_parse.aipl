@@ -1,6 +1,4 @@
 import {
-    ==,
-    >,
     len,
     opt_left_fold as opt_fold,
     starts_with,
@@ -9,6 +7,8 @@ import {
     value_or,
     wrapping_mul as *,
     wrapping_sub as -,
+    ==,
+    >,
 } from builtins;
 
 // The AIPL implementation of the `int_parse` builtin. Monomorphization

@@ -1,10 +1,10 @@
 import {
-    +++,
-    ==,
     opt_left_fold as opt_fold,
     to_digit,
     wrapping_add as +,
     wrapping_mul as *,
+    +++,
+    ==,
 } from builtins;
 
 // `xs.opt_fold(init, f)` is `fold` with a *fallible* combiner: `f` returns `A?`,

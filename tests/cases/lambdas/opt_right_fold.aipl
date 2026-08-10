@@ -1,4 +1,4 @@
-import { +++, ==, opt_left_fold, opt_right_fold, wrapping_add as + } from builtins;
+import { opt_left_fold, opt_right_fold, wrapping_add as +, +++, == } from builtins;
 
 // `xs.opt_right_fold(init, f)` mirrors `opt_left_fold`: it combines right to
 // left, takes the element first and the accumulator second, and yields `none` as

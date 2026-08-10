@@ -14,12 +14,6 @@
 // the same cons-list — the list *is* the "rest of the line" the Rust `fits` reads
 // off the work stack.
 import {
-    !,
-    !=,
-    +++,
-    <,
-    ==,
-    >,
     any,
     contains,
     ends_with,
@@ -34,6 +28,12 @@ import {
     split,
     value_or,
     wrapping_add as +,
+    !,
+    !=,
+    +++,
+    <,
+    ==,
+    >,
 } from builtins;
 import { reindent_block } from "./reindent_block.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

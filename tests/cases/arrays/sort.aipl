@@ -1,4 +1,4 @@
-import { &&, ==, len, print, sort, to_str } from builtins;
+import { len, print, sort, to_str, &&, == } from builtins;
 
 // `xs.sort()` returns a *fresh* array with the same elements in ascending order.
 // It does not mutate the receiver (like `reverse`, and unlike `push`).

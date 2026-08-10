@@ -1,4 +1,4 @@
-import { >, len, push, value_or, wrapping_add as +, wrapping_sub as - } from builtins;
+import { len, push, value_or, wrapping_add as +, wrapping_sub as -, > } from builtins;
 
 // Arrays: a growable, refcounted sequence of primitives written `T[]`
 // (e.g. `i64[]`, `char[]`, `bool[]`).

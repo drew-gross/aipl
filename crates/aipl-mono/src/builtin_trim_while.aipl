@@ -1,4 +1,4 @@
-import { ==, count_while } from builtins;
+import { count_while, == } from builtins;
 
 // The AIPL implementation of the `trim_while` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_trim_while`

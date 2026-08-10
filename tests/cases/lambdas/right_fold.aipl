@@ -1,4 +1,4 @@
-import { !=, +++, ==, left_fold, right_fold, wrapping_add as + } from builtins;
+import { left_fold, right_fold, wrapping_add as +, !=, +++, == } from builtins;
 
 // `xs.right_fold(init, f)` mirrors `left_fold`: it combines right to left, so
 // `[a, b, c]` folds to `f(a, f(b, f(c, init)))` — and the combiner takes the

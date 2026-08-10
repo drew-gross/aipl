@@ -1,4 +1,4 @@
-import { ==, value_or } from builtins;
+import { value_or, == } from builtins;
 
 // `str?` is an optional holding a heap string. Both arms round-trip: the
 // `some` arm carries an owned string, the `none` arm falls back via

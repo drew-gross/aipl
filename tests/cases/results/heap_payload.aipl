@@ -1,4 +1,4 @@
-import { +++, ==, print, wrapping_add as + } from builtins;
+import { print, wrapping_add as +, +++, == } from builtins;
 
 // Both sides of a result can be `str` (heap). Constructing, matching, and `?`-
 // propagating them must keep refcounts balanced — the `--- performance ---`

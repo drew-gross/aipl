@@ -1,4 +1,4 @@
-import { +++, ==, map, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+import { map, to_str, wrapping_add as +, wrapping_mul as *, +++, == } from builtins;
 
 // When `map` receives a freshly-allocated, uniquely-owned array, it overwrites
 // each slot in place and reuses the same allocation instead of building a new

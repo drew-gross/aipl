@@ -1,4 +1,4 @@
-import { ==, value_or } from builtins;
+import { value_or, == } from builtins;
 
 fn unwrap(x: i64?, d: i64) -> i64 { x.value_or(d) }.test({
     assert(unwrap(some(42), 0) == 42);

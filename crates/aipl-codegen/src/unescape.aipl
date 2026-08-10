@@ -1,5 +1,5 @@
 // AIPL's string-escape decoder.
-import { &&, +++, <, ==, len, wrapping_add as + } from builtins;
+import { len, wrapping_add as +, &&, +++, <, == } from builtins;
 
 // Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
 // any other escaped char (`"`, `\`, `` ` ``, `{`) to itself. Validity was

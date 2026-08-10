@@ -4,7 +4,7 @@
 // (leading/trailing/consecutive separators); a missing separator yields one part
 // (the whole string); an empty separator yields `[s]`. Callable free or as a
 // method (`s.split(sep)`).
-import { ==, print, split, to_str, wrapping_add as + } from builtins;
+import { print, split, to_str, wrapping_add as +, == } from builtins;
 
 fn main() !prints {
     print(to_str(split("a,bb,ccc", ","))); // ["a", "bb", "ccc"]

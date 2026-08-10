@@ -11,13 +11,6 @@
 // (`peek`, `at_end`, …) takes `W` by value and returns just the answer; advancing
 // it (`bump`, `expect`, `lead`, …) returns a carrier holding the moved-on `W`.
 import {
-    !,
-    !=,
-    &&,
-    <,
-    <=,
-    ==,
-    ||,
     Span,
     contains,
     count,
@@ -33,6 +26,13 @@ import {
     starts_with,
     value_or,
     wrapping_add as +,
+    !,
+    !=,
+    &&,
+    <,
+    <=,
+    ==,
+    ||,
 } from builtins;
 import {
     BlankLine,
@@ -674,7 +674,7 @@ fn with_last(self: Doc[], d: Doc) -> Doc[] {
 struct WImport { w: W, key: str, doc: Doc }
 
 // One imported name: what it sorts by, and how it is spelled in the output.
-struct ImportName { key: str, rendered: str }
+struct ImportName { name: str, rendered: str }
 
 struct WKeys { w: W, names: ImportName[] }
 
@@ -702,7 +702,7 @@ fn import_names(self: W, acc0: ImportName[]) -> WKeys!FmtError {
         } else {
             WStr { w: first.w, text: first.text }
         };
-        set acc.push(ImportName { key: import_name_key(first.text), rendered: r.text });
+        set acc.push(ImportName { name: first.text, rendered: r.text });
         set w = if (r.w.peek_text() == ",") { r.w.bump().w } else { r.w };
     }
     ok(WKeys { w, names: acc })
@@ -714,17 +714,18 @@ fn import_alias(self: W, first: str) -> WStr {
     WStr { w: a.w, text: `{first} as {a.text}` }
 }
 
-// Operators sort ahead of plain names, each bucket alphabetical by the *imported*
-// name — the one to the left of an `as` — so `wrapping_add as +` sorts under `w`,
-// next to the function it actually imports, rather than among the operator
-// spellings. A bucket digit ahead of the name gives that in one `str` compare.
-fn import_name_key(first: str) -> str {
-    let bucket = if (first.is_operator_name()) { "0" } else { "1" };
-    `{bucket}{first}`
+// Plain names first, operators last; within each group, ordinary `str` order on
+// the *imported* name — the one to the left of an `as` — so `wrapping_add as +`
+// sorts under `w`, next to the function it actually imports, rather than among
+// the operator spellings. A comparator states that directly, so nothing has to
+// be packed into a sort key.
+fn import_name_precedes(a: str, b: str) -> bool {
+    let a_op = a.is_operator_name();
+    if (a_op != b.is_operator_name()) { !a_op } else { a < b }
 }
 
 fn sorted_import_names(names: ImportName[]) -> Doc[] {
-    names.sort_by(|a, b| a.key < b.key).map(|n| Text(n.rendered))
+    names.sort_by(|a, b| import_name_precedes(a.name, b.name)).map(|n| Text(n.rendered))
 }
 
 // What `program` orders imports by: builtins first, then paths alphabetically.
@@ -2503,23 +2504,23 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .import_item()?.doc
             .at(100) == "import { a, b } from builtins;",
     );
-    // Operators sort ahead of plain names.
+    // Operators sort after plain names, and among themselves by `str` order.
     assert(
-        walker_of("import { len , == , ! } from builtins ;")
+        walker_of("import { == , len , ! } from builtins ;")
             .import_item()?.doc
-            .at(100) == "import { !, ==, len } from builtins;",
+            .at(100) == "import { len, !, == } from builtins;",
     );
 
     // A renamed import sorts under the name it *imports* (`w`), not its operator
-    // spelling — so it lands after `len`, not among the operators.
+    // spelling — so it stays with the plain names rather than joining the
+    // operators at the end.
     assert(
         walker_of("import { wrapping_add as + , len , == } from builtins ;")
             .import_item()?.doc
-            .at(100) == "import { ==, len, wrapping_add as + } from builtins;",
+            .at(100) == "import { len, wrapping_add as +, == } from builtins;",
     );
 
-    // A prefix sorts before the longer name extending it (the encoded key's space
-    // terminator is below every identifier character).
+    // A prefix sorts before the longer name extending it.
     assert(
         walker_of("import { ab , a } from builtins ;")
             .import_item()?.doc
@@ -2576,15 +2577,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20319
-deallocations: 20319
+allocations: 20316
+deallocations: 20316
 reallocations: 657
-bytes allocated: 999010
-instructions executed: 3033475
-binary size: 2980752
-  code: 1700392
+bytes allocated: 998874
+instructions executed: 3033487
+binary size: 2980560
+  code: 1700320
   data: 25044
-  metadata: 1255316
+  metadata: 1255196
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
@@ -2627,6 +2628,7 @@ __m1__print_doc
 __m2__reindent_block
 __m3__dedent
 __m4__lines
+__m7__is_operator_name
 __m8__char_lit_emit
 __m8__dedent_segments
 __m8__ident_cont

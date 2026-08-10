@@ -1,4 +1,4 @@
-import { ==, print } from builtins;
+import { print, == } from builtins;
 
 // A `str` match takes string-literal arms, `[..]` destructuring, and `_`, not constructor patterns.
 fn label(s: str) -> str {
