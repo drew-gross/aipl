@@ -1207,6 +1207,13 @@ fn __builtin_join(self: str[], sep: str) -> str { "" }
 // `..!Error` (codegen builds the real ok/err).
 fn __builtin_read_file_to_string(self: str) !read_files -> str!Error { ok("") }
 fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Error { ok() }
+// Every file at or below the directory `self`, recursively: each element is the
+// path `self` joined with the entry's path beneath it (`"dir/sub/f.txt"`), in
+// unspecified order. Directories are descended into, not listed; a symlink is a
+// file (never followed). `err(..)` if the tree can't be walked at all — an
+// unreadable directory, a non-UTF-8 name, or an entry whose kind the filesystem
+// won't report.
+fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
 // Spawn `self` with `args` (no shell involved) and wait for it to finish:
 // `ok(ExecResult)` whenever it was actually launched, whatever it then exited
 // with; `err(message)` only if it couldn't be launched at all (not found,
@@ -1459,6 +1466,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "has",
     "read_file_to_string",
     "write_string_to_file",
+    "list_files",
     "execute_program",
     "union",
     "get",

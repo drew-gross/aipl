@@ -564,6 +564,71 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
+/// `list_files(dir) -> str[]?` runtime: every file at or below `dir`, walked
+/// recursively, as a fresh `str[]` of `dir`-prefixed paths — or null on
+/// any failure (unreadable directory, non-UTF-8 name, unknowable entry kind),
+/// which codegen wraps into `err`. Order is whatever the filesystem yields;
+/// callers that need determinism sort. A directory is descended into rather than
+/// listed, and a symlink counts as a file (`file_type` doesn't follow it), so the
+/// walk can't cycle. Decrements `dir` per the refcount protocol (callers pre-inc,
+/// as with any str-taking fn). Mirrors `aipl_list_files` in the linker runtime.
+extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
+    let result = list_files_impl(dir);
+    aipl_dec(dir);
+    result
+}
+
+fn list_files_impl(dir: *const u8) -> *const u8 {
+    if dir.is_null() {
+        return std::ptr::null();
+    }
+    let mut dbuf = [0u8; 8];
+    let Ok(root) = std::str::from_utf8(unsafe { str_bytes(dir, &mut dbuf) }) else {
+        return std::ptr::null();
+    };
+    let mut files: Vec<String> = Vec::new();
+    if walk_dir(root, &mut files).is_err() {
+        return std::ptr::null();
+    }
+    let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
+    let arr = aipl_array_new(files.len() as i64, drop_fn, 8);
+    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut i64 };
+    for (i, f) in files.iter().enumerate() {
+        unsafe { *elems.add(i) = make_str(f.as_bytes()) as i64 };
+    }
+    arr
+}
+
+/// Append every file under `dir` (recursively) to `out` as `dir`-prefixed paths.
+/// `Err(())` for anything that leaves the walk incomplete rather than silently
+/// short: an unreadable directory, a name that isn't UTF-8, or an entry whose
+/// kind the filesystem won't report (`file_type` falls back to `lstat` when the
+/// directory entry itself says "unknown", and only fails if that fails too).
+fn walk_dir(dir: &str, out: &mut Vec<String>) -> Result<(), ()> {
+    for entry in std::fs::read_dir(dir).map_err(|_| ())? {
+        let entry = entry.map_err(|_| ())?;
+        let name = entry.file_name();
+        let name = name.to_str().ok_or(())?;
+        let path = join_path(dir, name);
+        if entry.file_type().map_err(|_| ())?.is_dir() {
+            walk_dir(&path, out)?;
+        } else {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// `dir` and `name` joined with a single `/` (a `dir` that already ends in one
+/// isn't given a second). Mirrors the linker runtime's path building.
+fn join_path(dir: &str, name: &str) -> String {
+    if dir.ends_with('/') {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}/{name}")
+    }
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
 /// hidden-sret ABI the generic `compile_call` path already builds for any
 /// composite-returning builtin (see its `sret` handling) — `out` is the
@@ -2996,13 +3061,14 @@ pub fn build_test_program(program: &Program) -> Program {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
     };
     // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`/
-    // `!execute_program` functions), so the synthesized test fns / driver declare
-    // every known effect.
+    // `!list_files`/`!execute_program` functions), so the synthesized test fns /
+    // driver declare every known effect.
     let all_effects = || {
         vec![
             "prints".to_string(),
             "read_files".to_string(),
             "write_files".to_string(),
+            "list_files".to_string(),
             "execute_program".to_string(),
         ]
     };
@@ -3103,6 +3169,7 @@ const REINDENT_BLOCK_SRC: &str = include_str!("reindent_block.aipl");
 const INDENT_SRC: &str = include_str!("indent.aipl");
 const DOC_SRC: &str = include_str!("doc.aipl");
 const WALKER_SRC: &str = include_str!("walker.aipl");
+const FIND_FILES_SRC: &str = include_str!("find_files.aipl");
 
 /// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
 /// modules — so `from "./..."` imports resolve without disk access. Each file
@@ -3145,6 +3212,7 @@ pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./unescape.aipl", UNESCAPE_SRC),
     ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
     ("./indent.aipl", INDENT_SRC),
+    ("./find_files.aipl", FIND_FILES_SRC),
 ];
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
@@ -3168,6 +3236,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "is_operator_name",
     "lex_aipl",
     "lex_aipl_stripped",
+    "find_files",
 ];
 
 /// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
@@ -3484,6 +3553,40 @@ pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result
                 other => panic!("dogfooded fill_or_add_section_file() err payload: {other:?}"),
             },
             other => panic!("dogfooded fill_or_add_section_file() call: {other:?}"),
+        }
+    })
+}
+
+/// Every file at or below `dir` whose path ends with `ext`, sorted — computed by
+/// the dogfooded AIPL `find_files` via the FFI (itself doing the directory walk;
+/// nothing here touches `std::fs`). Not a parser hook — only `tests/fmt.rs`'s
+/// formatting enforcement calls this. Returns the walked paths, or the builtin
+/// `Error`'s message if the tree couldn't be walked. No native fallback; panics
+/// if it can't be built or called.
+pub fn find_files(dir: &str, ext: &str) -> Result<Vec<String>, String> {
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values(
+            "find_files",
+            &[
+                FfiValue::Str(dir.to_string()),
+                FfiValue::Str(ext.to_string()),
+            ],
+        ) {
+            Ok(FfiValue::Res(Ok(v))) => match *v {
+                FfiValue::Array(paths) => Ok(paths
+                    .into_iter()
+                    .map(|p| match p {
+                        FfiValue::Str(s) => s,
+                        other => panic!("dogfooded find_files() path is not a str: {other:?}"),
+                    })
+                    .collect()),
+                other => panic!("dogfooded find_files() ok side is not an array: {other:?}"),
+            },
+            Ok(FfiValue::Res(Err(e))) => match *e {
+                FfiValue::Str(s) => Err(s),
+                other => panic!("dogfooded find_files() err payload: {other:?}"),
+            },
+            other => panic!("dogfooded find_files() call: {other:?}"),
         }
     })
 }
@@ -4178,6 +4281,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl_write_string_to_file",
         aipl_write_string_to_file as *const u8,
     );
+    jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
@@ -6675,6 +6779,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_hash"
         | "aipl_str_iter_next"
         | "aipl_read_file_to_string"
+        | "aipl_list_files"
         | "aipl_str_reverse"
         | "aipl_str_sort" => sig(1, true),
         "aipl_rec_alloc"
@@ -6797,6 +6902,7 @@ fn register_builtins(
             "__builtin_write_string_to_file",
             "aipl_write_string_to_file",
         ),
+        ("__builtin_list_files", "aipl_list_files"),
         ("__builtin_execute_program", "aipl_execute_program"),
         ("__builtin_trim", "aipl_trim"),
         ("__builtin_repeat", "aipl_str_repeat"),
@@ -12421,6 +12527,52 @@ fn compile_call_expr<M: Module>(
             )?;
             // The ok payload is a fresh, owned str (the err is a static literal):
             // track so it's released at scope exit (drop decs it only on tag 1).
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &result_ty));
+            (ptr, result_ty)
+        }
+        "__builtin_list_files" => {
+            // `(str) -> str[]!str`: ok(paths) on success, err(message) on any
+            // failure. The runtime returns a fresh array pointer or null (an
+            // empty listing is still a real, non-null array block, so it reads
+            // back as `ok([])`); codegen wraps it into the Result with a static
+            // error message. The `!list_files` effect is checker-enforced.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("list_files expects 1 arg, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (dir_v, dir_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            expect_type(
+                &dir_t,
+                &Type::Primitive(Primitive::Str),
+                "list_files directory",
+                args[0].span.clone(),
+            )?;
+            // The runtime consumes (decs) the directory ref, so inc to keep our
+            // scope-tracked ref alive.
+            emit_inc(builder, module, builtins, dir_v);
+            let local = builtins.import(module, builder.func, "aipl_list_files");
+            let inst = builder.ins().call(local, &[dir_v]);
+            let raw = builder.inst_results(inst)[0];
+            let result_ty = Type::Result(
+                Box::new(Type::Array(Box::new(Type::Primitive(Primitive::Str)))),
+                Box::new(error_ty()),
+            );
+            let ptr = emit_file_result(
+                module,
+                builder,
+                cx,
+                raw,
+                /*ok_is_value=*/ true,
+                b"could not list files",
+            )?;
+            // The ok payload is a fresh, owned array (the err is a static
+            // literal): track so it's released at scope exit (drop decs the
+            // array — and cascades to its strs — only on tag 1).
             scopes
                 .last_mut()
                 .expect("scope")

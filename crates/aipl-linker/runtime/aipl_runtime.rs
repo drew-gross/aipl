@@ -677,6 +677,208 @@ unsafe fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
     }
 }
 
+/// `list_files(dir) -> str[]?`: every file at or below `dir`, walked
+/// recursively, as a fresh `str[]` of `dir`-prefixed paths — or null on any
+/// failure (unreadable directory, non-UTF-8 name, unknowable entry kind, path
+/// too long, unsupported platform), which codegen wraps into `err`. Order is
+/// whatever the filesystem yields; callers that need determinism sort. A
+/// directory is descended into rather than listed, and a symlink counts as a
+/// file (never followed), so the walk can't cycle. POSIX-only for now
+/// (`cfg(unix)`). Decrements `dir` per the refcount protocol. Mirrors
+/// `aipl_list_files` in the JIT runtime.
+#[no_mangle]
+pub extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
+    let result = unsafe { list_files_impl(dir) };
+    aipl_dec(dir);
+    result
+}
+
+#[cfg(unix)]
+unsafe fn list_files_impl(dir: *const u8) -> *const u8 {
+    unsafe { list_unix::list_files(dir) }
+}
+
+#[cfg(not(unix))]
+unsafe fn list_files_impl(_dir: *const u8) -> *const u8 {
+    core::ptr::null()
+}
+
+/// The recursive directory walk behind `list_files`, on POSIX `opendir`/
+/// `readdir`. Reading `struct dirent` means knowing its layout, which is
+/// per-platform (see [`D_TYPE_OFFSET`]) — hence a POSIX-gated module rather
+/// than the portable-libc style the rest of the runtime uses.
+#[cfg(unix)]
+mod list_unix {
+    use super::{
+        aipl_arr_drop_str, aipl_array_dec, aipl_array_push_mut, aipl_array_with_cap, make_str,
+        memcpy, str_bytes, strlen, ArrDropFn,
+    };
+    use core::ffi::{c_char, c_int, c_void};
+
+    // On x86_64 macOS the plain `opendir`/`readdir` symbols are the legacy
+    // 32-bit-inode variants with a different `struct dirent` layout; the C
+    // headers redirect to these `$INODE64` ones, so we name them directly.
+    // arm64 macOS has only the 64-bit-inode versions, under the bare names.
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    extern "C" {
+        #[link_name = "opendir$INODE64"]
+        fn opendir(name: *const c_char) -> *mut c_void;
+        #[link_name = "readdir$INODE64"]
+        fn readdir(dirp: *mut c_void) -> *const u8;
+        fn closedir(dirp: *mut c_void) -> c_int;
+    }
+    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+    extern "C" {
+        fn opendir(name: *const c_char) -> *mut c_void;
+        fn readdir(dirp: *mut c_void) -> *const u8;
+        fn closedir(dirp: *mut c_void) -> c_int;
+    }
+
+    // Byte offsets of `d_type` and `d_name` within `struct dirent`. macOS (with
+    // the 64-bit inode layout above): `d_ino: u64, d_seekoff: u64, d_reclen:
+    // u16, d_namlen: u16, d_type: u8, d_name`. Linux/BSD 64-bit: `d_ino: u64,
+    // d_off: i64, d_reclen: u16, d_type: u8, d_name`.
+    #[cfg(target_os = "macos")]
+    const D_TYPE_OFFSET: usize = 20;
+    #[cfg(target_os = "macos")]
+    const D_NAME_OFFSET: usize = 21;
+    #[cfg(not(target_os = "macos"))]
+    const D_TYPE_OFFSET: usize = 18;
+    #[cfg(not(target_os = "macos"))]
+    const D_NAME_OFFSET: usize = 19;
+
+    /// `d_type` values: the filesystem doesn't know the kind, and a directory.
+    /// Everything else counts as a file (a symlink included — it isn't followed).
+    const DT_UNKNOWN: u8 = 0;
+    const DT_DIR: u8 = 4;
+
+    /// Longest path the walk will build, NUL included — the usual `PATH_MAX`.
+    /// A deeper tree fails the listing rather than truncating a path.
+    const PATH_CAP: usize = 4096;
+
+    /// The walk's mutable state: one reusable NUL-terminated path buffer (each
+    /// level appends `/name` at its parent's length, so no per-frame copy) and
+    /// the `str[]` being accumulated.
+    struct Walk {
+        path: [u8; PATH_CAP],
+        out: *const u8,
+    }
+
+    /// Walk `dir` and return the `str[]` of files beneath it, or null on any
+    /// failure (a partially built array is released first).
+    pub unsafe fn list_files(dir: *const u8) -> *const u8 {
+        let mut dbuf = [0u8; 8];
+        let bytes = unsafe { str_bytes(dir, &mut dbuf) };
+        if bytes.is_empty() || bytes.len() >= PATH_CAP {
+            return core::ptr::null();
+        }
+        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
+        let mut w = Walk {
+            path: [0u8; PATH_CAP],
+            out: aipl_array_with_cap(0, drop_fn, 8),
+        };
+        unsafe {
+            memcpy(
+                w.path.as_mut_ptr() as *mut c_void,
+                bytes.as_ptr() as *const c_void,
+                bytes.len(),
+            );
+            if !walk(&mut w, bytes.len(), drop_fn) {
+                aipl_array_dec(w.out);
+                return core::ptr::null();
+            }
+        }
+        w.out
+    }
+
+    /// Descend into the directory named by the first `len` bytes of `w.path`,
+    /// appending every file beneath it to `w.out`. False if the walk couldn't be
+    /// completed — the caller then discards the whole listing.
+    unsafe fn walk(w: &mut Walk, len: usize, drop_fn: i64) -> bool {
+        w.path[len] = 0;
+        let d = unsafe { opendir(w.path.as_ptr() as *const c_char) };
+        if d.is_null() {
+            return false;
+        }
+        loop {
+            let ent = unsafe { readdir(d) };
+            if ent.is_null() {
+                break; // end of directory
+            }
+            let name = unsafe { ent.add(D_NAME_OFFSET) };
+            if unsafe { is_dot_entry(name) } {
+                continue;
+            }
+            let kind = unsafe { *ent.add(D_TYPE_OFFSET) };
+            let nlen = unsafe { strlen(name as *const c_char) };
+            // Append `/name` after the parent path (which never gets a second
+            // separator if it already ends in one).
+            let mut end = len;
+            if end == 0 || w.path[end - 1] != b'/' {
+                w.path[end] = b'/';
+                end += 1;
+            }
+            // The entry kind decides whether to descend, so an entry the
+            // filesystem won't classify fails the listing rather than guessing.
+            let ok = if kind == DT_UNKNOWN || end + nlen + 1 > PATH_CAP {
+                false
+            } else {
+                unsafe {
+                    memcpy(
+                        w.path.as_mut_ptr().add(end) as *mut c_void,
+                        name as *const c_void,
+                        nlen,
+                    );
+                    if kind == DT_DIR {
+                        walk(w, end + nlen, drop_fn)
+                    } else {
+                        push_file(w, end + nlen, drop_fn)
+                    }
+                }
+            };
+            if !ok {
+                unsafe { closedir(d) };
+                return false;
+            }
+        }
+        unsafe { closedir(d) };
+        true
+    }
+
+    /// Push the first `end` bytes of `w.path` onto the listing as a fresh str.
+    /// False for a path that isn't UTF-8 (an AIPL `str` the program could only
+    /// mangle further downstream).
+    unsafe fn push_file(w: &mut Walk, end: usize, drop_fn: i64) -> bool {
+        let bytes = unsafe { core::slice::from_raw_parts(w.path.as_ptr(), end) };
+        if core::str::from_utf8(bytes).is_err() {
+            return false;
+        }
+        let slot = make_str(bytes) as i64;
+        // retain-fn 0: the fresh string's one reference moves into the array.
+        w.out = unsafe {
+            aipl_array_push_mut(
+                w.out,
+                &slot as *const i64 as *const u8,
+                drop_fn,
+                0,
+                8,
+            )
+        };
+        true
+    }
+
+    /// Whether `name` is `.` or `..` — the two entries a walk always skips.
+    unsafe fn is_dot_entry(name: *const u8) -> bool {
+        unsafe {
+            if *name != b'.' {
+                return false;
+            }
+            let second = *name.add(1);
+            second == 0 || (second == b'.' && *name.add(2) == 0)
+        }
+    }
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring
 /// the JIT runtime): writes `Result<ExecResult, Error>` directly into `out`
 /// (tag 1 = ok, 0 = err, matching the `ok`/`err` expression codegen; the

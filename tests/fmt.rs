@@ -11,7 +11,7 @@
 //!   *idempotently*, and preserve its tokens and comments exactly — imports
 //!   excepted, which may reorder by design and are compared as multisets.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aipl::fmt::{format_source, FmtOptions};
 use aipl::{lex_signatures_and_comments, FmtTokenKind};
@@ -20,20 +20,14 @@ fn setup() {
     aipl::install_parser_hooks();
 }
 
-/// All `.aipl` files under `dir`, recursively, sorted for stable output.
-fn aipl_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    let mut entries: Vec<_> = entries.flatten().map(|e| e.path()).collect();
-    entries.sort();
-    for path in entries {
-        if path.is_dir() {
-            aipl_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aipl") {
-            out.push(path);
-        }
-    }
+/// All `.aipl` files under `dir`, recursively, sorted for stable output —
+/// walked by the dogfooded AIPL `find_files` (see [`aipl::codegen::find_files`]),
+/// not `std::fs`. A directory that can't be walked is a broken discovery, not an
+/// empty one, so it panics rather than silently enforcing nothing.
+fn aipl_files(dir: &str, out: &mut Vec<PathBuf>) {
+    let found = aipl::codegen::find_files(dir, ".aipl")
+        .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
+    out.extend(found.into_iter().map(PathBuf::from));
 }
 
 /// A value fingerprint of `src` split into import statements and everything
@@ -95,7 +89,7 @@ fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
 fn enforced_files() -> Vec<PathBuf> {
     let mut files = Vec::new();
     for dir in ["tests/cases", "crates", "examples", "tests/ffi_fixtures"] {
-        aipl_files(Path::new(dir), &mut files);
+        aipl_files(dir, &mut files);
     }
     files
 }
@@ -175,7 +169,7 @@ fn corpus_formats_idempotently_and_losslessly() {
     setup();
     let mut files = Vec::new();
     for dir in ["tests/cases", "crates", "examples", "tests/fmt"] {
-        aipl_files(Path::new(dir), &mut files);
+        aipl_files(dir, &mut files);
     }
     assert!(files.len() > 100, "corpus walk found too few files");
 
@@ -246,7 +240,7 @@ fn split_fixture(contents: &str) -> Option<(&str, &str)> {
 
 fn fixture_files() -> Vec<PathBuf> {
     let mut files = Vec::new();
-    aipl_files(Path::new("tests/fmt"), &mut files);
+    aipl_files("tests/fmt", &mut files);
     assert!(!files.is_empty(), "no fixtures under tests/fmt");
     files
 }

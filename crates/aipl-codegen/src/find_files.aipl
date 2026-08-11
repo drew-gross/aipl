@@ -1,0 +1,50 @@
+// The compiler's own directory walk: `tests/fmt.rs` uses it to discover every
+// `.aipl` file whose formatting is enforced.
+import { ends_with, filter, list_files, sort, == } from builtins;
+
+pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
+    ok(with_extension(list_files(dir)?, ext))
+}.doc("""
+    Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if
+    the tree can't be walked at all — see the `list_files` builtin.
+""").test({
+    // `list_files` is the disk-touching half, and this file is loaded in place by
+    // `aipl check` (whose cwd is the repo root, not a staged throwaway dir), so
+    // only the failure path — which reads nothing — is safe to exercise here. The
+    // success path is `with_extension` below, plus the end-to-end walk in
+    // `tests/cases/files/list_files.aipl`.
+    assert(find_files("no_such_dir_xyz_12345", ".aipl") == err("could not list files"));
+})
+
+pub fn with_extension(self: str[], ext: str) -> str[] {
+    self.filter(|p| p.ends_with(ext)).sort()
+}.doc("""
+    The paths ending with `ext`, sorted — the pure half of `find_files`, applied
+    to a directory listing (which arrives in filesystem order).
+""").test({
+    let paths = ["b/x.aipl", "a.txt", "a.aipl"];
+    assert(paths.with_extension(".aipl") == ["a.aipl", "b/x.aipl"]); // filtered + sorted
+    assert(paths.with_extension(".txt") == ["a.txt"]);
+    assert(paths.with_extension(".rs") == []); // nothing matches
+    assert(paths.with_extension("") == ["a.aipl", "a.txt", "b/x.aipl"]); // empty suffix matches all
+    assert([].with_extension(".aipl") == []); // empty listing
+
+    // The suffix is matched on the whole path, not just the name: an extension
+    // that only appears mid-path doesn't match.
+    assert(["a.aipl/b.txt"].with_extension(".aipl") == []);
+})
+--- monomorphizations ---
+__test$with_extension
+find_files
+main
+with_extension
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 936
+instructions executed: 1484
+binary size: 7056
+  code: 2820
+  data: 798
+  metadata: 3438

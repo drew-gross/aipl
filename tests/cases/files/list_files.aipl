@@ -1,0 +1,56 @@
+import { len, list_files, print, sort, to_str } from builtins;
+
+// `list_files` walks a directory tree into a `str[]!Error`: `ok(paths)` of every
+// file at or below it (recursively, each path prefixed with the directory it was
+// given), or `err(message)` if the tree can't be walked at all. It carries the
+// `!list_files` effect, so every caller must declare it. The files below are
+// staged next to the program (see the `file:` sections) and the harness runs in
+// that dir.
+
+// The filesystem yields entries in an unspecified order, so sorting is what makes
+// a listing printable. Directories are descended into, never listed themselves.
+fn sorted_listing(dir: str) !list_files -> str[]!Error {
+    match (list_files(dir)) {
+        ok(paths) => ok(paths.sort()),
+        err(e) => err(e),
+    }
+}
+
+// `?` unwraps the listing instead of matching on it, and the array it yields is
+// released with the rest of this scope — the balanced allocation/deallocation
+// counts below are what hold that down.
+fn count_files(dir: str) !list_files -> i64!Error { ok(i64(list_files(dir)?.len())) }
+
+fn main() !prints !list_files {
+    print(to_str(count_files("data")));
+    print(to_str(sorted_listing("data")));
+    print(to_str(sorted_listing("data/sub")));
+    print(to_str(sorted_listing("missing"))); // err: no such directory
+    print(to_str(sorted_listing("data/top.txt"))); // err: not a directory
+}
+--- file: data/top.txt ---
+top
+--- file: data/sub/nested.txt ---
+nested
+--- file: data/sub/deeper/leaf.txt ---
+leaf
+--- stdout ---
+ok(3)
+ok(["data/sub/deeper/leaf.txt", "data/sub/nested.txt", "data/top.txt"])
+ok(["data/sub/deeper/leaf.txt", "data/sub/nested.txt"])
+err("could not list files")
+err("could not list files")
+--- monomorphizations ---
+count_files
+main
+sorted_listing
+--- performance ---
+allocations: 19
+deallocations: 19
+reallocations: 8
+bytes allocated: 801
+instructions executed: 1430
+binary size: 6912
+  code: 3268
+  data: 403
+  metadata: 3241

@@ -29,6 +29,10 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   refcount elision after inlining likely beats the call-overhead win itself.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
+List files:
+  fall back on (l)stat in case of DT_UNKNOWN?
+  implement effect shims
+
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
@@ -294,14 +298,15 @@ implement vec.back(), use it to simplify trim_suffix
 
 Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
+walker.aipl:
+  If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
+
 optimize string comparison by comparing more than one byte at a time
 
 sort optimization:
   make sort_by a builtin so it can be faster
   make stable_sort and unstable_sort (qsort)
   get rid of the mut out = self[0..0] workaround
-
-The comparator's second parameter doesn't get its type bound. (T, T) -> bool binds a from the element type but leaves b as __none__. zip_with's (T, U) -> V works, so two-parameter lambdas are fine in general — it's specifically two parameters sharing one type variable that bind_field doesn't propagate. That's a checker/mono inference fix, not something I can hack around in the builtin.
 
 test procedure improvements:
   figureout why listing takes so long in nextest
