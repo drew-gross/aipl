@@ -33,6 +33,10 @@ List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims
 
+clock:
+  add a shim
+  make units types
+
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread

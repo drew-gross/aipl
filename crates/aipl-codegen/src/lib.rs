@@ -629,6 +629,19 @@ fn join_path(dir: &str, name: &str) -> String {
     }
 }
 
+/// `now_nanos() -> u64` runtime: wall-clock nanoseconds since the Unix epoch,
+/// carried on the shared `i64` ABI (a `u64` occupies the same 8-byte slot, so
+/// the bit pattern is the value — it stays positive until the year 2554). A
+/// clock set before the epoch reads as 0 rather than wrapping. Takes nothing and
+/// owns nothing, so there is no refcount traffic. Mirrors `aipl_now_nanos` in
+/// the linker runtime.
+extern "C" fn aipl_now_nanos() -> i64 {
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_nanos() as u64 as i64,
+        Err(_) => 0, // clock is before the epoch
+    }
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
 /// hidden-sret ABI the generic `compile_call` path already builds for any
 /// composite-returning builtin (see its `sret` handling) — `out` is the
@@ -3061,8 +3074,8 @@ pub fn build_test_program(program: &Program) -> Program {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
     };
     // A test body may call anything (incl. `!prints`/`!read_files`/`!write_files`/
-    // `!list_files`/`!execute_program` functions), so the synthesized test fns /
-    // driver declare every known effect.
+    // `!list_files`/`!execute_program`/`!clock` functions), so the synthesized
+    // test fns / driver declare every known effect.
     let all_effects = || {
         vec![
             "prints".to_string(),
@@ -3070,6 +3083,7 @@ pub fn build_test_program(program: &Program) -> Program {
             "write_files".to_string(),
             "list_files".to_string(),
             "execute_program".to_string(),
+            "clock".to_string(),
         ]
     };
 
@@ -4282,6 +4296,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         aipl_write_string_to_file as *const u8,
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
+    jit_builder.symbol("aipl_now_nanos", aipl_now_nanos as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
@@ -6755,7 +6770,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
         // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
         "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
-        "aipl_test_summary" => sig(0, true),
+        // Takes nothing, returns the reading.
+        "aipl_test_summary" | "aipl_now_nanos" => sig(0, true),
         "aipl_assert" => sig(2, false),
         "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
@@ -6903,6 +6919,7 @@ fn register_builtins(
             "aipl_write_string_to_file",
         ),
         ("__builtin_list_files", "aipl_list_files"),
+        ("__builtin_now_nanos", "aipl_now_nanos"),
         ("__builtin_execute_program", "aipl_execute_program"),
         ("__builtin_trim", "aipl_trim"),
         ("__builtin_repeat", "aipl_str_repeat"),
@@ -12532,6 +12549,24 @@ fn compile_call_expr<M: Module>(
                 .expect("scope")
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
+        }
+        "__builtin_now_nanos" => {
+            // `() -> u64`: the runtime reads the wall clock and returns the
+            // nanosecond count on the shared i64 ABI. Nothing is allocated or
+            // consumed, so there is no refcount traffic and nothing to track for
+            // scope release. The `!clock` effect is checker-enforced.
+            if !args.is_empty() {
+                return Err(Error::at(
+                    format!("now_nanos expects no args, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let local = builtins.import(module, builder.func, "aipl_now_nanos");
+            let inst = builder.ins().call(local, &[]);
+            (
+                builder.inst_results(inst)[0],
+                Type::Primitive(Primitive::U64),
+            )
         }
         "__builtin_list_files" => {
             // `(str) -> str[]!str`: ok(paths) on success, err(message) on any

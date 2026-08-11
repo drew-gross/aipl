@@ -1214,6 +1214,13 @@ fn __builtin_write_string_to_file(self: str, contents: str) !write_files -> !Err
 // unreadable directory, a non-UTF-8 name, or an entry whose kind the filesystem
 // won't report.
 fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
+
+// Wall-clock nanoseconds since the Unix epoch (1970-01-01 UTC). Unsigned and
+// 64-bit, so it counts up to the year 2554; a clock set before the epoch reads
+// as 0. This is the system's *wall* clock, which can jump backwards (NTP,
+// manual changes) — successive readings are not guaranteed to increase, so it
+// measures "when", not reliably "how long".
+fn __builtin_now_nanos() !clock -> u64 { u64(0) }
 // Spawn `self` with `args` (no shell involved) and wait for it to finish:
 // `ok(ExecResult)` whenever it was actually launched, whatever it then exited
 // with; `err(message)` only if it couldn't be launched at all (not found,
@@ -1467,6 +1474,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "read_file_to_string",
     "write_string_to_file",
     "list_files",
+    "now_nanos",
     "execute_program",
     "union",
     "get",

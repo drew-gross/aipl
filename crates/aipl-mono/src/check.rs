@@ -97,13 +97,15 @@ pub(crate) fn generic_instance_name(base: &str, args: &[Type]) -> String {
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
-/// `execute_program` = spawns a child process.
+/// `execute_program` = spawns a child process; `clock` = reads the wall clock
+/// (so a function's result depends on when it ran).
 const KNOWN_EFFECTS: &[&str] = &[
     "prints",
     "read_files",
     "write_files",
     "list_files",
     "execute_program",
+    "clock",
 ];
 
 /// A bound name's type and whether it's reassignable (`let mut` / `mut self`).

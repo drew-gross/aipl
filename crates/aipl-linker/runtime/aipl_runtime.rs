@@ -879,6 +879,51 @@ mod list_unix {
     }
 }
 
+/// `now_nanos() -> u64`: wall-clock nanoseconds since the Unix epoch, carried on
+/// the shared `i64` ABI (a `u64` occupies the same 8-byte slot, so the bit
+/// pattern is the value). A clock set before the epoch — or an unsupported
+/// platform — reads as 0. Takes nothing and owns nothing, so there is no
+/// refcount traffic. Mirrors `aipl_now_nanos` in the JIT runtime.
+#[no_mangle]
+pub extern "C" fn aipl_now_nanos() -> i64 {
+    unsafe { now_nanos_impl() }
+}
+
+#[cfg(unix)]
+unsafe fn now_nanos_impl() -> i64 {
+    // `struct timespec { tv_sec: time_t, tv_nsec: long }` is two 64-bit words on
+    // every 64-bit POSIX target, so one layout covers macOS and Linux alike —
+    // unlike `timeval`, whose `tv_usec` width differs between them. That's why
+    // this reads the clock through `clock_gettime` rather than `gettimeofday`.
+    #[repr(C)]
+    struct Timespec {
+        tv_sec: i64,
+        tv_nsec: i64,
+    }
+    extern "C" {
+        fn clock_gettime(clk_id: c_int, tp: *mut Timespec) -> c_int;
+    }
+    const CLOCK_REALTIME: c_int = 0;
+
+    let mut ts = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    if unsafe { clock_gettime(CLOCK_REALTIME, &mut ts) } != 0 || ts.tv_sec < 0 {
+        return 0; // unreadable clock, or one set before the epoch
+    }
+    // Wrapping, like the JIT's `as u64 as i64`: the count stays a valid unsigned
+    // nanosecond reading past the point where it stops fitting in an `i64`.
+    (ts.tv_sec as u64)
+        .wrapping_mul(1_000_000_000)
+        .wrapping_add(ts.tv_nsec as u64) as i64
+}
+
+#[cfg(not(unix))]
+unsafe fn now_nanos_impl() -> i64 {
+    0
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring
 /// the JIT runtime): writes `Result<ExecResult, Error>` directly into `out`
 /// (tag 1 = ok, 0 = err, matching the `ok`/`err` expression codegen; the
