@@ -1,0 +1,58 @@
+import { execute_program, monotonic_now, wrapping_sub as -, !, &&, <, >, >= } from builtins;
+
+// `monotonic_now` reads the system's monotonic clock in nanoseconds. It carries
+// the same `!clock` effect as `now_nanos`, but answers a different question:
+// this clock only ever counts up, so a *difference* between two readings is a
+// real elapsed duration. Its origin is unspecified, so an absolute reading means
+// nothing on its own — which is why the checks below are all about differences.
+
+fn readings_never_go_backwards() !clock -> bool {
+    let a = monotonic_now();
+    let b = monotonic_now();
+
+    // Non-strict: two back-to-back readings can land in the same clock tick, so
+    // the guarantee is "never decreases", not "always increases".
+    b >= a
+}.test({
+    assert(readings_never_go_backwards());
+    // 0 is what an unreadable clock reads as, so a live one is never there.
+    assert(monotonic_now() > u64(0));
+})
+
+// Loose on both ends deliberately: `sleep` never returns early, and the ceiling
+// is far enough out that a loaded machine can't trip it.
+fn is_about_one_second(ns: u64) -> bool { ns > u64(500000000) && ns < u64(60000000000) }.test({
+    assert(is_about_one_second(u64(1000000000))); // one second, on the nose
+    assert(is_about_one_second(u64(1400000000))); // a slow second still counts
+    assert(!is_about_one_second(u64(1000000))); // a millisecond clock: 1000x small
+    assert(!is_about_one_second(u64(1000))); // a microsecond clock: 1e6 too small
+    assert(!is_about_one_second(u64(0)));
+})
+
+fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
+    let start = monotonic_now();
+    match ("sleep".execute_program(args=["1"])) {
+        ok(r) => monotonic_now() - start,
+        // A launch failure reads as no elapsed time at all, which fails the
+        // check below — `sleep` has to actually run for this to mean anything.
+        err(e) => u64(0),
+    }
+}.test({
+    // Sleeping a second has to show up as roughly a billion nanoseconds. This is
+    // what pins the *unit*: a micro- or millisecond clock reads a thousand or a
+    // million times smaller, and would fail here.
+    assert(is_about_one_second(elapsed_over_a_one_second_sleep()));
+})
+--- monomorphizations ---
+is_about_one_second
+main
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 72
+instructions executed: 187
+binary size: 3664
+  code: 940
+  data: 631
+  metadata: 2093

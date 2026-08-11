@@ -642,6 +642,52 @@ extern "C" fn aipl_now_nanos() -> i64 {
     }
 }
 
+/// `monotonic_now() -> u64` runtime: nanoseconds from the system's monotonic
+/// clock, which only counts up — so a difference between two readings is a real
+/// elapsed duration. The origin is unspecified (the kernel's, typically boot),
+/// so an absolute reading means nothing on its own. Read through `clock_gettime`
+/// rather than `std::time::Instant` because `Instant` has no way to yield an
+/// absolute count, and because it puts this runtime and the linker's on the
+/// exact same clock. Mirrors `aipl_monotonic_now` in the linker runtime.
+extern "C" fn aipl_monotonic_now() -> i64 {
+    monotonic_nanos()
+}
+
+#[cfg(unix)]
+fn monotonic_nanos() -> i64 {
+    // See the linker runtime's `now_nanos_impl` for why this is `clock_gettime`
+    // (a `timespec` is two 64-bit words everywhere) rather than `gettimeofday`.
+    #[repr(C)]
+    struct Timespec {
+        tv_sec: i64,
+        tv_nsec: i64,
+    }
+    extern "C" {
+        fn clock_gettime(clk_id: std::ffi::c_int, tp: *mut Timespec) -> std::ffi::c_int;
+    }
+    // `CLOCK_MONOTONIC`'s value is per-platform: 6 on Darwin, 1 on Linux.
+    #[cfg(target_os = "macos")]
+    const CLOCK_MONOTONIC: std::ffi::c_int = 6;
+    #[cfg(not(target_os = "macos"))]
+    const CLOCK_MONOTONIC: std::ffi::c_int = 1;
+
+    let mut ts = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    if unsafe { clock_gettime(CLOCK_MONOTONIC, &mut ts) } != 0 {
+        return 0; // unreadable clock
+    }
+    (ts.tv_sec as u64)
+        .wrapping_mul(1_000_000_000)
+        .wrapping_add(ts.tv_nsec as u64) as i64
+}
+
+#[cfg(not(unix))]
+fn monotonic_nanos() -> i64 {
+    0
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
 /// hidden-sret ABI the generic `compile_call` path already builds for any
 /// composite-returning builtin (see its `sret` handling) — `out` is the
@@ -4297,6 +4343,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_now_nanos", aipl_now_nanos as *const u8);
+    jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
@@ -6771,7 +6818,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
         "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
         // Takes nothing, returns the reading.
-        "aipl_test_summary" | "aipl_now_nanos" => sig(0, true),
+        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(0, true),
         "aipl_assert" => sig(2, false),
         "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
@@ -6920,6 +6967,7 @@ fn register_builtins(
         ),
         ("__builtin_list_files", "aipl_list_files"),
         ("__builtin_now_nanos", "aipl_now_nanos"),
+        ("__builtin_monotonic_now", "aipl_monotonic_now"),
         ("__builtin_execute_program", "aipl_execute_program"),
         ("__builtin_trim", "aipl_trim"),
         ("__builtin_repeat", "aipl_str_repeat"),
@@ -12550,18 +12598,24 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        "__builtin_now_nanos" => {
-            // `() -> u64`: the runtime reads the wall clock and returns the
-            // nanosecond count on the shared i64 ABI. Nothing is allocated or
-            // consumed, so there is no refcount traffic and nothing to track for
-            // scope release. The `!clock` effect is checker-enforced.
+        "__builtin_now_nanos" | "__builtin_monotonic_now" => {
+            // `() -> u64`: the runtime reads a clock (wall or monotonic) and
+            // returns the nanosecond count on the shared i64 ABI. Nothing is
+            // allocated or consumed, so there is no refcount traffic and nothing
+            // to track for scope release. The `!clock` effect is
+            // checker-enforced.
+            let (sym, pretty) = if name == "__builtin_now_nanos" {
+                ("aipl_now_nanos", "now_nanos")
+            } else {
+                ("aipl_monotonic_now", "monotonic_now")
+            };
             if !args.is_empty() {
                 return Err(Error::at(
-                    format!("now_nanos expects no args, got {}", args.len()),
+                    format!("{pretty} expects no args, got {}", args.len()),
                     span.clone(),
                 ));
             }
-            let local = builtins.import(module, builder.func, "aipl_now_nanos");
+            let local = builtins.import(module, builder.func, sym);
             let inst = builder.ins().call(local, &[]);
             (
                 builder.inst_results(inst)[0],

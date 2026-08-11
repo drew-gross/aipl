@@ -33,6 +33,8 @@ List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims
 
+u64 can't be a Result payload
+
 clock:
   add a shim
   make units types

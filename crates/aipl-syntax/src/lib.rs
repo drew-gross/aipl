@@ -1221,6 +1221,12 @@ fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
 // manual changes) — successive readings are not guaranteed to increase, so it
 // measures "when", not reliably "how long".
 fn __builtin_now_nanos() !clock -> u64 { u64(0) }
+// Nanoseconds from the system's monotonic clock: it only ever counts up (no NTP
+// step or manual clock change moves it), so a *difference* between two readings
+// is a real elapsed duration. Its origin is unspecified — an absolute reading
+// means nothing on its own, and nothing across processes or machines. Use this
+// to measure "how long"; use `now_nanos` for "when".
+fn __builtin_monotonic_now() !clock -> u64 { u64(0) }
 // Spawn `self` with `args` (no shell involved) and wait for it to finish:
 // `ok(ExecResult)` whenever it was actually launched, whatever it then exited
 // with; `err(message)` only if it couldn't be launched at all (not found,
@@ -1475,6 +1481,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "write_string_to_file",
     "list_files",
     "now_nanos",
+    "monotonic_now",
     "execute_program",
     "union",
     "get",

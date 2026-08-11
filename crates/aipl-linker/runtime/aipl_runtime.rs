@@ -891,37 +891,75 @@ pub extern "C" fn aipl_now_nanos() -> i64 {
 
 #[cfg(unix)]
 unsafe fn now_nanos_impl() -> i64 {
-    // `struct timespec { tv_sec: time_t, tv_nsec: long }` is two 64-bit words on
-    // every 64-bit POSIX target, so one layout covers macOS and Linux alike —
-    // unlike `timeval`, whose `tv_usec` width differs between them. That's why
-    // this reads the clock through `clock_gettime` rather than `gettimeofday`.
-    #[repr(C)]
-    struct Timespec {
-        tv_sec: i64,
-        tv_nsec: i64,
-    }
-    extern "C" {
-        fn clock_gettime(clk_id: c_int, tp: *mut Timespec) -> c_int;
-    }
-    const CLOCK_REALTIME: c_int = 0;
-
-    let mut ts = Timespec {
-        tv_sec: 0,
-        tv_nsec: 0,
-    };
-    if unsafe { clock_gettime(CLOCK_REALTIME, &mut ts) } != 0 || ts.tv_sec < 0 {
-        return 0; // unreadable clock, or one set before the epoch
-    }
-    // Wrapping, like the JIT's `as u64 as i64`: the count stays a valid unsigned
-    // nanosecond reading past the point where it stops fitting in an `i64`.
-    (ts.tv_sec as u64)
-        .wrapping_mul(1_000_000_000)
-        .wrapping_add(ts.tv_nsec as u64) as i64
+    unsafe { clock_nanos(CLOCK_REALTIME) }
 }
 
 #[cfg(not(unix))]
 unsafe fn now_nanos_impl() -> i64 {
     0
+}
+
+/// `monotonic_now() -> u64`: nanoseconds from the system's monotonic clock,
+/// which only counts up — so a difference between two readings is a real
+/// elapsed duration. The origin is unspecified (the kernel's, typically boot),
+/// so an absolute reading means nothing on its own. Reads as 0 on an
+/// unsupported platform. Mirrors `aipl_monotonic_now` in the JIT runtime.
+#[no_mangle]
+pub extern "C" fn aipl_monotonic_now() -> i64 {
+    unsafe { monotonic_now_impl() }
+}
+
+#[cfg(unix)]
+unsafe fn monotonic_now_impl() -> i64 {
+    unsafe { clock_nanos(CLOCK_MONOTONIC) }
+}
+
+#[cfg(not(unix))]
+unsafe fn monotonic_now_impl() -> i64 {
+    0
+}
+
+// `struct timespec { tv_sec: time_t, tv_nsec: long }` is two 64-bit words on
+// every 64-bit POSIX target, so one layout covers macOS and Linux alike — unlike
+// `timeval`, whose `tv_usec` width differs between them. That's why the clocks
+// are read through `clock_gettime` rather than `gettimeofday`.
+#[cfg(unix)]
+#[repr(C)]
+struct Timespec {
+    tv_sec: i64,
+    tv_nsec: i64,
+}
+
+#[cfg(unix)]
+extern "C" {
+    fn clock_gettime(clk_id: c_int, tp: *mut Timespec) -> c_int;
+}
+
+/// Wall clock, seconds since the Unix epoch. Same id on every POSIX platform.
+#[cfg(unix)]
+const CLOCK_REALTIME: c_int = 0;
+/// Monotonic clock — the id, unlike `CLOCK_REALTIME`'s, is per-platform.
+#[cfg(all(unix, target_os = "macos"))]
+const CLOCK_MONOTONIC: c_int = 6;
+#[cfg(all(unix, not(target_os = "macos")))]
+const CLOCK_MONOTONIC: c_int = 1;
+
+/// Read clock `id` as a nanosecond count. 0 if the clock can't be read, or (for
+/// the wall clock) is set before its epoch. The arithmetic wraps, like the JIT's
+/// `as u64 as i64`: the count stays a valid *unsigned* nanosecond reading past
+/// the point where it stops fitting in an `i64`.
+#[cfg(unix)]
+unsafe fn clock_nanos(id: c_int) -> i64 {
+    let mut ts = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    if unsafe { clock_gettime(id, &mut ts) } != 0 || ts.tv_sec < 0 {
+        return 0;
+    }
+    (ts.tv_sec as u64)
+        .wrapping_mul(1_000_000_000)
+        .wrapping_add(ts.tv_nsec as u64) as i64
 }
 
 /// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring

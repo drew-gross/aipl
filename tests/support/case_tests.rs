@@ -95,6 +95,7 @@ case_tests! {
     cases_builtins_err_use_without_import = "cases/builtins/err_use_without_import",
     cases_builtins_err_value_or_type_mismatch = "cases/builtins/err_value_or_type_mismatch",
     cases_builtins_import_then_use = "cases/builtins/import_then_use",
+    cases_builtins_monotonic_now = "cases/builtins/monotonic_now",
     cases_builtins_now_nanos = "cases/builtins/now_nanos",
     cases_builtins_reverse = "cases/builtins/reverse",
     cases_builtins_span = "cases/builtins/span",
