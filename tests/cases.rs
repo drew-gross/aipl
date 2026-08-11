@@ -745,16 +745,15 @@ fn run_fill() {
     );
 }
 
+/// Every `.aipl` case under `dir`, recursively — walked by the dogfooded AIPL
+/// `find_files` (see [`aipl::codegen::find_files`]), not `std::fs`. Discovery
+/// finding nothing would silently run no cases at all, so an unwalkable
+/// directory panics rather than yielding an empty list.
 fn collect_cases(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("read tests/cases dir") {
-        let entry = entry.expect("dir entry");
-        let path = entry.path();
-        if path.is_dir() {
-            collect_cases(&path, out);
-        } else if path.extension().and_then(|s| s.to_str()) == Some("aipl") {
-            out.push(path);
-        }
-    }
+    let dir = dir.to_str().expect("utf-8 directory path");
+    let found = aipl::codegen::find_files(dir, ".aipl")
+        .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
+    out.extend(found.into_iter().map(PathBuf::from));
 }
 
 fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill: bool) -> Outcome {

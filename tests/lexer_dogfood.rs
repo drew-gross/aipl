@@ -170,19 +170,13 @@ fn hook_dump(src: &str) -> String {
     }
 }
 
-/// Every `.aipl` file under `dir`, recursively.
+/// Every `.aipl` file under `dir`, recursively — walked by the dogfooded AIPL
+/// `find_files` (see [`aipl::codegen::find_files`]), not `std::fs`.
 fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_aipl(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aipl") {
-            out.push(path);
-        }
-    }
+    let dir = dir.to_str().expect("utf-8 directory path");
+    let found = aipl::codegen::find_files(dir, ".aipl")
+        .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
+    out.extend(found.into_iter().map(PathBuf::from));
 }
 
 /// The freshly-compiled lexer produces the expected tokens for a small

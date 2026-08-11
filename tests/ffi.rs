@@ -662,19 +662,13 @@ fn compile_sources_rejects_a_missing_module() {
     assert_eq!(err.err().expect("Should err").message, "calc.aipl: imported module \"mathlib.aipl\" was not provided to compile_sources. Sources: [\"./ffi_fixtures/calc.aipl\"]");
 }
 
-/// Recursively collect `.aipl` files under `dir`.
+/// Recursively collect `.aipl` files under `dir` — walked by the dogfooded AIPL
+/// `find_files` (see [`aipl::codegen::find_files`]), not `std::fs`.
 fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let p = entry.path();
-        if p.is_dir() {
-            collect_aipl(&p, out);
-        } else if p.extension().is_some_and(|e| e == "aipl") {
-            out.push(p);
-        }
-    }
+    let dir = dir.to_str().expect("utf-8 directory path");
+    let found = aipl::codegen::find_files(dir, ".aipl")
+        .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
+    out.extend(found.into_iter().map(PathBuf::from));
 }
 
 /// Every `.aipl` file embedded in a compiler crate (used via the FFI) must be

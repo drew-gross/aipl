@@ -360,18 +360,14 @@ fn collect_files() -> Vec<(PathBuf, &'static str)> {
     out
 }
 
+/// Every `.aipl` file under `dir`, recursively, tagged with `prefix` — walked by
+/// the dogfooded AIPL `find_files` (see [`aipl::codegen::find_files`]), not
+/// `std::fs`.
 fn visit_aipl(dir: &Path, prefix: &'static str, out: &mut Vec<(PathBuf, &'static str)>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            visit_aipl(&path, prefix, out);
-        } else if path.extension().and_then(|s| s.to_str()) == Some("aipl") {
-            out.push((path, prefix));
-        }
-    }
+    let dir = dir.to_str().expect("utf-8 directory path");
+    let found = aipl::codegen::find_files(dir, ".aipl")
+        .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
+    out.extend(found.into_iter().map(|p| (PathBuf::from(p), prefix)));
 }
 
 /// True if the file declares an `--- errors ---` section — i.e. it
