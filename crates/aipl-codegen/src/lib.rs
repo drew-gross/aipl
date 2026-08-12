@@ -13082,11 +13082,12 @@ fn compile_call_expr<M: Module>(
                 ));
             };
             let elem = (**elem).clone();
-            // Only `i64` and `str` actually reach here today: `char[]` took the
-            // str path above, and no narrow or unsigned integer is a legal array
-            // element yet (`u64[]`/`u8[]`/`i32[]` are all rejected — see
-            // `is_array_elem`). The unsigned arm is kept anyway so that widening
-            // element support later cannot silently sort unsigned words as signed.
+            // `char[]` took the str path above; every other element type that
+            // satisfies the `ord` bound reaches here. Elements of a narrow width
+            // are stored canonicalized in their 8-byte slots (sign-extended for
+            // `i*`, zero-extended for `u*`), so the same full-width signed and
+            // unsigned comparisons order them correctly — only the choice
+            // between the two arms depends on the width's signedness.
             let kind = match &elem {
                 Type::Primitive(Primitive::Str) => SORT_KIND_STR,
                 // A `char` is a byte value, so it orders as an unsigned word.

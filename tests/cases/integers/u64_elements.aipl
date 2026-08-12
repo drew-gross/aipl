@@ -10,13 +10,12 @@ import {
     ==,
 } from builtins;
 
-// `u64` works as an array and optional element, not just as a scalar. Both
-// 64-bit integers fit because an element slot is 8 bytes and a 64-bit value
-// needs no re-canonicalization when loaded — only the *interpretation* differs,
-// and everything that reads one (rendering, comparison, `sort`) dispatches on
-// signedness. The narrow widths (`i8`..`i32`, `u8`..`u32`) still don't fit: their
-// slots would have to be truncated and re-extended, so they stay scalar-only
-// (see `err_narrow_int_element`).
+// `u64` works as an array and optional element, not just as a scalar. An
+// element slot is 8 bytes and a 64-bit value needs no re-canonicalization when
+// loaded — only the *interpretation* differs, and everything that reads one
+// (rendering, comparison, `sort`) dispatches on signedness. This file is the
+// `u64`-specific half of that; `narrow_int_elements` covers the sub-64-bit
+// widths, which round-trip the same way.
 
 fn sum(xs: u64[]) -> u64 {
     mut total = u64(0);

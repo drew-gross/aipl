@@ -8,11 +8,9 @@ import { len, print, sort, to_str, &&, == } from builtins;
 // chars and strings by byte. Unlike `reverse`, the result cannot be a lazy view
 // — the order isn't a function of the index — so it is materialized.
 //
-// Only `i64`, `char` and `str` elements are exercised below because those are the
-// only `ord` types that can currently *be* array elements: `u64[]`/`u8[]`/`i32[]`
-// are all rejected ("not yet supported as an array/optional element"). The
-// runtime still distinguishes signed from unsigned words, so that stays correct
-// if narrow elements are allowed later.
+// Every integer width is an `ord` array element, and the runtime picks the
+// signed or unsigned comparison from the element type — see
+// `integers/narrow_int_elements` for the width-by-width coverage.
 
 fn sorted_ints() -> i64[] { [3, 1, 2].sort() }.test({
     assert(sorted_ints() == [1, 2, 3]);

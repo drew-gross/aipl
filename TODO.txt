@@ -87,8 +87,6 @@ make for (key, val) work for dicts, and also arrays (key=index)
 line numbers on test assertion failures, err/none propagations, etc.
 get claude to reorganize my todos
 
-only i64 among integers can be an array element <--- really? fix this
-u64? isn't a supported optional element type. <--- really? fix this
 A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at first — char[] shares the str representation and has no array length field, so array_len_of read garbage. Routed str-shaped receivers to a separate aipl_str_sort, mirroring how reverse splits the same cases.
 The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
 
@@ -131,8 +129,6 @@ have the clir IR include the human readable version of data section strings in c
 
 Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
 
-TODO: garbage collectable types, so we can make a .aipl parser.
-
 improve dogfooding:
 - stop using global function ids.
 - go back to one .clif file per .aipl file
@@ -151,10 +147,6 @@ instead of err_message use x == err(...)
 set k++;
 
 use template literals more than concat
-
-extended should just use concat at the call site
-
-nextest is reporting a leak in cases_arithmetic_precedence
 
 make a function composition operator
 

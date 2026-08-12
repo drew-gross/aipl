@@ -1,8 +1,0 @@
-// `i64` and `u64` are allowed as array/optional elements, but the narrow widths
-// are not: an element slot is 8 bytes and a narrow value would have to be
-// truncated on store and re-extended on load. They remain usable as scalars.
-fn f(xs: u8[]) -> u8[] { xs }
-
-fn main() {}
---- errors ---
-error: fn "f": u8 is not yet supported as an array/optional element (only as a scalar value)
