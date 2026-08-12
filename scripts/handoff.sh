@@ -36,10 +36,10 @@
 #      just those cases' sections from actual output (not the whole corpus).
 #   5. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
 #      artifact -> auto-promote when that run is green.
-#  5b. Rebuild, if steps 3-5 changed something that is compiled in rather than
-#      read at run time (the promoted `.clif`s, the per-case `#[test]` list). Its
-#      own step purely so the timing report attributes the compile to the thing
-#      that caused it instead of to the final run.
+#  5b. Rebuild, if step 3 regenerated the per-case `#[test]` list (the one thing
+#      the remediation steps rewrite that is compiled in rather than read at run
+#      time). Its own step purely so the timing report attributes the compile to
+#      the thing that caused it instead of to the final run.
 #   6. Final run confirms green against the live (promoted) artifacts.
 #
 # Test runner: `cargo nextest`, which runs each test in its own process (so one
@@ -372,22 +372,20 @@ fi
 
 # --- 5b. Rebuild what the regeneration invalidated ------------------------------
 
-# Some of what steps 3-5 rewrite is *compiled in*, not read at runtime, so the
-# final run below can't start until cargo rebuilds:
-#   - `promote_staged_ir` overwrites dogfood.clif (948K) and fmt.clif (3.0M),
-#     both `include_str!`d by aipl-codegen — which aipl-fmt and the root crate
-#     depend on, so every test binary relinks. Measured at ~730s here, against a
-#     1s no-op build.
-#   - `fill_case_tests` regenerates tests/support/case_tests.rs, `include!`d by
-#     tests/cases.rs — one binary, far cheaper.
-# (`fill_expected` needs no rebuild: case `.aipl` files are read at run time. Nor
-# does the staged-IR corpus run above — AIPL_DOGFOOD_IR/AIPL_FMT_IR are read at
-# run time and the `.staged` files aren't compiled in.)
+# `fill_case_tests` regenerates tests/support/case_tests.rs, which tests/cases.rs
+# pulls in with `include!` — so it's a source change, and the final run below
+# can't start until the `cases` binary is rebuilt. Its own labelled step so the
+# timing report attributes that compile to the regeneration that caused it
+# instead of making the final run look mysteriously slow.
 #
-# Doing it here as its own labelled step makes it no faster. It makes it *legible*:
-# otherwise the final run reports ~4x the discovery run's wall clock with the
-# entire difference being a compile the timing report never mentions.
-if [ $need_ir -eq 1 ] || [ $need_case_tests -eq 1 ]; then
+# Nothing else in steps 3-5 invalidates the build. `fill_expected` rewrites case
+# `.aipl` files, read at run time. `promote_staged_ir` rewrites dogfood.clif and
+# fmt.clif, also read at run time (DOGFOOD_CLIF_PATH / FMT_CLIF_PATH are compile-
+# time *paths*, not `include_str!`d text) — that used to cost ~730s here, all of
+# it rebuilding the 12 test binaries, which is why it's a path now. Nor does the
+# staged-IR corpus run above: the `.staged` files are read through
+# AIPL_DOGFOOD_IR/AIPL_FMT_IR and aren't compiled in either.
+if [ $need_case_tests -eq 1 ]; then
     run_step "nextest --no-run (rebuild after regeneration)" \
         cargo nextest run --no-run --color never
     [ $? -eq 0 ] || {

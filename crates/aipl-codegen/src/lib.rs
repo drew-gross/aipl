@@ -3270,9 +3270,9 @@ const FIND_FILES_SRC: &str = include_str!("find_files.aipl");
 /// appears exactly once (unlike the old per-function engines, which each
 /// separately bundled copies of their shared dependencies — `lines.aipl`,
 /// `parse_test_section_header.aipl`, etc.). This is the single source of
-/// truth shared by [`DOGFOOD_ENGINE`] (re-linked from the checked-in
-/// [`DOGFOOD_CLIF`]), the author helper that regenerates it, and the test that
-/// verifies it's current.
+/// truth shared by [`DOGFOOD_ENGINE`] (re-linked from the checked-in artifact at
+/// [`DOGFOOD_CLIF_PATH`]), the author helper that regenerates it, and the test
+/// that verifies it's current.
 pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
     ("./process_raw_string.aipl", RAW_STRING_SRC),
     ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
@@ -3370,8 +3370,10 @@ pub const FMT_SOURCES: &[(&str, &str)] = &[
 /// The formatter engine's single FFI entry.
 pub const FMT_ENTRIES: &[&str] = &["format_program"];
 
-/// The checked-in formatter IR, and its filename for the `dogfood_ir` test.
-pub const FMT_CLIF: &str = include_str!("fmt.clif");
+/// Where the checked-in formatter IR lives, and its bare filename for the
+/// `dogfood_ir` test. See [`DOGFOOD_CLIF_PATH`] for why this is a path read at
+/// run time rather than the artifact text baked in with `include_str!`.
+pub const FMT_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/fmt.clif");
 pub const FMT_CLIF_FILE: &str = "fmt.clif";
 
 /// Env var naming an alternate *formatter* artifact — the [`DOGFOOD_IR_ENV`]
@@ -3379,11 +3381,26 @@ pub const FMT_CLIF_FILE: &str = "fmt.clif";
 /// regenerated and promoted together.
 pub const FMT_IR_ENV: &str = "AIPL_FMT_IR";
 
-/// The checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
-/// [`DOGFOOD_ENTRIES`], re-linked at runtime instead of recompiling from
-/// source. Kept current by the `dogfood_ir` test (regenerate with
+/// Where the checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
+/// [`DOGFOOD_ENTRIES`] lives — re-linked at run time instead of recompiling
+/// from source. Kept current by the `dogfood_ir` test (regenerate with
 /// `fill_dogfood_ir`).
-pub const DOGFOOD_CLIF: &str = include_str!("dogfood.clif");
+///
+/// This is a *path*, resolved at compile time from the manifest directory, and
+/// the file is read at run time. It used to be the artifact text itself, via
+/// `include_str!` — which made every `.clif` regeneration a source change to
+/// this crate, and so a full rebuild of it, everything downstream, and all 12
+/// test binaries: ~730s against a 1s no-op build. Since `promote_staged_ir`
+/// rewrites both artifacts, that cost landed on every handoff that touched IR
+/// generation. Reading at run time leaves no crate's fingerprint depending on
+/// the artifact, so regenerating one now costs nothing to rebuild.
+///
+/// The price is that a compiler binary is tied to the repo it was built from,
+/// and a missing artifact is a run-time panic rather than a compile error. The
+/// run-time read path is not new or lightly tested, though: it is exactly what
+/// [`DOGFOOD_IR_ENV`] has always done, and the staged-IR workflow drives the
+/// whole corpus through it before every promotion.
+pub const DOGFOOD_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/dogfood.clif");
 /// The checked-in artifact's filename, for the `dogfood_ir` test.
 pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
 
@@ -3391,34 +3408,34 @@ pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
 /// (see [`dogfood_artifact_text`]). Set it to a `.clif` path — typically
 /// `dogfood.clif.staged` — to validate *candidate* IR: every parse the compiler
 /// does (including its own source) then runs off that file instead of the
-/// baked-in [`DOGFOOD_CLIF`], so `AIPL_DOGFOOD_IR=…staged cargo test` exercises
-/// staged IR across the whole corpus before it's promoted to live. Unset (the
-/// normal case) uses the compiled-in artifact and reads no file.
+/// checked-in [`DOGFOOD_CLIF_PATH`], so `AIPL_DOGFOOD_IR=…staged cargo test`
+/// exercises staged IR across the whole corpus before it's promoted to live.
 pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
 
 /// The dogfood-IR artifact text to link: the file named by [`DOGFOOD_IR_ENV`]
-/// if that env var is set to a non-empty path, else the baked-in
-/// [`DOGFOOD_CLIF`]. Reading the env-named file loudly panics on an I/O error
-/// (a validation run pointed at a missing/unreadable artifact is a mistake to
-/// surface, not to silently fall back from).
-fn dogfood_artifact_text() -> std::borrow::Cow<'static, str> {
-    artifact_text(DOGFOOD_IR_ENV, DOGFOOD_CLIF)
+/// if that env var is set to a non-empty path, else the checked-in
+/// [`DOGFOOD_CLIF_PATH`].
+fn dogfood_artifact_text() -> String {
+    artifact_text(DOGFOOD_IR_ENV, DOGFOOD_CLIF_PATH)
 }
 
 /// The formatter artifact text, on the same rules.
-fn fmt_artifact_text() -> std::borrow::Cow<'static, str> {
-    artifact_text(FMT_IR_ENV, FMT_CLIF)
+fn fmt_artifact_text() -> String {
+    artifact_text(FMT_IR_ENV, FMT_CLIF_PATH)
 }
 
-fn artifact_text(env: &str, baked_in: &'static str) -> std::borrow::Cow<'static, str> {
-    match std::env::var(env) {
-        Ok(path) if !path.is_empty() => {
-            let text = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("{env}={path:?}: could not read IR: {e}"));
-            std::borrow::Cow::Owned(text)
-        }
-        _ => std::borrow::Cow::Borrowed(baked_in),
-    }
+/// Read an IR artifact: the path in `$env` if that's set to something non-empty,
+/// else `checked_in`. An I/O error is a loud panic either way — an override
+/// pointing at a missing file is a mistake to surface, and a missing checked-in
+/// artifact means the compiler can't parse its own source, for which there is
+/// deliberately no fallback (see "No native fallbacks for dogfooded functions").
+fn artifact_text(env: &str, checked_in: &'static str) -> String {
+    let (path, from) = match std::env::var(env) {
+        Ok(p) if !p.is_empty() => (p, env),
+        _ => (checked_in.to_string(), "checked-in IR"),
+    };
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{from}: could not read IR at {path:?}: {e}"))
 }
 
 thread_local! {
