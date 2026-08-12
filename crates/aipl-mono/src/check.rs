@@ -146,6 +146,12 @@ struct Cx<'a> {
     /// type-vars substituted), so a `return value;` can be checked against it.
     /// Functions are top-level (never nested), so a single slot suffices.
     current_ret: std::cell::RefCell<Type>,
+    /// The name and type parameters of the function currently being checked, so
+    /// a `let x: T = ..` annotation deep in its body can be validated with
+    /// [`Cx::check_ty`] (which needs both) and blamed on the right function.
+    /// Single slots for the same reason as `current_ret`: functions never nest.
+    current_fn: std::cell::RefCell<String>,
+    current_type_params: std::cell::RefCell<Vec<String>>,
 }
 
 impl<'a> Cx<'a> {
@@ -737,6 +743,8 @@ pub fn check(program: &Program) -> Result<(), Error> {
         generic_ctors: &generic_ctors,
         sigs: &sigs,
         current_ret: std::cell::RefCell::new(Type::Unit),
+        current_fn: std::cell::RefCell::new(String::new()),
+        current_type_params: std::cell::RefCell::new(Vec::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -876,8 +884,11 @@ impl Cx<'_> {
         // A `mut self` method and a `()`-returning fn check their body as unit.
         let declared = subst_typevars(&f.sig.return_type(), &type_var_names);
         // Make the declared return type available to any `return value;` in the
-        // body (functions are top-level, so this single slot can't nest).
+        // body (functions are top-level, so this single slot can't nest), and
+        // likewise the name/type params for any `let x: T = ..` annotation.
         *self.current_ret.borrow_mut() = declared.clone();
+        *self.current_fn.borrow_mut() = f.name.clone();
+        *self.current_type_params.borrow_mut() = type_var_names.clone();
         let body_ty = self.check_expr(&f.body, &env, &f.sig.effects)?;
         // A bare-literal body flexes to a narrow-int return type (`fn g() -> u8
         // { 200 }`).
@@ -1007,6 +1018,58 @@ impl Cx<'_> {
                 Ok(())
             }
         }
+    }
+
+    /// Type a `let`/`mut` binding's initializer and decide the binding's type —
+    /// the half of `Let`/`LetMut` checking that doesn't depend on mutability.
+    ///
+    /// Unannotated, the binding simply takes the initializer's type. With a
+    /// `let x: T = ..` annotation, `T` is the binding's type and the
+    /// initializer is checked *against* it, so a bare integer literal flexes to
+    /// it (`let n: u8 = 200;`) exactly as it would flowing into a parameter or
+    /// a declared return type. The annotation is the only way to pin a narrow
+    /// width on a binding whose initializer would otherwise infer `i64`.
+    fn check_binding(
+        &self,
+        name: &str,
+        ty: Option<&Type>,
+        val: &Expr,
+        body: &Expr,
+        env: &Env,
+        effects: &[String],
+    ) -> Result<Type, Error> {
+        let vt = self.check_expr(val, env, effects)?;
+        if is_unit(&vt) {
+            return Err(Error::at(
+                format!("cannot bind {name:?} to a value of type ()"),
+                val.span.clone(),
+            ));
+        }
+        check_result_inspected(name, &vt, body, val.span.clone())?;
+        let Some(declared) = ty else {
+            return Ok(vt);
+        };
+        // An annotation is a type in its own right: reject one that names an
+        // unknown type or is illegal in this position, with the same
+        // diagnostics a parameter's type gets.
+        self.check_ty(
+            declared,
+            &self.current_type_params.borrow(),
+            &self.current_fn.borrow(),
+        )?;
+        let declared = subst_typevars(declared, &self.current_type_params.borrow());
+        let vt = self.flex_int(val, &vt, &declared)?;
+        coerce(&vt, &declared).map_err(|()| {
+            Error::at(
+                format!(
+                    "binding {name:?} is declared {}, but its value is {}",
+                    tyname(&declared),
+                    tyname(&vt)
+                ),
+                val.span.clone(),
+            )
+        })?;
+        Ok(declared)
     }
 
     fn check_elem_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
@@ -1766,39 +1829,25 @@ impl Cx<'_> {
                 }
                 Type::Named(name)
             }
-            ExprKind::Let(name, val, body) => {
-                let vt = self.check_expr(val, env, effects)?;
-                if is_unit(&vt) {
-                    return Err(Error::at(
-                        format!("cannot bind {name:?} to a value of type ()"),
-                        val.span.clone(),
-                    ));
-                }
-                check_result_inspected(name, &vt, body, val.span.clone())?;
+            ExprKind::Let(name, ty, val, body) => {
+                let bt = self.check_binding(name, ty.as_ref(), val, body, env, effects)?;
                 let mut env2 = env.clone();
                 env2.insert(
                     name.clone(),
                     Binding {
-                        ty: vt,
+                        ty: bt,
                         mutable: false,
                     },
                 );
                 self.check_expr(body, &env2, effects)?
             }
-            ExprKind::LetMut(name, val, body) => {
-                let vt = self.check_expr(val, env, effects)?;
-                if is_unit(&vt) {
-                    return Err(Error::at(
-                        format!("cannot bind {name:?} to a value of type ()"),
-                        val.span.clone(),
-                    ));
-                }
-                check_result_inspected(name, &vt, body, val.span.clone())?;
+            ExprKind::LetMut(name, ty, val, body) => {
+                let bt = self.check_binding(name, ty.as_ref(), val, body, env, effects)?;
                 let mut env2 = env.clone();
                 env2.insert(
                     name.clone(),
                     Binding {
-                        ty: vt,
+                        ty: bt,
                         mutable: true,
                     },
                 );

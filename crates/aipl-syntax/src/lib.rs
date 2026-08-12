@@ -701,10 +701,20 @@ pub mod ast {
         If(Box<Expr>, Box<Expr>, Box<Expr>),
         Construct(String, Vec<FieldInit>),
         Field(Box<Expr>, String),
-        /// `let name = value; body` — immutable binding.
-        Let(String, Box<Expr>, Box<Expr>),
-        /// `let mut name = value; body` — mutable binding, lives in a stack slot.
-        LetMut(String, Box<Expr>, Box<Expr>),
+        /// `let name = value; body` — immutable binding. The `Option<Type>` is
+        /// the optional annotation from `let name: T = value;`: when present it
+        /// is the binding's declared type, so `value` is checked *against* it
+        /// (and a bare integer literal flexes to it) instead of the binding
+        /// simply taking whatever `value` inferred to. `None` is the
+        /// unannotated form, and is what every synthesized binding uses.
+        Let(String, Option<Type>, Box<Expr>, Box<Expr>),
+        /// `mut name = value; body` — mutable binding, lives in a stack slot.
+        /// The `Option<Type>` is the `mut name: T = value;` annotation, with
+        /// the same meaning as [`ExprKind::Let`]'s. It matters more here: a
+        /// `mut` binding's type is fixed at its declaration and every later
+        /// `set` must match it, so the annotation is how a counter is pinned to
+        /// a narrow width (`mut n: u8 = 0;`) with nothing else to infer from.
+        LetMut(String, Option<Type>, Box<Expr>, Box<Expr>),
         /// `set lhs = value; body` — store to an existing mut binding. The
         /// LHS is a *place* expression: a bare `Ident` (store to the binding
         /// itself) or a `Field` chain of any depth rooted at one
@@ -969,8 +979,8 @@ pub fn flex_int_values(e: &ast::Expr, out: &mut Vec<i64>) -> bool {
         },
         // Value-passing wrappers: only the tail decides the type.
         ast::ExprKind::Seq(_, tail)
-        | ast::ExprKind::Let(_, _, tail)
-        | ast::ExprKind::LetMut(_, _, tail)
+        | ast::ExprKind::Let(_, _, _, tail)
+        | ast::ExprKind::LetMut(_, _, _, tail)
         | ast::ExprKind::Assign(_, _, tail) => flex_int_values(tail, out),
         // Every branch must be literal for the whole to stay flexible.
         ast::ExprKind::If(_, a, b) => flex_int_values(a, out) && flex_int_values(b, out),
@@ -1117,8 +1127,8 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
         // contain an operator — only the value and body need walking.
         K::Seq(a, b)
         | K::Index(a, b)
-        | K::Let(_, a, b)
-        | K::LetMut(_, a, b)
+        | K::Let(_, _, a, b)
+        | K::LetMut(_, _, a, b)
         | K::Assign(_, a, b)
         | K::For(_, a, b)
         | K::While(a, b) => {
@@ -1639,8 +1649,8 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         K::Binop(a, _, b)
         | K::Seq(a, b)
         | K::Index(a, b)
-        | K::Let(_, a, b)
-        | K::LetMut(_, a, b)
+        | K::Let(_, _, a, b)
+        | K::LetMut(_, _, a, b)
         | K::For(_, a, b)
         | K::While(a, b) => {
             each_subexpr(a, f);

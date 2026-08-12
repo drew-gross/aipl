@@ -1,0 +1,7 @@
+// An annotation is a type in its own right: an unknown name is rejected, with
+// the same diagnostic a parameter's type would get.
+fn main() {
+    let n: Nope = 1;
+}
+--- errors ---
+error: fn "main": unknown type "Nope"

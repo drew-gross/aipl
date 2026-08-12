@@ -270,7 +270,7 @@ impl Expander {
             ExprKind::Call("__aipl_arr_reserve".to_string(), vec![seed, extra], false),
             span.clone(),
         );
-        ExprKind::LetMut(acc, Box::new(reserved), Box::new(body))
+        ExprKind::LetMut(acc, None, Box::new(reserved), Box::new(body))
     }
 
     /// The expanded default expressions of `name`'s keyword parameters, in
@@ -569,13 +569,15 @@ impl Expander {
                 Box::new(self.expand_expr(t, locals)?),
                 Box::new(self.expand_expr(f, locals)?),
             ),
-            ExprKind::Let(name, value, body) => ExprKind::Let(
+            ExprKind::Let(name, ty, value, body) => ExprKind::Let(
                 name.clone(),
+                ty.clone(),
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, &with(name))?),
             ),
-            ExprKind::LetMut(name, value, body) => ExprKind::LetMut(
+            ExprKind::LetMut(name, ty, value, body) => ExprKind::LetMut(
                 name.clone(),
+                ty.clone(),
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, &with(name))?),
             ),

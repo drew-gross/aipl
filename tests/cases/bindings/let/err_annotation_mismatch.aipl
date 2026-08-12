@@ -1,0 +1,11 @@
+// The initializer is checked against the annotation, so a value of another type
+// is an error at the binding rather than wherever the binding is later used.
+fn main() {
+    let n: u8 = "hi";
+}
+--- errors ---
+error: binding "n" is declared u8, but its value is str
+ --> ./tests/cases/bindings/let/err_annotation_mismatch.aipl:4:17
+  |
+4 |     let n: u8 = "hi";
+  |                 ^^^^

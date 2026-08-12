@@ -1,0 +1,11 @@
+// A literal flexes to the annotation only if it fits — the same range check a
+// literal gets flowing into a narrow parameter or return type.
+fn main() {
+    let n: u8 = 300;
+}
+--- errors ---
+error: integer literal 300 does not fit in u8
+ --> ./tests/cases/bindings/let/err_annotation_literal_too_big.aipl:4:17
+  |
+4 |     let n: u8 = 300;
+  |                 ^^^

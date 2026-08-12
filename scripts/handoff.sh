@@ -44,6 +44,10 @@
 #     `cargo test --doc` separately rather than let that coverage vanish.
 # `--color never` keeps the captured output greppable.
 #
+# Output: every step's combined output is always *captured* (the greps below parse
+# it, and a failure message points at the saved log). Whether it's also *streamed*
+# depends on who's watching — see HANDOFF_VERBOSE below.
+#
 # Exit status: 0 = handoff green; 1 = stopped (message says at which step and why).
 
 set -uo pipefail
@@ -67,6 +71,24 @@ trap 'rm -f "$STEP_OUT" "$TIMINGS"' EXIT
 
 bold=$'\033[1m'; red=$'\033[31m'; green=$'\033[32m'; dim=$'\033[2m'; off=$'\033[0m'
 
+# Stream each step's output as it runs, or just capture it?
+#
+# This script is run both by hand and by agents, and an agent pays for every line
+# it reads — capturing was the original point ("the whole sequence in a fraction
+# of the tokens"). But a human running it manually otherwise stares at a step
+# banner for minutes with no sign of life. So: stream when stderr is a terminal,
+# stay quiet when it isn't (piped into a tool, redirected to a file, run by an
+# agent). `HANDOFF_VERBOSE=1` forces streaming, `=0` forces quiet.
+#
+# Streaming does not change what's captured or how: the step's stdout is a pipe
+# rather than a file, which no tool here distinguishes (`--color never` is passed
+# explicitly, and nextest keys its progress output on isatty, false for both).
+case "${HANDOFF_VERBOSE:-auto}" in
+    1|true|yes) VERBOSE=1 ;;
+    0|false|no) VERBOSE=0 ;;
+    *)          if [ -t 2 ]; then VERBOSE=1; else VERBOSE=0; fi ;;
+esac
+
 # The whole suite. `--no-fail-fast` because nextest cancels on the first failure
 # by default and this script needs to see *all* remediable staleness in one pass
 # (see the discovery step).
@@ -85,14 +107,24 @@ failed_tests() { awk '/^ *(FAIL|SIGSEGV|ABORT|TIMEOUT|LEAK-FAIL) \[/ {print $NF}
 
 banner() { printf '\n%s==> %s%s\n' "$bold" "$*" "$off" >&2; }
 
-# Run a labelled step, capturing combined output to $STEP_OUT. Caller inspects $?,
-# so the command's status is passed through untouched.
+# Run a labelled step, capturing combined output to $STEP_OUT (and, when VERBOSE,
+# streaming it too). Caller inspects $?, so the command's status is passed through
+# untouched — via `PIPESTATUS[0]` on the streaming path, since `$?` there would be
+# `tee`'s.
 run_step() {
     banner "$1"
     local label="$1"; shift
     local start=$SECONDS
-    "$@" >"$STEP_OUT" 2>&1
-    local rc=$?
+    local rc
+    if [ "$VERBOSE" -eq 1 ]; then
+        # To stderr, like every other thing this script prints, so `2>&1 | less`
+        # sees the banners and the step output interleaved in order.
+        "$@" 2>&1 | tee "$STEP_OUT" >&2
+        rc=${PIPESTATUS[0]}
+    else
+        "$@" >"$STEP_OUT" 2>&1
+        rc=$?
+    fi
     local secs=$((SECONDS - start))
     printf '%s    (%ss)%s\n' "$dim" "$secs" "$off" >&2
     printf '%s\t%s\n' "$secs" "$label" >>"$TIMINGS"

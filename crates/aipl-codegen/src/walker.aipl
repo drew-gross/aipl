@@ -1338,7 +1338,7 @@ fn statement(self: W) -> WDoc!FmtError {
     ok(WDoc { w: e.w.bump().w, doc: Concat([e.doc, Text(";")]) })
 }
 
-// `let x = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
+// `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
 fn let_stmt(self: W) -> WDoc!FmtError {
     let kw = self.bump().w;
     if (kw.peek_text() == "(") {
@@ -1360,17 +1360,38 @@ fn let_stmt(self: W) -> WDoc!FmtError {
             doc: Concat([Text(`let {n.text} \{ {ids.names.join(", ")} } = `), v.doc, Text(";")]),
         });
     };
-    let v = n.w.expect("=")?.w.expr()?;
+    let a = n.w.binding_ann()?;
+    let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
-    ok(WDoc { w: done, doc: Concat([Text(`let {n.text} = `), v.doc, Text(";")]) })
+    ok(WDoc { w: done, doc: Concat([Text(`let {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
 
 fn mut_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
-    let v = n.w.expect("=")?.w.expr()?;
+    let a = n.w.binding_ann()?;
+    let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
-    ok(WDoc { w: done, doc: Concat([Text(`mut {n.text} = `), v.doc, Text(";")]) })
+    ok(WDoc { w: done, doc: Concat([Text(`mut {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
+
+// The optional `: T` on a `let`/`mut` binding, rendered as `": T"` (empty when
+// absent). Positioned after the name and before the `=`, so both callers can
+// splice it in unconditionally.
+fn binding_ann(self: W) -> WDoc!FmtError {
+    if (self.peek_text() != ":") {
+        return ok(WDoc { w: self, doc: Text("") });
+    };
+    let t = self.bump().w.ty()?;
+    ok(WDoc { w: t.w, doc: Concat([Text(": "), t.doc]) })
+}.test({
+    // `toks_of` splits on spaces, so these inputs are spelled token-by-token.
+    assert(walker_of(": u8 =").binding_ann().rendered(100)? == ": u8");
+    assert(walker_of(": i8 [ ] =").binding_ann().rendered(100)? == ": i8[]");
+    assert(walker_of(": # { str : u8 } =").binding_ann().rendered(100)? == ": #{str: u8}");
+    assert(walker_of(": Point ? =").binding_ann().rendered(100)? == ": Point?");
+    // Absent: renders nothing and consumes nothing.
+    assert(walker_of("= 1 ;").binding_ann().rendered(100)? == "");
+})
 
 // `set n = e;`, `set n++;`, `set recv.f.g = e;`, or the writeback form
 // `set recv.method(args);`.
@@ -2625,15 +2646,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20508
-deallocations: 20508
-reallocations: 657
-bytes allocated: 1005746
-instructions executed: 3058670
-binary size: 3001056
-  code: 1712628
-  data: 25060
-  metadata: 1263368
+allocations: 20670
+deallocations: 20670
+reallocations: 677
+bytes allocated: 1014340
+instructions executed: 3085676
+binary size: 3018360
+  code: 1722112
+  data: 25740
+  metadata: 1270508
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
@@ -2701,6 +2722,7 @@ __m9__template_step$__m8__AiplTok
 __m9__unterminated_msg
 __map48$own0
 __map54$own0
+__test$binding_ann
 __test$new_walker
 __test$walker_of
 array_atom
@@ -2709,6 +2731,7 @@ at
 at_end
 atom
 base_ty
+binding_ann
 binop_expr
 binop_tail
 block

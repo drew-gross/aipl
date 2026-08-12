@@ -7219,6 +7219,33 @@ fn expect_len_operand(actual: &Type, context: &str, span: Span) -> Result<(), Er
     expect_type(actual, &Type::Primitive(Primitive::I64), context, span)
 }
 
+/// The type a `let`/`mut` binding takes, given its initializer's compiled type
+/// `actual` and the optional `let x: T = ..` annotation. Unannotated, that's
+/// just `actual`. Annotated, the annotation wins, and a bare integer literal
+/// initializer flexes to it — the same `flex_int_ty` retype a literal gets
+/// flowing into a narrow parameter or return type, and correct for the same
+/// reason: a literal that fits is already canonical in its i64 register, so
+/// only the static type changes. The checker has verified all of this; this is
+/// the codegen-side mirror.
+fn binding_ty(
+    value: &Expr,
+    actual: &Type,
+    declared: Option<&Type>,
+    name: &str,
+) -> Result<Type, Error> {
+    let Some(declared) = declared else {
+        return Ok(actual.clone());
+    };
+    let actual = aipl_syntax::flex_int_ty(value, actual, declared);
+    expect_type(
+        &actual,
+        declared,
+        &format!("binding {name:?}"),
+        value.span.clone(),
+    )?;
+    Ok(declared.clone())
+}
+
 /// Reject binding a unit value (the result of a function that returns
 /// nothing) to a name. Such a value can't be stored or used; the call
 /// belongs in statement position instead (`print(x);`, not
@@ -15273,12 +15300,13 @@ fn compile_expr<M: Module>(
         ExprKind::Lambda(_, _) => unreachable!("lambda reached codegen"),
         // Monomorphization lowers TupleLit to Construct before codegen.
         ExprKind::TupleLit(_) => unreachable!("TupleLit must be lowered before codegen"),
-        ExprKind::Let(name, value, body) => {
+        ExprKind::Let(name, ty, value, body) => {
             // Evaluate the binding's value in the current scope (so any
             // string refcounts allocated by the value are already tracked
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
+            let t = binding_ty(value, &t, ty.as_ref(), name)?;
             reject_unit_binding(&t, name, value.span.clone())?;
             let mut new_env = env.clone();
             cx.bindings
@@ -15296,8 +15324,9 @@ fn compile_expr<M: Module>(
                 body,
             )?
         }
-        ExprKind::LetMut(name, value, body) => {
+        ExprKind::LetMut(name, ty, value, body) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
+            let t = binding_ty(value, &t, ty.as_ref(), name)?;
             reject_unit_binding(&t, name, value.span.clone())?;
             // 8-byte slot, 8-byte aligned: fits any i64/bool/char/str.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(

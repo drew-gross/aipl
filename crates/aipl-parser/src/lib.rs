@@ -278,7 +278,12 @@ gazelle! {
                 | for_tuple_stmt => for_tuple_stmt
                 | while_stmt => while_stmt
                 | return_stmt => return_stmt;
-        let_stmt = LET IDENT EQ expr SEMI => let_stmt;
+        // `let x = e;` and the annotated `let x: T = e;`. After `LET IDENT` the
+        // three forms are separated by one token of lookahead — EQ (plain),
+        // COLON (annotated), LBRACE (`let_struct_stmt`) — so the annotation
+        // adds no LR conflict.
+        let_stmt = LET IDENT EQ expr SEMI => let_stmt
+                 | LET IDENT COLON ty EQ expr SEMI => let_ty_stmt;
         // `let (a, b, c) = expr;` — tuple destructuring. Reuses `match_bindings`
         // (existing left-recursive ident list) to avoid adding new LR states.
         let_tuple_stmt = LET LPAREN match_bindings RPAREN EQ expr SEMI => let_tuple_stmt;
@@ -292,7 +297,8 @@ gazelle! {
         // `return value;` — early-return. A statement (keyword-led, so its FIRST
         // set stays disjoint from `expr`); control never falls through it.
         return_stmt = RETURN expr SEMI => return_stmt;
-        mut_stmt = MUT IDENT EQ expr SEMI => mut_stmt;
+        mut_stmt = MUT IDENT EQ expr SEMI => mut_stmt
+                 | MUT IDENT COLON ty EQ expr SEMI => mut_ty_stmt;
         // `set n = expr;` stores to a mut binding; `set n++;` is sugar for
         // `set n = n + 1;` (so it desugars to a `+`/`wrapping_add` use and is
         // gated on importing `+` like any other operator).
@@ -620,6 +626,8 @@ pub enum StmtSpec {
     Let {
         name: String,
         name_span: Span,
+        /// `Some(T)` for the annotated `let name: T = value;` form.
+        ty: Option<Type>,
         value: Expr,
         span: Span,
     },
@@ -637,6 +645,8 @@ pub enum StmtSpec {
     Mut {
         name: String,
         name_span: Span,
+        /// `Some(T)` for the annotated `mut name: T = value;` form.
+        ty: Option<Type>,
         value: Expr,
         span: Span,
     },
@@ -1311,20 +1321,28 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
         StmtSpec::Let {
             name,
             name_span,
+            ty,
             value,
             ..
         } => {
             let span = join_spans(&name_span, &acc.span);
-            Expr::new(ExprKind::Let(name, Box::new(value), Box::new(acc)), span)
+            Expr::new(
+                ExprKind::Let(name, ty, Box::new(value), Box::new(acc)),
+                span,
+            )
         }
         StmtSpec::Mut {
             name,
             name_span,
+            ty,
             value,
             ..
         } => {
             let span = join_spans(&name_span, &acc.span);
-            Expr::new(ExprKind::LetMut(name, Box::new(value), Box::new(acc)), span)
+            Expr::new(
+                ExprKind::LetMut(name, ty, Box::new(value), Box::new(acc)),
+                span,
+            )
         }
         StmtSpec::Assign { lhs, value, span } => {
             // The statement's own span (LHS through value), not the usual join
@@ -1375,13 +1393,13 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
                 );
                 let inner_span = join_spans(&tup_span, &result.span);
                 result = Expr::new(
-                    ExprKind::Let(name.clone(), Box::new(field), Box::new(result)),
+                    ExprKind::Let(name.clone(), None, Box::new(field), Box::new(result)),
                     inner_span,
                 );
             }
             let outer_span = join_spans(&tup_span, &result.span);
             Expr::new(
-                ExprKind::Let(tmp, Box::new(value), Box::new(result)),
+                ExprKind::Let(tmp, None, Box::new(value), Box::new(result)),
                 outer_span,
             )
         }
@@ -1401,13 +1419,13 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
                 );
                 let inner_span = join_spans(&struct_span, &result.span);
                 result = Expr::new(
-                    ExprKind::Let(field_name.clone(), Box::new(field), Box::new(result)),
+                    ExprKind::Let(field_name.clone(), None, Box::new(field), Box::new(result)),
                     inner_span,
                 );
             }
             let outer_span = join_spans(&struct_span, &result.span);
             Expr::new(
-                ExprKind::Let(tmp, Box::new(value), Box::new(result)),
+                ExprKind::Let(tmp, None, Box::new(value), Box::new(result)),
                 outer_span,
             )
         }
@@ -1527,11 +1545,17 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
 
 impl gazelle::Action<aipl::LetStmt<Self>> for Build {
     fn build(&mut self, node: aipl::LetStmt<Self>) -> Result<StmtSpec, Self::Error> {
-        let aipl::LetStmt::LetStmt((name, name_span), value) = node;
+        let (name, name_span, ty, value) = match node {
+            aipl::LetStmt::LetStmt((name, name_span), value) => (name, name_span, None, value),
+            aipl::LetStmt::LetTyStmt((name, name_span), ty, value) => {
+                (name, name_span, Some(ty), value)
+            }
+        };
         let span = join_spans(&name_span, &value.span);
         Ok(StmtSpec::Let {
             name,
             name_span,
+            ty,
             value,
             span,
         })
@@ -1590,11 +1614,17 @@ impl gazelle::Action<aipl::StructFieldBindingList<Self>> for Build {
 
 impl gazelle::Action<aipl::MutStmt<Self>> for Build {
     fn build(&mut self, node: aipl::MutStmt<Self>) -> Result<StmtSpec, Self::Error> {
-        let aipl::MutStmt::MutStmt((name, name_span), value) = node;
+        let (name, name_span, ty, value) = match node {
+            aipl::MutStmt::MutStmt((name, name_span), value) => (name, name_span, None, value),
+            aipl::MutStmt::MutTyStmt((name, name_span), ty, value) => {
+                (name, name_span, Some(ty), value)
+            }
+        };
         let span = join_spans(&name_span, &value.span);
         Ok(StmtSpec::Mut {
             name,
             name_span,
+            ty,
             value,
             span,
         })
@@ -1709,7 +1739,7 @@ impl gazelle::Action<aipl::ForTupleStmt<Self>> for Build {
             );
             let inner_span = join_spans(&tmp_span, &new_body.span);
             new_body = Expr::new(
-                ExprKind::Let(name.clone(), Box::new(field), Box::new(new_body)),
+                ExprKind::Let(name.clone(), None, Box::new(field), Box::new(new_body)),
                 inner_span,
             );
         }
@@ -3191,8 +3221,8 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         }
         ExprKind::Binop(a, _, b)
         | ExprKind::Seq(a, b)
-        | ExprKind::Let(_, a, b)
-        | ExprKind::LetMut(_, a, b)
+        | ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::Index(a, b)
         | ExprKind::For(_, a, b)

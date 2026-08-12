@@ -94,8 +94,8 @@ fn fold_expr(e: &Expr) -> Expr {
                 .collect(),
         ),
         ExprKind::Field(x, field) => ExprKind::Field(f(x), field.clone()),
-        ExprKind::Let(n, v, b) => ExprKind::Let(n.clone(), f(v), f(b)),
-        ExprKind::LetMut(n, v, b) => ExprKind::LetMut(n.clone(), f(v), f(b)),
+        ExprKind::Let(n, ty, v, b) => ExprKind::Let(n.clone(), ty.clone(), f(v), f(b)),
+        ExprKind::LetMut(n, ty, v, b) => ExprKind::LetMut(n.clone(), ty.clone(), f(v), f(b)),
         // The LHS is a place (idents/fields only) — nothing to fold there.
         ExprKind::Assign(lhs, v, b) => ExprKind::Assign(lhs.clone(), f(v), f(b)),
         ExprKind::For(v, iter, b) => ExprKind::For(v.clone(), f(iter), f(b)),

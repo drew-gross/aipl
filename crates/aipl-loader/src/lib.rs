@@ -584,8 +584,8 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         // contain an operator — only the value and body need walking.
         ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
-        | ExprKind::Let(_, a, b)
-        | ExprKind::LetMut(_, a, b)
+        | ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => {
@@ -1049,13 +1049,18 @@ fn rewrite_expr(
             Box::new(rewrite_expr(else_b, view, sc, locals)),
         ),
         // `name` binds a local for `body` (but not for `value`).
-        ExprKind::Let(name, value, body) => ExprKind::Let(
+        // A `let x: T = ..` annotation names a type in *this* file's view, so it
+        // is rewritten like a lambda parameter's annotation (no type vars in
+        // expression position).
+        ExprKind::Let(name, ty, value, body) => ExprKind::Let(
             name.clone(),
+            ty.as_ref().map(|t| rewrite_type(t, view, &[])),
             Box::new(rewrite_expr(value, view, sc, locals)),
             Box::new(rewrite_expr(body, view, sc, &with(name))),
         ),
-        ExprKind::LetMut(name, value, body) => ExprKind::LetMut(
+        ExprKind::LetMut(name, ty, value, body) => ExprKind::LetMut(
             name.clone(),
+            ty.as_ref().map(|t| rewrite_type(t, view, &[])),
             Box::new(rewrite_expr(value, view, sc, locals)),
             Box::new(rewrite_expr(body, view, sc, &with(name))),
         ),

@@ -217,19 +217,29 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>)
             Box::new(lcr_expr(a, ctors, scope)),
             Box::new(lcr_expr(b, ctors, scope)),
         )),
-        K::Let(name, val, body) => {
+        K::Let(name, ty, val, body) => {
             let val = lcr_expr(val, ctors, scope);
             scope.push(name.clone());
             let body = lcr_expr(body, ctors, scope);
             scope.pop();
-            rw(K::Let(name.clone(), Box::new(val), Box::new(body)))
+            rw(K::Let(
+                name.clone(),
+                ty.clone(),
+                Box::new(val),
+                Box::new(body),
+            ))
         }
-        K::LetMut(name, val, body) => {
+        K::LetMut(name, ty, val, body) => {
             let val = lcr_expr(val, ctors, scope);
             scope.push(name.clone());
             let body = lcr_expr(body, ctors, scope);
             scope.pop();
-            rw(K::LetMut(name.clone(), Box::new(val), Box::new(body)))
+            rw(K::LetMut(
+                name.clone(),
+                ty.clone(),
+                Box::new(val),
+                Box::new(body),
+            ))
         }
         K::For(var, iter, body) => {
             let iter = lcr_expr(iter, ctors, scope);
@@ -510,13 +520,15 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(b, fm, ord)),
             c.as_ref().map(|c| Box::new(lt_expr(c, fm, ord))),
         ),
-        ExprKind::Let(n, a, b) => ExprKind::Let(
+        ExprKind::Let(n, ty, a, b) => ExprKind::Let(
             n.clone(),
+            ty.clone(),
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
-        ExprKind::LetMut(n, a, b) => ExprKind::LetMut(
+        ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
             n.clone(),
+            ty.clone(),
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
@@ -804,8 +816,8 @@ impl GenericLowerer {
                 b(self, c)?,
                 d.as_ref().map(|x| b(self, x)).transpose()?,
             ),
-            K::Let(n, a, c) => K::Let(n.clone(), b(self, a)?, b(self, c)?),
-            K::LetMut(n, a, c) => K::LetMut(n.clone(), b(self, a)?, b(self, c)?),
+            K::Let(n, ty, a, c) => K::Let(n.clone(), ty.clone(), b(self, a)?, b(self, c)?),
+            K::LetMut(n, ty, a, c) => K::LetMut(n.clone(), ty.clone(), b(self, a)?, b(self, c)?),
             K::Assign(lhs, a, c) => K::Assign(lhs.clone(), b(self, a)?, b(self, c)?),
             K::For(v, iter, body) => K::For(v.clone(), b(self, iter)?, b(self, body)?),
             K::Call(name, args, ms) => K::Call(
@@ -1502,7 +1514,7 @@ fn specialize_variadic(
     let mut new_body = body;
     for (orig, convert) in prologues.into_iter().rev() {
         new_body = Expr::new(
-            ExprKind::Let(orig, Box::new(convert), Box::new(new_body)),
+            ExprKind::Let(orig, None, Box::new(convert), Box::new(new_body)),
             span.clone(),
         );
     }
@@ -2294,6 +2306,7 @@ impl Mono<'_> {
             let inner = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(result)),
@@ -2303,7 +2316,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             Expr::new(
-                ExprKind::LetMut("$a".to_string(), Box::new(id("$arr")), Box::new(inner)),
+                ExprKind::LetMut(
+                    "$a".to_string(),
+                    None,
+                    Box::new(id("$arr")),
+                    Box::new(inner),
+                ),
                 span.clone(),
             )
         } else {
@@ -2340,6 +2358,7 @@ impl Mono<'_> {
             Expr::new(
                 ExprKind::LetMut(
                     "$out".to_string(),
+                    None,
                     Box::new(out_init),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
@@ -2679,6 +2698,7 @@ impl Mono<'_> {
             let with_w = Expr::new(
                 ExprKind::LetMut(
                     "$w".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(inner),
                 ),
@@ -2687,13 +2707,19 @@ impl Mono<'_> {
             let with_i = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(with_w),
                 ),
                 span.clone(),
             );
             Expr::new(
-                ExprKind::LetMut("$z".to_string(), Box::new(id(reused)), Box::new(with_i)),
+                ExprKind::LetMut(
+                    "$z".to_string(),
+                    None,
+                    Box::new(id(reused)),
+                    Box::new(with_i),
+                ),
                 span.clone(),
             )
         };
@@ -2775,6 +2801,7 @@ impl Mono<'_> {
             let with_i = Expr::new(
                 ExprKind::LetMut(
                     "$i".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
@@ -2787,6 +2814,7 @@ impl Mono<'_> {
             Expr::new(
                 ExprKind::LetMut(
                     "$out".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())),
                     Box::new(with_i),
                 ),
@@ -2994,6 +3022,7 @@ impl Mono<'_> {
             let inner = Expr::new(
                 ExprKind::LetMut(
                     "$w".to_string(),
+                    None,
                     Box::new(Expr::new(ExprKind::Num(0), span.clone())),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(after)),
@@ -3003,7 +3032,12 @@ impl Mono<'_> {
                 span.clone(),
             );
             Expr::new(
-                ExprKind::LetMut("$a".to_string(), Box::new(id("$arr")), Box::new(inner)),
+                ExprKind::LetMut(
+                    "$a".to_string(),
+                    None,
+                    Box::new(id("$arr")),
+                    Box::new(inner),
+                ),
                 span.clone(),
             )
         } else {
@@ -3050,6 +3084,7 @@ impl Mono<'_> {
             Expr::new(
                 ExprKind::LetMut(
                     "$out".to_string(),
+                    None,
                     Box::new(out_init),
                     Box::new(Expr::new(
                         ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
@@ -3157,10 +3192,12 @@ impl Mono<'_> {
         let enumerate_body = Expr::new(
             ExprKind::LetMut(
                 "$i".to_string(),
+                None,
                 Box::new(zero_u64),
                 Box::new(Expr::new(
                     ExprKind::LetMut(
                         "$out".to_string(),
+                        None,
                         Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())),
                         Box::new(Expr::new(
                             ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
@@ -4199,23 +4236,33 @@ impl Mono<'_> {
                     Type::Fn(ptys, Box::new(ret)),
                 )
             }
-            ExprKind::Let(name, val, body) => {
+            ExprKind::Let(name, ty, val, body) => {
                 let (rv, vt) = self.infer(val, env)?;
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(body, &env2)?;
                 (
-                    node(ExprKind::Let(name.clone(), Box::new(rv), Box::new(rb))),
+                    node(ExprKind::Let(
+                        name.clone(),
+                        ty.clone(),
+                        Box::new(rv),
+                        Box::new(rb),
+                    )),
                     bt,
                 )
             }
-            ExprKind::LetMut(name, val, body) => {
+            ExprKind::LetMut(name, ty, val, body) => {
                 let (rv, vt) = self.infer(val, env)?;
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(body, &env2)?;
                 (
-                    node(ExprKind::LetMut(name.clone(), Box::new(rv), Box::new(rb))),
+                    node(ExprKind::LetMut(
+                        name.clone(),
+                        ty.clone(),
+                        Box::new(rv),
+                        Box::new(rb),
+                    )),
                     bt,
                 )
             }
@@ -4500,6 +4547,7 @@ impl Mono<'_> {
                         ));
                         let desugared = node(ExprKind::LetMut(
                             tmp.clone(),
+                            None,
                             Box::new(args[0].clone()),
                             Box::new(set),
                         ));
@@ -4723,7 +4771,7 @@ impl Mono<'_> {
                     let field = node(ExprKind::Field(Box::new(recv), name.clone()));
                     let call = node(ExprKind::Call(tmp.clone(), rest, false));
                     (
-                        node(ExprKind::Let(tmp, Box::new(field), Box::new(call))),
+                        node(ExprKind::Let(tmp, None, Box::new(field), Box::new(call))),
                         ret,
                     )
                 } else {
@@ -5806,7 +5854,7 @@ fn collect_free(
                 }
             }
         }
-        ExprKind::Let(n, val, b) | ExprKind::LetMut(n, val, b) => {
+        ExprKind::Let(n, _, val, b) | ExprKind::LetMut(n, _, val, b) => {
             collect_free(val, bound, env, out, seen);
             let added = bound.insert(n.clone());
             collect_free(b, bound, env, out, seen);
@@ -5984,7 +6032,7 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
                 }
             }
         }
-        ExprKind::Let(n, val, b) | ExprKind::LetMut(n, val, b) => {
+        ExprKind::Let(n, _, val, b) | ExprKind::LetMut(n, _, val, b) => {
             count_uses(val, bound, counts);
             let added = bound.insert(n.clone());
             count_uses(b, bound, counts);
@@ -6261,7 +6309,7 @@ fn collect_binders_mono(program: &MonoProgram) -> HashSet<String> {
 
 fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
     match &e.kind {
-        ExprKind::Let(n, _, _) | ExprKind::LetMut(n, _, _) | ExprKind::For(n, _, _) => {
+        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
             set.insert(n.clone());
         }
         ExprKind::Lambda(ps, _) => {
@@ -6304,8 +6352,8 @@ fn children(e: &Expr) -> Vec<&Expr> {
         ExprKind::Binop(a, _, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
-        | ExprKind::Let(_, a, b)
-        | ExprKind::LetMut(_, a, b)
+        | ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => vec![a, b],
@@ -6463,13 +6511,15 @@ fn replace_call(
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
-        ExprKind::Let(n, a, b) => ExprKind::Let(
+        ExprKind::Let(n, ty, a, b) => ExprKind::Let(
             n.clone(),
+            ty.clone(),
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
-        ExprKind::LetMut(n, a, b) => ExprKind::LetMut(
+        ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
             n.clone(),
+            ty.clone(),
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
         ),
@@ -6560,7 +6610,7 @@ fn build_inlined(
     let mut expr = rename_params(fbody, &map);
     for (fp, arg) in fresh.iter().zip(args).rev() {
         expr = Expr::new(
-            ExprKind::Let(fp.clone(), Box::new(arg.clone()), Box::new(expr)),
+            ExprKind::Let(fp.clone(), None, Box::new(arg.clone()), Box::new(expr)),
             span.clone(),
         );
     }
@@ -6671,13 +6721,15 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, map)),
         ),
-        ExprKind::Let(n, a, b) => ExprKind::Let(
+        ExprKind::Let(n, ty, a, b) => ExprKind::Let(
             n.clone(),
+            ty.clone(),
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, &without(n))),
         ),
-        ExprKind::LetMut(n, a, b) => ExprKind::LetMut(
+        ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
             n.clone(),
+            ty.clone(),
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, &without(n))),
         ),
@@ -6852,7 +6904,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         ExprKind::Construct(_, inits) => inits.iter().any(|i| is_n(&i.value) || rec(&i.value)),
         // A capture of `name` inside a lambda body counts as a use (conservative).
         ExprKind::Lambda(_, body) => rec(body),
-        ExprKind::Let(_, val, b) | ExprKind::LetMut(_, val, b) => {
+        ExprKind::Let(_, _, val, b) | ExprKind::LetMut(_, _, val, b) => {
             is_n(val) || rec(val) || rec_tail(b)
         }
         ExprKind::Assign(lhs, val, b) => {
@@ -6957,8 +7009,8 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::Binop(a, _, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
-        | ExprKind::Let(_, a, b)
-        | ExprKind::LetMut(_, a, b)
+        | ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => c(a) + c(b),
         // A bare-ident LHS is an lvalue, not a read; a field-path LHS also
@@ -6993,11 +7045,11 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         ExprKind::Shim(_, _, body) => find_move_into(param, body),
-        ExprKind::LetMut(y, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
+        ExprKind::LetMut(y, _, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
             Some((y.as_str(), body))
         }
-        ExprKind::Let(_, a, b)
-        | ExprKind::LetMut(_, a, b)
+        ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::Seq(a, b)
         | ExprKind::Binop(a, _, b)
