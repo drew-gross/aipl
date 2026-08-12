@@ -138,6 +138,13 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>)
     use ExprKind as K;
     let rw = |k: ExprKind| Expr::new(k, e.span.clone());
     match &e.kind {
+        // A shim's bindings already name functions directly (never a bare
+        // constructor reference needing a lambda), so only the body is walked.
+        K::Shim(effect, bindings, body) => rw(K::Shim(
+            effect.clone(),
+            bindings.clone(),
+            Box::new(lcr_expr(body, ctors, scope)),
+        )),
         K::Ident(name) => {
             let Some(payload) = ctors.get(name.as_str()) else {
                 return e.clone();
@@ -451,6 +458,12 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // A shim carries no type annotations of its own; only its body can.
+        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
+            effect.clone(),
+            bindings.clone(),
+            Box::new(lt_expr(body, fm, ord)),
+        ),
         ExprKind::Lambda(params, body) => {
             let new_params: Vec<LambdaParam> = params
                 .iter()
@@ -755,6 +768,10 @@ impl GenericLowerer {
         use ExprKind as K;
         let b = |lc: &mut Self, x: &Expr| lc.lower_expr(x).map(Box::new);
         let kind = match &e.kind {
+            // A shim carries no type annotations of its own.
+            K::Shim(effect, bindings, body) => {
+                K::Shim(effect.clone(), bindings.clone(), b(self, body)?)
+            }
             K::Lambda(params, body) => {
                 let params = params
                     .iter()
@@ -3885,6 +3902,24 @@ impl Mono<'_> {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => (expr.clone(), Type::Unit),
+            // A shim evaluates to its body. Its bindings are function
+            // *references* — codegen emits a `func_addr` for each — so each one
+            // has to be queued for emission exactly like a function used as a
+            // value, or it would never be instantiated.
+            ExprKind::Shim(effect, bindings, body) => {
+                for (_, f) in bindings {
+                    self.enqueue_concrete(f);
+                }
+                let (b, t) = self.infer(body, env)?;
+                (
+                    node(ExprKind::Shim(
+                        effect.clone(),
+                        bindings.clone(),
+                        Box::new(b),
+                    )),
+                    t,
+                )
+            }
             ExprKind::Num(_) => (expr.clone(), Type::Primitive(Primitive::I64)),
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
             ExprKind::Str(_) => (expr.clone(), Type::Primitive(Primitive::Str)),
@@ -5700,6 +5735,8 @@ fn collect_free(
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // A shim binds global functions, which are never free *locals*.
+        ExprKind::Shim(_, _, body) => collect_free(body, bound, env, out, seen),
         ExprKind::Ident(n) => {
             if !bound.contains(n) && !seen.contains(n) {
                 if let Some(t) = env.get(n) {
@@ -5865,6 +5902,16 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // A shim installs its bound functions by address, which is a use like
+        // any other — without counting them here they'd look dead and be pruned.
+        ExprKind::Shim(_, bindings, body) => {
+            for (_, f) in bindings {
+                if !bound.contains(f) {
+                    *counts.entry(f.clone()).or_insert(0) += 1;
+                }
+            }
+            count_uses(body, bound, counts);
+        }
         ExprKind::Ident(n) => {
             if !bound.contains(n) {
                 *counts.entry(n.clone()).or_insert(0) += 1;
@@ -6241,6 +6288,7 @@ fn children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        ExprKind::Shim(_, _, body) => vec![body],
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -6374,6 +6422,13 @@ fn replace_call(
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // Only the body is rewritten: a binding names a function whose *address*
+        // is installed, so there is no call there to inline.
+        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
+            effect.clone(),
+            bindings.clone(),
+            Box::new(rc(body, counter, replaced)),
+        ),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
@@ -6534,6 +6589,12 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // A shim binds global functions, which parameter renaming never touches.
+        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
+            effect.clone(),
+            bindings.clone(),
+            Box::new(rename_params(body, map)),
+        ),
         ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
         ExprKind::Call(name, args, m) => ExprKind::Call(
             sub(name),
@@ -6714,6 +6775,9 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // The shim's bindings name globals, so only the body can alias `name`.
+        // Its value is the shim's value, so tail position carries through.
+        ExprKind::Shim(_, _, body) => rec_tail(body),
         ExprKind::Ident(n) => n == name && !tail,
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -6877,6 +6941,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        ExprKind::Shim(_, _, body) => c(body),
         ExprKind::Ident(n) => usize::from(n == name),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -6927,6 +6992,7 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        ExprKind::Shim(_, _, body) => find_move_into(param, body),
         ExprKind::LetMut(y, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
             Some((y.as_str(), body))
         }

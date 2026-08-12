@@ -99,6 +99,7 @@ variant AiplTok =
     | While
     | Match
     | Return
+    | Shim
     | Struct
     | Variant
     | If
@@ -280,6 +281,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("while", While),
         kw("match", Match),
         kw("return", Return),
+        kw("shim", Shim),
         kw("struct", Struct),
         kw("variant", Variant),
         kw("if", If),
@@ -646,15 +648,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4595
-deallocations: 4595
+allocations: 4723
+deallocations: 4723
 reallocations: 0
-bytes allocated: 269736
-instructions executed: 759119
-binary size: 198560
-  code: 124296
+bytes allocated: 275592
+instructions executed: 777998
+binary size: 199136
+  code: 124736
   data: 7100
-  metadata: 67164
+  metadata: 67300
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam17
 __builtin_count_while$char$s0$lam28

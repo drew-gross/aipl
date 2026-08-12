@@ -27,6 +27,9 @@ gazelle! {
             // Keywords (no value)
             FN, IF, ELSE, STRUCT, VARIANT, IMPORT, FROM, AS, PUB, LET, FOR, WHILE, MUT, SET, MATCH,
             RETURN,
+            // `shim` carries a span so a shim diagnostic can underline the
+            // construct (its block body may be empty and span nothing).
+            SHIM: _,
             // `builtins` keyword for `from builtins` imports; carries a
             // span so the loader can point errors at it.
             BUILTINS: _,
@@ -242,6 +245,12 @@ gazelle! {
         // its absence made it the block's value. Having `expr` reachable from
         // two productions (a trailing value *and* a separate `expr;` statement)
         // is what made gazelle's LR tables explode.
+        // `op = f, op2 = g,` — a shim's operation bindings (trailing comma ok).
+        shim_bindings = shim_binding_list => present | _ => empty;
+        shim_binding_list = shim_binding => first
+                          | shim_binding_list COMMA shim_binding => rest
+                          | shim_binding_list COMMA => trailing;
+        shim_binding = IDENT EQ IDENT => shim_binding;
         block = LBRACE block_body RBRACE => block;
         block_body = _ => empty
                    | expr block_tail => head_expr
@@ -360,6 +369,11 @@ gazelle! {
              | IF LPAREN expr RPAREN block => if_no_else
              | NONE => none_lit
              | MATCH LPAREN expr RPAREN LBRACE match_arms RBRACE => match_expr
+             // `shim <effect> { op = f, .. } { body }` — install shims for an
+             // effect's operations over the dynamic extent of `body`. An
+             // expression (its value is the body's), like `match`. The leading
+             // SHIM keyword makes it a single-token decision.
+             | SHIM IDENT LBRACE shim_bindings RBRACE block => shim_expr
              | LBRACKET args RBRACKET => array_lit
              | HASH LBRACE brace_body RBRACE => brace_lit
              // Template literal: `` `text {expr} text` `` with 1+ interpolations.
@@ -506,6 +520,7 @@ impl aipl::Types for Build {
     type False = Span;
     type None = Span;
     type Lbracket = Span;
+    type Shim = Span;
     type Plusplus = Span;
     type Hash = Span;
     type Builtins = Span;
@@ -568,6 +583,10 @@ impl aipl::Types for Build {
     type ImportNameList = Vec<ImportName>;
     type ImportNames = Vec<ImportName>;
     type MatchArm = MatchArm;
+    /// A shim's `op = f` binding, and the lists built from it.
+    type ShimBinding = (String, String);
+    type ShimBindingList = Vec<(String, String)>;
+    type ShimBindings = Vec<(String, String)>;
     type MatchArmList = Vec<MatchArm>;
     type MatchArms = Vec<MatchArm>;
     type TupleMore = Vec<Expr>;
@@ -1902,6 +1921,12 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 let span = join_spans(&scrutinee.span, &last_span);
                 Expr::new(ExprKind::Match(Box::new(scrutinee), arms), span)
             }
+            aipl::Atom::ShimExpr(shim_span, (effect, effect_span), bindings, body) => {
+                // `shim <effect>` — not the body, whose span is empty when it
+                // ends in a `;` statement.
+                let span = join_spans(&shim_span, &effect_span);
+                Expr::new(ExprKind::Shim(effect, bindings, Box::new(body)), span)
+            }
             aipl::Atom::ArrayLit(lbracket_span, elems) => {
                 // Span runs from `[` to the last element (or just the
                 // `[` for an empty literal).
@@ -2016,6 +2041,41 @@ impl gazelle::Action<aipl::TupleMore<Self>> for Build {
                 prev
             }
         })
+    }
+}
+
+impl gazelle::Action<aipl::ShimBindings<Self>> for Build {
+    fn build(
+        &mut self,
+        node: aipl::ShimBindings<Self>,
+    ) -> Result<Vec<(String, String)>, Self::Error> {
+        Ok(match node {
+            aipl::ShimBindings::Present(list) => list,
+            aipl::ShimBindings::Empty => Vec::new(),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ShimBindingList<Self>> for Build {
+    fn build(
+        &mut self,
+        node: aipl::ShimBindingList<Self>,
+    ) -> Result<Vec<(String, String)>, Self::Error> {
+        Ok(match node {
+            aipl::ShimBindingList::First(b) => vec![b],
+            aipl::ShimBindingList::Rest(mut list, b) => {
+                list.push(b);
+                list
+            }
+            aipl::ShimBindingList::Trailing(list) => list,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ShimBinding<Self>> for Build {
+    fn build(&mut self, node: aipl::ShimBinding<Self>) -> Result<(String, String), Self::Error> {
+        let aipl::ShimBinding::ShimBinding((op, _), (f, _)) = node;
+        Ok((op, f))
     }
 }
 
@@ -2441,6 +2501,7 @@ pub enum LexedTokenKind {
     While,
     Match,
     Return,
+    Shim,
     Struct,
     Variant,
     If,
@@ -2844,6 +2905,7 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
         | K::Set
         | K::Match
         | K::Return
+        | K::Shim
         | K::Builtins => TokenKind::Keyword,
         K::True | K::False | K::None => TokenKind::Constant,
         K::Name(s) => match s.as_str() {
@@ -2962,6 +3024,7 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             K::Set => T::Set,
             K::Match => T::Match,
             K::Return => T::Return,
+            K::Shim => T::Shim(span.clone()),
             K::Builtins => T::Builtins(span.clone()),
             K::None => T::None(span.clone()),
             K::True => T::True(span.clone()),
@@ -3110,6 +3173,8 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         }
     }
     match &mut e.kind {
+        // A shim's bindings are names; asserts can only be in its body.
+        ExprKind::Shim(_, _, body) => bake_asserts(body, src),
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
         | ExprKind::SetLit(args)
@@ -3233,6 +3298,7 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("SET", "set"),
     ("MATCH", "match"),
     ("RETURN", "return"),
+    ("SHIM", "shim"),
     // Punctuation / operators.
     ("LPAREN", "("),
     ("RPAREN", ")"),

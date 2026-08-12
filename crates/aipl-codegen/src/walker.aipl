@@ -488,6 +488,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         Set => Keyword,
         Match => Keyword,
         Return => Keyword,
+        Shim => Keyword,
         Builtins => Keyword,
         True => Constant,
         False => Constant,
@@ -1690,6 +1691,9 @@ fn atom(self: W) -> WDoc!FmtError {
     if (t == "match") {
         return self.match_expr();
     };
+    if (t == "shim") {
+        return self.shim_expr();
+    };
 
     // A lambda used as a value (`let f = |x: i64| { .. }`). Only the single-`|`
     // form reaches expression position; `||` there would be a binary operator.
@@ -1889,6 +1893,35 @@ fn match_expr(self: W) -> WDoc!FmtError {
         w: closed,
         doc: Concat([head, Text("{"), Indent(Concat(inner)), HardLine, Text("}")]),
     })
+}
+
+// `shim <effect> { op = f, .. } { body }`. The bindings group like a call's
+// arguments — flat when they fit, one per line when they don't — and the body is
+// laid out as an ordinary block.
+fn shim_expr(self: W) -> WDoc!FmtError {
+    let effect = self.expect("shim")?.w.bump();
+    let opened = effect.w.expect("{")?.w;
+    let binds = opened.shim_bindings([])?;
+    let closed = binds.w.expect("}")?.w;
+    let body = closed.block_layout()?;
+    let list = comma_list_docs(binds.docs, SpacedBraces);
+    ok(WDoc {
+        w: body.w,
+        doc: group(Concat([Text(`shim {effect.text} `), list, Text(" "), body.doc])),
+    })
+}
+
+// `op = f` pairs up to (not consuming) the closing brace, trailing comma allowed.
+fn shim_bindings(self: W, acc0: Doc[]) -> WDocs!FmtError {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_text() != "}") {
+        let op = w.bump();
+        let f = op.w.expect("=")?.w.bump();
+        set acc.push(Text(`{op.text} = {f.text}`));
+        set w = if (f.w.peek_text() == ",") { f.w.bump().w } else { f.w };
+    }
+    ok(WDocs { w, docs: acc })
 }
 
 fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
@@ -2592,15 +2625,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20310
-deallocations: 20310
+allocations: 20508
+deallocations: 20508
 reallocations: 657
-bytes allocated: 998706
-instructions executed: 3033485
-binary size: 2984472
-  code: 1702640
+bytes allocated: 1005746
+instructions executed: 3058670
+binary size: 3001056
+  code: 1712628
   data: 25060
-  metadata: 1256772
+  metadata: 1263368
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
@@ -2749,6 +2782,8 @@ set_member
 set_or_dict_atom
 set_or_dict_ty
 set_stmt
+shim_bindings
+shim_expr
 slice_to
 spaced_default
 statement

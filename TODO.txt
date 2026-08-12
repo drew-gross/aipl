@@ -34,8 +34,12 @@ List files:
   implement effect shims
 
 clock:
-  add a shim
   make units types
+
+shim:
+  better syntax
+  shim the rest of the effects
+  whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })

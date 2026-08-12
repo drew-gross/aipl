@@ -688,6 +688,40 @@ fn monotonic_nanos() -> i64 {
     0
 }
 
+// ---------- Effect shims ----------
+//
+// A `shim <effect> { op = f, .. } { body }` installs `f`'s address into the slot
+// belonging to `op` for the dynamic extent of `body`, restoring the previous
+// occupant afterwards. Every shimmable operation compiles to "load my slot; call
+// it if non-zero, else call the real runtime fn", so a shim reaches every call
+// at any depth — including through function values and recursion — without the
+// callees knowing anything about it.
+//
+// One flat slot array indexed by `aipl_syntax::shim_slot_index` is the whole
+// mechanism; nothing here names a particular effect. Save/restore is the
+// caller's job (codegen emits it), which is what makes shims nest.
+
+/// Installed shim addresses, one slot per shimmable operation. 0 means "no shim
+/// installed" — the state every slot starts in and returns to. Mirrors
+/// `SHIM_SLOTS` in the linker runtime.
+static SHIM_SLOTS: [std::sync::atomic::AtomicI64; aipl_syntax::SHIM_SLOT_COUNT] =
+    [const { std::sync::atomic::AtomicI64::new(0) }; aipl_syntax::SHIM_SLOT_COUNT];
+
+/// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
+/// as "no shim" rather than trapping (codegen only ever emits valid indices).
+extern "C" fn aipl_shim_get(idx: i64) -> i64 {
+    SHIM_SLOTS
+        .get(idx as usize)
+        .map_or(0, |s| s.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// Install `ptr` (0 to clear) as the shim for slot `idx`.
+extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
+    if let Some(slot) = SHIM_SLOTS.get(idx as usize) {
+        slot.store(ptr, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
 /// hidden-sret ABI the generic `compile_call` path already builds for any
 /// composite-returning builtin (see its `sret` handling) — `out` is the
@@ -3806,6 +3840,7 @@ fn marshal_lex(
             "While" => K::While,
             "Match" => K::Match,
             "Return" => K::Return,
+            "Shim" => K::Shim,
             "Struct" => K::Struct,
             "Variant" => K::Variant,
             "If" => K::If,
@@ -4344,6 +4379,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_now_nanos", aipl_now_nanos as *const u8);
     jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
+    jit_builder.symbol("aipl_shim_get", aipl_shim_get as *const u8);
+    jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
     jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
@@ -6819,6 +6856,9 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
         // Takes nothing, returns the reading.
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(0, true),
+        // Shim slots: read one, or write one (returns nothing).
+        "aipl_shim_get" => sig(1, true),
+        "aipl_shim_set" => sig(2, false),
         "aipl_assert" => sig(2, false),
         "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
@@ -10022,6 +10062,63 @@ fn define_elem_rc_fn<M: Module>(
     Ok(())
 }
 
+/// Emit a call to a shimmable *operation* — one of the builtins listed in
+/// `aipl_syntax::SHIMMABLE_EFFECTS`. Reads the operation's shim slot and calls
+/// the installed shim through it when one is present, falling back to the real
+/// runtime symbol otherwise:
+///
+/// ```text
+///     cur = aipl_shim_get(slot)
+///     brif cur != 0 -> shim(cur) : real()
+/// ```
+///
+/// The branch is what makes a shim reach every call at any depth: a callee
+/// compiled long before any shim existed still asks the slot each time. Only
+/// zero-argument, single-`i64`-result operations are supported so far, which is
+/// all the clock operations need; widening it means threading args and the sret
+/// ABI through, exactly as `compile_indirect_call` already does.
+fn emit_shimmable_call<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    op: &str,
+    real_sym: &'static str,
+) -> Value {
+    let slot = aipl_syntax::shim_slot_index(op).expect("a shimmable operation has a slot") as i64;
+    let get = builtins.import(module, builder.func, "aipl_shim_get");
+    let idx = builder.ins().iconst(types::I64, slot);
+    let inst = builder.ins().call(get, &[idx]);
+    let cur = builder.inst_results(inst)[0];
+
+    let shim_b = builder.create_block();
+    let real_b = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    let installed = builder.ins().icmp_imm_s(IntCC::NotEqual, cur, 0);
+    builder.ins().brif(installed, shim_b, &[], real_b, &[]);
+
+    // A shim has the operation's own signature, which for these is `() -> i64`.
+    builder.switch_to_block(shim_b);
+    builder.seal_block(shim_b);
+    let mut sig = module.make_signature();
+    sig.returns.push(AbiParam::new(types::I64));
+    let sigref = builder.import_signature(sig);
+    let inst = builder.ins().call_indirect(sigref, cur, &[]);
+    let shimmed = builder.inst_results(inst)[0];
+    builder.ins().jump(merge, &[BlockArg::Value(shimmed)]);
+
+    builder.switch_to_block(real_b);
+    builder.seal_block(real_b);
+    let real = builtins.import(module, builder.func, real_sym);
+    let inst = builder.ins().call(real, &[]);
+    let actual = builder.inst_results(inst)[0];
+    builder.ins().jump(merge, &[BlockArg::Value(actual)]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.block_params(merge)[0]
+}
+
 fn fn_addr_or_zero<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
@@ -12615,12 +12712,10 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             }
-            let local = builtins.import(module, builder.func, sym);
-            let inst = builder.ins().call(local, &[]);
-            (
-                builder.inst_results(inst)[0],
-                Type::Primitive(Primitive::U64),
-            )
+            // Both are shimmable operations, so the call routes through the
+            // shim slot: an installed shim wins, otherwise the real clock.
+            let v = emit_shimmable_call(module, builder, builtins, pretty, sym);
+            (v, Type::Primitive(Primitive::U64))
         }
         "__builtin_list_files" => {
             // `(str) -> str[]!str`: ok(paths) on success, err(message) on any
@@ -14452,6 +14547,47 @@ fn compile_expr<M: Module>(
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
+        ExprKind::Shim(_, bindings, body) => {
+            // Install each bound function's address into its operation's slot
+            // for the dynamic extent of `body`, then put back whatever was
+            // there. Saving the previous occupant (rather than clearing) is what
+            // makes shims nest and what lets an inner shim shadow an outer one.
+            // The checker has already verified coverage and signatures.
+            let get = builtins.import(module, builder.func, "aipl_shim_get");
+            let set = builtins.import(module, builder.func, "aipl_shim_set");
+            let mut saved: Vec<(Value, Value)> = Vec::with_capacity(bindings.len());
+            for (op, f) in bindings {
+                let slot = aipl_syntax::shim_slot_index(op)
+                    .expect("checker verified this is a shimmable operation");
+                let idx = builder.ins().iconst(types::I64, slot as i64);
+                let inst = builder.ins().call(get, &[idx]);
+                let old = builder.inst_results(inst)[0];
+                let Some(info) = cx.funcs.get(f) else {
+                    return Err(Error::at(
+                        format!("unknown shim function {:?}", display_name(f)),
+                        expr.span.clone(),
+                    ));
+                };
+                let FuncLink::User(id) = info.link else {
+                    return Err(Error::at(
+                        format!(
+                            "shim function {:?} is a runtime builtin, which has no address to \
+                             install",
+                            display_name(f)
+                        ),
+                        expr.span.clone(),
+                    ));
+                };
+                let addr = fn_addr_or_zero(builder, module, Some(id));
+                builder.ins().call(set, &[idx, addr]);
+                saved.push((idx, old));
+            }
+            let (v, t) = compile_expr(module, builder, cx, scopes, body)?;
+            for (idx, old) in saved {
+                builder.ins().call(set, &[idx, old]);
+            }
+            (v, t)
+        }
         ExprKind::Return(value) => {
             // Early return: evaluate the value, hand the caller a reference,
             // release *every* live scope (we're leaving the function), then return

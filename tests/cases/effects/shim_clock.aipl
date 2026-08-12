@@ -1,0 +1,85 @@
+import { monotonic_now, now_nanos, print, to_str, ==, > } from builtins;
+
+// A `shim <effect> { op = f, .. } { body }` installs stand-ins for an effect's
+// operations over the *dynamic* extent of `body`: every call made while it runs
+// reaches the bound function instead of the real one, at any call depth, without
+// the callees knowing a shim exists.
+//
+// Because every operation of `!clock` is bound, the body provably cannot reach
+// the real clock — so the effect is *discharged*. The functions below that
+// install shims declare **no effects at all**, while calling code that declares
+// `!clock`. (What an installer must still declare is whatever the shim functions
+// themselves declare — see `err_shim_undeclared_effect`.)
+
+fn fixed_wall() -> u64 { u64(1111) }
+
+fn fixed_mono() -> u64 { u64(2222) }
+
+fn inner_wall() -> u64 { u64(3333) }
+
+fn inner_mono() -> u64 { u64(4444) }
+
+// Three call levels between the shim and the operation, none of them aware a
+// shim exists. Each still declares `!clock` — they really do read the clock.
+fn depth3() !clock -> u64 { now_nanos() }
+
+fn depth2() !clock -> u64 { depth3() }
+
+fn depth1() !clock -> u64 { depth2() }
+
+fn mono_reading() !clock -> u64 { monotonic_now() }
+
+// No effect declaration, yet it calls `!clock` code: the shim discharges it.
+fn through_three_frames() -> u64 {
+    shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } { depth1() }
+}
+
+fn shimmed_mono() -> u64 {
+    shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } { mono_reading() }
+}
+
+// A nested shim shadows the outer one for its own extent; the outer binding is
+// restored on the way out, which is what the second reading shows.
+fn nested() -> str {
+    shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } {
+        let inner = shim clock { now_nanos = inner_wall, monotonic_now = inner_mono } { depth1() };
+        let outer_again = depth1();
+        `{to_str(inner)} then {to_str(outer_again)}`
+    }
+}
+
+// The restore is scoped to the block, not the function: this reads a shimmed
+// clock and then the real one, so it declares `!clock` for the second reading.
+fn shimmed_then_real() !clock -> bool {
+    let shimmed = shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } { depth1() };
+    if (shimmed == u64(1111)) { now_nanos() > u64(1704067200000000000) } else { false }
+}
+
+fn main() !prints !clock {
+    print(to_str(through_three_frames()));
+    print(to_str(shimmed_mono()));
+    print(nested());
+    print(to_str(shimmed_then_real()));
+}
+--- stdout ---
+1111
+2222
+3333 then 1111
+true
+--- monomorphizations ---
+depth1
+fixed_mono
+fixed_wall
+inner_mono
+inner_wall
+main
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 85
+instructions executed: 321
+binary size: 4472
+  code: 1936
+  data: 47
+  metadata: 2489

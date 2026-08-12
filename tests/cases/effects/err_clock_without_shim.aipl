@@ -1,0 +1,13 @@
+import { now_nanos } from builtins;
+
+// The discharge is what a shim buys: *without* one, `!clock` propagates to the
+// caller like any other effect. This is the case `shim_clock` contrasts with.
+fn reads() !clock -> u64 { now_nanos() }
+
+fn main() -> u64 { reads() }
+--- errors ---
+error: fn "reads" has effect "!clock" but the calling function does not declare it
+ --> ./tests/cases/effects/err_clock_without_shim.aipl:7:20
+  |
+7 | fn main() -> u64 { reads() }
+  |                    ^^^^^

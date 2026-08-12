@@ -722,6 +722,18 @@ pub mod ast {
         /// iteration and runs `body` while it holds. Body's value is discarded;
         /// the loop expression itself is i64 0 (like `For`).
         While(Box<Expr>, Box<Expr>),
+        /// `shim <effect> { op = f, .. } { body }` — install shim functions for
+        /// an effect's operations over the *dynamic* extent of `body`: every
+        /// call made while it runs, at any depth, reaches the bound function
+        /// instead of the real one. Carries the effect name, the bindings as
+        /// `(operation, function)` pairs in source order, and the body.
+        ///
+        /// Discharges the effect: `body` may call operations of `<effect>`
+        /// without the enclosing function declaring it, since with every
+        /// operation bound the body cannot reach the underlying resource. The
+        /// bound functions' *own* effects still propagate to the enclosing
+        /// function. See `SHIMMABLE_EFFECTS`.
+        Shim(String, Vec<(String, String)>, Box<Expr>),
         /// `none` — the None value. Its type is determined by context
         /// (function return, function arg, or the other branch of an
         /// if/else), at which point it materializes as a stack slot
@@ -1083,6 +1095,8 @@ pub fn binop_spelling(c: char) -> &'static str {
 pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<String>) {
     use ast::ExprKind as K;
     match &e.kind {
+        // A shim's bindings are plain names; only its body holds expressions.
+        K::Shim(_, _, body) => collect_operators(body, out),
         K::Binop(a, op, b) => {
             out.insert(binop_spelling(*op).to_string());
             collect_operators(a, out);
@@ -1510,6 +1524,46 @@ pub fn builtin_canonical(name: &str) -> Option<String> {
     }
 }
 
+/// The *operations* of each shimmable effect: the builtins through which that
+/// effect actually reaches its underlying resource. A `shim <effect> { .. }`
+/// block must bind every one of them — a partial shim would let the body reach
+/// the real resource while the enclosing function stops declaring the effect,
+/// which would make that declaration a lie.
+///
+/// This is the one table that decides what can be shimmed. Every other part of
+/// the feature (parser, checker, codegen, runtime slots) reads it rather than
+/// naming a specific effect, so opening up another effect is an entry here plus
+/// the runtime dispatch for its operations. Only `clock` is listed for now.
+pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[("clock", &["now_nanos", "monotonic_now"])];
+
+/// The operations of `effect`, or `None` if it isn't shimmable.
+pub fn effect_operations(effect: &str) -> Option<&'static [&'static str]> {
+    SHIMMABLE_EFFECTS
+        .iter()
+        .find(|(name, _)| *name == effect)
+        .map(|(_, ops)| *ops)
+}
+
+/// Every shimmable operation across every effect, in declaration order — the
+/// order that assigns each operation its runtime slot index (see
+/// `shim_slot_index`). Stable because [`SHIMMABLE_EFFECTS`] is.
+pub fn shim_operations() -> impl Iterator<Item = (&'static str, &'static str)> {
+    SHIMMABLE_EFFECTS
+        .iter()
+        .flat_map(|(effect, ops)| ops.iter().map(move |op| (*effect, *op)))
+}
+
+/// The runtime slot index holding the installed shim for `op`, or `None` if `op`
+/// isn't a shimmable operation. Both runtimes size their slot array by
+/// [`SHIM_SLOT_COUNT`], so these indices are the shared contract.
+pub fn shim_slot_index(op: &str) -> Option<usize> {
+    shim_operations().position(|(_, name)| name == op)
+}
+
+/// How many shim slots the runtimes must reserve. Kept in sync by
+/// `shim_slots_match_runtime` in `tests/shims.rs`.
+pub const SHIM_SLOT_COUNT: usize = 2;
+
 /// Built-in *type* names that must be brought into scope with
 /// `import { .. } from builtins;` before use — the type-level analog of
 /// [`IMPORTABLE_BUILTINS`]. Unlike the ambient builtin `Error` type (which
@@ -1564,6 +1618,8 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
     f(e);
     match &e.kind {
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {}
+        // A shim's bindings name functions; only its body nests expressions.
+        K::Shim(_, _, body) => each_subexpr(body, f),
         K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
             for a in args {
                 each_subexpr(a, f);

@@ -1,0 +1,21 @@
+import { print } from builtins;
+
+// Installing a shim means the enclosing function may run it, so the shim
+// functions' *own* effects propagate to the installer. Discharging `!clock`
+// doesn't excuse the `!prints` this shim performs.
+fn logging_clock() !prints -> u64 {
+    print("tick");
+    u64(1)
+}
+
+fn fake_mono() -> u64 { u64(2) }
+
+fn main() {
+    shim clock { now_nanos = logging_clock, monotonic_now = fake_mono } {};
+}
+--- errors ---
+error: shim fn "logging_clock" has effect "!prints" but the function installing the shim does not declare it
+  --> ./tests/cases/effects/err_shim_undeclared_effect.aipl:14:5
+   |
+14 |     shim clock { now_nanos = logging_clock, monotonic_now = fake_mono } {};
+   |     ^^^^^^^^^^

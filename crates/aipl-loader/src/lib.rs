@@ -560,6 +560,8 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         }
     };
     match &e.kind {
+        // A shim's bindings are bare names; operators can only be in its body.
+        ExprKind::Shim(_, _, body) => check_operators(body, view)?,
         ExprKind::Binop(a, op, b) => {
             require(aipl_syntax::binop_spelling(*op), e.span.clone())?;
             check_operators(a, view)?;
@@ -909,6 +911,20 @@ fn rewrite_expr(
         | ExprKind::Char(_)
         | ExprKind::Unit
         | ExprKind::None => e.kind.clone(),
+        // A shim's bound functions are global references like any other, so
+        // they resolve through the view (a local can't shadow them: a shim
+        // binds a *function*, and locals never name one here).
+        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
+            effect.clone(),
+            bindings
+                .iter()
+                .map(|(op, f)| {
+                    let resolved = view.get(f).cloned().unwrap_or_else(|| f.clone());
+                    (op.clone(), resolved)
+                })
+                .collect(),
+            Box::new(rewrite_expr(body, view, sc, locals)),
+        ),
         // A bare ident: resolve it to a global only if it isn't a local. This is
         // how a function or imported builtin used as a value (`map(xs, f)`)
         // reaches its mangled/canonical name; a shadowing local is left alone.

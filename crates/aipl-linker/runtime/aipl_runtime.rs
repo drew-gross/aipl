@@ -962,6 +962,40 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
         .wrapping_add(ts.tv_nsec as u64) as i64
 }
 
+// ---------- Effect shims ----------
+//
+// A `shim <effect> { op = f, .. } { body }` installs `f`'s address into the slot
+// belonging to `op` for the dynamic extent of `body`. Every shimmable operation
+// compiles to "load my slot; call it if non-zero, else call the real runtime
+// fn", so a shim reaches every call at any depth without callees knowing about
+// it. Save/restore is emitted by codegen, which is what makes shims nest.
+// Mirrors the `SHIM_SLOTS` block in the JIT runtime.
+
+/// One slot per shimmable operation, indexed as `aipl_syntax::shim_slot_index`
+/// assigns. 0 means "no shim installed" — the state every slot starts in and
+/// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
+/// in `tests/shims.rs` holds the two in sync.
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 2] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 2];
+
+/// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
+/// as "no shim" rather than trapping (codegen only ever emits valid indices).
+#[no_mangle]
+pub extern "C" fn aipl_shim_get(idx: i64) -> i64 {
+    match SHIM_SLOTS.get(idx as usize) {
+        Some(slot) => slot.load(core::sync::atomic::Ordering::Relaxed),
+        None => 0,
+    }
+}
+
+/// Install `ptr` (0 to clear) as the shim for slot `idx`.
+#[no_mangle]
+pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
+    if let Some(slot) = SHIM_SLOTS.get(idx as usize) {
+        slot.store(ptr, core::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 /// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring
 /// the JIT runtime): writes `Result<ExecResult, Error>` directly into `out`
 /// (tag 1 = ok, 0 = err, matching the `ok`/`err` expression codegen; the

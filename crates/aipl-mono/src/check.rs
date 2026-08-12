@@ -1383,6 +1383,131 @@ impl Cx<'_> {
             .unwrap_or_default()
     }
 
+    /// Check a `shim <effect> { op = f, .. } { body }` and return the body's
+    /// type. Three rules, all stated in terms of the effect's operation table
+    /// (`aipl_syntax::effect_operations`) rather than any particular effect:
+    ///
+    /// 1. **Coverage.** Every operation of `effect` must be bound exactly once,
+    ///    and each bound function must match that operation's signature. With
+    ///    full coverage the body provably cannot reach the real resource, which
+    ///    is what makes rule 3 sound.
+    /// 2. **The shim's own effects propagate.** Installing a shim means the
+    ///    enclosing function may run it, so the enclosing function must declare
+    ///    whatever the shim functions declare.
+    /// 3. **The effect is discharged.** `effect` is added to the permitted set
+    ///    for `body` only, so the body may call its operations (directly or at
+    ///    any call depth) without the enclosing function declaring it.
+    fn check_shim(
+        &self,
+        effect: &str,
+        bindings: &[(String, String)],
+        body: &Expr,
+        env: &Env,
+        effects: &[String],
+        span: Span,
+    ) -> Result<Type, Error> {
+        let Some(ops) = aipl_syntax::effect_operations(effect) else {
+            let known = aipl_syntax::SHIMMABLE_EFFECTS
+                .iter()
+                .map(|(n, _)| format!("\"!{n}\""))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(Error::at(
+                format!("effect \"!{effect}\" cannot be shimmed; shimmable effects are: {known}"),
+                span,
+            ));
+        };
+        // Each binding names an operation of this effect, at most once.
+        let mut seen: Vec<&str> = Vec::new();
+        for (op, _) in bindings {
+            if !ops.contains(&op.as_str()) {
+                return Err(Error::at(
+                    format!(
+                        "\"{op}\" is not an operation of effect \"!{effect}\"; its operations are: {}",
+                        ops.join(", ")
+                    ),
+                    span,
+                ));
+            }
+            if seen.contains(&op.as_str()) {
+                return Err(Error::at(
+                    format!("operation \"{op}\" is shimmed more than once"),
+                    span,
+                ));
+            }
+            seen.push(op);
+        }
+        // Coverage: a partial shim can't discharge the effect, because the
+        // unshimmed operations would still reach the real resource.
+        for op in ops {
+            if !seen.contains(op) {
+                return Err(Error::at(
+                    format!(
+                        "shim of \"!{effect}\" does not cover operation \"{op}\"; a partial shim \
+                         cannot discharge the effect"
+                    ),
+                    span,
+                ));
+            }
+        }
+        for (op, f) in bindings {
+            let Some(shim_sig) = self.sigs.get(f) else {
+                return Err(Error::at(
+                    format!("unknown function {:?} bound to \"{op}\"", display(f)),
+                    span,
+                ));
+            };
+            // The shim stands in for the operation at every call site, so it
+            // must accept and return exactly what the operation does.
+            let op_sig = self
+                .sigs
+                .get(&format!("__builtin_{op}"))
+                .expect("a shimmable operation is a declared builtin");
+            let show = |s: &Signature| {
+                let ps = s
+                    .param_types()
+                    .iter()
+                    .map(tyname)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let r = s.return_ty.as_ref().map_or("()".to_string(), tyname);
+                format!("({ps}) -> {r}")
+            };
+            if shim_sig.param_types() != op_sig.param_types()
+                || shim_sig.return_ty != op_sig.return_ty
+            {
+                return Err(Error::at(
+                    format!(
+                        "fn {:?} cannot shim \"{op}\": it is {}, but \"{op}\" is {}",
+                        display(f),
+                        show(shim_sig),
+                        show(op_sig)
+                    ),
+                    span,
+                ));
+            }
+            // Rule 2: running the shim is the enclosing function's business.
+            for e in &shim_sig.effects {
+                if !effects.contains(e) {
+                    return Err(Error::at(
+                        format!(
+                            "shim fn {:?} has effect \"!{e}\" but the function installing the \
+                             shim does not declare it",
+                            display(f)
+                        ),
+                        span,
+                    ));
+                }
+            }
+        }
+        // Rule 3: the body may use the effect; the enclosing function need not.
+        let mut inner: Vec<String> = effects.to_vec();
+        if !inner.iter().any(|e| e == effect) {
+            inner.push(effect.to_string());
+        }
+        self.check_expr(body, env, &inner)
+    }
+
     /// Check `expr` and return its type. `effects` is the enclosing function's
     /// declared effect set (callees must not exceed it).
     /// The result type of slicing a receiver of type `ot` (`recv[a..b]`, or
@@ -1404,6 +1529,9 @@ impl Cx<'_> {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => Type::Unit,
+            ExprKind::Shim(effect, bindings, body) => {
+                self.check_shim(effect, bindings, body, env, effects, span.clone())?
+            }
             ExprKind::Num(_) => Type::Primitive(Primitive::I64),
             ExprKind::Bool(_) => Type::Primitive(Primitive::Bool),
             ExprKind::Str(_) => Type::Primitive(Primitive::Str),

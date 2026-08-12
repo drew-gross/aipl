@@ -1,0 +1,21 @@
+import { now_nanos } from builtins;
+
+// A shim must bind *every* operation of the effect it discharges. `!clock` has
+// two (`now_nanos` and `monotonic_now`); binding one would leave the body able
+// to reach the real clock while the enclosing function stops declaring the
+// effect — so a partial shim is rejected rather than silently half-applied.
+fn fake() -> u64 { u64(1) }
+
+fn reads() !clock -> u64 { now_nanos() }
+
+fn main() {
+    shim clock { now_nanos = fake } {
+        reads();
+    };
+}
+--- errors ---
+error: shim of "!clock" does not cover operation "monotonic_now"; a partial shim cannot discharge the effect
+  --> ./tests/cases/effects/err_shim_partial_coverage.aipl:12:5
+   |
+12 |     shim clock { now_nanos = fake } {
+   |     ^^^^^^^^^^

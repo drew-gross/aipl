@@ -120,7 +120,7 @@
       "name": "constant.numeric.integer.aipl"
     },
     "keyword": {
-      "match": "\\b(fn|if|else|struct|variant|import|from|as|pub|let|for|while|mut|set|match|return|builtins)\\b",
+      "match": "\\b(fn|if|else|struct|variant|import|from|as|pub|let|for|while|mut|set|match|return|shim|builtins)\\b",
       "name": "keyword.control.aipl"
     },
     "constant": {

@@ -455,6 +455,13 @@ impl Expander {
             | ExprKind::Char(_)
             | ExprKind::Unit
             | ExprKind::None => e.kind.clone(),
+            // A shim binds functions by name (no call site to fill defaults at);
+            // only its body can contain calls.
+            ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
+                effect.clone(),
+                bindings.clone(),
+                Box::new(self.expand_expr(body, locals)?),
+            ),
             // A bare reference to a function with keyword parameters (passing
             // it as a value): there is no call site to fill defaults at, and a
             // function type has no keyword parameters, so reject it.

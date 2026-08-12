@@ -1,0 +1,14 @@
+// Only effects listed in the compiler's shimmable-effect table can be shimmed —
+// the table is what says which operations make up an effect, and without it
+// there is nothing to bind or to check coverage against.
+fn fake() -> u64 { u64(1) }
+
+fn main() {
+    shim prints { now_nanos = fake } {};
+}
+--- errors ---
+error: effect "!prints" cannot be shimmed; shimmable effects are: "!clock"
+ --> ./tests/cases/effects/err_shim_unshimmable_effect.aipl:7:5
+  |
+7 |     shim prints { now_nanos = fake } {};
+  |     ^^^^^^^^^^^

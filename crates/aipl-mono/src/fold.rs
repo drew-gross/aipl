@@ -65,6 +65,10 @@ fn fold_expr(e: &Expr) -> Expr {
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        // Nothing to fold in a shim's bindings — they are function names.
+        ExprKind::Shim(effect, bindings, body) => {
+            ExprKind::Shim(effect.clone(), bindings.clone(), f(body))
+        }
         ExprKind::Num(_)
         | ExprKind::Bool(_)
         | ExprKind::Str(_)
