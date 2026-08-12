@@ -33,8 +33,6 @@ List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims
 
-u64 can't be a Result payload
-
 clock:
   add a shim
   make units types
@@ -50,7 +48,6 @@ optimizations:
   make arrays work sorta like strings i.e. have a rope representation
 
 start writing some profiling tools in aipl:
-  !clock effect
   shimable clock, mostly for tests
   all effects should be shimmable actually
 

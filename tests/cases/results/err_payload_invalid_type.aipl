@@ -1,0 +1,9 @@
+// A result payload may be any type that is valid on its own, so there is no
+// separate payload whitelist to fall foul of — but an invalid *type* is still
+// invalid as a payload. Here the problem is the set's element type (a set holds
+// scalars, not arrays), and it's the set's own rule that reports it.
+fn bad() -> #{i64[]}!Error { err("x") }
+
+fn main() {}
+--- errors ---
+error: fn "bad": a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]

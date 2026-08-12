@@ -1,0 +1,105 @@
+import { get, len, print, to_str, wrapping_add as +, == } from builtins;
+
+// A result payload can be *any* value type, not a privileged handful. Each side
+// rides the same generic machinery — sized by its layout, written and refcounted
+// like any other value — so what a payload may be is just "a type that is valid
+// on its own". The cases below are the ones that used to be rejected.
+
+struct Point { x: i64, y: i64 }
+
+variant Shape = Circle(i64) | Empty
+
+// Every integer width, not only `i64`.
+fn wide(n: u64) -> u64!Error { ok(n + u64(1)) }
+
+fn narrow(n: i8) -> i8!Error { ok(n) }
+
+// An optional payload, including one wrapping a heap value.
+fn maybe(x: i64?) -> i64?!Error { ok(x) }
+
+fn maybe_strs() -> str[]?!Error { ok(some(["a", "b"])) }
+
+// Set and dict payloads: refcounted containers, released with the result.
+fn evens(n: i64) -> #{i64}!Error { if (n == 0) { err("no evens") } else { ok(#{2, 4, n}) } }
+
+fn counts() -> #{str: i64}!Error { ok(#{"a": 1, "b": 2}) }
+
+// A tuple payload. Tuples lower to a struct before checking, so the payload
+// machinery already handled them — but `(A, B)!E` had no grammar rule to be
+// spelled with, since a tuple type isn't a `base_ty`.
+fn pair(n: i64) -> (i64, str)!Error { if (n == 0) { err("zero") } else { ok((n, "x")) } }
+
+// Already supported, kept here so the whole payload surface reads in one place.
+fn point() -> Point!Error { ok(Point { x: 1, y: 2 }) }
+
+fn shape() -> Shape!Error { ok(Circle(3)) }
+
+// `?` unwraps a container payload and the unwrapped value outlives the result.
+fn count_evens(n: i64) -> i64!Error {
+    let s = evens(n)?;
+    ok(i64(s.len()))
+}
+
+fn first_of_pair(n: i64) -> i64!Error {
+    let p = pair(n)?;
+    ok(p.0)
+}
+
+fn main() !prints {
+    print(to_str(wide(u64(41))));
+    print(to_str(narrow(i8(-3))));
+    print(to_str(maybe(some(5))));
+    print(to_str(maybe(none)));
+    print(to_str(maybe_strs()));
+    print(to_str(evens(6)));
+    print(to_str(counts()));
+    print(to_str(point()));
+    print(to_str(shape()));
+    print(to_str(count_evens(6)));
+    print(to_str(count_evens(0)));
+    print(to_str(first_of_pair(7)));
+    print(to_str(pair(0)));
+
+    // Payload-aware equality and matching, not just rendering.
+    print(to_str(evens(6) == evens(6)));
+    print(to_str(evens(6) == evens(8)));
+    match (counts()) {
+        ok(d) => print(to_str(d.get("b"))),
+        err(e) => print(e),
+    };
+}
+--- stdout ---
+ok(42)
+ok(-3)
+ok(some(5))
+ok(none)
+ok(some(["a", "b"]))
+ok({2, 4, 6})
+ok({"a": 1, "b": 2})
+ok(Point { x: 1, y: 2 })
+ok(Circle(3))
+ok(3)
+err("no evens")
+ok(7)
+err("zero")
+true
+false
+some(2)
+--- monomorphizations ---
+count_evens
+counts
+evens
+first_of_pair
+main
+maybe
+pair
+--- performance ---
+allocations: 18
+deallocations: 18
+reallocations: 0
+bytes allocated: 800
+instructions executed: 3499
+binary size: 24304
+  code: 12700
+  data: 1731
+  metadata: 9873

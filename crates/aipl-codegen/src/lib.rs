@@ -14147,30 +14147,32 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // Any *value* can be a payload. The machinery a payload rides on is
+            // already generic over the type: `elem_size_of` sizes it (an inline
+            // composite — struct, variant, optional, nested result — by its
+            // layout; everything else as one 8-byte word),
+            // `store_array_elem`/`copy_composite` writes it, and
+            // `emit_retain`/`needs_drop` refcount whatever heap it owns. So the
+            // only things rejected here are the two types that have no runtime
+            // value to store.
             match &t {
-                Type::Primitive(
-                    Primitive::I64 | Primitive::Bool | Primitive::Char | Primitive::Str,
-                ) => {}
-                _ if is_error(&t) => {}
-                // A struct or variant payload is an inline composite (like an
-                // optional's core): `elem_size_of`/`store_array_elem`/`emit_rc`
-                // already size, copy, and refcount it generically once it's
-                // addressed as a `Result` payload (struct/variant layout
-                // resolution is unified in `structs`). An array payload is a
-                // single refcounted pointer word, handled by the same machinery
-                // (an empty literal's element type coerces at the use site,
-                // like any `[]`).
-                Type::Named(n) if structs.get(n).is_some() => {}
-                Type::Array(_) => {}
-                _ => {
+                // `ok()` (no argument) is how a void success is written; `ok(x)`
+                // needs an `x` that exists.
+                Type::Unit => {
                     return Err(Error::at(
-                        format!(
-                            "{name:?} payload must be a scalar, str, struct, variant, or array, got {}",
-                            type_name(&t)
-                        ),
+                        format!("{name:?} payload cannot be () — write `ok()` for a void success"),
                         args[0].span.clone(),
                     ));
                 }
+                // Function types are erased by monomorphization: a function is
+                // never a runtime value, so it can't be carried in one.
+                Type::Fn(_, _) => {
+                    return Err(Error::at(
+                        format!("{name:?} payload cannot be a function ({})", type_name(&t)),
+                        args[0].span.clone(),
+                    ));
+                }
+                _ => {}
             }
             let res_ty = if is_ok {
                 Type::Result(Box::new(t.clone()), Box::new(Type::NoneInner))

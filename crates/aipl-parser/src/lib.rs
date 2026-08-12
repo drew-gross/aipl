@@ -206,7 +206,13 @@ gazelle! {
            | LPAREN ty_args RPAREN => tuple_ty
            // `(A, B)[]` — an array of tuples. Shifts over `tuple_ty` when
            // the lookahead is `LBRACKET`.
-           | LPAREN ty_args RPAREN LBRACKET RBRACKET => tuple_array_ty;
+           | LPAREN ty_args RPAREN LBRACKET RBRACKET => tuple_array_ty
+           // `(A, B)!E` — a result whose Ok payload is a tuple. A tuple type
+           // isn't a `base_ty` (it can't take postfix `?`/`[]` the same way),
+           // so the `base_ty BANG base_ty` form above can't reach it; with
+           // `BANG` as lookahead the parser shifts here instead of reducing
+           // `tuple_ty`.
+           | LPAREN ty_args RPAREN BANG base_ty => tuple_result;
         base_ty = IDENT => named
                 // `Foo<A, B>` — a use of a generic struct/variant with concrete
                 // type arguments. Only in type position (no expressions here),
@@ -1215,6 +1221,14 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
                     ));
                 }
                 Type::Array(Box::new(Type::Tuple(args)))
+            }
+            aipl::Ty::TupleResult(args, err) => {
+                if args.len() < 2 {
+                    return Err(Error::msg(
+                        "a tuple type needs at least 2 elements, e.g. (i64, str)!Error".to_string(),
+                    ));
+                }
+                Type::Result(Box::new(Type::Tuple(args)), Box::new(err))
             }
         })
     }

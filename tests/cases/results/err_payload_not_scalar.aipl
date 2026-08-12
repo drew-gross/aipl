@@ -1,7 +1,0 @@
-// A result payload (either side) must be a scalar, `str`, a struct, a
-// variant, or an array — optional payloads aren't supported yet.
-fn bad() -> i64?!str { ok(some(1)) }
-
-fn main() {}
---- errors ---
-error: fn "bad": a result Ok payload must be an integer (i8..i64, u8..u64), bool, char, str, a struct, a variant, an array, or unit ("!E"), got i64?

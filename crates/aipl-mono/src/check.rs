@@ -958,44 +958,29 @@ impl Cx<'_> {
                 }
                 self.check_elem_ty(v, type_params, fname)
             }
-            // A result `T!E`: the Ok and Err payloads are scalar/`str`/a
-            // struct/a variant/an array (or a type parameter pinned to a
-            // scalar). The Ok side may also be unit — a void-result `!E` whose
-            // success carries no value. Arrays and variants ride the same
-            // generic payload machinery as structs (sized by `elem_size_of`,
-            // refcounted by `emit_rc`); an array's element type is validated
-            // like any other array's.
+            // A result `T!E`: either side may be *any* type that is valid on its
+            // own, so this just recurses — which is also what applies each
+            // payload's own rules (an array payload's elements are validated
+            // like any array's, a dict payload's key like any dict's, a nested
+            // result's sides like these). They all ride the same generic payload
+            // machinery in codegen: sized by `elem_size_of`, written by
+            // `store_array_elem`, refcounted by `emit_rc`. The Ok side may
+            // additionally be unit — a void-result `!E` whose success carries no
+            // value. A function is the one thing neither side can be: it's
+            // erased by monomorphization, so there's no runtime value to carry.
             Type::Result(ok, err) => {
-                let payload_ok = |p: &Type| {
-                    is_set_elem(p) // i64/bool/char/str
-                        || is_error(p)
-                        || is_abstract_scalar_ty(p, type_params)
-                        || matches!(p, Type::Named(n) if self.has_struct(n))
-                        || matches!(p, Type::Named(n) if self.variants.contains_key(n))
-                        || matches!(p, Type::Array(_))
-                        // An (abstract) generic struct/variant `StepResult<K>` —
-                        // a valid payload like any struct/variant.
-                        || matches!(p, Type::Generic(..))
-                };
-                if !payload_ok(ok) && !is_unit(ok) {
-                    return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Ok payload must be an integer (i8..i64, u8..u64), bool, char, str, a struct, a variant, an array, or unit (\"!E\"), got {}",
-                        tyname(ok)
-                    )));
+                for (p, side) in [(ok, "Ok"), (err, "Err")] {
+                    if let Type::Fn(_, _) = &**p {
+                        return Err(Error::msg(format!(
+                            "fn {fname:?}: a result {side} payload cannot be a function, got {}",
+                            tyname(p)
+                        )));
+                    }
                 }
-                if !payload_ok(err) {
-                    return Err(Error::msg(format!(
-                        "fn {fname:?}: a result Err payload must be an integer (i8..i64, u8..u64), bool, char, str, Error, a struct, a variant, or an array, got {}",
-                        tyname(err)
-                    )));
+                if !is_unit(ok) {
+                    self.check_ty(ok, type_params, fname)?;
                 }
-                if let Type::Array(elem) = &**ok {
-                    self.check_elem_ty(elem, type_params, fname)?;
-                }
-                if let Type::Array(elem) = &**err {
-                    self.check_elem_ty(elem, type_params, fname)?;
-                }
-                Ok(())
+                self.check_ty(err, type_params, fname)
             }
             // A function type (a lambda parameter): validate its argument and
             // return types. `check_fn` separately forbids it as a *return* type.

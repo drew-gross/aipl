@@ -757,8 +757,9 @@ fn ty(self: W) -> WDoc!FmtError {
     ok(base)
 }
 
-// `(A, B) -> R` (function type), `(A, B)` (tuple), or `(A, B)[]` (tuple array).
-// Which one is only known after the closing paren.
+// `(A, B) -> R` (function type), `(A, B)` (tuple), `(A, B)[]` (tuple array), or
+// `(A, B)!E` (a result with a tuple Ok payload). Which one is only known after
+// the closing paren.
 fn paren_ty(self: W) -> WDoc!FmtError {
     let args = self.bump().w.ty_list(")", [])?;
     let closed = args.w.expect(")")?.w;
@@ -766,6 +767,13 @@ fn paren_ty(self: W) -> WDoc!FmtError {
     if (closed.peek_text() == "->") {
         let r = closed.bump().w.ty()?;
         return ok(WDoc { w: r.w, doc: Concat([list, Text(" -> "), r.doc]) });
+    };
+
+    // Mirrors the grammar's `LPAREN ty_args RPAREN BANG base_ty`: the `!` binds
+    // to the tuple directly, so no array suffix can precede it.
+    if (closed.peek_text() == "!") {
+        let e = closed.bump().w.base_ty()?;
+        return ok(WDoc { w: e.w, doc: Concat([list, Text("!"), e.doc]) });
     };
     let arrs = closed.array_suffixes([]);
     ok(WDoc { w: arrs.w, doc: Concat([list, ..arrs.docs]) })
@@ -2588,11 +2596,11 @@ allocations: 20310
 deallocations: 20310
 reallocations: 657
 bytes allocated: 998706
-instructions executed: 3033378
-binary size: 2980392
-  code: 1700200
+instructions executed: 3033485
+binary size: 2984472
+  code: 1702640
   data: 25060
-  metadata: 1255132
+  metadata: 1256772
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
