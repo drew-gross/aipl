@@ -44,9 +44,6 @@ shim:
 syntax:
   remove the ability to cast literals
 
-misc:
- in builtin_sort_by self[0..0] can be fixes now that let x: T = y; is supported
-
 lint:
   x[0..] etc should just be x
 

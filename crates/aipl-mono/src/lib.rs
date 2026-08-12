@@ -1271,7 +1271,15 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     })
                     .collect();
                 let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
-                (params, sig.effects.clone(), return_ty, body.clone())
+                // The body's own annotations (`let x: T`, `|a: T|`) need the
+                // same substitution the signature just got — they reach codegen
+                // verbatim otherwise.
+                (
+                    params,
+                    sig.effects.clone(),
+                    return_ty,
+                    subst_expr_tys(&body, &map),
+                )
             } else {
                 // Concrete function: its signature is already concrete.
                 let f = mono.concrete[&inst.template].clone();
@@ -2070,7 +2078,9 @@ impl Mono<'_> {
             params,
             effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
-            body: body.clone(),
+            // As in the instance-emitting path: the body's own `let x: T` /
+            // `|a: T|` annotations need the same substitution as the signature.
+            body: subst_expr_tys(&body, &map),
         };
         // Name the instance by its type args so different `T`s don't collide in
         // the specialization memo; a `str`-specialized parameter is marked too, so
@@ -5631,6 +5641,101 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
                 .map(|a| normalize_inner(a, type_vars, counter))
                 .collect(),
         ),
+    }
+}
+
+/// Substitute type variables in every type annotation *inside* a generic's
+/// body, using the same map that concretizes its signature.
+///
+/// `subst_vars` handles the signature — parameters and return type — but a body
+/// carries annotations of its own: a `let x: T = ..` / `mut x: T = ..` binding,
+/// and a lambda parameter's `|a: T|`. Those reach codegen verbatim, so without
+/// this a specialized instance compares a leftover `T[]` against the concrete
+/// `i64[]` and rejects its own body.
+///
+/// The motivating case is seeding a generic accumulator: `mut out: T[] = [];`
+/// is how you give an empty literal the element type `T` rather than the
+/// `__none__` an untyped `[]` infers.
+///
+/// Exhaustive rather than a catch-all, so a future annotation-carrying
+/// expression has to decide here instead of silently keeping its type variable.
+fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
+    use ExprKind as K;
+    let r = |x: &Expr| Box::new(subst_expr_tys(x, map));
+    let kind = match &e.kind {
+        // The three annotation carriers — the whole point of this walk.
+        K::Let(n, ty, v, b) => K::Let(
+            n.clone(),
+            ty.as_ref().map(|t| subst_vars(t, map)),
+            r(v),
+            r(b),
+        ),
+        K::LetMut(n, ty, v, b) => K::LetMut(
+            n.clone(),
+            ty.as_ref().map(|t| subst_vars(t, map)),
+            r(v),
+            r(b),
+        ),
+        K::Lambda(params, body) => K::Lambda(
+            params
+                .iter()
+                .map(|p| LambdaParam {
+                    ty: p.ty.as_ref().map(|t| subst_vars(t, map)),
+                    ..p.clone()
+                })
+                .collect(),
+            r(body),
+        ),
+        // Leaves: nothing to rewrite.
+        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
+            e.kind.clone()
+        }
+        // Everything else just carries the substitution to its children.
+        K::Call(name, args, m) => K::Call(name.clone(), args.iter().map(|a| *r(a)).collect(), *m),
+        K::Binop(a, op, b) => K::Binop(r(a), *op, r(b)),
+        K::Neg(x) => K::Neg(r(x)),
+        K::Not(x) => K::Not(r(x)),
+        K::Try(x) => K::Try(r(x)),
+        K::Return(x) => K::Return(r(x)),
+        K::Field(x, f) => K::Field(r(x), f.clone()),
+        K::If(a, b, c) => K::If(r(a), r(b), r(c)),
+        K::Seq(a, b) => K::Seq(r(a), r(b)),
+        K::Index(a, b) => K::Index(r(a), r(b)),
+        K::While(a, b) => K::While(r(a), r(b)),
+        K::Assign(lhs, v, b) => K::Assign(lhs.clone(), r(v), r(b)),
+        K::For(v, iter, body) => K::For(v.clone(), r(iter), r(body)),
+        K::Slice(a, b, c) => K::Slice(r(a), r(b), c.as_ref().map(|x| r(x))),
+        K::Shim(effect, bindings, body) => K::Shim(effect.clone(), bindings.clone(), r(body)),
+        K::Construct(name, fields) => K::Construct(
+            name.clone(),
+            fields
+                .iter()
+                .map(|f| FieldInit {
+                    name: f.name.clone(),
+                    value: *r(&f.value),
+                })
+                .collect(),
+        ),
+        K::Match(scrut, arms) => K::Match(
+            r(scrut),
+            arms.iter()
+                .map(|a| MatchArm {
+                    pattern: a.pattern.clone(),
+                    body: *r(&a.body),
+                    span: a.span.clone(),
+                })
+                .collect(),
+        ),
+        K::ArrayLit(es) => K::ArrayLit(es.iter().map(|x| *r(x)).collect()),
+        K::SetLit(es) => K::SetLit(es.iter().map(|x| *r(x)).collect()),
+        K::TupleLit(es) => K::TupleLit(es.iter().map(|x| *r(x)).collect()),
+        K::DictLit(entries) => K::DictLit(entries.iter().map(|(k, v)| (*r(k), *r(v))).collect()),
+        K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+    };
+    Expr {
+        kind,
+        span: e.span.clone(),
     }
 }
 

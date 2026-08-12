@@ -23,11 +23,11 @@ struct E { key: str, tag: str }
 // short sequences. Sorting a large array by its natural order should still use
 // the native `sort` builtin.
 pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
-    // Seed from an *empty slice of the input*, not `[]`: an untyped empty
-    // literal has element type `__none__`, so `out[k]` below would hand the
-    // comparator a `__none__` second argument and fail to type against a real
-    // `T` (it only slipped through for `i64`, which `__none__` meets).
-    mut out = self[..0];
+    // The annotation is what makes the empty literal usable: untyped, `[]` has
+    // element type `__none__`, so `out[k]` below would hand the comparator a
+    // `__none__` second argument and fail to type against a real `T` (it only
+    // slipped through for `i64`, which `__none__` meets).
+    mut out: T[] = [];
     for (let x : self) {
         // The first position in `out` that `x` precedes, or the end. Scanning
         // stops there rather than at the first *non*-preceding element, so an
@@ -83,13 +83,23 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
 })
 --- monomorphizations ---
 main
+sort_by$E$lam17
+sort_by$i64$lam1
+sort_by$i64$lam11
+sort_by$i64$lam13
+sort_by$i64$lam21
+sort_by$i64$lam3
+sort_by$i64$lam5
+sort_by$i64$lam7
+sort_by$i64$lam9
+sort_by$str$lam15
 --- performance ---
 allocations: 111
 deallocations: 111
 reallocations: 27
 bytes allocated: 4352
-instructions executed: 7847
-binary size: 22704
-  code: 13864
+instructions executed: 7889
+binary size: 24440
+  code: 14888
   data: 754
-  metadata: 8086
+  metadata: 8798

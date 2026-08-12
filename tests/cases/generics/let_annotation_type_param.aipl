@@ -1,0 +1,77 @@
+import { len, print, to_str, value_or, <, == } from builtins;
+
+// A `let`/`mut` annotation may name the enclosing function's type parameter:
+// `mut out: T[] = [];`. Monomorphization substitutes type variables into a
+// specialized instance's *body* annotations, not just its signature, so the
+// instance sees `i64[]` (or `str[]`, …) exactly as its parameters do.
+//
+// The motivating use is seeding a generic accumulator. An untyped `[]` has
+// element type `__none__`, which meets a real `T` only by accident (it happens
+// to meet `i64`), so building up a `T[]` from `[]` needs the element type
+// stated. The alternative — an empty slice of the input, `self[..0]` — works
+// but reads as a trick.
+
+fn collect<T: any>(xs: T[]) -> T[] {
+    mut out: T[] = [];
+    for (let x : xs) {
+        set out = [..out, x];
+    }
+    out
+}.test({
+    // Two instantiations from the same body: each substitutes its own `T`.
+    assert(collect([1, 2, 3]) == [1, 2, 3]);
+    assert(collect(["a", "b"]) == ["a", "b"]);
+    assert(collect([]).len() == u64(0));
+})
+
+// An annotation on an immutable binding, and one naming `T` bare rather than
+// through a container.
+fn first_or<T: any>(xs: T[], fallback: T) -> T {
+    let head: T? = xs[0];
+    head.value_or(fallback)
+}.test({
+    assert(first_or([7, 8], 0) == 7);
+    assert(first_or([], 0) == 0);
+    assert(first_or(["x"], "z") == "x");
+})
+
+// The instance's own `T` is what's substituted, even when the generic is
+// reached through a function-typed parameter (a different specialization path).
+fn filtered<T: any>(xs: T[], keep: (T) -> bool) -> T[] {
+    mut out: T[] = [];
+    for (let x : xs) {
+        if (keep(x)) {
+            set out = [..out, x];
+        };
+    }
+    out
+}.test({
+    assert(filtered([1, 5, 2], |n| n < 3) == [1, 2]);
+})
+
+fn main() !prints {
+    print(collect([1, 2, 3]).to_str());
+    print(collect(["a", "b"]).to_str());
+    print(first_or([7, 8], 0).to_str());
+    print(filtered([1, 5, 2], |n| n < 3).to_str());
+}
+--- monomorphizations ---
+collect$i64
+collect$str
+filtered$i64$lam1
+main
+--- stdout ---
+[1, 2, 3]
+["a", "b"]
+7
+[1, 2]
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 677
+instructions executed: 1755
+binary size: 7552
+  code: 4136
+  data: 139
+  metadata: 3277

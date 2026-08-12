@@ -2650,11 +2650,11 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3085676
-binary size: 3018360
-  code: 1722112
+instructions executed: 3085814
+binary size: 3018376
+  code: 1721948
   data: 25740
-  metadata: 1270508
+  metadata: 1270688
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
@@ -2666,6 +2666,8 @@ __builtin_count_while$char$s0$lam78
 __builtin_int_parse
 __builtin_is_some_and$char$lam70
 __builtin_opt_left_fold$char$i64$s0$lam58
+__builtin_sort_by$ImportEntry$lam17
+__builtin_sort_by$ImportName$lam23
 __enumerate20
 __enumerate21
 __enumerate35
