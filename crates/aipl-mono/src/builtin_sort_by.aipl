@@ -27,7 +27,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // literal has element type `__none__`, so `out[k]` below would hand the
     // comparator a `__none__` second argument and fail to type against a real
     // `T` (it only slipped through for `i64`, which `__none__` meets).
-    mut out = self[0..0];
+    mut out = self[..0];
     for (let x : self) {
         // The first position in `out` that `x` precedes, or the end. Scanning
         // stops there rather than at the first *non*-preceding element, so an
@@ -47,7 +47,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
                 set k = k + u64(1);
             };
         }
-        set out = [..out[0..k], x, ..out[k..]];
+        set out = [..out[..k], x, ..out[k..]];
     }
     out
 }.doc("""

@@ -1,11 +1,11 @@
 // Slicing requires a `str` receiver.
 fn main() {
     let n = 5;
-    let s = n[0..2];
+    let s = n[..2];
 }
 --- errors ---
 error: cannot slice a value of type i64
  --> ./tests/cases/strings/errors/err_slice_non_str.aipl:4:13
   |
-4 |     let s = n[0..2];
+4 |     let s = n[..2];
   |             ^

@@ -18,7 +18,7 @@ import { split, == } from builtins;
 fn shrink(s: str) -> str {
     mut acc = s;
     for (let part : s.split(",")) {
-        set acc = acc[0..8]; // self-referential slice -> heap view, reassigned
+        set acc = acc[..8]; // self-referential slice -> heap view, reassigned
     }
     acc
 }.test({

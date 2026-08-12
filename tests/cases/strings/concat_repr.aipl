@@ -22,7 +22,7 @@ fn main() !prints {
 
     // Index and slice transparently materialize.
     print(to_str(g[0])); // some('f')
-    print(g[0..3]); // foo
+    print(g[..3]); // foo
 
     // Iterate the materialized bytes.
     mut n = 0;

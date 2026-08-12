@@ -296,7 +296,7 @@ fn cleanup(out: str) -> str {
 
     // `lines()` drops exactly one trailing empty when the text ends in a newline;
     // `split` keeps it, so drop it here to match.
-    let lines = if (ended) { raw[0..raw.len() - 1] } else { raw };
+    let lines = if (ended) { raw[..raw.len() - 1] } else { raw };
     let body = lines.map(|line| line.trim_end_while(is_space)).join("\n");
     body +++ if (ended) { "\n" } else { "" }
 }.test({

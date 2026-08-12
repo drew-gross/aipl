@@ -1,0 +1,27 @@
+import { print, to_str } from builtins;
+
+// `x[0..]` is *not* flagged, even though the `0` is just as redundant: the
+// recommendation would have to be `x[..]`, which is not a form. So the lint
+// only fires when there is an end bound to keep. (An omitted start is
+// synthesized as a zero with an empty span, which is how a written `0` is told
+// apart from an elided one in the first place.)
+fn main() !prints {
+    let xs = [10, 20, 30];
+    print(xs[0..].to_str());
+    print(xs[..2].to_str());
+}
+--- stdout ---
+[10, 20, 30]
+[10, 20]
+--- monomorphizations ---
+main
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 214
+instructions executed: 685
+binary size: 2464
+  code: 1044
+  data: 67
+  metadata: 1353

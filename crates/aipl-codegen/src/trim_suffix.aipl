@@ -3,7 +3,7 @@
 import { len, wrapping_sub as -, == } from builtins;
 
 pub fn trim_suffix(self: str, c: char) -> str {
-    if (self[self.len() - 1] == some(c)) { self[0..self.len() - 1] } else { self }
+    if (self[self.len() - 1] == some(c)) { self[..self.len() - 1] } else { self }
 }.doc("Drops a single trailing `c` if present, else returns `self` unchanged.").test({
     assert("rest\n".trim_suffix('\n') == "rest"); // trailing char dropped
     assert("rest".trim_suffix('\n') == "rest"); // absent -> unchanged

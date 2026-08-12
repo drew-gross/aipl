@@ -639,7 +639,7 @@ fn drop_trailing_break(self: Doc[]) -> Doc[] {
     if (n == 0) {
         return self;
     };
-    if (self[n - 1].value_or(Concat([])).is_line_break()) { self[0..n - 1] } else { self }
+    if (self[n - 1].value_or(Concat([])).is_line_break()) { self[..n - 1] } else { self }
 }
 
 // A break `lead` may have left at the end of its docs.
@@ -666,7 +666,7 @@ fn with_last(self: Doc[], d: Doc) -> Doc[] {
     if (n == 0) {
         return self.push(d);
     };
-    self[0..n - 1].push(d)
+    self[..n - 1].push(d)
 }
 
 // ---------- imports ----------

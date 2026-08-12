@@ -37960,7 +37960,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   v33 = __fpat$34235
+;   v33 = __fpat$34233
 ;   v38 = i
 ;   v40 = c
 ; __m16__program
@@ -38562,11 +38562,11 @@ block30:
 ;   v2 = h
 ;   v73 = p
 ;   ss2 = out
-;   v111 = __fpat$35200
+;   v111 = __fpat$35198
 ;   v113 = i
 ;   v114 = d
 ;   v157 = had_imports
-;   v184 = __fpat$35405
+;   v184 = __fpat$35403
 ;   v186 = i
 ;   v187 = d
 ; __m16__program_items
@@ -87753,7 +87753,7 @@ block67:
 ;   v5 = params
 ;   v291 = body
 ;   ss8 = d
-;   v486 = __fpat$71582
+;   v486 = __fpat$71580
 ;   v488 = i
 ;   v489 = p
 ; __m16__lambda_params

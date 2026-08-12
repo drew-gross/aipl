@@ -1,0 +1,15 @@
+import { print, to_str } from builtins;
+
+// A lint: `x[0..y]` already means "from the start", so the open-ended `x[..y]`
+// is the right spelling. The mirror of `err_slice_to_len`, which trims a
+// redundant end bound the same way.
+fn main() !prints {
+    let xs = [10, 20, 30];
+    print(xs[0..2].to_str());
+}
+--- errors ---
+error: slice starts at 0 — use the open-ended "xs[..2]" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_slice_from_zero.aipl:8:14
+  |
+8 |     print(xs[0..2].to_str());
+  |              ^

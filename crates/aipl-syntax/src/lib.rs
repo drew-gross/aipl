@@ -1708,7 +1708,13 @@ pub mod lint {
         let allowed: std::collections::HashSet<usize> =
             allows.iter().map(|sp| line_of(src, sp.start)).collect();
         let mut hits: Vec<Error> = Vec::new();
+        // `slice_to_len` before `slice_from_zero`: `x[0..x.len()]` trips both,
+        // and only the first hit is reported. Dropping the end first gives
+        // `x[0..]`, which is already clean; dropping the start first would give
+        // `x[..x.len()]`, which still trips `slice_to_len` and costs a second
+        // round trip.
         each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
+        each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
         each_expr(program, &mut |e| eta_lambda(e, &mut hits));
         each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
         hits.retain(|e| match &e.span {
@@ -1755,6 +1761,32 @@ pub mod lint {
                  \"{recv}[{st}..]\" (or append #[allow] to this line to keep it)"
             ),
             end.span.clone(),
+        ));
+    }
+
+    /// `x[0..y]` — a start bound of literal `0` is what the open-ended form
+    /// already means; recommend `x[..y]`. The mirror of [`slice_to_len`], and it
+    /// leans on the same distinction: an *omitted* start is synthesized as a
+    /// zero with an **empty** span, so requiring a non-empty span is what
+    /// separates a written `0` from an elided one.
+    ///
+    /// Only flagged when there is an end bound. `x[0..]` is left alone on
+    /// purpose: `x[..]` is not a form, so there would be nothing to recommend.
+    fn slice_from_zero(e: &Expr, src: &str, hits: &mut Vec<Error>) {
+        let ExprKind::Slice(obj, start, Some(end)) = &e.kind else {
+            return;
+        };
+        if !matches!(start.kind, ExprKind::Num(0)) || start.span.is_empty() {
+            return;
+        }
+        let recv = &src[obj.span.clone()];
+        let en = &src[end.span.clone()];
+        hits.push(Error::at(
+            format!(
+                "slice starts at 0 — use the open-ended \"{recv}[..{en}]\" \
+                 (or append #[allow] to this line to keep it)"
+            ),
+            start.span.clone(),
         ));
     }
 
