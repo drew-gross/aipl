@@ -103,10 +103,9 @@ handoff:
   reimplement it in rust and/or aipl
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
-  nextest (final) is taking abnormally long, 4x nextest (discovery), please investigate why. It took ages to even get to the first test.
-    time: 1143s total
-      835s  nextest (final)
-      208s  nextest (discovery)
+
+build performance:
+  look for any ways to improve full-rebuild performance, esp. to avoid a full rebuild after regenerating IR
 
 - Match patterns don't support | grouping, so every Doc arm is spelled out (matching doc.aipl's existing style).
 - \{ is a template-literal escape only; inside a plain string it's an error.

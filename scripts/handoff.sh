@@ -10,8 +10,12 @@
 #
 # Order & why:
 #   1. Format first — `cargo fmt` (Rust) + the `format_corpus` helper (every
-#      checked-in `.aipl`). Formatting is cheap and *span-shifting*, so doing it
-#      up front means a formatting-only fix never costs a second full test run.
+#      checked-in `.aipl`), then the compile check + doctests. Formatting is cheap
+#      and *span-shifting*, so doing it up front means a formatting-only fix never
+#      costs a second full test run. Both formatters run *before* the compile
+#      check, because the corpus includes the `.aipl` files compiled into
+#      aipl-codegen: reformatting one after a build would invalidate it and hand
+#      the discovery run a rebuild it shouldn't be paying for.
 #   2. Discovery run. Three outcomes:
 #        - green                       -> done.
 #        - only fillable staleness      -> remediate (steps 3-5), then re-confirm.
@@ -32,6 +36,10 @@
 #      just those cases' sections from actual output (not the whole corpus).
 #   5. Staged dogfood-IR regen: fill -> validate -> corpus run against the staged
 #      artifact -> auto-promote when that run is green.
+#  5b. Rebuild, if steps 3-5 changed something that is compiled in rather than
+#      read at run time (the promoted `.clif`s, the per-case `#[test]` list). Its
+#      own step purely so the timing report attributes the compile to the thing
+#      that caused it instead of to the final run.
 #   6. Final run confirms green against the live (promoted) artifacts.
 #
 # Test runner: `cargo nextest`, which runs each test in its own process (so one
@@ -170,19 +178,21 @@ fi
 run_step "cargo fmt (Rust)" cargo fmt
 [ $? -eq 0 ] || { save_out; fail "cargo fmt" "$(cat "$STEP_OUT")"; }
 
-# Compile everything (incl. every test binary) so a compile error surfaces here
-# cleanly rather than buried in a test run's output.
-run_step "nextest --no-run (compile check)" cargo nextest run --no-run --color never
-[ $? -eq 0 ] || { save_out; fail "compile" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
-
-# nextest does not run doctests. Run them here so switching runners didn't
-# silently drop them; they're a couple of seconds.
-run_step "cargo test --doc (nextest skips doctests)" cargo test --doc
-[ $? -eq 0 ] || { save_out; fail "doctests" "$(grep -nE '^(error|test .* FAILED)' "$STEP_OUT" | head -20)"; }
-
 # `format_corpus` rewrites any mis-formatted `.aipl` in place, then fails on
 # purpose to show its summary — so its non-zero exit is expected; a genuine
 # formatter error prints "format failed:".
+#
+# It runs *before* the compile check, not after, because the corpus it reformats
+# includes `crates/aipl-codegen/src/*.aipl` — ~28 of which are `include_str!`d
+# into aipl-codegen. Reformatting one of those after a full build invalidates it,
+# and the discovery run then silently pays a ~730s rebuild. Ahead of the compile
+# check, that invalidation costs nothing: the build that follows was going to
+# happen anyway.
+#
+# The cost of going first is that this step builds the `fmt` test binary itself,
+# so a Rust compile error surfaces here rather than in the dedicated step below.
+# That's harmless: a build failure means `format_corpus` never ran, nothing was
+# reformatted, and the compile check immediately after reports the error properly.
 run_step "aipl fmt (format_corpus)" helper format_corpus
 if grep -q 'format failed:' "$STEP_OUT"; then
     save_out; fail "aipl fmt" "$(grep -n 'format failed:' "$STEP_OUT")"
@@ -191,6 +201,17 @@ reformatted="$(grep -oE 'reformatted [0-9]+ file' "$STEP_OUT" | grep -oE '[0-9]+
 if [ -n "${reformatted:-}" ] && [ "$reformatted" -gt 0 ]; then
     printf '%s    (reformatted %s .aipl file(s))%s\n' "$dim" "$reformatted" "$off" >&2
 fi
+
+# Compile everything (incl. every test binary) so a compile error surfaces here
+# cleanly rather than buried in a test run's output — and so the discovery run
+# starts from a fully built tree whatever the step above just reformatted.
+run_step "nextest --no-run (compile check)" cargo nextest run --no-run --color never
+[ $? -eq 0 ] || { save_out; fail "compile" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
+
+# nextest does not run doctests. Run them here so switching runners didn't
+# silently drop them; they're a couple of seconds.
+run_step "cargo test --doc (nextest skips doctests)" cargo test --doc
+[ $? -eq 0 ] || { save_out; fail "doctests" "$(grep -nE '^(error|test .* FAILED)' "$STEP_OUT" | head -20)"; }
 
 # --- 2. Discovery test ---------------------------------------------------------
 
@@ -347,6 +368,32 @@ if [ $need_ir -eq 1 ]; then
 
     run_step "promote_staged_ir" helper promote_staged_ir
     grep -q 'promoted' "$STEP_OUT" || { save_out; fail "promote_staged_ir" "$(tail -40 "$STEP_OUT")"; }
+fi
+
+# --- 5b. Rebuild what the regeneration invalidated ------------------------------
+
+# Some of what steps 3-5 rewrite is *compiled in*, not read at runtime, so the
+# final run below can't start until cargo rebuilds:
+#   - `promote_staged_ir` overwrites dogfood.clif (948K) and fmt.clif (3.0M),
+#     both `include_str!`d by aipl-codegen — which aipl-fmt and the root crate
+#     depend on, so every test binary relinks. Measured at ~730s here, against a
+#     1s no-op build.
+#   - `fill_case_tests` regenerates tests/support/case_tests.rs, `include!`d by
+#     tests/cases.rs — one binary, far cheaper.
+# (`fill_expected` needs no rebuild: case `.aipl` files are read at run time. Nor
+# does the staged-IR corpus run above — AIPL_DOGFOOD_IR/AIPL_FMT_IR are read at
+# run time and the `.staged` files aren't compiled in.)
+#
+# Doing it here as its own labelled step makes it no faster. It makes it *legible*:
+# otherwise the final run reports ~4x the discovery run's wall clock with the
+# entire difference being a compile the timing report never mentions.
+if [ $need_ir -eq 1 ] || [ $need_case_tests -eq 1 ]; then
+    run_step "nextest --no-run (rebuild after regeneration)" \
+        cargo nextest run --no-run --color never
+    [ $? -eq 0 ] || {
+        save_out
+        fail "rebuild after regeneration" "$(grep -nE '^error' "$STEP_OUT" | head -30)"
+    }
 fi
 
 # --- 6. Final confirmation against the live artifacts --------------------------
