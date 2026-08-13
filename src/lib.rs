@@ -51,7 +51,7 @@ pub fn install_parser_hooks() {
 /// let src = "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }";
 /// let engine = aipl::Engine::compile(src)?;
 /// assert_eq!(engine.call("add", &[2, 3])?, 5);
-/// # Ok::<(), aipl::Error>(())
+/// # Ok::<(), Vec<aipl::Error>>(())
 /// ```
 pub struct Engine {
     comp: codegen::Compilation,
@@ -60,7 +60,7 @@ pub struct Engine {
 impl Engine {
     /// Compile AIPL source held in memory. `from "..."` path imports resolve
     /// relative to the current directory; `from builtins` works as usual.
-    pub fn compile(source: &str) -> Result<Engine, Error> {
+    pub fn compile(source: &str) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program_str(source, dbg)?;
@@ -86,11 +86,11 @@ impl Engine {
     ///     ("mathlib.aipl", "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
     /// ])?;
     /// engine.call("sum_of_squares", &[3, 4])?;
-    /// # Ok::<(), aipl::Error>(())
+    /// # Ok::<(), Vec<aipl::Error>>(())
     /// ```
     ///
     /// [`compile_file`]: Engine::compile_file
-    pub fn compile_sources(sources: &[(&str, &str)]) -> Result<Engine, Error> {
+    pub fn compile_sources(sources: &[(&str, &str)]) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program_sources(sources, dbg)?;
@@ -107,7 +107,7 @@ impl Engine {
     /// surface and helpers are invoked transitively.
     ///
     /// [`call`]: Engine::call
-    pub fn compile_file(path: &Path) -> Result<Engine, Error> {
+    pub fn compile_file(path: &Path) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program(path, dbg)?;
@@ -146,7 +146,7 @@ impl Engine {
     ///     &[FfiValue::Str("    x".into()), FfiValue::Str("  y".into())],
     /// )?;
     /// assert_eq!(n, FfiValue::Int(2));
-    /// # Ok::<(), aipl::Error>(())
+    /// # Ok::<(), Vec<aipl::Error>>(())
     /// ```
     pub fn call_values(&self, name: &str, args: &[FfiValue]) -> Result<FfiValue, Error> {
         self.comp.call_values(name, args)

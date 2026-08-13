@@ -27,7 +27,7 @@ use aipl_syntax::{builtin_canonical, DebugOptions, Error, Span};
 
 /// Parse `root`, recursively resolve every `import`, and return a single
 /// merged [`Program`] ready for codegen.
-pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Error> {
+pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
     let root_canon = canonicalize(root)?;
     let mut loader = Loader {
         dbg,
@@ -38,13 +38,13 @@ pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Error> {
         "loader",
         format_args!("flattening {} file(s)", loader.files.len()),
     );
-    loader.flatten(&root_canon)
+    Ok(loader.flatten(&root_canon)?)
 }
 
 /// Like [`load_program`] but with the root file's source supplied in memory
 /// (used by the embedding FFI). Any `from "..."` path imports resolve relative
 /// to the current directory; `from builtins` works as usual.
-pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Error> {
+pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
     let mut loader = Loader {
         dbg,
         ..Loader::default()
@@ -55,7 +55,7 @@ pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Erro
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("__aipl_ffi_root__.aipl");
     loader.load_source(&root, source)?;
-    loader.flatten(&root)
+    Ok(loader.flatten(&root)?)
 }
 
 /// Like [`load_program`] but over a set of in-memory virtual files, supplied as
@@ -65,9 +65,12 @@ pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Erro
 /// `from "..."` path imports resolve *by name* against the provided set (a
 /// leading `./` is stripped, so `from "./util.aipl"` matches a `"util.aipl"`
 /// entry); `from builtins` works as usual.
-pub fn load_program_sources(sources: &[(&str, &str)], dbg: DebugOptions) -> Result<Program, Error> {
+pub fn load_program_sources(
+    sources: &[(&str, &str)],
+    dbg: DebugOptions,
+) -> Result<Program, Vec<Error>> {
     let Some((root_name, _)) = sources.first() else {
-        return Err(Error::msg("load_program_sources: no sources provided"));
+        return Err(Error::msg("load_program_sources: no sources provided").into());
     };
     let root = PathBuf::from(root_name);
     let mut loader = Loader {
@@ -80,7 +83,7 @@ pub fn load_program_sources(sources: &[(&str, &str)], dbg: DebugOptions) -> Resu
         loader.register_virtual(PathBuf::from(name), src)?;
     }
     loader.check_virtual_imports()?;
-    loader.flatten(&root)
+    Ok(loader.flatten(&root)?)
 }
 
 /// Reject importing from the same place on more than one line: every import from
@@ -151,7 +154,7 @@ struct ResolvedImport {
 }
 
 impl Loader {
-    fn load(&mut self, path: &Path) -> Result<(), Error> {
+    fn load(&mut self, path: &Path) -> Result<(), Vec<Error>> {
         if self.files.contains_key(path) {
             return Ok(());
         }
@@ -164,7 +167,7 @@ impl Loader {
 
     /// Parse `src` as the file at `path`, register it, and recurse into its
     /// path imports. `load` reads `src` from disk; the FFI supplies it directly.
-    fn load_source(&mut self, path: &Path, src: &str) -> Result<(), Error> {
+    fn load_source(&mut self, path: &Path, src: &str) -> Result<(), Vec<Error>> {
         if self.files.contains_key(path) {
             return Ok(());
         }
@@ -225,7 +228,7 @@ impl Loader {
     /// each target was actually supplied.
     ///
     /// [`check_virtual_imports`]: Loader::check_virtual_imports
-    fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Error> {
+    fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
         let (program, allows) = parse_with_allows(src)?;
         aipl_syntax::lint::check(&program, src, &allows)?;
         if !key.starts_with("./") {
@@ -265,7 +268,8 @@ impl Loader {
             return Err(Error::msg(format!(
                 "duplicate source {:?} in compile_sources",
                 file_label(&key)
-            )));
+            ))
+            .into());
         }
         Ok(())
     }

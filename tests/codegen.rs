@@ -43,7 +43,7 @@ fn ir_contains_function_body() {
 fn render_points_at_offending_expression() {
     let src = "fn f(c: i64) -> i64 { if (c) { 1 } else { 2 } }";
     let program = parse(src).unwrap();
-    let Err(err): Result<_, Error> = Compilation::new(&program, DebugOptions::OFF) else {
+    let Err(errs): Result<_, Vec<Error>> = Compilation::new(&program, DebugOptions::OFF) else {
         panic!("expected error");
     };
     // The `c` in the if condition is at byte 26 → column 27.
@@ -52,14 +52,14 @@ fn render_points_at_offending_expression() {
   |
 1 | fn f(c: i64) -> i64 { if (c) { 1 } else { 2 } }
   |                           ^";
-    assert_eq!(err.render(src, "input"), expected);
+    assert_eq!(Error::render_all(&errs, src, "input"), expected);
 }
 
 #[test]
 fn render_multiline_source_picks_correct_line() {
     let src = "fn f() -> i64 {\n    bogus\n}";
     let program = parse(src).unwrap();
-    let Err(err): Result<_, Error> = Compilation::new(&program, DebugOptions::OFF) else {
+    let Err(errs): Result<_, Vec<Error>> = Compilation::new(&program, DebugOptions::OFF) else {
         panic!("expected error");
     };
     // `bogus` spans bytes 20..25 → line 2, col 5.
@@ -68,7 +68,7 @@ fn render_multiline_source_picks_correct_line() {
   |
 2 |     bogus
   |     ^^^^^"#;
-    assert_eq!(err.render(src, "input"), expected);
+    assert_eq!(Error::render_all(&errs, src, "input"), expected);
 }
 
 #[test]
@@ -158,11 +158,11 @@ fn object_compilation_emits_object_file_with_renamed_main() {
 #[test]
 fn object_compilation_requires_main() {
     let program = parse("fn other() -> i64 { 1 }").unwrap();
-    let Err(err) = ObjectCompilation::new(&program, "test", DebugOptions::OFF, false) else {
+    let Err(errs) = ObjectCompilation::new(&program, "test", DebugOptions::OFF, false) else {
         panic!("expected error");
     };
     assert!(
-        err.message.contains("main"),
-        "expected error mentioning main, got: {err}"
+        errs.iter().any(|e| e.message.contains("main")),
+        "expected error mentioning main, got: {errs:?}"
     );
 }

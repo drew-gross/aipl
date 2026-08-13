@@ -8,14 +8,16 @@ use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
 use aipl::{DebugOptions, Error};
 
-/// Render a compiler error with a source caret when possible. Spans are
-/// relative to `file`'s own source (correct for a single-file program; for an
-/// imported-file error only the caret line may be off — the message is still
-/// right), falling back to the plain message if the file can't be read.
-fn render_err(file: &str, e: Error) -> String {
+/// Render the errors a compile reported — every independent finding a pass
+/// collected, not just the first — each with a source caret when possible.
+/// Spans are relative to `file`'s own source (correct for a single-file
+/// program; for an imported-file error only the caret line may be off — the
+/// message is still right), falling back to the plain messages if the file
+/// can't be read.
+fn render_err(file: &str, errors: Vec<Error>) -> String {
     match std::fs::read_to_string(file) {
-        Ok(src) => e.render(aipl::strip_test_sections(&src), file),
-        Err(_) => e.to_string(),
+        Ok(src) => Error::render_all(&errors, aipl::strip_test_sections(&src), file),
+        Err(_) => Error::display_all(&errors),
     }
 }
 

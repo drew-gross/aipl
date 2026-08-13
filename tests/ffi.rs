@@ -1006,7 +1006,9 @@ fn compile_sources_rejects_a_missing_module() {
         "./ffi_fixtures/calc.aipl",
         include_str!("ffi_fixtures/calc.aipl"),
     )]);
-    assert_eq!(err.err().expect("Should err").message, "calc.aipl: imported module \"mathlib.aipl\" was not provided to compile_sources. Sources: [\"./ffi_fixtures/calc.aipl\"]");
+    let errs = err.err().expect("Should err");
+    assert_eq!(errs.len(), 1);
+    assert_eq!(errs[0].message, "calc.aipl: imported module \"mathlib.aipl\" was not provided to compile_sources. Sources: [\"./ffi_fixtures/calc.aipl\"]");
 }
 
 /// Recursively collect `.aipl` files under `dir` — walked by the dogfooded AIPL

@@ -106,7 +106,7 @@ fn active_path_of(a: &Artifact) -> PathBuf {
 /// command to iterate on just that file. Falls back to the raw error if no
 /// single file reproduces the failure (e.g. a cross-file resolution or codegen
 /// error, not a parse error).
-fn blame_dogfood_failure(err: aipl::Error) -> ! {
+fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
     for (name, src) in DOGFOOD_SOURCES {
         let stripped = aipl::strip_test_sections(src);
         let Err(e) = aipl::parse(stripped) else {
@@ -120,7 +120,7 @@ fn blame_dogfood_failure(err: aipl::Error) -> ! {
             e.render(stripped, &rel),
         );
     }
-    panic!("generate dogfood IR: {err}");
+    panic!("generate dogfood IR:\n{}", aipl::Error::display_all(&errs));
 }
 
 /// Generate the unified dogfood artifact via the live frontend.
@@ -641,8 +641,12 @@ pub fn rich(flag: bool) -> Out<Kind>!Lerr {
 fn artifact_round_trips_rich_types() {
     aipl::install_parser_hooks();
     let sources: &[(&str, &str)] = &[("./rich.aipl", RICH_TYPES_SRC)];
-    let artifact = generate_dogfood_artifact(sources, &["rich"])
-        .unwrap_or_else(|e| panic!("generate rich-types artifact: {e}"));
+    let artifact = generate_dogfood_artifact(sources, &["rich"]).unwrap_or_else(|e| {
+        panic!(
+            "generate rich-types artifact: {}",
+            aipl::Error::display_all(&e)
+        )
+    });
     let comp = Compilation::from_artifact(&artifact)
         .unwrap_or_else(|e| panic!("load rich-types artifact: {e}"));
 

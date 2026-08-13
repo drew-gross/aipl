@@ -655,9 +655,10 @@ impl<'a> Cx<'a> {
     }
 }
 
-/// Type-check `program`. Returns the first error found, or `Ok` if every
-/// function is well-formed.
-pub fn check(program: &Program) -> Result<(), Error> {
+/// Type-check `program`. The checker recovers at each item, so this returns
+/// *every* error found — in source order — or `Ok` if every function is
+/// well-formed.
+pub fn check(program: &Program) -> Result<(), Vec<Error>> {
     // struct name → [(field_name, field_type, has_default)]
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
@@ -787,9 +788,10 @@ pub fn check(program: &Program) -> Result<(), Error> {
             }
         }
     }
-    match Error::combine(errors) {
-        Some(e) => Err(e),
-        None => Ok(()),
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 

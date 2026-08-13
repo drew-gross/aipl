@@ -4041,7 +4041,7 @@ fn compile_program<M: Module>(
     // builds — it adds a per-block call — and on only for the test harness's
     // separate measurement object.
     instrument: bool,
-) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Error> {
+) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
     // Builtin *types* (e.g. `__builtin_Span`) are real struct declarations,
     // unlike builtin functions: a call to a builtin function is intercepted by
     // reserved name in codegen and never needs to reach monomorphization as a
@@ -4670,7 +4670,7 @@ fn remap_func_ids(ir: &str, remap: &HashMap<u32, u32>) -> String {
 pub fn generate_dogfood_artifact(
     sources: &[(&str, &str)],
     entries: &[&str],
-) -> Result<String, Error> {
+) -> Result<String, Vec<Error>> {
     let dbg = DebugOptions::new(false);
     // Propagate a load/parse failure (don't `unwrap`) so the caller can pin the
     // offending source file and report how to test just it.
@@ -4782,15 +4782,16 @@ pub fn generate_dogfood_artifact(
         let id = match info.link {
             FuncLink::User(id) => remap[&id.as_u32()],
             FuncLink::Builtin(_) => {
-                return Err(Error::msg(format!(
-                    "dogfood entry {name:?} is a builtin, not a fn"
-                )))
+                return Err(
+                    Error::msg(format!("dogfood entry {name:?} is a builtin, not a fn")).into(),
+                )
             }
         };
         if info.is_mutating {
             return Err(Error::msg(format!(
                 "dogfood entry {name:?} is a mutating method; not FFI-callable"
-            )));
+            ))
+            .into());
         }
         let params = info
             .params
@@ -4841,9 +4842,9 @@ pub fn generate_dogfood_artifact(
                 out.push_str(&format!("; variant {sname} {}{cases}\n", layout.size));
             }
             None => {
-                return Err(Error::msg(format!(
-                    "dogfood entry references unknown type {sname:?}"
-                )))
+                return Err(
+                    Error::msg(format!("dogfood entry references unknown type {sname:?}")).into(),
+                )
             }
         }
     }
@@ -4860,7 +4861,7 @@ pub fn generate_dogfood_artifact(
 }
 
 impl Compilation {
-    pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Error> {
+    pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
         let mut module = new_jit_module()?;
 
         // The JIT never reports perf counters, so it's never instrumented.
@@ -6468,15 +6469,13 @@ impl ObjectCompilation {
         name: &str,
         dbg: DebugOptions,
         instrument: bool,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Vec<Error>> {
         if !program
             .items
             .iter()
             .any(|i| matches!(i, Item::Fn(f) if f.name == "main"))
         {
-            return Err(Error::msg(
-                "binary build requires a \"main\" function".to_string(),
-            ));
+            return Err(Error::msg("binary build requires a \"main\" function".to_string()).into());
         }
 
         // Object files must be position-independent so the system linker

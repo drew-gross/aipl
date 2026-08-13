@@ -110,7 +110,7 @@ use aipl::ast::Program;
 use aipl::binary;
 use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
-use aipl::DebugOptions;
+use aipl::{DebugOptions, Error};
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
 /// Surfaced in failure messages so a stale `--- performance ---`/`errors`/`check`
@@ -862,7 +862,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
 fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> Outcome {
     let result = loader::load_program(src_path, debug_opts())
         .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
-    let err = match result {
+    let errs = match result {
         Err(e) => e,
         Ok(()) => {
             return Outcome::Fail(format!(
@@ -870,7 +870,7 @@ fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> 
             ))
         }
     };
-    let actual = err.render(&spec.source, &render_path(orig_path));
+    let actual = Error::render_all(&errs, &spec.source, &render_path(orig_path));
     let expected = spec.errors.as_deref().unwrap_or("");
     // Fill mode refreshed this above (see `run_case`); here we only validate.
     if actual != expected {
@@ -956,10 +956,11 @@ fn measured_program(program: &Program) -> Program {
 
 /// Build the production (non-instrumented) binary for a case, returning its path.
 fn build_case_binary(src_path: &Path, stem: &str, case_dir: &Path) -> Result<PathBuf, String> {
-    let program = loader::load_program(src_path, debug_opts()).map_err(|e| e.to_string())?;
+    let program =
+        loader::load_program(src_path, debug_opts()).map_err(|e| Error::display_all(&e))?;
     let measured = measured_program(&program);
-    let comp =
-        ObjectCompilation::new(&measured, stem, debug_opts(), false).map_err(|e| e.to_string())?;
+    let comp = ObjectCompilation::new(&measured, stem, debug_opts(), false)
+        .map_err(|e| Error::display_all(&e))?;
     let obj = comp.emit().map_err(|e| e.to_string())?;
     let exe = case_dir.join(binary::default_exe_name(stem));
     binary::link(&obj, &exe).map_err(|e| e.to_string())?;
@@ -1313,7 +1314,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: load failed:\n{}",
-                e.render(&spec.source, &render_path(orig_path))
+                Error::render_all(&e, &spec.source, &render_path(orig_path))
             ))
         }
     };
@@ -1349,7 +1350,7 @@ fn run_success_case(
         Err(e) => {
             return Outcome::Fail(format!(
                 "{ctx}: compile failed:\n{}",
-                e.render(&spec.source, &render_path(orig_path))
+                Error::render_all(&e, &spec.source, &render_path(orig_path))
             ))
         }
     };
@@ -1535,16 +1536,17 @@ fn run_performance_check(
     prod_sizes: BinSizes,
     fill: bool,
 ) -> Outcome {
-    let obj_bytes =
-        match ObjectCompilation::new(program, stem, debug_opts(), true).and_then(|c| c.emit()) {
-            Ok(b) => b,
-            Err(e) => {
-                return Outcome::Fail(format!(
-                    "{ctx}: instrumented compile failed:\n{}",
-                    e.render(&spec.source, &render_path(orig_path))
-                ))
-            }
-        };
+    let obj_bytes = match ObjectCompilation::new(program, stem, debug_opts(), true)
+        .and_then(|c| c.emit().map_err(Vec::from))
+    {
+        Ok(b) => b,
+        Err(e) => {
+            return Outcome::Fail(format!(
+                "{ctx}: instrumented compile failed:\n{}",
+                Error::render_all(&e, &spec.source, &render_path(orig_path))
+            ))
+        }
+    };
     let actual =
         match measure_perf_stats(ctx, orig_path, &obj_bytes, stem, spec, case_dir, prod_sizes) {
             Ok(v) => v,
@@ -1808,7 +1810,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) -> Outcome {
     let result = loader::load_program(&tmp, debug_opts())
         .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
     let _ = fs::remove_dir_all(&dir);
-    let err = match result {
+    let errs = match result {
         Err(e) => e,
         Ok(()) => {
             // The program compiled, so there's no error to splice in — nothing
@@ -1821,7 +1823,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) -> Outcome {
             return Outcome::Pass;
         }
     };
-    let rendered = err.render(&spec.source, &render_path(path));
+    let rendered = Error::render_all(&errs, &spec.source, &render_path(path));
     // Replace everything after the `--- errors ---` header with the rendered error.
     let header_marker = "--- errors ---";
     let header_idx = contents

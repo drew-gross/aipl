@@ -12,8 +12,18 @@ pub fn join_spans(a: &Span, b: &Span) -> Span {
     a.start.min(b.start)..a.end.max(b.end)
 }
 
-/// Error returned by parsing or codegen. Use [`Error::render`] for the
+/// One error from parsing, checking, or codegen. Use [`Error::render`] for the
 /// human-friendly rendering with source-line context.
+///
+/// A pass that can keep going after a failure (the checker, which recovers at
+/// each item; the lints, which are collected wholesale) reports *every*
+/// independent finding, as a `Vec<Error>` propagated up to whoever prints —
+/// see [`Error::render_all`]. That plurality lives in the signature rather than
+/// inside `Error`, so a value of this type is always exactly one error, and the
+/// deeply recursive checker and codegen keep passing the small
+/// `Result<_, Error>` their frames are sized for. [`From<Error>`] lifts a single
+/// error into that `Vec`, so `?` still carries a leaf error up into a
+/// multi-error signature unchanged.
 #[derive(Debug, Clone)]
 pub struct Error {
     pub message: String,
@@ -21,22 +31,15 @@ pub struct Error {
     /// Secondary labeled locations, rendered as `note:` blocks after the
     /// primary caret — e.g. pointing at the *other* side of a conflict.
     pub notes: Vec<(String, Span)>,
-    /// Further *independent* errors found in the same pass, rendered after this
-    /// one separated by a blank line. A pass that can keep going after a failure
-    /// (the checker, which recovers at each item; the lints, which are collected
-    /// wholesale) reports everything it found instead of just the first, so one
-    /// run surfaces every problem at that phase.
-    ///
-    /// Carried inside `Error` rather than changing every `Result<_, Error>` in
-    /// the compiler: each is a complete error in its own right, and every
-    /// existing `render` call site prints the whole set for free.
-    ///
-    /// *Boxed*, and deliberately so. `Result<_, Error>` sits in every frame of
-    /// the deeply recursive checker and codegen, so `Error`'s size is stack
-    /// depth: holding the extras inline as a `Vec` grew it from 72 to 96 bytes
-    /// and overflowed the stack compiling the dogfooded lexer. A null pointer
-    /// costs 8, and only the single combined error at the top ever allocates.
-    pub more: Option<Box<Vec<Error>>>,
+}
+
+/// Lift a single error into the multi-error form the pipeline propagates, so a
+/// leaf `Result<_, Error>` flows through `?` into a `Result<_, Vec<Error>>`
+/// without a per-call-site `vec![..]`.
+impl From<Error> for Vec<Error> {
+    fn from(e: Error) -> Self {
+        vec![e]
+    }
 }
 
 impl std::fmt::Display for Error {
@@ -54,7 +57,6 @@ impl Error {
             message: message.into(),
             span: None,
             notes: Vec::new(),
-            more: None,
         }
     }
 
@@ -63,7 +65,6 @@ impl Error {
             message: message.into(),
             span: Some(span),
             notes: Vec::new(),
-            more: None,
         }
     }
 
@@ -79,19 +80,6 @@ impl Error {
     /// plain `error: ...` otherwise. `filename` appears in the ` --> ` location
     /// line; pass `"input"` when no real path is available.
     pub fn render(&self, source: &str, filename: &str) -> String {
-        let mut out = self.render_one(source, filename);
-        // Independent findings from the same pass, each a full error block, one
-        // blank line apart.
-        for e in self.more.iter().flat_map(|v| v.iter()) {
-            out.push_str("\n\n");
-            out.push_str(&e.render_one(source, filename));
-        }
-        out
-    }
-
-    /// This error alone — message, caret, and its own notes — without the
-    /// independent errors in [`Error::more`].
-    fn render_one(&self, source: &str, filename: &str) -> String {
         let Some(span) = self.span.as_ref() else {
             return format!("error: {}", self.message);
         };
@@ -109,13 +97,28 @@ impl Error {
         out
     }
 
-    /// Combine independently-found errors into one, in the order found. `None`
-    /// when there were none — the caller's success case.
-    pub fn combine(mut errors: Vec<Error>) -> Option<Error> {
-        let mut first = errors.first().cloned()?;
-        let rest = errors.split_off(1);
-        first.more = (!rest.is_empty()).then(|| Box::new(rest));
-        Some(first)
+    /// Render every independent finding a pass reported, in the order found —
+    /// each a full [`Error::render`] block, one blank line apart. This is what a
+    /// caller holding the `Vec<Error>` the pipeline propagates prints.
+    pub fn render_all(errors: &[Error], source: &str, filename: &str) -> String {
+        errors
+            .iter()
+            .map(|e| e.render(source, filename))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    /// Every error's plain [`Display`] form, one per line — the sourceless
+    /// counterpart to [`Error::render_all`], for a caller with no source text to
+    /// point a caret into.
+    ///
+    /// [`Display`]: std::fmt::Display
+    pub fn display_all(errors: &[Error]) -> String {
+        errors
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -1865,8 +1868,8 @@ pub mod lint {
     /// Run every lint over `program` — function bodies, `.test` blocks, and
     /// keyword-parameter / struct-field default expressions — then drop the
     /// hits squelched by a same-line `#[allow]` (`allows` are the marker spans
-    /// the lexer collected). Returns the first surviving lint error.
-    pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Error> {
+    /// the lexer collected). Returns every surviving lint error.
+    pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Error>> {
         let allowed: std::collections::HashSet<usize> =
             allows.iter().map(|sp| line_of(src, sp.start)).collect();
         let mut hits: Vec<Error> = Vec::new();
@@ -1886,9 +1889,10 @@ pub mod lint {
         // Every surviving hit, not just the first: lints are independent
         // findings over the whole file, so there is nothing to recover from and
         // no reason to make the reader re-run to see the next one.
-        match Error::combine(hits) {
-            Some(e) => Err(e),
-            None => Ok(()),
+        if hits.is_empty() {
+            Ok(())
+        } else {
+            Err(hits)
         }
     }
 

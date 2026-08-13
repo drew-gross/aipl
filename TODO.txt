@@ -65,8 +65,7 @@ optimizations:
   make arrays work sorta like strings i.e. have a rope representation
   we had a bug that only manifested after an optimization - lets make it so that all tests are run both with and without optimizations to avoid hitting this issue again
 
-start writing some profiling tools in aipl:
-  shimable clock, mostly for tests
+effects:
   all effects should be shimmable actually
 
 lex json
