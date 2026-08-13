@@ -1,7 +1,0 @@
-fn main() -> i64 { if (true) { 1 } else { "two" } }
---- errors ---
-error: if branches have mismatched types: i64 vs str
- --> ./tests/cases/conditionals/err_if_branch_type_mismatch.aipl:1:24
-  |
-1 | fn main() -> i64 { if (true) { 1 } else { "two" } }
-  |                        ^^^^^^^^^^^^^^^^^^^^^^^^

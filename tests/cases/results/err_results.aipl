@@ -1,0 +1,60 @@
+import { < } from builtins;
+
+// Every *check-phase* result error, in one file, reported in one run.
+//
+// `err_try_outside_result` is not here: a bad `?` is caught during
+// *monomorphization*, which only visits functions something reaches — so it
+// needs a `main` that calls it, and mono stops at its first error anyway.
+
+fn might_fail(n: i64) -> i64!str { if (n < 0) { err("negative") } else { ok(n) } }
+
+// A result whose error is never handled — discarded outright, and bound to a
+// name that is then never used.
+fn ignored_result() {
+    might_fail(5);
+}
+
+fn unused_result_binding() {
+    let r = might_fail(5);
+}
+
+// A `match` on a result that omits the `err` case.
+fn match_missing_arm(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+    }
+}
+
+// A payload type a result can't carry.
+fn payload_invalid_type() -> #{i64[]}!Error { err("x") }
+
+// The void-success form `!E` still needs an argument for `err`.
+fn void_err() -> !str { err() }
+
+fn main() {}
+--- errors ---
+error: this result is discarded, ignoring its possible error; handle it with `match` or propagate it with `?`
+  --> ./tests/cases/results/err_results.aipl:14:5
+   |
+14 |     might_fail(5);
+   |     ^^^^^^^^^^^^
+
+error: the result bound to "r" is never used, ignoring its possible error; inspect it with `match` or `?`
+  --> ./tests/cases/results/err_results.aipl:18:13
+   |
+18 |     let r = might_fail(5);
+   |             ^^^^^^^^^^^^
+
+error: non-exhaustive match: missing err
+  --> ./tests/cases/results/err_results.aipl:23:12
+   |
+23 |     match (r) {
+   |            ^^^^
+
+error: fn "payload_invalid_type": a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
+
+error: "err" expects 1 argument, got 0
+  --> ./tests/cases/results/err_results.aipl:32:25
+   |
+32 | fn void_err() -> !str { err() }
+   |                         ^^^

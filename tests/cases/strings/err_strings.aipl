@@ -1,0 +1,137 @@
+import { Span, len, print, wrapping_add as +, == } from builtins;
+
+// Every *check-phase* string error, in one file, reported in one run. The
+// checker recovers at each item, so each failing function below is recorded and
+// the next is still checked.
+//
+// The string errors that aren't here belong to earlier phases and would abort
+// the file before the checker ran:
+//   - `err_unterminated_string`, `err_raw_string_unterminated`,
+//     `err_unknown_escape`, and the three unclosed-interpolation cases — all
+//     *lexer* errors;
+//   - `err_char_at_removed` — a *loader* error (an unknown builtin name is
+//     rejected while resolving the import list).
+
+// Comparing a str to an integer.
+fn str_eq_with_i64() -> i64 { if ("hi" == 5) { 1 } else { 2 } }
+
+// `+` is integer addition; string concatenation is `+++`.
+fn str_plus_i64() -> i64 { "hi" + 5 }
+
+// `match` on a str takes string literals and `_` — not a constructor pattern —
+// and the usual arm rules apply: no duplicate, no missing `_`, `_` last.
+fn match_ctor_arm(s: str) -> str {
+    match (s) {
+        some(v) => v,
+        _ => "default",
+    }
+}
+
+fn match_duplicate(s: str) -> str {
+    match (s) {
+        "a" => "x",
+        "a" => "y",
+        _ => "z",
+    }
+}
+
+fn match_non_exhaustive(s: str) -> str {
+    match (s) {
+        "a" => "x",
+        "b" => "y",
+    }
+}
+
+fn match_wildcard_not_last(s: str) -> str {
+    match (s) {
+        _ => "default",
+        "a" => "x",
+    }
+}
+
+// `print` takes a str.
+fn print_wrong_arg_type() !prints -> i64 {
+    let _ = print(42);
+    0
+}
+
+// Slicing something that isn't sliceable, and a bound that isn't an integer.
+fn slice_non_str() -> i64 {
+    let n = 5;
+    let s = n[..2];
+    0
+}
+
+fn slice_bound_not_int() {
+    let s = "hello";
+    let x = s[..'z'];
+}
+
+// Slicing by a `Span` value has the same requirement on its receiver.
+fn slice_span_unsliceable() -> i64 {
+    let n = 5;
+    let sp = Span { start: 0, end: 2 };
+    n[sp].len()
+}
+
+fn main() {}
+--- errors ---
+error: "==" between str and i64: both sides must be the same type
+  --> ./tests/cases/strings/err_strings.aipl:16:35
+   |
+16 | fn str_eq_with_i64() -> i64 { if ("hi" == 5) { 1 } else { 2 } }
+   |                                   ^^^^^^^^^
+
+error: "+" is integer addition, but this operand is str; use "+++" to concatenate strings
+  --> ./tests/cases/strings/err_strings.aipl:19:28
+   |
+19 | fn str_plus_i64() -> i64 { "hi" + 5 }
+   |                            ^^^^
+
+error: "match" on a str expects string literals, `[..]` patterns, or `_`
+  --> ./tests/cases/strings/err_strings.aipl:25:9
+   |
+25 |         some(v) => v,
+   |         ^^^^
+
+error: duplicate "a" arm
+  --> ./tests/cases/strings/err_strings.aipl:33:9
+   |
+33 |         "a" => "y",
+   |         ^^^
+
+error: non-exhaustive match on a str: add a `_` arm
+  --> ./tests/cases/strings/err_strings.aipl:39:12
+   |
+39 |     match (s) {
+   |            ^^^^
+
+error: the `_` arm must be last (arms after it are unreachable)
+  --> ./tests/cases/strings/err_strings.aipl:47:9
+   |
+47 |         _ => "default",
+   |         ^
+
+error: fn "print" arg 0: expected str, got i64
+  --> ./tests/cases/strings/err_strings.aipl:54:19
+   |
+54 |     let _ = print(42);
+   |                   ^^
+
+error: cannot slice a value of type i64
+  --> ./tests/cases/strings/err_strings.aipl:61:13
+   |
+61 |     let s = n[..2];
+   |             ^
+
+error: slice end: expected i64, got char
+  --> ./tests/cases/strings/err_strings.aipl:67:17
+   |
+67 |     let x = s[..'z'];
+   |                 ^^^
+
+error: cannot slice a value of type i64
+  --> ./tests/cases/strings/err_strings.aipl:74:5
+   |
+74 |     n[sp].len()
+   |     ^

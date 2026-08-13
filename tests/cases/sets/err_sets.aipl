@@ -1,0 +1,37 @@
+import { contains, print, to_str } from builtins;
+
+// Every *check-phase* set error, in one file, reported in one run.
+
+// `contains` is for arrays and strs; a set uses `has`.
+fn contains_on_set(s: #{i64}) -> bool { s.contains(1) }
+
+// Elements must share one type.
+fn elem_mismatch() {
+    let s = #{1, true};
+}
+
+// A set isn't indexable.
+fn index_set() !prints {
+    let s = #{1, 2, 3};
+    print(to_str(s[0]));
+}
+
+fn main() {}
+--- errors ---
+error: "contains" takes an array or str receiver; for set membership use "has"
+ --> ./tests/cases/sets/err_sets.aipl:6:41
+  |
+6 | fn contains_on_set(s: #{i64}) -> bool { s.contains(1) }
+  |                                         ^
+
+error: set element: expected i64, got bool
+  --> ./tests/cases/sets/err_sets.aipl:10:18
+   |
+10 |     let s = #{1, true};
+   |                  ^^^^
+
+error: cannot index a value of type #{i64}
+  --> ./tests/cases/sets/err_sets.aipl:16:18
+   |
+16 |     print(to_str(s[0]));
+   |                  ^

@@ -748,6 +748,13 @@ pub fn check(program: &Program) -> Result<(), Error> {
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
+    // Errors are collected per *item*, not thrown at the first one: each
+    // function (and each struct-field default) is checked independently, so one
+    // run reports every item that fails instead of only the earliest. Recovery
+    // is at the item boundary — a function stops at its own first error, since
+    // continuing inside one without a type for the offending expression would
+    // produce cascades rather than findings.
+    let mut errors: Vec<Error> = Vec::new();
     for item in &program.items {
         if let Item::Struct(s) = item {
             // A generic template's field types mention its type variables, so
@@ -758,23 +765,32 @@ pub fn check(program: &Program) -> Result<(), Error> {
             }
             for f in &s.fields {
                 if let Some(default) = &f.default {
-                    let dt = cx.check_expr(default, &HashMap::new(), &[])?;
-                    expect(
-                        &dt,
-                        &f.ty,
-                        &format!("default for struct {:?} field {:?}", s.name, f.name),
-                        default.span.clone(),
-                    )?;
+                    let checked = cx.check_expr(default, &HashMap::new(), &[]).and_then(|dt| {
+                        expect(
+                            &dt,
+                            &f.ty,
+                            &format!("default for struct {:?} field {:?}", s.name, f.name),
+                            default.span.clone(),
+                        )
+                    });
+                    if let Err(e) = checked {
+                        errors.push(e);
+                    }
                 }
             }
         }
     }
     for item in &program.items {
         if let Item::Fn(f) = item {
-            cx.check_fn(f)?;
+            if let Err(e) = cx.check_fn(f) {
+                errors.push(e);
+            }
         }
     }
-    Ok(())
+    match Error::combine(errors) {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the

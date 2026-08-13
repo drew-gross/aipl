@@ -1,0 +1,48 @@
+import { now_nanos, print } from builtins;
+
+// Every *check-phase* effect error, in one file, reported in one run. The four
+// `shim` fixtures stay separate: shim validation is its own pass and stops at
+// the first problem.
+
+fn declares_unknown_effect() !mystery -> i64 { 0 }
+
+// Calling an effectful builtin without declaring its effect.
+fn print_without_prints_effect() -> i64 {
+    let _ = print("forbidden");
+    0
+}
+
+fn clock_without_shim() -> u64 { now_nanos() }
+
+// The effect is transitive: a caller of an effectful function needs it too.
+fn inner() !prints -> i64 { print("hi") }
+
+fn outer() -> i64 { inner() }
+
+fn main() {}
+--- errors ---
+error: fn "declares_unknown_effect" declares unknown effect "!mystery"
+
+error: fn "print" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_effects.aipl:11:13
+   |
+11 |     let _ = print("forbidden");
+   |             ^^^^^^^^^^^^^^^^^
+
+error: fn "now_nanos" has effect "!clock" but the calling function does not declare it
+  --> ./tests/cases/effects/err_effects.aipl:15:34
+   |
+15 | fn clock_without_shim() -> u64 { now_nanos() }
+   |                                  ^^^^^^^^^
+
+error: fn "inner": body returns (), but the declared return type is i64
+  --> ./tests/cases/effects/err_effects.aipl:18:29
+   |
+18 | fn inner() !prints -> i64 { print("hi") }
+   |                             ^^^^^^^^^^
+
+error: fn "inner" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_effects.aipl:20:21
+   |
+20 | fn outer() -> i64 { inner() }
+   |                     ^^^^^

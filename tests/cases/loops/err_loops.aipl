@@ -1,0 +1,60 @@
+import { wrapping_add as +, == } from builtins;
+
+// Every *check-phase* loop error, in one file, reported in one run. The four
+// `for`-syntax fixtures (`err_for_body_stmt_then_expr`,
+// `err_for_body_trailing_expr`, `err_for_missing_colon`, `err_for_missing_let`)
+// are *parse* errors and stay separate — the file never reaches the checker.
+
+// A `for` body that compares the loop variable to the wrong type.
+fn for_body_type_mismatch() -> i64 {
+    for (let c : "x") {
+        let _ = c == 5;
+    }
+    0
+}
+
+// A `for` over something that isn't a str or array.
+fn for_iterable_must_be_str() -> i64 {
+    for (let c : 42) {}
+    0
+}
+
+// The loop variable is scoped to the body.
+fn for_var_does_not_leak() -> i64 {
+    for (let c : "x") {}
+    c
+}
+
+// A `while` condition that isn't a bool.
+fn while_non_bool_condition() {
+    mut i = 0;
+    while (i + 1) {
+        set i = i + 1;
+    }
+}
+
+fn main() {}
+--- errors ---
+error: "==" between char and i64: both sides must be the same type
+  --> ./tests/cases/loops/err_loops.aipl:11:17
+   |
+11 |         let _ = c == 5;
+   |                 ^^^^^^
+
+error: for-loop iterable must be a str or array, got i64
+  --> ./tests/cases/loops/err_loops.aipl:18:18
+   |
+18 |     for (let c : 42) {}
+   |                  ^^
+
+error: unknown identifier "c"
+  --> ./tests/cases/loops/err_loops.aipl:25:5
+   |
+25 |     c
+   |     ^
+
+error: while condition: expected bool, got i64
+  --> ./tests/cases/loops/err_loops.aipl:31:12
+   |
+31 |     while (i + 1) {
+   |            ^^^^^

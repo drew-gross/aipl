@@ -12,3 +12,9 @@ error: "==" is not supported for function values
   |
 4 | fn apply(f: (i64) -> i64) -> bool { f == f }
   |                                     ^^^^^^
+
+error: fn "print" has effect "!prints" but the calling function does not declare it
+ --> ./tests/cases/equality/err_fn_eq.aipl:7:5
+  |
+7 |     print("unreachable");
+  |     ^^^^^^^^^^^^^^^^^^^

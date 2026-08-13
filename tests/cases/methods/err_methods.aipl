@@ -1,0 +1,85 @@
+import { push, wrapping_add as + } from builtins;
+
+// Every *check-phase* method error, in one file, reported in one run. The
+// checker recovers at each item, so each failing function below is recorded and
+// the next is still checked.
+
+fn no_self(x: i64) -> i64 { x }
+
+fn greet(self: str) -> i64 { 0 }
+
+fn add(mut self: i64, x: i64) {
+    set self = self + x;
+}
+
+// A method nothing declares.
+fn method_call_undefined() -> i64 { 5.nope() }
+
+// A function whose first parameter isn't `self` can't be called as a method.
+fn method_call_without_self() -> i64 { 5.no_self() }
+
+// A receiver of the wrong type for the method's `self`.
+fn method_call_wrong_receiver_type() -> i64 { 5.greet() }
+
+// A mutating method's result must be written back with `set`, not discarded.
+fn bare_mutating_call() {
+    mut xs = [1];
+    xs.push(2);
+}
+
+// …and its receiver must be mutable.
+fn immutable_receiver() -> i64 {
+    let n = 1;
+    set n.add(2);
+    n
+}
+
+// A `mut` receiver must be named `self`, must be the first parameter, and a
+// mutating method cannot also return a value.
+fn mut_not_self(mut other: i64) {
+    set other = 0;
+}
+
+fn non_first_mut(self: i64, mut x: i64) {
+    set x = 0;
+}
+
+fn mutating_returns_value(mut self: i64) -> i64 { self }
+
+fn main() {}
+--- errors ---
+error: call to undefined fn "nope"
+  --> ./tests/cases/methods/err_methods.aipl:16:37
+   |
+16 | fn method_call_undefined() -> i64 { 5.nope() }
+   |                                     ^^^^^^
+
+error: fn "no_self" cannot be called as a method (its first parameter must be named "self")
+  --> ./tests/cases/methods/err_methods.aipl:19:40
+   |
+19 | fn method_call_without_self() -> i64 { 5.no_self() }
+   |                                        ^
+
+error: fn "greet" arg 0: expected str, got i64
+  --> ./tests/cases/methods/err_methods.aipl:22:47
+   |
+22 | fn method_call_wrong_receiver_type() -> i64 { 5.greet() }
+   |                                               ^
+
+error: the result of mutating method "push" is discarded, losing the mutation; write "set xs.push(..)" to mutate xs in place, or use the returned value
+  --> ./tests/cases/methods/err_methods.aipl:27:5
+   |
+27 |     xs.push(2);
+   |     ^^^^^^^^^
+
+error: set: cannot assign to immutable binding "n" (use "let mut")
+  --> ./tests/cases/methods/err_methods.aipl:33:9
+   |
+33 |     set n.add(2);
+   |         ^^^^^^^
+
+error: fn "mut_not_self": a "mut" receiver must be named "self"
+
+error: fn "non_first_mut": only the first parameter may be "mut"
+
+error: fn "mutating_returns_value": a mutating method cannot return a value

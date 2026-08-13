@@ -1,0 +1,31 @@
+import { len, wrapping_add as + } from builtins;
+
+// Every *check-phase* generic error, in one file, reported in one run.
+//
+// Not here, because each aborts before or outside the per-item checking loop:
+// `err_unknown_type_param_bound` (bounds are validated in an earlier pass over
+// signatures), `err_generic_arity` / `err_generic_cannot_infer` /
+// `err_instance_name_demangled` (generic lowering), and
+// `err_ord_bound_violation` / `err_type_param_conflict` / `err_bare_any_param` /
+// `err_any_in_return` (all raised while monomorphizing a *call* — a generic
+// body is only checked once something instantiates it).
+
+// Arithmetic on an unconstrained type parameter.
+fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }
+
+// A generic body whose type doesn't match the declared return.
+fn generic_body_unreachable(v: any[]) -> bool { len(v) }
+
+fn main() {}
+--- errors ---
+error: arithmetic operand: expected i64, got a type parameter
+  --> ./tests/cases/generics/err_generics.aipl:14:51
+   |
+14 | fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }
+   |                                                   ^
+
+error: fn "generic_body_unreachable": body returns u64, but the declared return type is bool
+  --> ./tests/cases/generics/err_generics.aipl:17:49
+   |
+17 | fn generic_body_unreachable(v: any[]) -> bool { len(v) }
+   |                                                 ^^^^^

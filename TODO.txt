@@ -79,7 +79,6 @@ warn/err on:
 
 make it possible to fill expected output for one test at a time (or a list of tests), add a CLAUDE.md reminder to use that any time you are running tests (the full suite should only be run during handoff)
 
-output multiple errors at once, then combine tests that are all testing errors for the same feature
 remove install_parser_hook with lazy loader
 make the vscode extension also auto-format
 constant folding optimization pass

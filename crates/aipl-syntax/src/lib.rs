@@ -21,6 +21,22 @@ pub struct Error {
     /// Secondary labeled locations, rendered as `note:` blocks after the
     /// primary caret — e.g. pointing at the *other* side of a conflict.
     pub notes: Vec<(String, Span)>,
+    /// Further *independent* errors found in the same pass, rendered after this
+    /// one separated by a blank line. A pass that can keep going after a failure
+    /// (the checker, which recovers at each item; the lints, which are collected
+    /// wholesale) reports everything it found instead of just the first, so one
+    /// run surfaces every problem at that phase.
+    ///
+    /// Carried inside `Error` rather than changing every `Result<_, Error>` in
+    /// the compiler: each is a complete error in its own right, and every
+    /// existing `render` call site prints the whole set for free.
+    ///
+    /// *Boxed*, and deliberately so. `Result<_, Error>` sits in every frame of
+    /// the deeply recursive checker and codegen, so `Error`'s size is stack
+    /// depth: holding the extras inline as a `Vec` grew it from 72 to 96 bytes
+    /// and overflowed the stack compiling the dogfooded lexer. A null pointer
+    /// costs 8, and only the single combined error at the top ever allocates.
+    pub more: Option<Box<Vec<Error>>>,
 }
 
 impl std::fmt::Display for Error {
@@ -38,6 +54,7 @@ impl Error {
             message: message.into(),
             span: None,
             notes: Vec::new(),
+            more: None,
         }
     }
 
@@ -46,6 +63,7 @@ impl Error {
             message: message.into(),
             span: Some(span),
             notes: Vec::new(),
+            more: None,
         }
     }
 
@@ -61,6 +79,19 @@ impl Error {
     /// plain `error: ...` otherwise. `filename` appears in the ` --> ` location
     /// line; pass `"input"` when no real path is available.
     pub fn render(&self, source: &str, filename: &str) -> String {
+        let mut out = self.render_one(source, filename);
+        // Independent findings from the same pass, each a full error block, one
+        // blank line apart.
+        for e in self.more.iter().flat_map(|v| v.iter()) {
+            out.push_str("\n\n");
+            out.push_str(&e.render_one(source, filename));
+        }
+        out
+    }
+
+    /// This error alone — message, caret, and its own notes — without the
+    /// independent errors in [`Error::more`].
+    fn render_one(&self, source: &str, filename: &str) -> String {
         let Some(span) = self.span.as_ref() else {
             return format!("error: {}", self.message);
         };
@@ -76,6 +107,15 @@ impl Error {
             ));
         }
         out
+    }
+
+    /// Combine independently-found errors into one, in the order found. `None`
+    /// when there were none — the caller's success case.
+    pub fn combine(mut errors: Vec<Error>) -> Option<Error> {
+        let mut first = errors.first().cloned()?;
+        let rest = errors.split_off(1);
+        first.more = (!rest.is_empty()).then(|| Box::new(rest));
+        Some(first)
     }
 }
 
@@ -1843,7 +1883,10 @@ pub mod lint {
             Some(sp) => !allowed.contains(&line_of(src, sp.start)),
             None => true,
         });
-        match hits.into_iter().next() {
+        // Every surviving hit, not just the first: lints are independent
+        // findings over the whole file, so there is nothing to recover from and
+        // no reason to make the reader re-run to see the next one.
+        match Error::combine(hits) {
             Some(e) => Err(e),
             None => Ok(()),
         }
@@ -1895,17 +1938,19 @@ pub mod lint {
     /// Only flagged when there is an end bound. `x[0..]` is left alone on
     /// purpose: `x[..]` is not a form, so there would be nothing to recommend.
     fn slice_from_zero(e: &Expr, src: &str, hits: &mut Vec<Error>) {
-        let ExprKind::Slice(obj, start, Some(end)) = &e.kind else {
+        let ExprKind::Slice(obj, start, Some(_end)) = &e.kind else {
             return;
         };
         if !matches!(start.kind, ExprKind::Num(0)) || start.span.is_empty() {
             return;
         }
+        // The end bound is deliberately *not* quoted back: a call-shaped end
+        // (`s.len()`) has a span that stops before its parens, so splicing the
+        // source text produced malformed advice like `s[..s.len]`.
         let recv = &src[obj.span.clone()];
-        let en = &src[end.span.clone()];
         hits.push(Error::at(
             format!(
-                "slice starts at 0 — use the open-ended \"{recv}[..{en}]\" \
+                "slice starts at 0 — drop it for the open-ended \"{recv}[..end]\" \
                  (or append #[allow] to this line to keep it)"
             ),
             start.span.clone(),

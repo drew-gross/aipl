@@ -1,0 +1,132 @@
+import { filter, map, print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+
+// Every *check-phase* lambda / function-value error, in one file, reported in
+// one run. The checker recovers at each item, so each failing function below is
+// recorded and the next is still checked.
+//
+// `err_operator_value_not_imported` is not here: the operator-import gate is a
+// *loader* check, so it aborts the file before the checker runs and would mask
+// everything below.
+
+fn apply_i64(f: (i64) -> i64, x: i64) -> i64 { f(x) }
+
+fn apply_str(f: (str) -> str, x: str) -> str { f(x) }
+
+fn apply_binop(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
+
+fn twice(x: i64) -> i64 { x * 2 }
+
+fn inc(n: i64) -> i64 { n + 1 }
+
+fn takes_str(s: str) -> str { s }
+
+fn shout(x: i64) !prints -> i64 {
+    print(to_str(x));
+    x
+}
+
+// Calling something that isn't a function.
+fn call_non_function() -> i64 {
+    let x = 5;
+    x(3)
+}
+
+// `filter` wants a bool-returning predicate — as a named fn, and as a lambda.
+fn filter_named_not_bool() !prints {
+    print(to_str([1, 2, 3].filter(twice)));
+}
+
+fn filter_not_bool() !prints {
+    print(to_str([1, 2, 3].filter(|x| x + 1)));
+}
+
+// A function reference whose effects the caller doesn't declare.
+fn fn_ref_effect() -> i64 {
+    let ys = [1, 2, 3].map(shout);
+    3
+}
+
+// A function reference whose parameter type doesn't match what it will be
+// called with — through `map`, and through a declared function-typed parameter.
+fn fn_ref_map_type() !prints {
+    print(to_str([1, 2, 3].map(takes_str)));
+}
+
+fn fn_ref_sig() -> str { apply_str(inc, "hi") }
+
+// A lambda with the wrong parameter count — against a declared function type,
+// and against `map`.
+fn lambda_arity() -> i64 { apply_i64(|x, y| x + y, 3) }
+
+fn map_lambda_arity() !prints {
+    print(to_str([1, 2, 3].map(|x, y| x + y)));
+}
+
+// A lambda whose body has the wrong type.
+fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
+
+// `map` on something that isn't an array.
+fn map_not_array() !prints {
+    print(to_str(map(5, |x| x + 1)));
+}
+
+// A function value cannot be returned.
+fn return_function() -> (i64) -> i64 { inc }
+
+fn main() {}
+--- errors ---
+error: "x" is not a function and cannot be called
+  --> ./tests/cases/lambdas/err_lambdas.aipl:31:5
+   |
+31 |     x(3)
+   |     ^^^
+
+error: fn "twice" returns i64, but bool is expected here
+  --> ./tests/cases/lambdas/err_lambdas.aipl:36:35
+   |
+36 |     print(to_str([1, 2, 3].filter(twice)));
+   |                                   ^^^^^
+
+error: lambda body returns i64, but bool was expected
+  --> ./tests/cases/lambdas/err_lambdas.aipl:40:39
+   |
+40 |     print(to_str([1, 2, 3].filter(|x| x + 1)));
+   |                                       ^^^^^
+
+error: fn "shout" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/lambdas/err_lambdas.aipl:45:28
+   |
+45 |     let ys = [1, 2, 3].map(shout);
+   |                            ^^^^^
+
+error: fn "takes_str" expects a str argument, but will be called with i64 here
+  --> ./tests/cases/lambdas/err_lambdas.aipl:52:32
+   |
+52 |     print(to_str([1, 2, 3].map(takes_str)));
+   |                                ^^^^^^^^^
+
+error: fn "inc" expects a i64 argument, but will be called with str here
+  --> ./tests/cases/lambdas/err_lambdas.aipl:55:36
+   |
+55 | fn fn_ref_sig() -> str { apply_str(inc, "hi") }
+   |                                    ^^^
+
+error: lambda has 2 parameter(s), but (i64) -> i64 was expected
+  --> ./tests/cases/lambdas/err_lambdas.aipl:59:38
+   |
+59 | fn lambda_arity() -> i64 { apply_i64(|x, y| x + y, 3) }
+   |                                      ^^^^^^^^^^^^
+
+error: lambda has 2 parameter(s), but (i64) -> _ was expected
+  --> ./tests/cases/lambdas/err_lambdas.aipl:62:32
+   |
+62 |     print(to_str([1, 2, 3].map(|x, y| x + y)));
+   |                                ^^^^^^^^^^^^
+
+error: lambda body returns bool, but i64 was expected
+  --> ./tests/cases/lambdas/err_lambdas.aipl:66:46
+   |
+66 | fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
+   |                                              ^^^^
+
+error: fn "return_function": cannot return a function value ((i64) -> i64)

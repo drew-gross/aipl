@@ -1,0 +1,95 @@
+import { len, map, print, to_str, == } from builtins;
+
+// Every lint, in one file, reported in one run.
+//
+// Lints are ordinary errors — they fail the compile — but unlike a type error
+// they are *independent findings*: nothing has to be recovered from to keep
+// looking, so the pass collects them all and reports the set. That is what
+// makes this file possible, and it is the point of it: the expected output
+// below is the whole lint surface at once, so adding a lint or changing a
+// message shows up here rather than in a file of its own.
+//
+// Each lint has its own `#[allow]` companion case proving the marker squelches
+// it (`allow_squelch`, `eta_lambda_allow`, `field_init_shorthand_allow`,
+// `slice_from_zero_allow`), and its own passing case for the shapes it must
+// *not* flag (`slice_from_zero_open_end`, `field_init_range_value`).
+
+struct Point { x: i64, y: i64 }
+
+// `x: x` — a field initialized with the identifier of the same name has the
+// shorthand spelling `Point { x }`.
+fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+
+// `|x| to_str(x)` — a lambda that only forwards its argument to a single call
+// is redundant; pass `to_str` itself. The method form `|x| x.to_str()` is
+// stored as the same free call, so it is covered too.
+fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+
+fn slices() !prints {
+    let s = "hello, world";
+
+    // `x[y..x.len()]` — the end bound is the receiver's own length, which the
+    // open-ended form already means.
+    print(s[3..s.len()]);
+
+    // The open-*start* form synthesizes a `0`, so the recommendation spells it
+    // back out as `s[0..]` rather than the un-writable `s[..]`.
+    print(s[..s.len()]);
+
+    // `x[0..y]` — the mirror: a literal `0` start is what the open-ended form
+    // already means.
+    print(s[0..2]);
+
+    // `#[allow]` is line-scoped, so a marker on the *neighbouring* line
+    // squelches nothing.
+    #[allow]
+    print(s[4..s.len()]);
+}
+
+fn main() !prints {
+    print(make(1, 2).x.to_str());
+    print(stringify([1]).len().to_str());
+    slices();
+}
+--- errors ---
+error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:33:16
+   |
+33 |     print(s[3..s.len()]);
+   |                ^^^^^
+
+error: slice end is the receiver's whole length — use the open-ended "s[0..]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:37:15
+   |
+37 |     print(s[..s.len()]);
+   |               ^^^^^
+
+error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:46:16
+   |
+46 |     print(s[4..s.len()]);
+   |                ^^^^^
+
+error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:41:13
+   |
+41 |     print(s[0..2]);
+   |             ^
+
+error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:26:43
+   |
+26 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+   |                                           ^^^^^^^^^^^^
+
+error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:21:47
+   |
+21 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                               ^
+
+error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:21:53
+   |
+21 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                                     ^

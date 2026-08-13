@@ -1,0 +1,164 @@
+import { print, wrapping_add as + } from builtins;
+
+// Every *check-phase* function error, in one file, reported in one run.
+//
+// The checker recovers at each item, so each failing function below is recorded
+// and the next is still checked. `err_missing_fn_keyword` is not here: it is a
+// parse error, so the file never reaches the checker at all.
+
+struct Point { x: i64, y: i64 }
+
+fn add(x: i64, y: i64) -> i64 { x + y }
+
+fn use_point(p: Point) -> i64 { p.x }
+
+fn sum(self: i64, others: i64*) -> i64 { self }
+
+// Too few arguments.
+fn arity_mismatch() -> i64 { add(1) }
+
+// An argument of the wrong type.
+fn call_type_mismatch() -> i64 { use_point(5) }
+
+// A call to something nothing declares.
+fn call_undefined() -> i64 { missing(1) }
+
+// A variadic parameter given a value of the wrong element type.
+fn variadic_wrong_type() {
+    let _ = 1.sum(true);
+}
+
+// An early `return` of the wrong type for the declared return.
+fn return_type_mismatch(b: bool) -> i64 {
+    if (b) {
+        return "nope";
+    };
+    0
+}
+
+// The declared return type vs the body's type, in each direction that has its
+// own message: bool/i64, i64/str, str/i64, ()/i64, and a bare value where an
+// optional is declared.
+fn return_bool_for_i64() -> i64 { true }
+
+fn return_i64_for_str() -> str { 5 }
+
+fn return_str_for_i64() -> i64 { "five" }
+
+fn return_void_for_i64() -> i64 {}
+
+fn return_bare_for_optional() -> i64? { 5 }
+
+// A lambda used as a *value* may not capture a local, and its parameters must
+// be typed.
+fn value_lambda_capture() -> i64 {
+    let n = 5;
+    let f = |x: i64| { x + n };
+    f(10)
+}
+
+fn value_lambda_untyped() -> i64 {
+    let f = |x| { x + 1 };
+    f(10)
+}
+
+// A call that returns nothing can't be bound, nor used as an operand.
+fn bind_void_result() !prints -> i64 {
+    let _ = print("hi");
+    0
+}
+
+fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
+
+// A void `main` (the default) with a trailing value.
+fn main() { 5 }
+--- errors ---
+error: fn "add" expects 2 arg(s), got 1
+  --> ./tests/cases/functions/err_functions.aipl:18:30
+   |
+18 | fn arity_mismatch() -> i64 { add(1) }
+   |                              ^^^^^
+
+error: fn "use_point" arg 0: expected Point, got i64
+  --> ./tests/cases/functions/err_functions.aipl:21:44
+   |
+21 | fn call_type_mismatch() -> i64 { use_point(5) }
+   |                                            ^
+
+error: call to undefined fn "missing"
+  --> ./tests/cases/functions/err_functions.aipl:24:30
+   |
+24 | fn call_undefined() -> i64 { missing(1) }
+   |                              ^^^^^^^^^
+
+error: fn "sum" arg 1: variadic parameter expects i64[], i64, or i64?, got bool
+  --> ./tests/cases/functions/err_functions.aipl:28:19
+   |
+28 |     let _ = 1.sum(true);
+   |                   ^^^^
+
+error: return value is str, but the function returns i64
+  --> ./tests/cases/functions/err_functions.aipl:34:16
+   |
+34 |         return "nope";
+   |                ^^^^^^
+
+error: fn "return_bool_for_i64": body returns bool, but the declared return type is i64
+  --> ./tests/cases/functions/err_functions.aipl:42:35
+   |
+42 | fn return_bool_for_i64() -> i64 { true }
+   |                                   ^^^^
+
+error: fn "return_i64_for_str": body returns i64, but the declared return type is str
+  --> ./tests/cases/functions/err_functions.aipl:44:34
+   |
+44 | fn return_i64_for_str() -> str { 5 }
+   |                                  ^
+
+error: fn "return_str_for_i64": body returns str, but the declared return type is i64
+  --> ./tests/cases/functions/err_functions.aipl:46:34
+   |
+46 | fn return_str_for_i64() -> i64 { "five" }
+   |                                  ^^^^^^
+
+error: fn "return_void_for_i64": body returns (), but the declared return type is i64
+ --> ./tests/cases/functions/err_functions.aipl:1:1
+  |
+1 | import { print, wrapping_add as + } from builtins;
+  | ^
+
+error: fn "return_bare_for_optional": body returns i64, but the declared return type is i64?
+  --> ./tests/cases/functions/err_functions.aipl:50:41
+   |
+50 | fn return_bare_for_optional() -> i64? { 5 }
+   |                                         ^
+
+error: a lambda used as a value cannot capture local "n" (function values are non-capturing)
+  --> ./tests/cases/functions/err_functions.aipl:56:13
+   |
+56 |     let f = |x: i64| { x + n };
+   |             ^^^^^^^^^^^^^^^^
+
+error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
+  --> ./tests/cases/functions/err_functions.aipl:61:14
+   |
+61 |     let f = |x| { x + 1 };
+   |              ^
+
+error: cannot bind "_" to a value of type ()
+  --> ./tests/cases/functions/err_functions.aipl:67:13
+   |
+67 |     let _ = print("hi");
+   |             ^^^^^^^^^^
+
+error: arithmetic operand: expected i64, got ()
+  --> ./tests/cases/functions/err_functions.aipl:71:42
+   |
+71 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
+   |                                          ^^^^^^^^^^
+
+error: fn "main": body returns i64, but the declared return type is ()
+  --> ./tests/cases/functions/err_functions.aipl:74:13
+   |
+74 | fn main() { 5 }
+   |             ^

@@ -1,0 +1,31 @@
+// Every *check-phase* conditional error, in one file, reported in one run.
+// `err_if_without_parens` is a parse error and stays separate.
+
+// Branches of different types.
+fn if_branch_type_mismatch() -> i64 { if (true) { 1 } else { "two" } }
+
+// A condition that isn't a bool.
+fn if_cond_not_bool() -> i64 { if (5) { 1 } else { 2 } }
+
+// No `else`, so the `then` branch must produce nothing.
+fn if_no_else_non_unit_then() { if (true) { 2 } }
+
+fn main() {}
+--- errors ---
+error: if branches have mismatched types: i64 vs str
+ --> ./tests/cases/conditionals/err_conditionals.aipl:5:43
+  |
+5 | fn if_branch_type_mismatch() -> i64 { if (true) { 1 } else { "two" } }
+  |                                           ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: if condition: expected bool, got i64
+ --> ./tests/cases/conditionals/err_conditionals.aipl:8:36
+  |
+8 | fn if_cond_not_bool() -> i64 { if (5) { 1 } else { 2 } }
+  |                                    ^
+
+error: if branches have mismatched types: i64 vs ()
+  --> ./tests/cases/conditionals/err_conditionals.aipl:11:37
+   |
+11 | fn if_no_else_non_unit_then() { if (true) { 2 } }
+   |                                     ^^^^^^^^^

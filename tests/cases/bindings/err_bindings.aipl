@@ -1,0 +1,81 @@
+// Every *check-phase* binding error, in one file, reported in one run. The
+// checker recovers at each item, so each failing function below is recorded and
+// the next is still checked.
+//
+// `err_incr_needs_plusplus_import` is not here: the operator-import gate is a
+// *loader* check, so it aborts the file before the checker runs.
+
+// A name nothing declares — read, and assigned to.
+fn undefined_ident() -> i64 { bogus }
+
+fn set_undeclared() -> i64 {
+    set ghost = 1;
+    0
+}
+
+// `set` to an immutable binding, and with a value of the wrong type.
+fn set_immutable() -> i64 {
+    let x = 1;
+    set x = 2;
+    x
+}
+
+fn set_type_mismatch() -> i64 {
+    mut s = "hello";
+    set s = 42;
+    0
+}
+
+// A `let`/`mut` annotation: a value of the wrong type, a literal that doesn't
+// fit the declared width, and a type name nothing declares.
+fn annotation_mismatch() {
+    let n: u8 = "hi";
+}
+
+fn annotation_literal_too_big() {
+    let n: u8 = 300;
+}
+
+fn annotation_unknown_type() {
+    let n: Nope = 1;
+}
+
+fn main() {}
+--- errors ---
+error: unknown identifier "bogus"
+ --> ./tests/cases/bindings/err_bindings.aipl:9:31
+  |
+9 | fn undefined_ident() -> i64 { bogus }
+  |                               ^^^^^
+
+error: set: undeclared variable "ghost"
+  --> ./tests/cases/bindings/err_bindings.aipl:12:9
+   |
+12 |     set ghost = 1;
+   |         ^^^^^^^^^
+
+error: set: cannot assign to immutable binding "x" (use "let mut")
+  --> ./tests/cases/bindings/err_bindings.aipl:19:9
+   |
+19 |     set x = 2;
+   |         ^^^^^
+
+error: set: expected str, got i64
+  --> ./tests/cases/bindings/err_bindings.aipl:25:13
+   |
+25 |     set s = 42;
+   |             ^^
+
+error: binding "n" is declared u8, but its value is str
+  --> ./tests/cases/bindings/err_bindings.aipl:32:17
+   |
+32 |     let n: u8 = "hi";
+   |                 ^^^^
+
+error: integer literal 300 does not fit in u8
+  --> ./tests/cases/bindings/err_bindings.aipl:36:17
+   |
+36 |     let n: u8 = 300;
+   |                 ^^^
+
+error: fn "annotation_unknown_type": unknown type "Nope"

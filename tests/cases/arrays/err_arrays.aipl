@@ -1,0 +1,110 @@
+import { push, value_or, wrapping_add as + } from builtins;
+
+// Every *check-phase* array error, in one file, reported in one run. The
+// checker recovers at each item, so each failing function below is recorded and
+// the next is still checked.
+//
+// Three array errors are not here, because they belong to other phases and so
+// can't be reported alongside these:
+//   - the two `..` spread errors — spread desugaring runs in the *loader*, so
+//     either one aborts the file before the checker sees it;
+//   - `err_push_char_from_empty` — a *codegen* error (pushing a char would
+//     change the array's representation), and codegen only runs once checking
+//     has passed, so it can never appear next to a check error.
+
+// Indexing something that isn't an array.
+fn index_non_array() -> i64 {
+    let x = 5;
+    x[0].value_or(0)
+}
+
+// Array-pattern `match`: a repeated arm, an element of the wrong type, a
+// non-literal element, a missing `_`, and a `_` that isn't last.
+fn match_duplicate(xs: i64[]) -> i64 {
+    match (xs) {
+        [1, 2] => 1,
+        [1, 2] => 2,
+        _ => 0,
+    }
+}
+
+fn match_elem_type(xs: i64[]) -> i64 {
+    match (xs) {
+        ["a", "b"] => 1,
+        _ => 0,
+    }
+}
+
+fn match_non_literal(xs: i64[]) -> i64 {
+    let k = 2;
+    match (xs) {
+        [1, k + 1] => 1,
+        _ => 0,
+    }
+}
+
+fn match_non_exhaustive(xs: i64[]) -> i64 {
+    match (xs) {
+        [1, 2] => 1,
+        [3, 4] => 2,
+    }
+}
+
+fn match_wildcard_not_last(xs: i64[]) -> i64 {
+    match (xs) {
+        [1, 2] => 1,
+        _ => 0,
+        [3, 4] => 2,
+    }
+}
+
+// `push` needs a `mut` receiver.
+fn push_immutable() -> i64 {
+    let xs = [1];
+    set xs.push(2);
+    0
+}
+
+fn main() {}
+--- errors ---
+error: cannot index a value of type i64
+  --> ./tests/cases/arrays/err_arrays.aipl:18:5
+   |
+18 |     x[0].value_or(0)
+   |     ^
+
+error: duplicate match arm
+  --> ./tests/cases/arrays/err_arrays.aipl:26:9
+   |
+26 |         [1, 2] => 2,
+   |         ^
+
+error: array-pattern element: expected i64, got str
+  --> ./tests/cases/arrays/err_arrays.aipl:33:10
+   |
+33 |         ["a", "b"] => 1,
+   |          ^^^
+
+error: array-pattern elements must be a binding name or a literal
+  --> ./tests/cases/arrays/err_arrays.aipl:41:13
+   |
+41 |         [1, k + 1] => 1,
+   |             ^^^^^
+
+error: non-exhaustive match on an array: add a `_` arm
+  --> ./tests/cases/arrays/err_arrays.aipl:47:12
+   |
+47 |     match (xs) {
+   |            ^^^^^
+
+error: the `_` arm must be last (arms after it are unreachable)
+  --> ./tests/cases/arrays/err_arrays.aipl:56:9
+   |
+56 |         _ => 0,
+   |         ^
+
+error: set: cannot assign to immutable binding "xs" (use "let mut")
+  --> ./tests/cases/arrays/err_arrays.aipl:64:9
+   |
+64 |     set xs.push(2);
+   |         ^^^^^^^^^

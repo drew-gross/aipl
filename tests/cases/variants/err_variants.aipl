@@ -1,0 +1,32 @@
+import { print, to_str, wrapping_mul as * } from builtins;
+
+// Every *check-phase* variant error, in one file, reported in one run.
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// A constructor given the wrong number of payload arguments.
+fn ctor_arity() !prints {
+    print(to_str(Circle(1, 2)));
+}
+
+// A `match` that doesn't cover every case.
+fn non_exhaustive(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r * r,
+        Empty => 0,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: constructor "Circle" expects 1 argument(s), got 2
+ --> ./tests/cases/variants/err_variants.aipl:9:18
+  |
+9 |     print(to_str(Circle(1, 2)));
+  |                  ^^^^^^^^^^^
+
+error: non-exhaustive match: missing Rect
+  --> ./tests/cases/variants/err_variants.aipl:14:12
+   |
+14 |     match (s) {
+   |            ^^^^

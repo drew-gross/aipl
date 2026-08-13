@@ -1,0 +1,146 @@
+// Every *check-phase* struct error, in one file, reported in one run.
+//
+// The checker recovers at each item, so a function that fails is recorded and
+// the next one is still checked. That makes this file the whole struct error
+// surface at once: adding a rule or changing a message shows up here rather
+// than in a fixture of its own.
+//
+// Two struct errors are deliberately *not* here, because they abort the file
+// before the checker sees it and would mask everything below:
+//   - `err_field_missing_type` — a parse error (the grammar can't build an AST).
+//   - `err_duplicate_struct` — a loader error (raised while collecting items).
+//   - the two generic-struct errors — generic lowering runs before the
+//     per-item checking loop, so either one aborts before anything else is
+//     reported (they keep their own fixtures under `errors/`).
+// Errors that no longer exist as separate fixtures live here; the ones that
+// assert an *absence* (a shape that must not be rejected) stay separate.
+
+struct Point { x: i64, y: i64 }
+
+struct Pair { a: i64, b: i64 }
+
+struct Color { r: i64, g: i64, b: i64 }
+
+// A type name nothing declares.
+fn unknown_type(x: Widget) -> i64 { 0 }
+
+// A construction of a struct nothing declares.
+fn unknown_struct() -> i64 { Bogus { x: 1 }.x }
+
+// A field the struct doesn't have — at construction, and at `set`.
+fn unknown_field() -> i64 { Point { x: 1, z: 2 }.x }
+
+fn set_unknown_field() {
+    mut p = Point { x: 1, y: 2 };
+    set p.z = 3;
+}
+
+// A field with no default that the construction leaves out.
+fn missing_field() -> i64 { Pair { a: 1 }.a }
+
+// A struct value of the wrong type for the declared return.
+fn wrong_struct_return() -> Point { Color { r: 1, g: 2, b: 3 } }
+
+// `set` to a field of an immutable binding.
+fn set_immutable() {
+    let p = Point { x: 1, y: 2 };
+    set p.x = 3;
+}
+
+// `set` to a field of something that isn't a struct — directly, and one level
+// in (where the *path* runs through a non-struct field).
+fn set_non_struct() {
+    mut n = 1;
+    set n.x = 2;
+}
+
+fn set_nested_non_struct() {
+    mut p = Point { x: 1, y: 2 };
+    set p.x.y = 3;
+}
+
+// `set` with a value of the wrong type for the field.
+fn set_type_mismatch() {
+    mut p = Point { x: 1, y: 2 };
+    set p.x = true;
+}
+
+// `Span` bounds are `i64`: a `str` bound, and a chained range (whose left side
+// is itself a `Span`).
+fn range_bound_type() {
+    let r = "a"..2;
+}
+
+fn range_chained() {
+    let r = 1..2..3;
+}
+
+fn main() {}
+--- errors ---
+error: fn "unknown_type": unknown type "Widget"
+
+error: unknown struct "Bogus"
+  --> ./tests/cases/structs/err_structs.aipl:28:30
+   |
+28 | fn unknown_struct() -> i64 { Bogus { x: 1 }.x }
+   |                              ^^^^^^^^^^^^
+
+error: struct "Point" has no field "z"
+  --> ./tests/cases/structs/err_structs.aipl:31:46
+   |
+31 | fn unknown_field() -> i64 { Point { x: 1, z: 2 }.x }
+   |                                              ^
+
+error: struct "Point" has no field "z"
+  --> ./tests/cases/structs/err_structs.aipl:35:9
+   |
+35 |     set p.z = 3;
+   |         ^^^^^^^
+
+error: struct "Pair" field "b" has no default and was not provided
+  --> ./tests/cases/structs/err_structs.aipl:39:29
+   |
+39 | fn missing_field() -> i64 { Pair { a: 1 }.a }
+   |                             ^^^^^^^^^^^
+
+error: fn "wrong_struct_return": body returns Color, but the declared return type is Point
+  --> ./tests/cases/structs/err_structs.aipl:42:37
+   |
+42 | fn wrong_struct_return() -> Point { Color { r: 1, g: 2, b: 3 } }
+   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: set: cannot assign to immutable binding "p" (use "let mut")
+  --> ./tests/cases/structs/err_structs.aipl:47:9
+   |
+47 |     set p.x = 3;
+   |         ^^^^^^^
+
+error: set: field assignment target must be a struct, "n" has type i64
+  --> ./tests/cases/structs/err_structs.aipl:54:9
+   |
+54 |     set n.x = 2;
+   |         ^^^^^^^
+
+error: set: field assignment target must be a struct, "p.x" has type i64
+  --> ./tests/cases/structs/err_structs.aipl:59:9
+   |
+59 |     set p.x.y = 3;
+   |         ^^^^^^^^^
+
+error: set: expected i64, got bool
+  --> ./tests/cases/structs/err_structs.aipl:65:15
+   |
+65 |     set p.x = true;
+   |               ^^^^
+
+error: struct "Span" field "start": expected i64, got str
+  --> ./tests/cases/structs/err_structs.aipl:71:13
+   |
+71 |     let r = "a"..2;
+   |             ^^^
+
+error: struct "Span" field "start": expected i64, got Span
+  --> ./tests/cases/structs/err_structs.aipl:75:13
+   |
+75 |     let r = 1..2..3;
+   |             ^^^^
