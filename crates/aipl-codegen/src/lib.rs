@@ -2071,6 +2071,21 @@ extern "C" fn aipl_array_push_mut(
     elem_size: i64,
 ) -> *const u8 {
     let a = aipl_arr_ensure_heap(a);
+    // A `STATIC_REFCOUNT` block belongs to someone else — an array the *host*
+    // lent us as an FFI argument (see [`ArgBufs::array_block`]) and frees itself
+    // after the call — so it can neither be written into nor `realloc`ed here.
+    // Copy instead, exactly as `aipl_concat_mut` does for a static string
+    // literal.
+    //
+    // Reaching this needs a host array to become an exclusive `mut` binding,
+    // which today it can't: `exclusive` wants a fresh array literal or a
+    // *moved-in* parameter, and a moved-in parameter is a separate `$own`
+    // instance that the host never calls (an FFI entry is always the borrow
+    // form). The check keeps that a property of the runtime rather than of an
+    // invariant maintained two crates away in the monomorphizer.
+    if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
+        return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
+    }
     if elem_size == ELEM_BITPACKED {
         // Bit-packed `bool[]`, in place: set bit `old_len`, growing the byte
         // capacity (doubling) only when the next bit needs a new byte.
@@ -3038,13 +3053,15 @@ impl TypeDef {
 /// A value marshaled across the embedding FFI by [`Compilation::call_values`].
 /// Scalars (`i64`/`bool`/`char`) ride their shared `i64` ABI as `Int` (`bool` is
 /// `0`/`1`, `char` a codepoint; `Unit` also reads back as `Int(0)`); a `str` (or
-/// the builtin `Error`) is `Str`; an optional `T?` over a scalar or `str` core
-/// is `Opt`; a `Result` is `Res` (only as a *return* value so far — optionals
-/// and results can't be passed as arguments yet). A `struct` of scalar/`str`
-/// fields is `Struct`, and a `variant` whose active case's payload is all
-/// scalar/`str` is `Variant` — both marshal in *and* out. An array of any
-/// marshalable element type comes back as `Array` (return-only for now). Sets and
-/// dicts aren't marshalable yet.
+/// the builtin `Error`) is `Str`; an optional is `Opt`, a `Result` is `Res`, a
+/// `struct` is `Struct`, a `variant` is `Variant`, and an array is `Array`.
+///
+/// Every variant marshals in *both* directions, and by the same rule in each:
+/// whatever [`check_ffi_return`] accepts as a return type can also be passed as
+/// an argument (built by [`ffi_arg_abi`]), to any nesting depth — a `Note[]` of
+/// `{ message: str, span: Span }` goes in as readily as it comes out. The two
+/// exceptions are a *recursive* (boxed) type, which the host has no way to
+/// allocate, and sets/dicts, which aren't marshalable in either direction.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FfiValue {
     /// A scalar AIPL value at its `i64` ABI.
@@ -3061,18 +3078,18 @@ pub enum FfiValue {
     /// whatever [`check_ffi_return`] accepted for that side.
     Res(Result<Box<FfiValue>, Box<FfiValue>>),
     /// An AIPL `struct`: its fields in declaration order, each a `(name, value)`.
-    /// Returned through a hidden sret pointer (like an optional). Fields are
-    /// scalars (`Int`) or `str` (`Str`) for now — see [`Compilation::call_values`].
+    /// Passed and returned through a hidden sret pointer (like an optional). A
+    /// field may itself be any marshalable value, composites included.
     Struct(Vec<(String, FfiValue)>),
     /// An AIPL `variant` (sum type): the active case's constructor name plus its
     /// payload values in positional order (empty for a nullary case). Passed and
-    /// returned through a hidden sret pointer, like a struct. Each payload value
-    /// is a scalar (`Int`) or `str` (`Str`) — see [`Compilation::call_values`].
+    /// returned through a hidden sret pointer, like a struct. A payload value may
+    /// itself be any marshalable value.
     Variant(String, Vec<FfiValue>),
     /// An AIPL array `T[]`: its elements in order. Each element is marshaled by
     /// the array's element type — an `Int`/`Str`/`Struct`/`Variant`/`Array`/… as
-    /// appropriate (a `char[]` comes back as an `Array` of `Int` codepoints).
-    /// Return-only for now (arrays can't be passed as arguments yet).
+    /// appropriate (a `char[]` is an `Array` of `Int` codepoints, and a `bool[]`
+    /// an `Array` of `Int` `0`/`1`, both directions).
     Array(Vec<FfiValue>),
 }
 
@@ -5261,17 +5278,20 @@ impl Compilation {
         Ok(unsafe { invoke(ptr, args) })
     }
 
-    /// Call AIPL function `name` from Rust, marshaling `str` as well as scalars
-    /// (see [`FfiValue`]). Each argument's [`FfiValue`] variant must match the
-    /// parameter type — `Int` for `i64`/`bool`/`char`, `Str` for `str` — and the
-    /// return is marshaled by the function's declared return type. Like [`call`],
-    /// it rejects a missing/mutating/wrong-arity function or an unmarshalable
-    /// (array/struct/…) parameter or return.
+    /// Call AIPL function `name` from Rust, marshaling composites as well as
+    /// scalars (see [`FfiValue`]). Each argument's [`FfiValue`] variant must
+    /// match the parameter type — `Int` for `i64`/`bool`/`char`, `Str` for `str`,
+    /// `Array` for an array, and so on, to any nesting depth — and the return is
+    /// marshaled by the function's declared return type. Like [`call`], it
+    /// rejects a missing/mutating/wrong-arity function, and it rejects any
+    /// parameter or return type the FFI can't marshal (a set, a dict, a recursive
+    /// type) or an argument whose shape doesn't match its parameter.
     ///
-    /// A `str` argument is *borrowed* for the duration of the call: the host owns
-    /// the backing buffer (passed with a static refcount so the callee never
-    /// frees it) and releases it on return. Don't write an AIPL function that
-    /// stashes a `str` argument somewhere outliving the call.
+    /// Every heap value the host builds for an argument — a `str`, an array block,
+    /// the strings inside one — is *borrowed* for the duration of the call: the
+    /// host owns the buffer (passed with a static refcount, so the callee neither
+    /// frees nor mutates it in place) and releases it on return. Don't write an
+    /// AIPL function that stashes an argument somewhere outliving the call.
     ///
     /// [`call`]: Compilation::call
     pub fn call_values(&self, name: &str, args: &[FfiValue]) -> Result<FfiValue, Error> {
@@ -5314,184 +5334,18 @@ impl Compilation {
         // buffer (same sret shape as a struct return).
         let ret_variant = ffi_variant_layout(&info.return_ty, &self.structs);
 
-        // Marshal each argument to its `i64` ABI, validating the variant against
-        // the parameter type. A heap `str` buffer the host allocates is recorded
-        // in `to_free` to release after the call. Struct buffers are kept alive
-        // in `struct_bufs` until after `invoke` (the ABI passes a pointer).
+        // Marshal each argument to its `i64` ABI, validating the value against
+        // the parameter type. Every buffer this allocates — heap `str`s, array
+        // blocks, and the composite buffers the ABI passes by pointer — lives in
+        // `bufs` until it drops at the end of this function, which is after
+        // `invoke` and after the return value has been copied out.
+        let mut bufs = ArgBufs::default();
         let mut abi: Vec<i64> = Vec::with_capacity(args.len());
-        let mut to_free: Vec<(*mut u8, usize)> = Vec::new();
-        let mut struct_bufs: Vec<Vec<u8>> = Vec::new();
         for (i, (p, a)) in info.params.iter().zip(args).enumerate() {
-            match a {
-                FfiValue::Int(v) if is_ffi_scalar(p) => abi.push(*v),
-                FfiValue::Str(s) if is_str_repr(p) => {
-                    let (val, heap) = build_borrowed_str(s.as_bytes());
-                    if let Some(buf) = heap {
-                        to_free.push(buf);
-                    }
-                    abi.push(val);
-                }
-                FfiValue::Struct(fields) => {
-                    // Collect layout info (clone to end the borrow of self.structs).
-                    let (buf_size, field_specs) = match ffi_struct_layout(p, &self.structs) {
-                        Some(layout) => {
-                            let specs = layout
-                                .fields
-                                .iter()
-                                .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
-                                .collect::<Vec<_>>();
-                            (layout.size as usize, specs)
-                        }
-                        None => {
-                            for (header, content_len) in std::mem::take(&mut to_free) {
-                                unsafe { free_dynamic_string(header, content_len) };
-                            }
-                            return Err(Error::msg(format!(
-                                "fn {name:?} parameter {i} is {}; pass it as the matching \
-                                 FfiValue (Int for i64/bool/char, Str for str, Struct for struct)",
-                                type_name(p)
-                            )));
-                        }
-                    };
-                    if fields.len() != field_specs.len() {
-                        for (header, content_len) in std::mem::take(&mut to_free) {
-                            unsafe { free_dynamic_string(header, content_len) };
-                        }
-                        return Err(Error::msg(format!(
-                            "fn {name:?} parameter {i}: struct {} has {} field(s), got {}",
-                            type_name(p),
-                            field_specs.len(),
-                            fields.len()
-                        )));
-                    }
-                    let mut buf = vec![0u8; buf_size];
-                    for ((fname, fval), (fl_name, fl_offset, fl_ty)) in
-                        fields.iter().zip(field_specs.iter())
-                    {
-                        if fname != fl_name {
-                            for (header, content_len) in std::mem::take(&mut to_free) {
-                                unsafe { free_dynamic_string(header, content_len) };
-                            }
-                            return Err(Error::msg(format!(
-                                "fn {name:?} parameter {i}: expected field {:?}, got {:?}",
-                                fl_name, fname
-                            )));
-                        }
-                        match fval {
-                            FfiValue::Int(v) if is_ffi_scalar(fl_ty) => {
-                                let off = *fl_offset as usize;
-                                buf[off..off + 8].copy_from_slice(&v.to_ne_bytes());
-                            }
-                            _ => {
-                                for (header, content_len) in std::mem::take(&mut to_free) {
-                                    unsafe { free_dynamic_string(header, content_len) };
-                                }
-                                return Err(Error::msg(format!(
-                                    "fn {name:?} parameter {i}, field {:?} is {}; only \
-                                     i64/bool/char fields can be passed in a FfiValue::Struct",
-                                    fl_name,
-                                    type_name(fl_ty)
-                                )));
-                            }
-                        }
-                    }
-                    struct_bufs.push(buf);
-                    abi.push(struct_bufs.last().unwrap().as_ptr() as i64);
-                }
-                FfiValue::Variant(case_name, payload) => {
-                    // Collect layout info (clone to end the borrow of self.structs):
-                    // the whole variant's size, and the active case's tag + field
-                    // (offset, ty) specs.
-                    let (buf_size, tag, field_specs) = match ffi_variant_layout(p, &self.structs) {
-                        Some(layout) => match layout.case(case_name) {
-                            Some((tag, case)) => {
-                                let specs = case
-                                    .fields
-                                    .iter()
-                                    .map(|f| (f.offset, f.ty.clone()))
-                                    .collect::<Vec<_>>();
-                                (layout.size as usize, tag, specs)
-                            }
-                            None => {
-                                for (header, content_len) in std::mem::take(&mut to_free) {
-                                    unsafe { free_dynamic_string(header, content_len) };
-                                }
-                                return Err(Error::msg(format!(
-                                    "fn {name:?} parameter {i}: variant {} has no case {:?}",
-                                    type_name(p),
-                                    case_name
-                                )));
-                            }
-                        },
-                        None => {
-                            for (header, content_len) in std::mem::take(&mut to_free) {
-                                unsafe { free_dynamic_string(header, content_len) };
-                            }
-                            return Err(Error::msg(format!(
-                                "fn {name:?} parameter {i} is {}; pass it as the matching FfiValue \
-                                 (Int for i64/bool/char, Str for str, Struct for struct, Variant \
-                                 for variant)",
-                                type_name(p)
-                            )));
-                        }
-                    };
-                    if payload.len() != field_specs.len() {
-                        for (header, content_len) in std::mem::take(&mut to_free) {
-                            unsafe { free_dynamic_string(header, content_len) };
-                        }
-                        return Err(Error::msg(format!(
-                            "fn {name:?} parameter {i}: variant {} case {:?} takes {} payload \
-                             value(s), got {}",
-                            type_name(p),
-                            case_name,
-                            field_specs.len(),
-                            payload.len()
-                        )));
-                    }
-                    // Tag at offset 0, then each payload value at its field offset.
-                    let mut buf = vec![0u8; buf_size];
-                    buf[0..8].copy_from_slice(&(tag as i64).to_ne_bytes());
-                    for (pval, (fl_offset, fl_ty)) in payload.iter().zip(field_specs.iter()) {
-                        let off = *fl_offset as usize;
-                        match pval {
-                            FfiValue::Int(v) if is_ffi_scalar(fl_ty) => {
-                                buf[off..off + 8].copy_from_slice(&v.to_ne_bytes());
-                            }
-                            FfiValue::Str(s) if is_str_repr(fl_ty) => {
-                                let (val, heap) = build_borrowed_str(s.as_bytes());
-                                if let Some(h) = heap {
-                                    to_free.push(h);
-                                }
-                                buf[off..off + 8].copy_from_slice(&val.to_ne_bytes());
-                            }
-                            _ => {
-                                for (header, content_len) in std::mem::take(&mut to_free) {
-                                    unsafe { free_dynamic_string(header, content_len) };
-                                }
-                                return Err(Error::msg(format!(
-                                    "fn {name:?} parameter {i}: variant {} case {:?} payload is \
-                                     {}; only i64/bool/char and str payloads can be passed in a \
-                                     FfiValue::Variant",
-                                    type_name(p),
-                                    case_name,
-                                    type_name(fl_ty)
-                                )));
-                            }
-                        }
-                    }
-                    struct_bufs.push(buf);
-                    abi.push(struct_bufs.last().unwrap().as_ptr() as i64);
-                }
-                _ => {
-                    // Release any buffers earlier `str` args already allocated.
-                    for (header, content_len) in std::mem::take(&mut to_free) {
-                        unsafe { free_dynamic_string(header, content_len) };
-                    }
-                    return Err(Error::msg(format!(
-                        "fn {name:?} parameter {i} is {}; pass it as the matching FfiValue \
-                         (Int for i64/bool/char, Str for str, Struct for struct)",
-                        type_name(p)
-                    )));
+            match ffi_arg_abi(p, a, &self.structs, &mut bufs) {
+                Ok(word) => abi.push(word),
+                Err(why) => {
+                    return Err(Error::msg(format!("fn {name:?} parameter {i} {why}")));
                 }
             }
         }
@@ -5512,9 +5366,6 @@ impl Compilation {
             sret_abi.push(sret_buf.as_mut_ptr() as i64);
             sret_abi.extend_from_slice(&abi);
             if sret_abi.len() > 6 {
-                for (header, content_len) in to_free {
-                    unsafe { free_dynamic_string(header, content_len) };
-                }
                 return Err(Error::msg(format!(
                     "fn {name:?} has too many parameters for an optional return; the FFI \
                      supports up to 5 (plus the hidden return pointer)"
@@ -5527,9 +5378,6 @@ impl Compilation {
             let result = unsafe {
                 read_ffi_optional(sret_buf.as_ptr(), &info.return_ty, true, &self.structs)
             };
-            for (header, content_len) in to_free {
-                unsafe { free_dynamic_string(header, content_len) };
-            }
             return Ok(result);
         }
 
@@ -5546,9 +5394,6 @@ impl Compilation {
             sret_abi.push(sret_buf.as_mut_ptr() as i64);
             sret_abi.extend_from_slice(&abi);
             if sret_abi.len() > 6 {
-                for (header, content_len) in to_free {
-                    unsafe { free_dynamic_string(header, content_len) };
-                }
                 return Err(Error::msg(format!(
                     "fn {name:?} has too many parameters for a result return; the FFI \
                      supports up to 5 (plus the hidden return pointer)"
@@ -5558,9 +5403,6 @@ impl Compilation {
             let _ = unsafe { invoke(ptr, &sret_abi) };
             let result =
                 unsafe { read_ffi_result(sret_buf.as_ptr(), &info.return_ty, true, &self.structs) };
-            for (header, content_len) in to_free {
-                unsafe { free_dynamic_string(header, content_len) };
-            }
             return Ok(result);
         }
 
@@ -5574,9 +5416,6 @@ impl Compilation {
             sret_abi.push(sret_buf.as_mut_ptr() as i64);
             sret_abi.extend_from_slice(&abi);
             if sret_abi.len() > 6 {
-                for (header, content_len) in to_free {
-                    unsafe { free_dynamic_string(header, content_len) };
-                }
                 return Err(Error::msg(format!(
                     "fn {name:?} has too many parameters for a struct return; the FFI supports \
                      up to 5 (plus the hidden return pointer)"
@@ -5587,9 +5426,6 @@ impl Compilation {
             let result = unsafe {
                 read_ffi_struct(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
             };
-            for (header, content_len) in to_free {
-                unsafe { free_dynamic_string(header, content_len) };
-            }
             return Ok(result);
         }
 
@@ -5603,9 +5439,6 @@ impl Compilation {
             sret_abi.push(sret_buf.as_mut_ptr() as i64);
             sret_abi.extend_from_slice(&abi);
             if sret_abi.len() > 6 {
-                for (header, content_len) in to_free {
-                    unsafe { free_dynamic_string(header, content_len) };
-                }
                 return Err(Error::msg(format!(
                     "fn {name:?} has too many parameters for a variant return; the FFI supports \
                      up to 5 (plus the hidden return pointer)"
@@ -5616,9 +5449,6 @@ impl Compilation {
             let result = unsafe {
                 read_ffi_variant(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
             };
-            for (header, content_len) in to_free {
-                unsafe { free_dynamic_string(header, content_len) };
-            }
             return Ok(result);
         }
 
@@ -5631,17 +5461,14 @@ impl Compilation {
         // handed us one reference on the block, which `read_ffi_array` releases.
         if let Type::Array(elem) = &info.return_ty {
             let result = unsafe { read_ffi_array(r, elem, true, &self.structs) };
-            for (header, content_len) in to_free {
-                unsafe { free_dynamic_string(header, content_len) };
-            }
             return Ok(result);
         }
 
         let result = if ret_is_str {
             // The callee handed us a reference on the returned `str` (its body
-            // retained it before dropping its scope). Copy the bytes out *before*
-            // freeing any argument buffer — an identity `fn(s) -> s` returns one
-            // of them — then release our reference and free the borrowed buffers.
+            // retained it before dropping its scope). Copy the bytes out here,
+            // while the argument buffers are still alive — an identity
+            // `fn(s) -> s` returns one of them — then release our reference.
             let rv = r as *const u8;
             let mut buf = [0u8; 8];
             let bytes = unsafe { str_bytes(rv, &mut buf) };
@@ -5651,9 +5478,6 @@ impl Compilation {
         } else {
             FfiValue::Int(r)
         };
-        for (header, content_len) in to_free {
-            unsafe { free_dynamic_string(header, content_len) };
-        }
         Ok(result)
     }
 
@@ -5828,6 +5652,372 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
             (raw.add(STR_HEADER_SIZE) as i64, Some((raw, bytes.len())))
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// FFI argument writers.
+//
+// The mirror of the return-value readers below: given a host [`FfiValue`] and
+// the parameter's declared `Type`, produce the value the callee expects, in the
+// callee's own representation. The rule matches `check_ffi_return`'s, so an
+// argument can be any shape a return value can be.
+//
+// Everything the host builds is *borrowed*: a heap `str` or array block it
+// allocates carries `STATIC_REFCOUNT`, so every retain/release the callee
+// performs on it is a no-op and nothing the callee does can free it. The host
+// keeps ownership and frees the lot when [`ArgBufs`] drops — after the call, and
+// after the return value has been copied out (an identity `fn(s) -> s` hands
+// back an argument). The one thing a static block forbids is *in-place*
+// mutation, which the runtime's `aipl_array_push_mut` / `aipl_concat_mut` /
+// `aipl_trim_mut` guards already redirect to their copying counterparts.
+// ---------------------------------------------------------------------------
+
+/// One host-owned buffer backing a borrowed FFI argument.
+enum ArgBuf {
+    /// A heap `str` block from [`build_borrowed_str`]: its base and content length.
+    Str(*mut u8, usize),
+    /// An array block from [`ArgBufs::array_block`]: its *data* pointer (the base
+    /// plus [`HEADER_SIZE`]) and the byte capacity that sizes the deallocation.
+    Array(*mut u8, usize),
+    /// An inline composite (struct/variant/optional/result) the callee receives a
+    /// pointer to. Owned by the `Vec`, so it just has to stay alive.
+    Composite(Vec<u8>),
+}
+
+/// The host-owned buffers behind one call's borrowed arguments, freed on drop.
+/// Dropping is the *only* release path, which is what makes the early `return
+/// Err(..)`s in [`Compilation::call_values`] leak-free without a cleanup block
+/// each.
+#[derive(Default)]
+struct ArgBufs(Vec<ArgBuf>);
+
+impl ArgBufs {
+    /// A borrowed `str` value (see [`build_borrowed_str`]), keeping the heap case
+    /// alive for the call.
+    fn str_value(&mut self, s: &str) -> i64 {
+        let (val, heap) = build_borrowed_str(s.as_bytes());
+        if let Some((block, content_len)) = heap {
+            self.0.push(ArgBuf::Str(block, content_len));
+        }
+        val
+    }
+
+    /// Keep `buf` — an inline composite — alive for the call, and return the
+    /// address the callee receives. The `Vec`'s own buffer doesn't move when the
+    /// enclosing `Vec<ArgBuf>` grows, so the address stays valid.
+    fn composite(&mut self, buf: Vec<u8>) -> i64 {
+        self.0.push(ArgBuf::Composite(buf));
+        match self.0.last() {
+            Some(ArgBuf::Composite(b)) => b.as_ptr() as i64,
+            _ => unreachable!("just pushed a composite buffer"),
+        }
+    }
+
+    /// Allocate a zeroed, borrowed array block of `len` elements of `elem_size`
+    /// bytes (0 = bit-packed) and return its data pointer — the array value
+    /// itself, since a fresh block is untagged (`ArrRepr::Heap`).
+    ///
+    /// The element drop-fn is 0, and unused: the header's drop-fn only runs when
+    /// `aipl_array_dec` frees the block, which `STATIC_REFCOUNT` prevents, and
+    /// every path that *copies* an array (`push`, `slice`, `sort`, `reserve`)
+    /// takes the drop-fn for the copy from codegen rather than from this header.
+    fn array_block(&mut self, len: usize, elem_size: i64) -> *mut u8 {
+        let data = alloc_array(len, len, 0, elem_size) as *mut u8;
+        let cap_bytes = cap_bytes_for(elem_size, len);
+        unsafe {
+            // Zero the element region: a partially-written inline composite
+            // element (a `none`'s slack, a nullary variant case's payload) must
+            // read back as zeroes, and `alloc_array` leaves it uninitialized.
+            std::ptr::write_bytes(data.add(ARR_ELEMS_OFFSET), 0, cap_bytes);
+            *header_of(data) = STATIC_REFCOUNT;
+        }
+        self.0.push(ArgBuf::Array(data, cap_bytes));
+        data
+    }
+}
+
+impl Drop for ArgBufs {
+    fn drop(&mut self) {
+        for buf in &self.0 {
+            match buf {
+                ArgBuf::Str(block, content_len) => unsafe {
+                    free_dynamic_string(*block, *content_len)
+                },
+                ArgBuf::Array(data, cap_bytes) => unsafe {
+                    let layout = std::alloc::Layout::from_size_align(
+                        array_block_size(*cap_bytes),
+                        std::mem::align_of::<i64>(),
+                    )
+                    .expect("array layout");
+                    std::alloc::dealloc(data.sub(HEADER_SIZE), layout);
+                },
+                // Freed by the `Vec`'s own drop.
+                ArgBuf::Composite(_) => {}
+            }
+        }
+    }
+}
+
+/// Marshal `v` into the single `i64` the ABI passes for a parameter of type
+/// `ty`. An inline composite (struct, variant, optional, result) is written into
+/// a host buffer and passed by *pointer*, exactly as codegen passes one from a
+/// stack slot; everything else — scalars, `str`, arrays — is the value word
+/// itself. Any buffer this needs is recorded in `bufs` and outlives the call.
+///
+/// The `Err` describes the mismatch without naming the function or parameter
+/// index; [`Compilation::call_values`] prefixes those.
+fn ffi_arg_abi(
+    ty: &Type,
+    v: &FfiValue,
+    structs: &HashMap<String, TypeDef>,
+    bufs: &mut ArgBufs,
+) -> Result<i64, String> {
+    if is_composite(ty, structs) {
+        let size = sret_size(ty, structs).expect("a composite has an inline size") as usize;
+        let mut buf = vec![0u8; size.max(8)];
+        // SAFETY: `buf` is `size` zeroed bytes — the type's own inline layout.
+        unsafe { write_ffi_arg(buf.as_mut_ptr(), ty, v, structs, bufs)? };
+        return Ok(bufs.composite(buf));
+    }
+    ffi_arg_word(ty, v, structs, bufs)
+}
+
+/// Marshal `v` into the 8-byte word a value of the *pointer-like* type `ty` — a
+/// scalar, a `str`, or an array — is represented by. Composites don't come here;
+/// see [`ffi_arg_abi`].
+fn ffi_arg_word(
+    ty: &Type,
+    v: &FfiValue,
+    structs: &HashMap<String, TypeDef>,
+    bufs: &mut ArgBufs,
+) -> Result<i64, String> {
+    match v {
+        FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
+        FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
+        FfiValue::Array(elems) => match ty {
+            Type::Array(elem) => build_borrowed_array(elem, elems, structs, bufs),
+            _ => Err(mismatch(ty, v)),
+        },
+        _ => Err(mismatch(ty, v)),
+    }
+}
+
+/// The error for an [`FfiValue`] that doesn't match the parameter type it was
+/// passed for — naming both sides, since the pairing is the whole mistake.
+fn mismatch(ty: &Type, v: &FfiValue) -> String {
+    format!(
+        "is {} but was given an FfiValue::{}; pass the matching variant (Int for \
+         i64/bool/char, Str for str, Array for an array, Struct for a struct, Variant for a \
+         variant, Opt for an optional, Res for a result)",
+        type_name(ty),
+        ffi_value_kind(v)
+    )
+}
+
+/// An [`FfiValue`]'s variant name, for error messages.
+fn ffi_value_kind(v: &FfiValue) -> &'static str {
+    match v {
+        FfiValue::Int(_) => "Int",
+        FfiValue::Str(_) => "Str",
+        FfiValue::Opt(_) => "Opt",
+        FfiValue::Res(_) => "Res",
+        FfiValue::Struct(_) => "Struct",
+        FfiValue::Variant(_, _) => "Variant",
+        FfiValue::Array(_) => "Array",
+    }
+}
+
+/// Build a borrowed `T[]` value from `elems`: an array block the callee reads
+/// like any other, tagged `STATIC_REFCOUNT` so its retains and releases no-op
+/// (the `str` treatment in [`build_borrowed_str`], one level up). Each element is
+/// written in its inline representation, so an element may itself be a struct, a
+/// variant, an optional, or another array.
+///
+/// `char[]` is the one element type that shares `str`'s representation rather
+/// than using a block (see [`is_char_array`]), so it's built as packed bytes;
+/// `bool[]` is bit-packed, one bit per element.
+fn build_borrowed_array(
+    elem: &Type,
+    elems: &[FfiValue],
+    structs: &HashMap<String, TypeDef>,
+    bufs: &mut ArgBufs,
+) -> Result<i64, String> {
+    if matches!(elem, Type::Primitive(Primitive::Char)) {
+        let mut s = String::with_capacity(elems.len());
+        for e in elems {
+            match e {
+                FfiValue::Int(c) => s.push(
+                    char::from_u32(*c as u32)
+                        .ok_or_else(|| format!("char[] element {c} is not a valid codepoint"))?,
+                ),
+                other => {
+                    return Err(format!(
+                        "char[] element must be an FfiValue::Int codepoint, got FfiValue::{}",
+                        ffi_value_kind(other)
+                    ))
+                }
+            }
+        }
+        return Ok(bufs.str_value(&s));
+    }
+    let elem_size = runtime_elem_size(elem, structs);
+    let data = bufs.array_block(elems.len(), elem_size);
+    let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
+    if elem_size == ELEM_BITPACKED {
+        for (i, e) in elems.iter().enumerate() {
+            match e {
+                FfiValue::Int(b) => unsafe { write_packed_bit(base, i, *b != 0) },
+                other => {
+                    return Err(format!(
+                        "bool[] element must be an FfiValue::Int 0/1, got FfiValue::{}",
+                        ffi_value_kind(other)
+                    ))
+                }
+            }
+        }
+    } else {
+        let stride = elem_size.max(8) as usize;
+        for (i, e) in elems.iter().enumerate() {
+            // SAFETY: the block was sized for `elems.len()` elements of `stride`
+            // bytes and zeroed, so this slot is in bounds and initialized.
+            unsafe { write_ffi_arg(base.add(i * stride), elem, e, structs, bufs)? };
+        }
+    }
+    Ok(data as i64)
+}
+
+/// Write `v`, a value of type `ty`, at `dst` in the callee's inline
+/// representation — the mirror of [`read_ffi_borrowed`]. A struct/variant/
+/// optional/result is written in place, component by component; a scalar, `str`,
+/// or array is the single word at `dst`.
+///
+/// SAFETY: `dst` must point at `elem_size_of(ty)` writable bytes, zeroed (the
+/// slack past a `none`'s tag or a nullary variant case's payload is never
+/// written here, but the callee may still copy it around).
+unsafe fn write_ffi_arg(
+    dst: *mut u8,
+    ty: &Type,
+    v: &FfiValue,
+    structs: &HashMap<String, TypeDef>,
+    bufs: &mut ArgBufs,
+) -> Result<(), String> {
+    // A recursive type's value is a pointer to a refcounted heap block the host
+    // has no way to build — and passing an inline payload where one is expected
+    // would have the callee read a header off the front of our buffer.
+    if is_boxed(ty, structs) {
+        return Err(format!(
+            "is {}, a recursive type held behind a refcounted heap pointer; the FFI can't \
+             build one",
+            type_name(ty)
+        ));
+    }
+    if let Some(layout) = ffi_struct_layout(ty, structs) {
+        let FfiValue::Struct(fields) = v else {
+            return Err(mismatch(ty, v));
+        };
+        if fields.len() != layout.fields.len() {
+            return Err(format!(
+                "is struct {} with {} field(s), got {}",
+                type_name(ty),
+                layout.fields.len(),
+                fields.len()
+            ));
+        }
+        for ((name, val), f) in fields.iter().zip(layout.fields.iter()) {
+            if name != &f.name {
+                return Err(format!("expected field {:?}, got {:?}", f.name, name));
+            }
+            unsafe { write_ffi_arg(dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
+        }
+        return Ok(());
+    }
+    if let Some(layout) = ffi_variant_layout(ty, structs) {
+        let FfiValue::Variant(case_name, payload) = v else {
+            return Err(mismatch(ty, v));
+        };
+        let Some((tag, case)) = layout.case(case_name) else {
+            return Err(format!(
+                "is variant {}, which has no case {case_name:?}",
+                type_name(ty)
+            ));
+        };
+        if payload.len() != case.fields.len() {
+            return Err(format!(
+                "is variant {} whose case {case_name:?} takes {} payload value(s), got {}",
+                type_name(ty),
+                case.fields.len(),
+                payload.len()
+            ));
+        }
+        // The tag (case index) at offset 0, then each payload at its offset.
+        unsafe { std::ptr::write(dst as *mut i64, tag as i64) };
+        for (val, f) in payload.iter().zip(case.fields.iter()) {
+            unsafe { write_ffi_arg(dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
+        }
+        return Ok(());
+    }
+    if matches!(ty, Type::Optional(_)) {
+        // Flattened `{ i64 tag, core }`: the tag counts the `some` layers (`0` =
+        // `none`) and every layer shares the one core slot, so peel `Opt`s and
+        // `Optional`s together and write the depth reached. See
+        // `read_ffi_optional_tag`, which reconstructs the nesting from it.
+        let (mut cur_ty, mut cur_v, mut depth) = (ty, v, 0i64);
+        while let Type::Optional(inner) = cur_ty {
+            let FfiValue::Opt(o) = cur_v else {
+                return Err(mismatch(cur_ty, cur_v));
+            };
+            match o {
+                // A `none` at this depth: the tag alone, no core.
+                None => {
+                    unsafe { std::ptr::write(dst as *mut i64, depth) };
+                    return Ok(());
+                }
+                Some(inner_v) => {
+                    depth += 1;
+                    cur_ty = inner;
+                    cur_v = inner_v;
+                }
+            }
+        }
+        unsafe {
+            std::ptr::write(dst as *mut i64, depth);
+            return write_ffi_arg(
+                dst.add(OPT_VALUE_OFFSET as usize),
+                cur_ty,
+                cur_v,
+                structs,
+                bufs,
+            );
+        }
+    }
+    if let Type::Result(ok, err) = ty {
+        // `{ i64 tag, value }` like an optional, but the tag is `1` = Ok / `0` =
+        // Err and the slot is sized to the wider side. A `Unit` side (`!Error`'s
+        // ok case) has no value to write — the zeroed slot stands in for it.
+        let FfiValue::Res(r) = v else {
+            return Err(mismatch(ty, v));
+        };
+        let (tag, side, payload) = match r {
+            Ok(p) => (1i64, ok.as_ref(), p),
+            Err(p) => (0i64, err.as_ref(), p),
+        };
+        unsafe { std::ptr::write(dst as *mut i64, tag) };
+        if is_unit(side) {
+            return Ok(());
+        }
+        return unsafe {
+            write_ffi_arg(
+                dst.add(OPT_VALUE_OFFSET as usize),
+                side,
+                payload,
+                structs,
+                bufs,
+            )
+        };
+    }
+    let word = ffi_arg_word(ty, v, structs, bufs)?;
+    unsafe { std::ptr::write(dst as *mut i64, word) };
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

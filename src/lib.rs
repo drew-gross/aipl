@@ -123,11 +123,13 @@ impl Engine {
         self.comp.call(name, args)
     }
 
-    /// Call AIPL function `name`, marshaling `str` as well as scalars (see
+    /// Call AIPL function `name`, marshaling composites as well as scalars (see
     /// [`FfiValue`]). Each argument's variant must match the parameter type —
-    /// `Int` for `i64`/`bool`/`char`, `Str` for `str` — and the result is
-    /// marshaled by the function's declared return type. A `str` argument is
-    /// borrowed for the duration of the call.
+    /// `Int` for `i64`/`bool`/`char`, `Str` for `str`, `Array` for an array, and
+    /// so on for structs, variants, optionals and results, to any nesting depth —
+    /// and the result is marshaled by the function's declared return type. Heap
+    /// values the host builds for an argument are borrowed for the duration of
+    /// the call.
     ///
     /// ```no_run
     /// let src = "import { wrapping_add as +, ==, && } from builtins;\n\

@@ -2605,6 +2605,14 @@ pub extern "C" fn aipl_array_push_mut(
     elem_size: i64,
 ) -> *const u8 {
     let a = aipl_arr_ensure_heap(a);
+    // A `STATIC_REFCOUNT` block is not ours to grow or write into, however
+    // unaliased codegen proved the binding to be: it has no owner to answer to
+    // and may live in read-only data. Copy instead, exactly as `aipl_concat_mut`
+    // does for a static string literal. Mirrors the JIT runtime's guard, which
+    // is what keeps a host-lent FFI argument array off this path.
+    if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
+        return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
+    }
     unsafe {
         let old_len = if a.is_null() { 0 } else { array_len(a) };
         let cap_bytes = if a.is_null() { 0 } else { array_cap_bytes(a) };

@@ -602,15 +602,362 @@ fn call_values_marshals_optional_array_return() {
     assert_eq!(e.call_values("maybe", &[Int(0)]).unwrap(), Opt(None));
 }
 
+/// Array *parameters* over the same spread of element types `ARRAY_SRC` returns:
+/// scalars, `str`, `bool` (bit-packed), `char` (str-shaped), nested arrays,
+/// optionals, structs, and variants. Each function consumes the array in a way
+/// that reads every element, so a mis-sized stride or a wrong tag shows up as a
+/// wrong answer rather than passing unnoticed.
+const ARRAY_PARAM_SRC: &str = "\
+import { len, push, wrapping_add as +, wrapping_sub as -, +++, == } from builtins;
+struct Span { start: i64, end: i64 }
+variant Token = Eof | Ident(str) | Count(i64)
+
+pub fn total(xs: i64[]) -> i64 {
+    mut sum = 0;
+    for (let x : xs) {
+        set sum = sum + x;
+    }
+    sum
+}
+pub fn count(xs: i64[]) -> u64 { len(xs) }
+pub fn concat_all(parts: str[]) -> str {
+    mut out = \"\";
+    for (let p : parts) {
+        set out = out +++ p;
+    }
+    out
+}
+pub fn echo(parts: str[]) -> str[] { parts }
+pub fn trues(bs: bool[]) -> i64 {
+    mut n = 0;
+    for (let b : bs) {
+        if (b) {
+            set n = n + 1;
+        };
+    }
+    n
+}
+pub fn echo_chars(cs: char[]) -> char[] { cs }
+pub fn char_count(cs: char[]) -> u64 { len(cs) }
+pub fn grid_total(grid: i64[][]) -> i64 {
+    mut sum = 0;
+    for (let row : grid) {
+        set sum = sum + total(row);
+    }
+    sum
+}
+pub fn somes(xs: i64?[]) -> i64 {
+    mut n = 0;
+    for (let x : xs) {
+        let add = match (x) {
+            some(v) => v,
+            none => 100,
+        };
+        set n = n + add;
+    }
+    n
+}
+pub fn span_total(ss: Span[]) -> i64 {
+    mut n = 0;
+    for (let s : ss) {
+        set n = n + (s.end - s.start);
+    }
+    n
+}
+pub fn describe_all(ts: Token[]) -> str {
+    mut out = \"\";
+    for (let t : ts) {
+        let piece = match (t) {
+            Eof => \"<eof>\",
+            Ident(s) => s,
+            Count(n) => \"<count>\",
+        };
+        set out = out +++ piece;
+    }
+    out
+}
+pub fn appended(xs: i64[], v: i64) -> i64[] {
+    mut ys = xs;
+    set ys.push(v);
+    ys
+}";
+
 #[test]
-fn call_values_rejects_array_argument() {
-    // Arrays marshal *out* but not *in* yet: passing an `Array` argument is a
-    // clear error, not a silent misread.
-    let e = Engine::compile("pub fn len(xs: i64[]) -> i64 { 0 }").unwrap();
+fn call_values_marshals_array_params() {
+    // An array argument is a host-built block the callee borrows: `STATIC_REFCOUNT`
+    // so its retains/releases no-op, elements written in the callee's own inline
+    // representation. Every element type the FFI marshals *out* also goes in.
+    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    use aipl::FfiValue::{Array, Int, Opt, Str};
+
+    // Scalars, and the empty array (a real zero-length block, so `len` is 0).
+    assert_eq!(
+        e.call_values("total", &[Array(vec![Int(10), Int(20), Int(30)])])
+            .unwrap(),
+        Int(60)
+    );
+    assert_eq!(e.call_values("count", &[Array(vec![])]).unwrap(), Int(0));
+    assert_eq!(
+        e.call_values("count", &[Array(vec![Int(1), Int(2)])])
+            .unwrap(),
+        Int(2)
+    );
+
+    // `str[]`: a mix of inline (<= 7 bytes) and borrowed-heap element strings.
+    assert_eq!(
+        e.call_values(
+            "concat_all",
+            &[Array(vec![
+                Str("alpha".into()),
+                Str("-beta is a longer word-".into()),
+                Str("gamma".into()),
+            ])]
+        )
+        .unwrap(),
+        Str("alpha-beta is a longer word-gamma".into())
+    );
+
+    // Handing the argument straight back: the returned block is ours, so the
+    // bytes have to be copied out before the argument buffers are freed.
+    assert_eq!(
+        e.call_values(
+            "echo",
+            &[Array(vec![
+                Str("first element".into()),
+                Str("second".into())
+            ])]
+        )
+        .unwrap(),
+        Array(vec![Str("first element".into()), Str("second".into())])
+    );
+
+    // `bool[]` is bit-packed — 9 elements spill into a second byte.
+    assert_eq!(
+        e.call_values(
+            "trues",
+            &[Array(vec![
+                Int(1),
+                Int(0),
+                Int(1),
+                Int(1),
+                Int(0),
+                Int(1),
+                Int(0),
+                Int(1),
+                Int(1),
+            ])]
+        )
+        .unwrap(),
+        Int(6)
+    );
+
+    // `char[]` shares `str`'s representation: codepoints in, packed UTF-8 bytes
+    // in the block, decoded back to codepoints on the way out (`é` is two bytes,
+    // so a byte/codepoint mixup wouldn't survive the round trip).
+    let chars = Array(vec![Int('a' as i64), Int('b' as i64), Int('é' as i64)]);
+    assert_eq!(
+        e.call_values("echo_chars", &[chars.clone()]).unwrap(),
+        chars
+    );
+    // `len` on a `char[]` is `str`'s byte length, representation and all — `é`
+    // is two of the four bytes here.
+    assert_eq!(e.call_values("char_count", &[chars]).unwrap(), Int(4));
+
+    // Nested arrays: each element is itself a block, built the same way.
+    assert_eq!(
+        e.call_values(
+            "grid_total",
+            &[Array(vec![
+                Array(vec![Int(1), Int(2)]),
+                Array(vec![]),
+                Array(vec![Int(3)]),
+            ])]
+        )
+        .unwrap(),
+        Int(6)
+    );
+
+    // `i64?[]`: each element is an inline `{ tag, core }` (a `none` counts 100,
+    // so a mis-tagged element can't pass unnoticed).
+    let some = |v: i64| Opt(Some(Box::new(Int(v))));
+    assert_eq!(
+        e.call_values("somes", &[Array(vec![some(1), Opt(None), some(3)])])
+            .unwrap(),
+        Int(104)
+    );
+}
+
+#[test]
+fn call_values_marshals_composite_array_params() {
+    // Struct and variant elements: written inline at the element stride, field
+    // by field (a `str` payload becomes a borrowed value word inside the block).
+    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
+
+    let span = |a, b| Struct(vec![("start".into(), Int(a)), ("end".into(), Int(b))]);
+    assert_eq!(
+        e.call_values("span_total", &[Array(vec![span(1, 4), span(10, 12)])])
+            .unwrap(),
+        Int(5)
+    );
+
+    // The token-stream shape: nullary, `str`-payload, and scalar-payload cases.
+    assert_eq!(
+        e.call_values(
+            "describe_all",
+            &[Array(vec![
+                Variant("Eof".into(), vec![]),
+                Variant("Ident".into(), vec![Str("a heap identifier".into())]),
+                Variant("Count".into(), vec![Int(7)]),
+            ])]
+        )
+        .unwrap(),
+        Str("<eof>a heap identifier<count>".into())
+    );
+}
+
+#[test]
+fn array_param_grows_into_a_copy() {
+    // `mut ys = xs; set ys.push(v)` — the callee grows the array it was handed.
+    // The host's block is exactly `len` elements with no spare capacity, so a
+    // push that mistook it for its own would write past the end or `realloc` it
+    // out from under the host's own free. (Codegen sends this through the
+    // *copying* `aipl_array_push`: an FFI entry is the borrow form of the
+    // function, whose parameter isn't moved in and so isn't exclusive.)
+    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
     use aipl::FfiValue::{Array, Int};
+
+    let xs = Array(vec![Int(1), Int(2), Int(3)]);
+    assert_eq!(
+        e.call_values("appended", &[xs.clone(), Int(4)]).unwrap(),
+        Array(vec![Int(1), Int(2), Int(3), Int(4)])
+    );
+    // The same elements passed again still read back as themselves.
+    assert_eq!(e.call_values("total", &[xs]).unwrap(), Int(6));
+}
+
+#[test]
+fn call_values_marshals_composite_params() {
+    // The input side takes whatever the output side does, to any depth: a struct
+    // field may be a `str`, a nested struct, or an array; and an optional or a
+    // result is passed by pointer as its flattened `{ tag, core }`, the same
+    // buffer shape the sret path reads a return value out of.
+    let src = "\
+import { len, wrapping_add as +, wrapping_sub as - } from builtins;
+struct Span { start: i64, end: i64 }
+struct Note { message: str, span: Span, tags: i64[] }
+pub fn note_size(n: Note) -> u64 { len(n.message) + len(n.tags) }
+pub fn note_width(n: Note) -> i64 { n.span.end - n.span.start }
+pub fn note_text(n: Note) -> str { n.message }
+pub fn span_end(s: Span?) -> i64 {
+    match (s) {
+        some(v) => v.end,
+        none => -1,
+    }
+}
+pub fn depth(n: i64??) -> i64 {
+    match (n) {
+        some(inner) => match (inner) {
+            some(v) => v,
+            none => -1,
+        },
+        none => -2,
+    }
+}
+pub fn or_zero(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => 0,
+    }
+}
+pub fn why(r: i64!str) -> str {
+    match (r) {
+        ok(v) => \"\",
+        err(e) => e,
+    }
+}";
+    let e = Engine::compile(src).unwrap();
+    use aipl::FfiValue::{Array, Int, Opt, Res, Str, Struct};
+
+    // A struct whose fields are a heap `str`, a nested struct, and an array.
+    let note = Struct(vec![
+        ("message".into(), Str("a heap message".into())),
+        (
+            "span".into(),
+            Struct(vec![("start".into(), Int(2)), ("end".into(), Int(5))]),
+        ),
+        ("tags".into(), Array(vec![Int(1), Int(2)])),
+    ]);
+    assert_eq!(
+        e.call_values("note_size", &[note.clone()]).unwrap(),
+        Int(14 + 2)
+    );
+    assert_eq!(
+        e.call_values("note_width", &[note.clone()]).unwrap(),
+        Int(3)
+    );
+    assert_eq!(
+        e.call_values("note_text", &[note]).unwrap(),
+        Str("a heap message".into())
+    );
+
+    // Optionals: `some(struct)` / `none`, and a nested `i64??` whose tag counts
+    // the `some` layers (2 / 1 / 0).
+    let some = |v| Opt(Some(Box::new(v)));
+    assert_eq!(
+        e.call_values(
+            "span_end",
+            &[some(Struct(vec![
+                ("start".into(), Int(1)),
+                ("end".into(), Int(9))
+            ]))]
+        )
+        .unwrap(),
+        Int(9)
+    );
+    assert_eq!(e.call_values("span_end", &[Opt(None)]).unwrap(), Int(-1));
+    assert_eq!(
+        e.call_values("depth", &[some(some(Int(7)))]).unwrap(),
+        Int(7)
+    );
+    assert_eq!(e.call_values("depth", &[some(Opt(None))]).unwrap(), Int(-1));
+    assert_eq!(e.call_values("depth", &[Opt(None)]).unwrap(), Int(-2));
+
+    // Results: each side written at the shared value offset, tagged 1 / 0.
+    assert_eq!(
+        e.call_values("or_zero", &[Res(Ok(Box::new(Int(42))))])
+            .unwrap(),
+        Int(42)
+    );
+    assert_eq!(
+        e.call_values("or_zero", &[Res(Err(Box::new(Str("nope".into()))))])
+            .unwrap(),
+        Int(0)
+    );
+    assert_eq!(
+        e.call_values(
+            "why",
+            &[Res(Err(Box::new(Str("a long failure reason".into()))))]
+        )
+        .unwrap(),
+        Str("a long failure reason".into())
+    );
+}
+
+#[test]
+fn call_values_validates_array_params() {
+    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    use aipl::FfiValue::{Array, Int, Str};
+
+    // An `Array` for a non-array param, and a non-`Array` for an array param.
+    assert!(e.call_values("count", &[Int(3)]).is_err());
     assert!(e
-        .call_values("len", &[Array(vec![Int(1), Int(2)])])
+        .call_values("total", &[Array(vec![Str("not an int".into())])])
         .is_err());
+    // An element of the wrong shape is caught before the call, not written as a
+    // misread word.
+    assert!(e.call_values("span_total", &[Array(vec![Int(1)])]).is_err());
+    assert!(e.call_values("grid_total", &[Array(vec![Int(1)])]).is_err());
 }
 
 #[test]
