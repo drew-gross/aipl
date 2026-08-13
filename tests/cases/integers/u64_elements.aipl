@@ -18,44 +18,51 @@ import {
 // widths, which round-trip the same way.
 
 fn sum(xs: u64[]) -> u64 {
-    mut total = u64(0);
+    mut total: u64 = 0;
     for (let x : xs) {
         set total = total + x;
     }
     total
 }.test({
-    assert(sum([u64(1), u64(2), u64(3)]) == u64(6));
-    assert(sum([]) == u64(0));
+    assert(sum([1, 2, 3]) == 6);
+    assert(sum([]) == 0);
 })
 
 fn first(xs: u64[]) -> u64? { xs[0] }.test({
-    assert(first([u64(7)]) == some(u64(7)));
+    assert(first([7]) == some(7));
     assert(first([]) == none);
-    assert(first([]).value_or(u64(99)) == u64(99));
+    assert(first([]).value_or(99) == 99);
 })
 
 fn grown() -> u64[] {
-    mut xs = [u64(1)];
-    set xs.push(u64(2));
+    mut xs: u64[] = [1];
+    set xs.push(2);
     xs
 }.test({
-    assert(grown() == [u64(1), u64(2)]);
-    assert(grown().len() == u64(2));
+    assert(grown() == [1, 2]);
+    assert(grown().len() == 2);
 })
 
 // The value that distinguishes unsigned from signed: `u64::MAX` shares its bit
 // pattern with `-1`. It must *render* as a huge number and *sort* last.
-fn u64_max() -> u64 { u64(0) - u64(1) }.test({
+fn u64_max() -> u64 {
+    let m: u64 = 0 - 1; // -1's bit pattern, read unsigned
+    m
+}.test({
     assert(u64_max().to_str() == "18446744073709551615");
-    assert([u64_max(), u64(1)].sort() == [u64(1), u64_max()]);
+
+    // Named so both literals are `u64`: an array literal takes its element
+    // type from its *first* element, which a later one cannot retype.
+    let one: u64 = 1;
+    assert([u64_max(), one].sort() == [one, u64_max()]);
     // The signed contrast: the same bit pattern as `i64` sorts first.
     assert([0 - 1, 1].sort() == [0 - 1, 1]);
 })
 
 fn main() !prints {
-    print(to_str([u64(3), u64(1), u64(2)].sort()));
+    print(to_str([3, 1, 2].sort()));
     print(to_str([u64_max()]));
-    print(sum([u64(1), u64(2)]).to_str());
+    print(sum([1, 2]).to_str());
 }
 --- stdout ---
 [1, 2, 3]
@@ -66,10 +73,10 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 265
-instructions executed: 730
-binary size: 3160
-  code: 1524
-  data: 67
-  metadata: 1569
+instructions executed: 728
+binary size: 4272
+  code: 2192
+  data: 139
+  metadata: 1941
 --- monomorphizations ---
 main

@@ -34,7 +34,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
         // `x` equal to what is already placed walks past it — that is what
         // makes the sort stable. (A `count_while` would read better, but a
         // function-typed parameter cannot be captured into a nested lambda.)
-        mut k = u64(0);
+        mut k: u64 = 0;
         mut placed = false;
         while (!placed && k < out.len()) {
             let step = match (out[k]) {
@@ -44,7 +44,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
             if (step) {
                 set placed = true;
             } else {
-                set k = k + u64(1);
+                set k = k + 1;
             };
         }
         set out = [..out[..k], x, ..out[k..]];

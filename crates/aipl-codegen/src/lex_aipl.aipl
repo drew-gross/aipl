@@ -652,11 +652,11 @@ allocations: 4723
 deallocations: 4723
 reallocations: 0
 bytes allocated: 275592
-instructions executed: 777998
-binary size: 199136
-  code: 124736
+instructions executed: 778930
+binary size: 199592
+  code: 124976
   data: 7100
-  metadata: 67300
+  metadata: 67516
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam17
 __builtin_count_while$char$s0$lam28
@@ -681,6 +681,7 @@ __m1__between_len
 __m1__delimited_len
 __m1__finalize_template$AiplTok
 __m1__float_len
+__m1__ilen
 __m1__interp_scan$AiplTok
 __m1__lex$AiplTok
 __m1__lex_step$AiplTok

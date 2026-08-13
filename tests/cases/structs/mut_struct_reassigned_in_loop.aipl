@@ -58,7 +58,7 @@ fn run() -> u64 {
 
 fn main() !prints {
     // Exactly one iteration runs, pushing exactly one element.
-    print(if (run() == u64(1)) { "one element" } else { "corrupted" });
+    print(if (run() == 1) { "one element" } else { "corrupted" });
 }
 --- stdout ---
 one element

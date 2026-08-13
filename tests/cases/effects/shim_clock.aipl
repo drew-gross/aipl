@@ -11,13 +11,13 @@ import { monotonic_now, now_nanos, print, to_str, ==, > } from builtins;
 // `!clock`. (What an installer must still declare is whatever the shim functions
 // themselves declare — see `err_shim_undeclared_effect`.)
 
-fn fixed_wall() -> u64 { u64(1111) }
+fn fixed_wall() -> u64 { 1111 }
 
-fn fixed_mono() -> u64 { u64(2222) }
+fn fixed_mono() -> u64 { 2222 }
 
-fn inner_wall() -> u64 { u64(3333) }
+fn inner_wall() -> u64 { 3333 }
 
-fn inner_mono() -> u64 { u64(4444) }
+fn inner_mono() -> u64 { 4444 }
 
 // Three call levels between the shim and the operation, none of them aware a
 // shim exists. Each still declares `!clock` — they really do read the clock.
@@ -52,7 +52,7 @@ fn nested() -> str {
 // clock and then the real one, so it declares `!clock` for the second reading.
 fn shimmed_then_real() !clock -> bool {
     let shimmed = shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } { depth1() };
-    if (shimmed == u64(1111)) { now_nanos() > u64(1704067200000000000) } else { false }
+    if (shimmed == 1111) { now_nanos() > 1704067200000000000 } else { false }
 }
 
 fn main() !prints !clock {

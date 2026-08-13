@@ -14,9 +14,9 @@ import { now_nanos, &&, <, > } from builtins;
 // `now_nanos` answers "when", not reliably "how long".
 
 // 2024-01-01 and 2100-01-01 UTC, in nanoseconds since the epoch.
-fn year_2024_nanos() -> u64 { u64(1704067200000000000) }
+fn year_2024_nanos() -> u64 { 1704067200000000000 }
 
-fn year_2100_nanos() -> u64 { u64(4102444800000000000) }
+fn year_2100_nanos() -> u64 { 4102444800000000000 }
 
 fn now_is_plausible() !clock -> bool {
     let t = now_nanos();

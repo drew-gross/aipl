@@ -10,7 +10,7 @@ import { wrapping_add as +, ++, == } from builtins;
 // predicate; this counts *every* element equal to a value, anywhere. Unsigned,
 // like `len`: a count is never negative.
 pub fn count<T: any>(self: T[], x: T) -> u64 {
-    mut n = u64(0);
+    mut n: u64 = 0;
     for (let e : self) {
         if (e == x) {
             set n++;
@@ -25,21 +25,21 @@ pub fn count<T: any>(self: T[], x: T) -> u64 {
 
     See `count_while` for the leading-run-matching-a-predicate form.
 """).test({
-    assert([1, 2, 3, 2].count(2) == u64(2));
-    assert([1, 2, 3].count(9) == u64(0)); // absent
-    assert([].count(1) == u64(0)); // empty
-    assert([7, 7, 7].count(7) == u64(3)); // every element
-    assert(count([2, 2], 2) == u64(2)); // function-call form too
+    assert([1, 2, 3, 2].count(2) == 2);
+    assert([1, 2, 3].count(9) == 0); // absent
+    assert([].count(1) == 0); // empty
+    assert([7, 7, 7].count(7) == 3); // every element
+    assert(count([2, 2], 2) == 2); // function-call form too
 
     // Generic over the element type — the same definition serves char and str,
     // and comparison is by value, not identity.
-    assert(['a', 'b', 'a'].count('a') == u64(2));
-    assert(["go", "stop", "go"].count("go") == u64(2));
+    assert(['a', 'b', 'a'].count('a') == 2);
+    assert(["go", "stop", "go"].count("go") == 2);
 
     // A `str` receiver counts bytes: `str` and `char[]` share a representation.
-    assert("a\nb\nc".count('\n') == u64(2));
-    assert("abc".count('\n') == u64(0));
-    assert("".count('\n') == u64(0));
+    assert("a\nb\nc".count('\n') == 2);
+    assert("abc".count('\n') == 0);
+    assert("".count('\n') == 0);
 })
 --- performance ---
 allocations: 7
@@ -47,10 +47,10 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 332
 instructions executed: 1226
-binary size: 4664
+binary size: 4624
   code: 1852
-  data: 587
-  metadata: 2225
+  data: 551
+  metadata: 2221
 --- monomorphizations ---
 __test$count
 count$char$s0

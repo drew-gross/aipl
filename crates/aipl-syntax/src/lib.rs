@@ -1016,18 +1016,140 @@ pub fn set_int_fits_hook(f: fn(i64, &str) -> bool) {
     let _ = INT_FITS_HOOK.set(f);
 }
 
-/// Retype a bare integer literal `e` (currently `ety`) to a target integer type
-/// `other` — used by mono/codegen after the checker has verified the literal
-/// fits, so a literal's value (already canonical when in range) flows into a
-/// narrow-int context without an explicit conversion. Non-literals and
-/// non-integer targets are left unchanged.
-pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
-    if let Type::Primitive(p) = other {
-        if p.is_int() && ety != other && flex_int_values(e, &mut Vec::new()) {
-            return other.clone();
+/// Can literal expression `e` (inferred as `ety`) flex to `target`, and to what?
+///
+/// `Ok(Some(t))` — yes, `e` takes type `t`. `Ok(None)` — not a flexible shape,
+/// leave it to the ordinary coercion rules. `Err((value, type_name))` — the
+/// shape matched but `value` doesn't fit `type_name`, which is a hard error the
+/// caller renders (the checker points at the offending literal).
+///
+/// Flexing is *structural*: it reaches through the constructs that merely pass a
+/// value along (a block tail, `if`/`match` arms) and, crucially, **into
+/// container literals**. An array/set/dict literal or a `some(..)` flexes when
+/// every literal inside it flexes to the corresponding part of the target, so
+///
+/// ```text
+/// let xs: u8[] = [200, 100];
+/// let o: u8? = some(200);
+/// let d: #{str: u8} = #{"a": 200};
+/// ```
+///
+/// work exactly like the scalar `let n: u8 = 200`. Without this, an untyped
+/// `[200]` is stuck at `i64[]` and a narrow-element array could only be built by
+/// converting each element one at a time.
+///
+/// Retyping alone is sufficient: an integer literal that fits its target is
+/// *already* canonical in its i64 register (sign-extended for `i*`, masked for
+/// `u*`), and an element slot is 8 bytes, so nothing about the emitted value
+/// changes — only its static type.
+pub fn flex_fit(
+    e: &ast::Expr,
+    ety: &Type,
+    target: &Type,
+) -> Result<Option<Type>, (i64, &'static str)> {
+    use ast::ExprKind as K;
+    // Value-passing wrappers: only the tail decides the type. Mirrors
+    // `flex_int_values`, so `{ let a = f(); [200] }` flexes like a bare `[200]`.
+    match &e.kind {
+        K::Seq(_, tail)
+        | K::Let(_, _, _, tail)
+        | K::LetMut(_, _, _, tail)
+        | K::Assign(_, _, tail) => {
+            return flex_fit(tail, ety, target);
         }
+        K::If(_, a, b) => {
+            // Both branches must flex, and to the same target.
+            return Ok(
+                match (flex_fit(a, ety, target)?, flex_fit(b, ety, target)?) {
+                    (Some(t), Some(_)) => Some(t),
+                    _ => None,
+                },
+            );
+        }
+        _ => {}
     }
-    ety.clone()
+    match target {
+        // The scalar case: a bare (possibly negated) integer literal.
+        Type::Primitive(p) if p.is_int() => {
+            if ety == target {
+                return Ok(None);
+            }
+            let mut vs = Vec::new();
+            if !flex_int_values(e, &mut vs) {
+                return Ok(None);
+            }
+            match vs.iter().find(|v| !int_fits(**v, p.name())) {
+                Some(v) => Err((*v, p.name())),
+                None => Ok(Some(target.clone())),
+            }
+        }
+        // A container literal flexes when every element does. An *empty* literal
+        // is left alone: it already coerces through the `__none__`/empty-arg
+        // markers, and there is nothing inside to range-check.
+        Type::Array(inner) => match &e.kind {
+            K::ArrayLit(elems) if !elems.is_empty() => flex_all(elems.iter(), inner, target),
+            _ => Ok(None),
+        },
+        Type::Set(inner) => match &e.kind {
+            K::SetLit(elems) if !elems.is_empty() => flex_all(elems.iter(), inner, target),
+            _ => Ok(None),
+        },
+        Type::Dict(kt, vt) => match &e.kind {
+            K::DictLit(entries) if !entries.is_empty() => {
+                let mut flexed = false;
+                for (k, v) in entries {
+                    // A dict flexes if *either* half does — a `#{str: u8}` has a
+                    // non-flexing key and a flexing value.
+                    flexed |= flex_fit(k, &Type::Unit, kt)?.is_some();
+                    flexed |= flex_fit(v, &Type::Unit, vt)?.is_some();
+                }
+                Ok(flexed.then(|| target.clone()))
+            }
+            _ => Ok(None),
+        },
+        // `some(x)` — the optional's payload flexes to the core type.
+        Type::Optional(inner) => match &e.kind {
+            K::Call(name, args, _) if name == "some" && args.len() == 1 => {
+                Ok(flex_fit(&args[0], &Type::Unit, inner)?.map(|_| target.clone()))
+            }
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+/// The container takes `whole` when at least one element flexes to `inner` and
+/// none *fails* to fit it.
+///
+/// Element types aren't known here, so each is probed with the unknown marker.
+/// A non-literal element reports "doesn't flex", which is not a veto — it is
+/// usually already the right type, as in `[1, u64_max()]` where the literal
+/// needs the flex and the call does not. Mistyped elements are still caught: the
+/// ordinary element check runs afterwards either way. An out-of-range literal is
+/// a hard error and propagates.
+fn flex_all<'a>(
+    mut elems: impl Iterator<Item = &'a ast::Expr>,
+    inner: &Type,
+    whole: &Type,
+) -> Result<Option<Type>, (i64, &'static str)> {
+    let mut any = false;
+    for e in &mut elems {
+        any |= flex_fit(e, &Type::Unit, inner)?.is_some();
+    }
+    Ok(any.then(|| whole.clone()))
+}
+
+/// Retype a literal expression `e` (currently `ety`) to `other` — used by
+/// mono/codegen after the checker has verified every literal involved fits, so a
+/// literal's value flows into a narrow-int context without an explicit
+/// conversion. The codegen-side mirror of the checker's `flex_int`; a
+/// non-flexing shape or an out-of-range literal (already rejected upstream) is
+/// left unchanged.
+pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
+    match flex_fit(e, ety, other) {
+        Ok(Some(t)) => t,
+        _ => ety.clone(),
+    }
 }
 
 /// If `name` is a named operator builtin, the `(operator, canonical impl)` it
@@ -1244,13 +1366,13 @@ fn __builtin_list_files(self: str) !list_files -> str[]!Error { ok([]) }
 // as 0. This is the system's *wall* clock, which can jump backwards (NTP,
 // manual changes) — successive readings are not guaranteed to increase, so it
 // measures "when", not reliably "how long".
-fn __builtin_now_nanos() !clock -> u64 { u64(0) }
+fn __builtin_now_nanos() !clock -> u64 { 0 }
 // Nanoseconds from the system's monotonic clock: it only ever counts up (no NTP
 // step or manual clock change moves it), so a *difference* between two readings
 // is a real elapsed duration. Its origin is unspecified — an absolute reading
 // means nothing on its own, and nothing across processes or machines. Use this
 // to measure "how long"; use `now_nanos` for "when".
-fn __builtin_monotonic_now() !clock -> u64 { u64(0) }
+fn __builtin_monotonic_now() !clock -> u64 { 0 }
 // Spawn `self` with `args` (no shell involved) and wait for it to finish:
 // `ok(ExecResult)` whenever it was actually launched, whatever it then exited
 // with; `err(message)` only if it couldn't be launched at all (not found,
@@ -1297,7 +1419,7 @@ fn __builtin_maximum<T: ord>(self: T[]) -> T? { none }
 // saturating-at-zero unsigned world rather than silently going negative.
 // Index/slice bounds accept either signedness, so `xs[xs.len() - 1]` still
 // works without a conversion.
-fn __builtin_len<T: any>(self: T[]) -> u64 { u64(0) }
+fn __builtin_len<T: any>(self: T[]) -> u64 { 0 }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
 // Character classification: ASCII whitespace (space/tab/newline/carriage return).
 fn __builtin_is_space(self: char) -> bool { false }

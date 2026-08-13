@@ -10,16 +10,22 @@ fn inc(x: u8) -> u8 {
 fn make() -> i16 {
     1000 // literal return flexes to i16
 }.test({
-    // Compare a narrow int to a literal (either side).
-    assert(i8(5) == 5);
-    assert(5 == i8(5));
-    assert(u8(255) > 1);
-    assert(i8(-1) == -1); // negative literal flexes to i8
+    // Compare a narrow int to a literal (either side). The narrow operand comes
+    // from an annotated binding — the one place a type is stated outright.
+    let five: i8 = 5;
+    assert(five == 5);
+    assert(5 == five);
+    let umax8: u8 = 255;
+    assert(umax8 > 1);
+    let neg: i8 = -1;
+    assert(neg == -1); // negative literal flexes to i8
 
     // Arithmetic with a literal operand stays at the narrow width (wraps).
-    assert(i8(127) + 1 == -128);
-    assert(u8(250) + 10 == u8(4));
-    assert(inc(u8(9)) == 10);
+    let imax8: i8 = 127;
+    assert(imax8 + 1 == -128);
+    let near: u8 = 250;
+    assert(near + 10 == 4);
+    assert(inc(9) == 10);
 
     // Literal flexes through a parameter and a return type.
     assert(inc(200) == 201);
@@ -27,7 +33,8 @@ fn make() -> i16 {
 })
 
 fn main() !prints {
-    print(to_str(i8(127) + 1)); // -128
+    let imax8: i8 = 127;
+    print(to_str(imax8 + 1)); // -128
     print(to_str(inc(200))); // 201
     print(to_str(make())); // 1000
 }
@@ -40,10 +47,10 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 124
-binary size: 1680
-  code: 624
+instructions executed: 122
+binary size: 2008
+  code: 800
   data: 1
-  metadata: 1055
+  metadata: 1207
 --- monomorphizations ---
 main

@@ -221,11 +221,10 @@ impl Expander {
             .iter()
             .filter(|x| !matches!(x.kind, ExprKind::Spread(_)))
             .count();
-        let mut extra = node(ExprKind::Call(
-            "u64".to_string(),
-            vec![node(ExprKind::Num(plain as i64))],
-            false,
-        ));
+        // A bare literal, not a `u64(..)` conversion (that form is gone): this
+        // desugaring only runs for a literal that *has* a spread, so the count is
+        // always summed with at least one `len()` below and flexes to its `u64`.
+        let mut extra = node(ExprKind::Num(plain as i64));
         for elem in rest {
             let ExprKind::Spread(inner) = &elem.kind else {
                 continue;

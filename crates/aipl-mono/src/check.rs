@@ -1059,6 +1059,16 @@ impl Cx<'_> {
         )?;
         let declared = subst_typevars(declared, &self.current_type_params.borrow());
         let vt = self.flex_int(val, &vt, &declared)?;
+        // An annotated binding *converts* between integer widths rather than
+        // merely checking: `let n: u8 = some_i64;` re-canonicalizes to 8 bits
+        // (wrapping, exactly like the arithmetic operators), and `let n: i64 =
+        // some_u8;` widens. This is the replacement for the removed `u8(..)`
+        // conversion form — the annotation is now the one place a value changes
+        // integer type, which is why it is allowed to be lossy here and nowhere
+        // else. Non-integer pairs still have to coerce normally.
+        if aipl_syntax::is_int_ty(&vt) && aipl_syntax::is_int_ty(&declared) {
+            return Ok(declared);
+        }
         coerce(&vt, &declared).map_err(|()| {
             Error::at(
                 format!(
@@ -2178,7 +2188,12 @@ impl Cx<'_> {
                 let st = self.check_expr(scrut, env, effects)?;
                 // The scrutinee's type decides the legal patterns: `some`/`none`
                 // for an optional, the declared cases for a variant.
-                let mut merged: Option<Type> = None;
+                // `merged` carries the arm that produced it, so a bare-literal arm
+                // can flex to a *later* narrow-int arm as well as the other way
+                // round — the same courtesy `if` branches get. Without it,
+                // `match (w) { WNil => 0, WC(n, ..) => n }` with a `u64` payload
+                // has no spelling at all now that `u64(0)` is gone.
+                let mut merged: Option<(Type, &Expr)> = None;
                 for arm in arms {
                     let bind_tys =
                         self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
@@ -2188,10 +2203,15 @@ impl Cx<'_> {
                     }
                     let t = self.check_expr(&arm.body, &env2, effects)?;
                     merged = Some(match merged {
-                        None => t,
-                        Some(prev) => merge(prev, t),
+                        None => (t, &arm.body),
+                        Some((prev, prev_body)) => {
+                            let t = self.flex_int(&arm.body, &t, &prev)?;
+                            let prev = self.flex_int(prev_body, &prev, &t)?;
+                            (merge(prev, t), &arm.body)
+                        }
                     });
                 }
+                let merged = merged.map(|(t, _)| t);
                 self.check_match_exhaustive(&st, arms, span.clone())?;
                 merged.unwrap_or(Type::Primitive(Primitive::I64))
             }
@@ -2269,30 +2289,20 @@ impl Cx<'_> {
                 return self.infer_generic_variant_ctor(base, name, args, env, effects, span);
             }
         }
-        // Integer conversion builtins `i8(x)`/`i32(x)`/`u64(x)`/… — like the
-        // result/optional constructors, these are special-cased (not imported)
-        // and reserved. They convert any integer to the named width (wrapping /
-        // sign- or zero-extending), so the result type is the named type.
+        // The integer conversion builtins `i8(x)`/`u64(x)`/… are gone. A typed
+        // binding does the job — and it is the *only* place a value changes
+        // integer type, so a lossy narrowing is always written down. A bare
+        // literal needs nothing at all: it takes whatever integer type its
+        // context expects. Recognized here only to say so, since otherwise this
+        // reads as a call to an undefined function.
         if !env.contains_key(name) && aipl_syntax::int_bits(name).is_some() {
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("{name:?} conversion expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let at = self.check_expr(&args[0], env, effects)?;
-            if !aipl_syntax::is_int_ty(&at) {
-                return Err(Error::at(
-                    format!(
-                        "{name:?} converts an integer, but its argument is {}",
-                        tyname(&at)
-                    ),
-                    args[0].span.clone(),
-                ));
-            }
-            // `int_bits` matched, so the name is a known integer primitive.
-            return Ok(Type::Primitive(
-                Primitive::from_name(name).expect("integer conversion name is a primitive"),
+            return Err(Error::at(
+                format!(
+                    "{name}(..) conversions were removed — bind with the type instead \
+                     (`let n: {name} = ..;`), or drop the conversion entirely if the \
+                     argument is a literal, which takes the type its context expects"
+                ),
+                span.clone(),
             ));
         }
         // `ok(x)` / `err(e)` — result constructors, like `some`/`none`. Each
@@ -2380,6 +2390,9 @@ impl Cx<'_> {
                 None
             };
             if let Some(seq) = seq {
+                // A bare literal pattern flexes to the sequence's element type,
+                // so `i8_array.contains(-128)` needs no conversion on the literal.
+                let pat = self.flex_int(&args[1], &pat, &variadic_elem(&seq))?;
                 if !variadic_accepts(&pat, &seq) {
                     let elem = variadic_elem(&seq);
                     return Err(Error::at(
@@ -2908,23 +2921,14 @@ impl Cx<'_> {
     /// an `if`/`match` whose arms are all literals) — see
     /// [`aipl_syntax::flex_int_values`].
     fn flex_int(&self, e: &Expr, ety: &Type, other: &Type) -> Result<Type, Error> {
-        if let Type::Primitive(p) = other {
-            if p.is_int() && ety != other {
-                let mut vs = Vec::new();
-                if aipl_syntax::flex_int_values(e, &mut vs) {
-                    match vs.iter().find(|v| !aipl_syntax::int_fits(**v, p.name())) {
-                        None => return Ok(other.clone()),
-                        Some(v) => {
-                            return Err(Error::at(
-                                format!("integer literal {v} does not fit in {}", p.name()),
-                                e.span.clone(),
-                            ));
-                        }
-                    }
-                }
-            }
+        match aipl_syntax::flex_fit(e, ety, other) {
+            Ok(Some(t)) => Ok(t),
+            Ok(None) => Ok(ety.clone()),
+            Err((v, name)) => Err(Error::at(
+                format!("integer literal {v} does not fit in {name}"),
+                e.span.clone(),
+            )),
         }
-        Ok(ety.clone())
     }
 
     /// Type of an integer addition — the `+` operator and the `wrapping_add` /

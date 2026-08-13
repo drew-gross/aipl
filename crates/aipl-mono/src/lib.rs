@@ -3165,18 +3165,11 @@ impl Mono<'_> {
         //   for (let $e : $arr) { set $out.push(($i, $e)); set $i = $i + 1; }
         //   $out
         //
-        // The counter is seeded `u64(0)`, not `0`: an index is unsigned, and a
-        // `mut` binding takes its type from its initializer with no way to widen
-        // it later — a bare `0` would pin `$i` to `i64` and the tuple below with
-        // it.
-        let zero_u64 = Expr::new(
-            ExprKind::Call(
-                "u64".to_string(),
-                vec![Expr::new(ExprKind::Num(0), span.clone())],
-                false,
-            ),
-            span.clone(),
-        );
+        // The counter is *annotated* `u64`, not left to its initializer: an index
+        // is unsigned, and a bare `0` would otherwise pin `$i` to `i64` and the
+        // tuple below with it. (This used to synthesize a `u64(0)` conversion
+        // call; the annotation is what replaced that form.)
+        let zero_u64 = Expr::new(ExprKind::Num(0), span.clone());
         let tuple = Expr::new(ExprKind::TupleLit(vec![id("$i"), id("$e")]), span.clone());
         let push = set_push(id("$out"), tuple, span.clone());
         let incr = Expr::new(
@@ -3202,7 +3195,7 @@ impl Mono<'_> {
         let enumerate_body = Expr::new(
             ExprKind::LetMut(
                 "$i".to_string(),
-                None,
+                Some(Type::Primitive(Primitive::U64)),
                 Box::new(zero_u64),
                 Box::new(Expr::new(
                     ExprKind::LetMut(
@@ -4248,6 +4241,10 @@ impl Mono<'_> {
             }
             ExprKind::Let(name, ty, val, body) => {
                 let (rv, vt) = self.infer(val, env)?;
+                // An annotation is the binding's type, not merely a check on the
+                // initializer — it is also what *converts* an integer to another
+                // width, so the body must see the declared type.
+                let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(body, &env2)?;
@@ -4263,6 +4260,7 @@ impl Mono<'_> {
             }
             ExprKind::LetMut(name, ty, val, body) => {
                 let (rv, vt) = self.infer(val, env)?;
+                let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(body, &env2)?;
@@ -6222,7 +6220,12 @@ pub fn inline_single_use(program: &Program) -> Program {
 
         // Replace the single `Call(f, ..)` (it lives in exactly one body — `f`'s
         // name is never shadowed, see the `binders` guard).
-        let fparam_names: Vec<String> = f.sig.params.iter().map(|p| p.name.clone()).collect();
+        let fparam_names: Vec<(String, Type)> = f
+            .sig
+            .params
+            .iter()
+            .map(|p| (p.name.clone(), p.ty.clone()))
+            .collect();
         let mut replaced = false;
         for it in &mut program.items {
             if let Item::Fn(g) = it {
@@ -6280,7 +6283,11 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             .cloned();
         let Some(f) = candidate else { break };
 
-        let fparam_names: Vec<String> = f.params.iter().map(|p| p.name.clone()).collect();
+        let fparam_names: Vec<(String, Type)> = f
+            .params
+            .iter()
+            .map(|p| (p.name.clone(), p.ty.clone()))
+            .collect();
         let mut replaced = false;
         for g in &mut program.fns {
             let body = replace_call(
@@ -6549,7 +6556,7 @@ fn references_name(e: &Expr, name: &str) -> bool {
 fn replace_call(
     e: &Expr,
     fname: &str,
-    fparam_names: &[String],
+    fparams: &[(String, Type)],
     fbody: &Expr,
     counter: &mut usize,
     replaced: &mut bool,
@@ -6561,16 +6568,16 @@ fn replace_call(
             // comes from `f`'s *parameter*, which a `let`-binding discards. Leave
             // the call (so `inline_single_use` keeps `f`).
             if name == fname
-                && args.len() == fparam_names.len()
+                && args.len() == fparams.len()
                 && !args.iter().any(contains_context_literal)
             {
                 *replaced = true;
-                return build_inlined(fparam_names, fbody, args, e.span.clone(), counter);
+                return build_inlined(fparams, fbody, args, e.span.clone(), counter);
             }
         }
     }
     let rc = |x: &Expr, counter: &mut usize, replaced: &mut bool| {
-        replace_call(x, fname, fparam_names, fbody, counter, replaced)
+        replace_call(x, fname, fparams, fbody, counter, replaced)
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
@@ -6696,16 +6703,16 @@ fn replace_call(
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
 fn build_inlined(
-    fparam_names: &[String],
+    fparams: &[(String, Type)],
     fbody: &Expr,
     args: &[Expr],
     span: Span,
     counter: &mut usize,
 ) -> Expr {
     let mut map: HashMap<String, String> = HashMap::new();
-    let fresh: Vec<String> = fparam_names
+    let fresh: Vec<String> = fparams
         .iter()
-        .map(|pname| {
+        .map(|(pname, _)| {
             let nm = format!("$inl{}_{}", *counter, pname);
             *counter += 1;
             map.insert(pname.clone(), nm.clone());
@@ -6713,9 +6720,21 @@ fn build_inlined(
         })
         .collect();
     let mut expr = rename_params(fbody, &map);
-    for (fp, arg) in fresh.iter().zip(args).rev() {
+    for ((fp, (_, pty)), arg) in fresh.iter().zip(fparams).zip(args).rev() {
+        // The binding carries the *parameter's* declared type, not whatever the
+        // argument inferred. It matters for a narrow int: inlining `add8(100,
+        // 50)` for `fn add8(a: i8, b: i8)` would otherwise bind two `i64`
+        // literals, and the body's `a + b` would add at 64 bits instead of
+        // wrapping at 8. (Latent until integer conversions were removed —
+        // arguments used to be written `i8(100)`, which carried the type
+        // themselves.)
         expr = Expr::new(
-            ExprKind::Let(fp.clone(), None, Box::new(arg.clone()), Box::new(expr)),
+            ExprKind::Let(
+                fp.clone(),
+                Some(pty.clone()),
+                Box::new(arg.clone()),
+                Box::new(expr),
+            ),
             span.clone(),
         );
     }

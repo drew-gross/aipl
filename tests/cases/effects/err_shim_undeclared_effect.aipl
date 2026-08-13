@@ -5,10 +5,10 @@ import { print } from builtins;
 // doesn't excuse the `!prints` this shim performs.
 fn logging_clock() !prints -> u64 {
     print("tick");
-    u64(1)
+    1
 }
 
-fn fake_mono() -> u64 { u64(2) }
+fn fake_mono() -> u64 { 2 }
 
 fn main() {
     shim clock { now_nanos = logging_clock, monotonic_now = fake_mono } {};

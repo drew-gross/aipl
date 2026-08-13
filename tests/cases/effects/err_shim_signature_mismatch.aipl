@@ -1,8 +1,8 @@
 // A shim stands in for the operation at every call site, so it must accept and
 // return exactly what the operation does.
-fn fake_wall() -> u64 { u64(1) }
+fn fake_wall() -> u64 { 1 }
 
-fn takes_an_arg(n: i64) -> u64 { u64(2) }
+fn takes_an_arg(n: i64) -> u64 { 2 }
 
 fn main() {
     shim clock { now_nanos = fake_wall, monotonic_now = takes_an_arg } {};

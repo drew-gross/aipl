@@ -28,86 +28,86 @@ import {
 // (`i8::MIN`, `u32::MAX`, …) has bits set outside every narrower width, and a
 // negative signed value shares its low bits with a large unsigned one.
 
-fn i8s() -> i8[] { [i8(3), i8(0) - i8(128), i8(127)] }.test({
+fn i8s() -> i8[] { [3, -128, 127] }.test({
     assert(i8s().to_str() == "[3, -128, 127]");
-    assert(i8s().sort() == [i8(0) - i8(128), i8(3), i8(127)]);
-    assert(i8s().reverse() == [i8(127), i8(0) - i8(128), i8(3)]);
-    assert(i8s().minimum() == some(i8(0) - i8(128)));
-    assert(i8s().maximum() == some(i8(127)));
-    assert(i8s().contains(i8(0) - i8(128)));
-    assert(i8s().len() == u64(3));
+    assert(i8s().sort() == [-128, 3, 127]);
+    assert(i8s().reverse() == [127, -128, 3]);
+    assert(i8s().minimum() == some(-128));
+    assert(i8s().maximum() == some(127));
+    assert(i8s().contains(-128));
+    assert(i8s().len() == 3);
 })
 
-fn u8s() -> u8[] { [u8(3), u8(255), u8(0)] }.test({
+fn u8s() -> u8[] { [3, 255, 0] }.test({
     assert(u8s().to_str() == "[3, 255, 0]");
     // 255 is `-1`'s low byte: an unsigned element must sort *last*, not first.
-    assert(u8s().sort() == [u8(0), u8(3), u8(255)]);
-    assert(u8s().maximum() == some(u8(255)));
+    assert(u8s().sort() == [0, 3, 255]);
+    assert(u8s().maximum() == some(255));
 })
 
-fn i16s() -> i16[] { [i16(0) - i16(32768), i16(32767)] }.test({
+fn i16s() -> i16[] { [-32768, 32767] }.test({
     assert(i16s().to_str() == "[-32768, 32767]");
-    assert(i16s().sort() == [i16(0) - i16(32768), i16(32767)]);
+    assert(i16s().sort() == [-32768, 32767]);
 })
 
-fn u16s() -> u16[] { [u16(65535), u16(1)] }.test({
+fn u16s() -> u16[] { [65535, 1] }.test({
     assert(u16s().to_str() == "[65535, 1]");
-    assert(u16s().sort() == [u16(1), u16(65535)]);
+    assert(u16s().sort() == [1, 65535]);
 })
 
-fn i32s() -> i32[] { [i32(0) - i32(2147483648), i32(2147483647)] }.test({
+fn i32s() -> i32[] { [-2147483648, 2147483647] }.test({
     assert(i32s().to_str() == "[-2147483648, 2147483647]");
-    assert(i32s().sort() == [i32(0) - i32(2147483648), i32(2147483647)]);
+    assert(i32s().sort() == [-2147483648, 2147483647]);
 })
 
-fn u32s() -> u32[] { [u32(4294967295), u32(1)] }.test({
+fn u32s() -> u32[] { [4294967295, 1] }.test({
     assert(u32s().to_str() == "[4294967295, 1]");
-    assert(u32s().sort() == [u32(1), u32(4294967295)]);
+    assert(u32s().sort() == [1, 4294967295]);
 })
 
 // Optionals: the core of a `T?` is the same 8-byte slot, so the same
 // round-trip argument applies — including through `xs[i]`, which hands an
 // element back as `T?`.
 fn first(xs: u16[]) -> u16? { xs[0] }.test({
-    assert(first([u16(65535)]) == some(u16(65535)));
+    assert(first([65535]) == some(65535));
     assert(first([]) == none);
-    assert(first([]).value_or(u16(7)) == u16(7));
+    assert(first([]).value_or(7) == 7);
 })
 
-fn neg_or(o: i8?) -> i8 { o.value_or(i8(0)) }.test({
-    assert(neg_or(some(i8(0) - i8(128))) == i8(0) - i8(128));
-    assert(neg_or(none) == i8(0));
-    assert(some(i8(0) - i8(1)).to_str() == "some(-1)");
+fn neg_or(o: i8?) -> i8 { o.value_or(0) }.test({
+    assert(neg_or(some(-128)) == -128);
+    assert(neg_or(none) == 0);
+    assert(some(-1).to_str() == "some(-1)");
     // The same low bits read as unsigned stay unsigned.
-    assert(some(u8(255)).to_str() == "some(255)");
+    assert(some(255).to_str() == "some(255)");
 })
 
 // Growing past the inline capacity reallocates the element buffer; the
 // canonical bit pattern has to survive the copy.
 fn grown() -> u32[] {
-    mut xs = [u32(4294967295)];
+    mut xs: u32[] = [4294967295];
     for (let _ : [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
-        set xs.push(u32(4294967295));
+        set xs.push(4294967295);
     }
     xs
 }.test({
-    assert(grown().len() == u64(10));
-    assert(grown()[9] == some(u32(4294967295)));
-    assert(grown().minimum() == some(u32(4294967295)));
+    assert(grown().len() == 10);
+    assert(grown()[9] == some(4294967295));
+    assert(grown().minimum() == some(4294967295));
 })
 
 // Nested containers: an array of narrow arrays, an array of narrow optionals.
-fn nested() -> i8[][] { [[i8(0) - i8(128)], [i8(127), i8(0)]] }.test({
+fn nested() -> i8[][] { [[-128], [127, 0]] }.test({
     assert(nested().to_str() == "[[-128], [127, 0]]");
-    assert(nested()[0] == some([i8(0) - i8(128)]));
-    assert([some(u16(65535)), none].to_str() == "[some(65535), none]");
+    assert(nested()[0] == some([-128]));
+    assert([some(65535), none].to_str() == "[some(65535), none]");
 })
 
 // Arithmetic on a value that came *out* of an array still wraps at the
 // element's own width, which only holds if the load produced a canonical value.
-fn wrap_from_elem(xs: u8[]) -> u8 { xs[0].value_or(u8(0)) + u8(100) }.test({
-    assert(wrap_from_elem([u8(200)]) == u8(44)); // 300 wraps to 44 in 8 bits
-    assert(wrap_from_elem([u8(1)]) == u8(101));
+fn wrap_from_elem(xs: u8[]) -> u8 { xs[0].value_or(0) + 100 }.test({
+    assert(wrap_from_elem([200]) == 44); // 300 wraps to 44 in 8 bits
+    assert(wrap_from_elem([1]) == 101);
 })
 
 fn main() !prints {
@@ -115,7 +115,7 @@ fn main() !prints {
     print(u8s().sort().to_str());
     print(i32s().to_str());
     print(u32s().sort().to_str());
-    print(first([u16(65535)]).to_str());
+    print(first([65535]).to_str());
     print(nested().to_str());
 }
 --- stdout ---
@@ -130,10 +130,10 @@ allocations: 17
 deallocations: 17
 reallocations: 0
 bytes allocated: 740
-instructions executed: 2269
-binary size: 9848
-  code: 5608
-  data: 499
-  metadata: 3741
+instructions executed: 2195
+binary size: 6512
+  code: 3436
+  data: 283
+  metadata: 2793
 --- monomorphizations ---
 main

@@ -7,38 +7,49 @@ import { saturating_sub as -, <, == } from builtins;
 // imported `wrapping_sub as -`. Unary negation (`-x`) is unaffected.
 fn probe() -> bool { true }.test({
     // In range: exact difference, same as any subtraction.
-    assert(i8(30) - i8(20) == 10);
-    assert(u8(150) - u8(50) == 100);
+    assert(30 - 20 == 10);
+    assert(150 - 50 == 100);
     assert(10 - 3 == 7);
 
-    // Signed narrow: clamp at the min and max on over/underflow.
-    assert(i8(-100) - i8(100) == -128);
-    assert(i8(100) - i8(-100) == 127);
-    assert(i16(-30000) - i16(10000) == -32768);
-    assert(i16(30000) - i16(-10000) == 32767);
-    assert(i32(-2000000000) - i32(2000000000) == -2147483648);
+    // Signed narrow: clamp at the min and max on over/underflow. The width comes
+    // from the annotated binding — a bare literal pair would subtract at i64,
+    // where none of these underflow and nothing would clamp.
+    let n8: i8 = -100;
+    assert(n8 - 100 == -128);
+    let a8: i8 = 100;
+    assert(a8 - -100 == 127);
+    let n16: i16 = -30000;
+    assert(n16 - 10000 == -32768);
+    let a16: i16 = 30000;
+    assert(a16 - -10000 == 32767);
+    let n32: i32 = -2000000000;
+    assert(n32 - 2000000000 == -2147483648);
 
     // Unsigned narrow: underflow floors at 0 (a smaller minus larger).
-    assert(u8(50) - u8(100) == 0);
-    assert(u16(10000) - u16(60000) == 0);
-    assert(u32(1000000000) - u32(4000000000) == 0);
+    let u8a: u8 = 50;
+    assert(u8a - 100 == 0);
+    let u16a: u16 = 10000;
+    assert(u16a - 60000 == 0);
+    let u32a: u32 = 1000000000;
+    assert(u32a - 4000000000 == 0);
 
     // 64-bit signed: a large underflow saturates toward i64::MIN, which stays
     // very negative (a wrapping sub would flip it positive) — it pins at exactly
     // i64::MIN, now writable as a literal.
     assert(-9000000000000000000 - 9000000000000000000 == -9223372036854775808);
     // Unsigned 64-bit underflow floors at 0.
-    assert(u64(3) - u64(9) == 0);
+    let u64a: u64 = 3;
+    assert(u64a - 9 == 0);
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 269
-binary size: 3512
-  code: 1096
-  data: 784
-  metadata: 1632
+instructions executed: 183
+binary size: 3176
+  code: 868
+  data: 673
+  metadata: 1635
 --- monomorphizations ---
 main

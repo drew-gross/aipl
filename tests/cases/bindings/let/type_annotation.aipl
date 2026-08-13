@@ -14,18 +14,20 @@ import {
 // default nearly always — but it leaves no way to *say* what a binding is when
 // the initializer alone would infer something else. The motivating case is a
 // narrow integer: `mut n = 0;` infers `i64`, and there is no context anywhere in
-// the block to bend it, so a `u8` counter previously had to be written
-// `mut n = u8(0);`.
+// the block to bend it, so a `u8` counter has to say `mut n: u8 = 0;`.
 //
 // With an annotation the declared type wins and the initializer is checked
 // *against* it, so a bare integer literal flexes to it exactly as it would
-// flowing into a parameter or a declared return type.
+// flowing into a parameter or a declared return type — and that reaches into
+// container literals too (`let xs: u8[] = [200];`).
 //
-// Two limits, both shared with every other annotated position: flexing does not
-// yet reach *inside* a container literal, so `let xs: u8[] = [200]` is still an
-// error (write `[u8(200)]`); and only the plain `let name`/`mut name` forms take
-// an annotation, not the `let (a, b) = ..` / `let P { x, y } = ..`
-// destructuring forms.
+// The annotation is also the only place a value *changes* integer type: `let n:
+// u8 = some_i64;` wraps to 8 bits and `let n: i64 = some_u8;` widens. That is
+// deliberate — there is no conversion form, so a lossy narrowing is always
+// written down as a declaration rather than buried in an expression.
+//
+// One limit: only the plain `let name`/`mut name` forms take an annotation, not
+// the `let (a, b) = ..` / `let P { x, y } = ..` destructuring forms.
 
 struct P { x: i64, y: i64 }
 
@@ -36,7 +38,7 @@ fn wrapped() -> u8 {
     set c = c + 10;
     c
 }.test({
-    assert(wrapped() == u8(4)); // 260 wraps to 4 in 8 bits
+    assert(wrapped() == 4); // 260 wraps to 4 in 8 bits
 })
 
 // A literal initializer flexes to the annotation, at every width.
@@ -58,10 +60,10 @@ fn widths() -> str {
 fn shapes() -> str {
     let s: str = "hi";
     let xs: i64[] = [1, 2, 3];
-    let o: u8? = some(u8(9));
-    let d: #{str: u8} = #{"a": u8(1)};
+    let o: u8? = some(9);
+    let d: #{str: u8} = #{"a": 1};
     let p: P = P { x: 1, y: 2 };
-    `{s} {xs.len()} {o.value_or(u8(0))} {d.get("a").value_or(u8(0))} {p.x + p.y}`
+    `{s} {xs.len()} {o.value_or(0)} {d.get("a").value_or(0)} {p.x + p.y}`
 }.test({
     assert(shapes() == "hi 3 9 1 3");
 })
@@ -94,8 +96,8 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 565
-instructions executed: 632
-binary size: 7808
-  code: 4184
+instructions executed: 624
+binary size: 7792
+  code: 4172
   data: 1
-  metadata: 3623
+  metadata: 3619

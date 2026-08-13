@@ -7,22 +7,33 @@ import { saturating_add as +, wrapping_sub as -, == } from builtins;
 // `wrapping_add as +`.
 fn probe() -> bool { true }.test({
     // In range: exact sum, same as any add.
-    assert(i8(10) + i8(20) == 30);
-    assert(u8(100) + u8(50) == 150);
+    assert(10 + 20 == 30);
+    assert(100 + 50 == 150);
     assert(5 + 3 == 8);
 
-    // Signed narrow: clamp at the max (127/32767/2147483647) and min.
-    assert(i8(100) + i8(100) == 127);
-    assert(i8(-100) + i8(-100) == -128);
-    assert(i16(30000) + i16(10000) == 32767);
-    assert(i16(-30000) + i16(-10000) == -32768);
-    assert(i32(2000000000) + i32(2000000000) == 2147483647);
-    assert(i32(-2000000000) + i32(-2000000000) == -2147483648);
+    // Signed narrow: clamp at the max (127/32767/2147483647) and min. The width
+    // comes from the annotated binding — a bare literal pair would add at i64,
+    // where none of these overflow and nothing would clamp.
+    let a8: i8 = 100;
+    assert(a8 + 100 == 127);
+    let n8: i8 = -100;
+    assert(n8 + -100 == -128);
+    let a16: i16 = 30000;
+    assert(a16 + 10000 == 32767);
+    let n16: i16 = -30000;
+    assert(n16 + -10000 == -32768);
+    let a32: i32 = 2000000000;
+    assert(a32 + 2000000000 == 2147483647);
+    let n32: i32 = -2000000000;
+    assert(n32 + -2000000000 == -2147483648);
 
     // Unsigned narrow: clamp at the max (0 is a natural floor).
-    assert(u8(200) + u8(100) == 255);
-    assert(u16(60000) + u16(10000) == 65535);
-    assert(u32(4000000000) + u32(1000000000) == 4294967295);
+    let u8a: u8 = 200;
+    assert(u8a + 100 == 255);
+    let u16a: u16 = 60000;
+    assert(u16a + 10000 == 65535);
+    let u32a: u32 = 4000000000;
+    assert(u32a + 1000000000 == 4294967295);
 
     // 64-bit: i64::MAX + 1 saturates (a wrapping add would flip to i64::MIN).
     assert(9223372036854775807 + 1 == 9223372036854775807);
@@ -32,10 +43,10 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 268
-binary size: 3552
-  code: 1100
-  data: 818
+instructions executed: 177
+binary size: 3192
+  code: 868
+  data: 690
   metadata: 1634
 --- monomorphizations ---
 main

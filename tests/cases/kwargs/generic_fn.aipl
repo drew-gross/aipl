@@ -1,7 +1,10 @@
 // A generic function may declare a (concrete) keyword parameter.
 import { len, print, to_str, wrapping_add as + } from builtins;
 
-fn padded_len<T: any>(xs: T[], extra: i64 = 10) -> i64 { i64(xs.len()) + extra }
+fn padded_len<T: any>(xs: T[], extra: i64 = 10) -> i64 {
+    let n: i64 = xs.len();
+    n + extra
+}
 
 fn main() !prints {
     print(to_str(padded_len([1, 2, 3])));

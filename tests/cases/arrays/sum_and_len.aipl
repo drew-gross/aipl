@@ -12,7 +12,8 @@ fn sum(xs: i64[]) -> i64 {
     let xs = [10, 20, 30];
     assert(sum(xs) == 60);
     assert(len(xs) == 3);
-    assert(sum(xs) + i64(len(xs)) == 63);
+    let n: i64 = len(xs);
+    assert(sum(xs) + n == 63);
 })
 --- performance ---
 allocations: 1
@@ -20,10 +21,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 317
-binary size: 1856
+binary size: 1848
   code: 580
-  data: 136
-  metadata: 1140
+  data: 125
+  metadata: 1143
 --- monomorphizations ---
 main
 sum

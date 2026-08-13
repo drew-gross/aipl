@@ -237,6 +237,19 @@ fn lex_err(message: str, start: i64, end: i64) -> LexError {
     LexError { message, span: start..end }
 }
 
+// A `str`'s length as `i64`. `len()` is `u64`, and the two widths can't be
+// mixed, but every cursor and span in this file is signed — so the conversion
+// would otherwise appear at nearly every comparison. Converting is what a typed
+// binding does, and this is that binding with a name.
+fn ilen(self: str) -> i64 {
+    let n: i64 = self.len();
+    n
+}.test({
+    assert("".ilen() == 0);
+    assert("abc".ilen() == 3);
+    assert("héllo".ilen() == 6); // bytes, like `len()`
+})
+
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
 // char, then `cont` chars. 0 when the first char isn't in `first`.
 fn char_run_len(self: str, first: str, cont: str) -> i64 {
@@ -250,7 +263,7 @@ fn char_run_len(self: str, first: str, cont: str) -> i64 {
 // `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
 // spelling never matches.
 fn exact_len(self: str, spelling: str) -> i64 {
-    if (0 < spelling.len() && self.starts_with(spelling)) { i64(spelling.len()) } else { 0 }
+    if (0 < spelling.len() && self.starts_with(spelling)) { spelling.ilen() } else { 0 }
 }
 
 // `Keyword`: the length of `spelling` when it prefixes `self`, but only when the
@@ -259,11 +272,7 @@ fn exact_len(self: str, spelling: str) -> i64 {
 // after is a boundary char, as in `iffy` for `if`).
 fn keyword_len(self: str, spelling: str, boundary: str) -> i64 {
     let bounded = !self[spelling.len()].is_some_and(|c| boundary.contains(c));
-    if (0 < spelling.len() && bounded && self.starts_with(spelling)) {
-        i64(spelling.len())
-    } else {
-        0
-    }
+    if (0 < spelling.len() && bounded && self.starts_with(spelling)) { spelling.ilen() } else { 0 }
 }
 
 // `Delimited`: a `delims` char opens the token, which spans to just past the
@@ -281,7 +290,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
     let d = self[0].value_or(' '); // in bounds: the guard above saw a char
     mut i = 1;
     mut closed = false;
-    while (!closed && i < i64(self.len())) {
+    while (!closed && i < self.ilen()) {
         let c = self[i].value_or(' '); // in bounds: the loop condition holds
         if (c == d) {
             set closed = true;
@@ -292,7 +301,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
             // unterminated). The escaped char must be allowed, and is content:
             // the extra step below skips it, so an escaped delimiter can't
             // close the token.
-            if (c == '\\' && 0 < escapes.len() && i + 1 < i64(self.len())) {
+            if (c == '\\' && 0 < escapes.len() && i + 1 < self.ilen()) {
                 if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
                     return err(LexError {
                         message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
@@ -305,7 +314,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
         set i = i + 1;
     }
     if (!closed) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + i64(self.len()) });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() });
     };
     ok(i)
 }
@@ -330,14 +339,14 @@ fn between_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexEr
 
     // Scan for the close from just past the open, so an `open`/`close` that
     // share text (e.g. `"""`/`"""`) can't self-close on the opener.
-    mut i = i64(open.len());
-    while (i < i64(self.len())) {
+    mut i: i64 = open.len();
+    while (i < self.ilen()) {
         if (self[i..].starts_with(close)) {
-            return ok(i + i64(close.len()));
+            return ok(i + close.ilen());
         };
         set i = i + 1;
     }
-    err(LexError { message: unterminated_msg(msg), span: at..at + i64(self.len()) })
+    err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() })
 }
 
 // `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
@@ -352,22 +361,22 @@ fn nested_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexErr
         return ok(0);
     };
     mut depth = 1;
-    mut i = i64(open.len());
-    while (0 < depth && i < i64(self.len())) {
+    mut i: i64 = open.len();
+    while (0 < depth && i < self.ilen()) {
         if (self[i..].starts_with(open)) {
             set depth = depth + 1;
-            set i = i + i64(open.len());
+            set i = i + open.ilen();
         } else {
             if (self[i..].starts_with(close)) {
                 set depth = depth - 1;
-                set i = i + i64(close.len());
+                set i = i + close.ilen();
             } else {
                 set i = i + 1;
             };
         };
     }
     if (0 < depth) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + i64(self.len()) });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() });
     };
     ok(i)
 }
@@ -633,15 +642,15 @@ fn template_scan<K>(
     mut seg_texts = [];
     mut seg_spans = [];
     mut interp_runs = [];
-    mut i = at + i64(delim.len());
+    mut i = at + delim.ilen();
     mut seg_start = at;
-    while (i < i64(src.len())) {
+    while (i < src.ilen()) {
         // The segment's text: past the opening delim for the first segment,
         // from just past the previous interpolation's `}` after — through the
         // current position (a closing delim or an opening `{`), exclusive.
-        let text_start = if (seg_texts.len() == 0) { at + i64(delim.len()) } else { seg_start };
+        let text_start = if (seg_texts.len() == 0) { at + delim.ilen() } else { seg_start };
         if (src[i..].starts_with(delim)) {
-            let end = i + i64(delim.len());
+            let end = i + delim.ilen();
             set seg_texts.push(src[text_start..i]);
             set seg_spans.push(seg_start..end);
             return finalize_template(finalize, emit, seg_texts, seg_spans, interp_runs, end);
@@ -655,7 +664,7 @@ fn template_scan<K>(
             set i = interp.end;
             set seg_start = i;
         } else {
-            if (c == '\\' && 0 < escapes.len() && i + 1 < i64(src.len())) {
+            if (c == '\\' && 0 < escapes.len() && i + 1 < src.ilen()) {
                 if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
                     return err(LexError {
                         message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
@@ -689,7 +698,7 @@ fn finalize_template<K>(
     let finals = finalize(seg_texts);
     mut toks = [];
     mut trivia = [];
-    let n = i64(seg_texts.len());
+    let n: i64 = seg_texts.len();
     mut k = 0;
     while (k < n) {
         // `k` is always in range (0..n), so the `none` fallbacks below are dead.
@@ -737,7 +746,7 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
     mut depth = 1;
     mut i = at;
     while (0 < depth) {
-        if (!(i < i64(src.len()))) {
+        if (!(i < src.ilen())) {
             return err(LexError {
                 message: "unterminated template literal interpolation",
                 span: open..open + 1,
@@ -860,7 +869,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];
     mut trivia = [];
     mut pos = 0;
-    while (pos < i64(self.len())) {
+    while (pos < self.ilen()) {
         let step = lex_step(self, pos, rules)?;
         if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
@@ -1235,11 +1244,11 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 277103
-binary size: 1754864
-  code: 1099560
-  data: 8132
-  metadata: 647172
+instructions executed: 279104
+binary size: 1755912
+  code: 1099984
+  data: 8276
+  metadata: 647652
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam27
 __builtin_count_while$char$s0$lam32
@@ -1279,6 +1288,7 @@ delimited_len
 esc_str
 finalize_template$Kind
 float_len
+ilen
 int_tok
 interp_scan$Kind
 lex$Kind

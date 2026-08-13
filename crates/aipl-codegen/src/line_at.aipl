@@ -8,8 +8,8 @@ import { enumerate, len, wrapping_add as +, ==, >= } from builtins;
 struct LineAt { line: u64, line_start: u64, line_end: u64 }
 
 pub fn line_at(source: str, offset: u64) -> LineAt {
-    mut line = u64(0);
-    mut line_start = u64(0);
+    mut line: u64 = 0;
+    mut line_start: u64 = 0;
     mut found = false;
     for (let (i, c) : source.enumerate()) {
         if (c == '\n') {

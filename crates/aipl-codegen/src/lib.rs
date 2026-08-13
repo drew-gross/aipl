@@ -7245,22 +7245,36 @@ fn expect_len_operand(actual: &Type, context: &str, span: Span) -> Result<(), Er
 /// only the static type changes. The checker has verified all of this; this is
 /// the codegen-side mirror.
 fn binding_ty(
+    builder: &mut FunctionBuilder,
     value: &Expr,
+    v: Value,
     actual: &Type,
     declared: Option<&Type>,
     name: &str,
-) -> Result<Type, Error> {
+) -> Result<(Value, Type), Error> {
     let Some(declared) = declared else {
-        return Ok(actual.clone());
+        return Ok((v, actual.clone()));
     };
     let actual = aipl_syntax::flex_int_ty(value, actual, declared);
+    // Widths that genuinely differ: the annotation *converts*, which is what
+    // replaced the `u8(..)` form — re-canonicalize the i64-register value to the
+    // declared width (wrapping for a narrowing, extending for a widening),
+    // exactly as the old conversion builtin did. Skipped when flexing already
+    // settled the type, so a literal initializer emits no extra instructions.
+    if actual != *declared {
+        if let (Type::Primitive(pa), Type::Primitive(pd)) = (&actual, declared) {
+            if pa.is_int() && pd.is_int() {
+                return Ok((canon_int(builder, v, *pd), declared.clone()));
+            }
+        }
+    }
     expect_type(
         &actual,
         declared,
         &format!("binding {name:?}"),
         value.span.clone(),
     )?;
-    Ok(declared.clone())
+    Ok((v, declared.clone()))
 }
 
 /// Reject binding a unit value (the result of a function that returns
@@ -12880,6 +12894,9 @@ fn compile_call_expr<M: Module>(
             let result_ty = if is_none_inner(&inner) {
                 default_ty.clone()
             } else {
+                // A bare literal default flexes to the optional's element type,
+                // so `some(u8(3)).value_or(0)` needs no conversion on the `0`.
+                let default_ty = aipl_syntax::flex_int_ty(&args[1], &default_ty, &inner);
                 expect_type(
                     &default_ty,
                     &inner,
@@ -13548,6 +13565,9 @@ fn compile_call_expr<M: Module>(
                     Type::Primitive(Primitive::Bool),
                 )
             } else {
+                // A bare literal queried against a narrow-element set flexes,
+                // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
+                let x_ty = aipl_syntax::flex_int_ty(&args[1], &x_ty, &elem);
                 expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
                 // The runtime reads the queried value through a pointer; spill
                 // the scalar (a `bool` is read back as i64) and pass its address.
@@ -13658,6 +13678,7 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_store(types::I64, zero, slot, 0);
                 (sbase, result_ty)
             } else {
+                let key_t = aipl_syntax::flex_int_ty(&args[1], &key_t, &key_ty);
                 expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
                 // Spill the key and pass its address (a `bool` reads back as i64,
                 // a `str` as its pointer).
@@ -13735,6 +13756,7 @@ fn compile_call_expr<M: Module>(
                     Type::Primitive(Primitive::Bool),
                 )
             } else {
+                let key_t = aipl_syntax::flex_int_ty(&args[1], &key_t, &key_ty);
                 expect_type(&key_t, &key_ty, "contains_key key", args[1].span.clone())?;
                 let ks = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -14090,6 +14112,8 @@ fn compile_call_expr<M: Module>(
                 }
                 x_ty
             } else {
+                // A bare literal pushed onto a narrow-element array flexes.
+                let x_ty = aipl_syntax::flex_int_ty(value, &x_ty, &elem_ty);
                 expect_type(&x_ty, &elem_ty, "push element", value.span.clone())?;
                 elem_ty
             };
@@ -14238,24 +14262,19 @@ fn compile_call_expr<M: Module>(
             // `push` mutates; it produces no value.
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
+        // The `i8(x)`/`u32(x)`/… conversion builtins were removed in favour of a
+        // typed binding (`let n: u8 = x;`), which is where `canon_int` now runs.
+        // The checker rejects these first with the same advice; this mirrors it
+        // so a direct codegen entry point can't fall through to "unknown call".
         _ if Primitive::from_name(name).is_some_and(Primitive::is_int) => {
-            // Integer conversion builtin `i8(x)`/`u32(x)`/… — convert the (integer)
-            // argument to this width by re-canonicalizing the i64-register value.
-            let p = Primitive::from_name(name).expect("guard checked it's an integer primitive");
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!("{name:?} conversion expects 1 arg, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if !is_int_ty(&t) {
-                return Err(Error::at(
-                    format!("{name:?} converts an integer, got {}", type_name(&t)),
-                    args[0].span.clone(),
-                ));
-            }
-            (canon_int(builder, v, p), Type::Primitive(p))
+            return Err(Error::at(
+                format!(
+                    "{name}(..) conversions were removed — bind with the type instead \
+                     (`let n: {name} = ..;`), or drop the conversion entirely if the \
+                     argument is a literal, which takes the type its context expects"
+                ),
+                span.clone(),
+            ));
         }
         "ok" | "err" => {
             // A Result `{ tag, value }` (tag 1 = ok, 0 = err). The unbound side is
@@ -15323,7 +15342,7 @@ fn compile_expr<M: Module>(
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            let t = binding_ty(value, &t, ty.as_ref(), name)?;
+            let (v, t) = binding_ty(builder, value, v, &t, ty.as_ref(), name)?;
             reject_unit_binding(&t, name, value.span.clone())?;
             let mut new_env = env.clone();
             cx.bindings
@@ -15343,7 +15362,7 @@ fn compile_expr<M: Module>(
         }
         ExprKind::LetMut(name, ty, value, body) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            let t = binding_ty(value, &t, ty.as_ref(), name)?;
+            let (v, t) = binding_ty(builder, value, v, &t, ty.as_ref(), name)?;
             reject_unit_binding(&t, name, value.span.clone())?;
             // 8-byte slot, 8-byte aligned: fits any i64/bool/char/str.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
@@ -16029,6 +16048,9 @@ fn compile_expr<M: Module>(
             };
 
             let mut merged_ty: Option<Type> = None;
+            // The arm that produced `merged_ty`, so an earlier literal arm can
+            // still flex to a later narrow-int one.
+            let mut merged_body: Option<&Expr> = None;
             for (i, arm) in arms.iter().enumerate() {
                 builder.switch_to_block(arm_blocks[i]);
                 builder.seal_block(arm_blocks[i]);
@@ -16106,18 +16128,34 @@ fn compile_expr<M: Module>(
                     scopes.pop().expect("arm scope"),
                 );
                 builder.ins().jump(merge, &[BlockArg::Value(av)]);
-                merged_ty = Some(match merged_ty {
-                    None => at,
-                    Some(prev) => merge_types(&prev, &at).ok_or_else(|| {
-                        Error::at(
-                            format!(
-                                "match arms have mismatched types: {} vs {}",
-                                type_name(&prev),
-                                type_name(&at),
-                            ),
-                            span.clone(),
-                        )
-                    })?,
+                // Mirrors the checker: a bare-literal arm flexes to a narrow-int
+                // arm in either order. The emitted value is the same 64-bit
+                // constant either way — only its static type moves — so retyping
+                // after the fact is sound.
+                merged_ty = Some(match merged_ty.take() {
+                    None => {
+                        merged_body = Some(&arm.body);
+                        at
+                    }
+                    Some(prev) => {
+                        let at = aipl_syntax::flex_int_ty(&arm.body, &at, &prev);
+                        let prev = match merged_body {
+                            Some(b) => aipl_syntax::flex_int_ty(b, &prev, &at),
+                            None => prev,
+                        };
+                        let m = merge_types(&prev, &at).ok_or_else(|| {
+                            Error::at(
+                                format!(
+                                    "match arms have mismatched types: {} vs {}",
+                                    type_name(&prev),
+                                    type_name(&at),
+                                ),
+                                span.clone(),
+                            )
+                        })?;
+                        merged_body = Some(&arm.body);
+                        m
+                    }
                 });
             }
 
@@ -16147,7 +16185,7 @@ fn compile_expr<M: Module>(
             let mut vals: Vec<(Value, Type, bool)> = Vec::with_capacity(elems.len());
             for el in elems {
                 let before = scope_depth(scopes);
-                let (v, t) = compile_expr(module, builder, cx, scopes, el)?;
+                let (v, mut t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
                         let ok = is_array_elem(&t)
@@ -16164,7 +16202,12 @@ fn compile_expr<M: Module>(
                         }
                         elem_ty = Some(t.clone());
                     }
-                    Some(expected) => expect_type(&t, expected, "array element", el.span.clone())?,
+                    // A bare literal element flexes to the element type the
+                    // first element established, so `[u64_max(), 1]` is `u64[]`.
+                    Some(expected) => {
+                        t = aipl_syntax::flex_int_ty(el, &t, expected);
+                        expect_type(&t, expected, "array element", el.span.clone())?;
+                    }
                 }
                 let owned_temp = owned_temp_since(scopes, before, v);
                 vals.push((v, t, owned_temp));

@@ -17,7 +17,7 @@ fn fill_section(contents: str, section: str, body: str) -> str {
     // replaces whatever followed it up to (not including) the next header.
     mut out = "";
     mut skipping = false;
-    mut line_start = u64(0);
+    mut line_start: u64 = 0;
     for (let (i, c) : contents.enumerate()) {
         if (c == '\n') {
             let line = contents[line_start..i];

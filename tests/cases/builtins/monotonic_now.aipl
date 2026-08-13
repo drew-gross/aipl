@@ -16,17 +16,17 @@ fn readings_never_go_backwards() !clock -> bool {
 }.test({
     assert(readings_never_go_backwards());
     // 0 is what an unreadable clock reads as, so a live one is never there.
-    assert(monotonic_now() > u64(0));
+    assert(monotonic_now() > 0);
 })
 
 // Loose on both ends deliberately: `sleep` never returns early, and the ceiling
 // is far enough out that a loaded machine can't trip it.
-fn is_about_one_second(ns: u64) -> bool { ns > u64(500000000) && ns < u64(60000000000) }.test({
-    assert(is_about_one_second(u64(1000000000))); // one second, on the nose
-    assert(is_about_one_second(u64(1400000000))); // a slow second still counts
-    assert(!is_about_one_second(u64(1000000))); // a millisecond clock: 1000x small
-    assert(!is_about_one_second(u64(1000))); // a microsecond clock: 1e6 too small
-    assert(!is_about_one_second(u64(0)));
+fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }.test({
+    assert(is_about_one_second(1000000000)); // one second, on the nose
+    assert(is_about_one_second(1400000000)); // a slow second still counts
+    assert(!is_about_one_second(1000000)); // a millisecond clock: 1000x small
+    assert(!is_about_one_second(1000)); // a microsecond clock: 1e6 too small
+    assert(!is_about_one_second(0));
 })
 
 fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
@@ -35,7 +35,7 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
         ok(r) => monotonic_now() - start,
         // A launch failure reads as no elapsed time at all, which fails the
         // check below — `sleep` has to actually run for this to mean anything.
-        err(e) => u64(0),
+        err(e) => 0,
     }
 }.test({
     // Sleeping a second has to show up as roughly a billion nanoseconds. This is
@@ -52,7 +52,7 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 72
 instructions executed: 217
-binary size: 3920
+binary size: 3896
   code: 1096
-  data: 631
+  data: 607
   metadata: 2193

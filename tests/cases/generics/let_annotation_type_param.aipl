@@ -21,7 +21,7 @@ fn collect<T: any>(xs: T[]) -> T[] {
     // Two instantiations from the same body: each substitutes its own `T`.
     assert(collect([1, 2, 3]) == [1, 2, 3]);
     assert(collect(["a", "b"]) == ["a", "b"]);
-    assert(collect([]).len() == u64(0));
+    assert(collect([]).len() == 0);
 })
 
 // An annotation on an immutable binding, and one naming `T` bare rather than

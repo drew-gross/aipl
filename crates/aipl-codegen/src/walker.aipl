@@ -596,7 +596,7 @@ fn skip_comment(self: W) -> W {
 // there was no comment — the "nothing here" doc.
 fn is_empty_doc(self: Doc) -> bool {
     match (self) {
-        Concat(ds) => ds.len() == u64(0),
+        Concat(ds) => ds.len() == 0,
         Text(_) => false,
         RawBlock(_) => false,
         IfBroken(_) => false,
@@ -1668,7 +1668,7 @@ fn index_or_from(self: W) -> WDocs!FmtError {
 }
 
 fn call_count(segs: Seg[]) -> u64 {
-    mut n = u64(0);
+    mut n: u64 = 0;
     for (let s : segs) {
         if (s.is_call) {
             set n = n + 1;
@@ -2082,7 +2082,7 @@ fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
 fn template_verbatim(self: W) -> WDoc!FmtError {
     match (self.peek()) {
         none => err(self.err_here("formatter: unterminated template literal in token stream")),
-        some(t) => self.template_scan(t.span.start, u64(0)),
+        some(t) => self.template_scan(t.span.start, 0),
     }
 }
 
@@ -2190,7 +2190,7 @@ fn hugs_sole_arg(self: W) -> bool {
 // match, which on a large construct is far too deep to recurse.
 fn hug_close(self: W, start: u64) -> u64? {
     mut i = start;
-    mut depth = u64(0);
+    mut depth: u64 = 0;
     while (i < self.toks.len()) {
         let t = self.tok_text(i);
         if (t == "(" || t == "[" || t == "{" || t == "#{") {
@@ -2235,8 +2235,8 @@ fn call_arg_list(args: Doc[], hug: bool) -> Doc {
 // file dispatch on token *text*, not kind.
 fn toks_of(src: str) -> FmtTok[] {
     mut out = [];
-    mut start = u64(0);
-    mut i = u64(0);
+    mut start: u64 = 0;
+    mut i: u64 = 0;
     while (i < src.len()) {
         if (src[i] == some(' ')) {
             if (start < i) {
@@ -2650,11 +2650,11 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3085814
-binary size: 3018376
-  code: 1721948
+instructions executed: 3086758
+binary size: 3018824
+  code: 1722188
   data: 25740
-  metadata: 1270688
+  metadata: 1270896
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46
@@ -2712,6 +2712,7 @@ __m9__between_len
 __m9__delimited_len
 __m9__finalize_template$__m8__AiplTok
 __m9__float_len
+__m9__ilen
 __m9__interp_scan$__m8__AiplTok
 __m9__lex$__m8__AiplTok
 __m9__lex_step$__m8__AiplTok

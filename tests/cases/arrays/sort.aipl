@@ -19,7 +19,7 @@ fn sorted_ints() -> i64[] { [3, 1, 2].sort() }.test({
     assert([3, 2, 1].sort() == [1, 2, 3]);
     assert([2, 1, 2, 1].sort() == [1, 1, 2, 2]);
     assert([7].sort() == [7]);
-    assert([].sort().len() == u64(0));
+    assert([].sort().len() == 0);
 })
 
 // Signed integers order numerically, not by their bit pattern.

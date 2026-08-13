@@ -4,7 +4,7 @@ import { now_nanos } from builtins;
 // two (`now_nanos` and `monotonic_now`); binding one would leave the body able
 // to reach the real clock while the enclosing function stops declaring the
 // effect — so a partial shim is rejected rather than silently half-applied.
-fn fake() -> u64 { u64(1) }
+fn fake() -> u64 { 1 }
 
 fn reads() !clock -> u64 { now_nanos() }
 

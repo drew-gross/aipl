@@ -32,8 +32,8 @@ pub fn escape_text(self: str) -> str {
 // occur — the matcher already rejected such a token as unterminated.
 pub fn unescape(self: str) -> str {
     mut out = "";
-    mut run_start = u64(0);
-    mut i = u64(0);
+    mut run_start: u64 = 0;
+    mut i: u64 = 0;
     while (i < self.len()) {
         if (self[i] == some('\\') && i + 1 < self.len()) {
             set out = out +++ self[run_start..i] +++ self[i + 1..i + 2].escape_text();
