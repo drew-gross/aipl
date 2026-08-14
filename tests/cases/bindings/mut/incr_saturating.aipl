@@ -1,0 +1,31 @@
+import { print, saturating_increment as ++, to_str } from builtins;
+
+// `++` has the same flavors `+` does: `saturating_increment as ++` clamps at the
+// type's bound where `wrapping_increment as ++` (see `incr`) wraps around it.
+// Both lower to the same builtin their `+` counterpart does — incrementing is
+// adding 1 — so the flavor is chosen entirely by which one the file imports.
+fn main() !prints {
+    mut n: u8 = 253;
+    set n++;
+    print(n.to_str()); // 254
+    set n++;
+    print(n.to_str()); // 255 — at the bound
+    set n++;
+    print(n.to_str()); // 255 — clamped, where wrapping would give 0
+}
+--- stdout ---
+254
+255
+255
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 145
+binary size: 1464
+  code: 508
+  data: 1
+  metadata: 955
+--- monomorphizations ---
+main

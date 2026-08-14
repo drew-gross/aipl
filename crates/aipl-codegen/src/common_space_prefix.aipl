@@ -1,7 +1,7 @@
 // A dogfooded helper, no longer wired in (the raw-string de-denter moved to the
 // dogfooded `dedent`); kept as a well-tested example. Returns a *length* rather
 // than a slice deliberately — AIPL has no substring operator.
-import { &&, ++, == } from builtins;
+import { wrapping_increment as ++, &&, == } from builtins;
 
 pub fn common_space_prefix(a: str, b: str) -> i64 {
     // Walk forward while both strings still have a space at index `i`. `s[i]`

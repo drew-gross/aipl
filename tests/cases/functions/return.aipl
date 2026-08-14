@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_sub as -, ++, +++, <=, == } from builtins;
+import { print, to_str, wrapping_increment as ++, wrapping_sub as -, +++, <=, == } from builtins;
 
 // `return value;` early-exits the enclosing function. It's a statement (like
 // `set`), so it appears followed by `;`; control never falls through it, and the

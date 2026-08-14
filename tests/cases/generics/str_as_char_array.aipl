@@ -1,4 +1,4 @@
-import { ++, == } from builtins;
+import { wrapping_increment as ++, == } from builtins;
 
 // A `str` is implicitly usable as `char[]`: passing a string to a generic `T[]`
 // parameter infers `T = char` and materializes the string's bytes into a real

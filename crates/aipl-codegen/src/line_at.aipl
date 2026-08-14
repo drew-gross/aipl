@@ -3,7 +3,7 @@
 // `source` and a byte `offset`, it returns the 0-based line index, the byte
 // offset of that line's first byte, and the byte offset of the line's end
 // (the '\n' terminator, or source.len() for the last line).
-import { enumerate, len, wrapping_add as +, ++, ==, >= } from builtins;
+import { enumerate, len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
 
 struct LineAt { line: u64, line_start: u64, line_end: u64 }
 

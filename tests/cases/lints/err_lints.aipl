@@ -104,7 +104,7 @@ error: field "y" is set to the identifier of the same name — use the shorthand
 22 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                                     ^
 
-error: adding 1 to "n" — use the increment form "set n++;" (or append #[allow] to this line to keep it)
+error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:33:9
    |
 33 |     set n = n + 1;

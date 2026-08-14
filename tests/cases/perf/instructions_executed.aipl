@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, ++ } from builtins;
+import { print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 // Exercises the "instructions executed" performance counter. The metric is the
 // sum, over every basic-block entry at runtime, of that block's (compile-time

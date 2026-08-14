@@ -48,13 +48,13 @@ numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
   make the rest of the .len() wrappers in walker return u64
 
-operators:
-  make saturating_increment and wrapping_increment
+mod_aipl:
+  create it
+  probably need the formatter to be ast based first
 
 lint:
   x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
-  set x = x + 1; lint should only apply when ++ and + are the same type of add (wrapping vs. saturating)
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
@@ -76,8 +76,9 @@ recovering check:
   can recover from type errors even?
   can for sure recover from format errors
 
-test isolation:
+tests:
   make tests unable to write files, using shimming
+  make tests leverage better parallelism and caching by using more files
 
 lex json
 find a more natural way of testing builtins

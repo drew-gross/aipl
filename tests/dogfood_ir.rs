@@ -572,9 +572,9 @@ fn checked_in_ir_is_current() {
                 path.display()
             )
         });
-        assert_eq!(
-            lf(&generated),
-            lf(&checked_in),
+        // IR is too large to print on error, so don't use assert_eq!
+        assert!(
+            lf(&generated) == lf(&checked_in),
             "IR {} is stale. Regenerate with: {FILL_CMD}",
             path.display()
         );

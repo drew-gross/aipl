@@ -1,8 +1,10 @@
-import { ++, <, == } from builtins;
+import { wrapping_increment as ++, <, == } from builtins;
 
-// `set n++;` increments a mut binding by one. `++` is its own operator, imported
-// separately from `+` (it lowers to a `wrapping_add` internally, but a file that
-// uses `set n++;` imports `++`, not `+`).
+// `set n++;` increments a mut binding by one. `++` is its own operator with its
+// own flavors, imported separately from `+`: `wrapping_increment as ++` here,
+// `saturating_increment as ++` for the clamping one (see
+// `bindings/mut/incr_saturating`). Each shares its `+` counterpart's
+// implementation, since incrementing is adding 1.
 fn count_to(limit: i64) -> i64 {
     mut n = 0;
     while (n < limit) {

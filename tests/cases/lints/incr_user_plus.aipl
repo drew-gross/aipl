@@ -1,0 +1,28 @@
+// `+` need not be a builtin at all: bound to one of your own functions, no `++`
+// flavor can match it, so the increment lint stays quiet rather than
+// recommending a form that would call something else.
+import { print, to_str } from builtins;
+import { my_custom_add as + } from "./mymath.aipl";
+
+fn main() !prints {
+    mut n = 0;
+    set n = n + 1; // == my_custom_add(n, 1), not an increment
+    print(n.to_str());
+}
+--- file: mymath.aipl ---
+import { wrapping_add as + } from builtins;
+pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
+--- stdout ---
+1001
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 52
+binary size: 1176
+  code: 332
+  data: 1
+  metadata: 843
+--- monomorphizations ---
+main

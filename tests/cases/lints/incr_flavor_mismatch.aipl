@@ -1,0 +1,29 @@
+import { print, saturating_increment as ++, to_str, wrapping_add as + } from builtins;
+
+// `+` and `++` here are *different* flavors — a wrapping add beside a saturating
+// increment — so `set n = n + 1;` and `set n++;` genuinely differ and the lint
+// stays quiet. It fires only when the file's two spellings resolve to the same
+// implementation.
+fn main() !prints {
+    mut n: u8 = 255;
+    set n = n + 1; // wraps to 0
+    print(n.to_str());
+    mut m: u8 = 255;
+    set m++; // saturates at 255
+    print(m.to_str());
+}
+--- stdout ---
+0
+255
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 101
+binary size: 1320
+  code: 420
+  data: 1
+  metadata: 899
+--- monomorphizations ---
+main

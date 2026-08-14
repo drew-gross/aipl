@@ -608,7 +608,7 @@ fn call_values_marshals_optional_array_return() {
 /// that reads every element, so a mis-sized stride or a wrong tag shows up as a
 /// wrong answer rather than passing unnoticed.
 const ARRAY_PARAM_SRC: &str = "\
-import { len, push, wrapping_add as +, wrapping_sub as -, ++, +++, == } from builtins;
+import { len, push, wrapping_add as +, wrapping_sub as -, wrapping_add as ++, +++, == } from builtins;
 struct Span { start: i64, end: i64 }
 variant Token = Eof | Ident(str) | Count(i64)
 

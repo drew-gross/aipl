@@ -1,4 +1,4 @@
-import { ++, == } from builtins;
+import { wrapping_increment as ++, == } from builtins;
 
 // A for-loop body needn't end in an expression — its value is discarded,
 // so no trailing `0` is required. The first loop is statement-only; the

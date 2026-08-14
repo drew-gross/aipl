@@ -469,6 +469,14 @@ impl Loader {
                         "+" => Some(("add", "wrapping_add", Some("saturating_add"))),
                         "-" => Some(("subtract", "wrapping_sub", Some("saturating_sub"))),
                         "*" => Some(("multiply", "wrapping_mul", None)),
+                        // `set n++;` adds 1, so it has the same flavors its `+`
+                        // does — and picking one is what lets a file's increment
+                        // agree with its addition.
+                        "++" => Some((
+                            "increment",
+                            "wrapping_increment",
+                            Some("saturating_increment"),
+                        )),
                         _ => None,
                     } {
                         let sat = saturating
@@ -549,12 +557,15 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         if view.contains_key(spelling) {
             Ok(())
         } else {
-            // The pluggable-semantics operators (`+`/`-`/`*`) have no bare
-            // spelling — each is a `wrapping_*` builtin aliased to the operator.
+            // The pluggable-semantics operators (`+`/`-`/`*`/`++`) have no bare
+            // spelling — each is a named builtin aliased to the operator. Suggest
+            // the wrapping flavor, the one a file that hasn't thought about
+            // overflow wants.
             let hint = match spelling {
                 "+" => "wrapping_add as +".to_string(),
                 "-" => "wrapping_sub as -".to_string(),
                 "*" => "wrapping_mul as *".to_string(),
+                "++" => "wrapping_increment as ++".to_string(),
                 _ => spelling.to_string(),
             };
             Err(Error::at(
@@ -1037,14 +1048,13 @@ fn rewrite_expr(
                 Some(target) if target != spelling => {
                     ExprKind::Call(target.clone(), vec![lhs, rhs], false)
                 }
-                // The increment operator `++` (`'P'`) is gated on its own
-                // spelling but is just a `wrapping_add`; collapse it to `+` now
-                // (gating already ran) so codegen/mono never see the
-                // increment-only char.
-                _ => {
-                    let op = if *op == 'P' { '+' } else { *op };
-                    ExprKind::Binop(Box::new(lhs), op, Box::new(rhs))
-                }
+                // `++` (`'P'`) always takes the branch above: like `+`, it has no
+                // bare form, so it is only ever bound to a named flavor
+                // (`wrapping_increment`/`saturating_increment`, i.e. one of the
+                // `__builtin_*_add` impls) or to a user function — and gating has
+                // already rejected a use with no binding at all. So no `'P'`
+                // survives the rewrite into mono or codegen.
+                _ => ExprKind::Binop(Box::new(lhs), *op, Box::new(rhs)),
             }
         }
         ExprKind::If(cond, then_b, else_b) => ExprKind::If(

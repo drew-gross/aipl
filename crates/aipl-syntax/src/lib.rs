@@ -1195,24 +1195,51 @@ pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
     }
 }
 
+/// Every named operator builtin: `(builtin name, operator spelling, canonical
+/// impl)`. The operator spelling is what the name must be aliased to on import
+/// (`import { wrapping_add as + } from builtins;`), and the canonical impl is
+/// the reserved `__builtin_*` function a use of that operator resolves to
+/// (intrinsified by codegen).
+///
+/// Several builtins may provide the same operator (`wrapping_add`/
+/// `saturating_add` both give `+`), which is what lets a file pick the semantics
+/// it wants: the operator use dispatches on the resolved impl, not the spelling.
+/// And several may share one impl — `wrapping_increment` is `++` over the same
+/// `__builtin_wrapping_add` that `wrapping_add` gives `+`, since `set n++;` is
+/// an add of `1`. That shared impl is exactly what makes two spellings
+/// comparable: the increment lint pairs a file's `+` with the `++` of matching
+/// semantics by looking for the flavor with the same impl.
+///
+/// This table is the single place operator builtins are declared — extend it
+/// (not per-operator special-cases) to add flavors.
+const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
+    ("wrapping_add", "+", "__builtin_wrapping_add"),
+    ("saturating_add", "+", "__builtin_saturating_add"),
+    ("wrapping_sub", "-", "__builtin_wrapping_sub"),
+    ("saturating_sub", "-", "__builtin_saturating_sub"),
+    ("wrapping_mul", "*", "__builtin_wrapping_mul"),
+    ("wrapping_increment", "++", "__builtin_wrapping_add"),
+    ("saturating_increment", "++", "__builtin_saturating_add"),
+];
+
 /// If `name` is a named operator builtin, the `(operator, canonical impl)` it
-/// provides — the operator spelling it must be aliased to, and the reserved
-/// `__builtin_*` function the operator resolves to (intrinsified by codegen). An
-/// operator builtin must be imported aliased to its operator: `import {
-/// wrapping_add as + } from builtins;`. Multiple builtins map to the same operator
-/// (`wrapping_add`/`saturating_add` both provide `+`), letting a file pick the
-/// semantics it wants; the operator use dispatches on the resolved impl, not on
-/// the spelling. This registry is the single place operator builtins are declared
-/// — extend it (not per-operator special-cases) to add flavors.
+/// provides — see [`OPERATOR_BUILTINS`].
 pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static str)> {
-    match name {
-        "wrapping_add" => Some(("+", "__builtin_wrapping_add")),
-        "saturating_add" => Some(("+", "__builtin_saturating_add")),
-        "wrapping_sub" => Some(("-", "__builtin_wrapping_sub")),
-        "saturating_sub" => Some(("-", "__builtin_saturating_sub")),
-        "wrapping_mul" => Some(("*", "__builtin_wrapping_mul")),
-        _ => None,
-    }
+    OPERATOR_BUILTINS
+        .iter()
+        .find(|(n, _, _)| *n == name)
+        .map(|(_, op, canonical)| (*op, *canonical))
+}
+
+/// The operator builtin providing `op` with the semantics of `canonical_impl` —
+/// the inverse of [`operator_builtin`], for naming the import that pairs with
+/// one a file already has (`__builtin_saturating_add` + `"++"` →
+/// `saturating_increment`).
+pub fn operator_builtin_named(op: &str, canonical_impl: &str) -> Option<&'static str> {
+    OPERATOR_BUILTINS
+        .iter()
+        .find(|(_, o, c)| *o == op && *c == canonical_impl)
+        .map(|(name, _, _)| *name)
 }
 
 /// Whether `s` spells a built-in operator that must be imported to be used
@@ -1882,9 +1909,10 @@ pub mod lint {
         each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
         each_expr(program, &mut |e| eta_lambda(e, &mut hits));
         each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
-        // Only where the two spellings provably agree — see `plus_means_incr`.
-        if plus_means_incr(program) {
-            each_expr(program, &mut |e| incr_by_one(e, &mut hits));
+        // Only where a `++` flavor provably matches this file's `+` — see
+        // `matching_increment`, which also names the import when it's missing.
+        if let Some(incr) = matching_increment(program) {
+            each_expr(program, &mut |e| incr_by_one(e, incr, &mut hits));
         }
         hits.retain(|e| match &e.span {
             Some(sp) => !allowed.contains(&line_of(src, sp.start)),
@@ -2043,13 +2071,16 @@ pub mod lint {
     /// `set x = x + 1;` — an increment written the long way; `set x++;` is the
     /// form for it. Either operand order counts (`x + 1` and `1 + x` both add
     /// one), and `set x++;` itself never trips this: it parses as the *increment*
-    /// operator (`'P'`), which the loader only collapses to `'+'` after lints
-    /// have run.
+    /// operator (`'P'`), which is a different node entirely.
     ///
     /// Only a bare-identifier LHS is flagged, because that is all `set x++;`
     /// accepts — a field store (`set p.n = p.n + 1;`) has no shorter spelling to
     /// recommend.
-    fn incr_by_one(e: &Expr, hits: &mut Vec<Error>) {
+    ///
+    /// `incr` is the `++` import to recommend, from [`matching_increment`]: the
+    /// flavor that adds the way this file's `+` does. `None` when the file
+    /// already imports it, so the message stays short.
+    fn incr_by_one(e: &Expr, incr: Option<&str>, hits: &mut Vec<Error>) {
         let ExprKind::Assign(lhs, value, _) = &e.kind else {
             return;
         };
@@ -2064,39 +2095,64 @@ pub mod lint {
         if !((is_target(l) && is_one(r)) || (is_one(l) && is_target(r))) {
             return;
         }
+        // Name the import too when it's missing: `++` has no bare form, so
+        // following the advice without it only trades this error for the
+        // operator gate's.
+        let import = incr
+            .map(|n| format!(", importing `{n} as ++` from builtins"))
+            .unwrap_or_default();
         hits.push(Error::at(
             format!(
-                "adding 1 to \"{name}\" — use the increment form \"set {name}++;\" \
+                "adding 1 to \"{name}\" — use the increment form \"set {name}++;\"{import} \
                  (or append #[allow] to this line to keep it)"
             ),
             e.span.clone(),
         ));
     }
 
-    /// Whether this file's `+` and `++` provably mean the same addition, which is
-    /// what makes [`incr_by_one`]'s advice behavior-preserving.
+    /// The `++` flavor that increments the way this file's `+` adds, and whether
+    /// it still needs importing — `Some(None)` when the file already has it,
+    /// `Some(Some(name))` when [`incr_by_one`] should name it, and `None` when
+    /// the lint must stay quiet.
     ///
-    /// Both operators are bound by import, and neither binding is fixed: a file
-    /// may write `import { saturating_add as + }`, or `import { my_add as + }
-    /// from "./m.aipl"`, and rewriting such a `+ 1` to `++` would silently change
-    /// which function runs. So the lint fires only for a `+` imported as the
-    /// builtin `wrapping_add` — what `++` lowers to — and only when `++` itself
-    /// is unbound or bound to that same builtin.
-    fn plus_means_incr(program: &Program) -> bool {
-        let (mut plus_is_wrapping, mut incr_is_builtin) = (false, true);
+    /// Both operators are bound by import and neither binding is fixed, so the
+    /// two spellings only agree when they resolve to the same implementation:
+    /// `wrapping_add as +` pairs with `wrapping_increment as ++`, and
+    /// `saturating_add as +` with `saturating_increment as ++` — each pair
+    /// sharing one `__builtin_*_add` (see `OPERATOR_BUILTINS`). The lint stays
+    /// quiet when the file's `+` is a user function (no `++` flavor could match
+    /// it), and when its `++` is already bound to the *other* flavor, where
+    /// `set x++;` would add differently than the `+ 1` it replaces.
+    fn matching_increment(program: &Program) -> Option<Option<&'static str>> {
+        // What each operator's import resolves to: `None` for unbound, and
+        // `Some(None)` for a binding that isn't an operator builtin at all (a
+        // user function), which no `++` flavor can match.
+        let (mut plus, mut incr) = (None, None);
         for item in &program.items {
             let Item::Import(decl) = item else {
                 continue;
             };
             let from_builtins = matches!(decl.source, ImportSource::Builtins { .. });
             for n in &decl.names {
+                let canonical = from_builtins
+                    .then(|| super::operator_builtin(&n.name))
+                    .flatten()
+                    .map(|(_, canonical)| canonical);
                 match n.local() {
-                    "+" => plus_is_wrapping = from_builtins && n.name == "wrapping_add",
-                    "++" => incr_is_builtin = from_builtins && n.name == "++",
+                    "+" => plus = Some(canonical),
+                    "++" => incr = Some(canonical),
                     _ => {}
                 }
             }
         }
-        plus_is_wrapping && incr_is_builtin
+        let plus = plus??;
+        let name = super::operator_builtin_named("++", plus)?;
+        match incr {
+            // Already imported, and it adds the same way: recommend the form alone.
+            Some(Some(c)) if c == plus => Some(None),
+            // Bound to something else — the other flavor, or a user function.
+            Some(_) => None,
+            None => Some(Some(name)),
+        }
     }
 }

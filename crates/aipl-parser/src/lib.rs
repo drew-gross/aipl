@@ -101,6 +101,9 @@ gazelle! {
                     | IDENT AS RANGLE => aliased_gt
                     | IDENT AS OROR => aliased_or
                     | IDENT AS BANG => aliased_bang
+                    // `wrapping_increment as ++` — `++` has no bare form either,
+                    // so like `+` it is only ever reached through an alias.
+                    | IDENT AS PLUSPLUS => aliased_plusplus
                     | OP => op
                     | MINUS => op_minus
                     | LANGLE => op_lt
@@ -748,6 +751,7 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::AliasedLt((name, span)) => name_as_op(name, span, "<"),
             aipl::ImportName::AliasedGt((name, span)) => name_as_op(name, span, ">"),
             aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
+            aipl::ImportName::AliasedPlusplus((name, span), _) => name_as_op(name, span, "++"),
             aipl::ImportName::AliasedBang((name, span)) => name_as_op(name, span, "!"),
             // Operator imports (`import { ==, < } from builtins`). The `OP`
             // span isn't needed here — operator imports rarely conflict, and the
@@ -759,9 +763,11 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::OpGt => op_import(">"),
             aipl::ImportName::OpOr => op_import("||"),
             aipl::ImportName::OpBang => op_import("!"),
-            // `import { ++ } from builtins;` — the increment operator. Imported
-            // on its own spelling (not via `+`); the span is unused like the
-            // other bare operators.
+            // `import { ++ } from builtins;` — parsed so the loader can reject it
+            // with the "no bare form" message, exactly as it does for a bare `+`:
+            // `++` is reached through `wrapping_increment as ++` /
+            // `saturating_increment as ++`. The span is unused like the other bare
+            // operators.
             aipl::ImportName::OpPlusplus(_) => op_import("++"),
         })
     }

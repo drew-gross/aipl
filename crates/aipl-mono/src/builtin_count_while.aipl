@@ -1,4 +1,4 @@
-import { !, ++, <=, == } from builtins;
+import { wrapping_increment as ++, !, <=, == } from builtins;
 
 // The AIPL implementation of the `count_while` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_count_while`
