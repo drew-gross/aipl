@@ -9,13 +9,17 @@
 # six, so it's the whole sequence in a fraction of the tokens.
 #
 # Order & why:
-#   1. Format first — `cargo fmt` (Rust) + the `format_corpus` helper (every
+#   1. `cargo fmt` (Rust), then a build, then the `format_corpus` helper (every
 #      checked-in `.aipl`), then the compile check + doctests. Formatting is cheap
-#      and *span-shifting*, so doing it up front means a formatting-only fix never
-#      costs a second full test run. Both formatters run *before* the compile
-#      check, because the corpus includes the `.aipl` files compiled into
-#      aipl-codegen: reformatting one after a build would invalidate it and hand
-#      the discovery run a rebuild it shouldn't be paying for.
+#      and *span-shifting*, so doing it ahead of the test runs means a
+#      formatting-only fix never costs a second full-corpus run.
+#
+#      The build is its own step for attribution: every step here is a `cargo`
+#      invocation, so whichever runs first silently absorbs any pending rebuild —
+#      which is how `aipl fmt` came to report ~850s for ~38s of formatting. It
+#      goes after `cargo fmt` (which can invalidate what it built) and before
+#      `format_corpus` (which, since the dogfooded `.aipl` sources became
+#      run-time reads, no longer can).
 #   2. Discovery run. Three outcomes:
 #        - green                       -> done.
 #        - only fillable staleness      -> remediate (steps 3-5), then re-confirm.
@@ -65,7 +69,7 @@ cd "$REPO"
 # The dogfood-IR corpus run spawns the compiler as a subprocess whose CWD isn't
 # the repo root, so this path must be absolute.
 # Two artifacts are staged and promoted together: the parser-hook engine and the
-# formatter engine (see FMT_SOURCES in aipl-codegen). Either one pending means an
+# formatter engine (see FMT_SOURCE_FILES in aipl-codegen). Either one pending means an
 # interrupted workflow.
 STAGED="$REPO/crates/aipl-codegen/src/dogfood.clif.staged"
 STAGED_FMT="$REPO/crates/aipl-codegen/src/fmt.clif.staged"
@@ -173,26 +177,38 @@ or discard it
     rm -f '$STAGED' '$STAGED_FMT'"
 fi
 
-# --- 1. Format (cheap, up front, span-shifting) --------------------------------
+# --- 1. Format + build (cheap, up front, span-shifting) ------------------------
 
 run_step "cargo fmt (Rust)" cargo fmt
 [ $? -eq 0 ] || { save_out; fail "cargo fmt" "$(cat "$STEP_OUT")"; }
+
+# Build everything up front, as its own step, purely so the timing report
+# attributes the compile to the compile. Every step below is a `cargo` invocation
+# that would otherwise absorb whatever rebuild is pending — and it was always the
+# *first* one that paid, which made `aipl fmt` read as ~850s when the formatting
+# itself is ~38s and the other ~812s was a rebuild triggered by an edit to a Rust
+# source. Right after `cargo fmt`, so a reformat of a `.rs` file can't invalidate
+# what this just built.
+#
+# A Rust compile error now also surfaces here, first and on its own, instead of
+# inside the formatting step.
+run_step "nextest --no-run (build)" cargo nextest run --no-run --color never
+[ $? -eq 0 ] || { save_out; fail "build" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
 
 # `format_corpus` rewrites any mis-formatted `.aipl` in place, then fails on
 # purpose to show its summary — so its non-zero exit is expected; a genuine
 # formatter error prints "format failed:".
 #
-# It runs *before* the compile check, not after, because the corpus it reformats
-# includes `crates/aipl-codegen/src/*.aipl` — ~28 of which are `include_str!`d
-# into aipl-codegen. Reformatting one of those after a full build invalidates it,
-# and the discovery run then silently pays a ~730s rebuild. Ahead of the compile
-# check, that invalidation costs nothing: the build that follows was going to
-# happen anyway.
+# Formatting stays ahead of the *test* runs because it is span-shifting: doing it
+# up front means a formatting-only fix never costs a second full-corpus run.
 #
-# The cost of going first is that this step builds the `fmt` test binary itself,
-# so a Rust compile error surfaces here rather than in the dedicated step below.
-# That's harmless: a build failure means `format_corpus` never ran, nothing was
-# reformatted, and the compile check immediately after reports the error properly.
+# It no longer has to run ahead of the build to avoid invalidating it. The
+# `crates/aipl-codegen/src/*.aipl` this reformats used to be `include_str!`d, so
+# rewriting one after a build cost a ~730s rebuild; they are read at run time now,
+# and nothing's fingerprint depends on them. What remains embedded is
+# `crates/aipl-mono/src/*.aipl` (the AIPL-defined builtins), so reformatting one
+# of *those* does still invalidate aipl-mono — which the compile check below
+# absorbs and reports as its own step.
 run_step "aipl fmt (format_corpus)" helper format_corpus
 if grep -q 'format failed:' "$STEP_OUT"; then
     save_out; fail "aipl fmt" "$(grep -n 'format failed:' "$STEP_OUT")"
@@ -202,9 +218,11 @@ if [ -n "${reformatted:-}" ] && [ "$reformatted" -gt 0 ]; then
     printf '%s    (reformatted %s .aipl file(s))%s\n' "$dim" "$reformatted" "$off" >&2
 fi
 
-# Compile everything (incl. every test binary) so a compile error surfaces here
-# cleanly rather than buried in a test run's output — and so the discovery run
-# starts from a fully built tree whatever the step above just reformatted.
+# Re-compile after the formatters, so the discovery run starts from a fully built
+# tree whatever they just rewrote — a reformatted `crates/aipl-mono/src/*.aipl`
+# (still `include_str!`d) invalidates aipl-mono, and that rebuild belongs to this
+# step rather than to the run below. A no-op second or two when they changed
+# nothing, which is the common case.
 run_step "nextest --no-run (compile check)" cargo nextest run --no-run --color never
 [ $? -eq 0 ] || { save_out; fail "compile" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
 
