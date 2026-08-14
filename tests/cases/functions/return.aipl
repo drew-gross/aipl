@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, wrapping_sub as -, +++, <=, == } from builtins;
+import { print, to_str, wrapping_sub as -, ++, +++, <=, == } from builtins;
 
 // `return value;` early-exits the enclosing function. It's a statement (like
 // `set`), so it appears followed by `;`; control never falls through it, and the
@@ -21,7 +21,7 @@ fn first_index_reaching(xs: i64[], limit: i64) -> str {
         if (limit <= x) {
             return to_str(i);
         };
-        set i = i + 1;
+        set i++;
     }
     log
 }

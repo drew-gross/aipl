@@ -1,4 +1,4 @@
-import { push, wrapping_add as +, == } from builtins;
+import { push, ++, == } from builtins;
 
 // A generic that iterates the array elements (binding each as the concrete
 // element type per instance) and counts them. Exercises element-level body
@@ -7,7 +7,7 @@ import { push, wrapping_add as +, == } from builtins;
 fn count(v: any[]) -> i64 {
     mut n = 0;
     for (let x : v) {
-        set n = n + 1;
+        set n++;
     }
     n
 }.test({

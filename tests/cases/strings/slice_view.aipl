@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, +++, == } from builtins;
+import { print, to_str, ++, +++, == } from builtins;
 
 // A slice of a long (heap) string whose result is > 7 bytes shares the source's
 // buffer as a *view*. A view is still a plain `str`: it prints, renders with
@@ -12,7 +12,7 @@ fn main() !prints {
     print(to_str(v)); // "ello, worl"
     mut n = 0;
     for (let c : v) {
-        set n = n + 1;
+        set n++;
     }
     print(to_str(n)); // 10
     print(v +++ "!"); // ello, worl!

@@ -41,9 +41,6 @@ shim:
   shim the rest of the effects
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
-syntax:
-  remove the ability to cast literals
-
 types:
   an array should be typed by ALL it's components, not just the first
 
@@ -51,8 +48,13 @@ numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
   make the rest of the .len() wrappers in walker return u64
 
+operators:
+  make saturating_increment and wrapping_increment
+
 lint:
   x[0..] etc should just be x
+  make a regex-like langauge for expressions to make lints easier to implement
+  set x = x + 1; lint should only apply when ++ and + are the same type of add (wrapping vs. saturating)
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
@@ -67,6 +69,15 @@ optimizations:
 
 effects:
   all effects should be shimmable actually
+
+recovering check:
+  check should error on lint failures, but still run tests and report results
+  can recover from parse errors too and run tests
+  can recover from type errors even?
+  can for sure recover from format errors
+
+test isolation:
+  make tests unable to write files, using shimming
 
 lex json
 find a more natural way of testing builtins
@@ -164,8 +175,6 @@ Nested matching e.g.
 implement is_ok_and and is_err
 instead of err_message use x == err(...)
 
-set k++;
-
 use template literals more than concat
 
 make a function composition operator
@@ -250,7 +259,7 @@ make a strip_trailing_whitespace if I can figure out a good name for it (that is
 
 Allow int literals to flex to the type they are being assinged to / passed as
 
-len should return unsigned int
+len should return unsigned int, including len-like functions
 
 narrower ints should take up less space
 

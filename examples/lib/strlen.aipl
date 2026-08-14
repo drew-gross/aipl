@@ -1,4 +1,4 @@
-import { wrapping_add as + } from builtins;
+import { ++ } from builtins;
 
 // `len` implemented in AIPL itself rather than as a builtin: walk the
 // string char-by-char with a `for` loop, incrementing a mutable counter.
@@ -10,7 +10,7 @@ import { wrapping_add as + } from builtins;
 pub fn len(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {
-        set n = n + 1;
+        set n++;
     }
     n
 }

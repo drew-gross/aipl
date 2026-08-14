@@ -23357,7 +23357,7 @@ block19(v164: i64):
 ;   v2 = s
 ;   v31 = edge
 ;   ss1 = inner
-;   v74 = __fpat$15650
+;   v74 = __fpat$15658
 ;   v76 = i
 ;   v77 = item
 ;   ss7 = parts
@@ -38012,7 +38012,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   v33 = __fpat$34228
+;   v33 = __fpat$34236
 ;   v38 = i
 ;   v40 = c
 ; __m16__program
@@ -38614,11 +38614,11 @@ block30:
 ;   v2 = h
 ;   v73 = p
 ;   ss2 = out
-;   v111 = __fpat$35193
+;   v111 = __fpat$35201
 ;   v113 = i
 ;   v114 = d
 ;   v157 = had_imports
-;   v184 = __fpat$35398
+;   v184 = __fpat$35406
 ;   v186 = i
 ;   v187 = d
 ; __m16__program_items
@@ -87805,7 +87805,7 @@ block67:
 ;   v5 = params
 ;   v291 = body
 ;   ss8 = d
-;   v486 = __fpat$71575
+;   v486 = __fpat$71571
 ;   v488 = i
 ;   v489 = p
 ; __m16__lambda_params

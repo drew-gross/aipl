@@ -1,4 +1,4 @@
-import { len, map, print, to_str, == } from builtins;
+import { len, map, print, to_str, wrapping_add as +, == } from builtins;
 
 // Every lint, in one file, reported in one run.
 //
@@ -11,8 +11,9 @@ import { len, map, print, to_str, == } from builtins;
 //
 // Each lint has its own `#[allow]` companion case proving the marker squelches
 // it (`allow_squelch`, `eta_lambda_allow`, `field_init_shorthand_allow`,
-// `slice_from_zero_allow`), and its own passing case for the shapes it must
-// *not* flag (`slice_from_zero_open_end`, `field_init_range_value`).
+// `slice_from_zero_allow`, `incr_by_one_allow`), and its own passing case for
+// the shapes it must *not* flag (`slice_from_zero_open_end`,
+// `field_init_range_value`, `incr_shapes_not_flagged`, `incr_custom_plus`).
 
 struct Point { x: i64, y: i64 }
 
@@ -24,6 +25,14 @@ fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
 // is redundant; pass `to_str` itself. The method form `|x| x.to_str()` is
 // stored as the same free call, so it is covered too.
 fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+
+// `set x = x + 1;` — an increment written the long way; `set x++;` is the form
+// for it (either operand order counts, so `1 + n` is flagged too).
+fn bump(start: i64) -> i64 {
+    mut n = start;
+    set n = n + 1;
+    n
+}
 
 fn slices() !prints {
     let s = "hello, world";
@@ -49,47 +58,54 @@ fn slices() !prints {
 fn main() !prints {
     print(make(1, 2).x.to_str());
     print(stringify([1]).len().to_str());
+    print(bump(1).to_str());
     slices();
 }
 --- errors ---
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:33:16
+  --> ./tests/cases/lints/err_lints.aipl:42:16
    |
-33 |     print(s[3..s.len()]);
+42 |     print(s[3..s.len()]);
    |                ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[0..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:37:15
+  --> ./tests/cases/lints/err_lints.aipl:46:15
    |
-37 |     print(s[..s.len()]);
+46 |     print(s[..s.len()]);
    |               ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:46:16
+  --> ./tests/cases/lints/err_lints.aipl:55:16
    |
-46 |     print(s[4..s.len()]);
+55 |     print(s[4..s.len()]);
    |                ^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:41:13
+  --> ./tests/cases/lints/err_lints.aipl:50:13
    |
-41 |     print(s[0..2]);
+50 |     print(s[0..2]);
    |             ^
 
 error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:26:43
+  --> ./tests/cases/lints/err_lints.aipl:27:43
    |
-26 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+27 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
    |                                           ^^^^^^^^^^^^
 
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:21:47
+  --> ./tests/cases/lints/err_lints.aipl:22:47
    |
-21 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+22 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                               ^
 
 error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:21:53
+  --> ./tests/cases/lints/err_lints.aipl:22:53
    |
-21 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+22 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                                     ^
+
+error: adding 1 to "n" — use the increment form "set n++;" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:33:9
+   |
+33 |     set n = n + 1;
+   |         ^^^^^^^^^

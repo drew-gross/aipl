@@ -29,6 +29,7 @@ import {
     !,
     !=,
     &&,
+    ++,
     +++,
     <,
     ==,
@@ -308,10 +309,10 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
                         span: at + i..at + i + 2,
                     });
                 };
-                set i = i + 1;
+                set i++;
             };
         };
-        set i = i + 1;
+        set i++;
     }
     if (!closed) {
         return err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() });
@@ -344,7 +345,7 @@ fn between_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexEr
         if (self[i..].starts_with(close)) {
             return ok(i + close.ilen());
         };
-        set i = i + 1;
+        set i++;
     }
     err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() })
 }
@@ -364,14 +365,14 @@ fn nested_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexErr
     mut i: i64 = open.len();
     while (0 < depth && i < self.ilen()) {
         if (self[i..].starts_with(open)) {
-            set depth = depth + 1;
+            set depth++;
             set i = i + open.ilen();
         } else {
             if (self[i..].starts_with(close)) {
                 set depth = depth - 1;
                 set i = i + close.ilen();
             } else {
-                set i = i + 1;
+                set i++;
             };
         };
     }
@@ -673,7 +674,7 @@ fn template_scan<K>(
                 };
                 set i = i + 2;
             } else {
-                set i = i + 1;
+                set i++;
             };
         };
     }
@@ -727,7 +728,7 @@ fn finalize_template<K>(
         for (let t : run.trivia) {
             set trivia.push(t);
         }
-        set k = k + 1;
+        set k++;
     }
     ok(StepResult { tokens: toks, trivia, end })
 }
@@ -754,7 +755,7 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
         };
         if (depth == 1 && src[i] == some('}')) {
             set depth = 0;
-            set i = i + 1;
+            set i++;
         } else {
             let step = lex_step(src, i, rules)?;
             if (step.end == i) {
@@ -767,7 +768,7 @@ fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepRe
                 set trivia.push(t);
             }
             if (src[i..step.end] == "{") {
-                set depth = depth + 1;
+                set depth++;
             };
             if (src[i..step.end] == "}") {
                 set depth = depth - 1;

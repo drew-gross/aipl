@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { wrapping_add as +, ++, == } from builtins;
 
 // Every *check-phase* loop error, in one file, reported in one run. The four
 // `for`-syntax fixtures (`err_for_body_stmt_then_expr`,
@@ -29,7 +29,7 @@ fn for_var_does_not_leak() -> i64 {
 fn while_non_bool_condition() {
     mut i = 0;
     while (i + 1) {
-        set i = i + 1;
+        set i++;
     }
 }
 

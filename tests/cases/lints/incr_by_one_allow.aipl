@@ -1,0 +1,23 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// `#[allow]` on the line squelches the increment lint, like any other — the
+// long-hand `set n = n + 1;` compiles and runs as written.
+fn main() !prints {
+    mut n = 0;
+    set n = n + 1; #[allow]
+    print(n.to_str());
+}
+--- stdout ---
+1
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 50
+binary size: 1176
+  code: 328
+  data: 1
+  metadata: 847
+--- monomorphizations ---
+main

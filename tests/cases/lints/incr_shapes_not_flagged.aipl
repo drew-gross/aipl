@@ -1,0 +1,35 @@
+import { print, to_str, wrapping_add as +, ++ } from builtins;
+
+struct Counter { n: i64 }
+
+// The shapes the increment lint must leave alone: adding something other than
+// one, adding one to a *different* binding, and a field store — which has no
+// `++` spelling, since `set x++;` takes a bare binding.
+fn main() !prints {
+    mut n = 0;
+    set n = n + 2; // not one
+    mut m = 0;
+    set m = n + 1; // one, but added to another binding
+    mut c = Counter { n: 0 };
+    set c.n = c.n + 1; // a field store, not a bare binding
+    set n++; // the recommended form itself never trips its own lint
+    print(n.to_str());
+    print(m.to_str());
+    print(c.n.to_str());
+}
+--- stdout ---
+3
+3
+1
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 163
+binary size: 1496
+  code: 540
+  data: 1
+  metadata: 955
+--- monomorphizations ---
+main

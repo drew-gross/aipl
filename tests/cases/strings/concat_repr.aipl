@@ -1,4 +1,4 @@
-import { len, print, to_str, wrapping_add as +, +++, == } from builtins;
+import { len, print, to_str, ++, +++, == } from builtins;
 
 // Every `str + str` builds the *concatenated-string* representation — a lazy
 // rope of two str pointers, materialized (and memoized) only when its bytes are
@@ -27,7 +27,7 @@ fn main() !prints {
     // Iterate the materialized bytes.
     mut n = 0;
     for (let c : g) {
-        set n = n + 1;
+        set n++;
     }
     print(to_str(n)); // 6
 

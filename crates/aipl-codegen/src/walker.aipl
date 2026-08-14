@@ -29,6 +29,7 @@ import {
     !,
     !=,
     &&,
+    ++,
     <,
     <=,
     ==,
@@ -1302,7 +1303,7 @@ fn range_has_semi(self: W, lo: u64, hi: u64) -> bool {
         if (self.tok_text(i) == ";") {
             return true;
         };
-        set i = i + 1;
+        set i++;
     }
     false
 }
@@ -1671,7 +1672,7 @@ fn call_count(segs: Seg[]) -> u64 {
     mut n: u64 = 0;
     for (let s : segs) {
         if (s.is_call) {
-            set n = n + 1;
+            set n++;
         };
     }
     n
@@ -2093,7 +2094,7 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
         let t = w.cur_tok();
         let stepped = w.advance(t.span.end);
         if (t.kind == TplHead) {
-            set depth = depth + 1;
+            set depth++;
         } else {
             if (t.kind == TplTail) {
                 if (depth <= 1) {
@@ -2194,7 +2195,7 @@ fn hug_close(self: W, start: u64) -> u64? {
     while (i < self.toks.len()) {
         let t = self.tok_text(i);
         if (t == "(" || t == "[" || t == "{" || t == "#{") {
-            set depth = depth + 1;
+            set depth++;
         } else {
             if (t == ")" || t == "]" || t == "}") {
                 if (depth <= 1) {
@@ -2203,7 +2204,7 @@ fn hug_close(self: W, start: u64) -> u64? {
                 set depth = depth - 1;
             };
         };
-        set i = i + 1;
+        set i++;
     }
     none
 }
@@ -2244,7 +2245,7 @@ fn toks_of(src: str) -> FmtTok[] {
             };
             set start = i + 1;
         };
-        set i = i + 1;
+        set i++;
     }
     if (start < i) {
         set out.push(FmtTok { kind: Ident, span: start..i });

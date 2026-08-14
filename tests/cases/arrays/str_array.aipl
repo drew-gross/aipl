@@ -1,4 +1,4 @@
-import { len, push, value_or, wrapping_add as +, == } from builtins;
+import { len, push, value_or, ++, == } from builtins;
 
 // A `str[]` is an array whose elements are heap-allocated strings. Build,
 // index (yields `str?`), push, and iterate — each operation retains/releases
@@ -17,7 +17,7 @@ fn appended(xs: str[], s: str) -> str[] {
     assert(ys == ["foo", "bar", "baz"]);
     mut count = 0;
     for (let s : ys) {
-        set count = count + 1;
+        set count++;
     }
     assert(count == 3);
     // xs is unchanged (len 2)

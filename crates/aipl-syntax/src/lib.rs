@@ -1862,7 +1862,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
 /// file right after parsing (the markers come from the lexer via
 /// `parse_with_allows`), so lints fire before type checking.
 pub mod lint {
-    use super::ast::{Expr, ExprKind, Program};
+    use super::ast::{Expr, ExprKind, ImportSource, Item, Program};
     use super::{each_expr, Error, Span};
 
     /// Run every lint over `program` — function bodies, `.test` blocks, and
@@ -1882,6 +1882,10 @@ pub mod lint {
         each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
         each_expr(program, &mut |e| eta_lambda(e, &mut hits));
         each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
+        // Only where the two spellings provably agree — see `plus_means_incr`.
+        if plus_means_incr(program) {
+            each_expr(program, &mut |e| incr_by_one(e, &mut hits));
+        }
         hits.retain(|e| match &e.span {
             Some(sp) => !allowed.contains(&line_of(src, sp.start)),
             None => true,
@@ -2034,5 +2038,65 @@ pub mod lint {
                 init.value.span.clone(),
             ));
         }
+    }
+
+    /// `set x = x + 1;` — an increment written the long way; `set x++;` is the
+    /// form for it. Either operand order counts (`x + 1` and `1 + x` both add
+    /// one), and `set x++;` itself never trips this: it parses as the *increment*
+    /// operator (`'P'`), which the loader only collapses to `'+'` after lints
+    /// have run.
+    ///
+    /// Only a bare-identifier LHS is flagged, because that is all `set x++;`
+    /// accepts — a field store (`set p.n = p.n + 1;`) has no shorter spelling to
+    /// recommend.
+    fn incr_by_one(e: &Expr, hits: &mut Vec<Error>) {
+        let ExprKind::Assign(lhs, value, _) = &e.kind else {
+            return;
+        };
+        let ExprKind::Ident(name) = &lhs.kind else {
+            return;
+        };
+        let ExprKind::Binop(l, '+', r) = &value.kind else {
+            return;
+        };
+        let is_one = |e: &Expr| matches!(e.kind, ExprKind::Num(1));
+        let is_target = |e: &Expr| matches!(&e.kind, ExprKind::Ident(n) if n == name);
+        if !((is_target(l) && is_one(r)) || (is_one(l) && is_target(r))) {
+            return;
+        }
+        hits.push(Error::at(
+            format!(
+                "adding 1 to \"{name}\" — use the increment form \"set {name}++;\" \
+                 (or append #[allow] to this line to keep it)"
+            ),
+            e.span.clone(),
+        ));
+    }
+
+    /// Whether this file's `+` and `++` provably mean the same addition, which is
+    /// what makes [`incr_by_one`]'s advice behavior-preserving.
+    ///
+    /// Both operators are bound by import, and neither binding is fixed: a file
+    /// may write `import { saturating_add as + }`, or `import { my_add as + }
+    /// from "./m.aipl"`, and rewriting such a `+ 1` to `++` would silently change
+    /// which function runs. So the lint fires only for a `+` imported as the
+    /// builtin `wrapping_add` — what `++` lowers to — and only when `++` itself
+    /// is unbound or bound to that same builtin.
+    fn plus_means_incr(program: &Program) -> bool {
+        let (mut plus_is_wrapping, mut incr_is_builtin) = (false, true);
+        for item in &program.items {
+            let Item::Import(decl) = item else {
+                continue;
+            };
+            let from_builtins = matches!(decl.source, ImportSource::Builtins { .. });
+            for n in &decl.names {
+                match n.local() {
+                    "+" => plus_is_wrapping = from_builtins && n.name == "wrapping_add",
+                    "++" => incr_is_builtin = from_builtins && n.name == "++",
+                    _ => {}
+                }
+            }
+        }
+        plus_is_wrapping && incr_is_builtin
     }
 }

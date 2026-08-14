@@ -1,10 +1,10 @@
-import { wrapping_add as +, == } from builtins;
+import { ++, == } from builtins;
 
 // `len` written in AIPL using the for-each-char loop + mutation.
 fn len(s: str) -> i64 {
     mut n = 0;
     for (let c : s) {
-        set n = n + 1;
+        set n++;
     }
     n
 }.test({

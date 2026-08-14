@@ -5,7 +5,7 @@
 // first offending run, or `none` when there is none; `aipl_str_iter_next` walks
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
-import { Span, is_some, wrapping_add as +, wrapping_sub as -, &&, ==, >, || } from builtins;
+import { Span, is_some, wrapping_add as +, wrapping_sub as -, &&, ++, ==, >, || } from builtins;
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'
@@ -49,7 +49,7 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
         };
         set prev2 = prev;
         set prev = c;
-        set i = i + 1;
+        set i++;
     }
     // The final line may have no trailing '\n'; its boundary is the input length.
     line_end_span(prev, prev2, i, ws_start, line_start)

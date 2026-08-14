@@ -1,4 +1,4 @@
-import { len, push, value_or, wrapping_add as +, == } from builtins;
+import { len, push, value_or, ++, == } from builtins;
 
 // `str[][]` — an array whose elements are themselves `str[]`. Both levels
 // are refcounted heap pointers (8-byte elements), so the outer array's
@@ -17,7 +17,7 @@ fn grid3() -> str[][] {
     mut cells = 0;
     for (let r : g2) {
         for (let c : r) {
-            set cells = cells + 1;
+            set cells++;
         }
     }
     // 2 + 1 + 3 elements iterated; len(g2) == 3

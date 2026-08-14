@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, +++, == } from builtins;
+import { print, to_str, ++, +++, == } from builtins;
 
 // Iterating a rope's chars (`for c in s`) streams its leaves via a small
 // stack-allocated cursor — no flattened buffer. Building this 18-byte rope and
@@ -9,7 +9,7 @@ fn main() !prints {
     mut n = 0;
     mut last_is_bang = false;
     for (let c : r) {
-        set n = n + 1;
+        set n++;
         set last_is_bang = c == '!'; // exercises the char binding each step
     }
     print(to_str(n)); // 18

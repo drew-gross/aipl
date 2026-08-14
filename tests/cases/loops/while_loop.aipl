@@ -1,4 +1,4 @@
-import { wrapping_add as +, <, == } from builtins;
+import { wrapping_add as +, ++, <, == } from builtins;
 
 // `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
 // it before each pass. The counter is a `mut` declared before the loop; the
@@ -8,7 +8,7 @@ fn sum_below(n: i64) -> i64 {
     mut total = 0;
     while (i < n) {
         set total = total + i;
-        set i = i + 1;
+        set i++;
     }
     total
 }.test({

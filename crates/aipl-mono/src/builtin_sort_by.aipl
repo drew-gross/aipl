@@ -1,4 +1,4 @@
-import { len, map, wrapping_add as +, !, &&, <, == } from builtins;
+import { len, map, !, &&, ++, <, == } from builtins;
 
 // Test fixture: a record sorted by one of its fields.
 struct E { key: str, tag: str }
@@ -44,7 +44,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
             if (step) {
                 set placed = true;
             } else {
-                set k = k + 1;
+                set k++;
             };
         }
         set out = [..out[..k], x, ..out[k..]];
