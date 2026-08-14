@@ -78,6 +78,20 @@ optimizations:
     B. Compiler speed
 
     B1. No opt_level is set anywhere — neither host_isa (:4367) nor the AOT builder (:6485), so Cranelift runs at its default none. Fast compiles, but aipl build emits unoptimized machine code. Splitting the setting (JIT stays none, AOT goes speed) is a two-line change with a plausibly large effect on wall-clock and code size.
+      B1: measured, and the answer is no — so I'm not shipping it.
+
+        The finding. opt_level=speed on the AOT path is a wash on this codebase. Same machine, same benchmarks, only the flag differing:
+
+        - 300M scalar-arithmetic iterations: 0.19s → 0.19s
+        - 6M struct + str-concat allocations: 0.57-0.59s → 0.58s
+        - production object size: −1.5 to −2% (arrays/slice 6864→6736, strings/int_parse 5048→4976)
+        - aipl build: 0.802s → 1.151s, +44%
+
+        Why, and this is the part worth keeping: the generated code is call-dominated. 88% of the calls in the largest dogfooded function are aipl_inc/aipl_dec, and an optimizer cannot see through a call — there's barely any straight-line code for it to work on. So B1 isn't wrong, it's gated on C1/C2: inline the refcount and str-iteration fast paths first (the way load_array_elem already inlines the array one), and then Cranelift has something to optimize. Flipping it now would cost a ~380-fixture binary size refill and half again the build time for nothing measurable.
+
+        What's in the tree: opt_level set explicitly to "none" in ObjectCompilation::new — functionally identical to the inherited default, but with the measurement, the reason, and the revisit condition recorded at the decision site so nobody (me included) re-runs this experiment cold. The rebuild and corpus re-check are running to confirm the binary size assertions are back to their checked-in values.
+
+        One correction to my earlier framing: I sold B1 as "a two-line change with a plausibly large effect." The two-line part was right; the effect estimate wasn't, and I should have flagged that the call-dominated profile I'd already measured for C1 predicted this. If you want to keep going down the optimization list, C1 is now the one carrying B1's value as well as its own.
 
     B2. rewrite_expr clones the whole locals set per nested binding. crates/aipl-loader/src/lib.rs:917 — let with = |name| { let mut s = locals.clone(); … }, called for every let, lambda param, and loop variable. Quadratic in binding depth across every file on every compile. A push/pop scope stack or a persistent set fixes it.
 

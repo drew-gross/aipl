@@ -6499,6 +6499,28 @@ impl ObjectCompilation {
         flag_builder
             .set("is_pic", "true")
             .map_err(|e| Error::msg(format!("flag: {e}")))?;
+        // `none` is Cranelift's default; it is set here explicitly because it was
+        // measured rather than inherited.
+        //
+        // `speed` looks obviously right for the AOT path — a `build` compiles
+        // once and the code then runs indefinitely, unlike the JIT (`host_isa`),
+        // where compile time *is* the latency. It measured as a wash. Two
+        // benchmarks, 300M iterations of scalar arithmetic and 6M
+        // struct-plus-`str`-concat allocations, each ran within noise of the
+        // `none` build (0.19s vs 0.19s, 0.58s vs 0.57s) — for 1.5-2% smaller
+        // objects and a 44% slower build.
+        //
+        // The reason is the shape of what this frontend emits: the generated code
+        // is dominated by extern calls into the runtime — 88% of the calls in the
+        // largest dogfooded function are `aipl_inc`/`aipl_dec` — and an optimizer
+        // cannot see through a call. There is little straight-line code for it to
+        // work on. Worth revisiting once the refcount and `str`-iteration fast
+        // paths are inlined the way `load_array_elem` already inlines the array
+        // one; until then it would cost a corpus-wide `binary size` refill and
+        // half again the build time for no measured gain.
+        flag_builder
+            .set("opt_level", "none")
+            .map_err(|e| Error::msg(format!("flag: {e}")))?;
         let isa_builder = cranelift_native::builder()
             .map_err(|msg| Error::msg(format!("host machine not supported: {msg}")))?;
         let isa = isa_builder
