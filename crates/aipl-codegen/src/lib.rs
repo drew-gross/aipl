@@ -3244,91 +3244,136 @@ pub fn build_test_program(program: &Program) -> Program {
 // Rather than one hand-assembled `Compilation` per function — each having to
 // separately list its own transitive dependencies as bundled in-memory
 // modules — every dogfooded `.aipl` file is gathered into one list
-// ([`DOGFOOD_SOURCES`]) and compiled together as a single program with one
+// ([`DOGFOOD_SOURCE_FILES`]) and compiled together as a single program with one
 // checked-in artifact ([`dogfood.clif`]) and one set of FFI entry points
-// ([`DOGFOOD_ENTRIES`]). `aipl_loader::load_program_sources` still designates
-// `DOGFOOD_SOURCES`' first file as "root" (only its top-level names stay
-// unmangled; every other file's are renamed to `__m<index>__<name>`), but
-// [`resolve_dogfood_entry`] resolves an entries name against either form, so
-// any dogfooded function can be an entry regardless of which file declares
-// it — no aggregator/re-export file required. Adding a newly-dogfooded
-// function is then: write the `.aipl` file and add it to `DOGFOOD_SOURCES` /
-// `DOGFOOD_ENTRIES` — two lists touched, not a new bundle of duplicated
+// ([`DOGFOOD_ENTRIES`]). Adding a newly-dogfooded function is then: write the
+// `.aipl` file and add it to those two lists, not a new bundle of duplicated
 // dependency sources.
-const RAW_STRING_SRC: &str = include_str!("process_raw_string.aipl");
-const RAW_STRING_DEDENT_SRC: &str = include_str!("dedent.aipl");
-const RAW_STRING_LINES_SRC: &str = include_str!("lines.aipl");
-const RAW_STRING_TRIM_PREFIX_SRC: &str = include_str!("trim_prefix.aipl");
-const RAW_STRING_TRIM_END_WHILE_SRC: &str = include_str!("trim_end_while.aipl");
-const RAW_STRING_TRIM_SUFFIX_SRC: &str = include_str!("trim_suffix.aipl");
-const PARSE_TEST_SECTION_HEADER_SRC: &str = include_str!("parse_test_section_header.aipl");
-const STRIP_TEST_SECTIONS_SRC: &str = include_str!("strip_test_sections.aipl");
-const SPLIT_TEST_SECTIONS_SRC: &str = include_str!("split_test_sections.aipl");
-const FIND_TRAILING_WHITESPACE_SRC: &str = include_str!("find_trailing_whitespace.aipl");
-const ASSERT_LOC_SRC: &str = include_str!("assert_loc.aipl");
-const LINE_AT_SRC: &str = include_str!("line_at.aipl");
-const CARET_BLOCK_SRC: &str = include_str!("caret_block.aipl");
-const FILL_OR_ADD_SECTION_SRC: &str = include_str!("fill_or_add_section.aipl");
-const FILL_OR_ADD_SECTION_FILE_SRC: &str = include_str!("fill_or_add_section_file.aipl");
-const NORMALIZE_OUTPUT_SRC: &str = include_str!("normalize_output.aipl");
-const INT_FITS_SRC: &str = include_str!("int_fits.aipl");
-const IS_OPERATOR_NAME_SRC: &str = include_str!("is_operator_name.aipl");
-const LEXER_LIB_SRC: &str = include_str!("lexer.aipl");
-const LEX_AIPL_SRC: &str = include_str!("lex_aipl.aipl");
-const UNESCAPE_SRC: &str = include_str!("unescape.aipl");
-const REINDENT_BLOCK_SRC: &str = include_str!("reindent_block.aipl");
-const INDENT_SRC: &str = include_str!("indent.aipl");
-const DOC_SRC: &str = include_str!("doc.aipl");
-const WALKER_SRC: &str = include_str!("walker.aipl");
-const FIND_FILES_SRC: &str = include_str!("find_files.aipl");
+/// Where the dogfooded `.aipl` sources live: this crate's `src/` directory,
+/// resolved at compile time from the manifest dir but *read at run time*, by
+/// [`read_dogfood_sources`].
+///
+/// Reading rather than `include_str!`ing them is the same trade
+/// [`DOGFOOD_CLIF_PATH`] makes, for the same reason and with more force.
+/// Embedding made every `.aipl` edit a source change to this crate, and so a
+/// rebuild of it, everything downstream, and all 12 test binaries — ~730s
+/// against a 1s no-op build — even though nothing in an ordinary compile reads
+/// these sources: the compiler links the checked-in `.clif`, and only the
+/// IR-regeneration helpers and their tests ever want the text. Reading at run
+/// time leaves no crate's fingerprint depending on the corpus, so editing a
+/// dogfooded `.aipl` now costs nothing to rebuild.
+///
+/// The price is the one the artifact already pays: a compiler binary is tied to
+/// the repo it was built from, and a missing or unreadable source is a run-time
+/// panic rather than a compile error. Only the author helpers can reach it.
+const DOGFOOD_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
 
-/// Every `.aipl` file the compiler dogfoods, as `(name, source)` in-memory
-/// modules — so `from "./..."` imports resolve without disk access. Each file
-/// appears exactly once (unlike the old per-function engines, which each
-/// separately bundled copies of their shared dependencies — `lines.aipl`,
-/// `parse_test_section_header.aipl`, etc.). This is the single source of
-/// truth shared by [`DOGFOOD_ENGINE`] (re-linked from the checked-in artifact at
-/// [`DOGFOOD_CLIF_PATH`]), the author helper that regenerates it, and the test
-/// that verifies it's current.
-pub const DOGFOOD_SOURCES: &[(&str, &str)] = &[
-    ("./process_raw_string.aipl", RAW_STRING_SRC),
-    ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
-    ("./lines.aipl", RAW_STRING_LINES_SRC),
-    ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
-    ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-    ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
-    (
-        "./parse_test_section_header.aipl",
-        PARSE_TEST_SECTION_HEADER_SRC,
-    ),
-    ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
-    ("./split_test_sections.aipl", SPLIT_TEST_SECTIONS_SRC),
-    (
-        "./find_trailing_whitespace.aipl",
-        FIND_TRAILING_WHITESPACE_SRC,
-    ),
-    ("./assert_loc.aipl", ASSERT_LOC_SRC),
-    ("./line_at.aipl", LINE_AT_SRC),
-    ("./caret_block.aipl", CARET_BLOCK_SRC),
-    ("./fill_or_add_section.aipl", FILL_OR_ADD_SECTION_SRC),
-    (
-        "./fill_or_add_section_file.aipl",
-        FILL_OR_ADD_SECTION_FILE_SRC,
-    ),
-    ("./normalize_output.aipl", NORMALIZE_OUTPUT_SRC),
-    ("./int_fits.aipl", INT_FITS_SRC),
-    ("./is_operator_name.aipl", IS_OPERATOR_NAME_SRC),
-    ("./lexer.aipl", LEXER_LIB_SRC),
-    ("./lex_aipl.aipl", LEX_AIPL_SRC),
-    ("./unescape.aipl", UNESCAPE_SRC),
-    ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
-    ("./indent.aipl", INDENT_SRC),
-    ("./find_files.aipl", FIND_FILES_SRC),
+/// Every `.aipl` file the compiler dogfoods, by module name — the name a
+/// `from "./..."` import resolves against. The set is closed under imports and
+/// each file appears exactly once (unlike the old per-function engines, which
+/// each separately bundled copies of their shared dependencies — `lines.aipl`,
+/// `parse_test_section_header.aipl`, etc.).
+///
+/// This list is the single source of truth shared by [`DOGFOOD_ENGINE`] (which
+/// runs the artifact these compile to), the author helper that regenerates it,
+/// and the test that verifies it's current; [`read_dogfood_sources`] reads them.
+/// The **first** entry is the root: `aipl_loader::load_program_sources` leaves
+/// only its top-level names unmangled (every other file's become
+/// `__m<index>__<name>`), but [`resolve_dogfood_entry`] resolves an entry name
+/// against either form, so any dogfooded function can be an entry regardless of
+/// which file declares it — no aggregator/re-export file required. Adding a
+/// newly-dogfooded function is then: write the `.aipl` file and add it to this
+/// list and [`DOGFOOD_ENTRIES`].
+pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
+    "./process_raw_string.aipl",
+    "./dedent.aipl",
+    "./lines.aipl",
+    "./trim_prefix.aipl",
+    "./trim_end_while.aipl",
+    "./trim_suffix.aipl",
+    "./parse_test_section_header.aipl",
+    "./strip_test_sections.aipl",
+    "./split_test_sections.aipl",
+    "./find_trailing_whitespace.aipl",
+    "./assert_loc.aipl",
+    "./line_at.aipl",
+    "./caret_block.aipl",
+    "./fill_or_add_section.aipl",
+    "./fill_or_add_section_file.aipl",
+    "./normalize_output.aipl",
+    "./int_fits.aipl",
+    "./is_operator_name.aipl",
+    "./lexer.aipl",
+    "./lex_aipl.aipl",
+    "./unescape.aipl",
+    "./reindent_block.aipl",
+    "./indent.aipl",
+    "./find_files.aipl",
 ];
+
+/// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
+/// plus everything they import — which includes the lexer, since
+/// `format_program` tokenizes for itself. That overlaps [`DOGFOOD_SOURCE_FILES`]
+/// heavily, and deliberately so: the two artifacts are linked independently, and
+/// keeping each self-contained is what lets an ordinary compile link only the
+/// parser half.
+///
+/// Splitting them matters because re-linking is not free — it is ~2.4s for the
+/// combined artifact, paid once per process, and the formatter is over two
+/// thirds of it. An ordinary compile never formats, so it should never pay for
+/// the walker; `aipl fmt` links this one on top and is an explicit user action.
+pub const FMT_SOURCE_FILES: &[&str] = &[
+    "./process_raw_string.aipl",
+    "./dedent.aipl",
+    "./lines.aipl",
+    "./trim_prefix.aipl",
+    "./trim_end_while.aipl",
+    "./trim_suffix.aipl",
+    "./parse_test_section_header.aipl",
+    "./strip_test_sections.aipl",
+    "./split_test_sections.aipl",
+    "./is_operator_name.aipl",
+    "./lexer.aipl",
+    "./lex_aipl.aipl",
+    "./unescape.aipl",
+    "./reindent_block.aipl",
+    "./indent.aipl",
+    "./doc.aipl",
+    "./walker.aipl",
+];
+
+/// Read `files` — module names as spelled in [`DOGFOOD_SOURCE_FILES`] — out of
+/// [`DOGFOOD_SRC_DIR`], as the `(name, source)` pairs the loader compiles as
+/// in-memory modules. The name is kept verbatim so `from "./x.aipl"` imports
+/// still resolve against it; only the path read from disk strips the `./`.
+///
+/// An unreadable file is a loud panic: these are checked-in sources the caller
+/// has just asked to compile, so a missing one is a broken checkout or a stale
+/// entry in the list, not something to recover from.
+pub fn read_dogfood_sources(files: &[&str]) -> Vec<(String, String)> {
+    files
+        .iter()
+        .map(|name| {
+            let path = std::path::Path::new(DOGFOOD_SRC_DIR).join(name.trim_start_matches("./"));
+            let src = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("dogfood source {path:?}: {e}"));
+            ((*name).to_string(), src)
+        })
+        .collect()
+}
+
+/// Borrow a read-in source set as the `(name, source)` slice the loader and
+/// [`generate_dogfood_artifact`] take.
+pub fn source_refs(sources: &[(String, String)]) -> Vec<(&str, &str)> {
+    sources
+        .iter()
+        .map(|(name, src)| (name.as_str(), src.as_str()))
+        .collect()
+}
 
 /// The functions Rust calls via the FFI (need `; entry` metadata in the
 /// checked-in artifact) — the real name each is declared with in its own file
-/// under [`DOGFOOD_SOURCES`]. Resolved through mangling by
+/// under [`DOGFOOD_SOURCE_FILES`]. Resolved through mangling by
 /// [`resolve_dogfood_entry`], so a function need not live in the root file to
 /// be listed here.
 pub const DOGFOOD_ENTRIES: &[&str] = &[
@@ -3350,40 +3395,6 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "find_files",
 ];
 
-/// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
-/// plus everything they import — which includes the lexer, since
-/// `format_program` tokenizes for itself. That overlaps [`DOGFOOD_SOURCES`]
-/// heavily, and deliberately so: the two artifacts are linked independently, and
-/// keeping each self-contained is what lets an ordinary compile link only the
-/// parser half.
-///
-/// Splitting them matters because re-linking is not free — it is ~2.4s for the
-/// combined artifact, paid once per process, and the formatter is over two
-/// thirds of it. An ordinary compile never formats, so it should never pay for
-/// the walker; `aipl fmt` links this one on top and is an explicit user action.
-pub const FMT_SOURCES: &[(&str, &str)] = &[
-    ("./process_raw_string.aipl", RAW_STRING_SRC),
-    ("./dedent.aipl", RAW_STRING_DEDENT_SRC),
-    ("./lines.aipl", RAW_STRING_LINES_SRC),
-    ("./trim_prefix.aipl", RAW_STRING_TRIM_PREFIX_SRC),
-    ("./trim_end_while.aipl", RAW_STRING_TRIM_END_WHILE_SRC),
-    ("./trim_suffix.aipl", RAW_STRING_TRIM_SUFFIX_SRC),
-    (
-        "./parse_test_section_header.aipl",
-        PARSE_TEST_SECTION_HEADER_SRC,
-    ),
-    ("./strip_test_sections.aipl", STRIP_TEST_SECTIONS_SRC),
-    ("./split_test_sections.aipl", SPLIT_TEST_SECTIONS_SRC),
-    ("./is_operator_name.aipl", IS_OPERATOR_NAME_SRC),
-    ("./lexer.aipl", LEXER_LIB_SRC),
-    ("./lex_aipl.aipl", LEX_AIPL_SRC),
-    ("./unescape.aipl", UNESCAPE_SRC),
-    ("./reindent_block.aipl", REINDENT_BLOCK_SRC),
-    ("./indent.aipl", INDENT_SRC),
-    ("./doc.aipl", DOC_SRC),
-    ("./walker.aipl", WALKER_SRC),
-];
-
 /// The formatter engine's single FFI entry.
 pub const FMT_ENTRIES: &[&str] = &["format_program"];
 
@@ -3398,7 +3409,7 @@ pub const FMT_CLIF_FILE: &str = "fmt.clif";
 /// regenerated and promoted together.
 pub const FMT_IR_ENV: &str = "AIPL_FMT_IR";
 
-/// Where the checked-in dogfood IR for the whole of [`DOGFOOD_SOURCES`]/
+/// Where the checked-in dogfood IR for the whole of [`DOGFOOD_SOURCE_FILES`]/
 /// [`DOGFOOD_ENTRIES`] lives — re-linked at run time instead of recompiling
 /// from source. Kept current by the `dogfood_ir` test (regenerate with
 /// `fill_dogfood_ir`).
@@ -3466,7 +3477,7 @@ thread_local! {
         .expect("dogfood engine builds");
 
     /// The formatter engine, built lazily and separately — so a compile that
-    /// never formats never links the walker. See [`FMT_SOURCES`].
+    /// never formats never links the walker. See [`FMT_SOURCE_FILES`].
     static FMT_ENGINE: Compilation = Compilation::from_artifact(&fmt_artifact_text())
         .expect("formatter engine builds");
 }

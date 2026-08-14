@@ -66,6 +66,51 @@ optimizations:
   make array reserve grow geometrically
   make arrays work sorta like strings i.e. have a rope representation
   we had a bug that only manifested after an optimization - lets make it so that all tests are run both with and without optimizations to avoid hitting this issue again
+  claudes suggestions:
+    A. Dev loop — the biggest numbers in the repo
+
+    A2. Every aipl process pays ~0.75s re-linking the dogfood engine; aipl fmt pays 2.69s. Measured on an empty file. It's Compilation::from_artifact (:4897) parsing 973KB / 40k lines of CLIF text and JIT-compiling 138 functions (fmt: 3.1MB, 316 more). The cases harness spawns aipl check for 258 cases (tests/cases.rs:1470), so a suite run burns ~190s of CPU on nothing but re-linking. Options: cache the compiled code (ship a prebuilt object/dylib instead of re-JITting text), lazily compile only the entries a run actually calls, or split the artifact so an ordinary parse links less than all 138.
+
+    A3. The 5.9 MB runtime archive is written to a temp file on every link. link_with (crates/aipl-linker/src/lib.rs:44) writes libaipl_runtime.a next to the object, spawns clang, deletes the directory. Cases link twice each (production + instrumented) → ~760 links ≈ 4.5 GB of temp I/O per suite run. Cache it at a content-keyed path and reuse. Related: which("clang") re-scans PATH per link, and the archive is built with opt-level=3 but no -C debuginfo=0/strip (crates/aipl-linker/build.rs:50) — stripping shrinks the temp write, the link time, and ~12MB from the aipl binary itself (both archives are include_bytes!d).
+
+    A4. Each perf-checked case compiles and links the program twice — production for behavior, instrumented for counters (tests/cases.rs:1539). Unavoidable in general, but worth checking whether the production binary can be reused when a case has no behavior sections.
+
+    B. Compiler speed
+
+    B1. No opt_level is set anywhere — neither host_isa (:4367) nor the AOT builder (:6485), so Cranelift runs at its default none. Fast compiles, but aipl build emits unoptimized machine code. Splitting the setting (JIT stays none, AOT goes speed) is a two-line change with a plausibly large effect on wall-clock and code size.
+
+    B2. rewrite_expr clones the whole locals set per nested binding. crates/aipl-loader/src/lib.rs:917 — let with = |name| { let mut s = locals.clone(); … }, called for every let, lambda param, and loop variable. Quadratic in binding depth across every file on every compile. A push/pop scope stack or a persistent set fixes it.
+
+    B3. type_name allocates a fresh recursive String and is used as a cache key — crates/aipl-syntax/src/lib.rs:1576, keyed at codegen:8944, :10100, :10125, :11299 and in mono's mangling (mono:2092, :3287). Interning types (or a Display into a reused buffer) removes per-call-site allocation.
+
+    B4. lexer.aipl costs 8.04s to build — 5.6× the next worst and ~18% of the corpus's 43s total build time (tests/performance_metrics.md), producing a 1.75MB object with 1.1MB of code from 1310 source lines and 57 instances. Worth profiling on its own; it's also the file the compiler dogfoods most heavily.
+
+    B5. Clone-heavy passes: 620 .clone() in mono/lib.rs, 319 in codegen/lib.rs, 217 in check.rs. Not a finding per se, but the AST is cloned wholesale several times per compile (fold → mono → codegen); worth a look for Rc/borrow opportunities.
+
+    C. Generated code
+
+    C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (inc-then-dec of the same value in a block is a no-op; borrowed args never need a pair).
+
+    C2. Iterating a str calls into the runtime once per byte. for (let c : s) lowers to a header-block call aipl_str_iter_next (:11056) with no inline fast path — a call, three loads, and two branches per character. This is the hot path of the dogfooded lexer, which is on every compile. Inline the common case (position inside the current leaf → load byte, bump) and call out only on leaf exhaustion.
+
+    C3. Mangled symbol names dominate small binaries. tests/cases.rs:1675 notes it outright: metadata (symbol/string tables, relocations) exceeds code for small programs. Shortening or hashing mangled names would move binary size — an asserted metric — across the whole corpus at once.
+
+    D. Runtime data structures
+
+    D1. Sets and dicts are linear scans. aipl_set_contains (:2614) and dict_find (:2751) walk every element, so building an n-element set or dict is O(n²). There's already an FNV-1a hash (:2600) and a comment at :9584 anticipating "the eventual hash-dict/set use case" — this is the largest asymptotic win available to user programs.
+
+    D2. aipl_arr_reserve only reuses in place at rc == 1 (:2201) — correct, but worth checking how often the corpus's push loops actually hit the fast path versus copying each time.
+
+    E. The dogfooded AIPL itself
+
+    E1. self[i..].starts_with(needle) inside byte loops allocates a view per character. crates/aipl-codegen/src/lexer.aipl:345, 367, 371, 653 and src[i..step.end] == "{" at :770. aipl_str_slice (:1131) copies for ≤7 bytes but allocates a 32-byte view block plus a retain for larger heap slices — so scanning for a delimiter allocates O(n) views. A starts_with_at(self, i, needle) builtin (no slice) removes it. This is likely most of lexer.aipl's 1678 allocations, and it runs on every raw string and comment in every compile.
+
+    F. Worth a look, lower confidence
+
+    - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
+    - The --- performance --- corpus totals 178,604 instructions and 1,400 allocations across 369 cases; 178 of them allocate nothing at all. The heavy tail (strings/int_parse at 6,779 instructions) is where C1/C2 would show up first, so those cases double as the benchmark for any of this.
+
+    If you only pick three: A1 (kills a 730s rebuild from the inner loop), A2+A3 (kills ~190s of engine re-linking and 4.5GB of temp I/O per suite run), and C1 (88% of generated calls). C2 and E1 are the two that would most speed up the compiler compiling itself. D1 is the biggest win for programs users actually write.
 
 effects:
   all effects should be shimmable actually

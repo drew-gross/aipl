@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 /// Compile the AIPL lexer into an FFI engine exposing `lex_aipl_tokens`. Takes
 /// the lexer's transitive dependency files straight from the canonical
-/// `DOGFOOD_SOURCES` (so their contents never desync a copy here), reordered so
+/// dogfood source directory (so their contents never desync a copy here), reordered so
 /// `lex_aipl.aipl` is the callable root. It's the lexer's own dependency closure
 /// rather than *all* of `DOGFOOD_SOURCES` because the other dogfood files (e.g.
 /// `caret_block.aipl`) recurse deeply enough to overflow the default test-thread
@@ -42,11 +42,16 @@ fn compile_lexer() -> Engine {
         "./trim_end_while.aipl",
         "./trim_suffix.aipl",
     ];
-    let mut sources: Vec<(&str, &str)> = aipl::codegen::DOGFOOD_SOURCES
-        .iter()
-        .copied()
-        .filter(|(name, _)| LEXER_DEPS.contains(name))
-        .collect();
+    // Every dep must be a real dogfood module, so a rename over there is caught
+    // here rather than silently dropping a file from the compile.
+    for dep in LEXER_DEPS {
+        assert!(
+            aipl::codegen::DOGFOOD_SOURCE_FILES.contains(dep),
+            "{dep} is not in DOGFOOD_SOURCE_FILES"
+        );
+    }
+    let owned = aipl::codegen::read_dogfood_sources(LEXER_DEPS);
+    let mut sources = aipl::codegen::source_refs(&owned);
     sources.sort_by_key(|(name, _)| *name != "./lex_aipl.aipl");
     Engine::compile_sources(&sources).expect("compile AIPL lexer for differential test")
 }

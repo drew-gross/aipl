@@ -22,8 +22,9 @@
 //! anything is off.
 
 use aipl::codegen::{
-    generate_dogfood_artifact, Compilation, DOGFOOD_CLIF_FILE, DOGFOOD_ENTRIES, DOGFOOD_IR_ENV,
-    DOGFOOD_SOURCES, FMT_CLIF_FILE, FMT_ENTRIES, FMT_IR_ENV, FMT_SOURCES,
+    generate_dogfood_artifact, read_dogfood_sources, source_refs, Compilation, DOGFOOD_CLIF_FILE,
+    DOGFOOD_ENTRIES, DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES, FMT_CLIF_FILE, FMT_ENTRIES, FMT_IR_ENV,
+    FMT_SOURCE_FILES,
 };
 use aipl::FfiValue;
 use std::path::PathBuf;
@@ -53,7 +54,10 @@ fn validate_staged_corpus_cmd() -> String {
 struct Artifact {
     file: &'static str,
     env: &'static str,
-    sources: &'static [(&'static str, &'static str)],
+    /// The artifact's `.aipl` module names; the sources themselves are read
+    /// from disk (`read_dogfood_sources`) at the point of use, so editing one
+    /// doesn't rebuild the compiler.
+    sources: &'static [&'static str],
     entries: &'static [&'static str],
 }
 
@@ -61,13 +65,13 @@ const ARTIFACTS: &[Artifact] = &[
     Artifact {
         file: DOGFOOD_CLIF_FILE,
         env: DOGFOOD_IR_ENV,
-        sources: DOGFOOD_SOURCES,
+        sources: DOGFOOD_SOURCE_FILES,
         entries: DOGFOOD_ENTRIES,
     },
     Artifact {
         file: FMT_CLIF_FILE,
         env: FMT_IR_ENV,
-        sources: FMT_SOURCES,
+        sources: FMT_SOURCE_FILES,
         entries: FMT_ENTRIES,
     },
 ];
@@ -107,8 +111,8 @@ fn active_path_of(a: &Artifact) -> PathBuf {
 /// single file reproduces the failure (e.g. a cross-file resolution or codegen
 /// error, not a parse error).
 fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
-    for (name, src) in DOGFOOD_SOURCES {
-        let stripped = aipl::strip_test_sections(src);
+    for (name, src) in read_dogfood_sources(DOGFOOD_SOURCE_FILES) {
+        let stripped = aipl::strip_test_sections(&src);
         let Err(e) = aipl::parse(stripped) else {
             continue;
         };
@@ -129,17 +133,19 @@ fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
 /// (e.g. `caret_block.aipl`) trigger deep recursion in the compiler that
 /// overflows the default test-framework stack (8 MiB on macOS).
 fn generate_for(a: &Artifact) -> String {
-    for (path, _) in a.sources {
+    for path in a.sources {
         if !path.starts_with("./") {
             panic!("non-relative path: {path:?}")
         }
     }
+    let owned = read_dogfood_sources(a.sources);
+    let sources = source_refs(&owned);
     let mut result = None;
     std::thread::scope(|s| {
         let handle = std::thread::Builder::new()
             .stack_size(64 * 1024 * 1024)
             .spawn_scoped(s, || {
-                generate_dogfood_artifact(a.sources, a.entries)
+                generate_dogfood_artifact(&sources, a.entries)
                     .unwrap_or_else(|e| blame_dogfood_failure(e))
             })
             .expect("spawn scoped thread");
