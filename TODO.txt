@@ -105,8 +105,6 @@ optimizations:
 
     C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (inc-then-dec of the same value in a block is a no-op; borrowed args never need a pair).
 
-    C2. Iterating a str calls into the runtime once per byte. for (let c : s) lowers to a header-block call aipl_str_iter_next (:11056) with no inline fast path — a call, three loads, and two branches per character. This is the hot path of the dogfooded lexer, which is on every compile. Inline the common case (position inside the current leaf → load byte, bump) and call out only on leaf exhaustion.
-
     C3. Mangled symbol names dominate small binaries. tests/cases.rs:1675 notes it outright: metadata (symbol/string tables, relocations) exceeds code for small programs. Shortening or hashing mangled names would move binary size — an asserted metric — across the whole corpus at once.
 
     D. Runtime data structures
@@ -128,6 +126,12 @@ optimizations:
 
 effects:
   all effects should be shimmable actually
+
+perfmon:
+  show regression and improvements
+  add tests that specifically exersize perf
+  metrics:
+    call to a runtime method is counted as one instruction when is not representative
 
 recovering check:
   check should error on lint failures, but still run tests and report results

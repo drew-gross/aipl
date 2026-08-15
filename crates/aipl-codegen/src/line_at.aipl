@@ -41,11 +41,11 @@ allocations: 7
 deallocations: 7
 reallocations: 26
 bytes allocated: 224
-instructions executed: 4162
-binary size: 4536
-  code: 1772
+instructions executed: 4896
+binary size: 4600
+  code: 1832
   data: 729
-  metadata: 2035
+  metadata: 2039
 --- monomorphizations ---
 __enumerate0
 line_at

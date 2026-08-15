@@ -25,11 +25,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 360
-instructions executed: 1241
-binary size: 4112
-  code: 1332
+instructions executed: 1670
+binary size: 4168
+  code: 1392
   data: 558
-  metadata: 2222
+  metadata: 2218
 --- monomorphizations ---
 main
 normalize_output

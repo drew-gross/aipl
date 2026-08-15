@@ -8295,6 +8295,98 @@ fn coerce_empty_to_char_array<M: Module>(
     }
 }
 
+/// Advance a `str` cursor and return its next byte as `0..=255`, or `-1` at the
+/// end — the inlined form of `aipl_str_iter_next`, which it still calls for the
+/// case that needs real work.
+///
+/// This is `load_array_elem`'s pattern one level down: a fast path in IR, an
+/// extern call only when the fast path doesn't apply. It matters more here,
+/// because the call was *per byte* — every `for (let c : s)` paid a full call
+/// plus its loads and branches for each character, and walking source text a
+/// character at a time is what the dogfooded lexer does for a living.
+///
+/// The fast path is exactly the runtime's: still inside the string, and still
+/// inside the cached leaf, so the byte is a load at `leaf_ptr + (pos -
+/// leaf_start)` and the only write is the bumped position. Everything else —
+/// descending a rope to the leaf containing `pos`, and caching it — stays in the
+/// runtime, reached by the same call as before.
+///
+/// The leaf test is one unsigned compare rather than two signed ones: `pos <
+/// leaf_start` wraps `rel` negative, which as a `u64` is enormous and so fails
+/// `rel < leaf_len` too. A freshly-initialized cursor has `leaf_len == 0`, so it
+/// fails that test for any position and takes the call — which is what fills the
+/// cache in the first place, and why the null `leaf_ptr` is never loaded from.
+fn emit_str_iter_next<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    cur_addr: Value,
+) -> Value {
+    let flags = MemFlagsData::trusted();
+    let check_leaf = builder.create_block();
+    let fast = builder.create_block();
+    let slow = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+
+    // Past the end: `-1`, leaving the cursor untouched.
+    let pos = builder
+        .ins()
+        .load(types::I64, flags, cur_addr, ITER_POS as i32);
+    let total = builder
+        .ins()
+        .load(types::I64, flags, cur_addr, ITER_TOTAL as i32);
+    let at_end = builder
+        .ins()
+        .icmp(IntCC::SignedGreaterThanOrEqual, pos, total);
+    let minus_one = builder.ins().iconst(types::I64, -1);
+    builder.ins().brif(
+        at_end,
+        merge,
+        &[BlockArg::Value(minus_one)],
+        check_leaf,
+        &[],
+    );
+
+    builder.switch_to_block(check_leaf);
+    builder.seal_block(check_leaf);
+    let leaf_start = builder
+        .ins()
+        .load(types::I64, flags, cur_addr, ITER_LEAF_START as i32);
+    let leaf_len = builder
+        .ins()
+        .load(types::I64, flags, cur_addr, ITER_LEAF_LEN as i32);
+    let rel = builder.ins().isub(pos, leaf_start);
+    let in_leaf = builder.ins().icmp(IntCC::UnsignedLessThan, rel, leaf_len);
+    builder.ins().brif(in_leaf, fast, &[], slow, &[]);
+
+    builder.switch_to_block(fast);
+    builder.seal_block(fast);
+    let leaf_ptr = builder
+        .ins()
+        .load(types::I64, flags, cur_addr, ITER_LEAF_PTR as i32);
+    let at = builder.ins().iadd(leaf_ptr, rel);
+    let byte = builder.ins().uload8(types::I64, flags, at, 0);
+    let next_pos = builder.ins().iadd_imm_s(pos, 1);
+    builder
+        .ins()
+        .store(flags, next_pos, cur_addr, ITER_POS as i32);
+    builder.ins().jump(merge, &[BlockArg::Value(byte)]);
+
+    // Not in the cached leaf (or no leaf yet): the runtime descends, caches, and
+    // returns the byte, doing the position bump itself.
+    builder.switch_to_block(slow);
+    builder.seal_block(slow);
+    let next_f = builtins.import(module, builder.func, "aipl_str_iter_next");
+    let inst = builder.ins().call(next_f, &[cur_addr]);
+    let from_runtime = builder.inst_results(inst)[0];
+    builder.ins().jump(merge, &[BlockArg::Value(from_runtime)]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.block_params(merge)[0]
+}
+
 /// The `elem_size` argument handed to the array runtime: a byte stride, or the
 /// sentinel 0 for a bit-packed `bool` array.
 fn runtime_elem_size(elem: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
@@ -11086,9 +11178,7 @@ fn emit_render_char_array<M: Module>(
     builder.ins().jump(header, &[]);
 
     builder.switch_to_block(header);
-    let next_f = b.import(module, builder.func, "aipl_str_iter_next");
-    let inst = builder.ins().call(next_f, &[cur_addr]);
-    let byte_i64 = builder.inst_results(inst)[0];
+    let byte_i64 = emit_str_iter_next(module, builder, b, cur_addr);
     let more = builder
         .ins()
         .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
@@ -15972,9 +16062,7 @@ fn compile_expr<M: Module>(
                     // Pull the next byte from the cursor; `-1` signals the end (so
                     // a rope is walked leaf-by-leaf, never flattened, and we never
                     // index out of bounds).
-                    let next_f = builtins.import(module, builder.func, "aipl_str_iter_next");
-                    let inst = builder.ins().call(next_f, &[str_cursor]);
-                    let byte_i64 = builder.inst_results(inst)[0];
+                    let byte_i64 = emit_str_iter_next(module, builder, builtins, str_cursor);
                     let more =
                         builder
                             .ins()

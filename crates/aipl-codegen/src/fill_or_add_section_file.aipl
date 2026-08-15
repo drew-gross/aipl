@@ -30,8 +30,8 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 88
-binary size: 9784
-  code: 4984
+binary size: 9904
+  code: 5104
   data: 358
   metadata: 4442
 --- monomorphizations ---

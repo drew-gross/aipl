@@ -2651,11 +2651,11 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3086758
-binary size: 3018824
-  code: 1722188
+instructions executed: 3119503
+binary size: 3019528
+  code: 1722888
   data: 25740
-  metadata: 1270896
+  metadata: 1270900
 --- monomorphizations ---
 __builtin_any$__m1__Doc$lam36
 __builtin_count_while$char$s0$lam46

@@ -4958,51 +4958,33 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// arguments, lambdas lifted with captures threaded through, `str` receivers
 /// kept in the `str` representation. An entry the program never calls costs
 /// nothing (uninstantiated templates are dropped).
+/// Where the AIPL-implemented builtins' sources live: this crate's `src/`
+/// directory, resolved at compile time but *read at run time* (by
+/// [`aipl_builtin`]).
+///
+/// The same trade `aipl-codegen` makes for its dogfooded sources, for the same
+/// reason: `include_str!` here made every edit to one of these `.aipl` files a
+/// source change to this crate, rebuilding it, everything downstream, and every
+/// test binary. That is paid on a plain edit, and again on each one the test
+/// harness's `fill_expected` refreshes — a perf refill across these files
+/// otherwise rebuilds the workspace once per file.
+const BUILTIN_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
+
 const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
-    ("__builtin_all", include_str!("builtin_all.aipl")),
-    ("__builtin_sort_by", include_str!("builtin_sort_by.aipl")),
-    ("__builtin_any", include_str!("builtin_any.aipl")),
-    (
-        "__builtin_left_fold",
-        include_str!("builtin_left_fold.aipl"),
-    ),
-    (
-        "__builtin_right_fold",
-        include_str!("builtin_right_fold.aipl"),
-    ),
-    (
-        "__builtin_opt_left_fold",
-        include_str!("builtin_opt_left_fold.aipl"),
-    ),
-    (
-        "__builtin_opt_right_fold",
-        include_str!("builtin_opt_right_fold.aipl"),
-    ),
-    ("__builtin_count", include_str!("builtin_count.aipl")),
-    (
-        "__builtin_count_while",
-        include_str!("builtin_count_while.aipl"),
-    ),
-    (
-        "__builtin_is_err_and",
-        include_str!("builtin_is_err_and.aipl"),
-    ),
-    (
-        "__builtin_is_some_and",
-        include_str!("builtin_is_some_and.aipl"),
-    ),
-    (
-        "__builtin_int_parse",
-        include_str!("builtin_int_parse.aipl"),
-    ),
-    (
-        "__builtin_trim_while",
-        include_str!("builtin_trim_while.aipl"),
-    ),
-    (
-        "__builtin_value_or_err",
-        include_str!("builtin_value_or_err.aipl"),
-    ),
+    ("__builtin_all", "builtin_all.aipl"),
+    ("__builtin_sort_by", "builtin_sort_by.aipl"),
+    ("__builtin_any", "builtin_any.aipl"),
+    ("__builtin_left_fold", "builtin_left_fold.aipl"),
+    ("__builtin_right_fold", "builtin_right_fold.aipl"),
+    ("__builtin_opt_left_fold", "builtin_opt_left_fold.aipl"),
+    ("__builtin_opt_right_fold", "builtin_opt_right_fold.aipl"),
+    ("__builtin_count", "builtin_count.aipl"),
+    ("__builtin_count_while", "builtin_count_while.aipl"),
+    ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
+    ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
+    ("__builtin_int_parse", "builtin_int_parse.aipl"),
+    ("__builtin_trim_while", "builtin_trim_while.aipl"),
+    ("__builtin_value_or_err", "builtin_value_or_err.aipl"),
 ];
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real
@@ -5035,13 +5017,13 @@ struct AiplBuiltin {
     decl: Item,
 }
 
-/// [`AIPL_BUILTIN_SOURCES`] as a lookup by canonical name, each entry paired
-/// with an empty slot for its loaded form. Building this map parses *nothing*
-/// — the slot fills on the entry's first [`aipl_builtin`] lookup — so the cost
-/// of a builtin's source is paid only by a program that actually reaches it
-/// (see [`aipl_builtin_demand`]). Loading every entry eagerly used to dominate
-/// compile time: the sources total ~28 KB and the parser runs them through the
-/// dogfooded AIPL lexer.
+/// [`AIPL_BUILTIN_SOURCES`] as a lookup by canonical name, each file name paired
+/// with an empty slot for its loaded form. Building this map neither reads nor
+/// parses *anything* — the slot fills on the entry's first [`aipl_builtin`]
+/// lookup — so the cost of a builtin's source is paid only by a program that
+/// actually reaches it (see [`aipl_builtin_demand`]). Loading every entry
+/// eagerly used to dominate compile time: the sources total ~28 KB and the
+/// parser runs them through the dogfooded AIPL lexer.
 fn aipl_builtin_slots() -> &'static HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)> {
     static SLOTS: OnceLock<HashMap<&'static str, (&'static str, OnceLock<AiplBuiltin>)>> =
         OnceLock::new();
@@ -5057,9 +5039,16 @@ fn aipl_builtin_slots() -> &'static HashMap<&'static str, (&'static str, OnceLoc
 /// source on first request and reusing it thereafter. `None` if `canonical`
 /// isn't one of them (a native builtin, or a user function).
 fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
-    let (src, slot) = aipl_builtin_slots().get(canonical)?;
+    let (file, slot) = aipl_builtin_slots().get(canonical)?;
     Some(slot.get_or_init(|| {
-        let f = load_aipl_builtin_fn(src);
+        // Read here, not when the slot map is built, so an unreached builtin
+        // costs no I/O either — the same reason its source isn't parsed until
+        // now. An unreadable file is a loud panic: it is a checked-in source
+        // this compile has just demanded.
+        let path = std::path::Path::new(BUILTIN_SRC_DIR).join(file);
+        let src = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("AIPL builtin source {path:?}: {e}"));
+        let f = load_aipl_builtin_fn(&src);
         let generic = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
         let mut decl = f;
         decl.name = canonical.to_string();

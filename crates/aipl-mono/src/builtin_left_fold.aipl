@@ -48,11 +48,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 507
-instructions executed: 1140
-binary size: 6032
-  code: 2664
+instructions executed: 1171
+binary size: 6088
+  code: 2724
   data: 724
-  metadata: 2644
+  metadata: 2640
 --- monomorphizations ---
 __filter11$own0
 add

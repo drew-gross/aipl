@@ -40,11 +40,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 323
-instructions executed: 929
-binary size: 6680
-  code: 3244
+instructions executed: 1030
+binary size: 6856
+  code: 3424
   data: 589
-  metadata: 2847
+  metadata: 2843
 --- monomorphizations ---
 __filter13$own0
 any$char$lam7
