@@ -29,6 +29,21 @@ binary size: 5792
   code: 2848
   data: 436
   metadata: 2508
+builtin calls: 39
+  aipl_arr_inc: 1
+  aipl_array_dec: 11
+  aipl_array_new: 7
+  aipl_assert: 8
+  aipl_dec: 1
+  aipl_inc: 2
+  aipl_str_alloc: 1
+  aipl_str_data: 1
+  aipl_str_iter_init: 1
+  aipl_str_iter_next: 1
+  aipl_str_len: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_any$char$lam8
 __builtin_any$i64$lam1

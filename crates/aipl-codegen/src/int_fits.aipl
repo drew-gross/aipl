@@ -78,6 +78,16 @@ binary size: 7440
   code: 2224
   data: 1605
   metadata: 3611
+builtin calls: 872
+  aipl_array_dec: 1
+  aipl_assert: 31
+  aipl_dec: 319
+  aipl_inc: 144
+  aipl_str_eq: 144
+  aipl_str_len: 230
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 int_fits
 main

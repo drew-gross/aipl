@@ -17,6 +17,12 @@ binary size: 1536
   code: 372
   data: 156
   metadata: 1008
+builtin calls: 7
+  aipl_array_dec: 1
+  aipl_assert: 3
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$pick
 main

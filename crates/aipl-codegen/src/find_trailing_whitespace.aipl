@@ -97,6 +97,17 @@ binary size: 5464
   code: 2128
   data: 1110
   metadata: 2226
+builtin calls: 85
+  aipl_array_dec: 1
+  aipl_assert: 12
+  aipl_dec: 12
+  aipl_str_data: 11
+  aipl_str_iter_init: 12
+  aipl_str_iter_next: 11
+  aipl_str_len: 23
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$find_trailing_whitespace
 find_trailing_whitespace

@@ -38,3 +38,11 @@ binary size: 1448
   code: 272
   data: 132
   metadata: 1044
+builtin calls: 10
+  aipl_array_dec: 1
+  aipl_assert: 2
+  aipl_now_nanos: 2
+  aipl_shim_get: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

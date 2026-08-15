@@ -46,6 +46,17 @@ binary size: 2784
   code: 780
   data: 293
   metadata: 1711
+builtin calls: 40
+  aipl_array_dec: 1
+  aipl_assert: 5
+  aipl_concat_lazy: 2
+  aipl_dec: 12
+  aipl_inc: 5
+  aipl_str_eq: 2
+  aipl_str_len: 8
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 dbl
 inc

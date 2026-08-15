@@ -34,6 +34,21 @@ binary size: 5160
   code: 2660
   data: 200
   metadata: 2300
+builtin calls: 122
+  aipl_arr_drop_arr: 3
+  aipl_arr_drop_str: 6
+  aipl_arr_inc: 7
+  aipl_arr_retain_ptr: 2
+  aipl_array_dec: 21
+  aipl_array_new: 9
+  aipl_array_push: 1
+  aipl_assert: 4
+  aipl_dec: 34
+  aipl_inc: 25
+  aipl_str_eq: 7
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$grid3
 main

@@ -48,6 +48,23 @@ binary size: 6976
   code: 3608
   data: 404
   metadata: 2964
+builtin calls: 107
+  aipl_arr_drop_str: 2
+  aipl_arr_inc: 2
+  aipl_arr_retain_ptr: 3
+  aipl_array_dec: 18
+  aipl_array_new: 9
+  aipl_array_push_mut: 15
+  aipl_array_with_cap: 4
+  aipl_assert: 7
+  aipl_dec: 15
+  aipl_i64_len: 6
+  aipl_inc: 11
+  aipl_str_eq: 3
+  aipl_test_begin: 4
+  aipl_test_end: 4
+  aipl_test_summary: 1
+  aipl_write_i64: 3
 --- monomorphizations ---
 __map2$own0
 double

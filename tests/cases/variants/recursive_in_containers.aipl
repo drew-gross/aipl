@@ -58,6 +58,25 @@ binary size: 9176
   code: 4528
   data: 389
   metadata: 4259
+builtin calls: 370
+  aipl_array_dec: 2
+  aipl_array_new: 1
+  aipl_dec: 53
+  aipl_i64_len: 34
+  aipl_inc: 5
+  aipl_print: 5
+  aipl_rec_alloc: 11
+  aipl_rec_dec_strong: 15
+  aipl_rec_dec_weak: 6
+  aipl_rec_inc_strong: 4
+  aipl_rec_inc_weak: 6
+  aipl_str_alloc: 19
+  aipl_str_data: 22
+  aipl_str_len: 44
+  aipl_u64_len: 2
+  aipl_write_bytes: 123
+  aipl_write_i64: 17
+  aipl_write_u64: 1
 --- monomorphizations ---
 main
 sumall

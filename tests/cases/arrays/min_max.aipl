@@ -26,6 +26,19 @@ binary size: 6360
   code: 3444
   data: 508
   metadata: 2408
+builtin calls: 50
+  aipl_arr_inc: 1
+  aipl_array_dec: 8
+  aipl_array_new: 6
+  aipl_assert: 8
+  aipl_char_at: 6
+  aipl_dec: 8
+  aipl_inc: 6
+  aipl_str_alloc: 2
+  aipl_str_len: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __filter1$own0
 __test$smallest

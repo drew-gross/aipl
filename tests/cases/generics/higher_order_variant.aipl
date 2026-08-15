@@ -32,6 +32,12 @@ binary size: 1568
   code: 480
   data: 128
   metadata: 960
+builtin calls: 6
+  aipl_array_dec: 1
+  aipl_assert: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __lambda_0
 apply$Tok

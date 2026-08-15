@@ -56,3 +56,16 @@ binary size: 3896
   code: 1096
   data: 607
   metadata: 2193
+builtin calls: 42
+  aipl_arr_drop_str: 1
+  aipl_array_dec: 4
+  aipl_array_new: 1
+  aipl_assert: 8
+  aipl_dec: 7
+  aipl_execute_program: 1
+  aipl_inc: 3
+  aipl_monotonic_now: 5
+  aipl_shim_get: 5
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1

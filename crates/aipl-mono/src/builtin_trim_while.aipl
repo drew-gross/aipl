@@ -32,6 +32,20 @@ binary size: 6576
   code: 3164
   data: 506
   metadata: 2906
+builtin calls: 99
+  aipl_array_dec: 1
+  aipl_assert: 7
+  aipl_dec: 28
+  aipl_inc: 7
+  aipl_str_data: 6
+  aipl_str_eq: 7
+  aipl_str_iter_init: 7
+  aipl_str_iter_next: 6
+  aipl_str_len: 20
+  aipl_str_slice: 7
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam14
 __builtin_count_while$char$s0$lam15

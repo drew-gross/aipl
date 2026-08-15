@@ -64,6 +64,14 @@ binary size: 5536
   code: 3400
   data: 1
   metadata: 2135
+builtin calls: 42
+  aipl_array_dec: 3
+  aipl_array_new: 2
+  aipl_dec: 17
+  aipl_i64_len: 2
+  aipl_inc: 13
+  aipl_print: 4
+  aipl_write_i64: 1
 --- monomorphizations ---
 __lambda_0
 __lambda_1

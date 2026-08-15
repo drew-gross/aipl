@@ -1250,6 +1250,29 @@ binary size: 1756200
   code: 1100272
   data: 8276
   metadata: 647652
+builtin calls: 31062
+  aipl_arr_drop_str: 22
+  aipl_arr_inc: 3037
+  aipl_arr_retain_ptr: 30
+  aipl_array_dec: 4715
+  aipl_array_new: 1177
+  aipl_array_push: 195
+  aipl_assert: 62
+  aipl_char_at: 481
+  aipl_concat_lazy: 29
+  aipl_dec: 8807
+  aipl_inc: 7899
+  aipl_str_contains: 325
+  aipl_str_data: 131
+  aipl_str_eq: 111
+  aipl_str_iter_init: 140
+  aipl_str_iter_next: 131
+  aipl_str_len: 2618
+  aipl_str_slice: 842
+  aipl_str_starts_with: 305
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam27
 __builtin_count_while$char$s0$lam32

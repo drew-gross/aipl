@@ -19,6 +19,12 @@ binary size: 1704
   code: 404
   data: 186
   metadata: 1114
+builtin calls: 10
+  aipl_array_dec: 1
+  aipl_assert: 4
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 is_even
 is_odd

@@ -657,6 +657,36 @@ binary size: 200064
   code: 125448
   data: 7100
   metadata: 67516
+builtin calls: 88338
+  aipl_arr_drop_str: 9
+  aipl_arr_inc: 7546
+  aipl_arr_retain_ptr: 9
+  aipl_array_dec: 11366
+  aipl_array_new: 3599
+  aipl_array_push: 69
+  aipl_array_push_mut: 4
+  aipl_array_with_cap: 4
+  aipl_assert: 20
+  aipl_char_at: 1365
+  aipl_concat_lazy: 12
+  aipl_dec: 28163
+  aipl_inc: 23077
+  aipl_str_contains: 1016
+  aipl_str_data: 88
+  aipl_str_ends_with: 3
+  aipl_str_eq: 30
+  aipl_str_is_all_whitespace: 4
+  aipl_str_iter_init: 90
+  aipl_str_iter_next: 88
+  aipl_str_join: 3
+  aipl_str_len: 8169
+  aipl_str_slice: 1982
+  aipl_str_split: 3
+  aipl_str_starts_with: 1610
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
+  aipl_trim: 2
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam17
 __builtin_count_while$char$s0$lam28

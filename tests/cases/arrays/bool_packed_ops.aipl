@@ -33,6 +33,16 @@ binary size: 4856
   code: 2428
   data: 377
   metadata: 2051
+builtin calls: 54
+  aipl_arr_inc: 3
+  aipl_array_dec: 16
+  aipl_array_new: 10
+  aipl_array_push_mut: 15
+  aipl_assert: 5
+  aipl_inc: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __filter5
 __map1

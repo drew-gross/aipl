@@ -43,6 +43,15 @@ binary size: 2416
   code: 1008
   data: 1
   metadata: 1407
+builtin calls: 42
+  aipl_array_dec: 1
+  aipl_concat_lazy: 1
+  aipl_dec: 17
+  aipl_i64_len: 4
+  aipl_inc: 11
+  aipl_print: 4
+  aipl_str_len: 2
+  aipl_write_i64: 2
 --- monomorphizations ---
 combine_i
 combine_s

@@ -50,6 +50,23 @@ binary size: 12368
   code: 6776
   data: 857
   metadata: 4735
+builtin calls: 178
+  aipl_arr_inc: 8
+  aipl_array_dec: 24
+  aipl_array_new: 6
+  aipl_array_push_mut: 16
+  aipl_array_with_cap: 9
+  aipl_assert: 12
+  aipl_concat_lazy: 4
+  aipl_dec: 29
+  aipl_dict_get: 13
+  aipl_dict_insert: 16
+  aipl_inc: 14
+  aipl_str_eq: 2
+  aipl_str_len: 14
+  aipl_test_begin: 5
+  aipl_test_end: 5
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$array_values
 __test$optional_values

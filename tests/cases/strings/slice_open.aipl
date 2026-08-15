@@ -23,5 +23,16 @@ binary size: 3432
   code: 1096
   data: 385
   metadata: 1951
+builtin calls: 59
+  aipl_array_dec: 1
+  aipl_assert: 7
+  aipl_dec: 21
+  aipl_inc: 7
+  aipl_str_eq: 7
+  aipl_str_len: 6
+  aipl_str_slice: 7
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 main

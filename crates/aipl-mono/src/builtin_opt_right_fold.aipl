@@ -92,6 +92,20 @@ binary size: 10112
   code: 5900
   data: 854
   metadata: 3358
+builtin calls: 110
+  aipl_arr_drop_str: 1
+  aipl_arr_inc: 1
+  aipl_array_dec: 10
+  aipl_array_new: 8
+  aipl_assert: 10
+  aipl_concat_lazy: 3
+  aipl_dec: 34
+  aipl_inc: 27
+  aipl_str_eq: 1
+  aipl_str_len: 8
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
 --- monomorphizations ---
 __filter5$own0
 __lambda_10

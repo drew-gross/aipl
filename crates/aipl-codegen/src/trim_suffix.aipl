@@ -20,6 +20,18 @@ binary size: 2840
   code: 920
   data: 274
   metadata: 1646
+builtin calls: 58
+  aipl_array_dec: 1
+  aipl_assert: 4
+  aipl_char_at: 4
+  aipl_dec: 22
+  aipl_inc: 12
+  aipl_str_eq: 4
+  aipl_str_len: 6
+  aipl_str_slice: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 main
 trim_suffix

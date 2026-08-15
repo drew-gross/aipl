@@ -25,6 +25,12 @@ binary size: 1328
   code: 304
   data: 107
   metadata: 917
+builtin calls: 6
+  aipl_array_dec: 1
+  aipl_assert: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 eval
 inc

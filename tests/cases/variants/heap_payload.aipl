@@ -28,6 +28,19 @@ binary size: 3664
   code: 1408
   data: 263
   metadata: 1993
+builtin calls: 62
+  aipl_array_dec: 1
+  aipl_assert: 4
+  aipl_concat_lazy: 2
+  aipl_dec: 24
+  aipl_i64_len: 4
+  aipl_inc: 12
+  aipl_str_eq: 4
+  aipl_str_len: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_write_i64: 2
 --- monomorphizations ---
 describe
 main

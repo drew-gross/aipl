@@ -93,6 +93,27 @@ binary size: 10128
   code: 3956
   data: 1720
   metadata: 4452
+builtin calls: 1023
+  aipl_arr_inc: 6
+  aipl_array_dec: 13
+  aipl_array_new: 6
+  aipl_array_push_mut: 54
+  aipl_assert: 6
+  aipl_concat: 120
+  aipl_dec: 465
+  aipl_inc: 195
+  aipl_str_data: 6
+  aipl_str_eq: 6
+  aipl_str_iter_init: 6
+  aipl_str_iter_next: 6
+  aipl_str_len: 35
+  aipl_str_repeat: 18
+  aipl_str_slice: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_u64_len: 48
+  aipl_write_u64: 24
 --- monomorphizations ---
 __enumerate0
 __m1__line_at

@@ -50,6 +50,14 @@ binary size: 3360
   code: 1488
   data: 131
   metadata: 1741
+builtin calls: 30
+  aipl_array_dec: 1
+  aipl_concat_lazy: 1
+  aipl_dec: 13
+  aipl_inc: 9
+  aipl_print: 3
+  aipl_str_len: 2
+  aipl_write_bytes: 1
 --- monomorphizations ---
 check_positive
 describe

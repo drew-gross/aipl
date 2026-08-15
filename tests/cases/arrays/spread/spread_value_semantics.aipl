@@ -26,3 +26,14 @@ binary size: 4752
   code: 2208
   data: 249
   metadata: 2295
+builtin calls: 71
+  aipl_arr_inc: 20
+  aipl_arr_reserve: 2
+  aipl_array_dec: 29
+  aipl_array_new: 5
+  aipl_array_push: 1
+  aipl_array_push_mut: 7
+  aipl_assert: 4
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

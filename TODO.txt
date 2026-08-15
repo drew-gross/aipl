@@ -104,6 +104,9 @@ optimizations:
     C. Generated code
 
     C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (inc-then-dec of the same value in a block is a no-op; borrowed args never need a pair).
+      C1a: tried it an there were a lot of bugs.
+
+    C2 redux - inline str len fast path, only call into runtime when it turns out to be a rope
 
     C3. Mangled symbol names dominate small binaries. tests/cases.rs:1675 notes it outright: metadata (symbol/string tables, relocations) exceeds code for small programs. Shortening or hashing mangled names would move binary size — an asserted metric — across the whole corpus at once.
 
@@ -116,6 +119,7 @@ optimizations:
     E. The dogfooded AIPL itself
 
     E1. self[i..].starts_with(needle) inside byte loops allocates a view per character. crates/aipl-codegen/src/lexer.aipl:345, 367, 371, 653 and src[i..step.end] == "{" at :770. aipl_str_slice (:1131) copies for ≤7 bytes but allocates a 32-byte view block plus a retain for larger heap slices — so scanning for a delimiter allocates O(n) views. A starts_with_at(self, i, needle) builtin (no slice) removes it. This is likely most of lexer.aipl's 1678 allocations, and it runs on every raw string and comment in every compile.
+    - My note: This seems like a prime case for operation fusion
 
     F. Worth a look, lower confidence
 
@@ -130,8 +134,6 @@ effects:
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
-  metrics:
-    call to a runtime method is counted as one instruction when is not representative
 
 recovering check:
   check should error on lint failures, but still run tests and report results
@@ -142,6 +144,7 @@ recovering check:
 tests:
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
+  convert the doctests into regular tests and remove the cargo test --doc step
 
 lex json
 find a more natural way of testing builtins

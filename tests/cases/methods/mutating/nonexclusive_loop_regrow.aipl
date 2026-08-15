@@ -45,6 +45,16 @@ binary size: 3840
   code: 1884
   data: 132
   metadata: 1824
+builtin calls: 70
+  aipl_arr_inc: 15
+  aipl_array_dec: 32
+  aipl_array_new: 7
+  aipl_array_push: 7
+  aipl_assert: 2
+  aipl_inc: 2
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$addtwo
 addtwo

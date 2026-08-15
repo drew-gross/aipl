@@ -30,6 +30,24 @@ binary size: 4168
   code: 1392
   data: 558
   metadata: 2218
+builtin calls: 240
+  aipl_arr_drop_str: 8
+  aipl_array_dec: 17
+  aipl_array_new: 8
+  aipl_assert: 8
+  aipl_dec: 77
+  aipl_inc: 24
+  aipl_str_data: 7
+  aipl_str_eq: 8
+  aipl_str_iter_init: 8
+  aipl_str_iter_next: 7
+  aipl_str_join: 8
+  aipl_str_len: 28
+  aipl_str_slice: 21
+  aipl_str_split: 8
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 main
 normalize_output

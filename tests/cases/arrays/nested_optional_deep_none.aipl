@@ -50,6 +50,16 @@ binary size: 5008
   code: 2324
   data: 355
   metadata: 2329
+builtin calls: 59
+  aipl_array_dec: 2
+  aipl_array_new: 1
+  aipl_dec: 10
+  aipl_i64_len: 4
+  aipl_inc: 5
+  aipl_print: 5
+  aipl_str_alloc: 5
+  aipl_write_bytes: 25
+  aipl_write_i64: 2
 --- monomorphizations ---
 main
 ret_deep

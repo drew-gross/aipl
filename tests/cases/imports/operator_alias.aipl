@@ -23,5 +23,12 @@ binary size: 1152
   code: 304
   data: 1
   metadata: 847
+builtin calls: 8
+  aipl_array_dec: 1
+  aipl_dec: 2
+  aipl_i64_len: 2
+  aipl_inc: 1
+  aipl_print: 1
+  aipl_write_i64: 1
 --- monomorphizations ---
 main

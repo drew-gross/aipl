@@ -43,6 +43,14 @@ binary size: 3080
   code: 1456
   data: 27
   metadata: 1597
+builtin calls: 81
+  aipl_array_dec: 1
+  aipl_concat_lazy: 6
+  aipl_dec: 36
+  aipl_inc: 20
+  aipl_print: 2
+  aipl_str_eq: 2
+  aipl_str_len: 14
 --- monomorphizations ---
 greet
 main

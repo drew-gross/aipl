@@ -18,6 +18,12 @@ binary size: 1856
   code: 604
   data: 194
   metadata: 1058
+builtin calls: 7
+  aipl_array_dec: 1
+  aipl_assert: 3
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$divide
 divide

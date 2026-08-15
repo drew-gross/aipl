@@ -52,6 +52,16 @@ binary size: 2432
   code: 1048
   data: 1
   metadata: 1383
+builtin calls: 61
+  aipl_array_dec: 3
+  aipl_array_new: 2
+  aipl_concat_lazy: 4
+  aipl_dec: 22
+  aipl_i64_len: 6
+  aipl_inc: 9
+  aipl_print: 4
+  aipl_str_len: 8
+  aipl_write_i64: 3
 --- monomorphizations ---
 clamp_low
 first_index_reaching

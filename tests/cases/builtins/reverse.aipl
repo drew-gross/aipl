@@ -27,6 +27,21 @@ binary size: 5760
   code: 2296
   data: 618
   metadata: 2846
+builtin calls: 122
+  aipl_arr_drop_str: 2
+  aipl_arr_elem_ptr: 7
+  aipl_arr_reverse: 4
+  aipl_array_dec: 16
+  aipl_array_new: 7
+  aipl_assert: 9
+  aipl_dec: 36
+  aipl_inc: 19
+  aipl_str_eq: 8
+  aipl_str_len: 2
+  aipl_str_reverse: 5
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
 --- monomorphizations ---
 arr_rev
 main

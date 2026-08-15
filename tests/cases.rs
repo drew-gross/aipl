@@ -1644,7 +1644,7 @@ fn measure_perf_stats(
 /// (codegen emits from ordered work-lists, not HashMap iteration), though
 /// `binary_size` is target-specific (machine code + object format), unlike the
 /// others.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct PerfStats {
     allocations: u64,
     deallocations: u64,
@@ -1652,12 +1652,19 @@ struct PerfStats {
     bytes_allocated: u64,
     instructions: u64,
     binary_size: BinSizes,
+    /// How many times each runtime builtin ran, `(name, count)`, in the
+    /// runtime's (sorted) order and omitting the ones that never ran. See
+    /// `builtin_calls` in the runtime for why this is tracked beside
+    /// `instructions`: a call into the runtime is one CLIF instruction whatever
+    /// it does, so the instruction count alone can't see work crossing that
+    /// boundary — and these say which builtins a program leans on.
+    builtin_calls: Vec<(String, u64)>,
 }
 
 impl PerfStats {
     /// The `--- performance ---` body these stats represent.
     fn render(&self) -> String {
-        format!(
+        let mut out = format!(
             "allocations: {}\ndeallocations: {}\nreallocations: {}\nbytes allocated: {}\n\
              instructions executed: {}\n{}",
             self.allocations,
@@ -1666,7 +1673,13 @@ impl PerfStats {
             self.bytes_allocated,
             self.instructions,
             self.binary_size.render(),
-        )
+        );
+        let total: u64 = self.builtin_calls.iter().map(|(_, n)| n).sum();
+        out.push_str(&format!("\nbuiltin calls: {total}"));
+        for (name, n) in &self.builtin_calls {
+            out.push_str(&format!("\n  {name}: {n}"));
+        }
+        out
     }
 }
 
@@ -1736,8 +1749,26 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     let mut code = None;
     let mut data = None;
     let mut metadata = None;
-    for line in s.lines() {
-        let line = line.trim();
+    // Indented `<builtin>: <n>` lines follow the `builtin calls:` total. They
+    // are collected by position rather than by name, so a new builtin needs no
+    // change here.
+    let mut builtin_calls: Vec<(String, u64)> = Vec::new();
+    let mut in_builtins = false;
+    for raw in s.lines() {
+        let line = raw.trim();
+        if line.starts_with("builtin calls:") {
+            in_builtins = true;
+            continue;
+        }
+        if in_builtins {
+            match (raw.starts_with("  "), line.rsplit_once(": ")) {
+                (true, Some((name, n))) if n.trim().parse::<u64>().is_ok() => {
+                    builtin_calls.push((name.trim().to_string(), n.trim().parse().unwrap()));
+                    continue;
+                }
+                _ => in_builtins = false,
+            }
+        }
         if let Some(v) = line.strip_prefix("bytes allocated:") {
             bytes_allocated = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("instructions executed:") {
@@ -1770,6 +1801,7 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             data: data?,
             metadata: metadata?,
         },
+        builtin_calls,
     })
 }
 

@@ -47,6 +47,20 @@ binary size: 7832
   code: 2732
   data: 1473
   metadata: 3627
+builtin calls: 348
+  aipl_array_dec: 1
+  aipl_assert: 13
+  aipl_dec: 129
+  aipl_inc: 76
+  aipl_str_ends_with: 8
+  aipl_str_eq: 12
+  aipl_str_len: 71
+  aipl_str_slice: 7
+  aipl_str_starts_with: 13
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 15
 --- monomorphizations ---
 __test$parse_test_section_header
 main

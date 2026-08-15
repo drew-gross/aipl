@@ -41,6 +41,20 @@ binary size: 8128
   code: 4508
   data: 411
   metadata: 3209
+builtin calls: 93
+  aipl_arr_drop_str: 1
+  aipl_arr_inc: 2
+  aipl_array_dec: 22
+  aipl_array_new: 14
+  aipl_array_push_mut: 10
+  aipl_array_with_cap: 5
+  aipl_assert: 6
+  aipl_dec: 14
+  aipl_inc: 10
+  aipl_str_eq: 2
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
 --- monomorphizations ---
 main
 pair_up$lam11

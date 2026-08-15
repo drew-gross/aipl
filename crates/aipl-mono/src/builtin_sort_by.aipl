@@ -103,3 +103,22 @@ binary size: 24440
   code: 14888
   data: 754
   metadata: 8798
+builtin calls: 904
+  aipl_arr_drop_str: 13
+  aipl_arr_extend: 27
+  aipl_arr_inc: 182
+  aipl_arr_reserve: 27
+  aipl_arr_retain_ptr: 16
+  aipl_arr_slice: 81
+  aipl_array_dec: 295
+  aipl_array_new: 29
+  aipl_array_push_mut: 30
+  aipl_array_with_cap: 1
+  aipl_assert: 10
+  aipl_dec: 96
+  aipl_inc: 82
+  aipl_str_cmp: 6
+  aipl_str_eq: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

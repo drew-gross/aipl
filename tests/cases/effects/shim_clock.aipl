@@ -83,3 +83,15 @@ binary size: 4472
   code: 1936
   data: 47
   metadata: 2489
+builtin calls: 89
+  aipl_array_dec: 1
+  aipl_concat: 4
+  aipl_dec: 21
+  aipl_inc: 9
+  aipl_now_nanos: 1
+  aipl_print: 4
+  aipl_shim_get: 16
+  aipl_shim_set: 20
+  aipl_u64_len: 8
+  aipl_write_bytes: 1
+  aipl_write_u64: 4

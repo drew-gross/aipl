@@ -46,6 +46,22 @@ binary size: 8408
   code: 4428
   data: 792
   metadata: 3188
+builtin calls: 129
+  aipl_arr_drop_str: 1
+  aipl_array_dec: 6
+  aipl_array_new: 5
+  aipl_assert: 10
+  aipl_concat_lazy: 3
+  aipl_dec: 41
+  aipl_inc: 29
+  aipl_str_data: 4
+  aipl_str_eq: 1
+  aipl_str_iter_init: 5
+  aipl_str_iter_next: 4
+  aipl_str_len: 17
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_opt_left_fold$char$i64$s0$lam12
 __builtin_opt_left_fold$i64$i64$lam1

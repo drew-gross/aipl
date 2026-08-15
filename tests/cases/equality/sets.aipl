@@ -18,6 +18,16 @@ binary size: 4328
   code: 2072
   data: 243
   metadata: 2013
+builtin calls: 100
+  aipl_array_dec: 11
+  aipl_array_push_mut: 21
+  aipl_array_with_cap: 10
+  aipl_assert: 5
+  aipl_set_contains: 29
+  aipl_set_insert: 21
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$eq_set
 main

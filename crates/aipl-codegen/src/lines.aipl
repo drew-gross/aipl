@@ -48,6 +48,20 @@ binary size: 4408
   code: 1480
   data: 760
   metadata: 2168
+builtin calls: 188
+  aipl_arr_drop_str: 12
+  aipl_array_dec: 13
+  aipl_array_new: 12
+  aipl_assert: 6
+  aipl_dec: 72
+  aipl_inc: 34
+  aipl_str_eq: 13
+  aipl_str_len: 4
+  aipl_str_slice: 13
+  aipl_str_split: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 lines
 main

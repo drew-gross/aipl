@@ -62,6 +62,20 @@ binary size: 6096
   code: 2764
   data: 308
   metadata: 3024
+builtin calls: 66
+  aipl_array_dec: 1
+  aipl_dec: 6
+  aipl_i64_len: 6
+  aipl_inc: 3
+  aipl_print: 3
+  aipl_rec_alloc: 5
+  aipl_rec_dec_strong: 14
+  aipl_rec_dec_weak: 3
+  aipl_rec_inc_strong: 9
+  aipl_rec_inc_weak: 3
+  aipl_str_alloc: 1
+  aipl_write_bytes: 9
+  aipl_write_i64: 3
 --- monomorphizations ---
 leaf
 main

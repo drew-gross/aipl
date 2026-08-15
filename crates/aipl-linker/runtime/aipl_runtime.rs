@@ -95,6 +95,198 @@ static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
 #[cfg(aipl_instrument)]
 static INSN_COUNT: AtomicU64 = AtomicU64::new(0);
 
+// ---------- Per-builtin call counts (instrumented build only) ----------
+//
+// `INSN_COUNT` above counts CLIF instructions executed in *AIPL* code, where a
+// call into this runtime is one instruction however much work it does. That
+// makes the boundary invisible: inlining a runtime fast path raises the count
+// while doing strictly less work, and moving a loop into the runtime lowers it
+// while doing the same work. These counts are the missing half — how many times
+// each builtin actually ran — and they double as a profile of which builtins are
+// worth optimizing.
+//
+// Counted at *entry*, so a builtin that recurses (a `dec` cascading through a
+// rope's children) or calls another counts every invocation: the question is how
+// often the code runs, not how often AIPL asked for it.
+#[cfg(aipl_instrument)]
+mod builtin_calls {
+    use core::sync::atomic::AtomicU64;
+
+    /// Every counted entry point, NUL-terminated for `fputs` and sorted so the
+    /// reported breakdown has a stable order. The `IDX_*` constants below index
+    /// this list; both are generated from the `pub extern "C" fn aipl_*` set.
+    pub const NAMES: &[&[u8]] = &[
+        b"aipl_arr_drop_arr\0",
+        b"aipl_arr_drop_opt_arr\0",
+        b"aipl_arr_drop_opt_str\0",
+        b"aipl_arr_drop_str\0",
+        b"aipl_arr_elem_ptr\0",
+        b"aipl_arr_extend\0",
+        b"aipl_arr_inc\0",
+        b"aipl_arr_load_bit\0",
+        b"aipl_arr_reserve\0",
+        b"aipl_arr_retain_opt\0",
+        b"aipl_arr_retain_ptr\0",
+        b"aipl_arr_reverse\0",
+        b"aipl_arr_slice\0",
+        b"aipl_arr_sort\0",
+        b"aipl_array_dec\0",
+        b"aipl_array_new\0",
+        b"aipl_array_push\0",
+        b"aipl_array_push_mut\0",
+        b"aipl_array_with_cap\0",
+        b"aipl_assert\0",
+        b"aipl_char_at\0",
+        b"aipl_concat\0",
+        b"aipl_concat_lazy\0",
+        b"aipl_concat_mut\0",
+        b"aipl_dec\0",
+        b"aipl_dict_contains_key\0",
+        b"aipl_dict_get\0",
+        b"aipl_dict_insert\0",
+        b"aipl_execute_program\0",
+        b"aipl_i64_len\0",
+        b"aipl_inc\0",
+        b"aipl_list_files\0",
+        b"aipl_monotonic_now\0",
+        b"aipl_now_nanos\0",
+        b"aipl_print\0",
+        b"aipl_print_error\0",
+        b"aipl_read_file_to_string\0",
+        b"aipl_rec_alloc\0",
+        b"aipl_rec_dec_strong\0",
+        b"aipl_rec_dec_weak\0",
+        b"aipl_rec_inc_strong\0",
+        b"aipl_rec_inc_weak\0",
+        b"aipl_set_contains\0",
+        b"aipl_set_insert\0",
+        b"aipl_set_union\0",
+        b"aipl_set_union_mut\0",
+        b"aipl_shim_get\0",
+        b"aipl_shim_set\0",
+        b"aipl_str_alloc\0",
+        b"aipl_str_cmp\0",
+        b"aipl_str_contains\0",
+        b"aipl_str_data\0",
+        b"aipl_str_ends_with\0",
+        b"aipl_str_eq\0",
+        b"aipl_str_hash\0",
+        b"aipl_str_is_all_whitespace\0",
+        b"aipl_str_iter_init\0",
+        b"aipl_str_iter_next\0",
+        b"aipl_str_join\0",
+        b"aipl_str_len\0",
+        b"aipl_str_repeat\0",
+        b"aipl_str_reverse\0",
+        b"aipl_str_slice\0",
+        b"aipl_str_sort\0",
+        b"aipl_str_split\0",
+        b"aipl_str_starts_with\0",
+        b"aipl_test_begin\0",
+        b"aipl_test_end\0",
+        b"aipl_test_fail\0",
+        b"aipl_test_fail_none\0",
+        b"aipl_test_summary\0",
+        b"aipl_trim\0",
+        b"aipl_trim_mut\0",
+        b"aipl_u64_len\0",
+        b"aipl_write_bytes\0",
+        b"aipl_write_i64\0",
+        b"aipl_write_string_to_file\0",
+        b"aipl_write_u64\0",
+    ];
+
+    pub static COUNTS: [AtomicU64; NAMES.len()] = [const { AtomicU64::new(0) }; NAMES.len()];
+
+    pub const AIPL_ARR_DROP_ARR: usize = 0;
+    pub const AIPL_ARR_DROP_OPT_ARR: usize = 1;
+    pub const AIPL_ARR_DROP_OPT_STR: usize = 2;
+    pub const AIPL_ARR_DROP_STR: usize = 3;
+    pub const AIPL_ARR_ELEM_PTR: usize = 4;
+    pub const AIPL_ARR_EXTEND: usize = 5;
+    pub const AIPL_ARR_INC: usize = 6;
+    pub const AIPL_ARR_LOAD_BIT: usize = 7;
+    pub const AIPL_ARR_RESERVE: usize = 8;
+    pub const AIPL_ARR_RETAIN_OPT: usize = 9;
+    pub const AIPL_ARR_RETAIN_PTR: usize = 10;
+    pub const AIPL_ARR_REVERSE: usize = 11;
+    pub const AIPL_ARR_SLICE: usize = 12;
+    pub const AIPL_ARR_SORT: usize = 13;
+    pub const AIPL_ARRAY_DEC: usize = 14;
+    pub const AIPL_ARRAY_NEW: usize = 15;
+    pub const AIPL_ARRAY_PUSH: usize = 16;
+    pub const AIPL_ARRAY_PUSH_MUT: usize = 17;
+    pub const AIPL_ARRAY_WITH_CAP: usize = 18;
+    pub const AIPL_ASSERT: usize = 19;
+    pub const AIPL_CHAR_AT: usize = 20;
+    pub const AIPL_CONCAT: usize = 21;
+    pub const AIPL_CONCAT_LAZY: usize = 22;
+    pub const AIPL_CONCAT_MUT: usize = 23;
+    pub const AIPL_DEC: usize = 24;
+    pub const AIPL_DICT_CONTAINS_KEY: usize = 25;
+    pub const AIPL_DICT_GET: usize = 26;
+    pub const AIPL_DICT_INSERT: usize = 27;
+    pub const AIPL_EXECUTE_PROGRAM: usize = 28;
+    pub const AIPL_I64_LEN: usize = 29;
+    pub const AIPL_INC: usize = 30;
+    pub const AIPL_LIST_FILES: usize = 31;
+    pub const AIPL_MONOTONIC_NOW: usize = 32;
+    pub const AIPL_NOW_NANOS: usize = 33;
+    pub const AIPL_PRINT: usize = 34;
+    pub const AIPL_PRINT_ERROR: usize = 35;
+    pub const AIPL_READ_FILE_TO_STRING: usize = 36;
+    pub const AIPL_REC_ALLOC: usize = 37;
+    pub const AIPL_REC_DEC_STRONG: usize = 38;
+    pub const AIPL_REC_DEC_WEAK: usize = 39;
+    pub const AIPL_REC_INC_STRONG: usize = 40;
+    pub const AIPL_REC_INC_WEAK: usize = 41;
+    pub const AIPL_SET_CONTAINS: usize = 42;
+    pub const AIPL_SET_INSERT: usize = 43;
+    pub const AIPL_SET_UNION: usize = 44;
+    pub const AIPL_SET_UNION_MUT: usize = 45;
+    pub const AIPL_SHIM_GET: usize = 46;
+    pub const AIPL_SHIM_SET: usize = 47;
+    pub const AIPL_STR_ALLOC: usize = 48;
+    pub const AIPL_STR_CMP: usize = 49;
+    pub const AIPL_STR_CONTAINS: usize = 50;
+    pub const AIPL_STR_DATA: usize = 51;
+    pub const AIPL_STR_ENDS_WITH: usize = 52;
+    pub const AIPL_STR_EQ: usize = 53;
+    pub const AIPL_STR_HASH: usize = 54;
+    pub const AIPL_STR_IS_ALL_WHITESPACE: usize = 55;
+    pub const AIPL_STR_ITER_INIT: usize = 56;
+    pub const AIPL_STR_ITER_NEXT: usize = 57;
+    pub const AIPL_STR_JOIN: usize = 58;
+    pub const AIPL_STR_LEN: usize = 59;
+    pub const AIPL_STR_REPEAT: usize = 60;
+    pub const AIPL_STR_REVERSE: usize = 61;
+    pub const AIPL_STR_SLICE: usize = 62;
+    pub const AIPL_STR_SORT: usize = 63;
+    pub const AIPL_STR_SPLIT: usize = 64;
+    pub const AIPL_STR_STARTS_WITH: usize = 65;
+    pub const AIPL_TEST_BEGIN: usize = 66;
+    pub const AIPL_TEST_END: usize = 67;
+    pub const AIPL_TEST_FAIL: usize = 68;
+    pub const AIPL_TEST_FAIL_NONE: usize = 69;
+    pub const AIPL_TEST_SUMMARY: usize = 70;
+    pub const AIPL_TRIM: usize = 71;
+    pub const AIPL_TRIM_MUT: usize = 72;
+    pub const AIPL_U64_LEN: usize = 73;
+    pub const AIPL_WRITE_BYTES: usize = 74;
+    pub const AIPL_WRITE_I64: usize = 75;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 76;
+    pub const AIPL_WRITE_U64: usize = 77;
+}
+
+/// Tally one call to the builtin at `$idx`. Compiles to nothing in the default
+/// build, like every other counter here.
+macro_rules! count_builtin {
+    ($idx:expr) => {
+        #[cfg(aipl_instrument)]
+        builtin_calls::COUNTS[$idx].fetch_add(1, Ordering::Relaxed);
+    };
+}
+
 #[inline]
 unsafe fn rt_alloc(size: usize) -> *mut c_void {
     #[cfg(aipl_instrument)]
@@ -397,6 +589,7 @@ unsafe fn concat_materialize(v: *const u8) -> *const u8 {
 /// them. The defining producer of the concat representation.
 #[no_mangle]
 pub extern "C" fn aipl_concat_lazy(a: *const u8, b: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_CONCAT_LAZY);
     // Sum the operands' lengths once (each is O(1)) so the rope's total length is
     // O(1) to read at the root.
     let len = aipl_str_len(a) + aipl_str_len(b);
@@ -416,6 +609,7 @@ pub extern "C" fn aipl_concat_lazy(a: *const u8, b: *const u8) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn aipl_inc(ptr: *const u8) {
+    count_builtin!(builtin_calls::AIPL_INC);
     match str_repr(ptr) {
         // Null and inline values own no heap — nothing to count.
         StrRepr::Null | StrRepr::Inline => {}
@@ -432,6 +626,7 @@ pub extern "C" fn aipl_inc(ptr: *const u8) {
 
 #[no_mangle]
 pub extern "C" fn aipl_dec(ptr: *const u8) {
+    count_builtin!(builtin_calls::AIPL_DEC);
     match str_repr(ptr) {
         // Null and inline values own no heap — nothing to free.
         StrRepr::Null | StrRepr::Inline => {}
@@ -500,6 +695,7 @@ fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool
 
 #[no_mangle]
 pub extern "C" fn aipl_print(ptr: *const u8) {
+    count_builtin!(builtin_calls::AIPL_PRINT);
     // A null str prints nothing; an inline empty `""` is non-null and prints a
     // blank line. A rope is streamed leaf-by-leaf (no materialization).
     if !ptr.is_null() {
@@ -516,6 +712,7 @@ pub extern "C" fn aipl_print(ptr: *const u8) {
 /// Borrows `msg` (no refcount change) — `main`'s scope drop frees it.
 #[no_mangle]
 pub extern "C" fn aipl_print_error(msg: *const u8) {
+    count_builtin!(builtin_calls::AIPL_PRINT_ERROR);
     let prefix = b"error: ";
     unsafe { write(2, prefix.as_ptr() as *const c_void, prefix.len()) };
     str_for_each_chunk(msg, &mut |chunk| {
@@ -531,6 +728,7 @@ pub extern "C" fn aipl_print_error(msg: *const u8) {
 /// site. Decrements `s` per the refcount protocol.
 #[no_mangle]
 pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_CHAR_AT);
     let mut found: i64 = -1;
     if i >= 0 {
         // Walk leaves to the chunk containing index `i` and stop — no materializing.
@@ -555,6 +753,7 @@ pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
 /// `s` per the refcount protocol. Mirrors the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_IS_ALL_WHITESPACE);
     // Scan leaves, stopping at the first non-whitespace chunk — no materializing.
     // An empty string visits no chunks, so it stays all-whitespace (true).
     let all = str_for_each_chunk(s, &mut |chunk| {
@@ -572,6 +771,7 @@ pub extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
 /// Codegen wraps null into None. Decrements `name` per the refcount protocol.
 #[no_mangle]
 pub extern "C" fn aipl_read_file_to_string(name: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_READ_FILE_TO_STRING);
     let path = unsafe { view_to_owned_path(name) };
     let result = unsafe { read_file_impl(path) };
     if path != name {
@@ -637,6 +837,7 @@ unsafe fn read_file_impl(name: *const u8) -> *const u8 {
 /// pre-inc, as with any str-taking fn).
 #[no_mangle]
 pub extern "C" fn aipl_write_string_to_file(path: *const u8, contents: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_WRITE_STRING_TO_FILE);
     let cpath = unsafe { view_to_owned_path(path) };
     let ok = unsafe { write_file_impl(cpath, contents) };
     if cpath != path {
@@ -688,6 +889,7 @@ unsafe fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
 /// `aipl_list_files` in the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_LIST_FILES);
     let result = unsafe { list_files_impl(dir) };
     aipl_dec(dir);
     result
@@ -886,6 +1088,7 @@ mod list_unix {
 /// refcount traffic. Mirrors `aipl_now_nanos` in the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_now_nanos() -> i64 {
+    count_builtin!(builtin_calls::AIPL_NOW_NANOS);
     unsafe { now_nanos_impl() }
 }
 
@@ -906,6 +1109,7 @@ unsafe fn now_nanos_impl() -> i64 {
 /// unsupported platform. Mirrors `aipl_monotonic_now` in the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_monotonic_now() -> i64 {
+    count_builtin!(builtin_calls::AIPL_MONOTONIC_NOW);
     unsafe { monotonic_now_impl() }
 }
 
@@ -982,6 +1186,7 @@ static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 2] =
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
 #[no_mangle]
 pub extern "C" fn aipl_shim_get(idx: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_SHIM_GET);
     match SHIM_SLOTS.get(idx as usize) {
         Some(slot) => slot.load(core::sync::atomic::Ordering::Relaxed),
         None => 0,
@@ -991,6 +1196,7 @@ pub extern "C" fn aipl_shim_get(idx: i64) -> i64 {
 /// Install `ptr` (0 to clear) as the shim for slot `idx`.
 #[no_mangle]
 pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
+    count_builtin!(builtin_calls::AIPL_SHIM_SET);
     if let Some(slot) = SHIM_SLOTS.get(idx as usize) {
         slot.store(ptr, core::sync::atomic::Ordering::Relaxed);
     }
@@ -1009,6 +1215,7 @@ pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
 /// `program` and `args` per the refcount protocol.
 #[no_mangle]
 pub extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
+    count_builtin!(builtin_calls::AIPL_EXECUTE_PROGRAM);
     let a = aipl_arr_ensure_heap(args);
     unsafe { execute_program_impl(out, program, a) };
     aipl_dec(program);
@@ -1364,6 +1571,7 @@ unsafe fn rt_str_buf(content: usize) -> *mut u8 {
 /// Allocate one writable `str` buffer of `len` content bytes; return the data ptr.
 #[no_mangle]
 pub extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_ALLOC);
     let len = if len < 0 { 0 } else { len as usize };
     unsafe { rt_str_buf(len).add(STR_HEADER_SIZE) }
 }
@@ -1371,6 +1579,7 @@ pub extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
 /// Decimal byte length of `n` (matching `aipl_write_i64`).
 #[no_mangle]
 pub extern "C" fn aipl_i64_len(n: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_I64_LEN);
     let mut buf = [0u8; 20];
     (20 - fmt_i64(&mut buf, n)) as i64
 }
@@ -1378,6 +1587,7 @@ pub extern "C" fn aipl_i64_len(n: i64) -> i64 {
 /// Write `n`'s decimal representation at `dst`; return the advanced cursor.
 #[no_mangle]
 pub extern "C" fn aipl_write_i64(dst: *const u8, n: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_WRITE_I64);
     unsafe {
         let mut buf = [0u8; 20];
         let start = fmt_i64(&mut buf, n);
@@ -1410,6 +1620,7 @@ fn fmt_u64(buf: &mut [u8; 20], mut n: u64) -> usize {
 /// Decimal byte length of `n` interpreted as *unsigned* (matching aipl_write_u64).
 #[no_mangle]
 pub extern "C" fn aipl_u64_len(n: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_U64_LEN);
     let mut buf = [0u8; 20];
     (20 - fmt_u64(&mut buf, n as u64)) as i64
 }
@@ -1417,6 +1628,7 @@ pub extern "C" fn aipl_u64_len(n: i64) -> i64 {
 /// Write `n` (interpreted as unsigned) in decimal at `dst`; return the cursor.
 #[no_mangle]
 pub extern "C" fn aipl_write_u64(dst: *const u8, n: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_WRITE_U64);
     unsafe {
         let mut buf = [0u8; 20];
         let start = fmt_u64(&mut buf, n as u64);
@@ -1435,6 +1647,7 @@ pub extern "C" fn aipl_write_u64(dst: *const u8, n: i64) -> *const u8 {
 /// the total cached at its root; a heap string reads its header word).
 #[no_mangle]
 pub extern "C" fn aipl_str_len(s: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_LEN);
     match str_repr(s) {
         StrRepr::Null => 0,
         StrRepr::Inline => inline_len(s) as i64,
@@ -1447,6 +1660,7 @@ pub extern "C" fn aipl_str_len(s: *const u8) -> i64 {
 /// Copy `n` bytes `src` → `dst`; return the advanced cursor.
 #[no_mangle]
 pub extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_WRITE_BYTES);
     let n = if n < 0 { 0 } else { n as usize };
     unsafe {
         memcpy(dst as *mut c_void, src as *const c_void, n);
@@ -1456,6 +1670,7 @@ pub extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *c
 
 #[no_mangle]
 pub extern "C" fn aipl_concat(a: *const u8, b: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_CONCAT);
     unsafe {
         let mut ba = [0u8; 8];
         let mut bb = [0u8; 8];
@@ -1513,6 +1728,7 @@ fn is_ascii_ws(b: u8) -> bool {
 /// trims to "".
 #[no_mangle]
 pub extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_TRIM);
     unsafe {
         let mut sbuf = [0u8; 8];
         let bytes = str_bytes(s, &mut sbuf);
@@ -1553,6 +1769,7 @@ pub extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
 /// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_reverse`.
 #[no_mangle]
 pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_REVERSE);
     unsafe {
         let mut sbuf = [0u8; 8];
         let bytes = str_bytes(s, &mut sbuf);
@@ -1594,6 +1811,7 @@ pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
 /// allocated anyway.
 #[no_mangle]
 pub extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_REPEAT);
     unsafe {
         let mut sbuf = [0u8; 8];
         let bytes = str_bytes(s, &mut sbuf);
@@ -1656,6 +1874,7 @@ pub extern "C" fn aipl_arr_sort(
     elem_size: i64,
     kind: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_SORT);
     let a = aipl_arr_ensure_heap(a);
     if a.is_null() {
         return a;
@@ -1685,6 +1904,7 @@ pub extern "C" fn aipl_arr_sort(
 /// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_sort`.
 #[no_mangle]
 pub extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_SORT);
     unsafe {
         let mut sbuf = [0u8; 8];
         let bytes = str_bytes(s, &mut sbuf);
@@ -1721,6 +1941,7 @@ pub extern "C" fn aipl_arr_reverse(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_REVERSE);
     if a.is_null() {
         return a;
     }
@@ -1734,6 +1955,7 @@ pub extern "C" fn aipl_arr_reverse(
 /// runtime's `aipl_str_slice`.
 #[no_mangle]
 pub extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_SLICE);
     unsafe {
         let mut sbuf = [0u8; 8];
         let bytes = str_bytes(s, &mut sbuf);
@@ -1772,6 +1994,7 @@ pub extern "C" fn aipl_arr_slice(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_SLICE);
     if a.is_null() {
         return a;
     }
@@ -1807,6 +2030,7 @@ pub extern "C" fn aipl_arr_slice(
 /// `self`'s buffer. Mirrors the JIT runtime's `aipl_str_split`.
 #[no_mangle]
 pub extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_SPLIT);
     unsafe {
         let mut sbuf = [0u8; 8];
         let mut pbuf = [0u8; 8];
@@ -1861,6 +2085,7 @@ pub extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_JOIN);
     let result = unsafe {
         let len = *(arr as *const i64) as usize; // length lives at the data pointer
         let elems = arr.add(ARR_ELEMS_OFFSET) as *const i64;
@@ -1920,6 +2145,7 @@ pub extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
 /// owned/view content is returned in place. Mirrors the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_str_data(s: *const u8, scratch: *mut u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_STR_DATA);
     match str_repr(s) {
         StrRepr::Inline => {
             let val = (s as usize as u64).to_le_bytes();
@@ -1957,6 +2183,7 @@ const ITER_SCRATCH: usize = 48;
 
 #[no_mangle]
 pub extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
+    count_builtin!(builtin_calls::AIPL_STR_ITER_INIT);
     unsafe {
         *(cur.add(ITER_ROOT) as *mut *const u8) = s;
         *(cur.add(ITER_POS) as *mut i64) = 0;
@@ -1970,6 +2197,7 @@ pub extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
 /// Next byte of the iterated string as `0..=255`, or `-1` at the end.
 #[no_mangle]
 pub extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_ITER_NEXT);
     unsafe {
         let pos = *(cur.add(ITER_POS) as *const i64);
         if pos >= *(cur.add(ITER_TOTAL) as *const i64) {
@@ -2025,6 +2253,7 @@ pub extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
 /// not dropped.
 #[no_mangle]
 pub extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_TRIM_MUT);
     unsafe {
         // Only a uniquely-owned (non-static) heap string can be trimmed in place;
         // any other representation copies via `aipl_trim`. Matching (rather than an
@@ -2082,6 +2311,7 @@ pub extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
 /// keeping the alloc/dealloc tally balanced. `a` is reused, so it isn't dropped.
 #[no_mangle]
 pub extern "C" fn aipl_concat_mut(a: *const u8, b: *const u8) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_CONCAT_MUT);
     unsafe {
         // Only a uniquely-owned (non-static) heap `a` can be grown in place; any
         // other representation copies via `aipl_concat`. Matching (rather than an
@@ -2349,6 +2579,7 @@ unsafe fn array_alloc(len: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *
 
 #[no_mangle]
 pub extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARRAY_NEW);
     let len = if len < 0 { 0 } else { len as usize };
     // A fresh literal is allocated to exactly its length (cap == len).
     unsafe { array_alloc(len, len, drop_fn, elem_size) }
@@ -2359,12 +2590,14 @@ pub extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *con
 /// pre-size their output.
 #[no_mangle]
 pub extern "C" fn aipl_array_with_cap(cap: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARRAY_WITH_CAP);
     let cap = if cap < 0 { 0 } else { cap as usize };
     unsafe { array_alloc(0, cap, drop_fn, elem_size) }
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_array_dec(ptr: *const u8) {
+    count_builtin!(builtin_calls::AIPL_ARRAY_DEC);
     if ptr.is_null() {
         return;
     }
@@ -2400,6 +2633,7 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
 /// representation tag before touching the refcount.
 #[no_mangle]
 pub extern "C" fn aipl_arr_inc(ptr: *const u8) {
+    count_builtin!(builtin_calls::AIPL_ARR_INC);
     if ptr.is_null() {
         return;
     }
@@ -2449,6 +2683,7 @@ fn rec_block(p: *const u8) -> *mut i64 {
 /// immediately after.
 #[no_mangle]
 pub extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_REC_ALLOC);
     let size = if size < 0 { 0 } else { size as usize };
     unsafe {
         let raw = rt_alloc(REC_HEADER_SIZE + size) as *mut u8;
@@ -2466,16 +2701,19 @@ pub extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn aipl_rec_inc_strong(p: *const u8) {
+    count_builtin!(builtin_calls::AIPL_REC_INC_STRONG);
     unsafe { *rec_block(p) += 1 }
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_rec_inc_weak(p: *const u8) {
+    count_builtin!(builtin_calls::AIPL_REC_INC_WEAK);
     unsafe { *rec_block(p).add(REC_WEAK_WORD) += 1 }
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_rec_dec_strong(p: *const u8) {
+    count_builtin!(builtin_calls::AIPL_REC_DEC_STRONG);
     let b = rec_block(p);
     unsafe {
         *b -= 1;
@@ -2487,6 +2725,7 @@ pub extern "C" fn aipl_rec_dec_strong(p: *const u8) {
 
 #[no_mangle]
 pub extern "C" fn aipl_rec_dec_weak(p: *const u8) {
+    count_builtin!(builtin_calls::AIPL_REC_DEC_WEAK);
     let b = rec_block(p);
     unsafe {
         *b.add(REC_WEAK_WORD) -= 1;
@@ -2536,12 +2775,14 @@ fn rec_release(b: *mut i64) {
 /// `elem_size` must be > 0 (not bit-packed — use `aipl_arr_load_bit` for bools).
 #[no_mangle]
 pub extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_ELEM_PTR);
     unsafe { arr_elem_ptr_rt(a, idx as usize, elem_size as usize) }
 }
 
 /// Repr-aware bit load for AOT-compiled code. Returns 0 or 1 as i64.
 #[no_mangle]
 pub extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_ARR_LOAD_BIT);
     i64::from(unsafe { arr_load_bit_rt(a, idx as usize) })
 }
 
@@ -2554,6 +2795,7 @@ pub extern "C" fn aipl_array_push(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARRAY_PUSH);
     let a = aipl_arr_ensure_heap(a);
     unsafe {
         let old_len = if a.is_null() { 0 } else { array_len(a) };
@@ -2604,6 +2846,7 @@ pub extern "C" fn aipl_array_push_mut(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARRAY_PUSH_MUT);
     let a = aipl_arr_ensure_heap(a);
     // A `STATIC_REFCOUNT` block is not ours to grow or write into, however
     // unaliased codegen proved the binding to be: it has no owner to answer to
@@ -2746,6 +2989,7 @@ unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
 /// compensating pre-inc. Mirrors the JIT `aipl_str_cmp`.
 #[no_mangle]
 pub extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_CMP);
     let mut ab = [0u8; 8];
     let mut bb = [0u8; 8];
     let (x, y) = unsafe { (str_bytes(a, &mut ab), str_bytes(b, &mut bb)) };
@@ -2770,6 +3014,7 @@ pub extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
 /// from each; callers pre-inc). Returns 1/0. Mirrors the JIT `aipl_str_eq`.
 #[no_mangle]
 pub extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_EQ);
     let eq = unsafe { rt_str_eq(a, b) };
     aipl_dec(a);
     aipl_dec(b);
@@ -2781,6 +3026,7 @@ pub extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
 /// always matches. Mirrors the JIT `aipl_str_starts_with`.
 #[no_mangle]
 pub extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_STARTS_WITH);
     let pl = aipl_str_len(prefix) as usize;
     let starts = if (aipl_str_len(s) as usize) < pl {
         false
@@ -2815,6 +3061,7 @@ pub extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
 /// Mirrors the JIT `aipl_str_ends_with`.
 #[no_mangle]
 pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_ENDS_WITH);
     let sl = aipl_str_len(s) as usize;
     let ql = aipl_str_len(suffix) as usize;
     let ends = if sl < ql {
@@ -2857,6 +3104,7 @@ pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
 /// JIT `aipl_str_contains`.
 #[no_mangle]
 pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_CONTAINS);
     let mut sb = [0u8; 8];
     let mut nb = [0u8; 8];
     let found = unsafe {
@@ -2873,6 +3121,7 @@ pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
 /// Borrows `a` (no refcount change). Mirrors the JIT `aipl_str_hash`.
 #[no_mangle]
 pub extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_HASH);
     // FNV-1a is a left fold over bytes, so streaming a rope's leaves in order
     // gives the same result as the flattened bytes — no materialization.
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
@@ -2896,6 +3145,7 @@ pub extern "C" fn aipl_set_contains(
     elem_size: i64,
     str_cmp: i64,
 ) -> i64 {
+    count_builtin!(builtin_calls::AIPL_SET_CONTAINS);
     if a.is_null() {
         return 0;
     }
@@ -2945,6 +3195,7 @@ pub extern "C" fn aipl_set_insert(
     elem_size: i64,
     str_cmp: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_SET_INSERT);
     if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
         return a;
     }
@@ -2973,6 +3224,7 @@ pub extern "C" fn aipl_arr_reserve(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_RESERVE);
     unsafe {
         let a = aipl_arr_ensure_heap(a);
         let elem_size = core::cmp::max(elem_size, 8) as usize;
@@ -3031,6 +3283,7 @@ pub extern "C" fn aipl_arr_extend(
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_EXTEND);
     unsafe {
         let src_heap = aipl_arr_ensure_heap(src);
         if elem_size == ELEM_BITPACKED {
@@ -3102,6 +3355,7 @@ pub extern "C" fn aipl_set_union(
     elem_size: i64,
     str_cmp: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_SET_UNION);
     unsafe {
         let a_len = if a.is_null() { 0 } else { array_len(a) };
         let b_len = if b.is_null() { 0 } else { array_len(b) };
@@ -3146,6 +3400,7 @@ pub extern "C" fn aipl_set_union_mut(
     elem_size: i64,
     str_cmp: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_SET_UNION_MUT);
     unsafe {
         let mut a = a;
         let b_len = if b.is_null() { 0 } else { array_len(b) };
@@ -3203,6 +3458,7 @@ pub extern "C" fn aipl_dict_insert(
     pair_size: i64,
     str_cmp: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_DICT_INSERT);
     unsafe {
         let idx = dict_find(a, pair_ptr, pair_size, str_cmp);
         if idx >= 0 {
@@ -3226,6 +3482,7 @@ pub extern "C" fn aipl_dict_get(
     pair_size: i64,
     str_cmp: i64,
 ) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_DICT_GET);
     unsafe {
         let idx = dict_find(a, key_ptr, pair_size, str_cmp);
         if idx < 0 {
@@ -3243,12 +3500,14 @@ pub extern "C" fn aipl_dict_contains_key(
     pair_size: i64,
     str_cmp: i64,
 ) -> i64 {
+    count_builtin!(builtin_calls::AIPL_DICT_CONTAINS_KEY);
     (unsafe { dict_find(a, key_ptr, pair_size, str_cmp) } >= 0) as i64
 }
 
 /// Element drop-fn for `str[]`: dec each element string.
 #[no_mangle]
 pub extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_DROP_STR);
     unsafe {
         let elems = elems as *const i64;
         for i in 0..len as usize {
@@ -3261,6 +3520,7 @@ pub extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
 /// array (which recursively releases its own elements).
 #[no_mangle]
 pub extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_DROP_ARR);
     unsafe {
         let elems = elems as *const i64;
         for i in 0..len as usize {
@@ -3272,6 +3532,7 @@ pub extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
 /// Element retain-fn for `str[]`/`T[][]`: inc each element pointer.
 #[no_mangle]
 pub extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_RETAIN_PTR);
     unsafe {
         let elems = elems as *const i64;
         for i in 0..len as usize {
@@ -3284,6 +3545,7 @@ pub extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
 /// optional; dec the inner string when present (tag != 0).
 #[no_mangle]
 pub extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_DROP_OPT_STR);
     unsafe {
         for i in 0..len as usize {
             let e = elems.add(i * 16);
@@ -3297,6 +3559,7 @@ pub extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
 /// Element drop-fn for `T[]?[]`: release the inner array of each present element.
 #[no_mangle]
 pub extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_DROP_OPT_ARR);
     unsafe {
         for i in 0..len as usize {
             let e = elems.add(i * 16);
@@ -3311,6 +3574,7 @@ pub extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
 /// present element (tag != 0).
 #[no_mangle]
 pub extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
+    count_builtin!(builtin_calls::AIPL_ARR_RETAIN_OPT);
     unsafe {
         for i in 0..len as usize {
             let e = elems.add(i * 16);
@@ -3399,6 +3663,8 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
 //   reallocations: <K>
 //   bytes allocated: <B>
 //   instructions executed: <I>
+//   builtin calls: <C>
+//     <builtin>: <n>        (one line per builtin that ran)
 // The test harness reads this back to verify a case's `--- performance ---`
 // section. Opened in binary mode so no `\n` -> `\r\n` translation occurs.
 
@@ -3448,6 +3714,25 @@ unsafe fn report_alloc_stats() {
         fput_u64(f, ALLOC_BYTES.load(Ordering::Relaxed));
         fputs(b"\ninstructions executed: \0".as_ptr() as *const c_char, f);
         fput_u64(f, INSN_COUNT.load(Ordering::Relaxed));
+        // Per-builtin call counts: a total, then one indented line per builtin
+        // that ran at all (a full 78-line block per case would bury the few
+        // entries that matter). `NAMES` is sorted, so the order is stable.
+        let mut total: u64 = 0;
+        for c in builtin_calls::COUNTS.iter() {
+            total += c.load(Ordering::Relaxed);
+        }
+        fputs(b"\nbuiltin calls: \0".as_ptr() as *const c_char, f);
+        fput_u64(f, total);
+        for (i, name) in builtin_calls::NAMES.iter().enumerate() {
+            let n = builtin_calls::COUNTS[i].load(Ordering::Relaxed);
+            if n == 0 {
+                continue;
+            }
+            fputs(b"\n  \0".as_ptr() as *const c_char, f);
+            fputs(name.as_ptr() as *const c_char, f);
+            fputs(b": \0".as_ptr() as *const c_char, f);
+            fput_u64(f, n);
+        }
         fputs(b"\n\0".as_ptr() as *const c_char, f);
         fclose(f);
     }
@@ -3615,11 +3900,13 @@ static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
 
 #[no_mangle]
 pub extern "C" fn aipl_test_begin(_name: *const u8) {
+    count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
     TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
 }
 
 #[no_mangle]
 pub extern "C" fn aipl_assert(cond: i64, _loc: *const u8) {
+    count_builtin!(builtin_calls::AIPL_ASSERT);
     if cond == 0 {
         TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
     }
@@ -3627,6 +3914,7 @@ pub extern "C" fn aipl_assert(cond: i64, _loc: *const u8) {
 
 #[no_mangle]
 pub extern "C" fn aipl_test_fail(_msg: *const u8) {
+    count_builtin!(builtin_calls::AIPL_TEST_FAIL);
     // `?` on an err inside a `.test`: mark the current test failed. The error
     // message (`_msg`) is only rendered by the JIT runtime under `aipl check`.
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
@@ -3634,6 +3922,7 @@ pub extern "C" fn aipl_test_fail(_msg: *const u8) {
 
 #[no_mangle]
 pub extern "C" fn aipl_test_fail_none() {
+    count_builtin!(builtin_calls::AIPL_TEST_FAIL_NONE);
     // `?` on a `none` inside a `.test`: mark the current test failed. The
     // report is only printed by the JIT runtime under `aipl check`.
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
@@ -3641,6 +3930,7 @@ pub extern "C" fn aipl_test_fail_none() {
 
 #[no_mangle]
 pub extern "C" fn aipl_test_end() {
+    count_builtin!(builtin_calls::AIPL_TEST_END);
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
         TEST_FAILED.fetch_add(1, TestOrd::Relaxed);
     }
@@ -3648,5 +3938,6 @@ pub extern "C" fn aipl_test_end() {
 
 #[no_mangle]
 pub extern "C" fn aipl_test_summary() -> i64 {
+    count_builtin!(builtin_calls::AIPL_TEST_SUMMARY);
     i64::from(TEST_FAILED.load(TestOrd::Relaxed) > 0)
 }

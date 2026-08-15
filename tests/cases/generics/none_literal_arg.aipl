@@ -21,6 +21,12 @@ binary size: 1216
   code: 216
   data: 85
   metadata: 915
+builtin calls: 5
+  aipl_array_dec: 1
+  aipl_assert: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$is_present
 is_present$NoneLiteral

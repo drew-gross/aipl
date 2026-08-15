@@ -21,6 +21,16 @@ binary size: 2560
   code: 1060
   data: 88
   metadata: 1412
+builtin calls: 26
+  aipl_arr_inc: 5
+  aipl_array_dec: 11
+  aipl_array_new: 3
+  aipl_array_push: 1
+  aipl_assert: 2
+  aipl_inc: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 append$i64
 main

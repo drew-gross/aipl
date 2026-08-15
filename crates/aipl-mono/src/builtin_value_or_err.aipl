@@ -99,6 +99,16 @@ binary size: 9152
   code: 4064
   data: 1179
   metadata: 3909
+builtin calls: 152
+  aipl_array_dec: 1
+  aipl_assert: 14
+  aipl_char_at: 7
+  aipl_dec: 73
+  aipl_inc: 45
+  aipl_str_eq: 7
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 code
 digit_of

@@ -45,6 +45,18 @@ binary size: 12456
   code: 7440
   data: 1067
   metadata: 3949
+builtin calls: 136
+  aipl_arr_drop_str: 4
+  aipl_array_dec: 31
+  aipl_array_new: 30
+  aipl_assert: 20
+  aipl_dec: 23
+  aipl_inc: 10
+  aipl_str_eq: 7
+  aipl_str_len: 8
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$single
 main

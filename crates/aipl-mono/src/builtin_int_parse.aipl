@@ -117,6 +117,20 @@ binary size: 10328
   code: 3616
   data: 2185
   metadata: 4527
+builtin calls: 661
+  aipl_array_dec: 1
+  aipl_assert: 24
+  aipl_dec: 176
+  aipl_inc: 100
+  aipl_str_data: 35
+  aipl_str_iter_init: 39
+  aipl_str_iter_next: 35
+  aipl_str_len: 196
+  aipl_str_slice: 28
+  aipl_str_starts_with: 24
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam4
 __builtin_opt_left_fold$char$i64$s0$lam3

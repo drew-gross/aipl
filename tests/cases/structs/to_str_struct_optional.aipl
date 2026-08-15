@@ -39,5 +39,19 @@ binary size: 8664
   code: 4012
   data: 715
   metadata: 3937
+builtin calls: 94
+  aipl_arr_inc: 1
+  aipl_array_dec: 3
+  aipl_array_new: 1
+  aipl_char_at: 1
+  aipl_dec: 17
+  aipl_i64_len: 12
+  aipl_inc: 8
+  aipl_print: 7
+  aipl_str_alloc: 5
+  aipl_str_data: 2
+  aipl_str_len: 4
+  aipl_write_bytes: 27
+  aipl_write_i64: 6
 --- monomorphizations ---
 main

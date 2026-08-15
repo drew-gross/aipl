@@ -93,6 +93,15 @@ binary size: 3120
   code: 1388
   data: 1
   metadata: 1731
+builtin calls: 78
+  aipl_array_dec: 1
+  aipl_dec: 22
+  aipl_i64_len: 6
+  aipl_inc: 11
+  aipl_print: 11
+  aipl_u64_len: 16
+  aipl_write_i64: 3
+  aipl_write_u64: 8
 --- monomorphizations ---
 early_return
 main

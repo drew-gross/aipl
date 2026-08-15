@@ -264,6 +264,30 @@ binary size: 14608
   code: 5768
   data: 3041
   metadata: 5799
+builtin calls: 1742
+  aipl_arr_drop_str: 10
+  aipl_arr_inc: 5
+  aipl_array_dec: 21
+  aipl_array_new: 15
+  aipl_array_push_mut: 106
+  aipl_assert: 10
+  aipl_concat: 30
+  aipl_concat_lazy: 30
+  aipl_dec: 672
+  aipl_inc: 394
+  aipl_str_data: 9
+  aipl_str_ends_with: 12
+  aipl_str_eq: 34
+  aipl_str_iter_init: 10
+  aipl_str_iter_next: 9
+  aipl_str_len: 246
+  aipl_str_slice: 60
+  aipl_str_split: 10
+  aipl_str_starts_with: 32
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 24
 --- monomorphizations ---
 __enumerate2
 __m2__parse_test_section_header

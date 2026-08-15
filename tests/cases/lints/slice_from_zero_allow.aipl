@@ -19,3 +19,14 @@ binary size: 2264
   code: 936
   data: 67
   metadata: 1261
+builtin calls: 19
+  aipl_arr_slice: 1
+  aipl_array_dec: 3
+  aipl_array_new: 1
+  aipl_dec: 2
+  aipl_i64_len: 4
+  aipl_inc: 1
+  aipl_print: 1
+  aipl_str_alloc: 1
+  aipl_write_bytes: 3
+  aipl_write_i64: 2

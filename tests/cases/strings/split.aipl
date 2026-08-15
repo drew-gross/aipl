@@ -51,5 +51,18 @@ binary size: 3792
   code: 1624
   data: 171
   metadata: 1997
+builtin calls: 215
+  aipl_arr_drop_str: 8
+  aipl_array_dec: 9
+  aipl_array_new: 8
+  aipl_dec: 50
+  aipl_inc: 9
+  aipl_print: 8
+  aipl_str_alloc: 5
+  aipl_str_data: 17
+  aipl_str_len: 34
+  aipl_str_slice: 17
+  aipl_str_split: 8
+  aipl_write_bytes: 42
 --- monomorphizations ---
 main

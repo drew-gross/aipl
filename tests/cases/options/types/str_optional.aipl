@@ -18,6 +18,15 @@ binary size: 2704
   code: 1004
   data: 233
   metadata: 1467
+builtin calls: 34
+  aipl_array_dec: 1
+  aipl_assert: 3
+  aipl_dec: 13
+  aipl_inc: 11
+  aipl_str_eq: 3
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 main
 pick

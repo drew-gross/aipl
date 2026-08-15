@@ -36,6 +36,24 @@ binary size: 5416
   code: 1652
   data: 916
   metadata: 2848
+builtin calls: 309
+  aipl_arr_drop_str: 6
+  aipl_array_dec: 7
+  aipl_array_new: 6
+  aipl_assert: 6
+  aipl_concat: 24
+  aipl_dec: 138
+  aipl_inc: 50
+  aipl_str_eq: 6
+  aipl_str_len: 12
+  aipl_str_slice: 21
+  aipl_str_split: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 6
+  aipl_u64_len: 12
+  aipl_write_u64: 6
 --- monomorphizations ---
 assert_loc
 main

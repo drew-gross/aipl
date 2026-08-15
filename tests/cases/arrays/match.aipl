@@ -52,6 +52,17 @@ binary size: 4400
   code: 2372
   data: 26
   metadata: 2002
+builtin calls: 100
+  aipl_arr_drop_str: 3
+  aipl_array_dec: 9
+  aipl_array_new: 8
+  aipl_dec: 33
+  aipl_i64_len: 10
+  aipl_inc: 14
+  aipl_print: 8
+  aipl_str_eq: 6
+  aipl_str_len: 4
+  aipl_write_i64: 5
 --- monomorphizations ---
 code
 label

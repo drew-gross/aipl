@@ -40,5 +40,17 @@ binary size: 20552
   code: 9828
   data: 2083
   metadata: 8641
+builtin calls: 131
+  aipl_array_dec: 3
+  aipl_array_new: 2
+  aipl_dec: 20
+  aipl_i64_len: 18
+  aipl_inc: 9
+  aipl_print: 9
+  aipl_str_alloc: 6
+  aipl_str_data: 2
+  aipl_str_len: 4
+  aipl_write_bytes: 49
+  aipl_write_i64: 9
 --- monomorphizations ---
 main

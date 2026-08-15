@@ -37,6 +37,16 @@ binary size: 5080
   code: 2108
   data: 569
   metadata: 2403
+builtin calls: 82
+  aipl_arr_elem_ptr: 10
+  aipl_arr_reverse: 8
+  aipl_array_dec: 29
+  aipl_array_new: 12
+  aipl_assert: 8
+  aipl_inc: 8
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$reversed_eq
 __test$reversed_len

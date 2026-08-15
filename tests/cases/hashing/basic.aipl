@@ -53,6 +53,23 @@ binary size: 13240
   code: 8668
   data: 957
   metadata: 3615
+builtin calls: 132
+  aipl_array_dec: 13
+  aipl_array_new: 4
+  aipl_array_push_mut: 17
+  aipl_array_with_cap: 8
+  aipl_assert: 16
+  aipl_concat_lazy: 1
+  aipl_dec: 12
+  aipl_dict_insert: 6
+  aipl_inc: 6
+  aipl_set_contains: 11
+  aipl_set_insert: 11
+  aipl_str_hash: 10
+  aipl_str_len: 2
+  aipl_test_begin: 7
+  aipl_test_end: 7
+  aipl_test_summary: 1
 --- monomorphizations ---
 h
 hs

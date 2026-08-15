@@ -45,3 +45,14 @@ binary size: 11264
   code: 5844
   data: 613
   metadata: 4807
+builtin calls: 218
+  aipl_arr_extend: 11
+  aipl_arr_inc: 64
+  aipl_arr_reserve: 12
+  aipl_array_dec: 92
+  aipl_array_new: 19
+  aipl_array_push_mut: 6
+  aipl_assert: 11
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

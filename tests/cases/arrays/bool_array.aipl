@@ -27,6 +27,13 @@ binary size: 3128
   code: 1408
   data: 273
   metadata: 1447
+builtin calls: 13
+  aipl_array_dec: 3
+  aipl_array_new: 2
+  aipl_assert: 5
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$count_true
 main

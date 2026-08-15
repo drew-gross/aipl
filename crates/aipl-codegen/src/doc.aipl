@@ -349,6 +349,41 @@ binary size: 30480
   code: 17028
   data: 842
   metadata: 12610
+builtin calls: 5156
+  aipl_arr_drop_str: 82
+  aipl_arr_inc: 88
+  aipl_arr_retain_ptr: 81
+  aipl_arr_slice: 1
+  aipl_array_dec: 236
+  aipl_array_new: 54
+  aipl_array_push: 34
+  aipl_array_push_mut: 21
+  aipl_array_with_cap: 11
+  aipl_assert: 9
+  aipl_concat_lazy: 22
+  aipl_dec: 899
+  aipl_inc: 632
+  aipl_rec_alloc: 156
+  aipl_rec_dec_strong: 1152
+  aipl_rec_dec_weak: 105
+  aipl_rec_inc_strong: 996
+  aipl_rec_inc_weak: 105
+  aipl_str_contains: 25
+  aipl_str_data: 19
+  aipl_str_ends_with: 9
+  aipl_str_eq: 13
+  aipl_str_is_all_whitespace: 3
+  aipl_str_iter_init: 20
+  aipl_str_iter_next: 19
+  aipl_str_join: 21
+  aipl_str_len: 222
+  aipl_str_repeat: 9
+  aipl_str_slice: 71
+  aipl_str_split: 37
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 1
 --- monomorphizations ---
 __builtin_any$Doc$lam3
 __builtin_count_while$char$s0$lam11

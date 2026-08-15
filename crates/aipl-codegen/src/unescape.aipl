@@ -75,6 +75,19 @@ binary size: 8568
   code: 3036
   data: 1253
   metadata: 4279
+builtin calls: 1007
+  aipl_array_dec: 1
+  aipl_assert: 19
+  aipl_char_at: 36
+  aipl_concat_lazy: 38
+  aipl_dec: 366
+  aipl_inc: 183
+  aipl_str_eq: 63
+  aipl_str_len: 258
+  aipl_str_slice: 38
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 escape_text
 main

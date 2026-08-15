@@ -31,6 +31,22 @@ binary size: 4840
   code: 2264
   data: 226
   metadata: 2350
+builtin calls: 165
+  aipl_arr_drop_str: 6
+  aipl_arr_inc: 3
+  aipl_arr_retain_ptr: 9
+  aipl_array_dec: 14
+  aipl_array_new: 7
+  aipl_array_push_mut: 9
+  aipl_assert: 3
+  aipl_dec: 45
+  aipl_i64_len: 18
+  aipl_inc: 30
+  aipl_str_eq: 9
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_write_i64: 9
 --- monomorphizations ---
 main
 tag$lam1

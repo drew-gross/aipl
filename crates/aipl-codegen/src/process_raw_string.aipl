@@ -58,6 +58,31 @@ binary size: 8920
   code: 4124
   data: 696
   metadata: 4100
+builtin calls: 848
+  aipl_arr_drop_str: 14
+  aipl_arr_inc: 7
+  aipl_arr_retain_ptr: 20
+  aipl_array_dec: 43
+  aipl_array_new: 7
+  aipl_array_push_mut: 20
+  aipl_array_with_cap: 14
+  aipl_assert: 7
+  aipl_char_at: 22
+  aipl_dec: 267
+  aipl_inc: 206
+  aipl_str_data: 15
+  aipl_str_ends_with: 7
+  aipl_str_eq: 7
+  aipl_str_is_all_whitespace: 22
+  aipl_str_iter_init: 16
+  aipl_str_iter_next: 15
+  aipl_str_join: 7
+  aipl_str_len: 84
+  aipl_str_slice: 38
+  aipl_str_split: 7
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam12
 __builtin_count_while$char$s0$lam5

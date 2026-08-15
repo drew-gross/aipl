@@ -52,6 +52,16 @@ binary size: 6432
   code: 4204
   data: 1
   metadata: 2227
+builtin calls: 173
+  aipl_arr_inc: 5
+  aipl_array_dec: 22
+  aipl_array_new: 8
+  aipl_array_push_mut: 12
+  aipl_dec: 38
+  aipl_i64_len: 28
+  aipl_inc: 27
+  aipl_print: 19
+  aipl_write_i64: 14
 --- monomorphizations ---
 __lambda_7
 __zip1

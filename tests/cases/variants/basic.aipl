@@ -43,6 +43,12 @@ binary size: 3432
   code: 1236
   data: 533
   metadata: 1663
+builtin calls: 14
+  aipl_array_dec: 1
+  aipl_assert: 10
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 area
 main

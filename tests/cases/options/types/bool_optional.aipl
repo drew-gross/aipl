@@ -20,6 +20,12 @@ binary size: 1496
   code: 348
   data: 147
   metadata: 1001
+builtin calls: 7
+  aipl_array_dec: 1
+  aipl_assert: 3
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$flag
 flag

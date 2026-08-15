@@ -46,6 +46,14 @@ binary size: 3568
   code: 2020
   data: 1
   metadata: 1547
+builtin calls: 28
+  aipl_array_dec: 2
+  aipl_array_new: 1
+  aipl_dec: 11
+  aipl_i64_len: 2
+  aipl_inc: 8
+  aipl_print: 3
+  aipl_write_i64: 1
 --- monomorphizations ---
 __lambda_0
 __lambda_1

@@ -45,6 +45,20 @@ binary size: 6856
   code: 3424
   data: 589
   metadata: 2843
+builtin calls: 50
+  aipl_arr_inc: 1
+  aipl_array_dec: 8
+  aipl_array_new: 6
+  aipl_assert: 11
+  aipl_dec: 3
+  aipl_str_alloc: 1
+  aipl_str_data: 3
+  aipl_str_iter_init: 3
+  aipl_str_iter_next: 3
+  aipl_str_len: 6
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 __filter13$own0
 any$char$lam7

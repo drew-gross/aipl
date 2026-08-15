@@ -72,6 +72,16 @@ binary size: 1952
   code: 636
   data: 59
   metadata: 1257
+builtin calls: 27
+  aipl_arr_drop_str: 1
+  aipl_arr_inc: 7
+  aipl_arr_retain_ptr: 1
+  aipl_array_dec: 10
+  aipl_array_new: 1
+  aipl_array_push: 1
+  aipl_dec: 3
+  aipl_inc: 2
+  aipl_print: 1
 --- monomorphizations ---
 main
 run

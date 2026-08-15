@@ -29,6 +29,21 @@ binary size: 5048
   code: 2508
   data: 186
   metadata: 2354
+builtin calls: 106
+  aipl_arr_drop_arr: 5
+  aipl_arr_drop_str: 6
+  aipl_arr_inc: 8
+  aipl_arr_retain_ptr: 4
+  aipl_array_dec: 25
+  aipl_array_new: 10
+  aipl_array_push: 2
+  aipl_assert: 4
+  aipl_dec: 19
+  aipl_inc: 14
+  aipl_str_eq: 4
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$first
 add_row

@@ -53,6 +53,15 @@ binary size: 4232
   code: 1252
   data: 930
   metadata: 2050
+builtin calls: 187
+  aipl_array_dec: 1
+  aipl_assert: 13
+  aipl_char_at: 48
+  aipl_dec: 74
+  aipl_inc: 48
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 common_space_prefix
 main

@@ -62,6 +62,21 @@ binary size: 9120
   code: 3572
   data: 1316
   metadata: 4232
+builtin calls: 1029
+  aipl_array_dec: 1
+  aipl_assert: 9
+  aipl_char_at: 128
+  aipl_dec: 340
+  aipl_inc: 244
+  aipl_str_ends_with: 5
+  aipl_str_eq: 23
+  aipl_str_len: 217
+  aipl_str_slice: 32
+  aipl_str_starts_with: 17
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 10
 --- monomorphizations ---
 __m1__parse_test_section_header
 main

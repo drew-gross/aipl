@@ -28,6 +28,13 @@ binary size: 1168
   code: 328
   data: 1
   metadata: 839
+builtin calls: 41
+  aipl_array_dec: 1
+  aipl_concat_lazy: 4
+  aipl_dec: 18
+  aipl_inc: 6
+  aipl_print: 4
+  aipl_str_len: 8
 --- monomorphizations ---
 banner
 main

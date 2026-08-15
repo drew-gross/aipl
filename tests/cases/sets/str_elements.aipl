@@ -33,5 +33,21 @@ binary size: 5240
   code: 2240
   data: 453
   metadata: 2547
+builtin calls: 207
+  aipl_arr_drop_str: 7
+  aipl_arr_retain_ptr: 17
+  aipl_array_dec: 8
+  aipl_array_push_mut: 17
+  aipl_array_with_cap: 7
+  aipl_assert: 8
+  aipl_concat_lazy: 1
+  aipl_dec: 20
+  aipl_inc: 17
+  aipl_set_contains: 29
+  aipl_set_insert: 19
+  aipl_str_len: 52
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
 --- monomorphizations ---
 main

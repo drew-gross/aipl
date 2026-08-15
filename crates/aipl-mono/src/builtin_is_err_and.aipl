@@ -83,6 +83,17 @@ binary size: 10768
   code: 4464
   data: 1571
   metadata: 4733
+builtin calls: 228
+  aipl_array_dec: 1
+  aipl_assert: 18
+  aipl_char_at: 11
+  aipl_dec: 101
+  aipl_inc: 65
+  aipl_str_eq: 15
+  aipl_str_len: 8
+  aipl_test_begin: 4
+  aipl_test_end: 4
+  aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_value_or_err$char$i64
 check_len

@@ -104,3 +104,25 @@ binary size: 24296
   code: 12692
   data: 1731
   metadata: 9873
+builtin calls: 348
+  aipl_arr_drop_str: 1
+  aipl_arr_inc: 17
+  aipl_array_dec: 27
+  aipl_array_new: 1
+  aipl_array_push_mut: 22
+  aipl_array_with_cap: 8
+  aipl_dec: 46
+  aipl_dict_get: 1
+  aipl_dict_insert: 4
+  aipl_i64_len: 26
+  aipl_inc: 27
+  aipl_print: 16
+  aipl_set_contains: 24
+  aipl_set_insert: 18
+  aipl_str_alloc: 9
+  aipl_str_data: 6
+  aipl_str_len: 18
+  aipl_u64_len: 2
+  aipl_write_bytes: 61
+  aipl_write_i64: 13
+  aipl_write_u64: 1

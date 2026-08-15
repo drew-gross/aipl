@@ -101,3 +101,19 @@ binary size: 7792
   code: 4172
   data: 1
   metadata: 3619
+builtin calls: 205
+  aipl_array_dec: 3
+  aipl_array_new: 1
+  aipl_array_push_mut: 1
+  aipl_array_with_cap: 1
+  aipl_concat: 24
+  aipl_dec: 90
+  aipl_dict_get: 1
+  aipl_dict_insert: 1
+  aipl_i64_len: 10
+  aipl_inc: 38
+  aipl_print: 4
+  aipl_str_alloc: 2
+  aipl_u64_len: 16
+  aipl_write_i64: 5
+  aipl_write_u64: 8

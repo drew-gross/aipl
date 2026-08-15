@@ -23,6 +23,14 @@ binary size: 5104
   code: 2528
   data: 257
   metadata: 2319
+builtin calls: 30
+  aipl_arr_inc: 4
+  aipl_array_dec: 12
+  aipl_array_new: 7
+  aipl_assert: 4
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __map1$own0
 __map3$own0

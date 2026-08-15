@@ -41,6 +41,12 @@ binary size: 2672
   code: 580
   data: 522
   metadata: 1570
+builtin calls: 14
+  aipl_array_dec: 1
+  aipl_assert: 10
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 i16v
 i32v

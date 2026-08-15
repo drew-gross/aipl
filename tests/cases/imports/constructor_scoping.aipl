@@ -50,6 +50,13 @@ binary size: 1712
   code: 640
   data: 1
   metadata: 1071
+builtin calls: 29
+  aipl_array_dec: 1
+  aipl_dec: 8
+  aipl_i64_len: 8
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_write_i64: 4
 --- monomorphizations ---
 __m1__area
 main

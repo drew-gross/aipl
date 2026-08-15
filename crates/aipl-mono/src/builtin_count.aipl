@@ -51,6 +51,22 @@ binary size: 4736
   code: 1964
   data: 551
   metadata: 2221
+builtin calls: 72
+  aipl_arr_drop_str: 1
+  aipl_array_dec: 7
+  aipl_array_new: 6
+  aipl_assert: 10
+  aipl_dec: 16
+  aipl_inc: 6
+  aipl_str_alloc: 1
+  aipl_str_data: 3
+  aipl_str_eq: 3
+  aipl_str_iter_init: 4
+  aipl_str_iter_next: 3
+  aipl_str_len: 9
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$count
 count$char$s0

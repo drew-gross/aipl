@@ -56,6 +56,21 @@ binary size: 7320
   code: 2704
   data: 1079
   metadata: 3537
+builtin calls: 900
+  aipl_array_dec: 1
+  aipl_assert: 9
+  aipl_char_at: 128
+  aipl_dec: 281
+  aipl_inc: 203
+  aipl_str_ends_with: 5
+  aipl_str_eq: 14
+  aipl_str_len: 202
+  aipl_str_slice: 27
+  aipl_str_starts_with: 17
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 10
 --- monomorphizations ---
 __m1__parse_test_section_header
 main

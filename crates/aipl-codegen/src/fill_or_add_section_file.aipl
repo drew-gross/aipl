@@ -34,6 +34,17 @@ binary size: 9904
   code: 5104
   data: 358
   metadata: 4442
+builtin calls: 20
+  aipl_array_dec: 1
+  aipl_assert: 1
+  aipl_dec: 8
+  aipl_inc: 3
+  aipl_read_file_to_string: 1
+  aipl_str_eq: 1
+  aipl_str_len: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __enumerate2
 __m1__contains_section

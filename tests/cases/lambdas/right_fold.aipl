@@ -44,6 +44,24 @@ binary size: 8136
   code: 4028
   data: 655
   metadata: 3453
+builtin calls: 249
+  aipl_arr_drop_str: 3
+  aipl_array_dec: 9
+  aipl_array_new: 8
+  aipl_assert: 8
+  aipl_concat_lazy: 9
+  aipl_dec: 66
+  aipl_inc: 42
+  aipl_rec_alloc: 13
+  aipl_rec_dec_strong: 29
+  aipl_rec_dec_weak: 8
+  aipl_rec_inc_strong: 16
+  aipl_rec_inc_weak: 8
+  aipl_str_eq: 3
+  aipl_str_len: 24
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
 --- monomorphizations ---
 __test$to_list_keeps_order
 main

@@ -60,6 +60,17 @@ binary size: 6552
   code: 2996
   data: 499
   metadata: 3057
+builtin calls: 77
+  aipl_array_dec: 1
+  aipl_dec: 16
+  aipl_i64_len: 12
+  aipl_inc: 9
+  aipl_print: 7
+  aipl_str_alloc: 4
+  aipl_str_data: 1
+  aipl_str_len: 2
+  aipl_write_bytes: 19
+  aipl_write_i64: 6
 --- monomorphizations ---
 main
 unwrap2
