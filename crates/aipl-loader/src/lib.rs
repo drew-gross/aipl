@@ -62,9 +62,14 @@ pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<
 /// `(name, source)` pairs (typically each `include_str!`'d into the host
 /// binary, so nothing is read from disk at runtime). The **first** pair is the
 /// root/entry — its functions keep their original names, ready to be called.
-/// `from "..."` path imports resolve *by name* against the provided set (a
-/// leading `./` is stripped, so `from "./util.aipl"` matches a `"util.aipl"`
-/// entry); `from builtins` works as usual.
+/// `from builtins` works as usual.
+///
+/// Every name must be written as a relative path — `"./util.aipl"`, not
+/// `"util.aipl"` — and a `from "..."` path import resolves *by exact match*
+/// against those names, so an import must spell its target the same way. Nothing
+/// is normalized: requiring the one spelling keeps a name meaning exactly one
+/// file, and keeps these names identical to the `from "./..."` clauses the same
+/// sources use when they're loaded from disk instead.
 pub fn load_program_sources(
     sources: &[(&str, &str)],
     dbg: DebugOptions,
@@ -231,8 +236,19 @@ impl Loader {
     fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
         let (program, allows) = parse_with_allows(src)?;
         aipl_syntax::lint::check(&program, src, &allows)?;
+        // A caller-supplied name, so a wrong one is a caller error to report,
+        // not an invariant to assert: `load_program_sources` returns a `Result`
+        // precisely so a host learns what to fix.
         if !key.starts_with("./") {
-            panic!("non-relative path: {key:?}");
+            return Err(Error::msg(format!(
+                concat!(
+                    "source name {:?} must be a relative path starting with \"./\" ",
+                    "(e.g. \"./{}\"); imports resolve against these names by exact match"
+                ),
+                key,
+                file_label(&key)
+            ))
+            .into());
         }
         check_no_duplicate_import_sources(&program)?;
         let mut items = Vec::new();

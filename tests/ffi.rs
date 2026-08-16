@@ -975,6 +975,72 @@ pub fn id(s: str) -> str { s }";
     assert!(e.call_values("id", &[Int(0)]).is_err());
 }
 
+// ---------------------------------------------------------------------------
+// The examples in `aipl`'s public docs, executed.
+//
+// These were `no_run` doctests, which compiled the example but never ran it —
+// and being doctests, `cargo nextest` skipped them entirely, so the handoff
+// needed a separate `cargo test --doc` step to keep the coverage. As ordinary
+// tests they run with everything else and actually *execute*, which is what
+// makes a documented example trustworthy. Each mirrors the doc block it is
+// named for; keep the two in step when either changes.
+// ---------------------------------------------------------------------------
+
+/// The `Engine` type's own example: compile a one-function program and call it.
+#[test]
+fn doc_example_engine() {
+    let src =
+        "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }";
+    let engine = Engine::compile(src).unwrap();
+    assert_eq!(engine.call("add", &[2, 3]).unwrap(), 5);
+}
+
+/// [`Engine::compile_sources`]'s example: two in-memory files, one importing the
+/// other by name. Distinct from `compile_sources_embeds_separate_files_via_include_str`
+/// in that the sources are written inline rather than `include_str!`d.
+///
+/// The names carry their `./` here because the loader requires it — matching the
+/// doc block, which said `"calc.aipl"` and so panicked on `non-relative path`.
+/// Being `no_run`, the doctest compiled that example without ever running it.
+#[test]
+fn doc_example_compile_sources() {
+    let engine = Engine::compile_sources(&[
+        (
+            "./calc.aipl",
+            "import { square } from \"./mathlib.aipl\";\n\
+             import { wrapping_add as + } from builtins;\n\
+             pub fn sum_of_squares(a: i64, b: i64) -> i64 { square(a) + square(b) }",
+        ),
+        (
+            "./mathlib.aipl",
+            "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }",
+        ),
+    ])
+    .unwrap();
+    assert_eq!(engine.call("sum_of_squares", &[3, 4]).unwrap(), 25);
+}
+
+/// [`Engine::call_values`]'s example: `str` arguments marshaled in, an `i64` out.
+#[test]
+fn doc_example_call_values() {
+    let src = "import { wrapping_add as +, ==, && } from builtins;\n\
+               fn go(a: str, b: str, i: i64) -> i64 {\n\
+                 match (a[i]) {\n\
+                   some(x) => match (b[i]) {\n\
+                     some(y) => if (x == ' ' && y == ' ') { go(a, b, i + 1) } else { i }, none => i },\n\
+                   none => i } }\n\
+               pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
+    let engine = Engine::compile(src).unwrap();
+    use aipl::FfiValue;
+    let n = engine
+        .call_values(
+            "common_space_prefix",
+            &[FfiValue::Str("    x".into()), FfiValue::Str("  y".into())],
+        )
+        .unwrap();
+    assert_eq!(n, FfiValue::Int(2));
+}
+
 #[test]
 fn compile_file_loads_functions_from_separate_files() {
     // The compiler-in-AIPL direction: helpers live in their own `.aipl` files,
@@ -1009,6 +1075,22 @@ fn compile_sources_rejects_a_missing_module() {
     let errs = err.err().expect("Should err");
     assert_eq!(errs.len(), 1);
     assert_eq!(errs[0].message, "calc.aipl: imported module \"mathlib.aipl\" was not provided to compile_sources. Sources: [\"./ffi_fixtures/calc.aipl\"]");
+}
+
+#[test]
+fn compile_sources_requires_relative_names() {
+    // Source names are matched verbatim against the `from "./..."` clauses that
+    // reach them, so a bare `"calc.aipl"` names nothing. It reports that rather
+    // than panicking: the names come from the host, so a wrong one is a caller
+    // error to explain, not an invariant to assert.
+    let errs = Engine::compile_sources(&[("calc.aipl", "pub fn f() -> i64 { 1 }")])
+        .err()
+        .expect("a name without `./` is rejected");
+    assert_eq!(errs.len(), 1);
+    assert_eq!(
+        errs[0].message,
+        "source name \"calc.aipl\" must be a relative path starting with \"./\" (e.g. \"./calc.aipl\"); imports resolve against these names by exact match"
+    );
 }
 
 /// Recursively collect `.aipl` files under `dir` — walked by the dogfooded AIPL

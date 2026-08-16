@@ -47,7 +47,9 @@ pub fn install_parser_hooks() {
 /// `0`/`1`, `char` is a codepoint). `str`, arrays, and other composite
 /// arguments/returns aren't marshalable across the FFI yet.
 ///
-/// ```no_run
+/// Verified by `doc_example_engine` in `tests/ffi.rs`.
+///
+/// ```ignore
 /// let src = "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }";
 /// let engine = aipl::Engine::compile(src)?;
 /// assert_eq!(engine.call("add", &[2, 3])?, 5);
@@ -73,19 +75,26 @@ impl Engine {
     /// pairs — typically each `include_str!`'d into the host binary, so the AIPL
     /// is embedded at build time and nothing is read from disk at run time. The
     /// **first** pair is the root (its functions are callable by name); the rest
-    /// are reached through `import { f } from "name"` clauses, resolved *by name*
-    /// against the supplied set (a leading `./` is stripped, so the same files
-    /// also load via [`compile_file`]).
+    /// are reached through `import { f } from "./name.aipl"` clauses, resolved
+    /// against the supplied names by *exact match*.
     ///
-    /// ```no_run
+    /// Each name must be a relative path starting with `./`, spelled the same way
+    /// in the import that reaches it — nothing is normalized, and a name without
+    /// the prefix is an error. That is also what lets the same sources load
+    /// unchanged from disk via [`compile_file`], where the `./` is what makes the
+    /// import relative in the first place.
+    ///
+    /// Verified by `doc_example_compile_sources` in `tests/ffi.rs`.
+    ///
+    /// ```ignore
     /// // In real use each source is `include_str!("aipl/<name>.aipl")`.
     /// let engine = aipl::Engine::compile_sources(&[
-    ///     ("calc.aipl", "import { square } from \"mathlib.aipl\";\n\
-    ///                    import { wrapping_add as + } from builtins;\n\
-    ///                    pub fn sum_of_squares(a: i64, b: i64) -> i64 { square(a) + square(b) }"),
-    ///     ("mathlib.aipl", "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
+    ///     ("./calc.aipl", "import { square } from \"./mathlib.aipl\";\n\
+    ///                      import { wrapping_add as + } from builtins;\n\
+    ///                      pub fn sum_of_squares(a: i64, b: i64) -> i64 { square(a) + square(b) }"),
+    ///     ("./mathlib.aipl", "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
     /// ])?;
-    /// engine.call("sum_of_squares", &[3, 4])?;
+    /// assert_eq!(engine.call("sum_of_squares", &[3, 4])?, 25);
     /// # Ok::<(), Vec<aipl::Error>>(())
     /// ```
     ///
@@ -131,7 +140,9 @@ impl Engine {
     /// values the host builds for an argument are borrowed for the duration of
     /// the call.
     ///
-    /// ```no_run
+    /// Verified by `doc_example_call_values` in `tests/ffi.rs`.
+    ///
+    /// ```ignore
     /// let src = "import { wrapping_add as +, ==, && } from builtins;\n\
     ///            fn go(a: str, b: str, i: i64) -> i64 {\n\
     ///              match (a[i]) {\n\

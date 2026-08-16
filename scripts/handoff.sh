@@ -49,11 +49,11 @@
 # Test runner: `cargo nextest`, which runs each test in its own process (so one
 # crashing case can't take the binary down with it) and reports a stable
 # `FAIL [..] (n/m) <binary> <test>` line per failure — what the greps below parse.
-# Two nextest differences this script has to account for:
-#   - It *defaults to fail-fast*, the opposite of `cargo test`, so every
-#     whole-suite run below passes `--no-fail-fast` explicitly.
-#   - It does not run doctests at all. There are real ones here, so step 1b runs
-#     `cargo test --doc` separately rather than let that coverage vanish.
+# One nextest difference this script has to account for: it *defaults to
+# fail-fast*, the opposite of `cargo test`, so every whole-suite run below passes
+# `--no-fail-fast` explicitly. (It also skips doctests, which used to need a step
+# of its own — there are none left: the examples that were `no_run` doctests are
+# ordinary tests in `tests/ffi.rs` now, and run with everything else.)
 # `--color never` keeps the captured output greppable.
 #
 # Output: every step's combined output is always *captured* (the greps below parse
@@ -225,11 +225,6 @@ fi
 # nothing, which is the common case.
 run_step "nextest --no-run (compile check)" cargo nextest run --no-run --color never
 [ $? -eq 0 ] || { save_out; fail "compile" "$(grep -nE '^error' "$STEP_OUT" | head -30)"; }
-
-# nextest does not run doctests. Run them here so switching runners didn't
-# silently drop them; they're a couple of seconds.
-run_step "cargo test --doc (nextest skips doctests)" cargo test --doc
-[ $? -eq 0 ] || { save_out; fail "doctests" "$(grep -nE '^(error|test .* FAILED)' "$STEP_OUT" | head -20)"; }
 
 # --- 2. Discovery test ---------------------------------------------------------
 

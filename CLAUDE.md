@@ -18,10 +18,11 @@ changes to review in the git diff), or stops with a pointed message naming the
 step and why on any failure a refill can't fix.
 
 The script runs the suite with **`cargo nextest`** (each test in its own
-process; requires `cargo install cargo-nextest`). Two consequences it handles
-for you: nextest defaults to fail-fast, so every whole-suite run there passes
-`--no-fail-fast`; and nextest doesn't run doctests, so the script runs
-`cargo test --doc` as its own step. Your own inner-loop runs can use either
+process; requires `cargo install cargo-nextest`). One consequence it handles for
+you: nextest defaults to fail-fast, so every whole-suite run there passes
+`--no-fail-fast`. (Nextest also skips doctests; the repo has none left — the
+documented examples are ordinary tests in `tests/ffi.rs`, so they run with the
+rest of the suite.) Your own inner-loop runs can use either
 runner — the cadence commands below are written for `cargo test`, and
 `cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
