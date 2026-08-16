@@ -41,17 +41,17 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 488
-binary size: 3568
-  code: 2020
+instructions executed: 482
+binary size: 3280
+  code: 1856
   data: 1
-  metadata: 1547
-builtin calls: 28
+  metadata: 1423
+builtin calls: 22
   aipl_array_dec: 2
   aipl_array_new: 1
-  aipl_dec: 11
+  aipl_dec: 8
   aipl_i64_len: 2
-  aipl_inc: 8
+  aipl_inc: 5
   aipl_print: 3
   aipl_write_i64: 1
 --- monomorphizations ---

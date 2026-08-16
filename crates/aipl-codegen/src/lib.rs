@@ -15,7 +15,10 @@ use std::{
 use cranelift::{
     codegen::{
         cursor::{Cursor, FuncCursor},
-        ir::{Block, BlockArg, FuncRef, Function, Signature, StackSlot, UserFuncName},
+        ir::{
+            Block, BlockArg, ExternalName, FuncRef, Function, Inst, InstructionData, Signature,
+            StackSlot, UserFuncName,
+        },
         isa::TargetIsa,
         Context,
     },
@@ -4201,7 +4204,7 @@ fn compile_program<M: Module>(
         dbg.trace("codegen", format_args!("define `{}`", f.name));
         define_fn(
             module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &str_data,
-            &elem_rc, &mut ir, instrument,
+            &elem_rc, &mut ir, instrument, dbg,
         )?;
     }
 
@@ -7160,6 +7163,14 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
 
 impl Builtins {
     /// The `FuncId` for runtime import `sym`, declaring it (once) on first use.
+    /// The `FuncId` for `sym` **if it has already been declared**, without
+    /// declaring it. An IR pass keyed on a runtime symbol uses this rather than
+    /// [`Builtins::id`]: declaring one here would add an unused import to every
+    /// program that never calls it, moving its `binary size` for nothing.
+    fn declared<M: Module>(&self, _module: &mut M, sym: &'static str) -> Option<FuncId> {
+        self.imports.borrow().get(sym).copied()
+    }
+
     fn id<M: Module>(&self, module: &mut M, sym: &'static str) -> FuncId {
         if let Some(&id) = self.imports.borrow().get(sym) {
             return id;
@@ -7589,6 +7600,7 @@ fn define_fn<M: Module>(
     elem_rc: &RefCell<ElemRc>,
     ir_out: &mut String,
     instrument: bool,
+    dbg: DebugOptions,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
     // Parameters this instance owns (moved in): monomorphization marks them, so
@@ -7763,6 +7775,10 @@ fn define_fn<M: Module>(
     // self-identify its id, which the dogfood-IR loader relies on to re-link the
     // checked-in CLIF (see `from_artifact`).
     ctx.func.name = UserFuncName::user(0, id.as_u32());
+    // Optimize before the dump: the dumped text is what `aipl ir` shows *and*
+    // what the dogfood `.clif` artifacts carry, so a pass run after it would
+    // never reach the compiler's own re-linked engine.
+    run_ir_passes(module, builtins, &mut ctx.func, dbg);
     ir_out.push_str(&fix_data_ref_names(
         &ctx.func,
         &format!("{}\n", ctx.func.display()),
@@ -7791,6 +7807,164 @@ fn define_fn<M: Module>(
         .map_err(|e| Error::msg(format!("define {}: {e:?}", func.name)))?;
     module.clear_context(ctx);
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// IR passes
+//
+// Small rewrites over a function's finished CLIF. They run after the body is
+// built and *before* the IR is dumped, which matters more than it looks: the
+// dump is what `aipl ir` prints and what the checked-in dogfood `.clif`
+// artifacts are made of, so a pass running after it would optimize every
+// compiled program while leaving the compiler's own re-linked engine on
+// unoptimized IR.
+//
+// A pass sees one function at a time, rewrites it in place, and reports how many
+// rewrites it made — the count drives the `--debug` trace and tells you at a
+// glance whether a pass fires at all on real code. Adding one is: implement
+// [`IrPass`], add it to [`IR_PASSES`]. They run in list order, once each; a pass
+// that wants a fixpoint should iterate internally rather than rely on the driver
+// re-running it, so its cost stays its own.
+// ---------------------------------------------------------------------------
+
+/// What a pass needs besides the function: the `FuncId`s of the runtime symbols
+/// it recognizes, so a `call` can be matched against them.
+///
+/// Each is `None` when the symbol was never declared in this module, which means
+/// nothing calls it and any pass keyed on it can return immediately. Resolved by
+/// *lookup only* — declaring a symbol here would add an unused import to programs
+/// that never use it, and so move their `binary size`.
+struct PassCx {
+    inc: Option<FuncId>,
+    dec: Option<FuncId>,
+}
+
+/// One rewrite over a finished function. See the section comment above.
+trait IrPass {
+    /// Stable identifier, used in the `--debug` trace.
+    fn name(&self) -> &'static str;
+
+    /// Rewrite `func` in place; return the number of rewrites made (0 = the pass
+    /// did not apply).
+    fn run(&self, func: &mut Function, cx: &PassCx) -> usize;
+}
+
+/// Every pass, in the order they run.
+const IR_PASSES: &[&dyn IrPass] = &[&ElideRcPairs];
+
+/// Run [`IR_PASSES`] over `func`.
+fn run_ir_passes<M: Module>(
+    module: &mut M,
+    builtins: &Builtins,
+    func: &mut Function,
+    dbg: DebugOptions,
+) {
+    let cx = PassCx {
+        inc: builtins.declared(module, "aipl_inc"),
+        dec: builtins.declared(module, "aipl_dec"),
+    };
+    for pass in IR_PASSES {
+        let n = pass.run(func, &cx);
+        if n > 0 {
+            dbg.trace(
+                "ir-pass",
+                format_args!("{}: {n} rewrite(s) in {}", pass.name(), func.name),
+            );
+        }
+    }
+}
+
+/// Whether `inst` calls the module function `want`, and if so its first argument.
+/// `None` for any other instruction — including a call to something else, which
+/// callers still have to treat as opaque.
+fn calls_builtin(func: &Function, inst: Inst, want: Option<FuncId>) -> Option<Value> {
+    let want = want?;
+    let InstructionData::Call { func_ref, .. } = func.dfg.insts[inst] else {
+        return None;
+    };
+    let ExternalName::User(name_ref) = func.dfg.ext_funcs[func_ref].name else {
+        return None;
+    };
+    let user = &func.params.user_named_funcs()[name_ref];
+    // Namespace 0 is `cranelift-module`'s: the index is the `FuncId`.
+    (user.namespace == 0 && user.index == want.as_u32())
+        .then(|| func.dfg.inst_args(inst).first().copied())
+        .flatten()
+}
+
+/// Whether `inst` is a call of any kind — the conservative barrier every pass
+/// here reasons against, since a call is the only thing that can free memory,
+/// re-enter compiled code, or otherwise observe a refcount mid-block.
+fn is_any_call(func: &Function, inst: Inst) -> bool {
+    matches!(
+        func.dfg.insts[inst],
+        InstructionData::Call { .. } | InstructionData::CallIndirect { .. }
+    )
+}
+
+/// `aipl_inc(v)` … `aipl_dec(v)` within one block, with no call between them:
+/// both are removed.
+///
+/// The pair cancels. Nothing between the two can observe the raised count —
+/// only a call could free the value, re-enter compiled code, or read the
+/// counter, and a call between them is exactly what disqualifies the pair.
+/// Loads and stores in between are fine: a store may hand `v` to a new owner,
+/// which is the common shape (retain, store into a struct or array, then drop
+/// the temporary at scope exit), and eliding both leaves that owner holding the
+/// reference the temporary used to hold — the same end state, two runtime calls
+/// cheaper.
+///
+/// Deliberately not matched across blocks. A retain in one block and a release
+/// in another is only safe to cancel if every path between them agrees, which is
+/// a dataflow question rather than a peephole one — worth its own pass, not a
+/// widening of this one.
+struct ElideRcPairs;
+
+impl IrPass for ElideRcPairs {
+    fn name(&self) -> &'static str {
+        "elide-rc-pairs"
+    }
+
+    fn run(&self, func: &mut Function, cx: &PassCx) -> usize {
+        if cx.inc.is_none() || cx.dec.is_none() {
+            return 0;
+        }
+        let mut doomed: Vec<Inst> = Vec::new();
+        let blocks: Vec<Block> = func.layout.blocks().collect();
+        for block in blocks {
+            // Retains seen since the last call, innermost last.
+            let mut pending: Vec<(Value, Inst)> = Vec::new();
+            let mut inst = func.layout.first_inst(block);
+            while let Some(i) = inst {
+                inst = func.layout.next_inst(i);
+                if let Some(v) = calls_builtin(func, i, cx.inc) {
+                    // A retain only bumps a counter: it can't free or re-enter,
+                    // so it doesn't invalidate the retains already pending.
+                    pending.push((v, i));
+                    continue;
+                }
+                if let Some(v) = calls_builtin(func, i, cx.dec) {
+                    // Pair with the *nearest* unmatched retain of the same value,
+                    // so `inc(v); inc(v); dec(v)` cancels one and leaves one.
+                    if let Some(pos) = pending.iter().rposition(|(pv, _)| *pv == v) {
+                        doomed.push(pending[pos].1);
+                        doomed.push(i);
+                    }
+                    // A release *is* a call — it can free and cascade — so every
+                    // remaining retain stops being pairable across it.
+                    pending.clear();
+                    continue;
+                }
+                if is_any_call(func, i) {
+                    pending.clear();
+                }
+            }
+        }
+        for i in &doomed {
+            func.layout.remove_inst(*i);
+        }
+        doomed.len() / 2
+    }
 }
 
 /// Instrument `func` to tally executed instructions: at the head of every basic
@@ -11528,6 +11702,7 @@ fn define_test_fail_fn<M: Module>(
     }
 
     ctx.func.name = UserFuncName::user(0, id.as_u32());
+    run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
     ir_out.push_str(&format!("{}\n", ctx.func.display()));
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
@@ -11602,6 +11777,7 @@ fn define_eq_fn<M: Module>(
     }
 
     ctx.func.name = UserFuncName::user(0, id.as_u32());
+    run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
     ir_out.push_str(&format!("{}\n", ctx.func.display()));
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
@@ -11747,6 +11923,7 @@ fn define_tostr_fn<M: Module>(
         builder.finalize(module.target_config());
     }
     ctx.func.name = UserFuncName::user(0, id.as_u32());
+    run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
     ir_out.push_str(&fix_data_ref_names(
         &ctx.func,
         &format!("{}\n", ctx.func.display()),

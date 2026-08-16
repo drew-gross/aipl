@@ -103,7 +103,7 @@ optimizations:
 
     C. Generated code
 
-    C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (inc-then-dec of the same value in a block is a no-op; borrowed args never need a pair).
+    C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (borrowed args never need a pair).
       C1a: tried it an there were a lot of bugs.
 
     C2 redux - inline str len fast path, only call into runtime when it turns out to be a rope
@@ -144,7 +144,6 @@ recovering check:
 tests:
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
-  convert the doctests into regular tests and remove the cargo test --doc step
 
 lex json
 find a more natural way of testing builtins
