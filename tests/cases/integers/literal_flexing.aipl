@@ -88,20 +88,20 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 442
-binary size: 3072
-  code: 1376
+instructions executed: 436
+binary size: 3040
+  code: 1348
   data: 1
-  metadata: 1695
+  metadata: 1691
 builtin calls: 78
   aipl_array_dec: 1
   aipl_dec: 22
-  aipl_i64_len: 6
+  aipl_i64_len: 8
   aipl_inc: 11
   aipl_print: 11
-  aipl_u64_len: 16
-  aipl_write_i64: 3
-  aipl_write_u64: 8
+  aipl_u64_len: 14
+  aipl_write_i64: 4
+  aipl_write_u64: 7
 --- monomorphizations ---
 early_return
 main

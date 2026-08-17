@@ -224,6 +224,27 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
             _ => None,
         },
         ExprKind::Binop(l, op, r) => fold_binop(l, *op, r),
+        // `if (true) { a } else { b }` → `a`. The discarded branch is the one
+        // that would not have run, so dropping it changes nothing observable —
+        // and it removes a control-flow split, which is what later passes care
+        // about: `ElideRcPairs` only cancels a retain against a release in the
+        // *same* basic block, so collapsing an `if` can put the two together.
+        //
+        // Both branches must be free of context-typed literals. An `if` unifies
+        // its branches' types, so `if (true) { none } else { some(1) }` gets the
+        // `none`'s inner type from the arm being discarded; keeping only that
+        // arm strands a `__none__` that codegen cannot render. Same reason
+        // `inline_small` refuses such bodies.
+        ExprKind::If(c, t, f) => {
+            let taken = match c.kind {
+                ExprKind::Bool(true) => t,
+                ExprKind::Bool(false) => f,
+                _ => return None,
+            };
+            let unifies_types =
+                crate::contains_context_literal(t) || crate::contains_context_literal(f);
+            (!unifies_types).then(|| taken.kind.clone())
+        }
         // The reserved impls the loader resolves `+`/`-` to. Only these names:
         // an operator aliased to a user function is an ordinary call.
         ExprKind::Call(name, args, _) => {
