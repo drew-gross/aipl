@@ -1,5 +1,3 @@
-import { print } from builtins;
-
 // A dict key must be a scalar/str, not a container.
 fn main() -> i64 {
     let d = #{[1]: "a"};
@@ -7,7 +5,7 @@ fn main() -> i64 {
 }
 --- errors ---
 error: dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
- --> ./tests/cases/dicts/err_key_type.aipl:5:13
+ --> ./tests/cases/dicts/err_key_type.aipl:3:13
   |
-5 |     let d = #{[1]: "a"};
+3 |     let d = #{[1]: "a"};
   |             ^^^^^^^^^^

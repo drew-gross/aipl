@@ -1,4 +1,4 @@
-import { wrapping_sub as -, == } from builtins;
+import { == } from builtins;
 
 // none in else branch picks up the type from the some branch.
 fn maybe(want: bool) -> i64 {

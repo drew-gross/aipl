@@ -1,4 +1,4 @@
-import { ends_with, starts_with, !, == } from builtins;
+import { ends_with, starts_with, ! } from builtins;
 
 // `xs.starts_with(p)` / `xs.ends_with(p)` test whether `p`'s elements equal a
 // contiguous prefix / suffix of `xs`'s, by element-wise structural `==`. The

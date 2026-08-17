@@ -1,4 +1,4 @@
-import { push, value_or, wrapping_add as + } from builtins;
+import { push, value_or } from builtins;
 
 // Every *check-phase* array error, in one file, reported in one run. The
 // checker recovers at each item, so each failing function below is recorded and

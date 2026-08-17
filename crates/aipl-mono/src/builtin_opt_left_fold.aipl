@@ -1,14 +1,12 @@
 import {
     filter,
     is_some,
-    len,
     to_digit,
     value_or,
     wrapping_add as +,
     wrapping_mul as *,
     !,
     +++,
-    <,
     ==,
 } from builtins;
 

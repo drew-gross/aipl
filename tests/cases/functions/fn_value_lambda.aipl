@@ -1,4 +1,4 @@
-import { map, wrapping_add as +, wrapping_mul as *, +++, == } from builtins;
+import { map, wrapping_add as +, +++, == } from builtins;
 
 // A lambda and a payload-carrying constructor can both be used as function
 // *values*: bound to a local or stored in a struct field, then called through.

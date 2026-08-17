@@ -3,7 +3,7 @@
 // internally, so there is no collision. `import { A as ColorA }` disambiguates at
 // the use site, and `Size.A` names the other one directly.
 import { print, to_str, wrapping_add as + } from builtins;
-import { A as ColorA, Color, hue } from "./color.aipl";
+import { A as ColorA, hue } from "./color.aipl";
 import { Size, size_rank } from "./size.aipl";
 
 fn main() !prints {

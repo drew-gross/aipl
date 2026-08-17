@@ -23,7 +23,6 @@ import {
     push,
     saturating_sub as -,
     sort_by,
-    split,
     starts_with,
     value_or,
     wrapping_add as +,
@@ -53,7 +52,6 @@ import {
 } from "./doc.aipl";
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
-import { Token } from "./lexer.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 // `TokenKind` for an ordinary token, plus the three interpolated-template pieces,

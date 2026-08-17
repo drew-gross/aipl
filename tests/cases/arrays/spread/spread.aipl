@@ -1,4 +1,4 @@
-import { len, push, == } from builtins;
+import { == } from builtins;
 
 // `..xs` inside an array literal splices `xs`'s elements in at that position,
 // rather than nesting the array. Spreads mix freely with plain elements, and

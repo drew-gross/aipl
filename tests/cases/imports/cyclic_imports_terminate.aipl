@@ -14,7 +14,9 @@ import { b_fn } from "./b.aipl";
 import { wrapping_add as + } from builtins;
 pub fn a_fn() -> i64 { 10 + b_fn() }
 --- file: b.aipl ---
-import { a_fn } from "./a.aipl";
+// Never referenced — importing back from `a` is what closes the cycle, which is
+// the whole point here — so `#[allow]` squelches the unused-import lint.
+import { a_fn } from "./a.aipl"; #[allow]
 pub fn b_fn() -> i64 { 32 }
 --- performance ---
 allocations: 0

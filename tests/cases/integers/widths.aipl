@@ -1,13 +1,4 @@
-import {
-    print,
-    to_str,
-    wrapping_add as +,
-    wrapping_mul as *,
-    wrapping_sub as -,
-    /,
-    ==,
-    >,
-} from builtins;
+import { print, to_str, wrapping_add as +, wrapping_mul as *, /, ==, > } from builtins;
 
 // Fixed-width integers: signed i8/i16/i32/i64 and unsigned u8/u16/u32/u64.
 // Arithmetic and comparison happen at the type's width and signedness; results

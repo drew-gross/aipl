@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, == } from builtins;
+import { +++, == } from builtins;
 
 // Building a string by repeated `set s = s + ..` on a never-aliased binding:
 // `s` grows in place via realloc, so only the first append (off the static "")

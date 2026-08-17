@@ -1,9 +1,11 @@
-import { frobnicate } from builtins;
+// Never referenced on purpose: the import itself is what must be rejected, so
+// `#[allow]` squelches the unused-import lint and leaves the real error.
+import { frobnicate } from builtins; #[allow]
 
 fn main() -> i64 { 0 }
 --- errors ---
 error: "frobnicate" is not a builtin
- --> ./tests/cases/builtins/err_unknown_builtin.aipl:1:10
+ --> ./tests/cases/builtins/err_unknown_builtin.aipl:3:10
   |
-1 | import { frobnicate } from builtins;
+3 | import { frobnicate } from builtins; #[allow]
   |          ^^^^^^^^^^

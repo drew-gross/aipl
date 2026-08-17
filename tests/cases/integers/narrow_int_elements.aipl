@@ -10,8 +10,6 @@ import {
     to_str,
     value_or,
     wrapping_add as +,
-    wrapping_sub as -,
-    <,
     ==,
 } from builtins;
 

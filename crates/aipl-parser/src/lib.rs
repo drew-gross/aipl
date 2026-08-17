@@ -753,11 +753,13 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
             aipl::ImportName::AliasedPlusplus((name, span), _) => name_as_op(name, span, "++"),
             aipl::ImportName::AliasedBang((name, span)) => name_as_op(name, span, "!"),
-            // Operator imports (`import { ==, < } from builtins`). The `OP`
-            // span isn't needed here — operator imports rarely conflict, and the
-            // "not imported" error points at the use site — so a dummy keeps all
-            // operator-import variants (the spanless `-`/`<`/… below) uniform.
-            aipl::ImportName::Op((c, _)) => op_import(op_spelling(c)),
+            // Operator imports (`import { ==, < } from builtins`). An `OP` token
+            // carries a span, so keep it — the unused-import lint reports at the
+            // imported name, and without a span its caret would land on the
+            // file's first line. The bare `-`/`<`/`>`/`||`/`!` tokens below
+            // produce no span at all; those fall back to the import statement's
+            // own span (see the lint's `unused_imports`).
+            aipl::ImportName::Op((c, span)) => op_import_at(op_spelling(c), span),
             aipl::ImportName::OpMinus => op_import("-"),
             aipl::ImportName::OpLt => op_import("<"),
             aipl::ImportName::OpGt => op_import(">"),
@@ -766,19 +768,29 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             // `import { ++ } from builtins;` — parsed so the loader can reject it
             // with the "no bare form" message, exactly as it does for a bare `+`:
             // `++` is reached through `wrapping_increment as ++` /
-            // `saturating_increment as ++`. The span is unused like the other bare
-            // operators.
-            aipl::ImportName::OpPlusplus(_) => op_import("++"),
+            // `saturating_increment as ++`.
+            aipl::ImportName::OpPlusplus(span) => op_import_at("++", span),
         })
     }
 }
 
-/// An `ImportName` for an operator (no source span — operator tokens carry none).
+/// An `ImportName` for an operator whose token carries no span (`-`, `<`, `>`,
+/// `||`, `!`). The empty span is a marker: a diagnostic pointing at the name
+/// falls back to the enclosing import statement.
 fn op_import(spelling: &str) -> ImportName {
     ImportName {
         name: spelling.to_string(),
         alias: None,
         span: 0..0,
+    }
+}
+
+/// An `ImportName` for an operator token that does carry a span.
+fn op_import_at(spelling: &str, span: Span) -> ImportName {
+    ImportName {
+        name: spelling.to_string(),
+        alias: None,
+        span,
     }
 }
 

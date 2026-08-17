@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, +++, == } from builtins;
+import { print, to_str, +++ } from builtins;
 
 // `match` on a `str`: each arm is a string literal, with a required `_` default
 // as the last arm. Arms compare by content (string equality), so a rope (a

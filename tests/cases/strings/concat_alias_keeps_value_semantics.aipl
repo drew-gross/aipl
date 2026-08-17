@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, == } from builtins;
+import { +++, == } from builtins;
 
 // Aliasing disables the in-place concat: once `s` is captured by `t`, the
 // static analysis marks `s` non-exclusive, so further `set s = s + ..` build

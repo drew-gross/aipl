@@ -1,4 +1,4 @@
-import { len, push, == } from builtins;
+import { push, == } from builtins;
 
 // A spread copies: growing the result never writes through to the array that
 // was spread, even though `[..xs, ..]` starts the build *from* `xs` — the

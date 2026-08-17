@@ -49,10 +49,15 @@ mod_aipl:
   create it
   probably need the formatter to be ast based first
 
+write_file.aipl
+  I keep seeing rt.txt in my worktree - I think the tests aren't running in a temp dir like they should.
+  Lets have write_file.aipl leverage the ?-in-tests feature
+
 lint:
   x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
-  Lets go further actually and add a lint error against unused imports
+  lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
+  don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })

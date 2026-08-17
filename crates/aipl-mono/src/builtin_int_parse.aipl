@@ -4,7 +4,6 @@ import {
     starts_with,
     to_digit,
     trim_while,
-    value_or,
     wrapping_mul as *,
     wrapping_sub as -,
     ==,

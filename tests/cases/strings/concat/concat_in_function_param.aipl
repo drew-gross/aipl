@@ -1,4 +1,4 @@
-import { wrapping_add as +, +++, == } from builtins;
+import { +++, == } from builtins;
 
 // String materialized inline as a fn argument; lifetime must survive
 // the call.

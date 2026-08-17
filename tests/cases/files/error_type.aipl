@@ -1,12 +1,4 @@
-import {
-    print,
-    read_file_to_string,
-    to_str,
-    wrapping_add as +,
-    write_string_to_file,
-    +++,
-    ==,
-} from builtins;
+import { print, read_file_to_string, write_string_to_file, +++, == } from builtins;
 
 // The file builtins return the builtin `Error` type as their error side
 // (`read_file_to_string -> str!Error`, `write_string_to_file -> !Error`).

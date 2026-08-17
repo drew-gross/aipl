@@ -1,4 +1,4 @@
-import { contains, !, +++, == } from builtins;
+import { contains, !, +++ } from builtins;
 
 // `contains` on a `str` receiver takes a `char*` needle: a `str` matches as a
 // substring, a `char` as a single character, and a `char?` as its character

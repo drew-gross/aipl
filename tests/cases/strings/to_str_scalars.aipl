@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, wrapping_sub as -, +++ } from builtins;
+import { print, to_str, wrapping_add as +, +++ } from builtins;
 
 // The generic `to_str` renders any value by its static type. Scalars: i64 as
 // decimal, bool as true/false, char as 'c', str as "s" (Debug-style quoting).

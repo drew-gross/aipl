@@ -1,10 +1,11 @@
 // `char_at` was removed in favor of `s[i]` indexing — importing it is an error.
-import { char_at } from builtins;
+// Never referenced on purpose, so `#[allow]` squelches the unused-import lint.
+import { char_at } from builtins; #[allow]
 
 fn main() {}
 --- errors ---
 error: "char_at" is not a builtin
- --> ./tests/cases/strings/err_char_at_removed.aipl:2:10
+ --> ./tests/cases/strings/err_char_at_removed.aipl:3:10
   |
-2 | import { char_at } from builtins;
+3 | import { char_at } from builtins; #[allow]
   |          ^^^^^^^

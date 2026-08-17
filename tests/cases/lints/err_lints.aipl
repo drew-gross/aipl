@@ -1,4 +1,6 @@
-import { len, map, print, to_str, wrapping_add as +, == } from builtins;
+// `value_or` is imported but never referenced — the unused-import lint. Every
+// other name here is used by a case below.
+import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
 // Every lint, in one file, reported in one run.
 //
@@ -63,49 +65,55 @@ fn main() !prints {
 }
 --- errors ---
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:42:16
+  --> ./tests/cases/lints/err_lints.aipl:44:16
    |
-42 |     print(s[3..s.len()]);
+44 |     print(s[3..s.len()]);
    |                ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[0..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:46:15
+  --> ./tests/cases/lints/err_lints.aipl:48:15
    |
-46 |     print(s[..s.len()]);
+48 |     print(s[..s.len()]);
    |               ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:55:16
+  --> ./tests/cases/lints/err_lints.aipl:57:16
    |
-55 |     print(s[4..s.len()]);
+57 |     print(s[4..s.len()]);
    |                ^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:50:13
+  --> ./tests/cases/lints/err_lints.aipl:52:13
    |
-50 |     print(s[0..2]);
+52 |     print(s[0..2]);
    |             ^
 
 error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:27:43
+  --> ./tests/cases/lints/err_lints.aipl:29:43
    |
-27 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+29 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
    |                                           ^^^^^^^^^^^^
 
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:22:47
+  --> ./tests/cases/lints/err_lints.aipl:24:47
    |
-22 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+24 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                               ^
 
 error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:22:53
+  --> ./tests/cases/lints/err_lints.aipl:24:53
    |
-22 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+24 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                                     ^
 
 error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:33:9
+  --> ./tests/cases/lints/err_lints.aipl:35:9
    |
-33 |     set n = n + 1;
+35 |     set n = n + 1;
    |         ^^^^^^^^^
+
+error: unused import "value_or": nothing in this file references it; drop it from the import list
+ --> ./tests/cases/lints/err_lints.aipl:3:35
+  |
+3 | import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
+  |                                   ^^^^^^^^

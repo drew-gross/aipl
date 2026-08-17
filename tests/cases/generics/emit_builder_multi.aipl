@@ -1,4 +1,4 @@
-import { print, to_str, == } from builtins;
+import { print, to_str } from builtins;
 
 // The lexer-shaped pattern at *two* instances (`Emit$TokA`, `Emit$TokB`): a
 // generic variant carrying constructors, whose shared constructor names

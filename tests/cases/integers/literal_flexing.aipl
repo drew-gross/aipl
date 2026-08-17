@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, == } from builtins;
+import { print, to_str, wrapping_add as + } from builtins;
 
 // A bare integer literal adapts to whatever integer type the context expects,
 // as long as its value fits. There is no conversion form to reach for; the

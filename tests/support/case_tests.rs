@@ -281,6 +281,7 @@ case_tests! {
     cases_lints_incr_user_plus = "cases/lints/incr_user_plus",
     cases_lints_slice_from_zero_allow = "cases/lints/slice_from_zero_allow",
     cases_lints_slice_from_zero_open_end = "cases/lints/slice_from_zero_open_end",
+    cases_lints_unused_import_allow = "cases/lints/unused_import_allow",
     cases_loops_enumerate = "cases/loops/enumerate",
     cases_loops_err_loops = "cases/loops/err_loops",
     cases_loops_errors_err_for_body_stmt_then_expr = "cases/loops/errors/err_for_body_stmt_then_expr",

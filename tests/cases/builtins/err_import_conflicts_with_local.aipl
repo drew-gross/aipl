@@ -1,11 +1,14 @@
-import { len } from builtins;
+// The import is deliberately never used — the conflict with the local `len`
+// below is the whole point — so `#[allow]` squelches the unused-import lint,
+// leaving the conflict as the only error.
+import { len } from builtins; #[allow]
 
 fn len(x: i64) -> i64 { x }
 
 fn main() -> i64 { 0 }
 --- errors ---
 error: err_import_conflicts_with_local.aipl: builtin import "len" conflicts with a local item
- --> ./tests/cases/builtins/err_import_conflicts_with_local.aipl:1:10
+ --> ./tests/cases/builtins/err_import_conflicts_with_local.aipl:4:10
   |
-1 | import { len } from builtins;
+4 | import { len } from builtins; #[allow]
   |          ^^^

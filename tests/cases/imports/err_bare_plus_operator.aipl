@@ -3,12 +3,13 @@
 // is special — it must be imported as `wrapping_add as +`. This pins that
 // `is_operator_name` classifies `+` as an operator; a port that dropped `+` from
 // the operator set would instead produce the generic "is not a builtin" error.
-import { + } from builtins;
+// Never referenced on purpose, so `#[allow]` squelches the unused-import lint.
+import { + } from builtins; #[allow]
 
 fn main() {}
 --- errors ---
 error: the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins (add)
- --> ./tests/cases/imports/err_bare_plus_operator.aipl:1:1
+ --> ./tests/cases/imports/err_bare_plus_operator.aipl:7:10
   |
-1 | // A bare `import { + }` is gated by `is_operator_name`: `+` is recognized as an
-  | ^
+7 | import { + } from builtins; #[allow]
+  |          ^

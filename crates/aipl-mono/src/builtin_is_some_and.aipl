@@ -1,4 +1,4 @@
-import { is_some, !, <=, == } from builtins;
+import { !, <=, == } from builtins;
 
 // The AIPL implementation of the `is_some_and` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_is_some_and`
