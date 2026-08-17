@@ -261,9 +261,14 @@ fn check_file(file: &Path, label: &str, dbg: DebugOptions) -> Result<i64, String
 /// Loading still happens from the original absolute path, so imports resolve
 /// against the real tree rather than the scratch copy.
 fn in_staged_dir<T>(file: &Path, f: impl FnOnce() -> T) -> Result<T, String> {
-    let companions = std::fs::read_to_string(file)
-        .map(|src| aipl::companion_files(&src))
-        .unwrap_or_default();
+    let companions = match std::fs::read_to_string(file) {
+        // A `file:` marker naming an unstageable path is the file's error to
+        // report, not something to quietly stage somewhere else.
+        Ok(src) => aipl::companion_files(&src).map_err(|e| format!("{}: {e}", file.display()))?,
+        // Unreadable is not fatal here — loading the file below reports it with
+        // the diagnostic the user actually wants.
+        Err(_) => Vec::new(),
+    };
     let dir = binary::scratch_dir("check").map_err(|e| e.to_string())?;
     aipl::stage_companions(&dir, &companions)
         .map_err(|e| format!("stage companions in {}: {e}", dir.display()))?;

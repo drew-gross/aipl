@@ -2825,7 +2825,10 @@ pub fn strip_test_sections(src: &str) -> &str {
 /// installed hook. There is **no native fallback**: it panics if the hook isn't
 /// installed, so install it (via `install_parser_hooks`) first, exactly like
 /// [`parse_test_section_header`].
-pub fn companion_files(src: &str) -> Vec<(String, String)> {
+/// `Err(message)` when a `file:` marker names a path that can't be staged (empty,
+/// or containing a backslash) — refusing is better than staging a case somewhere
+/// unintended, and it matches what the corpus harness already asserts.
+pub fn companion_files(src: &str) -> Result<Vec<(String, String)>, String> {
     let hook = COMPANION_FILES_HOOK
         .get()
         .expect("companion-files hook not installed (call install_parser_hooks)");
@@ -2836,13 +2839,14 @@ pub fn companion_files(src: &str) -> Vec<(String, String)> {
 /// [`set_companion_files_hook`]) to dogfood the AIPL `companion_files`.
 /// Required — see [`companion_files`].
 #[allow(clippy::type_complexity)]
-static COMPANION_FILES_HOOK: std::sync::OnceLock<fn(&str) -> Vec<(String, String)>> =
-    std::sync::OnceLock::new();
+static COMPANION_FILES_HOOK: std::sync::OnceLock<
+    fn(&str) -> Result<Vec<(String, String)>, String>,
+> = std::sync::OnceLock::new();
 
 /// Install the companion-file extractor. The compiler points this at the
 /// dogfooded AIPL `companion_files`, run through the embedding FFI. First
 /// install wins (the hook is process-global).
-pub fn set_companion_files_hook(f: fn(&str) -> Vec<(String, String)>) {
+pub fn set_companion_files_hook(f: fn(&str) -> Result<Vec<(String, String)>, String>) {
     let _ = COMPANION_FILES_HOOK.set(f);
 }
 

@@ -39,6 +39,7 @@ utilitiy functions:
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : arr) syntax that gives you indexes (and keys for dicts, etc.)
+  match should allow statements
 
 shim:
   better syntax
@@ -60,7 +61,6 @@ write_file.aipl
   Lets have write_file.aipl leverage the ?-in-tests feature
 
 companion_files.aipl:
-  should error for invalid (empty with w/backslash) rather than skip. This makes with_companion just a fancy push that can be deleted.
   With split_with_predicate, implement this more functionally.
 
 lint:
@@ -81,6 +81,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass
   move single use inlining to after monomorphization
   add a constant branch elimination pass

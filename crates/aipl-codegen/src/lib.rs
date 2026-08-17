@@ -3608,10 +3608,10 @@ fn split_test_sections(src: &str) -> (String, String) {
 
 /// The parser's companion-files hook (see [`install_parser_hooks`]): the
 /// `--- file: <path> ---` sections of a source, computed by the dogfooded AIPL
-/// `companion_files` (`str -> Companion[]`) and marshaled back as an
-/// [`FfiValue::Array`] of `Companion` structs. No native fallback; panics if it
+/// `companion_files` (`str -> Companion[]!str`) and marshaled back as an
+/// [`FfiValue::Res`] of an [`FfiValue::Array`] of `Companion` structs. No native fallback; panics if it
 /// can't be built or called.
-fn companion_files(src: &str) -> Vec<(String, String)> {
+fn companion_files(src: &str) -> Result<Vec<(String, String)>, String> {
     fn field(fields: &[(String, FfiValue)], name: &str) -> String {
         match fields.iter().find(|(n, _)| n == name) {
             Some((_, FfiValue::Str(s))) => s.clone(),
@@ -3620,13 +3620,22 @@ fn companion_files(src: &str) -> Vec<(String, String)> {
     }
     DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values("companion_files", &[FfiValue::Str(src.to_string())]) {
-            Ok(FfiValue::Array(items)) => items
-                .iter()
-                .map(|item| match item {
-                    FfiValue::Struct(fields) => (field(fields, "path"), field(fields, "contents")),
-                    other => panic!("dogfooded companion_files() element: {other:?}"),
-                })
-                .collect(),
+            Ok(FfiValue::Res(Ok(ok))) => match *ok {
+                FfiValue::Array(items) => Ok(items
+                    .iter()
+                    .map(|item| match item {
+                        FfiValue::Struct(fields) => {
+                            (field(fields, "path"), field(fields, "contents"))
+                        }
+                        other => panic!("dogfooded companion_files() element: {other:?}"),
+                    })
+                    .collect()),
+                other => panic!("dogfooded companion_files() ok payload: {other:?}"),
+            },
+            Ok(FfiValue::Res(Err(e))) => match *e {
+                FfiValue::Str(msg) => Err(msg),
+                other => panic!("dogfooded companion_files() err payload: {other:?}"),
+            },
             other => panic!("dogfooded companion_files() call: {other:?}"),
         }
     })
