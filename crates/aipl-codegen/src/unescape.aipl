@@ -70,18 +70,18 @@ allocations: 39
 deallocations: 39
 reallocations: 0
 bytes allocated: 1552
-instructions executed: 3678
-binary size: 8568
-  code: 3036
+instructions executed: 3609
+binary size: 9448
+  code: 3680
   data: 1253
-  metadata: 4279
-builtin calls: 1007
+  metadata: 4515
+builtin calls: 978
   aipl_array_dec: 1
   aipl_assert: 19
   aipl_char_at: 36
   aipl_concat_lazy: 38
-  aipl_dec: 366
-  aipl_inc: 183
+  aipl_dec: 359
+  aipl_inc: 161
   aipl_str_eq: 63
   aipl_str_len: 258
   aipl_str_slice: 38
@@ -89,6 +89,5 @@ builtin calls: 1007
   aipl_test_end: 2
   aipl_test_summary: 1
 --- monomorphizations ---
-escape_text
 main
 unescape

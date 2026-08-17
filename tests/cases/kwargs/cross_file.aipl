@@ -21,18 +21,17 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 160
-instructions executed: 40
-binary size: 1416
-  code: 404
+instructions executed: 26
+binary size: 1296
+  code: 344
   data: 35
-  metadata: 977
-builtin calls: 43
+  metadata: 917
+builtin calls: 33
   aipl_array_dec: 1
   aipl_concat_lazy: 4
-  aipl_dec: 18
-  aipl_inc: 10
+  aipl_dec: 14
+  aipl_inc: 4
   aipl_print: 2
   aipl_str_len: 8
 --- monomorphizations ---
-__m1__framed
 main

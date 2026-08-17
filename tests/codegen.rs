@@ -115,11 +115,16 @@ fn concat_arg_emits_concat_specialized_instance() {
     // `str + str` lowers to a lazy concat node (`aipl_concat_lazy`), and passing
     // that concat value to a `str` parameter emits a distinct concat-specialized
     // instance (`label$c0`) alongside the plain `label` used for a plain-str arg.
-    // Each variant is called twice so the post-monomorphization inlining pass
-    // (which folds single-use functions away) keeps both as standalone instances.
+    //
+    // `label` has to survive as a real function for there to be an instance to
+    // look at, so it is written past both inlining passes: called more than once,
+    // which `inline_single_use` requires, and with an early `return`, which
+    // `inline_small` refuses regardless of how small the body is (see
+    // `contains_early_exit`). A plain `{ 0 }` body would simply be inlined into
+    // `main` and no `label` instance of either kind would be emitted.
     let comp = compile(
         "import { wrapping_add as +, +++ } from builtins;
-         fn label(s: str) -> i64 { 0 }
+         fn label(s: str) -> i64 { if (true) { return 0; }; 0 }
          fn main() -> i64 {
              label(\"abcdefgh\" +++ \"ijklmnop\") + label(\"qrstuvwx\" +++ \"yz012345\")
              + label(\"plainval\") + label(\"another0\")

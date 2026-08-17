@@ -78,17 +78,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1366
-binary size: 10440
-  code: 4296
+instructions executed: 1426
+binary size: 10560
+  code: 4364
   data: 1571
-  metadata: 4573
-builtin calls: 224
+  metadata: 4625
+builtin calls: 227
   aipl_array_dec: 1
   aipl_assert: 18
   aipl_char_at: 11
-  aipl_dec: 99
-  aipl_inc: 63
+  aipl_dec: 105
+  aipl_inc: 60
   aipl_str_eq: 15
   aipl_str_len: 8
   aipl_test_begin: 4
@@ -96,7 +96,7 @@ builtin calls: 224
   aipl_test_summary: 1
 --- monomorphizations ---
 __builtin_value_or_err$char$i64
+__builtin_value_or_err$char$str
 check_len
 digit_of
-is_not_a_digit
 main

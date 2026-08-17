@@ -38,20 +38,21 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 240
-instructions executed: 203
-binary size: 3080
-  code: 1456
+instructions executed: 221
+binary size: 3248
+  code: 1560
   data: 27
-  metadata: 1597
-builtin calls: 81
+  metadata: 1661
+builtin calls: 85
   aipl_array_dec: 1
   aipl_concat_lazy: 6
-  aipl_dec: 36
-  aipl_inc: 20
+  aipl_dec: 38
+  aipl_inc: 22
   aipl_print: 2
   aipl_str_eq: 2
   aipl_str_len: 14
 --- monomorphizations ---
 greet
+lookup
 main
 show

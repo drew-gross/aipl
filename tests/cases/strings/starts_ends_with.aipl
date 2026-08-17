@@ -42,16 +42,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 303
-binary size: 6512
-  code: 1920
+instructions executed: 293
+binary size: 6432
+  code: 1896
   data: 1279
-  metadata: 3313
-builtin calls: 158
+  metadata: 3257
+builtin calls: 152
   aipl_array_dec: 1
   aipl_assert: 23
-  aipl_dec: 49
-  aipl_inc: 11
+  aipl_dec: 47
+  aipl_inc: 7
   aipl_str_ends_with: 10
   aipl_str_len: 47
   aipl_str_slice: 1
@@ -61,5 +61,4 @@ builtin calls: 158
   aipl_test_summary: 1
 --- monomorphizations ---
 __test$is_dotfile
-is_dotfile
 main

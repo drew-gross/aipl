@@ -93,17 +93,22 @@ evens
 first_of_pair
 main
 maybe
+maybe_strs
+narrow
 pair
+point
+shape
+wide
 --- performance ---
 allocations: 18
 deallocations: 18
 reallocations: 0
 bytes allocated: 800
-instructions executed: 3495
-binary size: 24296
-  code: 12692
-  data: 1731
-  metadata: 9873
+instructions executed: 3571
+binary size: 26904
+  code: 14236
+  data: 1851
+  metadata: 10817
 builtin calls: 348
   aipl_arr_drop_str: 1
   aipl_arr_inc: 17

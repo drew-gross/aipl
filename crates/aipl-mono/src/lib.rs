@@ -6165,6 +6165,20 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
 
 // ---- Inlining ---------------------------------------------------------------
 //
+// Two selection rules share one substitution engine (`replace_call` /
+// `build_inlined`) and one set of safety rules (`is_inline_shape`):
+//
+//   - `inline_single_use`: a private function called exactly once. Inlining it
+//     is free — the body moves, nothing is duplicated — and the definition goes.
+//   - `inline_small`: any function whose body is under a size threshold,
+//     however many times it is called. This one *does* duplicate, which is the
+//     point: a two-line callee inlined into its callers puts the retain of an
+//     argument and the release at the callee's exit in the same basic block,
+//     where `ElideRcPairs` can cancel them.
+//
+// Both are conservative in the same way, and for the same reason: an inlined
+// body has to mean exactly what it meant where it was written.
+//
 // Inline a *private* function that is used exactly once: replace its single call
 // site with the function's body (parameters bound to the arguments via `let`s)
 // and drop the now-uncalled definition. Gated to programs with a `main` (and no
@@ -6225,6 +6239,7 @@ pub fn inline_single_use(program: &Program) -> Program {
                     &f.body,
                     &mut counter,
                     &mut replaced,
+                    InlineSites::First,
                 );
                 g.body = body;
             }
@@ -6286,6 +6301,7 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
                 &f.body,
                 &mut counter,
                 &mut replaced,
+                InlineSites::First,
             );
             g.body = body;
         }
@@ -6300,6 +6316,188 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
 
 /// Whether `f` is a single-use private function safe to inline. See the module
 /// note for the conservative criteria.
+/// How many call sites one [`replace_call`] walk rewrites.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InlineSites {
+    /// Stop after the first — what [`inline_single_use`] wants, since by
+    /// construction there is exactly one and stopping ends the walk early.
+    First,
+    /// Every site, which is what inlining a *small* function means.
+    All,
+}
+
+/// The default body-size threshold for [`inline_small`], in non-leaf
+/// expressions.
+///
+/// Four, because that is where inlining starts paying for itself. The point of
+/// inlining a small callee is not the removed call but what it exposes: an
+/// argument's retain and the callee's release of it land in one basic block,
+/// which is the shape `ElideRcPairs` cancels. Measured over the dogfooded
+/// sources, the pairs that pass finds go 67 (inlining off) → 67 (threshold 2) →
+/// 80 (4) → 83 (8): nothing at 2, because a body that small is scalar
+/// arithmetic or a field access and has no refcount traffic to expose, and
+/// little more after 4, which buys 3 further pairs for roughly 20% more IR.
+///
+/// Override at run time with `AIPL_INLINE_MAX_EXPRS` (see
+/// `aipl_codegen::INLINE_MAX_EXPRS_ENV`) to re-run that experiment without a
+/// rebuild.
+pub const DEFAULT_INLINE_MAX_EXPRS: usize = 4;
+
+/// Whether `ty` mentions a type that only monomorphization resolves: bare `any`,
+/// or one of the literal placeholders the checker threads through inference.
+///
+/// [`build_inlined`] binds each parameter with its *declared* type — load-bearing
+/// for narrow ints, where dropping the annotation would widen the arithmetic — so
+/// a parameter typed `any[]` would pin an inlined `i64[]` argument to `any[]` and
+/// fail to check. Such a signature is fine to *call*; it is only inlining it
+/// early, before those types are resolved, that breaks. Declared type variables
+/// are excluded separately by the candidate filter; this catches the bare-`any`
+/// signatures that carry none.
+fn mentions_abstract_type(ty: &Type) -> bool {
+    match ty {
+        Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => true,
+        Type::Optional(t) | Type::Array(t) | Type::Set(t) => mentions_abstract_type(t),
+        Type::Dict(k, v) | Type::Result(k, v) => {
+            mentions_abstract_type(k) || mentions_abstract_type(v)
+        }
+        Type::Fn(ps, r) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
+        Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_abstract_type),
+        Type::Unit | Type::Primitive(_) | Type::Named(_) => false,
+    }
+}
+
+/// A body's size for [`inline_small`]: the number of *non-leaf* expressions in
+/// it — the operations, not their operands.
+///
+/// Counting every node would make the threshold hard to reason about, since a
+/// leaf costs the same as the operation containing it: `a + b` would be three
+/// nodes and a threshold of 2 would admit almost nothing. Counting operations
+/// makes the unit the thing a reader means by "an expression": `a + b` is 1,
+/// `a + b * c` is 2, `f(g(x))` is 2.
+fn body_size(e: &Expr) -> usize {
+    let leaf = matches!(
+        e.kind,
+        ExprKind::Num(_)
+            | ExprKind::Bool(_)
+            | ExprKind::Str(_)
+            | ExprKind::Char(_)
+            | ExprKind::Ident(_)
+            | ExprKind::None
+            | ExprKind::Unit
+    );
+    usize::from(!leaf) + children(e).iter().map(|c| body_size(c)).sum::<usize>()
+}
+
+/// Inline every function whose body is at most `max_exprs` [`body_size`], at all
+/// of its call sites.
+///
+/// Unlike [`inline_single_use`] this duplicates the body — once per call — which
+/// is why it is gated on size. The gain is not the removed call so much as what
+/// the removed call *exposes*: an argument's retain and the callee's release of
+/// it end up in one basic block with nothing between them, which is exactly the
+/// shape `ElideRcPairs` cancels. A call between them is what stops that pass, and
+/// the call is what this one removes.
+///
+/// Definitions are never removed here — only calls are rewritten. Deciding a
+/// name is dead needs to account for every way a program can still reach it, and
+/// getting that wrong turns an optimization into a "call to undefined fn". The
+/// monomorphizer already prunes by reachability from the entry point, so an
+/// inlined-away function disappears there anyway, decided by the pass that has
+/// the whole picture. [`inline_single_use`] can drop its own candidate because
+/// it has already proved the name is used exactly once — the call it just
+/// replaced.
+///
+/// Conservative in the same ways as [`inline_single_use`] — see
+/// [`is_inline_shape`] — plus never inlining a function whose name is shadowed
+/// anywhere, so a call site always means the function it appears to.
+pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
+    let mut program = program.clone();
+    let mut counter = 0usize;
+    let binders = collect_binders(&program);
+    // Selected once, from the original program: a function that qualifies now
+    // stays eligible, and inlining only ever *grows* callers, so re-selecting
+    // after each step could never add to this set — while re-walking it would
+    // risk an unbounded ping-pong between two small mutually-calling functions.
+    let candidates: Vec<Function> = program
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Fn(f)
+                if body_size(&f.body) <= max_exprs
+                    && f.name != "main"
+                    && f.sig.type_vars.is_empty()
+                    && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
+                    && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
+                    && !binders.contains(&f.name)
+                    && is_inline_shape(
+                        f.sig
+                            .params
+                            .iter()
+                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
+                        f.sig.is_mutating(),
+                        &f.body,
+                        &f.name,
+                    ) =>
+            {
+                Some(f.clone())
+            }
+            _ => None,
+        })
+        .collect();
+
+    for f in candidates {
+        let fparams: Vec<(String, Type)> = f
+            .sig
+            .params
+            .iter()
+            .map(|p| (p.name.clone(), p.ty.clone()))
+            .collect();
+        let mut replaced = false;
+        for it in &mut program.items {
+            if let Item::Fn(g) = it {
+                // Not into itself: `is_inline_shape` already rejected a
+                // self-referencing body, but a candidate is still its own item.
+                if g.name == f.name {
+                    continue;
+                }
+                g.body = replace_call(
+                    &g.body,
+                    &f.name,
+                    &fparams,
+                    &f.body,
+                    &mut counter,
+                    &mut replaced,
+                    InlineSites::All,
+                );
+                // `.test` blocks are compiled too, by `check` and by the cases
+                // harness — so a call in one is a call to inline, and (below) a
+                // reference that keeps the definition alive.
+                g.test_body = g.test_body.as_ref().map(|t| {
+                    replace_call(
+                        t,
+                        &f.name,
+                        &fparams,
+                        &f.body,
+                        &mut counter,
+                        &mut replaced,
+                        InlineSites::All,
+                    )
+                });
+            }
+        }
+        // Drop the definition only if nothing names it any more — an `Ident` use
+        // (the function as a value) keeps it alive, as does a `pub` name that
+        // another file may still call, as does any reference from a `.test`
+        // block.
+        let _ = replaced;
+    }
+    program
+}
+
 fn is_inline_candidate(
     f: &Function,
     counts: &HashMap<String, usize>,
@@ -6519,6 +6717,13 @@ fn contains_context_literal(e: &Expr) -> bool {
         ExprKind::None => true,
         ExprKind::ArrayLit(v) | ExprKind::SetLit(v) => v.is_empty(),
         ExprKind::DictLit(v) => v.is_empty(),
+        // `ok(x)` types as `Result<typeof x, __none__>` and `err(e)` as
+        // `Result<__none__, typeof e>`: the *other* side is a placeholder that
+        // the declared return type resolves. Inlining puts the construction
+        // somewhere with no such declaration — `to_str(ok(v))` rather than a
+        // function returning `T!E` — and the placeholder survives to codegen,
+        // which fails with "rendering __none__ is not yet supported".
+        ExprKind::Call(n, _, _) => n == "ok" || n == "err",
         _ => false,
     };
     here || children(e).iter().any(|c| contains_context_literal(c))
@@ -6534,10 +6739,11 @@ fn references_name(e: &Expr, name: &str) -> bool {
     }
 }
 
-/// Rebuild `e`, replacing the (single) direct call to `fname` — with matching
-/// arity — by the inlined body of the function it names (`fparam_names`/`fbody`).
-/// `replaced` guards against touching more than one site (there is only one,
-/// but the flag also short-circuits the rest of the walk). Takes just the
+/// Rebuild `e`, replacing direct calls to `fname` — with matching arity — by the
+/// inlined body of the function it names (`fparam_names`/`fbody`). `sites` says
+/// how many: [`InlineSites::First`] stops at one (and `replaced` short-circuits
+/// the rest of the walk), [`InlineSites::All`] rewrites every site. `replaced`
+/// reports whether anything was rewritten either way. Takes just the
 /// callee's parameter names (rather than a whole function/param list) so it
 /// works for both the pre-mono [`Function`]/[`Param`] and the post-mono
 /// [`ConcreteFn`]/[`ConcreteParam`] representations — inlining only ever
@@ -6549,8 +6755,9 @@ fn replace_call(
     fbody: &Expr,
     counter: &mut usize,
     replaced: &mut bool,
+    sites: InlineSites,
 ) -> Expr {
-    if !*replaced {
+    if !*replaced || sites == InlineSites::All {
         if let ExprKind::Call(name, args, _) = &e.kind {
             // Skip if any argument is a context-typed literal (`none`, empty
             // `[]`/`#{}`/`#{:}`, or a `some(..)`/`ok(..)` wrapping one): its type
@@ -6566,7 +6773,7 @@ fn replace_call(
         }
     }
     let rc = |x: &Expr, counter: &mut usize, replaced: &mut bool| {
-        replace_call(x, fname, fparams, fbody, counter, replaced)
+        replace_call(x, fname, fparams, fbody, counter, replaced, sites)
     };
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),

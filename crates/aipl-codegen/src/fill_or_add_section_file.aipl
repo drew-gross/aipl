@@ -29,11 +29,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 88
-binary size: 9848
-  code: 5076
+instructions executed: 91
+binary size: 9920
+  code: 5092
   data: 358
-  metadata: 4414
+  metadata: 4470
 builtin calls: 20
   aipl_array_dec: 1
   aipl_assert: 1
@@ -50,5 +50,6 @@ __enumerate2
 __m1__contains_section
 __m1__fill_section
 __m3__parse_test_section_header
+__test$fill_or_add_section_file
 fill_or_add_section_file
 main

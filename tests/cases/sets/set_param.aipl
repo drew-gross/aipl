@@ -19,11 +19,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 296
-instructions executed: 313
-binary size: 3600
-  code: 1656
+instructions executed: 309
+binary size: 3592
+  code: 1660
   data: 219
-  metadata: 1725
+  metadata: 1713
 builtin calls: 76
   aipl_array_dec: 6
   aipl_array_push_mut: 15
@@ -36,4 +36,3 @@ builtin calls: 76
   aipl_test_summary: 1
 --- monomorphizations ---
 main
-member

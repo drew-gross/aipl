@@ -44,18 +44,17 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
     assert(is_about_one_second(elapsed_over_a_one_second_sleep()));
 })
 --- monomorphizations ---
-is_about_one_second
 main
 --- performance ---
 allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 72
-instructions executed: 217
-binary size: 3824
-  code: 1056
+instructions executed: 205
+binary size: 3952
+  code: 1260
   data: 607
-  metadata: 2161
+  metadata: 2085
 builtin calls: 42
   aipl_arr_drop_str: 1
   aipl_array_dec: 4

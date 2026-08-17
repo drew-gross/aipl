@@ -48,11 +48,11 @@ allocations: 38
 deallocations: 38
 reallocations: 0
 bytes allocated: 1736
-instructions executed: 2673
-binary size: 15016
-  code: 8864
+instructions executed: 2669
+binary size: 15336
+  code: 9152
   data: 1316
-  metadata: 4836
+  metadata: 4868
 builtin calls: 145
   aipl_arr_drop_arr: 6
   aipl_arr_drop_str: 4
@@ -67,5 +67,4 @@ builtin calls: 145
   aipl_test_summary: 1
 --- monomorphizations ---
 __test$has_header
-has_header
 main

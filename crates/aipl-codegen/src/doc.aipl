@@ -340,33 +340,33 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 292
-deallocations: 292
+allocations: 293
+deallocations: 293
 reallocations: 0
-bytes allocated: 16708
-instructions executed: 25177
-binary size: 30136
-  code: 16844
+bytes allocated: 16748
+instructions executed: 25002
+binary size: 30688
+  code: 17240
   data: 842
-  metadata: 12450
-builtin calls: 5150
-  aipl_arr_drop_str: 82
-  aipl_arr_inc: 88
-  aipl_arr_retain_ptr: 81
+  metadata: 12606
+builtin calls: 5089
+  aipl_arr_drop_str: 83
+  aipl_arr_inc: 87
+  aipl_arr_retain_ptr: 82
   aipl_arr_slice: 1
-  aipl_array_dec: 236
+  aipl_array_dec: 216
   aipl_array_new: 54
   aipl_array_push: 34
-  aipl_array_push_mut: 21
-  aipl_array_with_cap: 11
+  aipl_array_push_mut: 22
+  aipl_array_with_cap: 12
   aipl_assert: 9
   aipl_concat_lazy: 22
-  aipl_dec: 896
-  aipl_inc: 629
+  aipl_dec: 892
+  aipl_inc: 605
   aipl_rec_alloc: 156
-  aipl_rec_dec_strong: 1152
+  aipl_rec_dec_strong: 1144
   aipl_rec_dec_weak: 105
-  aipl_rec_inc_strong: 996
+  aipl_rec_inc_strong: 988
   aipl_rec_inc_weak: 105
   aipl_str_contains: 25
   aipl_str_data: 19
@@ -386,20 +386,14 @@ builtin calls: 5150
   aipl_trim: 1
 --- monomorphizations ---
 __builtin_any$Doc$lam3
-__builtin_count_while$char$s0$lam11
-__builtin_count_while$char$s0$lam21
+__builtin_count_while$char$s0$lam15
+__builtin_count_while$char$s0$lam25
 __m1__reindent_block
-__m3__lines
-__map13$own0
-__map19$own0
+__map17$own0
 col_after
 fits
-fits_after
 fits_atom
 go
-group
 has_hard
 main
-newline_str
-prepend
 print_doc

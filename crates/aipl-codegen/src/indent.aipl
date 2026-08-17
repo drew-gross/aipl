@@ -35,24 +35,26 @@ pub fn indent(self: str, target: u64) -> str {
     assert("a\n  b".indent(0) == "a\n  b");
 })
 --- performance ---
-allocations: 26
-deallocations: 26
+allocations: 32
+deallocations: 32
 reallocations: 0
-bytes allocated: 943
-instructions executed: 1137
-binary size: 4416
-  code: 1492
+bytes allocated: 1239
+instructions executed: 996
+binary size: 4328
+  code: 1392
   data: 474
-  metadata: 2450
-builtin calls: 382
-  aipl_arr_drop_str: 6
-  aipl_arr_inc: 6
+  metadata: 2462
+builtin calls: 402
+  aipl_arr_drop_str: 12
+  aipl_arr_retain_ptr: 13
   aipl_array_dec: 19
   aipl_array_new: 6
+  aipl_array_push_mut: 13
+  aipl_array_with_cap: 6
   aipl_assert: 6
   aipl_concat_lazy: 11
-  aipl_dec: 147
-  aipl_inc: 85
+  aipl_dec: 141
+  aipl_inc: 79
   aipl_str_eq: 6
   aipl_str_is_all_whitespace: 13
   aipl_str_join: 6
@@ -64,6 +66,5 @@ builtin calls: 382
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__map2$own0
 indent
 main

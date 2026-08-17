@@ -34,11 +34,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 135
-binary size: 2144
-  code: 844
+instructions executed: 149
+binary size: 2248
+  code: 920
   data: 32
-  metadata: 1268
+  metadata: 1296
 builtin calls: 35
   aipl_array_dec: 1
   aipl_concat_lazy: 2
@@ -51,3 +51,4 @@ builtin calls: 35
 --- monomorphizations ---
 describe
 main
+safe_div

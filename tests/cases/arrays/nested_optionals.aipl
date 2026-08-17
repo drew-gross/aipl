@@ -55,11 +55,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 130
-instructions executed: 755
-binary size: 6552
-  code: 2996
+instructions executed: 737
+binary size: 6560
+  code: 3064
   data: 499
-  metadata: 3057
+  metadata: 2997
 builtin calls: 77
   aipl_array_dec: 1
   aipl_dec: 16
@@ -74,4 +74,3 @@ builtin calls: 77
 --- monomorphizations ---
 main
 unwrap2
-wrap2

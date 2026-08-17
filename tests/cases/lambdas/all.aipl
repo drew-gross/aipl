@@ -24,11 +24,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 388
-instructions executed: 1085
-binary size: 5976
-  code: 2932
+instructions executed: 1081
+binary size: 6320
+  code: 3192
   data: 477
-  metadata: 2567
+  metadata: 2651
 builtin calls: 39
   aipl_arr_inc: 1
   aipl_array_dec: 11
@@ -49,9 +49,9 @@ __builtin_all$char$lam8
 __builtin_all$i64$lam1
 __builtin_all$i64$lam12
 __builtin_all$i64$lam14
+__builtin_all$i64$lam16
 __builtin_all$i64$lam3
 __builtin_all$i64$lam5
 __builtin_all$i64$lam6
 __filter10$own0
 main
-positive

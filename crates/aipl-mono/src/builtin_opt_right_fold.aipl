@@ -87,11 +87,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 536
-instructions executed: 2403
-binary size: 10112
-  code: 5900
+instructions executed: 2375
+binary size: 10024
+  code: 5844
   data: 854
-  metadata: 3358
+  metadata: 3326
 builtin calls: 110
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1
@@ -111,7 +111,6 @@ __filter5$own0
 __lambda_10
 __lambda_8
 __test$opt_right_fold
-add
 is_big
 main
 opt_right_fold$i64$i64$lam1

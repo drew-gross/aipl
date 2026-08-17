@@ -57,21 +57,21 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 156
-instructions executed: 301
-binary size: 3552
-  code: 1528
+instructions executed: 307
+binary size: 4664
+  code: 2192
   data: 165
-  metadata: 1859
-builtin calls: 88
+  metadata: 2307
+builtin calls: 86
   aipl_array_dec: 1
   aipl_concat_lazy: 3
-  aipl_dec: 41
-  aipl_inc: 27
+  aipl_dec: 40
+  aipl_inc: 26
   aipl_print: 3
   aipl_read_file_to_string: 3
   aipl_str_eq: 2
   aipl_str_len: 8
 --- monomorphizations ---
-describe
 first
 main
+nonempty

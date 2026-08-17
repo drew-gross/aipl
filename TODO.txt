@@ -22,11 +22,8 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   `return false`, into a value-producing form) vs Cranelift-IR-level (handles
   every body shape, bigger lift; check what cranelift's own inlining infra
   offers now).
-- Heuristics: always inline single-call-site instances; otherwise a body-size
-  threshold; never inline recursive fns; memoized instances with many call
+- never inline recursive fns; memoized instances with many call
   sites stay outlined to avoid bloat.
-- Synergy: inlining exposes retain/release pairs across the old call boundary —
-  refcount elision after inlining likely beats the call-overhead win itself.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 List files:
@@ -62,6 +59,9 @@ Spreading:
   optimize the bit packed and rope representations as well
 
 optimizations:
+  dead code elimination, plus a better uncalled function elimination pass
+  move single use inlining to after monomorphization
+  add a constant folding pass
   make functions that generate an array accept a write target under the hood, which is a pre-allocated span. For spreads this can generate directly into the destination buffer, probably has applications elsewhere also.
   make array reserve grow geometrically
   make arrays work sorta like strings i.e. have a rope representation

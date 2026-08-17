@@ -2651,19 +2651,19 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3119379
-binary size: 3017816
-  code: 1722012
+instructions executed: 3078769
+binary size: 3015784
+  code: 1723500
   data: 25740
-  metadata: 1270064
-builtin calls: 511488
+  metadata: 1266544
+builtin calls: 506799
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
   aipl_arr_inc: 57162
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 71396
+  aipl_array_dec: 70102
   aipl_array_new: 9922
   aipl_array_push: 1650
   aipl_array_push_mut: 1470
@@ -2672,12 +2672,12 @@ builtin calls: 511488
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 112614
-  aipl_inc: 93473
+  aipl_dec: 112003
+  aipl_inc: 91567
   aipl_rec_alloc: 5717
-  aipl_rec_dec_strong: 46944
+  aipl_rec_dec_strong: 46505
   aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 41227
+  aipl_rec_inc_strong: 40788
   aipl_rec_inc_weak: 3509
   aipl_str_cmp: 7
   aipl_str_contains: 2505
@@ -2696,82 +2696,72 @@ builtin calls: 511488
   aipl_test_end: 3
   aipl_test_summary: 1
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam36
-__builtin_count_while$char$s0$lam46
+__builtin_any$__m1__Doc$lam26
+__builtin_count$char$s0
+__builtin_count_while$char$s0$lam48
 __builtin_count_while$char$s0$lam64
-__builtin_count_while$char$s0$lam69
-__builtin_count_while$char$s0$lam71
-__builtin_count_while$char$s0$lam77
-__builtin_count_while$char$s0$lam78
+__builtin_count_while$char$s0$lam74
+__builtin_count_while$char$s0$lam79
+__builtin_count_while$char$s0$lam81
+__builtin_count_while$char$s0$lam84
 __builtin_int_parse
-__builtin_is_some_and$char$lam70
-__builtin_opt_left_fold$char$i64$s0$lam58
+__builtin_is_some_and$char$lam80
+__builtin_opt_left_fold$char$i64$s0$lam68
 __builtin_sort_by$ImportEntry$lam17
 __builtin_sort_by$ImportName$lam23
+__builtin_value_or_err$i64$str
 __enumerate20
 __enumerate21
-__enumerate35
+__enumerate32
 __enumerate8
-__enumerate94
-__lambda_26
-__lambda_27
-__lambda_28
-__lambda_29
-__lambda_30
-__lambda_31
-__lambda_32
-__lambda_33
-__lambda_57
+__enumerate95
+__lambda_37
+__lambda_38
+__lambda_39
+__lambda_40
+__lambda_41
+__lambda_42
+__lambda_43
+__lambda_44
+__lambda_67
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
 __m13__trim_suffix
 __m1__col_after
 __m1__fits
-__m1__fits_after
 __m1__fits_atom
 __m1__go
-__m1__group
 __m1__has_hard
-__m1__newline_str
-__m1__prepend
 __m1__print_doc
 __m2__reindent_block
 __m3__dedent
-__m4__lines
-__m7__is_operator_name
 __m8__char_lit_emit
 __m8__dedent_segments
 __m8__ident_cont
 __m8__int_lit
-__m8__kw
-__m8__op
 __m8__raw_tpl_kind
 __m8__tpl_kind
+__m9__apply_emit$__m8__AiplTok
 __m9__between_len
 __m9__delimited_len
 __m9__finalize_template$__m8__AiplTok
 __m9__float_len
-__m9__ilen
 __m9__interp_scan$__m8__AiplTok
 __m9__lex$__m8__AiplTok
 __m9__lex_step$__m8__AiplTok
 __m9__nested_len
-__m9__seg_needs_ofseg
-__m9__seg_only
+__m9__seg_emit$__m8__AiplTok
 __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
-__m9__unterminated_msg
-__map48$own0
-__map54$own0
+__map50$own0
 __test$binding_ann
 __test$new_walker
 __test$walker_of
 array_atom
 array_suffixes
 at
-at_end
 atom
 base_ty
 binding_ann
@@ -2800,7 +2790,6 @@ fn_item
 fn_return
 for_stmt
 format_program
-gap_has_blank
 hug_close
 hugs_sole_arg
 ident_list
@@ -2809,7 +2798,6 @@ import_item
 import_names
 index_or_from
 index_seg
-is_empty_doc
 is_line_break
 item
 lambda
@@ -2818,6 +2806,7 @@ lambda_params
 lead
 lead_loop
 let_stmt
+lex_for_fmt
 main
 match_arms
 match_expr
@@ -2831,18 +2820,14 @@ paren_atom
 paren_ty
 pattern
 peek
-peek_is
-peek_text
 peek_text_n
 postfix
 postfix_segs
 program
 program_items
-quoted
 range_has_semi
 range_tail
 rendered
-same_line
 sep_entry
 set_member
 set_or_dict_atom
@@ -2861,6 +2846,7 @@ struct_inits
 struct_item
 take_comment
 template_scan
+template_verbatim
 tok_text
 toks_of
 trailing_comment

@@ -32,11 +32,11 @@ allocations: 20
 deallocations: 20
 reallocations: 0
 bytes allocated: 944
-instructions executed: 856
-binary size: 5080
-  code: 2108
+instructions executed: 848
+binary size: 5816
+  code: 2544
   data: 569
-  metadata: 2403
+  metadata: 2703
 builtin calls: 82
   aipl_arr_elem_ptr: 10
   aipl_arr_reverse: 8

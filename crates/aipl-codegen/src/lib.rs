@@ -3435,6 +3435,22 @@ pub const DOGFOOD_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/do
 /// The checked-in artifact's filename, for the `dogfood_ir` test.
 pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
 
+/// Env var overriding [`aipl_mono::DEFAULT_INLINE_MAX_EXPRS`], the body-size
+/// threshold for small-function inlining. Set it to a number to try a different
+/// one — `AIPL_INLINE_MAX_EXPRS=4 cargo test --test cases -- cases_strings` —
+/// without rebuilding the compiler for each value. An unparseable value falls
+/// back to the default rather than failing a compile over a stray env var.
+pub const INLINE_MAX_EXPRS_ENV: &str = "AIPL_INLINE_MAX_EXPRS";
+
+/// The small-function inlining threshold: [`INLINE_MAX_EXPRS_ENV`] if it parses,
+/// else [`aipl_mono::DEFAULT_INLINE_MAX_EXPRS`].
+fn inline_max_exprs() -> usize {
+    std::env::var(INLINE_MAX_EXPRS_ENV)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(aipl_mono::DEFAULT_INLINE_MAX_EXPRS)
+}
+
 /// Env var naming an alternate dogfood-IR artifact to run the compiler against
 /// (see [`dogfood_artifact_text`]). Set it to a `.clif` path — typically
 /// `dogfood.clif.staged` — to validate *candidate* IR: every parse the compiler
@@ -4127,6 +4143,12 @@ fn compile_program<M: Module>(
     // before monomorphization; mono's reachability then drops the inlined-away
     // definitions.
     let inlined = aipl_mono::inline_single_use(program);
+
+    // Optimization: inline every function small enough to be worth duplicating,
+    // at all of its call sites. After `inline_single_use` (which is strictly
+    // cheaper — it moves a body rather than copying it) so a single-use function
+    // is never duplicated here first.
+    let inlined = aipl_mono::inline_small(&inlined, inline_max_exprs());
 
     // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
     // `check` so diagnostics always report against the unfolded source, and

@@ -34,17 +34,16 @@ fn joined(a: i64[]) -> i64[] { [..a, ..tail(), five(), 6] }.test({
 })
 --- monomorphizations ---
 main
-tail
 --- performance ---
 allocations: 27
 deallocations: 27
 reallocations: 4
 bytes allocated: 1552
-instructions executed: 3258
-binary size: 11264
-  code: 5844
+instructions executed: 3254
+binary size: 11232
+  code: 5836
   data: 613
-  metadata: 4807
+  metadata: 4783
 builtin calls: 218
   aipl_arr_extend: 11
   aipl_arr_inc: 64

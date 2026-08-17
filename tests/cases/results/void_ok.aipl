@@ -45,11 +45,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 261
-binary size: 3360
-  code: 1488
+instructions executed: 257
+binary size: 3520
+  code: 1588
   data: 131
-  metadata: 1741
+  metadata: 1801
 builtin calls: 30
   aipl_array_dec: 1
   aipl_concat_lazy: 1
@@ -60,6 +60,5 @@ builtin calls: 30
   aipl_write_bytes: 1
 --- monomorphizations ---
 check_positive
-describe
 main
 validate

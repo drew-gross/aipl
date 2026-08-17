@@ -41,21 +41,24 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 190
-instructions executed: 432
-binary size: 4032
-  code: 2012
+instructions executed: 479
+binary size: 4480
+  code: 2252
   data: 61
-  metadata: 1959
-builtin calls: 97
+  metadata: 2167
+builtin calls: 102
   aipl_array_dec: 1
   aipl_char_at: 4
   aipl_concat: 8
-  aipl_dec: 48
+  aipl_dec: 53
   aipl_i64_len: 4
   aipl_inc: 26
   aipl_print: 4
   aipl_write_i64: 2
 --- monomorphizations ---
+__builtin_value_or_err$char$i64
+__builtin_value_or_err$char$str
+__builtin_value_or_err$i64$str
 describe
 first_digit
 main

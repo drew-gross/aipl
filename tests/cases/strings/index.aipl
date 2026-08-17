@@ -14,21 +14,19 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 265
-binary size: 2352
-  code: 752
+instructions executed: 220
+binary size: 2240
+  code: 712
   data: 261
-  metadata: 1339
-builtin calls: 29
+  metadata: 1267
+builtin calls: 19
   aipl_array_dec: 1
   aipl_assert: 5
   aipl_char_at: 5
-  aipl_dec: 10
-  aipl_inc: 5
+  aipl_dec: 5
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
 __test$at
-at
 main
