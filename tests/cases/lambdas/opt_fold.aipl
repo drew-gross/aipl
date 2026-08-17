@@ -41,9 +41,9 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 384
-instructions executed: 2395
-binary size: 8408
-  code: 4428
+instructions executed: 2396
+binary size: 8392
+  code: 4412
   data: 792
   metadata: 3188
 builtin calls: 129
@@ -63,13 +63,13 @@ builtin calls: 129
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__builtin_opt_left_fold$char$i64$s0$lam12
+__builtin_opt_left_fold$char$i64$s0$lam11
 __builtin_opt_left_fold$i64$i64$lam1
-__builtin_opt_left_fold$i64$i64$lam10
 __builtin_opt_left_fold$i64$i64$lam3
 __builtin_opt_left_fold$i64$i64$lam7
+__builtin_opt_left_fold$i64$i64$lam9
 __builtin_opt_left_fold$str$str$s1$lam5
-__lambda_11
+__lambda_10
 __lambda_6
 __test$parses_a_digit_run
 digits_to_int

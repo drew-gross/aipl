@@ -58,10 +58,19 @@ Spreading:
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
   optimize the bit packed and rope representations as well
 
+type checking:
+  we've seen a few problems where inlining or constand folding causes behaviour to change because after inlining type information is lost. Lets fix this by:
+    a) do all type checking before any optimization
+    b) do inlining after monomorphization
+    c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
+
 optimizations:
   dead code elimination, plus a better uncalled function elimination pass
   move single use inlining to after monomorphization
-  add a constant folding pass
+  add a constant branch elimination pass
+  make constant folding a little smarter
+    fold mutable consts before they get mutated
+    fold constant function arguments
   make functions that generate an array accept a write target under the hood, which is a pre-allocated span. For spreads this can generate directly into the destination buffer, probably has applications elsewhere also.
   make array reserve grow geometrically
   make arrays work sorta like strings i.e. have a rope representation

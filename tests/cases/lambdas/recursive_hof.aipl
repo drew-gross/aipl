@@ -26,4 +26,4 @@ builtin calls: 5
   aipl_test_summary: 1
 --- monomorphizations ---
 main
-rec$lam2
+rec$lam1

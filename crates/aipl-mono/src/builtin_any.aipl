@@ -40,11 +40,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 323
-instructions executed: 1026
-binary size: 6856
-  code: 3440
+instructions executed: 1019
+binary size: 6800
+  code: 3380
   data: 589
-  metadata: 2827
+  metadata: 2831
 builtin calls: 50
   aipl_arr_inc: 1
   aipl_array_dec: 8
@@ -67,7 +67,7 @@ any$char$s0$lam9
 any$i64$lam1
 any$i64$lam12
 any$i64$lam15
-any$i64$lam18
+any$i64$lam17
 any$i64$lam3
 any$i64$lam5
 is_nine

@@ -22,7 +22,7 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 616
-instructions executed: 2071
+instructions executed: 2073
 binary size: 5904
   code: 3120
   data: 313
@@ -45,5 +45,5 @@ builtin calls: 91
   aipl_test_summary: 1
   aipl_write_i64: 3
 --- monomorphizations ---
-__map11$own0
+__map10$own0
 main

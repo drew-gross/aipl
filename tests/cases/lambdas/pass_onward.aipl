@@ -23,9 +23,9 @@ allocations: 6
 deallocations: 6
 reallocations: 5
 bytes allocated: 272
-instructions executed: 665
-binary size: 3144
-  code: 1484
+instructions executed: 666
+binary size: 3128
+  code: 1468
   data: 134
   metadata: 1526
 builtin calls: 31
@@ -40,5 +40,5 @@ builtin calls: 31
   aipl_test_summary: 1
 --- monomorphizations ---
 main
+map$lam4
 map$lam5
-map$lam7

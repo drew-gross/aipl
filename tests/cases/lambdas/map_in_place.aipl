@@ -37,9 +37,9 @@ allocations: 16
 deallocations: 16
 reallocations: 1
 bytes allocated: 817
-instructions executed: 2812
-binary size: 8272
-  code: 4600
+instructions executed: 2814
+binary size: 8248
+  code: 4576
   data: 468
   metadata: 3204
 builtin calls: 171
@@ -62,9 +62,9 @@ builtin calls: 171
 --- monomorphizations ---
 __map1$own0
 __map10$own0
-__map11$own0
-__map13
+__map12
 __map3$own0
 __map5$own0
 __map7$own0
+__map9$own0
 main

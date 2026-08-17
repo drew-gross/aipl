@@ -87,11 +87,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 536
-instructions executed: 2375
-binary size: 10024
-  code: 5844
+instructions executed: 2374
+binary size: 9976
+  code: 5800
   data: 854
-  metadata: 3326
+  metadata: 3322
 builtin calls: 110
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1
@@ -115,7 +115,7 @@ is_big
 main
 opt_right_fold$i64$i64$lam1
 opt_right_fold$i64$i64$lam11
-opt_right_fold$i64$i64$lam14
+opt_right_fold$i64$i64$lam13
 opt_right_fold$i64$i64$lam3
 opt_right_fold$i64$i64$lam4
 opt_right_fold$i64$i64$lam9

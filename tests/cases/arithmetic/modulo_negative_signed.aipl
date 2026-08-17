@@ -10,9 +10,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 33
-binary size: 1136
-  code: 208
+instructions executed: 21
+binary size: 1080
+  code: 152
   data: 84
   metadata: 844
 builtin calls: 6

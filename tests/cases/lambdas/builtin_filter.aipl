@@ -31,9 +31,9 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 3423
-binary size: 7680
-  code: 4288
+instructions executed: 3431
+binary size: 7648
+  code: 4256
   data: 468
   metadata: 2924
 builtin calls: 121
@@ -53,8 +53,8 @@ builtin calls: 121
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__filter9$own0
-__map13$own0
+__filter7$own0
+__map11$own0
 __test$is_even
 is_even
 main
