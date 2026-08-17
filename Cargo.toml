@@ -81,3 +81,32 @@ missing_transmute_annotations = "allow"
 large_enum_variant = "allow"
 filter_map_bool_then = "allow"
 needless_range_loop = "allow"
+
+# Dependencies are built optimized even in the dev profile; our own crates stay
+# unoptimized for fast rebuilds.
+#
+# Cranelift is the reason. Every `aipl` process re-links the dogfood artifact
+# (`Compilation::from_artifact`) before it can do anything, and a debug-built
+# Cranelift does that work several times slower than an optimized one. That cost
+# is paid by every invocation, and a suite run spawns hundreds of subprocesses.
+#
+# Measured on the same machine and artifact, debug deps -> opt-level = 2:
+#
+#     CLIF parse                 150ms -> 18ms
+#     Cranelift compile+finalize 530ms -> 62ms
+#     `aipl` startup            0.82s  -> 0.24s
+#
+# The price is one slow dependency build (~5m from cold). It does not recur on
+# an edit-rebuild cycle: nothing we edit invalidates these crates, so touching
+# our own code still rebuilds only our own crates (~35s, measured).
+#
+# The `test` profile inherits this override from `dev`, so `cargo test` /
+# `cargo nextest` get the faster startup too — verified by the fact that
+# `cargo test --no-run` after a `cargo build` recompiles only the
+# dev-dependency subgraph and *not* cranelift-codegen/jit/reader, i.e. it
+# reuses the optimized artifacts rather than building debug copies.
+#
+# If startup regresses, suspect the artifact growing rather than this setting —
+# link time scales with `dogfood.clif` size.
+[profile.dev.package."*"]
+opt-level = 2
