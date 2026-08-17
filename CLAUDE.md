@@ -170,8 +170,10 @@ attach `.test({ assert(...) })` blocks covering its real behavior (including the
 shapes the compiler actually calls it with). These tests run via `aipl check`,
 and the `compiler_aipl_files_are_tested_and_pass_check` test in `tests/ffi.rs`
 discovers every `.aipl` under `crates/`, requires each to carry a `.test` block,
-and runs `aipl check` on it — so an untested or failing compiler-FFI function
-fails the suite.
+and runs one `aipl check crates` over the whole directory — so an untested or
+failing compiler-FFI function fails the suite. Re-run that check by hand with
+`cargo run -q -- check crates`, or narrow it to one file with
+`cargo run -q -- check <file.aipl>`.
 
 ## No native fallbacks for dogfooded functions
 A dogfooded AIPL function is the **single source of truth** — never write a

@@ -1,7 +1,8 @@
 //! Integration tests for the `aipl check` command — the in-language test
 //! runner. These drive the real CLI binary as a subprocess (the cases harness
 //! only runs a program's `main`, so it can't exercise `check`), staging a
-//! temp `.aipl` file and asserting on `check`'s stdout and exit code.
+//! temp `.aipl` file — or a whole temp tree, for the batch mode a bare
+//! `aipl check` runs — and asserting on `check`'s stdout and exit code.
 
 use std::fs;
 use std::path::PathBuf;
@@ -26,6 +27,169 @@ fn check(name: &str, src: &str) -> (String, String, i32) {
         norm(&out.stderr),
         out.status.code().unwrap_or(-1),
     )
+}
+
+/// Stage a tree of `(relative path, source)` files under a uniquely-named temp
+/// directory and run `aipl check` in it with `args` (empty = the bare
+/// whole-codebase form), returning `(stdout, stderr, exit_code)`. Paths may name
+/// subdirectories (`"sub/b.aipl"`), which are created as needed.
+fn check_tree(name: &str, files: &[(&str, &str)], args: &[&str]) -> (String, String, i32) {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_tree")
+        .join(name);
+    let _ = fs::remove_dir_all(&dir);
+    for (rel, src) in files {
+        let path = dir.join(rel);
+        fs::create_dir_all(path.parent().expect("file has a parent")).expect("create temp dir");
+        fs::write(&path, src).expect("write temp source");
+    }
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("check")
+        .args(args)
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
+    (
+        norm(&out.stdout),
+        norm(&out.stderr),
+        out.status.code().unwrap_or(-1),
+    )
+}
+
+const PASSES: &str =
+    "import { == } from builtins;\nfn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
+const FAILS: &str =
+    "import { == } from builtins;\nfn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
+/// Declared `i64`, returns `str` — fails the checker, so it never runs.
+const BROKEN: &str = "pub fn c() -> i64 { \"oops\" }\n";
+
+#[test]
+fn bare_check_runs_every_file_under_the_working_directory() {
+    let (stdout, _stderr, code) = check_tree(
+        "whole_tree",
+        &[("a.aipl", PASSES), ("sub/b.aipl", PASSES)],
+        &[],
+    );
+    // Both files' tests ran, counted into one aggregate.
+    assert_eq!(stdout, "2 files, 2 tests: 2 passed, 0 failed\n");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn batch_failures_name_the_file_they_came_from() {
+    let (stdout, _stderr, code) = check_tree(
+        "attribute",
+        &[("ok.aipl", PASSES), ("sub/bad.aipl", FAILS)],
+        &[],
+    );
+    // With many files in play, a bare test name wouldn't locate the failure.
+    assert!(
+        stdout.contains("test ./sub/bad.aipl::b ... FAIL"),
+        "expected a file-qualified FAIL header, got:\n{stdout}"
+    );
+    assert!(stdout.contains("2 files, 2 tests: 1 passed, 1 failed"));
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_file_that_does_not_compile_is_reported_without_stopping_the_run() {
+    let (stdout, stderr, code) = check_tree(
+        "keep_going",
+        &[
+            ("a_broken.aipl", BROKEN),
+            ("b_ok.aipl", PASSES),
+            ("c_fails.aipl", FAILS),
+        ],
+        &[],
+    );
+    // The broken file sorts first, so the run would end there if it aborted.
+    assert!(
+        stderr.contains("declared return type is i64"),
+        "expected the compile error, got:\n{stderr}"
+    );
+    assert!(
+        stdout.contains("test ./c_fails.aipl::b ... FAIL"),
+        "the run should continue past the broken file, got:\n{stdout}"
+    );
+    // A file that never compiled contributes no test counts, so it is called out
+    // separately — otherwise "1 failed" would understate the damage.
+    assert!(
+        stdout.contains("3 files, 2 tests: 1 passed, 1 failed"),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("1 file failed to compile"),
+        "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn discovery_skips_hidden_directories_and_target() {
+    // Both would fail to parse if they were picked up.
+    let junk = "this is not valid aipl at all\n";
+    let (stdout, _stderr, code) = check_tree(
+        "exclusions",
+        &[
+            ("a.aipl", PASSES),
+            (".hidden/x.aipl", junk),
+            ("target/y.aipl", junk),
+        ],
+        &[],
+    );
+    assert_eq!(stdout, "1 file, 1 tests: 1 passed, 0 failed\n");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn a_directory_argument_checks_the_tree_under_it() {
+    let (stdout, _stderr, code) = check_tree(
+        "dir_arg",
+        &[("sub/a.aipl", PASSES), ("outside.aipl", FAILS)],
+        &["sub"],
+    );
+    // Only the named subtree runs — the failing file outside it is untouched.
+    assert_eq!(stdout, "1 file, 1 tests: 1 passed, 0 failed\n");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn several_explicit_paths_are_checked_as_one_batch() {
+    let (stdout, _stderr, code) = check_tree(
+        "multi_path",
+        &[
+            ("a.aipl", PASSES),
+            ("b.aipl", PASSES),
+            ("unused.aipl", FAILS),
+        ],
+        &["a.aipl", "b.aipl"],
+    );
+    assert_eq!(stdout, "2 files, 2 tests: 2 passed, 0 failed\n");
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn finding_no_files_is_a_failure_not_a_silent_pass() {
+    // A bare `aipl check` is meant to be a project's whole handoff gate, so
+    // "checked nothing, all good" would quietly disarm it.
+    let (_stdout, stderr, code) = check_tree("empty", &[], &[]);
+    assert!(
+        stderr.contains("no .aipl files found"),
+        "expected an empty-tree diagnostic, got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_missing_path_is_reported() {
+    let (_stdout, stderr, code) = check_tree("missing", &[("a.aipl", PASSES)], &["nope.aipl"]);
+    assert!(
+        stderr.contains("no such file or directory"),
+        "expected a missing-path diagnostic, got:\n{stderr}"
+    );
+    assert_eq!(code, 1);
 }
 
 #[test]

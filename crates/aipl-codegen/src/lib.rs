@@ -2343,8 +2343,14 @@ extern "C" fn aipl_count_insns(_n: i64) {}
 // State is process-global (the driver runs single-threaded in-process). Only
 // failures print: a failing test gets one `test <name> ... FAIL` header line
 // followed by an indented line per failed assertion; passing tests are silent.
+//
+// `check`'s batch mode runs one such driver per file in a single process, so the
+// counters here deliberately accumulate across drivers: [`set_test_file`] adds
+// the file to each FAIL header and [`set_quiet_summary`] suppresses the per-file
+// summary line, leaving one aggregate that [`test_totals`] reports at the end.
 
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering as TestOrd};
+use std::sync::Mutex;
 
 static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
 static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
@@ -2352,6 +2358,54 @@ static TEST_CUR_NAME: AtomicUsize = AtomicUsize::new(0);
 static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
 static TEST_PASSED: AtomicI64 = AtomicI64::new(0);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
+/// Set by `check`'s batch mode (see [`set_test_file`]); `None` in single-file
+/// mode, where the file is already obvious from the command line.
+static TEST_CUR_FILE: Mutex<Option<String>> = Mutex::new(None);
+/// Set by `check`'s batch mode (see [`set_quiet_summary`]).
+static TEST_QUIET_SUMMARY: AtomicBool = AtomicBool::new(false);
+
+/// Name the file whose tests are running now, so a failure in a many-file run
+/// says which file it came from (`test <file>::<name> ... FAIL`). Passing `None`
+/// restores the bare `test <name> ... FAIL` used when checking a single file.
+///
+/// The counters this module keeps are cumulative across every program run in the
+/// process, which is exactly what batch mode wants — one aggregate at the end.
+pub fn set_test_file(file: Option<&str>) {
+    let mut cur = TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner());
+    *cur = file.map(str::to_string);
+}
+
+/// Silence the per-program summary line that [`aipl_test_summary`] otherwise
+/// prints. Batch mode runs one program per file and prints its own aggregate,
+/// so the per-file lines would just be a running total repeated N times.
+pub fn set_quiet_summary(quiet: bool) {
+    TEST_QUIET_SUMMARY.store(quiet, TestOrd::Relaxed);
+}
+
+/// Cumulative `(total, passed, failed)` test counts across every program run in
+/// this process, for batch mode's aggregate report.
+pub fn test_totals() -> (i64, i64, i64) {
+    (
+        TEST_TOTAL.load(TestOrd::Relaxed),
+        TEST_PASSED.load(TestOrd::Relaxed),
+        TEST_FAILED.load(TestOrd::Relaxed),
+    )
+}
+
+/// Print the `test <name> ... FAIL` header once per failing test, qualified by
+/// the current file in batch mode. Shared by every failure path below so the
+/// header appears exactly once no matter which of them reports first.
+fn print_fail_header() {
+    if TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
+        return;
+    }
+    let mut nbuf = [0u8; 8];
+    let name = unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
+    match &*TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner()) {
+        Some(file) => println!("test {file}::{name} ... FAIL"),
+        None => println!("test {name} ... FAIL"),
+    }
+}
 
 /// Read a runtime `str` value (inline or heap) as a `&str` for the report.
 /// `buf` backs an inline string's materialized bytes and must outlive the result.
@@ -2371,12 +2425,7 @@ extern "C" fn aipl_test_begin(name: *const u8) {
 
 extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
     if cond == 0 {
-        if !TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
-            let mut nbuf = [0u8; 8];
-            let name =
-                unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
-            println!("test {name} ... FAIL");
-        }
+        print_fail_header();
         let mut lbuf = [0u8; 8];
         println!("  assert failed at {}", unsafe {
             test_cstr(loc, &mut lbuf)
@@ -2390,12 +2439,7 @@ extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
 // carries on; on `err` it can't produce a value, so codegen fails the test here
 // and returns early). Same failure bookkeeping as `aipl_assert`.
 extern "C" fn aipl_test_fail(msg: *const u8) {
-    if !TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
-        let mut nbuf = [0u8; 8];
-        let name =
-            unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
-        println!("test {name} ... FAIL");
-    }
+    print_fail_header();
     let mut mbuf = [0u8; 8];
     println!("  `?` propagated an error: {}", unsafe {
         test_cstr(msg, &mut mbuf)
@@ -2407,12 +2451,7 @@ extern "C" fn aipl_test_fail(msg: *const u8) {
 // [`aipl_test_fail`]. There is no payload to render — `none` carries nothing —
 // so the report just names what happened. Same failure bookkeeping.
 extern "C" fn aipl_test_fail_none() {
-    if !TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
-        let mut nbuf = [0u8; 8];
-        let name =
-            unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
-        println!("test {name} ... FAIL");
-    }
+    print_fail_header();
     println!("  `?` propagated a `none`");
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
@@ -2427,10 +2466,10 @@ extern "C" fn aipl_test_end() {
 }
 
 extern "C" fn aipl_test_summary() -> i64 {
-    let total = TEST_TOTAL.load(TestOrd::Relaxed);
-    let passed = TEST_PASSED.load(TestOrd::Relaxed);
-    let failed = TEST_FAILED.load(TestOrd::Relaxed);
-    println!("{total} tests: {passed} passed, {failed} failed");
+    let (total, passed, failed) = test_totals();
+    if !TEST_QUIET_SUMMARY.load(TestOrd::Relaxed) {
+        println!("{total} tests: {passed} passed, {failed} failed");
+    }
     i64::from(failed > 0)
 }
 

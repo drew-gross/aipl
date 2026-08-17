@@ -1122,25 +1122,25 @@ fn compiler_aipl_files_are_tested_and_pass_check() {
             "{} has no `.test` block — aipl functions used in the compiler must be tested",
             f.display()
         );
-        let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-            .arg("check")
-            .arg(f)
-            .output()
-            .expect("spawn aipl check");
-        // Show the command to re-run just this file's check (relative to the repo
-        // root, so it's copy-pasteable) rather than making the reader rediscover
-        // which file the whole-corpus test tripped on.
-        let rel = f.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(f);
-        assert!(
-            out.status.success(),
-            "`aipl check {}` failed — re-run just this check with:\n    \
-             cargo run -q -- check {}\n\n{}{}",
-            f.display(),
-            rel.display(),
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr),
-        );
     }
+    // One `aipl check` over the whole directory rather than one spawn per file:
+    // the dogfood engine links once for the batch instead of ~40 times, and
+    // `check` reports every failing file rather than stopping at the first.
+    // Batch failures name their file, so the report still locates the problem.
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("check")
+        .arg(&crates)
+        .output()
+        .expect("spawn aipl check");
+    assert!(
+        out.status.success(),
+        "`aipl check {}` failed — re-run it with:\n    \
+         cargo run -q -- check crates\n\nor check a single file with:\n    \
+         cargo run -q -- check crates/<crate>/src/<file>.aipl\n\n{}{}",
+        crates.display(),
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
 }
 
 #[test]

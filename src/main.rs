@@ -76,7 +76,12 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print each fn's `.doc(\"..\")` documentation
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
-  {prog} check <file.aipl>                  run every fn's `.test({{ .. }})` block
+  {prog} check [path...]                    run every fn's `.test({{ .. }})` block
+
+`check` with no path checks every `.aipl` file under the working directory (one
+process, so the engine links once); pass a file to check just that one, or a
+directory to check the tree under it. It reports every failure rather than
+stopping at the first, and exits 0 only if all of them compiled and passed.
 
 args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
 `build` requires `clang` on PATH (used as linker driver).
@@ -187,40 +192,140 @@ fn fmt_cmd(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `check <file>` — JIT-run every function's `.test({ .. })` block and report.
-/// Returns exit code 0 if all tests pass, 1 if any assertion fails (or on a
-/// load/compile error). The pass/fail report is printed by the test runtime.
-fn check_cmd(args: &[String]) -> ExitCode {
-    let (args, dbg) = take_debug_flag(args);
-    let file = match args.first() {
-        Some(f) => f,
-        None => {
-            eprintln!("missing source file");
-            return ExitCode::FAILURE;
-        }
-    };
-    let program = match loader::load_program(Path::new(file), dbg) {
-        Ok(p) => p,
+/// Collect every `*.aipl` file under `dir`, recursively, into `out`.
+///
+/// Skips hidden entries (`.git`, editor state) and `target/` build output —
+/// neither holds project sources, and descending into them is pure cost. A
+/// directory that can't be read is reported and skipped rather than aborting the
+/// walk, so one unreadable corner doesn't cost you the whole check.
+fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
         Err(e) => {
-            eprintln!("{}", render_err(file, e));
-            return ExitCode::FAILURE;
+            eprintln!("warning: cannot read {}: {e}", dir.display());
+            return;
         }
     };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') || name == "target" {
+            continue;
+        }
+        let path = entry.path();
+        if path.is_dir() {
+            collect_aipl(&path, out);
+        } else if path.extension() == Some(OsStr::new("aipl")) {
+            out.push(path);
+        }
+    }
+}
+
+/// Load, compile, and run one file's `__test_main` driver, returning its exit
+/// code (0 = every test passed). `Err` is a rendered load/compile failure.
+///
+/// The pass/fail tallies live in the test runtime and accumulate across calls,
+/// which is what lets a batch run report one aggregate at the end.
+fn check_file(file: &Path, dbg: DebugOptions) -> Result<i64, String> {
+    let name = file.display().to_string();
+    let program = loader::load_program(file, dbg).map_err(|e| render_err(&name, e))?;
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
-    // printing the report itself. (Runs on `main`'s large-stack worker thread,
+    // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
-    let outcome = (|| {
-        let comp = Compilation::new(&test_program, dbg).map_err(|e| render_err(file, e))?;
-        comp.run_0("__test_main").map_err(|e| e.to_string())
-    })();
-    match outcome {
-        Ok(0) => ExitCode::SUCCESS,
-        Ok(_) => ExitCode::FAILURE,
-        Err(msg) => {
-            eprintln!("{msg}");
-            ExitCode::FAILURE
+    let comp = Compilation::new(&test_program, dbg).map_err(|e| render_err(&name, e))?;
+    comp.run_0("__test_main").map_err(|e| e.to_string())
+}
+
+/// `check [path...]` — JIT-run every function's `.test({ .. })` block and report.
+///
+/// With no path, checks every `.aipl` file under the working directory: `aipl
+/// check` on its own is meant to be a project's whole handoff step. A path may
+/// be a file (check just that one, for targeted development) or a directory
+/// (check the tree under it), and several may be given.
+///
+/// Checking many files in one process is the point: each file still becomes its
+/// own program — a file's tests are its own, since the loader drops imported
+/// functions' `.test` bodies — but the ~0.2s dogfood-engine link is a lazy
+/// per-thread `thread_local!`, so a batch pays it once instead of once per file.
+///
+/// A file that fails to compile is reported and does *not* stop the run; you get
+/// every problem in the codebase from one invocation rather than the first one.
+/// Exit code 0 only if every file compiled and every test passed.
+fn check_cmd(args: &[String]) -> ExitCode {
+    let (args, dbg) = take_debug_flag(args);
+
+    // One explicit file keeps the single-file report: bare `test <name>` headers
+    // and the runtime's own summary line. Anything else — no argument, a
+    // directory, or several paths — is a batch, which prefixes failures with
+    // their file and prints one aggregate.
+    let single = args.len() == 1 && Path::new(&args[0]).is_file();
+
+    let mut files = Vec::new();
+    if args.is_empty() {
+        collect_aipl(Path::new("."), &mut files);
+    }
+    for arg in &args {
+        let path = Path::new(arg);
+        if path.is_dir() {
+            collect_aipl(path, &mut files);
+        } else if path.exists() {
+            files.push(path.to_path_buf());
+        } else {
+            eprintln!("no such file or directory: {arg}");
+            return ExitCode::FAILURE;
         }
+    }
+    files.sort();
+    files.dedup();
+    if files.is_empty() {
+        // Checking nothing and reporting success would quietly disarm a handoff
+        // that runs a bare `aipl check`, so an empty tree is a failure.
+        let where_ = if args.is_empty() {
+            ".".to_string()
+        } else {
+            args.join(", ")
+        };
+        eprintln!("no .aipl files found under {where_}");
+        return ExitCode::FAILURE;
+    }
+
+    if single {
+        return match check_file(&files[0], dbg) {
+            Ok(0) => ExitCode::SUCCESS,
+            Ok(_) => ExitCode::FAILURE,
+            Err(msg) => {
+                eprintln!("{msg}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
+    aipl::codegen::set_quiet_summary(true);
+    let mut broken = 0usize;
+    for file in &files {
+        aipl::codegen::set_test_file(Some(&file.display().to_string()));
+        if let Err(msg) = check_file(file, dbg) {
+            eprintln!("{msg}");
+            broken += 1;
+        }
+    }
+    aipl::codegen::set_test_file(None);
+
+    let (total, passed, failed) = aipl::codegen::test_totals();
+    let n = files.len();
+    let files_word = if n == 1 { "file" } else { "files" };
+    println!("{n} {files_word}, {total} tests: {passed} passed, {failed} failed");
+    if broken > 0 {
+        // Called out separately: a file that never compiled contributes no test
+        // counts, so "0 failed" above must not read as "everything is fine".
+        let word = if broken == 1 { "file" } else { "files" };
+        println!("{broken} {word} failed to compile");
+    }
+    if failed > 0 || broken > 0 {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
