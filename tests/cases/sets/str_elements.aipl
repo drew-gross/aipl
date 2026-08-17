@@ -28,15 +28,15 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 416
-instructions executed: 547
-binary size: 5240
-  code: 2240
+instructions executed: 546
+binary size: 5208
+  code: 2220
   data: 453
-  metadata: 2547
-builtin calls: 207
+  metadata: 2535
+builtin calls: 206
   aipl_arr_drop_str: 7
   aipl_arr_retain_ptr: 17
-  aipl_array_dec: 8
+  aipl_array_dec: 7
   aipl_array_push_mut: 17
   aipl_array_with_cap: 7
   aipl_assert: 8

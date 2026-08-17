@@ -21,13 +21,12 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 42
-instructions executed: 498
-binary size: 3904
-  code: 1932
+instructions executed: 497
+binary size: 3824
+  code: 1904
   data: 167
-  metadata: 1805
-builtin calls: 46
-  aipl_array_dec: 1
+  metadata: 1753
+builtin calls: 45
   aipl_dec: 12
   aipl_inc: 6
   aipl_print: 6

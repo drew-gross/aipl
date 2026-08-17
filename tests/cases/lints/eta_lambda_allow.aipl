@@ -12,15 +12,15 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 168
-instructions executed: 477
-binary size: 2848
-  code: 1128
+instructions executed: 476
+binary size: 2808
+  code: 1108
   data: 97
-  metadata: 1623
-builtin calls: 55
+  metadata: 1603
+builtin calls: 54
   aipl_arr_drop_str: 2
   aipl_arr_retain_ptr: 3
-  aipl_array_dec: 4
+  aipl_array_dec: 3
   aipl_array_new: 2
   aipl_array_push_mut: 3
   aipl_array_with_cap: 1

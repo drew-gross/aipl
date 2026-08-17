@@ -2651,19 +2651,19 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3078769
-binary size: 3015784
-  code: 1723500
+instructions executed: 3078768
+binary size: 3015736
+  code: 1723464
   data: 25740
-  metadata: 1266544
-builtin calls: 506799
+  metadata: 1266532
+builtin calls: 506798
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
   aipl_arr_inc: 57162
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 70102
+  aipl_array_dec: 70101
   aipl_array_new: 9922
   aipl_array_push: 1650
   aipl_array_push_mut: 1470

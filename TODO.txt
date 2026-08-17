@@ -26,9 +26,6 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
-oddities:
-  why does division.aipl call aipl_array_dec once?
-
 List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims

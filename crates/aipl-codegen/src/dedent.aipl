@@ -64,16 +64,16 @@ allocations: 35
 deallocations: 35
 reallocations: 0
 bytes allocated: 1641
-instructions executed: 7723
-binary size: 8128
-  code: 3296
+instructions executed: 7722
+binary size: 8096
+  code: 3276
   data: 989
-  metadata: 3843
-builtin calls: 917
+  metadata: 3831
+builtin calls: 916
   aipl_arr_drop_str: 20
   aipl_arr_inc: 10
   aipl_arr_retain_ptr: 38
-  aipl_array_dec: 61
+  aipl_array_dec: 60
   aipl_array_new: 10
   aipl_array_push_mut: 38
   aipl_array_with_cap: 20

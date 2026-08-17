@@ -6370,6 +6370,20 @@ fn cli_args_ty() -> Type {
     Type::Array(Box::new(Type::Primitive(Primitive::Str)))
 }
 
+/// The type of the *injected* CLI-arguments parameter — the one added to a
+/// `main` that declares none, purely to keep the entry ABI uniform.
+///
+/// Deliberately not [`cli_args_ty`]. A `main` that ignores the arguments is
+/// exactly the case where the runtime skips building the array and passes null
+/// (see [`MAIN_WANTS_ARGS_SYMBOL`]), so this parameter never receives an array:
+/// typing it `str[]` would make the callee drop an owned heap parameter it was
+/// never given, emitting one `aipl_array_dec(null)` per program run. An
+/// ignored pointer-sized word lowers to the same ABI and owns nothing, so no
+/// drop is registered and no call is emitted.
+fn injected_cli_args_ty() -> Type {
+    Type::Primitive(Primitive::I64)
+}
+
 /// `main` declared with no return type: it returns nothing, and its exit code
 /// is implicitly 0. As the program entry it still needs an `i64` result, so
 /// codegen gives it one (emitting 0) — but its body is type-checked as unit,
@@ -6472,9 +6486,11 @@ fn fn_value_signature<M: Module>(
 /// Prepare `program`'s `main` for the AOT entry, which always receives the CLI
 /// arguments as a `str[]` (the runtime passes one). If the user's `main`
 /// declares no parameters, inject a synthetic, ignored one so the entry ABI is
-/// uniform and the args array is still owned — and thus freed — by `main` via
-/// the normal heap-parameter drop. Errors if `main` declares anything other
-/// than a single `str[]` parameter.
+/// uniform — typed as an ignored word rather than `str[]`, because that is
+/// exactly the case the runtime passes null for (see [`injected_cli_args_ty`]).
+/// A declared `str[]` is owned by `main` and freed by the normal heap-parameter
+/// drop. Errors if `main` declares anything other than a single `str[]`
+/// parameter.
 ///
 /// Returns the rewritten program together with whether the user's `main`
 /// *actually declared* the args parameter (vs. having one injected) — the
@@ -6494,7 +6510,7 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
         match f.sig.params.as_slice() {
             [] => f.sig.params.push(Param {
                 name: "__cli_args".to_string(),
-                ty: cli_args_ty(),
+                ty: injected_cli_args_ty(),
                 mutable: false,
                 variadic: false,
                 default: None,

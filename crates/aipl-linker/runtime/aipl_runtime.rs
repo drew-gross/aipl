@@ -3620,9 +3620,10 @@ unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
 //
 // `__aipl_main_wants_args` is a 1-byte flag the object emits (see codegen's
 // `MAIN_WANTS_ARGS_SYMBOL`): nonzero iff the user's `main` actually declared the
-// args parameter. When it's zero we skip building the array and pass null — the
-// injected, ignored parameter then drops via `aipl_array_dec(null)` (a no-op),
-// so a `main` that ignores args costs no allocation.
+// args parameter. When it's zero we skip building the array and pass null. The
+// injected parameter is typed as an ignored word rather than `str[]` (codegen's
+// `injected_cli_args_ty`) precisely so it owns nothing: `main` neither allocates
+// nor drops anything for arguments it never asked for.
 extern "C" {
     fn __aipl_user_main(args: *const u8) -> i64;
     static __aipl_main_wants_args: u8;
