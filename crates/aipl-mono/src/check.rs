@@ -2729,8 +2729,11 @@ impl Cx<'_> {
         // binding, so it doesn't resolve through `env` — validate its signature.
         if let (Some(Type::Fn(ptys, ret)), ExprKind::Ident(g)) = (expected, &arg.kind) {
             if !env.contains_key(g) {
-                self.check_fn_ref(g, ptys, ret, effects, arg.span.clone())?;
-                return Ok(Type::Fn(ptys.clone(), ret.clone()));
+                // Report the function's *declared* return, not the expected one,
+                // for the same reason the lambda branch above does: it may pin a
+                // variable that appears only here (`F` in `map_err`'s `(E) -> F`).
+                let actual_ret = self.check_fn_ref(g, ptys, ret, effects, arg.span.clone())?;
+                return Ok(Type::Fn(ptys.clone(), Box::new(actual_ret)));
             }
         }
         let aty = self.check_expr(arg, env, effects)?;
@@ -2847,6 +2850,11 @@ impl Cx<'_> {
     /// `(expected_params) -> expected_ret` value is expected: arity and types
     /// must line up (parameters contravariantly, the result covariantly), and
     /// its effects must be covered by the supplying function's `effects`.
+    /// Validates `name` against the expected signature and yields its *declared*
+    /// return type — which may be more specific than `expected_ret` when that is
+    /// still an unresolved type variable, and is what lets a generic HOF pin a
+    /// variable appearing only in this parameter's result (the named-function
+    /// counterpart of the lambda case in [`Self::check_arg`]).
     fn check_fn_ref(
         &self,
         name: &str,
@@ -2854,7 +2862,7 @@ impl Cx<'_> {
         expected_ret: &Type,
         effects: &[String],
         span: Span,
-    ) -> Result<(), Error> {
+    ) -> Result<Type, Error> {
         let (params, ret, fx) = self.fn_ref_sig(name, expected_params).ok_or_else(|| {
             Error::at(
                 format!(
@@ -2911,7 +2919,7 @@ impl Cx<'_> {
                 ));
             }
         }
-        Ok(())
+        Ok(ret)
     }
 
     /// The return type of a non-generic call (the generic path substitutes its

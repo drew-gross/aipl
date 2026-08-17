@@ -19,6 +19,7 @@ import {
     join,
     len,
     map,
+    map_err,
     push,
     saturating_sub as -,
     sort_by,
@@ -52,7 +53,7 @@ import {
 } from "./doc.aipl";
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
-import { LexResult, Token } from "./lexer.aipl";
+import { Token } from "./lexer.aipl";
 
 // What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 // `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -432,7 +433,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 // trailing `--- section ---` blocks, stripping trailing whitespace, validating
 // with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let lexed = lex_for_fmt(src)?;
+    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?;
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
@@ -449,16 +450,6 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
             message: "formatter: comment was not carried into the output (formatter bug)",
             span: c,
         }),
-    }
-}
-
-// `lex_aipl`'s failure as a `FmtError`. The two carry the same shape, but `?`
-// propagates only the enclosing function's error type, so the sides are bridged
-// here rather than at every call.
-fn lex_for_fmt(src: str) -> LexResult<AiplTok>!FmtError {
-    match (lex_aipl(src)) {
-        ok(l) => ok(l),
-        err(e) => err(FmtError { message: e.message, span: e.span }),
     }
 }
 
@@ -2651,12 +2642,12 @@ allocations: 20670
 deallocations: 20670
 reallocations: 677
 bytes allocated: 1014340
-instructions executed: 3078768
-binary size: 3015736
-  code: 1723464
+instructions executed: 3078752
+binary size: 3054272
+  code: 1748044
   data: 25740
-  metadata: 1266532
-builtin calls: 506798
+  metadata: 1280488
+builtin calls: 506782
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
   aipl_arr_inc: 57162
@@ -2672,8 +2663,8 @@ builtin calls: 506798
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 112003
-  aipl_inc: 91567
+  aipl_dec: 111995
+  aipl_inc: 91559
   aipl_rec_alloc: 5717
   aipl_rec_dec_strong: 46505
   aipl_rec_dec_weak: 3509
@@ -2696,34 +2687,35 @@ builtin calls: 506798
   aipl_test_end: 3
   aipl_test_summary: 1
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam26
+__builtin_any$__m1__Doc$lam28
 __builtin_count$char$s0
-__builtin_count_while$char$s0$lam48
-__builtin_count_while$char$s0$lam64
-__builtin_count_while$char$s0$lam74
-__builtin_count_while$char$s0$lam79
-__builtin_count_while$char$s0$lam81
+__builtin_count_while$char$s0$lam52
+__builtin_count_while$char$s0$lam70
+__builtin_count_while$char$s0$lam75
+__builtin_count_while$char$s0$lam77
+__builtin_count_while$char$s0$lam83
 __builtin_count_while$char$s0$lam84
 __builtin_int_parse
-__builtin_is_some_and$char$lam80
-__builtin_opt_left_fold$char$i64$s0$lam68
-__builtin_sort_by$ImportEntry$lam17
-__builtin_sort_by$ImportName$lam23
+__builtin_is_some_and$char$lam76
+__builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam13
+__builtin_opt_left_fold$char$i64$s0$lam64
+__builtin_sort_by$ImportEntry$lam19
+__builtin_sort_by$ImportName$lam25
 __builtin_value_or_err$i64$str
-__enumerate20
-__enumerate21
-__enumerate32
+__enumerate100
+__enumerate22
+__enumerate23
+__enumerate42
 __enumerate8
-__enumerate95
+__lambda_33
+__lambda_34
+__lambda_35
+__lambda_36
 __lambda_37
 __lambda_38
 __lambda_39
 __lambda_40
-__lambda_41
-__lambda_42
-__lambda_43
-__lambda_44
-__lambda_67
+__lambda_63
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2755,7 +2747,7 @@ __m9__seg_emit$__m8__AiplTok
 __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
-__map50$own0
+__map54$own0
 __test$binding_ann
 __test$new_walker
 __test$walker_of
@@ -2806,7 +2798,6 @@ lambda_params
 lead
 lead_loop
 let_stmt
-lex_for_fmt
 main
 match_arms
 match_expr

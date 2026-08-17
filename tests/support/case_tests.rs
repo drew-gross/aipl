@@ -517,6 +517,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_is_err_and = "crates/aipl-mono/src/builtin_is_err_and",
     crates_aipl_mono_src_builtin_is_some_and = "crates/aipl-mono/src/builtin_is_some_and",
     crates_aipl_mono_src_builtin_left_fold = "crates/aipl-mono/src/builtin_left_fold",
+    crates_aipl_mono_src_builtin_map_err = "crates/aipl-mono/src/builtin_map_err",
     crates_aipl_mono_src_builtin_opt_left_fold = "crates/aipl-mono/src/builtin_opt_left_fold",
     crates_aipl_mono_src_builtin_opt_right_fold = "crates/aipl-mono/src/builtin_opt_right_fold",
     crates_aipl_mono_src_builtin_right_fold = "crates/aipl-mono/src/builtin_right_fold",

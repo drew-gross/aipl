@@ -1995,11 +1995,42 @@ impl Mono<'_> {
         ))
     }
 
+    /// The result type of a function-typed *argument* — a lambda literal or a
+    /// named function reference — called with `arg_tys`. Used to pin a type
+    /// variable that appears only as such a parameter's result (see
+    /// [`Self::specialize_generic_call`]).
+    ///
+    /// `None` when the argument is neither shape, or a lambda's arity doesn't
+    /// match: the variable is then left unpinned, so the caller's ordinary
+    /// "cannot infer" error reports it rather than this returning a wrong guess.
+    fn fn_arg_return(
+        &mut self,
+        arg: &Expr,
+        arg_tys: &[Type],
+        env: &Env,
+    ) -> Result<Option<Type>, Error> {
+        match &arg.kind {
+            ExprKind::Lambda(params, body) if params.len() == arg_tys.len() => {
+                let mut benv = env.clone();
+                for (p, t) in params.iter().zip(arg_tys) {
+                    benv.insert(p.name.clone(), t.clone());
+                }
+                let (_, ty) = self.infer(body, &benv)?;
+                Ok(Some(ty))
+            }
+            ExprKind::Ident(g) if self.is_fn_ref(g, env) => Ok(Some(self.ref_return(g, arg_tys))),
+            _ => Ok(None),
+        }
+    }
+
     /// Specialize a call to a *generic* higher-order function (e.g. a
     /// `count_while<T>(self: T[], pred: (T) -> bool)`): infer the type variables
     /// from the non-lambda arguments, substitute them into a concrete template
     /// (whose function-typed parameter is now concrete), then hand off to
     /// `specialize_call_with` to lift the lambda over that instance.
+    ///
+    /// A variable appearing *only* as a function-typed parameter's result is
+    /// pinned from the lambda's own body — see the second inference pass below.
     fn specialize_generic_call(
         &mut self,
         gname: &str,
@@ -2030,6 +2061,36 @@ impl Mono<'_> {
             self.bind_generic_or(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
             inferred[i] = Some(ra);
+        }
+        // A variable no ordinary argument pinned may still appear as a
+        // function-typed parameter's *result* — `map_err`'s `F` in `(E) -> F`.
+        // The lambda carries no type of its own, but the loop above has pinned
+        // everything its *parameters* mention, so typing its body against those
+        // parameter types (or reading a named function's return) yields the
+        // missing variable.
+        //
+        // Reached only for a variable that would otherwise be the hard error
+        // below, so a call that already specializes takes exactly the path it
+        // took before.
+        let unpinned: Vec<String> = sig
+            .type_vars
+            .iter()
+            .map(|tp| tp.name.clone())
+            .filter(|n| !map.contains_key(n))
+            .collect();
+        if !unpinned.is_empty() {
+            for (param, arg) in sig.params.iter().zip(args) {
+                let Type::Fn(ptys, ret) = &param.ty else {
+                    continue;
+                };
+                if !mentions_var(ret, &unpinned) {
+                    continue;
+                }
+                let ptys: Vec<Type> = ptys.iter().map(|t| subst_vars(t, &map)).collect();
+                if let Some(rty) = self.fn_arg_return(arg, &ptys, env)? {
+                    self.bind_generic_or(ret, &rty, &var_set, &mut map, gname, span.clone())?;
+                }
+            }
         }
         let mut type_args = Vec::with_capacity(sig.type_vars.len());
         for tp in &sig.type_vars {
@@ -4982,6 +5043,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_count_while", "builtin_count_while.aipl"),
     ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
     ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
+    ("__builtin_map_err", "builtin_map_err.aipl"),
     ("__builtin_int_parse", "builtin_int_parse.aipl"),
     ("__builtin_trim_while", "builtin_trim_while.aipl"),
     ("__builtin_value_or_err", "builtin_value_or_err.aipl"),

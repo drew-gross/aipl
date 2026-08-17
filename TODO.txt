@@ -52,6 +52,7 @@ mod_aipl:
 lint:
   x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
+  Lets go further actually and add a lint error against unused imports
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
@@ -162,7 +163,6 @@ find a way to make sure the code still works even after optimizations (and the t
 
 warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
-- unused imports
 
 make it possible to fill expected output for one test at a time (or a list of tests), add a CLAUDE.md reminder to use that any time you are running tests (the full suite should only be run during handoff)
 

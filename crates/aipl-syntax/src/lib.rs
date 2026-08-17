@@ -1682,6 +1682,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "is_some",
     "is_some_and",
     "is_err_and",
+    "map_err",
     "int_parse",
     "is_space",
     "is_digit",

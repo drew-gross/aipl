@@ -1,0 +1,120 @@
+import { is_err_and, value_or_err, !, == } from builtins;
+
+// The AIPL implementation of the `map_err` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_map_err` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_err(f)` specializes
+// through the ordinary generic / higher-order machinery — the in-file name
+// `map_err` is only for this file's own tests, which read exactly like user
+// code.
+//
+// `?` propagates only the enclosing function's error type, so a call whose error
+// side differs from its caller's cannot be propagated directly. Without this,
+// every such boundary needs a hand-written `match` that rebuilds one error as
+// the other — one per pair of error types. `map_err` converts the error side and
+// leaves the ok side alone, so the bridge becomes part of the call:
+// `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
+pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
+    match (self) {
+        ok(v) => ok(v),
+        err(e) => err(f(e)),
+    }
+}.doc("""
+    `self` with its error side rewritten by `f`: `err(e)` becomes `err(f(e))`,
+    and `ok(v)` passes through untouched (`f` is not called). Generic over the
+    ok type and both error types, and callable as a method: `r.map_err(f)`.
+
+    Bridges a call whose error type differs from the enclosing function's, so
+    `?` can propagate it.
+""").test({
+    // err: the payload is rewritten, ok type carried along unchanged.
+    assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.message == "unexpected"));
+    assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.span == 3));
+
+    // ok: the value survives the conversion, and `?` unwraps it here.
+    assert(lex("fine").map_err(to_fmt)? == "fine");
+
+    // A lambda rather than a named function, including a struct-to-struct
+    // rewrite — the shape the formatter's lex/format boundary uses.
+    assert(
+        lex("bad")
+            .map_err(|e| FmtError { message: e.message, span: e.span })
+            .is_err_and(|e| e.span == 3),
+    );
+
+    // The error type may change shape entirely: struct to str.
+    assert(lex("bad").map_err(|e| e.message).is_err_and(|e| e == "unexpected"));
+
+    // ... or to a scalar of a different type.
+    assert(lex("bad").map_err(|e| e.span).is_err_and(|c| c == 3));
+
+    // Free-call form.
+    assert(map_err(lex("bad"), to_fmt).is_err_and(|e| e.message == "unexpected"));
+
+    // A captured value.
+    let reason = "replaced";
+    assert(lex("bad").map_err(|e| reason).is_err_and(|e| e == "replaced"));
+
+    // The ok type is generic too: a non-`str` ok side maps its error the same
+    // way, and passes an ok value through.
+    assert(""[0].value_or_err(404).map_err(|c| c == 404).is_err_and(|b| b));
+    assert("a"[0].value_or_err(404).map_err(|c| c == 404)? == 'a');
+
+    // Chained: mapping twice composes, and the ok side still survives both.
+    assert(lex("bad").map_err(to_fmt).map_err(|e| e.span).is_err_and(|c| c == 3));
+    assert(lex("fine").map_err(to_fmt).map_err(|e| e.span)? == "fine");
+})
+
+struct LexError { message: str, span: i64 }
+
+struct FmtError { message: str, span: i64 }
+
+// A named conversion, so the tests cover passing a function rather than a
+// lambda — the two sides carry the same shape, which is exactly the case
+// `map_err` exists to bridge.
+fn to_fmt(self: LexError) -> FmtError { FmtError { message: self.message, span: self.span } }.test({
+    assert(to_fmt(LexError { message: "unexpected", span: 3 }).message == "unexpected");
+    assert(to_fmt(LexError { message: "unexpected", span: 3 }).span == 3);
+})
+
+// Fails with a struct error, so the tests above cover rewriting a multi-field
+// payload as well as reading one field out of it.
+fn lex(s: str) -> str!LexError {
+    if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
+}.test({
+    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
+    assert(!lex("fine").is_err_and(|e| e.span == 3));
+})
+--- monomorphizations ---
+__builtin_value_or_err$char$i64
+__test$map_err
+lex
+main
+map_err$char$i64$bool$lam25
+map_err$char$i64$bool$lam29
+map_err$str$FmtError$i64$lam31
+map_err$str$FmtError$i64$lam35
+map_err$str$LexError$FmtError$lam0
+map_err$str$LexError$FmtError$lam6
+map_err$str$LexError$i64$lam14
+map_err$str$LexError$str$lam10
+map_err$str$LexError$str$lam21
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1980
+binary size: 20120
+  code: 10196
+  data: 1719
+  metadata: 8205
+builtin calls: 287
+  aipl_assert: 16
+  aipl_char_at: 2
+  aipl_dec: 141
+  aipl_inc: 95
+  aipl_str_eq: 20
+  aipl_str_len: 6
+  aipl_test_begin: 3
+  aipl_test_end: 3
+  aipl_test_summary: 1
