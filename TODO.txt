@@ -78,7 +78,9 @@ optimizations:
   claudes suggestions:
     A. Dev loop — the biggest numbers in the repo
 
-    A2. Every aipl process pays ~0.75s re-linking the dogfood engine; aipl fmt pays 2.69s. Measured on an empty file. It's Compilation::from_artifact (:4897) parsing 973KB / 40k lines of CLIF text and JIT-compiling 138 functions (fmt: 3.1MB, 316 more). The cases harness spawns aipl check for 258 cases (tests/cases.rs:1470), so a suite run burns ~190s of CPU on nothing but re-linking. Options: cache the compiled code (ship a prebuilt object/dylib instead of re-JITting text), lazily compile only the entries a run actually calls, or split the artifact so an ordinary parse links less than all 138.
+    A2. Every aipl process pays ~0.75s re-linking the dogfood engine; aipl fmt pays 2.69s. Measured on an empty file. It's Compilation::from_artifact (:4897) parsing 973KB / 40k lines of CLIF text and JIT-compiling 138 functions (fmt: 3.1MB, 316 more). The cases harness spawns aipl check for 258 cases (tests/cases.rs:1470), so a suite run burns ~190s of CPU on nothing but re-linking. Options:
+      a) cache the compiled code (ship a prebuilt object/dylib instead of re-JITting text),
+      b) lazily compile only the entries a run actually calls
 
     A3. The 5.9 MB runtime archive is written to a temp file on every link. link_with (crates/aipl-linker/src/lib.rs:44) writes libaipl_runtime.a next to the object, spawns clang, deletes the directory. Cases link twice each (production + instrumented) → ~760 links ≈ 4.5 GB of temp I/O per suite run. Cache it at a content-keyed path and reuse. Related: which("clang") re-scans PATH per link, and the archive is built with opt-level=3 but no -C debuginfo=0/strip (crates/aipl-linker/build.rs:50) — stripping shrinks the temp write, the link time, and ~12MB from the aipl binary itself (both archives are include_bytes!d).
 
