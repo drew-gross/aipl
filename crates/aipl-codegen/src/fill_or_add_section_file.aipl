@@ -30,10 +30,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 90
-binary size: 9864
-  code: 5056
+binary size: 9256
+  code: 4712
   data: 358
-  metadata: 4450
+  metadata: 4186
 builtin calls: 19
   aipl_assert: 1
   aipl_dec: 8
@@ -45,7 +45,6 @@ builtin calls: 19
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__enumerate2
 __m1__contains_section
 __m1__fill_section
 __m3__parse_test_section_header

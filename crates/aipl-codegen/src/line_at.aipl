@@ -3,7 +3,7 @@
 // `source` and a byte `offset`, it returns the 0-based line index, the byte
 // offset of that line's first byte, and the byte offset of the line's end
 // (the '\n' terminator, or source.len() for the last line).
-import { enumerate, len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
+import { len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
 
 struct LineAt { line: u64, line_start: u64, line_end: u64 }
 
@@ -11,7 +11,7 @@ pub fn line_at(source: str, offset: u64) -> LineAt {
     mut line: u64 = 0;
     mut line_start: u64 = 0;
     mut found = false;
-    for (let (i, c) : source.enumerate()) {
+    for (let i, c : source) {
         if (c == '\n') {
             if (found) {
                 return LineAt { line, line_start, line_end: i };
@@ -37,23 +37,18 @@ pub fn line_at(source: str, offset: u64) -> LineAt {
     assert(line_at("a\nb\nc", 4) == LineAt { line: 2, line_start: 4, line_end: 5 });
 })
 --- performance ---
-allocations: 7
-deallocations: 7
-reallocations: 26
-bytes allocated: 224
-instructions executed: 4895
-binary size: 4552
-  code: 1804
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 2492
+binary size: 3768
+  code: 1408
   data: 729
-  metadata: 2019
-builtin calls: 142
-  aipl_arr_inc: 7
-  aipl_array_dec: 14
-  aipl_array_new: 7
-  aipl_array_push_mut: 46
+  metadata: 1631
+builtin calls: 54
   aipl_assert: 7
-  aipl_dec: 14
-  aipl_inc: 7
+  aipl_dec: 7
   aipl_str_data: 6
   aipl_str_iter_init: 7
   aipl_str_iter_next: 6
@@ -62,6 +57,5 @@ builtin calls: 142
   aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__enumerate0
 line_at
 main

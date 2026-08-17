@@ -148,11 +148,11 @@ allocations: 162
 deallocations: 162
 reallocations: 0
 bytes allocated: 6286
-instructions executed: 9936
+instructions executed: 10092
 binary size: 15856
-  code: 6428
+  code: 6432
   data: 2525
-  metadata: 6903
+  metadata: 6899
 builtin calls: 2888
   aipl_arr_drop_str: 12
   aipl_arr_inc: 70

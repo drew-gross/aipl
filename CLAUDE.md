@@ -276,6 +276,24 @@ compiler runs on.
 > a handoff is how you stage IR from unformatted source and then validate an
 > artifact that is stale before you finish.
 
+**The one case handoff genuinely cannot bootstrap: a change to the formatter's
+own grammar.** `crates/aipl-codegen/src/walker.aipl` compiles into `fmt.clif`,
+and handoff formats the corpus (step 1) *before* regenerating IR (step 5) — so
+the live formatter, which doesn't know the new syntax yet, is what formats
+sources written in it, and the run stops at `aipl fmt`. Adding a syntax form
+means teaching two parsers: the gazelle grammar in `aipl-parser` *and* the
+formatter's own token walker. To get out of the loop:
+
+1. `fill_staged_ir` — builds a `fmt.clif.staged` that understands the new form.
+2. Format the corpus with the staged formatter:
+   `AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test fmt -- --ignored format_corpus`
+3. `fill_staged_ir` **again** — step 2 shifted spans, so the IR from step 1 is
+   already stale.
+4. Validate + promote as below, then run handoff normally for the refills.
+
+This is not a licence to hand-drive generally: it announces itself as a hard
+`aipl fmt` failure, and it's the only ordering the script can't express.
+
 The steps, for those cases:
 
 1. **Generate staged IR** — compiles each `.aipl` source with the new frontend

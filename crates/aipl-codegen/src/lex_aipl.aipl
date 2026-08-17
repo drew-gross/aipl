@@ -639,11 +639,11 @@ allocations: 4723
 deallocations: 4723
 reallocations: 0
 bytes allocated: 275592
-instructions executed: 751322
+instructions executed: 751337
 binary size: 223720
-  code: 143296
+  code: 143300
   data: 7100
-  metadata: 73324
+  metadata: 73320
 builtin calls: 85773
   aipl_arr_drop_str: 9
   aipl_arr_inc: 7546

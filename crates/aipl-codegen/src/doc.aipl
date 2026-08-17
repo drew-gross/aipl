@@ -343,11 +343,11 @@ allocations: 293
 deallocations: 293
 reallocations: 0
 bytes allocated: 16748
-instructions executed: 25001
-binary size: 30648
-  code: 17220
+instructions executed: 25172
+binary size: 30656
+  code: 17224
   data: 842
-  metadata: 12586
+  metadata: 12590
 builtin calls: 5088
   aipl_arr_drop_str: 83
   aipl_arr_inc: 87

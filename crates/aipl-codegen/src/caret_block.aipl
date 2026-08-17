@@ -84,24 +84,20 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     );
 })
 --- performance ---
-allocations: 83
-deallocations: 83
-reallocations: 26
-bytes allocated: 3022
-instructions executed: 7092
-binary size: 10088
-  code: 3936
+allocations: 77
+deallocations: 77
+reallocations: 0
+bytes allocated: 2830
+instructions executed: 4387
+binary size: 9328
+  code: 3540
   data: 1720
-  metadata: 4432
-builtin calls: 1022
-  aipl_arr_inc: 6
-  aipl_array_dec: 12
-  aipl_array_new: 6
-  aipl_array_push_mut: 54
+  metadata: 4068
+builtin calls: 932
   aipl_assert: 6
   aipl_concat: 120
-  aipl_dec: 465
-  aipl_inc: 195
+  aipl_dec: 459
+  aipl_inc: 189
   aipl_str_data: 6
   aipl_str_eq: 6
   aipl_str_iter_init: 6
@@ -115,7 +111,6 @@ builtin calls: 1022
   aipl_u64_len: 48
   aipl_write_u64: 24
 --- monomorphizations ---
-__enumerate0
 __m1__line_at
 caret_block
 main

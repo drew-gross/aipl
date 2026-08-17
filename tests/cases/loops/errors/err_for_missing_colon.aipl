@@ -1,6 +1,6 @@
 fn f() -> i64 { for (let c "x") { 0 } 0 }
 --- errors ---
-error: unexpected "x"; expected ':'
+error: unexpected "x"; expected ',' or ':'
  --> ./tests/cases/loops/errors/err_for_missing_colon.aipl:1:28
   |
 1 | fn f() -> i64 { for (let c "x") { 0 } 0 }

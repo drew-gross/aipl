@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_increment as ++, +++, <=, == } from builtins;
+import { print, to_str, +++, <=, == } from builtins;
 
 // `return value;` early-exits the enclosing function. It's a statement (like
 // `set`), so it appears followed by `;`; control never falls through it, and the
@@ -15,13 +15,11 @@ fn clamp_low(x: i64) -> i64 {
 // released on the early-return path (no leak, no double free).
 fn first_index_reaching(xs: i64[], limit: i64) -> str {
     mut log = "";
-    mut i = 0;
-    for (let x : xs) {
+    for (let i, x : xs) {
         set log = log +++ "s";
         if (limit <= x) {
             return to_str(i);
         };
-        set i++;
     }
     log
 }
@@ -47,21 +45,23 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 264
-instructions executed: 402
-binary size: 2392
-  code: 1028
+instructions executed: 411
+binary size: 2736
+  code: 1216
   data: 1
-  metadata: 1363
+  metadata: 1519
 builtin calls: 60
   aipl_array_dec: 2
   aipl_array_new: 2
   aipl_concat_lazy: 4
   aipl_dec: 22
-  aipl_i64_len: 6
+  aipl_i64_len: 4
   aipl_inc: 9
   aipl_print: 4
   aipl_str_len: 8
-  aipl_write_i64: 3
+  aipl_u64_len: 2
+  aipl_write_i64: 2
+  aipl_write_u64: 1
 --- monomorphizations ---
 clamp_low
 first_index_reaching

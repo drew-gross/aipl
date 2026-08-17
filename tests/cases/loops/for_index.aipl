@@ -1,0 +1,54 @@
+import { print, to_str } from builtins;
+
+// `for (let i, x : xs)` binds the iteration index alongside the element. The
+// index counts iterations, so it is the element's position for an array and the
+// byte offset for a `str`.
+fn main() !prints {
+    let words = ["zero", "one", "two"];
+    for (let i, w : words) {
+        print(to_str(i));
+        print(w);
+    }
+    // Nested: the inner index restarts each time the inner loop is entered.
+    for (let outer, w : ["ab", "c"]) {
+        for (let inner, c : w) {
+            print(`{to_str(outer)}{to_str(inner)}{to_str(c)}`);
+        }
+    }
+}
+--- stdout ---
+0
+zero
+1
+one
+2
+two
+00'a'
+01'b'
+10'c'
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 104
+instructions executed: 952
+binary size: 3456
+  code: 1700
+  data: 1
+  metadata: 1755
+builtin calls: 193
+  aipl_arr_drop_str: 2
+  aipl_array_dec: 2
+  aipl_array_new: 2
+  aipl_concat: 18
+  aipl_dec: 85
+  aipl_inc: 38
+  aipl_print: 9
+  aipl_str_data: 2
+  aipl_str_iter_init: 2
+  aipl_str_iter_next: 2
+  aipl_str_len: 4
+  aipl_u64_len: 18
+  aipl_write_u64: 9
+--- monomorphizations ---
+main

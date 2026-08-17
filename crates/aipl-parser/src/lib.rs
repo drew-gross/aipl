@@ -281,6 +281,7 @@ gazelle! {
                 | assign_stmt => assign_stmt
                 | for_stmt => for_stmt
                 | for_tuple_stmt => for_tuple_stmt
+                | for_indexed_stmt => for_indexed_stmt
                 | while_stmt => while_stmt
                 | return_stmt => return_stmt;
         // `let x = e;` and the annotated `let x: T = e;`. After `LET IDENT` the
@@ -326,6 +327,11 @@ gazelle! {
         // prepended to the body; after `FOR LPAREN LET`, the next token (`LPAREN`
         // vs `IDENT`) unambiguously distinguishes this from `for_stmt`.
         for_tuple_stmt = FOR LPAREN LET LPAREN match_bindings RPAREN COLON expr RPAREN loop_body => for_tuple_stmt;
+        // `for (let i, x : expr) { ... }` — index-and-item for loop. Desugars to a
+        // plain for loop over a counter the block folder introduces; after
+        // `FOR LPAREN LET IDENT`, the next token (`COMMA` vs `COLON`)
+        // unambiguously distinguishes this from `for_stmt`.
+        for_indexed_stmt = FOR LPAREN LET IDENT COMMA IDENT COLON expr RPAREN loop_body => for_indexed_stmt;
         while_stmt = WHILE LPAREN expr RPAREN loop_body => while_stmt;
 
         // `start..end` — a range expression, constructing the builtin `Span`
@@ -621,6 +627,7 @@ impl aipl::Types for Build {
     type FieldPath = Vec<(String, Span)>;
     type ForStmt = StmtSpec;
     type ForTupleStmt = StmtSpec;
+    type ForIndexedStmt = StmtSpec;
     type WhileStmt = StmtSpec;
     type ReturnStmt = StmtSpec;
 }
@@ -665,6 +672,10 @@ pub enum StmtSpec {
     For {
         var: String,
         var_span: Span,
+        /// `Some(i)` for the `for (let i, x : xs)` form: the name bound to the
+        /// iteration index. The block folder desugars it (it needs the rest of
+        /// the block to scope the counter over).
+        index: Option<String>,
         iterable: Expr,
         body: Expr,
         span: Span,
@@ -1377,16 +1388,78 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
         StmtSpec::For {
             var,
             var_span,
+            index,
             iterable,
             body,
             span: for_span,
         } => {
+            // `for (let i, x : iter) { body }` desugars to a plain loop over a
+            // counter declared just outside it:
+            //   mut __idx$N: u64 = 0;
+            //   for (let x : iter) { let i = __idx$N; body; set __idx$N = __idx$N + 1; }
+            // The counter is introduced here rather than in the action because
+            // it has to scope over the rest of the block (`acc`) — and being
+            // re-declared per entry is what resets it when the loop is nested
+            // inside another. `i` is re-bound immutably each iteration, so the
+            // body can't move the counter out from under the loop.
+            //
+            // The increment calls the canonical builtin rather than emitting a
+            // `+`: operator *usage* is gated per file against its imports, and
+            // a loop should not oblige the file to import an operator it never
+            // wrote.
+            let Some(index) = index else {
+                let for_expr = Expr::new(
+                    ExprKind::For(var, Box::new(iterable), Box::new(body)),
+                    for_span,
+                );
+                let span = join_spans(&var_span, &acc.span);
+                return Expr::new(ExprKind::Seq(Box::new(for_expr), Box::new(acc)), span);
+            };
+            let tmp = format!("__idx${}", iterable.span.start);
+            let sp = var_span.clone();
+            let counter = || Expr::new(ExprKind::Ident(tmp.clone()), sp.clone());
+            let bump = Expr::new(
+                ExprKind::Assign(
+                    Box::new(counter()),
+                    Box::new(Expr::new(
+                        ExprKind::Call(
+                            "__builtin_wrapping_add".to_string(),
+                            vec![counter(), Expr::new(ExprKind::Num(1), sp.clone())],
+                            false,
+                        ),
+                        sp.clone(),
+                    )),
+                    Box::new(Expr::new(ExprKind::Unit, sp.clone())),
+                ),
+                sp.clone(),
+            );
+            let body_span = body.span.clone();
+            let counted = Expr::new(
+                ExprKind::Seq(Box::new(body), Box::new(bump)),
+                body_span.clone(),
+            );
+            let bound = Expr::new(
+                ExprKind::Let(index, None, Box::new(counter()), Box::new(counted)),
+                body_span,
+            );
             let for_expr = Expr::new(
-                ExprKind::For(var, Box::new(iterable), Box::new(body)),
+                ExprKind::For(var, Box::new(iterable), Box::new(bound)),
                 for_span,
             );
             let span = join_spans(&var_span, &acc.span);
-            Expr::new(ExprKind::Seq(Box::new(for_expr), Box::new(acc)), span)
+            let rest = Expr::new(
+                ExprKind::Seq(Box::new(for_expr), Box::new(acc)),
+                span.clone(),
+            );
+            Expr::new(
+                ExprKind::LetMut(
+                    tmp,
+                    Some(Type::Primitive(Primitive::U64)),
+                    Box::new(Expr::new(ExprKind::Num(0), sp)),
+                    Box::new(rest),
+                ),
+                span,
+            )
         }
         StmtSpec::While {
             cond,
@@ -1557,6 +1630,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
             aipl::KwStmt::AssignStmt(s) => s,
             aipl::KwStmt::ForStmt(s) => s,
             aipl::KwStmt::ForTupleStmt(s) => s,
+            aipl::KwStmt::ForIndexedStmt(s) => s,
             aipl::KwStmt::WhileStmt(s) => s,
             aipl::KwStmt::ReturnStmt(s) => s,
         })
@@ -1729,6 +1803,7 @@ impl gazelle::Action<aipl::ForStmt<Self>> for Build {
         Ok(StmtSpec::For {
             var,
             var_span,
+            index: None,
             iterable,
             body,
             span,
@@ -1767,8 +1842,25 @@ impl gazelle::Action<aipl::ForTupleStmt<Self>> for Build {
         Ok(StmtSpec::For {
             var: tmp,
             var_span: tmp_span,
+            index: None,
             iterable,
             body: new_body,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ForIndexedStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::ForIndexedStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::ForIndexedStmt::ForIndexedStmt((index, index_span), (var, _), iterable, body) =
+            node;
+        let span = join_spans(&index_span, &body.span);
+        Ok(StmtSpec::For {
+            var,
+            var_span: index_span,
+            index: Some(index),
+            iterable,
+            body,
             span,
         })
     }

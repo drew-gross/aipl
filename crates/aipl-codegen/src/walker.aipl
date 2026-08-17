@@ -14,7 +14,6 @@ import {
     Span,
     contains,
     count,
-    enumerate,
     is_err_and,
     join,
     len,
@@ -404,7 +403,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     };
     let edge = if (s.spaced) { Line } else { SoftLine };
     mut inner = [edge];
-    for (let (i, item) : items.enumerate()) {
+    for (let i, item : items) {
         if (0 < i) {
             set inner.push(Text(","));
             set inner.push(Line);
@@ -951,7 +950,7 @@ fn variant_payload(self: W) -> WDoc!FmtError {
 // by a `Line` and its `| ` separator, with its leading comments above it.
 fn variant_body(cases: VCase[]) -> Doc[] {
     mut out = [];
-    for (let (i, c) : cases.enumerate()) {
+    for (let i, c : cases) {
         if (0 < i) {
             set out.push(Line);
         };
@@ -980,14 +979,14 @@ fn program(self: W) -> WDoc!FmtError {
     let h = self.lead();
     let p = h.w.program_items([], [])?;
     mut out = [h.doc];
-    for (let (i, d) : sorted_imports(p.imports).enumerate()) {
+    for (let i, d : sorted_imports(p.imports)) {
         if (0 < i) {
             set out.push(HardLine);
         };
         set out.push(d);
     }
     let had_imports = 0 < p.imports.len();
-    for (let (i, d) : p.items.enumerate()) {
+    for (let i, d : p.items) {
         if (0 < i || had_imports) {
             set out.push(BlankLine);
         };
@@ -1435,7 +1434,15 @@ fn for_stmt(self: W) -> WDoc!FmtError {
         opened.tuple_binder()
     } else {
         let b = opened.bump();
-        WStr { w: b.w, text: b.text }
+        if (b.w.peek_text() == ",") {
+            // `for (let i, x : xs)` — the index-and-item form: two names, and the
+            // comma is part of the binder rather than a separator the header
+            // walker would otherwise stop on.
+            let item = b.w.bump().w.bump();
+            WStr { w: item.w, text: `{b.text}, {item.text}` }
+        } else {
+            WStr { w: b.w, text: b.text }
+        }
     };
     let it = binder.w.expect(":")?.w.expr()?;
     let body = it.w.expect(")")?.w.block()?;
@@ -2034,7 +2041,7 @@ fn lambda(self: W) -> WDoc!FmtError {
     };
     let body = if (params.w.peek_text() == "{") { params.w.block()? } else { params.w.expr()? };
     mut d = [Text("|")];
-    for (let (i, p) : params.docs.enumerate()) {
+    for (let i, p : params.docs) {
         if (0 < i) {
             set d.push(Text(", "));
         };
@@ -2636,84 +2643,79 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20670
-deallocations: 20670
-reallocations: 677
-bytes allocated: 1014340
-instructions executed: 3078752
-binary size: 3054272
-  code: 1748044
+allocations: 20581
+deallocations: 20581
+reallocations: 560
+bytes allocated: 1011492
+instructions executed: 3075003
+binary size: 3051912
+  code: 1746368
   data: 25740
-  metadata: 1280488
-builtin calls: 506782
+  metadata: 1279804
+builtin calls: 505157
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57162
+  aipl_arr_inc: 57078
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 70101
-  aipl_array_new: 9922
+  aipl_array_dec: 69854
+  aipl_array_new: 9833
   aipl_array_push: 1650
-  aipl_array_push_mut: 1470
+  aipl_array_push_mut: 1353
   aipl_array_with_cap: 175
   aipl_assert: 164
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 111995
-  aipl_inc: 91559
+  aipl_dec: 112003
+  aipl_inc: 91491
   aipl_rec_alloc: 5717
-  aipl_rec_dec_strong: 46505
+  aipl_rec_dec_strong: 45989
   aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 40788
+  aipl_rec_inc_strong: 40272
   aipl_rec_inc_weak: 3509
   aipl_str_cmp: 7
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 5952
+  aipl_str_eq: 5953
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31101
+  aipl_str_len: 31103
   aipl_str_repeat: 74
-  aipl_str_slice: 8445
+  aipl_str_slice: 8446
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
 --- monomorphizations ---
-__builtin_any$__m1__Doc$lam28
+__builtin_any$__m1__Doc$lam25
 __builtin_count$char$s0
-__builtin_count_while$char$s0$lam52
-__builtin_count_while$char$s0$lam70
-__builtin_count_while$char$s0$lam75
-__builtin_count_while$char$s0$lam77
-__builtin_count_while$char$s0$lam83
-__builtin_count_while$char$s0$lam84
+__builtin_count_while$char$s0$lam48
+__builtin_count_while$char$s0$lam66
+__builtin_count_while$char$s0$lam71
+__builtin_count_while$char$s0$lam73
+__builtin_count_while$char$s0$lam79
+__builtin_count_while$char$s0$lam80
 __builtin_int_parse
-__builtin_is_some_and$char$lam76
-__builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam13
-__builtin_opt_left_fold$char$i64$s0$lam64
-__builtin_sort_by$ImportEntry$lam19
-__builtin_sort_by$ImportName$lam25
+__builtin_is_some_and$char$lam72
+__builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12
+__builtin_opt_left_fold$char$i64$s0$lam60
+__builtin_sort_by$ImportEntry$lam18
+__builtin_sort_by$ImportName$lam22
 __builtin_value_or_err$i64$str
-__enumerate100
-__enumerate22
-__enumerate23
-__enumerate42
-__enumerate8
+__lambda_30
+__lambda_31
+__lambda_32
 __lambda_33
 __lambda_34
 __lambda_35
 __lambda_36
 __lambda_37
-__lambda_38
-__lambda_39
-__lambda_40
-__lambda_63
+__lambda_59
 __m10__unescape
 __m11__process_raw_string
 __m12__trim_prefix
@@ -2745,7 +2747,7 @@ __m9__seg_emit$__m8__AiplTok
 __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
-__map54$own0
+__map50$own0
 __test$binding_ann
 __test$new_walker
 __test$walker_of

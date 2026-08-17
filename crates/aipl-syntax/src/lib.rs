@@ -1522,8 +1522,6 @@ fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 // Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
 // str), enforced generically by the checker's bound-checking.
 fn __builtin_sort<T: ord>(self: T[]) -> T[] { [] }
-// Pair each element with its index: `[a, b, c].enumerate()` → `[(0,a),(1,b),(2,c)]`.
-fn __builtin_enumerate<T: any>(self: T[]) -> (u64, T)[] { [] }
 fn some<T: any>(x: T) -> T? { none }
 
 // Test-runner hooks. `__assert(cond, loc)` is what `assert(cond)` lowers to
@@ -1711,7 +1709,6 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "reverse",
     "sort",
     "sort_by",
-    "enumerate",
     "repeat",
 ];
 

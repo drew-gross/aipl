@@ -5,17 +5,7 @@
 // first offending run, or `none` when there is none; `aipl_str_iter_next` walks
 // `src` byte-by-byte, so the offsets are byte offsets, matching the parser's
 // error rendering.
-import {
-    Span,
-    is_some,
-    wrapping_add as +,
-    wrapping_increment as ++,
-    wrapping_sub as -,
-    &&,
-    ==,
-    >,
-    ||,
-} from builtins;
+import { Span, is_some, len, wrapping_add as +, wrapping_sub as -, &&, ==, >, || } from builtins;
 
 // The span of a line's trailing space/tab run, given the bytes around its ending,
 // or `none` if the line has none. `boundary` is the index of the line-ending '\n'
@@ -23,7 +13,7 @@ import {
 // `ws_start` is where the current run of spaces/tabs began; `line_start` is the
 // line's first byte. A single '\r' right before the boundary is part of a CRLF
 // (or lone-CR) ending, so the last content byte is the one before it.
-fn line_end_span(prev: char, prev2: char, boundary: i64, ws_start: i64, line_start: i64) -> Span? {
+fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -> Span? {
     let cr = prev == '\r';
     let end = if (cr) { boundary - 1 } else { boundary };
     let last = if (cr) { prev2 } else { prev };
@@ -35,12 +25,11 @@ fn line_end_span(prev: char, prev2: char, boundary: i64, ws_start: i64, line_sta
 }
 
 pub fn find_trailing_whitespace(src: str) -> Span? {
-    mut i = 0; // index of the current byte `c`
     mut prev = '\n'; // byte at i-1 (sentinel '\n': line start, not ws/CR)
     mut prev2 = '\n'; // byte at i-2
-    mut ws_start = 0; // start of the space/tab run ending at the last ws byte
-    mut line_start = 0; // index of the current line's first byte
-    for (let c : src) {
+    mut ws_start: u64 = 0; // start of the space/tab run ending at the last ws byte
+    mut line_start: u64 = 0; // index of the current line's first byte
+    for (let i, c : src) {
         if (c == '\n') {
             // End of a line: return its trailing run if any. Returning on the first
             // match is the parser's "report the first" rule.
@@ -59,10 +48,9 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
         };
         set prev2 = prev;
         set prev = c;
-        set i++;
     }
     // The final line may have no trailing '\n'; its boundary is the input length.
-    line_end_span(prev, prev2, i, ws_start, line_start)
+    line_end_span(prev, prev2, src.len(), ws_start, line_start)
 }.doc("The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.").test({
     // A clean line yields `none`.
     assert(find_trailing_whitespace("") == none);
@@ -92,18 +80,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 5021
-binary size: 5384
-  code: 2092
+instructions executed: 5130
+binary size: 5456
+  code: 2120
   data: 1110
-  metadata: 2182
-builtin calls: 84
+  metadata: 2226
+builtin calls: 93
   aipl_assert: 12
   aipl_dec: 12
   aipl_str_data: 11
   aipl_str_iter_init: 12
   aipl_str_iter_next: 11
-  aipl_str_len: 23
+  aipl_str_len: 32
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1

@@ -1,15 +1,13 @@
 // String-only; walks once, tracking the position just past the last
 // *non*-matching char.
-import { wrapping_increment as ++, !, == } from builtins;
+import { wrapping_add as +, !, == } from builtins;
 
 pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
-    mut k = 0;
-    mut i = 0;
-    for (let c : self) {
-        set i++;
+    mut k: u64 = 0; // end of the last non-matching run
+    for (let i, c : self) {
         if (!pred(c)) {
-            set k = i;
-        }; // k = end of the last non-matching run
+            set k = i + 1;
+        };
     }
     self[..k]
 }.doc("Drops the trailing run of characters satisfying `pred` (the trailing counterpart of `trim_while`).").test({
@@ -24,11 +22,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 963
-binary size: 3864
-  code: 1736
+instructions executed: 1017
+binary size: 3880
+  code: 1756
   data: 395
-  metadata: 1733
+  metadata: 1729
 builtin calls: 60
   aipl_assert: 5
   aipl_dec: 15

@@ -25,11 +25,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 360
-instructions executed: 1669
+instructions executed: 1750
 binary size: 4136
-  code: 1372
+  code: 1376
   data: 558
-  metadata: 2206
+  metadata: 2202
 builtin calls: 239
   aipl_arr_drop_str: 8
   aipl_array_dec: 16

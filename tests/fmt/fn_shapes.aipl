@@ -11,7 +11,8 @@ struct Point { x: i64, y: i64 = 0 }
 fn destructure(p: Point) -> i64 {
     let Point { x, y } = p;
     let (a, b) = (x, y);
-    for (let (i, c) : "ab".enumerate()) { set_use(i, c); }
+    for (let (i, c) : pairs()) { set_use(i, c); }
+    for (let i, c : "ab") { set_use(i, c); }
     a + b
 }
 fn set_use(i: i64, c: char) {}
@@ -38,7 +39,10 @@ struct Point { x: i64, y: i64 = 0 }
 fn destructure(p: Point) -> i64 {
     let Point { x, y } = p;
     let (a, b) = (x, y);
-    for (let (i, c) : "ab".enumerate()) {
+    for (let (i, c) : pairs()) {
+        set_use(i, c);
+    }
+    for (let i, c : "ab") {
         set_use(i, c);
     }
     a + b
