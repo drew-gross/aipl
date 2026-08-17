@@ -2728,32 +2728,30 @@ pub fn strip_test_sections(src: &str) -> &str {
 ///
 /// Shared so the corpus harness and `aipl check` stage companions the same way
 /// rather than each parsing the markers itself.
+///
+/// Dogfooded — the AIPL `companion_files`, run through the embedding FFI via the
+/// installed hook. There is **no native fallback**: it panics if the hook isn't
+/// installed, so install it (via `install_parser_hooks`) first, exactly like
+/// [`parse_test_section_header`].
 pub fn companion_files(src: &str) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = Vec::new();
-    let mut current: Option<String> = None;
-    let mut buf = String::new();
-    let mut flush = |current: &Option<String>, buf: &mut String| {
-        let body = std::mem::take(buf);
-        let Some(name) = current.as_deref().and_then(|n| n.strip_prefix("file:")) else {
-            return;
-        };
-        let rel = name.trim();
-        if rel.is_empty() || rel.contains('\\') {
-            return;
-        }
-        out.push((rel.to_string(), body.trim_end_matches('\n').to_string()));
-    };
-    for line in src.lines() {
-        if let Some(name) = parse_test_section_header(line) {
-            flush(&current, &mut buf);
-            current = Some(name);
-        } else {
-            buf.push_str(line);
-            buf.push('\n');
-        }
-    }
-    flush(&current, &mut buf);
-    out
+    let hook = COMPANION_FILES_HOOK
+        .get()
+        .expect("companion-files hook not installed (call install_parser_hooks)");
+    hook(src)
+}
+
+/// The companion-file extractor, installed by the compiler (via
+/// [`set_companion_files_hook`]) to dogfood the AIPL `companion_files`.
+/// Required — see [`companion_files`].
+#[allow(clippy::type_complexity)]
+static COMPANION_FILES_HOOK: std::sync::OnceLock<fn(&str) -> Vec<(String, String)>> =
+    std::sync::OnceLock::new();
+
+/// Install the companion-file extractor. The compiler points this at the
+/// dogfooded AIPL `companion_files`, run through the embedding FFI. First
+/// install wins (the hook is process-global).
+pub fn set_companion_files_hook(f: fn(&str) -> Vec<(String, String)>) {
+    let _ = COMPANION_FILES_HOOK.set(f);
 }
 
 /// Write `companions` (from [`companion_files`]) under `dir`, creating parent

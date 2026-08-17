@@ -26,15 +26,40 @@ rest of the suite.) Your own inner-loop runs can use either
 runner — the cadence commands below are written for `cargo test`, and
 `cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
-**Don't hand-drive the sequence and don't validate before it.** The script is
-the validation, so running a full `cargo test`, a `cargo fmt`, or a section
-refill *before* invoking it just pays for a full-corpus run twice. The only
-thing worth running ahead of the script is a **targeted** test for the code you
-just touched (`cargo test -- name_substring`, `cargo test --test <file>`, or a
-scoped `cargo test --test cases -- cases_generics`) as a fast inner-loop check —
-that's a dev-loop signal, not the handoff gate. When the change is ready, let
-the script do the full verification, formatting, and any regeneration in one
-pass.
+**Don't hand-drive the sequence, and don't validate before it.** The script is
+the validation *and* the order. Running its steps yourself — `cargo fmt`,
+`fill_case_tests`, `fill_expected`, the staged dogfood-IR flow — doesn't just
+pay for the corpus twice; it reorders steps that depend on each other, and the
+breakage that follows looks exactly like a real bug, so you then debug your own
+sequencing. The dependencies that bite:
+
+- **Formatting shifts spans, so it must come first.** `aipl fmt` moves spans,
+  string-literal data symbols are span-named, and the checked-in `.clif` plus
+  every `--- performance ---`/`--- errors ---`/`--- check ---` section is
+  span-sensitive. Stage IR (or refill sections) before formatting and what you
+  just validated is already stale.
+- **A new or deleted case file needs its `#[test]` list regenerated before a
+  suite run means anything** — until then the case simply never runs.
+- **Section refills come after the discovery run**, which is what establishes
+  which sections are genuinely stale rather than refreshing on suspicion.
+
+The script does all of this in dependency order and pays for the expensive
+regeneration only when a test run proved it necessary. The only thing worth
+running ahead of it is a **targeted** test for the code you just touched
+(`cargo test -- name_substring`, `cargo test --test <file>`, or a scoped
+`cargo test --test cases -- cases_generics`) as a fast inner-loop check — that's
+a dev-loop signal, not the handoff gate. When the change is ready, run the
+script and let it format, verify, and regenerate in one pass.
+
+**The one sanctioned deviation.** When a change invalidates *hundreds* of
+`--- performance ---` sections at once (anything that moves a counter in every
+binary — a codegen change, a new baseline runtime call), handoff's per-case
+`AIPL_CASE` refill loop spawns one `nextest` per mismatched case and becomes
+pathological. Run the whole-corpus refill once
+(`cargo test --test cases -- --ignored fill_expected`), then hand off. Two
+guards on that: it's only worth it at that scale, and a blanket refill can bury
+a real regression, so afterwards diff the corpus and confirm every changed line
+is a metric — no `--- stdout ---`/`--- errors ---` body should move.
 
 ## Shell
 Use the **Bash** tool for everything terminal-side: `cargo build`,
@@ -132,14 +157,21 @@ compare with `==` and return a distinguishing exit code. Reserve `tests/*.rs`
 for things the cases framework genuinely can't express (e.g. asserting on a
 parser/loader API directly).
 
-**Adding or deleting a case file needs one extra step.** Every case gets its own
-`#[test]`, and `#[test]` is compile-time while cases are discovered at run time
-— so the list lives in the checked-in `tests/support/case_tests.rs`. After adding
-or removing a `.aipl` case, regenerate it:
+**Adding or deleting a case file needs one extra step — which handoff takes for
+you.** Every case gets its own `#[test]`, and `#[test]` is compile-time while
+cases are discovered at run time — so the list lives in the checked-in
+`tests/support/case_tests.rs`. `scripts/handoff.sh` regenerates it when the tree
+and the list disagree, so adding or deleting a case is not a reason to run
+anything by hand. The command exists for when you want it directly:
 `cargo test --test cases -- --ignored fill_case_tests`. You don't have to
-remember: the `every_case_has_a_test` test fails when the list and the tree
-disagree (in either direction) and prints that command. It's a hard failure
+remember either way: the `every_case_has_a_test` test fails when the list and the
+tree disagree (in either direction) and prints that command. It's a hard failure
 precisely because a case with no `#[test]` would otherwise never run.
+
+Note that every `.aipl` under `crates/` is *also* discovered as a case, so
+adding a dogfooded source adds a case too — it needs the same `#[test]` entry
+and the same `--- performance ---`/`--- monomorphizations ---` sections any case
+does. Handoff fills both.
 
 ## Operators must be imported
 Operators are not ambient — a file that uses `==`, `<`, `&&`, unary `-`/`!`, etc.
@@ -233,7 +265,18 @@ Any change that affects how the compiler generates Cranelift IR (new builtins,
 type layout changes, codegen restructuring, etc.) also invalidates the checked-in
 `*.clif` artifacts. Use the staged IR workflow instead of calling `fill_dogfood_ir`
 directly — it lets you validate candidate IR before it becomes the live IR the
-compiler runs on:
+compiler runs on.
+
+> **`scripts/handoff.sh` already runs this entire flow**, in its correct place
+> in the sequence: *after* the corpus is formatted (spans settled) and *after* a
+> discovery run has shown the IR is actually stale. Adding a dogfooded `.aipl`
+> or changing codegen is **not** a reason to run the steps below by hand — just
+> hand off. Reach for them only to localize a failure handoff already reported,
+> or to inspect a candidate artifact on purpose. Driving them yourself ahead of
+> a handoff is how you stage IR from unformatted source and then validate an
+> artifact that is stale before you finish.
+
+The steps, for those cases:
 
 1. **Generate staged IR** — compiles each `.aipl` source with the new frontend
    and writes `*.clif.staged` files next to the live `*.clif` files:

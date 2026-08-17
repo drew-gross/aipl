@@ -1,0 +1,179 @@
+// The `--- file: <path> ---` companion sources a case declares: the sibling
+// files it needs on disk beside it (modules it imports, fixtures its tests
+// read). `aipl check` stages these into the scratch directory it runs a file's
+// tests in, and the corpus harness stages the same set for a case's build.
+import { contains, len, push, starts_with, trim, value_or, !, +++, ==, || } from builtins;
+import { lines } from "./lines.aipl";
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+struct Companion { path: str, contents: str }
+
+pub fn companion_files(src: str) -> Companion[] {
+    mut out: Companion[] = [];
+
+    // The section the lines being collected belong to. `""` is "no section yet"
+    // (the text before the first marker) and can't collide with a real name —
+    // `parse_test_section_header` never yields an empty one.
+    mut section = "";
+    mut buf = "";
+    for (let line : src.lines()) {
+        let header = parse_test_section_header(line).value_or("");
+        if (header == "") {
+            set buf = buf +++ line +++ "\n";
+        } else {
+            set out = out.with_companion(section, buf);
+            set section = header;
+            set buf = "";
+        };
+    }
+    out.with_companion(section, buf)
+}.doc("""
+    The `--- file: <path> ---` sections of `src`, in order, as `path`/`contents`
+    pairs. Everything outside such a section — the program text and the other
+    section kinds — is ignored, and a section body keeps its inner blank lines
+    but drops trailing newlines.
+
+    A `file:` section whose path is empty, or contains a backslash, is skipped:
+    both would resolve unpredictably when staged.
+""").test({
+    let one = """
+        fn main() {}
+        --- file: data.txt ---
+        hi
+    """;
+    assert(companion_files(one) == [Companion { path: "data.txt", contents: "hi" }]);
+
+    // Several companions, in declaration order, alongside other section kinds
+    // (which are ignored) — the shape a real case has.
+    let many = """
+        fn main() {}
+        --- stdout ---
+        ok
+        --- file: a.aipl ---
+        pub fn a() -> i64 { 1 }
+        --- file: sub/b.txt ---
+        two
+        lines
+        --- exit code ---
+        0
+    """;
+    assert(
+        companion_files(many) == [
+            Companion { path: "a.aipl", contents: "pub fn a() -> i64 { 1 }" },
+            Companion { path: "sub/b.txt", contents: "two\nlines" },
+        ],
+    );
+
+    // An empty body is a real companion — `--- file: empty.txt ---` stages an
+    // empty file, which is exactly what a case testing "read an empty file"
+    // needs.
+    let empty = """
+        fn main() {}
+        --- file: empty.txt ---
+    """;
+    assert(companion_files(empty) == [Companion { path: "empty.txt", contents: "" }]);
+
+    // Inner blank lines survive; only trailing newlines are dropped.
+    let inner = """
+        --- file: gap.txt ---
+        a
+
+        b
+    """;
+    assert(companion_files(inner) == [Companion { path: "gap.txt", contents: "a\n\nb" }]);
+
+    // No `file:` sections at all -> nothing, whether or not other sections exist.
+    assert(companion_files("fn main() {}\n") == []);
+    assert(companion_files("fn main() {}\n--- stdout ---\nok\n") == []);
+    assert(companion_files("") == []);
+
+    // Unusable paths are skipped rather than staged somewhere unexpected.
+    assert(companion_files("--- file: ---\nx\n") == []); // empty path
+    assert(companion_files("--- file:    ---\nx\n") == []); // whitespace-only path
+    assert(companion_files("--- file: a\\b.txt ---\nx\n") == []); // backslash
+
+    // The path is trimmed, and a `file:`-prefixed name that isn't the marker
+    // (e.g. `files:`) is not a companion.
+    assert(
+        companion_files("--- file:   spaced.txt   ---\nx\n") == [
+            Companion { path: "spaced.txt", contents: "x" },
+        ],
+    );
+    assert(companion_files("--- files: x.txt ---\nx\n") == []);
+})
+
+// `self` plus the companion `section`/`body` describe, when they describe one at
+// all. Kept separate so the flush at the end of `companion_files` is the same
+// code as the flush between sections.
+fn with_companion(self: Companion[], section: str, body: str) -> Companion[] {
+    if (!section.starts_with("file:")) {
+        return self;
+    };
+    let path = section["file:".len()..].trim();
+    if (path == "" || path.contains("\\")) {
+        return self;
+    };
+    mut out = self;
+    set out.push(Companion { path, contents: body.trim_end_while(|c| c == '\n') });
+    out
+}.test({
+    let empty: Companion[] = [];
+    // Not a `file:` section (including the "no section yet" empty name): unchanged.
+    assert(empty.with_companion("", "text") == []);
+    assert(empty.with_companion("stdout", "text") == []);
+    // A companion is appended after what is already there.
+    assert(
+        [Companion { path: "a", contents: "1" }].with_companion("file: b", "2") == [
+            Companion { path: "a", contents: "1" },
+            Companion { path: "b", contents: "2" },
+        ],
+    );
+    // Only trailing newlines are dropped from the body.
+    assert(
+        empty.with_companion("file: x", "a\n\nb\n\n") == [
+            Companion { path: "x", contents: "a\n\nb" },
+        ],
+    );
+})
+--- monomorphizations ---
+__m2__parse_test_section_header
+__test$companion_files
+__test$with_companion
+companion_files
+main
+with_companion
+--- performance ---
+allocations: 162
+deallocations: 162
+reallocations: 0
+bytes allocated: 6286
+instructions executed: 9936
+binary size: 15856
+  code: 6428
+  data: 2525
+  metadata: 6903
+builtin calls: 2888
+  aipl_arr_drop_str: 12
+  aipl_arr_inc: 70
+  aipl_array_dec: 148
+  aipl_array_new: 42
+  aipl_array_push: 8
+  aipl_assert: 16
+  aipl_concat_lazy: 56
+  aipl_dec: 1065
+  aipl_inc: 648
+  aipl_str_contains: 11
+  aipl_str_data: 18
+  aipl_str_ends_with: 13
+  aipl_str_eq: 83
+  aipl_str_iter_init: 8
+  aipl_str_iter_next: 18
+  aipl_str_len: 475
+  aipl_str_slice: 73
+  aipl_str_split: 12
+  aipl_str_starts_with: 70
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
+  aipl_trim: 37

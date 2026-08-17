@@ -33,6 +33,13 @@ List files:
 clock:
   make units types
 
+utilitiy functions:
+  split with predicate, use in companion_files.aipl
+
+syntax:
+  allow mut self so you don't have to do mut out = self; set out.push(...); out
+  for (let i, c : arr) syntax that gives you indexes (and keys for dicts, etc.)
+
 shim:
   better syntax
   shim the rest of the effects
@@ -51,6 +58,10 @@ mod_aipl:
 
 write_file.aipl
   Lets have write_file.aipl leverage the ?-in-tests feature
+
+companion_files.aipl:
+  should error for invalid (empty with w/backslash) rather than skip. This makes with_companion just a fancy push that can be deleted.
+  With split_with_predicate, implement this more functionally.
 
 lint:
   x[0..] etc should just be x
@@ -150,6 +161,7 @@ effects:
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
+  break down code section of binary by function
 
 recovering check:
   check should error on lint failures, but still run tests and report results

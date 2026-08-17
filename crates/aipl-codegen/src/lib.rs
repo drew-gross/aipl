@@ -3351,6 +3351,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./reindent_block.aipl",
     "./indent.aipl",
     "./find_files.aipl",
+    "./companion_files.aipl",
 ];
 
 /// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
@@ -3435,6 +3436,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "lex_aipl",
     "lex_aipl_stripped",
     "find_files",
+    "companion_files",
 ];
 
 /// The formatter engine's single FFI entry.
@@ -3600,6 +3602,32 @@ fn split_test_sections(src: &str) -> (String, String) {
         match comp.call_values("split_test_sections", &[FfiValue::Str(src.to_string())]) {
             Ok(FfiValue::Struct(fields)) => (field(&fields, "_0"), field(&fields, "_1")),
             other => panic!("dogfooded split_test_sections() call: {other:?}"),
+        }
+    })
+}
+
+/// The parser's companion-files hook (see [`install_parser_hooks`]): the
+/// `--- file: <path> ---` sections of a source, computed by the dogfooded AIPL
+/// `companion_files` (`str -> Companion[]`) and marshaled back as an
+/// [`FfiValue::Array`] of `Companion` structs. No native fallback; panics if it
+/// can't be built or called.
+fn companion_files(src: &str) -> Vec<(String, String)> {
+    fn field(fields: &[(String, FfiValue)], name: &str) -> String {
+        match fields.iter().find(|(n, _)| n == name) {
+            Some((_, FfiValue::Str(s))) => s.clone(),
+            other => panic!("dogfooded companion_files() Companion.{name}: {other:?}"),
+        }
+    }
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("companion_files", &[FfiValue::Str(src.to_string())]) {
+            Ok(FfiValue::Array(items)) => items
+                .iter()
+                .map(|item| match item {
+                    FfiValue::Struct(fields) => (field(fields, "path"), field(fields, "contents")),
+                    other => panic!("dogfooded companion_files() element: {other:?}"),
+                })
+                .collect(),
+            other => panic!("dogfooded companion_files() call: {other:?}"),
         }
     })
 }
@@ -4087,6 +4115,7 @@ pub fn install_parser_hooks() {
     aipl_parser::set_test_section_header_hook(parse_test_section_header);
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_split_test_sections_hook(split_test_sections);
+    aipl_parser::set_companion_files_hook(companion_files);
     aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_parser::set_lex_hook(lex_aipl);
