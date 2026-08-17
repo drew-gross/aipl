@@ -50,7 +50,6 @@ mod_aipl:
   probably need the formatter to be ast based first
 
 write_file.aipl
-  I keep seeing rt.txt in my worktree - I think the tests aren't running in a temp dir like they should.
   Lets have write_file.aipl leverage the ?-in-tests feature
 
 lint:

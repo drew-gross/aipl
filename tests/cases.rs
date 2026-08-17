@@ -779,13 +779,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         fs::create_dir_all(&dir).expect("mkdir case staging");
         let src = dir.join(format!("{stem}.aipl"));
         fs::write(&src, &spec.source).expect("write staged source");
-        for (rel_path, contents) in &spec.extra_files {
-            let p = dir.join(rel_path);
-            if let Some(parent) = p.parent() {
-                fs::create_dir_all(parent).expect("mkdir companion parent");
-            }
-            fs::write(&p, contents).expect("write companion source");
-        }
+        aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
         (src, dir)
     } else {
         if !spec.extra_files.is_empty() {
@@ -914,13 +908,7 @@ fn stage_case_for_build(
         fs::create_dir_all(&dir).expect("mkdir case staging");
         let src = dir.join(format!("{stem}.aipl"));
         fs::write(&src, &spec.source).expect("write staged source");
-        for (rel_path, contents) in &spec.extra_files {
-            let p = dir.join(rel_path);
-            if let Some(parent) = p.parent() {
-                fs::create_dir_all(parent).expect("mkdir companion parent");
-            }
-            fs::write(&p, contents).expect("write companion source");
-        }
+        aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
         (src, dir)
     } else {
         fs::create_dir_all(&dir).expect("mkdir case output");
@@ -1466,11 +1454,16 @@ fn run_success_case(
     // own clean state and avoids races between parallel shards. Run when the
     // source has `.test` blocks, or when a `--- check ---` section pins the
     // expected report (so the testless majority of cases pay nothing).
+    //
+    // Pointed at the *original* case file, not the staged copy: `check` stages
+    // each file's `--- file: ---` companions into a scratch directory and runs
+    // the tests there (so writes never land in the tree), and it can only read
+    // those sections from the unstripped source. That keeps one staging
+    // implementation — `check`'s — rather than a second one here.
     if spec.check.is_some() || spec.source.contains(".test") {
         let output = match Command::new(env!("CARGO_BIN_EXE_aipl"))
             .arg("check")
-            .arg(src_path)
-            .current_dir(case_dir)
+            .arg(orig_path)
             .output()
         {
             Ok(o) => o,
@@ -1832,13 +1825,7 @@ fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) -> Outcome {
     fs::create_dir_all(&dir).expect("mkdir fill staging");
     let tmp = dir.join(format!("{stem}.aipl"));
     fs::write(&tmp, &spec.source).expect("write tmp source");
-    for (rel_path, contents) in &spec.extra_files {
-        let p = dir.join(rel_path);
-        if let Some(parent) = p.parent() {
-            fs::create_dir_all(parent).expect("mkdir companion parent");
-        }
-        fs::write(&p, contents).expect("write companion source");
-    }
+    aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
     let result = loader::load_program(&tmp, debug_opts())
         .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
     let _ = fs::remove_dir_all(&dir);

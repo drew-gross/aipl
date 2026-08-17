@@ -85,15 +85,22 @@ fn object_ext() -> &'static str {
     "o"
 }
 
-fn staging_dir() -> Result<PathBuf, Error> {
-    // PID + monotonic counter keeps concurrent in-process callers (e.g.
-    // parallel cargo-test threads) from colliding on the same temp dir.
+/// A fresh empty directory under the system temp dir, named `aipl-<prefix>-…`.
+///
+/// PID + monotonic counter keeps concurrent callers — parallel cargo-test
+/// threads, or several `aipl` processes at once — from colliding on the same
+/// path. The caller owns cleanup.
+pub fn scratch_dir(prefix: &str) -> Result<PathBuf, Error> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
-    let dir = env::temp_dir().join(format!("aipl-build-{pid}-{n}"));
+    let dir = env::temp_dir().join(format!("aipl-{prefix}-{pid}-{n}"));
     fs::create_dir_all(&dir).map_err(|e| Error::msg(format!("create {}: {e}", dir.display())))?;
     Ok(dir)
+}
+
+fn staging_dir() -> Result<PathBuf, Error> {
+    scratch_dir("build")
 }
 
 fn which(prog: &str) -> Option<PathBuf> {

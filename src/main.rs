@@ -15,8 +15,16 @@ use aipl::{DebugOptions, Error};
 /// message is still right), falling back to the plain messages if the file
 /// can't be read.
 fn render_err(file: &str, errors: Vec<Error>) -> String {
-    match std::fs::read_to_string(file) {
-        Ok(src) => Error::render_all(&errors, aipl::strip_test_sections(&src), file),
+    render_err_at(Path::new(file), file, errors)
+}
+
+/// [`render_err`] for a file whose source lives at `path` but should be *named*
+/// `label` in the output — the two differ once `check` resolves inputs to
+/// absolute paths (so they load from any working directory) while still
+/// reporting them as the user wrote them.
+fn render_err_at(path: &Path, label: &str, errors: Vec<Error>) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(src) => Error::render_all(&errors, aipl::strip_test_sections(&src), label),
         Err(_) => Error::display_all(&errors),
     }
 }
@@ -224,17 +232,50 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Load, compile, and run one file's `__test_main` driver, returning its exit
 /// code (0 = every test passed). `Err` is a rendered load/compile failure.
 ///
+/// `file` is absolute (so loading and its relative imports resolve no matter
+/// what the working directory is); `label` is the path as the user typed or as
+/// discovery found it, and is what diagnostics show.
+///
 /// The pass/fail tallies live in the test runtime and accumulate across calls,
 /// which is what lets a batch run report one aggregate at the end.
-fn check_file(file: &Path, dbg: DebugOptions) -> Result<i64, String> {
-    let name = file.display().to_string();
-    let program = loader::load_program(file, dbg).map_err(|e| render_err(&name, e))?;
+fn check_file(file: &Path, label: &str, dbg: DebugOptions) -> Result<i64, String> {
+    let render = |e| render_err_at(file, label, e);
+    let program = loader::load_program(file, dbg).map_err(render)?;
     let test_program = aipl::codegen::build_test_program(&program);
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
     // which gives codegen room for deep `.test` driver/expression trees.)
-    let comp = Compilation::new(&test_program, dbg).map_err(|e| render_err(&name, e))?;
+    let comp = Compilation::new(&test_program, dbg).map_err(render)?;
     comp.run_0("__test_main").map_err(|e| e.to_string())
+}
+
+/// Run `f` with the process working directory pointed at a fresh scratch
+/// directory holding `file`'s `--- file: ---` companions.
+///
+/// A `.test` block is ordinary code: it can write files, and it resolves
+/// relative paths against the working directory. Run in place, `aipl check`
+/// would scatter whatever its tests write across the tree it was invoked from —
+/// so tests get a scratch directory instead, staged with the sibling files a
+/// case expects to find (fixtures its tests read, modules they import).
+///
+/// Loading still happens from the original absolute path, so imports resolve
+/// against the real tree rather than the scratch copy.
+fn in_staged_dir<T>(file: &Path, f: impl FnOnce() -> T) -> Result<T, String> {
+    let companions = std::fs::read_to_string(file)
+        .map(|src| aipl::companion_files(&src))
+        .unwrap_or_default();
+    let dir = binary::scratch_dir("check").map_err(|e| e.to_string())?;
+    aipl::stage_companions(&dir, &companions)
+        .map_err(|e| format!("stage companions in {}: {e}", dir.display()))?;
+    let prev = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
+    env::set_current_dir(&dir).map_err(|e| format!("enter {}: {e}", dir.display()))?;
+    let out = f();
+    // Restore first, so a failure to clean up can't leave the process parked in
+    // a directory it is about to delete.
+    let restored = env::set_current_dir(&prev);
+    let _ = std::fs::remove_dir_all(&dir);
+    restored.map_err(|e| format!("return to {}: {e}", prev.display()))?;
+    Ok(out)
 }
 
 /// `check [path...]` — JIT-run every function's `.test({ .. })` block and report.
@@ -290,8 +331,24 @@ fn check_cmd(args: &[String]) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    // Resolve up front: the tests below run from a scratch directory, so a
+    // relative path would no longer find its file. Diagnostics keep naming the
+    // path as discovery found it.
+    let resolved: Vec<(PathBuf, String)> = files
+        .iter()
+        .map(|f| {
+            let abs = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
+            (abs, f.display().to_string())
+        })
+        .collect();
+
     if single {
-        return match check_file(&files[0], dbg) {
+        let (path, label) = &resolved[0];
+        let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
+            Ok(o) => o,
+            Err(msg) => Err(msg),
+        };
+        return match outcome {
             Ok(0) => ExitCode::SUCCESS,
             Ok(_) => ExitCode::FAILURE,
             Err(msg) => {
@@ -303,9 +360,13 @@ fn check_cmd(args: &[String]) -> ExitCode {
 
     aipl::codegen::set_quiet_summary(true);
     let mut broken = 0usize;
-    for file in &files {
-        aipl::codegen::set_test_file(Some(&file.display().to_string()));
-        if let Err(msg) = check_file(file, dbg) {
+    for (path, label) in &resolved {
+        aipl::codegen::set_test_file(Some(label));
+        let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
+            Ok(o) => o,
+            Err(msg) => Err(msg),
+        };
+        if let Err(msg) = outcome {
             eprintln!("{msg}");
             broken += 1;
         }

@@ -2,6 +2,8 @@
 //! human-friendly rendering of syntax errors. Produces an [`aipl_syntax::ast`]
 //! tree from source text.
 
+use std::path::Path;
+
 use gazelle::Precedence;
 use gazelle_macros::gazelle;
 
@@ -2712,6 +2714,60 @@ pub fn strip_test_sections(src: &str) -> &str {
     // The returned prefix ends on a line boundary (after a `\n`, or all of `src`),
     // so its byte length is a valid char boundary to re-borrow from `src`.
     &src[..hook(src).len().min(src.len())]
+}
+
+/// The `--- file: <path> ---` companion sources declared in `src`, as
+/// `(relative path, contents)` — the sibling files a case needs on disk beside
+/// it (imported modules, fixtures its tests read). Empty when there are none.
+///
+/// Section bodies keep their inner blank lines but drop trailing newlines, which
+/// is how the test harness has always written them; a companion whose path is
+/// empty or contains a backslash is skipped, since both would resolve
+/// unpredictably (the harness asserts on those instead, where a fixture author
+/// is there to fix it).
+///
+/// Shared so the corpus harness and `aipl check` stage companions the same way
+/// rather than each parsing the markers itself.
+pub fn companion_files(src: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    let mut current: Option<String> = None;
+    let mut buf = String::new();
+    let mut flush = |current: &Option<String>, buf: &mut String| {
+        let body = std::mem::take(buf);
+        let Some(name) = current.as_deref().and_then(|n| n.strip_prefix("file:")) else {
+            return;
+        };
+        let rel = name.trim();
+        if rel.is_empty() || rel.contains('\\') {
+            return;
+        }
+        out.push((rel.to_string(), body.trim_end_matches('\n').to_string()));
+    };
+    for line in src.lines() {
+        if let Some(name) = parse_test_section_header(line) {
+            flush(&current, &mut buf);
+            current = Some(name);
+        } else {
+            buf.push_str(line);
+            buf.push('\n');
+        }
+    }
+    flush(&current, &mut buf);
+    out
+}
+
+/// Write `companions` (from [`companion_files`]) under `dir`, creating parent
+/// directories as needed. Used to give a case's tests the sibling files they
+/// expect to find in the working directory.
+pub fn stage_companions(dir: &Path, companions: &[(String, String)]) -> std::io::Result<()> {
+    for (rel, contents) in companions {
+        let path = dir.join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, contents)?;
+    }
+    Ok(())
 }
 
 /// The section stripper, installed by the compiler (via
