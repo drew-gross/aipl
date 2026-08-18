@@ -55,11 +55,6 @@ fn main() !prints {
     print(first_or([7, 8], 0).to_str());
     print(filtered([1, 5, 2], |n| n < 3).to_str());
 }
---- monomorphizations ---
-collect$i64
-collect$str
-filtered$i64$lam1
-main
 --- stdout ---
 [1, 2, 3]
 ["a", "b"]
@@ -73,6 +68,13 @@ bytes allocated: 677
 instructions executed: 1754
 binary size: 7520
   code: 4116
+    __to_str_0: 672
+    __to_str_1: 740
+    __to_str_2: 180
+    collect$i64: 564
+    collect$str: 612
+    filtered$i64$lam1: 592
+    main: 756
   data: 139
   metadata: 3265
 builtin calls: 189

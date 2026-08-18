@@ -51,8 +51,6 @@ fn main() !prints {
     print(to_str(add8(100, 50))); // -106
     print(to_str(uwide)); // 4000000000
 }
---- monomorphizations ---
-main
 --- stdout ---
 -106
 4000000000
@@ -64,6 +62,9 @@ bytes allocated: 27
 instructions executed: 78
 binary size: 1544
   code: 540
+    __to_str_0: 180
+    __to_str_1: 180
+    main: 180
   data: 1
   metadata: 1003
 builtin calls: 15

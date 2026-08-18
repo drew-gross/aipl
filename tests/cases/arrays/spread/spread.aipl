@@ -32,8 +32,6 @@ fn joined(a: i64[]) -> i64[] { [..a, ..tail(), five(), 6] }.test({
     assert([0, ..a, ..b, ..a] == [0, 1, 2, 3, 1, 2]);
     assert([..a, ..b, ..a] == [1, 2, 3, 1, 2]);
 })
---- monomorphizations ---
-main
 --- performance ---
 allocations: 27
 deallocations: 27
@@ -42,6 +40,8 @@ bytes allocated: 1552
 instructions executed: 3253
 binary size: 11200
   code: 5820
+    __eq_0: 296
+    main: 5524
   data: 613
   metadata: 4767
 builtin calls: 217

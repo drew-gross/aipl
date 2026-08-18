@@ -7,8 +7,6 @@ import { print, value_or } from builtins; #[allow]
 fn main() !prints { print("ok") }
 --- stdout ---
 ok
---- monomorphizations ---
-main
 --- performance ---
 allocations: 0
 deallocations: 0
@@ -17,6 +15,7 @@ bytes allocated: 0
 instructions executed: 5
 binary size: 560
   code: 44
+    main: 44
   data: 1
   metadata: 515
 builtin calls: 2

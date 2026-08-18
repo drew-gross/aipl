@@ -6730,22 +6730,32 @@ impl ObjectCompilation {
         &self.ir
     }
 
-    /// The names of the function instances monomorphization emitted into this
-    /// object — exactly what codegen defined. Each generic specialization and
-    /// owned/borrow/`str`-kept form is a distinct mangled instance (see the
-    /// monomorphizer's `enqueue_full`); non-generic functions appear under their
-    /// own name. Sorted, and excludes builtin imports (runtime externs, linked
-    /// in separately, not emitted here). Used by the test harness's
-    /// `--- monomorphizations ---` section.
-    pub fn monomorphized_fns(&self) -> Vec<String> {
-        let mut names: Vec<String> = self
-            .funcs
+    /// Maps each defined function's *object symbol* to the AIPL-level name it
+    /// was compiled from, for the per-function `code:` breakdown in the test
+    /// harness's `--- performance ---` section (the object knows only symbols;
+    /// this is what turns them back into names a reader recognizes).
+    ///
+    /// The two differ wherever codegen renames on the way out — notably `main`,
+    /// which is emitted as [`BINARY_USER_MAIN`] so the linked runtime can own
+    /// the real `main`. Covers only functions defined here: each generic
+    /// specialization and owned/borrow/`str`-kept form is its own mangled
+    /// instance (see the monomorphizer's `enqueue_full`), while builtin imports
+    /// are runtime externs linked in separately and carry no code in this
+    /// object. Codegen's *synthesized* helpers (`__to_str_<n>`, …) are absent
+    /// too — they are declared straight on the module rather than through
+    /// `funcs`, so the breakdown shows them under their symbol name.
+    pub fn code_symbol_names(&self) -> HashMap<String, String> {
+        let decls = self.module.declarations();
+        self.funcs
             .iter()
-            .filter(|(_, info)| matches!(info.link, FuncLink::User(_)))
-            .map(|(name, _)| name.clone())
-            .collect();
-        names.sort();
-        names
+            .filter_map(|(name, info)| match info.link {
+                FuncLink::User(id) => Some((
+                    decls.get_function_decl(id).linkage_name(id).into_owned(),
+                    name.clone(),
+                )),
+                FuncLink::Builtin(_) => None,
+            })
+            .collect()
     }
 
     /// Consume self and return the serialized object-file bytes.

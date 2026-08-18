@@ -48,6 +48,27 @@ bytes allocated: 1008
 instructions executed: 1458
 binary size: 12328
   code: 6756
+    __dict_drop_0: 116
+    __dict_drop_3: 140
+    __dict_drop_4: 128
+    __dict_drop_5: 128
+    __dict_retain_0: 116
+    __dict_retain_3: 140
+    __dict_retain_4: 128
+    __dict_retain_5: 128
+    __eq_1: 248
+    __eq_10: 104
+    __eq_11: 296
+    __eq_12: 100
+    __eq_2: 92
+    __eq_6: 256
+    __eq_7: 92
+    __eq_8: 248
+    __eq_9: 100
+    __test$array_values: 1276
+    __test$optional_values: 604
+    main: 2084
+    optional_values: 232
   data: 857
   metadata: 4715
 builtin calls: 177
@@ -67,8 +88,3 @@ builtin calls: 177
   aipl_test_begin: 5
   aipl_test_end: 5
   aipl_test_summary: 1
---- monomorphizations ---
-__test$array_values
-__test$optional_values
-main
-optional_values

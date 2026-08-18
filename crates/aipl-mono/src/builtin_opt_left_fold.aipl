@@ -94,6 +94,25 @@ bytes allocated: 575
 instructions executed: 2598
 binary size: 11160
   code: 6260
+    __eq_0: 100
+    __eq_1: 148
+    __filter5$own0: 284
+    __lambda_10: 52
+    __lambda_12: 136
+    __lambda_14: 136
+    __lambda_8: 88
+    __test$opt_left_fold: 1372
+    is_big: 16
+    main: 256
+    opt_left_fold$char$i64$lam13: 376
+    opt_left_fold$char$i64$lam15: 376
+    opt_left_fold$i64$i64$lam1: 360
+    opt_left_fold$i64$i64$lam11: 352
+    opt_left_fold$i64$i64$lam17: 364
+    opt_left_fold$i64$i64$lam3: 360
+    opt_left_fold$i64$i64$lam4: 360
+    opt_left_fold$i64$i64$lam9: 352
+    opt_left_fold$str$str$s1$lam7: 772
   data: 1061
   metadata: 3839
 builtin calls: 119
@@ -114,21 +133,3 @@ builtin calls: 119
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-__filter5$own0
-__lambda_10
-__lambda_12
-__lambda_14
-__lambda_8
-__test$opt_left_fold
-is_big
-main
-opt_left_fold$char$i64$lam13
-opt_left_fold$char$i64$lam15
-opt_left_fold$i64$i64$lam1
-opt_left_fold$i64$i64$lam11
-opt_left_fold$i64$i64$lam17
-opt_left_fold$i64$i64$lam3
-opt_left_fold$i64$i64$lam4
-opt_left_fold$i64$i64$lam9
-opt_left_fold$str$str$s1$lam7

@@ -1,7 +1,6 @@
 1. No </<= on char — so no '0' <= c range checks; classifiers use string-membership ("0123456789".contains_char(c))
 instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64,
 while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
-2. Char literals aren't valid match arms (str/int/array literals are).
 
 Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 Make the language features powerful enough that we don't need builtin_return
@@ -48,9 +47,11 @@ utilitiy functions:
 
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
-  for (let i, c : arr) syntax that gives you indexes (and keys for dicts, etc.)
+  for (let i, c : dct) syntax for dicts
   match should allow statements
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
+  match arm grouping (i.e. ArmA | ArmB => { same_statement })
+  match arms can be char literals
 
 shim:
   better syntax
@@ -166,15 +167,12 @@ optimizations:
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
     - The --- performance --- corpus totals 178,604 instructions and 1,400 allocations across 369 cases; 178 of them allocate nothing at all. The heavy tail (strings/int_parse at 6,779 instructions) is where C1/C2 would show up first, so those cases double as the benchmark for any of this.
 
-    If you only pick three: A1 (kills a 730s rebuild from the inner loop), A2+A3 (kills ~190s of engine re-linking and 4.5GB of temp I/O per suite run), and C1 (88% of generated calls). C2 and E1 are the two that would most speed up the compiler compiling itself. D1 is the biggest win for programs users actually write.
-
 effects:
   all effects should be shimmable actually
 
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
-  break down code section of binary by function
 
 recovering check:
   check should error on lint failures, but still run tests and report results
@@ -213,8 +211,6 @@ Unicode support
 
 int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
 
-make for (key, val) work for dicts, and also arrays (key=index)
-
 line numbers on test assertion failures, err/none propagations, etc.
 get claude to reorganize my todos
 
@@ -233,7 +229,6 @@ handoff:
 build performance:
   look for any ways to improve full-rebuild performance, esp. to avoid a full rebuild after regenerating IR
 
-- Match patterns don't support | grouping, so every Doc arm is spelled out (matching doc.aipl's existing style).
 - \{ is a template-literal escape only; inside a plain string it's an error.
 
 optimize enumerate/reverse/right_fold with streams

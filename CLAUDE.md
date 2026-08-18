@@ -170,8 +170,7 @@ precisely because a case with no `#[test]` would otherwise never run.
 
 Note that every `.aipl` under `crates/` is *also* discovered as a case, so
 adding a dogfooded source adds a case too — it needs the same `#[test]` entry
-and the same `--- performance ---`/`--- monomorphizations ---` sections any case
-does. Handoff fills both.
+and the same `--- performance ---` section any case does. Handoff fills both.
 
 ## Operators must be imported
 Operators are not ambient — a file that uses `==`, `<`, `&&`, unary `-`/`!`, etc.

@@ -346,6 +346,22 @@ bytes allocated: 16748
 instructions executed: 25172
 binary size: 30656
   code: 17224
+    __arr_drop_1: 116
+    __arr_retain_1: 116
+    __builtin_any$Doc$lam3: 296
+    __builtin_count_while$char$s0$lam15: 288
+    __builtin_count_while$char$s0$lam25: 288
+    __m1__reindent_block: 3360
+    __map17$own0: 336
+    __rec_drop_0: 184
+    __rec_drop_2: 84
+    col_after: 464
+    fits: 1688
+    fits_atom: 204
+    go: 4392
+    has_hard: 536
+    main: 3544
+    print_doc: 1328
   data: 842
   metadata: 12590
 builtin calls: 5088
@@ -383,16 +399,3 @@ builtin calls: 5088
   aipl_test_end: 1
   aipl_test_summary: 1
   aipl_trim: 1
---- monomorphizations ---
-__builtin_any$Doc$lam3
-__builtin_count_while$char$s0$lam15
-__builtin_count_while$char$s0$lam25
-__m1__reindent_block
-__map17$own0
-col_after
-fits
-fits_atom
-go
-has_hard
-main
-print_doc

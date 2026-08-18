@@ -49,10 +49,6 @@ pub fn clean_trailing_whitespace(src: str) -> str {
     assert(clean_trailing_whitespace("a  \r\n") == "a  \r\n");
     assert(clean_trailing_whitespace("a\r\n") == "a\r\n");
 })
---- monomorphizations ---
-__m2__trim_end_while$lam1
-clean_trailing_whitespace
-main
 --- performance ---
 allocations: 45
 deallocations: 45
@@ -61,6 +57,9 @@ bytes allocated: 1929
 instructions executed: 7651
 binary size: 8440
   code: 2800
+    __m2__trim_end_while$lam1: 316
+    clean_trailing_whitespace: 712
+    main: 1772
   data: 1561
   metadata: 4079
 builtin calls: 828

@@ -62,6 +62,11 @@ bytes allocated: 627
 instructions executed: 1653
 binary size: 7272
   code: 3584
+    __filter4$own0: 284
+    add: 8
+    is_big: 16
+    main: 2976
+    right_fold$i64$i64$lam5: 300
   data: 740
   metadata: 2948
 builtin calls: 148
@@ -80,9 +85,3 @@ builtin calls: 148
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-__filter4$own0
-add
-is_big
-main
-right_fold$i64$i64$lam5

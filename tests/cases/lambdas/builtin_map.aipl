@@ -25,6 +25,11 @@ bytes allocated: 616
 instructions executed: 2072
 binary size: 5864
   code: 3100
+    __eq_0: 296
+    __eq_2: 352
+    __map10$own0: 252
+    __to_str_1: 180
+    main: 2020
   data: 313
   metadata: 2451
 builtin calls: 90
@@ -44,6 +49,3 @@ builtin calls: 90
   aipl_test_end: 1
   aipl_test_summary: 1
   aipl_write_i64: 3
---- monomorphizations ---
-__map10$own0
-main

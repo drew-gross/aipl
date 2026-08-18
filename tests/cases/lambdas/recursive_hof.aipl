@@ -16,6 +16,8 @@ bytes allocated: 0
 instructions executed: 54
 binary size: 968
   code: 156
+    main: 108
+    rec$lam1: 48
   data: 52
   metadata: 760
 builtin calls: 4
@@ -23,6 +25,3 @@ builtin calls: 4
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-main
-rec$lam1

@@ -44,6 +44,15 @@ bytes allocated: 152
 instructions executed: 512
 binary size: 3688
   code: 1480
+    __eq_0: 296
+    __lambda_0: 8
+    __lambda_1: 60
+    __lambda_10: 92
+    __lambda_2: 8
+    __lambda_4: 60
+    __lambda_5: 8
+    __map9$own0: 252
+    main: 696
   data: 290
   metadata: 1918
 builtin calls: 30
@@ -59,12 +68,3 @@ builtin calls: 30
   aipl_test_begin: 2
   aipl_test_end: 2
   aipl_test_summary: 1
---- monomorphizations ---
-__lambda_0
-__lambda_1
-__lambda_10
-__lambda_2
-__lambda_4
-__lambda_5
-__map9$own0
-main

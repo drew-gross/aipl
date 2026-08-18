@@ -84,20 +84,6 @@ fn lex(s: str) -> str!LexError {
     assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
     assert(!lex("fine").is_err_and(|e| e.span == 3));
 })
---- monomorphizations ---
-__builtin_value_or_err$char$i64
-__test$map_err
-lex
-main
-map_err$char$i64$bool$lam25
-map_err$char$i64$bool$lam29
-map_err$str$FmtError$i64$lam31
-map_err$str$FmtError$i64$lam35
-map_err$str$LexError$FmtError$lam0
-map_err$str$LexError$FmtError$lam6
-map_err$str$LexError$i64$lam14
-map_err$str$LexError$str$lam10
-map_err$str$LexError$str$lam21
 --- performance ---
 allocations: 0
 deallocations: 0
@@ -106,6 +92,25 @@ bytes allocated: 0
 instructions executed: 1980
 binary size: 20120
   code: 10196
+    __builtin_value_or_err$char$i64: 92
+    __test$map_err: 4988
+    __test_try_fail_0: 64
+    __test_try_fail_1: 64
+    __test_try_fail_2: 64
+    __to_str_3: 540
+    __to_str_4: 212
+    __to_str_5: 180
+    lex: 392
+    main: 932
+    map_err$char$i64$bool$lam25: 112
+    map_err$char$i64$bool$lam29: 112
+    map_err$str$FmtError$i64$lam31: 280
+    map_err$str$FmtError$i64$lam35: 280
+    map_err$str$LexError$FmtError$lam0: 420
+    map_err$str$LexError$FmtError$lam6: 420
+    map_err$str$LexError$i64$lam14: 280
+    map_err$str$LexError$str$lam10: 388
+    map_err$str$LexError$str$lam21: 376
   data: 1719
   metadata: 8205
 builtin calls: 287

@@ -67,6 +67,11 @@ bytes allocated: 1641
 instructions executed: 7722
 binary size: 8096
   code: 3276
+    __builtin_count_while$char$s0$lam10: 288
+    __builtin_count_while$char$s0$lam3: 288
+    __map5$own0: 336
+    dedent: 1188
+    main: 1176
   data: 989
   metadata: 3831
 builtin calls: 916
@@ -92,9 +97,3 @@ builtin calls: 916
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_count_while$char$s0$lam10
-__builtin_count_while$char$s0$lam3
-__map5$own0
-dedent
-main

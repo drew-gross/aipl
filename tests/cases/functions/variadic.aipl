@@ -42,6 +42,12 @@ bytes allocated: 568
 instructions executed: 901
 binary size: 6688
   code: 3128
+    __test$joined: 1156
+    __test$sum: 692
+    joined$vo1: 588
+    main: 112
+    sum: 216
+    sum$vo1: 364
   data: 524
   metadata: 3036
 builtin calls: 129
@@ -58,10 +64,3 @@ builtin calls: 129
   aipl_test_begin: 2
   aipl_test_end: 2
   aipl_test_summary: 1
---- monomorphizations ---
-__test$joined
-__test$sum
-joined$vo1
-main
-sum
-sum$vo1

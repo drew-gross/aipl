@@ -29,6 +29,12 @@ bytes allocated: 320
 instructions executed: 1392
 binary size: 4784
   code: 2224
+    __eq_0: 352
+    __to_str_1: 180
+    main: 692
+    tag$lam1: 332
+    tag$lam3: 332
+    tag$lam5: 336
   data: 226
   metadata: 2334
 builtin calls: 164
@@ -47,8 +53,3 @@ builtin calls: 164
   aipl_test_end: 1
   aipl_test_summary: 1
   aipl_write_i64: 9
---- monomorphizations ---
-main
-tag$lam1
-tag$lam3
-tag$lam5

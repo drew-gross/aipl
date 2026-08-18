@@ -27,6 +27,16 @@ bytes allocated: 388
 instructions executed: 1080
 binary size: 6280
   code: 3164
+    __builtin_all$char$lam8: 268
+    __builtin_all$i64$lam1: 256
+    __builtin_all$i64$lam12: 256
+    __builtin_all$i64$lam14: 256
+    __builtin_all$i64$lam16: 256
+    __builtin_all$i64$lam3: 256
+    __builtin_all$i64$lam5: 256
+    __builtin_all$i64$lam6: 256
+    __filter10$own0: 272
+    main: 832
   data: 477
   metadata: 2639
 builtin calls: 38
@@ -44,14 +54,3 @@ builtin calls: 38
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_all$char$lam8
-__builtin_all$i64$lam1
-__builtin_all$i64$lam12
-__builtin_all$i64$lam14
-__builtin_all$i64$lam16
-__builtin_all$i64$lam3
-__builtin_all$i64$lam5
-__builtin_all$i64$lam6
-__filter10$own0
-main

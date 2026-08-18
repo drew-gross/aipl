@@ -43,10 +43,6 @@ ok(["data/sub/deeper/leaf.txt", "data/sub/nested.txt", "data/top.txt"])
 ok(["data/sub/deeper/leaf.txt", "data/sub/nested.txt"])
 err("could not list files")
 err("could not list files")
---- monomorphizations ---
-count_files
-main
-sorted_listing
 --- performance ---
 allocations: 19
 deallocations: 19
@@ -55,6 +51,11 @@ bytes allocated: 801
 instructions executed: 1429
 binary size: 6872
   code: 3240
+    __to_str_0: 540
+    __to_str_1: 1080
+    count_files: 368
+    main: 680
+    sorted_listing: 572
   data: 403
   metadata: 3229
 builtin calls: 171

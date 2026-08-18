@@ -62,6 +62,18 @@ bytes allocated: 160
 instructions executed: 626
 binary size: 4960
   code: 3064
+    __arr_drop_0: 160
+    __arr_drop_2: 160
+    __arr_retain_0: 160
+    __arr_retain_2: 160
+    __lambda_0: 60
+    __lambda_1: 60
+    __lambda_2: 60
+    __lambda_3: 60
+    __lambda_4: 60
+    __lambda_5: 60
+    __to_str_1: 180
+    main: 1884
   data: 1
   metadata: 1895
 builtin calls: 31
@@ -72,11 +84,3 @@ builtin calls: 31
   aipl_inc: 8
   aipl_print: 4
   aipl_write_i64: 1
---- monomorphizations ---
-__lambda_0
-__lambda_1
-__lambda_2
-__lambda_3
-__lambda_4
-__lambda_5
-main

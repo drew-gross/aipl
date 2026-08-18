@@ -143,13 +143,6 @@ fn companion_path(header: str) -> str!str {
     );
     assert(companion_path("file: a\\b.txt").is_err_and(|e| e.starts_with(`use "/"`)));
 })
---- monomorphizations ---
-__m2__parse_test_section_header
-__test$companion_files
-__test$companion_path
-companion_files
-companion_path
-main
 --- performance ---
 allocations: 148
 deallocations: 148
@@ -158,6 +151,18 @@ bytes allocated: 5774
 instructions executed: 9502
 binary size: 24120
   code: 10720
+    __arr_drop_1: 140
+    __arr_retain_1: 140
+    __eq_2: 284
+    __eq_4: 224
+    __m2__parse_test_section_header: 740
+    __test$companion_files: 4576
+    __test$companion_path: 1196
+    __test_try_fail_0: 64
+    __to_str_3: 252
+    companion_files: 2152
+    companion_path: 840
+    main: 112
   data: 3094
   metadata: 10306
 builtin calls: 2596

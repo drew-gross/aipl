@@ -66,12 +66,6 @@ fn main() !prints !clock {
 2222
 3333 then 1111
 true
---- monomorphizations ---
-fixed_mono
-fixed_wall
-inner_mono
-inner_wall
-main
 --- performance ---
 allocations: 3
 deallocations: 3
@@ -80,6 +74,13 @@ bytes allocated: 85
 instructions executed: 312
 binary size: 4544
   code: 2012
+    __to_str_0: 180
+    __to_str_1: 212
+    fixed_mono: 8
+    fixed_wall: 8
+    inner_mono: 8
+    inner_wall: 8
+    main: 1588
   data: 47
   metadata: 2485
 builtin calls: 88

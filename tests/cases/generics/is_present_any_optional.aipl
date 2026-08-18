@@ -20,6 +20,8 @@ bytes allocated: 0
 instructions executed: 77
 binary size: 1552
   code: 332
+    is_present$char: 28
+    main: 304
   data: 198
   metadata: 1022
 builtin calls: 8
@@ -29,6 +31,3 @@ builtin calls: 8
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-is_present$char
-main

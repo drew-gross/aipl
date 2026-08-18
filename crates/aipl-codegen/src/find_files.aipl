@@ -33,12 +33,6 @@ pub fn with_extension(self: str[], ext: str) -> str[] {
     // that only appears mid-path doesn't match.
     assert(["a.aipl/b.txt"].with_extension(".aipl") == []);
 })
---- monomorphizations ---
-__test$find_files
-__test$with_extension
-find_files
-main
-with_extension
 --- performance ---
 allocations: 22
 deallocations: 22
@@ -47,6 +41,12 @@ bytes allocated: 936
 instructions executed: 1450
 binary size: 10448
   code: 4928
+    __eq_0: 352
+    __test$find_files: 224
+    __test$with_extension: 2916
+    find_files: 852
+    main: 112
+    with_extension: 472
   data: 798
   metadata: 4722
 builtin calls: 281

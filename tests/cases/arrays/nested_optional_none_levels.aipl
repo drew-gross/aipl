@@ -89,6 +89,17 @@ bytes allocated: 213
 instructions executed: 1247
 binary size: 7976
   code: 3932
+    __to_str_0: 516
+    __to_str_1: 680
+    __to_str_2: 180
+    __to_str_3: 600
+    main: 1508
+    none2: 52
+    none3: 52
+    snone2: 96
+    swrap2: 112
+    wrap2: 68
+    wrap3: 68
   data: 499
   metadata: 3545
 builtin calls: 113
@@ -101,11 +112,3 @@ builtin calls: 113
   aipl_str_len: 2
   aipl_write_bytes: 32
   aipl_write_i64: 5
---- monomorphizations ---
-main
-none2
-none3
-snone2
-swrap2
-wrap2
-wrap3

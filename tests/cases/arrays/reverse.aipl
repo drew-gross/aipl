@@ -35,6 +35,14 @@ bytes allocated: 944
 instructions executed: 847
 binary size: 5760
   code: 2508
+    __eq_0: 296
+    __test$reversed_eq: 964
+    __test$reversed_len: 284
+    __test$sum_reversed: 232
+    main: 152
+    reversed_eq: 172
+    reversed_len: 128
+    sum_reversed: 280
   data: 569
   metadata: 2683
 builtin calls: 81
@@ -47,11 +55,3 @@ builtin calls: 81
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-__test$reversed_eq
-__test$reversed_len
-__test$sum_reversed
-main
-reversed_eq
-reversed_len
-sum_reversed

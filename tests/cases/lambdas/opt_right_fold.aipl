@@ -36,6 +36,20 @@ bytes allocated: 1264
 instructions executed: 2744
 binary size: 10848
   code: 6068
+    __builtin_opt_left_fold$str$str$s1$lam3: 772
+    __builtin_opt_right_fold$i64$List$lam9: 736
+    __builtin_opt_right_fold$i64$i64$lam5: 464
+    __builtin_opt_right_fold$i64$i64$lam7: 468
+    __builtin_opt_right_fold$str$str$s1$lam1: 900
+    __eq_1: 92
+    __eq_2: 148
+    __eq_3: 100
+    __eq_4: 124
+    __lambda_8: 280
+    __rec_drop_0: 44
+    __test$to_list_keeps_order: 1696
+    main: 72
+    to_list: 172
   data: 630
   metadata: 4150
 builtin calls: 272
@@ -56,13 +70,3 @@ builtin calls: 272
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_opt_left_fold$str$str$s1$lam3
-__builtin_opt_right_fold$i64$List$lam9
-__builtin_opt_right_fold$i64$i64$lam5
-__builtin_opt_right_fold$i64$i64$lam7
-__builtin_opt_right_fold$str$str$s1$lam1
-__lambda_8
-__test$to_list_keeps_order
-main
-to_list

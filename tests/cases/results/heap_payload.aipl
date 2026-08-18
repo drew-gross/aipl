@@ -41,6 +41,10 @@ bytes allocated: 240
 instructions executed: 220
 binary size: 3184
   code: 1540
+    greet: 416
+    lookup: 408
+    main: 308
+    show: 408
   data: 27
   metadata: 1617
 builtin calls: 84
@@ -50,8 +54,3 @@ builtin calls: 84
   aipl_print: 2
   aipl_str_eq: 2
   aipl_str_len: 14
---- monomorphizations ---
-greet
-lookup
-main
-show

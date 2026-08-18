@@ -43,8 +43,6 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
     // million times smaller, and would fail here.
     assert(is_about_one_second(elapsed_over_a_one_second_sleep()));
 })
---- monomorphizations ---
-main
 --- performance ---
 allocations: 4
 deallocations: 4
@@ -53,6 +51,7 @@ bytes allocated: 72
 instructions executed: 204
 binary size: 3912
   code: 1240
+    main: 1240
   data: 607
   metadata: 2065
 builtin calls: 41

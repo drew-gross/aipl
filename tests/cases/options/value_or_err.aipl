@@ -44,6 +44,13 @@ bytes allocated: 190
 instructions executed: 478
 binary size: 4408
   code: 2232
+    __builtin_value_or_err$char$i64: 92
+    __builtin_value_or_err$char$str: 212
+    __builtin_value_or_err$i64$str: 212
+    __to_str_0: 180
+    describe: 408
+    first_digit: 504
+    main: 624
   data: 61
   metadata: 2115
 builtin calls: 101
@@ -54,10 +61,3 @@ builtin calls: 101
   aipl_inc: 26
   aipl_print: 4
   aipl_write_i64: 2
---- monomorphizations ---
-__builtin_value_or_err$char$i64
-__builtin_value_or_err$char$str
-__builtin_value_or_err$i64$str
-describe
-first_digit
-main

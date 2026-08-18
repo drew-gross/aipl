@@ -97,6 +97,14 @@ bytes allocated: 0
 instructions executed: 1201
 binary size: 8880
   code: 4064
+    digit_of: 504
+    main: 2444
+    maybe_int: 84
+    maybe_str: 188
+    value_or_err$char$i64: 92
+    value_or_err$char$str: 212
+    value_or_err$i64$str: 212
+    value_or_err$str$str: 328
   data: 1179
   metadata: 3637
 builtin calls: 139
@@ -108,12 +116,3 @@ builtin calls: 139
   aipl_test_begin: 2
   aipl_test_end: 2
   aipl_test_summary: 1
---- monomorphizations ---
-digit_of
-main
-maybe_int
-maybe_str
-value_or_err$char$i64
-value_or_err$char$str
-value_or_err$i64$str
-value_or_err$str$str

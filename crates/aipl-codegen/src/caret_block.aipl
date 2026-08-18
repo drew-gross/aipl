@@ -91,6 +91,10 @@ bytes allocated: 2830
 instructions executed: 4387
 binary size: 9328
   code: 3540
+    __m1__line_at: 580
+    __to_str_0: 180
+    caret_block: 1840
+    main: 940
   data: 1720
   metadata: 4068
 builtin calls: 932
@@ -110,7 +114,3 @@ builtin calls: 932
   aipl_test_summary: 1
   aipl_u64_len: 48
   aipl_write_u64: 24
---- monomorphizations ---
-__m1__line_at
-caret_block
-main

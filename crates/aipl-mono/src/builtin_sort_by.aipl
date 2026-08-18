@@ -81,18 +81,6 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // Function-call form too.
     assert(sort_by([2, 1], |a, b| a < b) == [1, 2]);
 })
---- monomorphizations ---
-main
-sort_by$E$lam17
-sort_by$i64$lam1
-sort_by$i64$lam11
-sort_by$i64$lam13
-sort_by$i64$lam21
-sort_by$i64$lam3
-sort_by$i64$lam5
-sort_by$i64$lam7
-sort_by$i64$lam9
-sort_by$str$lam15
 --- performance ---
 allocations: 111
 deallocations: 111
@@ -101,6 +89,21 @@ bytes allocated: 4352
 instructions executed: 7888
 binary size: 24400
   code: 14868
+    __arr_drop_2: 140
+    __arr_retain_2: 140
+    __eq_0: 296
+    __eq_1: 352
+    main: 2484
+    sort_by$E$lam17: 1436
+    sort_by$i64$lam1: 1092
+    sort_by$i64$lam11: 1092
+    sort_by$i64$lam13: 1092
+    sort_by$i64$lam21: 1092
+    sort_by$i64$lam3: 1092
+    sort_by$i64$lam5: 1092
+    sort_by$i64$lam7: 1092
+    sort_by$i64$lam9: 1092
+    sort_by$str$lam15: 1284
   data: 754
   metadata: 8778
 builtin calls: 903

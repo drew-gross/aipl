@@ -44,8 +44,8 @@ bytes allocated: 0
 instructions executed: 317
 binary size: 1432
   code: 872
+    __eq_0: 100
+    main: 772
   data: 1
   metadata: 559
 builtin calls: 0
---- monomorphizations ---
-main

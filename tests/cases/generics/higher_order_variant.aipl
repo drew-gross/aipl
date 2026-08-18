@@ -30,6 +30,9 @@ bytes allocated: 0
 instructions executed: 99
 binary size: 1448
   code: 436
+    __lambda_0: 60
+    apply$Tok: 100
+    main: 276
   data: 128
   metadata: 884
 builtin calls: 5
@@ -37,7 +40,3 @@ builtin calls: 5
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__lambda_0
-apply$Tok
-main

@@ -21,6 +21,9 @@ bytes allocated: 0
 instructions executed: 73
 binary size: 1528
   code: 316
+    __test$value_or: 220
+    main: 72
+    value_or$i64: 24
   data: 203
   metadata: 1009
 builtin calls: 6
@@ -28,7 +31,3 @@ builtin calls: 6
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$value_or
-main
-value_or$i64

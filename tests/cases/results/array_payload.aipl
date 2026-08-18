@@ -50,6 +50,16 @@ bytes allocated: 888
 instructions executed: 1541
 binary size: 7960
   code: 3820
+    __eq_1: 296
+    __test$below: 888
+    __test$nothing: 460
+    __test$tail_below: 532
+    __test_try_fail_0: 64
+    __to_str_2: 252
+    below: 620
+    main: 156
+    nothing: 148
+    tail_below: 404
   data: 514
   metadata: 3626
 builtin calls: 122
@@ -65,11 +75,3 @@ builtin calls: 122
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-__test$below
-__test$nothing
-__test$tail_below
-below
-main
-nothing
-tail_below

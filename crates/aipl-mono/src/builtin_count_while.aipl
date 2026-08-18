@@ -39,6 +39,14 @@ bytes allocated: 348
 instructions executed: 928
 binary size: 5712
   code: 2756
+    count_while$char$lam11: 288
+    count_while$i64$lam1: 264
+    count_while$i64$lam3: 264
+    count_while$i64$lam5: 264
+    count_while$i64$lam7: 264
+    count_while$i64$lam9: 264
+    count_while$str$lam13: 360
+    main: 788
   data: 544
   metadata: 2412
 builtin calls: 53
@@ -57,12 +65,3 @@ builtin calls: 53
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-count_while$char$lam11
-count_while$i64$lam1
-count_while$i64$lam3
-count_while$i64$lam5
-count_while$i64$lam7
-count_while$i64$lam9
-count_while$str$lam13
-main

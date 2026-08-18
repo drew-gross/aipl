@@ -642,6 +642,74 @@ bytes allocated: 275592
 instructions executed: 751337
 binary size: 223720
   code: 143300
+    __arr_drop_1: 364
+    __arr_drop_5: 800
+    __arr_drop_8: 140
+    __arr_retain_1: 364
+    __arr_retain_5: 800
+    __arr_retain_8: 140
+    __builtin_count_while$char$s0$lam17: 288
+    __builtin_count_while$char$s0$lam28: 384
+    __builtin_count_while$char$s0$lam33: 292
+    __builtin_count_while$char$s0$lam35: 300
+    __builtin_count_while$char$s0$lam36: 288
+    __builtin_count_while$char$s0$lam38: 288
+    __builtin_int_parse: 884
+    __builtin_is_some_and$char$lam34: 48
+    __builtin_opt_left_fold$char$i64$s0$lam13: 376
+    __builtin_value_or_err$i64$str: 212
+    __eq_10: 104
+    __eq_11: 120
+    __eq_12: 884
+    __eq_13: 64
+    __eq_2: 120
+    __eq_3: 168
+    __eq_4: 284
+    __eq_6: 100
+    __eq_7: 148
+    __lambda_0: 68
+    __lambda_1: 68
+    __lambda_12: 140
+    __lambda_2: 152
+    __lambda_3: 152
+    __lambda_4: 152
+    __lambda_5: 152
+    __lambda_6: 64
+    __lambda_7: 64
+    __m10__parse_test_section_header: 740
+    __m1__apply_emit$AiplTok: 4980
+    __m1__between_len: 972
+    __m1__delimited_len: 1772
+    __m1__finalize_template$AiplTok: 4432
+    __m1__float_len: 844
+    __m1__interp_scan$AiplTok: 3284
+    __m1__lex$AiplTok: 2568
+    __m1__lex_step$AiplTok: 23196
+    __m1__nested_len: 1228
+    __m1__seg_emit$AiplTok: 4368
+    __m1__step_result$AiplTok: 7212
+    __m1__template_scan$AiplTok: 3172
+    __m1__template_step$AiplTok: 796
+    __m2__unescape: 908
+    __m3__process_raw_string: 1664
+    __m7__trim_prefix: 236
+    __m8__trim_suffix: 252
+    __m9__strip_test_sections: 624
+    __map19$own0: 336
+    __test$lex_aipl: 15388
+    __test$lex_aipl_stripped: 1504
+    __test$lex_aipl_tokens: 1096
+    __test_try_fail_0: 64
+    __to_str_9: 812
+    char_lit_emit: 1432
+    dedent_segments: 160
+    ident_cont: 16
+    int_lit: 1064
+    lex_aipl: 44416
+    lex_aipl_tokens: 424
+    main: 152
+    raw_tpl_kind: 2088
+    tpl_kind: 2128
   data: 7100
   metadata: 73320
 builtin calls: 85773
@@ -674,55 +742,3 @@ builtin calls: 85773
   aipl_test_end: 3
   aipl_test_summary: 1
   aipl_trim: 2
---- monomorphizations ---
-__builtin_count_while$char$s0$lam17
-__builtin_count_while$char$s0$lam28
-__builtin_count_while$char$s0$lam33
-__builtin_count_while$char$s0$lam35
-__builtin_count_while$char$s0$lam36
-__builtin_count_while$char$s0$lam38
-__builtin_int_parse
-__builtin_is_some_and$char$lam34
-__builtin_opt_left_fold$char$i64$s0$lam13
-__builtin_value_or_err$i64$str
-__lambda_0
-__lambda_1
-__lambda_12
-__lambda_2
-__lambda_3
-__lambda_4
-__lambda_5
-__lambda_6
-__lambda_7
-__m10__parse_test_section_header
-__m1__apply_emit$AiplTok
-__m1__between_len
-__m1__delimited_len
-__m1__finalize_template$AiplTok
-__m1__float_len
-__m1__interp_scan$AiplTok
-__m1__lex$AiplTok
-__m1__lex_step$AiplTok
-__m1__nested_len
-__m1__seg_emit$AiplTok
-__m1__step_result$AiplTok
-__m1__template_scan$AiplTok
-__m1__template_step$AiplTok
-__m2__unescape
-__m3__process_raw_string
-__m7__trim_prefix
-__m8__trim_suffix
-__m9__strip_test_sections
-__map19$own0
-__test$lex_aipl
-__test$lex_aipl_stripped
-__test$lex_aipl_tokens
-char_lit_emit
-dedent_segments
-ident_cont
-int_lit
-lex_aipl
-lex_aipl_tokens
-main
-raw_tpl_kind
-tpl_kind

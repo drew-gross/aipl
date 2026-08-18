@@ -32,6 +32,11 @@ bytes allocated: 480
 instructions executed: 1237
 binary size: 5040
   code: 2592
+    __eq_0: 300
+    __eq_1: 148
+    __eq_2: 352
+    __test$grid3: 1720
+    main: 72
   data: 200
   metadata: 2248
 builtin calls: 109
@@ -49,6 +54,3 @@ builtin calls: 109
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$grid3
-main

@@ -25,6 +25,8 @@ bytes allocated: 231
 instructions executed: 732
 binary size: 2832
   code: 1136
+    __eq_0: 296
+    main: 840
   data: 215
   metadata: 1481
 builtin calls: 28
@@ -36,5 +38,3 @@ builtin calls: 28
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-main

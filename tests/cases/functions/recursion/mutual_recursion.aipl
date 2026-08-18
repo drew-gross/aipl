@@ -17,6 +17,9 @@ bytes allocated: 0
 instructions executed: 949
 binary size: 1632
   code: 384
+    is_even: 56
+    is_odd: 56
+    main: 272
   data: 186
   metadata: 1062
 builtin calls: 9
@@ -24,7 +27,3 @@ builtin calls: 9
   aipl_test_begin: 2
   aipl_test_end: 2
   aipl_test_summary: 1
---- monomorphizations ---
-is_even
-is_odd
-main

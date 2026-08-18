@@ -268,7 +268,7 @@ if [ -n "$bad" ]; then
 fi
 
 # What (fillable) staleness did we see? A backtick-section mismatch (any of
-# stdout / exit code / stderr / errors / check / performance / monomorphizations)
+# stdout / exit code / stderr / errors / check / performance)
 # or an error-fixture mismatch is refilled; so is a *missing* required section,
 # which is what a brand-new case reports — `fill_expected` creates one that isn't
 # there, so a new case finishes in this same pass. The two IR gates trigger an IR

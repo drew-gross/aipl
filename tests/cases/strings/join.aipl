@@ -20,6 +20,8 @@ bytes allocated: 401
 instructions executed: 196
 binary size: 4576
   code: 1540
+    __test$rejoin: 1464
+    main: 76
   data: 545
   metadata: 2491
 builtin calls: 133
@@ -37,6 +39,3 @@ builtin calls: 133
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$rejoin
-main

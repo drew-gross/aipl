@@ -25,9 +25,6 @@ fn now_is_plausible() !clock -> bool {
     assert(now_is_plausible());
     assert(now_is_plausible()); // reading it twice is fine — nothing is consumed
 })
---- monomorphizations ---
-main
-now_is_plausible
 --- performance ---
 allocations: 0
 deallocations: 0
@@ -36,6 +33,8 @@ bytes allocated: 0
 instructions executed: 52
 binary size: 1360
   code: 236
+    main: 124
+    now_is_plausible: 112
   data: 132
   metadata: 992
 builtin calls: 9

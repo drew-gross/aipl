@@ -86,19 +86,6 @@ err("zero")
 true
 false
 some(2)
---- monomorphizations ---
-count_evens
-counts
-evens
-first_of_pair
-main
-maybe
-maybe_strs
-narrow
-pair
-point
-shape
-wide
 --- performance ---
 allocations: 18
 deallocations: 18
@@ -107,6 +94,34 @@ bytes allocated: 800
 instructions executed: 3570
 binary size: 26864
   code: 14216
+    __dict_drop_13: 128
+    __dict_retain_13: 128
+    __eq_10: 156
+    __eq_14: 256
+    __to_str_0: 540
+    __to_str_1: 540
+    __to_str_11: 212
+    __to_str_12: 360
+    __to_str_2: 708
+    __to_str_3: 1244
+    __to_str_4: 1012
+    __to_str_5: 1148
+    __to_str_6: 864
+    __to_str_7: 804
+    __to_str_8: 540
+    __to_str_9: 924
+    count_evens: 264
+    counts: 300
+    evens: 476
+    first_of_pair: 260
+    main: 2148
+    maybe: 120
+    maybe_strs: 288
+    narrow: 100
+    pair: 316
+    point: 136
+    shape: 140
+    wide: 104
   data: 1851
   metadata: 10797
 builtin calls: 347

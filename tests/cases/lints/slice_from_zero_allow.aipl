@@ -7,8 +7,6 @@ fn main() !prints {
 }
 --- stdout ---
 [10, 20]
---- monomorphizations ---
-main
 --- performance ---
 allocations: 3
 deallocations: 3
@@ -17,6 +15,8 @@ bytes allocated: 129
 instructions executed: 303
 binary size: 2232
   code: 916
+    __to_str_0: 672
+    main: 244
   data: 67
   metadata: 1249
 builtin calls: 18

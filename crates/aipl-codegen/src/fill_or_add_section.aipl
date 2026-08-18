@@ -262,6 +262,12 @@ bytes allocated: 2981
 instructions executed: 11502
 binary size: 13912
   code: 5384
+    __eq_0: 148
+    __m2__parse_test_section_header: 740
+    contains_section: 648
+    fill_or_add_section: 924
+    fill_section: 1544
+    main: 1380
   data: 3041
   metadata: 5487
 builtin calls: 1595
@@ -286,9 +292,3 @@ builtin calls: 1595
   aipl_test_end: 1
   aipl_test_summary: 1
   aipl_trim: 24
---- monomorphizations ---
-__m2__parse_test_section_header
-contains_section
-fill_or_add_section
-fill_section
-main

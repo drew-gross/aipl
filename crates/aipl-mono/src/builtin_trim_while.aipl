@@ -30,6 +30,14 @@ bytes allocated: 0
 instructions executed: 870
 binary size: 6504
   code: 3136
+    __builtin_count_while$char$s0$lam14: 288
+    __builtin_count_while$char$s0$lam15: 288
+    __builtin_count_while$char$s0$lam16: 288
+    __builtin_count_while$char$s0$lam17: 288
+    __builtin_count_while$char$s0$lam18: 288
+    __builtin_count_while$char$s0$lam19: 288
+    __builtin_count_while$char$s0$lam20: 288
+    main: 1120
   data: 506
   metadata: 2862
 builtin calls: 98
@@ -45,12 +53,3 @@ builtin calls: 98
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_count_while$char$s0$lam14
-__builtin_count_while$char$s0$lam15
-__builtin_count_while$char$s0$lam16
-__builtin_count_while$char$s0$lam17
-__builtin_count_while$char$s0$lam18
-__builtin_count_while$char$s0$lam19
-__builtin_count_while$char$s0$lam20
-main

@@ -60,6 +60,12 @@ bytes allocated: 419
 instructions executed: 644
 binary size: 6024
   code: 2744
+    __rec_drop_0: 104
+    __to_str_1: 180
+    __to_str_2: 1104
+    leaf: 192
+    main: 840
+    total: 324
   data: 308
   metadata: 2972
 builtin calls: 65
@@ -75,7 +81,3 @@ builtin calls: 65
   aipl_str_alloc: 1
   aipl_write_bytes: 9
   aipl_write_i64: 3
---- monomorphizations ---
-leaf
-main
-total

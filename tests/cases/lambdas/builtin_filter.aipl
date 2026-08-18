@@ -34,6 +34,13 @@ bytes allocated: 1032
 instructions executed: 3430
 binary size: 7600
   code: 4220
+    __eq_0: 296
+    __eq_1: 352
+    __filter7$own0: 272
+    __map11$own0: 256
+    __test$is_even: 2936
+    is_even: 32
+    main: 76
   data: 468
   metadata: 2912
 builtin calls: 120
@@ -52,9 +59,3 @@ builtin calls: 120
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__filter7$own0
-__map11$own0
-__test$is_even
-is_even
-main

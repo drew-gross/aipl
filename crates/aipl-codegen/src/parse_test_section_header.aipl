@@ -45,6 +45,10 @@ bytes allocated: 192
 instructions executed: 1242
 binary size: 7752
   code: 2696
+    __eq_0: 148
+    __test$parse_test_section_header: 1736
+    main: 72
+    parse_test_section_header: 740
   data: 1473
   metadata: 3583
 builtin calls: 347
@@ -60,7 +64,3 @@ builtin calls: 347
   aipl_test_end: 1
   aipl_test_summary: 1
   aipl_trim: 15
---- monomorphizations ---
-__test$parse_test_section_header
-main
-parse_test_section_header

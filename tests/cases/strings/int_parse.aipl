@@ -55,6 +55,12 @@ bytes allocated: 192
 instructions executed: 8300
 binary size: 4624
   code: 2628
+    __builtin_count_while$char$s0$lam4: 288
+    __builtin_int_parse: 884
+    __builtin_opt_left_fold$char$i64$s0$lam3: 376
+    __eq_0: 100
+    __lambda_2: 140
+    main: 840
   data: 158
   metadata: 1838
 builtin calls: 288
@@ -66,9 +72,3 @@ builtin calls: 288
   aipl_str_len: 91
   aipl_str_slice: 13
   aipl_str_starts_with: 11
---- monomorphizations ---
-__builtin_count_while$char$s0$lam4
-__builtin_int_parse
-__builtin_opt_left_fold$char$i64$s0$lam3
-__lambda_2
-main

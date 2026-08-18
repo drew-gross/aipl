@@ -56,6 +56,14 @@ bytes allocated: 1288
 instructions executed: 8940
 binary size: 8632
   code: 3980
+    __builtin_count_while$char$s0$lam12: 288
+    __builtin_count_while$char$s0$lam5: 288
+    __eq_0: 100
+    __m4__trim_prefix: 236
+    __m5__trim_suffix: 252
+    __map7$own0: 336
+    main: 816
+    process_raw_string: 1664
   data: 696
   metadata: 3956
 builtin calls: 799
@@ -83,11 +91,3 @@ builtin calls: 799
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_count_while$char$s0$lam12
-__builtin_count_while$char$s0$lam5
-__m4__trim_prefix
-__m5__trim_suffix
-__map7$own0
-main
-process_raw_string

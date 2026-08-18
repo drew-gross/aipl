@@ -27,6 +27,16 @@ bytes allocated: 584
 instructions executed: 2331
 binary size: 6480
   code: 3548
+    __eq_0: 296
+    __eq_1: 352
+    __filter1$own0: 272
+    __filter11$own0: 272
+    __filter3$own0: 272
+    __filter5$own0: 272
+    __filter7$own0: 368
+    __map9$own0: 256
+    __test$keep_gt3: 1116
+    main: 72
   data: 426
   metadata: 2506
 builtin calls: 101
@@ -42,12 +52,3 @@ builtin calls: 101
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__filter1$own0
-__filter11$own0
-__filter3$own0
-__filter5$own0
-__filter7$own0
-__map9$own0
-__test$keep_gt3
-main

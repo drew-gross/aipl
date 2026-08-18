@@ -21,6 +21,16 @@ bytes allocated: 224
 instructions executed: 278
 binary size: 4984
   code: 2460
+    __eq_0: 296
+    __eq_1: 352
+    __map1$own0: 256
+    __map3$own0: 256
+    __map5$own0: 252
+    __map6$own0: 264
+    __test$empty_ints: 488
+    __to_str_2: 180
+    empty_ints: 44
+    main: 72
   data: 257
   metadata: 2267
 builtin calls: 29
@@ -31,11 +41,3 @@ builtin calls: 29
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__map1$own0
-__map3$own0
-__map5$own0
-__map6$own0
-__test$empty_ints
-empty_ints
-main

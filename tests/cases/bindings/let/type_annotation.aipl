@@ -75,8 +75,6 @@ fn main() !prints {
     print(shapes());
     print(shadowed().to_str());
 }
---- monomorphizations ---
-main
 --- stdout ---
 4
 -128 255 -32768 65535 -2147483648 4294967295 5
@@ -90,6 +88,17 @@ bytes allocated: 565
 instructions executed: 623
 binary size: 7760
   code: 4152
+    __dict_drop_7: 128
+    __dict_retain_7: 128
+    __to_str_0: 180
+    __to_str_1: 180
+    __to_str_2: 180
+    __to_str_3: 180
+    __to_str_4: 180
+    __to_str_5: 180
+    __to_str_6: 180
+    __to_str_8: 180
+    main: 2456
   data: 1
   metadata: 3607
 builtin calls: 204

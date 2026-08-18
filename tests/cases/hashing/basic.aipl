@@ -51,6 +51,10 @@ bytes allocated: 704
 instructions executed: 2622
 binary size: 13192
   code: 8708
+    __dict_drop_0: 128
+    __dict_retain_0: 128
+    main: 8368
+    opt: 84
   data: 957
   metadata: 3527
 builtin calls: 128
@@ -70,6 +74,3 @@ builtin calls: 128
   aipl_test_begin: 7
   aipl_test_end: 7
   aipl_test_summary: 1
---- monomorphizations ---
-main
-opt

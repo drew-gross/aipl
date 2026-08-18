@@ -22,6 +22,11 @@ bytes allocated: 184
 instructions executed: 487
 binary size: 3960
   code: 2192
+    __arr_drop_0: 116
+    __arr_retain_0: 116
+    __lambda_0: 132
+    __zip1$own0$own1: 1408
+    main: 420
   data: 1
   metadata: 1767
 builtin calls: 66
@@ -34,7 +39,3 @@ builtin calls: 66
   aipl_inc: 21
   aipl_print: 3
   aipl_str_len: 4
---- monomorphizations ---
-__lambda_0
-__zip1$own0$own1
-main

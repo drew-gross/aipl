@@ -29,7 +29,11 @@
 //!                          harness builds a separate instrumented object, links
 //!                          it against the instrumented runtime, runs it, and
 //!                          checks the tallies (binary size is measured from the
-//!                          non-instrumented object).
+//!                          non-instrumented object). `binary size` breaks down
+//!                          into `code`/`data`/`metadata`, and `code` again into
+//!                          one line per function — which is also the list of
+//!                          instances monomorphization emitted, so a change in
+//!                          what gets specialized shows up as a diff here.
 //!                          Mutually exclusive with `errors`. REQUIRED on every
 //!                          running case under `tests/cases/` and `crates/`
 //!                          (only the user-facing `examples/` are exempt); a
@@ -48,14 +52,6 @@
 //!                          When absent, a case with `.test` blocks must instead
 //!                          pass cleanly (the harness requires `check` to exit 0).
 //!                          Mutually exclusive with `errors`.
-//!   `--- monomorphizations ---` — the mangled names of the function instances
-//!                          monomorphization emits into the final binary, one per
-//!                          line, sorted (each generic specialization / owned form
-//!                          is its own instance). Lets a change in what gets
-//!                          specialized show up as a diff. REQUIRED on every running case under
-//!                          `tests/cases/` and `crates/` (same gate as
-//!                          `performance` — the user-facing `examples/` are
-//!                          exempt). Mutually exclusive with `errors`.
 //!   `--- file: rel/path.aipl ---` — additional source files, staged
 //!                          alongside the entry source so `import`s
 //!                          resolve as written.
@@ -85,7 +81,7 @@
 //! test` skips them; opt in by name):
 //!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
 //!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
-//!     `performance`/`monomorphizations`/`check`/`errors`/`expect file`) with the
+//!     `performance`/`check`/`errors`/`expect file`) with the
 //!     actual output. Set `AIPL_CASE` to a path substring to target a subset —
 //!     this is the one mode that still reads it, since it is a single test and
 //!     libtest's filter can't reach inside it.
@@ -181,11 +177,6 @@ struct Spec {
     /// *failing* test can be a documented fixture); when absent, a case with
     /// `.test` blocks must instead pass cleanly (`check` exits 0).
     check: Option<String>,
-    /// Expected list of monomorphized function instances emitted into the final
-    /// binary (the `--- monomorphizations ---` body): the mangled instance names,
-    /// one per line, sorted.
-    /// `None` means the case doesn't pin its monomorphizations.
-    monomorphizations: Option<String>,
 }
 
 fn parse_spec(contents: &str) -> Spec {
@@ -222,7 +213,6 @@ fn finalize(spec: &mut Spec, current: Option<&str>, buf: String) {
         Some("errors") => spec.errors = Some(trimmed),
         Some("performance") => spec.performance = Some(trimmed),
         Some("check") => spec.check = Some(trimmed),
-        Some("monomorphizations") => spec.monomorphizations = Some(trimmed),
         // One CLI argument per line; an empty section means no arguments.
         Some("cli") => spec.cli = trimmed.lines().map(str::to_string).collect(),
         Some(name) if name.starts_with("expect file:") => {
@@ -475,7 +465,7 @@ fn every_case_has_a_test() {
 
 /// Author helper: in one pass, rewrite every section whose body differs from the
 /// actual output — `stdout` / `stderr` / `exit code` / `performance` /
-/// `monomorphizations` / `check` / `errors` / `expect file`. No `?` placeholder
+/// `check` / `errors` / `expect file`. No `?` placeholder
 /// or repeated runs are needed; a single pass refreshes all sections of every
 /// case. Set `AIPL_CASE` to target a subset. Run with:
 ///   cargo test --test cases -- --ignored fill_expected
@@ -582,7 +572,7 @@ fn run_perfmon() {
 ///   - `crates/**/*.aipl` — the compiler-dogfooded helpers (`add`, `count_while`,
 ///     `dedent`, `process_raw_string`, …), loaded in place. Run as library cases:
 ///     their `.test` blocks are verified and their (required) `--- performance ---`
-///     and `--- monomorphizations ---` sections are asserted.
+///     section is asserted.
 fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path) -> Vec<CaseFile> {
     let mut cases = Vec::new();
     collect_cases(cases_root, &mut cases);
@@ -810,11 +800,6 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
                 "{ctx}: `check` section requires a compiling program, so it cannot coexist with `errors`"
             ));
         }
-        if spec.monomorphizations.is_some() {
-            return Outcome::Fail(format!(
-                "{ctx}: `monomorphizations` section requires a compiling program, so it cannot coexist with `errors`"
-            ));
-        }
         if !spec.expect_files.is_empty() {
             return Outcome::Fail(format!(
                 "{ctx}: `expect file:` section requires a running program, so it cannot coexist with `errors`"
@@ -837,15 +822,6 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
                 "{ctx}: missing required `--- performance ---` section. Add one with a \
                  `?` body and run `{}` to fill in the measured \
                  allocation/deallocation counts.",
-                scoped_fill_cmd(&ctx)
-            ));
-        }
-        // A `--- monomorphizations ---` section is likewise mandatory for every
-        // running test case (same gate as performance — examples are exempt).
-        if !exempt && !fill && spec.monomorphizations.is_none() {
-            return Outcome::Fail(format!(
-                "{ctx}: missing required `--- monomorphizations ---` section. Add one with a \
-                 `?` body and run `{}` to fill in the emitted instances.",
                 scoped_fill_cmd(&ctx)
             ));
         }
@@ -1291,10 +1267,9 @@ fn run_success_case(
     spec: &Spec,
     case_dir: &Path,
     fill: bool,
-    // Whether `--- performance ---`/`--- monomorphizations ---` are mandatory
-    // for this case (false only for the exempt `examples/`). In fill mode this
-    // is what authorizes *creating* an absent one, so a fill never adds those
-    // sections to an example.
+    // Whether `--- performance ---` is mandatory for this case (false only for
+    // the exempt `examples/`). In fill mode this is what authorizes *creating*
+    // an absent one, so a fill never adds that section to an example.
     require_metrics: bool,
 ) -> Outcome {
     let program = match loader::load_program(src_path, debug_opts()) {
@@ -1347,16 +1322,9 @@ fn run_success_case(
     // upgrades it to `Filled` (so the case reports as refreshed, not a clean
     // pass). Normal runs only ever leave it `Pass` or short-circuit to `Fail`.
     let mut outcome = Outcome::Pass;
-    // The monomorphized instances emitted into this binary, pinned by an optional
-    // `--- monomorphizations ---` section. Read before `emit` consumes `obj_comp`.
-    if spec.monomorphizations.is_some() || (fill && require_metrics) {
-        let expected = spec.monomorphizations.as_deref().unwrap_or("");
-        let actual = obj_comp.monomorphized_fns().join("\n");
-        fold_section!(
-            outcome,
-            check_or_fill(orig_path, ctx, "monomorphizations", &actual, expected, fill)
-        );
-    }
+    // What the object's symbols are called in AIPL, for the per-function `code`
+    // breakdown in `--- performance ---`. Read before `emit` consumes `obj_comp`.
+    let symbol_names = obj_comp.code_symbol_names();
     let obj_bytes = match obj_comp.emit() {
         Ok(b) => b,
         Err(e) => {
@@ -1501,7 +1469,7 @@ fn run_success_case(
         let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — split into code/data/metadata for the report.
-        let sizes = BinSizes::of(&obj_bytes);
+        let sizes = BinSizes::of(&obj_bytes, &symbol_names);
         fold_section!(
             outcome,
             run_performance_check(
@@ -1683,48 +1651,112 @@ impl PerfStats {
 /// deterministic for a fixed toolchain (like `total` itself) and is often
 /// dominated by `metadata`: AIPL's long mangled symbol names and per-function
 /// relocations cost more than the machine code for small programs.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct BinSizes {
     total: u64,
     code: u64,
     data: u64,
     metadata: u64,
+    /// `code`, split per function: `(name, bytes)` sorted by name. Every
+    /// function the object defines appears, so this doubles as the list of
+    /// instances monomorphization emitted — which is why there is no separate
+    /// section for that. Sorted by *name* rather than by size so a function
+    /// that grows moves one line instead of reshuffling the list.
+    code_fns: Vec<(String, u64)>,
 }
 
 impl BinSizes {
-    /// Split an object's bytes into code/data/metadata (see the struct docs).
-    fn of(obj_bytes: &[u8]) -> BinSizes {
-        use object::{Object, ObjectSection, SectionKind};
+    /// Split an object's bytes into code/data/metadata (see the struct docs),
+    /// and `code` further into its per-function parts. `names` maps object
+    /// symbols back to the AIPL names they were compiled from (see
+    /// [`ObjectCompilation::code_symbol_names`]); a symbol that isn't in it —
+    /// codegen's synthesized helpers — keeps its own name.
+    fn of(obj_bytes: &[u8], names: &HashMap<String, String>) -> BinSizes {
+        use object::{Object, ObjectSection, ObjectSymbol, SectionIndex, SectionKind, SymbolKind};
         let total = obj_bytes.len() as u64;
         let (mut code, mut data) = (0u64, 0u64);
+        let mut code_fns: Vec<(String, u64)> = Vec::new();
         if let Ok(obj) = object::File::parse(obj_bytes) {
+            // Mach-O prefixes every symbol with `_`; the name in `names` (and
+            // the one worth reading) is the unprefixed one.
+            let prefix = match obj.format() {
+                object::BinaryFormat::MachO => "_",
+                _ => "",
+            };
+            let mut text: Vec<(SectionIndex, u64, u64)> = Vec::new();
             for sec in obj.sections() {
                 // On-disk byte span (BSS-style sections have none → 0), so
                 // `code + data` never exceeds the file and `metadata` is the rest.
                 let bytes = sec.file_range().map_or(0, |(_, len)| len);
                 match sec.kind() {
-                    SectionKind::Text => code += bytes,
+                    SectionKind::Text => {
+                        code += bytes;
+                        text.push((sec.index(), sec.address(), bytes));
+                    }
                     SectionKind::Data | SectionKind::ReadOnlyData | SectionKind::ReadOnlyString => {
                         data += bytes
                     }
                     _ => {}
                 }
             }
+            // Where each function starts. The object records no symbol *sizes*
+            // (Mach-O has nowhere to put them), so a function's size is the
+            // distance to the next one — and the last runs to the end of its
+            // section. Padding between functions therefore lands on the one it
+            // follows, and the parts sum to `code` exactly.
+            let mut starts: HashMap<SectionIndex, Vec<(u64, String)>> = HashMap::new();
+            for sym in obj.symbols() {
+                let Some(ix) = sym.section_index() else {
+                    continue;
+                };
+                // Only function starts: a text section can also carry section
+                // symbols and embedded data, whose bytes belong to the function
+                // they sit in rather than to a line of their own.
+                if sym.kind() != SymbolKind::Text || !text.iter().any(|(t, _, _)| *t == ix) {
+                    continue;
+                }
+                let raw = sym.name().unwrap_or("<unnamed>");
+                let unprefixed = raw.strip_prefix(prefix).unwrap_or(raw);
+                let name = names.get(unprefixed).map_or(unprefixed, String::as_str);
+                starts
+                    .entry(ix)
+                    .or_default()
+                    .push((sym.address(), name.to_string()));
+            }
+            for (ix, addr, size) in text {
+                let mut syms = starts.remove(&ix).unwrap_or_default();
+                syms.sort();
+                for (i, (at, name)) in syms.iter().enumerate() {
+                    // The first symbol absorbs any section-leading padding, so
+                    // no bytes go unattributed.
+                    let start = if i == 0 { addr } else { *at };
+                    let end = syms.get(i + 1).map_or(addr + size, |(next, _)| *next);
+                    code_fns.push((name.clone(), end.saturating_sub(start)));
+                }
+            }
         }
+        code_fns.sort();
         BinSizes {
             total,
             code,
             data,
             metadata: total.saturating_sub(code + data),
+            code_fns,
         }
     }
 
-    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split.
+    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split,
+    /// with `code`'s per-function parts nested under it.
     fn render(&self) -> String {
-        format!(
-            "binary size: {}\n  code: {}\n  data: {}\n  metadata: {}",
-            self.total, self.code, self.data, self.metadata,
-        )
+        let mut out = format!("binary size: {}\n  code: {}", self.total, self.code);
+        for (name, bytes) in &self.code_fns {
+            out.push_str(&format!("\n    {name}: {bytes}"));
+        }
+        out.push_str(&format!(
+            "\n  data: {}\n  metadata: {}",
+            self.data, self.metadata
+        ));
+        out
     }
 }
 
@@ -1747,6 +1779,12 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     // change here.
     let mut builtin_calls: Vec<(String, u64)> = Vec::new();
     let mut in_builtins = false;
+    // Likewise the per-function `code` split: the deeper-indented `<fn>: <n>`
+    // lines that follow `code:`. Read by position, not by name — a function may
+    // legitimately be called `data` or `metadata`, so matching on the text would
+    // mistake it for the sibling line it sits under.
+    let mut code_fns: Vec<(String, u64)> = Vec::new();
+    let mut in_code = false;
     for raw in s.lines() {
         let line = raw.trim();
         if line.starts_with("builtin calls:") {
@@ -1762,6 +1800,15 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
                 _ => in_builtins = false,
             }
         }
+        if in_code {
+            match (raw.starts_with("    "), line.rsplit_once(": ")) {
+                (true, Some((name, n))) if n.trim().parse::<u64>().is_ok() => {
+                    code_fns.push((name.trim().to_string(), n.trim().parse().unwrap()));
+                    continue;
+                }
+                _ => in_code = false,
+            }
+        }
         if let Some(v) = line.strip_prefix("bytes allocated:") {
             bytes_allocated = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("instructions executed:") {
@@ -1770,6 +1817,7 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             binary_size = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("code:") {
             code = v.trim().parse().ok();
+            in_code = true;
         } else if let Some(v) = line.strip_prefix("data:") {
             data = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("metadata:") {
@@ -1793,6 +1841,7 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             code: code?,
             data: data?,
             metadata: metadata?,
+            code_fns,
         },
         builtin_calls,
     })

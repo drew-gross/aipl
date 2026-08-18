@@ -39,6 +39,13 @@ bytes allocated: 936
 instructions executed: 1869
 binary size: 8080
   code: 4476
+    __arr_drop_0: 136
+    __arr_retain_0: 136
+    __eq_1: 284
+    __eq_2: 268
+    main: 2972
+    pair_up$lam11: 340
+    pair_up$lam13: 340
   data: 411
   metadata: 3193
 builtin calls: 92
@@ -55,7 +62,3 @@ builtin calls: 92
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-main
-pair_up$lam11
-pair_up$lam13

@@ -51,6 +51,9 @@ bytes allocated: 0
 instructions executed: 2249
 binary size: 4152
   code: 1216
+    __eq_0: 100
+    common_space_prefix: 320
+    main: 796
   data: 930
   metadata: 2006
 builtin calls: 186
@@ -61,6 +64,3 @@ builtin calls: 186
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-common_space_prefix
-main

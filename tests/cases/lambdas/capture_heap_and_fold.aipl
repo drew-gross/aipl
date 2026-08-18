@@ -35,6 +35,10 @@ bytes allocated: 272
 instructions executed: 557
 binary size: 3768
   code: 1656
+    __eq_0: 352
+    __to_str_1: 180
+    main: 692
+    tag$lam4: 432
   data: 161
   metadata: 1951
 builtin calls: 72
@@ -56,6 +60,3 @@ builtin calls: 72
   aipl_test_summary: 1
   aipl_trim: 1
   aipl_write_i64: 2
---- monomorphizations ---
-main
-tag$lam4

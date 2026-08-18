@@ -24,6 +24,8 @@ bytes allocated: 0
 instructions executed: 78
 binary size: 1864
   code: 424
+    main: 384
+    wrap$i64: 40
   data: 242
   metadata: 1198
 builtin calls: 14
@@ -34,6 +36,3 @@ builtin calls: 14
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-main
-wrap$i64

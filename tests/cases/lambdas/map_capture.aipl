@@ -25,6 +25,10 @@ bytes allocated: 288
 instructions executed: 759
 binary size: 2936
   code: 1376
+    __eq_0: 296
+    main: 496
+    map$lam1: 292
+    map$lam3: 292
   data: 137
   metadata: 1423
 builtin calls: 27
@@ -36,7 +40,3 @@ builtin calls: 27
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-main
-map$lam1
-map$lam3

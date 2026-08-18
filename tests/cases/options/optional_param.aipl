@@ -15,6 +15,9 @@ bytes allocated: 0
 instructions executed: 78
 binary size: 1456
   code: 360
+    __test$pick: 264
+    main: 72
+    pick: 24
   data: 156
   metadata: 940
 builtin calls: 6
@@ -22,7 +25,3 @@ builtin calls: 6
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$pick
-main
-pick

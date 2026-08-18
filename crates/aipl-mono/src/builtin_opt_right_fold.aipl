@@ -90,6 +90,21 @@ bytes allocated: 536
 instructions executed: 2373
 binary size: 9928
   code: 5764
+    __eq_0: 100
+    __eq_1: 148
+    __filter5$own0: 284
+    __lambda_10: 52
+    __lambda_8: 88
+    __test$opt_right_fold: 1148
+    is_big: 16
+    main: 256
+    opt_right_fold$i64$i64$lam1: 464
+    opt_right_fold$i64$i64$lam11: 456
+    opt_right_fold$i64$i64$lam13: 468
+    opt_right_fold$i64$i64$lam3: 464
+    opt_right_fold$i64$i64$lam4: 464
+    opt_right_fold$i64$i64$lam9: 456
+    opt_right_fold$str$str$s1$lam7: 900
   data: 854
   metadata: 3310
 builtin calls: 109
@@ -106,17 +121,3 @@ builtin calls: 109
   aipl_test_begin: 3
   aipl_test_end: 3
   aipl_test_summary: 1
---- monomorphizations ---
-__filter5$own0
-__lambda_10
-__lambda_8
-__test$opt_right_fold
-is_big
-main
-opt_right_fold$i64$i64$lam1
-opt_right_fold$i64$i64$lam11
-opt_right_fold$i64$i64$lam13
-opt_right_fold$i64$i64$lam3
-opt_right_fold$i64$i64$lam4
-opt_right_fold$i64$i64$lam9
-opt_right_fold$str$str$s1$lam7

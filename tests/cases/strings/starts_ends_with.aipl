@@ -45,6 +45,8 @@ bytes allocated: 0
 instructions executed: 292
 binary size: 6352
   code: 1860
+    __test$is_dotfile: 1788
+    main: 72
   data: 1279
   metadata: 3213
 builtin calls: 151
@@ -58,6 +60,3 @@ builtin calls: 151
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$is_dotfile
-main

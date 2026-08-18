@@ -36,6 +36,9 @@ bytes allocated: 296
 instructions executed: 801
 binary size: 2680
   code: 1128
+    __eq_0: 296
+    filter_evens$lam0: 320
+    main: 512
   data: 190
   metadata: 1362
 builtin calls: 25
@@ -47,6 +50,3 @@ builtin calls: 25
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-filter_evens$lam0
-main

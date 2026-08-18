@@ -81,6 +81,11 @@ bytes allocated: 0
 instructions executed: 1425
 binary size: 10504
   code: 4352
+    __builtin_value_or_err$char$i64: 92
+    __builtin_value_or_err$char$str: 212
+    check_len: 392
+    digit_of: 424
+    main: 3232
   data: 1571
   metadata: 4581
 builtin calls: 226
@@ -93,9 +98,3 @@ builtin calls: 226
   aipl_test_begin: 4
   aipl_test_end: 4
   aipl_test_summary: 1
---- monomorphizations ---
-__builtin_value_or_err$char$i64
-__builtin_value_or_err$char$str
-check_len
-digit_of
-main

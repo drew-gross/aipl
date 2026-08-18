@@ -14,6 +14,9 @@ bytes allocated: 32
 instructions executed: 29
 binary size: 1128
   code: 196
+    __test$g: 84
+    g$EmptyArray: 48
+    main: 64
   data: 37
   metadata: 895
 builtin calls: 6
@@ -23,7 +26,3 @@ builtin calls: 6
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__test$g
-g$EmptyArray
-main

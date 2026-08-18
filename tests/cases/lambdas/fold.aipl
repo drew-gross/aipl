@@ -38,6 +38,10 @@ bytes allocated: 484
 instructions executed: 1170
 binary size: 5992
   code: 2856
+    __filter6$own0: 272
+    __test$sums_an_array: 2292
+    main: 72
+    sum: 220
   data: 641
   metadata: 2495
 builtin calls: 81
@@ -58,8 +62,3 @@ builtin calls: 81
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1
---- monomorphizations ---
-__filter6$own0
-__test$sums_an_array
-main
-sum
