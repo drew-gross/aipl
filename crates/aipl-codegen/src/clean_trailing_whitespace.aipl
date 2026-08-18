@@ -1,0 +1,86 @@
+// The formatter's pre-pass: trailing spaces and tabs come off every line before
+// layout, so every span the walker copies verbatim refers to the cleaned text.
+// The language rejects trailing whitespace, so removing it can't change the
+// meaning of a program the parser would accept.
+import { join, map, ==, || } from builtins;
+import { lines } from "./lines.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+pub fn clean_trailing_whitespace(src: str) -> str {
+    src.lines().map(|l| l.trim_end_while(|c| c == ' ' || c == '\t')).join("\n")
+}.doc("""
+    `src` with the trailing space/tab run removed from every line. Line endings
+    are preserved exactly — splitting and rejoining on `\\n` puts back what was
+    there, including a trailing newline or its absence.
+
+    Only spaces and tabs count as trailing whitespace, so a `\\r` before the
+    `\\n` of a CRLF ending is content: it stops the trim, and whitespace before
+    it survives. The formatter's input has already been through the parser's
+    trailing-whitespace check, which treats CRLF the same way.
+""").test({
+    // The point of the function: a trailing run comes off, per line.
+    assert(clean_trailing_whitespace("a  \nb\t\n") == "a\nb\n");
+    assert(clean_trailing_whitespace("trailing   ") == "trailing"); // no newline at EOF
+    assert(clean_trailing_whitespace("mixed \t \t") == "mixed"); // spaces and tabs
+
+    // Whitespace that isn't trailing is untouched: indentation, and runs with
+    // content after them.
+    assert(clean_trailing_whitespace("    indented") == "    indented");
+    assert(clean_trailing_whitespace("a  b  \n") == "a  b\n"); // interior kept, trailing cut
+    assert(clean_trailing_whitespace("\ttab-indented\t") == "\ttab-indented");
+
+    // A whitespace-only line becomes empty rather than disappearing.
+    assert(clean_trailing_whitespace("a\n   \nb") == "a\n\nb");
+    assert(clean_trailing_whitespace("   ") == "");
+
+    // Line endings survive exactly: a trailing newline stays, its absence stays,
+    // and consecutive newlines aren't collapsed.
+    assert(clean_trailing_whitespace("a\n") == "a\n");
+    assert(clean_trailing_whitespace("a") == "a");
+    assert(clean_trailing_whitespace("a\n\n\nb") == "a\n\n\nb");
+    assert(clean_trailing_whitespace("") == "");
+    assert(clean_trailing_whitespace("\n") == "\n");
+
+    // Nothing to do: already-clean text comes back byte-for-byte.
+    assert(clean_trailing_whitespace("fn main() {\n    0\n}\n") == "fn main() {\n    0\n}\n");
+
+    // A `\r` is content, not trailing whitespace: it stops the trim, so the run
+    // before a CRLF ending survives.
+    assert(clean_trailing_whitespace("a  \r\n") == "a  \r\n");
+    assert(clean_trailing_whitespace("a\r\n") == "a\r\n");
+})
+--- monomorphizations ---
+__m2__trim_end_while$lam1
+clean_trailing_whitespace
+main
+--- performance ---
+allocations: 45
+deallocations: 45
+reallocations: 0
+bytes allocated: 1929
+instructions executed: 7651
+binary size: 8440
+  code: 2800
+  data: 1561
+  metadata: 4079
+builtin calls: 828
+  aipl_arr_drop_str: 32
+  aipl_arr_retain_ptr: 31
+  aipl_array_dec: 48
+  aipl_array_new: 16
+  aipl_array_push_mut: 31
+  aipl_array_with_cap: 16
+  aipl_assert: 16
+  aipl_dec: 245
+  aipl_inc: 119
+  aipl_str_data: 20
+  aipl_str_eq: 16
+  aipl_str_iter_init: 31
+  aipl_str_iter_next: 20
+  aipl_str_join: 16
+  aipl_str_len: 90
+  aipl_str_slice: 62
+  aipl_str_split: 16
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

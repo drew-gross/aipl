@@ -33,6 +33,9 @@ self-hosting:
   move format_source to aipl
   make formatter command that is fully self-hosted
 
+clean_trailing_whitespace.aipl:
+  optimize: use char-by-char approach? make lines() streaming?
+
 List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims

@@ -3367,6 +3367,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
 /// the walker; `aipl fmt` links this one on top and is an explicit user action.
 pub const FMT_SOURCE_FILES: &[&str] = &[
     "./process_raw_string.aipl",
+    "./clean_trailing_whitespace.aipl",
     "./dedent.aipl",
     "./lines.aipl",
     "./trim_prefix.aipl",
@@ -3446,7 +3447,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
 ];
 
 /// The formatter engine's single FFI entry.
-pub const FMT_ENTRIES: &[&str] = &["format_program"];
+pub const FMT_ENTRIES: &[&str] = &["format_program", "clean_trailing_whitespace"];
 
 /// Where the checked-in formatter IR lives, and its bare filename for the
 /// `dogfood_ir` test. See [`DOGFOOD_CLIF_PATH`] for why this is a path read at
@@ -3716,6 +3717,24 @@ pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
             },
             Ok(FfiValue::Res(Err(e))) => Err(err_of(*e)),
             other => panic!("dogfooded format_program() call: {other:?}"),
+        }
+    })
+}
+
+/// Strip the trailing space/tab run from every line of `src`, preserving line
+/// endings — the formatter's pre-pass, so every span its walker copies verbatim
+/// refers to the cleaned text. Computed by the dogfooded AIPL
+/// `clean_trailing_whitespace`, on the formatter engine (its only caller is
+/// `aipl-fmt`, which already links that engine). No native fallback; panics if
+/// it can't be built or called.
+pub fn clean_trailing_whitespace(src: &str) -> String {
+    FMT_ENGINE.with(|comp| {
+        match comp.call_values(
+            "clean_trailing_whitespace",
+            &[FfiValue::Str(src.to_string())],
+        ) {
+            Ok(FfiValue::Str(out)) => out,
+            other => panic!("dogfooded clean_trailing_whitespace() call: {other:?}"),
         }
     })
 }

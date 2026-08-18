@@ -61,7 +61,7 @@ pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
 
     // Remove trailing whitespace per line before laying out, so every span the
     // walker copies verbatim refers to the cleaned text.
-    let cleaned = clean_trailing_whitespace(code);
+    let cleaned = aipl_codegen::clean_trailing_whitespace(code);
 
     // Validate with the real parser first: its errors are the good ones, and
     // anything it accepts the walker below must handle.
@@ -88,32 +88,6 @@ pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
         out.push_str(sections);
     }
     Ok(out)
-}
-
-/// Strip trailing spaces/tabs from every line (line endings preserved).
-fn clean_trailing_whitespace(src: &str) -> String {
-    let mut out = String::with_capacity(src.len());
-    let mut line_start = true;
-    let mut pending_ws = String::new();
-    for c in src.chars() {
-        match c {
-            ' ' | '\t' => pending_ws.push(c),
-            '\n' => {
-                pending_ws.clear();
-                out.push('\n');
-                line_start = true;
-            }
-            _ => {
-                if !line_start || !pending_ws.is_empty() {
-                    out.push_str(&pending_ws);
-                }
-                pending_ws.clear();
-                out.push(c);
-                line_start = false;
-            }
-        }
-    }
-    out
 }
 
 /// Lex both texts and compare token/comment content as multisets (imports may
