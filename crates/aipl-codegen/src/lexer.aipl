@@ -41,6 +41,32 @@ import {
 // than keeping a second copy in sync.
 import { unescape } from "./unescape.aipl";
 
+// ---------- SIGNEDNESS ----------
+//
+// Every length, offset, cursor and span in this file is `u64`: they all count
+// bytes, and none of them can be negative. Conversions to signed are pushed to
+// the leaf that forces them, so nothing signed propagates upward. Three things
+// force one today, each a compiler-side gap rather than something this file
+// wants:
+//
+// (1) `count_while` returns `i64` though it is a count. Its sibling `count` and
+//     `len` both return `u64`, so the three disagree. This is the only reason
+//     `ucount_while` exists; if `count_while` were `u64`, that helper and its
+//     conversion would both disappear.
+//
+// (2) An integer literal doesn't flex through a constructor: in a function
+//     returning `u64!LexError`, `ok(0)` types its payload `i64` and is rejected.
+//     The three "declined" sites bind `let declined: u64 = 0;` first for that
+//     reason alone.
+//
+// (3) A lambda/function-ref specialization created inside a `.test` body
+//     inherits that body's "all effects allowed", and a production caller then
+//     reuses the same instance — so a helper called from both places fails with
+//     a spurious effect error (`ucount_while$lam0 has effect "!prints"`). That
+//     is why `ucount_while` carries no `.test` block of its own.
+//
+// Fixing (1) is the one that would actually shrink this file.
+
 // What a token carries beyond its span: the processed *value* of the matched
 // text, computed at lex time by the matcher that claimed it (see each
 // matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
@@ -234,28 +260,30 @@ struct TokenRule<K> {
 // `skip` matches appear in neither.
 struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
-fn lex_err(message: str, start: i64, end: i64) -> LexError {
+fn lex_err(message: str, start: u64, end: u64) -> LexError {
     LexError { message, span: start..end }
 }
 
-// A `str`'s length as `i64`. `len()` is `u64`, and the two widths can't be
-// mixed, but every cursor and span in this file is signed — so the conversion
-// would otherwise appear at nearly every comparison. Converting is what a typed
-// binding does, and this is that binding with a name.
-fn ilen(self: str) -> i64 {
-    let n: i64 = self.len();
+// `count_while` as the `u64` it should be — see SIGNEDNESS (1) at the top of the
+// file. This is the *only* place a signed count enters, so every length, cursor
+// and span above it stays unsigned.
+//
+// It deliberately carries no `.test` block of its own: a specialization created
+// inside a test body inherits that body's "all effects allowed" and is then
+// reused by production callers, so testing it here makes `float_len` fail with
+// `ucount_while$lam0 has effect "!prints"` — see SIGNEDNESS (3). Its behavior is
+// covered through `char_run_len`/`to_eol_len`/`int_len`/`float_len` in the
+// `lex` tests at the end of the file.
+fn ucount_while(self: str, pred: (char) -> bool) -> u64 {
+    let n: u64 = self.count_while(pred);
     n
-}.test({
-    assert("".ilen() == 0);
-    assert("abc".ilen() == 3);
-    assert("héllo".ilen() == 6); // bytes, like `len()`
-})
+}
 
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
 // char, then `cont` chars. 0 when the first char isn't in `first`.
-fn char_run_len(self: str, first: str, cont: str) -> i64 {
+fn char_run_len(self: str, first: str, cont: str) -> u64 {
     if (self[0].is_some_and(|c| first.contains(c))) {
-        1 + self[1..].count_while(|c| cont.contains(c))
+        1 + self[1..].ucount_while(|c| cont.contains(c))
     } else {
         0
     }
@@ -263,17 +291,17 @@ fn char_run_len(self: str, first: str, cont: str) -> i64 {
 
 // `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
 // spelling never matches.
-fn exact_len(self: str, spelling: str) -> i64 {
-    if (0 < spelling.len() && self.starts_with(spelling)) { spelling.ilen() } else { 0 }
+fn exact_len(self: str, spelling: str) -> u64 {
+    if (0 < spelling.len() && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
 // `Keyword`: the length of `spelling` when it prefixes `self`, but only when the
 // char after it is absent (end of source) or outside `boundary` — a keyword must
 // not end in the middle of an identifier. 0 when it doesn't match (or the char
 // after is a boundary char, as in `iffy` for `if`).
-fn keyword_len(self: str, spelling: str, boundary: str) -> i64 {
+fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
     let bounded = !self[spelling.len()].is_some_and(|c| boundary.contains(c));
-    if (0 < spelling.len() && bounded && self.starts_with(spelling)) { spelling.ilen() } else { 0 }
+    if (0 < spelling.len() && bounded && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
 // `Delimited`: a `delims` char opens the token, which spans to just past the
@@ -284,14 +312,15 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> i64 {
 // source leaves the token unterminated. A token still open at the end of the
 // source is a hard error (`at` is the token's absolute start, so error spans
 // land in the real source).
-fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64!LexError {
+fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64!LexError {
     if (!self[0].is_some_and(|c| delims.contains(c))) {
-        return ok(0);
+        let declined: u64 = 0; // SIGNEDNESS: a literal doesn't flex through `ok(..)`
+        return ok(declined);
     };
     let d = self[0].value_or(' '); // in bounds: the guard above saw a char
-    mut i = 1;
+    mut i: u64 = 1;
     mut closed = false;
-    while (!closed && i < self.ilen()) {
+    while (!closed && i < self.len()) {
         let c = self[i].value_or(' '); // in bounds: the loop condition holds
         if (c == d) {
             set closed = true;
@@ -302,7 +331,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
             // unterminated). The escaped char must be allowed, and is content:
             // the extra step below skips it, so an escaped delimiter can't
             // close the token.
-            if (c == '\\' && 0 < escapes.len() && i + 1 < self.ilen()) {
+            if (c == '\\' && 0 < escapes.len() && i + 1 < self.len()) {
                 if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
                     return err(LexError {
                         message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
@@ -315,7 +344,7 @@ fn delimited_len(self: str, at: i64, delims: str, escapes: str, msg: str) -> i64
         set i++;
     }
     if (!closed) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
     };
     ok(i)
 }
@@ -333,21 +362,22 @@ fn unterminated_msg(msg: str) -> str {
 // content, not a terminator, and open/close may be multi-char and differ. No
 // escapes — contents are verbatim. A token still open at the end of the source
 // is a hard error (`at` places the span in the real source).
-fn between_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexError {
+fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
-        return ok(0);
+        let declined: u64 = 0; // SIGNEDNESS: a literal doesn't flex through `ok(..)`
+        return ok(declined);
     };
 
     // Scan for the close from just past the open, so an `open`/`close` that
     // share text (e.g. `"""`/`"""`) can't self-close on the opener.
-    mut i: i64 = open.len();
-    while (i < self.ilen()) {
+    mut i = open.len();
+    while (i < self.len()) {
         if (self[i..].starts_with(close)) {
-            return ok(i + close.ilen());
+            return ok(i + close.len());
         };
         set i++;
     }
-    err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() })
+    err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
 }
 
 // `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
@@ -357,51 +387,56 @@ fn between_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexEr
 // overlap can't misclassify, but the two must be distinct for nesting to mean
 // anything. No escapes — contents are verbatim. Still open (depth > 0) at the
 // end of the source is a hard error (`at` places the span in the real source).
-fn nested_len(self: str, at: i64, open: str, close: str, msg: str) -> i64!LexError {
+fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
-        return ok(0);
+        let declined: u64 = 0; // SIGNEDNESS: a literal doesn't flex through `ok(..)`
+        return ok(declined);
     };
-    mut depth = 1;
-    mut i: i64 = open.len();
-    while (0 < depth && i < self.ilen()) {
+    mut depth: u64 = 1;
+    mut i = open.len();
+    while (0 < depth && i < self.len()) {
         if (self[i..].starts_with(open)) {
             set depth++;
-            set i = i + open.ilen();
+            set i = i + open.len();
         } else {
             if (self[i..].starts_with(close)) {
                 set depth = depth - 1;
-                set i = i + close.ilen();
+                set i = i + close.len();
             } else {
                 set i++;
             };
         };
     }
     if (0 < depth) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + self.ilen() });
+        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
     };
     ok(i)
 }
 
 // `ToEol`: the marker, then everything up to (not including) the next
 // newline. 0 when `self` doesn't start with the (non-empty) marker.
-fn to_eol_len(self: str, marker: str) -> i64 {
-    if (0 < marker.len() && self.starts_with(marker)) { self.count_while(|x| x != '\n') } else { 0 }
+fn to_eol_len(self: str, marker: str) -> u64 {
+    if (0 < marker.len() && self.starts_with(marker)) {
+        self.ucount_while(|x| x != '\n')
+    } else {
+        0
+    }
 }
 
 // The end of the number whose integer part ends at `int_end`: extends past a
 // fraction (`.` then at least one digit), then past an exponent (`e` or `E`,
 // an optional sign, then at least one digit). Either part may be absent;
 // `int_end` comes back unchanged when neither matches.
-fn number_end(self: str, int_end: i64) -> i64 {
+fn number_end(self: str, int_end: u64) -> u64 {
     mut end = int_end;
     if (self[end] == some('.') && self[end + 1].is_some_and(is_digit)) {
-        set end = end + 1 + self[end + 1..].count_while(is_digit);
+        set end = end + 1 + self[end + 1..].ucount_while(is_digit);
     };
     if (self[end].is_some_and(|e| e == 'e' || e == 'E')) {
         let has_sign = self[end + 1].is_some_and(|sign| sign == '+' || sign == '-');
         let digits = if (has_sign) { end + 2 } else { end + 1 };
         if (self[digits].is_some_and(is_digit)) {
-            set end = digits + self[digits..].count_while(is_digit);
+            set end = digits + self[digits..].ucount_while(is_digit);
         };
     };
     end
@@ -409,8 +444,8 @@ fn number_end(self: str, int_end: i64) -> i64 {
 
 // `Float`: a digit run that extends past a fraction and/or exponent. A bare
 // digit run is 0 (no match) — it belongs to the int rule.
-fn float_len(self: str) -> i64 {
-    let int_end = self.count_while(is_digit);
+fn float_len(self: str) -> u64 {
+    let int_end = self.ucount_while(is_digit);
     if (int_end == 0) {
         return 0;
     };
@@ -425,10 +460,10 @@ fn float_len(self: str) -> i64 {
 // disambiguation: with an `Int` rule before the `-` operator rule, `-5` is a
 // signed literal while `- 5`/`-x` are the operator; put the operator first and
 // every `-` is the operator and `Int` is unsigned.
-fn int_len(self: str) -> i64 {
+fn int_len(self: str) -> u64 {
     let signed = self[0] == some('-') && self[1].is_some_and(is_digit);
-    let start = if (signed) { 1 } else { 0 };
-    let digits = self[start..].count_while(is_digit);
+    let start: u64 = if (signed) { 1 } else { 0 };
+    let digits = self[start..].ucount_while(is_digit);
     if (digits == 0) { 0 } else { start + digits }
 }
 
@@ -494,14 +529,14 @@ fn seg_only(span: Span) -> LexError {
 // usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
 // `Template` — any trivia recorded along the way, and the position just past
 // the consumed text. `end` staying at the step's start means no rule matched.
-struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: i64 }
+struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: u64 }
 
 // A simple (single-token) matcher's outcome: a decline when the matched
 // length `n` is 0, otherwise `n` chars consumed producing the rule's one
 // token — recorded as trivia for a `trivia` rule, or nothing at all for a
 // `skip` rule. The token's kind comes from the rule's `emit` applied to the
 // matcher-computed value, which can fail on an emit/value-shape mismatch.
-fn step_result<K>(r: TokenRule<K>, src: str, at: i64, n: i64) -> StepResult<K>!LexError {
+fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!LexError {
     if (n == 0 || r.skip) {
         return ok(StepResult { tokens: [], trivia: [], end: at + n });
     };
@@ -523,7 +558,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: i64, n: i64) -> StepResult<K>!L
 // length, so its arm builds the outcome directly. Mutually recursive with
 // `template_scan`: an interpolation re-enters this full rule set, so template
 // literals nest.
-fn lex_step<K>(src: str, at: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
+fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     for (let r : rules) {
         let res = match (r.matcher) {
             CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
@@ -600,7 +635,7 @@ fn seg_needs_ofseg(span: Span) -> LexError {
 // literal's whole token run.
 fn template_step<K>(
     src: str,
-    at: i64,
+    at: u64,
     delim: str,
     escapes: str,
     finalize: (str[]) -> str[],
@@ -630,7 +665,7 @@ fn template_step<K>(
 // falling through to run the literal out unterminated.
 fn template_scan<K>(
     src: str,
-    at: i64,
+    at: u64,
     delim: str,
     escapes: str,
     finalize: (str[]) -> str[],
@@ -643,15 +678,15 @@ fn template_scan<K>(
     mut seg_texts = [];
     mut seg_spans = [];
     mut interp_runs = [];
-    mut i = at + delim.ilen();
+    mut i = at + delim.len();
     mut seg_start = at;
-    while (i < src.ilen()) {
+    while (i < src.len()) {
         // The segment's text: past the opening delim for the first segment,
         // from just past the previous interpolation's `}` after — through the
         // current position (a closing delim or an opening `{`), exclusive.
-        let text_start = if (seg_texts.len() == 0) { at + delim.ilen() } else { seg_start };
+        let text_start = if (seg_texts.len() == 0) { at + delim.len() } else { seg_start };
         if (src[i..].starts_with(delim)) {
-            let end = i + delim.ilen();
+            let end = i + delim.len();
             set seg_texts.push(src[text_start..i]);
             set seg_spans.push(seg_start..end);
             return finalize_template(finalize, emit, seg_texts, seg_spans, interp_runs, end);
@@ -665,7 +700,7 @@ fn template_scan<K>(
             set i = interp.end;
             set seg_start = i;
         } else {
-            if (c == '\\' && 0 < escapes.len() && i + 1 < src.ilen()) {
+            if (c == '\\' && 0 < escapes.len() && i + 1 < src.len()) {
                 if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
                     return err(LexError {
                         message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
@@ -694,13 +729,13 @@ fn finalize_template<K>(
     seg_texts: str[],
     seg_spans: Span[],
     interp_runs: StepResult<K>[],
-    end: i64,
+    end: u64,
 ) -> StepResult<K>!LexError {
     let finals = finalize(seg_texts);
     mut toks = [];
     mut trivia = [];
-    let n: i64 = seg_texts.len();
-    mut k = 0;
+    let n = seg_texts.len();
+    mut k: u64 = 0;
     while (k < n) {
         // `k` is always in range (0..n), so the `none` fallbacks below are dead.
         let txt = finals[k].value_or("");
@@ -741,13 +776,13 @@ fn finalize_template<K>(
 // its own token — set/dict literals, blocks) raises/lowers it, while a brace
 // buried inside a bigger token (a delimited string's content, a nested
 // template) doesn't. The result's `end` sits just past the closing `}`.
-fn interp_scan<K>(src: str, at: i64, open: i64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
+fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     mut toks = [];
     mut trivia = [];
-    mut depth = 1;
+    mut depth: u64 = 1;
     mut i = at;
     while (0 < depth) {
-        if (!(i < src.ilen())) {
+        if (!(i < src.len())) {
             return err(LexError {
                 message: "unterminated template literal interpolation",
                 span: open..open + 1,
@@ -862,15 +897,15 @@ fn rawtpl_kind(text: str, seg: Seg) -> Kind {
 
 // Test-block shorthands over the concrete `Kind` (each kind arm carries its own
 // content): an expected token, and a token-only result (no trivia).
-fn tok(kind: Kind, start: i64, end: i64) -> Token<Kind> { Token { kind, span: start..end } }
+fn tok(kind: Kind, start: u64, end: u64) -> Token<Kind> { Token { kind, span: start..end } }
 
 fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { LexResult { tokens, trivia: [] } }
 
 pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];
     mut trivia = [];
-    mut pos = 0;
-    while (pos < self.ilen()) {
+    mut pos: u64 = 0;
+    while (pos < self.len()) {
         let step = lex_step(self, pos, rules)?;
         if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
@@ -1245,39 +1280,39 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 281245
-binary size: 1807408
-  code: 1134492
-  data: 8276
-  metadata: 664640
-builtin calls: 30152
+instructions executed: 281525
+binary size: 1809312
+  code: 1136708
+  data: 8148
+  metadata: 664456
+builtin calls: 30362
   aipl_arr_drop_str: 22
   aipl_arr_inc: 3037
   aipl_arr_retain_ptr: 30
   aipl_array_dec: 4714
   aipl_array_new: 1177
   aipl_array_push: 195
-  aipl_assert: 62
+  aipl_assert: 59
   aipl_char_at: 481
   aipl_concat_lazy: 29
-  aipl_dec: 8351
-  aipl_inc: 7446
+  aipl_dec: 8460
+  aipl_inc: 7555
   aipl_str_contains: 325
   aipl_str_data: 131
   aipl_str_eq: 111
   aipl_str_iter_init: 140
   aipl_str_iter_next: 131
-  aipl_str_len: 2618
+  aipl_str_len: 2615
   aipl_str_slice: 842
   aipl_str_starts_with: 305
-  aipl_test_begin: 2
-  aipl_test_end: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
   aipl_test_summary: 1
 --- monomorphizations ---
-__builtin_count_while$char$s0$lam27
-__builtin_count_while$char$s0$lam32
-__builtin_count_while$char$s0$lam34
-__builtin_count_while$char$s0$lam49
+__builtin_count_while$char$s0$lam40
+__builtin_count_while$char$s0$lam47
+__builtin_count_while$char$s0$lam52
+__builtin_count_while$char$s0$lam53
 __builtin_int_parse
 __builtin_is_some_and$char$lam33
 __builtin_opt_left_fold$char$i64$s0$lam38
@@ -1327,3 +1362,4 @@ template_scan$Kind
 template_step$Kind
 toks
 tpl_kind
+ucount_while$lam34

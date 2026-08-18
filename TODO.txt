@@ -26,6 +26,11 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
+integer signedness problems:
+  1. count_while returns i64 though it counts — its sibling count and len both return u64. This is the root cause: every length here derives from it. Making it u64 deletes ucount_while and its conversion outright. This is the one worth fixing.
+  2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
+  3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
+
 List files:
   fall back on (l)stat in case of DT_UNKNOWN?
   implement effect shims
@@ -40,6 +45,7 @@ syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : arr) syntax that gives you indexes (and keys for dicts, etc.)
   match should allow statements
+  allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
 
 shim:
   better syntax
@@ -460,3 +466,27 @@ Reasons dec.aipl uses a cons list:
     Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
 
     One caveat on the file's own header comment: it claims the tail-recursive form means it "never recurses on the native stack proportionally to document size." I don't see return_call anywhere in codegen, so guaranteed tail-call elimination doesn't appear to be implemented — that claim may depend on Cranelift happening to optimize the self-call, or it may just be aspirational. The cons-list rationale stands either way; the native-stack part of that comment is worth verifying if you care about it.
+
+signedness:
+
+    Lengths, offsets, cursors and spans are byte counts and should be u64 everywhere.
+    crates/aipl-codegen/src/lexer.aipl is now fully unsigned (see its SIGNEDNESS block);
+    these are the compiler-side gaps that forced a conversion, in order of value:
+
+    1. count_while returns i64 though it counts. Its sibling count returns u64, and so
+       does len, so the three disagree. Every length in lexer.aipl derives from it, which
+       is why the file was signed throughout; it now converts once, in ucount_while.
+       Making count_while u64 deletes that helper and its conversion outright.
+       (crates/aipl-mono/src/builtin_count_while.aipl:11)
+
+    2. An integer literal doesn't flex through a constructor. In a fn returning u64!E,
+       ok(0) types its payload i64 and is rejected, so the three "declined" sites in
+       lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an
+       annotated let, a parameter, or a struct field — just not through ok/err/some.
+
+    3. A lambda or fn-ref specialization created inside a .test body inherits that
+       body's "all effects allowed", and a production caller then reuses the same
+       instance — so a helper called from both places fails with a spurious effect
+       error (ucount_while$lam0 has effect "!prints"). That is why ucount_while carries
+       no .test block. This is the "test-block effect poisoning" already seen while
+       porting the lexer, now with a concrete reproducer.
