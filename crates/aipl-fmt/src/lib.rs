@@ -54,40 +54,26 @@ impl Default for FmtOptions {
 /// Requires the parser hooks (`aipl::install_parser_hooks`) — lexing a
 /// `"""` raw string runs the dogfooded de-denter.
 pub fn format_source(src: &str, opts: &FmtOptions) -> Result<String, Error> {
-    // Split off the trailing test sections: they are re-attached verbatim from
-    // the *original* text (an expected-output body may contain whitespace the
-    // cleanup below must not touch).
-    let (code, sections) = aipl_parser::split_test_sections(src);
+    // The pipeline itself is dogfooded (`format_source.aipl`), in the two halves
+    // this wraps around the checks that stay in Rust. `fmt_prepare` splits off
+    // the trailing sections and strips trailing whitespace; `fmt_layout` lays the
+    // rest out and normalizes the final newline.
+    let input = aipl_codegen::fmt_prepare(src);
 
-    // Remove trailing whitespace per line before laying out, so every span the
-    // walker copies verbatim refers to the cleaned text.
-    let cleaned = aipl_codegen::clean_trailing_whitespace(code);
+    // Validate with the real parser *before* laying out: its errors are the good
+    // ones, and anything it accepts the walker must handle. This is why the AIPL
+    // side is two entries — a Rust step sits in the middle of the pipeline.
+    aipl_parser::parse(&input.cleaned)?;
 
-    // Validate with the real parser first: its errors are the good ones, and
-    // anything it accepts the walker below must handle.
-    aipl_parser::parse(&cleaned)?;
-
-    // The layout proper — dogfooded (`walker.aipl` + `doc.aipl`). It lexes for
-    // itself, since arrays cannot cross the FFI as arguments.
-    let mut out = aipl_codegen::format_program(&cleaned, opts.max_width)?;
-
-    // Exactly one trailing newline, always — including for an empty program.
-    // The printer only preserves one if the layout happened to end with it, so
-    // normalize here: this is the formatter's guarantee, not the printer's.
-    while out.ends_with('\n') {
-        out.pop();
-    }
-    out.push('\n');
+    let out = aipl_codegen::fmt_layout(&input.cleaned, opts.max_width)?;
 
     // Safety net: the output must contain exactly the input's tokens and
     // comments (imports may be reordered, so compare as multisets). Any
     // mismatch is a formatter bug — refuse to emit rather than corrupt code.
-    verify_same_tokens(&cleaned, &out)?;
+    // Runs before the sections are re-attached, so it compares like with like.
+    verify_same_tokens(&input.cleaned, &out)?;
 
-    if !sections.is_empty() {
-        out.push_str(sections);
-    }
-    Ok(out)
+    Ok(out + &input.sections)
 }
 
 /// Lex both texts and compare token/comment content as multisets (imports may

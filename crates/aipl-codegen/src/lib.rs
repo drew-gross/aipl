@@ -66,6 +66,29 @@ const STATIC_REFCOUNT: i64 = i64::MAX;
 // (the NUL is kept only so a heap path can be handed to the C file API).
 const STR_HEADER_SIZE: usize = 16;
 
+/// The AIPL `FmtError` struct, rebuilt as a spanned [`Error`]. Shared by every
+/// formatter entry that can fail, so they decode the same shape the same way.
+fn fmt_error_of(v: FfiValue) -> Error {
+    let FfiValue::Struct(fields) = v else {
+        panic!("dogfooded formatter: err side is not a struct: {v:?}");
+    };
+    let get = |k: &str| fields.iter().find(|(n, _)| n == k).map(|(_, v)| v);
+    let msg = match get("message") {
+        Some(FfiValue::Str(m)) => m.clone(),
+        other => panic!("dogfooded formatter: FmtError.message: {other:?}"),
+    };
+    match get("span") {
+        Some(FfiValue::Struct(sp)) => {
+            let at = |k: &str| match sp.iter().find(|(n, _)| n == k) {
+                Some((_, FfiValue::Int(v))) => *v as usize,
+                other => panic!("dogfooded formatter: Span.{k}: {other:?}"),
+            };
+            Error::at(msg, at("start")..at("end"))
+        }
+        other => panic!("dogfooded formatter: FmtError.span: {other:?}"),
+    }
+}
+
 /// The refcount cell of any heap block (string or array): the word at `-8`.
 unsafe fn header_of(ptr: *const u8) -> *mut i64 {
     unsafe { ptr.sub(HEADER_SIZE) as *mut i64 }
@@ -3368,6 +3391,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
 pub const FMT_SOURCE_FILES: &[&str] = &[
     "./process_raw_string.aipl",
     "./clean_trailing_whitespace.aipl",
+    "./format_source.aipl",
     "./dedent.aipl",
     "./lines.aipl",
     "./trim_prefix.aipl",
@@ -3447,7 +3471,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
 ];
 
 /// The formatter engine's single FFI entry.
-pub const FMT_ENTRIES: &[&str] = &["format_program", "clean_trailing_whitespace"];
+pub const FMT_ENTRIES: &[&str] = &["format_program", "fmt_prepare", "fmt_layout"];
 
 /// Where the checked-in formatter IR lives, and its bare filename for the
 /// `dogfood_ir` test. See [`DOGFOOD_CLIF_PATH`] for why this is a path read at
@@ -3686,26 +3710,6 @@ fn find_trailing_whitespace(src: &str) -> Option<Span> {
 /// rebuilt as a spanned [`Error`]. No native fallback; panics if the engine
 /// can't be built or called.
 pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
-    fn err_of(v: FfiValue) -> Error {
-        let FfiValue::Struct(fields) = v else {
-            panic!("dogfooded format_program(): err side is not a struct: {v:?}");
-        };
-        let get = |k: &str| fields.iter().find(|(n, _)| n == k).map(|(_, v)| v);
-        let msg = match get("message") {
-            Some(FfiValue::Str(m)) => m.clone(),
-            other => panic!("dogfooded format_program(): FmtError.message: {other:?}"),
-        };
-        match get("span") {
-            Some(FfiValue::Struct(sp)) => {
-                let at = |k: &str| match sp.iter().find(|(n, _)| n == k) {
-                    Some((_, FfiValue::Int(v))) => *v as usize,
-                    other => panic!("dogfooded format_program(): Span.{k}: {other:?}"),
-                };
-                Error::at(msg, at("start")..at("end"))
-            }
-            other => panic!("dogfooded format_program(): FmtError.span: {other:?}"),
-        }
-    }
     FMT_ENGINE.with(|comp| {
         match comp.call_values(
             "format_program",
@@ -3715,26 +3719,58 @@ pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
                 FfiValue::Str(out) => Ok(out),
                 other => panic!("dogfooded format_program(): ok side is not a str: {other:?}"),
             },
-            Ok(FfiValue::Res(Err(e))) => Err(err_of(*e)),
+            Ok(FfiValue::Res(Err(e))) => Err(fmt_error_of(*e)),
             other => panic!("dogfooded format_program() call: {other:?}"),
         }
     })
 }
 
-/// Strip the trailing space/tab run from every line of `src`, preserving line
-/// endings — the formatter's pre-pass, so every span its walker copies verbatim
-/// refers to the cleaned text. Computed by the dogfooded AIPL
-/// `clean_trailing_whitespace`, on the formatter engine (its only caller is
-/// `aipl-fmt`, which already links that engine). No native fallback; panics if
-/// it can't be built or called.
-pub fn clean_trailing_whitespace(src: &str) -> String {
+/// `format_source`'s input, as [`fmt_prepare`] splits it: the code to lay out
+/// (trailing whitespace already stripped) and the trailing `--- section ---`
+/// blocks, which are copied to the output verbatim.
+pub struct FmtInput {
+    pub cleaned: String,
+    pub sections: String,
+}
+
+/// The first half of the formatter pipeline, dogfooded — see the AIPL
+/// `fmt_prepare`. No native fallback; panics if it can't be built or called.
+pub fn fmt_prepare(src: &str) -> FmtInput {
+    fn field(fields: &[(String, FfiValue)], name: &str) -> String {
+        match fields.iter().find(|(n, _)| n == name) {
+            Some((_, FfiValue::Str(s))) => s.clone(),
+            other => panic!("dogfooded fmt_prepare() FmtInput.{name}: {other:?}"),
+        }
+    }
+    FMT_ENGINE.with(|comp| {
+        match comp.call_values("fmt_prepare", &[FfiValue::Str(src.to_string())]) {
+            Ok(FfiValue::Struct(fields)) => FmtInput {
+                cleaned: field(&fields, "cleaned"),
+                sections: field(&fields, "sections"),
+            },
+            other => panic!("dogfooded fmt_prepare() call: {other:?}"),
+        }
+    })
+}
+
+/// The second half of the formatter pipeline, dogfooded — see the AIPL
+/// `fmt_layout`. `cleaned` must already have been parsed by the caller. No
+/// native fallback; panics if it can't be built or called.
+pub fn fmt_layout(cleaned: &str, width: usize) -> Result<String, Error> {
     FMT_ENGINE.with(|comp| {
         match comp.call_values(
-            "clean_trailing_whitespace",
-            &[FfiValue::Str(src.to_string())],
+            "fmt_layout",
+            &[
+                FfiValue::Str(cleaned.to_string()),
+                FfiValue::Int(width as i64),
+            ],
         ) {
-            Ok(FfiValue::Str(out)) => out,
-            other => panic!("dogfooded clean_trailing_whitespace() call: {other:?}"),
+            Ok(FfiValue::Res(Ok(v))) => match *v {
+                FfiValue::Str(out) => Ok(out),
+                other => panic!("dogfooded fmt_layout(): ok side is not a str: {other:?}"),
+            },
+            Ok(FfiValue::Res(Err(e))) => Err(fmt_error_of(*e)),
+            other => panic!("dogfooded fmt_layout() call: {other:?}"),
         }
     })
 }

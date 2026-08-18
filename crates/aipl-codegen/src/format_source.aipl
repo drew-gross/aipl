@@ -1,0 +1,282 @@
+// `format_source`, the formatter's top-level pipeline, in the two halves the
+// Rust side calls around the checks that stay there.
+//
+// The whole sequence is: split off the trailing `--- section ---` blocks, strip
+// trailing whitespace from what's left, **parse it with the real parser**, lay
+// it out, normalize to exactly one trailing newline, **verify the output has the
+// same tokens as the input**, then re-attach the sections verbatim.
+//
+// The two bold steps are Rust's and stay there — the parser and the token
+// comparison are not dogfooded — and one of them sits in the *middle*, which is
+// why this is two entries rather than one. Parsing has to come before layout:
+// the parser's errors are the good ones, and anything it accepts the walker must
+// handle, so a malformed program should fail with the parser's message rather
+// than whatever the walker makes of it.
+import { +++, == } from builtins;
+import { clean_trailing_whitespace } from "./clean_trailing_whitespace.aipl";
+import { split_test_sections } from "./split_test_sections.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+import { FmtError, format_program } from "./walker.aipl";
+
+// The formatter's input, split into the part it lays out and the part it copies.
+struct FmtInput { cleaned: str, sections: str }
+
+pub fn fmt_prepare(src: str) -> FmtInput {
+    let (code, sections) = split_test_sections(src);
+    FmtInput { cleaned: clean_trailing_whitespace(code), sections }
+}.doc("""
+    The first half of `format_source`: `src` split into the code to format
+    (trailing whitespace already stripped) and its trailing `--- section ---`
+    blocks, which are copied to the output verbatim rather than laid out.
+
+    The caller parses `cleaned` before handing it to `fmt_layout`.
+""").test({
+    // No sections: everything is code, and the cleanup has run.
+    let plain = fmt_prepare("fn main() {}  \n");
+    assert(plain.cleaned == "fn main() {}\n");
+    assert(plain.sections == "");
+
+    // Sections split off, and are *not* whitespace-cleaned — an expected-output
+    // body may contain trailing whitespace that is part of what it asserts.
+    let with_sections = fmt_prepare("fn main() {}  \n--- stdout ---\nhi  \n");
+    assert(with_sections.cleaned == "fn main() {}\n");
+    assert(with_sections.sections == "--- stdout ---\nhi  \n");
+
+    // Empty input stays empty on both sides.
+    let empty = fmt_prepare("");
+    assert(empty.cleaned == "");
+    assert(empty.sections == "");
+})
+
+pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
+    let laid_out = format_program(cleaned, width)?;
+    ok(laid_out.trim_end_while(|c| c == '\n') +++ "\n")
+}.doc("""
+    The second half of `format_source`: lay `cleaned` out at `width`, then
+    normalize to exactly one trailing newline — including for an empty program,
+    which formats to just that. The printer only keeps a trailing newline when
+    the layout happens to end with one, so the guarantee is made here rather
+    than there.
+
+    The caller verifies the result carries the same tokens as `cleaned`, then
+    appends the sections `fmt_prepare` set aside.
+""").test({
+    assert(fmt_layout("fn main() {}", 100) == ok("fn main() {}\n")); // newline added
+    assert(fmt_layout("fn main() {}\n\n\n", 100) == ok("fn main() {}\n")); // run collapsed
+    assert(fmt_layout("", 100) == ok("\n")); // empty program is just the newline
+
+    // The layout itself still happens — this is the real formatter, not a
+    // passthrough — and a malformed program still surfaces the walker's error.
+    assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
+})
+--- monomorphizations ---
+__builtin_any$__m7__Doc$lam88
+__builtin_count$char$s0
+__builtin_count_while$char$s0$lam42
+__builtin_count_while$char$s0$lam53
+__builtin_count_while$char$s0$lam58
+__builtin_count_while$char$s0$lam60
+__builtin_count_while$char$s0$lam69
+__builtin_count_while$char$s0$lam71
+__builtin_int_parse
+__builtin_is_some_and$char$lam59
+__builtin_map_err$__m13__LexResult$__m12__AiplTok$__m13__LexError$__m6__FmtError$lam7
+__builtin_opt_left_fold$char$i64$s0$lam38
+__builtin_sort_by$__m6__ImportEntry$lam23
+__builtin_sort_by$__m6__ImportName$lam62
+__builtin_value_or_err$i64$str
+__lambda_14
+__lambda_15
+__lambda_16
+__lambda_17
+__lambda_18
+__lambda_19
+__lambda_20
+__lambda_21
+__lambda_37
+__m12__char_lit_emit
+__m12__dedent_segments
+__m12__ident_cont
+__m12__int_lit
+__m12__raw_tpl_kind
+__m12__tpl_kind
+__m13__apply_emit$__m12__AiplTok
+__m13__between_len
+__m13__delimited_len
+__m13__finalize_template$__m12__AiplTok
+__m13__float_len
+__m13__interp_scan$__m12__AiplTok
+__m13__lex$__m12__AiplTok
+__m13__lex_step$__m12__AiplTok
+__m13__nested_len
+__m13__seg_emit$__m12__AiplTok
+__m13__step_result$__m12__AiplTok
+__m13__template_scan$__m12__AiplTok
+__m13__template_step$__m12__AiplTok
+__m14__unescape
+__m15__process_raw_string
+__m16__trim_prefix
+__m17__trim_suffix
+__m3__trim_end_while$lam3
+__m4__split_test_sections
+__m5__parse_test_section_header
+__m6__array_atom
+__m6__array_suffixes
+__m6__atom
+__m6__base_ty
+__m6__binding_ann
+__m6__binop_expr
+__m6__binop_tail
+__m6__block
+__m6__block_entries
+__m6__block_layout
+__m6__bump
+__m6__call_arg
+__m6__call_arg_list
+__m6__call_args_until
+__m6__chain_docs
+__m6__comma_list_docs
+__m6__comment_starts_before
+__m6__dict_entries
+__m6__dict_value
+__m6__dict_value_ty
+__m6__dot_seg
+__m6__drop_trailing_break
+__m6__err_here
+__m6__expect
+__m6__expr
+__m6__fn_attrs
+__m6__fn_item
+__m6__fn_return
+__m6__for_stmt
+__m6__format_program
+__m6__hug_close
+__m6__hugs_sole_arg
+__m6__ident_list
+__m6__if_expr
+__m6__import_item
+__m6__import_names
+__m6__index_or_from
+__m6__index_seg
+__m6__is_line_break
+__m6__item
+__m6__lambda
+__m6__lambda_param_ty
+__m6__lambda_params
+__m6__lead
+__m6__lead_loop
+__m6__let_stmt
+__m6__match_arms
+__m6__match_expr
+__m6__mut_stmt
+__m6__name_atom
+__m6__named_ty
+__m6__next_start
+__m6__params_until
+__m6__paren_atom
+__m6__paren_ty
+__m6__pattern
+__m6__peek
+__m6__peek_text_n
+__m6__postfix
+__m6__postfix_segs
+__m6__program
+__m6__program_items
+__m6__range_has_semi
+__m6__range_tail
+__m6__sep_entry
+__m6__set_member
+__m6__set_or_dict_atom
+__m6__set_or_dict_ty
+__m6__set_stmt
+__m6__shim_bindings
+__m6__shim_expr
+__m6__slice_to
+__m6__spaced_default
+__m6__statement
+__m6__str_atom
+__m6__struct_atom
+__m6__struct_field_value
+__m6__struct_fields
+__m6__struct_inits
+__m6__struct_item
+__m6__take_comment
+__m6__template_scan
+__m6__template_verbatim
+__m6__tok_text
+__m6__trailing_comment
+__m6__trim_last_break
+__m6__tuple_binder
+__m6__tuple_rest
+__m6__ty
+__m6__ty_list
+__m6__type_param_list
+__m6__type_params
+__m6__type_suffixes
+__m6__unary
+__m6__variant_body
+__m6__variant_cases
+__m6__variant_item
+__m6__variant_payload
+__m6__while_stmt
+__m6__with_last
+__m6__without_trailing_break
+__m7__col_after
+__m7__fits
+__m7__fits_atom
+__m7__go
+__m7__has_hard
+__m7__print_doc
+__m8__reindent_block
+__m9__dedent
+__map44$own0
+__test$fmt_layout
+fmt_layout
+fmt_prepare
+main
+--- performance ---
+allocations: 2188
+deallocations: 2188
+reallocations: 6
+bytes allocated: 100657
+instructions executed: 332456
+binary size: 852232
+  code: 521472
+  data: 2507
+  metadata: 328253
+builtin calls: 42364
+  aipl_arr_drop_str: 50
+  aipl_arr_inc: 4581
+  aipl_arr_reserve: 6
+  aipl_arr_retain_ptr: 42
+  aipl_array_dec: 6479
+  aipl_array_new: 1762
+  aipl_array_push: 42
+  aipl_array_push_mut: 45
+  aipl_array_with_cap: 19
+  aipl_assert: 10
+  aipl_char_at: 453
+  aipl_concat: 12
+  aipl_concat_lazy: 8
+  aipl_dec: 11534
+  aipl_inc: 9730
+  aipl_rec_alloc: 96
+  aipl_rec_dec_strong: 704
+  aipl_rec_dec_weak: 47
+  aipl_rec_inc_strong: 608
+  aipl_rec_inc_weak: 47
+  aipl_str_contains: 292
+  aipl_str_data: 32
+  aipl_str_ends_with: 5
+  aipl_str_eq: 92
+  aipl_str_iter_init: 37
+  aipl_str_iter_next: 32
+  aipl_str_join: 11
+  aipl_str_len: 3802
+  aipl_str_slice: 987
+  aipl_str_split: 25
+  aipl_str_starts_with: 767
+  aipl_test_begin: 2
+  aipl_test_end: 2
+  aipl_test_summary: 1
+  aipl_trim: 2
