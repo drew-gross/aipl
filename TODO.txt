@@ -31,6 +31,8 @@ integer signedness problems:
 self-hosting:
   move format_source to aipl
   make formatter command that is fully self-hosted
+  parser library in aipl (grammar as data; generates highlighter + formatter)
+    -> plan and progress checkboxes live in PARSER_LIBRARY.md
 
 clean_trailing_whitespace.aipl:
   optimize: use char-by-char approach? make lines() streaming?
@@ -76,6 +78,9 @@ write_file.aipl
 companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
+parser:
+  implement the plan
+
 lint:
   x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
@@ -94,6 +99,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  tail call elimination
   we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass
   move single use inlining to after monomorphization
@@ -173,6 +179,7 @@ effects:
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
+  rename to_str functions in code to show what they are to_str'ing
 
 recovering check:
   check should error on lint failures, but still run tests and report results
@@ -225,9 +232,6 @@ handoff:
   reimplement it in rust and/or aipl
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
-
-build performance:
-  look for any ways to improve full-rebuild performance, esp. to avoid a full rebuild after regenerating IR
 
 - \{ is a template-literal escape only; inside a plain string it's an error.
 
