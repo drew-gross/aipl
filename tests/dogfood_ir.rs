@@ -206,14 +206,6 @@ fn sanity_check(artifact: &str) {
         ])
     };
 
-    let out = comp
-        .call_values(
-            "process_raw_string",
-            &[FfiValue::Str("\n    a\n    b\n    ".to_string())],
-        )
-        .unwrap();
-    assert_eq!(out, FfiValue::Str("a\nb".to_string()));
-
     // Returns `str?`: a marker is `some(name)`, a non-marker is `none`.
     let marker = comp
         .call_values(
@@ -283,39 +275,6 @@ fn sanity_check(artifact: &str) {
         .unwrap();
     assert_eq!(loc2, FfiValue::Str("input:2: y".to_string()));
 
-    // Returns `LineAt { line, line_start, line_end }`: the 0-based line index,
-    // byte offset of the line's first byte, and byte offset of the line's end
-    // (the '\n' terminator or source.len() for the last line).
-    let line_at = comp
-        .call_values(
-            "line_at",
-            &[FfiValue::Str("hello\nworld".to_string()), FfiValue::Int(6)],
-        )
-        .unwrap();
-    assert_eq!(
-        line_at,
-        FfiValue::Struct(vec![
-            ("line".to_string(), FfiValue::Int(1)),
-            ("line_start".to_string(), FfiValue::Int(6)),
-            ("line_end".to_string(), FfiValue::Int(11)),
-        ])
-    );
-    // Offset 0 always returns line 0, line_start 0.
-    let line_at_first = comp
-        .call_values(
-            "line_at",
-            &[FfiValue::Str("abc".to_string()), FfiValue::Int(0)],
-        )
-        .unwrap();
-    assert_eq!(
-        line_at_first,
-        FfiValue::Struct(vec![
-            ("line".to_string(), FfiValue::Int(0)),
-            ("line_start".to_string(), FfiValue::Int(0)),
-            ("line_end".to_string(), FfiValue::Int(3)),
-        ])
-    );
-
     // Returns the rustc-style location + caret underline block for a span.
     // Third arg is the filename that appears in the ` --> ` line.
     let caret = comp
@@ -361,37 +320,6 @@ fn sanity_check(artifact: &str) {
     assert_eq!(
         caret_with_name,
         FfiValue::Str(" --> foo.aipl:1:1\n  |\n1 | hello world\n  | ^^^^^".to_string())
-    );
-
-    // Section missing: appended after stripping trailing newlines.
-    let fill_result = comp
-        .call_values(
-            "fill_or_add_section",
-            &[
-                FfiValue::Str("code\n".to_string()),
-                FfiValue::Str("stdout".to_string()),
-                FfiValue::Str("hi".to_string()),
-            ],
-        )
-        .unwrap();
-    assert_eq!(
-        fill_result,
-        FfiValue::Str("code\n--- stdout ---\nhi\n".to_string())
-    );
-    // Section present: same behavior as `fill_section`.
-    let fill_replaced = comp
-        .call_values(
-            "fill_or_add_section",
-            &[
-                FfiValue::Str("a\n--- foo ---\nold\n".to_string()),
-                FfiValue::Str("foo".to_string()),
-                FfiValue::Str("new".to_string()),
-            ],
-        )
-        .unwrap();
-    assert_eq!(
-        fill_replaced,
-        FfiValue::Str("a\n--- foo ---\nnew\n".to_string())
     );
 
     // Real file I/O, so stage it under the OS temp dir (never the repo tree)

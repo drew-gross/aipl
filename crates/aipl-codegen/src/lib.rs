@@ -3419,16 +3419,22 @@ pub fn source_refs(sources: &[(String, String)]) -> Vec<(&str, &str)> {
 /// under [`DOGFOOD_SOURCE_FILES`]. Resolved through mangling by
 /// [`resolve_dogfood_entry`], so a function need not live in the root file to
 /// be listed here.
+///
+/// *Every* entry must have a Rust caller: this list is the FFI surface, not an
+/// index of what is dogfooded. A dogfooded function whose caller has since been
+/// ported to AIPL is reached in-engine by that AIPL caller and belongs only in
+/// [`DOGFOOD_SOURCE_FILES`] — `process_raw_string` (called by `lex_aipl`'s
+/// emit), `line_at` (by `caret_block`), and `fill_or_add_section` (by
+/// `fill_or_add_section_file`) are all in that position. Listing one here anyway
+/// costs entry metadata in the artifact and advertises a Rust-facing API that
+/// nothing calls.
 pub const DOGFOOD_ENTRIES: &[&str] = &[
-    "process_raw_string",
     "parse_test_section_header",
     "strip_test_sections",
     "split_test_sections",
     "find_trailing_whitespace",
     "assert_loc",
-    "line_at",
     "caret_block",
-    "fill_or_add_section",
     "fill_or_add_section_file",
     "normalize_output",
     "int_fits",
