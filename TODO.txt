@@ -27,7 +27,6 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 integer signedness problems:
-  1. count_while returns i64 though it counts — its sibling count and len both return u64. This is the root cause: every length here derives from it. Making it u64 deletes ucount_while and its conversion outright. This is the one worth fixing.
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
@@ -54,6 +53,7 @@ shim:
 
 types:
   an array should be typed by ALL it's components, not just the first
+  you should be able to mut n = 0; and get the right integer type
 
 numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range

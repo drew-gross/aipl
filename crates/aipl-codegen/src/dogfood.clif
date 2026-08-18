@@ -107,7 +107,7 @@ function u0:35(i64, i64) -> i64 apple_aarch64 {
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:29 sig2  ; aipl_str_split
     fn3 = u0:31 sig3  ; aipl_trim
-    fn4 = colocated u0:172 sig4  ; __to_str_0
+    fn4 = colocated u0:169 sig4  ; __to_str_0
     fn5 = u0:12 sig5  ; aipl_concat
     fn6 = u0:12 sig6  ; aipl_concat
     fn7 = u0:12 sig7  ; aipl_concat
@@ -198,17 +198,17 @@ function u0:36(i64, i64, i64) -> i64 apple_aarch64 {
     sig31 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = colocated u0:87 sig1  ; __m11__line_at
-    fn2 = colocated u0:172 sig2  ; __to_str_0
+    fn2 = colocated u0:169 sig2  ; __to_str_0
     fn3 = u0:26 sig3  ; aipl_str_len
     fn4 = u0:27 sig4  ; aipl_str_repeat
     fn5 = u0:12 sig5  ; aipl_concat
     fn6 = u0:12 sig6  ; aipl_concat
-    fn7 = colocated u0:172 sig7  ; __to_str_0
+    fn7 = colocated u0:169 sig7  ; __to_str_0
     fn8 = u0:12 sig8  ; aipl_concat
-    fn9 = colocated u0:172 sig9  ; __to_str_0
+    fn9 = colocated u0:169 sig9  ; __to_str_0
     fn10 = u0:12 sig10  ; aipl_concat
     fn11 = u0:12 sig11  ; aipl_concat
-    fn12 = colocated u0:172 sig12  ; __to_str_0
+    fn12 = colocated u0:169 sig12  ; __to_str_0
     fn13 = u0:12 sig13  ; aipl_concat
     fn14 = u0:28 sig14  ; aipl_str_slice
     fn15 = u0:12 sig15  ; aipl_concat
@@ -436,15 +436,15 @@ function u0:37(i64, i64) apple_aarch64 {
     fn7 = u0:13 sig7  ; aipl_concat_lazy
     fn8 = u0:14 sig8  ; aipl_dec
     fn9 = colocated u0:100 sig9  ; __m4__trim_end_while$lam1
-    fn10 = colocated u0:173 sig10  ; __arr_drop_1
-    fn11 = colocated u0:174 sig11  ; __arr_retain_1
+    fn10 = colocated u0:170 sig10  ; __arr_drop_1
+    fn11 = colocated u0:171 sig11  ; __arr_retain_1
     fn12 = u0:8 sig12  ; aipl_array_push
     fn13 = u0:6 sig13  ; aipl_array_dec
     fn14 = u0:30 sig14  ; aipl_str_starts_with
     fn15 = colocated u0:38 sig15  ; __m24__companion_path
     fn16 = colocated u0:102 sig16  ; __m4__trim_end_while$lam3
-    fn17 = colocated u0:173 sig17  ; __arr_drop_1
-    fn18 = colocated u0:174 sig18  ; __arr_retain_1
+    fn17 = colocated u0:170 sig17  ; __arr_drop_1
+    fn18 = colocated u0:171 sig18  ; __arr_retain_1
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -1249,14 +1249,14 @@ function u0:40(i64, i64, i64) -> i64 apple_aarch64 {
     fn2 = u0:28 sig2  ; aipl_str_slice
     fn3 = u0:15 sig3  ; aipl_inc
     fn4 = colocated u0:90 sig4  ; __m6__parse_test_section_header
-    fn5 = colocated u0:175 sig5  ; __eq_2
+    fn5 = colocated u0:172 sig5  ; __eq_2
     fn6 = u0:13 sig6  ; aipl_concat_lazy
     fn7 = u0:14 sig7  ; aipl_dec
-    fn8 = colocated u0:175 sig8  ; __eq_2
+    fn8 = colocated u0:172 sig8  ; __eq_2
     fn9 = u0:26 sig9  ; aipl_str_len
     fn10 = colocated u0:90 sig10  ; __m6__parse_test_section_header
-    fn11 = colocated u0:175 sig11  ; __eq_2
-    fn12 = colocated u0:175 sig12  ; __eq_2
+    fn11 = colocated u0:172 sig11  ; __eq_2
+    fn12 = colocated u0:172 sig12  ; __eq_2
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 1
@@ -1629,7 +1629,7 @@ function u0:41(i64, i64) -> i64 apple_aarch64 {
     fn1 = u0:29 sig1  ; aipl_str_split
     fn2 = u0:1 sig2  ; aipl_arr_elem_ptr
     fn3 = colocated u0:90 sig3  ; __m6__parse_test_section_header
-    fn4 = colocated u0:175 sig4  ; __eq_2
+    fn4 = colocated u0:172 sig4  ; __eq_2
     fn5 = u0:14 sig5  ; aipl_dec
     fn6 = u0:6 sig6  ; aipl_array_dec
 
@@ -6065,7 +6065,7 @@ function u0:60() -> i64 apple_aarch64 {
     fn28 = colocated u0:57 sig28  ; __m19__raw_tpl_kind
     fn29 = colocated u0:128 sig29  ; __lambda_31
     fn30 = colocated u0:55 sig30  ; __m19__tpl_kind
-    fn31 = colocated u0:176 sig31  ; __arr_drop_3
+    fn31 = colocated u0:173 sig31  ; __arr_drop_3
     fn32 = u0:7 sig32  ; aipl_array_new
     fn33 = u0:14 sig33  ; aipl_dec
 
@@ -20729,7 +20729,7 @@ function u0:65(i64, i64, i64) -> i64 apple_aarch64 {
     fn2 = colocated u0:131 sig2  ; __builtin_is_some_and$char$lam34
     fn3 = u0:26 sig3  ; aipl_str_len
     fn4 = u0:28 sig4  ; aipl_str_slice
-    fn5 = colocated u0:133 sig5  ; __m18__ucount_while$lam37
+    fn5 = colocated u0:133 sig5  ; __builtin_count_while$char$s0$lam37
     fn6 = u0:14 sig6  ; aipl_dec
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -21906,7 +21906,7 @@ function u0:72(i64, i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:30 sig2  ; aipl_str_starts_with
-    fn3 = colocated u0:141 sig3  ; __m18__ucount_while$lam48
+    fn3 = colocated u0:141 sig3  ; __builtin_count_while$char$s0$lam48
     fn4 = u0:14 sig4  ; aipl_dec
 
 block0(v0: i64, v1: i64):
@@ -21961,15 +21961,15 @@ function u0:73(i64, i64) -> i64 apple_aarch64 {
     sig11 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:178 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_4
     fn3 = colocated u0:142 sig3  ; __builtin_is_some_and$char$lam49
     fn4 = u0:26 sig4  ; aipl_str_len
     fn5 = u0:28 sig5  ; aipl_str_slice
-    fn6 = colocated u0:143 sig6  ; __m18__ucount_while$lam50
+    fn6 = colocated u0:143 sig6  ; __builtin_count_while$char$s0$lam50
     fn7 = colocated u0:145 sig7  ; __builtin_is_some_and$char$lam52
     fn8 = colocated u0:147 sig8  ; __builtin_is_some_and$char$lam54
     fn9 = colocated u0:142 sig9  ; __builtin_is_some_and$char$lam49
-    fn10 = colocated u0:143 sig10  ; __m18__ucount_while$lam50
+    fn10 = colocated u0:143 sig10  ; __builtin_count_while$char$s0$lam50
     fn11 = u0:14 sig11  ; aipl_dec
 
 block0(v0: i64, v1: i64):
@@ -22139,7 +22139,7 @@ function u0:74(i64) -> i64 apple_aarch64 {
     sig2 = (i64) apple_aarch64
     sig3 = (i64, i64) -> i64 apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:143 sig1  ; __m18__ucount_while$lam50
+    fn1 = colocated u0:143 sig1  ; __builtin_count_while$char$s0$lam50
     fn2 = u0:14 sig2  ; aipl_dec
     fn3 = colocated u0:73 sig3  ; __m18__number_end
 
@@ -22203,11 +22203,11 @@ function u0:75(i64) -> i64 apple_aarch64 {
     sig7 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:178 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_4
     fn3 = colocated u0:142 sig3  ; __builtin_is_some_and$char$lam49
     fn4 = u0:26 sig4  ; aipl_str_len
     fn5 = u0:28 sig5  ; aipl_str_slice
-    fn6 = colocated u0:143 sig6  ; __m18__ucount_while$lam50
+    fn6 = colocated u0:143 sig6  ; __builtin_count_while$char$s0$lam50
     fn7 = u0:14 sig7  ; aipl_dec
 
 block0(v0: i64):
@@ -28047,13 +28047,13 @@ function u0:93(i64, i64) apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:178 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_4
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = colocated u0:90 sig5  ; __m6__parse_test_section_header
-    fn6 = colocated u0:175 sig6  ; __eq_2
+    fn6 = colocated u0:172 sig6  ; __eq_2
     fn7 = u0:14 sig7  ; aipl_dec
     fn8 = colocated u0:90 sig8  ; __m6__parse_test_section_header
-    fn9 = colocated u0:175 sig9  ; __eq_2
+    fn9 = colocated u0:172 sig9  ; __eq_2
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -28294,13 +28294,13 @@ function u0:94(i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:178 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_4
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = colocated u0:90 sig5  ; __m6__parse_test_section_header
-    fn6 = colocated u0:175 sig6  ; __eq_2
+    fn6 = colocated u0:172 sig6  ; __eq_2
     fn7 = u0:14 sig7  ; aipl_dec
     fn8 = colocated u0:90 sig8  ; __m6__parse_test_section_header
-    fn9 = colocated u0:175 sig9  ; __eq_2
+    fn9 = colocated u0:172 sig9  ; __eq_2
 
 block0(v0: i64):
     v1 = iconst.i64 0
@@ -28482,7 +28482,7 @@ function u0:95(i64, i64) -> i64 apple_aarch64 {
     sig5 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:178 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_4
     fn3 = u0:26 sig3  ; aipl_str_len
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:14 sig5  ; aipl_dec
@@ -28539,7 +28539,7 @@ function u0:96(i64, i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:178 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_4
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:14 sig5  ; aipl_dec
 
@@ -28657,7 +28657,7 @@ function u0:98(i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:178 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_4
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:13 sig5  ; aipl_concat_lazy
     fn6 = u0:21 sig6  ; aipl_str_eq
@@ -30807,11 +30807,11 @@ function u0:129(i64, i64, i64) apple_aarch64 {
     fn5 = u0:14 sig5  ; aipl_dec
     fn6 = u0:6 sig6  ; aipl_array_dec
     fn7 = u0:1 sig7  ; aipl_arr_elem_ptr
-    fn8 = colocated u0:179 sig8  ; __arr_drop_5
-    fn9 = colocated u0:180 sig9  ; __arr_retain_5
+    fn8 = colocated u0:176 sig8  ; __arr_drop_5
+    fn9 = colocated u0:177 sig9  ; __arr_retain_5
     fn10 = u0:8 sig10  ; aipl_array_push
-    fn11 = colocated u0:179 sig11  ; __arr_drop_5
-    fn12 = colocated u0:180 sig12  ; __arr_retain_5
+    fn11 = colocated u0:176 sig11  ; __arr_drop_5
+    fn12 = colocated u0:177 sig12  ; __arr_retain_5
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -31661,28 +31661,118 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = c
 ;   v1 = cont
-; __m18__ucount_while$lam37
+; __builtin_count_while$char$s0$lam37
 function u0:133(i64, i64) -> i64 apple_aarch64 {
-    sig0 = (i64) apple_aarch64
-    sig1 = (i64, i64) -> i64 apple_aarch64
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 56, align = 8
+    ss2 = explicit_slot 8, align = 8
+    sig0 = (i64, i64) apple_aarch64
+    sig1 = (i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
-    fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:159 sig1  ; __builtin_count_while$char$s0$lam66
-    fn2 = u0:14 sig2  ; aipl_dec
+    sig3 = (i64, i64) -> i64 apple_aarch64
+    sig4 = (i64) apple_aarch64
+    fn0 = u0:23 sig0  ; aipl_str_iter_init
+    fn1 = u0:24 sig1  ; aipl_str_iter_next
+    fn2 = u0:15 sig2  ; aipl_inc
+    fn3 = colocated u0:132 sig3  ; __lambda_35
+    fn4 = u0:14 sig4  ; aipl_dec
 
 block0(v0: i64, v1: i64):
-    call fn0(v0)
-    call fn0(v1)
-    v2 = call fn1(v0, v1)
-    call fn2(v0)
+    v2 = iconst.i64 0
+    v3 = stack_addr.i64 ss0
+    store notrap v2, v3  ; v2 = 0
+    v4 = stack_addr.i64 ss1
+    call fn0(v4, v0)
+    v5 = iconst.i64 0
+    v6 = stack_addr.i64 ss2
+    store notrap v5, v6  ; v5 = 0
+    jump block1
+
+block1:
+    v7 = stack_addr.i64 ss2
+    v8 = load.i64 notrap v7
+    v10 = load.i64 notrap aligned v4+8
+    v11 = load.i64 notrap aligned v4+16
+    v12 = icmp sge v10, v11
+    v13 = iconst.i64 -1
+    brif v12, block7(v13), block4  ; v13 = -1
+
+block4:
+    v14 = load.i64 notrap aligned v4+32
+    v15 = load.i64 notrap aligned v4+40
+    v16 = isub.i64 v10, v14
+    v17 = icmp ult v16, v15
+    brif v17, block5, block6
+
+block5:
+    v18 = load.i64 notrap aligned v4+24
+    v19 = iadd v18, v16
+    v20 = uload8.i64 notrap aligned v19
+    v21 = iconst.i64 1
+    v22 = iadd.i64 v10, v21  ; v21 = 1
+    store notrap aligned v22, v4+8
+    jump block7(v20)
+
+block6:
+    v23 = call fn1(v4)
+    jump block7(v23)
+
+block7(v9: i64):
+    v24 = iconst.i64 0
+    v25 = icmp sge v9, v24  ; v24 = 0
+    brif v25, block2, block3
+
+block2:
     call fn2(v1)
-    return v2
+    v26 = call fn3(v9, v1)
+    v27 = iconst.i64 1
+    v28 = bxor v26, v27  ; v27 = 1
+    brif v28, block8, block9
+
+block8:
+    v30 = stack_addr.i64 ss0
+    v31 = load.i64 notrap v30
+    call fn4(v0)
+    call fn4(v1)
+    return v31
+
+block11:
+    v32 = iconst.i64 0
+    v33 = iconst.i64 0
+    jump block10(v33)  ; v33 = 0
+
+block9:
+    v34 = iconst.i64 0
+    jump block10(v34)  ; v34 = 0
+
+block10(v29: i64):
+    v35 = stack_addr.i64 ss0
+    v36 = load.i64 notrap v35
+    v37 = iconst.i64 1
+    v38 = iadd v36, v37  ; v37 = 1
+    v39 = stack_addr.i64 ss0
+    store notrap v38, v39
+    v40 = iconst.i64 0
+    v41 = iconst.i64 1
+    v42 = iadd.i64 v8, v41  ; v41 = 1
+    v43 = stack_addr.i64 ss2
+    store notrap v42, v43
+    jump block1
+
+block3:
+    v44 = iconst.i64 0
+    v45 = stack_addr.i64 ss0
+    v46 = load.i64 notrap v45
+    call fn4(v0)
+    call fn4(v1)
+    return v46
 }
 
 ; source variables:
 ;   v0 = self
 ;   v1 = $cap36
-;   v2 = n
+;   ss0 = n
+;   v9 = x
 ; __lambda_38
 function u0:134(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -31864,25 +31954,112 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = x
-; __m18__ucount_while$lam48
+; __builtin_count_while$char$s0$lam48
 function u0:141(i64) -> i64 apple_aarch64 {
-    sig0 = (i64) apple_aarch64
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 56, align = 8
+    ss2 = explicit_slot 8, align = 8
+    sig0 = (i64, i64) apple_aarch64
     sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:160 sig1  ; __builtin_count_while$char$s0$lam67
-    fn2 = u0:14 sig2  ; aipl_dec
+    sig2 = (i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    fn0 = u0:23 sig0  ; aipl_str_iter_init
+    fn1 = u0:24 sig1  ; aipl_str_iter_next
+    fn2 = colocated u0:140 sig2  ; __lambda_47
+    fn3 = u0:14 sig3  ; aipl_dec
 
 block0(v0: i64):
-    call fn0(v0)
-    v1 = call fn1(v0)
-    call fn2(v0)
-    return v1
+    v1 = iconst.i64 0
+    v2 = stack_addr.i64 ss0
+    store notrap v1, v2  ; v1 = 0
+    v3 = stack_addr.i64 ss1
+    call fn0(v3, v0)
+    v4 = iconst.i64 0
+    v5 = stack_addr.i64 ss2
+    store notrap v4, v5  ; v4 = 0
+    jump block1
+
+block1:
+    v6 = stack_addr.i64 ss2
+    v7 = load.i64 notrap v6
+    v9 = load.i64 notrap aligned v3+8
+    v10 = load.i64 notrap aligned v3+16
+    v11 = icmp sge v9, v10
+    v12 = iconst.i64 -1
+    brif v11, block7(v12), block4  ; v12 = -1
+
+block4:
+    v13 = load.i64 notrap aligned v3+32
+    v14 = load.i64 notrap aligned v3+40
+    v15 = isub.i64 v9, v13
+    v16 = icmp ult v15, v14
+    brif v16, block5, block6
+
+block5:
+    v17 = load.i64 notrap aligned v3+24
+    v18 = iadd v17, v15
+    v19 = uload8.i64 notrap aligned v18
+    v20 = iconst.i64 1
+    v21 = iadd.i64 v9, v20  ; v20 = 1
+    store notrap aligned v21, v3+8
+    jump block7(v19)
+
+block6:
+    v22 = call fn1(v3)
+    jump block7(v22)
+
+block7(v8: i64):
+    v23 = iconst.i64 0
+    v24 = icmp sge v8, v23  ; v23 = 0
+    brif v24, block2, block3
+
+block2:
+    v25 = call fn2(v8)
+    v26 = iconst.i64 1
+    v27 = bxor v25, v26  ; v26 = 1
+    brif v27, block8, block9
+
+block8:
+    v29 = stack_addr.i64 ss0
+    v30 = load.i64 notrap v29
+    call fn3(v0)
+    return v30
+
+block11:
+    v31 = iconst.i64 0
+    v32 = iconst.i64 0
+    jump block10(v32)  ; v32 = 0
+
+block9:
+    v33 = iconst.i64 0
+    jump block10(v33)  ; v33 = 0
+
+block10(v28: i64):
+    v34 = stack_addr.i64 ss0
+    v35 = load.i64 notrap v34
+    v36 = iconst.i64 1
+    v37 = iadd v35, v36  ; v36 = 1
+    v38 = stack_addr.i64 ss0
+    store notrap v37, v38
+    v39 = iconst.i64 0
+    v40 = iconst.i64 1
+    v41 = iadd.i64 v7, v40  ; v40 = 1
+    v42 = stack_addr.i64 ss2
+    store notrap v41, v42
+    jump block1
+
+block3:
+    v43 = iconst.i64 0
+    v44 = stack_addr.i64 ss0
+    v45 = load.i64 notrap v44
+    call fn3(v0)
+    return v45
 }
 
 ; source variables:
 ;   v0 = self
-;   v1 = n
+;   ss0 = n
+;   v8 = x
 ; __builtin_is_some_and$char$lam49
 function u0:142(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -31910,25 +32087,115 @@ block1(v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v3 = x
-; __m18__ucount_while$lam50
+; __builtin_count_while$char$s0$lam50
 function u0:143(i64) -> i64 apple_aarch64 {
-    sig0 = (i64) apple_aarch64
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 56, align = 8
+    ss2 = explicit_slot 8, align = 8
+    sig0 = (i64, i64) apple_aarch64
     sig1 = (i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
-    fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:161 sig1  ; __builtin_count_while$char$s0$lam68
+    fn0 = u0:23 sig0  ; aipl_str_iter_init
+    fn1 = u0:24 sig1  ; aipl_str_iter_next
     fn2 = u0:14 sig2  ; aipl_dec
 
 block0(v0: i64):
-    call fn0(v0)
-    v1 = call fn1(v0)
+    v1 = iconst.i64 0
+    v2 = stack_addr.i64 ss0
+    store notrap v1, v2  ; v1 = 0
+    v3 = stack_addr.i64 ss1
+    call fn0(v3, v0)
+    v4 = iconst.i64 0
+    v5 = stack_addr.i64 ss2
+    store notrap v4, v5  ; v4 = 0
+    jump block1
+
+block1:
+    v6 = stack_addr.i64 ss2
+    v7 = load.i64 notrap v6
+    v9 = load.i64 notrap aligned v3+8
+    v10 = load.i64 notrap aligned v3+16
+    v11 = icmp sge v9, v10
+    v12 = iconst.i64 -1
+    brif v11, block7(v12), block4  ; v12 = -1
+
+block4:
+    v13 = load.i64 notrap aligned v3+32
+    v14 = load.i64 notrap aligned v3+40
+    v15 = isub.i64 v9, v13
+    v16 = icmp ult v15, v14
+    brif v16, block5, block6
+
+block5:
+    v17 = load.i64 notrap aligned v3+24
+    v18 = iadd v17, v15
+    v19 = uload8.i64 notrap aligned v18
+    v20 = iconst.i64 1
+    v21 = iadd.i64 v9, v20  ; v20 = 1
+    store notrap aligned v21, v3+8
+    jump block7(v19)
+
+block6:
+    v22 = call fn1(v3)
+    jump block7(v22)
+
+block7(v8: i64):
+    v23 = iconst.i64 0
+    v24 = icmp sge v8, v23  ; v23 = 0
+    brif v24, block2, block3
+
+block2:
+    v25 = iconst.i64 48
+    v26 = icmp.i64 uge v8, v25  ; v25 = 48
+    v27 = iconst.i64 57
+    v28 = icmp.i64 ule v8, v27  ; v27 = 57
+    v29 = band v26, v28
+    v30 = uextend.i64 v29
+    v31 = iconst.i64 1
+    v32 = bxor v30, v31  ; v31 = 1
+    brif v32, block8, block9
+
+block8:
+    v34 = stack_addr.i64 ss0
+    v35 = load.i64 notrap v34
     call fn2(v0)
-    return v1
+    return v35
+
+block11:
+    v36 = iconst.i64 0
+    v37 = iconst.i64 0
+    jump block10(v37)  ; v37 = 0
+
+block9:
+    v38 = iconst.i64 0
+    jump block10(v38)  ; v38 = 0
+
+block10(v33: i64):
+    v39 = stack_addr.i64 ss0
+    v40 = load.i64 notrap v39
+    v41 = iconst.i64 1
+    v42 = iadd v40, v41  ; v41 = 1
+    v43 = stack_addr.i64 ss0
+    store notrap v42, v43
+    v44 = iconst.i64 0
+    v45 = iconst.i64 1
+    v46 = iadd.i64 v7, v45  ; v45 = 1
+    v47 = stack_addr.i64 ss2
+    store notrap v46, v47
+    jump block1
+
+block3:
+    v48 = iconst.i64 0
+    v49 = stack_addr.i64 ss0
+    v50 = load.i64 notrap v49
+    call fn2(v0)
+    return v50
 }
 
 ; source variables:
 ;   v0 = self
-;   v1 = n
+;   ss0 = n
+;   v8 = x
 ; __lambda_51
 function u0:144(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -32407,7 +32674,7 @@ function u0:155(i64) -> i64 apple_aarch64 {
     sig3 = (i64, i64, i64) -> i64 apple_aarch64
     sig4 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:162 sig1  ; __builtin_count_while$char$s0$lam69
+    fn1 = colocated u0:159 sig1  ; __builtin_count_while$char$s0$lam65
     fn2 = u0:26 sig2  ; aipl_str_len
     fn3 = u0:28 sig3  ; aipl_str_slice
     fn4 = u0:14 sig4  ; aipl_dec
@@ -32667,27 +32934,27 @@ function u0:158(i64, i64, i64, i64) apple_aarch64 {
     fn2 = u0:26 sig2  ; aipl_str_len
     fn3 = u0:28 sig3  ; aipl_str_slice
     fn4 = colocated u0:65 sig4  ; __m18__char_run_len
-    fn5 = colocated u0:163 sig5  ; __m18__step_result$__m19__AiplTok
+    fn5 = colocated u0:160 sig5  ; __m18__step_result$__m19__AiplTok
     fn6 = u0:2 sig6  ; aipl_arr_inc
     fn7 = u0:14 sig7  ; aipl_dec
     fn8 = u0:6 sig8  ; aipl_array_dec
     fn9 = colocated u0:66 sig9  ; __m18__exact_len
-    fn10 = colocated u0:163 sig10  ; __m18__step_result$__m19__AiplTok
+    fn10 = colocated u0:160 sig10  ; __m18__step_result$__m19__AiplTok
     fn11 = colocated u0:67 sig11  ; __m18__keyword_len
-    fn12 = colocated u0:163 sig12  ; __m18__step_result$__m19__AiplTok
+    fn12 = colocated u0:160 sig12  ; __m18__step_result$__m19__AiplTok
     fn13 = colocated u0:68 sig13  ; __m18__delimited_len
-    fn14 = colocated u0:163 sig14  ; __m18__step_result$__m19__AiplTok
+    fn14 = colocated u0:160 sig14  ; __m18__step_result$__m19__AiplTok
     fn15 = colocated u0:70 sig15  ; __m18__between_len
-    fn16 = colocated u0:163 sig16  ; __m18__step_result$__m19__AiplTok
+    fn16 = colocated u0:160 sig16  ; __m18__step_result$__m19__AiplTok
     fn17 = colocated u0:71 sig17  ; __m18__nested_len
-    fn18 = colocated u0:163 sig18  ; __m18__step_result$__m19__AiplTok
-    fn19 = colocated u0:164 sig19  ; __m18__template_step$__m19__AiplTok
+    fn18 = colocated u0:160 sig18  ; __m18__step_result$__m19__AiplTok
+    fn19 = colocated u0:161 sig19  ; __m18__template_step$__m19__AiplTok
     fn20 = colocated u0:72 sig20  ; __m18__to_eol_len
-    fn21 = colocated u0:163 sig21  ; __m18__step_result$__m19__AiplTok
+    fn21 = colocated u0:160 sig21  ; __m18__step_result$__m19__AiplTok
     fn22 = colocated u0:74 sig22  ; __m18__float_len
-    fn23 = colocated u0:163 sig23  ; __m18__step_result$__m19__AiplTok
+    fn23 = colocated u0:160 sig23  ; __m18__step_result$__m19__AiplTok
     fn24 = colocated u0:75 sig24  ; __m18__int_len
-    fn25 = colocated u0:163 sig25  ; __m18__step_result$__m19__AiplTok
+    fn25 = colocated u0:160 sig25  ; __m18__step_result$__m19__AiplTok
     fn26 = u0:7 sig26  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
@@ -39131,335 +39398,8 @@ block1082:
 ;   v1343 = finalize
 ;   v1570 = marker
 ;   v128 = res
-; __builtin_count_while$char$s0$lam66
-function u0:159(i64, i64) -> i64 apple_aarch64 {
-    ss0 = explicit_slot 8, align = 8
-    ss1 = explicit_slot 56, align = 8
-    ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) apple_aarch64
-    sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    sig3 = (i64, i64) -> i64 apple_aarch64
-    sig4 = (i64) apple_aarch64
-    fn0 = u0:23 sig0  ; aipl_str_iter_init
-    fn1 = u0:24 sig1  ; aipl_str_iter_next
-    fn2 = u0:15 sig2  ; aipl_inc
-    fn3 = colocated u0:132 sig3  ; __lambda_35
-    fn4 = u0:14 sig4  ; aipl_dec
-
-block0(v0: i64, v1: i64):
-    v2 = iconst.i64 0
-    v3 = stack_addr.i64 ss0
-    store notrap v2, v3  ; v2 = 0
-    v4 = stack_addr.i64 ss1
-    call fn0(v4, v0)
-    v5 = iconst.i64 0
-    v6 = stack_addr.i64 ss2
-    store notrap v5, v6  ; v5 = 0
-    jump block1
-
-block1:
-    v7 = stack_addr.i64 ss2
-    v8 = load.i64 notrap v7
-    v10 = load.i64 notrap aligned v4+8
-    v11 = load.i64 notrap aligned v4+16
-    v12 = icmp sge v10, v11
-    v13 = iconst.i64 -1
-    brif v12, block7(v13), block4  ; v13 = -1
-
-block4:
-    v14 = load.i64 notrap aligned v4+32
-    v15 = load.i64 notrap aligned v4+40
-    v16 = isub.i64 v10, v14
-    v17 = icmp ult v16, v15
-    brif v17, block5, block6
-
-block5:
-    v18 = load.i64 notrap aligned v4+24
-    v19 = iadd v18, v16
-    v20 = uload8.i64 notrap aligned v19
-    v21 = iconst.i64 1
-    v22 = iadd.i64 v10, v21  ; v21 = 1
-    store notrap aligned v22, v4+8
-    jump block7(v20)
-
-block6:
-    v23 = call fn1(v4)
-    jump block7(v23)
-
-block7(v9: i64):
-    v24 = iconst.i64 0
-    v25 = icmp sge v9, v24  ; v24 = 0
-    brif v25, block2, block3
-
-block2:
-    call fn2(v1)
-    v26 = call fn3(v9, v1)
-    v27 = iconst.i64 1
-    v28 = bxor v26, v27  ; v27 = 1
-    brif v28, block8, block9
-
-block8:
-    v30 = stack_addr.i64 ss0
-    v31 = load.i64 notrap v30
-    call fn4(v0)
-    call fn4(v1)
-    return v31
-
-block11:
-    v32 = iconst.i64 0
-    v33 = iconst.i64 0
-    jump block10(v33)  ; v33 = 0
-
-block9:
-    v34 = iconst.i64 0
-    jump block10(v34)  ; v34 = 0
-
-block10(v29: i64):
-    v35 = stack_addr.i64 ss0
-    v36 = load.i64 notrap v35
-    v37 = iconst.i64 1
-    v38 = iadd v36, v37  ; v37 = 1
-    v39 = stack_addr.i64 ss0
-    store notrap v38, v39
-    v40 = iconst.i64 0
-    v41 = iconst.i64 1
-    v42 = iadd.i64 v8, v41  ; v41 = 1
-    v43 = stack_addr.i64 ss2
-    store notrap v42, v43
-    jump block1
-
-block3:
-    v44 = iconst.i64 0
-    v45 = stack_addr.i64 ss0
-    v46 = load.i64 notrap v45
-    call fn4(v0)
-    call fn4(v1)
-    return v46
-}
-
-; source variables:
-;   v0 = self
-;   v1 = $cap65
-;   ss0 = n
-;   v9 = x
-; __builtin_count_while$char$s0$lam67
-function u0:160(i64) -> i64 apple_aarch64 {
-    ss0 = explicit_slot 8, align = 8
-    ss1 = explicit_slot 56, align = 8
-    ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) apple_aarch64
-    sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) -> i64 apple_aarch64
-    sig3 = (i64) apple_aarch64
-    fn0 = u0:23 sig0  ; aipl_str_iter_init
-    fn1 = u0:24 sig1  ; aipl_str_iter_next
-    fn2 = colocated u0:140 sig2  ; __lambda_47
-    fn3 = u0:14 sig3  ; aipl_dec
-
-block0(v0: i64):
-    v1 = iconst.i64 0
-    v2 = stack_addr.i64 ss0
-    store notrap v1, v2  ; v1 = 0
-    v3 = stack_addr.i64 ss1
-    call fn0(v3, v0)
-    v4 = iconst.i64 0
-    v5 = stack_addr.i64 ss2
-    store notrap v4, v5  ; v4 = 0
-    jump block1
-
-block1:
-    v6 = stack_addr.i64 ss2
-    v7 = load.i64 notrap v6
-    v9 = load.i64 notrap aligned v3+8
-    v10 = load.i64 notrap aligned v3+16
-    v11 = icmp sge v9, v10
-    v12 = iconst.i64 -1
-    brif v11, block7(v12), block4  ; v12 = -1
-
-block4:
-    v13 = load.i64 notrap aligned v3+32
-    v14 = load.i64 notrap aligned v3+40
-    v15 = isub.i64 v9, v13
-    v16 = icmp ult v15, v14
-    brif v16, block5, block6
-
-block5:
-    v17 = load.i64 notrap aligned v3+24
-    v18 = iadd v17, v15
-    v19 = uload8.i64 notrap aligned v18
-    v20 = iconst.i64 1
-    v21 = iadd.i64 v9, v20  ; v20 = 1
-    store notrap aligned v21, v3+8
-    jump block7(v19)
-
-block6:
-    v22 = call fn1(v3)
-    jump block7(v22)
-
-block7(v8: i64):
-    v23 = iconst.i64 0
-    v24 = icmp sge v8, v23  ; v23 = 0
-    brif v24, block2, block3
-
-block2:
-    v25 = call fn2(v8)
-    v26 = iconst.i64 1
-    v27 = bxor v25, v26  ; v26 = 1
-    brif v27, block8, block9
-
-block8:
-    v29 = stack_addr.i64 ss0
-    v30 = load.i64 notrap v29
-    call fn3(v0)
-    return v30
-
-block11:
-    v31 = iconst.i64 0
-    v32 = iconst.i64 0
-    jump block10(v32)  ; v32 = 0
-
-block9:
-    v33 = iconst.i64 0
-    jump block10(v33)  ; v33 = 0
-
-block10(v28: i64):
-    v34 = stack_addr.i64 ss0
-    v35 = load.i64 notrap v34
-    v36 = iconst.i64 1
-    v37 = iadd v35, v36  ; v36 = 1
-    v38 = stack_addr.i64 ss0
-    store notrap v37, v38
-    v39 = iconst.i64 0
-    v40 = iconst.i64 1
-    v41 = iadd.i64 v7, v40  ; v40 = 1
-    v42 = stack_addr.i64 ss2
-    store notrap v41, v42
-    jump block1
-
-block3:
-    v43 = iconst.i64 0
-    v44 = stack_addr.i64 ss0
-    v45 = load.i64 notrap v44
-    call fn3(v0)
-    return v45
-}
-
-; source variables:
-;   v0 = self
-;   ss0 = n
-;   v8 = x
-; __builtin_count_while$char$s0$lam68
-function u0:161(i64) -> i64 apple_aarch64 {
-    ss0 = explicit_slot 8, align = 8
-    ss1 = explicit_slot 56, align = 8
-    ss2 = explicit_slot 8, align = 8
-    sig0 = (i64, i64) apple_aarch64
-    sig1 = (i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    fn0 = u0:23 sig0  ; aipl_str_iter_init
-    fn1 = u0:24 sig1  ; aipl_str_iter_next
-    fn2 = u0:14 sig2  ; aipl_dec
-
-block0(v0: i64):
-    v1 = iconst.i64 0
-    v2 = stack_addr.i64 ss0
-    store notrap v1, v2  ; v1 = 0
-    v3 = stack_addr.i64 ss1
-    call fn0(v3, v0)
-    v4 = iconst.i64 0
-    v5 = stack_addr.i64 ss2
-    store notrap v4, v5  ; v4 = 0
-    jump block1
-
-block1:
-    v6 = stack_addr.i64 ss2
-    v7 = load.i64 notrap v6
-    v9 = load.i64 notrap aligned v3+8
-    v10 = load.i64 notrap aligned v3+16
-    v11 = icmp sge v9, v10
-    v12 = iconst.i64 -1
-    brif v11, block7(v12), block4  ; v12 = -1
-
-block4:
-    v13 = load.i64 notrap aligned v3+32
-    v14 = load.i64 notrap aligned v3+40
-    v15 = isub.i64 v9, v13
-    v16 = icmp ult v15, v14
-    brif v16, block5, block6
-
-block5:
-    v17 = load.i64 notrap aligned v3+24
-    v18 = iadd v17, v15
-    v19 = uload8.i64 notrap aligned v18
-    v20 = iconst.i64 1
-    v21 = iadd.i64 v9, v20  ; v20 = 1
-    store notrap aligned v21, v3+8
-    jump block7(v19)
-
-block6:
-    v22 = call fn1(v3)
-    jump block7(v22)
-
-block7(v8: i64):
-    v23 = iconst.i64 0
-    v24 = icmp sge v8, v23  ; v23 = 0
-    brif v24, block2, block3
-
-block2:
-    v25 = iconst.i64 48
-    v26 = icmp.i64 uge v8, v25  ; v25 = 48
-    v27 = iconst.i64 57
-    v28 = icmp.i64 ule v8, v27  ; v27 = 57
-    v29 = band v26, v28
-    v30 = uextend.i64 v29
-    v31 = iconst.i64 1
-    v32 = bxor v30, v31  ; v31 = 1
-    brif v32, block8, block9
-
-block8:
-    v34 = stack_addr.i64 ss0
-    v35 = load.i64 notrap v34
-    call fn2(v0)
-    return v35
-
-block11:
-    v36 = iconst.i64 0
-    v37 = iconst.i64 0
-    jump block10(v37)  ; v37 = 0
-
-block9:
-    v38 = iconst.i64 0
-    jump block10(v38)  ; v38 = 0
-
-block10(v33: i64):
-    v39 = stack_addr.i64 ss0
-    v40 = load.i64 notrap v39
-    v41 = iconst.i64 1
-    v42 = iadd v40, v41  ; v41 = 1
-    v43 = stack_addr.i64 ss0
-    store notrap v42, v43
-    v44 = iconst.i64 0
-    v45 = iconst.i64 1
-    v46 = iadd.i64 v7, v45  ; v45 = 1
-    v47 = stack_addr.i64 ss2
-    store notrap v46, v47
-    jump block1
-
-block3:
-    v48 = iconst.i64 0
-    v49 = stack_addr.i64 ss0
-    v50 = load.i64 notrap v49
-    call fn2(v0)
-    return v50
-}
-
-; source variables:
-;   v0 = self
-;   ss0 = n
-;   v8 = x
-; __builtin_count_while$char$s0$lam69
-function u0:162(i64) -> i64 apple_aarch64 {
+; __builtin_count_while$char$s0$lam65
+function u0:159(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -39565,7 +39505,7 @@ block3:
 ;   ss0 = n
 ;   v8 = x
 ; __m18__step_result$__m19__AiplTok
-function u0:163(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:160(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 16, align = 8
@@ -39594,9 +39534,9 @@ function u0:163(i64, i64, i64, i64, i64) apple_aarch64 {
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:15 sig5  ; aipl_inc
     fn6 = colocated u0:76 sig6  ; __m18__token_value
-    fn7 = colocated u0:165 sig7  ; __m18__apply_emit$__m19__AiplTok
-    fn8 = colocated u0:179 sig8  ; __arr_drop_5
-    fn9 = colocated u0:179 sig9  ; __arr_drop_5
+    fn7 = colocated u0:162 sig7  ; __m18__apply_emit$__m19__AiplTok
+    fn8 = colocated u0:176 sig8  ; __arr_drop_5
+    fn9 = colocated u0:176 sig9  ; __arr_drop_5
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64):
     v5 = iconst.i64 0
@@ -41466,7 +41406,7 @@ block301:
 ;   v244 = kind
 ;   v284 = t
 ; __m18__template_step$__m19__AiplTok
-function u0:164(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:161(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -41487,7 +41427,7 @@ function u0:164(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn5 = u0:2 sig5  ; aipl_arr_inc
     fn6 = u0:14 sig6  ; aipl_dec
     fn7 = u0:6 sig7  ; aipl_array_dec
-    fn8 = colocated u0:166 sig8  ; __m18__template_scan$__m19__AiplTok
+    fn8 = colocated u0:163 sig8  ; __m18__template_scan$__m19__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64, v7: i64, v8: i64):
     v9 = call fn0(v1)
@@ -41613,7 +41553,7 @@ block3(v14: i64):
 ;   v7 = rules
 ;   v8 = unterminated
 ; __m18__apply_emit$__m19__AiplTok
-function u0:165(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:162(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
     ss1 = explicit_slot 24, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -43571,7 +43511,7 @@ block5(v10: i64):
 ;   v620 = f
 ;   v4 = $inl116_span
 ; __m18__template_scan$__m19__AiplTok
-function u0:166(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:163(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -43622,16 +43562,16 @@ function u0:166(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn6 = u0:0 sig6  ; aipl_arr_drop_str
     fn7 = u0:3 sig7  ; aipl_arr_retain_ptr
     fn8 = u0:8 sig8  ; aipl_array_push
-    fn9 = colocated u0:167 sig9  ; __m18__finalize_template$__m19__AiplTok
+    fn9 = colocated u0:164 sig9  ; __m18__finalize_template$__m19__AiplTok
     fn10 = u0:14 sig10  ; aipl_dec
     fn11 = u0:6 sig11  ; aipl_array_dec
     fn12 = u0:11 sig12  ; aipl_char_at
     fn13 = u0:0 sig13  ; aipl_arr_drop_str
     fn14 = u0:3 sig14  ; aipl_arr_retain_ptr
-    fn15 = colocated u0:168 sig15  ; __m18__interp_scan$__m19__AiplTok
-    fn16 = colocated u0:181 sig16  ; __arr_drop_6
-    fn17 = colocated u0:182 sig17  ; __arr_retain_6
-    fn18 = colocated u0:170 sig18  ; __builtin_is_some_and$char$lam72
+    fn15 = colocated u0:165 sig15  ; __m18__interp_scan$__m19__AiplTok
+    fn16 = colocated u0:178 sig16  ; __arr_drop_6
+    fn17 = colocated u0:179 sig17  ; __arr_retain_6
+    fn18 = colocated u0:167 sig18  ; __builtin_is_some_and$char$lam68
     fn19 = u0:13 sig19  ; aipl_concat_lazy
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64, v7: i64, v8: i64):
@@ -44272,7 +44212,7 @@ block37:
 ;   v198 = interp
 ;   v322 = m
 ; __m18__finalize_template$__m19__AiplTok
-function u0:167(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:164(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -44315,16 +44255,16 @@ function u0:167(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn1 = u0:7 sig2  ; aipl_array_new
     fn2 = u0:2 sig3  ; aipl_arr_inc
     fn3 = u0:1 sig4  ; aipl_arr_elem_ptr
-    fn4 = colocated u0:171 sig5  ; __m18__seg_emit$__m19__AiplTok
+    fn4 = colocated u0:168 sig5  ; __m18__seg_emit$__m19__AiplTok
     fn5 = u0:6 sig6  ; aipl_array_dec
     fn6 = u0:14 sig7  ; aipl_dec
-    fn7 = colocated u0:179 sig8  ; __arr_drop_5
-    fn8 = colocated u0:180 sig9  ; __arr_retain_5
+    fn7 = colocated u0:176 sig8  ; __arr_drop_5
+    fn8 = colocated u0:177 sig9  ; __arr_retain_5
     fn9 = u0:8 sig10  ; aipl_array_push
-    fn10 = colocated u0:179 sig11  ; __arr_drop_5
-    fn11 = colocated u0:180 sig12  ; __arr_retain_5
-    fn12 = colocated u0:179 sig13  ; __arr_drop_5
-    fn13 = colocated u0:180 sig14  ; __arr_retain_5
+    fn10 = colocated u0:176 sig11  ; __arr_drop_5
+    fn11 = colocated u0:177 sig12  ; __arr_retain_5
+    fn12 = colocated u0:176 sig13  ; __arr_drop_5
+    fn13 = colocated u0:177 sig14  ; __arr_retain_5
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64):
     call fn0(v3)
@@ -45758,7 +45698,7 @@ block206:
 ;   v346 = t
 ;   v439 = t
 ; __m18__interp_scan$__m19__AiplTok
-function u0:168(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:165(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -45804,14 +45744,14 @@ function u0:168(i64, i64, i64, i64, i64) apple_aarch64 {
     fn4 = u0:14 sig4  ; aipl_dec
     fn5 = u0:6 sig5  ; aipl_array_dec
     fn6 = u0:11 sig6  ; aipl_char_at
-    fn7 = colocated u0:178 sig7  ; __eq_4
+    fn7 = colocated u0:175 sig7  ; __eq_4
     fn8 = colocated u0:158 sig8  ; __m18__lex_step$__m19__AiplTok
     fn9 = u0:1 sig9  ; aipl_arr_elem_ptr
-    fn10 = colocated u0:179 sig10  ; __arr_drop_5
-    fn11 = colocated u0:180 sig11  ; __arr_retain_5
+    fn10 = colocated u0:176 sig10  ; __arr_drop_5
+    fn11 = colocated u0:177 sig11  ; __arr_retain_5
     fn12 = u0:8 sig12  ; aipl_array_push
-    fn13 = colocated u0:179 sig13  ; __arr_drop_5
-    fn14 = colocated u0:180 sig14  ; __arr_retain_5
+    fn13 = colocated u0:176 sig13  ; __arr_drop_5
+    fn14 = colocated u0:177 sig14  ; __arr_retain_5
     fn15 = u0:28 sig15  ; aipl_str_slice
     fn16 = u0:21 sig16  ; aipl_str_eq
 
@@ -46779,8 +46719,8 @@ block116:
 ;   v142 = step
 ;   v220 = t
 ;   v313 = t
-; __lambda_70
-function u0:169(i64, i64) -> i64 apple_aarch64 {
+; __lambda_66
+function u0:166(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
@@ -46803,13 +46743,13 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = e
 ;   v1 = escapes
-; __builtin_is_some_and$char$lam72
-function u0:170(i64, i64) -> i64 apple_aarch64 {
+; __builtin_is_some_and$char$lam68
+function u0:167(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
-    fn1 = colocated u0:169 sig1  ; __lambda_70
+    fn1 = colocated u0:166 sig1  ; __lambda_66
     fn2 = u0:14 sig2  ; aipl_dec
 
 block0(v0: i64, v1: i64):
@@ -46833,10 +46773,10 @@ block1(v2: i64):
 
 ; source variables:
 ;   v0 = self
-;   v1 = $cap71
+;   v1 = $cap67
 ;   v4 = x
 ; __m18__seg_emit$__m19__AiplTok
-function u0:171(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:168(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -48544,7 +48484,7 @@ block1(v5: i64):
 ;   v553 = f
 ;   v4 = $inl119_span
 ; __arr_drop_1
-function u0:173(i64, i64) apple_aarch64 {
+function u0:170(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:14 sig0  ; aipl_dec
@@ -48582,7 +48522,7 @@ block3:
 }
 
 ; __arr_retain_1
-function u0:174(i64, i64) apple_aarch64 {
+function u0:171(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
@@ -48620,7 +48560,7 @@ block3:
 }
 
 ; __arr_drop_3
-function u0:176(i64, i64) apple_aarch64 {
+function u0:173(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:14 sig0  ; aipl_dec
@@ -48854,7 +48794,7 @@ block3:
 }
 
 ; __arr_retain_3
-function u0:177(i64, i64) apple_aarch64 {
+function u0:174(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
@@ -49088,7 +49028,7 @@ block3:
 }
 
 ; __arr_drop_5
-function u0:179(i64, i64) apple_aarch64 {
+function u0:176(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:14 sig0  ; aipl_dec
@@ -49208,7 +49148,7 @@ block3:
 }
 
 ; __arr_retain_5
-function u0:180(i64, i64) apple_aarch64 {
+function u0:177(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
@@ -49328,7 +49268,7 @@ block3:
 }
 
 ; __arr_drop_6
-function u0:181(i64, i64) apple_aarch64 {
+function u0:178(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:6 sig0  ; aipl_array_dec
@@ -49366,7 +49306,7 @@ block3:
 }
 
 ; __arr_retain_6
-function u0:182(i64, i64) apple_aarch64 {
+function u0:179(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:2 sig0  ; aipl_arr_inc
@@ -49404,7 +49344,7 @@ block3:
 }
 
 ; __eq_2
-function u0:175(i64, i64) -> i64 apple_aarch64 {
+function u0:172(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
@@ -49448,7 +49388,7 @@ block2:
 }
 
 ; __eq_4
-function u0:178(i64, i64) -> i64 fast {
+function u0:175(i64, i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
 
 block0(v0: i64, v1: i64):
@@ -49487,7 +49427,7 @@ block2:
 }
 
 ; __to_str_0
-function u0:172(i64) -> i64 fast {
+function u0:169(i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8

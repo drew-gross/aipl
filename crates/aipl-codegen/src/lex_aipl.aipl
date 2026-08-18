@@ -639,12 +639,12 @@ allocations: 4723
 deallocations: 4723
 reallocations: 0
 bytes allocated: 275592
-instructions executed: 751547
-binary size: 223936
-  code: 143404
+instructions executed: 751337
+binary size: 223720
+  code: 143300
   data: 7100
-  metadata: 73432
-builtin calls: 85927
+  metadata: 73320
+builtin calls: 85773
   aipl_arr_drop_str: 9
   aipl_arr_inc: 7546
   aipl_arr_retain_ptr: 9
@@ -656,8 +656,8 @@ builtin calls: 85927
   aipl_assert: 20
   aipl_char_at: 1365
   aipl_concat_lazy: 12
-  aipl_dec: 26960
-  aipl_inc: 21870
+  aipl_dec: 26883
+  aipl_inc: 21793
   aipl_str_contains: 1016
   aipl_str_data: 88
   aipl_str_ends_with: 3
@@ -676,11 +676,11 @@ builtin calls: 85927
   aipl_trim: 2
 --- monomorphizations ---
 __builtin_count_while$char$s0$lam17
+__builtin_count_while$char$s0$lam28
+__builtin_count_while$char$s0$lam33
+__builtin_count_while$char$s0$lam35
 __builtin_count_while$char$s0$lam36
 __builtin_count_while$char$s0$lam38
-__builtin_count_while$char$s0$lam40
-__builtin_count_while$char$s0$lam47
-__builtin_count_while$char$s0$lam52
 __builtin_int_parse
 __builtin_is_some_and$char$lam34
 __builtin_opt_left_fold$char$i64$s0$lam13
@@ -708,7 +708,6 @@ __m1__seg_emit$AiplTok
 __m1__step_result$AiplTok
 __m1__template_scan$AiplTok
 __m1__template_step$AiplTok
-__m1__ucount_while$lam35
 __m2__unescape
 __m3__process_raw_string
 __m7__trim_prefix

@@ -8,8 +8,8 @@ import { wrapping_increment as ++, !, <=, == } from builtins;
 // user code. Because a builtin's body may call other builtins (loaded through
 // the real loader), this is also the shared helper the `trim_while` builtin and
 // the dogfooded compiler helpers (`dedent`, and `lexer.aipl`) call.
-pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> i64 {
-    mut n = 0;
+pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> u64 {
+    mut n: u64 = 0;
     for (let x : self) {
         if (!pred(x)) {
             return n;

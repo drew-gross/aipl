@@ -2647,12 +2647,12 @@ allocations: 20581
 deallocations: 20581
 reallocations: 560
 bytes allocated: 1011492
-instructions executed: 3075341
-binary size: 3052136
-  code: 1746472
+instructions executed: 3075003
+binary size: 3051912
+  code: 1746368
   data: 25740
-  metadata: 1279924
-builtin calls: 505395
+  metadata: 1279804
+builtin calls: 505157
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
   aipl_arr_inc: 57078
@@ -2668,8 +2668,8 @@ builtin calls: 505395
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 112122
-  aipl_inc: 91610
+  aipl_dec: 112003
+  aipl_inc: 91491
   aipl_rec_alloc: 5717
   aipl_rec_dec_strong: 45989
   aipl_rec_dec_weak: 3509
@@ -2695,11 +2695,11 @@ builtin calls: 505395
 __builtin_any$__m1__Doc$lam25
 __builtin_count$char$s0
 __builtin_count_while$char$s0$lam48
+__builtin_count_while$char$s0$lam66
+__builtin_count_while$char$s0$lam71
+__builtin_count_while$char$s0$lam73
 __builtin_count_while$char$s0$lam79
 __builtin_count_while$char$s0$lam80
-__builtin_count_while$char$s0$lam82
-__builtin_count_while$char$s0$lam89
-__builtin_count_while$char$s0$lam94
 __builtin_int_parse
 __builtin_is_some_and$char$lam72
 __builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12
@@ -2747,7 +2747,6 @@ __m9__seg_emit$__m8__AiplTok
 __m9__step_result$__m8__AiplTok
 __m9__template_scan$__m8__AiplTok
 __m9__template_step$__m8__AiplTok
-__m9__ucount_while$lam73
 __map50$own0
 __test$binding_ann
 __test$new_walker
