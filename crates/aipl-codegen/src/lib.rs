@@ -2993,10 +2993,45 @@ enum FuncLink {
     Builtin(&'static str),
 }
 
+/// One parameter of a `funcs`-map entry: its type together with the two
+/// per-parameter calling-convention decisions the call site and the callee body
+/// must both honour. They live on the parameter rather than as index lists on
+/// [`FuncInfo`] because that is what they are — properties of a parameter,
+/// decided once monomorphization knows the instance (the same reasoning that
+/// puts them on [`aipl_mono::ConcreteParam`]).
+#[derive(Clone)]
+struct ParamInfo {
+    ty: Type,
+    /// This instance takes ownership of the parameter (set by monomorphization).
+    /// At a call site the corresponding argument — always a fresh, uniquely-owned
+    /// heap value — is *moved* in (no retain) rather than borrowed, and the
+    /// callee won't drop it on entry-scope exit.
+    owned: bool,
+    /// The instance only *inspects* this heap argument, so the borrow protocol's
+    /// retain/release pair cancels — the call site skips the retain and the
+    /// callee skips the entry-scope release (see
+    /// `aipl_mono::inspect_only_params`, which decides both halves so they cannot
+    /// disagree). Always false for builtins and for the FFI metadata rebuilt from
+    /// checked-in IR, neither of which has a body here to elide against.
+    inspect_only: bool,
+}
+
+impl ParamInfo {
+    /// A plainly borrowed parameter — the shape every builtin and every
+    /// rebuilt-from-IR entry takes: the caller retains, the callee releases.
+    fn borrowed(ty: Type) -> Self {
+        Self {
+            ty,
+            owned: false,
+            inspect_only: false,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct FuncInfo {
     link: FuncLink,
-    params: Vec<Type>,
+    params: Vec<ParamInfo>,
     return_ty: Type,
     effects: Vec<String>,
     /// `true` for a mutating method (`fn f(mut self: T, ...)`): it returns
@@ -3004,18 +3039,15 @@ struct FuncInfo {
     /// `v.f(...)`. At the ABI level it returns the mutated `self` (its
     /// `return_ty`), which the call site stores back into `v`.
     is_mutating: bool,
-    /// Indices of parameters this instance takes ownership of (set by
-    /// monomorphization). At a call site the corresponding argument — always a
-    /// fresh, uniquely-owned heap value — is *moved* in (no retain) rather than
-    /// borrowed, and the callee won't drop it on entry-scope exit.
-    owned_params: Vec<usize>,
-    /// Per parameter (positionally): the instance only *inspects* this heap
-    /// argument, so the borrow protocol's retain/release pair cancels — the
-    /// call site skips the retain and the callee skips the entry-scope release
-    /// (see `aipl_mono::inspect_only_params`, which decides both halves so they
-    /// cannot disagree). Empty for builtins and for the FFI metadata rebuilt
-    /// from checked-in IR, neither of which has a body here to elide against.
-    inspect_only: Vec<bool>,
+}
+
+impl FuncInfo {
+    /// Just the parameter types, in order — for the places that describe the
+    /// function's *type* rather than its calling convention (a function value's
+    /// `Type::Fn`, the dogfood-IR manifest, FFI argument checking).
+    fn param_types(&self) -> impl Iterator<Item = &Type> {
+        self.params.iter().map(|p| &p.ty)
+    }
 }
 
 struct StructLayout {
@@ -4323,7 +4355,8 @@ fn compile_program<M: Module>(
 
     // Monomorphization has already split each function into the instances the
     // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
-    // with `owned_params` set. Codegen just declares and defines each one.
+    // with each parameter's `owned` set. Codegen just declares and defines each
+    // one.
     let mut decls: Vec<(FuncId, &aipl_mono::ConcreteFn)> = Vec::new();
     // Which heap parameters each instance only *inspects*, so its call sites can
     // skip the borrow retain and its body the matching entry-scope release. One
@@ -4344,22 +4377,22 @@ fn compile_program<M: Module>(
             .declare_function(export_name, Linkage::Export, &sig)
             .map_err(|e| Error::msg(format!("declare {}: {e}", f.name)))?;
         dbg.trace("codegen", format_args!("declare `{}`", f.name));
+        let inspects = inspect_only.remove(&f.name).unwrap_or_default();
         let info = FuncInfo {
             link: FuncLink::User(id),
-            params: f.params.iter().map(|p| p.ty.clone()).collect(),
-            return_ty: abi_return_ty(f),
-            effects: f.effects.clone(),
-            is_mutating: is_mutating_fn(f),
-            // Parameters this instance takes ownership of: a call site moves the
-            // (fresh) argument in instead of retaining it.
-            owned_params: f
+            params: f
                 .params
                 .iter()
                 .enumerate()
-                .filter(|(_, p)| p.owned)
-                .map(|(i, _)| i)
+                .map(|(i, p)| ParamInfo {
+                    ty: p.ty.clone(),
+                    owned: p.owned,
+                    inspect_only: inspects.get(i).copied().unwrap_or(false),
+                })
                 .collect(),
-            inspect_only: inspect_only.remove(&f.name).unwrap_or_default(),
+            return_ty: abi_return_ty(f),
+            effects: f.effects.clone(),
+            is_mutating: is_mutating_fn(f),
         };
         funcs.insert(f.name.clone(), info);
         decls.push((id, f));
@@ -4980,15 +5013,14 @@ pub fn generate_dogfood_artifact(
             .into());
         }
         let params = info
-            .params
-            .iter()
+            .param_types()
             .map(ffi_type_tag)
             .collect::<Result<Vec<_>, _>>()?
             .join(" ");
         let sep = if params.is_empty() { "" } else { " " };
         let ret = ffi_type_tag(&info.return_ty)?;
         out.push_str(&format!("; entry {name} {id}{sep}{params} -> {ret}\n"));
-        for t in info.params.iter().chain(std::iter::once(&info.return_ty)) {
+        for t in info.param_types().chain(std::iter::once(&info.return_ty)) {
             collect_named_types(t, &structs, &mut referenced_structs);
         }
     }
@@ -5352,12 +5384,10 @@ impl Compilation {
                 name,
                 FuncInfo {
                     link: FuncLink::User(ids[id as usize]),
-                    params,
+                    params: params.into_iter().map(ParamInfo::borrowed).collect(),
                     return_ty,
                     effects: Vec::new(),
                     is_mutating: false,
-                    owned_params: Vec::new(),
-                    inspect_only: Vec::new(),
                 },
             );
         }
@@ -5403,7 +5433,7 @@ impl Compilation {
     pub fn takes_cli_args(&self, name: &str) -> bool {
         self.funcs
             .get(name)
-            .is_some_and(|i| i.params.len() == 1 && i.params[0] == cli_args_ty())
+            .is_some_and(|i| i.params.len() == 1 && i.params[0].ty == cli_args_ty())
     }
 
     /// Run a function taking a single `str[]`, passing `args` as that array.
@@ -5438,7 +5468,7 @@ impl Compilation {
                 args.len()
             )));
         }
-        for (i, p) in info.params.iter().enumerate() {
+        for (i, p) in info.param_types().enumerate() {
             if !is_ffi_scalar(p) {
                 return Err(Error::msg(format!(
                     "fn {name:?} parameter {i} is {}; the FFI supports only i64/bool/char",
@@ -5529,7 +5559,7 @@ impl Compilation {
         // `invoke` and after the return value has been copied out.
         let mut bufs = ArgBufs::default();
         let mut abi: Vec<i64> = Vec::with_capacity(args.len());
-        for (i, (p, a)) in info.params.iter().zip(args).enumerate() {
+        for (i, (p, a)) in info.param_types().zip(args).enumerate() {
             match ffi_arg_abi(p, a, &self.structs, &mut bufs) {
                 Ok(word) => abi.push(word),
                 Err(why) => {
@@ -7423,12 +7453,10 @@ fn register_builtins(
             name.to_string(),
             FuncInfo {
                 link: FuncLink::Builtin(sym),
-                params,
+                params: params.into_iter().map(ParamInfo::borrowed).collect(),
                 return_ty,
                 effects: effects.iter().map(|s| s.to_string()).collect(),
                 is_mutating: false,
-                owned_params: Vec::new(),
-                inspect_only: Vec::new(),
             },
         );
     }
@@ -7803,12 +7831,12 @@ fn define_fn<M: Module>(
     dbg: DebugOptions,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
-    // Which parameters this instance only inspects, read back from the same
-    // `funcs` entry every call site consults — so the caller's skipped retain and
-    // the release skipped below are always the same decision.
-    let inspect_only: &[bool] = funcs
+    // This instance's own `funcs` entry — the very one every call site reads, so
+    // the caller's skipped retain and the release skipped below can only ever be
+    // the same decision.
+    let call_params: &[ParamInfo] = funcs
         .get(&func.name)
-        .map_or(&[], |info| info.inspect_only.as_slice());
+        .map_or(&[], |info| info.params.as_slice());
     // Parameters this instance owns (moved in): monomorphization marks them, so
     // they aren't dropped on entry-scope exit and `mut y = p` moves rather than
     // copies. Keyed by name for `Cx::owned_params`.
@@ -7895,7 +7923,8 @@ fn define_fn<M: Module>(
             // or an inspect-only one, which the caller didn't retain: it is a
             // pure borrow, alive for the call by the caller's own reference, and
             // releasing it here would free a value the caller still holds.
-            if is_heap(&p.ty) && !p.owned && !inspect_only.get(idx).copied().unwrap_or(false) {
+            let inspect_only = call_params.get(idx).is_some_and(|cp| cp.inspect_only);
+            if is_heap(&p.ty) && !p.owned && !inspect_only {
                 scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
@@ -13007,7 +13036,8 @@ fn compile_call<M: Module>(
     }
     let mut arg_values = Vec::with_capacity(args.len());
     let mut arg_fresh = Vec::with_capacity(args.len());
-    for (idx, (arg, expected)) in args.iter().zip(info.params.iter()).enumerate() {
+    for (idx, (arg, p)) in args.iter().zip(info.params.iter()).enumerate() {
+        let expected = &p.ty;
         let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         // A bare literal argument flexes to a narrow-int parameter (its
@@ -13040,8 +13070,8 @@ fn compile_call<M: Module>(
     // "caller pre-incs"; a str concat/rope builds a view that keeps referencing
     // its operands), so it isn't guaranteed to free exactly the one ref we'd hand
     // it — retain into builtins as before. (Owned params never apply to builtins.)
-    for (idx, (v, expected)) in arg_values.iter().zip(info.params.iter()).enumerate() {
-        if !is_heap(expected) {
+    for (idx, (v, p)) in arg_values.iter().zip(info.params.iter()).enumerate() {
+        if !is_heap(&p.ty) {
             continue;
         }
         // The callee only inspects this parameter (`aipl_mono::inspect_only_params`)
@@ -13051,11 +13081,11 @@ fn compile_call<M: Module>(
         // the retain/release pair we'd otherwise emit cancels. A fresh temporary
         // deliberately keeps its tracking entry here (it is *not* moved), since
         // nothing in the callee will free it.
-        if info.inspect_only.get(idx).copied().unwrap_or(false) {
+        if p.inspect_only {
             continue;
         }
         let is_builtin = matches!(info.link, FuncLink::Builtin(_));
-        let moved = info.owned_params.contains(&idx) || (arg_fresh[idx] && !is_builtin);
+        let moved = p.owned || (arg_fresh[idx] && !is_builtin);
         hand_off_arg(builder, module, builtins, scopes, *v, moved);
     }
     // A composite result (struct or optional) is returned through a caller-
@@ -15487,7 +15517,10 @@ fn compile_expr<M: Module>(
                 };
                 let fref = module.declare_func_in_func(id, builder.func);
                 let addr = builder.ins().func_addr(types::I64, fref);
-                let ty = Type::Fn(info.params.clone(), Box::new(info.return_ty.clone()));
+                let ty = Type::Fn(
+                    info.param_types().cloned().collect(),
+                    Box::new(info.return_ty.clone()),
+                );
                 (addr, ty)
             } else {
                 env_load(builder, name, env, span.clone())?
