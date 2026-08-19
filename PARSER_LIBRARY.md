@@ -11,7 +11,7 @@ each is sized to be finishable in one session.
 - [ ] 1.1 Generic-variant inference from expected type (`check.rs:605-635`)
 - [ ] 1.2 `case_index` / `case_name` builtins — match a case, not a payload
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
-- [ ] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320
+- [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
 - [ ] 1.5 Tail-call elimination — TODO.txt:467
 - [ ] 1.6 `match` arms as statement blocks; arm grouping; char-literal arms
 - [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
@@ -149,10 +149,23 @@ Stage 1.0 reproducer.
 *Fallback:* a mutual cons-list (`CstList = CNil | CCons(Cst, CstList)`) to force
 the cycle — correct today, but it makes every child access a list walk.
 
-### 1.4 Fix `{ boxed recursive field, array field }` — *required*
+### 1.4 Fix `{ boxed recursive field, array field }` — *required* — **already fixed**
 
 TODO.txt:320, already marked *"`<--- fix this`"*: a struct holding both a
-recursive-variant field and an array field breaks the compiler. `walker.aipl`
+recursive-variant field and an array field breaks the compiler.
+
+**Resolved without a code change.** That TODO line was an intermediate
+*narrowing note* for the composite `mut`-binding corruption, written in
+`f5ecdec` and fixed by the very next commit, `36b3301` ("Fix assignment in loop
+bug"), which shipped `tests/cases/structs/mut_struct_reassigned_in_loop.aipl`
+and narrowed further — the real trigger is one hidden-sret buffer per call site
+aliasing a composite `mut` binding across `set b = step(b);`, and it "needs no
+variant, no matched payload, no helper fn and no empty initial array". The line
+was simply never deleted. Verified by building the compiler at `f5ecdec`: the
+shape corrupts memory there and is clean on `main`.
+`tests/cases/structs/boxed_field_with_array.aipl` now locks the *type* shape in
+(it segfaults on that historical build); nothing in the library needs a
+fallback. `walker.aipl`
 threads around it and never violates it — `Step { col, work: Work, ... }` has a
 direct boxed field and no array; `WDocs { w: W, docs: Doc[] }` has an array of
 boxed values and no direct boxed field. This lands **with or before 1.3**, since

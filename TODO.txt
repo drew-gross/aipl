@@ -321,7 +321,6 @@ none.value_or_err doesn't type check. Maybe it should? Unclear.
 Known limitation recorded in #7: cross-iteration struct aliases still see the newer value, since the per-set buffer is a reused stack slot. <--- fix this
 
 value_or can't unwrap struct optionals — needs match. <--- fix this
-Narrowed precisely: a struct holding both a recursive-variant field and an array field breaks the compiler. <--- fix this
 
 Why the formatter isn't already a thin wrapper
 

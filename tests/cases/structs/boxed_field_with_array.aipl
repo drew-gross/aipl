@@ -1,0 +1,167 @@
+import { print, to_str, wrapping_add as +, wrapping_increment as ++, !=, <, == } from builtins;
+
+// A struct that holds *both* a direct boxed (recursive) field and an array
+// field, plus the variant spelling of the same mix — a `Climb`-shaped case
+// carrying a self reference (an internal, weak-counted one) alongside an array
+// payload. The two references are counted differently, so the pairing is worth
+// pinning down: dropping one of these values releases the boxed field weakly
+// and the array strongly, and the balanced allocation counts below are what
+// proves neither path leaks or over-drops.
+variant List = Cons(i64, List) | Nil
+
+struct Prec { power: u64, right: bool }
+
+variant Rule = Term(i64) | Climb(Rule, Prec[])
+
+struct Both { head: List, nums: i64[] }
+
+struct Mixed { tails: List[], head: List }
+
+// The same mix within one recursion group: `next` is an internal (weak) self
+// reference and `kids` an array of *external* (strong) references to values of
+// that same group, so one node is reached by both counts at once.
+struct Node { v: i64, next: Node?, kids: Node[] }
+
+fn sum(self: List) -> i64 {
+    match (self) {
+        Cons(x, r) => x + r.sum(),
+        Nil => 0,
+    }
+}
+
+fn leaf(v: i64) -> Node { Node { v, next: none, kids: [] } }
+
+fn total(self: Node) -> i64 {
+    mut s = self.v;
+    for (let k : self.kids) {
+        set s = s + k.total();
+    }
+    match (self.next) {
+        some(n) => s + n.total(),
+        none => s,
+    }
+}
+
+fn spine(n: i64) -> Both {
+    mut b = Both { head: Nil, nums: [7, 8] };
+    mut i = 0;
+    while (i < n) {
+        set b.head = Cons(i, b.head);
+        set i++;
+    }
+    b
+}
+
+fn step(b: Both) -> Both { Both { head: Cons(b.head.sum(), b.head), nums: b.nums } }
+
+// `set b = step(b);` in a loop is the shape that used to corrupt a composite
+// `mut` binding — one hidden-sret buffer per call site, with `b` pointing into
+// the very buffer the next call writes its result to (see
+// `structs/mut_struct_reassigned_in_loop`). Repeated here because this struct
+// carries a boxed field *and* an array field, so a stale pointer would be
+// refcounted twice over.
+fn climb(n: i64) -> Both {
+    mut b = Both { head: Cons(1, Nil), nums: [7, 8] };
+    mut i = 0;
+    while (i < n) {
+        set b = step(b);
+        set i++;
+    }
+    b
+}
+
+fn main() !prints {
+    print(to_str(spine(3)));
+    print(to_str(climb(3)));
+    print(to_str(Climb(Term(1), [Prec { power: 1, right: false }])));
+    print(to_str(Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }));
+    print(to_str(Node { v: 1, next: some(leaf(2)), kids: [leaf(3)] }));
+}.test({
+    // Rebinding the boxed field in a loop leaves the array field untouched.
+    let b = spine(3);
+    assert(b.head.sum() == 3);
+    assert(b.nums == [7, 8]);
+    assert(spine(0) == Both { head: Nil, nums: [7, 8] });
+
+    // Reassigning the whole binding from a call on itself, in a loop.
+    assert(climb(0) == Both { head: Cons(1, Nil), nums: [7, 8] });
+    assert(climb(3).head.sum() == 8);
+    assert(climb(3).nums == [7, 8]);
+
+    // A variant case with both a self payload and an array payload.
+    let r = Climb(Term(1), [Prec { power: 1, right: false }]);
+    assert(r == Climb(Term(1), [Prec { power: 1, right: false }]));
+    assert(Climb(Climb(Term(2), []), []) != r);
+
+    // An array of boxed values next to a direct boxed field.
+    let m = Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) };
+    assert(m.head.sum() == 2);
+    assert(m == Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) });
+
+    // Weak self reference and strong same-group array on one value.
+    let n = Node {
+        v: 1,
+        next: some(leaf(2)),
+        kids: [leaf(3), Node { v: 4, next: none, kids: [leaf(5)] }],
+    };
+    assert(n.total() == 15);
+    assert(leaf(6).total() == 6);
+    assert(
+        n == Node {
+            v: 1,
+            next: some(leaf(2)),
+            kids: [leaf(3), Node { v: 4, next: none, kids: [leaf(5)] }],
+        },
+    );
+})
+--- stdout ---
+Both { head: Cons(2, Cons(1, Cons(0, Nil))), nums: [7, 8] }
+Both { head: Cons(4, Cons(2, Cons(1, Cons(1, Nil)))), nums: [7, 8] }
+Climb(Term(1), [Prec { power: 1, right: false }])
+Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }
+Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3, next: none, kids: [] }] }
+--- performance ---
+allocations: 83
+deallocations: 83
+reallocations: 0
+bytes allocated: 3678
+instructions executed: 11714
+binary size: 18136
+  code: 9048
+    __arr_drop_4: 116
+    __arr_drop_7: 116
+    __arr_retain_4: 116
+    __arr_retain_7: 116
+    __rec_drop_0: 44
+    __rec_drop_2: 84
+    __rec_drop_6: 92
+    __to_str_1: 1024
+    __to_str_3: 1600
+    __to_str_5: 1108
+    __to_str_8: 1408
+    __to_str_9: 664
+    leaf: 164
+    main: 2292
+    sum: 104
+  data: 1229
+  metadata: 7859
+builtin calls: 1086
+  aipl_arr_inc: 14
+  aipl_array_dec: 21
+  aipl_array_new: 7
+  aipl_dec: 122
+  aipl_i64_len: 118
+  aipl_inc: 5
+  aipl_print: 5
+  aipl_rec_alloc: 19
+  aipl_rec_dec_strong: 43
+  aipl_rec_dec_weak: 11
+  aipl_rec_inc_strong: 24
+  aipl_rec_inc_weak: 11
+  aipl_str_alloc: 57
+  aipl_str_data: 56
+  aipl_str_len: 112
+  aipl_u64_len: 2
+  aipl_write_bytes: 399
+  aipl_write_i64: 59
+  aipl_write_u64: 1

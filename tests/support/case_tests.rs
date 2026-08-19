@@ -415,6 +415,7 @@ case_tests! {
     cases_strings_trim = "cases/strings/trim",
     cases_strings_trim_alias_keeps_value_semantics = "cases/strings/trim_alias_keeps_value_semantics",
     cases_strings_trim_in_place = "cases/strings/trim_in_place",
+    cases_structs_boxed_field_with_array = "cases/structs/boxed_field_with_array",
     cases_structs_defaults = "cases/structs/defaults",
     cases_structs_destructure = "cases/structs/destructure",
     cases_structs_err_duplicate_struct = "cases/structs/err_duplicate_struct",
