@@ -176,6 +176,9 @@ optimizations:
 effects:
   all effects should be shimmable actually
 
+misc cleanup:
+  in FuncInfo, params should contain a vec of ParamInfo that has the type of the param, is_owned, and inspect_only, instead of parallel arrays
+
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf

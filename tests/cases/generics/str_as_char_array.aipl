@@ -24,18 +24,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 84
-instructions executed: 828
-binary size: 2936
-  code: 1096
-    count_eq$char$s0: 256
+instructions executed: 825
+binary size: 2896
+  code: 1072
+    count_eq$char$s0: 232
     main: 840
   data: 322
-  metadata: 1518
-builtin calls: 32
+  metadata: 1502
+builtin calls: 29
   aipl_array_dec: 1
   aipl_array_new: 1
   aipl_assert: 5
-  aipl_dec: 4
+  aipl_dec: 1
   aipl_str_alloc: 1
   aipl_str_data: 3
   aipl_str_iter_init: 4

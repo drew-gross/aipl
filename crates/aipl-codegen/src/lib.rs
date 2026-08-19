@@ -3009,6 +3009,13 @@ struct FuncInfo {
     /// fresh, uniquely-owned heap value — is *moved* in (no retain) rather than
     /// borrowed, and the callee won't drop it on entry-scope exit.
     owned_params: Vec<usize>,
+    /// Per parameter (positionally): the instance only *inspects* this heap
+    /// argument, so the borrow protocol's retain/release pair cancels — the
+    /// call site skips the retain and the callee skips the entry-scope release
+    /// (see `aipl_mono::inspect_only_params`, which decides both halves so they
+    /// cannot disagree). Empty for builtins and for the FFI metadata rebuilt
+    /// from checked-in IR, neither of which has a body here to elide against.
+    inspect_only: Vec<bool>,
 }
 
 struct StructLayout {
@@ -4318,6 +4325,10 @@ fn compile_program<M: Module>(
     // program reaches — borrow and owned forms alike, each its own `ConcreteFn`
     // with `owned_params` set. Codegen just declares and defines each one.
     let mut decls: Vec<(FuncId, &aipl_mono::ConcreteFn)> = Vec::new();
+    // Which heap parameters each instance only *inspects*, so its call sites can
+    // skip the borrow retain and its body the matching entry-scope release. One
+    // shared answer for both halves — see `aipl_mono::inspect_only_params`.
+    let mut inspect_only = aipl_mono::inspect_only_params(program);
     for f in &program.fns {
         // Signature/effect/mutating validity is checked up front by
         // `aipl_mono::check`; codegen trusts it and goes straight to lowering.
@@ -4348,6 +4359,7 @@ fn compile_program<M: Module>(
                 .filter(|(_, p)| p.owned)
                 .map(|(i, _)| i)
                 .collect(),
+            inspect_only: inspect_only.remove(&f.name).unwrap_or_default(),
         };
         funcs.insert(f.name.clone(), info);
         decls.push((id, f));
@@ -5345,6 +5357,7 @@ impl Compilation {
                     effects: Vec::new(),
                     is_mutating: false,
                     owned_params: Vec::new(),
+                    inspect_only: Vec::new(),
                 },
             );
         }
@@ -7415,6 +7428,7 @@ fn register_builtins(
                 effects: effects.iter().map(|s| s.to_string()).collect(),
                 is_mutating: false,
                 owned_params: Vec::new(),
+                inspect_only: Vec::new(),
             },
         );
     }
@@ -7789,6 +7803,12 @@ fn define_fn<M: Module>(
     dbg: DebugOptions,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
+    // Which parameters this instance only inspects, read back from the same
+    // `funcs` entry every call site consults — so the caller's skipped retain and
+    // the release skipped below are always the same decision.
+    let inspect_only: &[bool] = funcs
+        .get(&func.name)
+        .map_or(&[], |info| info.inspect_only.as_slice());
     // Parameters this instance owns (moved in): monomorphization marks them, so
     // they aren't dropped on entry-scope exit and `mut y = p` moves rather than
     // copies. Keyed by name for `Cx::owned_params`.
@@ -7838,7 +7858,7 @@ fn define_fn<M: Module>(
         let mut env: Env = HashMap::new();
         let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
         let mut self_slot: Option<StackSlot> = None;
-        for (p, v) in func.params.iter().zip(user_params) {
+        for (idx, (p, v)) in func.params.iter().zip(user_params).enumerate() {
             if p.mutable {
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -7871,8 +7891,11 @@ fn define_fn<M: Module>(
             }
             // A heap parameter is owned by the callee and dropped at exit —
             // unless it's a moved-in owned param, whose ownership transfers to
-            // the local it's moved into (so dropping it here would double-free).
-            if is_heap(&p.ty) && !p.owned {
+            // the local it's moved into (so dropping it here would double-free),
+            // or an inspect-only one, which the caller didn't retain: it is a
+            // pure borrow, alive for the call by the caller's own reference, and
+            // releasing it here would free a value the caller still holds.
+            if is_heap(&p.ty) && !p.owned && !inspect_only.get(idx).copied().unwrap_or(false) {
                 scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
@@ -13019,6 +13042,16 @@ fn compile_call<M: Module>(
     // it — retain into builtins as before. (Owned params never apply to builtins.)
     for (idx, (v, expected)) in arg_values.iter().zip(info.params.iter()).enumerate() {
         if !is_heap(expected) {
+            continue;
+        }
+        // The callee only inspects this parameter (`aipl_mono::inspect_only_params`)
+        // and so skips its entry-scope release: hand it over untouched. Our own
+        // reference — a live binding, an owning container, or a fresh temporary
+        // still tracked by this scope — keeps it alive for the whole call, and
+        // the retain/release pair we'd otherwise emit cancels. A fresh temporary
+        // deliberately keeps its tracking entry here (it is *not* moved), since
+        // nothing in the callee will free it.
+        if info.inspect_only.get(idx).copied().unwrap_or(false) {
             continue;
         }
         let is_builtin = matches!(info.link, FuncLink::Builtin(_));

@@ -37,15 +37,15 @@ deallocations: 19
 reallocations: 10
 bytes allocated: 936
 instructions executed: 1869
-binary size: 8080
-  code: 4476
+binary size: 8072
+  code: 4468
     __arr_drop_0: 136
     __arr_retain_0: 136
     __eq_1: 284
     __eq_2: 268
-    main: 2972
-    pair_up$lam11: 340
-    pair_up$lam13: 340
+    main: 3020
+    pair_up$lam11: 312
+    pair_up$lam13: 312
   data: 411
   metadata: 3193
 builtin calls: 92

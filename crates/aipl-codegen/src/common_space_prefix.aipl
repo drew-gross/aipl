@@ -48,18 +48,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2249
-binary size: 4152
-  code: 1216
+instructions executed: 2223
+binary size: 4048
+  code: 1176
     __eq_0: 100
-    common_space_prefix: 320
+    common_space_prefix: 280
     main: 796
   data: 930
-  metadata: 2006
-builtin calls: 186
+  metadata: 1942
+builtin calls: 160
   aipl_assert: 13
   aipl_char_at: 48
-  aipl_dec: 74
+  aipl_dec: 48
   aipl_inc: 48
   aipl_test_begin: 1
   aipl_test_end: 1

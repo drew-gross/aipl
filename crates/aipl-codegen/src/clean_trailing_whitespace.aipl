@@ -54,15 +54,15 @@ allocations: 45
 deallocations: 45
 reallocations: 0
 bytes allocated: 1929
-instructions executed: 7651
-binary size: 8440
-  code: 2800
-    __m2__trim_end_while$lam1: 316
-    clean_trailing_whitespace: 712
+instructions executed: 7635
+binary size: 8368
+  code: 2760
+    __m2__trim_end_while$lam1: 292
+    clean_trailing_whitespace: 696
     main: 1772
   data: 1561
-  metadata: 4079
-builtin calls: 828
+  metadata: 4047
+builtin calls: 812
   aipl_arr_drop_str: 32
   aipl_arr_retain_ptr: 31
   aipl_array_dec: 48
@@ -70,7 +70,7 @@ builtin calls: 828
   aipl_array_push_mut: 31
   aipl_array_with_cap: 16
   aipl_assert: 16
-  aipl_dec: 245
+  aipl_dec: 229
   aipl_inc: 119
   aipl_str_data: 20
   aipl_str_eq: 16

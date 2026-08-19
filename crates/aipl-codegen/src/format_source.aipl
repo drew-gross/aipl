@@ -74,9 +74,9 @@ allocations: 2188
 deallocations: 2188
 reallocations: 6
 bytes allocated: 100657
-instructions executed: 332456
-binary size: 852232
-  code: 521472
+instructions executed: 330151
+binary size: 845104
+  code: 517612
     __arr_drop_10: 140
     __arr_drop_12: 120
     __arr_drop_2: 800
@@ -93,60 +93,60 @@ binary size: 852232
     __arr_retain_7: 140
     __arr_retain_8: 140
     __arr_retain_9: 140
-    __builtin_any$__m7__Doc$lam88: 296
-    __builtin_count$char$s0: 256
-    __builtin_count_while$char$s0$lam42: 288
-    __builtin_count_while$char$s0$lam53: 384
-    __builtin_count_while$char$s0$lam58: 292
-    __builtin_count_while$char$s0$lam60: 300
-    __builtin_count_while$char$s0$lam69: 288
-    __builtin_count_while$char$s0$lam71: 288
-    __builtin_int_parse: 884
+    __builtin_any$__m7__Doc$lam88: 260
+    __builtin_count$char$s0: 232
+    __builtin_count_while$char$s0$lam42: 232
+    __builtin_count_while$char$s0$lam53: 296
+    __builtin_count_while$char$s0$lam58: 236
+    __builtin_count_while$char$s0$lam60: 244
+    __builtin_count_while$char$s0$lam69: 232
+    __builtin_count_while$char$s0$lam71: 232
+    __builtin_int_parse: 744
     __builtin_is_some_and$char$lam59: 48
     __builtin_map_err$__m13__LexResult$__m12__AiplTok$__m13__LexError$__m6__FmtError$lam7: 540
-    __builtin_opt_left_fold$char$i64$s0$lam38: 376
-    __builtin_sort_by$__m6__ImportEntry$lam23: 1564
-    __builtin_sort_by$__m6__ImportName$lam62: 3264
-    __builtin_value_or_err$i64$str: 212
+    __builtin_opt_left_fold$char$i64$s0$lam38: 348
+    __builtin_sort_by$__m6__ImportEntry$lam23: 1536
+    __builtin_sort_by$__m6__ImportName$lam62: 3236
+    __builtin_value_or_err$i64$str: 180
     __eq_0: 100
     __eq_1: 148
     __eq_11: 64
-    __lambda_14: 68
+    __lambda_14: 100
     __lambda_15: 68
-    __lambda_16: 152
-    __lambda_17: 152
-    __lambda_18: 152
-    __lambda_19: 152
-    __lambda_20: 64
+    __lambda_16: 108
+    __lambda_17: 136
+    __lambda_18: 108
+    __lambda_19: 136
+    __lambda_20: 48
     __lambda_21: 64
     __lambda_37: 140
-    __m12__char_lit_emit: 1432
-    __m12__dedent_segments: 160
+    __m12__char_lit_emit: 1412
+    __m12__dedent_segments: 188
     __m12__ident_cont: 16
-    __m12__int_lit: 1064
+    __m12__int_lit: 1044
     __m12__raw_tpl_kind: 2088
-    __m12__tpl_kind: 2128
-    __m13__apply_emit$__m12__AiplTok: 4980
-    __m13__between_len: 972
-    __m13__delimited_len: 1772
-    __m13__finalize_template$__m12__AiplTok: 4432
-    __m13__float_len: 844
-    __m13__interp_scan$__m12__AiplTok: 3284
-    __m13__lex$__m12__AiplTok: 2568
-    __m13__lex_step$__m12__AiplTok: 23196
-    __m13__nested_len: 1228
-    __m13__seg_emit$__m12__AiplTok: 4368
-    __m13__step_result$__m12__AiplTok: 7212
-    __m13__template_scan$__m12__AiplTok: 3172
-    __m13__template_step$__m12__AiplTok: 796
-    __m14__unescape: 908
-    __m15__process_raw_string: 576
-    __m16__trim_prefix: 236
-    __m17__trim_suffix: 252
-    __m3__trim_end_while$lam3: 316
-    __m4__split_test_sections: 904
-    __m5__parse_test_section_header: 740
-    __m6__array_atom: 2160
+    __m12__tpl_kind: 2112
+    __m13__apply_emit$__m12__AiplTok: 4964
+    __m13__between_len: 744
+    __m13__delimited_len: 1504
+    __m13__finalize_template$__m12__AiplTok: 4288
+    __m13__float_len: 816
+    __m13__interp_scan$__m12__AiplTok: 3120
+    __m13__lex$__m12__AiplTok: 2436
+    __m13__lex_step$__m12__AiplTok: 22728
+    __m13__nested_len: 1044
+    __m13__seg_emit$__m12__AiplTok: 4344
+    __m13__step_result$__m12__AiplTok: 7140
+    __m13__template_scan$__m12__AiplTok: 2772
+    __m13__template_step$__m12__AiplTok: 556
+    __m14__unescape: 892
+    __m15__process_raw_string: 564
+    __m16__trim_prefix: 216
+    __m17__trim_suffix: 232
+    __m3__trim_end_while$lam3: 292
+    __m4__split_test_sections: 928
+    __m5__parse_test_section_header: 696
+    __m6__array_atom: 2176
     __m6__array_suffixes: 1248
     __m6__atom: 2776
     __m6__base_ty: 2248
@@ -154,122 +154,122 @@ binary size: 852232
     __m6__binop_expr: 2868
     __m6__binop_tail: 3920
     __m6__block: 996
-    __m6__block_entries: 3720
+    __m6__block_entries: 3744
     __m6__block_layout: 5112
     __m6__bump: 1624
     __m6__call_arg: 4792
-    __m6__call_arg_list: 724
-    __m6__call_args_until: 2720
-    __m6__chain_docs: 500
-    __m6__comma_list_docs: 2936
+    __m6__call_arg_list: 636
+    __m6__call_args_until: 2688
+    __m6__chain_docs: 472
+    __m6__comma_list_docs: 2868
     __m6__comment_starts_before: 280
     __m6__dict_entries: 4264
     __m6__dict_value: 1428
     __m6__dict_value_ty: 1300
-    __m6__dot_seg: 5168
-    __m6__drop_trailing_break: 612
-    __m6__err_here: 680
-    __m6__expect: 1300
+    __m6__dot_seg: 5184
+    __m6__drop_trailing_break: 580
+    __m6__err_here: 656
+    __m6__expect: 1304
     __m6__expr: 700
     __m6__fn_attrs: 5304
-    __m6__fn_item: 17604
-    __m6__fn_return: 1728
+    __m6__fn_item: 17724
+    __m6__fn_return: 1696
     __m6__for_stmt: 9924
-    __m6__format_program: 74956
+    __m6__format_program: 74964
     __m6__hug_close: 716
     __m6__hugs_sole_arg: 1320
-    __m6__ident_list: 1672
+    __m6__ident_list: 1660
     __m6__if_expr: 10884
-    __m6__import_item: 7996
+    __m6__import_item: 7956
     __m6__import_names: 3240
     __m6__index_or_from: 3872
     __m6__index_seg: 3676
     __m6__is_line_break: 372
-    __m6__item: 1044
+    __m6__item: 1064
     __m6__lambda: 5920
-    __m6__lambda_param_ty: 1484
-    __m6__lambda_params: 3204
+    __m6__lambda_param_ty: 1456
+    __m6__lambda_params: 3236
     __m6__lead: 436
-    __m6__lead_loop: 1508
+    __m6__lead_loop: 1532
     __m6__let_stmt: 19204
     __m6__match_arms: 5056
     __m6__match_expr: 10744
     __m6__mut_stmt: 5364
-    __m6__name_atom: 5660
-    __m6__named_ty: 3640
+    __m6__name_atom: 5712
+    __m6__named_ty: 3656
     __m6__next_start: 536
-    __m6__params_until: 9552
-    __m6__paren_atom: 5300
-    __m6__paren_ty: 7512
-    __m6__pattern: 7568
+    __m6__params_until: 9516
+    __m6__paren_atom: 5316
+    __m6__paren_ty: 7608
+    __m6__pattern: 7588
     __m6__peek: 276
     __m6__peek_text_n: 32
-    __m6__postfix: 4640
+    __m6__postfix: 4652
     __m6__postfix_segs: 3252
-    __m6__program: 2800
+    __m6__program: 2784
     __m6__program_items: 4372
     __m6__range_has_semi: 220
     __m6__range_tail: 2136
     __m6__sep_entry: 328
-    __m6__set_member: 9728
-    __m6__set_or_dict_atom: 5000
+    __m6__set_member: 9644
+    __m6__set_or_dict_atom: 5016
     __m6__set_or_dict_ty: 5976
-    __m6__set_stmt: 7300
+    __m6__set_stmt: 7316
     __m6__shim_bindings: 3048
-    __m6__shim_expr: 5828
+    __m6__shim_expr: 5844
     __m6__slice_to: 1300
-    __m6__spaced_default: 1724
+    __m6__spaced_default: 1692
     __m6__statement: 5168
     __m6__str_atom: 532
-    __m6__struct_atom: 2976
-    __m6__struct_field_value: 1524
-    __m6__struct_fields: 5872
-    __m6__struct_inits: 3656
-    __m6__struct_item: 5912
+    __m6__struct_atom: 2932
+    __m6__struct_field_value: 1496
+    __m6__struct_fields: 5860
+    __m6__struct_inits: 3688
+    __m6__struct_item: 5804
     __m6__take_comment: 916
     __m6__template_scan: 3240
     __m6__template_verbatim: 724
     __m6__tok_text: 368
     __m6__trailing_comment: 1972
-    __m6__trim_last_break: 556
+    __m6__trim_last_break: 512
     __m6__tuple_binder: 1732
     __m6__tuple_rest: 2688
     __m6__ty: 4432
-    __m6__ty_list: 2320
+    __m6__ty_list: 2288
     __m6__type_param_list: 3044
-    __m6__type_params: 2256
+    __m6__type_params: 2272
     __m6__type_suffixes: 1844
     __m6__unary: 1700
-    __m6__variant_body: 796
+    __m6__variant_body: 760
     __m6__variant_cases: 3804
-    __m6__variant_item: 4708
-    __m6__variant_payload: 2160
+    __m6__variant_item: 4724
+    __m6__variant_payload: 2176
     __m6__while_stmt: 4272
     __m6__with_last: 468
-    __m6__without_trailing_break: 720
-    __m7__col_after: 464
-    __m7__fits: 1688
-    __m7__fits_atom: 204
-    __m7__go: 4392
-    __m7__has_hard: 536
+    __m6__without_trailing_break: 696
+    __m7__col_after: 448
+    __m7__fits: 1660
+    __m7__fits_atom: 176
+    __m7__go: 4356
+    __m7__has_hard: 520
     __m7__print_doc: 1328
-    __m8__reindent_block: 2288
-    __m9__dedent: 1188
-    __map44$own0: 336
+    __m8__reindent_block: 2292
+    __m9__dedent: 1164
+    __map44$own0: 320
     __rec_drop_4: 184
     __rec_drop_5: 84
     __test$fmt_layout: 764
-    fmt_layout: 700
-    fmt_prepare: 904
+    fmt_layout: 612
+    fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 328253
-builtin calls: 42364
+  metadata: 324985
+builtin calls: 40059
   aipl_arr_drop_str: 50
   aipl_arr_inc: 4581
   aipl_arr_reserve: 6
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6479
+  aipl_array_dec: 6424
   aipl_array_new: 1762
   aipl_array_push: 42
   aipl_array_push_mut: 45
@@ -278,8 +278,8 @@ builtin calls: 42364
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 11534
-  aipl_inc: 9730
+  aipl_dec: 10424
+  aipl_inc: 8590
   aipl_rec_alloc: 96
   aipl_rec_dec_strong: 704
   aipl_rec_dec_weak: 47

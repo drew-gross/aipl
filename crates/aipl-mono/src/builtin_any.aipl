@@ -40,29 +40,29 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 323
-instructions executed: 1018
-binary size: 6744
-  code: 3344
+instructions executed: 1016
+binary size: 6256
+  code: 3028
     __filter13$own0: 284
-    any$char$lam7: 256
-    any$char$s0$lam11: 256
-    any$char$s0$lam9: 256
-    any$i64$lam1: 244
-    any$i64$lam12: 244
-    any$i64$lam15: 244
-    any$i64$lam17: 244
-    any$i64$lam3: 244
-    any$i64$lam5: 244
+    any$char$lam7: 200
+    any$char$s0$lam11: 200
+    any$char$s0$lam9: 200
+    any$i64$lam1: 192
+    any$i64$lam12: 192
+    any$i64$lam15: 192
+    any$i64$lam17: 192
+    any$i64$lam3: 192
+    any$i64$lam5: 192
     is_nine: 16
-    main: 812
+    main: 976
   data: 589
-  metadata: 2811
-builtin calls: 49
+  metadata: 2639
+builtin calls: 47
   aipl_arr_inc: 1
   aipl_array_dec: 7
   aipl_array_new: 6
   aipl_assert: 11
-  aipl_dec: 3
+  aipl_dec: 1
   aipl_str_alloc: 1
   aipl_str_data: 3
   aipl_str_iter_init: 3

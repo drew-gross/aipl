@@ -41,14 +41,14 @@ reallocations: 0
 bytes allocated: 1488
 instructions executed: 1844
 binary size: 9456
-  code: 4904
+  code: 4900
     __eq_1: 124
     __rec_drop_0: 44
-    __test$to_list_keeps_order: 4092
+    __test$to_list_keeps_order: 4120
     main: 72
-    to_list: 572
+    to_list: 540
   data: 655
-  metadata: 3897
+  metadata: 3901
 builtin calls: 244
   aipl_arr_drop_str: 3
   aipl_array_dec: 8

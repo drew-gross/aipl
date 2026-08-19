@@ -15,18 +15,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 224
-binary size: 2680
-  code: 856
+instructions executed: 220
+binary size: 2640
+  code: 836
     __eq_0: 100
     main: 520
-    trim_prefix: 236
+    trim_prefix: 216
   data: 274
-  metadata: 1550
-builtin calls: 49
+  metadata: 1530
+builtin calls: 45
   aipl_assert: 4
   aipl_char_at: 4
-  aipl_dec: 20
+  aipl_dec: 16
   aipl_inc: 10
   aipl_str_eq: 4
   aipl_str_len: 2

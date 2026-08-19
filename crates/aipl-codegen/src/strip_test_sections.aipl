@@ -51,20 +51,20 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 320
-instructions executed: 8833
-binary size: 7184
-  code: 2648
+instructions executed: 8824
+binary size: 7152
+  code: 2628
     __eq_0: 100
     __eq_1: 148
-    __m1__parse_test_section_header: 740
+    __m1__parse_test_section_header: 696
     main: 1036
-    strip_test_sections: 624
+    strip_test_sections: 648
   data: 1079
-  metadata: 3457
-builtin calls: 897
+  metadata: 3445
+builtin calls: 888
   aipl_assert: 9
   aipl_char_at: 128
-  aipl_dec: 280
+  aipl_dec: 271
   aipl_inc: 202
   aipl_str_ends_with: 5
   aipl_str_eq: 14

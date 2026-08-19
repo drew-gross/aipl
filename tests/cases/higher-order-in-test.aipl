@@ -34,13 +34,13 @@ deallocations: 6
 reallocations: 4
 bytes allocated: 296
 instructions executed: 801
-binary size: 2680
-  code: 1128
+binary size: 2728
+  code: 1156
     __eq_0: 296
-    filter_evens$lam0: 320
-    main: 512
+    filter_evens$lam0: 292
+    main: 568
   data: 190
-  metadata: 1362
+  metadata: 1382
 builtin calls: 25
   aipl_arr_inc: 2
   aipl_array_dec: 8

@@ -49,15 +49,15 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 507
 instructions executed: 1171
-binary size: 6048
-  code: 2696
+binary size: 6072
+  code: 2708
     __filter11$own0: 284
     add: 8
     is_big: 16
-    left_fold$i64$i64$lam10: 216
-    main: 2172
+    left_fold$i64$i64$lam10: 180
+    main: 2220
   data: 724
-  metadata: 2628
+  metadata: 2640
 builtin calls: 81
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1

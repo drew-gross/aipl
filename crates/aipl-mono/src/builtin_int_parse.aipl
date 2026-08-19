@@ -111,22 +111,22 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 416
-instructions executed: 16053
-binary size: 10208
-  code: 3576
-    __builtin_count_while$char$s0$lam4: 288
-    __builtin_opt_left_fold$char$i64$s0$lam3: 376
+instructions executed: 15951
+binary size: 9824
+  code: 3352
+    __builtin_count_while$char$s0$lam4: 232
+    __builtin_opt_left_fold$char$i64$s0$lam3: 348
     __eq_0: 100
     __lambda_2: 140
     __test$int_parse: 1716
-    int_parse: 884
+    int_parse: 744
     main: 72
   data: 2185
-  metadata: 4447
-builtin calls: 648
+  metadata: 4287
+builtin calls: 546
   aipl_assert: 24
-  aipl_dec: 170
-  aipl_inc: 94
+  aipl_dec: 107
+  aipl_inc: 55
   aipl_str_data: 35
   aipl_str_iter_init: 39
   aipl_str_iter_next: 35

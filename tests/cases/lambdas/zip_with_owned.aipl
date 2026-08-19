@@ -74,40 +74,40 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 800
-instructions executed: 3988
-binary size: 12976
-  code: 8860
+instructions executed: 3969
+binary size: 12728
+  code: 8724
     __arr_drop_1: 116
     __arr_retain_1: 116
     __lambda_0: 8
     __lambda_10: 8
     __lambda_12: 28
-    __lambda_14: 132
+    __lambda_14: 84
     __lambda_2: 8
     __to_str_0: 180
     __zip1$own0$own1: 968
     __zip11$own0$own1: 968
     __zip13$own0$own1: 976
-    __zip15$own0$own1: 1408
+    __zip15$own0$own1: 1348
     __zip3$own0$own1: 968
-    __zip5$own0: 480
-    __zip7$own1: 480
-    main: 1396
-    show: 304
-    show_strs: 316
+    __zip5$own0: 464
+    __zip7$own1: 464
+    main: 1504
+    show: 252
+    show_strs: 264
   data: 93
-  metadata: 4023
-builtin calls: 247
+  metadata: 3911
+builtin calls: 228
   aipl_arr_drop_str: 2
   aipl_arr_inc: 7
-  aipl_array_dec: 23
+  aipl_array_dec: 21
   aipl_array_new: 12
   aipl_array_push_mut: 3
   aipl_array_with_cap: 1
   aipl_concat_lazy: 2
-  aipl_dec: 75
+  aipl_dec: 64
   aipl_i64_len: 30
-  aipl_inc: 49
+  aipl_inc: 43
   aipl_print: 24
   aipl_str_len: 4
   aipl_write_i64: 15

@@ -23,16 +23,16 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 160
-instructions executed: 42
-binary size: 1088
-  code: 296
-    banner: 240
+instructions executed: 40
+binary size: 1056
+  code: 280
+    banner: 224
     main: 56
   data: 1
-  metadata: 791
-builtin calls: 40
+  metadata: 775
+builtin calls: 38
   aipl_concat_lazy: 4
-  aipl_dec: 18
+  aipl_dec: 16
   aipl_inc: 6
   aipl_print: 4
   aipl_str_len: 8

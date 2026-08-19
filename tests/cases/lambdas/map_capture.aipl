@@ -26,9 +26,9 @@ instructions executed: 759
 binary size: 2936
   code: 1376
     __eq_0: 296
-    main: 496
-    map$lam1: 292
-    map$lam3: 292
+    main: 552
+    map$lam1: 264
+    map$lam3: 264
   data: 137
   metadata: 1423
 builtin calls: 27

@@ -1,0 +1,88 @@
+import { to_str, wrapping_add as +, wrapping_increment as ++, == } from builtins;
+
+// Retain elision for *inspect-only* arguments. A heap argument is normally
+// borrowed across a call by a matched pair — the caller retains it, the callee
+// releases it once on return — which exists only so the callee can outlive the
+// caller's own reference. Neither function below ever keeps its argument: they
+// read it and return a number. So the pair cancels and both halves are elided
+// (`aipl_mono::inspect_only_params`), leaving the call site with no refcount
+// traffic at all. The `--- performance ---` section is the real assertion here:
+// `aipl_inc` never appears, and every allocation is still freed exactly once.
+//
+// The boundary: a function that *re-owns* its argument through a `mut` binding
+// (`mut t = s`, below), one with a `mut self` receiver, or one whose address is
+// taken as a function value keeps the borrow pair, and so keeps its refcount
+// traffic — `aipl_inc` in the section below is entirely `count_via_copy`'s.
+fn count_ones(s: str) -> i64 {
+    mut n = 0;
+    for (let c : s) {
+        let _ = if (c == '1') {
+            set n++;
+            0
+        } else {
+            0
+        };
+    }
+    n
+}
+
+fn total(xs: i64[]) -> i64 {
+    mut t = 0;
+    for (let x : xs) {
+        set t = t + x;
+    }
+    t
+}
+
+// Re-owns its argument into a `mut` binding, so it is *not* inspect-only: the
+// binding's slot may take over the incoming reference rather than retaining a
+// fresh one, so the borrow pair stays exactly as it was.
+fn count_via_copy(s: str) -> i64 {
+    mut t = s;
+    count_ones(t)
+}.test({
+    // A real heap string (a literal would be statically refcounted, so its
+    // inc/dec are no-ops and would hide the difference).
+    let digits = to_str(11011);
+    assert(count_ones(digits) == 4);
+    // Still ours after the call: the callee never touched its refcount.
+    assert(count_ones(digits) == 4);
+    // Twice, so the retains it keeps are visibly proportional to its uses.
+    assert(count_via_copy(digits) == 4);
+    assert(count_via_copy(digits) == 4);
+    assert(digits == "11011");
+
+    let xs = [1, 2, 3, 4];
+    assert(total(xs) == 10);
+    assert(total(xs) == 10);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 64
+instructions executed: 1316
+binary size: 3552
+  code: 1208
+    __to_str_0: 180
+    count_ones: 212
+    main: 632
+    total: 184
+  data: 395
+  metadata: 1949
+builtin calls: 44
+  aipl_array_dec: 1
+  aipl_array_new: 1
+  aipl_assert: 7
+  aipl_dec: 5
+  aipl_i64_len: 2
+  aipl_inc: 3
+  aipl_str_data: 4
+  aipl_str_eq: 1
+  aipl_str_iter_init: 4
+  aipl_str_iter_next: 4
+  aipl_str_len: 8
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_write_i64: 1

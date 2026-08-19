@@ -41,32 +41,32 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 384
-instructions executed: 2395
-binary size: 8336
-  code: 4376
-    __builtin_opt_left_fold$char$i64$s0$lam11: 376
-    __builtin_opt_left_fold$i64$i64$lam1: 360
-    __builtin_opt_left_fold$i64$i64$lam3: 360
-    __builtin_opt_left_fold$i64$i64$lam7: 352
-    __builtin_opt_left_fold$i64$i64$lam9: 364
-    __builtin_opt_left_fold$str$str$s1$lam5: 772
+instructions executed: 2380
+binary size: 8216
+  code: 4304
+    __builtin_opt_left_fold$char$i64$s0$lam11: 348
+    __builtin_opt_left_fold$i64$i64$lam1: 344
+    __builtin_opt_left_fold$i64$i64$lam3: 344
+    __builtin_opt_left_fold$i64$i64$lam7: 336
+    __builtin_opt_left_fold$i64$i64$lam9: 348
+    __builtin_opt_left_fold$str$str$s1$lam5: 736
     __eq_0: 100
     __eq_1: 148
     __lambda_10: 136
     __lambda_6: 88
-    __test$parses_a_digit_run: 1124
-    digits_to_int: 124
+    __test$parses_a_digit_run: 1232
+    digits_to_int: 72
     main: 72
   data: 792
-  metadata: 3168
-builtin calls: 128
+  metadata: 3120
+builtin calls: 113
   aipl_arr_drop_str: 1
   aipl_array_dec: 5
   aipl_array_new: 5
   aipl_assert: 10
   aipl_concat_lazy: 3
-  aipl_dec: 41
-  aipl_inc: 29
+  aipl_dec: 31
+  aipl_inc: 24
   aipl_str_data: 4
   aipl_str_eq: 1
   aipl_str_iter_init: 5

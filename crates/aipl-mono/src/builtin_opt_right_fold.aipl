@@ -88,25 +88,25 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 536
 instructions executed: 2373
-binary size: 9928
-  code: 5764
+binary size: 9904
+  code: 5724
     __eq_0: 100
     __eq_1: 148
     __filter5$own0: 284
     __lambda_10: 52
     __lambda_8: 88
-    __test$opt_right_fold: 1148
+    __test$opt_right_fold: 1332
     is_big: 16
     main: 256
-    opt_right_fold$i64$i64$lam1: 464
-    opt_right_fold$i64$i64$lam11: 456
-    opt_right_fold$i64$i64$lam13: 468
-    opt_right_fold$i64$i64$lam3: 464
-    opt_right_fold$i64$i64$lam4: 464
-    opt_right_fold$i64$i64$lam9: 456
-    opt_right_fold$str$str$s1$lam7: 900
+    opt_right_fold$i64$i64$lam1: 432
+    opt_right_fold$i64$i64$lam11: 424
+    opt_right_fold$i64$i64$lam13: 436
+    opt_right_fold$i64$i64$lam3: 432
+    opt_right_fold$i64$i64$lam4: 432
+    opt_right_fold$i64$i64$lam9: 424
+    opt_right_fold$str$str$s1$lam7: 868
   data: 854
-  metadata: 3310
+  metadata: 3326
 builtin calls: 109
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1

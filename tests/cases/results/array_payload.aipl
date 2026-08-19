@@ -47,30 +47,30 @@ allocations: 22
 deallocations: 22
 reallocations: 0
 bytes allocated: 888
-instructions executed: 1541
-binary size: 7960
-  code: 3820
+instructions executed: 1537
+binary size: 8104
+  code: 3912
     __eq_1: 296
-    __test$below: 888
+    __test$below: 988
     __test$nothing: 460
-    __test$tail_below: 532
+    __test$tail_below: 604
     __test_try_fail_0: 64
     __to_str_2: 252
-    below: 620
+    below: 604
     main: 156
     nothing: 148
-    tail_below: 404
+    tail_below: 340
   data: 514
-  metadata: 3626
-builtin calls: 122
+  metadata: 3678
+builtin calls: 118
   aipl_arr_inc: 21
   aipl_arr_slice: 1
-  aipl_array_dec: 45
+  aipl_array_dec: 43
   aipl_array_new: 16
   aipl_array_push: 5
   aipl_assert: 7
   aipl_dec: 9
-  aipl_inc: 9
+  aipl_inc: 7
   aipl_str_eq: 2
   aipl_test_begin: 3
   aipl_test_end: 3

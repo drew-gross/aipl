@@ -33,18 +33,18 @@ deallocations: 20
 reallocations: 0
 bytes allocated: 944
 instructions executed: 847
-binary size: 5760
-  code: 2508
+binary size: 5800
+  code: 2528
     __eq_0: 296
-    __test$reversed_eq: 964
-    __test$reversed_len: 284
-    __test$sum_reversed: 232
+    __test$reversed_eq: 1008
+    __test$reversed_len: 304
+    __test$sum_reversed: 272
     main: 152
-    reversed_eq: 172
-    reversed_len: 128
-    sum_reversed: 280
+    reversed_eq: 140
+    reversed_len: 96
+    sum_reversed: 260
   data: 569
-  metadata: 2683
+  metadata: 2703
 builtin calls: 81
   aipl_arr_elem_ptr: 10
   aipl_arr_reverse: 8

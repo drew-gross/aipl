@@ -27,21 +27,21 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 152
-instructions executed: 487
-binary size: 3552
-  code: 1504
-    __test$count_h: 220
-    __test$first_true: 680
-    count_h: 240
-    first_true: 248
+instructions executed: 486
+binary size: 3520
+  code: 1468
+    __test$count_h: 240
+    __test$first_true: 700
+    count_h: 208
+    first_true: 204
     main: 116
   data: 328
-  metadata: 1720
-builtin calls: 28
+  metadata: 1724
+builtin calls: 27
   aipl_array_dec: 4
   aipl_array_new: 4
   aipl_assert: 5
-  aipl_dec: 2
+  aipl_dec: 1
   aipl_str_alloc: 1
   aipl_str_data: 1
   aipl_str_iter_init: 2

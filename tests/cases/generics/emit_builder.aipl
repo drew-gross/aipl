@@ -42,18 +42,18 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 104
 instructions executed: 479
-binary size: 3232
-  code: 1824
+binary size: 3280
+  code: 1856
     __arr_drop_0: 160
     __arr_retain_0: 160
-    __lambda_0: 60
+    __lambda_0: 92
     __lambda_1: 60
     __lambda_2: 60
     __lambda_3: 60
     __to_str_1: 180
     main: 1084
   data: 1
-  metadata: 1407
+  metadata: 1423
 builtin calls: 21
   aipl_array_dec: 1
   aipl_array_new: 1

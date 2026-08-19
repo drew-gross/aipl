@@ -27,22 +27,22 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 870
-binary size: 6504
-  code: 3136
-    __builtin_count_while$char$s0$lam14: 288
-    __builtin_count_while$char$s0$lam15: 288
-    __builtin_count_while$char$s0$lam16: 288
-    __builtin_count_while$char$s0$lam17: 288
-    __builtin_count_while$char$s0$lam18: 288
-    __builtin_count_while$char$s0$lam19: 288
-    __builtin_count_while$char$s0$lam20: 288
+instructions executed: 863
+binary size: 5888
+  code: 2744
+    __builtin_count_while$char$s0$lam14: 232
+    __builtin_count_while$char$s0$lam15: 232
+    __builtin_count_while$char$s0$lam16: 232
+    __builtin_count_while$char$s0$lam17: 232
+    __builtin_count_while$char$s0$lam18: 232
+    __builtin_count_while$char$s0$lam19: 232
+    __builtin_count_while$char$s0$lam20: 232
     main: 1120
   data: 506
-  metadata: 2862
-builtin calls: 98
+  metadata: 2638
+builtin calls: 91
   aipl_assert: 7
-  aipl_dec: 28
+  aipl_dec: 21
   aipl_inc: 7
   aipl_str_data: 6
   aipl_str_eq: 7

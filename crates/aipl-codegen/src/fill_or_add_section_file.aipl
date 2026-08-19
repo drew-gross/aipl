@@ -29,21 +29,21 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 90
-binary size: 9256
-  code: 4712
+instructions executed: 87
+binary size: 8520
+  code: 4340
     __eq_0: 148
-    __m1__contains_section: 648
-    __m1__fill_section: 1544
-    __m3__parse_test_section_header: 740
+    __m1__contains_section: 568
+    __m1__fill_section: 1464
+    __m3__parse_test_section_header: 696
     __test$fill_or_add_section_file: 196
-    fill_or_add_section_file: 1364
+    fill_or_add_section_file: 1196
     main: 72
   data: 358
-  metadata: 4186
-builtin calls: 19
+  metadata: 3822
+builtin calls: 16
   aipl_assert: 1
-  aipl_dec: 8
+  aipl_dec: 5
   aipl_inc: 3
   aipl_read_file_to_string: 1
   aipl_str_eq: 1

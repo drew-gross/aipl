@@ -7070,6 +7070,119 @@ fn owned_eligible(
     binding_is_exclusive(y, body_after, true).then_some(0)
 }
 
+// ---- Borrow-only parameter analysis (retain elision) ------------------------
+//
+// A heap argument is normally *borrowed* across a call by the uniform borrow
+// protocol: the caller retains it before the call and the callee releases it
+// once on return (its entry-scope track). Those two operations are a matched
+// pair — they exist only to keep the value alive for a callee that might
+// outlive the caller's own reference to it, and every callee use that really
+// *keeps* the value (storing it in a struct/array, returning it, handing it to
+// a consuming builtin) emits its own retain on top. So whenever the caller
+// provably holds a reference for the whole call, the pair cancels and both
+// halves can be dropped: the callee just *inspects* a value someone else owns.
+//
+// `inspect_only_params` decides, per instance and per parameter, whether that
+// holds. It must agree exactly with codegen on both sides of a call — the
+// caller's skipped retain and the callee's skipped release come from this one
+// answer, keyed by instance name, so they cannot drift apart.
+//
+// The pair is *not* cancellable when:
+//
+//   - the parameter is `owned` — the caller already moves its sole reference in
+//     and the callee consumes it (there is no retain to elide, and no release);
+//   - the instance has a `mut self` receiver — a mutating method is the one way
+//     a callee can reach back and drop a value its *caller* still refers to
+//     (`set self.f = v` / an element overwrite releases the old field, which a
+//     sibling argument may be a borrow of, e.g. `w.set_s(w.s)`). The caller's
+//     retain is exactly what keeps that sibling alive, so no parameter of a
+//     mutating instance is elidable;
+//   - the instance's address is taken as a function value — an indirect call
+//     goes through `compile_indirect_call`, which knows only the function
+//     *type* and so always retains; a callee that skipped its release would
+//     leak one reference per such call;
+//   - the body re-owns the parameter through a `mut` binding's slot (`mut y =
+//     p` / `set y = p`), the one shape where codegen may transfer an incoming
+//     reference rather than retaining a fresh one.
+//
+// Everything else is an inspecting use — reading, comparing, iterating,
+// indexing, slicing, passing it on (a nested call retains it itself, or is
+// itself elided and touches no refcount at all).
+
+/// Which parameters of each instance in `program` are *borrow-only*: the caller
+/// need not retain the argument and the callee must not release it. Keyed by
+/// instance name, one flag per parameter (positionally aligned with
+/// [`ConcreteFn::params`]). See the section comment above for the rules; both
+/// codegen call sites read this same map, so the two halves always agree.
+pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> {
+    // Instances used as function *values* (a bare identifier naming a function,
+    // rather than a call of it). Over-approximate — a local binding that
+    // happens to share a function's name counts too — which only costs elision.
+    let names: HashSet<&str> = program.fns.iter().map(|f| f.name.as_str()).collect();
+    let mut address_taken: HashSet<&str> = HashSet::new();
+    for f in &program.fns {
+        aipl_syntax::each_subexpr(&f.body, &mut |e| {
+            if let ExprKind::Ident(n) = &e.kind {
+                if let Some(name) = names.get(n.as_str()) {
+                    address_taken.insert(name);
+                }
+            }
+        });
+    }
+
+    program
+        .fns
+        .iter()
+        .map(|f| {
+            // `main` is called by the runtime entry point, not by compiled code:
+            // it is handed a freshly built CLI-args array (rc 1) that nothing
+            // else owns, so its entry-scope release is what frees it.
+            let elidable = f.name != "main"
+                && !f.params.iter().any(|p| p.mutable)
+                && !address_taken.contains(f.name.as_str());
+            let flags = f
+                .params
+                .iter()
+                .map(|p| {
+                    elidable
+                        && !p.owned
+                        && is_heap(&p.ty)
+                        && !is_empty_array_placeholder(&p.ty)
+                        && param_is_inspect_only(&p.name, &f.body)
+                })
+                .collect();
+            (f.name.clone(), flags)
+        })
+        .collect()
+}
+
+/// A parameter typed as the untyped empty array (`[]`'s `__none__` element).
+/// `coerce_empty_to_char_array` *releases* such a value when it flows into a
+/// `char[]` position, which only balances if the callee holds a reference —
+/// so these never elide.
+fn is_empty_array_placeholder(ty: &Type) -> bool {
+    matches!(ty, Type::Array(inner) if is_none_inner(inner))
+}
+
+/// Whether every use of the parameter `name` in `body` merely inspects it: no
+/// use re-owns the incoming reference. Only the `mut`-binding slot forms can —
+/// `own_value_into_slot` may transfer a value's existing reference into the
+/// slot instead of retaining a new one — so those disqualify and everything
+/// else (including a plain `let`, a field/element store, a `return`, and any
+/// nested call, each of which retains what it keeps) is fine.
+fn param_is_inspect_only(name: &str, body: &Expr) -> bool {
+    let is_n = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if n == name);
+    let mut inspect_only = true;
+    aipl_syntax::each_subexpr(body, &mut |e| match &e.kind {
+        // `mut y = p` and `set y = p`.
+        ExprKind::LetMut(_, _, val, _) | ExprKind::Assign(_, val, _) if is_n(val) => {
+            inspect_only = false;
+        }
+        _ => {}
+    });
+    inspect_only
+}
+
 /// Static "exclusivity" analysis for a mutable heap binding (array or `str`):
 /// true iff every use of `name` in `body` is provably non-aliasing, so `push` /
 /// `+` may mutate it in place. `allow_tail_move` permits a final move-out (a

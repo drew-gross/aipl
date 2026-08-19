@@ -19,23 +19,23 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 184
-instructions executed: 487
-binary size: 3960
-  code: 2192
+instructions executed: 479
+binary size: 3752
+  code: 2084
     __arr_drop_0: 116
     __arr_retain_0: 116
-    __lambda_0: 132
-    __zip1$own0$own1: 1408
+    __lambda_0: 84
+    __zip1$own0$own1: 1348
     main: 420
   data: 1
-  metadata: 1767
-builtin calls: 66
+  metadata: 1667
+builtin calls: 58
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1
   aipl_array_dec: 3
   aipl_array_new: 2
   aipl_concat_lazy: 2
-  aipl_dec: 29
-  aipl_inc: 21
+  aipl_dec: 25
+  aipl_inc: 17
   aipl_print: 3
   aipl_str_len: 4

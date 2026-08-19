@@ -70,19 +70,19 @@ allocations: 39
 deallocations: 39
 reallocations: 0
 bytes allocated: 1552
-instructions executed: 3608
-binary size: 9384
-  code: 3660
+instructions executed: 3596
+binary size: 9352
+  code: 3644
     __eq_0: 100
     main: 2652
-    unescape: 908
+    unescape: 892
   data: 1253
-  metadata: 4471
-builtin calls: 977
+  metadata: 4455
+builtin calls: 965
   aipl_assert: 19
   aipl_char_at: 36
   aipl_concat_lazy: 38
-  aipl_dec: 359
+  aipl_dec: 347
   aipl_inc: 161
   aipl_str_eq: 63
   aipl_str_len: 258

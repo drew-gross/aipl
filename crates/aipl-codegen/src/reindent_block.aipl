@@ -103,17 +103,17 @@ allocations: 93
 deallocations: 93
 reallocations: 0
 bytes allocated: 3804
-instructions executed: 5295
-binary size: 12104
-  code: 5380
-    __builtin_count_while$char$s0$lam13: 288
-    __builtin_count_while$char$s0$lam3: 288
-    __map5$own0: 336
+instructions executed: 5276
+binary size: 11936
+  code: 5272
+    __builtin_count_while$char$s0$lam13: 232
+    __builtin_count_while$char$s0$lam3: 232
+    __map5$own0: 320
     main: 1108
-    reindent_block: 3360
+    reindent_block: 3380
   data: 1228
-  metadata: 5496
-builtin calls: 1393
+  metadata: 5436
+builtin calls: 1374
   aipl_arr_drop_str: 35
   aipl_arr_inc: 5
   aipl_arr_retain_ptr: 29
@@ -124,8 +124,8 @@ builtin calls: 1393
   aipl_array_with_cap: 15
   aipl_assert: 9
   aipl_concat_lazy: 40
-  aipl_dec: 495
-  aipl_inc: 290
+  aipl_dec: 481
+  aipl_inc: 285
   aipl_str_data: 7
   aipl_str_eq: 37
   aipl_str_is_all_whitespace: 24

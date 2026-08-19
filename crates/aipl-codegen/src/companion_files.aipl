@@ -148,24 +148,24 @@ allocations: 148
 deallocations: 148
 reallocations: 0
 bytes allocated: 5774
-instructions executed: 9502
-binary size: 24120
-  code: 10720
+instructions executed: 9396
+binary size: 23888
+  code: 10596
     __arr_drop_1: 140
     __arr_retain_1: 140
     __eq_2: 284
     __eq_4: 224
-    __m2__parse_test_section_header: 740
+    __m2__parse_test_section_header: 696
     __test$companion_files: 4576
     __test$companion_path: 1196
     __test_try_fail_0: 64
     __to_str_3: 252
-    companion_files: 2152
-    companion_path: 840
+    companion_files: 2088
+    companion_path: 824
     main: 112
   data: 3094
-  metadata: 10306
-builtin calls: 2596
+  metadata: 10198
+builtin calls: 2490
   aipl_arr_drop_str: 12
   aipl_arr_inc: 27
   aipl_array_dec: 66
@@ -174,8 +174,8 @@ builtin calls: 2596
   aipl_assert: 18
   aipl_concat: 4
   aipl_concat_lazy: 44
-  aipl_dec: 1016
-  aipl_inc: 578
+  aipl_dec: 954
+  aipl_inc: 534
   aipl_str_contains: 11
   aipl_str_data: 16
   aipl_str_ends_with: 13

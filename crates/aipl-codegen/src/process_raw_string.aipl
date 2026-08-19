@@ -53,20 +53,20 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 8940
-binary size: 8632
-  code: 3980
-    __builtin_count_while$char$s0$lam12: 288
-    __builtin_count_while$char$s0$lam5: 288
+instructions executed: 8901
+binary size: 8376
+  code: 3820
+    __builtin_count_while$char$s0$lam12: 232
+    __builtin_count_while$char$s0$lam5: 232
     __eq_0: 100
-    __m4__trim_prefix: 236
-    __m5__trim_suffix: 252
-    __map7$own0: 336
+    __m4__trim_prefix: 216
+    __m5__trim_suffix: 232
+    __map7$own0: 320
     main: 816
-    process_raw_string: 1664
+    process_raw_string: 1672
   data: 696
-  metadata: 3956
-builtin calls: 799
+  metadata: 3860
+builtin calls: 760
   aipl_arr_drop_str: 14
   aipl_arr_inc: 7
   aipl_arr_retain_ptr: 20
@@ -76,8 +76,8 @@ builtin calls: 799
   aipl_array_with_cap: 14
   aipl_assert: 7
   aipl_char_at: 22
-  aipl_dec: 243
-  aipl_inc: 182
+  aipl_dec: 220
+  aipl_inc: 166
   aipl_str_data: 15
   aipl_str_ends_with: 7
   aipl_str_eq: 7

@@ -57,22 +57,22 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 336
-instructions executed: 693
-binary size: 6120
-  code: 3508
+instructions executed: 687
+binary size: 6072
+  code: 3476
     __to_str_0: 180
     __to_str_1: 184
-    classify: 916
-    main: 1848
-    sum_head: 380
+    classify: 912
+    main: 1868
+    sum_head: 332
   data: 26
-  metadata: 2586
-builtin calls: 160
+  metadata: 2570
+builtin calls: 154
   aipl_array_dec: 4
   aipl_array_new: 4
   aipl_char_at: 6
   aipl_concat_lazy: 4
-  aipl_dec: 60
+  aipl_dec: 54
   aipl_i64_len: 8
   aipl_inc: 30
   aipl_print: 10

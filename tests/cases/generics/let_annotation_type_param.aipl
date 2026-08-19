@@ -66,15 +66,15 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 677
 instructions executed: 1754
-binary size: 7520
-  code: 4116
+binary size: 7488
+  code: 4084
     __to_str_0: 672
     __to_str_1: 740
     __to_str_2: 180
-    collect$i64: 564
-    collect$str: 612
-    filtered$i64$lam1: 592
-    main: 756
+    collect$i64: 536
+    collect$str: 584
+    filtered$i64$lam1: 556
+    main: 816
   data: 139
   metadata: 3265
 builtin calls: 189

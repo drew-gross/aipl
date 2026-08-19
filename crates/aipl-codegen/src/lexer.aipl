@@ -1238,22 +1238,22 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 281209
-binary size: 1809088
-  code: 1136604
+instructions executed: 278556
+binary size: 1801560
+  code: 1132564
     __arr_drop_0: 928
     __arr_drop_3: 492
     __arr_drop_6: 140
     __arr_retain_0: 928
     __arr_retain_3: 492
     __arr_retain_6: 140
-    __builtin_count_while$char$s0$lam27: 384
-    __builtin_count_while$char$s0$lam32: 292
-    __builtin_count_while$char$s0$lam34: 300
-    __builtin_count_while$char$s0$lam49: 288
-    __builtin_int_parse: 884
+    __builtin_count_while$char$s0$lam27: 296
+    __builtin_count_while$char$s0$lam32: 236
+    __builtin_count_while$char$s0$lam34: 244
+    __builtin_count_while$char$s0$lam49: 232
+    __builtin_int_parse: 744
     __builtin_is_some_and$char$lam33: 48
-    __builtin_opt_left_fold$char$i64$s0$lam38: 376
+    __builtin_opt_left_fold$char$i64$s0$lam38: 348
     __eq_10: 120
     __eq_11: 1136
     __eq_2: 120
@@ -1261,68 +1261,68 @@ binary size: 1809088
     __eq_5: 100
     __eq_8: 284
     __eq_9: 104
-    __lambda_0: 60
+    __lambda_0: 92
     __lambda_1: 60
-    __lambda_10: 64
+    __lambda_10: 48
     __lambda_11: 64
-    __lambda_12: 64
+    __lambda_12: 48
     __lambda_13: 64
-    __lambda_14: 64
+    __lambda_14: 48
     __lambda_15: 64
-    __lambda_16: 64
+    __lambda_16: 48
     __lambda_17: 64
-    __lambda_18: 60
+    __lambda_18: 92
     __lambda_19: 60
-    __lambda_2: 60
-    __lambda_20: 60
+    __lambda_2: 92
+    __lambda_20: 92
     __lambda_21: 60
     __lambda_3: 60
     __lambda_37: 140
-    __lambda_4: 60
+    __lambda_4: 92
     __lambda_5: 60
-    __lambda_6: 60
+    __lambda_6: 92
     __lambda_7: 60
-    __lambda_8: 60
+    __lambda_8: 92
     __lambda_9: 60
-    __m1__unescape: 908
-    __test$lex: 1046364
+    __m1__unescape: 892
+    __test$lex: 1045056
     __test_try_fail_1: 64
     __to_str_7: 812
-    apply_emit$Kind: 6860
-    between_len: 972
+    apply_emit$Kind: 6844
+    between_len: 744
     checked_seg: 1700
-    delimited_len: 1772
-    esc_str: 128
-    finalize_template$Kind: 5320
-    float_len: 844
-    int_tok: 1664
-    interp_scan$Kind: 3732
-    lex$Kind: 3016
-    lex_step$Kind: 25628
+    delimited_len: 1504
+    esc_str: 112
+    finalize_template$Kind: 5176
+    float_len: 816
+    int_tok: 1644
+    interp_scan$Kind: 3568
+    lex$Kind: 2884
+    lex_step$Kind: 25160
     main: 68
-    nested_len: 1228
-    nonempty_str: 1704
+    nested_len: 1044
+    nonempty_str: 1684
     rawtpl_kind: 2944
-    seg_emit$Kind: 5936
-    step_result$Kind: 8624
-    template_scan$Kind: 3172
-    template_step$Kind: 796
+    seg_emit$Kind: 5912
+    step_result$Kind: 8548
+    template_scan$Kind: 2772
+    template_step$Kind: 556
     toks: 128
-    tpl_kind: 3004
+    tpl_kind: 2980
   data: 8132
-  metadata: 664352
-builtin calls: 30144
+  metadata: 660864
+builtin calls: 27491
   aipl_arr_drop_str: 22
   aipl_arr_inc: 3037
   aipl_arr_retain_ptr: 30
-  aipl_array_dec: 4714
+  aipl_array_dec: 4424
   aipl_array_new: 1177
   aipl_array_push: 195
   aipl_assert: 59
   aipl_char_at: 481
   aipl_concat_lazy: 29
-  aipl_dec: 8351
-  aipl_inc: 7446
+  aipl_dec: 7285
+  aipl_inc: 6149
   aipl_str_contains: 325
   aipl_str_data: 131
   aipl_str_eq: 111

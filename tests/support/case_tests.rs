@@ -311,6 +311,7 @@ case_tests! {
     cases_methods_mutating_set_writeback_form = "cases/methods/mutating/set_writeback_form",
     cases_optimizations_const_fold = "cases/optimizations/const_fold",
     cases_optimizations_const_fold_saturating = "cases/optimizations/const_fold_saturating",
+    cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",
     cases_options_err_match_missing_arrow = "cases/options/err_match_missing_arrow",
     cases_options_err_match_str_literal = "cases/options/err_match_str_literal",
     cases_options_err_try_on_optional_needs_optional_return = "cases/options/err_try_on_optional_needs_optional_return",

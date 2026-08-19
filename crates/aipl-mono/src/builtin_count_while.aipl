@@ -37,18 +37,18 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 348
 instructions executed: 928
-binary size: 5712
-  code: 2756
-    count_while$char$lam11: 288
-    count_while$i64$lam1: 264
-    count_while$i64$lam3: 264
-    count_while$i64$lam5: 264
-    count_while$i64$lam7: 264
-    count_while$i64$lam9: 264
-    count_while$str$lam13: 360
-    main: 788
+binary size: 5472
+  code: 2628
+    count_while$char$lam11: 232
+    count_while$i64$lam1: 224
+    count_while$i64$lam3: 224
+    count_while$i64$lam5: 224
+    count_while$i64$lam7: 224
+    count_while$i64$lam9: 224
+    count_while$str$lam13: 324
+    main: 952
   data: 544
-  metadata: 2412
+  metadata: 2300
 builtin calls: 53
   aipl_arr_drop_str: 1
   aipl_array_dec: 6

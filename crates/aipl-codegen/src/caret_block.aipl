@@ -88,20 +88,20 @@ allocations: 77
 deallocations: 77
 reallocations: 0
 bytes allocated: 2830
-instructions executed: 4387
-binary size: 9328
-  code: 3540
-    __m1__line_at: 580
+instructions executed: 4363
+binary size: 9144
+  code: 3456
+    __m1__line_at: 544
     __to_str_0: 180
-    caret_block: 1840
+    caret_block: 1792
     main: 940
   data: 1720
-  metadata: 4068
-builtin calls: 932
+  metadata: 3968
+builtin calls: 908
   aipl_assert: 6
   aipl_concat: 120
-  aipl_dec: 459
-  aipl_inc: 189
+  aipl_dec: 441
+  aipl_inc: 183
   aipl_str_data: 6
   aipl_str_eq: 6
   aipl_str_iter_init: 6

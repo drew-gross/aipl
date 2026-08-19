@@ -73,16 +73,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1140
-binary size: 7360
-  code: 2188
-    int_fits: 792
+instructions executed: 1109
+binary size: 7264
+  code: 2132
+    int_fits: 736
     main: 1396
   data: 1605
-  metadata: 3567
-builtin calls: 871
+  metadata: 3527
+builtin calls: 840
   aipl_assert: 31
-  aipl_dec: 319
+  aipl_dec: 288
   aipl_inc: 144
   aipl_str_eq: 144
   aipl_str_len: 230

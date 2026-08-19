@@ -48,17 +48,17 @@ allocations: 19
 deallocations: 19
 reallocations: 8
 bytes allocated: 801
-instructions executed: 1429
-binary size: 6872
-  code: 3240
+instructions executed: 1424
+binary size: 6752
+  code: 3172
     __to_str_0: 540
     __to_str_1: 1080
-    count_files: 368
+    count_files: 324
     main: 680
-    sorted_listing: 572
+    sorted_listing: 548
   data: 403
-  metadata: 3229
-builtin calls: 171
+  metadata: 3177
+builtin calls: 166
   aipl_arr_drop_str: 7
   aipl_arr_inc: 6
   aipl_arr_retain_ptr: 2
@@ -66,7 +66,7 @@ builtin calls: 171
   aipl_array_dec: 15
   aipl_array_push_mut: 8
   aipl_array_with_cap: 5
-  aipl_dec: 41
+  aipl_dec: 36
   aipl_i64_len: 2
   aipl_inc: 23
   aipl_list_files: 5
