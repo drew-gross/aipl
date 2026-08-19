@@ -16,7 +16,7 @@ fn total(self: Tree) -> i64 {
     sum
 }
 
-fn leaf(label: i64) -> Tree { Tree { label, kids: [] } }
+fn leaf(label: i64) -> Tree { label, kids: [] }
 
 fn main() !prints {
     // Grow a spine by wrapping the previous node in a new parent — the shape

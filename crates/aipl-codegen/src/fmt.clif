@@ -31577,7 +31577,7 @@ block19(v171: i64):
 ;   v2 = s
 ;   v31 = edge
 ;   ss1 = inner
-;   ss2 = __idx$16031
+;   ss2 = __idx$16046
 ;   v77 = item
 ;   v79 = i
 ;   ss8 = parts
@@ -48819,7 +48819,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$34410
+;   ss1 = __idx$34425
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -49434,11 +49434,11 @@ block30:
 ;   v2 = h
 ;   v73 = p
 ;   ss2 = out
-;   ss3 = __idx$35361
+;   ss3 = __idx$35376
 ;   v114 = d
 ;   v116 = i
 ;   v164 = had_imports
-;   ss8 = __idx$35552
+;   ss8 = __idx$35567
 ;   v194 = d
 ;   v196 = i
 ; __m18__program_items
@@ -107024,7 +107024,7 @@ block70:
 ;   v332 = $inl293_self
 ;   v340 = body
 ;   ss10 = d
-;   ss11 = __idx$74564
+;   ss11 = __idx$74579
 ;   v538 = p
 ;   v540 = i
 ; __m18__lambda_params

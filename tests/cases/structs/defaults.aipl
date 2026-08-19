@@ -9,17 +9,17 @@ fn all_defaults() -> Point { Point {} }.test({
     assert(all_defaults().y == 0);
 })
 
-fn partial_x() -> Point { Point { x: 5 } }.test({
+fn partial_x() -> Point { x: 5 }.test({
     assert(partial_x().x == 5);
     assert(partial_x().y == 0);
 })
 
-fn partial_y() -> Point { Point { y: 7 } }.test({
+fn partial_y() -> Point { y: 7 }.test({
     assert(partial_y().x == 0);
     assert(partial_y().y == 7);
 })
 
-fn all_explicit() -> Point { Point { x: 3, y: 4 } }.test({
+fn all_explicit() -> Point { x: 3, y: 4 }.test({
     assert(all_explicit().x == 3);
     assert(all_explicit().y == 4);
 })
@@ -29,7 +29,7 @@ fn config_defaults() -> Config { Config {} }.test({
     assert(config_defaults().label == "default");
 })
 
-fn config_override() -> Config { Config { label: "custom" } }.test({
+fn config_override() -> Config { label: "custom" }.test({
     assert(config_override().retries == 3);
     assert(config_override().label == "custom");
 })

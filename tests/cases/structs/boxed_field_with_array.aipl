@@ -29,7 +29,7 @@ fn sum(self: List) -> i64 {
     }
 }
 
-fn leaf(v: i64) -> Node { Node { v, next: none, kids: [] } }
+fn leaf(v: i64) -> Node { v, next: none, kids: [] }
 
 fn total(self: Node) -> i64 {
     mut s = self.v;
@@ -52,7 +52,7 @@ fn spine(n: i64) -> Both {
     b
 }
 
-fn step(b: Both) -> Both { Both { head: Cons(b.head.sum(), b.head), nums: b.nums } }
+fn step(b: Both) -> Both { head: Cons(b.head.sum(), b.head), nums: b.nums }
 
 // `set b = step(b);` in a loop is the shape that used to corrupt a composite
 // `mut` binding — one hidden-sret buffer per call site, with `b` pointing into

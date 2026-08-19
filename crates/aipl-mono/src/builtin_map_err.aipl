@@ -71,7 +71,7 @@ struct FmtError { message: str, span: i64 }
 // A named conversion, so the tests cover passing a function rather than a
 // lambda — the two sides carry the same shape, which is exactly the case
 // `map_err` exists to bridge.
-fn to_fmt(self: LexError) -> FmtError { FmtError { message: self.message, span: self.span } }.test({
+fn to_fmt(self: LexError) -> FmtError { message: self.message, span: self.span }.test({
     assert(to_fmt(LexError { message: "unexpected", span: 3 }).message == "unexpected");
     assert(to_fmt(LexError { message: "unexpected", span: 3 }).span == 3);
 })

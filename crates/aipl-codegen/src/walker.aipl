@@ -105,7 +105,12 @@ struct WDocs { w: W, docs: Doc[] }
 struct FmtError { message: str, span: Span }
 
 fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
-    W { src, toks, comments, pos: 0, cpos: 0, last_end: 0 }
+    src,
+    toks,
+    comments,
+    pos: 0,
+    cpos: 0,
+    last_end: 0,
 }.test({
     // --- fixtures -------------------------------------------------------
     // `fn f() {}` with a leading line comment and a trailing one, so the

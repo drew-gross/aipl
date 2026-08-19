@@ -275,6 +275,8 @@ case_tests! {
     cases_lints_eta_lambda_allow = "cases/lints/eta_lambda_allow",
     cases_lints_field_init_range_value = "cases/lints/field_init_range_value",
     cases_lints_field_init_shorthand_allow = "cases/lints/field_init_shorthand_allow",
+    cases_lints_fn_body_type_stutter_allow = "cases/lints/fn_body_type_stutter_allow",
+    cases_lints_fn_body_type_stutter_not_flagged = "cases/lints/fn_body_type_stutter_not_flagged",
     cases_lints_incr_by_one_allow = "cases/lints/incr_by_one_allow",
     cases_lints_incr_flavor_mismatch = "cases/lints/incr_flavor_mismatch",
     cases_lints_incr_shapes_not_flagged = "cases/lints/incr_shapes_not_flagged",

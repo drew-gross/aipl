@@ -203,9 +203,9 @@ fn call_values_marshals_struct_return() {
 import { +++ } from builtins;
 struct Span { start: i64, end: i64 }
 struct Tagged { name: str, ok: bool, code: char }
-pub fn span(a: i64, b: i64) -> Span { Span { start: a, end: b } }
+pub fn span(a: i64, b: i64) -> Span { start: a, end: b }
 pub fn tagged(suffix: str, present: bool) -> Tagged {
-    Tagged { name: \"item-\" +++ suffix, ok: present, code: 'Z' }
+    name: \"item-\" +++ suffix, ok: present, code: 'Z'
 }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Str, Struct};
@@ -311,7 +311,7 @@ struct Span { start: i64, end: i64 }
 variant Kind = Word(str) | Punct
 struct Tok { kind: Kind, span: Span, tags: i64[] }
 pub fn tok(a: i64, b: i64) -> Tok {
-    Tok { kind: Word(\"a heap identifier\"), span: Span { start: a, end: b }, tags: [7, 8] }
+    kind: Word(\"a heap identifier\"), span: Span { start: a, end: b }, tags: [7, 8]
 }
 pub fn toks() -> Tok[] {
     [Tok { kind: Word(\"first\"), span: Span { start: 0, end: 5 }, tags: [] },

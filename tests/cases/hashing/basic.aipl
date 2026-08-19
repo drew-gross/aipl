@@ -34,7 +34,7 @@ fn dict() -> #{i64: str} { #{1: "a", 2: "b"} }.test({
 
 struct Point { x: i64, y: i64 }
 
-fn pt() -> Point { Point { x: 1, y: 2 } }.test({
+fn pt() -> Point { x: 1, y: 2 }.test({
     assert(hash(pt()) == hash(Point { x: 1, y: 2 })); // consistent with struct ==
     assert(hash(Point { x: 1, y: 2 }) != hash(Point { x: 2, y: 1 }));
 })

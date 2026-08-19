@@ -1,0 +1,56 @@
+import { wrapping_add as +, == } from builtins;
+
+// Shapes the body-shorthand lint must leave alone. Each involves a struct
+// literal in a function body, but none can be written as the shorthand — and a
+// false hit is a build nothing but `#[allow]` could fix, so the lint stays
+// narrow. (There is deliberately no "literal of the wrong type" case: a body's
+// type *is* the return type, so that shape cannot type-check in the first
+// place.)
+struct Point { x: i64, y: i64 }
+
+struct Other { n: i64 }
+
+// Already the shorthand — nothing left to say.
+fn shorthand(x: i64) -> Point { x, y: 0 }
+
+// The literal is not the whole body: a statement precedes it, and the shorthand
+// replaces the body entirely.
+fn with_stmt(x: i64) -> Point {
+    let y = x + 1;
+    Point { x, y }
+}
+
+// The body is an expression *around* a literal, not the literal itself.
+fn projected(x: i64) -> i64 { Point { x, y: 0 }.x }
+
+// The body is a call.
+fn forwarded(x: i64) -> Point { shorthand(x) }
+
+// A literal nested inside the shorthand body still names its own type.
+fn nested(x: i64) -> Other { n: Point { x, y: x }.y }
+
+// No declared return type, so there is nothing for the shorthand to name.
+fn discards(x: i64) {
+    let _ = Point { x, y: 0 };
+}
+
+fn main() {}.test({
+    assert(shorthand(1) == Point { x: 1, y: 0 });
+    assert(with_stmt(1) == Point { x: 1, y: 2 });
+    assert(projected(3) == 3);
+    assert(forwarded(4) == Point { x: 4, y: 0 });
+    assert(nested(5).n == 5);
+    discards(6);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 488
+  code: 8
+    main: 8
+  data: 1
+  metadata: 479
+builtin calls: 0

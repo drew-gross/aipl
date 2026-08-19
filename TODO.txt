@@ -224,6 +224,8 @@ get claude to reorganize my todos
 A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at first — char[] shares the str representation and has no array length field, so array_len_of read garbage. Routed str-shaped receivers to a separate aipl_str_sort, mirroring how reverse splits the same cases.
 The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
 
+A diagnostic raised against an *imported* file is rendered using the entry file's source: `aipl check b.aipl`, where b imports a.aipl, reports a.aipl's lint (or parse error) with a span indexed into b.aipl, so the caret lands on an unrelated line. Reproduced with the field_init_shorthand lint and with a plain parse error, so it predates the fn-body-shorthand lint that surfaced it (that one showed up as walker.aipl's `new_walker` being reported against format_source.aipl). The fix is to carry the owning file's source/path with the span.
+
 error improvements:
 - import suggestions when missing an import
 - from its defining file -> list the filename
@@ -247,7 +249,8 @@ make try_left_fold and try_right_fold for use when the lambda returns an error
 
 stop still stands in for min, which is i64-only. Making min/max generic over ord would let that line read as the Rust original does — happy to do it if you want, but not assuming.
 
-For lexer dogfooding:
+lexer:
+- lex_err/tok should accept a span argument instead of a start and end
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.

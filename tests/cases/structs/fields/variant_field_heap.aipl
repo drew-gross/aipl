@@ -14,7 +14,7 @@ fn label(p: Person) -> str {
     }
 }
 
-fn rename(p: Person, n: str) -> Person { Person { name: Named(n), age: p.age } }
+fn rename(p: Person, n: str) -> Person { name: Named(n), age: p.age }
 
 fn main() !prints {
     let p = Person { name: Named("al" +++ "ice"), age: 30 };

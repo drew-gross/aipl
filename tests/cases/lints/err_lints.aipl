@@ -13,15 +13,29 @@ import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
 //
 // Each lint has its own `#[allow]` companion case proving the marker squelches
 // it (`allow_squelch`, `eta_lambda_allow`, `field_init_shorthand_allow`,
-// `slice_from_zero_allow`, `incr_by_one_allow`), and its own passing case for
-// the shapes it must *not* flag (`slice_from_zero_open_end`,
-// `field_init_range_value`, `incr_shapes_not_flagged`, `incr_custom_plus`).
+// `slice_from_zero_allow`, `incr_by_one_allow`, `fn_body_type_stutter_allow`),
+// and its own passing case for the shapes it must *not* flag
+// (`slice_from_zero_open_end`, `field_init_range_value`,
+// `incr_shapes_not_flagged`, `incr_custom_plus`,
+// `fn_body_type_stutter_not_flagged`).
 
 struct Point { x: i64, y: i64 }
 
 // `x: x` — a field initialized with the identifier of the same name has the
-// shorthand spelling `Point { x }`.
+// shorthand spelling `Point { x }`. The body also names `Point` twice, so this
+// one line trips two lints at once.
 fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+
+struct Tag { id: i64 }
+
+// `fn f() -> T { T { .. } }` — a body that is a literal of the function's own
+// return type spells that type twice; the body shorthand drops the repeat.
+fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
+
+// The lone-*shorthand*-field case earns its own message, since the replacement
+// is `{ id, }` and that trailing comma is what keeps the body a struct literal
+// instead of a block whose value is `id`.
+fn tag_short(id: i64) -> Tag { Tag { id } }
 
 // `|x| to_str(x)` — a lambda that only forwards its argument to a single call
 // is redundant; pass `to_str` itself. The method form `|x| x.to_str()` is
@@ -59,57 +73,59 @@ fn slices() !prints {
 
 fn main() !prints {
     print(make(1, 2).x.to_str());
+    print(tag(1).id.to_str());
+    print(tag_short(2).id.to_str());
     print(stringify([1]).len().to_str());
     print(bump(1).to_str());
     slices();
 }
 --- errors ---
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:44:16
+  --> ./tests/cases/lints/err_lints.aipl:58:16
    |
-44 |     print(s[3..s.len()]);
+58 |     print(s[3..s.len()]);
    |                ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[0..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:48:15
+  --> ./tests/cases/lints/err_lints.aipl:62:15
    |
-48 |     print(s[..s.len()]);
+62 |     print(s[..s.len()]);
    |               ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:57:16
+  --> ./tests/cases/lints/err_lints.aipl:71:16
    |
-57 |     print(s[4..s.len()]);
+71 |     print(s[4..s.len()]);
    |                ^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:52:13
+  --> ./tests/cases/lints/err_lints.aipl:66:13
    |
-52 |     print(s[0..2]);
+66 |     print(s[0..2]);
    |             ^
 
 error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:29:43
+  --> ./tests/cases/lints/err_lints.aipl:43:43
    |
-29 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+43 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
    |                                           ^^^^^^^^^^^^
 
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:24:47
+  --> ./tests/cases/lints/err_lints.aipl:27:47
    |
-24 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+27 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                               ^
 
 error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:24:53
+  --> ./tests/cases/lints/err_lints.aipl:27:53
    |
-24 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+27 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                                     ^
 
 error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:35:9
+  --> ./tests/cases/lints/err_lints.aipl:49:9
    |
-35 |     set n = n + 1;
+49 |     set n = n + 1;
    |         ^^^^^^^^^
 
 error: unused import "value_or": nothing in this file references it; drop it from the import list
@@ -117,3 +133,21 @@ error: unused import "value_or": nothing in this file references it; drop it fro
   |
 3 | import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
   |                                   ^^^^^^^^
+
+error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:27:36
+   |
+27 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                    ^^^^^^^^^^^^^^^^^^
+
+error: fn "tag" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:33:26
+   |
+33 | fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
+   |                          ^^^^^^^^^^^^^^^^
+
+error: fn "tag_short" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the field directly as the body, "{ id, }" — the trailing comma is what keeps it a struct literal rather than a block (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:38:32
+   |
+38 | fn tag_short(id: i64) -> Tag { Tag { id } }
+   |                                ^^^^^^^^

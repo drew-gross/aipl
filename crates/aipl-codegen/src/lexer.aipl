@@ -234,9 +234,7 @@ struct TokenRule<K> {
 // `skip` matches appear in neither.
 struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
-fn lex_err(message: str, start: u64, end: u64) -> LexError {
-    LexError { message, span: start..end }
-}
+fn lex_err(message: str, start: u64, end: u64) -> LexError { message, span: start..end }
 
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
 // char, then `cont` chars. 0 when the first char isn't in `first`.
@@ -480,7 +478,8 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
 // A `LexError` for a segment emit (`OfSeg`/`TrySeg`) used on a non-`Template`
 // rule — those only make sense per template segment (see `seg_emit`).
 fn seg_only(span: Span) -> LexError {
-    LexError { message: "an OfSeg/TrySeg emit is only valid on a Template rule", span }
+    message: "an OfSeg/TrySeg emit is only valid on a Template rule",
+    span,
 }
 
 // One lexing step's outcome: the token(s) the winning rule produced — one
@@ -585,7 +584,8 @@ fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
 }
 
 fn seg_needs_ofseg(span: Span) -> LexError {
-    LexError { message: "a Template rule needs an OfSeg/TrySeg emit", span }
+    message: "a Template rule needs an OfSeg/TrySeg emit",
+    span,
 }
 
 // The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
@@ -855,9 +855,9 @@ fn rawtpl_kind(text: str, seg: Seg) -> Kind {
 
 // Test-block shorthands over the concrete `Kind` (each kind arm carries its own
 // content): an expected token, and a token-only result (no trivia).
-fn tok(kind: Kind, start: u64, end: u64) -> Token<Kind> { Token { kind, span: start..end } }
+fn tok(kind: Kind, start: u64, end: u64) -> Token<Kind> { kind, span: start..end }
 
-fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { LexResult { tokens, trivia: [] } }
+fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { tokens, trivia: [] }
 
 pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];

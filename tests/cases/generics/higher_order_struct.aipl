@@ -6,7 +6,7 @@ import { wrapping_add as +, == } from builtins;
 // a concrete type.
 struct Box<T> { value: T }
 
-fn wrap<T>(x: T) -> Box<T> { Box { value: x } }
+fn wrap<T>(x: T) -> Box<T> { value: x }
 
 fn unbox<T>(b: Box<T>) -> T { b.value }
 

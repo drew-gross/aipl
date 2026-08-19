@@ -20,7 +20,7 @@ fn total(self: Tree) -> i64 {
     self.value + l + r
 }
 
-fn leaf(v: i64) -> Tree { Tree { value: v, left: none, right: none } }
+fn leaf(v: i64) -> Tree { value: v, left: none, right: none }
 
 fn main() !prints {
     let t = Tree {

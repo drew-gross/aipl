@@ -6,7 +6,7 @@ import { Span, == } from builtins;
 // not flag it (the value's preceding source char is the *outer* `span:` colon).
 struct Tok { span: Span }
 
-fn tok(start: i64, end: i64) -> Tok { Tok { span: start..end } }.test({
+fn tok(start: i64, end: i64) -> Tok { span: start..end }.test({
     assert(tok(0, 5).span.start == 0);
     assert(tok(0, 5).span.end == 5);
 })

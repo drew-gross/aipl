@@ -140,7 +140,8 @@ fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0
 // the spelling and its `AiplTok` arm are named together — no spelling→arm
 // `match` to keep in sync with a separate spelling list.
 fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
-    TokenRule { matcher: Keyword(spelling, ident_cont()), emit: Bare(kind) }
+    matcher: Keyword(spelling, ident_cont()),
+    emit: Bare(kind),
 }
 
 // One operator/punctuation rule: match the exact `spelling` (no identifier
@@ -148,7 +149,8 @@ fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
 // spelling, and rules are first-match-wins — so `aipl_rules` lists the `op`
 // rules longest spelling first (`==` before `=`) to keep maximal munch.
 fn op(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
-    TokenRule { matcher: Exact(spelling), emit: Bare(kind) }
+    matcher: Exact(spelling),
+    emit: Bare(kind),
 }
 
 // The `OfSeg` emit for the `` `...` `` template rule: the `Template` matcher hands

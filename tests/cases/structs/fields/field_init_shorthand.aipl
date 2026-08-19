@@ -5,7 +5,7 @@ import { wrapping_add as +, == } from builtins;
 // explicit `field: expr` init.
 struct Point { x: i64, y: i64 }
 
-fn shift(x: i64, y: i64) -> Point { Point { x, y: y + 1 } }.test({
+fn shift(x: i64, y: i64) -> Point { x, y: y + 1 }.test({
     let x = 10;
     let y = 20;
     let p = Point { x, y };

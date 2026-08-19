@@ -46,7 +46,7 @@ fn pushed(self: str[], x: str) -> str[] {
     a
 }
 
-fn step(s: St) -> St { St { acc: s.acc.pushed("k"), done: true } }
+fn step(s: St) -> St { acc: s.acc.pushed("k"), done: true }
 
 fn run() -> u64 {
     mut s = St { acc: [], done: false };
