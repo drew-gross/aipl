@@ -31,6 +31,7 @@ pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Vec<Error
     let root_canon = canonicalize(root)?;
     let mut loader = Loader {
         dbg,
+        entry: Some(root_canon.clone()),
         ..Loader::default()
     };
     loader.load(&root_canon)?;
@@ -54,6 +55,7 @@ pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<
     let root = std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("__aipl_ffi_root__.aipl");
+    loader.entry = Some(root.clone());
     loader.load_source(&root, source)?;
     Ok(loader.flatten(&root)?)
 }
@@ -80,6 +82,7 @@ pub fn load_program_sources(
     let root = PathBuf::from(root_name);
     let mut loader = Loader {
         dbg,
+        entry: Some(root.clone()),
         ..Loader::default()
     };
     for (name, src) in sources {
@@ -139,6 +142,10 @@ struct Loader {
     files: BTreeMap<PathBuf, LoadedFile>,
     next_index: u32,
     dbg: DebugOptions,
+    /// The root file, set before loading starts. Diagnostics raised against
+    /// *any other* file are tagged with the source they index — see
+    /// `tag_origin`.
+    entry: Option<PathBuf>,
 }
 
 struct LoadedFile {
@@ -173,6 +180,12 @@ impl Loader {
     /// Parse `src` as the file at `path`, register it, and recurse into its
     /// path imports. `load` reads `src` from disk; the FFI supplies it directly.
     fn load_source(&mut self, path: &Path, src: &str) -> Result<(), Vec<Error>> {
+        let is_entry = self.entry.as_deref() == Some(path);
+        self.load_source_inner(path, src)
+            .map_err(|errs| tag_origin(is_entry, path, src, errs))
+    }
+
+    fn load_source_inner(&mut self, path: &Path, src: &str) -> Result<(), Vec<Error>> {
         if self.files.contains_key(path) {
             return Ok(());
         }
@@ -234,6 +247,13 @@ impl Loader {
     ///
     /// [`check_virtual_imports`]: Loader::check_virtual_imports
     fn register_virtual(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
+        let is_entry = self.entry.as_deref() == Some(key.as_path());
+        let path = key.clone();
+        self.register_virtual_inner(key, src)
+            .map_err(|errs| tag_origin(is_entry, &path, src, errs))
+    }
+
+    fn register_virtual_inner(&mut self, key: PathBuf, src: &str) -> Result<(), Vec<Error>> {
         let (program, allows) = parse_with_allows(src)?;
         aipl_syntax::lint::check(&program, src, &allows)?;
         // A caller-supplied name, so a wrong one is a caller error to report,
@@ -1190,6 +1210,25 @@ fn rewrite_expr(
         kind,
         span: e.span.clone(),
     }
+}
+
+/// Tag every error with the source its spans index, so the renderer points the
+/// caret into the right file. Diagnostics raised while loading an *imported*
+/// file index that file, while the caller renders against whatever source it
+/// holds — normally the entry file's — which is how a caret ends up on an
+/// unrelated line of the wrong file.
+///
+/// The entry file itself is deliberately left untagged: the caller already
+/// renders those against its source, under the path the user actually typed,
+/// and tagging would replace that with a bare basename. Errors arriving from
+/// deeper imports are already tagged, and `Error::in_file` keeps the innermost
+/// attribution.
+fn tag_origin(is_entry: bool, path: &Path, src: &str, errs: Vec<Error>) -> Vec<Error> {
+    if is_entry {
+        return errs;
+    }
+    let label = file_label(path);
+    errs.into_iter().map(|e| e.in_file(&label, src)).collect()
 }
 
 // Used to make errors better by eliminating asbolute paths. TODO: Instead, always

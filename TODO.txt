@@ -24,12 +24,17 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
+misc cleanup:
+  LineAt should store a Span, not a start/end
+  line_at.aipl should use .doc() instead of // header for docs
+  caret_block.aipl should use min/max
+  caret_block.aipl should use .doc() instead of // header for docs
+
 integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 self-hosting:
-  move format_source to aipl
   make formatter command that is fully self-hosted
   parser library in aipl (grammar as data; generates highlighter + formatter)
     -> plan and progress checkboxes live in PARSER_LIBRARY.md
@@ -86,6 +91,7 @@ lint:
   make a regex-like langauge for expressions to make lints easier to implement
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
+  recognize ad-hoc implementations of min/max an request using the function
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
@@ -224,11 +230,10 @@ get claude to reorganize my todos
 A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at first — char[] shares the str representation and has no array length field, so array_len_of read garbage. Routed str-shaped receivers to a separate aipl_str_sort, mirroring how reverse splits the same cases.
 The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
 
-A diagnostic raised against an *imported* file is rendered using the entry file's source: `aipl check b.aipl`, where b imports a.aipl, reports a.aipl's lint (or parse error) with a span indexed into b.aipl, so the caret lands on an unrelated line. Reproduced with the field_init_shorthand lint and with a plain parse error, so it predates the fn-body-shorthand lint that surfaced it (that one showed up as walker.aipl's `new_walker` being reported against format_source.aipl). The fix is to carry the owning file's source/path with the span.
-
 error improvements:
-- import suggestions when missing an import
-- from its defining file -> list the filename
+  import suggestions when missing an import
+  if you get error "from its defining file" it should instead say the actual filename
+  type errors from imported files point at the wrong filename. The fix is to carry the owning file onto Function and tag at the cx.check_fn(f) boundary in check.rs
 
 handoff:
   reimplement it in rust and/or aipl

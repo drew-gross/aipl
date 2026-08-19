@@ -1,0 +1,19 @@
+// A diagnostic raised against an *imported* file points into **that** file. The
+// spans an error carries index the source it was raised against, while the
+// caller renders against whatever source it holds — the entry file's — so
+// without the loader tagging each error with its origin, the caret below landed
+// on an unrelated line of this file instead of on `util.aipl`.
+import { print } from builtins;
+import { head } from "./util.aipl";
+
+fn main() !prints {
+    print(head("hello"));
+}
+--- file: util.aipl ---
+pub fn head(s: str) -> str { s[0..2] }
+--- errors ---
+error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
+ --> util.aipl:1:32
+  |
+1 | pub fn head(s: str) -> str { s[0..2] }
+  |                                ^

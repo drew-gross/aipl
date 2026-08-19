@@ -31,6 +31,21 @@ pub struct Error {
     /// Secondary labeled locations, rendered as `note:` blocks after the
     /// primary caret — e.g. pointing at the *other* side of a conflict.
     pub notes: Vec<(String, Span)>,
+    /// The file this error's spans index, when that isn't the file the
+    /// renderer was handed. The loader sets it on every diagnostic raised
+    /// against an *imported* file: those spans point into that file's source,
+    /// while the caller renders against the entry file's, so without this the
+    /// caret lands on an unrelated line of the wrong file. Boxed to keep
+    /// `Error` small on the common (unset) path.
+    pub origin: Option<Box<ErrorOrigin>>,
+}
+
+/// The source an [`Error`]'s spans belong to, carried when it isn't the source
+/// the renderer is given. `label` names the file in the ` --> ` line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorOrigin {
+    pub label: String,
+    pub source: String,
 }
 
 /// Lift a single error into the multi-error form the pipeline propagates, so a
@@ -57,6 +72,7 @@ impl Error {
             message: message.into(),
             span: None,
             notes: Vec::new(),
+            origin: None,
         }
     }
 
@@ -65,7 +81,22 @@ impl Error {
             message: message.into(),
             span: Some(span),
             notes: Vec::new(),
+            origin: None,
         }
+    }
+
+    /// Record that this error's spans index `source`, the file named `label`.
+    /// The *innermost* attribution wins: an error bubbling out through a chain
+    /// of imports is already tagged with the file it was raised against, and
+    /// each enclosing file must leave that alone.
+    pub fn in_file(mut self, label: impl Into<String>, source: &str) -> Self {
+        if self.origin.is_none() {
+            self.origin = Some(Box::new(ErrorOrigin {
+                label: label.into(),
+                source: source.to_string(),
+            }));
+        }
+        self
     }
 
     /// Attach a secondary labeled location, rendered as a `note:` block after
@@ -80,6 +111,12 @@ impl Error {
     /// plain `error: ...` otherwise. `filename` appears in the ` --> ` location
     /// line; pass `"input"` when no real path is available.
     pub fn render(&self, source: &str, filename: &str) -> String {
+        // A diagnostic carrying its own origin indexes *that* source, not the
+        // one the caller happens to hold — see `Error::origin`.
+        let (source, filename) = match &self.origin {
+            Some(o) => (o.source.as_str(), o.label.as_str()),
+            None => (source, filename),
+        };
         let Some(span) = self.span.as_ref() else {
             return format!("error: {}", self.message);
         };

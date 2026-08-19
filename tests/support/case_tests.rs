@@ -206,6 +206,7 @@ case_tests! {
     cases_imports_err_import_imported_twice = "cases/imports/err_import_imported_twice",
     cases_imports_err_import_private = "cases/imports/err_import_private",
     cases_imports_err_importing_nonexistent_name = "cases/imports/err_importing_nonexistent_name",
+    cases_imports_err_lint_in_imported_file = "cases/imports/err_lint_in_imported_file",
     cases_imports_err_operator_imported_twice = "cases/imports/err_operator_imported_twice",
     cases_imports_err_operator_not_imported = "cases/imports/err_operator_not_imported",
     cases_imports_import_alias = "cases/imports/import_alias",
