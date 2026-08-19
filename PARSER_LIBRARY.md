@@ -10,7 +10,7 @@ each is sized to be finishable in one session.
       is boxed; array of structs holding a boxed field; two-param generic variant
 - [ ] 1.1 Generic-variant inference from expected type (`check.rs:605-635`)
 - [ ] 1.2 `case_index` / `case_name` builtins — match a case, not a payload
-- [ ] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
+- [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [ ] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320
 - [ ] 1.5 Tail-call elimination — TODO.txt:467
 - [ ] 1.6 `match` arms as statement blocks; arm grouping; char-literal arms

@@ -6872,11 +6872,13 @@ fn build_struct_layouts(
     Ok(layouts)
 }
 
-/// The named types `ty` *contains* — reached directly or through
+/// The named types `ty` *contains inline* — reached directly or through
 /// optional/result layers, which store their core inline. Arrays/sets/dicts
-/// are excluded: they are separately refcounted heap blocks, so they already
-/// break the infinite-size chain (and their element references are external,
-/// strong references — see the recursive-type runtime).
+/// are excluded: they are separately refcounted heap blocks, so a reference
+/// they hold is an *external*, strong reference (see the recursive-type
+/// runtime). That distinction is what this answers, so it is the walk
+/// `contains_scc_ref` wants — for "does this type reach that one at all",
+/// which is what boxing is decided from, see `referenced_named_types`.
 fn contained_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
     match ty {
         Type::Named(n) => out.push(n),
@@ -6889,10 +6891,37 @@ fn contained_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
     }
 }
 
+/// Every named type `ty` *reaches*, through any number of layers — including
+/// array elements, set elements and dict keys/values, which
+/// `contained_named_types` stops at.
+///
+/// Being behind a heap block bounds a type's *size*, but it does not break the
+/// cycle for anything that walks a value's structure: rendering, dropping,
+/// retaining and comparing a `Tree { kids: Tree[] }` all have to recurse into
+/// the array's elements, which are `Tree`s again. Inline (unboxed) values are
+/// walked by inlining that structure into the generated code, so such a type
+/// must still be boxed — otherwise codegen recurses forever (`emit_render`) and
+/// a rebind copies a live value byte-wise instead of transferring a refcounted
+/// pointer. Function types are excluded: a function value is a bare code
+/// address that owns nothing, so it reaches no value at all.
+fn referenced_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
+    match ty {
+        Type::Named(n) => out.push(n),
+        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
+            referenced_named_types(inner, out)
+        }
+        Type::Result(a, b) | Type::Dict(a, b) => {
+            referenced_named_types(a, out);
+            referenced_named_types(b, out);
+        }
+        _ => {}
+    }
+}
+
 /// Compute the *recursion groups*: for every type that is part of a
-/// containment cycle (it reaches itself through struct fields, variant
-/// payloads, or optional/result cores — directly or mutually), map its name to
-/// its cycle's group id (the strongly-connected component of the containment
+/// reference cycle (it reaches itself through struct fields, variant payloads,
+/// optional/result cores, or container elements — directly or mutually), map
+/// its name to its cycle's group id (the strongly-connected component of the containment
 /// graph). Types not in any cycle are absent. Members of a group are boxed,
 /// and a reference between boxed values of the same group is an internal
 /// (weak-counted) reference.
@@ -6908,13 +6937,13 @@ fn recursion_groups(decls: &HashMap<&str, TypeDeclRef>) -> HashMap<String, u32> 
             match decls[n] {
                 TypeDeclRef::Struct(s) => {
                     for f in &s.fields {
-                        contained_named_types(&f.ty, &mut refs);
+                        referenced_named_types(&f.ty, &mut refs);
                     }
                 }
                 TypeDeclRef::Variant(v) => {
                     for c in &v.cases {
                         for ty in &c.payload {
-                            contained_named_types(ty, &mut refs);
+                            referenced_named_types(ty, &mut refs);
                         }
                     }
                 }

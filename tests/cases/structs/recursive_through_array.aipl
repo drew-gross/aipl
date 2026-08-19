@@ -1,0 +1,82 @@
+import { len, print, to_str, wrapping_add as +, wrapping_increment as ++, <, == } from builtins;
+
+// The struct form of "recursion only through an array": `kids` is `Tree[]`,
+// and no field is a `Tree` (or a `Tree?`) directly. The cycle is real —
+// dropping a `Tree` drops its kids, which are `Tree`s — so `Tree` is boxed,
+// and rebinding a node to a fresh one that holds the old one as a child is an
+// ordinary refcount transfer rather than a byte-wise copy of a value that
+// still owns heap.
+struct Tree { label: i64, kids: Tree[] }
+
+fn total(self: Tree) -> i64 {
+    mut sum = self.label;
+    for (let k : self.kids) {
+        set sum = sum + k.total();
+    }
+    sum
+}
+
+fn leaf(label: i64) -> Tree { Tree { label, kids: [] } }
+
+fn main() !prints {
+    // Grow a spine by wrapping the previous node in a new parent — the shape
+    // that used to leave the binding pointing at freed heap.
+    mut t = leaf(0);
+    mut i = 1;
+    while (i < 5) {
+        set t = Tree { label: i, kids: [t] };
+        set i++;
+    }
+    print(to_str(t.total()));
+    print(to_str(leaf(7)));
+    print(to_str(Tree { label: 1, kids: [leaf(2), leaf(3)] }));
+}.test({
+    assert(leaf(5).total() == 5);
+    assert(leaf(5).kids.len() == 0);
+
+    let t = Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] };
+    assert(t.total() == 10);
+    assert(t.kids.len() == 2);
+    assert(t.kids[0] == some(leaf(2)));
+
+    // Structural equality recurses through the array field.
+    assert(t == Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] });
+})
+--- stdout ---
+10
+Tree { label: 7, kids: [] }
+Tree { label: 1, kids: [Tree { label: 2, kids: [] }, Tree { label: 3, kids: [] }] }
+--- performance ---
+allocations: 24
+deallocations: 24
+reallocations: 0
+bytes allocated: 1088
+instructions executed: 1811
+binary size: 5320
+  code: 2520
+    __arr_drop_1: 116
+    __arr_retain_1: 116
+    __rec_drop_0: 36
+    __to_str_2: 180
+    __to_str_3: 1028
+    leaf: 104
+    main: 668
+    total: 272
+  data: 188
+  metadata: 2612
+builtin calls: 166
+  aipl_arr_inc: 5
+  aipl_array_dec: 14
+  aipl_array_new: 9
+  aipl_dec: 10
+  aipl_i64_len: 14
+  aipl_inc: 3
+  aipl_print: 3
+  aipl_rec_alloc: 9
+  aipl_rec_dec_strong: 22
+  aipl_rec_inc_strong: 13
+  aipl_str_alloc: 6
+  aipl_str_data: 2
+  aipl_str_len: 4
+  aipl_write_bytes: 45
+  aipl_write_i64: 7

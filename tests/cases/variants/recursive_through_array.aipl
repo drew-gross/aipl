@@ -1,0 +1,79 @@
+import { print, to_str, wrapping_add as +, !=, == } from builtins;
+
+// A variant that reaches itself only *through an array*: `CTree` carries
+// `Cst[]`, and no case has a direct `Cst` payload. That is still a containment
+// cycle — rendering, dropping and comparing a `Cst` each have to recurse into
+// the array's elements, which are `Cst`s again — so `Cst` is boxed (a
+// refcounted heap block) exactly like a directly recursive type. The array
+// itself holds *external* (strong) references to its element nodes.
+variant Cst = CLeaf(i64) | CTree(str, Cst[])
+
+fn sum_kids(kids: Cst[]) -> i64 {
+    mut total = 1;
+    for (let k : kids) {
+        set total = total + k.size();
+    }
+    total
+}
+
+fn size(self: Cst) -> i64 {
+    match (self) {
+        CLeaf(_) => 1,
+        CTree(_, kids) => sum_kids(kids),
+    }
+}
+
+fn main() !prints {
+    let t = CTree("a", [CLeaf(1), CTree("b", [CLeaf(2), CLeaf(3)]), CLeaf(4)]);
+    print(to_str(t));
+    print(to_str(t.size()));
+}.test({
+    assert(CLeaf(1).size() == 1);
+
+    // An empty child array is the other base case.
+    assert(CTree("leafless", []).size() == 1);
+
+    let t = CTree("a", [CLeaf(1), CTree("b", [CLeaf(2)])]);
+    assert(t.size() == 4);
+
+    // Structural equality recurses through the array payload.
+    assert(t == CTree("a", [CLeaf(1), CTree("b", [CLeaf(2)])]));
+    assert(t != CTree("a", [CLeaf(1), CTree("b", [CLeaf(9)])]));
+    assert(t != CTree("a", [CLeaf(1)]));
+})
+--- stdout ---
+CTree("a", [CLeaf(1), CTree("b", [CLeaf(2), CLeaf(3)]), CLeaf(4)])
+6
+--- performance ---
+allocations: 23
+deallocations: 23
+reallocations: 0
+bytes allocated: 921
+instructions executed: 2610
+binary size: 5704
+  code: 2776
+    __arr_drop_1: 116
+    __arr_retain_1: 116
+    __rec_drop_0: 84
+    __to_str_2: 1352
+    __to_str_3: 180
+    main: 580
+    size: 348
+  data: 235
+  metadata: 2693
+builtin calls: 210
+  aipl_arr_inc: 2
+  aipl_array_dec: 4
+  aipl_array_new: 2
+  aipl_dec: 22
+  aipl_i64_len: 26
+  aipl_inc: 4
+  aipl_print: 2
+  aipl_rec_alloc: 6
+  aipl_rec_dec_strong: 11
+  aipl_rec_inc_strong: 5
+  aipl_str_alloc: 15
+  aipl_str_data: 10
+  aipl_str_len: 20
+  aipl_write_bytes: 68
+  aipl_write_i64: 13
