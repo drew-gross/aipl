@@ -376,7 +376,14 @@ fn take_comment(self: W, c: Span) -> W {
 // (`(a, b)`, `[a]`, `#{a}`, `<T: any>`). Type-position lists (`TyParens`,
 // `Angles`) take no trailing comma when broken — the grammar doesn't allow one
 // there.
-variant ListStyle = Parens | Brackets | HashBraces | SpacedBraces | Angles | TyParens
+variant ListStyle =
+    Parens
+    | Brackets
+    | HashBraces
+    | SpacedBraces
+    | Angles
+    | TyParens
+    | SpacedBracesNoTrailing
 
 // A style's brackets and the two layout bits, unpacked. The Rust version returns
 // a 4-tuple from a `match`; a struct names the bits at the use site.
@@ -388,6 +395,15 @@ fn shape(self: ListStyle) -> ListShape {
         Brackets => ListShape { open: "[", close: "]", spaced: false, trailing: true },
         HashBraces => ListShape { open: "#{", close: "}", spaced: false, trailing: true },
         SpacedBraces => ListShape { open: "{", close: "}", spaced: true, trailing: true },
+        // `SpacedBraces` for a caller that has already written the trailing
+        // comma into the last item, so this must not add a second one when the
+        // list breaks. See `construct_body`.
+        SpacedBracesNoTrailing => ListShape {
+            open: "{",
+            close: "}",
+            spaced: true,
+            trailing: false,
+        },
         Angles => ListShape { open: "<", close: ">", spaced: false, trailing: false },
         TyParens => ListShape { open: "(", close: ")", spaced: false, trailing: false },
     }
@@ -549,8 +565,11 @@ fn tok_text(self: W, i: u64) -> str {
 }
 
 // Whether the token at the cursor has kind `k`.
-fn peek_is(self: W, k: FmtKind) -> bool {
-    match (self.peek()) {
+fn peek_is(self: W, k: FmtKind) -> bool { self.peek_is_n(0, k) }
+
+// Whether the token `n` past the cursor has kind `k`.
+fn peek_is_n(self: W, n: u64, k: FmtKind) -> bool {
+    match (self.toks[self.pos + n]) {
         some(t) => t.kind == k,
         none => false,
     }
@@ -1068,9 +1087,54 @@ fn fn_item(self: W) -> WDoc!FmtError {
     } else {
         WDocs { w: effs.w, docs: effs.docs }
     };
-    let body = ret.w.block()?;
+    let body = ret.w.fn_body()?;
     let attrs = body.w.fn_attrs([..ret.docs, Text(" "), body.doc])?;
     ok(WDoc { w: attrs.w, doc: Concat(attrs.docs) })
+}
+
+// A function body: an ordinary statement block, or the *struct-literal
+// shorthand* `{ field: value, .. }`, which names no type because the declared
+// return type supplies it. The shorthand is laid out like the struct literal it
+// stands for — flat while it fits — not like a block, which always breaks.
+//
+// `{ x }` stays a block returning `x`, so the shorthand is recognized by the
+// token *after* the first one: neither `IDENT :` nor `IDENT ,` can begin a
+// statement, and no other body shape puts `:` or `,` in that position (a tuple
+// or array literal leads with `(`/`[`, a call's comma sits past its `(`). That
+// is the grammar's own rule, so testing the following token alone keeps the two
+// parsers in step — testing the field name's *kind* would not, since a field
+// may be named `str`, which the formatter classifies as a builtin type rather
+// than an identifier.
+fn fn_body(self: W) -> WDoc!FmtError {
+    let after = self.peek_text_n(2);
+    if (self.peek_text() == "{" && (after == ":" || after == ",")) {
+        return self.bump().w.construct_body();
+    };
+    self.block()
+}
+
+// The shorthand body's field list, entered with the `{` already consumed.
+// Mirrors `struct_atom` without the leading type name.
+//
+// One wrinkle the ordinary struct literal doesn't have: in `{ id, }` — a single
+// *shorthand* field — the comma is **syntax, not style**. Drop it and `{ id }`
+// reads back as a block whose value is `id`, so formatting would change what the
+// source means. `comma_list_docs` writes a trailing comma only when the list
+// breaks (`IfBroken`), which is not enough here, so that comma is written into
+// the item itself and the style's own one switched off. Every other shape
+// already carries a comma or a colon between the braces and formats as usual.
+fn construct_body(self: W) -> WDoc!FmtError {
+    let lone_shorthand = self.peek_text_n(1) == "," && self.peek_text_n(2) == "}";
+    let inits = self.struct_inits([])?;
+    let closed = inits.w.expect("}")?.w;
+    if (lone_shorthand) {
+        // Write the comma into the item itself so it survives *both* layouts,
+        // and switch off the style's own break-only trailing comma so the
+        // broken form doesn't end up with two.
+        let item = Concat([..inits.docs, Text(",")]);
+        return ok(WDoc { w: closed, doc: comma_list_docs([item], SpacedBracesNoTrailing) });
+    };
+    ok(WDoc { w: closed, doc: comma_list_docs(inits.docs, SpacedBraces) })
 }
 
 // `!prints`, `!reads`, … — a run of effect annotations after the parameters.
@@ -2647,22 +2711,22 @@ allocations: 20581
 deallocations: 20581
 reallocations: 560
 bytes allocated: 1011492
-instructions executed: 3061053
-binary size: 3069608
-  code: 1754976
+instructions executed: 3058268
+binary size: 3075520
+  code: 1758472
     __arr_drop_10: 140
     __arr_drop_11: 140
     __arr_drop_12: 364
-    __arr_drop_14: 120
-    __arr_drop_15: 140
+    __arr_drop_13: 120
+    __arr_drop_14: 140
     __arr_drop_4: 116
     __arr_drop_7: 800
     __arr_drop_9: 140
     __arr_retain_10: 140
     __arr_retain_11: 140
     __arr_retain_12: 364
-    __arr_retain_14: 120
-    __arr_retain_15: 140
+    __arr_retain_13: 120
+    __arr_retain_14: 140
     __arr_retain_4: 116
     __arr_retain_7: 800
     __arr_retain_9: 140
@@ -2682,7 +2746,7 @@ binary size: 3069608
     __builtin_sort_by$ImportName$lam22: 3236
     __builtin_value_or_err$i64$str: 180
     __eq_0: 92
-    __eq_13: 64
+    __eq_15: 64
     __eq_17: 120
     __eq_18: 464
     __eq_2: 104
@@ -2739,7 +2803,7 @@ binary size: 3069608
     array_atom: 2176
     array_suffixes: 1248
     at: 24
-    atom: 2776
+    atom: 2596
     base_ty: 2248
     binding_ann: 1924
     binop_expr: 2868
@@ -2748,12 +2812,13 @@ binary size: 3069608
     block_entries: 3744
     block_layout: 5112
     bump: 1624
-    call_arg: 4792
+    call_arg: 4680
     call_arg_list: 636
     call_args_until: 2688
     chain_docs: 472
-    comma_list_docs: 2868
+    comma_list_docs: 2996
     comment_starts_before: 280
+    construct_body: 3208
     dict_entries: 4264
     dict_value: 1428
     dict_value_ty: 1300
@@ -2763,12 +2828,13 @@ binary size: 3069608
     expect: 1304
     expr: 700
     fn_attrs: 5304
+    fn_body: 680
     fn_item: 17724
     fn_return: 1696
     for_stmt: 9924
     format_program: 74964
     hug_close: 716
-    hugs_sole_arg: 1320
+    hugs_sole_arg: 1268
     ident_list: 1660
     if_expr: 10884
     import_item: 7956
@@ -2787,15 +2853,15 @@ binary size: 3069608
     match_arms: 5056
     match_expr: 10744
     mut_stmt: 5364
-    name_atom: 5712
+    name_atom: 5572
     named_ty: 3656
     new_walker: 200
     next_start: 536
     params_until: 9516
     paren_atom: 5316
     paren_ty: 7608
-    pattern: 7588
-    peek: 276
+    pattern: 7540
+    peek_is: 288
     peek_text_n: 32
     postfix: 4652
     postfix_segs: 3252
@@ -2844,15 +2910,15 @@ binary size: 3069608
     with_last: 468
     without_trailing_break: 696
   data: 25740
-  metadata: 1288892
-builtin calls: 491207
+  metadata: 1291308
+builtin calls: 491866
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57078
+  aipl_arr_inc: 57122
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 69142
+  aipl_array_dec: 69186
   aipl_array_new: 9833
   aipl_array_push: 1650
   aipl_array_push_mut: 1353
@@ -2861,8 +2927,8 @@ builtin calls: 491207
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 105461
-  aipl_inc: 84795
+  aipl_dec: 105707
+  aipl_inc: 84931
   aipl_rec_alloc: 5717
   aipl_rec_dec_strong: 45989
   aipl_rec_dec_weak: 3509
@@ -2872,13 +2938,13 @@ builtin calls: 491207
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 5953
+  aipl_str_eq: 6019
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31103
+  aipl_str_len: 31191
   aipl_str_repeat: 74
-  aipl_str_slice: 8446
+  aipl_str_slice: 8481
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3

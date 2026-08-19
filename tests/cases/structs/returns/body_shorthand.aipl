@@ -1,0 +1,93 @@
+import { print, to_str, wrapping_add as +, == } from builtins;
+
+// A function whose whole body is a struct literal of its declared return type
+// may drop the stutter: `-> Vec2 { Vec2 { x: 1, y: 2 } }` writes as
+// `-> Vec2 { x: 1, y: 2 }`. The return type names the struct, so the literal
+// needn't; it desugars in the parser to exactly the construct the long form
+// builds, and nothing downstream can tell the two apart.
+struct Vec2 { x: i64, y: i64 }
+
+struct Named { name: str, at: Vec2 }
+
+struct Pair<T> { left: T, right: T }
+
+struct Tag { id: i64 }
+
+fn origin() -> Vec2 { x: 0, y: 0 }
+
+// The shorthand field form works here too, as does a trailing comma.
+fn square(x: i64) -> Vec2 { x, y: x }
+
+fn shifted(x: i64, y: i64) -> Vec2 { x, y }
+
+// A single *explicit* field needs no comma, since `id:` already rules out a
+// block. A single *shorthand* field is the one shape that does need one —
+// `{ id }` is a block whose value is `id`, which is what it has always meant —
+// so it is written `{ id, }`.
+fn tag(id: i64) -> Tag { id: id + 0 }
+
+fn tag_short(id: i64) -> Tag { id, }
+
+// A generic return type contributes its base name; the arguments infer, exactly
+// as they do when the literal is spelled `Pair { .. }`.
+fn twin(x: i64) -> Pair<i64> { left: x, right: x }
+
+// `{ p }` is still a block returning `p` — not a one-field struct literal.
+fn passthrough(p: Vec2) -> Vec2 { p }
+
+// Nested literals still name their own type; only the outermost one is implied.
+fn place(name: str, x: i64) -> Named { name, at: Vec2 { x, y: 0 } }
+
+// The body is an ordinary expression position: effects, generics and a `.test`
+// attribute all still attach as usual.
+fn logged(x: i64) !prints -> Vec2 {
+    print("built");
+    Vec2 { x, y: x }
+}
+
+fn main() !prints {
+    print(to_str(origin()));
+    print(to_str(square(3)));
+    print(to_str(shifted(1, 2)));
+    print(to_str(place("home", 7)));
+    print(to_str(logged(4)));
+}.test({
+    assert(origin() == Vec2 { x: 0, y: 0 });
+    assert(square(3) == Vec2 { x: 3, y: 3 });
+    assert(shifted(1, 2) == Vec2 { x: 1, y: 2 });
+    assert(tag(5) == Tag { id: 5 });
+    assert(tag_short(5) == Tag { id: 5 });
+    assert(twin(6) == Pair { left: 6, right: 6 });
+    assert(passthrough(Vec2 { x: 8, y: 9 }) == Vec2 { x: 8, y: 9 });
+    assert(place("home", 7) == Named { name: "home", at: Vec2 { x: 7, y: 0 } });
+})
+--- stdout ---
+Vec2 { x: 0, y: 0 }
+Vec2 { x: 3, y: 3 }
+Vec2 { x: 1, y: 2 }
+Named { name: "home", at: Vec2 { x: 7, y: 0 } }
+built
+Vec2 { x: 4, y: 4 }
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 208
+instructions executed: 704
+binary size: 4480
+  code: 1768
+    __to_str_0: 464
+    __to_str_1: 812
+    main: 492
+  data: 364
+  metadata: 2348
+builtin calls: 92
+  aipl_dec: 12
+  aipl_i64_len: 20
+  aipl_inc: 5
+  aipl_print: 6
+  aipl_str_alloc: 5
+  aipl_str_data: 1
+  aipl_str_len: 2
+  aipl_write_bytes: 31
+  aipl_write_i64: 10

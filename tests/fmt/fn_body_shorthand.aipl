@@ -1,0 +1,66 @@
+import { wrapping_add as + } from builtins;
+struct Vec2 { x: i64, y: i64 }
+struct Tag { id: i64 }
+struct Wide { alpha: i64, bravo: i64, charlie: i64, delta: i64, echo: i64, foxtrot: i64 }
+fn origin() -> Vec2 {   x: 0,   y: 0   }
+fn square(x: i64) -> Vec2 { x,y: x }
+fn trailing(x: i64, y: i64) -> Vec2 { x, y, }
+fn lone(id: i64) -> Tag { id, }
+fn lone_explicit(id: i64) -> Tag { id: id + 0 }
+fn wide(n: i64) -> Wide { alpha: n + 1, bravo: n + 2, charlie: n + 3, delta: n + 4, echo: n + 5, foxtrot: n + 6 }
+fn commented(x: i64) -> Vec2 {
+    // the x coordinate
+    x,
+    y: 0, // and the y
+}
+fn lone_commented(id: i64) -> Tag {
+    // just the one
+    id,
+}
+fn passthrough(p: Vec2) -> Vec2 { p }
+fn block_body(x: i64) -> Vec2 { let y = x + 1; Vec2 { x, y } }
+--- formatted ---
+import { wrapping_add as + } from builtins;
+
+struct Vec2 { x: i64, y: i64 }
+
+struct Tag { id: i64 }
+
+struct Wide { alpha: i64, bravo: i64, charlie: i64, delta: i64, echo: i64, foxtrot: i64 }
+
+fn origin() -> Vec2 { x: 0, y: 0 }
+
+fn square(x: i64) -> Vec2 { x, y: x }
+
+fn trailing(x: i64, y: i64) -> Vec2 { x, y }
+
+fn lone(id: i64) -> Tag { id, }
+
+fn lone_explicit(id: i64) -> Tag { id: id + 0 }
+
+fn wide(n: i64) -> Wide {
+    alpha: n + 1,
+    bravo: n + 2,
+    charlie: n + 3,
+    delta: n + 4,
+    echo: n + 5,
+    foxtrot: n + 6,
+}
+
+fn commented(x: i64) -> Vec2 {
+    // the x coordinate
+    x,
+    y: 0,
+} // and the y
+
+fn lone_commented(id: i64) -> Tag {
+    // just the one
+    id,
+}
+
+fn passthrough(p: Vec2) -> Vec2 { p }
+
+fn block_body(x: i64) -> Vec2 {
+    let y = x + 1;
+    Vec2 { x, y }
+}

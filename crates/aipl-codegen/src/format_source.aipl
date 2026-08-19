@@ -74,11 +74,11 @@ allocations: 2188
 deallocations: 2188
 reallocations: 6
 bytes allocated: 100657
-instructions executed: 330151
-binary size: 845104
-  code: 517612
+instructions executed: 330517
+binary size: 851024
+  code: 521108
     __arr_drop_10: 140
-    __arr_drop_12: 120
+    __arr_drop_11: 120
     __arr_drop_2: 800
     __arr_drop_3: 116
     __arr_drop_6: 364
@@ -86,7 +86,7 @@ binary size: 845104
     __arr_drop_8: 140
     __arr_drop_9: 140
     __arr_retain_10: 140
-    __arr_retain_12: 120
+    __arr_retain_11: 120
     __arr_retain_2: 800
     __arr_retain_3: 116
     __arr_retain_6: 364
@@ -110,7 +110,7 @@ binary size: 845104
     __builtin_value_or_err$i64$str: 180
     __eq_0: 100
     __eq_1: 148
-    __eq_11: 64
+    __eq_12: 64
     __lambda_14: 100
     __lambda_15: 68
     __lambda_16: 108
@@ -148,7 +148,7 @@ binary size: 845104
     __m5__parse_test_section_header: 696
     __m6__array_atom: 2176
     __m6__array_suffixes: 1248
-    __m6__atom: 2776
+    __m6__atom: 2596
     __m6__base_ty: 2248
     __m6__binding_ann: 1924
     __m6__binop_expr: 2868
@@ -157,12 +157,13 @@ binary size: 845104
     __m6__block_entries: 3744
     __m6__block_layout: 5112
     __m6__bump: 1624
-    __m6__call_arg: 4792
+    __m6__call_arg: 4680
     __m6__call_arg_list: 636
     __m6__call_args_until: 2688
     __m6__chain_docs: 472
-    __m6__comma_list_docs: 2868
+    __m6__comma_list_docs: 2996
     __m6__comment_starts_before: 280
+    __m6__construct_body: 3208
     __m6__dict_entries: 4264
     __m6__dict_value: 1428
     __m6__dict_value_ty: 1300
@@ -172,12 +173,13 @@ binary size: 845104
     __m6__expect: 1304
     __m6__expr: 700
     __m6__fn_attrs: 5304
+    __m6__fn_body: 680
     __m6__fn_item: 17724
     __m6__fn_return: 1696
     __m6__for_stmt: 9924
     __m6__format_program: 74964
     __m6__hug_close: 716
-    __m6__hugs_sole_arg: 1320
+    __m6__hugs_sole_arg: 1268
     __m6__ident_list: 1660
     __m6__if_expr: 10884
     __m6__import_item: 7956
@@ -195,14 +197,14 @@ binary size: 845104
     __m6__match_arms: 5056
     __m6__match_expr: 10744
     __m6__mut_stmt: 5364
-    __m6__name_atom: 5712
+    __m6__name_atom: 5572
     __m6__named_ty: 3656
     __m6__next_start: 536
     __m6__params_until: 9516
     __m6__paren_atom: 5316
     __m6__paren_ty: 7608
-    __m6__pattern: 7588
-    __m6__peek: 276
+    __m6__pattern: 7540
+    __m6__peek_is: 288
     __m6__peek_text_n: 32
     __m6__postfix: 4652
     __m6__postfix_segs: 3252
@@ -263,13 +265,13 @@ binary size: 845104
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 324985
-builtin calls: 40059
+  metadata: 327409
+builtin calls: 40140
   aipl_arr_drop_str: 50
-  aipl_arr_inc: 4581
+  aipl_arr_inc: 4587
   aipl_arr_reserve: 6
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6424
+  aipl_array_dec: 6430
   aipl_array_new: 1762
   aipl_array_push: 42
   aipl_array_push_mut: 45
@@ -278,8 +280,8 @@ builtin calls: 40059
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 10424
-  aipl_inc: 8590
+  aipl_dec: 10454
+  aipl_inc: 8605
   aipl_rec_alloc: 96
   aipl_rec_dec_strong: 704
   aipl_rec_dec_weak: 47
@@ -288,12 +290,12 @@ builtin calls: 40059
   aipl_str_contains: 292
   aipl_str_data: 32
   aipl_str_ends_with: 5
-  aipl_str_eq: 92
+  aipl_str_eq: 101
   aipl_str_iter_init: 37
   aipl_str_iter_next: 32
   aipl_str_join: 11
-  aipl_str_len: 3802
-  aipl_str_slice: 987
+  aipl_str_len: 3814
+  aipl_str_slice: 990
   aipl_str_split: 25
   aipl_str_starts_with: 767
   aipl_test_begin: 2

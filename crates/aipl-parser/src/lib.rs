@@ -121,7 +121,30 @@ gazelle! {
         // An optional `pub` marks the function importable by other files; its
         // absence makes it file-private (importing it is a loader error).
         vis = PUB => public | _ => private;
-        function = vis FN IDENT type_params LPAREN params RPAREN effects return_ty block fn_attrs => function;
+        function = vis FN IDENT type_params LPAREN params RPAREN effects return_ty fn_body fn_attrs => function;
+        // A function body is an ordinary value block, or the *struct-literal
+        // shorthand*: `fn leaf(v: i64) -> Node { v, next: none }` instead of the
+        // stuttering `-> Node { Node { v, next: none } }`. The declared return
+        // type supplies the name, so the sugar is desugared to the same
+        // `Construct` the long form builds (see the `Function` build action).
+        //
+        // `{ x }` stays a **block** returning `x`: it is the one shape both
+        // readings accept, and a block is what it has always meant. So the
+        // shorthand needs either an explicit `field: value` or a comma —
+        // a single shorthand field is written `{ x, }`. That is also what keeps
+        // the two apart for the parser: after `LBRACE IDENT`, one token of
+        // lookahead decides (`:`/`,` → shorthand, `}` or anything else → block),
+        // and neither `IDENT :` nor `IDENT ,` can start a statement.
+        fn_body = block => block
+                | LBRACE construct_fields RBRACE => construct;
+        // The shorthand's field list. Spelled out from its leading `IDENT`
+        // rather than reusing `field_init` so the span starts at the first
+        // field *name* — that span is what the "needs a struct return type"
+        // error underlines. After `IDENT COLON expr`, one token of lookahead
+        // (`,` → `many`, `}` → `one`) picks the production.
+        construct_fields = IDENT COLON expr => one
+                         | IDENT COLON expr COMMA field_inits => many
+                         | IDENT COMMA field_inits => many_shorthand;
         // Zero or more attributes attached to a function, in any order:
         // `.test({ .. })` (a test block the `check` command runs) and
         // `.doc("...")` (documentation surfaced by the `doc` command). The two
@@ -558,6 +581,8 @@ impl aipl::Types for Build {
     type TypeParamList = Vec<TypeParam>;
     type TypeParam = TypeParam;
     type Block = Expr;
+    type FnBody = ParsedBody;
+    type ConstructFields = (Vec<FieldInit>, Span);
     type ElseBranch = Expr;
     type LoopBody = Expr;
     type Function = Function;
@@ -974,6 +999,60 @@ impl gazelle::Action<aipl::FieldInit<Self>> for Build {
     }
 }
 
+/// A parsed function body: an ordinary value block, or the struct-literal
+/// shorthand `{ field: value, .. }`, whose type name comes from the declared
+/// return type rather than the source. Resolved into a plain body `Expr` by the
+/// `Function` build action, which is the first place both halves are in scope.
+/// `pub` only because it surfaces as a gazelle `Action` associated type; not
+/// part of the crate's intended API.
+pub enum ParsedBody {
+    Block(Expr),
+    /// The shorthand's field list, spanned over the whole `{ .. }`.
+    Construct(Vec<FieldInit>, Span),
+}
+
+impl gazelle::Action<aipl::FnBody<Self>> for Build {
+    fn build(&mut self, node: aipl::FnBody<Self>) -> Result<ParsedBody, Self::Error> {
+        Ok(match node {
+            aipl::FnBody::Block(block) => ParsedBody::Block(block),
+            aipl::FnBody::Construct((fields, span)) => ParsedBody::Construct(fields, span),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ConstructFields<Self>> for Build {
+    fn build(
+        &mut self,
+        node: aipl::ConstructFields<Self>,
+    ) -> Result<(Vec<FieldInit>, Span), Self::Error> {
+        // Every form is spanned from the first field's name to the last field's
+        // value, so a diagnostic underlines the whole list.
+        let (start, first, rest) = match node {
+            // `{ name: value }` — one explicit field, no comma.
+            aipl::ConstructFields::One((name, span), value) => {
+                (span, FieldInit { name, value }, Vec::new())
+            }
+            // `{ name: value, rest.. }`.
+            aipl::ConstructFields::Many((name, span), value, rest) => {
+                (span, FieldInit { name, value }, rest)
+            }
+            // `{ name, rest.. }` — a leading shorthand field, which is also how
+            // the trailing-comma form `{ x, }` spells a lone one. The value is a
+            // reference to the identifier of the same name, as in `field_init`.
+            aipl::ConstructFields::ManyShorthand((name, span), rest) => {
+                let value = Expr::new(ExprKind::Ident(name.clone()), span.clone());
+                (span, FieldInit { name, value }, rest)
+            }
+        };
+        let mut fields = vec![first];
+        fields.extend(rest);
+        let span = fields
+            .last()
+            .map_or(start.clone(), |f| join_spans(&start, &f.value.span));
+        Ok((fields, span))
+    }
+}
+
 /// A parsed function attribute (`.test({ .. })` or `.doc("...")`), carrying the
 /// attribute name's span for duplicate-attribute diagnostics. Folded into the
 /// `Function`'s `test_body` / `doc` by the `Function` build action. `pub` only
@@ -1016,6 +1095,40 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
                 }
             }
         }
+        // Resolve the struct-literal shorthand now that the return type and the
+        // field list are both in hand. The result is exactly the `Construct` the
+        // long form parses to, so nothing downstream of the parser sees the
+        // sugar at all.
+        let body = match body {
+            ParsedBody::Block(e) => e,
+            ParsedBody::Construct(fields, span) => {
+                // The shorthand names no type, so the return type has to. A
+                // generic return (`-> Pair<i64>`) contributes its base name and
+                // infers its arguments, exactly like writing `Pair { .. }`.
+                let ty_name = match &return_ty {
+                    Some(Type::Named(n)) => n.clone(),
+                    Some(Type::Generic(base, _)) => base.clone(),
+                    Some(other) => {
+                        return Err(Error::at(
+                            format!(
+                                "fn {name:?}: a `{{ field: value, .. }}` body needs a struct return type to name, but this function returns {}; give the literal its type, or return a struct",
+                                aipl_syntax::type_name(other)
+                            ),
+                            span,
+                        ))
+                    }
+                    None => {
+                        return Err(Error::at(
+                            format!(
+                                "fn {name:?}: a `{{ field: value, .. }}` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type"
+                            ),
+                            span,
+                        ))
+                    }
+                };
+                Expr::new(ExprKind::Construct(ty_name, fields), span)
+            }
+        };
         Ok(Function {
             name,
             is_pub,
@@ -3531,6 +3644,7 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("block_body", "statement"),
     ("loop_inner", "statement"),
     ("block", "{"),
+    ("fn_body", "{"),
     ("loop_body", "{"),
     ("ty", "type"),
     ("return_ty", "->"),
@@ -3542,6 +3656,7 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("type_param_list", "type parameter"),
     ("field_decl", "field"),
     ("field_init", "field"),
+    ("construct_fields", "field"),
     ("arg_list", "expression"),
     ("effect", "effect"),
     ("effects", "effect"),

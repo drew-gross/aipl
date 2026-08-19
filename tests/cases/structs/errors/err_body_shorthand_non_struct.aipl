@@ -1,0 +1,10 @@
+// ...and a return type that isn't a struct can't name one either.
+struct Vec2 { x: i64, y: i64 }
+
+fn origin() -> i64 { x: 0, y: 0 }
+--- errors ---
+error: fn "origin": a `{ field: value, .. }` body needs a struct return type to name, but this function returns i64; give the literal its type, or return a struct
+ --> ./tests/cases/structs/errors/err_body_shorthand_non_struct.aipl:4:22
+  |
+4 | fn origin() -> i64 { x: 0, y: 0 }
+  |                      ^^^^^^^^^^
