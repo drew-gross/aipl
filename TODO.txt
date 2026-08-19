@@ -25,7 +25,6 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 misc cleanup:
-  LineAt should store a Span, not a start/end
   line_at.aipl should use .doc() instead of // header for docs
   caret_block.aipl should use min/max
   caret_block.aipl should use .doc() instead of // header for docs
@@ -92,6 +91,9 @@ lint:
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
   recognize ad-hoc implementations of min/max an request using the function
+
+errors:
+  using Span without importing it gives a bad error
 
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })

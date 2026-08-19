@@ -11,23 +11,24 @@ import { Span, len, repeat, saturating_sub as -, to_str, wrapping_add as +, <, =
 import { line_at } from "./line_at.aipl";
 
 pub fn caret_block(source: str, span: Span, filename: str) -> str {
-    let LineAt { line_start, line, line_end } = line_at(source, span.start);
-    let col = span.start - line_start;
+    // `at.span` is the line's byte range, so the source line is one slice.
+    let at = line_at(source, span.start);
+    let col = span.start - at.span.start;
 
     // The underline runs from the error's start to the earlier of its end and the
     // line's end, and is at least one column wide. `-` is `saturating_sub`, so an
     // empty or backwards span yields 0 rather than wrapping around on these
     // unsigned offsets — the zero check below then widens it to 1. (`stop` stands
     // in for `min`, which is still `i64`-only.)
-    let stop = if (line_end < span.end) { line_end } else { span.end };
+    let stop = if (at.span.end < span.end) { at.span.end } else { span.end };
     let width = stop - span.start;
     let underline_len = if (width == 0) { 1 } else { width };
-    let line_no = line + 1;
+    let line_no = at.line + 1;
     let blank = " ".repeat(line_no.to_str().len());
     ```
         {blank}--> {filename}:{line_no}:{col + 1}
         {blank} |
-        {line_no} | {source[line_start..line_end]}
+        {line_no} | {source[at.span]}
         {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
@@ -88,12 +89,12 @@ allocations: 77
 deallocations: 77
 reallocations: 0
 bytes allocated: 2830
-instructions executed: 4363
-binary size: 9144
-  code: 3456
-    __m1__line_at: 544
+instructions executed: 4456
+binary size: 9200
+  code: 3512
+    __m1__line_at: 596
     __to_str_0: 180
-    caret_block: 1792
+    caret_block: 1796
     main: 940
   data: 1720
   metadata: 3968

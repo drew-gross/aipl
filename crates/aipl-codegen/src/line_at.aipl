@@ -1,11 +1,12 @@
 // The error renderer's line locator: the compiler calls this through the FFI
 // (see `install_parser_hooks`) when rendering an error with a span. Given
-// `source` and a byte `offset`, it returns the 0-based line index, the byte
-// offset of that line's first byte, and the byte offset of the line's end
-// (the '\n' terminator, or source.len() for the last line).
-import { len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
+// `source` and a byte `offset`, it returns the 0-based line index and the
+// line's byte range — from its first byte up to the '\n' terminator (or
+// source.len() for the last line). The range is a `Span`, so a caller can
+// slice the line straight out of the source with `source[at.span]`.
+import { Span, len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
 
-struct LineAt { line: u64, line_start: u64, line_end: u64 }
+struct LineAt { line: u64, span: Span }
 
 pub fn line_at(source: str, offset: u64) -> LineAt {
     mut line: u64 = 0;
@@ -14,10 +15,10 @@ pub fn line_at(source: str, offset: u64) -> LineAt {
     for (let i, c : source) {
         if (c == '\n') {
             if (found) {
-                return LineAt { line, line_start, line_end: i };
+                return LineAt { line, span: line_start..i };
             };
             if (i >= offset) {
-                return LineAt { line, line_start, line_end: i };
+                return LineAt { line, span: line_start..i };
             };
             set line++;
             set line_start = i + 1;
@@ -26,29 +27,30 @@ pub fn line_at(source: str, offset: u64) -> LineAt {
             set found = true;
         };
     }
-    LineAt { line, line_start, line_end: source.len() }
+    LineAt { line, span: line_start..source.len() }
 }.test({
-    assert(line_at("hello", 0) == LineAt { line: 0, line_start: 0, line_end: 5 });
-    assert(line_at("hello\nworld", 3) == LineAt { line: 0, line_start: 0, line_end: 5 });
-    assert(line_at("hello\nworld", 5) == LineAt { line: 0, line_start: 0, line_end: 5 });
-    assert(line_at("hello\nworld", 6) == LineAt { line: 1, line_start: 6, line_end: 11 });
-    assert(line_at("a\nb", 10) == LineAt { line: 1, line_start: 2, line_end: 3 });
-    assert(line_at("", 0) == LineAt { line: 0, line_start: 0, line_end: 0 });
-    assert(line_at("a\nb\nc", 4) == LineAt { line: 2, line_start: 4, line_end: 5 });
+    assert(line_at("hello", 0) == LineAt { line: 0, span: 0..5 });
+    assert(line_at("hello\nworld", 3) == LineAt { line: 0, span: 0..5 });
+    assert(line_at("hello\nworld", 5) == LineAt { line: 0, span: 0..5 });
+    assert(line_at("hello\nworld", 6) == LineAt { line: 1, span: 6..11 });
+    assert(line_at("a\nb", 10) == LineAt { line: 1, span: 2..3 });
+    assert(line_at("", 0) == LineAt { line: 0, span: 0..0 });
+    assert(line_at("a\nb\nc", 4) == LineAt { line: 2, span: 4..5 });
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2485
-binary size: 3656
-  code: 1372
-    __eq_0: 136
-    line_at: 544
-    main: 692
-  data: 729
-  metadata: 1555
+instructions executed: 2695
+binary size: 3808
+  code: 1600
+    __eq_0: 96
+    __eq_1: 104
+    line_at: 596
+    main: 804
+  data: 617
+  metadata: 1591
 builtin calls: 47
   aipl_assert: 7
   aipl_str_data: 6
