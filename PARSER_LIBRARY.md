@@ -188,9 +188,73 @@ is not."*
 
 Cranelift supplies `return_call` / `return_call_indirect`. The real difficulty is
 not emission but **ordering against refcounting**: AIPL emits `aipl_dec` on scope
-exit, and those drops cannot run after control has left the frame. So TCE applies
-only where no drops are pending at the call — worth scoping honestly, because
-that condition is restrictive in exactly the refcount-heavy code this targets.
+exit, and those drops cannot run after control has left the frame.
+
+**Measured, 2026-08-20.** "Only where no drops are pending" was scoped as the
+conservative first cut. It is not a first cut — it is a no-op. Scanning
+`dogfood.clif`, `fmt.clif` and `doc.aipl` for calls in tail position:
+
+| shape | count |
+|---|---|
+| clean (nothing between call and return) | 76 |
+| drops/retains between | 37 |
+| other instructions between | 15 |
+| **of which self-calls** | **2** (both dirty) |
+
+**0 of the recursive tail-call cycles are fully eliminable.** A cycle is bounded
+only if *every* edge is, and every cycle has at least one drop-guarded edge. So
+the clean-only rule buys 76 individual frames — a constant factor — and bounds
+nothing. It would cost a calling-convention change, a full IR regeneration and a
+corpus-wide `--- performance ---` refill to do it.
+
+The reason is structural, not incidental. A function that `match`es an owned
+boxed value binds its payload, and those bindings are released on scope exit —
+*after* the recursive call returns. `doc.aipl`'s `fits` is the canonical shape:
+
+```
+    call fn1(v33)                      ; aipl_inc  — retain for the borrow
+    v34 = call fn2(v0, v33, v8, v10)   ; fits_atom
+    call fn3(v33)                      ; aipl_dec
+    jump block5(v34)
+block5(v11: i64):
+    call fn9(v9)                       ; rec_dec_strong — the destructured
+    call fn9(v10)                      ;   WCons payload, dropped on scope exit
+    return v11
+```
+
+Any function that destructures an owned recursive value and recurses on a field
+looks like this. **Drop motion across the tail call is therefore the feature, not
+an optimization on top of it.**
+
+The soundness rule for hoisting a drop above the tail call: hoist only when every
+refcounted argument holds a retain that dominates the call. The hazard is
+`aipl_mono::inspect_only_params` — when a callee only *inspects* a heap argument
+the caller skips the retain, so hoisting the owner's drop above the call is a
+use-after-free. That test needs type information, which is why this belongs in
+codegen (or in an IR pass fed a side table codegen builds) rather than in a pass
+reading CLIF alone.
+
+Also settled while measuring:
+
+- **128 of 130 tail calls are cross-function.** Rewriting self-calls as a jump
+  back to the entry block — no ABI change at all — is worthless here.
+- **No C-convention wrappers are needed.** `return_call` requires `CallConv::Tail`
+  on both sides, and every AIPL fn is `Linkage::Export`, so the first instinct is
+  to wrap. Unnecessary: excluding `main`, the FFI `; entry` list, and
+  address-taken functions (`ExprKind::Ident` resolving to a fn) is sufficient, and
+  ordinary `call` crosses conventions freely. `build_signature`
+  (`aipl-codegen/src/lib.rs`) feeds both the declaration and the definition, so
+  one assignment there sets the convention consistently.
+- **The pass slot exists**: `trait IrPass` / `IR_PASSES`, alongside `ElideRcPairs`.
+  `is_any_call` already encodes the "a call is the only thing that can free
+  memory" barrier the analysis needs.
+
+Build order: exclusion set → `CallConv::Tail` in `build_signature` → codegen
+records per-call "all refcounted args independently retained" into a side table →
+pass hoists drops and rewrites to `return_call` → a cases test that recurses
+deeper than the 8 MB `aipl build` stack allows → IR regeneration and corpus perf
+refill.
+
 Composite returns add a second wrinkle: a tail call returning via sret must
 forward the caller's sret pointer rather than allocate its own.
 
