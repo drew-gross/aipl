@@ -16,15 +16,12 @@ fn kind(c: char) -> str {
 }
 
 // Escapes work in a pattern exactly as they do in a char expression: the arm is
-// the character, not its spelling. An escaped-single-quote arm belongs here too
-// and compiles correctly, but is left out because the highlighting test's
-// simplified tmLanguage engine mis-scopes that literal anywhere it appears (its
-// `find_end` picks the first end match without interleaving the escape pattern);
-// the shipped grammar handles it.
+// the character, not its spelling — including the quote character itself.
 fn escaped(c: char) -> str {
     match (c) {
         '\n' => "newline",
         '\t' => "tab",
+        '\'' => "quote",
         '\\' => "backslash",
         _ => "plain",
     }
@@ -57,6 +54,7 @@ fn main() !prints {
 
     assert(escaped('\n') == "newline");
     assert(escaped('\t') == "tab");
+    assert(escaped('\'') == "quote");
     assert(escaped('\\') == "backslash");
     assert(escaped('a') == "plain");
 
@@ -75,10 +73,10 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 81
-binary size: 1912
-  code: 896
-    main: 896
+instructions executed: 84
+binary size: 1968
+  code: 952
+    main: 952
   data: 59
   metadata: 957
 builtin calls: 20

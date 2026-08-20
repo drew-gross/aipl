@@ -242,7 +242,7 @@ fn walk_refs(
             // until end matches (or EOF).
             apply_match(pat, text, &m, scopes);
             let content_start = m.end();
-            let (end_start, end_finish) = find_end(pat, text, content_start, end);
+            let (end_start, end_finish) = find_end(pat, grammar, text, content_start, end, depth);
             if let Some(name) = &pat.content_name {
                 push_scope(scopes, content_start..end_start, name);
             }
@@ -326,18 +326,74 @@ fn push_scope(scopes: &mut [Vec<String>], range: std::ops::Range<usize>, name: &
 /// Walk forward from `from` looking for `pat.end`. Returns the
 /// `(end_start, end_finish)` byte offsets — `end_start` is where the
 /// content stops; `end_finish` is where the next pattern resumes.
-fn find_end(pat: &Pattern, text: &str, from: usize, limit: usize) -> (usize, usize) {
+/// Where `pat`'s `end` matches, scanning from `from` — **interleaved with its
+/// inner patterns**, which is what TextMate does and what a naive "first `end`
+/// match wins" scan gets wrong.
+///
+/// The case that forces this is an escape guarding the delimiter it would
+/// otherwise close on: in `'\''` the content starts at the backslash, so the
+/// bare `end` regex (`'`) first matches the *escaped* quote. Closing there
+/// leaves the real closing quote to open a fresh block that runs to EOF, and
+/// the rest of the file is scoped as a string. TextMate resolves this by taking
+/// whichever of `end` or an inner pattern matches earliest; the escape starts
+/// one byte sooner, consumes `\'`, and the scan resumes past it.
+///
+/// So: find the next `end` candidate, and if an inner pattern begins strictly
+/// before it, skip what that pattern consumes and look again. A nested
+/// `begin`/`end` inner pattern (a block comment inside a block comment) is
+/// skipped whole, via recursion.
+fn find_end(
+    pat: &Pattern,
+    grammar: &Grammar,
+    text: &str,
+    from: usize,
+    limit: usize,
+    depth: usize,
+) -> (usize, usize) {
     let Some(re) = &pat.end_re else {
         return (limit, limit);
     };
-    if let Some(m) = re.find_at(text, from) {
-        if m.start() < limit {
-            return (m.start(), m.end());
+    let mut inner: Vec<&Pattern> = Vec::new();
+    collect_effective(&pat.inner, grammar, depth, &mut inner);
+
+    let mut pos = from;
+    loop {
+        let Some(end_m) = re.find_at(text, pos).filter(|m| m.start() < limit) else {
+            // `\z` and friends: end never literally matches inside the text but
+            // we still want to close the block at the limit (EOF).
+            return (limit, limit);
+        };
+        // The earliest inner match that starts *before* this end candidate —
+        // anything at or after it is inside the next block, not this one.
+        let mut first: Option<(&Pattern, regex::Match)> = None;
+        for p in &inner {
+            let Some(m) = pattern_match_at(p, text, pos) else {
+                continue;
+            };
+            if m.start() >= end_m.start() || m.start() >= limit {
+                continue;
+            }
+            if first.as_ref().is_none_or(|(_, b)| m.start() < b.start()) {
+                first = Some((p, m));
+            }
         }
+        let Some((p, m)) = first else {
+            return (end_m.start(), end_m.end());
+        };
+        // How far that inner pattern consumes: a plain `match` covers its own
+        // span; a nested `begin`/`end` block runs to its own end.
+        let consumed = if p.match_re.is_some() || depth >= MAX_INCLUDE_DEPTH {
+            m.end()
+        } else {
+            find_end(p, grammar, text, m.end(), limit, depth + 1).1
+        };
+        // A zero-width or backwards result would spin here; give up and let the
+        // end candidate stand rather than loop forever.
+        if consumed <= pos {
+            return (end_m.start(), end_m.end());
+        }
+        pos = consumed;
     }
-    // `\z` and friends: end never literally matches inside the text but
-    // we still want to close the block at the limit (EOF).
-    (limit, limit)
 }
 
 fn load_grammar() -> Grammar {
