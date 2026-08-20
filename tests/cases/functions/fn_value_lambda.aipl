@@ -42,9 +42,9 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 152
 instructions executed: 512
-binary size: 3688
+binary size: 3696
   code: 1480
-    __eq_0: 296
+    __eq_i64$arr: 296
     __lambda_0: 8
     __lambda_1: 60
     __lambda_10: 92
@@ -54,7 +54,7 @@ binary size: 3688
     __map9$own0: 252
     main: 696
   data: 290
-  metadata: 1918
+  metadata: 1926
 builtin calls: 30
   aipl_arr_inc: 1
   aipl_array_dec: 3

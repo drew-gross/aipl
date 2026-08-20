@@ -41,7 +41,7 @@ bytes allocated: 200
 instructions executed: 248
 binary size: 3232
   code: 1520
-    __to_str_0: 180
+    __to_str_i64: 180
     main: 992
     parse: 348
   data: 27

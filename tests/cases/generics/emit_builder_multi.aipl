@@ -60,22 +60,22 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 160
 instructions executed: 626
-binary size: 5056
+binary size: 5088
   code: 3128
-    __arr_drop_0: 160
-    __arr_drop_2: 160
-    __arr_retain_0: 160
-    __arr_retain_2: 160
+    __arr_drop_Rule$TokA: 160
+    __arr_drop_Rule$TokB: 160
+    __arr_retain_Rule$TokA: 160
+    __arr_retain_Rule$TokB: 160
     __lambda_0: 92
     __lambda_1: 60
     __lambda_2: 60
     __lambda_3: 60
     __lambda_4: 92
     __lambda_5: 60
-    __to_str_1: 180
+    __to_str_i64: 180
     main: 1884
   data: 1
-  metadata: 1927
+  metadata: 1959
 builtin calls: 31
   aipl_array_dec: 2
   aipl_array_new: 2

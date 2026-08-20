@@ -90,16 +90,16 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1967
-binary size: 20064
+binary size: 20088
   code: 10172
     __builtin_value_or_err$char$i64: 92
     __test$map_err: 4988
-    __test_try_fail_0: 64
-    __test_try_fail_1: 64
-    __test_try_fail_2: 64
-    __to_str_3: 540
-    __to_str_4: 212
-    __to_str_5: 180
+    __test_try_fail_FmtError: 64
+    __test_try_fail_bool: 64
+    __test_try_fail_i64: 64
+    __to_str_FmtError: 540
+    __to_str_bool: 212
+    __to_str_i64: 180
     lex: 380
     main: 932
     map_err$char$i64$bool$lam25: 112
@@ -112,7 +112,7 @@ binary size: 20064
     map_err$str$LexError$str$lam10: 388
     map_err$str$LexError$str$lam21: 364
   data: 1719
-  metadata: 8173
+  metadata: 8197
 builtin calls: 274
   aipl_assert: 16
   aipl_char_at: 2

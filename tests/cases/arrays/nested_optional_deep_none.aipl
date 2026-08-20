@@ -46,15 +46,15 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 213
 instructions executed: 749
-binary size: 4976
+binary size: 5000
   code: 2308
-    __to_str_0: 680
-    __to_str_1: 516
+    __to_str_i64$opt$opt: 516
+    __to_str_i64$opt$opt$opt: 680
     main: 988
     ret_deep: 100
     show: 24
   data: 355
-  metadata: 2313
+  metadata: 2337
 builtin calls: 58
   aipl_array_dec: 1
   aipl_array_new: 1

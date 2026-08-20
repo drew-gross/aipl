@@ -81,16 +81,16 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 5118
-binary size: 5368
+binary size: 5400
   code: 2088
-    __eq_0: 92
-    __eq_1: 104
+    __eq___builtin_Span: 104
+    __eq___builtin_Span$opt: 92
     __test$find_trailing_whitespace: 1084
     find_trailing_whitespace: 560
     line_end_span: 176
     main: 72
   data: 1110
-  metadata: 2170
+  metadata: 2202
 builtin calls: 81
   aipl_assert: 12
   aipl_str_data: 11

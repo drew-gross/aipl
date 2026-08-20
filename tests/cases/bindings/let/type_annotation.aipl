@@ -86,21 +86,21 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 565
 instructions executed: 623
-binary size: 7760
+binary size: 7784
   code: 4152
-    __dict_drop_7: 128
-    __dict_retain_7: 128
-    __to_str_0: 180
-    __to_str_1: 180
-    __to_str_2: 180
-    __to_str_3: 180
-    __to_str_4: 180
-    __to_str_5: 180
-    __to_str_6: 180
-    __to_str_8: 180
+    __dict_drop_str$i64: 128
+    __dict_retain_str$i64: 128
+    __to_str_i16: 180
+    __to_str_i32: 180
+    __to_str_i64: 180
+    __to_str_i8: 180
+    __to_str_u16: 180
+    __to_str_u32: 180
+    __to_str_u64: 180
+    __to_str_u8: 180
     main: 2456
   data: 1
-  metadata: 3607
+  metadata: 3631
 builtin calls: 204
   aipl_array_dec: 2
   aipl_array_new: 1

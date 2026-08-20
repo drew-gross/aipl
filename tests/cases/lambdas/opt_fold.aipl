@@ -42,7 +42,7 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 384
 instructions executed: 2380
-binary size: 8216
+binary size: 8224
   code: 4304
     __builtin_opt_left_fold$char$i64$s0$lam11: 348
     __builtin_opt_left_fold$i64$i64$lam1: 344
@@ -50,15 +50,15 @@ binary size: 8216
     __builtin_opt_left_fold$i64$i64$lam7: 336
     __builtin_opt_left_fold$i64$i64$lam9: 348
     __builtin_opt_left_fold$str$str$s1$lam5: 736
-    __eq_0: 100
-    __eq_1: 148
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
     __lambda_10: 136
     __lambda_6: 88
     __test$parses_a_digit_run: 1232
     digits_to_int: 72
     main: 72
   data: 792
-  metadata: 3120
+  metadata: 3128
 builtin calls: 113
   aipl_arr_drop_str: 1
   aipl_array_dec: 5

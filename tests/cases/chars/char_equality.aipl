@@ -17,7 +17,7 @@ bytes allocated: 0
 instructions executed: 83
 binary size: 1488
   code: 408
-    __eq_0: 100
+    __eq_char$opt: 100
     main: 308
   data: 130
   metadata: 950

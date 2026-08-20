@@ -30,15 +30,15 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 480
 instructions executed: 1237
-binary size: 5040
+binary size: 5064
   code: 2592
-    __eq_0: 300
-    __eq_1: 148
-    __eq_2: 352
+    __eq_str$arr: 352
+    __eq_str$arr$arr: 300
+    __eq_str$opt: 148
     __test$grid3: 1720
     main: 72
   data: 200
-  metadata: 2248
+  metadata: 2272
 builtin calls: 109
   aipl_arr_drop_arr: 3
   aipl_arr_drop_str: 6

@@ -260,16 +260,16 @@ deallocations: 78
 reallocations: 0
 bytes allocated: 2981
 instructions executed: 11338
-binary size: 13248
+binary size: 13256
   code: 5040
-    __eq_0: 148
+    __eq_str$opt: 148
     __m2__parse_test_section_header: 696
     contains_section: 568
     fill_or_add_section: 784
     fill_section: 1464
     main: 1380
   data: 3041
-  metadata: 5167
+  metadata: 5175
 builtin calls: 1431
   aipl_arr_drop_str: 10
   aipl_array_dec: 10

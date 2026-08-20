@@ -46,15 +46,15 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 264
 instructions executed: 411
-binary size: 2744
+binary size: 2752
   code: 1228
-    __to_str_0: 180
-    __to_str_1: 180
+    __to_str_i64: 180
+    __to_str_u64: 180
     clamp_low: 20
     first_index_reaching: 408
     main: 440
   data: 1
-  metadata: 1515
+  metadata: 1523
 builtin calls: 60
   aipl_array_dec: 2
   aipl_array_new: 2

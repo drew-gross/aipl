@@ -37,7 +37,7 @@ bytes allocated: 80
 instructions executed: 148
 binary size: 2184
   code: 900
-    __to_str_0: 180
+    __to_str_i64: 180
     describe: 344
     main: 164
     safe_div: 212

@@ -58,7 +58,7 @@ binary size: 4240
     __builtin_count_while$char$s0$lam4: 232
     __builtin_int_parse: 744
     __builtin_opt_left_fold$char$i64$s0$lam3: 348
-    __eq_0: 100
+    __eq_i64$opt: 100
     __lambda_2: 140
     main: 840
   data: 158

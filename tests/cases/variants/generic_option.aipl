@@ -27,7 +27,7 @@ bytes allocated: 0
 instructions executed: 96
 binary size: 1256
   code: 404
-    __to_str_0: 180
+    __to_str_i64: 180
     main: 224
   data: 1
   metadata: 851

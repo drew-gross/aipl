@@ -22,14 +22,14 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 238
-binary size: 2176
+binary size: 2192
   code: 736
-    __eq_0: 100
-    __eq_1: 100
+    __eq_i64$opt: 100
+    __eq_i64$opt$opt: 100
     __test$eq_opt: 460
     main: 76
   data: 218
-  metadata: 1222
+  metadata: 1238
 builtin calls: 9
   aipl_assert: 6
   aipl_test_begin: 1

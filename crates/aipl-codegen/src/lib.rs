@@ -9305,12 +9305,11 @@ fn rec_drop_func<M: Module>(module: &mut M, elem_rc: &RefCell<ElemRc>, name: &st
     if let Some(id) = er.rec_drop_fns.get(name) {
         return *id;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let sym = er.symbol("__rec_drop_", name);
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // payload ptr
     let id = module
-        .declare_function(&format!("__rec_drop_{n}"), Linkage::Local, &sig)
+        .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare rec-drop helper");
     er.rec_drop_fns.insert(name.to_string(), id);
     er.rec_drop_pending.push((name.to_string(), id));
@@ -9512,14 +9511,13 @@ fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
     if let Some(id) = er.eq_fns.get(&key) {
         return *id;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let sym = er.symbol("__eq_", &type_symbol(ty));
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // lv
     sig.params.push(AbiParam::new(types::I64)); // rv
     sig.returns.push(AbiParam::new(types::I64)); // 0/1
     let id = module
-        .declare_function(&format!("__eq_{n}"), Linkage::Local, &sig)
+        .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare eq helper");
     er.eq_fns.insert(key, id);
     er.eq_pending.push((ty.clone(), id));
@@ -10668,16 +10666,17 @@ fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &Type) -> (FuncId, FuncI
     if let Some(ids) = er.fns.get(&key) {
         return *ids;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let elem_sym = type_symbol(elem);
+    let drop_sym = er.symbol("__arr_drop_", &elem_sym);
+    let retain_sym = er.symbol("__arr_retain_", &elem_sym);
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // elems
     sig.params.push(AbiParam::new(types::I64)); // len
     let drop_id = module
-        .declare_function(&format!("__arr_drop_{n}"), Linkage::Local, &sig)
+        .declare_function(&drop_sym, Linkage::Local, &sig)
         .expect("declare elem drop");
     let retain_id = module
-        .declare_function(&format!("__arr_retain_{n}"), Linkage::Local, &sig)
+        .declare_function(&retain_sym, Linkage::Local, &sig)
         .expect("declare elem retain");
     er.fns.insert(key, (drop_id, retain_id));
     er.pending.push((elem.clone(), drop_id, retain_id));
@@ -10693,16 +10692,17 @@ fn pair_rc_ids<M: Module>(module: &mut M, cx: Cx, k: &Type, v: &Type) -> (FuncId
     if let Some(ids) = er.pair_fns.get(&key) {
         return *ids;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let pair_sym = format!("{}${}", type_symbol(k), type_symbol(v));
+    let drop_sym = er.symbol("__dict_drop_", &pair_sym);
+    let retain_sym = er.symbol("__dict_retain_", &pair_sym);
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // elems
     sig.params.push(AbiParam::new(types::I64)); // len
     let drop_id = module
-        .declare_function(&format!("__dict_drop_{n}"), Linkage::Local, &sig)
+        .declare_function(&drop_sym, Linkage::Local, &sig)
         .expect("declare pair drop");
     let retain_id = module
-        .declare_function(&format!("__dict_retain_{n}"), Linkage::Local, &sig)
+        .declare_function(&retain_sym, Linkage::Local, &sig)
         .expect("declare pair retain");
     er.pair_fns.insert(key, (drop_id, retain_id));
     er.pair_pending
@@ -11865,13 +11865,12 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
     if let Some(id) = er.tostr_fns.get(&key) {
         return *id;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let sym = er.symbol("__to_str_", &type_symbol(ty));
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // value
     sig.returns.push(AbiParam::new(types::I64)); // str
     let id = module
-        .declare_function(&format!("__to_str_{n}"), Linkage::Local, &sig)
+        .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare to_str helper");
     er.tostr_fns.insert(key, id);
     er.tostr_pending.push((ty.clone(), id));
@@ -11887,12 +11886,11 @@ fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &Type) -> FuncId {
     if let Some(id) = er.test_fail_fns.get(&key) {
         return *id;
     }
-    let n = er.ctr;
-    er.ctr += 1;
+    let sym = er.symbol("__test_try_fail_", &type_symbol(err_ty));
     let mut sig = module.make_signature();
     sig.params.push(AbiParam::new(types::I64)); // err payload (scalar/str value, or struct ptr)
     let id = module
-        .declare_function(&format!("__test_try_fail_{n}"), Linkage::Local, &sig)
+        .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare test-fail helper");
     er.test_fail_fns.insert(key, id);
     er.test_fail_pending.push((err_ty.clone(), id));
@@ -12374,6 +12372,91 @@ struct ElemRc {
     rec_drop_fns: HashMap<String, FuncId>,
     rec_drop_pending: Vec<(String, FuncId)>,
     ctr: u32,
+    // Every generated helper symbol handed out so far. The names carry the type
+    // they serve (`__to_str_Point`), which reads far better in a disassembly or
+    // a `--- performance ---` section than a bare counter — but two distinct
+    // types can mangle to one fragment (`arr[]` and the generic instance
+    // `arr<arr>` both give `arr$arr`), and `Module::declare_function` hands back
+    // the *same* `FuncId` for a repeated name+signature, which would silently
+    // fuse two types' helpers. So every name is checked here and disambiguated
+    // with the counter if it's taken.
+    used_symbols: HashSet<String>,
+}
+
+/// A symbol-safe fragment naming `ty`, for the generated per-type helpers
+/// (`__to_str_<ty>`, `__eq_<ty>`, `__arr_drop_<ty>`, ...). Object-file symbols
+/// can't carry the punctuation `type_name` uses, so each shape is spelled with
+/// `$` — the separator mono already uses for generic instances (`Foo$i64`).
+///
+/// Built by recursing on the *type*, not by sanitizing `type_name`'s string:
+/// stripping punctuation alone would erase the difference between a set and its
+/// element (`#{str}` and `str` both reduce to `str`), and between a dict and a
+/// two-field shape. Spelling the containers out keeps distinct types distinct
+/// and reads better besides — `dict$str$i64$arr` over `str$i64$arr`.
+fn type_symbol(ty: &Type) -> String {
+    match ty {
+        Type::Primitive(p) => p.name().to_string(),
+        Type::Named(n) => sanitize_symbol(n),
+        Type::Optional(inner) => format!("{}$opt", type_symbol(inner)),
+        Type::Array(inner) => format!("{}$arr", type_symbol(inner)),
+        Type::Set(inner) => format!("set${}", type_symbol(inner)),
+        Type::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
+        Type::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
+        Type::Fn(params, ret) => {
+            let ps = params.iter().map(type_symbol).collect::<Vec<_>>().join("$");
+            format!("fn${ps}$to${}", type_symbol(ret))
+        }
+        Type::Tuple(elems) => {
+            let es = elems.iter().map(type_symbol).collect::<Vec<_>>().join("$");
+            format!("tuple${es}")
+        }
+        Type::Generic(name, args) => {
+            let as_ = args.iter().map(type_symbol).collect::<Vec<_>>().join("$");
+            format!("{}${as_}", sanitize_symbol(name))
+        }
+        // Unit and the compiler pseudo-types. None of these reaches a generated
+        // helper today, but naming them keeps this exhaustive, so a new `Type`
+        // variant has to make a decision here rather than silently collapsing
+        // onto another type's symbol.
+        Type::Unit => "unit".to_string(),
+        Type::Any => "any".to_string(),
+        Type::NoneInner => "none".to_string(),
+        Type::EmptyArrayArg => "empty_arr".to_string(),
+        Type::NoneLiteralArg => "none_lit".to_string(),
+        Type::ConcatStr => "concat_str".to_string(),
+    }
+}
+
+/// A declared type's name, with anything an object-file symbol can't carry
+/// replaced by `$`. Mono's synthetic names already use `$` (`Foo$i64`) and the
+/// loader's per-file mangling uses `_` (`__m1__Point`), so in practice this
+/// passes both through untouched.
+fn sanitize_symbol(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '$'
+            }
+        })
+        .collect()
+}
+
+impl ElemRc {
+    /// A unique symbol for a generated helper: `<prefix><ty>`, falling back to
+    /// `<prefix><ty>$<n>` when that name is already spoken for (see
+    /// `used_symbols`).
+    fn symbol(&mut self, prefix: &str, ty: &str) -> String {
+        let mut name = format!("{prefix}{ty}");
+        if !self.used_symbols.insert(name.clone()) {
+            let n = self.ctr;
+            self.ctr += 1;
+            name = format!("{prefix}{ty}${n}");
+            self.used_symbols.insert(name.clone());
+        }
+        name
+    }
 }
 
 /// Emit a direct call to `info` with `args` (already including any receiver as

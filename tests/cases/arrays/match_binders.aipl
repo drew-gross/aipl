@@ -60,8 +60,8 @@ bytes allocated: 336
 instructions executed: 687
 binary size: 6072
   code: 3476
-    __to_str_0: 180
-    __to_str_1: 184
+    __to_str_char: 184
+    __to_str_i64: 180
     classify: 912
     main: 1868
     sum_head: 332

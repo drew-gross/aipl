@@ -49,13 +49,13 @@ deallocations: 38
 reallocations: 0
 bytes allocated: 1736
 instructions executed: 2668
-binary size: 15280
+binary size: 15288
   code: 9116
-    __eq_0: 296
+    __eq_i64$arr: 296
     __test$has_header: 8748
     main: 72
   data: 1316
-  metadata: 4848
+  metadata: 4856
 builtin calls: 144
   aipl_arr_drop_arr: 6
   aipl_arr_drop_str: 4

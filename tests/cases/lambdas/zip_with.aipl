@@ -48,10 +48,10 @@ deallocations: 8
 reallocations: 12
 bytes allocated: 352
 instructions executed: 2677
-binary size: 5944
+binary size: 5952
   code: 3936
     __lambda_7: 8
-    __to_str_0: 180
+    __to_str_i64: 180
     __zip1: 464
     __zip3: 464
     __zip5: 464
@@ -60,7 +60,7 @@ binary size: 5944
     main: 668
     show: 252
   data: 1
-  metadata: 2007
+  metadata: 2015
 builtin calls: 151
   aipl_arr_inc: 5
   aipl_array_dec: 13

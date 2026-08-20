@@ -74,14 +74,14 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 265
 instructions executed: 727
-binary size: 4240
+binary size: 4248
   code: 2172
-    __to_str_0: 672
-    __to_str_1: 672
-    __to_str_2: 180
+    __to_str_i64$arr: 672
+    __to_str_u64: 180
+    __to_str_u64$arr: 672
     main: 648
   data: 139
-  metadata: 1929
+  metadata: 1937
 builtin calls: 45
   aipl_arr_sort: 1
   aipl_array_dec: 5

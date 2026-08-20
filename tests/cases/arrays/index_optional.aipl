@@ -26,7 +26,7 @@ bytes allocated: 56
 instructions executed: 236
 binary size: 2792
   code: 1256
-    __eq_0: 100
+    __eq_i64$opt: 100
     __test$at: 1088
     main: 68
   data: 233

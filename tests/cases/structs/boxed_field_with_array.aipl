@@ -126,25 +126,25 @@ deallocations: 83
 reallocations: 0
 bytes allocated: 3678
 instructions executed: 11714
-binary size: 18136
+binary size: 18168
   code: 9048
-    __arr_drop_4: 116
-    __arr_drop_7: 116
-    __arr_retain_4: 116
-    __arr_retain_7: 116
-    __rec_drop_0: 44
-    __rec_drop_2: 84
-    __rec_drop_6: 92
-    __to_str_1: 1024
-    __to_str_3: 1600
-    __to_str_5: 1108
-    __to_str_8: 1408
-    __to_str_9: 664
+    __arr_drop_List: 116
+    __arr_drop_Node: 116
+    __arr_retain_List: 116
+    __arr_retain_Node: 116
+    __rec_drop_List: 44
+    __rec_drop_Node: 92
+    __rec_drop_Rule: 84
+    __to_str_Both: 1024
+    __to_str_List: 664
+    __to_str_Mixed: 1108
+    __to_str_Node: 1408
+    __to_str_Rule: 1600
     leaf: 164
     main: 2292
     sum: 104
   data: 1229
-  metadata: 7859
+  metadata: 7891
 builtin calls: 1086
   aipl_arr_inc: 14
   aipl_array_dec: 21

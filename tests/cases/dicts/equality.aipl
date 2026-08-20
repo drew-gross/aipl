@@ -16,18 +16,18 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 816
 instructions executed: 857
-binary size: 6824
+binary size: 6888
   code: 3536
-    __dict_drop_0: 128
-    __dict_drop_2: 128
-    __dict_retain_0: 128
-    __dict_retain_2: 128
-    __eq_1: 300
-    __eq_3: 256
-    __eq_4: 296
+    __dict_drop_i64$i64$arr: 128
+    __dict_drop_i64$str: 128
+    __dict_retain_i64$i64$arr: 128
+    __dict_retain_i64$str: 128
+    __eq_dict$i64$i64$arr: 256
+    __eq_dict$i64$str: 300
+    __eq_i64$arr: 296
     main: 2172
   data: 326
-  metadata: 2962
+  metadata: 3026
 builtin calls: 131
   aipl_arr_inc: 4
   aipl_array_dec: 20

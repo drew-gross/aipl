@@ -344,17 +344,17 @@ deallocations: 293
 reallocations: 0
 bytes allocated: 16748
 instructions executed: 25076
-binary size: 30160
+binary size: 30168
   code: 16956
-    __arr_drop_1: 116
-    __arr_retain_1: 116
+    __arr_drop_Doc: 116
+    __arr_retain_Doc: 116
     __builtin_any$Doc$lam3: 260
     __builtin_count_while$char$s0$lam15: 232
     __builtin_count_while$char$s0$lam25: 232
     __m1__reindent_block: 3380
     __map17$own0: 320
-    __rec_drop_0: 184
-    __rec_drop_2: 84
+    __rec_drop_Doc: 184
+    __rec_drop_Work: 84
     col_after: 448
     fits: 1660
     fits_atom: 176
@@ -363,7 +363,7 @@ binary size: 30160
     main: 3544
     print_doc: 1328
   data: 842
-  metadata: 12362
+  metadata: 12370
 builtin calls: 4992
   aipl_arr_drop_str: 83
   aipl_arr_inc: 87

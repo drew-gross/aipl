@@ -46,14 +46,14 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 256
-binary size: 3456
+binary size: 3472
   code: 1568
-    __to_str_0: 436
+    __to_str_unit$err$str: 436
     check_positive: 192
     main: 644
     validate: 296
   data: 131
-  metadata: 1757
+  metadata: 1773
 builtin calls: 29
   aipl_concat_lazy: 1
   aipl_dec: 13

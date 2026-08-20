@@ -49,14 +49,14 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 704
 instructions executed: 2622
-binary size: 13192
+binary size: 13208
   code: 8708
-    __dict_drop_0: 128
-    __dict_retain_0: 128
+    __dict_drop_i64$str: 128
+    __dict_retain_i64$str: 128
     main: 8368
     opt: 84
   data: 957
-  metadata: 3527
+  metadata: 3543
 builtin calls: 128
   aipl_array_dec: 12
   aipl_array_new: 4

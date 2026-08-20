@@ -17,7 +17,7 @@ bytes allocated: 0
 instructions executed: 63
 binary size: 1224
   code: 296
-    __eq_0: 104
+    __eq_Point: 104
     main: 192
   data: 99
   metadata: 829

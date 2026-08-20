@@ -25,13 +25,13 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 216
-binary size: 2272
+binary size: 2280
   code: 712
-    __eq_0: 104
-    __eq_1: 152
+    __eq_Named: 152
+    __eq_Point: 104
     main: 456
   data: 226
-  metadata: 1334
+  metadata: 1342
 builtin calls: 23
   aipl_assert: 5
   aipl_dec: 7

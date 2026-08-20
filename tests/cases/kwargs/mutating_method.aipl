@@ -21,7 +21,7 @@ bytes allocated: 144
 instructions executed: 138
 binary size: 2048
   code: 776
-    __to_str_0: 180
+    __to_str_u64: 180
     extend: 200
     main: 396
   data: 1

@@ -107,6 +107,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  why does nextest listing take so long?
   tail call elimination
   we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass
@@ -187,7 +188,6 @@ effects:
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
-  rename to_str functions in code to show what they are to_str'ing
 
 recovering check:
   check should error on lint failures, but still run tests and report results

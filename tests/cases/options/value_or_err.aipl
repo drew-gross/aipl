@@ -47,7 +47,7 @@ binary size: 4208
     __builtin_value_or_err$char$i64: 92
     __builtin_value_or_err$char$str: 180
     __builtin_value_or_err$i64$str: 180
-    __to_str_0: 180
+    __to_str_i64: 180
     describe: 408
     first_digit: 448
     main: 624

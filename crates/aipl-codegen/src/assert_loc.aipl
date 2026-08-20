@@ -34,7 +34,7 @@ bytes allocated: 543
 instructions executed: 534
 binary size: 5352
   code: 1620
-    __to_str_0: 180
+    __to_str_u64: 180
     assert_loc: 564
     main: 876
   data: 916

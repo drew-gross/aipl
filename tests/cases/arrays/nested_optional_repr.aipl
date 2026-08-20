@@ -46,15 +46,15 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 90
 instructions executed: 606
-binary size: 6672
+binary size: 6712
   code: 2980
-    __to_str_0: 836
-    __to_str_1: 212
-    __to_str_2: 180
-    __to_str_3: 912
+    __to_str_bool: 212
+    __to_str_i64: 180
+    __to_str_i64$opt$opt$opt$opt: 836
+    __to_str_str$opt$opt$opt$opt: 912
     main: 840
   data: 619
-  metadata: 3073
+  metadata: 3113
 builtin calls: 53
   aipl_dec: 12
   aipl_i64_len: 4

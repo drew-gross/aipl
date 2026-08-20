@@ -87,12 +87,12 @@ deallocations: 111
 reallocations: 27
 bytes allocated: 4352
 instructions executed: 7886
-binary size: 24328
+binary size: 24344
   code: 14824
-    __arr_drop_2: 140
-    __arr_retain_2: 140
-    __eq_0: 296
-    __eq_1: 352
+    __arr_drop_E: 140
+    __arr_retain_E: 140
+    __eq_i64$arr: 296
+    __eq_str$arr: 352
     main: 2648
     sort_by$E$lam17: 1408
     sort_by$i64$lam1: 1072
@@ -105,7 +105,7 @@ binary size: 24328
     sort_by$i64$lam9: 1072
     sort_by$str$lam15: 1264
   data: 754
-  metadata: 8750
+  metadata: 8766
 builtin calls: 901
   aipl_arr_drop_str: 13
   aipl_arr_extend: 27

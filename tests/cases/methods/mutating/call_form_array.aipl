@@ -17,13 +17,13 @@ deallocations: 5
 reallocations: 0
 bytes allocated: 240
 instructions executed: 365
-binary size: 2616
+binary size: 2624
   code: 1096
-    __eq_0: 296
+    __eq_i64$arr: 296
     extend: 280
     main: 520
   data: 85
-  metadata: 1435
+  metadata: 1443
 builtin calls: 29
   aipl_arr_inc: 6
   aipl_array_dec: 12

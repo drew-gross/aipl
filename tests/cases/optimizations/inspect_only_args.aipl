@@ -64,7 +64,7 @@ bytes allocated: 64
 instructions executed: 1316
 binary size: 3552
   code: 1208
-    __to_str_0: 180
+    __to_str_i64: 180
     count_ones: 212
     main: 632
     total: 184

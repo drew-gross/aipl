@@ -103,7 +103,7 @@ function u0:35(i64, i64) -> i64 apple_aarch64 {
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:29 sig2  ; aipl_str_split
     fn3 = u0:31 sig3  ; aipl_trim
-    fn4 = colocated u0:169 sig4  ; __to_str_0
+    fn4 = colocated u0:169 sig4  ; __to_str_u64
     fn5 = u0:12 sig5  ; aipl_concat
     fn6 = u0:12 sig6  ; aipl_concat
     fn7 = u0:12 sig7  ; aipl_concat
@@ -192,18 +192,18 @@ function u0:36(i64, i64, i64) -> i64 apple_aarch64 {
     sig30 = (i64, i64) -> i64 apple_aarch64
     sig31 = (i64) apple_aarch64
     fn0 = colocated u0:87 sig0  ; __m11__line_at
-    fn1 = colocated u0:169 sig1  ; __to_str_0
+    fn1 = colocated u0:169 sig1  ; __to_str_u64
     fn2 = u0:26 sig2  ; aipl_str_len
     fn3 = u0:27 sig3  ; aipl_str_repeat
     fn4 = u0:15 sig4  ; aipl_inc
     fn5 = u0:12 sig5  ; aipl_concat
     fn6 = u0:12 sig6  ; aipl_concat
-    fn7 = colocated u0:169 sig7  ; __to_str_0
+    fn7 = colocated u0:169 sig7  ; __to_str_u64
     fn8 = u0:12 sig8  ; aipl_concat
-    fn9 = colocated u0:169 sig9  ; __to_str_0
+    fn9 = colocated u0:169 sig9  ; __to_str_u64
     fn10 = u0:12 sig10  ; aipl_concat
     fn11 = u0:12 sig11  ; aipl_concat
-    fn12 = colocated u0:169 sig12  ; __to_str_0
+    fn12 = colocated u0:169 sig12  ; __to_str_u64
     fn13 = u0:12 sig13  ; aipl_concat
     fn14 = u0:28 sig14  ; aipl_str_slice
     fn15 = u0:12 sig15  ; aipl_concat
@@ -436,15 +436,15 @@ function u0:37(i64, i64) apple_aarch64 {
     fn7 = u0:13 sig7  ; aipl_concat_lazy
     fn8 = u0:14 sig8  ; aipl_dec
     fn9 = colocated u0:100 sig9  ; __m4__trim_end_while$lam1
-    fn10 = colocated u0:170 sig10  ; __arr_drop_1
-    fn11 = colocated u0:171 sig11  ; __arr_retain_1
+    fn10 = colocated u0:170 sig10  ; __arr_drop___m24__Companion
+    fn11 = colocated u0:171 sig11  ; __arr_retain___m24__Companion
     fn12 = u0:8 sig12  ; aipl_array_push
     fn13 = u0:6 sig13  ; aipl_array_dec
     fn14 = u0:30 sig14  ; aipl_str_starts_with
     fn15 = colocated u0:38 sig15  ; __m24__companion_path
     fn16 = colocated u0:102 sig16  ; __m4__trim_end_while$lam3
-    fn17 = colocated u0:170 sig17  ; __arr_drop_1
-    fn18 = colocated u0:171 sig18  ; __arr_retain_1
+    fn17 = colocated u0:170 sig17  ; __arr_drop___m24__Companion
+    fn18 = colocated u0:171 sig18  ; __arr_retain___m24__Companion
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -1236,15 +1236,15 @@ function u0:40(i64, i64, i64) -> i64 apple_aarch64 {
     fn1 = u0:24 sig1  ; aipl_str_iter_next
     fn2 = u0:28 sig2  ; aipl_str_slice
     fn3 = colocated u0:90 sig3  ; __m6__parse_test_section_header
-    fn4 = colocated u0:172 sig4  ; __eq_2
+    fn4 = colocated u0:172 sig4  ; __eq_str$opt
     fn5 = u0:15 sig5  ; aipl_inc
     fn6 = u0:13 sig6  ; aipl_concat_lazy
     fn7 = u0:14 sig7  ; aipl_dec
-    fn8 = colocated u0:172 sig8  ; __eq_2
+    fn8 = colocated u0:172 sig8  ; __eq_str$opt
     fn9 = u0:26 sig9  ; aipl_str_len
     fn10 = colocated u0:90 sig10  ; __m6__parse_test_section_header
-    fn11 = colocated u0:172 sig11  ; __eq_2
-    fn12 = colocated u0:172 sig12  ; __eq_2
+    fn11 = colocated u0:172 sig11  ; __eq_str$opt
+    fn12 = colocated u0:172 sig12  ; __eq_str$opt
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 1
@@ -1612,7 +1612,7 @@ function u0:41(i64, i64) -> i64 apple_aarch64 {
     fn1 = u0:29 sig1  ; aipl_str_split
     fn2 = u0:1 sig2  ; aipl_arr_elem_ptr
     fn3 = colocated u0:90 sig3  ; __m6__parse_test_section_header
-    fn4 = colocated u0:172 sig4  ; __eq_2
+    fn4 = colocated u0:172 sig4  ; __eq_str$opt
     fn5 = u0:6 sig5  ; aipl_array_dec
     fn6 = u0:14 sig6  ; aipl_dec
 
@@ -5994,7 +5994,7 @@ function u0:60() -> i64 apple_aarch64 {
     fn28 = colocated u0:57 sig28  ; __m19__raw_tpl_kind
     fn29 = colocated u0:128 sig29  ; __lambda_31
     fn30 = colocated u0:55 sig30  ; __m19__tpl_kind
-    fn31 = colocated u0:173 sig31  ; __arr_drop_3
+    fn31 = colocated u0:173 sig31  ; __arr_drop___m18__TokenRule$__m19__AiplTok
     fn32 = u0:7 sig32  ; aipl_array_new
     fn33 = u0:14 sig33  ; aipl_dec
 
@@ -21819,7 +21819,7 @@ function u0:73(i64, i64) -> i64 apple_aarch64 {
     sig11 = (i64) -> i64 apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:175 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_char$opt
     fn3 = colocated u0:142 sig3  ; __builtin_is_some_and$char$lam49
     fn4 = u0:26 sig4  ; aipl_str_len
     fn5 = u0:28 sig5  ; aipl_str_slice
@@ -22054,7 +22054,7 @@ function u0:75(i64) -> i64 apple_aarch64 {
     sig7 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:175 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_char$opt
     fn3 = colocated u0:142 sig3  ; __builtin_is_some_and$char$lam49
     fn4 = u0:26 sig4  ; aipl_str_len
     fn5 = u0:28 sig5  ; aipl_str_slice
@@ -27895,13 +27895,13 @@ function u0:93(i64, i64) apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:175 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_char$opt
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = colocated u0:90 sig5  ; __m6__parse_test_section_header
-    fn6 = colocated u0:172 sig6  ; __eq_2
+    fn6 = colocated u0:172 sig6  ; __eq_str$opt
     fn7 = u0:14 sig7  ; aipl_dec
     fn8 = colocated u0:90 sig8  ; __m6__parse_test_section_header
-    fn9 = colocated u0:172 sig9  ; __eq_2
+    fn9 = colocated u0:172 sig9  ; __eq_str$opt
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -28143,13 +28143,13 @@ function u0:94(i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:175 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_char$opt
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = colocated u0:90 sig5  ; __m6__parse_test_section_header
-    fn6 = colocated u0:172 sig6  ; __eq_2
+    fn6 = colocated u0:172 sig6  ; __eq_str$opt
     fn7 = u0:14 sig7  ; aipl_dec
     fn8 = colocated u0:90 sig8  ; __m6__parse_test_section_header
-    fn9 = colocated u0:172 sig9  ; __eq_2
+    fn9 = colocated u0:172 sig9  ; __eq_str$opt
 
 block0(v0: i64):
     v1 = iconst.i64 0
@@ -28332,7 +28332,7 @@ function u0:95(i64, i64) -> i64 apple_aarch64 {
     sig5 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_inc
     fn1 = u0:11 sig1  ; aipl_char_at
-    fn2 = colocated u0:175 sig2  ; __eq_4
+    fn2 = colocated u0:175 sig2  ; __eq_char$opt
     fn3 = u0:26 sig3  ; aipl_str_len
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:14 sig5  ; aipl_dec
@@ -28388,7 +28388,7 @@ function u0:96(i64, i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:175 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_char$opt
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:14 sig5  ; aipl_dec
 
@@ -28502,7 +28502,7 @@ function u0:98(i64) -> i64 apple_aarch64 {
     fn0 = u0:26 sig0  ; aipl_str_len
     fn1 = u0:15 sig1  ; aipl_inc
     fn2 = u0:11 sig2  ; aipl_char_at
-    fn3 = colocated u0:175 sig3  ; __eq_4
+    fn3 = colocated u0:175 sig3  ; __eq_char$opt
     fn4 = u0:28 sig4  ; aipl_str_slice
     fn5 = u0:13 sig5  ; aipl_concat_lazy
     fn6 = u0:21 sig6  ; aipl_str_eq
@@ -30571,11 +30571,11 @@ function u0:129(i64, i64, i64) apple_aarch64 {
     fn5 = u0:6 sig5  ; aipl_array_dec
     fn6 = u0:14 sig6  ; aipl_dec
     fn7 = u0:1 sig7  ; aipl_arr_elem_ptr
-    fn8 = colocated u0:176 sig8  ; __arr_drop_5
-    fn9 = colocated u0:177 sig9  ; __arr_retain_5
+    fn8 = colocated u0:176 sig8  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn9 = colocated u0:177 sig9  ; __arr_retain___m18__Token$__m19__AiplTok
     fn10 = u0:8 sig10  ; aipl_array_push
-    fn11 = colocated u0:176 sig11  ; __arr_drop_5
-    fn12 = colocated u0:177 sig12  ; __arr_retain_5
+    fn11 = colocated u0:176 sig11  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn12 = colocated u0:177 sig12  ; __arr_retain___m18__Token$__m19__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -39189,8 +39189,8 @@ function u0:160(i64, i64, i64, i64, i64) apple_aarch64 {
     fn5 = colocated u0:76 sig5  ; __m18__token_value
     fn6 = colocated u0:162 sig6  ; __m18__apply_emit$__m19__AiplTok
     fn7 = u0:14 sig7  ; aipl_dec
-    fn8 = colocated u0:176 sig8  ; __arr_drop_5
-    fn9 = colocated u0:176 sig9  ; __arr_drop_5
+    fn8 = colocated u0:176 sig8  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn9 = colocated u0:176 sig9  ; __arr_drop___m18__Token$__m19__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64):
     v5 = iconst.i64 0
@@ -43201,8 +43201,8 @@ function u0:163(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn13 = u0:0 sig13  ; aipl_arr_drop_str
     fn14 = u0:3 sig14  ; aipl_arr_retain_ptr
     fn15 = colocated u0:165 sig15  ; __m18__interp_scan$__m19__AiplTok
-    fn16 = colocated u0:178 sig16  ; __arr_drop_6
-    fn17 = colocated u0:179 sig17  ; __arr_retain_6
+    fn16 = colocated u0:178 sig16  ; __arr_drop___m18__StepResult$__m19__AiplTok
+    fn17 = colocated u0:179 sig17  ; __arr_retain___m18__StepResult$__m19__AiplTok
     fn18 = colocated u0:167 sig18  ; __builtin_is_some_and$char$lam68
     fn19 = u0:13 sig19  ; aipl_concat_lazy
 
@@ -43864,13 +43864,13 @@ function u0:164(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn4 = colocated u0:168 sig5  ; __m18__seg_emit$__m19__AiplTok
     fn5 = u0:6 sig6  ; aipl_array_dec
     fn6 = u0:14 sig7  ; aipl_dec
-    fn7 = colocated u0:176 sig8  ; __arr_drop_5
-    fn8 = colocated u0:177 sig9  ; __arr_retain_5
+    fn7 = colocated u0:176 sig8  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn8 = colocated u0:177 sig9  ; __arr_retain___m18__Token$__m19__AiplTok
     fn9 = u0:8 sig10  ; aipl_array_push
-    fn10 = colocated u0:176 sig11  ; __arr_drop_5
-    fn11 = colocated u0:177 sig12  ; __arr_retain_5
-    fn12 = colocated u0:176 sig13  ; __arr_drop_5
-    fn13 = colocated u0:177 sig14  ; __arr_retain_5
+    fn10 = colocated u0:176 sig11  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn11 = colocated u0:177 sig12  ; __arr_retain___m18__Token$__m19__AiplTok
+    fn12 = colocated u0:176 sig13  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn13 = colocated u0:177 sig14  ; __arr_retain___m18__Token$__m19__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64):
     call fn0(v3)
@@ -45343,14 +45343,14 @@ function u0:165(i64, i64, i64, i64, i64) apple_aarch64 {
     fn4 = u0:6 sig4  ; aipl_array_dec
     fn5 = u0:14 sig5  ; aipl_dec
     fn6 = u0:11 sig6  ; aipl_char_at
-    fn7 = colocated u0:175 sig7  ; __eq_4
+    fn7 = colocated u0:175 sig7  ; __eq_char$opt
     fn8 = colocated u0:158 sig8  ; __m18__lex_step$__m19__AiplTok
     fn9 = u0:1 sig9  ; aipl_arr_elem_ptr
-    fn10 = colocated u0:176 sig10  ; __arr_drop_5
-    fn11 = colocated u0:177 sig11  ; __arr_retain_5
+    fn10 = colocated u0:176 sig10  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn11 = colocated u0:177 sig11  ; __arr_retain___m18__Token$__m19__AiplTok
     fn12 = u0:8 sig12  ; aipl_array_push
-    fn13 = colocated u0:176 sig13  ; __arr_drop_5
-    fn14 = colocated u0:177 sig14  ; __arr_retain_5
+    fn13 = colocated u0:176 sig13  ; __arr_drop___m18__Token$__m19__AiplTok
+    fn14 = colocated u0:177 sig14  ; __arr_retain___m18__Token$__m19__AiplTok
     fn15 = u0:28 sig15  ; aipl_str_slice
     fn16 = u0:21 sig16  ; aipl_str_eq
 
@@ -48062,7 +48062,7 @@ block1(v5: i64):
 ;   v4 = $inl118_span
 ;   v553 = f
 ;   v4 = $inl119_span
-; __arr_drop_1
+; __arr_drop___m24__Companion
 function u0:170(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48100,7 +48100,7 @@ block3:
     return
 }
 
-; __arr_retain_1
+; __arr_retain___m24__Companion
 function u0:171(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48138,7 +48138,7 @@ block3:
     return
 }
 
-; __arr_drop_3
+; __arr_drop___m18__TokenRule$__m19__AiplTok
 function u0:173(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48372,7 +48372,7 @@ block3:
     return
 }
 
-; __arr_retain_3
+; __arr_retain___m18__TokenRule$__m19__AiplTok
 function u0:174(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48606,7 +48606,7 @@ block3:
     return
 }
 
-; __arr_drop_5
+; __arr_drop___m18__Token$__m19__AiplTok
 function u0:176(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48726,7 +48726,7 @@ block3:
     return
 }
 
-; __arr_retain_5
+; __arr_retain___m18__Token$__m19__AiplTok
 function u0:177(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48846,7 +48846,7 @@ block3:
     return
 }
 
-; __arr_drop_6
+; __arr_drop___m18__StepResult$__m19__AiplTok
 function u0:178(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48884,7 +48884,7 @@ block3:
     return
 }
 
-; __arr_retain_6
+; __arr_retain___m18__StepResult$__m19__AiplTok
 function u0:179(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48922,7 +48922,7 @@ block3:
     return
 }
 
-; __eq_2
+; __eq_str$opt
 function u0:172(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
@@ -48966,7 +48966,7 @@ block2:
     return v16
 }
 
-; __eq_4
+; __eq_char$opt
 function u0:175(i64, i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
 
@@ -49005,7 +49005,7 @@ block2:
     return v17
 }
 
-; __to_str_0
+; __to_str_u64
 function u0:169(i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8

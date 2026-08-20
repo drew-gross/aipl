@@ -93,7 +93,7 @@ instructions executed: 4456
 binary size: 9200
   code: 3512
     __m1__line_at: 596
-    __to_str_0: 180
+    __to_str_u64: 180
     caret_block: 1796
     main: 940
   data: 1720

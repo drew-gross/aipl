@@ -33,15 +33,15 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 334
-binary size: 3064
+binary size: 3088
   code: 1284
-    __eq_0: 92
-    __eq_1: 92
-    __eq_2: 104
-    __eq_3: 152
+    __eq_Named: 152
+    __eq_Named$opt: 92
+    __eq_Point: 104
+    __eq_Point$opt: 92
     main: 844
   data: 278
-  metadata: 1502
+  metadata: 1526
 builtin calls: 29
   aipl_assert: 5
   aipl_dec: 11

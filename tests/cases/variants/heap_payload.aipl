@@ -26,7 +26,7 @@ bytes allocated: 80
 instructions executed: 231
 binary size: 3464
   code: 1316
-    __to_str_0: 180
+    __to_str_i64: 180
     describe: 348
     main: 788
   data: 263

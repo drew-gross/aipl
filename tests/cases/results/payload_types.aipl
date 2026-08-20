@@ -92,24 +92,24 @@ deallocations: 18
 reallocations: 0
 bytes allocated: 800
 instructions executed: 3570
-binary size: 26864
+binary size: 27064
   code: 14216
-    __dict_drop_13: 128
-    __dict_retain_13: 128
-    __eq_10: 156
-    __eq_14: 256
-    __to_str_0: 540
-    __to_str_1: 540
-    __to_str_11: 212
-    __to_str_12: 360
-    __to_str_2: 708
-    __to_str_3: 1244
-    __to_str_4: 1012
-    __to_str_5: 1148
-    __to_str_6: 864
-    __to_str_7: 804
-    __to_str_8: 540
-    __to_str_9: 924
+    __dict_drop_str$i64: 128
+    __dict_retain_str$i64: 128
+    __eq_set$i64: 256
+    __eq_set$i64$err$Error: 156
+    __to_str_Point$err$Error: 864
+    __to_str_Shape$err$Error: 804
+    __to_str___tuple$i64$str$err$Error: 924
+    __to_str_bool: 212
+    __to_str_dict$str$i64$err$Error: 1148
+    __to_str_i64$err$Error: 540
+    __to_str_i64$opt: 360
+    __to_str_i64$opt$err$Error: 708
+    __to_str_i8$err$Error: 540
+    __to_str_set$i64$err$Error: 1012
+    __to_str_str$arr$opt$err$Error: 1244
+    __to_str_u64$err$Error: 540
     count_evens: 264
     counts: 300
     evens: 476
@@ -123,7 +123,7 @@ binary size: 26864
     shape: 140
     wide: 104
   data: 1851
-  metadata: 10797
+  metadata: 10997
 builtin calls: 347
   aipl_arr_drop_str: 1
   aipl_arr_inc: 17

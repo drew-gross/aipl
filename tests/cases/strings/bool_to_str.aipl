@@ -29,14 +29,14 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 267
 instructions executed: 1353
-binary size: 4096
+binary size: 4112
   code: 1896
-    __to_str_0: 212
-    __to_str_1: 692
-    __to_str_2: 160
+    __to_str_bool: 212
+    __to_str_bool$arr: 692
+    __to_str_none$arr: 160
     main: 832
   data: 188
-  metadata: 2012
+  metadata: 2028
 builtin calls: 68
   aipl_array_dec: 4
   aipl_array_new: 4

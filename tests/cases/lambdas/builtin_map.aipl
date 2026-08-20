@@ -23,15 +23,15 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 616
 instructions executed: 2072
-binary size: 5864
+binary size: 5880
   code: 3100
-    __eq_0: 296
-    __eq_2: 352
+    __eq_i64$arr: 296
+    __eq_str$arr: 352
     __map10$own0: 252
-    __to_str_1: 180
+    __to_str_i64: 180
     main: 2020
   data: 313
-  metadata: 2451
+  metadata: 2467
 builtin calls: 90
   aipl_arr_drop_str: 2
   aipl_arr_inc: 1

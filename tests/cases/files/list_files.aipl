@@ -49,15 +49,15 @@ deallocations: 19
 reallocations: 8
 bytes allocated: 801
 instructions executed: 1424
-binary size: 6752
+binary size: 6776
   code: 3172
-    __to_str_0: 540
-    __to_str_1: 1080
+    __to_str_i64$err$Error: 540
+    __to_str_str$arr$err$Error: 1080
     count_files: 324
     main: 680
     sorted_listing: 548
   data: 403
-  metadata: 3177
+  metadata: 3201
 builtin calls: 166
   aipl_arr_drop_str: 7
   aipl_arr_inc: 6

@@ -35,7 +35,7 @@ bytes allocated: 944
 instructions executed: 847
 binary size: 5800
   code: 2528
-    __eq_0: 296
+    __eq_i64$arr: 296
     __test$reversed_eq: 1008
     __test$reversed_len: 304
     __test$sum_reversed: 272

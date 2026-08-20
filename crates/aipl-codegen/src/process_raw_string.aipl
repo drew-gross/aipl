@@ -54,18 +54,18 @@ deallocations: 32
 reallocations: 0
 bytes allocated: 1288
 instructions executed: 8901
-binary size: 8376
+binary size: 8384
   code: 3820
     __builtin_count_while$char$s0$lam12: 232
     __builtin_count_while$char$s0$lam5: 232
-    __eq_0: 100
+    __eq_char$opt: 100
     __m4__trim_prefix: 216
     __m5__trim_suffix: 232
     __map7$own0: 320
     main: 816
     process_raw_string: 1672
   data: 696
-  metadata: 3860
+  metadata: 3868
 builtin calls: 760
   aipl_arr_drop_str: 14
   aipl_arr_inc: 7

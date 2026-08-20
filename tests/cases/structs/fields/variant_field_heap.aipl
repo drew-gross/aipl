@@ -37,12 +37,12 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 95
 instructions executed: 345
-binary size: 3776
+binary size: 3784
   code: 1648
-    __to_str_0: 800
+    __to_str_Person: 800
     main: 848
   data: 220
-  metadata: 1908
+  metadata: 1916
 builtin calls: 45
   aipl_concat_lazy: 1
   aipl_dec: 14

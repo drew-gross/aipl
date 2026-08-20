@@ -34,24 +34,24 @@ deallocations: 25
 reallocations: 0
 bytes allocated: 1264
 instructions executed: 2738
-binary size: 10792
+binary size: 10816
   code: 6016
     __builtin_opt_left_fold$str$str$s1$lam3: 736
     __builtin_opt_right_fold$i64$List$lam9: 696
     __builtin_opt_right_fold$i64$i64$lam5: 432
     __builtin_opt_right_fold$i64$i64$lam7: 436
     __builtin_opt_right_fold$str$str$s1$lam1: 868
-    __eq_1: 92
-    __eq_2: 148
-    __eq_3: 100
-    __eq_4: 124
+    __eq_List: 124
+    __eq_List$opt: 92
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
     __lambda_8: 280
-    __rec_drop_0: 44
+    __rec_drop_List: 44
     __test$to_list_keeps_order: 1848
     main: 72
     to_list: 140
   data: 630
-  metadata: 4146
+  metadata: 4170
 builtin calls: 266
   aipl_arr_drop_str: 2
   aipl_array_dec: 7

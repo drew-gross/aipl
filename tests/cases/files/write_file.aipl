@@ -35,12 +35,12 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 44
 instructions executed: 165
-binary size: 2360
+binary size: 2376
   code: 780
-    __to_str_0: 436
+    __to_str_unit$err$Error: 436
     main: 344
   data: 211
-  metadata: 1369
+  metadata: 1385
 builtin calls: 22
   aipl_dec: 8
   aipl_inc: 2

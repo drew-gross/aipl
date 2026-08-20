@@ -27,7 +27,7 @@ bytes allocated: 336
 instructions executed: 211
 binary size: 2840
   code: 1136
-    __rec_drop_0: 48
+    __rec_drop_List: 48
     main: 560
     pick: 424
     sum: 104

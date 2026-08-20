@@ -88,10 +88,10 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 536
 instructions executed: 2373
-binary size: 9904
+binary size: 9912
   code: 5724
-    __eq_0: 100
-    __eq_1: 148
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
     __filter5$own0: 284
     __lambda_10: 52
     __lambda_8: 88
@@ -106,7 +106,7 @@ binary size: 9904
     opt_right_fold$i64$i64$lam9: 424
     opt_right_fold$str$str$s1$lam7: 868
   data: 854
-  metadata: 3326
+  metadata: 3334
 builtin calls: 109
   aipl_arr_drop_str: 1
   aipl_arr_inc: 1

@@ -119,13 +119,13 @@ deallocations: 27
 reallocations: 0
 bytes allocated: 1260
 instructions executed: 2371
-binary size: 4728
+binary size: 4736
   code: 2124
-    __rec_drop_0: 44
-    __to_str_1: 664
+    __rec_drop_List: 44
+    __to_str_List: 664
     main: 1416
   data: 117
-  metadata: 2487
+  metadata: 2495
 builtin calls: 248
   aipl_array_dec: 2
   aipl_array_new: 2

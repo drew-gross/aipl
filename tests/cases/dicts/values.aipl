@@ -46,31 +46,31 @@ deallocations: 19
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1458
-binary size: 12328
+binary size: 12472
   code: 6756
-    __dict_drop_0: 116
-    __dict_drop_3: 140
-    __dict_drop_4: 128
-    __dict_drop_5: 128
-    __dict_retain_0: 116
-    __dict_retain_3: 140
-    __dict_retain_4: 128
-    __dict_retain_5: 128
-    __eq_1: 248
-    __eq_10: 104
-    __eq_11: 296
-    __eq_12: 100
-    __eq_2: 92
-    __eq_6: 256
-    __eq_7: 92
-    __eq_8: 248
-    __eq_9: 100
+    __dict_drop_bool$str: 128
+    __dict_drop_i64$i64$arr: 128
+    __dict_drop_str$Point: 116
+    __dict_drop_str$str: 140
+    __dict_retain_bool$str: 128
+    __dict_retain_i64$i64$arr: 128
+    __dict_retain_str$Point: 116
+    __dict_retain_str$str: 140
+    __eq_Point: 104
+    __eq_Point$opt: 92
+    __eq_dict$i64$i64$arr: 256
+    __eq_dict$i64$i64$opt: 248
+    __eq_dict$str$Point: 248
+    __eq_i64$arr: 296
+    __eq_i64$arr$opt: 92
+    __eq_i64$opt: 100
+    __eq_i64$opt$opt: 100
     __test$array_values: 1276
     __test$optional_values: 604
     main: 2084
     optional_values: 232
   data: 857
-  metadata: 4715
+  metadata: 4859
 builtin calls: 177
   aipl_arr_inc: 8
   aipl_array_dec: 23

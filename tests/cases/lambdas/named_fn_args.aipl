@@ -44,18 +44,18 @@ deallocations: 13
 reallocations: 3
 bytes allocated: 704
 instructions executed: 2189
-binary size: 6864
+binary size: 6872
   code: 3544
-    __eq_0: 296
-    __eq_2: 352
+    __eq_i64$arr: 296
+    __eq_str$arr: 352
     __map2$own0: 260
-    __to_str_1: 180
+    __to_str_i64: 180
     double: 12
     each$lam8: 276
     inc: 8
     main: 2160
   data: 404
-  metadata: 2916
+  metadata: 2924
 builtin calls: 104
   aipl_arr_drop_str: 2
   aipl_arr_inc: 2

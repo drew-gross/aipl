@@ -642,14 +642,14 @@ deallocations: 4723
 reallocations: 0
 bytes allocated: 275592
 instructions executed: 746385
-binary size: 219504
+binary size: 219768
   code: 141852
-    __arr_drop_1: 364
-    __arr_drop_5: 800
-    __arr_drop_8: 140
-    __arr_retain_1: 364
-    __arr_retain_5: 800
-    __arr_retain_8: 140
+    __arr_drop___m1__StepResult$AiplTok: 140
+    __arr_drop___m1__Token$AiplTok: 364
+    __arr_drop___m1__TokenRule$AiplTok: 800
+    __arr_retain___m1__StepResult$AiplTok: 140
+    __arr_retain___m1__Token$AiplTok: 364
+    __arr_retain___m1__TokenRule$AiplTok: 800
     __builtin_count_while$char$s0$lam17: 232
     __builtin_count_while$char$s0$lam28: 296
     __builtin_count_while$char$s0$lam33: 236
@@ -660,15 +660,15 @@ binary size: 219504
     __builtin_is_some_and$char$lam34: 48
     __builtin_opt_left_fold$char$i64$s0$lam13: 348
     __builtin_value_or_err$i64$str: 180
-    __eq_10: 104
-    __eq_11: 120
-    __eq_12: 884
-    __eq_13: 64
-    __eq_2: 120
-    __eq_3: 168
-    __eq_4: 284
-    __eq_6: 100
-    __eq_7: 148
+    __eq_AiplTok: 884
+    __eq_StrStyle: 64
+    __eq___builtin_Span: 104
+    __eq___m1__LexError: 168
+    __eq___m1__LexResult$AiplTok: 120
+    __eq___m1__Token$AiplTok: 120
+    __eq___m1__Token$AiplTok$arr: 284
+    __eq_char$opt: 100
+    __eq_str$opt: 148
     __lambda_0: 100
     __lambda_1: 68
     __lambda_12: 140
@@ -701,8 +701,8 @@ binary size: 219504
     __test$lex_aipl: 15388
     __test$lex_aipl_stripped: 1592
     __test$lex_aipl_tokens: 1096
-    __test_try_fail_0: 64
-    __to_str_9: 812
+    __test_try_fail___m1__LexError: 64
+    __to_str___m1__LexError: 812
     char_lit_emit: 1412
     dedent_segments: 188
     ident_cont: 16
@@ -713,7 +713,7 @@ binary size: 219504
     raw_tpl_kind: 2088
     tpl_kind: 2112
   data: 7100
-  metadata: 70552
+  metadata: 70816
 builtin calls: 80821
   aipl_arr_drop_str: 9
   aipl_arr_inc: 7546

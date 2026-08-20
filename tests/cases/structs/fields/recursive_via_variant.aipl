@@ -42,11 +42,11 @@ bytes allocated: 621
 instructions executed: 1298
 binary size: 5000
   code: 2128
-    __rec_drop_0: 36
-    __rec_drop_1: 44
-    __to_str_2: 180
-    __to_str_3: 552
-    __to_str_4: 524
+    __rec_drop_S: 36
+    __rec_drop_V: 44
+    __to_str_S: 552
+    __to_str_V: 524
+    __to_str_i64: 180
     depth: 148
     main: 644
   data: 214

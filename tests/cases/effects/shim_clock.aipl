@@ -72,17 +72,17 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 85
 instructions executed: 312
-binary size: 4544
+binary size: 4552
   code: 2012
-    __to_str_0: 180
-    __to_str_1: 212
+    __to_str_bool: 212
+    __to_str_u64: 180
     fixed_mono: 8
     fixed_wall: 8
     inner_mono: 8
     inner_wall: 8
     main: 1588
   data: 47
-  metadata: 2485
+  metadata: 2493
 builtin calls: 88
   aipl_concat: 4
   aipl_dec: 21

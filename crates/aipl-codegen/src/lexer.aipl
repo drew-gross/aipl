@@ -1239,14 +1239,14 @@ deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
 instructions executed: 278556
-binary size: 1801560
+binary size: 1801704
   code: 1132564
-    __arr_drop_0: 928
-    __arr_drop_3: 492
-    __arr_drop_6: 140
-    __arr_retain_0: 928
-    __arr_retain_3: 492
-    __arr_retain_6: 140
+    __arr_drop_StepResult$Kind: 140
+    __arr_drop_Token$Kind: 492
+    __arr_drop_TokenRule$Kind: 928
+    __arr_retain_StepResult$Kind: 140
+    __arr_retain_Token$Kind: 492
+    __arr_retain_TokenRule$Kind: 928
     __builtin_count_while$char$s0$lam27: 296
     __builtin_count_while$char$s0$lam32: 236
     __builtin_count_while$char$s0$lam34: 244
@@ -1254,13 +1254,13 @@ binary size: 1801560
     __builtin_int_parse: 744
     __builtin_is_some_and$char$lam33: 48
     __builtin_opt_left_fold$char$i64$s0$lam38: 348
-    __eq_10: 120
-    __eq_11: 1136
-    __eq_2: 120
-    __eq_4: 168
-    __eq_5: 100
-    __eq_8: 284
-    __eq_9: 104
+    __eq_Kind: 1136
+    __eq_LexError: 168
+    __eq_LexResult$Kind: 120
+    __eq_Token$Kind: 120
+    __eq_Token$Kind$arr: 284
+    __eq___builtin_Span: 104
+    __eq_char$opt: 100
     __lambda_0: 92
     __lambda_1: 60
     __lambda_10: 48
@@ -1286,8 +1286,8 @@ binary size: 1801560
     __lambda_9: 60
     __m1__unescape: 892
     __test$lex: 1045056
-    __test_try_fail_1: 64
-    __to_str_7: 812
+    __test_try_fail_LexError: 64
+    __to_str_LexError: 812
     apply_emit$Kind: 6844
     between_len: 744
     checked_seg: 1700
@@ -1310,7 +1310,7 @@ binary size: 1801560
     toks: 128
     tpl_kind: 2980
   data: 8132
-  metadata: 660864
+  metadata: 661008
 builtin calls: 27491
   aipl_arr_drop_str: 22
   aipl_arr_inc: 3037

@@ -26,14 +26,14 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 328
-binary size: 3176
+binary size: 3192
   code: 1244
-    __eq_2: 100
-    __to_str_0: 212
-    __to_str_1: 180
+    __eq_char$opt: 100
+    __to_str_bool: 212
+    __to_str_u64: 180
     main: 752
   data: 119
-  metadata: 1813
+  metadata: 1829
 builtin calls: 66
   aipl_char_at: 1
   aipl_concat_lazy: 1

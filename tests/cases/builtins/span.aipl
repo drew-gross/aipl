@@ -22,15 +22,15 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 42
 instructions executed: 497
-binary size: 3824
+binary size: 3856
   code: 1904
-    __eq_2: 104
-    __to_str_0: 180
-    __to_str_1: 464
-    __to_str_3: 212
+    __eq___builtin_Span: 104
+    __to_str___builtin_Span: 464
+    __to_str_bool: 212
+    __to_str_u64: 180
     main: 944
   data: 167
-  metadata: 1753
+  metadata: 1785
 builtin calls: 45
   aipl_dec: 12
   aipl_inc: 6

@@ -15,13 +15,13 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 219
-binary size: 2160
+binary size: 2168
   code: 676
-    __eq_0: 100
+    __eq_char$opt: 100
     __test$at: 508
     main: 68
   data: 261
-  metadata: 1223
+  metadata: 1231
 builtin calls: 18
   aipl_assert: 5
   aipl_char_at: 5

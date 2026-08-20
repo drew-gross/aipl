@@ -30,9 +30,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 87
-binary size: 8520
+binary size: 8528
   code: 4340
-    __eq_0: 148
+    __eq_str$opt: 148
     __m1__contains_section: 568
     __m1__fill_section: 1464
     __m3__parse_test_section_header: 696
@@ -40,7 +40,7 @@ binary size: 8520
     fill_or_add_section_file: 1196
     main: 72
   data: 358
-  metadata: 3822
+  metadata: 3830
 builtin calls: 16
   aipl_assert: 1
   aipl_dec: 5

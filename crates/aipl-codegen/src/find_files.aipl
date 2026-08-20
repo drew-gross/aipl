@@ -39,16 +39,16 @@ deallocations: 22
 reallocations: 0
 bytes allocated: 936
 instructions executed: 1447
-binary size: 10272
+binary size: 10280
   code: 4828
-    __eq_0: 352
+    __eq_str$arr: 352
     __test$find_files: 224
     __test$with_extension: 2936
     find_files: 776
     main: 112
     with_extension: 428
   data: 798
-  metadata: 4646
+  metadata: 4654
 builtin calls: 278
   aipl_arr_drop_str: 15
   aipl_arr_retain_ptr: 9

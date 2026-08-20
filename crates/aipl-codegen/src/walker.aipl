@@ -2717,24 +2717,24 @@ deallocations: 20581
 reallocations: 560
 bytes allocated: 1011492
 instructions executed: 3058268
-binary size: 3075520
+binary size: 3075824
   code: 1758472
-    __arr_drop_10: 140
-    __arr_drop_11: 140
-    __arr_drop_12: 364
-    __arr_drop_13: 120
-    __arr_drop_14: 140
-    __arr_drop_4: 116
-    __arr_drop_7: 800
-    __arr_drop_9: 140
-    __arr_retain_10: 140
-    __arr_retain_11: 140
-    __arr_retain_12: 364
-    __arr_retain_13: 120
-    __arr_retain_14: 140
-    __arr_retain_4: 116
-    __arr_retain_7: 800
-    __arr_retain_9: 140
+    __arr_drop_ImportEntry: 140
+    __arr_drop_ImportName: 140
+    __arr_drop_Seg: 120
+    __arr_drop_VCase: 140
+    __arr_drop___m1__Doc: 116
+    __arr_drop___m9__StepResult$__m8__AiplTok: 140
+    __arr_drop___m9__Token$__m8__AiplTok: 364
+    __arr_drop___m9__TokenRule$__m8__AiplTok: 800
+    __arr_retain_ImportEntry: 140
+    __arr_retain_ImportName: 140
+    __arr_retain_Seg: 120
+    __arr_retain_VCase: 140
+    __arr_retain___m1__Doc: 116
+    __arr_retain___m9__StepResult$__m8__AiplTok: 140
+    __arr_retain___m9__Token$__m8__AiplTok: 364
+    __arr_retain___m9__TokenRule$__m8__AiplTok: 800
     __builtin_any$__m1__Doc$lam25: 260
     __builtin_count$char$s0: 232
     __builtin_count_while$char$s0$lam48: 232
@@ -2750,13 +2750,13 @@ binary size: 3075520
     __builtin_sort_by$ImportEntry$lam18: 1536
     __builtin_sort_by$ImportName$lam22: 3236
     __builtin_value_or_err$i64$str: 180
-    __eq_0: 92
-    __eq_15: 64
-    __eq_17: 120
-    __eq_18: 464
-    __eq_2: 104
-    __eq_5: 300
-    __eq_8: 100
+    __eq_FmtKind: 64
+    __eq_FmtTok: 120
+    __eq_FmtTok$opt: 92
+    __eq___builtin_Span: 104
+    __eq___m1__Doc: 464
+    __eq___m1__Doc$arr: 300
+    __eq_char$opt: 100
     __lambda_30: 100
     __lambda_31: 68
     __lambda_32: 108
@@ -2798,13 +2798,13 @@ binary size: 3075520
     __m9__template_scan$__m8__AiplTok: 2772
     __m9__template_step$__m8__AiplTok: 556
     __map50$own0: 320
-    __rec_drop_3: 184
-    __rec_drop_6: 84
+    __rec_drop___m1__Doc: 184
+    __rec_drop___m1__Work: 84
     __test$binding_ann: 4604
     __test$new_walker: 10572
     __test$walker_of: 1223900
-    __test_try_fail_1: 64
-    __to_str_16: 812
+    __test_try_fail_FmtError: 64
+    __to_str_FmtError: 812
     array_atom: 2176
     array_suffixes: 1248
     at: 24
@@ -2915,7 +2915,7 @@ binary size: 3075520
     with_last: 468
     without_trailing_break: 696
   data: 25740
-  metadata: 1291308
+  metadata: 1291612
 builtin calls: 491866
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
