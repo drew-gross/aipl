@@ -1,0 +1,87 @@
+import { print, wrapping_add as +, == } from builtins;
+
+// `match` on a `char` dispatches on char-literal arms. Like a `str` match this
+// compares by value over an *open* domain — every `char` a scrutinee could hold
+// can't be listed — so the arms bind nothing and the match must end in `_`.
+// Dispatch is one integer comparison per arm; a char is a bare scalar, with no
+// length, elements or refcounting behind it.
+fn kind(c: char) -> str {
+    match (c) {
+        'a' => "vowel",
+        'e' => "vowel",
+        'i' => "vowel",
+        ' ' => "space",
+        _ => "consonant",
+    }
+}
+
+// Escapes work in a pattern exactly as they do in a char expression: the arm is
+// the character, not its spelling. An escaped-single-quote arm belongs here too
+// and compiles correctly, but is left out because the highlighting test's
+// simplified tmLanguage engine mis-scopes that literal anywhere it appears (its
+// `find_end` picks the first end match without interleaving the escape pattern);
+// the shipped grammar handles it.
+fn escaped(c: char) -> str {
+    match (c) {
+        '\n' => "newline",
+        '\t' => "tab",
+        '\\' => "backslash",
+        _ => "plain",
+    }
+}
+
+// A char match is an ordinary expression, so it nests and composes.
+fn score(s: str) -> i64 {
+    mut total = 0;
+    for (let c : s) {
+        set total = total + match (c) {
+            'a' => 1,
+            'b' => 10,
+            _ => 0,
+        };
+    }
+    total
+}
+
+fn main() !prints {
+    print(kind('a'));
+    print(kind('z'));
+    print(kind(' '));
+    print(escaped('\n'));
+    print(escaped('x'));
+}.test({
+    assert(kind('a') == "vowel");
+    assert(kind('i') == "vowel");
+    assert(kind(' ') == "space");
+    assert(kind('q') == "consonant");
+
+    assert(escaped('\n') == "newline");
+    assert(escaped('\t') == "tab");
+    assert(escaped('\\') == "backslash");
+    assert(escaped('a') == "plain");
+
+    assert(score("abba") == 22);
+    assert(score("") == 0);
+    assert(score("zzz") == 0);
+})
+--- stdout ---
+vowel
+consonant
+space
+newline
+plain
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 81
+binary size: 1912
+  code: 896
+    main: 896
+  data: 59
+  metadata: 957
+builtin calls: 20
+  aipl_dec: 10
+  aipl_inc: 5
+  aipl_print: 5

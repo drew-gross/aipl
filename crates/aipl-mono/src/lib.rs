@@ -4316,7 +4316,7 @@ impl Mono<'_> {
                             };
                             vec![elem; arm.pattern.bindings().len()]
                         }
-                        Pattern::Str(_) | Pattern::Wildcard => Vec::new(),
+                        Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
                     };
                     let mut env2 = env.clone();
                     for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {

@@ -480,6 +480,10 @@ gazelle! {
                   | IDENT FATARROW expr => nullary_arm
                   | NONE FATARROW expr => none_arm
                   | STR FATARROW expr => str_arm
+                  // `'c' => body` — a char-literal arm, matching a `char`
+                  // scrutinee by value. Like the `str` form it is open-domain,
+                  // so such a match must end in `_`.
+                  | CHAR FATARROW expr => char_arm
                   | LBRACKET args RBRACKET FATARROW expr => array_arm;
         match_bindings = binding_list => present;
         binding_list = IDENT => first | binding_list COMMA IDENT => rest;
@@ -2405,6 +2409,11 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
                 span,
             },
             // `"foo" => body`: a string-literal pattern (for a `str` scrutinee).
+            aipl::MatchArm::CharArm((c, span), body) => MatchArm {
+                pattern: Pattern::Char(c),
+                span: join_spans(&span, &body.span),
+                body,
+            },
             aipl::MatchArm::StrArm((lit, span), body) => MatchArm {
                 pattern: Pattern::Str(lit),
                 body,

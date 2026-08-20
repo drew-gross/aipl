@@ -940,6 +940,10 @@ pub mod ast {
         /// A string-literal pattern `"lit" => body` (matches a `str` scrutinee by
         /// content).
         Str(String),
+        /// A char-literal pattern `'c' => body` (matches a `char` scrutinee by
+        /// value). Like [`Pattern::Str`] the domain is open, so such a match
+        /// must end in a `_` arm.
+        Char(u8),
         /// An array/`str`-destructuring pattern `[e0, e1, ...] => body` (matches a
         /// `str` or array scrutinee by exact length, then, per element position,
         /// either a bound name or a literal-equality check). Each element is a
@@ -968,7 +972,7 @@ pub mod ast {
                         _ => None,
                     })
                     .collect(),
-                Pattern::Str(_) | Pattern::Wildcard => Vec::new(),
+                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
             }
         }
 
@@ -976,7 +980,7 @@ pub mod ast {
         pub fn ctor_name(&self) -> Option<&str> {
             match self {
                 Pattern::Ctor { name, .. } => Some(name),
-                Pattern::Str(_) | Pattern::Array(_) | Pattern::Wildcard => None,
+                Pattern::Str(_) | Pattern::Char(_) | Pattern::Array(_) | Pattern::Wildcard => None,
             }
         }
     }

@@ -2028,7 +2028,10 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn pattern(self: W) -> WDoc!FmtError {
-    if (self.peek_is(StrTok)) {
+    // A literal pattern — a string (`"lit" => ..`, str scrutinee) or a char
+    // (`'c' => ..`, char scrutinee) — lays out as its verbatim source, so its
+    // escapes round-trip untouched.
+    if (self.peek_is(StrTok) || self.peek_is(CharTok)) {
         let b = self.bump();
         return ok(WDoc { w: b.w, doc: Text(b.text) });
     };
@@ -2716,9 +2719,9 @@ allocations: 20581
 deallocations: 20581
 reallocations: 560
 bytes allocated: 1011492
-instructions executed: 3058268
-binary size: 3075824
-  code: 1758472
+instructions executed: 3058469
+binary size: 3075864
+  code: 1758504
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2865,7 +2868,7 @@ binary size: 3075824
     params_until: 9516
     paren_atom: 5316
     paren_ty: 7608
-    pattern: 7540
+    pattern: 7572
     peek_is: 288
     peek_text_n: 32
     postfix: 4652
@@ -2915,15 +2918,15 @@ binary size: 3075824
     with_last: 468
     without_trailing_break: 696
   data: 25740
-  metadata: 1291612
-builtin calls: 491866
+  metadata: 1291620
+builtin calls: 491872
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57122
+  aipl_arr_inc: 57125
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 69186
+  aipl_array_dec: 69189
   aipl_array_new: 9833
   aipl_array_push: 1650
   aipl_array_push_mut: 1353

@@ -75,8 +75,8 @@ deallocations: 2188
 reallocations: 6
 bytes allocated: 100657
 instructions executed: 330517
-binary size: 851344
-  code: 521108
+binary size: 851384
+  code: 521140
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -203,7 +203,7 @@ binary size: 851344
     __m6__params_until: 9516
     __m6__paren_atom: 5316
     __m6__paren_ty: 7608
-    __m6__pattern: 7540
+    __m6__pattern: 7572
     __m6__peek_is: 288
     __m6__peek_text_n: 32
     __m6__postfix: 4652
@@ -265,7 +265,7 @@ binary size: 851344
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 327729
+  metadata: 327737
 builtin calls: 40140
   aipl_arr_drop_str: 50
   aipl_arr_inc: 4587

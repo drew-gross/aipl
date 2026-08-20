@@ -1,0 +1,75 @@
+// Every char-match error, in one run: the domain is open so a `_` is required
+// and must come last, duplicate arms are dead code, and a char literal only
+// matches a `char`.
+
+// No `_`: the arms can't cover every char.
+fn missing_wildcard(c: char) -> i64 {
+    match (c) {
+        'a' => 1,
+    }
+}
+
+// `_` before another arm makes that arm unreachable.
+fn wildcard_not_last(c: char) -> i64 {
+    match (c) {
+        _ => 0,
+        'a' => 1,
+    }
+}
+
+// The same literal twice — the second can never be taken.
+fn duplicate_arm(c: char) -> i64 {
+    match (c) {
+        'a' => 1,
+        'a' => 2,
+        _ => 0,
+    }
+}
+
+// A char literal against a non-char scrutinee.
+fn wrong_scrutinee(n: i64) -> i64 {
+    match (n) {
+        'a' => 1,
+        _ => 0,
+    }
+}
+
+// ...and against a str, whose arms are string literals.
+fn char_arm_on_str(s: str) -> i64 {
+    match (s) {
+        'a' => 1,
+        _ => 0,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: non-exhaustive match on a char: add a `_` arm
+ --> ./tests/cases/chars/err_match_char_literals.aipl:7:12
+  |
+7 |     match (c) {
+  |            ^^^^
+
+error: the `_` arm must be last (arms after it are unreachable)
+  --> ./tests/cases/chars/err_match_char_literals.aipl:15:9
+   |
+15 |         _ => 0,
+   |         ^
+
+error: duplicate 'a' arm
+  --> ./tests/cases/chars/err_match_char_literals.aipl:24:9
+   |
+24 |         'a' => 2,
+   |         ^^^^^^^^
+
+error: char-literal pattern matches a char, not i64
+  --> ./tests/cases/chars/err_match_char_literals.aipl:32:9
+   |
+32 |         'a' => 1,
+   |         ^^^^^^^^
+
+error: "match" on a str expects string literals, `[..]` patterns, or `_`
+  --> ./tests/cases/chars/err_match_char_literals.aipl:40:9
+   |
+40 |         'a' => 1,
+   |         ^^^^^^^^

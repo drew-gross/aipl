@@ -38,6 +38,9 @@ self-hosting:
   parser library in aipl (grammar as data; generates highlighter + formatter)
     -> plan and progress checkboxes live in PARSER_LIBRARY.md
 
+highlighter:
+  tests/highlighting.rs mis-scopes an escaped single-quote char literal ('\''): find_end (line 329) searches for the first end match from the block's content start without interleaving the inner patterns, so the block closes on the escaped quote and the trailing quote opens a char literal that runs to EOF. Real TextMate picks whichever of end or a pattern matches earliest, so the escape wins. The shipped tmLanguage grammar is correct — the harness is the gap. Repro: a case file containing let q = '\'';. Blocks using that literal in any file under tests/cases or examples (noted while adding char-literal match arms)
+
 clean_trailing_whitespace.aipl:
   optimize: use char-by-char approach? make lines() streaming?
 

@@ -203,7 +203,7 @@ fn binds_name(e: &Expr, name: &str) -> bool {
             Pattern::Array(elems) => elems
                 .iter()
                 .any(|el| matches!(&el.kind, ExprKind::Ident(n) if n == name)),
-            Pattern::Str(_) | Pattern::Wildcard => false,
+            Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => false,
         }),
         _ => false,
     };

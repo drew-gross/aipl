@@ -1249,7 +1249,7 @@ impl Cx<'_> {
                     env,
                     effects,
                 ),
-                Pattern::Ctor { .. } => Err(Error::at(
+                Pattern::Ctor { .. } | Pattern::Char(_) => Err(Error::at(
                     "\"match\" on a str expects string literals, `[..]` patterns, or `_`"
                         .to_string(),
                     arm.span.clone(),
@@ -1264,13 +1264,26 @@ impl Cx<'_> {
             return match &arm.pattern {
                 Pattern::Array(elems) => self.array_pattern_bind_tys(elems, elem, env, effects),
                 Pattern::Wildcard => Ok(vec![]),
-                Pattern::Ctor { .. } | Pattern::Str(_) => Err(Error::at(
+                Pattern::Ctor { .. } | Pattern::Str(_) | Pattern::Char(_) => Err(Error::at(
                     "\"match\" on an array expects `[..]` patterns or `_`".to_string(),
                     arm.span.clone(),
                 )),
             };
         }
-        // The non-constructor patterns only apply to a `str` / array scrutinee.
+        // A `char` scrutinee matches char-literal arms (`'a' => ...`) and a
+        // wildcard. Like a `str` match it compares by value over an open domain,
+        // so it binds nothing and needs a `_`.
+        if matches!(st, Type::Primitive(Primitive::Char)) {
+            return match &arm.pattern {
+                Pattern::Char(_) | Pattern::Wildcard => Ok(vec![]),
+                Pattern::Ctor { .. } | Pattern::Str(_) | Pattern::Array(_) => Err(Error::at(
+                    "\"match\" on a char expects char literals or `_`".to_string(),
+                    arm.span.clone(),
+                )),
+            };
+        }
+        // The non-constructor patterns only apply to a `str` / array / `char`
+        // scrutinee.
         let (name, bindings) = match &arm.pattern {
             Pattern::Ctor { name, bindings } => (name, bindings),
             Pattern::Str(_) => {
@@ -1282,6 +1295,12 @@ impl Cx<'_> {
             Pattern::Array(_) => {
                 return Err(Error::at(
                     format!("array-literal pattern matches an array, not {}", tyname(st)),
+                    arm.span.clone(),
+                ))
+            }
+            Pattern::Char(_) => {
+                return Err(Error::at(
+                    format!("char-literal pattern matches a char, not {}", tyname(st)),
                     arm.span.clone(),
                 ))
             }
@@ -1375,8 +1394,14 @@ impl Cx<'_> {
         // unreachable), and the literal patterns must be distinct (a duplicate is
         // the only way an earlier arm makes a later one unreachable under exact
         // matching).
-        if is_str_repr(st) || matches!(st, Type::Array(_)) {
-            let noun = if is_str_repr(st) { "a str" } else { "an array" };
+        if is_str_repr(st) || matches!(st, Type::Array(_) | Type::Primitive(Primitive::Char)) {
+            let noun = if is_str_repr(st) {
+                "a str"
+            } else if matches!(st, Type::Primitive(Primitive::Char)) {
+                "a char"
+            } else {
+                "an array"
+            };
             for (idx, arm) in arms.iter().enumerate() {
                 // The `_` arm must be last.
                 if matches!(arm.pattern, Pattern::Wildcard) && idx != arms.len() - 1 {
@@ -1392,6 +1417,9 @@ impl Cx<'_> {
                 {
                     let what = match &arm.pattern {
                         Pattern::Str(lit) => format!("duplicate {lit:?} arm"),
+                        Pattern::Char(c) => {
+                            format!("duplicate {:?} arm", char::from(*c))
+                        }
                         _ => "duplicate match arm".to_string(),
                     };
                     return Err(Error::at(what, arm.span.clone()));

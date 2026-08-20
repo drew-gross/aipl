@@ -16759,7 +16759,28 @@ fn compile_expr<M: Module>(
             // `plan` is `None`; its arms' binders (array-pattern identifier
             // elements) are read from the scrutinee per-arm below. Any other
             // matchable type dispatches on its tag via a `MatchPlan`.
-            let plan = if is_str_repr(&scrut_ty) || matches!(&scrut_ty, Type::Array(_)) {
+            // A `char` scrutinee is a bare scalar: dispatch is one integer
+            // comparison per arm, with the `_` arm as the fallthrough. No length,
+            // no elements and no refcounting, so it gets its own short path
+            // rather than riding the sequence machinery below.
+            let plan = if matches!(&scrut_ty, Type::Primitive(Primitive::Char)) {
+                for (i, arm) in arms.iter().enumerate() {
+                    let Pattern::Char(c) = &arm.pattern else {
+                        continue; // the `_` arm — the fallthrough jump below
+                    };
+                    let hit = builder.ins().icmp_imm_s(IntCC::Equal, ptr, *c as i64);
+                    let next = builder.create_block();
+                    builder.ins().brif(hit, arm_blocks[i], &[], next, &[]);
+                    builder.switch_to_block(next);
+                    builder.seal_block(next);
+                }
+                let wildcard = arms
+                    .iter()
+                    .position(|a| matches!(a.pattern, Pattern::Wildcard))
+                    .expect("a char match has a `_` arm (checked)");
+                builder.ins().jump(arm_blocks[wildcard], &[]);
+                None
+            } else if is_str_repr(&scrut_ty) || matches!(&scrut_ty, Type::Array(_)) {
                 // Route each arm to its block: a `str`-literal arm (`"foo"`, str
                 // scrutinee) by content equality, an array pattern (`[a, 'x', b]`)
                 // by exact length then elementwise equality of its *literal*
@@ -16813,6 +16834,9 @@ fn compile_expr<M: Module>(
                 };
                 for (i, arm) in arms.iter().enumerate() {
                     match &arm.pattern {
+                        // A char literal never reaches here: it only matches a
+                        // `char` scrutinee, which took the scalar path above.
+                        Pattern::Char(_) => unreachable!("char arm on a str/array match"),
                         Pattern::Str(lit) => {
                             let lit_expr =
                                 Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
