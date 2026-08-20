@@ -1516,9 +1516,11 @@ fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
 // the empty pattern and matches). A str receiver is dispatched in the
 // checker / codegen (the `T[]` signature doesn't unify with `str`).
 fn __builtin_contains<T: any>(self: T[], needle: T[]) -> bool { false }
-// Smaller / larger of two `i64`s (codegen compares and selects).
-fn __builtin_min(self: i64, other: i64) -> i64 { self }
-fn __builtin_max(self: i64, other: i64) -> i64 { self }
+// Smaller / larger of two comparable values (codegen compares and selects).
+// `ord` is the same bound `minimum`/`maximum` carry — integers, `char` and
+// `str` — so these work at any integer width rather than `i64` alone.
+fn __builtin_min<T: ord>(self: T, other: T) -> T { self }
+fn __builtin_max<T: ord>(self: T, other: T) -> T { self }
 // Smallest / largest element of an array, or `none` if empty (codegen folds
 // over the elements). `ord` restricts `T` to comparable elements (integer or
 // char), enforced generically by the checker's bound-checking, not a special

@@ -19,6 +19,8 @@ import {
     len,
     map,
     map_err,
+    max,
+    min,
     push,
     saturating_sub as -,
     sort_by,
@@ -293,7 +295,7 @@ fn next_start(self: W) -> u64 {
         none => self.src.len(),
     };
     match (self.comments[self.cpos]) {
-        some(c) => if (c.start < tok) { c.start } else { tok },
+        some(c) => min(c.start, tok),
         none => tok,
     }
 }
@@ -332,7 +334,7 @@ fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -> WDoc {
         // `next` can precede `c.end` only if a later entity started inside this
         // comment, which the lexer cannot produce; `max` in the Rust version
         // guards the same impossible case.
-        let gap_end = if (next < c.end) { c.end } else { next };
+        let gap_end = max(next, c.end);
         let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
         set acc.push(Text(w.src[c]));
         set acc.push(sep);
@@ -1309,7 +1311,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
         let had_lead = !l.doc.is_empty_doc();
         set w = l.w;
         if (had_lead) {
-            let blank = w.gap_has_blank(prev_end, max_u64(prev_end, w.last_end));
+            let blank = w.gap_has_blank(prev_end, max(prev_end, w.last_end));
             set entries.push(sep_entry(blank, 0 < entries.len()));
             set entries.push(l.doc);
 
@@ -1348,8 +1350,6 @@ fn trim_last_break(self: Doc[]) -> Doc[] {
     };
     self.with_last(self[n - 1].value_or(Concat([])).without_trailing_break())
 }
-
-fn max_u64(a: u64, b: u64) -> u64 { if (a < b) { b } else { a } }
 
 // Whether any token in `[lo, hi)` is a `;`. A loop, not recursion: this scans
 // every token of a block, so on a large one the recursive form ran the native
@@ -2719,9 +2719,9 @@ allocations: 20581
 deallocations: 20581
 reallocations: 560
 bytes allocated: 1011492
-instructions executed: 3058469
-binary size: 3075864
-  code: 1758504
+instructions executed: 3058446
+binary size: 3075832
+  code: 1758472
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2817,7 +2817,7 @@ binary size: 3075864
     binop_expr: 2868
     binop_tail: 3920
     block: 996
-    block_entries: 3744
+    block_entries: 3736
     block_layout: 5112
     bump: 1624
     call_arg: 4680
@@ -2855,7 +2855,7 @@ binary size: 3075864
     lambda_param_ty: 1456
     lambda_params: 3236
     lead: 436
-    lead_loop: 1532
+    lead_loop: 1512
     let_stmt: 19204
     main: 152
     match_arms: 5056
@@ -2864,7 +2864,7 @@ binary size: 3075864
     name_atom: 5572
     named_ty: 3656
     new_walker: 200
-    next_start: 536
+    next_start: 532
     params_until: 9516
     paren_atom: 5316
     paren_ty: 7608

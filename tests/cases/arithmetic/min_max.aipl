@@ -1,8 +1,14 @@
-import { max, min, == } from builtins;
+import { len, max, min, wrapping_add as +, +++, == } from builtins;
 
-// `min`/`max` return the smaller / larger of two `i64`s. Callable free
-// (`min(a, b)`) or as a method (`a.max(b)`); a bare literal operand flexes to
-// `i64`. Equal operands return that value; negatives compare by value.
+// `min`/`max` return the smaller / larger of two comparable values. They carry
+// the `ord` bound — the same one `minimum`/`maximum` use — so they work at any
+// integer width, on `char`, and on `str`, not just `i64`. Callable free
+// (`min(a, b)`, the form to prefer) or as a method (`a.max(b)`); a bare literal
+// operand flexes to the other side's type. Equal operands return that value.
+//
+// Signedness comes from the operand type, which is the whole point of the
+// bound: a `u64` above `i64::MAX` compares as the large number it is, where a
+// signed compare would read it as negative and pick the wrong side.
 fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
     assert(min(3, 7) == 3);
     assert(max(3, 7) == 7);
@@ -15,20 +21,50 @@ fn clamp_low(x: i64, lo: i64) -> i64 { x.max(lo) }.test({
     assert((-5).max(0) == 0);
     assert(clamp_low(-3, 0) == 0); // used inside a function body
     assert(clamp_low(8, 0) == 8);
+
+    // Unsigned: `len()` is `u64`, and this value has the top bit set.
+    let huge: u64 = "".len() + 9223372036854775807 + 9223372036854775807;
+    let one: u64 = "x".len();
+    assert(min(huge, one) == one);
+    assert(max(huge, one) == huge);
+
+    // `char` compares by code point.
+    assert(min('a', 'z') == 'a');
+    assert(max('a', 'z') == 'z');
+
+    // `str` orders lexicographically by bytes, as `<`/`>` and `sort` do. The
+    // result aliases whichever operand won, so it is retained and released like
+    // any other owned str — the balanced allocation counts below cover it.
+    assert(min("pear", "apple") == "apple");
+    assert(max("pear", "apple") == "pear");
+    assert(min("ab", "abc") == "ab"); // a prefix orders first
+
+    // Freshly allocated (non-static) strings, so the losing operand is freed and
+    // the winner is retained — the balanced counts below are what proves it.
+    let a = "x" +++ "yz";
+    let b = "x" +++ "ya";
+    assert(min(a, b) == "xya");
+    assert(max(a, b) == "xyz");
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 0
-instructions executed: 142
-binary size: 2680
-  code: 648
-    main: 648
-  data: 536
-  metadata: 1496
-builtin calls: 14
-  aipl_assert: 11
+bytes allocated: 80
+instructions executed: 276
+binary size: 5624
+  code: 1768
+    main: 1768
+  data: 1038
+  metadata: 2818
+builtin calls: 78
+  aipl_assert: 20
+  aipl_concat_lazy: 2
+  aipl_dec: 23
+  aipl_inc: 10
+  aipl_str_cmp: 5
+  aipl_str_eq: 5
+  aipl_str_len: 10
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1

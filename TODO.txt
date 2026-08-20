@@ -26,8 +26,9 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 misc cleanup:
   line_at.aipl should use .doc() instead of // header for docs
-  caret_block.aipl should use min/max
   caret_block.aipl should use .doc() instead of // header for docs
+  having both min and minimum is kinda weird. Maybe combine somehow?
+  min/max shouldn't allow mixed integer types
 
 integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
@@ -89,6 +90,7 @@ parser:
   implement the plan
 
 lint:
+  recognize and recommend min/max
   x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
@@ -256,8 +258,6 @@ figure out / fix why template literals are peforming worse than concat chains
 improve the highlighter test: correct code should never highlight as a mismatched bracket
 
 make try_left_fold and try_right_fold for use when the lambda returns an error
-
-stop still stands in for min, which is i64-only. Making min/max generic over ord would let that line read as the Rust original does — happy to do it if you want, but not assuming.
 
 lexer:
 - lex_err/tok should accept a span argument instead of a start and end

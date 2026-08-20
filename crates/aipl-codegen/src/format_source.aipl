@@ -75,8 +75,8 @@ deallocations: 2188
 reallocations: 6
 bytes allocated: 100657
 instructions executed: 330517
-binary size: 851384
-  code: 521140
+binary size: 851352
+  code: 521108
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -154,7 +154,7 @@ binary size: 851384
     __m6__binop_expr: 2868
     __m6__binop_tail: 3920
     __m6__block: 996
-    __m6__block_entries: 3744
+    __m6__block_entries: 3736
     __m6__block_layout: 5112
     __m6__bump: 1624
     __m6__call_arg: 4680
@@ -192,14 +192,14 @@ binary size: 851384
     __m6__lambda_param_ty: 1456
     __m6__lambda_params: 3236
     __m6__lead: 436
-    __m6__lead_loop: 1532
+    __m6__lead_loop: 1512
     __m6__let_stmt: 19204
     __m6__match_arms: 5056
     __m6__match_expr: 10744
     __m6__mut_stmt: 5364
     __m6__name_atom: 5572
     __m6__named_ty: 3656
-    __m6__next_start: 536
+    __m6__next_start: 532
     __m6__params_until: 9516
     __m6__paren_atom: 5316
     __m6__paren_ty: 7608

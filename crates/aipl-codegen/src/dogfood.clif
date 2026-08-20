@@ -241,147 +241,124 @@ block0(v0: i64, v1: i64, v2: i64):
     v15 = load.i64 notrap aligned v14+8
     v16 = load.i64 notrap aligned v1+8
     v17 = icmp ult v15, v16
-    v18 = uextend.i64 v17
-    brif v18, block1, block2
-
-block1:
-    v20 = iconst.i64 8
-    v21 = iadd.i64 v4, v20  ; v20 = 8
-    v22 = load.i64 notrap aligned v21+8
-    jump block3(v22)
-
-block2:
-    v23 = load.i64 notrap aligned v1+8
-    jump block3(v23)
-
-block3(v19: i64):
-    v24 = load.i64 notrap aligned v1
-    v25 = isub v19, v24
-    v26 = icmp ult v19, v24
-    v27 = iconst.i64 0
-    v28 = select v26, v27, v25  ; v27 = 0
-    v29 = iconst.i64 0
-    v30 = icmp eq v28, v29  ; v29 = 0
-    v31 = uextend.i64 v30
-    brif v31, block4, block5
-
-block4:
-    v33 = iconst.i64 1
-    jump block6(v33)  ; v33 = 1
-
-block5:
-    jump block6(v28)
-
-block6(v32: i64):
-    v34 = load.i64 notrap aligned v4
-    v35 = iconst.i64 1
-    v36 = iadd v34, v35  ; v35 = 1
-    v37 = iconst.i64 8197
-    v38 = call fn1(v36)
-    v39 = call fn2(v38)
-    v40 = call fn3(v37, v39)  ; v37 = 8197
-    v41 = iconst.i64 1
-    call fn4(v40)
-    v42 = call fn5(v41, v40)  ; v41 = 1
-    v43 = iconst.i64 0x0020_3e2d_2d11
+    v18 = select v17, v15, v16
+    v19 = load.i64 notrap aligned v1
+    v20 = isub v18, v19
+    v21 = icmp ult v18, v19
+    v22 = iconst.i64 0
+    v23 = select v21, v22, v20  ; v22 = 0
+    v24 = iconst.i64 1
+    v25 = icmp ugt v23, v24  ; v24 = 1
+    v26 = select v25, v23, v24  ; v24 = 1
+    v27 = load.i64 notrap aligned v4
+    v28 = iconst.i64 1
+    v29 = iadd v27, v28  ; v28 = 1
+    v30 = iconst.i64 8197
+    v31 = call fn1(v29)
+    v32 = call fn2(v31)
+    v33 = call fn3(v30, v32)  ; v30 = 8197
+    v34 = iconst.i64 1
+    call fn4(v33)
+    v35 = call fn5(v34, v33)  ; v34 = 1
+    v36 = iconst.i64 0x0020_3e2d_2d11
     call fn4(v2)
-    v44 = call fn6(v43, v2)  ; v43 = 0x0020_3e2d_2d11
-    v45 = iconst.i64 0x3a05
-    v46 = call fn7(v36)
-    call fn4(v46)
-    v47 = call fn8(v45, v46)  ; v45 = 0x3a05
-    v48 = iconst.i64 0x3a05
-    v49 = iconst.i64 1
-    v50 = iadd.i64 v12, v49  ; v49 = 1
-    v51 = call fn9(v50)
-    call fn4(v51)
-    v52 = call fn10(v48, v51)  ; v48 = 0x3a05
-    v53 = iconst.i64 2565
-    call fn4(v40)
-    v54 = call fn11(v53, v40)  ; v53 = 2565
-    v55 = iconst.i64 0x0a7c_200d
-    v56 = call fn12(v36)
-    call fn4(v56)
-    v57 = call fn13(v55, v56)  ; v55 = 0x0a7c_200d
-    v58 = iconst.i64 0x207c_200d
-    v59 = iconst.i64 8
-    v60 = iadd.i64 v4, v59  ; v59 = 8
-    v61 = load.i64 notrap aligned v60
-    v62 = load.i64 notrap aligned v60+8
-    v63 = call fn14(v0, v61, v62)
-    call fn4(v63)
-    v64 = call fn15(v58, v63)  ; v58 = 0x207c_200d
-    v65 = iconst.i64 2565
-    call fn4(v40)
-    v66 = call fn16(v65, v40)  ; v65 = 2565
-    v67 = iconst.i64 0x207c_200d
-    v68 = iconst.i64 8197
-    v69 = call fn17(v68, v12)  ; v68 = 8197
-    call fn4(v69)
-    v70 = call fn18(v67, v69)  ; v67 = 0x207c_200d
-    v71 = iconst.i64 1
-    v72 = iconst.i64 0x5e05
-    v73 = call fn19(v72, v32)  ; v72 = 0x5e05
-    call fn4(v73)
-    v74 = call fn20(v71, v73)  ; v71 = 1
-    v75 = iconst.i64 1
-    call fn4(v74)
-    v76 = call fn21(v74, v75)  ; v75 = 1
-    call fn4(v70)
-    call fn4(v76)
-    v77 = call fn22(v70, v76)
-    call fn4(v66)
-    call fn4(v77)
-    v78 = call fn23(v66, v77)
-    call fn4(v64)
-    call fn4(v78)
-    v79 = call fn24(v64, v78)
-    call fn4(v57)
-    call fn4(v79)
-    v80 = call fn25(v57, v79)
-    call fn4(v54)
-    call fn4(v80)
-    v81 = call fn26(v54, v80)
-    call fn4(v52)
-    call fn4(v81)
-    v82 = call fn27(v52, v81)
-    call fn4(v47)
-    call fn4(v82)
-    v83 = call fn28(v47, v82)
+    v37 = call fn6(v36, v2)  ; v36 = 0x0020_3e2d_2d11
+    v38 = iconst.i64 0x3a05
+    v39 = call fn7(v29)
+    call fn4(v39)
+    v40 = call fn8(v38, v39)  ; v38 = 0x3a05
+    v41 = iconst.i64 0x3a05
+    v42 = iconst.i64 1
+    v43 = iadd v12, v42  ; v42 = 1
+    v44 = call fn9(v43)
     call fn4(v44)
-    call fn4(v83)
-    v84 = call fn29(v44, v83)
-    call fn4(v42)
-    call fn4(v84)
-    v85 = call fn30(v42, v84)
-    call fn31(v38)
+    v45 = call fn10(v41, v44)  ; v41 = 0x3a05
+    v46 = iconst.i64 2565
+    call fn4(v33)
+    v47 = call fn11(v46, v33)  ; v46 = 2565
+    v48 = iconst.i64 0x0a7c_200d
+    v49 = call fn12(v29)
+    call fn4(v49)
+    v50 = call fn13(v48, v49)  ; v48 = 0x0a7c_200d
+    v51 = iconst.i64 0x207c_200d
+    v52 = iconst.i64 8
+    v53 = iadd v4, v52  ; v52 = 8
+    v54 = load.i64 notrap aligned v53
+    v55 = load.i64 notrap aligned v53+8
+    v56 = call fn14(v0, v54, v55)
+    call fn4(v56)
+    v57 = call fn15(v51, v56)  ; v51 = 0x207c_200d
+    v58 = iconst.i64 2565
+    call fn4(v33)
+    v59 = call fn16(v58, v33)  ; v58 = 2565
+    v60 = iconst.i64 0x207c_200d
+    v61 = iconst.i64 8197
+    v62 = call fn17(v61, v12)  ; v61 = 8197
+    call fn4(v62)
+    v63 = call fn18(v60, v62)  ; v60 = 0x207c_200d
+    v64 = iconst.i64 1
+    v65 = iconst.i64 0x5e05
+    v66 = call fn19(v65, v26)  ; v65 = 0x5e05
+    call fn4(v66)
+    v67 = call fn20(v64, v66)  ; v64 = 1
+    v68 = iconst.i64 1
+    call fn4(v67)
+    v69 = call fn21(v67, v68)  ; v68 = 1
+    call fn4(v63)
+    call fn4(v69)
+    v70 = call fn22(v63, v69)
+    call fn4(v59)
+    call fn4(v70)
+    v71 = call fn23(v59, v70)
+    call fn4(v57)
+    call fn4(v71)
+    v72 = call fn24(v57, v71)
+    call fn4(v50)
+    call fn4(v72)
+    v73 = call fn25(v50, v72)
+    call fn4(v47)
+    call fn4(v73)
+    v74 = call fn26(v47, v73)
+    call fn4(v45)
+    call fn4(v74)
+    v75 = call fn27(v45, v74)
+    call fn4(v40)
+    call fn4(v75)
+    v76 = call fn28(v40, v75)
+    call fn4(v37)
+    call fn4(v76)
+    v77 = call fn29(v37, v76)
+    call fn4(v35)
+    call fn4(v77)
+    v78 = call fn30(v35, v77)
+    call fn31(v31)
+    call fn31(v33)
+    call fn31(v35)
+    call fn31(v37)
+    call fn31(v39)
     call fn31(v40)
-    call fn31(v42)
     call fn31(v44)
-    call fn31(v46)
+    call fn31(v45)
     call fn31(v47)
-    call fn31(v51)
-    call fn31(v52)
-    call fn31(v54)
+    call fn31(v49)
+    call fn31(v50)
     call fn31(v56)
     call fn31(v57)
+    call fn31(v59)
+    call fn31(v62)
     call fn31(v63)
-    call fn31(v64)
     call fn31(v66)
+    call fn31(v67)
     call fn31(v69)
     call fn31(v70)
+    call fn31(v71)
+    call fn31(v72)
     call fn31(v73)
     call fn31(v74)
+    call fn31(v75)
     call fn31(v76)
     call fn31(v77)
-    call fn31(v78)
-    call fn31(v79)
-    call fn31(v80)
-    call fn31(v81)
-    call fn31(v82)
-    call fn31(v83)
-    call fn31(v84)
-    return v85
+    return v78
 }
 
 ; source variables:
@@ -390,11 +367,10 @@ block6(v32: i64):
 ;   v2 = filename
 ;   v4 = at
 ;   v12 = col
-;   v19 = stop
-;   v28 = width
-;   v32 = underline_len
-;   v36 = line_no
-;   v40 = blank
+;   v23 = width
+;   v26 = underline_len
+;   v29 = line_no
+;   v33 = blank
 ; __m24__companion_files
 function u0:37(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8

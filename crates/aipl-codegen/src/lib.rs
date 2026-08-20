@@ -13489,8 +13489,11 @@ fn compile_call_expr<M: Module>(
             (result_ptr, opt_ty)
         }
         "__builtin_min" | "__builtin_max" => {
-            // `min(a, b)` / `max(a, b)` on `i64`: compare and select the smaller
-            // or larger. Both operands are scalars (own no heap), so no inc/dec.
+            // `min(a, b)` / `max(a, b)` over any `ord` type — every integer
+            // width, `char`, or `str` — comparing and selecting the smaller or
+            // larger. Scalars compare with `icmp` under the operand type's own
+            // signedness; strings order lexicographically through the runtime
+            // `aipl_str_cmp`, exactly as `<`/`>` do.
             let disp = display_name(name);
             if args.len() != 2 {
                 return Err(Error::at(
@@ -13499,28 +13502,78 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (a, at) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            expect_type(
-                &at,
-                &Type::Primitive(Primitive::I64),
-                "min/max operand",
-                args[0].span.clone(),
-            )?;
             let (b, bt) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            expect_type(
-                &bt,
-                &Type::Primitive(Primitive::I64),
-                "min/max operand",
-                args[1].span.clone(),
-            )?;
-            // `min`: keep `a` when `a < b`; `max`: keep `a` when `a > b`.
-            let cc = if name == "__builtin_min" {
-                IntCC::SignedLessThan
+            // A bare integer literal flexes to the other side's width, so
+            // `n.max(1)` needs no conversion on the `1` whatever `n` is.
+            let at = aipl_syntax::flex_int_ty(&args[0], &at, &bt);
+            let bt = aipl_syntax::flex_int_ty(&args[1], &bt, &at);
+            let want = if name == "__builtin_min" {
+                "min"
             } else {
-                IntCC::SignedGreaterThan
+                "max"
             };
-            let cond = builder.ins().icmp(cc, a, b);
+            let is_str = is_str_repr(&at) && is_str_repr(&bt);
+            if !is_str {
+                if at != bt {
+                    return Err(Error::at(
+                        format!(
+                            "{want:?} between {} and {}: both sides must be the same type",
+                            type_name(&at),
+                            type_name(&bt),
+                        ),
+                        span.clone(),
+                    ));
+                }
+                if !matches!(&at, Type::Primitive(p) if p.is_int() || *p == Primitive::Char) {
+                    return Err(Error::at(
+                        format!(
+                            "{want:?} compares integers, chars or strs, not {}",
+                            type_name(&at)
+                        ),
+                        span.clone(),
+                    ));
+                }
+            }
+            // `min`: keep `a` when `a < b`; `max`: keep `a` when `a > b`.
+            let want_min = name == "__builtin_min";
+            let cond = if is_str {
+                // `aipl_str_cmp` returns a sign; test it against zero.
+                let f = builtins.import(module, builder.func, "aipl_str_cmp");
+                let inst = builder.ins().call(f, &[a, b]);
+                let c = builder.inst_results(inst)[0];
+                let cc = if want_min {
+                    IntCC::SignedLessThan
+                } else {
+                    IntCC::SignedGreaterThan
+                };
+                builder.ins().icmp_imm_s(cc, c, 0)
+            } else {
+                let signed = match &at {
+                    Type::Primitive(p) if p.is_int() => p.int_signed(),
+                    _ => false, // `char` is a byte — unsigned
+                };
+                let cc = match (want_min, signed) {
+                    (true, true) => IntCC::SignedLessThan,
+                    (true, false) => IntCC::UnsignedLessThan,
+                    (false, true) => IntCC::SignedGreaterThan,
+                    (false, false) => IntCC::UnsignedGreaterThan,
+                };
+                builder.ins().icmp(cc, a, b)
+            };
             let r = builder.ins().select(cond, a, b);
-            (r, Type::Primitive(Primitive::I64))
+            let result_ty = at;
+            // The result aliases whichever operand won, and both are tracked by
+            // the enclosing scope; take an independently-owned ref and track it,
+            // as `value_or` does for the same select-one-of-two shape. Scalars
+            // own nothing, so this is a no-op for them.
+            if needs_drop(&result_ty, structs) {
+                emit_retain(builder, module, builtins, structs, r, &result_ty);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(r, &result_ty));
+            }
+            (r, result_ty)
         }
         "__builtin_split" => {
             // `split(s, sep) -> str[]`: the runtime builds the array of parts
