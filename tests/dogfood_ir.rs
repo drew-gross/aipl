@@ -515,6 +515,38 @@ fn checked_in_ir_is_current() {
     }
 }
 
+/// The prebuilt object in this binary must have been built from the checked-in
+/// `.clif` — not an older copy of it.
+///
+/// Ordinary runs execute the dogfood entries straight out of the binary
+/// (`Compilation::from_prebuilt`), so a stale object means the compiler is
+/// quietly parsing with superseded AIPL while `checked_in_ir_is_current` still
+/// reports the artifact as fine. Cargo is supposed to make this impossible —
+/// `build.rs` lists both artifacts as `rerun-if-changed` inputs — and this test
+/// is here to make the failure loud rather than to distrust it.
+///
+/// Compares against the *live* artifact even under a staged run: the object was
+/// built from the live file, and the staged one deliberately hasn't been
+/// promoted yet.
+#[test]
+fn prebuilt_object_matches_checked_in_ir() {
+    for a in ARTIFACTS {
+        let path = artifact_path_of(a);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("missing IR {}: {e}", path.display()));
+        let built = aipl::codegen::prebuilt_fingerprint(a.file)
+            .unwrap_or_else(|| panic!("no prebuilt object for {}", a.file));
+        assert_eq!(
+            built,
+            aipl::codegen::artifact_fingerprint(&text),
+            "the prebuilt object for {} was built from a different version of it \
+             than the one checked in. Rebuild (`cargo build`) to pick up the \
+             current artifact.",
+            a.file
+        );
+    }
+}
+
 /// Every checked-in artifact the compiler runs on must actually load and compute
 /// correctly (independent of whether it's byte-current with source — that's
 /// `checked_in_ir_is_current`). Targets each artifact's env override when set,

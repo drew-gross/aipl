@@ -128,10 +128,6 @@ optimizations:
   claudes suggestions:
     A. Dev loop — the biggest numbers in the repo
 
-    A2. Every aipl process pays ~0.75s re-linking the dogfood engine; aipl fmt pays 2.69s. Measured on an empty file. It's Compilation::from_artifact (:4897) parsing 973KB / 40k lines of CLIF text and JIT-compiling 138 functions (fmt: 3.1MB, 316 more). The cases harness spawns aipl check for 258 cases (tests/cases.rs:1470), so a suite run burns ~190s of CPU on nothing but re-linking. Options:
-      a) cache the compiled code (ship a prebuilt object/dylib instead of re-JITting text)
-      b) lazily compile only the entries a run actually calls
-
     A3. The 5.9 MB runtime archive is written to a temp file on every link. link_with (crates/aipl-linker/src/lib.rs:44) writes libaipl_runtime.a next to the object, spawns clang, deletes the directory. Cases link twice each (production + instrumented) → ~760 links ≈ 4.5 GB of temp I/O per suite run. Cache it at a content-keyed path and reuse. Related: which("clang") re-scans PATH per link, and the archive is built with opt-level=3 but no -C debuginfo=0/strip (crates/aipl-linker/build.rs:50) — stripping shrinks the temp write, the link time, and ~12MB from the aipl binary itself (both archives are include_bytes!d).
 
     A4. Each perf-checked case compiles and links the program twice — production for behavior, instrumented for counters (tests/cases.rs:1539). Unavoidable in general, but worth checking whether the production binary can be reused when a case has no behavior sections.
@@ -186,6 +182,8 @@ optimizations:
 
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
     - The --- performance --- corpus totals 178,604 instructions and 1,400 allocations across 369 cases; 178 of them allocate nothing at all. The heavy tail (strings/int_parse at 6,779 instructions) is where C1/C2 would show up first, so those cases double as the benchmark for any of this.
+
+  Re-analyze with a focus on why nextest discovery takes so long
 
 effects:
   all effects should be shimmable actually

@@ -4,8 +4,14 @@ version = "0.1.0"
 edition = "2021"
 description = "AIPL cranelift codegen (JIT and object emission)"
 license = "MIT"
+# Prebuilds the checked-in dogfood CLIF into an object linked into the binary.
+build = "build.rs"
 
 [dependencies]
+# Shared with this crate's `build.rs`: linking a checked-in dogfood artifact
+# into a cranelift module, one implementation for both the JIT and the
+# build-time prebuilt object.
+aipl-artifact = { workspace = true }
 aipl-syntax = { workspace = true }
 aipl-mono = { workspace = true }
 # Used to parse the embedded `add.aipl` the compiler dogfoods via the FFI.
@@ -20,9 +26,6 @@ cranelift = { workspace = true }
 cranelift-jit = { workspace = true }
 cranelift-module = { workspace = true }
 cranelift-native = { workspace = true }
-# Parses checked-in CLIF (the dogfood IR) back into `Function`s to re-link into a
-# fresh JITModule, so the compiler dogfoods AIPL without recompiling it from source.
-cranelift-reader = { workspace = true }
 cranelift-object = { workspace = true }
 target-lexicon = { workspace = true }
 
@@ -31,3 +34,12 @@ path = "src/lib.rs"
 
 [lints]
 workspace = true
+
+# The build script links the checked-in dogfood artifacts into an object; it
+# needs the same cranelift pieces the crate itself does.
+[build-dependencies]
+aipl-artifact = { workspace = true }
+cranelift = { workspace = true }
+cranelift-module = { workspace = true }
+cranelift-native = { workspace = true }
+cranelift-object = { workspace = true }

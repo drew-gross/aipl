@@ -286,6 +286,7 @@ unsafe fn concat_materialize(v: *const u8) -> *const u8 {
 /// `str + str`, lazily: build a concat node holding the two operands. *Takes
 /// ownership* of the refs the caller pre-inc'd (no copy, no further inc/dec); the
 /// node's `aipl_dec` releases them. The defining producer of the concat repr.
+#[no_mangle]
 extern "C" fn aipl_concat_lazy(a: *const u8, b: *const u8) -> *const u8 {
     // Sum the operands' lengths once (each is O(1) — stored on heap/rope, encoded
     // on inline/view), so the whole rope's length is O(1) to read at the root.
@@ -376,6 +377,7 @@ unsafe fn free_dynamic_string(block: *mut u8, content_len: usize) {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_inc(ptr: *const u8) {
     match str_repr(ptr) {
         // Null and inline values own no heap — nothing to count.
@@ -391,6 +393,7 @@ extern "C" fn aipl_inc(ptr: *const u8) {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_dec(ptr: *const u8) {
     match str_repr(ptr) {
         // Null and inline values own no heap — nothing to free.
@@ -464,6 +467,7 @@ fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool
 
 /// `print(s: str)`. Prints `s` with a trailing newline and drops its
 /// refcount to honor the caller's pre-call inc. Returns nothing.
+#[no_mangle]
 extern "C" fn aipl_print(ptr: *const u8) {
     use std::io::Write;
     // A null str prints nothing (defensive — well-typed code never passes one);
@@ -483,6 +487,7 @@ extern "C" fn aipl_print(ptr: *const u8) {
 
 /// `fn main() -> !Error` failure path (JIT): write `error: <msg>` to stderr.
 /// Borrows `msg` (no refcount change) — the caller's scope drop frees it.
+#[no_mangle]
 extern "C" fn aipl_print_error(msg: *const u8) {
     use std::io::Write;
     let stderr = std::io::stderr();
@@ -500,6 +505,7 @@ extern "C" fn aipl_print_error(msg: *const u8) {
 /// (`emit_char_at`) wraps the result into an Optional slot. Decrements `s` per
 /// the refcount protocol — callers pre-inc before the call as with any
 /// str-taking fn.
+#[no_mangle]
 extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
     let mut found: i64 = -1;
     if i >= 0 {
@@ -523,6 +529,7 @@ extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
 /// `s.is_all_whitespace() -> bool` (returned as i64 0/1): true when every byte is
 /// ASCII whitespace, or `s` is empty (consistent with `s.trim() == ""`). Consumes
 /// `s` (decs), like the other str builtins — callers pre-inc.
+#[no_mangle]
 extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
     // Scan leaves, stopping at the first non-whitespace chunk — no materializing.
     // An empty string visits no chunks, so it stays all-whitespace (true).
@@ -540,6 +547,7 @@ extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
 /// non-UTF-8 path, or a NUL byte in the contents (which a NUL-terminated str
 /// can't represent). Codegen wraps null into None. Decrements `name` per the
 /// refcount protocol (callers pre-inc, as with any str-taking fn).
+#[no_mangle]
 extern "C" fn aipl_read_file_to_string(name: *const u8) -> *const u8 {
     let result = read_file_impl(name);
     aipl_dec(name);
@@ -567,6 +575,7 @@ fn read_file_impl(name: *const u8) -> *const u8 {
 /// bytes to `path`, returning 1 on success or 0 on any failure (bad UTF-8 path,
 /// open/write error). Decrements both `path` and `contents` per the refcount
 /// protocol (callers pre-inc, as with any str-taking fn).
+#[no_mangle]
 extern "C" fn aipl_write_string_to_file(path: *const u8, contents: *const u8) -> i64 {
     let result = write_file_impl(path, contents);
     aipl_dec(path);
@@ -598,6 +607,7 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
 /// listed, and a symlink counts as a file (`file_type` doesn't follow it), so the
 /// walk can't cycle. Decrements `dir` per the refcount protocol (callers pre-inc,
 /// as with any str-taking fn). Mirrors `aipl_list_files` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
     let result = list_files_impl(dir);
     aipl_dec(dir);
@@ -661,6 +671,7 @@ fn join_path(dir: &str, name: &str) -> String {
 /// clock set before the epoch reads as 0 rather than wrapping. Takes nothing and
 /// owns nothing, so there is no refcount traffic. Mirrors `aipl_now_nanos` in
 /// the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_now_nanos() -> i64 {
     match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
         Ok(d) => d.as_nanos() as u64 as i64,
@@ -675,6 +686,7 @@ extern "C" fn aipl_now_nanos() -> i64 {
 /// rather than `std::time::Instant` because `Instant` has no way to yield an
 /// absolute count, and because it puts this runtime and the linker's on the
 /// exact same clock. Mirrors `aipl_monotonic_now` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_monotonic_now() -> i64 {
     monotonic_nanos()
 }
@@ -735,6 +747,7 @@ static SHIM_SLOTS: [std::sync::atomic::AtomicI64; aipl_syntax::SHIM_SLOT_COUNT] 
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
+#[no_mangle]
 extern "C" fn aipl_shim_get(idx: i64) -> i64 {
     SHIM_SLOTS
         .get(idx as usize)
@@ -742,6 +755,7 @@ extern "C" fn aipl_shim_get(idx: i64) -> i64 {
 }
 
 /// Install `ptr` (0 to clear) as the shim for slot `idx`.
+#[no_mangle]
 extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
     if let Some(slot) = SHIM_SLOTS.get(idx as usize) {
         slot.store(ptr, std::sync::atomic::Ordering::Relaxed);
@@ -762,6 +776,7 @@ extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
 /// 0/8/16 (`stdout`/`stderr`/`exit_code` — must stay in sync with
 /// `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Decrements `program` and
 /// `args` per the refcount protocol.
+#[no_mangle]
 extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
     let arr = aipl_arr_ensure_heap(args);
     execute_program_impl(out, program, arr);
@@ -832,12 +847,14 @@ fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
 
 /// Decimal byte length of `n` (with a leading `-` for negatives). Must agree,
 /// byte-for-byte, with `aipl_write_i64`.
+#[no_mangle]
 extern "C" fn aipl_i64_len(n: i64) -> i64 {
     let mut buf = [0u8; 24];
     fmt_i64(&mut buf, n) as i64
 }
 
 /// Write `n`'s decimal representation at `dst`; return the advanced cursor.
+#[no_mangle]
 extern "C" fn aipl_write_i64(dst: *const u8, n: i64) -> *const u8 {
     let mut buf = [0u8; 24];
     let len = fmt_i64(&mut buf, n);
@@ -875,12 +892,14 @@ fn fmt_i64(buf: &mut [u8; 24], n: i64) -> usize {
 
 /// Decimal byte length of `n` interpreted as *unsigned*. Agrees, byte-for-byte,
 /// with `aipl_write_u64` (used to render `u8`/`u16`/`u32`/`u64`).
+#[no_mangle]
 extern "C" fn aipl_u64_len(n: i64) -> i64 {
     let mut buf = [0u8; 24];
     fmt_u64(&mut buf, n as u64) as i64
 }
 
 /// Write `n` (interpreted as unsigned) in decimal at `dst`; return the cursor.
+#[no_mangle]
 extern "C" fn aipl_write_u64(dst: *const u8, n: i64) -> *const u8 {
     let mut buf = [0u8; 24];
     let len = fmt_u64(&mut buf, n as u64);
@@ -914,6 +933,7 @@ fn fmt_u64(buf: &mut [u8; 24], n: u64) -> usize {
 /// Byte content length of a `str`; 0 for null. O(1) for every representation —
 /// each stores or encodes its length, so this never walks the bytes (a rope reads
 /// the total cached at its root; a heap string reads its header word).
+#[no_mangle]
 extern "C" fn aipl_str_len(s: *const u8) -> i64 {
     match str_repr(s) {
         StrRepr::Null => 0,
@@ -925,6 +945,7 @@ extern "C" fn aipl_str_len(s: *const u8) -> i64 {
 }
 
 /// Copy `n` bytes `src` → `dst`; return the advanced cursor.
+#[no_mangle]
 extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const u8 {
     let n = n.max(0) as usize;
     unsafe {
@@ -936,6 +957,7 @@ extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const
 /// Allocate one writable `str` buffer of `len` content bytes (refcount 1,
 /// NUL-terminated); return the data pointer. The single allocation behind a
 /// whole `to_str`.
+#[no_mangle]
 extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
     let raw = alloc_dynamic_string(len.max(0) as usize);
     unsafe { raw.add(STR_HEADER_SIZE) }
@@ -943,6 +965,7 @@ extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
 
 /// `str + str`. Allocates a fresh refcounted buffer holding the two operands
 /// concatenated. Decrements both inputs at the end.
+#[no_mangle]
 extern "C" fn aipl_concat(a: *const u8, b: *const u8) -> *const u8 {
     let mut ba = [0u8; 8];
     let mut bb = [0u8; 8];
@@ -974,6 +997,7 @@ extern "C" fn aipl_concat(a: *const u8, b: *const u8) -> *const u8 {
 
 /// `trim(s) -> str`. Returns a fresh string with leading/trailing ASCII
 /// whitespace removed, then drops `s`. Mirrors the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
     let mut sb = [0u8; 8];
     let bytes = unsafe { str_bytes(s, &mut sb) };
@@ -1011,6 +1035,7 @@ extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
 
 /// `s.reverse() -> str` — returns a new string with the bytes in reverse order.
 /// Consumes `s` per the refcount protocol (callers pre-inc).
+#[no_mangle]
 extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
     let mut sb = [0u8; 8];
     let bytes = unsafe { str_bytes(s, &mut sb) };
@@ -1025,6 +1050,7 @@ extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
 /// str-shaped counterpart of [`aipl_arr_sort`], for a `str` or `char[]` receiver
 /// (the two share a representation, so neither is a real array block).
 /// Consumes `s` (callers pre-inc). Mirrors the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
     let mut sb = [0u8; 8];
     let bytes = unsafe { str_bytes(s, &mut sb) };
@@ -1042,6 +1068,7 @@ extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
 /// so it is read here as `i64`: the `n <= 0` guard yields `""` for zero and —
 /// reading as negative — for any `u64` past `i64::MAX`, which could never be
 /// allocated anyway.
+#[no_mangle]
 extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
     let mut sb = [0u8; 8];
     let bytes = unsafe { str_bytes(s, &mut sb) };
@@ -1077,6 +1104,7 @@ const SORT_KIND_STR: i64 = 2;
 /// no ownership, hence the single blanket retain before sorting.
 ///
 /// Mirrors `aipl_arr_sort` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_arr_sort(
     a: *const u8,
     drop_fn: i64,
@@ -1134,6 +1162,7 @@ fn sort_words(words: &mut [i64], kind: i64) {
 /// `xs.reverse() -> T[]` — O(1): returns a reversed-view repr wrapping `xs`.
 /// Transfers ownership of `xs` into the view (no drop, no retain).
 /// `drop_fn`, `retain_fn`, `elem_size` describe the element type.
+#[no_mangle]
 extern "C" fn aipl_arr_reverse(
     a: *const u8,
     drop_fn: i64,
@@ -1151,6 +1180,7 @@ extern "C" fn aipl_arr_reverse(
 /// out-of-range end yields a shorter string; `start >= end` yields `""`).
 /// *Borrows* `s` (does not drop it) and returns a fresh `str`. Stage 1 always
 /// copies; Stage 2 returns a buffer-sharing view for large heap sources.
+#[no_mangle]
 extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
     let mut sb = [0u8; 8];
     let bytes = unsafe { str_bytes(s, &mut sb) };
@@ -1183,6 +1213,7 @@ extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
 /// *Borrows* `xs` (does not drop it) and returns a fresh heap array holding
 /// copies of the elements in `[start, end)`, each retained via `retain_fn`
 /// (0 for scalar elements).
+#[no_mangle]
 extern "C" fn aipl_arr_slice(
     a: *const u8,
     start: i64,
@@ -1227,6 +1258,7 @@ extern "C" fn aipl_arr_slice(
 /// for a large part, else an inline/heap copy). An empty `sep` yields one part:
 /// the whole string. *Consumes* both `self` and `sep` (drops the handed refs); the
 /// view parts hold their own refs on `self`'s buffer, so it outlives them.
+#[no_mangle]
 extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
     let mut sb = [0u8; 8];
     let mut pb = [0u8; 8];
@@ -1279,6 +1311,7 @@ extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
 /// Consumes both args (the array drop releases its element strings), like the
 /// other str builtins.
+#[no_mangle]
 extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
     let result = unsafe {
         let len = *(arr.add(ARR_LEN_OFFSET) as *const i64) as usize;
@@ -1330,6 +1363,7 @@ extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
 /// loop and `to_str` rendering), which can't assume NUL-termination once views
 /// exist. Inline content is copied into the caller's 8-byte `scratch`; owned and
 /// view content is returned in place (valid while `scratch` and `s` live).
+#[no_mangle]
 extern "C" fn aipl_str_data(s: *const u8, scratch: *mut u8) -> *const u8 {
     match str_repr(s) {
         StrRepr::Inline => {
@@ -1369,6 +1403,7 @@ const ITER_LEAF_LEN: usize = 40;
 const ITER_SCRATCH: usize = 48;
 const ITER_SIZE: usize = 56;
 
+#[no_mangle]
 extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
     unsafe {
         *(cur.add(ITER_ROOT) as *mut *const u8) = s;
@@ -1381,6 +1416,7 @@ extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
 }
 
 /// Next byte of the iterated string as `0..=255`, or `-1` at the end.
+#[no_mangle]
 extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
     unsafe {
         let pos = *(cur.add(ITER_POS) as *const i64);
@@ -1427,6 +1463,7 @@ extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
 /// In-place trim for a uniquely owned string (mirrors the linker runtime).
 /// Shifts the trimmed content to the front and `realloc`s down to fit, reusing
 /// the block; a static literal can't be mutated so it copies. `s` is reused.
+#[no_mangle]
 extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
     // Only a uniquely-owned (non-static) heap string can be trimmed in place; any
     // other representation copies via `aipl_trim`. Matching (rather than an `is_*`
@@ -1481,6 +1518,7 @@ extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
 /// In-place concat for a uniquely owned string (mirrors the linker runtime).
 /// Grows `a`'s buffer with `realloc` and appends `b`; a static literal can't be
 /// grown so it copies instead. `a` is reused (not dropped); `b` is dropped.
+#[no_mangle]
 extern "C" fn aipl_concat_mut(a: *const u8, b: *const u8) -> *const u8 {
     // Only a uniquely-owned (non-static) heap `a` can be grown in place; any other
     // representation copies via `aipl_concat`. Matching (rather than an `is_*`
@@ -1693,11 +1731,13 @@ unsafe fn heap_elem_ptr(base: *const u8, idx: usize, elem_size: usize) -> *const
 /// path). Returns a pointer to element `idx` in any array representation.
 /// `elem_size` is the stride in bytes (0 = bit-packed, NOT valid here — use
 /// `aipl_arr_load_bit` for bit-packed arrays).
+#[no_mangle]
 extern "C" fn aipl_arr_elem_ptr(a: *const u8, idx: i64, elem_size: i64) -> *const u8 {
     unsafe { arr_elem_ptr(a, idx as usize, elem_size as usize) }
 }
 
 /// Repr-aware bit load for JIT-compiled code. Returns 0 or 1.
+#[no_mangle]
 extern "C" fn aipl_arr_load_bit(a: *const u8, idx: i64) -> i64 {
     i64::from(unsafe { arr_load_bit(a, idx as usize) })
 }
@@ -1814,6 +1854,7 @@ fn alloc_array(len: usize, cap: usize, drop_fn: i64, elem_size: i64) -> *const u
 /// Allocate an array of `len` uninitialized elements (refcount 1, cap == len)
 /// with the given element `drop_fn` (0 for scalar elements) and `elem_size`.
 /// Codegen stores each element immediately after.
+#[no_mangle]
 extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     let len = len.max(0) as usize;
     alloc_array(len, len, drop_fn, elem_size)
@@ -1822,12 +1863,14 @@ extern "C" fn aipl_array_new(len: i64, drop_fn: i64, elem_size: i64) -> *const u
 /// Allocate an empty array (len 0, refcount 1) reserved to `cap` slots of
 /// `elem_size` bytes with the given element `drop_fn`. Used by `map`/`filter` to
 /// pre-size their output. Mirrors `aipl_array_with_cap` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_array_with_cap(cap: i64, drop_fn: i64, elem_size: i64) -> *const u8 {
     alloc_array(0, cap.max(0) as usize, drop_fn, elem_size)
 }
 
 /// Decrement an array's refcount; at zero, release each element via the
 /// stored `drop_fn` (if any) and free the block (sized by its byte-capacity).
+#[no_mangle]
 extern "C" fn aipl_array_dec(ptr: *const u8) {
     if ptr.is_null() {
         return;
@@ -1874,6 +1917,7 @@ extern "C" fn aipl_array_dec(ptr: *const u8) {
 /// Retain an array value (any representation).  Arrays use this instead of
 /// `aipl_inc` because `aipl_inc` dispatches on the *string* tag scheme, which
 /// would misinterpret an array's representation tag.
+#[no_mangle]
 extern "C" fn aipl_arr_inc(ptr: *const u8) {
     if ptr.is_null() {
         return;
@@ -1941,6 +1985,7 @@ fn rec_layout(payload_size: usize) -> std::alloc::Layout {
 /// Allocate a boxed recursive-type value with a `size`-byte payload (strong 1,
 /// weak 0), returning the payload pointer. Codegen stores the tag/fields
 /// immediately after.
+#[no_mangle]
 extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
     let size = size.max(0) as usize;
     let layout = rec_layout(size);
@@ -1958,14 +2003,17 @@ extern "C" fn aipl_rec_alloc(size: i64, drop_fn: i64) -> *const u8 {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_rec_inc_strong(p: *const u8) {
     unsafe { *rec_block(p) += 1 }
 }
 
+#[no_mangle]
 extern "C" fn aipl_rec_inc_weak(p: *const u8) {
     unsafe { *rec_block(p).add(REC_WEAK_WORD) += 1 }
 }
 
+#[no_mangle]
 extern "C" fn aipl_rec_dec_strong(p: *const u8) {
     let b = rec_block(p);
     unsafe {
@@ -1976,6 +2024,7 @@ extern "C" fn aipl_rec_dec_strong(p: *const u8) {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_rec_dec_weak(p: *const u8) {
     let b = rec_block(p);
     unsafe {
@@ -2035,6 +2084,7 @@ fn rec_release(b: *mut i64) {
 /// the element at `x` (`elem_size` bytes), then drop `a`. Used when the array
 /// may be aliased. `retain_fn` retains the copied elements (the new array
 /// co-owns them).
+#[no_mangle]
 extern "C" fn aipl_array_push(
     a: *const u8,
     x: *const u8,
@@ -2089,6 +2139,7 @@ extern "C" fn aipl_array_push(
 /// static analysis proves the array is unaliased). Appends without copying when
 /// there's spare capacity, else grows to a doubled capacity by `realloc`.
 /// Mirrors `aipl_array_push_mut` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_array_push_mut(
     a: *const u8,
     x: *const u8,
@@ -2239,6 +2290,7 @@ extern "C" fn aipl_array_push_mut(
 /// `aipl_array_push_mut` / `aipl_arr_extend` can write straight into it. Sizing
 /// is exact rather than doubling: the spread knows its final length up front.
 /// Mirrors `aipl_arr_reserve` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_arr_reserve(
     a: *const u8,
     extra: i64,
@@ -2297,6 +2349,7 @@ extern "C" fn aipl_arr_reserve(
 /// made uniquely owned and large enough — so this is a single `memcpy` plus one
 /// retain pass, never a reallocation. Consumes (decs) `src`; `dst` keeps its
 /// identity. Mirrors `aipl_arr_extend` in the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_arr_extend(
     dst: *const u8,
     src: *const u8,
@@ -2355,6 +2408,7 @@ extern "C" fn aipl_arr_extend(
 /// (arg = the block's instruction count). The JIT path never reports perf
 /// counts (those come from the AOT instrumented runtime), so this is a no-op
 /// here — it exists only so the symbol resolves for JIT-run programs.
+#[no_mangle]
 extern "C" fn aipl_count_insns(_n: i64) {}
 
 // ---------- Test-runner runtime ----------
@@ -2440,12 +2494,14 @@ unsafe fn test_cstr(p: *const u8, buf: &mut [u8; 8]) -> &str {
     std::str::from_utf8(bytes).unwrap_or("<invalid utf8>")
 }
 
+#[no_mangle]
 extern "C" fn aipl_test_begin(name: *const u8) {
     TEST_CUR_NAME.store(name as usize, TestOrd::Relaxed);
     TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
     TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
 }
 
+#[no_mangle]
 extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
     if cond == 0 {
         print_fail_header();
@@ -2461,6 +2517,7 @@ extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
 // as failed and report the error's rendered message (the `?` unwraps `ok` and
 // carries on; on `err` it can't produce a value, so codegen fails the test here
 // and returns early). Same failure bookkeeping as `aipl_assert`.
+#[no_mangle]
 extern "C" fn aipl_test_fail(msg: *const u8) {
     print_fail_header();
     let mut mbuf = [0u8; 8];
@@ -2473,12 +2530,14 @@ extern "C" fn aipl_test_fail(msg: *const u8) {
 // `?` used inside a `.test` body, applied to a `none`: the optional analog of
 // [`aipl_test_fail`]. There is no payload to render — `none` carries nothing —
 // so the report just names what happened. Same failure bookkeeping.
+#[no_mangle]
 extern "C" fn aipl_test_fail_none() {
     print_fail_header();
     println!("  `?` propagated a `none`");
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
+#[no_mangle]
 extern "C" fn aipl_test_end() {
     TEST_TOTAL.fetch_add(1, TestOrd::Relaxed);
     if TEST_CUR_FAILED.load(TestOrd::Relaxed) {
@@ -2488,6 +2547,7 @@ extern "C" fn aipl_test_end() {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_test_summary() -> i64 {
     let (total, passed, failed) = test_totals();
     if !TEST_QUIET_SUMMARY.load(TestOrd::Relaxed) {
@@ -2545,6 +2605,7 @@ unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
 /// via `str_bytes`. Unlike `aipl_str_eq` this only *borrows* both inputs (no
 /// dec), so codegen emits no compensating pre-inc. Mirrors `aipl_str_cmp` in
 /// the linker runtime.
+#[no_mangle]
 extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
     let mut ab = [0u8; 8];
     let mut bb = [0u8; 8];
@@ -2556,6 +2617,7 @@ extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
     }
 }
 
+#[no_mangle]
 extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
     let eq = unsafe { rt_str_eq(a, b) };
     aipl_dec(a);
@@ -2566,6 +2628,7 @@ extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
 /// `s.starts_with(prefix) -> bool` (1/0): whether `s`'s bytes begin with
 /// `prefix`'s. Consumes (decs) both inputs, like the other str builtins; callers
 /// pre-inc. The empty prefix always matches.
+#[no_mangle]
 extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
     let pl = aipl_str_len(prefix) as usize;
     let starts = if (aipl_str_len(s) as usize) < pl {
@@ -2599,6 +2662,7 @@ extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
 /// `s.ends_with(suffix) -> bool` (1/0): whether `s`'s bytes end with `suffix`'s.
 /// Consumes (decs) both inputs, like the other str builtins; callers pre-inc.
 /// The empty suffix always matches.
+#[no_mangle]
 extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
     let sl = aipl_str_len(s) as usize;
     let ql = aipl_str_len(suffix) as usize;
@@ -2641,6 +2705,7 @@ extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
 /// `starts_with`/`ends_with` this reads both strings via `str_bytes` (a rope
 /// receiver materializes its memoized cache) — a streaming window search
 /// across chunk boundaries isn't worth the complexity here.
+#[no_mangle]
 extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
     let mut sb = [0u8; 8];
     let mut nb = [0u8; 8];
@@ -2657,6 +2722,7 @@ extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
 /// FNV-1a content hash of a NUL-terminated runtime string (consistent with
 /// `rt_str_eq`: equal content → equal hash). Borrows `a` — no refcount change.
 /// A null pointer hashes to the bare offset basis.
+#[no_mangle]
 extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
     // FNV-1a is a left fold over bytes, so it streams a rope's leaves in order
     // (same result as the flattened bytes) — no materialization.
@@ -2676,6 +2742,7 @@ extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
 /// set (`elem_size == 0`) compares unpacked bits and every other scalar set
 /// compares the 8-byte value. Returns 1 (present) or 0 (absent); a null/empty
 /// set is never a member.
+#[no_mangle]
 extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_cmp: i64) -> i64 {
     if a.is_null() {
         return 0;
@@ -2718,6 +2785,7 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
 /// `aipl_set_contains`). Returns the (possibly relocated) set pointer. For heap
 /// elements (`str`), `drop_fn`/`retain_fn` are the element helpers so the block
 /// frees/retains its strings; for scalars they're 0.
+#[no_mangle]
 extern "C" fn aipl_set_insert(
     a: *const u8,
     x: *const u8,
@@ -2749,6 +2817,7 @@ unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {
 /// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`.
 /// Consumes (decs) both inputs, like `aipl_concat`. Inserted elements are
 /// retained by `aipl_set_insert`, so they outlive the inputs' release.
+#[no_mangle]
 extern "C" fn aipl_set_union(
     a: *const u8,
     b: *const u8,
@@ -2787,6 +2856,7 @@ extern "C" fn aipl_set_union(
 /// `set a = a.union(b)` for an exclusive `a`: extend `a` in place with `b`'s
 /// distinct elements (reusing `a`'s allocation) and return the (possibly
 /// relocated) set. Consumes (decs) `b`; `a` is reused, not dec'd.
+#[no_mangle]
 extern "C" fn aipl_set_union_mut(
     a: *const u8,
     b: *const u8,
@@ -2842,6 +2912,7 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
 /// new one stored in its place (last-binding-wins); otherwise the pair is
 /// appended. Returns the (possibly relocated) dict pointer. Like the set/array
 /// inserters, the stored pair is retained, so the caller keeps its originals.
+#[no_mangle]
 extern "C" fn aipl_dict_insert(
     a: *const u8,
     pair_ptr: *const u8,
@@ -2867,6 +2938,7 @@ extern "C" fn aipl_dict_insert(
 /// Look up `key_ptr` in dict `a`: returns a pointer to the matching pair's value
 /// slot (its bytes are read/retained by the caller), or null if absent. Borrows
 /// `a` (no refcount change).
+#[no_mangle]
 extern "C" fn aipl_dict_get(
     a: *const u8,
     key_ptr: *const u8,
@@ -2882,6 +2954,7 @@ extern "C" fn aipl_dict_get(
 }
 
 /// `d.contains_key(k)`: whether `key_ptr` is a key of dict `a`. Borrows `a`.
+#[no_mangle]
 extern "C" fn aipl_dict_contains_key(
     a: *const u8,
     key_ptr: *const u8,
@@ -2892,6 +2965,7 @@ extern "C" fn aipl_dict_contains_key(
 }
 
 /// Element drop-fn for `str[]`: dec each element string.
+#[no_mangle]
 extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
     unsafe {
         let elems = elems as *const i64;
@@ -2903,6 +2977,7 @@ extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
 
 /// Element drop-fn for an array of arrays (`T[][]`): release each element
 /// array, which recursively releases its own elements via its own drop-fn.
+#[no_mangle]
 extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
     unsafe {
         let elems = elems as *const i64;
@@ -2914,6 +2989,7 @@ extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
 
 /// Element retain-fn for `str[]`/`T[][]`: inc each element pointer (the array's
 /// co-ownership). Both strings and arrays share the `inc` protocol.
+#[no_mangle]
 extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
     unsafe {
         let elems = elems as *const i64;
@@ -2925,6 +3001,7 @@ extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
 
 /// Element drop-fn for `str?[]`: each element is an inline 16-byte `{tag, value}`
 /// optional; dec the inner string when present (tag != 0).
+#[no_mangle]
 extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
     unsafe {
         for i in 0..len as usize {
@@ -2938,6 +3015,7 @@ extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
 }
 
 /// Element drop-fn for `T[]?[]`: release the inner array of each present element.
+#[no_mangle]
 extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
     unsafe {
         for i in 0..len as usize {
@@ -2952,6 +3030,7 @@ extern "C" fn aipl_arr_drop_opt_arr(elems: *const u8, len: i64) {
 
 /// Element retain-fn for `str?[]`/`T[]?[]`: inc the inner heap pointer of each
 /// present element (tag != 0). Both inner kinds share the `inc` protocol.
+#[no_mangle]
 extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
     unsafe {
         for i in 0..len as usize {
@@ -3198,7 +3277,7 @@ pub enum FfiValue {
 }
 
 pub struct Compilation {
-    module: JITModule,
+    code: Code,
     funcs: HashMap<String, FuncInfo>,
     /// Declared struct/variant layouts, retained so [`Compilation::call_values`]
     /// can marshal a struct return value back to the host (read each field at its
@@ -3529,19 +3608,17 @@ pub const FMT_IR_ENV: &str = "AIPL_FMT_IR";
 /// `fill_dogfood_ir`).
 ///
 /// This is a *path*, resolved at compile time from the manifest directory, and
-/// the file is read at run time. It used to be the artifact text itself, via
-/// `include_str!` — which made every `.clif` regeneration a source change to
-/// this crate, and so a full rebuild of it, everything downstream, and all 12
-/// test binaries: ~730s against a 1s no-op build. Since `promote_staged_ir`
-/// rewrites both artifacts, that cost landed on every handoff that touched IR
-/// generation. Reading at run time leaves no crate's fingerprint depending on
-/// the artifact, so regenerating one now costs nothing to rebuild.
+/// the file is read at run time — by the author helpers that regenerate and
+/// verify it, and by `build.rs`, which lowers it into the prebuilt object.
+/// Nothing reads it on the ordinary run path any more; the machine code it
+/// describes is already in the binary.
 ///
-/// The price is that a compiler binary is tied to the repo it was built from,
-/// and a missing artifact is a run-time panic rather than a compile error. The
-/// run-time read path is not new or lightly tested, though: it is exactly what
-/// [`DOGFOOD_IR_ENV`] has always done, and the staged-IR workflow drives the
-/// whole corpus through it before every promotion.
+/// It is not `include_str!`d into this crate. Doing that made every `.clif`
+/// regeneration a source change to a 16k-line crate, rebuilding it, everything
+/// downstream, and all 12 test binaries. `build.rs` does re-run when the
+/// artifact changes — that is what keeps the prebuilt object honest — so a
+/// regeneration is no longer free, but it costs a build-script run and a relink
+/// (~55s measured) rather than a recompile of the world.
 pub const DOGFOOD_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/dogfood.clif");
 /// The checked-in artifact's filename, for the `dogfood_ir` test.
 pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
@@ -3570,46 +3647,88 @@ fn inline_max_exprs() -> usize {
 /// exercises staged IR across the whole corpus before it's promoted to live.
 pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
 
-/// The dogfood-IR artifact text to link: the file named by [`DOGFOOD_IR_ENV`]
-/// if that env var is set to a non-empty path, else the checked-in
-/// [`DOGFOOD_CLIF_PATH`].
-fn dogfood_artifact_text() -> String {
-    artifact_text(DOGFOOD_IR_ENV, DOGFOOD_CLIF_PATH)
+/// The manifest headers of the two prebuilt artifacts, emitted alongside their
+/// object code by `build.rs`. Just the `;`-comment block — the FFI signatures
+/// and struct layouts the runtime marshals against — not the megabytes of IR
+/// bodies, which are already machine code by the time this crate compiles.
+const DOGFOOD_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/dogfood.manifest"));
+const FMT_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/fmt.manifest"));
+
+// Defines `DOGFOOD_PREBUILT` / `FMT_PREBUILT`: each artifact's entry points, as
+// (FFI name, address) pairs resolved by the system linker. See `build.rs`.
+include!(concat!(env!("OUT_DIR"), "/prebuilt.rs"));
+
+pub use aipl_artifact::fingerprint as artifact_fingerprint;
+
+/// The fingerprint of the artifact `<file>` (e.g. `"dogfood.clif"`) that this
+/// binary's prebuilt object was built from, or `None` if there is no such
+/// artifact. Compared against the checked-in file by a test — see
+/// [`artifact_fingerprint`].
+pub fn prebuilt_fingerprint(clif_file: &str) -> Option<u64> {
+    PREBUILT_FINGERPRINTS
+        .iter()
+        .find(|(f, _)| *f == clif_file)
+        .map(|(_, h)| *h)
 }
 
-/// The formatter artifact text, on the same rules.
-fn fmt_artifact_text() -> String {
-    artifact_text(FMT_IR_ENV, FMT_CLIF_PATH)
+/// The dogfood engine for this process: the prebuilt object normally, or a
+/// fresh JIT link of the file named by [`DOGFOOD_IR_ENV`] when that override is
+/// set.
+fn dogfood_engine() -> Compilation {
+    engine(
+        DOGFOOD_IR_ENV,
+        DOGFOOD_MANIFEST,
+        DOGFOOD_PREBUILT,
+        "dogfood engine",
+    )
 }
 
-/// Read an IR artifact: the path in `$env` if that's set to something non-empty,
-/// else `checked_in`. An I/O error is a loud panic either way — an override
-/// pointing at a missing file is a mistake to surface, and a missing checked-in
-/// artifact means the compiler can't parse its own source, for which there is
-/// deliberately no fallback (see "No native fallbacks for dogfooded functions").
-fn artifact_text(env: &str, checked_in: &'static str) -> String {
-    let (path, from) = match std::env::var(env) {
-        Ok(p) if !p.is_empty() => (p, env),
-        _ => (checked_in.to_string(), "checked-in IR"),
-    };
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("{from}: could not read IR at {path:?}: {e}"))
+/// The formatter engine, on the same rules.
+fn fmt_engine() -> Compilation {
+    engine(FMT_IR_ENV, FMT_MANIFEST, FMT_PREBUILT, "formatter engine")
+}
+
+/// Build one dogfood engine.
+///
+/// The default is the prebuilt object: the same artifact, already lowered to
+/// machine code inside this binary, so there is no IR to parse and nothing to
+/// compile. Setting `$env` to a `.clif` path swaps in the run-time JIT link of
+/// *that* file instead, which is how the staged-IR workflow validates candidate
+/// IR across the whole corpus before promoting it — the object in the binary
+/// was built from the live artifact and cannot speak for a staged one.
+///
+/// Either way a failure is a panic: the compiler cannot parse its own source
+/// without this engine, and there is deliberately no fallback (see "No native
+/// fallbacks for dogfooded functions").
+fn engine(
+    env: &str,
+    manifest: &'static str,
+    prebuilt: &'static [(&'static str, PrebuiltFn)],
+    what: &str,
+) -> Compilation {
+    match std::env::var(env) {
+        Ok(path) if !path.is_empty() => {
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{env}: could not read IR at {path:?}: {e}"));
+            Compilation::from_artifact(&text)
+                .unwrap_or_else(|e| panic!("{what} builds from {path:?}: {e:?}"))
+        }
+        _ => Compilation::from_prebuilt(manifest, prebuilt)
+            .unwrap_or_else(|e| panic!("{what} builds from the prebuilt object: {e:?}")),
+    }
 }
 
 thread_local! {
-    /// The one dogfood engine, re-linked from the checked-in IR (or the
-    /// [`DOGFOOD_IR_ENV`] override) lazily on first use per thread. A
-    /// `Compilation` isn't `Sync`, hence one per thread. Re-linking runs no
+    /// The one dogfood engine, built lazily on first use per thread. A
+    /// `Compilation` isn't `Sync`, hence one per thread. Building it runs no
     /// AIPL frontend, so it works even when the frontend can't currently
     /// compile the dogfooded sources, and never recurses even though several of
     /// these hooks are themselves invoked from the parser.
-    static DOGFOOD_ENGINE: Compilation = Compilation::from_artifact(&dogfood_artifact_text())
-        .expect("dogfood engine builds");
+    static DOGFOOD_ENGINE: Compilation = dogfood_engine();
 
     /// The formatter engine, built lazily and separately — so a compile that
     /// never formats never links the walker. See [`FMT_SOURCE_FILES`].
-    static FMT_ENGINE: Compilation = Compilation::from_artifact(&fmt_artifact_text())
-        .expect("formatter engine builds");
+    static FMT_ENGINE: Compilation = fmt_engine();
 }
 
 /// The parser's test-section-header hook (see [`install_parser_hooks`]): whether
@@ -4602,6 +4721,12 @@ fn host_isa() -> Result<std::sync::Arc<dyn TargetIsa>, Error> {
 /// a linkable symbol. Shared by [`Compilation::new`] (compiling AIPL source) and
 /// [`Compilation::from_artifact`] (re-linking checked-in dogfood IR) so both see
 /// the identical symbol table.
+///
+/// This table is for code compiled *in this process*. The prebuilt dogfood
+/// object (see `build.rs`) resolves the same builtins the ordinary way, through
+/// the system linker — which is why every one of them carries `#[no_mangle]`:
+/// an address registered here is invisible to a linker, so the object has to be
+/// able to find them by symbol name instead.
 fn new_jit_module() -> Result<JITModule, Error> {
     let isa = host_isa()?;
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
@@ -5078,61 +5203,63 @@ pub fn generate_dogfood_artifact(
     Ok(out)
 }
 
-impl Compilation {
-    pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
-        let mut module = new_jit_module()?;
+/// A prebuilt entry point: a function compiled into this binary by `build.rs`,
+/// held as a bare `fn()` because that is the one code-pointer shape Rust lets a
+/// `static` hold (a raw pointer is not `Sync`). Every call site transmutes it to
+/// the real signature, exactly as it does a JIT-finalized address.
+pub type PrebuiltFn = unsafe extern "C" fn();
 
-        // The JIT never reports perf counters, so it's never instrumented.
-        let (funcs, structs, ir) = compile_program(&mut module, program, None, dbg, false)?;
+/// Where a [`Compilation`]'s machine code lives.
+enum Code {
+    /// Compiled in this process, and owned by this module — source compilation,
+    /// and the `AIPL_DOGFOOD_IR` / `AIPL_FMT_IR` staging overrides.
+    Jit(JITModule),
+    /// Compiled at build time into the binary, addressed by a generated
+    /// name→address table. See [`Compilation::from_prebuilt`].
+    Prebuilt(&'static [(&'static str, PrebuiltFn)]),
+}
 
-        module
-            .finalize_definitions()
-            .map_err(|e| Error::msg(format!("finalize: {e}")))?;
-
-        Ok(Self {
-            module,
-            funcs,
-            structs,
-            ir,
+/// The FFI-callable metadata for an artifact's `; entry` functions, keyed by
+/// name — what `call` / `call_values` marshal against. `link` says how to reach
+/// the code, and differs between the JIT and prebuilt paths.
+fn entry_funcs(
+    manifest: &aipl_artifact::Manifest,
+    link: impl Fn(u32) -> FuncLink,
+) -> Result<HashMap<String, FuncInfo>, Error> {
+    manifest
+        .entries
+        .iter()
+        .map(|e| {
+            let params = e
+                .params
+                .iter()
+                .map(|t| ffi_type_from_tag(t).map(ParamInfo::borrowed))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((
+                e.name.clone(),
+                FuncInfo {
+                    link: link(e.id),
+                    params,
+                    return_ty: ffi_type_from_tag(&e.ret)?,
+                    effects: Vec::new(),
+                    is_mutating: false,
+                },
+            ))
         })
-    }
+        .collect()
+}
 
-    /// Build a `Compilation` by re-linking checked-in dogfood IR (the artifact
-    /// produced by [`generate_dogfood_artifact`]) into a fresh `JITModule`,
-    /// *without* running the AIPL frontend. This is how the compiler dogfoods
-    /// AIPL: even when the frontend can't compile the dogfooded `.aipl` sources
-    /// (mid-change), the checked-in CLIF still links and runs.
-    ///
-    /// The artifact is CLIF text with a `;`-comment manifest header. cranelift's
-    /// reader ignores the comments, so [`cranelift_reader::parse_functions`]
-    /// recovers the functions while we separately scan the comments for the
-    /// builtin-import table and the FFI metadata of the callable entries. Every
-    /// function carries its real `FuncId` in its `function u0:<id>` header (see
-    /// the `ctx.func.name` tagging in the emit sites), so we declare all ids in
-    /// ascending order — defined functions from the parsed signatures, builtin
-    /// imports by symbol name — reproducing the exact id↔name mapping the CLIF's
-    /// `u0:<id>` references were emitted against, then define each function.
-    pub fn from_artifact(text: &str) -> Result<Self, Error> {
-        // Parse the manifest carried as `;` comment lines.
-        let mut imports: HashMap<u32, String> = HashMap::new();
-        let mut entries: Vec<(String, u32, Vec<Type>, Type)> = Vec::new();
-        let mut structs: HashMap<String, TypeDef> = HashMap::new();
-        let mut data_entries: Vec<(u32, String, Vec<u8>)> = Vec::new();
-        for line in text.lines() {
-            let Some(body) = line.trim_start().strip_prefix(';') else {
-                continue;
-            };
-            let body = body.trim();
-            if let Some(rest) = body.strip_prefix("struct ") {
-                // `struct <name> <size> <field>@<offset>:<tag> ...`
-                let toks: Vec<&str> = rest.split_whitespace().collect();
-                let name = toks
-                    .first()
-                    .ok_or_else(|| Error::msg("`; struct` line missing name"))?;
-                let size: u32 = toks
-                    .get(1)
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| Error::msg("`; struct` line missing/invalid size"))?;
+/// Struct and variant layouts recovered from the artifact's `; struct` /
+/// `; variant` manifest lines, so a struct-returning entry can be marshaled back
+/// to the host field by field.
+fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String, TypeDef>, Error> {
+    let mut out = HashMap::new();
+    for line in &manifest.types {
+        let (name, def) = match line {
+            // `<name> <size> <field>@<offset>:<tag> ...`
+            aipl_artifact::TypeLine::Struct(body) => {
+                let toks: Vec<&str> = body.split_whitespace().collect();
+                let (name, size) = manifest_type_head(&toks, "struct")?;
                 let mut fields = Vec::new();
                 for ft in &toks[2..] {
                     let (fname, rest) = ft
@@ -5141,17 +5268,16 @@ impl Compilation {
                     let (off, tag) = rest
                         .split_once(':')
                         .ok_or_else(|| Error::msg(format!("malformed `; struct` field {ft:?}")))?;
-                    let offset: u32 = off
-                        .parse()
-                        .map_err(|_| Error::msg(format!("bad `; struct` field offset {ft:?}")))?;
                     fields.push(FieldLayout {
                         name: fname.to_string(),
                         ty: ffi_type_from_tag(tag)?,
-                        offset,
+                        offset: off.parse().map_err(|_| {
+                            Error::msg(format!("bad `; struct` field offset {ft:?}"))
+                        })?,
                     });
                 }
-                structs.insert(
-                    name.to_string(),
+                (
+                    name,
                     // FFI-marshalable types are never recursive (`check_ffi_return`
                     // rejects boxed types), so the manifest carries no flags.
                     TypeDef::Struct(StructLayout {
@@ -5160,18 +5286,13 @@ impl Compilation {
                         boxed: false,
                         scc: 0,
                     }),
-                );
-            } else if let Some(rest) = body.strip_prefix("variant ") {
-                // `variant <name> <size> <Case> <Case>(<off>:<tag>,...) ...`
-                // (payload fields are positional: offset + type tag, no name).
-                let toks: Vec<&str> = rest.split_whitespace().collect();
-                let name = toks
-                    .first()
-                    .ok_or_else(|| Error::msg("`; variant` line missing name"))?;
-                let size: u32 = toks
-                    .get(1)
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| Error::msg("`; variant` line missing/invalid size"))?;
+                )
+            }
+            // `<name> <size> <Case> <Case>(<off>:<tag>,...) ...`
+            // (payload fields are positional: offset + type tag, no name).
+            aipl_artifact::TypeLine::Variant(body) => {
+                let toks: Vec<&str> = body.split_whitespace().collect();
+                let (name, size) = manifest_type_head(&toks, "variant")?;
                 let mut cases = Vec::new();
                 for ct in &toks[2..] {
                     let (cname, fields) = match ct.split_once('(') {
@@ -5185,13 +5306,12 @@ impl Compilation {
                                 let (off, tag) = ft.split_once(':').ok_or_else(|| {
                                     Error::msg(format!("malformed `; variant` field {ft:?}"))
                                 })?;
-                                let offset: u32 = off.parse().map_err(|_| {
-                                    Error::msg(format!("bad `; variant` field offset {ft:?}"))
-                                })?;
                                 fields.push(FieldLayout {
                                     name: String::new(),
                                     ty: ffi_type_from_tag(tag)?,
-                                    offset,
+                                    offset: off.parse().map_err(|_| {
+                                        Error::msg(format!("bad `; variant` field offset {ft:?}"))
+                                    })?,
                                 });
                             }
                             (cname.to_string(), fields)
@@ -5202,203 +5322,117 @@ impl Compilation {
                         fields,
                     });
                 }
-                structs.insert(
-                    name.to_string(),
+                (
+                    name,
                     TypeDef::Variant(VariantLayout {
                         cases,
                         size,
                         boxed: false,
                         scc: 0,
                     }),
-                );
-            } else if let Some(rest) = body.strip_prefix("import ") {
-                let mut it = rest.split_whitespace();
-                let id: u32 = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| Error::msg("malformed `; import` line in dogfood IR"))?;
-                let sym = it
-                    .next()
-                    .ok_or_else(|| Error::msg("`; import` line missing symbol"))?;
-                imports.insert(id, sym.to_string());
-            } else if let Some(rest) = body.strip_prefix("entry ") {
-                let toks: Vec<&str> = rest.split_whitespace().collect();
-                let name = toks
-                    .first()
-                    .ok_or_else(|| Error::msg("`; entry` line missing name"))?;
-                let id: u32 = toks
-                    .get(1)
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| Error::msg("`; entry` line missing/invalid id"))?;
-                let arrow = toks
-                    .iter()
-                    .position(|t| *t == "->")
-                    .ok_or_else(|| Error::msg("`; entry` line missing `->`"))?;
-                let params = toks[2..arrow]
-                    .iter()
-                    .map(|t| ffi_type_from_tag(t))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let ret = ffi_type_from_tag(
-                    toks.get(arrow + 1)
-                        .ok_or_else(|| Error::msg("`; entry` line missing return type"))?,
-                )?;
-                entries.push((name.to_string(), id, params, ret));
-            } else if let Some(rest) = body.strip_prefix("data ") {
-                // `data <id> <name> <hex-bytes>` — static data object (string literals).
-                let mut it = rest.splitn(3, ' ');
-                let id: u32 = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| Error::msg("malformed `; data` id in dogfood IR"))?;
-                let name = it
-                    .next()
-                    .ok_or_else(|| Error::msg("`; data` line missing name"))?
-                    .to_string();
-                let hex = it
-                    .next()
-                    .ok_or_else(|| Error::msg("`; data` line missing bytes"))?;
-                if hex.len() % 2 != 0 {
-                    return Err(Error::msg("`; data` hex string has odd length"));
-                }
-                let bytes = (0..hex.len())
-                    .step_by(2)
-                    .map(|i| {
-                        u8::from_str_radix(&hex[i..i + 2], 16)
-                            .map_err(|_| Error::msg(format!("`; data` invalid hex at byte {i}")))
-                    })
-                    .collect::<Result<Vec<u8>, _>>()?;
-                data_entries.push((id, name, bytes));
+                )
             }
-        }
+        };
+        out.insert(name, def);
+    }
+    Ok(out)
+}
 
-        let parsed = cranelift_reader::parse_functions(text)
-            .map_err(|e| Error::msg(format!("parse dogfood IR: {e}")))?;
-
-        // Each parsed function's FuncId is encoded in its `function u0:<id>` header.
-        let mut defined: HashMap<u32, usize> = HashMap::new();
-        for (i, f) in parsed.iter().enumerate() {
-            let id = match &f.name {
-                UserFuncName::User(u) if u.namespace == 0 => u.index,
-                other => {
-                    return Err(Error::msg(format!(
-                        "dogfood IR function has unexpected name {other:?}"
-                    )))
-                }
-            };
-            if defined.insert(id, i).is_some() {
-                return Err(Error::msg(format!(
-                    "dogfood IR defines function id {id} twice"
-                )));
-            }
-        }
-
-        let max_id = defined
-            .keys()
-            .chain(imports.keys())
-            .copied()
-            .max()
-            .ok_or_else(|| Error::msg("dogfood IR has no functions"))?;
-
+/// The leading `<name> <size>` both type-manifest lines start with.
+fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32), Error> {
+    let name = toks
+        .first()
+        .ok_or_else(|| Error::msg(format!("`; {kind}` line missing name")))?;
+    let size = toks
+        .get(1)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| Error::msg(format!("`; {kind}` line missing/invalid size")))?;
+    Ok((name.to_string(), size))
+}
+impl Compilation {
+    pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
         let mut module = new_jit_module()?;
-        // Re-declare static data objects in id order so `u1:N` symbol references
-        // in the CLIF functions resolve to the right data at finalize time.
-        data_entries.sort_by_key(|(id, _, _)| *id);
-        for (expected_id, name, bytes) in &data_entries {
-            let got = module
-                .declare_data(name, Linkage::Local, false, false)
-                .map_err(|e| Error::msg(format!("declare dogfood data {name}: {e}")))?;
-            if got.as_u32() != *expected_id {
-                return Err(Error::msg(format!(
-                    "dogfood IR data id mismatch: expected {expected_id}, got {} \
-                     (declaration order broke)",
-                    got.as_u32()
-                )));
-            }
-            let mut desc = DataDescription::new();
-            desc.set_align(8);
-            desc.define(bytes.clone().into_boxed_slice());
-            module
-                .define_data(got, &desc)
-                .map_err(|e| Error::msg(format!("define dogfood data {name}: {e}")))?;
-        }
-        // Declare every id in ascending order so the JIT-assigned FuncIds line up
-        // with the `u0:<id>` indices baked into the CLIF.
-        let mut ids: Vec<FuncId> = Vec::with_capacity(max_id as usize + 1);
-        for id in 0..=max_id {
-            let got = match (imports.get(&id), defined.get(&id)) {
-                (Some(sym), None) => {
-                    let sig = builtin_import_sig(&mut module, sym);
-                    module
-                        .declare_function(sym, Linkage::Import, &sig)
-                        .map_err(|e| Error::msg(format!("declare dogfood import {sym}: {e}")))?
-                }
-                (None, Some(&i)) => {
-                    let sig = parsed[i].signature.clone();
-                    module
-                        .declare_function(&format!("__dogfood_fn{id}"), Linkage::Local, &sig)
-                        .map_err(|e| Error::msg(format!("declare dogfood fn {id}: {e}")))?
-                }
-                (None, None) => {
-                    return Err(Error::msg(format!(
-                        "dogfood IR has neither a function nor an import for id {id}"
-                    )))
-                }
-                (Some(_), Some(_)) => {
-                    return Err(Error::msg(format!(
-                        "dogfood IR id {id} is both a defined function and an import"
-                    )))
-                }
-            };
-            if got.as_u32() != id {
-                return Err(Error::msg(format!(
-                    "dogfood IR id mismatch: expected {id}, declaration produced {} \
-                     (declaration order broke)",
-                    got.as_u32()
-                )));
-            }
-            ids.push(got);
-        }
 
-        // Define each parsed function under its own id.
-        let mut ctx = module.make_context();
-        for f in &parsed {
-            let id = match &f.name {
-                UserFuncName::User(u) => u.index,
-                _ => unreachable!("validated above"),
-            };
-            ctx.func = f.clone();
-            module
-                .define_function(ids[id as usize], &mut ctx)
-                .map_err(|e| Error::msg(format!("define dogfood fn {id}: {e:?}")))?;
-            module.clear_context(&mut ctx);
-        }
+        // The JIT never reports perf counters, so it's never instrumented.
+        let (funcs, structs, ir) = compile_program(&mut module, program, None, dbg, false)?;
+
+        module
+            .finalize_definitions()
+            .map_err(|e| Error::msg(format!("finalize: {e}")))?;
+
+        Ok(Self {
+            code: Code::Jit(module),
+            funcs,
+            structs,
+            ir,
+        })
+    }
+
+    /// Build a `Compilation` by linking dogfood IR (the artifact produced by
+    /// [`generate_dogfood_artifact`]) into a fresh `JITModule`, *without*
+    /// running the AIPL frontend — so it works even when the frontend can't
+    /// currently compile the dogfooded `.aipl` sources.
+    ///
+    /// Ordinary runs don't come through here: they use
+    /// [`Compilation::from_prebuilt`], which reads the same artifact already
+    /// lowered to machine code by `build.rs`. This path exists for the artifact
+    /// the binary *wasn't* built against — the `AIPL_DOGFOOD_IR` /
+    /// `AIPL_FMT_IR` staging overrides, which run candidate IR across the whole
+    /// corpus before it is promoted, and the author helpers that validate a
+    /// freshly generated artifact.
+    ///
+    /// The linking itself — the id↔name mapping that makes the artifact's
+    /// `u0:<id>` references resolve — lives in [`aipl_artifact::link_artifact`],
+    /// shared with `build.rs` so the two can't drift.
+    pub fn from_artifact(text: &str) -> Result<Self, Error> {
+        let manifest = aipl_artifact::parse_manifest(text).map_err(Error::msg)?;
+        let mut module = new_jit_module()?;
+        let ids = aipl_artifact::link_artifact(
+            text,
+            &manifest,
+            &mut module,
+            &aipl_artifact::LinkNames::local("__dogfood_fn"),
+        )
+        .map_err(Error::msg)?;
         module
             .finalize_definitions()
             .map_err(|e| Error::msg(format!("finalize dogfood IR: {e}")))?;
-
-        // FFI-callable metadata for the declared entries, so `call`/`call_values`
-        // work exactly as they do for a source-compiled `Compilation`.
-        let mut funcs: HashMap<String, FuncInfo> = HashMap::new();
-        for (name, id, params, return_ty) in entries {
-            funcs.insert(
-                name,
-                FuncInfo {
-                    link: FuncLink::User(ids[id as usize]),
-                    params: params.into_iter().map(ParamInfo::borrowed).collect(),
-                    return_ty,
-                    effects: Vec::new(),
-                    is_mutating: false,
-                },
-            );
-        }
-
         Ok(Self {
-            module,
-            funcs,
+            funcs: entry_funcs(&manifest, |id| FuncLink::User(ids[id as usize]))?,
             // Struct layouts recovered from the `; struct` manifest lines, so a
             // struct-returning entry marshals back through `call_values`.
-            structs,
+            structs: manifest_structs(&manifest)?,
+            code: Code::Jit(module),
             ir: text.to_string(),
+        })
+    }
+
+    /// Build a `Compilation` over machine code that is *already in this binary*
+    /// — the same artifact, linked into a prebuilt object by `build.rs` instead
+    /// of JIT-compiled here. `manifest_text` is the artifact's `;`-comment
+    /// header, carried along by the build script; `entries` is the generated
+    /// name→address table for its `; entry` functions.
+    ///
+    /// This is the normal path, and it is the whole point of the prebuilt
+    /// object: it does no Cranelift work whatsoever, so a process that only
+    /// needs to parse (or format) starts in single-digit milliseconds instead of
+    /// re-lowering several hundred functions it lowered identically last time.
+    /// The manifest still gets parsed, because the FFI metadata and struct
+    /// layouts live there — but that is a scan of a few dozen header lines, not
+    /// of the megabytes of IR behind them.
+    pub fn from_prebuilt(
+        manifest_text: &'static str,
+        entries: &'static [(&'static str, PrebuiltFn)],
+    ) -> Result<Self, Error> {
+        let manifest = aipl_artifact::parse_manifest(manifest_text).map_err(Error::msg)?;
+        Ok(Self {
+            // The artifact's own id for the entry. Nothing dereferences it on
+            // this path — `code_ptr` resolves prebuilt entries by name — but it
+            // is the honest value, and it keeps `FuncInfo` uniform across both.
+            funcs: entry_funcs(&manifest, |id| FuncLink::User(FuncId::from_u32(id)))?,
+            structs: manifest_structs(&manifest)?,
+            code: Code::Prebuilt(entries),
+            ir: manifest_text.to_string(),
         })
     }
 
@@ -5407,22 +5441,19 @@ impl Compilation {
     }
 
     pub fn run_0(&self, name: &str) -> Result<i64, Error> {
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
         let f: extern "C" fn() -> i64 = unsafe { std::mem::transmute(ptr) };
         Ok(f())
     }
 
     pub fn run_1(&self, name: &str, a: i64) -> Result<i64, Error> {
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
         let f: extern "C" fn(i64) -> i64 = unsafe { std::mem::transmute(ptr) };
         Ok(f(a))
     }
 
     pub fn run_2(&self, name: &str, a: i64, b: i64) -> Result<i64, Error> {
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
         let f: extern "C" fn(i64, i64) -> i64 = unsafe { std::mem::transmute(ptr) };
         Ok(f(a, b))
     }
@@ -5439,8 +5470,7 @@ impl Compilation {
     /// Run a function taking a single `str[]`, passing `args` as that array.
     /// The callee owns the array (and its strings) and frees it on return.
     pub fn run_cli(&self, name: &str, args: &[String]) -> Result<i64, Error> {
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
         let f: extern "C" fn(*const u8) -> i64 = unsafe { std::mem::transmute(ptr) };
         Ok(f(build_cli_array(args)))
     }
@@ -5488,8 +5518,7 @@ impl Compilation {
                 args.len()
             )));
         }
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
         // SAFETY: every scalar AIPL param/return lowers to a single `i64`
         // (`cl_type_of`), and we verified arity (<= 6) + scalar types above, so
         // the finalized code matches the transmuted signature.
@@ -5568,8 +5597,7 @@ impl Compilation {
             }
         }
 
-        let id = self.lookup(name)?;
-        let ptr = self.module.get_finalized_function(id);
+        let ptr = self.code_ptr(name)?;
 
         if ret_is_opt {
             // Composite (optional) return: the callee writes it through a hidden
@@ -5697,6 +5725,25 @@ impl Compilation {
             FfiValue::Int(r)
         };
         Ok(result)
+    }
+
+    /// The address of `name`'s machine code, ready to transmute to its real
+    /// signature. The two [`Code`] backings resolve it differently — a JIT
+    /// module by `FuncId`, a prebuilt object by exported symbol name — and this
+    /// is the only place that distinction is visible.
+    fn code_ptr(&self, name: &str) -> Result<*const u8, Error> {
+        match &self.code {
+            Code::Jit(module) => Ok(module.get_finalized_function(self.lookup(name)?)),
+            Code::Prebuilt(entries) => entries
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, f)| *f as *const u8)
+                .ok_or_else(|| {
+                    // Reaching this means the generated table and the manifest
+                    // disagree, which `build.rs` builds them from together.
+                    Error::msg(format!("no prebuilt entry {name:?}"))
+                }),
+        }
     }
 
     fn lookup(&self, name: &str) -> Result<FuncId, Error> {

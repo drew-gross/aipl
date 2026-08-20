@@ -1,0 +1,21 @@
+[package]
+name = "aipl-artifact"
+version = "0.1.0"
+edition = "2021"
+description = "Linking checked-in AIPL dogfood CLIF artifacts into a cranelift Module"
+license = "MIT"
+
+# Deliberately dependency-free apart from cranelift: this crate is also a
+# *build* dependency of `aipl-codegen` (its `build.rs` links the same artifacts
+# into a prebuilt object), so anything it pulls in is compiled twice — once for
+# the host build script and once for the target.
+[dependencies]
+cranelift = { workspace = true }
+cranelift-module = { workspace = true }
+cranelift-reader = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true

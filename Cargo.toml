@@ -29,6 +29,7 @@ private_intra_doc_links = "allow"
 # written once (resolved relative to this workspace root).
 [workspace.dependencies]
 # Internal crates.
+aipl-artifact = { path = "crates/aipl-artifact" }
 aipl-syntax = { path = "crates/aipl-syntax" }
 aipl-parser = { path = "crates/aipl-parser" }
 aipl-mono = { path = "crates/aipl-mono" }
@@ -109,4 +110,12 @@ needless_range_loop = "allow"
 # If startup regresses, suspect the artifact growing rather than this setting —
 # link time scales with `dogfood.clif` size.
 [profile.dev.package."*"]
+opt-level = 2
+
+# Build scripts get the same optimization as ordinary dependencies. The reason is
+# `aipl-codegen`'s: it runs Cranelift over the whole dogfood artifact, which an
+# unoptimized Cranelift does an order of magnitude slower (see the note above).
+# Matching `[profile.dev.package."*"]` also lets Cargo share one set of cranelift
+# artifacts between the build script and the crate rather than building two.
+[profile.dev.build-override]
 opt-level = 2

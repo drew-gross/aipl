@@ -34,9 +34,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aipl-artifact"
+version = "0.1.0"
+dependencies = [
+ "cranelift",
+ "cranelift-module",
+ "cranelift-reader",
+]
+
+[[package]]
 name = "aipl-codegen"
 version = "0.1.0"
 dependencies = [
+ "aipl-artifact",
  "aipl-loader",
  "aipl-mono",
  "aipl-parser",
@@ -46,7 +56,6 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
- "cranelift-reader",
  "target-lexicon",
 ]
 
