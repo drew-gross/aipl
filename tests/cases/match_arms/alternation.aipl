@@ -1,0 +1,87 @@
+import { print, to_str } from builtins;
+
+// Several patterns may share one body: `A | B | C => body`.
+//
+// Grouping is source-level only — each alternative becomes its own arm before
+// anything else looks at the `match`, so exhaustiveness, codegen and the lints
+// all see exactly the shape they would have seen written longhand. Writing the
+// arms out one per line and grouping them here compile to the same program.
+variant Tok = Fn | If | Else | Name(str) | Num(i64)
+
+variant Class = Keyword | Other
+
+fn classify(t: Tok) -> Class {
+    match (t) {
+        Fn | If | Else => Keyword,
+        Name(_) => Other,
+        Num(_) => Other,
+    }
+}
+
+fn label(c: Class) -> str {
+    match (c) {
+        Keyword => "kw",
+        Other => "other",
+    }
+}
+
+// String-literal alternatives, against an open-domain `str` scrutinee (so the
+// match still has to end in `_`).
+fn keyword_group(s: str) -> i64 {
+    match (s) {
+        "let" | "mut" | "set" => 1,
+        "if" | "else" => 2,
+        _ => 0,
+    }
+}
+
+// Char-literal alternatives — the shape this feature is most useful for.
+fn is_vowel(c: char) -> bool {
+    match (c) {
+        'a' | 'e' | 'i' | 'o' | 'u' => true,
+        _ => false,
+    }
+}
+
+fn main() !prints {
+    print(label(classify(Fn)));
+    print(label(classify(Else)));
+    print(label(classify(Num(1))));
+    print(keyword_group("mut").to_str());
+    print(keyword_group("else").to_str());
+    print(keyword_group("nope").to_str());
+    print(is_vowel('e').to_str());
+    print(is_vowel('z').to_str());
+}
+--- stdout ---
+kw
+kw
+other
+1
+2
+0
+true
+false
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 374
+binary size: 3952
+  code: 2232
+    __to_str_bool: 212
+    __to_str_i64: 180
+    main: 1840
+  data: 47
+  metadata: 1673
+builtin calls: 99
+  aipl_dec: 40
+  aipl_i64_len: 6
+  aipl_inc: 8
+  aipl_print: 8
+  aipl_str_eq: 12
+  aipl_str_len: 20
+  aipl_write_bytes: 2
+  aipl_write_i64: 3

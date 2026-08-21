@@ -54,15 +54,14 @@ clock:
 
 utilitiy functions:
   split with predicate, use in companion_files.aipl
+  interaclate, generic join, use in walker.aipl to replace 0 < i loops.
 
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : dct) syntax for dicts
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
-  match arm grouping (i.e. ArmA | ArmB => { same_statement })
-  bump in walker.aipl contains mutations in a match, I thought we just banned that
+  allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
-  spread should require same type
 
 shim:
   better syntax
@@ -458,6 +457,7 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
+  replace is_binop with is_operator_name
 
 optimize string comparison by comparing more than one byte at a time
 

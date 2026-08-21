@@ -484,7 +484,30 @@ gazelle! {
                   // scrutinee by value. Like the `str` form it is open-domain,
                   // so such a match must end in `_`.
                   | CHAR FATARROW arm_body => char_arm
-                  | LBRACKET args RBRACKET FATARROW arm_body => array_arm;
+                  | LBRACKET args RBRACKET FATARROW arm_body => array_arm
+                  // `A | B | C => body` — several patterns sharing one body.
+                  // Only binding-free patterns may be grouped: an alternative
+                  // that bound a payload would have to bind the same names, at
+                  // the same types, in every branch, and nothing downstream is
+                  // set up to check that. So `some(v) | none` is a parse error,
+                  // not a silently-wrong binding.
+                  //
+                  // Expanded here into one `MatchArm` per pattern (the body is
+                  // cloned), so no later stage sees an alternation at all —
+                  // exhaustiveness, codegen and the lints all keep working on
+                  // the shape they already understand.
+                  | alt_heads FATARROW arm_body => alt_arm;
+        // Two or more binding-free patterns. A *single* pattern is already
+        // covered by the productions above, so this starts at a pair — which is
+        // also what keeps the grammar LR(1): after an IDENT, one token of
+        // lookahead (`|` here, `=>` / `(` / `.` there) picks the production.
+        alt_heads = alt_head PIPE alt_head => alt_pair
+                  | alt_heads PIPE alt_head => alt_more;
+        alt_head = IDENT => alt_nullary
+                 | IDENT DOT IDENT => alt_qualified
+                 | NONE => alt_none
+                 | STR => alt_str
+                 | CHAR => alt_char;
         // An arm's body: a single expression, or a brace-delimited statement
         // block whose trailing expression (if any) is the arm's value — exactly
         // an `if` branch's shape. Factored into its own nonterminal rather than
@@ -646,7 +669,10 @@ impl aipl::Types for Build {
     type ImportNameList = Vec<ImportName>;
     type ImportNames = Vec<ImportName>;
     type ArmBody = Expr;
-    type MatchArm = MatchArm;
+    // One written arm can produce several: see the `alt_arm` production.
+    type MatchArm = Vec<MatchArm>;
+    type AltHeads = Vec<(Pattern, Span)>;
+    type AltHead = (Pattern, Span);
     /// A shim's `op = f` binding, and the lists built from it.
     type ShimBinding = (String, String);
     type ShimBindingList = Vec<(String, String)>;
@@ -2371,6 +2397,56 @@ impl gazelle::Action<aipl::ShimBinding<Self>> for Build {
     }
 }
 
+impl gazelle::Action<aipl::AltHead<Self>> for Build {
+    /// One binding-free pattern inside an alternation, with its own span.
+    fn build(&mut self, node: aipl::AltHead<Self>) -> Result<(Pattern, Span), Self::Error> {
+        Ok(match node {
+            // `_` lexes as an identifier, so it arrives here like any nullary
+            // name — same as the standalone `nullary_arm` production.
+            aipl::AltHead::AltNullary((name, span)) => (
+                if name == "_" {
+                    Pattern::Wildcard
+                } else {
+                    Pattern::Ctor {
+                        name,
+                        bindings: Vec::new(),
+                    }
+                },
+                span,
+            ),
+            aipl::AltHead::AltQualified((v, span), (a, _)) => (
+                Pattern::Ctor {
+                    name: format!("{v}.{a}"),
+                    bindings: Vec::new(),
+                },
+                span,
+            ),
+            aipl::AltHead::AltNone(span) => (
+                Pattern::Ctor {
+                    name: "none".to_string(),
+                    bindings: Vec::new(),
+                },
+                span,
+            ),
+            aipl::AltHead::AltStr((lit, span)) => (Pattern::Str(lit), span),
+            aipl::AltHead::AltChar((c, span)) => (Pattern::Char(c), span),
+        })
+    }
+}
+
+impl gazelle::Action<aipl::AltHeads<Self>> for Build {
+    fn build(&mut self, node: aipl::AltHeads<Self>) -> Result<Vec<(Pattern, Span)>, Self::Error> {
+        Ok(match node {
+            // The middle field is the `|` terminal's own span, unused.
+            aipl::AltHeads::AltPair(a, _, b) => vec![a, b],
+            aipl::AltHeads::AltMore(mut prev, _, b) => {
+                prev.push(b);
+                prev
+            }
+        })
+    }
+}
+
 impl gazelle::Action<aipl::MatchArms<Self>> for Build {
     fn build(&mut self, node: aipl::MatchArms<Self>) -> Result<Vec<MatchArm>, Self::Error> {
         Ok(match node {
@@ -2383,9 +2459,9 @@ impl gazelle::Action<aipl::MatchArms<Self>> for Build {
 impl gazelle::Action<aipl::MatchArmList<Self>> for Build {
     fn build(&mut self, node: aipl::MatchArmList<Self>) -> Result<Vec<MatchArm>, Self::Error> {
         Ok(match node {
-            aipl::MatchArmList::First(a) => vec![a],
+            aipl::MatchArmList::First(a) => a,
             aipl::MatchArmList::Rest(mut prev, a) => {
-                prev.push(a);
+                prev.extend(a);
                 prev
             }
         })
@@ -2404,8 +2480,27 @@ impl gazelle::Action<aipl::ArmBody<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::MatchArm<Self>> for Build {
-    fn build(&mut self, node: aipl::MatchArm<Self>) -> Result<MatchArm, Self::Error> {
-        Ok(match node {
+    /// One written arm becomes one *or more* `MatchArm`s: an alternation
+    /// `A | B => body` expands here into one arm per pattern, so no later stage
+    /// ever sees an or-pattern. `MatchArmList` flattens the result.
+    fn build(&mut self, node: aipl::MatchArm<Self>) -> Result<Vec<MatchArm>, Self::Error> {
+        // `A | B | C => body`: one arm per pattern, each carrying its own
+        // pattern's span so a later diagnostic points at the alternative that
+        // caused it rather than at the whole group. The body is cloned per
+        // pattern — for the arms this exists to collapse (`Fn | If => Keyword`)
+        // that is exactly the code already written out longhand, so it costs
+        // nothing; a large shared body is duplicated, which is the tradeoff.
+        if let aipl::MatchArm::AltArm(heads, body) = node {
+            return Ok(heads
+                .into_iter()
+                .map(|(pattern, span)| MatchArm {
+                    pattern,
+                    body: body.clone(),
+                    span,
+                })
+                .collect());
+        }
+        Ok(vec![match node {
             aipl::MatchArm::CtorArm((name, span), bindings, body) => MatchArm {
                 pattern: Pattern::Ctor { name, bindings },
                 body,
@@ -2473,7 +2568,9 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
                     span,
                 }
             }
-        })
+            // Handled above, before this match.
+            aipl::MatchArm::AltArm(..) => unreachable!("AltArm returns early"),
+        }])
     }
 }
 

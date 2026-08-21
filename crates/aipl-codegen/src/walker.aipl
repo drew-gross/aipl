@@ -42,6 +42,7 @@ import {
     BreakParent,
     Concat,
     Doc,
+    Group,
     HardLine,
     IfBroken,
     Indent,
@@ -473,71 +474,21 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         RawTemplateMid(_) => TplMid,
         TemplateTail(_) => TplTail,
         RawTemplateTail(_) => TplTail,
-        Fn => Keyword,
-        If => Keyword,
-        Else => Keyword,
-        Struct => Keyword,
-        Variant => Keyword,
-        Import => Keyword,
-        From => Keyword,
-        As => Keyword,
-        Pub => Keyword,
-        Let => Keyword,
-        For => Keyword,
-        While => Keyword,
-        Mut => Keyword,
-        Set => Keyword,
-        Match => Keyword,
-        Return => Keyword,
-        Shim => Keyword,
-        Builtins => Keyword,
-        True => Constant,
-        False => Constant,
-        None => Constant,
-        // A name is a builtin *type* or an ordinary identifier.
+        Fn | If | Else | Struct | Variant | Import | From | As => Keyword,
+        Pub | Let | For | While | Mut | Set | Match | Return | Shim | Builtins => Keyword,
+        True | False | None => Constant,
         Name(n) => if (is_builtin_type_name(n)) { BuiltinType } else { Ident },
         IntLit(_) => Num,
         StrLit(_, _) => StrTok,
         CharTok(_) => CharTok,
-        EqEq => Op,
-        Ne => Op,
-        Arrow => Op,
-        FatArrow => Op,
-        AndAnd => Op,
-        OrOr => Op,
-        Pipe => Op,
-        DotDot => Op,
-        PlusPlusPlus => Op,
-        PlusPlus => Op,
-        Eq => Op,
-        Lt => Op,
-        Le => Op,
-        Gt => Op,
-        Ge => Op,
-        Bang => Op,
-        Plus => Op,
-        Minus => Op,
-        Star => Op,
-        Slash => Op,
-        Percent => Op,
-        Period => Punct,
-        Comma => Punct,
-        Colon => Punct,
-        Semi => Punct,
-        Question => Punct,
-        Hash => Punct,
-        LParen => Punct,
-        RParen => Punct,
-        LBrace => Punct,
-        RBrace => Punct,
-        LBracket => Punct,
-        RBracket => Punct,
+        EqEq | Ne | Arrow | FatArrow | AndAnd | OrOr | Pipe | DotDot => Op,
+        PlusPlusPlus | PlusPlus | Eq | Lt | Le | Gt | Ge | Bang => Op,
+        Plus | Minus | Star | Slash | Percent => Op,
+        Period | Comma | Colon | Semi | Question | Hash => Punct,
+        LParen | RParen | LBrace | RBrace | LBracket | RBracket => Punct,
         // Trivia never reaches the token stream (whitespace is skipped, comments
         // go to the trivia sink); classify them harmlessly rather than diverge.
-        Space => Punct,
-        LineComment => Punct,
-        BlockComment => Punct,
-        AllowMarker => Punct,
+        Space | LineComment | BlockComment | AllowMarker => Punct,
     }
 }
 
@@ -588,11 +539,7 @@ fn is_empty_doc(self: Doc) -> bool {
         IfBroken(_) => false,
         Indent(_) => false,
         Group(_, _) => false,
-        Line => false,
-        SoftLine => false,
-        HardLine => false,
-        BlankLine => false,
-        BreakParent => false,
+        Line | SoftLine | HardLine | BlankLine | BreakParent => false,
     }
 }
 
@@ -612,11 +559,7 @@ fn without_trailing_break(self: Doc) -> Doc {
         IfBroken(_) => self,
         Indent(_) => self,
         Group(_, _) => self,
-        Line => self,
-        SoftLine => self,
-        HardLine => self,
-        BlankLine => self,
-        BreakParent => self,
+        Line | SoftLine | HardLine | BlankLine | BreakParent => self,
     }
 }
 
@@ -631,17 +574,14 @@ fn drop_trailing_break(self: Doc[]) -> Doc[] {
 // A break `lead` may have left at the end of its docs.
 fn is_line_break(self: Doc) -> bool {
     match (self) {
-        HardLine => true,
-        BlankLine => true,
+        HardLine | BlankLine => true,
         Concat(_) => false,
         Text(_) => false,
         RawBlock(_) => false,
         IfBroken(_) => false,
         Indent(_) => false,
         Group(_, _) => false,
-        Line => false,
-        SoftLine => false,
-        BreakParent => false,
+        Line | SoftLine | BreakParent => false,
     }
 }
 
@@ -1998,7 +1938,8 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
     while (w.peek_text() != "}") {
         let l = w.lead();
         let pat = l.w.pattern()?;
-        let after = pat.w.expect("=>")?.w;
+        let alts = pat.w.pattern_alts(pat.doc)?;
+        let after = alts.w.expect("=>")?.w;
 
         // A statement-block arm (`P => { .. }`) lays out as a block, exactly like
         // an `if` branch; every other arm body is a single expression. One token
@@ -2007,10 +1948,33 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
         let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
         // A same-line `// comment` after the arm rides on its line.
         let tc = stepped.trailing_comment();
-        set acc.push(Concat([l.doc, pat.doc, Text(" => "), body.doc, Text(","), tc.doc]));
+        set acc.push(Concat([l.doc, alts.doc, Text(" => "), body.doc, Text(","), tc.doc]));
         set w = tc.w;
     }
     ok(WDocs { w, docs: acc })
+}
+
+// `A | B | C => body` — the `| P` tail of an alternation, folded onto the doc
+// for the pattern already parsed. A group with `Line` before each `|`, so a
+// short alternation stays on one line (`Line` renders flat as a space, giving
+// `A | B`) and a long one breaks with the `|` leading each continuation.
+fn pattern_alts(self: W, first: Doc) -> WDoc!FmtError {
+    mut w = self;
+    mut parts = [first];
+    while (w.peek_text() == "|") {
+        let next = w.bump().w.pattern()?;
+        set parts.push(Line);
+        set parts.push(Text("| "));
+        set parts.push(next.doc);
+        set w = next.w;
+    }
+
+    // A lone pattern is not an alternation — hand back the doc untouched rather
+    // than wrapping every ordinary arm in a group that can never break.
+    if (parts.len() == 1) {
+        return ok(WDoc { w, doc: first });
+    };
+    ok(WDoc { w, doc: Group(false, Concat(parts)) })
 }
 
 fn pattern(self: W) -> WDoc!FmtError {
@@ -2695,13 +2659,13 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20457
-deallocations: 20457
+allocations: 20460
+deallocations: 20460
 reallocations: 560
-bytes allocated: 1002564
-instructions executed: 2822200
-binary size: 3052704
-  code: 1746832
+bytes allocated: 1002684
+instructions executed: 2822917
+binary size: 3060352
+  code: 1751428
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2846,7 +2810,7 @@ binary size: 3052704
     lead_loop: 1520
     let_stmt: 19204
     main: 152
-    match_arms: 6140
+    match_arms: 7768
     match_expr: 10744
     mut_stmt: 5364
     name_atom: 5572
@@ -2857,6 +2821,7 @@ binary size: 3052704
     paren_atom: 5316
     paren_ty: 7608
     pattern: 7572
+    pattern_alts: 2968
     peek_is: 288
     peek_text_n: 32
     postfix: 4668
@@ -2908,16 +2873,16 @@ binary size: 3052704
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1280132
-builtin calls: 440280
+  metadata: 1283184
+builtin calls: 440430
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 48852
+  aipl_arr_inc: 48882
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 60642
-  aipl_array_new: 9833
+  aipl_array_dec: 60675
+  aipl_array_new: 9836
   aipl_array_push: 1650
   aipl_array_push_mut: 1353
   aipl_array_with_cap: 175
@@ -2925,24 +2890,24 @@ builtin calls: 440280
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 93987
-  aipl_inc: 74283
+  aipl_dec: 94014
+  aipl_inc: 74304
   aipl_rec_alloc: 5593
-  aipl_rec_dec_strong: 39777
+  aipl_rec_dec_strong: 39789
   aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 34184
+  aipl_rec_inc_strong: 34196
   aipl_rec_inc_weak: 3509
   aipl_str_cmp: 7
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 6024
+  aipl_str_eq: 6027
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31201
+  aipl_str_len: 31207
   aipl_str_repeat: 74
-  aipl_str_slice: 8486
+  aipl_str_slice: 8489
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3

@@ -2,22 +2,13 @@ import { ! } from builtins;
 
 pub fn is_operator_name(self: str) -> bool {
     match (self) {
-        "+" => true,
-        "-" => true,
-        "*" => true,
-        "/" => true,
-        "%" => true,
-        "==" => true,
-        "!=" => true,
-        "<" => true,
-        ">" => true,
-        "<=" => true,
-        ">=" => true,
-        "&&" => true,
-        "||" => true,
-        "!" => true,
-        "++" => true,
-        "+++" => true,
+        // Grouped by what they do rather than packed to the line: all sixteen in
+        // one alternation runs past the width, and the formatter would then break
+        // it one-per-line — back to the sixteen arms this replaces.
+        "+" | "-" | "*" | "/" | "%" => true,
+        "==" | "!=" | "<" | ">" | "<=" | ">=" => true,
+        "&&" | "||" | "!" => true,
+        "++" | "+++" => true,
         _ => false,
     }
 }.doc("""

@@ -86,12 +86,9 @@ fn has_hard(self: Doc) -> bool {
         Text(s) => s.contains("\n"),
         RawBlock(s) => s.contains("\n"),
         Concat(ds) => ds.any(has_hard),
-        Line => false,
-        SoftLine => false,
+        Line | SoftLine => false,
         IfBroken(_) => false,
-        HardLine => true,
-        BlankLine => true,
-        BreakParent => true,
+        HardLine | BlankLine | BreakParent => true,
         Indent(inner) => inner.has_hard(),
         Group(forced, _) => forced,
     }
@@ -217,8 +214,7 @@ fn fits(budget: u64, work: Work) -> bool {
             Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
             Line => if (flat) { fits_after(budget, 1, rest) } else { true },
             SoftLine => if (flat) { fits(budget, rest) } else { true },
-            HardLine => true,
-            BlankLine => true,
+            HardLine | BlankLine => true,
             Indent(inner) => fits(budget, WCons(sp, flat, inner, rest)),
             Group(forced, inner) => if (forced) {
                 !flat
