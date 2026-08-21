@@ -716,7 +716,7 @@ binary size: 219768
   metadata: 70816
 builtin calls: 80821
   aipl_arr_drop_str: 9
-  aipl_arr_inc: 7546
+  aipl_arr_inc: 7554
   aipl_arr_retain_ptr: 9
   aipl_array_dec: 11226
   aipl_array_new: 3599
@@ -727,7 +727,7 @@ builtin calls: 80821
   aipl_char_at: 1365
   aipl_concat_lazy: 12
   aipl_dec: 24534
-  aipl_inc: 19329
+  aipl_inc: 19321
   aipl_str_contains: 1016
   aipl_str_data: 88
   aipl_str_ends_with: 3

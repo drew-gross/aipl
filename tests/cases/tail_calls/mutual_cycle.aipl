@@ -1,0 +1,90 @@
+import { contains, ends_with, len, print, saturating_sub as -, to_str, ==, > } from builtins;
+
+// A three-function cycle, none of whose edges is a self-call. This is the shape
+// the compiler's own `doc.aipl` uses (`fits` / `fits_atom` / `fits_after`), and
+// the reason rewriting self-calls as a jump — which needs no calling-convention
+// change at all — is not a useful substitute: across the compiler's own IR, 128
+// of 130 tail calls are cross-function.
+//
+// A cycle is bounded only when *every* edge in it is eliminated, so this is the
+// case that would catch an implementation handling direct recursion and stopping
+// there. Each function is deliberately a little wider than the inliner's
+// four-expression budget, so the cycle survives to codegen as three functions
+// rather than being folded into one self-recursive body.
+variant Work = WNil | WCons(str, Work)
+
+fn fits(budget: u64, work: Work) -> bool {
+    match (work) {
+        WNil => true,
+        WCons(s, rest) => if (s.ends_with("!")) { budget > 0 } else { fits_atom(budget, s, rest) },
+    }
+}
+
+fn fits_atom(budget: u64, s: str, rest: Work) -> bool {
+    if (s.contains("\n")) {
+        false
+    } else if (s.len() == 0) { fits(budget, rest) } else { fits_after(budget, s.len(), rest) }
+}
+
+fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
+    if (n > budget) {
+        false
+    } else if (n == 0) { fits(budget, rest) } else { fits(budget - n, rest) }
+}
+
+fn work_of(n: u64, acc: Work) -> Work {
+    if (n == 0) { acc } else { work_of(n - 1, WCons("ab", acc)) }
+}
+
+fn main() !prints {
+    let work = work_of(150000, WNil);
+    // 150,000 two-byte atoms need exactly 300,000 columns to fit.
+    print(fits(300000, work).to_str());
+    print(fits(299999, work).to_str());
+
+    // Second call sites, so the cycle survives as three functions:
+    // `inline_single_use` moves any body reached from exactly one place, which
+    // would otherwise fold the whole cycle into `fits` and turn it into plain
+    // self-recursion — the very thing this case exists to distinguish.
+    print(fits_atom(4, "ab", WNil).to_str());
+    print(fits_after(4, 2, WNil).to_str());
+}
+--- stdout ---
+true
+false
+true
+true
+--- performance ---
+allocations: 150003
+deallocations: 150003
+reallocations: 0
+bytes allocated: 8400168
+instructions executed: 17700284
+binary size: 4576
+  code: 2140
+    __rec_drop_Work: 84
+    __to_str_bool: 212
+    fits: 36
+    fits$tail: 356
+    fits_after: 40
+    fits_after$tail: 220
+    fits_atom: 40
+    fits_atom$tail: 348
+    main: 556
+    work_of: 36
+    work_of$tail: 212
+  data: 47
+  metadata: 2389
+builtin calls: 7950043
+  aipl_dec: 1950011
+  aipl_inc: 1200005
+  aipl_print: 4
+  aipl_rec_alloc: 150003
+  aipl_rec_dec_strong: 1350008
+  aipl_rec_dec_weak: 150000
+  aipl_rec_inc_strong: 1200005
+  aipl_rec_inc_weak: 150000
+  aipl_str_contains: 300001
+  aipl_str_ends_with: 300000
+  aipl_str_len: 1200002
+  aipl_write_bytes: 4

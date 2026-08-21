@@ -17,20 +17,19 @@ deallocations: 5
 reallocations: 0
 bytes allocated: 240
 instructions executed: 365
-binary size: 2624
+binary size: 2600
   code: 1096
     __eq_i64$arr: 296
     extend: 280
     main: 520
   data: 85
-  metadata: 1443
+  metadata: 1419
 builtin calls: 29
-  aipl_arr_inc: 6
+  aipl_arr_inc: 7
   aipl_array_dec: 12
   aipl_array_new: 3
   aipl_array_push: 2
   aipl_assert: 2
-  aipl_inc: 1
   aipl_test_begin: 1
   aipl_test_end: 1
   aipl_test_summary: 1

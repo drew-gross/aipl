@@ -37,7 +37,7 @@ binary size: 7240
 builtin calls: 113
   aipl_arr_drop_str: 1
   aipl_arr_extend: 1
-  aipl_arr_inc: 16
+  aipl_arr_inc: 17
   aipl_arr_reserve: 5
   aipl_arr_retain_ptr: 1
   aipl_array_dec: 31
@@ -46,7 +46,7 @@ builtin calls: 113
   aipl_array_push_mut: 3
   aipl_assert: 7
   aipl_dec: 12
-  aipl_inc: 5
+  aipl_inc: 4
   aipl_str_alloc: 3
   aipl_str_data: 1
   aipl_str_eq: 2

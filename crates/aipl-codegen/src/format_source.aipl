@@ -74,9 +74,9 @@ allocations: 2188
 deallocations: 2188
 reallocations: 6
 bytes allocated: 100657
-instructions executed: 330517
-binary size: 851352
-  code: 521108
+instructions executed: 330520
+binary size: 854768
+  code: 522992
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -93,7 +93,8 @@ binary size: 851352
     __arr_retain___m6__Seg: 120
     __arr_retain___m6__VCase: 140
     __arr_retain___m7__Doc: 116
-    __builtin_any$__m7__Doc$lam88: 260
+    __builtin_any$__m7__Doc$lam88: 32
+    __builtin_any$__m7__Doc$lam88$tail: 324
     __builtin_count$char$s0: 232
     __builtin_count_while$char$s0$lam42: 232
     __builtin_count_while$char$s0$lam53: 296
@@ -113,15 +114,15 @@ binary size: 851352
     __eq_str$opt: 148
     __lambda_14: 100
     __lambda_15: 68
-    __lambda_16: 108
-    __lambda_17: 136
+    __lambda_16: 136
+    __lambda_17: 152
     __lambda_18: 108
     __lambda_19: 136
     __lambda_20: 48
     __lambda_21: 64
     __lambda_37: 140
     __m12__char_lit_emit: 1412
-    __m12__dedent_segments: 188
+    __m12__dedent_segments: 168
     __m12__ident_cont: 16
     __m12__int_lit: 1044
     __m12__raw_tpl_kind: 2088
@@ -140,7 +141,8 @@ binary size: 851352
     __m13__template_scan$__m12__AiplTok: 2772
     __m13__template_step$__m12__AiplTok: 556
     __m14__unescape: 892
-    __m15__process_raw_string: 564
+    __m15__process_raw_string: 32
+    __m15__process_raw_string$tail: 600
     __m16__trim_prefix: 216
     __m17__trim_suffix: 232
     __m3__trim_end_while$lam3: 292
@@ -151,17 +153,17 @@ binary size: 851352
     __m6__atom: 2596
     __m6__base_ty: 2248
     __m6__binding_ann: 1924
-    __m6__binop_expr: 2868
+    __m6__binop_expr: 2888
     __m6__binop_tail: 3920
-    __m6__block: 996
-    __m6__block_entries: 3736
+    __m6__block: 1012
+    __m6__block_entries: 3760
     __m6__block_layout: 5112
     __m6__bump: 1624
     __m6__call_arg: 4680
     __m6__call_arg_list: 636
     __m6__call_args_until: 2688
     __m6__chain_docs: 472
-    __m6__comma_list_docs: 2996
+    __m6__comma_list_docs: 3004
     __m6__comment_starts_before: 280
     __m6__construct_body: 3208
     __m6__dict_entries: 4264
@@ -181,7 +183,7 @@ binary size: 851352
     __m6__hug_close: 716
     __m6__hugs_sole_arg: 1268
     __m6__ident_list: 1660
-    __m6__if_expr: 10884
+    __m6__if_expr: 10916
     __m6__import_item: 7956
     __m6__import_names: 3240
     __m6__index_or_from: 3872
@@ -206,7 +208,7 @@ binary size: 851352
     __m6__pattern: 7572
     __m6__peek_is: 288
     __m6__peek_text_n: 32
-    __m6__postfix: 4652
+    __m6__postfix: 4668
     __m6__postfix_segs: 3252
     __m6__program: 2784
     __m6__program_items: 4372
@@ -218,7 +220,7 @@ binary size: 851352
     __m6__set_or_dict_ty: 5976
     __m6__set_stmt: 7316
     __m6__shim_bindings: 3048
-    __m6__shim_expr: 5844
+    __m6__shim_expr: 5860
     __m6__slice_to: 1300
     __m6__spaced_default: 1692
     __m6__statement: 5168
@@ -233,7 +235,8 @@ binary size: 851352
     __m6__template_verbatim: 724
     __m6__tok_text: 368
     __m6__trailing_comment: 1972
-    __m6__trim_last_break: 512
+    __m6__trim_last_break: 32
+    __m6__trim_last_break$tail: 528
     __m6__tuple_binder: 1732
     __m6__tuple_rest: 2688
     __m6__ty: 4432
@@ -244,19 +247,24 @@ binary size: 851352
     __m6__unary: 1700
     __m6__variant_body: 760
     __m6__variant_cases: 3804
-    __m6__variant_item: 4724
+    __m6__variant_item: 4736
     __m6__variant_payload: 2176
     __m6__while_stmt: 4272
-    __m6__with_last: 468
+    __m6__with_last: 36
+    __m6__with_last$tail: 528
     __m6__without_trailing_break: 696
     __m7__col_after: 448
-    __m7__fits: 1660
-    __m7__fits_atom: 176
-    __m7__go: 4356
-    __m7__has_hard: 520
+    __m7__fits: 36
+    __m7__fits$tail: 2636
+    __m7__fits_atom: 44
+    __m7__fits_atom$tail: 296
+    __m7__go: 4332
+    __m7__has_hard: 32
+    __m7__has_hard$tail: 664
     __m7__print_doc: 1328
-    __m8__reindent_block: 2292
-    __m9__dedent: 1164
+    __m8__reindent_block: 2308
+    __m9__dedent: 32
+    __m9__dedent$tail: 1196
     __map44$own0: 320
     __rec_drop___m7__Doc: 184
     __rec_drop___m7__Work: 84
@@ -265,10 +273,10 @@ binary size: 851352
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 327737
-builtin calls: 40140
+  metadata: 329269
+builtin calls: 40170
   aipl_arr_drop_str: 50
-  aipl_arr_inc: 4587
+  aipl_arr_inc: 4601
   aipl_arr_reserve: 6
   aipl_arr_retain_ptr: 42
   aipl_array_dec: 6430
@@ -280,12 +288,12 @@ builtin calls: 40140
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 10454
-  aipl_inc: 8605
+  aipl_dec: 10457
+  aipl_inc: 8594
   aipl_rec_alloc: 96
-  aipl_rec_dec_strong: 704
+  aipl_rec_dec_strong: 716
   aipl_rec_dec_weak: 47
-  aipl_rec_inc_strong: 608
+  aipl_rec_inc_strong: 620
   aipl_rec_inc_weak: 47
   aipl_str_contains: 292
   aipl_str_data: 32

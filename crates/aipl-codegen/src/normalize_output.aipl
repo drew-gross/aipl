@@ -26,19 +26,20 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 360
 instructions executed: 1742
-binary size: 4096
+binary size: 4128
   code: 1352
     main: 932
     normalize_output: 420
   data: 558
-  metadata: 2186
+  metadata: 2218
 builtin calls: 231
   aipl_arr_drop_str: 8
+  aipl_arr_inc: 8
   aipl_array_dec: 16
   aipl_array_new: 8
   aipl_assert: 8
   aipl_dec: 69
-  aipl_inc: 24
+  aipl_inc: 16
   aipl_str_data: 7
   aipl_str_eq: 8
   aipl_str_iter_init: 8

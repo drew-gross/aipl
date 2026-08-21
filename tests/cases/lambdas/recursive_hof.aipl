@@ -13,13 +13,14 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 54
-binary size: 968
-  code: 156
+instructions executed: 48
+binary size: 1024
+  code: 168
     main: 108
-    rec$lam1: 48
+    rec$lam1: 32
+    rec$lam1$tail: 28
   data: 52
-  metadata: 760
+  metadata: 804
 builtin calls: 4
   aipl_assert: 1
   aipl_test_begin: 1

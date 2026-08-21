@@ -19,7 +19,7 @@ use cranelift::{
             Block, BlockArg, ExternalName, FuncRef, Function, Inst, InstructionData, Signature,
             StackSlot, UserFuncName,
         },
-        isa::TargetIsa,
+        isa::{CallConv, TargetIsa},
         Context,
     },
     prelude::{
@@ -3093,6 +3093,18 @@ struct ParamInfo {
     /// disagree). Always false for builtins and for the FFI metadata rebuilt from
     /// checked-in IR, neither of which has a body here to elide against.
     inspect_only: bool,
+    /// Extend the caller-retains/callee-releases protocol to a parameter that
+    /// would otherwise be a *pure borrow* — a boxed (recursive) value, which is
+    /// refcounted but not [`is_heap`], so by default the caller's own reference
+    /// is what keeps it alive across the call and neither side touches the
+    /// count.
+    ///
+    /// Set only for the parameters of a tail-call participant (see
+    /// [`tail_call_plan`]), and it is what makes a tail call to one *possible*:
+    /// a tail call releases the caller's scope before transferring control, so
+    /// an argument the caller was lending would die under the callee's feet.
+    /// Paying the retain/release pair buys the callee a reference of its own.
+    tail_owned: bool,
 }
 
 impl ParamInfo {
@@ -3103,6 +3115,25 @@ impl ParamInfo {
             ty,
             owned: false,
             inspect_only: false,
+            tail_owned: false,
+        }
+    }
+
+    /// Whether the borrow protocol applies to this parameter: the caller
+    /// retains the argument and the callee releases it on entry-scope exit.
+    /// Both halves read this one answer, so they cannot disagree.
+    ///
+    /// False for a moved-in `owned` parameter (its reference transfers), for an
+    /// `inspect_only` heap parameter (the pair cancels), and for anything that
+    /// owns no heap at all.
+    fn retained(&self) -> bool {
+        if self.owned {
+            return false;
+        }
+        if is_heap(&self.ty) {
+            !self.inspect_only
+        } else {
+            self.tail_owned
         }
     }
 }
@@ -3110,6 +3141,13 @@ impl ParamInfo {
 #[derive(Clone)]
 struct FuncInfo {
     link: FuncLink,
+    /// The `<name>$tail` body, when this function participates in a tail call
+    /// (see the "Tail calls" section): a second declaration with the same ABI
+    /// but `CallConv::Tail`, module-local, holding the real body — `link` then
+    /// names the exported C-convention trampoline that forwards to it. Every
+    /// AIPL call site calls this one directly when it is present, tail or not;
+    /// only the FFI and `func_addr` go through the trampoline.
+    tail_id: Option<FuncId>,
     params: Vec<ParamInfo>,
     return_ty: Type,
     effects: Vec<String>,
@@ -4481,12 +4519,16 @@ fn compile_program<M: Module>(
     // skip the borrow retain and its body the matching entry-scope release. One
     // shared answer for both halves — see `aipl_mono::inspect_only_params`.
     let mut inspect_only = aipl_mono::inspect_only_params(program);
+    // Which functions carry `CallConv::Tail` (and so split into a `$tail` body
+    // plus an exported trampoline) — see the "Tail calls" section.
+    let tail_plan = tail_call_plan(program, &structs);
     for f in &program.fns {
         // Signature/effect/mutating validity is checked up front by
         // `aipl_mono::check`; codegen trusts it and goes straight to lowering.
+        let participant = tail_plan.contains(&f.name);
 
         let mut sig = module.make_signature();
-        build_signature(&mut sig, f, &structs);
+        build_signature(&mut sig, f, &structs, false);
 
         let export_name = match main_export_name {
             Some(rename) if f.name == "main" => rename,
@@ -4496,9 +4538,26 @@ fn compile_program<M: Module>(
             .declare_function(export_name, Linkage::Export, &sig)
             .map_err(|e| Error::msg(format!("declare {}: {e}", f.name)))?;
         dbg.trace("codegen", format_args!("declare `{}`", f.name));
+        // A participant's real body: same ABI, `tail` convention, module-local.
+        // `export_name` (not `f.name`) so a renamed `main` — which is never a
+        // participant today, but would be silently mis-declared if it became one
+        // — keeps one consistent symbol stem.
+        let tail_id = if participant {
+            let mut tail_sig = module.make_signature();
+            build_signature(&mut tail_sig, f, &structs, true);
+            let sym = format!("{export_name}{TAIL_SUFFIX}");
+            Some(
+                module
+                    .declare_function(&sym, Linkage::Local, &tail_sig)
+                    .map_err(|e| Error::msg(format!("declare {sym}: {e}")))?,
+            )
+        } else {
+            None
+        };
         let inspects = inspect_only.remove(&f.name).unwrap_or_default();
         let info = FuncInfo {
             link: FuncLink::User(id),
+            tail_id,
             params: f
                 .params
                 .iter()
@@ -4506,7 +4565,15 @@ fn compile_program<M: Module>(
                 .map(|(i, p)| ParamInfo {
                     ty: p.ty.clone(),
                     owned: p.owned,
-                    inspect_only: inspects.get(i).copied().unwrap_or(false),
+                    // A participant gives up retain elision on its heap
+                    // parameters: an inspect-only one is a borrow on the
+                    // caller's reference, which a tail call would release before
+                    // transferring control. Paying the pair is what makes the
+                    // call site eligible at all.
+                    inspect_only: !participant && inspects.get(i).copied().unwrap_or(false),
+                    // …and for the same reason its boxed parameters, borrows by
+                    // default, join the retain/release protocol.
+                    tail_owned: participant && is_boxed(&p.ty, &structs),
                 })
                 .collect(),
             return_ty: abi_return_ty(f),
@@ -5239,6 +5306,7 @@ fn entry_funcs(
                 e.name.clone(),
                 FuncInfo {
                     link: link(e.id),
+                    tail_id: None,
                     params,
                     return_ty: ffi_type_from_tag(&e.ret)?,
                     effects: Vec::new(),
@@ -6622,7 +6690,14 @@ fn build_signature(
     sig: &mut Signature,
     f: &aipl_mono::ConcreteFn,
     structs: &HashMap<String, TypeDef>,
+    tail: bool,
 ) {
+    // The `$tail` body differs from the exported trampoline only here: cranelift
+    // will not lower a `return_call` unless the callee's convention supports tail
+    // calls *and* matches the caller's, and the host convention does neither.
+    if tail {
+        sig.call_conv = CallConv::Tail;
+    }
     let abi = abi_return_ty(f);
     // Composites — structs and optionals (possibly nested) — are returned
     // through a hidden caller-provided pointer (sret), uniformly.
@@ -6638,6 +6713,176 @@ fn build_signature(
     } else {
         sig.returns.push(AbiParam::new(types::I64));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tail calls
+//
+// A call in *tail position* — one whose value is the enclosing function's value,
+// with nothing left to run but the scope cleanup — is emitted as cranelift's
+// `return_call`, which reuses the caller's frame instead of stacking a new one.
+// That turns a recursive walk into a loop, so depth stops being bounded by the
+// native stack (8 MB in a binary from `aipl build`, which is where this bites).
+//
+// Three things have to line up, and all three are decided *before* any function
+// is declared, by `tail_call_plan`:
+//
+//   1. **Calling convention.** `return_call` requires `CallConv::Tail` on the
+//      callee *and* an identical convention on the caller (cranelift's verifier
+//      enforces both). The host convention doesn't support tail calls, so a
+//      participant's body moves to a second, `Linkage::Local` function named
+//      `<name>$tail` carrying `CallConv::Tail`, and the exported `<name>` becomes
+//      a C-convention trampoline that forwards to it. The trampoline is what
+//      keeps `Engine::call_values`, the `; entry` FFI surface and function values
+//      (`func_addr`) working unconditionally — none of them can call a `tail`
+//      function, and none of them can know whether some AIPL function three
+//      edges away happens to tail-recurse. AIPL call sites skip the trampoline
+//      and call `<name>$tail` directly; an ordinary `call` may cross conventions
+//      freely, so only the `return_call` sites care.
+//
+//   2. **Nothing may point into the caller's frame.** The frame is gone the
+//      moment control transfers, so a participant may not take or return a
+//      composite (struct/optional/result): those are passed and returned by the
+//      address of caller storage.
+//
+//   3. **Every refcounted argument must be the callee's own.** This is the real
+//      constraint, and the reason "eliminate only where no drops are pending"
+//      is a no-op in practice: a function that destructures an owned recursive
+//      value and recurses on a field releases those payload bindings on scope
+//      exit — *after* the call — so there is always a drop pending. A tail call
+//      runs that cleanup *before* transferring control, which is safe only if
+//      each argument still holds a reference the cleanup cannot release.
+//      Refcounting gives exactly that guarantee for a retained argument (the
+//      caller's `+1` is the callee's, and releasing other references can never
+//      consume it), so the rule is: every argument that owns heap must be
+//      `ParamInfo::retained` or moved in. Boxed parameters are pure borrows by
+//      default, which would fail the rule, so a participant's boxed parameters
+//      are marked `tail_owned` and pay the retain/release pair.
+// ---------------------------------------------------------------------------
+
+/// The suffix distinguishing a participant's real, `tail`-convention body from
+/// the exported C-convention trampoline that forwards to it. `$` cannot appear
+/// in an AIPL identifier, so this can't collide with a user function.
+const TAIL_SUFFIX: &str = "$tail";
+
+/// The callees `body` can reach from *tail position*.
+///
+/// Tail position propagates through the forms that only sequence or choose a
+/// value — `Seq`/`Let`/`LetMut`/`Assign` bodies, both `if` branches, every
+/// `match` arm — and is *created* by `return e`, whose operand is in tail
+/// position however deep the `return` sits. It deliberately does not propagate
+/// through `Shim` (which restores the previous bindings after its body runs) or
+/// `Try` (which inspects the result), nor into any sub-expression whose value is
+/// consumed rather than yielded.
+///
+/// Under-approximating is safe: a missed edge only costs an optimization, since
+/// codegen independently re-derives tail position and emits a `return_call` only
+/// when both ends carry the convention this plan gave them.
+fn tail_callees(body: &Expr) -> Vec<String> {
+    fn walk(e: &Expr, tail: bool, out: &mut Vec<String>) {
+        match &e.kind {
+            ExprKind::Call(name, args, _) => {
+                if tail {
+                    out.push(name.clone());
+                }
+                for a in args {
+                    walk(a, false, out);
+                }
+            }
+            ExprKind::Return(v) => walk(v, true, out),
+            ExprKind::Seq(a, b) => {
+                walk(a, false, out);
+                walk(b, tail, out);
+            }
+            ExprKind::Let(_, _, v, b)
+            | ExprKind::LetMut(_, _, v, b)
+            | ExprKind::Assign(_, v, b) => {
+                walk(v, false, out);
+                walk(b, tail, out);
+            }
+            ExprKind::If(c, t, f) => {
+                walk(c, false, out);
+                walk(t, tail, out);
+                walk(f, tail, out);
+            }
+            ExprKind::Match(s, arms) => {
+                walk(s, false, out);
+                for a in arms {
+                    walk(&a.body, tail, out);
+                }
+            }
+            _ => {
+                for c in aipl_mono::children(e) {
+                    walk(c, false, out);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(body, true, &mut out);
+    out
+}
+
+/// Whether a parameter of this type can cross a tail call. A composite is
+/// handed over as the *address* of caller storage, which the transfer
+/// invalidates; anything else that owns heap has to be refcountable so the
+/// callee can hold a reference of its own (`str`/array/set directly, a boxed
+/// value via `tail_owned`). A dict — refcounted but neither — is left out
+/// rather than reasoned about.
+fn tail_safe_param(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+    !is_composite(ty, structs) && (!needs_drop(ty, structs) || is_heap(ty) || is_boxed(ty, structs))
+}
+
+/// Whether `f` can carry `CallConv::Tail` at all — independent of whether any
+/// tail call actually reaches or leaves it. Rules out the entry-style functions
+/// whose ABI return is *derived* from the body (a unit or `!Error` `main`, a
+/// mutating method), anything returning through an sret pointer, and any
+/// parameter that fails [`tail_safe_param`].
+fn tail_eligible(f: &aipl_mono::ConcreteFn, structs: &HashMap<String, TypeDef>) -> bool {
+    f.name != "main"
+        && !is_mutating_fn(f)
+        && !is_unit_main(f)
+        && !is_error_main(f)
+        && sret_size(&abi_return_ty(f), structs).is_none()
+        && f.params.iter().all(|p| tail_safe_param(&p.ty, structs))
+}
+
+/// The functions that get `CallConv::Tail` (and so a `$tail` body plus an
+/// exported trampoline): both endpoints of every tail-call edge whose two ends
+/// are eligible and agree on their ABI return shape — cranelift requires a
+/// `return_call`'s results to match the caller's signature exactly, which here
+/// means both unit or both scalar.
+fn tail_call_plan(
+    program: &aipl_mono::MonoProgram,
+    structs: &HashMap<String, TypeDef>,
+) -> HashSet<String> {
+    let by_name: HashMap<&str, &aipl_mono::ConcreteFn> =
+        program.fns.iter().map(|f| (f.name.as_str(), f)).collect();
+    let eligible: HashMap<&str, bool> = program
+        .fns
+        .iter()
+        .map(|f| (f.name.as_str(), tail_eligible(f, structs)))
+        .collect();
+    let mut plan = HashSet::new();
+    for f in &program.fns {
+        if !eligible[f.name.as_str()] {
+            continue;
+        }
+        let caller_unit = is_unit(&abi_return_ty(f));
+        for callee in tail_callees(&f.body) {
+            // A name with no instance is a builtin or a codegen intrinsic; both
+            // are reached through paths that never become a tail call.
+            let Some(g) = by_name.get(callee.as_str()) else {
+                continue;
+            };
+            if !eligible[callee.as_str()] || is_unit(&abi_return_ty(g)) != caller_unit {
+                continue;
+            }
+            plan.insert(f.name.clone());
+            plan.insert(g.name.clone());
+        }
+    }
+    plan
 }
 
 /// The declared type of an environment binding.
@@ -7529,6 +7774,7 @@ fn register_builtins(
             name.to_string(),
             FuncInfo {
                 link: FuncLink::Builtin(sym),
+                tail_id: None,
                 params: params.into_iter().map(ParamInfo::borrowed).collect(),
                 return_ty,
                 effects: effects.iter().map(|s| s.to_string()).collect(),
@@ -7910,9 +8156,13 @@ fn define_fn<M: Module>(
     // This instance's own `funcs` entry — the very one every call site reads, so
     // the caller's skipped retain and the release skipped below can only ever be
     // the same decision.
-    let call_params: &[ParamInfo] = funcs
-        .get(&func.name)
-        .map_or(&[], |info| info.params.as_slice());
+    let self_info: Option<&FuncInfo> = funcs.get(&func.name);
+    let call_params: &[ParamInfo] = self_info.map_or(&[], |info| info.params.as_slice());
+    // A tail-call participant's body is defined into its `$tail` declaration;
+    // `id` then receives the C-convention trampoline, emitted after this. Only a
+    // `tail`-convention body may itself contain a `return_call`.
+    let tail_id = self_info.and_then(|info| info.tail_id);
+    let body_id = tail_id.unwrap_or(id);
     // Parameters this instance owns (moved in): monomorphization marks them, so
     // they aren't dropped on entry-scope exit and `mut y = p` moves rather than
     // copies. Keyed by name for `Cx::owned_params`.
@@ -7933,7 +8183,7 @@ fn define_fn<M: Module>(
     let error_main = is_error_main(func);
     // Synthesized `.test` bodies are named `__test$<fn>` (see `synthesize_test_program`).
     let in_test = func.name.starts_with("__test$");
-    build_signature(&mut ctx.func.signature, func, structs);
+    build_signature(&mut ctx.func.signature, func, structs, tail_id.is_some());
 
     // Source-variable legend, filled as bindings are created (params + locals) and
     // printed after the function below — see `Cx::bindings`. Declared out here so
@@ -7993,14 +8243,21 @@ fn define_fn<M: Module>(
                     .borrow_mut()
                     .push((p.name.clone(), format!("v{}", v.as_u32())));
             }
-            // A heap parameter is owned by the callee and dropped at exit —
-            // unless it's a moved-in owned param, whose ownership transfers to
-            // the local it's moved into (so dropping it here would double-free),
-            // or an inspect-only one, which the caller didn't retain: it is a
-            // pure borrow, alive for the call by the caller's own reference, and
-            // releasing it here would free a value the caller still holds.
-            let inspect_only = call_params.get(idx).is_some_and(|cp| cp.inspect_only);
-            if is_heap(&p.ty) && !p.owned && !inspect_only {
+            // A retained parameter is owned by the callee and dropped at exit.
+            // `ParamInfo::retained` is the *shared* answer — the very entry each
+            // call site reads — so the caller's retain and the release here are
+            // one decision: a moved-in owned param transfers its reference (so
+            // dropping it here would double-free), an inspect-only one is a pure
+            // borrow alive by the caller's own reference (releasing it here would
+            // free a value the caller still holds), and a `tail_owned` boxed
+            // param is retained by the caller precisely so it *can* be released
+            // here. Without a `funcs` entry (nothing calls this instance), fall
+            // back to the plain heap-parameter rule.
+            let retained = match call_params.get(idx) {
+                Some(cp) => cp.retained(),
+                None => is_heap(&p.ty) && !p.owned,
+            };
+            if retained {
                 scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
@@ -8020,6 +8277,12 @@ fn define_fn<M: Module>(
             error_main,
             in_test,
             bindings: &bindings,
+            // The body of a `$tail` declaration is in tail position, and its ABI
+            // return is its own value (`tail_eligible` ruled out the entry-style
+            // functions whose return is derived from the body). Both halves of
+            // `can_tail`, in one flag.
+            can_tail: tail_id.is_some(),
+            tail: tail_id.is_some(),
         };
         let body_mark = scope_depth(&scopes);
         let (body_ret, body_ty) = compile_expr(module, &mut builder, cx, &mut scopes, &func.body)?;
@@ -8088,7 +8351,7 @@ fn define_fn<M: Module>(
     // `function u0:<id>` instead of the default `u0:0`. This makes each function
     // self-identify its id, which the dogfood-IR loader relies on to re-link the
     // checked-in CLIF (see `from_artifact`).
-    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ctx.func.name = UserFuncName::user(0, body_id.as_u32());
     // Optimize before the dump: the dumped text is what `aipl ir` shows *and*
     // what the dogfood `.clif` artifacts carry, so a pass run after it would
     // never reach the compiler's own re-linked engine.
@@ -8117,8 +8380,75 @@ fn define_fn<M: Module>(
     }
 
     module
-        .define_function(id, ctx)
+        .define_function(body_id, ctx)
         .map_err(|e| Error::msg(format!("define {}: {e:?}", func.name)))?;
+    module.clear_context(ctx);
+    // A participant's exported symbol is still C-convention: give it the
+    // forwarding body now that the real one is defined.
+    if tail_id.is_some() {
+        define_tail_trampoline(
+            module, ctx, fbc, id, body_id, func, structs, ir_out, instrument,
+        )?;
+    }
+    Ok(())
+}
+
+/// Define the exported C-convention trampoline for a tail-call participant:
+/// forward every parameter to the `$tail` body and hand its result straight
+/// back. Nothing else happens here — no refcount work, because the forwarded
+/// arguments and result keep exactly the ownership the ABI already gave them.
+///
+/// It exists because a `tail`-convention function cannot be called from outside
+/// the module: not by `Engine::call_values`, not through a `; entry` in a
+/// checked-in artifact, and not through a `func_addr` function value (whose
+/// signature is built by `fn_value_signature` at the default convention). None
+/// of those can know whether the function they name happens to tail-recurse, so
+/// the exported symbol keeps the convention they expect and this forwards.
+#[allow(clippy::too_many_arguments)]
+fn define_tail_trampoline<M: Module>(
+    module: &mut M,
+    ctx: &mut Context,
+    fbc: &mut FunctionBuilderContext,
+    id: FuncId,
+    tail_id: FuncId,
+    func: &aipl_mono::ConcreteFn,
+    structs: &HashMap<String, TypeDef>,
+    ir_out: &mut String,
+    instrument: bool,
+) -> Result<(), Error> {
+    build_signature(&mut ctx.func.signature, func, structs, false);
+    {
+        let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        builder.seal_block(entry);
+        let args: Vec<Value> = builder.block_params(entry).to_vec();
+        let callee = module.declare_func_in_func(tail_id, builder.func);
+        let inst = builder.ins().call(callee, &args);
+        let results: Vec<Value> = builder.inst_results(inst).to_vec();
+        builder.ins().return_(&results);
+        builder.finalize(module.target_config());
+    }
+    ctx.func.name = UserFuncName::user(0, id.as_u32());
+    ir_out.push_str(&format!("{}\n", ctx.func.display()));
+    if instrument {
+        // The trampoline is a real frame the program executes, so it counts like
+        // any other. `aipl_count_insns` is declared by the body's own
+        // instrumentation, so look it up rather than declaring it again.
+        let count_fn = module
+            .declarations()
+            .get_name("aipl_count_insns")
+            .and_then(|d| match d {
+                cranelift_module::FuncOrDataId::Func(f) => Some(f),
+                cranelift_module::FuncOrDataId::Data(_) => None,
+            })
+            .ok_or_else(|| Error::msg("instrumented build without `aipl_count_insns`"))?;
+        instrument_insn_count(module, &mut ctx.func, count_fn);
+    }
+    module
+        .define_function(id, ctx)
+        .map_err(|e| Error::msg(format!("define {} trampoline: {e:?}", func.name)))?;
     module.clear_context(ctx);
     Ok(())
 }
@@ -8496,21 +8826,30 @@ fn move_owned_temp(scopes: &mut [Vec<Tracked>], mark: usize, v: Value) -> bool {
     }
 }
 
-/// Hand a heap call argument `v` to a callee. When `moved` — the arg is a fresh
-/// temporary we exclusively own, or a param the callee takes ownership of — move
-/// it: drop its tracking entry so the callee's own accounting frees it exactly
-/// once (a borrowed param decs it on return; an owned param drops the local it's
-/// moved into). Otherwise retain, so the caller keeps its ref and the callee's
-/// return-dec balances the inc. Unlike `move_owned_temp`, the arg's tracking
-/// entry need not be on top (later args are evaluated before the hand-off), so it
-/// is located by value; a fresh temp that somehow isn't tracked is retained to
-/// stay balanced.
+/// Hand a refcounted call argument `v` (of type `ty`) to a callee. When `moved`
+/// — the arg is a fresh temporary we exclusively own, or a param the callee takes
+/// ownership of — move it: drop its tracking entry so the callee's own accounting
+/// frees it exactly once (a borrowed param decs it on return; an owned param
+/// drops the local it's moved into). Otherwise retain, so the caller keeps its
+/// ref and the callee's return-dec balances the inc. Unlike `move_owned_temp`,
+/// the arg's tracking entry need not be on top (later args are evaluated before
+/// the hand-off), so it is located by value; a fresh temp that somehow isn't
+/// tracked is retained to stay balanced.
+///
+/// The retain goes through [`emit_retain`] rather than the bare `aipl_inc`,
+/// because `ty` is no longer always [`is_heap`]: a tail-call participant's boxed
+/// parameters are retained here too (see `ParamInfo::tail_owned`), and a boxed
+/// value counts on its own block header via `aipl_rec_inc_strong` — `aipl_inc`
+/// dispatches on `str` tag bits and would read the wrong word.
+#[allow(clippy::too_many_arguments)]
 fn hand_off_arg<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
     scopes: &mut [Vec<Tracked>],
     v: Value,
+    ty: &Type,
     moved: bool,
 ) {
     if moved {
@@ -8522,10 +8861,10 @@ fn hand_off_arg<M: Module>(
             Some(pos) => {
                 scope.remove(pos);
             }
-            None => emit_inc(builder, module, builtins, v),
+            None => emit_retain(builder, module, builtins, structs, v, ty),
         }
     } else {
-        emit_inc(builder, module, builtins, v);
+        emit_retain(builder, module, builtins, structs, v, ty);
     }
 }
 
@@ -11994,6 +12333,10 @@ fn define_test_fail_fn<M: Module>(
             error_main: false,
             in_test: false,
             bindings: &no_bindings,
+            // A generated helper is plain C-convention and never a tail-call
+            // participant, so nothing inside it is ever in tail position.
+            can_tail: false,
+            tail: false,
         };
 
         // Render the borrowed payload to a fresh `str`, report it, then release
@@ -12081,6 +12424,10 @@ fn define_eq_fn<M: Module>(
             error_main: false,
             in_test: false,
             bindings: &no_bindings,
+            // A generated helper is plain C-convention and never a tail-call
+            // participant, so nothing inside it is ever in tail position.
+            can_tail: false,
+            tail: false,
         };
 
         let res = emit_eq_body(module, &mut builder, cx, lv, rv, ty)?;
@@ -12157,6 +12504,10 @@ fn define_tostr_fn<M: Module>(
             error_main: false,
             in_test: false,
             bindings: &no_bindings,
+            // A generated helper is plain C-convention and never a tail-call
+            // participant, so nothing inside it is ever in tail position.
+            can_tail: false,
+            tail: false,
         };
 
         // A boxed (recursive) type's helper renders its top level *inline* (via
@@ -12374,6 +12725,18 @@ struct Cx<'a> {
     /// cranelift's reader ignores the comments, so checked-in `.clif` still loads.
     /// Shared across the function's nested scopes (env clones spread `..cx`).
     bindings: &'a RefCell<Vec<(String, String)>>,
+    /// Whether this body is the `tail`-convention `$tail` one — cranelift
+    /// refuses a `return_call` from any other convention — *and* its ABI return
+    /// is the body's own value (so handing the callee's result straight back is
+    /// the whole epilogue). False disables tail calls in this function outright.
+    /// See the "Tail calls" section.
+    can_tail: bool,
+    /// Whether the expression being compiled is in *tail position*: its value is
+    /// the function's value, and nothing follows it but scope cleanup. Only ever
+    /// true when `can_tail` is. [`compile_expr`] clears it before recursing, so
+    /// each arm that genuinely passes tail position on (a `Seq`/`Let` body, both
+    /// `if` branches, every `match` arm, a `return` operand) has to say so.
+    tail: bool,
 }
 
 /// Per-element-type array drop/retain helpers, generated on demand. `fns` maps a
@@ -13124,7 +13487,16 @@ fn compile_indirect_call<M: Module>(
     // (transfer our sole ref, drop its tracking; the callee's return-dec frees it).
     for (idx, (v, expected)) in arg_values.iter().zip(ptys).enumerate() {
         if is_heap(expected) {
-            hand_off_arg(builder, module, builtins, scopes, *v, arg_fresh[idx]);
+            hand_off_arg(
+                builder,
+                module,
+                builtins,
+                structs,
+                scopes,
+                *v,
+                expected,
+                arg_fresh[idx],
+            );
         }
     }
     let sret = sret_size(ret, structs).map(|size| {
@@ -13171,6 +13543,14 @@ fn compile_call<M: Module>(
         effects: current_effects,
         ..
     } = cx;
+    // Tail position belongs to *this* call, never to its arguments — an argument
+    // is evaluated and then handed over, so a call inside one has the whole
+    // hand-off still ahead of it. Take the flag and clear it from the context
+    // every sub-expression below sees, so nothing can inherit it by accident
+    // (`1 + f(x)` in tail position is exactly this trap: `f(x)` is an argument of
+    // the `+`, and eliding the `+` by tail-calling `f` silently drops the add).
+    let tail = cx.tail;
+    let cx = Cx { tail: false, ..cx };
     let disp = display_name(name);
     if info.params.len() != args.len() {
         return Err(Error::at(
@@ -13230,22 +13610,20 @@ fn compile_call<M: Module>(
     // its operands), so it isn't guaranteed to free exactly the one ref we'd hand
     // it — retain into builtins as before. (Owned params never apply to builtins.)
     for (idx, (v, p)) in arg_values.iter().zip(info.params.iter()).enumerate() {
-        if !is_heap(&p.ty) {
-            continue;
-        }
-        // The callee only inspects this parameter (`aipl_mono::inspect_only_params`)
-        // and so skips its entry-scope release: hand it over untouched. Our own
-        // reference — a live binding, an owning container, or a fresh temporary
-        // still tracked by this scope — keeps it alive for the whole call, and
-        // the retain/release pair we'd otherwise emit cancels. A fresh temporary
-        // deliberately keeps its tracking entry here (it is *not* moved), since
-        // nothing in the callee will free it.
-        if p.inspect_only {
+        // Not retained: either the parameter owns no heap, or it is a pure
+        // borrow — an inspect-only heap parameter, or a boxed one outside a
+        // tail-call participant — that the callee will not release. Hand it over
+        // untouched: our own reference (a live binding, an owning container, or
+        // a fresh temporary still tracked by this scope) keeps it alive for the
+        // whole call, and the retain/release pair we'd otherwise emit cancels. A
+        // fresh temporary deliberately keeps its tracking entry here (it is
+        // *not* moved), since nothing in the callee will free it.
+        if !p.retained() && !p.owned {
             continue;
         }
         let is_builtin = matches!(info.link, FuncLink::Builtin(_));
         let moved = p.owned || (arg_fresh[idx] && !is_builtin);
-        hand_off_arg(builder, module, builtins, scopes, *v, moved);
+        hand_off_arg(builder, module, builtins, structs, scopes, *v, &p.ty, moved);
     }
     // A composite result (struct or optional) is returned through a caller-
     // provided pointer (sret): allocate a slot of its size and pass its address.
@@ -13262,12 +13640,55 @@ fn compile_call<M: Module>(
         None => arg_values,
     };
     // A user function is already declared; a builtin's import is declared lazily
-    // here on first reference.
+    // here on first reference. A tail-call participant's real body lives in its
+    // `$tail` declaration — call that directly and leave the exported trampoline
+    // to the FFI and to `func_addr`.
     let callee_id = match info.link {
-        FuncLink::User(id) => id,
+        FuncLink::User(id) => info.tail_id.unwrap_or(id),
         FuncLink::Builtin(sym) => builtins.id(module, sym),
     };
     let local_callee = module.declare_func_in_func(callee_id, builder.func);
+
+    // Tail call: this call's value *is* the enclosing function's value, and both
+    // ends carry `CallConv::Tail`, so hand the frame over instead of stacking a
+    // new one. `cx.tail` is only ever set inside a `$tail` body (see `can_tail`),
+    // and the two return-shape checks re-derive at the site what
+    // `tail_call_plan` decided for the pair — cranelift requires a
+    // `return_call`'s results to match the caller's signature exactly.
+    //
+    // The scope release has to happen *before* the transfer, since the frame is
+    // gone afterwards. That is safe here and only here: every argument that owns
+    // heap has been retained or moved above (`ParamInfo::retained`, which a
+    // participant's parameters are all forced into), so it holds a reference of
+    // its own, and releasing any *other* reference can never take it — that is
+    // exactly the invariant a refcount maintains. Arguments that were moved in
+    // are no longer tracked, so they are not released here at all.
+    if tail
+        && info.tail_id.is_some()
+        && sret.is_none()
+        && sret_size(cx.ret_ty, structs).is_none()
+        && is_unit(cx.ret_ty) == is_unit(&info.return_ty)
+    {
+        for scope in scopes.iter() {
+            for t in scope {
+                let v = match t.owned {
+                    Owned::Value(v) => v,
+                    Owned::Slot(slot) => builder.ins().stack_load(types::I64, types::I64, slot, 0),
+                };
+                emit_drop(builder, module, builtins, structs, v, &t.ty);
+            }
+        }
+        builder.ins().return_call(local_callee, &call_args);
+        // Unreachable continuation: the enclosing `if`/`match` arm still emits
+        // its merge jump (and the epilogue its return), which compile into here
+        // and are dropped as dead code — the same shape `ExprKind::Return` uses.
+        let dead = builder.create_block();
+        builder.switch_to_block(dead);
+        builder.seal_block(dead);
+        let placeholder = builder.ins().iconst(types::I64, 0);
+        return Ok((placeholder, info.return_ty.clone()));
+    }
+
     let inst = builder.ins().call(local_callee, &call_args);
     let ret_v = if let Some(s) = sret {
         s
@@ -13316,7 +13737,14 @@ fn compile_call_expr<M: Module>(
         error_main: _,
         in_test: _,
         bindings: _,
+        can_tail: _,
+        tail,
     } = cx;
+    // Only the ordinary-call arm at the bottom can become a tail call: the
+    // intrinsic arms below compile sub-expressions and then do further work with
+    // the result, so tail position must not reach them. Clear it here and put it
+    // back on the one hand-off that can honour it.
+    let cx = Cx { tail: false, ..cx };
     // A free call whose callee is a local holding a function value is an
     // indirect call (mono resolved HOF-parameter calls to concrete callees, so
     // any surviving call through a `Type::Fn` binding is a runtime one).
@@ -15450,8 +15878,19 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             // `name` already names the right instance (borrow or owned) chosen
-            // by monomorphization; `compile_call` moves the owned args in.
-            compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?
+            // by monomorphization; `compile_call` moves the owned args in. The
+            // only path that may emit a `return_call`, so the only one that gets
+            // tail position back.
+            compile_call(
+                module,
+                builder,
+                Cx { tail, ..cx },
+                scopes,
+                name,
+                &info,
+                args,
+                span.clone(),
+            )?
         }
     })
 }
@@ -15553,7 +15992,15 @@ fn compile_expr<M: Module>(
         error_main: _,
         in_test: _,
         bindings: _,
+        can_tail: _,
+        tail,
     } = cx;
+    // Tail position belongs to *this* expression, never automatically to what it
+    // evaluates: clear it before any recursion, so a sub-expression is in tail
+    // position only where an arm below deliberately puts it back with
+    // `Cx { tail, ..cx }`. The polarity matters — an expression form added later
+    // is non-tail by default rather than silently inheriting a wrong `true`.
+    let cx = Cx { tail: false, ..cx };
     let span = expr.span.clone();
     Ok(match &expr.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
@@ -15608,7 +16055,19 @@ fn compile_expr<M: Module>(
             // per the ABI — mirroring the function epilogue. Whatever follows in
             // the block is unreachable, so a fresh (dead) block receives it.
             let mark = scope_depth(scopes);
-            let (rv, rty) = compile_expr(module, builder, cx, scopes, value)?;
+            // `return e` puts `e` in tail position however deep the `return`
+            // sits — the epilogue below is exactly the cleanup a tail call
+            // hoists ahead of the transfer.
+            let (rv, rty) = compile_expr(
+                module,
+                builder,
+                Cx {
+                    tail: cx.can_tail,
+                    ..cx
+                },
+                scopes,
+                value,
+            )?;
             let ret_val = if cx.error_main {
                 // `fn main() -> !Error`: derive the exit code (printing
                 // `error: <msg>` on the err side) before releasing the scopes.
@@ -15753,10 +16212,13 @@ fn compile_expr<M: Module>(
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
             (ptr, Type::Optional(Box::new(Type::NoneInner)))
         }
+        // The only expression that can *become* a tail call: `tail` rides down
+        // to `compile_call`, which decides whether this particular callee
+        // qualifies.
         ExprKind::Call(name, args, style) => compile_call_expr(
             module,
             builder,
-            cx,
+            Cx { tail, ..cx },
             scopes,
             name,
             args,
@@ -16216,7 +16678,10 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(then_block);
             builder.seal_block(then_block);
             scopes.push(Vec::new());
-            let (then_v, then_ty) = compile_expr(module, builder, cx, scopes, then_e)?;
+            // Both branches are in tail position when the `if` is: whichever one
+            // runs, its value is the `if`'s value.
+            let (then_v, then_ty) =
+                compile_expr(module, builder, Cx { tail, ..cx }, scopes, then_e)?;
             if needs_drop(&then_ty, structs) {
                 emit_retain(builder, module, builtins, structs, then_v, &then_ty);
             }
@@ -16232,7 +16697,8 @@ fn compile_expr<M: Module>(
             builder.switch_to_block(else_block);
             builder.seal_block(else_block);
             scopes.push(Vec::new());
-            let (else_v, else_ty) = compile_expr(module, builder, cx, scopes, else_e)?;
+            let (else_v, else_ty) =
+                compile_expr(module, builder, Cx { tail, ..cx }, scopes, else_e)?;
             // Branch types must agree, with one twist: if one branch is
             // bare `none` (Optional(__none__)) and the other is a concrete
             // Optional(T), the result type is the concrete one.
@@ -16282,7 +16748,7 @@ fn compile_expr<M: Module>(
             // are released at scope exit, just like a discarded binding's
             // would be. Then evaluate and yield `rest`.
             compile_expr(module, builder, cx, scopes, first)?;
-            compile_expr(module, builder, cx, scopes, rest)?
+            compile_expr(module, builder, Cx { tail, ..cx }, scopes, rest)?
         }
         // Monomorphization lifts lambdas into synthesized functions before
         // codegen; the checker rejects them otherwise. So none reach here.
@@ -16307,6 +16773,7 @@ fn compile_expr<M: Module>(
                 builder,
                 Cx {
                     env: &new_env,
+                    tail,
                     ..cx
                 },
                 scopes,
@@ -16423,6 +16890,7 @@ fn compile_expr<M: Module>(
                 builder,
                 Cx {
                     env: &new_env,
+                    tail,
                     ..cx
                 },
                 scopes,
@@ -16450,7 +16918,7 @@ fn compile_expr<M: Module>(
             );
             if is_writeback_call {
                 compile_expr(module, builder, cx, scopes, value)?;
-                return compile_expr(module, builder, cx, scopes, body);
+                return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
             }
             // `set name = value;` — store to an existing mut binding.
             let binding = env.get(name).cloned().ok_or_else(|| {
@@ -16494,7 +16962,7 @@ fn compile_expr<M: Module>(
                         let new_ptr = builder.inst_results(inst)[0];
                         builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
-                        return compile_expr(module, builder, cx, scopes, body);
+                        return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                     }
                 }
                 // In-place trim: `set s = trim(s)` / `set s = s.trim()` shifts and
@@ -16515,7 +16983,7 @@ fn compile_expr<M: Module>(
                     let new_ptr = builder.inst_results(inst)[0];
                     builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                     // No new track — the binding's slot-track owns the result.
-                    return compile_expr(module, builder, cx, scopes, body);
+                    return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                 }
             }
             // In-place union: `set a = a.union(b)` on an exclusive set binding
@@ -16560,7 +17028,7 @@ fn compile_expr<M: Module>(
                         let new_ptr = builder.inst_results(inst)[0];
                         builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
-                        return compile_expr(module, builder, cx, scopes, body);
+                        return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                     }
                 }
             }
@@ -16651,7 +17119,7 @@ fn compile_expr<M: Module>(
             }
             // Body uses the unchanged env; the slot has been updated in-place
             // so subsequent Ident lookups will load the new value.
-            compile_expr(module, builder, cx, scopes, body)?
+            compile_expr(module, builder, Cx { tail, ..cx }, scopes, body)?
         }
         ExprKind::For(var, iterable, body) => {
             // `for (let v : iterable) { body }`. Over a `str` this walks
@@ -17082,11 +17550,14 @@ fn compile_expr<M: Module>(
                             .push(Tracked::new(*value, ty));
                     }
                 }
+                // Every arm is in tail position when the `match` is: whichever
+                // one runs, its value is the `match`'s value.
                 let (av, at) = compile_expr(
                     module,
                     builder,
                     Cx {
                         env: &arm_env,
+                        tail,
                         ..cx
                     },
                     scopes,

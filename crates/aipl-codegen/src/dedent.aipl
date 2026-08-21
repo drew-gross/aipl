@@ -76,7 +76,7 @@ binary size: 7848
   metadata: 3735
 builtin calls: 872
   aipl_arr_drop_str: 20
-  aipl_arr_inc: 10
+  aipl_arr_inc: 30
   aipl_arr_retain_ptr: 38
   aipl_array_dec: 60
   aipl_array_new: 10
@@ -84,7 +84,7 @@ builtin calls: 872
   aipl_array_with_cap: 20
   aipl_assert: 10
   aipl_dec: 245
-  aipl_inc: 183
+  aipl_inc: 163
   aipl_str_data: 17
   aipl_str_eq: 10
   aipl_str_is_all_whitespace: 42

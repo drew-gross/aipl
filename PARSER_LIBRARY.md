@@ -12,7 +12,7 @@ each is sized to be finishable in one session.
 - [ ] 1.2 `case_index` / `case_name` builtins — match a case, not a payload
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
-- [ ] 1.5 Tail-call elimination — TODO.txt:467
+- [x] 1.5 Tail-call elimination — TODO.txt:467
 - [ ] 1.6 `match` arms as statement blocks; arm grouping; char-literal arms
 - [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
 
@@ -175,24 +175,59 @@ boxing more types makes the broken shape more common.
 `{ cst: Cst, kids: A[] }`.
 *Fallback:* move all side tables onto the `Grammar` and reference them by index.
 
-### 1.5 Tail-call elimination — *required*
+### 1.5 Tail-call elimination — **done** (2026-08-20)
 
-TODO.txt:467 records that `return_call` appears nowhere in codegen. The stack
-budget is the problem: the `aipl` CLI and the cases harness run on 256 MB
-(`src/main.rs:33-38`, `tests/cases.rs:333`), but **a binary from `aipl build`
-gets the OS default — 8 MB**. `walker.aipl:1285` records a once-per-token
-recursion that "ran the native stack out" and had to become a `while` loop, and
-`doc.aipl:8-15` documents the same lesson: *"It was originally written as a
-tail-recursive walk on the assumption that the tail call would be eliminated; it
-is not."*
+Implemented in `aipl-codegen`. A call in tail position lowers to cranelift's
+`return_call`, so a recursive walk reuses one frame and depth stops being bounded
+by the native stack — the 8 MB an `aipl build` binary gets, against the 256 MB
+the CLI and the cases harness raise themselves to. `doc.aipl` and `walker.aipl`
+can now drop their work-stack rewrites (not yet done — see *Lifts* below).
 
-Cranelift supplies `return_call` / `return_call_indirect`. The real difficulty is
-not emission but **ordering against refcounting**: AIPL emits `aipl_dec` on scope
-exit, and those drops cannot run after control has left the frame.
+Three things had to line up, and all three are settled before any function is
+declared, by `tail_call_plan`:
 
-**Measured, 2026-08-20.** "Only where no drops are pending" was scoped as the
-conservative first cut. It is not a first cut — it is a no-op. Scanning
-`dogfood.clif`, `fmt.clif` and `doc.aipl` for calls in tail position:
+**Calling convention.** `return_call` requires `CallConv::Tail` on the callee
+*and* the identical convention on the caller. So a participant's body moves to a
+`Linkage::Local` `<name>$tail` carrying that convention, and the exported
+`<name>` becomes a C-convention trampoline forwarding to it. **This contradicts
+the earlier "no wrappers needed" finding**, which counted the FFI surface as
+`main` + the `; entry` list + address-taken functions. It is wider than that:
+`Engine::call_values` can name *any* function, and neither it nor a `func_addr`
+function value can know whether the function it names happens to tail-recurse.
+Without the trampoline, adding a tail call to an AIPL function would silently
+make it uncallable from Rust. AIPL call sites skip the trampoline and call
+`<name>$tail` directly, so only the `return_call` sites pay for the convention.
+
+**Nothing may point into the caller's frame.** A participant may not take or
+return a composite (struct/optional/result) — those are passed and returned by
+the address of caller storage, and the frame is gone the moment control
+transfers.
+
+**Every refcounted argument must be the callee's own** — the real constraint, and
+what the measurement below was about. A tail call runs the caller's scope cleanup
+*before* transferring control, which is safe only if each argument still holds a
+reference that cleanup cannot release. Refcounting gives exactly that for a
+retained argument: the caller's `+1` is the callee's, and releasing any other
+reference can never consume it. So the rule is that every argument owning heap is
+`ParamInfo::retained` or moved in. Two things had to change to make that true of
+real code:
+
+- **Boxed parameters join the borrow protocol.** They were pure borrows — alive
+  across a call only by the caller's own reference, with neither side touching
+  the count — which fails the rule outright. A participant's boxed parameters are
+  marked `tail_owned` and pay the retain/release pair.
+- **A participant gives up retain elision.** An `inspect_only` heap parameter is a
+  borrow on the caller's reference by construction, so `inspect_only` is forced
+  off for participants.
+
+`hand_off_arg` also had to become type-aware: it retained through the bare
+`aipl_inc`, which dispatches on `str` tag bits, and boxed values count on their
+own block header via `aipl_rec_inc_strong`.
+
+**The measurement that shaped this (2026-08-20).** "Only where no drops are
+pending" was scoped as the conservative first cut. It is not a first cut — it is
+a no-op. Scanning `dogfood.clif`, `fmt.clif` and `doc.aipl` for calls in tail
+position:
 
 | shape | count |
 |---|---|
@@ -201,67 +236,37 @@ conservative first cut. It is not a first cut — it is a no-op. Scanning
 | other instructions between | 15 |
 | **of which self-calls** | **2** (both dirty) |
 
-**0 of the recursive tail-call cycles are fully eliminable.** A cycle is bounded
-only if *every* edge is, and every cycle has at least one drop-guarded edge. So
-the clean-only rule buys 76 individual frames — a constant factor — and bounds
-nothing. It would cost a calling-convention change, a full IR regeneration and a
-corpus-wide `--- performance ---` refill to do it.
-
-The reason is structural, not incidental. A function that `match`es an owned
+**0 of the recursive tail-call cycles are fully eliminable under that rule.** A
+cycle is bounded only if *every* edge is, and every cycle has at least one
+drop-guarded edge. The reason is structural: a function that `match`es an owned
 boxed value binds its payload, and those bindings are released on scope exit —
-*after* the recursive call returns. `doc.aipl`'s `fits` is the canonical shape:
+*after* the recursive call returns. `doc.aipl`'s `fits` is the canonical shape.
+Drop motion across the tail call is therefore the feature, not an optimization on
+top of it. (The same measurement is why self-call-to-loop, which needs no ABI
+change at all, was not worth doing: 128 of 130 tail calls are cross-function.)
 
-```
-    call fn1(v33)                      ; aipl_inc  — retain for the borrow
-    v34 = call fn2(v0, v33, v8, v10)   ; fits_atom
-    call fn3(v33)                      ; aipl_dec
-    jump block5(v34)
-block5(v11: i64):
-    call fn9(v9)                       ; rec_dec_strong — the destructured
-    call fn9(v10)                      ;   WCons payload, dropped on scope exit
-    return v11
-```
+**Tail position** is computed in codegen rather than by a CLIF pass, because the
+soundness test needs types and per-parameter ownership, which the IR has lost. It
+propagates through the forms that only sequence or choose a value —
+`Seq`/`Let`/`LetMut`/`Assign` bodies, both `if` branches, every `match` arm — and
+is *created* by `return e`. It deliberately does not propagate through `Shim`
+(which restores its bindings afterwards) or `Try`. `compile_expr` clears the flag
+before every recursion, so an expression form added later is non-tail by default
+rather than silently inheriting a wrong `true`.
 
-Any function that destructures an owned recursive value and recurses on a field
-looks like this. **Drop motion across the tail call is therefore the feature, not
-an optimization on top of it.**
+**Coverage**: `tests/cases/tail_calls/` — a scalar accumulator at 300,000 deep, a
+boxed cons-list walk at 200,000, and a three-function cycle with no self-call.
+All three run as linked binaries on the OS-default 8 MB stack; the same programs
+written non-tail segfault at those depths.
 
-The soundness rule for hoisting a drop above the tail call: hoist only when every
-refcounted argument holds a retain that dominates the call. The hazard is
-`aipl_mono::inspect_only_params` — when a callee only *inspects* a heap argument
-the caller skips the retain, so hoisting the owner's drop above the call is a
-use-after-free. That test needs type information, which is why this belongs in
-codegen (or in an IR pass fed a side table codegen builds) rather than in a pass
-reading CLIF alone.
+**Still open**: composite returns. A tail call returning via sret has to forward
+the caller's sret pointer rather than allocate its own; until it does,
+composite-returning functions are simply not participants. Same for dict
+parameters, which are refcounted but neither `is_heap` nor boxed.
 
-Also settled while measuring:
-
-- **128 of 130 tail calls are cross-function.** Rewriting self-calls as a jump
-  back to the entry block — no ABI change at all — is worthless here.
-- **No C-convention wrappers are needed.** `return_call` requires `CallConv::Tail`
-  on both sides, and every AIPL fn is `Linkage::Export`, so the first instinct is
-  to wrap. Unnecessary: excluding `main`, the FFI `; entry` list, and
-  address-taken functions (`ExprKind::Ident` resolving to a fn) is sufficient, and
-  ordinary `call` crosses conventions freely. `build_signature`
-  (`aipl-codegen/src/lib.rs`) feeds both the declaration and the definition, so
-  one assignment there sets the convention consistently.
-- **The pass slot exists**: `trait IrPass` / `IR_PASSES`, alongside `ElideRcPairs`.
-  `is_any_call` already encodes the "a call is the only thing that can free
-  memory" barrier the analysis needs.
-
-Build order: exclusion set → `CallConv::Tail` in `build_signature` → codegen
-records per-call "all refcounted args independently retained" into a side table →
-pass hoists drops and rewrites to `return_call` → a cases test that recurses
-deeper than the 8 MB `aipl build` stack allows → IR regeneration and corpus perf
-refill.
-
-Composite returns add a second wrinkle: a tail call returning via sret must
-forward the caller's sret pointer rather than allocate its own.
-
-*Lifts:* the driver is written as ordinary recursive descent, which is the whole
-readability argument for this design; `doc.aipl` and `walker.aipl` can revert
-their work-stack rewrites.
-*Fallback:* an explicit work-stack cons-list, per `doc.aipl:78`.
+*Lifts:* the parser driver can be written as ordinary recursive descent, which is
+the whole readability argument for this design; `doc.aipl` and `walker.aipl` can
+revert their work-stack rewrites.
 
 ### 1.6 `match` arms as statement blocks — *recommended*
 

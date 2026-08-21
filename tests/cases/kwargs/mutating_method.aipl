@@ -27,12 +27,12 @@ binary size: 2048
   data: 1
   metadata: 1271
 builtin calls: 35
-  aipl_arr_inc: 9
+  aipl_arr_inc: 11
   aipl_array_dec: 14
   aipl_array_new: 1
   aipl_array_push: 2
   aipl_dec: 2
-  aipl_inc: 3
+  aipl_inc: 1
   aipl_print: 1
   aipl_u64_len: 2
   aipl_write_u64: 1

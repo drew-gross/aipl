@@ -113,7 +113,6 @@ type checking:
 
 optimizations:
   why does nextest listing take so long?
-  tail call elimination
   we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass
   move single use inlining to after monomorphization
@@ -191,6 +190,7 @@ effects:
 perfmon:
   show regression and improvements
   add tests that specifically exersize perf
+  instead of splitting builtin and non-builtin calls, combine and show both size and calls for both
 
 recovering check:
   check should error on lint failures, but still run tests and report results
@@ -477,8 +477,6 @@ Reasons dec.aipl uses a cons list:
     go and fits are tail-recursive with the work list as a parameter, where Rust uses while let over a mut local. AIPL does have while (tests/cases/loops/while_loop.aipl), but the functional formulation needs a persistent stack, and WCons gives one where push is a single allocation sharing the existing tail. prepend (doc.aipl:217) is then just a right_fold conses onto that tail, matching Rust's reverse-order push loop.
 
     Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
-
-    One caveat on the file's own header comment: it claims the tail-recursive form means it "never recurses on the native stack proportionally to document size." I don't see return_call anywhere in codegen, so guaranteed tail-call elimination doesn't appear to be implemented — that claim may depend on Cranelift happening to optimize the self-call, or it may just be aspirational. The cons-list rationale stands either way; the native-stack part of that comment is worth verifying if you care about it.
 
 signedness:
 

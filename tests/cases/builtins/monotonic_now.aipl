@@ -49,19 +49,20 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 72
 instructions executed: 204
-binary size: 3912
+binary size: 3944
   code: 1240
     main: 1240
   data: 607
-  metadata: 2065
+  metadata: 2097
 builtin calls: 41
   aipl_arr_drop_str: 1
+  aipl_arr_inc: 1
   aipl_array_dec: 3
   aipl_array_new: 1
   aipl_assert: 8
   aipl_dec: 7
   aipl_execute_program: 1
-  aipl_inc: 3
+  aipl_inc: 2
   aipl_monotonic_now: 5
   aipl_shim_get: 5
   aipl_test_begin: 3

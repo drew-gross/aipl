@@ -18,19 +18,20 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 401
 instructions executed: 196
-binary size: 4576
+binary size: 4608
   code: 1540
     __test$rejoin: 1464
     main: 76
   data: 545
-  metadata: 2491
+  metadata: 2523
 builtin calls: 133
   aipl_arr_drop_str: 6
+  aipl_arr_inc: 7
   aipl_array_dec: 14
   aipl_array_new: 7
   aipl_assert: 7
   aipl_dec: 45
-  aipl_inc: 14
+  aipl_inc: 7
   aipl_str_eq: 7
   aipl_str_join: 7
   aipl_str_len: 19

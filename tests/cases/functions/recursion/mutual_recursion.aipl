@@ -14,14 +14,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 949
-binary size: 1632
-  code: 384
-    is_even: 56
-    is_odd: 56
+instructions executed: 787
+binary size: 1728
+  code: 408
+    is_even: 32
+    is_even$tail: 36
+    is_odd: 32
+    is_odd$tail: 36
     main: 272
   data: 186
-  metadata: 1062
+  metadata: 1134
 builtin calls: 9
   aipl_assert: 4
   aipl_test_begin: 2

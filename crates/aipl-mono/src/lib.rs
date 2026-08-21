@@ -6571,8 +6571,10 @@ fn collect_body_binders(e: &Expr, set: &mut HashSet<String>) {
     }
 }
 
-/// The direct sub-expressions of `e` (read-only traversal helper).
-fn children(e: &Expr) -> Vec<&Expr> {
+/// The direct sub-expressions of `e` (read-only traversal helper). Public so
+/// codegen's tail-position walk (`tail_callees`) can reuse the one exhaustive
+/// list of child expressions rather than keep a second copy in step with it.
+pub fn children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),

@@ -1,0 +1,60 @@
+import { len, print, saturating_sub as -, to_str, wrapping_add as +, == } from builtins;
+
+// The shape that makes tail-call elimination worth having, and the one a
+// "eliminate only where no drops are pending" rule can never reach: a function
+// that destructures an owned recursive value and recurses on one of its fields.
+// Its payload bindings (`s` and `rest`) are released on scope exit — *after* the
+// recursive call would return — so there is always a drop pending at the call.
+//
+// A tail call runs that cleanup *before* transferring control, which is safe
+// because every argument that owns heap holds a reference of its own by then:
+// `rest` is retained for the call (a participant's boxed parameters join the
+// caller-retains/callee-releases protocol precisely so this works), and no
+// release of some *other* reference can take it. The `--- performance ---`
+// section is the second half of the assertion — every allocation is still freed
+// exactly once, so the extra retain/release pairs balance.
+variant List = Nil | Cons(str, List)
+
+fn build(n: u64, acc: List) -> List { if (n == 0) { acc } else { build(n - 1, Cons("item", acc)) } }
+
+fn total(xs: List, acc: u64) -> u64 {
+    match (xs) {
+        Nil => acc,
+        Cons(s, rest) => total(rest, acc + s.len()),
+    }
+}
+
+fn main() !prints {
+    print(total(build(200000, Nil), 0).to_str());
+}
+--- stdout ---
+800000
+--- performance ---
+allocations: 200001
+deallocations: 200001
+reallocations: 0
+bytes allocated: 11200056
+instructions executed: 8000062
+binary size: 2416
+  code: 940
+    __rec_drop_List: 84
+    __to_str_u64: 180
+    build: 36
+    build$tail: 216
+    main: 156
+    total: 36
+    total$tail: 232
+  data: 1
+  metadata: 1475
+builtin calls: 2400011
+  aipl_dec: 400002
+  aipl_inc: 200001
+  aipl_print: 1
+  aipl_rec_alloc: 200001
+  aipl_rec_dec_strong: 600002
+  aipl_rec_dec_weak: 200000
+  aipl_rec_inc_strong: 400001
+  aipl_rec_inc_weak: 200000
+  aipl_str_len: 200000
+  aipl_u64_len: 2
+  aipl_write_u64: 1

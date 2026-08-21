@@ -41,21 +41,20 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 720
 instructions executed: 992
-binary size: 3816
+binary size: 3792
   code: 1864
     __eq_i64$arr: 296
     __test$addtwo: 548
     addtwo: 268
     main: 752
   data: 132
-  metadata: 1820
+  metadata: 1796
 builtin calls: 69
-  aipl_arr_inc: 15
+  aipl_arr_inc: 17
   aipl_array_dec: 31
   aipl_array_new: 7
   aipl_array_push: 7
   aipl_assert: 2
-  aipl_inc: 2
   aipl_test_begin: 2
   aipl_test_end: 2
   aipl_test_summary: 1
