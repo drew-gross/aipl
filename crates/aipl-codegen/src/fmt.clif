@@ -28651,6 +28651,7 @@ block7(v37: i64):
 ;   v1 = self
 ;   v1 = $inl164_self
 ;   v40 = t
+;   v1 = __spread_base$0
 ; __m18__expect
 function u0:118(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -30327,6 +30328,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = c
+;   v1 = __spread_base$1
 ; __m18__shape
 function u0:128(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -32922,6 +32924,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = end
+;   v1 = __spread_base$2
 ; __m18__skip_comment
 function u0:139(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -32972,6 +32975,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = self
+;   v1 = __spread_base$3
 ; __m18__is_empty_doc
 function u0:140(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -45801,7 +45805,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$33949
+;   ss1 = __idx$33978
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -46415,11 +46419,11 @@ block30:
 ;   v2 = h
 ;   v73 = p
 ;   ss2 = out
-;   ss3 = __idx$34900
+;   ss3 = __idx$34929
 ;   v114 = d
 ;   v116 = i
 ;   v164 = had_imports
-;   ss8 = __idx$35091
+;   ss8 = __idx$35120
 ;   v194 = d
 ;   v196 = i
 ; __m18__program_items
@@ -97831,7 +97835,7 @@ block67:
 ;   v285 = $inl288_self
 ;   v293 = body
 ;   ss8 = d
-;   ss9 = __idx$75109
+;   ss9 = __idx$75138
 ;   v491 = p
 ;   v493 = i
 ; __m18__lambda_params

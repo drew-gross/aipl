@@ -12,7 +12,7 @@ import { is_err_and, value_or_err, !, == } from builtins;
 // every such boundary needs a hand-written `match` that rebuilds one error as
 // the other — one per pair of error types. `map_err` converts the error side and
 // leaves the ok side alone, so the bridge becomes part of the call:
-// `lex(src).map_err(|e| FmtError { ..e })?`.
+// `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
 pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     match (self) {
         ok(v) => ok(v),
@@ -35,7 +35,11 @@ pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
 
     // A lambda rather than a named function, including a struct-to-struct
     // rewrite — the shape the formatter's lex/format boundary uses.
-    assert(lex("bad").map_err(|e| FmtError { ..e }).is_err_and(|e| e.span == 3));
+    assert(
+        lex("bad")
+            .map_err(|e| FmtError { message: e.message, span: e.span })
+            .is_err_and(|e| e.span == 3),
+    );
 
     // The error type may change shape entirely: struct to str.
     assert(lex("bad").map_err(|e| e.message).is_err_and(|e| e == "unexpected"));
@@ -86,7 +90,7 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1967
-binary size: 20032
+binary size: 20088
   code: 10172
     __builtin_value_or_err$char$i64: 92
     __test$map_err: 4988
@@ -107,7 +111,7 @@ binary size: 20032
     map_err$str$LexError$i64$lam14: 280
     map_err$str$LexError$str$lam10: 388
     map_err$str$LexError$str$lam21: 364
-  data: 1663
+  data: 1719
   metadata: 8197
 builtin calls: 274
   aipl_assert: 16

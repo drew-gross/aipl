@@ -436,6 +436,7 @@ case_tests! {
     cases_structs_err_field_missing_type = "cases/structs/err_field_missing_type",
     cases_structs_err_spread_not_first = "cases/structs/err_spread_not_first",
     cases_structs_err_spread_twice = "cases/structs/err_spread_twice",
+    cases_structs_err_spread_type_mismatch = "cases/structs/err_spread_type_mismatch",
     cases_structs_err_structs = "cases/structs/err_structs",
     cases_structs_errors_err_body_shorthand_no_return_type = "cases/structs/errors/err_body_shorthand_no_return_type",
     cases_structs_errors_err_body_shorthand_non_struct = "cases/structs/errors/err_body_shorthand_non_struct",

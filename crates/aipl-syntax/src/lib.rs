@@ -1929,6 +1929,15 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
 /// message must name that better spelling. The loader runs `aipl_mono::check` on every
 /// file right after parsing (the markers come from the lexer via
 /// `parse_with_allows`), so lints fire before type checking.
+/// Prefix of the binding the loader synthesizes for a `..base` struct spread
+/// (`aipl-loader`'s `desugar_struct_spread`). It is the one thing that ties the
+/// two ends of that desugaring together: the loader emits the binding carrying
+/// the target struct's type, and the checker recognizes it so a failed
+/// annotation is reported as the spread the user actually wrote rather than as
+/// an internal `let`. Shared rather than spelled twice, because a silent
+/// mismatch would turn a good diagnostic back into a confusing one.
+pub const SPREAD_BASE_PREFIX: &str = "__spread_base$";
+
 pub mod lint {
     use super::ast::{Expr, ExprKind, ImportSource, Item, Pattern, Program, Type};
     use super::{each_expr, Error, Span};

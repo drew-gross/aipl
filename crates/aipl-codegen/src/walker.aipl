@@ -443,7 +443,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 // trailing `--- section ---` blocks, stripping trailing whitespace, validating
 // with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let lexed = lex_aipl(src).map_err(|e| FmtError { ..e })?;
+    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?;
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it

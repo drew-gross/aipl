@@ -1,0 +1,25 @@
+import { print } from builtins;
+
+// A `..` spread copies fields from another value of the *same* struct. These two
+// coincide in shape — same field names, same types — but they are still different
+// types, and a spread between them is rejected.
+//
+// The point is that the shapes agreeing is a coincidence, not a contract: the
+// moment either struct gains or renames a field, a spread that crossed between
+// them would silently start meaning something else. Converting between them is a
+// real operation and stays spelled out field by field.
+struct LexError { message: str, span: u64 }
+
+struct FmtError { message: str, span: u64 }
+
+fn main() !prints {
+    let e = LexError { message: "unexpected", span: 3 };
+    let f = FmtError { ..e };
+    print(f.message);
+}
+--- errors ---
+error: cannot spread LexError into FmtError — a ".." spread copies fields from another value of the same struct, and two structs that merely share field names are not interchangeable
+  --> ./tests/cases/structs/err_spread_type_mismatch.aipl:17:26
+   |
+17 |     let f = FmtError { ..e };
+   |                          ^

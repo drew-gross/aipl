@@ -102,6 +102,7 @@ lint:
   recognize ad-hoc implementations of min/max an request using the function
   set w.pos = w.pos + 1; <--- should be set w.pos++;
   forbid unnecessary allow
+  advance and skip_comment have the  W { W { } } stuttering, why isn't the linter flagging it?
 
 errors:
   using Span without importing it gives a bad error
@@ -332,7 +333,9 @@ the arg contract being different for builtins caused problems for retain elision
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
 
-make a docs renderer
+docs:
+  make a docs renderer
+  go through and convert all the // header docs to proper docs
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 
@@ -452,7 +455,7 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   clean things up with is_some_and
-  gap_has_blank and same_line should accept a span
+  gap_has_blank and same_line and range_has_semi should accept a span
 
 optimize string comparison by comparing more than one byte at a time
 

@@ -1159,14 +1159,26 @@ impl Cx<'_> {
             return Ok(declared);
         }
         coerce(&vt, &declared).map_err(|()| {
-            Error::at(
+            // The binding the loader synthesizes for a `..base` struct spread
+            // carries the target's type, so a cross-type spread lands here — but
+            // the user wrote no `let`, and naming the internal binding in the
+            // error would be nonsense. Report it as what they did write.
+            let msg = if name.starts_with(aipl_syntax::SPREAD_BASE_PREFIX) {
+                format!(
+                    "cannot spread {} into {} — a \"..\" spread copies fields from \
+                     another value of the same struct, and two structs that merely \
+                     share field names are not interchangeable",
+                    tyname(&vt),
+                    tyname(&declared)
+                )
+            } else {
                 format!(
                     "binding {name:?} is declared {}, but its value is {}",
                     tyname(&declared),
                     tyname(&vt)
-                ),
-                val.span.clone(),
-            )
+                )
+            };
+            Error::at(msg, val.span.clone())
         })?;
         Ok(declared)
     }

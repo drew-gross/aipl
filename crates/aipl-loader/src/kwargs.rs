@@ -19,7 +19,7 @@
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Program, Signature,
+    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Program, Signature, Type,
 };
 use aipl_syntax::{Error, Span};
 
@@ -47,7 +47,10 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         .filter_map(|item| match item {
             Item::Struct(s) => Some((
                 s.name.clone(),
-                s.fields.iter().map(|f| f.name.clone()).collect(),
+                (
+                    s.fields.iter().map(|f| f.name.clone()).collect(),
+                    s.is_generic(),
+                ),
             )),
             _ => None,
         })
@@ -175,11 +178,14 @@ struct Expander {
     /// Serial number for the synthetic bindings `desugar_spread` introduces, so
     /// nested array literals each get their own accumulator.
     spreads: usize,
-    /// Field names per struct, in declaration order — what a `..base` struct
-    /// spread expands to. Only *names* are needed, so a generic struct
-    /// contributes its template's list: every instance of `Box<T>` has the same
-    /// fields, and which instance this is isn't known until monomorphization.
-    struct_fields: HashMap<String, Vec<String>>,
+    /// Per struct: its field names in declaration order — what a `..base` struct
+    /// spread expands to — and whether it is a generic template. Only *names* are
+    /// needed for the expansion, so a generic struct contributes its template's
+    /// list: every instance of `Box<T>` has the same fields, and which instance
+    /// this is isn't known until monomorphization. The generic flag decides
+    /// whether the expansion can pin the operand's type (see
+    /// `desugar_struct_spread`).
+    struct_fields: HashMap<String, (Vec<String>, bool)>,
     /// Serial number for the binding `desugar_struct_spread` introduces when the
     /// spread operand isn't already a plain name.
     struct_spreads: usize,
@@ -212,13 +218,14 @@ impl Expander {
     /// once per field — `T { ..f() }` must not call `f` three times.
     ///
     /// Returns the rewritten init list plus the binding to wrap around the
-    /// construct, if one was needed.
+    /// construct — `(name, operand, type annotation)` — or `None` when there was
+    /// no spread.
     fn desugar_struct_spread(
         &mut self,
         name: &str,
         inits: &[FieldInit],
         span: &Span,
-    ) -> Result<(Vec<FieldInit>, Option<(String, Expr)>), Error> {
+    ) -> Result<(Vec<FieldInit>, Option<(String, Expr, Option<Type>)>), Error> {
         let spreads = inits.iter().filter(|fi| is_spread(fi)).count();
         if spreads == 0 {
             return Ok((inits.to_vec(), None));
@@ -250,25 +257,39 @@ impl Expander {
             unreachable!("is_spread matched")
         };
         let sspan = inits[0].value.span.clone();
-        let Some(field_names) = self.struct_fields.get(name).cloned() else {
+        let Some((field_names, generic)) = self.struct_fields.get(name).cloned() else {
             return Err(Error::at(
                 format!("cannot spread into {name:?}: no such struct"),
                 sspan,
             ));
         };
         let given = &inits[1..];
-        // Evaluate the operand once: a plain name already denotes one value, so
-        // it is used directly; anything else is bound first.
-        let (base_ref, binding) = match &base.kind {
-            ExprKind::Ident(_) => ((**base).clone(), None),
-            _ => {
-                let k = self.struct_spreads;
-                self.struct_spreads += 1;
-                let tmp = format!("__spread_base${k}");
-                let r = Expr::new(ExprKind::Ident(tmp.clone()), sspan.clone());
-                (r, Some((tmp, (**base).clone())))
-            }
+        // The operand is always bound, for two reasons. It is evaluated *once*,
+        // however many fields it stands for — the expansion mentions it per
+        // field, so `T { ..f() }` must not call `f` three times. And the binding
+        // carries the type annotation that makes the spread same-type: a spread
+        // copies fields from another value of *this* struct, so `FmtError { ..e }`
+        // where `e` is a `LexError` is rejected even though the fields line up.
+        // Two structs that merely coincide in shape are not interchangeable, and
+        // a spread that crossed between them would silently change meaning the
+        // moment either one gained or renamed a field.
+        //
+        // A generic target can't be annotated — `Box` names a template, not a
+        // type, and its instance isn't known until monomorphization — so those
+        // are bound without one. Their field *types* are still checked against
+        // the instance, which catches a mismatched instance (`Box<str>` into
+        // `Box<i64>`); what it doesn't catch is a different struct that happens
+        // to share the field names.
+        let k = self.struct_spreads;
+        self.struct_spreads += 1;
+        let tmp = format!("{}{k}", aipl_syntax::SPREAD_BASE_PREFIX);
+        let base_ref = Expr::new(ExprKind::Ident(tmp.clone()), sspan.clone());
+        let ann = if generic {
+            None
+        } else {
+            Some(Type::Named(name.to_string()))
         };
+        let binding = Some((tmp, (**base).clone(), ann));
         // Definition order, explicit fields winning over the spread. A field the
         // struct doesn't declare is left in place for the checker to reject, so
         // the diagnostic for a typo'd field name is the usual one.
@@ -674,9 +695,9 @@ impl Expander {
                 // binding wrapped around the construct.
                 match binding {
                     None => built,
-                    Some((tmp, base)) => ExprKind::Let(
+                    Some((tmp, base, ann)) => ExprKind::Let(
                         tmp,
-                        None,
+                        ann,
                         Box::new(self.expand_expr(&base, locals)?),
                         Box::new(Expr::new(built, e.span.clone())),
                     ),

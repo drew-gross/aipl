@@ -254,10 +254,17 @@ Rules worth knowing before reaching for it:
   which field came from where. Use it where it replaces several reads.
 - **A full copy is not a spread.** `T { ..x }` where every field comes from `x`
   is just `x`.
-- **The operand is evaluated once**, so a call is safe as a base — the loader
-  binds a non-name operand to a synthetic `let` before expanding.
-- It may cross types (`FmtError { ..e }` where `e` is a `LexError` with the same
-  fields), which is the neat way to write an error-type bridge.
+- **The operand is evaluated once**, so a call is safe as a base — the expansion
+  mentions it per field, so the loader binds it to a synthetic `let` first.
+- **The operand must be the same struct.** `FmtError { ..e }` where `e` is a
+  `LexError` is rejected even though the fields line up: the shapes agreeing is a
+  coincidence, not a contract, and a spread crossing between them would silently
+  change meaning the moment either struct gained or renamed a field. Converting
+  between two struct types stays spelled out field by field.
+  (Enforced by the type annotation on the binding the desugaring introduces —
+  which is why a *generic* target can't be pinned: `Box` names a template, not a
+  type. Its field types are still checked against the instance, so a mismatched
+  instance is caught; a different struct sharing the field names is not.)
 - It does **not** work in the fn-body shorthand (`fn f() -> T { ..x }`): that
   production is led by a field name, so `..` can't start one.
 
