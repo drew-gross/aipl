@@ -17,6 +17,19 @@ green (printing what it refilled/regenerated and flagging behavioral-output
 changes to review in the git diff), or stops with a pointed message naming the
 step and why on any failure a refill can't fix.
 
+**Every step is bounded by a wall-clock ceiling** — `HANDOFF_STEP_TIMEOUT`
+seconds, default 1800, `0` disables. A wedged `nextest` produces no output and
+makes no progress, so without a ceiling the script simply hangs and gets
+abandoned. On expiry it reports free RAM, swap usage and the busiest child
+process, then kills the step's whole descendant tree, because the cause is nearly
+always the machine rather than the tests: memory pressure (check swap — thrashing
+pins processes at 0% CPU in `_dyld_start`), or a first-exec code-signing scan on a
+freshly-linked test binary, which can idle ~2 minutes and looks exactly like a
+hang. Raise the ceiling on a genuinely slow box; don't switch to hand-driving.
+The script also clears orphaned `nextest --list --format terse` children at
+startup — an interrupted run leaves them blocked on a dead pipe, and they
+accumulate across retries and slow each attempt for reasons that look unrelated.
+
 The script runs the suite with **`cargo nextest`** (each test in its own
 process; requires `cargo install cargo-nextest`). One consequence it handles for
 you: nextest defaults to fail-fast, so every whole-suite run there passes
@@ -31,7 +44,19 @@ the validation *and* the order. Running its steps yourself — `cargo fmt`,
 `fill_case_tests`, `fill_expected`, the staged dogfood-IR flow — doesn't just
 pay for the corpus twice; it reorders steps that depend on each other, and the
 breakage that follows looks exactly like a real bug, so you then debug your own
-sequencing. The dependencies that bite:
+sequencing.
+
+**If you find yourself wanting non-targeted validation before the handoff run,
+that is a bug report about the script — say so instead of working around it.**
+Propose the improvement (and offer to implement it); don't build a parallel
+procedure. This is not hypothetical: a wedged `nextest` once sent an agent off to
+hand-roll the whole sequence, and it then kept using the hand-rolled version for
+hours after the machine recovered — re-implementing the staged-IR flow three
+times, at triple the cost, to reach conclusions one script run would have given.
+A blocker in the script is worth fixing once; routing around it is worth nothing
+and hides the blocker from the next person.
+
+The dependencies that bite:
 
 - **Formatting shifts spans, so it must come first.** `aipl fmt` moves spans,
   string-literal data symbols are span-named, and the checked-in `.clif` plus
@@ -185,6 +210,73 @@ since the import shifts line numbers, refill any `--- errors ---`/`--- check ---
 /`--- performance ---` sections (string-literal data symbols are span-named, so
 `binary size` shifts too).
 
+## `match` is either a statement or an expression, never both
+An arm's body may be a single expression or a brace-delimited statement block
+(statements, then an optional trailing expression that is the arm's value). Which
+kind the whole `match` is follows from its arms, and each kind carries one
+obligation — they're complementary, so no `match` satisfies both:
+
+| arms produce | kind | obligation |
+|---|---|---|
+| nothing | statement | may assign freely; must sit where its value is discarded — i.e. ends in `;` |
+| a value | expression | its value must be used; no arm may assign to a binding declared **outside** the `match` |
+
+So a `match` run for effect is written `match (x) { .. };` — with the semicolon.
+The point is that `let v = match (..) {..}` tells you the whole effect: it
+computed `v`. Anything that also mutates is spelled as a statement, where a
+reader expects effects.
+
+"Outside" is the operative word: an arm may declare and drive its own `mut`
+freely (that's how a block arm computes its value), and a *statement* `match`
+nested inside an expression arm is fine. Only a `set` reaching a binding declared
+outside the `match` is rejected.
+
+## Struct spread — `T { ..base, field: value }`
+Every field not given explicitly comes from `base`. Prefer it to restating
+fields, and especially to the functional-update longhand:
+
+```
+fn advance(self: W, end: u64) -> W {     fn advance(self: W, end: u64) -> W {
+    mut w = self;                   →        W { ..self, pos: self.pos + 1, last_end: end }
+    set w.pos = w.pos + 1;               }
+    set w.last_end = end;
+    w
+}
+```
+
+Rules worth knowing before reaching for it:
+
+- **The spread comes first, and there may be only one.** A trailing spread reads
+  as "and the rest from base"; a leading one as "start from base, then override".
+  Only the unambiguous order is accepted.
+- **It earns its keep on wide structs.** Copying one field of two (`WDoc { ..v,
+  doc: X }`) saves nothing and *loses* information — the explicit `w: v.w` says
+  which field came from where. Use it where it replaces several reads.
+- **A full copy is not a spread.** `T { ..x }` where every field comes from `x`
+  is just `x`.
+- **The operand is evaluated once**, so a call is safe as a base — the loader
+  binds a non-name operand to a synthetic `let` before expanding.
+- It may cross types (`FmtError { ..e }` where `e` is a `LexError` with the same
+  fields), which is the neat way to write an error-type bridge.
+- It does **not** work in the fn-body shorthand (`fn f() -> T { ..x }`): that
+  production is led by a field name, so `..` can't start one.
+
+## Authoring a lint: the hit's span must be one line that survives `aipl fmt`
+`#[allow]` is line-scoped — it squelches hits whose span *starts* on the marker's
+line. So a lint whose span covers a multi-line construct can never be squelched:
+the only line able to carry the marker is the construct's first, and `aipl fmt`
+relocates a marker written there (e.g. inside a `match (..) {` header) onto its
+own line, where it squelches nothing.
+
+Point the hit at a single-line sub-expression that identifies the shape — for
+`match_is_some_and`, the `none => false` arm rather than the whole `match`. Then
+verify by squelching it somewhere real and re-running `aipl fmt`.
+
+This matters more than it sounds: an unsquelchable lint that fires on an
+AIPL-implemented builtin (`crates/aipl-mono/src/builtin_*.aipl`) **panics the
+compiler** — "AIPL-implemented builtin sources are valid AIPL" — so every program
+reaching that builtin dies. One such lint took out 66 cases at once.
+
 ## Predicate methods (`is_*` functions)
 Boolean predicates should be written as methods on their receiver, not
 free functions — `c.is_digit()` reads more naturally than `is_digit(c)`.
@@ -281,7 +373,17 @@ and handoff formats the corpus (step 1) *before* regenerating IR (step 5) — so
 the live formatter, which doesn't know the new syntax yet, is what formats
 sources written in it, and the run stops at `aipl fmt`. Adding a syntax form
 means teaching two parsers: the gazelle grammar in `aipl-parser` *and* the
-formatter's own token walker. To get out of the loop:
+formatter's own token walker.
+
+Expect this on **any** change to `walker.aipl`'s grammar — it is routine, not
+exotic (two separate features hit it in a single session). Two symptoms to
+recognize: the run stops at `aipl fmt` with a parse error on a file using the new
+syntax; or, more insidiously, the live formatter *silently rewrites* the new form
+into something that means something else — a struct spread `T { ..base, x: 1 }`
+became `T { .., base, x: 1 }` before the walker knew the form. Always confirm the
+new syntax round-trips through `aipl fmt` before trusting a formatted corpus.
+
+To get out of the loop:
 
 1. `fill_staged_ir` — builds a `fmt.clif.staged` that understands the new form.
 2. Format the corpus with the staged formatter:
