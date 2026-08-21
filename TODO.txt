@@ -62,6 +62,8 @@ syntax:
   match arm grouping (i.e. ArmA | ArmB => { same_statement })
   unspread i.e. MyStruct { ..val_of_type_my_struct, some_field: override }
   bump in walker.aipl contains mutations in a match, I thought we just banned that
+  allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
+  ..spread should probably only allow same-type
 
 shim:
   better syntax

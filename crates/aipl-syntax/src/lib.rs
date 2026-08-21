@@ -2010,6 +2010,16 @@ pub mod lint {
             // A construct the parser synthesized from other syntax (a range is
             // `__builtin_Span { .. }`) is not a literal anyone wrote, and its
             // name can't be spelled, so it has no shorter form.
+            // A literal containing a `..base` spread has no shorthand spelling —
+            // the body-shorthand production is led by a field name, so `..`
+            // cannot start one. Advising the shorthand here would be advice the
+            // language can't take.
+            if inits
+                .iter()
+                .any(|i| matches!(i.value.kind, ExprKind::Spread(_)))
+            {
+                continue;
+            }
             if name != ret || name.starts_with("__builtin_") || inits.is_empty() {
                 continue;
             }

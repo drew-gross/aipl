@@ -74,9 +74,9 @@ allocations: 2184
 deallocations: 2184
 reallocations: 6
 bytes allocated: 100369
-instructions executed: 328259
-binary size: 858800
-  code: 525100
+instructions executed: 325775
+binary size: 854792
+  code: 522720
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -158,7 +158,7 @@ binary size: 858800
     __m6__block: 1012
     __m6__block_entries: 3760
     __m6__block_layout: 5112
-    __m6__bump: 1624
+    __m6__bump: 920
     __m6__call_arg: 4680
     __m6__call_arg_list: 636
     __m6__call_args_until: 2688
@@ -230,8 +230,8 @@ binary size: 858800
     __m6__struct_fields: 5860
     __m6__struct_inits: 5576
     __m6__struct_item: 5804
-    __m6__take_comment: 916
-    __m6__template_scan: 3240
+    __m6__take_comment: 232
+    __m6__template_scan: 2248
     __m6__template_verbatim: 724
     __m6__tok_text: 368
     __m6__trailing_comment: 1972
@@ -273,13 +273,13 @@ binary size: 858800
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 331193
-builtin calls: 39545
+  metadata: 329565
+builtin calls: 39005
   aipl_arr_drop_str: 50
-  aipl_arr_inc: 4601
+  aipl_arr_inc: 4421
   aipl_arr_reserve: 6
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6430
+  aipl_array_dec: 6250
   aipl_array_new: 1762
   aipl_array_push: 42
   aipl_array_push_mut: 45
@@ -288,8 +288,8 @@ builtin calls: 39545
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 10308
-  aipl_inc: 8472
+  aipl_dec: 10218
+  aipl_inc: 8382
   aipl_rec_alloc: 92
   aipl_rec_dec_strong: 539
   aipl_rec_dec_weak: 47

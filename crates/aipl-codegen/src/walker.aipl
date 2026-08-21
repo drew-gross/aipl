@@ -242,11 +242,9 @@ fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
 // not-carried check in the driver fails).
 fn bump(self: W) -> WStr {
     match (self.peek()) {
-        some(t) => {
-            mut w = self;
-            set w.pos = w.pos + 1;
-            set w.last_end = t.span.end;
-            WStr { w, text: self.src[t.span] }
+        some(t) => WStr {
+            w: W { ..self, pos: self.pos + 1, last_end: t.span.end },
+            text: self.src[t.span],
         },
         // Past the end there is nothing to consume: the cursor stays put and the
         // text is empty, matching `peek_text`. The Rust version indexes and would
@@ -366,12 +364,7 @@ fn trailing_comment(self: W) -> WDoc {
 
 // Consume comment `c`: step past it and mark it as the last thing emitted. The
 // Rust `pop_front` + `last_end` update, as one move.
-fn take_comment(self: W, c: Span) -> W {
-    mut w = self;
-    set w.cpos = w.cpos + 1;
-    set w.last_end = c.end;
-    w
-}
+fn take_comment(self: W, c: Span) -> W { W { ..self, cpos: self.cpos + 1, last_end: c.end } }
 
 // ---------- comma lists ----------
 
@@ -450,7 +443,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 // trailing `--- section ---` blocks, stripping trailing whitespace, validating
 // with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?;
+    let lexed = lex_aipl(src).map_err(|e| FmtError { ..e })?;
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
@@ -582,18 +575,9 @@ fn comment_before_cursor(self: W) -> bool {
 }
 
 // Step past one token, recording where it ended. `bump` without the text.
-fn advance(self: W, end: u64) -> W {
-    mut w = self;
-    set w.pos = w.pos + 1;
-    set w.last_end = end;
-    w
-}
+fn advance(self: W, end: u64) -> W { W { ..self, pos: self.pos + 1, last_end: end } }
 
-fn skip_comment(self: W) -> W {
-    mut w = self;
-    set w.cpos = w.cpos + 1;
-    w
-}
+fn skip_comment(self: W) -> W { W { ..self, cpos: self.cpos + 1 } }
 
 // Whether `d` is the empty `Concat` that `lead`/`trailing_comment` hand back when
 // there was no comment — the "nothing here" doc.
@@ -2716,9 +2700,9 @@ allocations: 20457
 deallocations: 20457
 reallocations: 560
 bytes allocated: 1002564
-instructions executed: 2945640
-binary size: 3056616
-  code: 1749112
+instructions executed: 2821440
+binary size: 3052600
+  code: 1746732
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2824,7 +2808,7 @@ binary size: 3056616
     block: 1012
     block_entries: 3760
     block_layout: 5112
-    bump: 1624
+    bump: 920
     call_arg: 4680
     call_arg_list: 636
     call_args_until: 2688
@@ -2899,8 +2883,8 @@ binary size: 3056616
     struct_fields: 5860
     struct_inits: 5576
     struct_item: 5804
-    take_comment: 916
-    template_scan: 3240
+    take_comment: 232
+    template_scan: 2248
     template_verbatim: 724
     tok_text: 368
     toks_of: 520
@@ -2925,15 +2909,15 @@ binary size: 3056616
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1281764
-builtin calls: 467280
+  metadata: 1280128
+builtin calls: 440280
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57852
+  aipl_arr_inc: 48852
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 69642
+  aipl_array_dec: 60642
   aipl_array_new: 9833
   aipl_array_push: 1650
   aipl_array_push_mut: 1353
@@ -2942,8 +2926,8 @@ builtin calls: 467280
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 98487
-  aipl_inc: 78783
+  aipl_dec: 93987
+  aipl_inc: 74283
   aipl_rec_alloc: 5593
   aipl_rec_dec_strong: 39777
   aipl_rec_dec_weak: 3509
