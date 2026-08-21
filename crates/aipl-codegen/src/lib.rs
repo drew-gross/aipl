@@ -5183,7 +5183,7 @@ pub fn generate_dogfood_artifact(
     out.push_str("; dogfood-ir v1\n");
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
     out.push_str("; DO NOT EDIT BY HAND. Regenerate:\n");
-    out.push_str(";   cargo test --test dogfood_ir -- --ignored fill_dogfood_ir\n");
+    out.push_str(";   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir\n");
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.

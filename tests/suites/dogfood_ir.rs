@@ -16,8 +16,8 @@
 //!     the regenerated diff is reviewed before committing.
 //!
 //! Authoring workflow: break the frontend freely (the compiler still runs off the
-//! checked-in IR) → fix it → `cargo test --test dogfood_ir -- --ignored
-//! fill_dogfood_ir` → full `cargo test` (exercises the new IR end-to-end and this
+//! checked-in IR) → fix it → `cargo test --test dogfood --
+//! --ignored dogfood_ir::fill_dogfood_ir` → full `cargo test` (exercises the new IR end-to-end and this
 //! verify test confirms the match) → commit, or revert `dogfood.clif` if
 //! anything is off.
 
@@ -29,10 +29,12 @@ use aipl::codegen::{
 use aipl::FfiValue;
 use std::path::PathBuf;
 
-const FILL_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_dogfood_ir";
-const FILL_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored fill_staged_ir";
-const VALIDATE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored validate_staged_ir";
-const PROMOTE_STAGED_CMD: &str = "cargo test --test dogfood_ir -- --ignored promote_staged_ir";
+const FILL_CMD: &str = "cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir";
+const FILL_STAGED_CMD: &str = "cargo test --test dogfood -- --ignored dogfood_ir::fill_staged_ir";
+const VALIDATE_STAGED_CMD: &str =
+    "cargo test --test dogfood -- --ignored dogfood_ir::validate_staged_ir";
+const PROMOTE_STAGED_CMD: &str =
+    "cargo test --test dogfood -- --ignored dogfood_ir::promote_staged_ir";
 
 /// The real validation command: run the whole suite with the compiler itself
 /// linking the staged IR (`AIPL_DOGFOOD_IR`), so every parse in the corpus
@@ -787,7 +789,7 @@ fn promote_staged_ir() {
 }
 
 #[test]
-#[ignore = "author helper — run: cargo test --test dogfood_ir -- --ignored fill_dogfood_ir"]
+#[ignore = "author helper — run: cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir"]
 fn fill_dogfood_ir() {
     aipl::install_parser_hooks();
     for a in ARTIFACTS {

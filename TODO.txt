@@ -119,6 +119,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  2. Cap link concurrency during handoff (cargo build -j4 for the build steps). Doesn't reduce work, but caps peak RSS so the box stops swapping. Cheap to try, low risk.
   common subexpression elimination
   sora
   licm

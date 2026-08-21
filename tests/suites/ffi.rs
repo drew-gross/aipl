@@ -1058,8 +1058,11 @@ fn compile_sources_embeds_separate_files_via_include_str() {
     // imports `from "./mathlib.aipl"`, which resolves by name to the supplied
     // "mathlib.aipl" entry — nothing is read from disk.
     let e = Engine::compile_sources(&[
-        ("./calc.aipl", include_str!("ffi_fixtures/calc.aipl")), // root (first)
-        ("./mathlib.aipl", include_str!("ffi_fixtures/mathlib.aipl")),
+        ("./calc.aipl", include_str!("../ffi_fixtures/calc.aipl")), // root (first)
+        (
+            "./mathlib.aipl",
+            include_str!("../ffi_fixtures/mathlib.aipl"),
+        ),
     ])
     .unwrap();
     assert_eq!(e.call("sum_of_squares", &[3, 4]).unwrap(), 25);
@@ -1070,7 +1073,7 @@ fn compile_sources_rejects_a_missing_module() {
     // calc.aipl imports "mathlib.aipl", which we don't supply.
     let err = Engine::compile_sources(&[(
         "./ffi_fixtures/calc.aipl",
-        include_str!("ffi_fixtures/calc.aipl"),
+        include_str!("../ffi_fixtures/calc.aipl"),
     )]);
     let errs = err.err().expect("Should err");
     assert_eq!(errs.len(), 1);

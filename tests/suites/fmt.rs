@@ -4,7 +4,7 @@
 //! - **Fixtures** (`tests/fmt/*.aipl`): input source followed by a final
 //!   `--- formatted ---` section holding the expected `format_source` output,
 //!   byte for byte. Refresh with
-//!   `cargo test --test fmt -- --ignored fill_expected_fmt` (scope with
+//!   `cargo test --test compiler -- --ignored fmt::fill_expected_fmt` (scope with
 //!   `AIPL_FMT_CASE=<substring>`), then review the diff.
 //! - **Corpus invariants**: every parseable `.aipl` in the repo (test cases,
 //!   dogfooded compiler sources, examples) must format without error, format
@@ -98,7 +98,7 @@ fn enforced_files() -> Vec<PathBuf> {
 /// already be in canonical format — this is what keeps the corpus, and any new
 /// file, formatted. A file that doesn't parse (a parse-error fixture) can't be
 /// formatted and is exempt. Fix a failure with
-/// `cargo test --test fmt -- --ignored format_corpus`.
+/// `cargo test --test compiler -- --ignored fmt::format_corpus`.
 #[test]
 fn all_aipl_files_stay_formatted() {
     setup();
@@ -124,7 +124,7 @@ fn all_aipl_files_stay_formatted() {
     assert!(
         unformatted.is_empty(),
         "{} file(s) are not canonically formatted; run \
-         `cargo test --test fmt -- --ignored format_corpus` to fix:\n{}",
+         `cargo test --test compiler -- --ignored fmt::format_corpus` to fix:\n{}",
         unformatted.len(),
         unformatted.join("\n")
     );
@@ -267,7 +267,7 @@ fn fixtures_match_expected() {
         let Some((input, expected)) = split_fixture(&contents) else {
             failures.push(format!(
                 "[{}] missing `--- formatted ---` section; add one with a `?` body and run \
-                 `cargo test --test fmt -- --ignored fill_expected_fmt`",
+                 `cargo test --test compiler -- --ignored fmt::fill_expected_fmt`",
                 path.display()
             ));
             continue;
@@ -281,7 +281,7 @@ fn fixtures_match_expected() {
         };
         if expected.trim() == "?" {
             failures.push(format!(
-                "[{}] expected body is `?`; run `cargo test --test fmt -- --ignored \
+                "[{}] expected body is `?`; run `cargo test --test compiler -- --ignored fmt:: \
                  fill_expected_fmt` to fill it. Actual:\n{actual}",
                 path.display()
             ));
@@ -345,7 +345,7 @@ fn fill_expected_fmt() {
         filled += 1;
     }
     panic!(
-        "filled {filled} fixture(s); review the diff, then re-run `cargo test --test fmt` \
+        "filled {filled} fixture(s); review the diff, then re-run `cargo test --test compiler -- fmt::` \
          normally (this run fails intentionally so the refresh is visible)"
     );
 }

@@ -314,7 +314,7 @@ if [ -e "$STAGED" ] || [ -e "$STAGED_FMT" ]; then
     fail "startup" "A staged IR artifact already exists:
     $STAGED / $STAGED_FMT
 Resolve the interrupted workflow first — promote it
-    cargo nextest run --run-ignored only -E 'test(=promote_staged_ir)'
+    cargo nextest run --run-ignored only -E 'test(=dogfood_ir::promote_staged_ir)'
 or discard it
     rm -f '$STAGED' '$STAGED_FMT'"
 fi
@@ -351,7 +351,7 @@ run_step "nextest --no-run (build)" cargo nextest run --no-run --color never
 # `crates/aipl-mono/src/*.aipl` (the AIPL-defined builtins), so reformatting one
 # of *those* does still invalidate aipl-mono — which the compile check below
 # absorbs and reports as its own step.
-run_step "aipl fmt (format_corpus)" helper format_corpus
+run_step "aipl fmt (format_corpus)" helper fmt::format_corpus
 if grep -q 'format failed:' "$STEP_OUT"; then
     save_out; fail "aipl fmt" "$(grep -n 'format failed:' "$STEP_OUT")"
 fi
@@ -507,10 +507,10 @@ fi
 # --- 5. Regenerate + validate + promote dogfood IR -----------------------------
 
 if [ $need_ir -eq 1 ]; then
-    run_step "fill_staged_ir" helper fill_staged_ir
+    run_step "fill_staged_ir" helper dogfood_ir::fill_staged_ir
     grep -qE 'wrote .*\.staged' "$STEP_OUT" || { save_out; fail "fill_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 
-    run_step "validate_staged_ir (entry-level pre-check)" helper validate_staged_ir
+    run_step "validate_staged_ir (entry-level pre-check)" helper dogfood_ir::validate_staged_ir
     [ $? -eq 0 ] || { save_out; fail "validate_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 
     run_step "staged-IR corpus run (AIPL_DOGFOOD_IR + AIPL_FMT_IR)" \
@@ -521,7 +521,7 @@ if [ $need_ir -eq 1 ]; then
             "$(grep -nE 'mismatch|FAILED|Abort' "$STEP_OUT" | head -20)"
     fi
 
-    run_step "promote_staged_ir" helper promote_staged_ir
+    run_step "promote_staged_ir" helper dogfood_ir::promote_staged_ir
     grep -q 'promoted' "$STEP_OUT" || { save_out; fail "promote_staged_ir" "$(tail -40 "$STEP_OUT")"; }
 fi
 

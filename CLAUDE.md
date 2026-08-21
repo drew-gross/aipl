@@ -94,7 +94,9 @@ Use the **Bash** tool for everything terminal-side: `cargo build`,
 ## Test cadence
 Avoid running the full test suite during development — it is the slowest part
 of the dev loop. Prefer:
-- A single test by file: `cargo test --test mono`
+- A single suite: `cargo test --test compiler -- mono::` (suites are `mod`s of
+  a merged target — see "Test targets are merged" below, so the suite name is a
+  module prefix, not a `--test` argument)
 - A single test by name: `cargo test -- name_substring`
 - A filtered case run: `cargo test --test cases -- cases_generics`
   (every case is its own `#[test]`, named after its display path with the
@@ -127,7 +129,7 @@ test in `tests/fmt.rs` enforces it over `tests/cases/`, `crates/`, `examples/`,
 and `tests/ffi_fixtures/`. So a **new or edited `.aipl` file must be formatted**:
 run `aipl fmt <file>` (in place; `--check` reports without writing), or reformat
 the whole corpus at once with the author helper
-`cargo test --test fmt -- --ignored format_corpus`.
+`cargo test --test compiler -- --ignored fmt::format_corpus`.
 
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
@@ -167,6 +169,39 @@ perf mismatch, a stale perfmon table) print the exact command to run.
 
 `fill_expected` always overwrites every section with current values — no need
 to set bodies to `?` first.
+
+## Test targets are merged (`tests/compiler.rs`, `tests/dogfood.rs`)
+
+There are **three** integration-test targets, not one per suite. Every extra
+target is a full static link of the ~77-crate compiler closure — measured at
+~6s each, and that link, not compiling the test source, is what dominates build
+time (`tests/shims.rs`, 73 lines, cost exactly as much as `tests/cases.rs`,
+1914 lines). The suites live in `tests/suites/*.rs` and are pulled in as `mod`s:
+
+| target | suites |
+|---|---|
+| `cases` | the `tests/cases/**/*.aipl` corpus (own target — 560 tests, filtered constantly) |
+| `compiler` | check, codegen, doc_cmd, fmt, highlighting, mono, parser, shims |
+| `dogfood` | dogfood_ir, ffi, lexer_dogfood |
+
+Two consequences:
+
+- **Test names are module-qualified.** `format_corpus` is `fmt::format_corpus`;
+  `fill_staged_ir` is `dogfood_ir::fill_staged_ir`. Names in `cases` are
+  unchanged. Filter one suite with `cargo test --test compiler -- fmt::`.
+- **`tests/suites/*.rs` are not auto-discovered** (cargo only discovers
+  `tests/*.rs` and `tests/*/main.rs`), so **adding a suite means adding a `mod`
+  line** to the relevant target — otherwise it silently never runs, exactly like
+  a case with no `#[test]`.
+
+They are `mod`s rather than `include!`s deliberately: splicing into one crate
+root collides on duplicate `use` statements (11 of them across these files —
+`PathBuf`, `Program`, `HashMap`, …), and each is a hard E0252 that any future
+import could reintroduce. `mod` keeps each suite's imports isolated.
+
+Paths inside a moved suite are now one level deeper — anchor fixtures at
+`env!("CARGO_MANIFEST_DIR")` rather than writing source-relative
+`include_str!("ffi_fixtures/…")`.
 
 ## Prefer the cases framework for tests
 Default to the `tests/cases/**/*.aipl` framework over Rust unit tests in
@@ -394,7 +429,7 @@ To get out of the loop:
 
 1. `fill_staged_ir` — builds a `fmt.clif.staged` that understands the new form.
 2. Format the corpus with the staged formatter:
-   `AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test fmt -- --ignored format_corpus`
+   `AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test compiler -- --ignored fmt::format_corpus`
 3. `fill_staged_ir` **again** — step 2 shifted spans, so the IR from step 1 is
    already stale.
 4. Validate + promote as below, then run handoff normally for the refills.
@@ -406,13 +441,13 @@ The steps, for those cases:
 
 1. **Generate staged IR** — compiles each `.aipl` source with the new frontend
    and writes `*.clif.staged` files next to the live `*.clif` files:
-   `cargo test --test dogfood_ir -- --ignored fill_staged_ir`
+   `cargo test --test dogfood -- --ignored dogfood_ir::fill_staged_ir`
 
 2. **Entry-level pre-check (fast)** — loads each `*.clif.staged` and calls its
    entry functions with known inputs; confirms the IR links and each entry
    computes correctly. This does *not* run the compiler on the staged IR — it's
    just the quick gate before the corpus run:
-   `cargo test --test dogfood_ir -- --ignored validate_staged_ir`
+   `cargo test --test dogfood -- --ignored dogfood_ir::validate_staged_ir`
 
 3. **Validate by running the corpus against the staged IR, not by reading the
    diff** — the real check is running the whole suite with the compiler itself
@@ -436,7 +471,7 @@ The steps, for those cases:
 4. **Promote staged → live** — validates again, copies `*.clif.staged` →
    `*.clif`, deletes the staged files, then fails intentionally so you review
    the final diff before committing:
-   `cargo test --test dogfood_ir -- --ignored promote_staged_ir`
+   `cargo test --test dogfood -- --ignored dogfood_ir::promote_staged_ir`
 
 5. **Run full suite**: `cargo test`
 

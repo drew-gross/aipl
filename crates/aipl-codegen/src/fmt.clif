@@ -1,7 +1,7 @@
 ; dogfood-ir v1
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
-;   cargo test --test dogfood_ir -- --ignored fill_dogfood_ir
+;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; entry format_program 130 str u64 -> str!__m18__FmtError
 ; entry fmt_prepare 60 str -> __m2__FmtInput
 ; entry fmt_layout 61 str u64 -> str!__m18__FmtError
