@@ -1902,14 +1902,24 @@ fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut acc = acc0;
     while (w.peek_text() != "}") {
         let l = w.lead();
-        let f = l.w.bump();
 
-        // `field: value`, or the shorthand `field` (sugar for `field: field`) —
-        // kept verbatim, not expanded.
-        let e = if (f.w.peek_text() == ":") {
-            f.w.struct_field_value(l.doc, f.text)?
+        // `..base` — a struct spread. It is one item, spelled tight against its
+        // operand: bumping the `..` as if it were a field name would leave the
+        // operand as a *separate* item, and the list would then write a comma
+        // between them (`.., base`), which is a different literal.
+        let e = if (l.w.peek_text() == "..") {
+            let v = l.w.bump().w.expr()?;
+            WDoc { w: v.w, doc: Concat([l.doc, Text(".."), v.doc]) }
         } else {
-            WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
+            let f = l.w.bump();
+
+            // `field: value`, or the shorthand `field` (sugar for `field: field`)
+            // — kept verbatim, not expanded.
+            if (f.w.peek_text() == ":") {
+                f.w.struct_field_value(l.doc, f.text)?
+            } else {
+                WDoc { w: f.w, doc: Concat([l.doc, Text(f.text)]) }
+            }
         };
         set acc.push(e.doc);
         set w = if (e.w.peek_text() == ",") { e.w.bump().w } else { e.w };
@@ -2706,9 +2716,9 @@ allocations: 20457
 deallocations: 20457
 reallocations: 560
 bytes allocated: 1002564
-instructions executed: 2945436
-binary size: 3053216
-  code: 1747224
+instructions executed: 2945640
+binary size: 3056616
+  code: 1749112
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2887,7 +2897,7 @@ binary size: 3053216
     struct_atom: 2932
     struct_field_value: 1496
     struct_fields: 5860
-    struct_inits: 3688
+    struct_inits: 5576
     struct_item: 5804
     take_comment: 916
     template_scan: 3240
@@ -2915,15 +2925,15 @@ binary size: 3053216
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1280252
-builtin calls: 467224
+  metadata: 1281764
+builtin calls: 467280
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57842
+  aipl_arr_inc: 57852
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 69632
+  aipl_array_dec: 69642
   aipl_array_new: 9833
   aipl_array_push: 1650
   aipl_array_push_mut: 1353
@@ -2932,24 +2942,24 @@ builtin calls: 467224
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 98473
-  aipl_inc: 78773
+  aipl_dec: 98487
+  aipl_inc: 78783
   aipl_rec_alloc: 5593
-  aipl_rec_dec_strong: 39775
+  aipl_rec_dec_strong: 39777
   aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 34182
+  aipl_rec_inc_strong: 34184
   aipl_rec_inc_weak: 3509
   aipl_str_cmp: 7
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 6022
+  aipl_str_eq: 6024
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31197
+  aipl_str_len: 31201
   aipl_str_repeat: 74
-  aipl_str_slice: 8484
+  aipl_str_slice: 8486
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3

@@ -41,11 +41,25 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         fns.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
     }
 
+    let struct_fields = program
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Struct(s) => Some((
+                s.name.clone(),
+                s.fields.iter().map(|f| f.name.clone()).collect(),
+            )),
+            _ => None,
+        })
+        .collect();
+
     let mut cx = Expander {
         fns,
         defaults: HashMap::new(),
         expanding: Vec::new(),
         spreads: 0,
+        struct_fields,
+        struct_spreads: 0,
     };
 
     let items = program
@@ -161,9 +175,124 @@ struct Expander {
     /// Serial number for the synthetic bindings `desugar_spread` introduces, so
     /// nested array literals each get their own accumulator.
     spreads: usize,
+    /// Field names per struct, in declaration order — what a `..base` struct
+    /// spread expands to. Only *names* are needed, so a generic struct
+    /// contributes its template's list: every instance of `Box<T>` has the same
+    /// fields, and which instance this is isn't known until monomorphization.
+    struct_fields: HashMap<String, Vec<String>>,
+    /// Serial number for the binding `desugar_struct_spread` introduces when the
+    /// spread operand isn't already a plain name.
+    struct_spreads: usize,
+}
+
+/// Whether this init is a `..base` struct spread rather than a named field.
+/// The `Spread` value is what identifies it (the name is empty and carries no
+/// meaning) — see the `FieldInit` build action in `aipl-parser`.
+fn is_spread(fi: &FieldInit) -> bool {
+    matches!(fi.value.kind, ExprKind::Spread(_))
 }
 
 impl Expander {
+    /// Replace a struct spread — `T { ..base, a: 1 }` — with the fields it
+    /// stands for: every field of `T` the literal does not give explicitly is
+    /// read off `base`. So with `struct T { a: i64, b: i64, c: i64 }`,
+    ///
+    /// ```text
+    /// T { ..base, a: 1 }  =>  T { a: 1, b: base.b, c: base.c }
+    /// ```
+    ///
+    /// Done here, in the loader, for the same reason the array spread is: it
+    /// runs before the checker, so nothing downstream — checker, monomorphizer,
+    /// codegen — ever sees a spread, and the rule lives in exactly one place.
+    /// Only field *names* are needed, which is why a generic struct can be
+    /// expanded from its template (see `struct_fields`).
+    ///
+    /// **The operand is evaluated once.** A spread of anything but a plain name
+    /// is bound to a synthetic `let` first, because the expansion mentions it
+    /// once per field — `T { ..f() }` must not call `f` three times.
+    ///
+    /// Returns the rewritten init list plus the binding to wrap around the
+    /// construct, if one was needed.
+    fn desugar_struct_spread(
+        &mut self,
+        name: &str,
+        inits: &[FieldInit],
+        span: &Span,
+    ) -> Result<(Vec<FieldInit>, Option<(String, Expr)>), Error> {
+        let spreads = inits.iter().filter(|fi| is_spread(fi)).count();
+        if spreads == 0 {
+            return Ok((inits.to_vec(), None));
+        }
+        // One spread, written first. Both restrictions exist so the literal has
+        // exactly one reading: two spreads would have to be ordered against each
+        // other, and a trailing spread reads as "and the rest from base" while
+        // this one means "start from base, then override" — the same text with
+        // two plausible meanings. Requiring it first makes the override
+        // direction unambiguous at a glance.
+        if spreads > 1 {
+            return Err(Error::at(
+                "a struct literal takes at most one \"..\" spread".to_string(),
+                span.clone(),
+            ));
+        }
+        if !is_spread(&inits[0]) {
+            return Err(Error::at(
+                "a \"..\" spread must come first in a struct literal, before the fields \
+                 that override it"
+                    .to_string(),
+                inits
+                    .iter()
+                    .find(|fi| is_spread(fi))
+                    .map_or_else(|| span.clone(), |fi| fi.value.span.clone()),
+            ));
+        }
+        let ExprKind::Spread(base) = &inits[0].value.kind else {
+            unreachable!("is_spread matched")
+        };
+        let sspan = inits[0].value.span.clone();
+        let Some(field_names) = self.struct_fields.get(name).cloned() else {
+            return Err(Error::at(
+                format!("cannot spread into {name:?}: no such struct"),
+                sspan,
+            ));
+        };
+        let given = &inits[1..];
+        // Evaluate the operand once: a plain name already denotes one value, so
+        // it is used directly; anything else is bound first.
+        let (base_ref, binding) = match &base.kind {
+            ExprKind::Ident(_) => ((**base).clone(), None),
+            _ => {
+                let k = self.struct_spreads;
+                self.struct_spreads += 1;
+                let tmp = format!("__spread_base${k}");
+                let r = Expr::new(ExprKind::Ident(tmp.clone()), sspan.clone());
+                (r, Some((tmp, (**base).clone())))
+            }
+        };
+        // Definition order, explicit fields winning over the spread. A field the
+        // struct doesn't declare is left in place for the checker to reject, so
+        // the diagnostic for a typo'd field name is the usual one.
+        let mut out: Vec<FieldInit> = Vec::with_capacity(field_names.len());
+        for fname in &field_names {
+            match given.iter().find(|fi| &fi.name == fname) {
+                Some(fi) => out.push(fi.clone()),
+                None => out.push(FieldInit {
+                    name: fname.clone(),
+                    value: Expr::new(
+                        ExprKind::Field(Box::new(base_ref.clone()), fname.clone()),
+                        sspan.clone(),
+                    ),
+                }),
+            }
+        }
+        for fi in given {
+            if !field_names.contains(&fi.name) {
+                out.push(fi.clone());
+            }
+        }
+        Ok((out, binding))
+    }
+
     /// Rewrite an array literal containing one or more `..xs` elements into a
     /// block that builds the array in one pre-sized allocation:
     ///
@@ -524,18 +653,35 @@ impl Expander {
                     )
                 }
             }
-            ExprKind::Construct(name, inits) => ExprKind::Construct(
-                name.clone(),
-                inits
-                    .iter()
-                    .map(|fi| {
-                        Ok(FieldInit {
-                            name: fi.name.clone(),
-                            value: self.expand_expr(&fi.value, locals)?,
+            ExprKind::Construct(name, inits) => {
+                // Expand any `..base` spread into the fields it stands for
+                // *before* recursing, so the reads it introduces are expanded
+                // like any other field value.
+                let (inits, binding) = self.desugar_struct_spread(name, inits, &e.span)?;
+                let built = ExprKind::Construct(
+                    name.clone(),
+                    inits
+                        .iter()
+                        .map(|fi| {
+                            Ok(FieldInit {
+                                name: fi.name.clone(),
+                                value: self.expand_expr(&fi.value, locals)?,
+                            })
                         })
-                    })
-                    .collect::<Result<_, Error>>()?,
-            ),
+                        .collect::<Result<_, Error>>()?,
+                );
+                // A spread of a non-name operand evaluates it once, into a
+                // binding wrapped around the construct.
+                match binding {
+                    None => built,
+                    Some((tmp, base)) => ExprKind::Let(
+                        tmp,
+                        None,
+                        Box::new(self.expand_expr(&base, locals)?),
+                        Box::new(Expr::new(built, e.span.clone())),
+                    ),
+                }
+            }
             ExprKind::Field(obj, field) => {
                 ExprKind::Field(Box::new(self.expand_expr(obj, locals)?), field.clone())
             }

@@ -1,0 +1,48 @@
+import { print, to_str } from builtins;
+
+// Two shapes the desugar has to get right beyond the simple one.
+struct Inner { a: i64, b: i64 }
+
+struct Outer { inner: Inner, n: i64 }
+
+fn main() !prints {
+    let o = Outer { inner: Inner { a: 1, b: 2 }, n: 5 };
+
+    // The base is a field path, not a bare name — so it is bound to a synthetic
+    // `let` and read once, the same as any other non-name operand.
+    let i2 = Inner { ..o.inner, b: 9 };
+    print(i2.a.to_str());
+    print(i2.b.to_str());
+
+    // A spread inside another spread's override value. The outer expansion
+    // produces the inner literal as a field value, and expansion recurses into
+    // it, so both layers resolve.
+    let o2 = Outer { ..o, inner: Inner { ..o.inner, a: 7 } };
+    print(o2.inner.a.to_str());
+    print(o2.inner.b.to_str());
+    print(o2.n.to_str());
+}
+--- stdout ---
+1
+9
+7
+2
+5
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 232
+binary size: 1648
+  code: 624
+    __to_str_i64: 180
+    main: 444
+  data: 1
+  metadata: 1023
+builtin calls: 35
+  aipl_dec: 10
+  aipl_i64_len: 10
+  aipl_inc: 5
+  aipl_print: 5
+  aipl_write_i64: 5

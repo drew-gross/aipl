@@ -75,8 +75,8 @@ deallocations: 2184
 reallocations: 6
 bytes allocated: 100369
 instructions executed: 328259
-binary size: 855400
-  code: 523212
+binary size: 858800
+  code: 525100
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -228,7 +228,7 @@ binary size: 855400
     __m6__struct_atom: 2932
     __m6__struct_field_value: 1496
     __m6__struct_fields: 5860
-    __m6__struct_inits: 3688
+    __m6__struct_inits: 5576
     __m6__struct_item: 5804
     __m6__take_comment: 916
     __m6__template_scan: 3240
@@ -273,7 +273,7 @@ binary size: 855400
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 329681
+  metadata: 331193
 builtin calls: 39545
   aipl_arr_drop_str: 50
   aipl_arr_inc: 4601

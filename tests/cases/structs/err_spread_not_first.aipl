@@ -1,0 +1,18 @@
+import { print, to_str } from builtins;
+
+// A `..` spread must lead. A trailing spread reads as "and the rest from base",
+// a leading one as "start from base, then override" — the same text with two
+// plausible meanings, so only the unambiguous order is accepted.
+struct P { a: i64, b: i64 }
+
+fn main() !prints {
+    let base = P { a: 1, b: 2 };
+    let p = P { a: 9, ..base };
+    print(p.a.to_str());
+}
+--- errors ---
+error: a ".." spread must come first in a struct literal, before the fields that override it
+  --> ./tests/cases/structs/err_spread_not_first.aipl:10:25
+   |
+10 |     let p = P { a: 9, ..base };
+   |                         ^^^^

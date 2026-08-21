@@ -1,0 +1,18 @@
+import { print, to_str } from builtins;
+
+// Two spreads would have to be ordered against each other to know which wins,
+// so a literal takes at most one.
+struct P { a: i64, b: i64 }
+
+fn main() !prints {
+    let x = P { a: 1, b: 2 };
+    let y = P { a: 3, b: 4 };
+    let p = P { ..x, ..y };
+    print(p.a.to_str());
+}
+--- errors ---
+error: a struct literal takes at most one ".." spread
+  --> ./tests/cases/structs/err_spread_twice.aipl:10:13
+   |
+10 |     let p = P { ..x, ..y };
+   |             ^^^^^^^^^^^^

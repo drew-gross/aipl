@@ -1,0 +1,88 @@
+import { print, to_str, value_or } from builtins;
+
+// `T { ..base, field: value }` — a struct spread. Every field not given
+// explicitly is taken from `base`, so a derived value names only what differs
+// instead of restating the whole struct.
+//
+// The spread comes first and the explicit fields override it. Both are
+// deliberate: one spread, always leading, gives the literal exactly one
+// reading. A trailing spread would read as "and the rest from base" while a
+// leading one reads as "start from base, then override" — the same text with
+// two plausible meanings, so only the unambiguous order is accepted.
+struct Config { host: str, port: i64, debug: bool }
+
+// Field names come from the *template* for a generic struct, so a spread works
+// there too — which instance it is stays for monomorphization to infer.
+struct Box<T> { value: T, tag: i64 }
+
+// A struct whose fields own heap: the spread reads each one, so `base` and the
+// derived value are both alive afterwards and each owns its reference. The
+// `--- performance ---` section is the real assertion — every allocation is
+// freed exactly once.
+struct Rec { name: str, tags: str[], n: i64 }
+
+fn main() !prints {
+    let base = Config { host: "localhost", port: 80, debug: false };
+    let prod = Config { ..base, port: 443, debug: true };
+    print(prod.host);
+    print(prod.port.to_str());
+    print(prod.debug.to_str());
+    // The spread reads `base`; it does not consume it.
+    print(base.port.to_str());
+
+    // Overriding nothing is a plain copy.
+    let same = Config { ..base };
+    print(same.host);
+    print(same.port.to_str());
+
+    let b1 = Box { value: 7, tag: 1 };
+    let b2 = Box { ..b1, tag: 2 };
+    print(b2.value.to_str());
+    print(b2.tag.to_str());
+
+    let r = Rec { name: "orig", tags: ["a", "b"], n: 1 };
+    let r2 = Rec { ..r, n: 2 };
+    print(r.name);
+    print(r2.name);
+    print(r.tags[0].value_or("?"));
+    print(r2.tags[1].value_or("?"));
+    print(r2.n.to_str());
+}
+--- stdout ---
+localhost
+443
+true
+80
+localhost
+80
+7
+2
+orig
+orig
+a
+b
+2
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 48
+instructions executed: 507
+binary size: 4528
+  code: 2148
+    __to_str_bool: 212
+    __to_str_i64: 180
+    main: 1756
+  data: 79
+  metadata: 2301
+builtin calls: 100
+  aipl_arr_drop_str: 1
+  aipl_arr_inc: 3
+  aipl_array_dec: 4
+  aipl_array_new: 1
+  aipl_dec: 35
+  aipl_i64_len: 12
+  aipl_inc: 24
+  aipl_print: 13
+  aipl_write_bytes: 1
+  aipl_write_i64: 6

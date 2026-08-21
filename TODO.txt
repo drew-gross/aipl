@@ -89,6 +89,9 @@ companion_files.aipl:
 parser:
   implement the plan
 
+utilities:
+  add is_some, lint against match none->false+some(_)->true
+
 lint:
   recognize and recommend min/max
   x[0..] etc should just be x

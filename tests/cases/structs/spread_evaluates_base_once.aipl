@@ -1,0 +1,42 @@
+import { print, to_str } from builtins;
+
+// The spread operand is evaluated **once**, however many fields it stands for.
+// The expansion mentions the base once per field, so a naive desugar would call
+// `make` three times here; the loader binds a non-name operand to a synthetic
+// `let` first. `"called"` printing exactly once is the assertion.
+struct P { a: i64, b: i64, c: i64 }
+
+fn make(n: i64) !prints -> P {
+    print("called");
+    P { a: n, b: n, c: n }
+}
+
+fn main() !prints {
+    let p = P { ..make(7), a: 1 };
+    print(p.a.to_str());
+    print(p.b.to_str());
+    print(p.c.to_str());
+}
+--- stdout ---
+called
+1
+7
+7
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 134
+binary size: 1400
+  code: 476
+    __to_str_i64: 180
+    main: 296
+  data: 1
+  metadata: 923
+builtin calls: 23
+  aipl_dec: 7
+  aipl_i64_len: 6
+  aipl_inc: 3
+  aipl_print: 4
+  aipl_write_i64: 3

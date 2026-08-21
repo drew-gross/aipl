@@ -536,7 +536,14 @@ gazelle! {
         // value is the identifier of the same name in scope. After the IDENT, a
         // COLON lookahead selects the explicit form; COMMA/RBRACE the shorthand.
         field_init = IDENT COLON expr => field_init
-                   | IDENT => field_init_shorthand;
+                   | IDENT => field_init_shorthand
+                   // `..base` — a struct spread: every field not given
+                   // explicitly is taken from `base`. `DOTDOT` can't begin
+                   // either other form, so it's an unambiguous lead (the same
+                   // reasoning as the array-literal spread on `arg`). The
+                   // builder carries it as a nameless init whose value is an
+                   // `ExprKind::Spread`; the loader desugars it away.
+                   | DOTDOT expr => field_init_spread;
     }
 }
 
@@ -1009,6 +1016,21 @@ impl gazelle::Action<aipl::FieldInit<Self>> for Build {
             aipl::FieldInit::FieldInitShorthand((name, span)) => {
                 let value = Expr::new(ExprKind::Ident(name.clone()), span);
                 FieldInit { name, value }
+            }
+            // `..base`. A spread names no field, so it rides as an init with an
+            // empty name whose *value* is the `Spread` — the value is what
+            // identifies it, exactly as an array-literal spread is identified by
+            // being a `Spread` element. The loader replaces it with the fields
+            // it stands for, so nothing downstream sees either the empty name or
+            // the `Spread`.
+            aipl::FieldInit::FieldInitSpread(base) => {
+                // Spanned at the operand, like the array-literal spread, so an
+                // error points at what is being spread.
+                let span = base.span.clone();
+                FieldInit {
+                    name: String::new(),
+                    value: Expr::new(ExprKind::Spread(Box::new(base)), span),
+                }
             }
         })
     }
