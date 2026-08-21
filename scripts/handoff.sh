@@ -60,6 +60,14 @@
 # it, and a failure message points at the saved log). Whether it's also *streamed*
 # depends on who's watching — see HANDOFF_VERBOSE below.
 #
+# Every step is bounded by a wall-clock ceiling (`HANDOFF_STEP_TIMEOUT`, default
+# 1800s, 0 to disable). A wedged `cargo nextest` produces no output and makes no
+# progress, so without one this script just hangs — and a hung script gets
+# abandoned for a hand-driven sequence, which is precisely what it exists to
+# prevent. On expiry it reports memory pressure and the busiest child, because
+# the cause is nearly always the machine (swap thrash, or a first-exec
+# code-signing scan) rather than the tests.
+#
 # Exit status: 0 = handoff green; 1 = stopped (message says at which step and why).
 
 set -uo pipefail
@@ -78,8 +86,23 @@ STEP_OUT_SAVED="$STEP_OUT"
 # Per-step wall-clock, so a slow handoff can be attributed to a step rather than
 # guessed at. Written as `seconds<TAB>label` and reported at exit.
 TIMINGS="$(mktemp -t handoff-times.XXXXXX)"
+# Written by the watchdog when it kills a step. A file, not a variable: the
+# watchdog is a background subshell and cannot assign to its parent.
+TIMED_OUT_FLAG="$(mktemp -t handoff-timeout.XXXXXX)"
 SCRIPT_START=$SECONDS
-trap 'rm -f "$STEP_OUT" "$TIMINGS"' EXIT
+trap 'rm -f "$STEP_OUT" "$TIMINGS" "$TIMED_OUT_FLAG"' EXIT
+
+# Wall-clock ceiling per step, in seconds; 0 disables. Every step here is a
+# `cargo nextest` invocation, and a wedged nextest produces no output and no
+# progress — indistinguishable from a slow build until you go looking. Without a
+# ceiling the script simply hangs, which is worse than failing: the reader
+# abandons it and starts hand-driving the sequence, which is the one thing this
+# script exists to prevent.
+#
+# The default is generous on purpose — a false timeout costs a whole re-run. The
+# slowest step is the cold build (~770s observed), so 1800s leaves better than 2x
+# headroom while still bounding a hang to half an hour.
+STEP_TIMEOUT="${HANDOFF_STEP_TIMEOUT:-1800}"
 
 bold=$'\033[1m'; red=$'\033[31m'; green=$'\033[32m'; dim=$'\033[2m'; off=$'\033[0m'
 
@@ -119,6 +142,89 @@ failed_tests() { awk '/^ *(FAIL|SIGSEGV|ABORT|TIMEOUT|LEAK-FAIL) \[/ {print $NF}
 
 banner() { printf '\n%s==> %s%s\n' "$bold" "$*" "$off" >&2; }
 
+# Every descendant of $1, deepest first, so a kill reaches the leaves before
+# their parents can be reparented away. `cargo` fans out into rustc/link/test
+# processes; killing only the direct child leaves those running, and orphaned
+# nextest children in particular go on holding memory and file locks (see the
+# startup sweep below).
+descendants() {
+    local pid="$1" kid
+    for kid in $(pgrep -P "$pid" 2>/dev/null); do
+        descendants "$kid"
+        printf '%s\n' "$kid"
+    done
+}
+
+# One line of machine state, best-effort. Printed only on a timeout, where the
+# question is always "is this hung, or is the machine just on its knees?" —
+# memory pressure and swap answer it immediately.
+machine_state() {
+    local mem="" swap=""
+    if command -v vm_stat >/dev/null 2>&1; then          # macOS
+        mem="$(vm_stat 2>/dev/null | awk '
+            /page size of/ { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+$/) ps=$i }
+            /Pages free/   { gsub(/\./,"",$3); free=$3 }
+            END { if (ps && free) printf "free RAM %.0f MB", free*ps/1048576 }')"
+        swap="$(sysctl -n vm.swapusage 2>/dev/null |
+            awk '{ printf "swap %s used of %s", $6, $3 }')"
+    elif command -v free >/dev/null 2>&1; then           # Linux
+        mem="$(free -m 2>/dev/null | awk '/^Mem:/ { printf "free RAM %s MB", $7 }')"
+        swap="$(free -m 2>/dev/null | awk '/^Swap:/ { printf "swap %s MB used of %s MB", $3, $2 }')"
+    fi
+    printf '%s' "${mem:+$mem}${mem:+${swap:+, }}${swap:-}"
+}
+
+# Busiest descendant of $1, as "<cpu>% <name>". A step at 0% for minutes is
+# blocked (memory thrash, or a first-exec code-signing scan), not computing.
+busiest_child() {
+    local pids; pids="$(descendants "$1" | tr '\n' ' ')"
+    [ -n "${pids// /}" ] || return 0
+    # shellcheck disable=SC2086
+    ps -o %cpu=,comm= -p $pids 2>/dev/null | sort -rn | head -1 |
+        awk '{ printf "%s%% %s", $1, $2 }'
+}
+
+# Kill the step running under $1 (the script itself) after $2 seconds, and say
+# why. Runs as a background job for the life of one step; `run_step` kills it on
+# normal exit.
+#
+# It targets the *script's* descendants rather than a specific pid so the step can
+# stay in the foreground, where `$?` and `PIPESTATUS` report its status directly.
+# Backgrounding the step to get a pid for the watchdog meant reading its status
+# out of a file instead, and that race was flaky — 11 runs in 40 read the file
+# before the write landed and reported a timeout for a plain failure.
+watch_step() {
+    local parent="$1" limit="$2" waited=0
+    while [ "$waited" -lt "$limit" ]; do
+        sleep 5
+        waited=$((waited + 5))
+    done
+    # Record the decision before killing: the step's own non-zero status arrives
+    # first, and this is what tells `run_step` the difference between "the tests
+    # failed" and "nothing was moving".
+    printf '1' >"$TIMED_OUT_FLAG"
+    local state busy
+    state="$(machine_state)"
+    busy="$(busiest_child "$parent")"
+    printf '\n%s    timed out after %ss%s\n' "$red" "$limit" "$off" >&2
+    [ -n "$state" ] && printf '%s    %s%s\n' "$dim" "$state" "$off" >&2
+    [ -n "$busy" ]  && printf '%s    busiest child: %s%s\n' "$dim" "$busy" "$off" >&2
+    # Leaves first, so nothing is reparented and left running — an orphaned
+    # `cargo`/`nextest` tree holds memory and locks and makes the *next* attempt
+    # slower for reasons that look unrelated. Skipping this watchdog (and its own
+    # `sleep`), which are descendants of the script too.
+    local pid
+    for pid in $(descendants "$parent"); do
+        [ "$pid" = "$BASHPID" ] && continue
+        kill -TERM "$pid" 2>/dev/null
+    done
+    sleep 2
+    for pid in $(descendants "$parent"); do
+        [ "$pid" = "$BASHPID" ] && continue
+        kill -KILL "$pid" 2>/dev/null
+    done
+}
+
 # Run a labelled step, capturing combined output to $STEP_OUT (and, when VERBOSE,
 # streaming it too). Caller inspects $?, so the command's status is passed through
 # untouched — via `PIPESTATUS[0]` on the streaming path, since `$?` there would be
@@ -128,6 +234,12 @@ run_step() {
     local label="$1"; shift
     local start=$SECONDS
     local rc
+    : >"$TIMED_OUT_FLAG"
+    local dog=""
+    if [ "$STEP_TIMEOUT" -gt 0 ]; then
+        watch_step "$$" "$STEP_TIMEOUT" &
+        dog=$!
+    fi
     if [ "$VERBOSE" -eq 1 ]; then
         # To stderr, like every other thing this script prints, so `2>&1 | less`
         # sees the banners and the step output interleaved in order.
@@ -137,7 +249,23 @@ run_step() {
         "$@" >"$STEP_OUT" 2>&1
         rc=$?
     fi
+    if [ -n "$dog" ]; then kill "$dog" 2>/dev/null; wait "$dog" 2>/dev/null; fi
     local secs=$((SECONDS - start))
+    if [ -s "$TIMED_OUT_FLAG" ]; then
+        printf '%s\t%s (timed out)\n' "$secs" "$label" >>"$TIMINGS"
+        save_out
+        fail "$label (timed out after ${STEP_TIMEOUT}s)" \
+"No step here should take that long, so this is almost always the machine rather
+than the tests — memory pressure, or a first-exec code-signing scan on a
+freshly-linked test binary. The line above says which.
+
+  * Machine starved (low free RAM, swap in use): free some and re-run.
+  * Genuinely a slow box: raise the ceiling, e.g.
+        HANDOFF_STEP_TIMEOUT=3600 scripts/handoff.sh
+    or disable it with HANDOFF_STEP_TIMEOUT=0.
+
+Re-run this script — don't hand-drive the sequence it was about to do."
+    fi
     printf '%s    (%ss)%s\n' "$dim" "$secs" "$off" >&2
     printf '%s\t%s\n' "$secs" "$label" >>"$TIMINGS"
     return $rc
@@ -164,6 +292,20 @@ fail() {
     timing_report
     exit 1
 }
+
+# Orphaned nextest listing children from a previous *interrupted* run. nextest
+# enumerates tests by running each binary with `--list --format terse`; when its
+# parent is killed, those children survive blocked on a dead pipe, holding memory
+# and the build lock. They accumulate across retries and make each attempt slower
+# for reasons that look nothing like the cause — so clear them before starting.
+# The argument pattern is nextest's own, so this can't match anything else.
+orphans="$(pgrep -f -- '--list --format terse' 2>/dev/null | tr '\n' ' ')"
+if [ -n "${orphans// /}" ]; then
+    # shellcheck disable=SC2086
+    kill -KILL $orphans 2>/dev/null
+    printf '%s(cleared %s orphaned nextest listing process(es) from an interrupted run)%s\n' \
+        "$dim" "$(printf '%s\n' $orphans | wc -l | tr -d ' ')" "$off" >&2
+fi
 
 # A leftover staged artifact means a previous IR workflow was interrupted; a plain
 # plain suite run fails on `no_staged_ir_pending` until it's resolved. Don't guess.

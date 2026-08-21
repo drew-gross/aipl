@@ -60,9 +60,9 @@ syntax:
   for (let i, c : dct) syntax for dicts
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
   match arm grouping (i.e. ArmA | ArmB => { same_statement })
-  unspread i.e. MyStruct { ..val_of_type_my_struct, some_field: override }
   bump in walker.aipl contains mutations in a match, I thought we just banned that
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
+  spread should require same type
 
 shim:
   better syntax
@@ -253,8 +253,7 @@ handoff:
   reimplement it in rust and/or aipl
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
-  1. Per-step timeout in run_step — there is none today, and every step is cargo nextest. On expiry, fail with free RAM, swap usage, and the step process's CPU%, so "the machine is thrashing" is distinguishable from "the tests hung" in five seconds. Plus pkill -f -- '--list --format terse' at startup to clear orphaned nextest children, which accumulated across my restarts and made things worse.
-  2. Auto-handle the formatter-grammar bootstrap — it hit twice this session (match blocks, struct spread). Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.
+  Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.
 
 - \{ is a template-literal escape only; inside a plain string it's an error.
 
