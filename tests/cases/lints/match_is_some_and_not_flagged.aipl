@@ -1,0 +1,76 @@
+import { print, to_str, == } from builtins;
+
+// The shapes the lint deliberately leaves alone. Each is a `match` on an
+// optional that is *close* to the flagged form but has no `is_some_and`
+// spelling, so rewriting it would be a loss.
+
+// `none => true` is the opposite question, and inverting the predicate to fit
+// `is_some_and` would obscure it.
+fn missing_or_five(o: i64?) -> bool {
+    match (o) {
+        some(v) => v == 5,
+        none => true,
+    }
+}
+
+// A computed `none` arm still has to run: `is_some_and` hard-codes `false`
+// there, so this has no short spelling.
+fn five_or_flag(o: i64?, flag: bool) -> bool {
+    match (o) {
+        some(v) => v == 5,
+        none => flag,
+    }
+}
+
+// `some(v) => true` ignores the payload — it asks only whether the optional is
+// populated. That is an `is_some`, which is not a builtin; advising
+// `is_some_and(|v| true)` would be worse than what is written here.
+fn is_present(o: i64?) -> bool {
+    match (o) {
+        some(v) => true,
+        none => false,
+    }
+}
+
+// Not a bool at all.
+fn or_zero(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v,
+        none => 0,
+    }
+}
+
+fn main() !prints {
+    print(missing_or_five(none).to_str());
+    print(five_or_flag(none, true).to_str());
+    print(is_present(some(1)).to_str());
+    print(or_zero(none).to_str());
+}
+--- stdout ---
+true
+true
+true
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 218
+binary size: 2168
+  code: 852
+    __to_str_bool: 212
+    __to_str_i64: 180
+    five_or_flag: 36
+    main: 364
+    missing_or_five: 36
+    or_zero: 24
+  data: 47
+  metadata: 1269
+builtin calls: 22
+  aipl_dec: 8
+  aipl_i64_len: 2
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_write_bytes: 3
+  aipl_write_i64: 1

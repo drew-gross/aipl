@@ -287,7 +287,7 @@ function u0:39(i64) -> i64 apple_aarch64 {
     sig2 = (i64) apple_aarch64
     sig3 = (i64) -> i64 tail
     sig4 = (i64) apple_aarch64
-    fn0 = colocated u0:362 sig0  ; __rec_drop___m17__Doc
+    fn0 = colocated u0:372 sig0  ; __rec_drop___m17__Doc
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
     fn3 = colocated u0:41 sig3  ; __m17__has_hard$tail
@@ -502,10 +502,10 @@ function u0:43(i64, i64) -> i64 tail {
     sig9 = (i64) -> i64 tail
     sig10 = (i64) apple_aarch64
     sig11 = (i64) apple_aarch64
-    fn0 = colocated u0:363 sig0  ; __rec_drop___m17__Work
+    fn0 = colocated u0:373 sig0  ; __rec_drop___m17__Work
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:363 sig3  ; __rec_drop___m17__Work
+    fn3 = colocated u0:373 sig3  ; __rec_drop___m17__Work
     fn4 = u0:21 sig4  ; aipl_rec_inc_weak
     fn5 = u0:8 sig5  ; aipl_array_new
     fn6 = colocated u0:44 sig6  ; __m17__go
@@ -665,12 +665,12 @@ function u0:44(i64, i64, i64, i64) -> i64 apple_aarch64 {
     fn27 = u0:31 sig27  ; aipl_str_repeat
     fn28 = u0:0 sig28  ; aipl_arr_drop_str
     fn29 = u0:5 sig29  ; aipl_arr_retain_ptr
-    fn30 = colocated u0:363 sig30  ; __rec_drop___m17__Work
+    fn30 = colocated u0:373 sig30  ; __rec_drop___m17__Work
     fn31 = u0:17 sig31  ; aipl_rec_alloc
     fn32 = u0:21 sig32  ; aipl_rec_inc_weak
-    fn33 = colocated u0:363 sig33  ; __rec_drop___m17__Work
+    fn33 = colocated u0:373 sig33  ; __rec_drop___m17__Work
     fn34 = colocated u0:48 sig34  ; __m17__fits$tail
-    fn35 = colocated u0:363 sig35  ; __rec_drop___m17__Work
+    fn35 = colocated u0:373 sig35  ; __rec_drop___m17__Work
     fn36 = u0:0 sig36  ; aipl_arr_drop_str
     fn37 = u0:5 sig37  ; aipl_arr_retain_ptr
     fn38 = u0:30 sig38  ; aipl_str_len
@@ -1271,7 +1271,7 @@ function u0:46(i64, i64, i64, i64, i64, i64) -> i64 tail {
     sig3 = (i64) apple_aarch64
     sig4 = (i64, i64) -> i64 tail
     sig5 = (i64) apple_aarch64
-    fn0 = colocated u0:363 sig0  ; __rec_drop___m17__Work
+    fn0 = colocated u0:373 sig0  ; __rec_drop___m17__Work
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
     fn3 = u0:21 sig3  ; aipl_rec_inc_weak
@@ -1377,11 +1377,11 @@ function u0:48(i64, i64) -> i64 tail {
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = colocated u0:48 sig10  ; __m17__fits$tail
     fn11 = colocated u0:48 sig11  ; __m17__fits$tail
-    fn12 = colocated u0:363 sig12  ; __rec_drop___m17__Work
+    fn12 = colocated u0:373 sig12  ; __rec_drop___m17__Work
     fn13 = u0:17 sig13  ; aipl_rec_alloc
     fn14 = u0:21 sig14  ; aipl_rec_inc_weak
     fn15 = colocated u0:48 sig15  ; __m17__fits$tail
-    fn16 = colocated u0:363 sig16  ; __rec_drop___m17__Work
+    fn16 = colocated u0:373 sig16  ; __rec_drop___m17__Work
     fn17 = colocated u0:48 sig17  ; __m17__fits$tail
     fn18 = colocated u0:48 sig18  ; __m17__fits$tail
     fn19 = u0:30 sig19  ; aipl_str_len
@@ -5781,7 +5781,7 @@ function u0:73() -> i64 apple_aarch64 {
     fn28 = colocated u0:70 sig28  ; __m13__raw_tpl_kind
     fn29 = colocated u0:297 sig29  ; __lambda_41
     fn30 = colocated u0:68 sig30  ; __m13__tpl_kind
-    fn31 = colocated u0:364 sig31  ; __arr_drop___m12__TokenRule$__m13__AiplTok
+    fn31 = colocated u0:374 sig31  ; __arr_drop___m12__TokenRule$__m13__AiplTok
     fn32 = u0:8 sig32  ; aipl_array_new
     fn33 = u0:15 sig33  ; aipl_dec
 
@@ -21624,7 +21624,7 @@ function u0:87(i64, i64) -> i64 apple_aarch64 {
     sig11 = (i64) -> i64 apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:12 sig1  ; aipl_char_at
-    fn2 = colocated u0:366 sig2  ; __eq_char$opt
+    fn2 = colocated u0:376 sig2  ; __eq_char$opt
     fn3 = colocated u0:312 sig3  ; __builtin_is_some_and$char$lam59
     fn4 = u0:30 sig4  ; aipl_str_len
     fn5 = u0:32 sig5  ; aipl_str_slice
@@ -21859,7 +21859,7 @@ function u0:89(i64) -> i64 apple_aarch64 {
     sig7 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:12 sig1  ; aipl_char_at
-    fn2 = colocated u0:366 sig2  ; __eq_char$opt
+    fn2 = colocated u0:376 sig2  ; __eq_char$opt
     fn3 = colocated u0:312 sig3  ; __builtin_is_some_and$char$lam59
     fn4 = u0:30 sig4  ; aipl_str_len
     fn5 = u0:32 sig5  ; aipl_str_slice
@@ -27440,13 +27440,13 @@ function u0:106(i64, i64) apple_aarch64 {
     fn0 = u0:30 sig0  ; aipl_str_len
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:12 sig2  ; aipl_char_at
-    fn3 = colocated u0:366 sig3  ; __eq_char$opt
+    fn3 = colocated u0:376 sig3  ; __eq_char$opt
     fn4 = u0:32 sig4  ; aipl_str_slice
     fn5 = colocated u0:102 sig5  ; __m8__parse_test_section_header
-    fn6 = colocated u0:367 sig6  ; __eq_str$opt
+    fn6 = colocated u0:377 sig6  ; __eq_str$opt
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = colocated u0:102 sig8  ; __m8__parse_test_section_header
-    fn9 = colocated u0:367 sig9  ; __eq_str$opt
+    fn9 = colocated u0:377 sig9  ; __eq_str$opt
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -27688,13 +27688,13 @@ function u0:107(i64) -> i64 apple_aarch64 {
     fn0 = u0:30 sig0  ; aipl_str_len
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:12 sig2  ; aipl_char_at
-    fn3 = colocated u0:366 sig3  ; __eq_char$opt
+    fn3 = colocated u0:376 sig3  ; __eq_char$opt
     fn4 = u0:32 sig4  ; aipl_str_slice
     fn5 = colocated u0:102 sig5  ; __m8__parse_test_section_header
-    fn6 = colocated u0:367 sig6  ; __eq_str$opt
+    fn6 = colocated u0:377 sig6  ; __eq_str$opt
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = colocated u0:102 sig8  ; __m8__parse_test_section_header
-    fn9 = colocated u0:367 sig9  ; __eq_str$opt
+    fn9 = colocated u0:377 sig9  ; __eq_str$opt
 
 block0(v0: i64):
     v1 = iconst.i64 0
@@ -27877,7 +27877,7 @@ function u0:108(i64, i64) -> i64 apple_aarch64 {
     sig5 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:12 sig1  ; aipl_char_at
-    fn2 = colocated u0:366 sig2  ; __eq_char$opt
+    fn2 = colocated u0:376 sig2  ; __eq_char$opt
     fn3 = u0:30 sig3  ; aipl_str_len
     fn4 = u0:32 sig4  ; aipl_str_slice
     fn5 = u0:15 sig5  ; aipl_dec
@@ -27933,7 +27933,7 @@ function u0:109(i64, i64) -> i64 apple_aarch64 {
     fn0 = u0:30 sig0  ; aipl_str_len
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:12 sig2  ; aipl_char_at
-    fn3 = colocated u0:366 sig3  ; __eq_char$opt
+    fn3 = colocated u0:376 sig3  ; __eq_char$opt
     fn4 = u0:32 sig4  ; aipl_str_slice
     fn5 = u0:15 sig5  ; aipl_dec
 
@@ -28047,7 +28047,7 @@ function u0:111(i64) -> i64 apple_aarch64 {
     fn0 = u0:30 sig0  ; aipl_str_len
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:12 sig2  ; aipl_char_at
-    fn3 = colocated u0:366 sig3  ; __eq_char$opt
+    fn3 = colocated u0:376 sig3  ; __eq_char$opt
     fn4 = u0:32 sig4  ; aipl_str_slice
     fn5 = u0:14 sig5  ; aipl_concat_lazy
     fn6 = u0:25 sig6  ; aipl_str_eq
@@ -29674,20 +29674,20 @@ function u0:125(i64, i64, i64, i64) apple_aarch64 {
     fn5 = colocated u0:121 sig5  ; __m18__next_start
     fn6 = u0:32 sig6  ; aipl_str_slice
     fn7 = colocated u0:320 sig7  ; __builtin_count$char$s0
-    fn8 = colocated u0:362 sig8  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:372 sig8  ; __rec_drop___m17__Doc
     fn9 = u0:17 sig9  ; aipl_rec_alloc
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
     fn11 = u0:18 sig11  ; aipl_rec_dec_strong
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
-    fn15 = colocated u0:369 sig15  ; __arr_retain___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:379 sig15  ; __arr_retain___m17__Doc
     fn16 = u0:9 sig16  ; aipl_array_push
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
-    fn18 = colocated u0:369 sig18  ; __arr_retain___m17__Doc
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:379 sig18  ; __arr_retain___m17__Doc
     fn19 = u0:15 sig19  ; aipl_dec
     fn20 = u0:7 sig20  ; aipl_array_dec
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
     v4 = stack_addr.i64 ss0
@@ -29960,7 +29960,7 @@ function u0:126(i64, i64) apple_aarch64 {
     fn2 = u0:16 sig2  ; aipl_inc
     fn3 = u0:30 sig3  ; aipl_str_len
     fn4 = u0:15 sig4  ; aipl_dec
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
     fn6 = u0:17 sig6  ; aipl_rec_alloc
     fn7 = u0:8 sig7  ; aipl_array_new
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
@@ -29969,12 +29969,12 @@ function u0:126(i64, i64) apple_aarch64 {
     fn11 = u0:32 sig11  ; aipl_str_slice
     fn12 = u0:23 sig12  ; aipl_str_contains
     fn13 = colocated u0:127 sig13  ; __m18__take_comment
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = load.i64 notrap aligned v1+8
@@ -30905,7 +30905,7 @@ function u0:129(i64, i64) -> i64 apple_aarch64 {
     sig41 = (i64) apple_aarch64
     sig42 = (i64) -> i64 tail
     fn0 = colocated u0:128 sig0  ; __m18__shape
-    fn1 = colocated u0:362 sig1  ; __rec_drop___m17__Doc
+    fn1 = colocated u0:372 sig1  ; __rec_drop___m17__Doc
     fn2 = u0:17 sig2  ; aipl_rec_alloc
     fn3 = u0:16 sig3  ; aipl_inc
     fn4 = u0:13 sig4  ; aipl_concat
@@ -30913,39 +30913,39 @@ function u0:129(i64, i64) -> i64 apple_aarch64 {
     fn6 = u0:13 sig6  ; aipl_concat
     fn7 = u0:13 sig7  ; aipl_concat
     fn8 = u0:15 sig8  ; aipl_dec
-    fn9 = colocated u0:362 sig9  ; __rec_drop___m17__Doc
+    fn9 = colocated u0:372 sig9  ; __rec_drop___m17__Doc
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
     fn11 = u0:18 sig11  ; aipl_rec_dec_strong
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
     fn14 = u0:8 sig14  ; aipl_array_new
     fn15 = u0:3 sig15  ; aipl_arr_inc
     fn16 = u0:1 sig16  ; aipl_arr_elem_ptr
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
-    fn19 = colocated u0:369 sig19  ; __arr_retain___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:379 sig19  ; __arr_retain___m17__Doc
     fn20 = u0:9 sig20  ; aipl_array_push
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
     fn24 = u0:7 sig24  ; aipl_array_dec
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
-    fn26 = colocated u0:369 sig26  ; __arr_retain___m17__Doc
-    fn27 = colocated u0:362 sig27  ; __rec_drop___m17__Doc
-    fn28 = colocated u0:362 sig28  ; __rec_drop___m17__Doc
-    fn29 = colocated u0:362 sig29  ; __rec_drop___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
+    fn26 = colocated u0:379 sig26  ; __arr_retain___m17__Doc
+    fn27 = colocated u0:372 sig27  ; __rec_drop___m17__Doc
+    fn28 = colocated u0:372 sig28  ; __rec_drop___m17__Doc
+    fn29 = colocated u0:372 sig29  ; __rec_drop___m17__Doc
     fn30 = u0:21 sig30  ; aipl_rec_inc_weak
-    fn31 = colocated u0:368 sig31  ; __arr_drop___m17__Doc
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
-    fn33 = colocated u0:368 sig33  ; __arr_drop___m17__Doc
-    fn34 = colocated u0:369 sig34  ; __arr_retain___m17__Doc
-    fn35 = colocated u0:368 sig35  ; __arr_drop___m17__Doc
-    fn36 = colocated u0:369 sig36  ; __arr_retain___m17__Doc
-    fn37 = colocated u0:362 sig37  ; __rec_drop___m17__Doc
-    fn38 = colocated u0:368 sig38  ; __arr_drop___m17__Doc
-    fn39 = colocated u0:369 sig39  ; __arr_retain___m17__Doc
-    fn40 = colocated u0:362 sig40  ; __rec_drop___m17__Doc
-    fn41 = colocated u0:362 sig41  ; __rec_drop___m17__Doc
+    fn31 = colocated u0:378 sig31  ; __arr_drop___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
+    fn33 = colocated u0:378 sig33  ; __arr_drop___m17__Doc
+    fn34 = colocated u0:379 sig34  ; __arr_retain___m17__Doc
+    fn35 = colocated u0:378 sig35  ; __arr_drop___m17__Doc
+    fn36 = colocated u0:379 sig36  ; __arr_retain___m17__Doc
+    fn37 = colocated u0:372 sig37  ; __rec_drop___m17__Doc
+    fn38 = colocated u0:378 sig38  ; __arr_drop___m17__Doc
+    fn39 = colocated u0:379 sig39  ; __arr_retain___m17__Doc
+    fn40 = colocated u0:372 sig40  ; __rec_drop___m17__Doc
+    fn41 = colocated u0:372 sig41  ; __rec_drop___m17__Doc
     fn42 = colocated u0:41 sig42  ; __m17__has_hard$tail
 
 block0(v0: i64, v1: i64):
@@ -31356,7 +31356,7 @@ block19(v171: i64):
 ;   v2 = s
 ;   v31 = edge
 ;   ss1 = inner
-;   ss2 = __idx$15837
+;   ss2 = __idx$15854
 ;   v77 = item
 ;   v79 = i
 ;   ss8 = parts
@@ -33007,7 +33007,7 @@ function u0:136(i64, i64, i64) -> i64 apple_aarch64 {
     sig3 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
-    fn2 = colocated u0:370 sig2  ; __eq___m18__FmtKind
+    fn2 = colocated u0:328 sig2  ; __builtin_is_some_and$__m18__FmtTok$lam75
     fn3 = u0:7 sig3  ; aipl_array_dec
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -33073,22 +33073,7 @@ block2:
     jump block3
 
 block3:
-    v40 = load.i64 notrap aligned v13
-    brif v40, block8, block9
-
-block8:
-    v41 = iconst.i64 8
-    v42 = iadd.i64 v13, v41  ; v41 = 8
-    v43 = iconst.i64 0
-    v44 = iadd v42, v43  ; v43 = 0
-    v45 = call fn2(v44, v2)
-    jump block7(v45)
-
-block9:
-    v46 = iconst.i64 0
-    jump block7(v46)  ; v46 = 0
-
-block7(v39: i64):
+    v39 = call fn2(v13, v2)
     call fn3(v3)
     return v39
 }
@@ -33097,19 +33082,18 @@ block7(v39: i64):
 ;   v0 = self
 ;   v1 = n
 ;   v2 = k
-;   v42 = t
 ; __m18__comment_before_cursor
 function u0:137(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 8, align = 8
-    ss2 = explicit_slot 32, align = 8
-    ss3 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64, i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
-    fn2 = u0:7 sig2  ; aipl_array_dec
+    fn2 = colocated u0:330 sig2  ; __builtin_is_some_and$__builtin_Span$lam78
+    fn3 = u0:7 sig3  ; aipl_array_dec
 
 block0(v0: i64):
     v1 = load.i64 notrap aligned v0+16
@@ -33171,109 +33155,13 @@ block2:
     jump block3
 
 block3:
-    v36 = load.i64 notrap aligned v10
-    brif v36, block9, block8
-
-block8:
-    v37 = iconst.i64 0
-    jump block7(v37)  ; v37 = 0
-
-block9:
-    v38 = iconst.i64 8
-    v39 = iadd.i64 v10, v38  ; v38 = 8
-    v40 = load.i64 notrap aligned v0+8
-    call fn0(v40)
-    v41 = load.i64 notrap aligned v0+24
-    v42 = iconst.i64 -4
-    v43 = band v40, v42  ; v42 = -4
-    v44 = load.i64 notrap aligned v43
-    v45 = iconst.i64 0
-    v46 = icmp sge v41, v45  ; v45 = 0
-    v47 = icmp slt v41, v44
-    v48 = band v46, v47
-    v49 = stack_addr.i64 ss2
-    brif v48, block10, block11
-
-block10:
-    v50 = iconst.i64 3
-    v51 = band.i64 v40, v50  ; v50 = 3
-    v52 = iconst.i64 0
-    v53 = icmp eq v51, v52  ; v52 = 0
-    brif v53, block13, block14
-
-block13:
-    v54 = iconst.i64 -4
-    v55 = band.i64 v40, v54  ; v54 = -4
-    v56 = iconst.i64 24
-    v57 = iadd v55, v56  ; v56 = 24
-    v58 = iconst.i64 24
-    v59 = imul.i64 v41, v58  ; v58 = 24
-    v60 = iadd v57, v59
-    v61 = stack_addr.i64 ss3
-    store notrap v60, v61
-    jump block15
-
-block14:
-    v62 = iconst.i64 24
-    v63 = call fn1(v40, v41, v62)  ; v62 = 24
-    v64 = stack_addr.i64 ss3
-    store notrap v63, v64
-    jump block15
-
-block15:
-    v65 = stack_addr.i64 ss3
-    v66 = load.i64 notrap v65
-    v67 = iconst.i64 1
-    store notrap aligned v67, v49  ; v67 = 1
-    v68 = iconst.i64 8
-    v69 = iadd.i64 v49, v68  ; v68 = 8
-    v70 = load.i64 notrap aligned v66
-    store notrap aligned v70, v69
-    v71 = load.i64 notrap aligned v66+8
-    store notrap aligned v71, v69+8
-    v72 = load.i64 notrap aligned v66+16
-    store notrap aligned v72, v69+16
-    jump block12
-
-block11:
-    v73 = iconst.i64 0
-    v74 = stack_addr.i64 ss2
-    store notrap v73, v74  ; v73 = 0
-    jump block12
-
-block12:
-    v76 = load.i64 notrap aligned v49
-    brif v76, block17, block18
-
-block17:
-    v77 = iconst.i64 8
-    v78 = iadd.i64 v49, v77  ; v77 = 8
-    v79 = load.i64 notrap aligned v39
-    v80 = iconst.i64 8
-    v81 = iadd v78, v80  ; v80 = 8
-    v82 = load.i64 notrap aligned v81
-    v83 = icmp ult v79, v82
-    v84 = uextend.i64 v83
-    jump block16(v84)
-
-block18:
-    v85 = iconst.i64 0
-    jump block16(v85)  ; v85 = 0
-
-block16(v75: i64):
-    call fn2(v40)
-    jump block7(v75)
-
-block7(v35: i64):
-    call fn2(v1)
+    v35 = call fn2(v10, v0)
+    call fn3(v1)
     return v35
 }
 
 ; source variables:
 ;   v0 = self
-;   v39 = c
-;   v0 = $inl169_self
-;   v78 = t
 ; __m18__advance
 function u0:138(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -33752,13 +33640,13 @@ function u0:141(i64, i64) -> i64 apple_aarch64 {
     sig4 = (i64) apple_aarch64
     sig5 = (i64) apple_aarch64
     sig6 = (i64) apple_aarch64
-    fn0 = colocated u0:362 sig0  ; __rec_drop___m17__Doc
+    fn0 = colocated u0:372 sig0  ; __rec_drop___m17__Doc
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:8 sig2  ; aipl_array_new
     fn3 = u0:20 sig3  ; aipl_rec_inc_strong
     fn4 = u0:18 sig4  ; aipl_rec_dec_strong
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
-    fn6 = colocated u0:362 sig6  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
+    fn6 = colocated u0:372 sig6  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 1
@@ -33831,7 +33719,7 @@ function u0:142(i64) -> i64 apple_aarch64 {
     sig7 = (i64) apple_aarch64
     sig8 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
-    fn1 = colocated u0:362 sig1  ; __rec_drop___m17__Doc
+    fn1 = colocated u0:372 sig1  ; __rec_drop___m17__Doc
     fn2 = u0:17 sig2  ; aipl_rec_alloc
     fn3 = colocated u0:143 sig3  ; __m18__drop_trailing_break
     fn4 = u0:20 sig4  ; aipl_rec_inc_strong
@@ -33999,12 +33887,12 @@ function u0:143(i64) -> i64 apple_aarch64 {
     fn0 = u0:3 sig0  ; aipl_arr_inc
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:362 sig3  ; __rec_drop___m17__Doc
+    fn3 = colocated u0:372 sig3  ; __rec_drop___m17__Doc
     fn4 = u0:17 sig4  ; aipl_rec_alloc
     fn5 = u0:8 sig5  ; aipl_array_new
     fn6 = colocated u0:144 sig6  ; __m18__is_line_break
-    fn7 = colocated u0:368 sig7  ; __arr_drop___m17__Doc
-    fn8 = colocated u0:369 sig8  ; __arr_retain___m17__Doc
+    fn7 = colocated u0:378 sig7  ; __arr_drop___m17__Doc
+    fn8 = colocated u0:379 sig8  ; __arr_retain___m17__Doc
     fn9 = u0:6 sig9  ; aipl_arr_slice
     fn10 = u0:7 sig10  ; aipl_array_dec
     fn11 = u0:18 sig11  ; aipl_rec_dec_strong
@@ -34320,16 +34208,16 @@ function u0:146(i64, i64) -> i64 tail {
     sig9 = (i64, i64) apple_aarch64
     sig10 = (i64, i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
-    fn1 = colocated u0:368 sig1  ; __arr_drop___m17__Doc
-    fn2 = colocated u0:369 sig2  ; __arr_retain___m17__Doc
+    fn1 = colocated u0:378 sig1  ; __arr_drop___m17__Doc
+    fn2 = colocated u0:379 sig2  ; __arr_retain___m17__Doc
     fn3 = u0:9 sig3  ; aipl_array_push
     fn4 = u0:7 sig4  ; aipl_array_dec
     fn5 = u0:18 sig5  ; aipl_rec_dec_strong
-    fn6 = colocated u0:368 sig6  ; __arr_drop___m17__Doc
-    fn7 = colocated u0:369 sig7  ; __arr_retain___m17__Doc
+    fn6 = colocated u0:378 sig6  ; __arr_drop___m17__Doc
+    fn7 = colocated u0:379 sig7  ; __arr_retain___m17__Doc
     fn8 = u0:6 sig8  ; aipl_arr_slice
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
-    fn10 = colocated u0:369 sig10  ; __arr_retain___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:379 sig10  ; __arr_retain___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 -4
@@ -34425,8 +34313,8 @@ block3(v8: i64):
 ;   v0 = self
 ;   v1 = d
 ;   v4 = n
-;   ss0 = __mut_copy$73
-;   ss2 = __mut_copy$74
+;   ss0 = __mut_copy$79
+;   ss2 = __mut_copy$80
 ; __m18__with_last
 function u0:145(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64) -> i64 tail
@@ -34487,13 +34375,13 @@ function u0:147(i64, i64) apple_aarch64 {
     fn12 = colocated u0:118 sig12  ; __m18__expect
     fn13 = colocated u0:152 sig13  ; __m18__sorted_import_names$tail
     fn14 = colocated u0:129 sig14  ; __m18__comma_list_docs
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:17 sig16  ; aipl_rec_alloc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:368 sig21  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:378 sig21  ; __arr_drop___m17__Doc
     fn22 = u0:18 sig22  ; aipl_rec_dec_strong
 
 block0(v0: i64, v1: i64):
@@ -35741,8 +35629,8 @@ function u0:148(i64, i64, i64) apple_aarch64 {
     fn6 = colocated u0:114 sig6  ; __m18__peek_text_n
     fn7 = colocated u0:149 sig7  ; __m18__import_alias
     fn8 = u0:7 sig8  ; aipl_array_dec
-    fn9 = colocated u0:371 sig9  ; __arr_drop___m18__ImportName
-    fn10 = colocated u0:372 sig10  ; __arr_retain___m18__ImportName
+    fn9 = colocated u0:380 sig9  ; __arr_drop___m18__ImportName
+    fn10 = colocated u0:381 sig10  ; __arr_retain___m18__ImportName
     fn11 = u0:9 sig11  ; aipl_array_push
     fn12 = colocated u0:114 sig12  ; __m18__peek_text_n
     fn13 = colocated u0:117 sig13  ; __m18__bump
@@ -36711,8 +36599,8 @@ function u0:152(i64) -> i64 tail {
     sig1 = (i64) -> i64 tail
     sig2 = (i64) apple_aarch64
     sig3 = (i64) apple_aarch64
-    fn0 = colocated u0:328 sig0  ; __builtin_sort_by$__m18__ImportName$lam76
-    fn1 = colocated u0:331 sig1  ; __map78$tail
+    fn0 = colocated u0:332 sig0  ; __builtin_sort_by$__m18__ImportName$lam82
+    fn1 = colocated u0:335 sig1  ; __map84$tail
     fn2 = u0:7 sig2  ; aipl_array_dec
     fn3 = u0:3 sig3  ; aipl_arr_inc
 
@@ -36833,10 +36721,10 @@ function u0:154(i64, i64) apple_aarch64 {
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:17 sig11  ; aipl_rec_alloc
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
     fn14 = u0:8 sig14  ; aipl_array_new
     fn15 = colocated u0:114 sig15  ; __m18__peek_text_n
     fn16 = colocated u0:155 sig16  ; __m18__paren_ty
@@ -36844,9 +36732,9 @@ function u0:154(i64, i64) apple_aarch64 {
     fn18 = colocated u0:114 sig18  ; __m18__peek_text_n
     fn19 = colocated u0:117 sig19  ; __m18__bump
     fn20 = colocated u0:157 sig20  ; __m18__base_ty
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -37870,24 +37758,24 @@ function u0:155(i64, i64) apple_aarch64 {
     fn12 = colocated u0:117 sig12  ; __m18__bump
     fn13 = colocated u0:154 sig13  ; __m18__ty
     fn14 = u0:18 sig14  ; aipl_rec_dec_strong
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:17 sig16  ; aipl_rec_alloc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
     fn19 = colocated u0:114 sig19  ; __m18__peek_text_n
     fn20 = colocated u0:117 sig20  ; __m18__bump
     fn21 = colocated u0:157 sig21  ; __m18__base_ty
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:362 sig23  ; __rec_drop___m17__Doc
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:372 sig23  ; __rec_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
     fn25 = colocated u0:162 sig25  ; __m18__array_suffixes
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
-    fn28 = colocated u0:368 sig28  ; __arr_drop___m17__Doc
-    fn29 = colocated u0:369 sig29  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
+    fn28 = colocated u0:378 sig28  ; __arr_drop___m17__Doc
+    fn29 = colocated u0:379 sig29  ; __arr_retain___m17__Doc
     fn30 = u0:4 sig30  ; aipl_arr_reserve
-    fn31 = colocated u0:368 sig31  ; __arr_drop___m17__Doc
-    fn32 = colocated u0:369 sig32  ; __arr_retain___m17__Doc
+    fn31 = colocated u0:378 sig31  ; __arr_drop___m17__Doc
+    fn32 = colocated u0:379 sig32  ; __arr_retain___m17__Doc
     fn33 = u0:2 sig33  ; aipl_arr_extend
 
 block0(v0: i64, v1: i64):
@@ -39301,8 +39189,8 @@ function u0:156(i64, i64, i64, i64) apple_aarch64 {
     fn6 = u0:7 sig6  ; aipl_array_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
-    fn10 = colocated u0:369 sig10  ; __arr_retain___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:379 sig10  ; __arr_retain___m17__Doc
     fn11 = u0:9 sig11  ; aipl_array_push
     fn12 = colocated u0:114 sig12  ; __m18__peek_text_n
     fn13 = colocated u0:117 sig13  ; __m18__bump
@@ -39767,14 +39655,14 @@ function u0:157(i64, i64) apple_aarch64 {
     fn9 = colocated u0:160 sig9  ; __m18__named_ty
     fn10 = u0:8 sig10  ; aipl_array_new
     fn11 = colocated u0:161 sig11  ; __m18__type_suffixes
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
-    fn16 = colocated u0:369 sig16  ; __arr_retain___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:379 sig16  ; __arr_retain___m17__Doc
     fn17 = u0:4 sig17  ; aipl_arr_reserve
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
-    fn19 = colocated u0:369 sig19  ; __arr_retain___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:379 sig19  ; __arr_retain___m17__Doc
     fn20 = u0:2 sig20  ; aipl_arr_extend
 
 block0(v0: i64, v1: i64):
@@ -40278,19 +40166,19 @@ function u0:158(i64, i64) apple_aarch64 {
     fn11 = colocated u0:159 sig11  ; __m18__dict_value_ty
     fn12 = u0:8 sig12  ; aipl_array_new
     fn13 = colocated u0:118 sig13  ; __m18__expect
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:17 sig15  ; aipl_rec_alloc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
-    fn19 = colocated u0:369 sig19  ; __arr_retain___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:379 sig19  ; __arr_retain___m17__Doc
     fn20 = u0:4 sig20  ; aipl_arr_reserve
-    fn21 = colocated u0:368 sig21  ; __arr_drop___m17__Doc
-    fn22 = colocated u0:369 sig22  ; __arr_retain___m17__Doc
+    fn21 = colocated u0:378 sig21  ; __arr_drop___m17__Doc
+    fn22 = colocated u0:379 sig22  ; __arr_retain___m17__Doc
     fn23 = u0:2 sig23  ; aipl_arr_extend
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
-    fn25 = colocated u0:369 sig25  ; __arr_retain___m17__Doc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:379 sig25  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
     fn27 = u0:10 sig27  ; aipl_array_push_mut
 
 block0(v0: i64, v1: i64):
@@ -41286,10 +41174,10 @@ function u0:159(i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:18 sig6  ; aipl_rec_dec_strong
-    fn7 = colocated u0:362 sig7  ; __rec_drop___m17__Doc
+    fn7 = colocated u0:372 sig7  ; __rec_drop___m17__Doc
     fn8 = u0:17 sig8  ; aipl_rec_alloc
     fn9 = u0:20 sig9  ; aipl_rec_inc_strong
-    fn10 = colocated u0:368 sig10  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:378 sig10  ; __arr_drop___m17__Doc
     fn11 = u0:8 sig11  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -41597,7 +41485,7 @@ function u0:160(i64, i64) apple_aarch64 {
     fn2 = u0:3 sig2  ; aipl_arr_inc
     fn3 = colocated u0:114 sig3  ; __m18__peek_text_n
     fn4 = u0:25 sig4  ; aipl_str_eq
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
     fn6 = u0:17 sig6  ; aipl_rec_alloc
     fn7 = u0:20 sig7  ; aipl_rec_inc_strong
     fn8 = u0:15 sig8  ; aipl_dec
@@ -41607,10 +41495,10 @@ function u0:160(i64, i64) apple_aarch64 {
     fn12 = u0:8 sig12  ; aipl_array_new
     fn13 = colocated u0:156 sig13  ; __m18__ty_list
     fn14 = colocated u0:118 sig14  ; __m18__expect
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
     fn17 = colocated u0:129 sig17  ; __m18__comma_list_docs
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -42346,10 +42234,10 @@ function u0:161(i64, i64, i64) apple_aarch64 {
     fn1 = u0:3 sig1  ; aipl_arr_inc
     fn2 = colocated u0:114 sig2  ; __m18__peek_text_n
     fn3 = u0:25 sig3  ; aipl_str_eq
-    fn4 = colocated u0:362 sig4  ; __rec_drop___m17__Doc
+    fn4 = colocated u0:372 sig4  ; __rec_drop___m17__Doc
     fn5 = u0:17 sig5  ; aipl_rec_alloc
-    fn6 = colocated u0:368 sig6  ; __arr_drop___m17__Doc
-    fn7 = colocated u0:369 sig7  ; __arr_retain___m17__Doc
+    fn6 = colocated u0:378 sig6  ; __arr_drop___m17__Doc
+    fn7 = colocated u0:379 sig7  ; __arr_retain___m17__Doc
     fn8 = u0:9 sig8  ; aipl_array_push
     fn9 = colocated u0:117 sig9  ; __m18__bump
     fn10 = u0:15 sig10  ; aipl_dec
@@ -42357,9 +42245,9 @@ function u0:161(i64, i64, i64) apple_aarch64 {
     fn12 = u0:18 sig12  ; aipl_rec_dec_strong
     fn13 = colocated u0:114 sig13  ; __m18__peek_text_n
     fn14 = colocated u0:134 sig14  ; __m18__tok_text
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
-    fn17 = colocated u0:369 sig17  ; __arr_retain___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:379 sig17  ; __arr_retain___m17__Doc
     fn18 = colocated u0:117 sig18  ; __m18__bump
     fn19 = colocated u0:117 sig19  ; __m18__bump
 
@@ -42732,10 +42620,10 @@ function u0:162(i64, i64, i64) apple_aarch64 {
     fn3 = u0:25 sig3  ; aipl_str_eq
     fn4 = colocated u0:134 sig4  ; __m18__tok_text
     fn5 = u0:15 sig5  ; aipl_dec
-    fn6 = colocated u0:362 sig6  ; __rec_drop___m17__Doc
+    fn6 = colocated u0:372 sig6  ; __rec_drop___m17__Doc
     fn7 = u0:17 sig7  ; aipl_rec_alloc
-    fn8 = colocated u0:368 sig8  ; __arr_drop___m17__Doc
-    fn9 = colocated u0:369 sig9  ; __arr_retain___m17__Doc
+    fn8 = colocated u0:378 sig8  ; __arr_drop___m17__Doc
+    fn9 = colocated u0:379 sig9  ; __arr_retain___m17__Doc
     fn10 = u0:9 sig10  ; aipl_array_push
     fn11 = colocated u0:117 sig11  ; __m18__bump
     fn12 = colocated u0:117 sig12  ; __m18__bump
@@ -42989,7 +42877,7 @@ function u0:163(i64, i64) apple_aarch64 {
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:25 sig2  ; aipl_str_eq
     fn3 = u0:3 sig3  ; aipl_arr_inc
-    fn4 = colocated u0:362 sig4  ; __rec_drop___m17__Doc
+    fn4 = colocated u0:372 sig4  ; __rec_drop___m17__Doc
     fn5 = u0:17 sig5  ; aipl_rec_alloc
     fn6 = u0:20 sig6  ; aipl_rec_inc_strong
     fn7 = u0:15 sig7  ; aipl_dec
@@ -43495,10 +43383,10 @@ function u0:164(i64, i64, i64) apple_aarch64 {
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = u0:18 sig10  ; aipl_rec_dec_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
     fn15 = u0:9 sig15  ; aipl_array_push
     fn16 = colocated u0:114 sig16  ; __m18__peek_text_n
     fn17 = colocated u0:117 sig17  ; __m18__bump
@@ -43926,7 +43814,7 @@ function u0:165(i64, i64, i64) apple_aarch64 {
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:3 sig2  ; aipl_arr_inc
     fn3 = colocated u0:117 sig3  ; __m18__bump
-    fn4 = colocated u0:362 sig4  ; __rec_drop___m17__Doc
+    fn4 = colocated u0:372 sig4  ; __rec_drop___m17__Doc
     fn5 = u0:17 sig5  ; aipl_rec_alloc
     fn6 = u0:13 sig6  ; aipl_concat
     fn7 = u0:13 sig7  ; aipl_concat
@@ -44100,21 +43988,21 @@ function u0:166(i64, i64) apple_aarch64 {
     fn9 = colocated u0:118 sig9  ; __m18__expect
     fn10 = u0:8 sig10  ; aipl_array_new
     fn11 = colocated u0:167 sig11  ; __m18__variant_cases
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:13 sig15  ; aipl_concat
     fn16 = u0:13 sig16  ; aipl_concat
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
     fn22 = colocated u0:169 sig22  ; __m18__variant_body
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
     fn24 = u0:21 sig24  ; aipl_rec_inc_weak
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
     fn27 = colocated u0:41 sig27  ; __m17__has_hard$tail
 
 block0(v0: i64, v1: i64):
@@ -45023,15 +44911,15 @@ function u0:167(i64, i64, i64) apple_aarch64 {
     fn8 = u0:15 sig8  ; aipl_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
     fn13 = colocated u0:126 sig13  ; __m18__trailing_comment
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
     fn17 = u0:8 sig17  ; aipl_array_new
-    fn18 = colocated u0:373 sig18  ; __arr_drop___m18__VCase
-    fn19 = colocated u0:374 sig19  ; __arr_retain___m18__VCase
+    fn18 = colocated u0:382 sig18  ; __arr_drop___m18__VCase
+    fn19 = colocated u0:383 sig19  ; __arr_retain___m18__VCase
     fn20 = u0:9 sig20  ; aipl_array_push
     fn21 = colocated u0:114 sig21  ; __m18__peek_text_n
     fn22 = colocated u0:117 sig22  ; __m18__bump
@@ -46221,19 +46109,19 @@ function u0:169(i64) -> i64 apple_aarch64 {
     fn0 = u0:8 sig0  ; aipl_array_new
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:362 sig3  ; __rec_drop___m17__Doc
+    fn3 = colocated u0:372 sig3  ; __rec_drop___m17__Doc
     fn4 = u0:17 sig4  ; aipl_rec_alloc
-    fn5 = colocated u0:368 sig5  ; __arr_drop___m17__Doc
-    fn6 = colocated u0:369 sig6  ; __arr_retain___m17__Doc
+    fn5 = colocated u0:378 sig5  ; __arr_drop___m17__Doc
+    fn6 = colocated u0:379 sig6  ; __arr_retain___m17__Doc
     fn7 = u0:10 sig7  ; aipl_array_push_mut
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
-    fn10 = colocated u0:369 sig10  ; __arr_retain___m17__Doc
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
-    fn12 = colocated u0:368 sig12  ; __arr_drop___m17__Doc
-    fn13 = colocated u0:369 sig13  ; __arr_retain___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
-    fn15 = colocated u0:369 sig15  ; __arr_retain___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:379 sig10  ; __arr_retain___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:378 sig12  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:379 sig13  ; __arr_retain___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:379 sig15  ; __arr_retain___m17__Doc
     fn16 = u0:3 sig16  ; aipl_arr_inc
     fn17 = u0:7 sig17  ; aipl_array_dec
 
@@ -46428,7 +46316,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$34216
+;   ss1 = __idx$34095
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -46482,22 +46370,22 @@ function u0:170(i64, i64) apple_aarch64 {
     fn6 = u0:15 sig6  ; aipl_dec
     fn7 = u0:7 sig7  ; aipl_array_dec
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
     fn10 = colocated u0:173 sig10  ; __m18__sorted_imports$tail
     fn11 = u0:1 sig11  ; aipl_arr_elem_ptr
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
-    fn15 = colocated u0:369 sig15  ; __arr_retain___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:379 sig15  ; __arr_retain___m17__Doc
     fn16 = u0:9 sig16  ; aipl_array_push
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
-    fn18 = colocated u0:369 sig18  ; __arr_retain___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
-    fn21 = colocated u0:369 sig21  ; __arr_retain___m17__Doc
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:379 sig18  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
+    fn21 = colocated u0:379 sig21  ; __arr_retain___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -47042,11 +46930,11 @@ block30:
 ;   v2 = h
 ;   v73 = p
 ;   ss2 = out
-;   ss3 = __idx$35167
+;   ss3 = __idx$35046
 ;   v114 = d
 ;   v116 = i
 ;   v164 = had_imports
-;   ss8 = __idx$35358
+;   ss8 = __idx$35237
 ;   v194 = d
 ;   v196 = i
 ; __m18__program_items
@@ -47099,26 +46987,26 @@ function u0:171(i64, i64, i64, i64) apple_aarch64 {
     fn3 = colocated u0:124 sig3  ; __m18__lead
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:20 sig5  ; aipl_rec_inc_strong
-    fn6 = colocated u0:368 sig6  ; __arr_drop___m17__Doc
-    fn7 = colocated u0:369 sig7  ; __arr_retain___m17__Doc
+    fn6 = colocated u0:378 sig6  ; __arr_drop___m17__Doc
+    fn7 = colocated u0:379 sig7  ; __arr_retain___m17__Doc
     fn8 = u0:9 sig8  ; aipl_array_push
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = colocated u0:114 sig10  ; __m18__peek_text_n
     fn11 = u0:25 sig11  ; aipl_str_eq
     fn12 = colocated u0:147 sig12  ; __m18__import_item
     fn13 = colocated u0:126 sig13  ; __m18__trailing_comment
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:17 sig15  ; aipl_rec_alloc
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
     fn17 = u0:8 sig17  ; aipl_array_new
-    fn18 = colocated u0:375 sig18  ; __arr_drop___m18__ImportEntry
-    fn19 = colocated u0:376 sig19  ; __arr_retain___m18__ImportEntry
+    fn18 = colocated u0:384 sig18  ; __arr_drop___m18__ImportEntry
+    fn19 = colocated u0:385 sig19  ; __arr_retain___m18__ImportEntry
     fn20 = colocated u0:174 sig20  ; __m18__item
     fn21 = colocated u0:126 sig21  ; __m18__trailing_comment
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
-    fn25 = colocated u0:369 sig25  ; __arr_retain___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:379 sig25  ; __arr_retain___m17__Doc
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
     v4 = stack_addr.i64 ss0
@@ -47948,8 +47836,8 @@ function u0:173(i64) -> i64 tail {
     sig1 = (i64) -> i64 tail
     sig2 = (i64) apple_aarch64
     sig3 = (i64) apple_aarch64
-    fn0 = colocated u0:333 sig0  ; __builtin_sort_by$__m18__ImportEntry$lam80
-    fn1 = colocated u0:336 sig1  ; __map82$tail
+    fn0 = colocated u0:337 sig0  ; __builtin_sort_by$__m18__ImportEntry$lam86
+    fn1 = colocated u0:340 sig1  ; __map88$tail
     fn2 = u0:7 sig2  ; aipl_array_dec
     fn3 = u0:3 sig3  ; aipl_arr_inc
 
@@ -48270,9 +48158,9 @@ function u0:175(i64, i64) apple_aarch64 {
     fn2 = u0:25 sig2  ; aipl_str_eq
     fn3 = colocated u0:117 sig3  ; __m18__bump
     fn4 = u0:3 sig4  ; aipl_arr_inc
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
     fn6 = u0:17 sig6  ; aipl_rec_alloc
-    fn7 = colocated u0:368 sig7  ; __arr_drop___m17__Doc
+    fn7 = colocated u0:378 sig7  ; __arr_drop___m17__Doc
     fn8 = u0:8 sig8  ; aipl_array_new
     fn9 = u0:15 sig9  ; aipl_dec
     fn10 = u0:7 sig10  ; aipl_array_dec
@@ -48284,34 +48172,34 @@ function u0:175(i64, i64) apple_aarch64 {
     fn16 = colocated u0:118 sig16  ; __m18__expect
     fn17 = colocated u0:181 sig17  ; __m18__params_until
     fn18 = colocated u0:118 sig18  ; __m18__expect
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
-    fn20 = colocated u0:369 sig20  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:379 sig20  ; __arr_retain___m17__Doc
     fn21 = u0:4 sig21  ; aipl_arr_reserve
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
     fn25 = u0:10 sig25  ; aipl_array_push_mut
-    fn26 = colocated u0:368 sig26  ; __arr_drop___m17__Doc
-    fn27 = colocated u0:369 sig27  ; __arr_retain___m17__Doc
-    fn28 = colocated u0:362 sig28  ; __rec_drop___m17__Doc
-    fn29 = colocated u0:368 sig29  ; __arr_drop___m17__Doc
-    fn30 = colocated u0:369 sig30  ; __arr_retain___m17__Doc
-    fn31 = colocated u0:368 sig31  ; __arr_drop___m17__Doc
-    fn32 = colocated u0:369 sig32  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:378 sig26  ; __arr_drop___m17__Doc
+    fn27 = colocated u0:379 sig27  ; __arr_retain___m17__Doc
+    fn28 = colocated u0:372 sig28  ; __rec_drop___m17__Doc
+    fn29 = colocated u0:378 sig29  ; __arr_drop___m17__Doc
+    fn30 = colocated u0:379 sig30  ; __arr_retain___m17__Doc
+    fn31 = colocated u0:378 sig31  ; __arr_drop___m17__Doc
+    fn32 = colocated u0:379 sig32  ; __arr_retain___m17__Doc
     fn33 = colocated u0:129 sig33  ; __m18__comma_list_docs
     fn34 = colocated u0:178 sig34  ; __m18__fn_effects
     fn35 = colocated u0:114 sig35  ; __m18__peek_text_n
     fn36 = colocated u0:179 sig36  ; __m18__fn_return
     fn37 = colocated u0:176 sig37  ; __m18__fn_body
-    fn38 = colocated u0:368 sig38  ; __arr_drop___m17__Doc
-    fn39 = colocated u0:369 sig39  ; __arr_retain___m17__Doc
-    fn40 = colocated u0:368 sig40  ; __arr_drop___m17__Doc
-    fn41 = colocated u0:369 sig41  ; __arr_retain___m17__Doc
-    fn42 = colocated u0:362 sig42  ; __rec_drop___m17__Doc
-    fn43 = colocated u0:368 sig43  ; __arr_drop___m17__Doc
-    fn44 = colocated u0:369 sig44  ; __arr_retain___m17__Doc
+    fn38 = colocated u0:378 sig38  ; __arr_drop___m17__Doc
+    fn39 = colocated u0:379 sig39  ; __arr_retain___m17__Doc
+    fn40 = colocated u0:378 sig40  ; __arr_drop___m17__Doc
+    fn41 = colocated u0:379 sig41  ; __arr_retain___m17__Doc
+    fn42 = colocated u0:372 sig42  ; __rec_drop___m17__Doc
+    fn43 = colocated u0:378 sig43  ; __arr_drop___m17__Doc
+    fn44 = colocated u0:379 sig44  ; __arr_retain___m17__Doc
     fn45 = colocated u0:180 sig45  ; __m18__fn_attrs
-    fn46 = colocated u0:362 sig46  ; __rec_drop___m17__Doc
+    fn46 = colocated u0:372 sig46  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -50875,16 +50763,16 @@ function u0:177(i64, i64) apple_aarch64 {
     fn8 = u0:15 sig8  ; aipl_dec
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = colocated u0:118 sig10  ; __m18__expect
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
     fn15 = u0:4 sig15  ; aipl_arr_reserve
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
-    fn17 = colocated u0:369 sig17  ; __arr_retain___m17__Doc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:379 sig17  ; __arr_retain___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
     fn19 = u0:10 sig19  ; aipl_array_push_mut
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
     fn21 = colocated u0:129 sig21  ; __m18__comma_list_docs
     fn22 = u0:18 sig22  ; aipl_rec_dec_strong
     fn23 = colocated u0:129 sig23  ; __m18__comma_list_docs
@@ -51542,12 +51430,12 @@ function u0:178(i64, i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = colocated u0:117 sig5  ; __m18__bump
     fn6 = colocated u0:117 sig6  ; __m18__bump
-    fn7 = colocated u0:362 sig7  ; __rec_drop___m17__Doc
+    fn7 = colocated u0:372 sig7  ; __rec_drop___m17__Doc
     fn8 = u0:17 sig8  ; aipl_rec_alloc
     fn9 = u0:13 sig9  ; aipl_concat
     fn10 = u0:13 sig10  ; aipl_concat
-    fn11 = colocated u0:368 sig11  ; __arr_drop___m17__Doc
-    fn12 = colocated u0:369 sig12  ; __arr_retain___m17__Doc
+    fn11 = colocated u0:378 sig11  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:379 sig12  ; __arr_retain___m17__Doc
     fn13 = u0:9 sig13  ; aipl_array_push
     fn14 = u0:7 sig14  ; aipl_array_dec
     fn15 = u0:18 sig15  ; aipl_rec_dec_strong
@@ -51801,16 +51689,16 @@ function u0:179(i64, i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:18 sig6  ; aipl_rec_dec_strong
-    fn7 = colocated u0:368 sig7  ; __arr_drop___m17__Doc
-    fn8 = colocated u0:369 sig8  ; __arr_retain___m17__Doc
+    fn7 = colocated u0:378 sig7  ; __arr_drop___m17__Doc
+    fn8 = colocated u0:379 sig8  ; __arr_retain___m17__Doc
     fn9 = u0:4 sig9  ; aipl_arr_reserve
-    fn10 = colocated u0:368 sig10  ; __arr_drop___m17__Doc
-    fn11 = colocated u0:369 sig11  ; __arr_retain___m17__Doc
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:378 sig10  ; __arr_drop___m17__Doc
+    fn11 = colocated u0:379 sig11  ; __arr_retain___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
     fn14 = u0:10 sig14  ; aipl_array_push_mut
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
-    fn16 = colocated u0:369 sig16  ; __arr_retain___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:379 sig16  ; __arr_retain___m17__Doc
     fn17 = u0:20 sig17  ; aipl_rec_inc_strong
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -52185,18 +52073,18 @@ function u0:180(i64, i64, i64) apple_aarch64 {
     fn12 = u0:20 sig12  ; aipl_rec_inc_strong
     fn13 = colocated u0:117 sig13  ; __m18__bump
     fn14 = colocated u0:217 sig14  ; __m18__str_atom
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:17 sig16  ; aipl_rec_alloc
     fn17 = u0:13 sig17  ; aipl_concat
     fn18 = u0:13 sig18  ; aipl_concat
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
-    fn20 = colocated u0:369 sig20  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:379 sig20  ; __arr_retain___m17__Doc
     fn21 = u0:9 sig21  ; aipl_array_push
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
-    fn26 = colocated u0:369 sig26  ; __arr_retain___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
+    fn26 = colocated u0:379 sig26  ; __arr_retain___m17__Doc
     fn27 = colocated u0:118 sig27  ; __m18__expect
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -53202,39 +53090,39 @@ function u0:181(i64, i64, i64, i64) apple_aarch64 {
     fn6 = colocated u0:114 sig6  ; __m18__peek_text_n
     fn7 = colocated u0:117 sig7  ; __m18__bump
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
-    fn9 = colocated u0:362 sig9  ; __rec_drop___m17__Doc
+    fn9 = colocated u0:372 sig9  ; __rec_drop___m17__Doc
     fn10 = u0:17 sig10  ; aipl_rec_alloc
-    fn11 = colocated u0:368 sig11  ; __arr_drop___m17__Doc
+    fn11 = colocated u0:378 sig11  ; __arr_drop___m17__Doc
     fn12 = u0:8 sig12  ; aipl_array_new
     fn13 = u0:7 sig13  ; aipl_array_dec
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = colocated u0:117 sig15  ; __m18__bump
     fn16 = colocated u0:118 sig16  ; __m18__expect
     fn17 = u0:18 sig17  ; aipl_rec_dec_strong
     fn18 = colocated u0:154 sig18  ; __m18__ty
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
-    fn20 = colocated u0:369 sig20  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:379 sig20  ; __arr_retain___m17__Doc
     fn21 = u0:4 sig21  ; aipl_arr_reserve
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
     fn25 = u0:10 sig25  ; aipl_array_push_mut
-    fn26 = colocated u0:368 sig26  ; __arr_drop___m17__Doc
-    fn27 = colocated u0:369 sig27  ; __arr_retain___m17__Doc
-    fn28 = colocated u0:362 sig28  ; __rec_drop___m17__Doc
-    fn29 = colocated u0:368 sig29  ; __arr_drop___m17__Doc
-    fn30 = colocated u0:369 sig30  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:378 sig26  ; __arr_drop___m17__Doc
+    fn27 = colocated u0:379 sig27  ; __arr_retain___m17__Doc
+    fn28 = colocated u0:372 sig28  ; __rec_drop___m17__Doc
+    fn29 = colocated u0:378 sig29  ; __arr_drop___m17__Doc
+    fn30 = colocated u0:379 sig30  ; __arr_retain___m17__Doc
     fn31 = colocated u0:114 sig31  ; __m18__peek_text_n
     fn32 = colocated u0:117 sig32  ; __m18__bump
-    fn33 = colocated u0:362 sig33  ; __rec_drop___m17__Doc
-    fn34 = colocated u0:368 sig34  ; __arr_drop___m17__Doc
-    fn35 = colocated u0:369 sig35  ; __arr_retain___m17__Doc
+    fn33 = colocated u0:372 sig33  ; __rec_drop___m17__Doc
+    fn34 = colocated u0:378 sig34  ; __arr_drop___m17__Doc
+    fn35 = colocated u0:379 sig35  ; __arr_retain___m17__Doc
     fn36 = u0:9 sig36  ; aipl_array_push
     fn37 = colocated u0:114 sig37  ; __m18__peek_text_n
     fn38 = colocated u0:182 sig38  ; __m18__spaced_default
-    fn39 = colocated u0:362 sig39  ; __rec_drop___m17__Doc
-    fn40 = colocated u0:368 sig40  ; __arr_drop___m17__Doc
-    fn41 = colocated u0:369 sig41  ; __arr_retain___m17__Doc
+    fn39 = colocated u0:372 sig39  ; __rec_drop___m17__Doc
+    fn40 = colocated u0:378 sig40  ; __arr_drop___m17__Doc
+    fn41 = colocated u0:379 sig41  ; __arr_retain___m17__Doc
     fn42 = colocated u0:114 sig42  ; __m18__peek_text_n
     fn43 = colocated u0:117 sig43  ; __m18__bump
 
@@ -54800,7 +54688,7 @@ block47:
 ;   ss9 = __spread$7
 ;   v371 = typed
 ;   v373 = $inl228_self
-;   ss15 = __mut_copy$83
+;   ss15 = __mut_copy$89
 ;   v381 = v
 ;   v482 = $inl229_self
 ;   v490 = d
@@ -54839,16 +54727,16 @@ function u0:182(i64, i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:18 sig6  ; aipl_rec_dec_strong
-    fn7 = colocated u0:368 sig7  ; __arr_drop___m17__Doc
-    fn8 = colocated u0:369 sig8  ; __arr_retain___m17__Doc
+    fn7 = colocated u0:378 sig7  ; __arr_drop___m17__Doc
+    fn8 = colocated u0:379 sig8  ; __arr_retain___m17__Doc
     fn9 = u0:4 sig9  ; aipl_arr_reserve
-    fn10 = colocated u0:368 sig10  ; __arr_drop___m17__Doc
-    fn11 = colocated u0:369 sig11  ; __arr_retain___m17__Doc
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:378 sig10  ; __arr_drop___m17__Doc
+    fn11 = colocated u0:379 sig11  ; __arr_retain___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
     fn14 = u0:10 sig14  ; aipl_array_push_mut
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
-    fn16 = colocated u0:369 sig16  ; __arr_retain___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:379 sig16  ; __arr_retain___m17__Doc
     fn17 = u0:20 sig17  ; aipl_rec_inc_strong
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -55208,14 +55096,14 @@ function u0:183(i64, i64) apple_aarch64 {
     fn10 = u0:8 sig10  ; aipl_array_new
     fn11 = colocated u0:184 sig11  ; __m18__struct_fields
     fn12 = colocated u0:118 sig12  ; __m18__expect
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
     fn14 = u0:17 sig14  ; aipl_rec_alloc
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:13 sig16  ; aipl_concat
     fn17 = u0:13 sig17  ; aipl_concat
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
     fn19 = colocated u0:129 sig19  ; __m18__comma_list_docs
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0x0074_6375_7274_7319
@@ -56278,16 +56166,16 @@ function u0:184(i64, i64, i64) apple_aarch64 {
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = colocated u0:154 sig10  ; __m18__ty
     fn11 = u0:20 sig11  ; aipl_rec_inc_strong
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
     fn16 = u0:8 sig16  ; aipl_array_new
     fn17 = colocated u0:114 sig17  ; __m18__peek_text_n
     fn18 = colocated u0:182 sig18  ; __m18__spaced_default
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
-    fn21 = colocated u0:369 sig21  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
+    fn21 = colocated u0:379 sig21  ; __arr_retain___m17__Doc
     fn22 = u0:9 sig22  ; aipl_array_push
     fn23 = colocated u0:114 sig23  ; __m18__peek_text_n
     fn24 = colocated u0:117 sig24  ; __m18__bump
@@ -57350,7 +57238,7 @@ function u0:185(i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:18 sig6  ; aipl_rec_dec_strong
-    fn7 = colocated u0:362 sig7  ; __rec_drop___m17__Doc
+    fn7 = colocated u0:372 sig7  ; __rec_drop___m17__Doc
     fn8 = u0:17 sig8  ; aipl_rec_alloc
     fn9 = colocated u0:41 sig9  ; __m17__has_hard$tail
     fn10 = u0:21 sig10  ; aipl_rec_inc_weak
@@ -57627,25 +57515,25 @@ function u0:186(i64, i64) apple_aarch64 {
     fn7 = colocated u0:187 sig7  ; __m18__block_entries
     fn8 = colocated u0:190 sig8  ; __m18__range_has_semi
     fn9 = colocated u0:118 sig9  ; __m18__expect
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:17 sig11  ; aipl_rec_alloc
     fn12 = u0:18 sig12  ; aipl_rec_dec_strong
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
-    fn21 = colocated u0:369 sig21  ; __arr_retain___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
+    fn21 = colocated u0:379 sig21  ; __arr_retain___m17__Doc
     fn22 = u0:4 sig22  ; aipl_arr_reserve
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
-    fn24 = colocated u0:369 sig24  ; __arr_retain___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
+    fn24 = colocated u0:379 sig24  ; __arr_retain___m17__Doc
     fn25 = u0:2 sig25  ; aipl_arr_extend
     fn26 = u0:21 sig26  ; aipl_rec_inc_weak
-    fn27 = colocated u0:362 sig27  ; __rec_drop___m17__Doc
-    fn28 = colocated u0:368 sig28  ; __arr_drop___m17__Doc
+    fn27 = colocated u0:372 sig27  ; __rec_drop___m17__Doc
+    fn28 = colocated u0:378 sig28  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0x7b05
@@ -58593,11 +58481,11 @@ function u0:187(i64, i64, i64, i64) apple_aarch64 {
     fn7 = u0:32 sig7  ; aipl_str_slice
     fn8 = colocated u0:320 sig8  ; __builtin_count$char$s0
     fn9 = colocated u0:141 sig9  ; __m18__sep_entry
-    fn10 = colocated u0:368 sig10  ; __arr_drop___m17__Doc
-    fn11 = colocated u0:369 sig11  ; __arr_retain___m17__Doc
+    fn10 = colocated u0:378 sig10  ; __arr_drop___m17__Doc
+    fn11 = colocated u0:379 sig11  ; __arr_retain___m17__Doc
     fn12 = u0:9 sig12  ; aipl_array_push
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
     fn15 = colocated u0:114 sig15  ; __m18__peek_text_n
     fn16 = u0:25 sig16  ; aipl_str_eq
     fn17 = colocated u0:189 sig17  ; __m18__trim_last_break$tail
@@ -58605,13 +58493,13 @@ function u0:187(i64, i64, i64, i64) apple_aarch64 {
     fn19 = colocated u0:191 sig19  ; __m18__statement
     fn20 = colocated u0:320 sig20  ; __builtin_count$char$s0
     fn21 = colocated u0:141 sig21  ; __m18__sep_entry
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
     fn24 = colocated u0:126 sig24  ; __m18__trailing_comment
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
-    fn26 = colocated u0:369 sig26  ; __arr_retain___m17__Doc
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
-    fn28 = colocated u0:369 sig28  ; __arr_retain___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
+    fn26 = colocated u0:379 sig26  ; __arr_retain___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
+    fn28 = colocated u0:379 sig28  ; __arr_retain___m17__Doc
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
     v4 = stack_addr.i64 ss0
@@ -59423,7 +59311,7 @@ function u0:189(i64) -> i64 tail {
     fn1 = u0:7 sig1  ; aipl_array_dec
     fn2 = u0:1 sig2  ; aipl_arr_elem_ptr
     fn3 = u0:20 sig3  ; aipl_rec_inc_strong
-    fn4 = colocated u0:362 sig4  ; __rec_drop___m17__Doc
+    fn4 = colocated u0:372 sig4  ; __rec_drop___m17__Doc
     fn5 = u0:17 sig5  ; aipl_rec_alloc
     fn6 = u0:8 sig6  ; aipl_array_new
     fn7 = colocated u0:142 sig7  ; __m18__without_trailing_break
@@ -59722,20 +59610,20 @@ function u0:191(i64, i64) apple_aarch64 {
     fn11 = u0:7 sig11  ; aipl_array_dec
     fn12 = u0:18 sig12  ; aipl_rec_dec_strong
     fn13 = colocated u0:118 sig13  ; __m18__expect
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:17 sig15  ; aipl_rec_alloc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
     fn19 = u0:8 sig19  ; aipl_array_new
     fn20 = colocated u0:198 sig20  ; __m18__for_stmt
     fn21 = colocated u0:200 sig21  ; __m18__while_stmt
     fn22 = colocated u0:202 sig22  ; __m18__expr
     fn23 = colocated u0:114 sig23  ; __m18__peek_text_n
     fn24 = colocated u0:117 sig24  ; __m18__bump
-    fn25 = colocated u0:362 sig25  ; __rec_drop___m17__Doc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:372 sig25  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -60922,14 +60810,14 @@ function u0:192(i64, i64) apple_aarch64 {
     fn13 = colocated u0:202 sig13  ; __m18__expr
     fn14 = u0:18 sig14  ; aipl_rec_dec_strong
     fn15 = colocated u0:118 sig15  ; __m18__expect
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
     fn17 = u0:17 sig17  ; aipl_rec_alloc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
     fn19 = u0:29 sig19  ; aipl_str_join
     fn20 = u0:13 sig20  ; aipl_concat
     fn21 = u0:13 sig21  ; aipl_concat
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
     fn24 = colocated u0:117 sig24  ; __m18__bump
     fn25 = colocated u0:114 sig25  ; __m18__peek_text_n
     fn26 = colocated u0:117 sig26  ; __m18__bump
@@ -60938,26 +60826,26 @@ function u0:192(i64, i64) apple_aarch64 {
     fn29 = colocated u0:118 sig29  ; __m18__expect
     fn30 = colocated u0:202 sig30  ; __m18__expr
     fn31 = colocated u0:118 sig31  ; __m18__expect
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
-    fn33 = colocated u0:362 sig33  ; __rec_drop___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
+    fn33 = colocated u0:372 sig33  ; __rec_drop___m17__Doc
     fn34 = u0:13 sig34  ; aipl_concat
     fn35 = u0:29 sig35  ; aipl_str_join
     fn36 = u0:13 sig36  ; aipl_concat
     fn37 = u0:13 sig37  ; aipl_concat
     fn38 = u0:13 sig38  ; aipl_concat
-    fn39 = colocated u0:362 sig39  ; __rec_drop___m17__Doc
-    fn40 = colocated u0:368 sig40  ; __arr_drop___m17__Doc
+    fn39 = colocated u0:372 sig39  ; __rec_drop___m17__Doc
+    fn40 = colocated u0:378 sig40  ; __arr_drop___m17__Doc
     fn41 = colocated u0:194 sig41  ; __m18__binding_ann
     fn42 = colocated u0:118 sig42  ; __m18__expect
     fn43 = colocated u0:202 sig43  ; __m18__expr
     fn44 = colocated u0:118 sig44  ; __m18__expect
-    fn45 = colocated u0:362 sig45  ; __rec_drop___m17__Doc
-    fn46 = colocated u0:362 sig46  ; __rec_drop___m17__Doc
+    fn45 = colocated u0:372 sig45  ; __rec_drop___m17__Doc
+    fn46 = colocated u0:372 sig46  ; __rec_drop___m17__Doc
     fn47 = u0:13 sig47  ; aipl_concat
     fn48 = u0:13 sig48  ; aipl_concat
-    fn49 = colocated u0:362 sig49  ; __rec_drop___m17__Doc
-    fn50 = colocated u0:362 sig50  ; __rec_drop___m17__Doc
-    fn51 = colocated u0:368 sig51  ; __arr_drop___m17__Doc
+    fn49 = colocated u0:372 sig49  ; __rec_drop___m17__Doc
+    fn50 = colocated u0:372 sig50  ; __rec_drop___m17__Doc
+    fn51 = colocated u0:378 sig51  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -64354,14 +64242,14 @@ function u0:193(i64, i64) apple_aarch64 {
     fn9 = colocated u0:118 sig9  ; __m18__expect
     fn10 = colocated u0:202 sig10  ; __m18__expr
     fn11 = colocated u0:118 sig11  ; __m18__expect
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:13 sig15  ; aipl_concat
     fn16 = u0:13 sig16  ; aipl_concat
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
     fn20 = u0:8 sig20  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -65310,7 +65198,7 @@ function u0:194(i64, i64) apple_aarch64 {
     fn1 = u0:16 sig1  ; aipl_inc
     fn2 = u0:25 sig2  ; aipl_str_eq
     fn3 = u0:3 sig3  ; aipl_arr_inc
-    fn4 = colocated u0:362 sig4  ; __rec_drop___m17__Doc
+    fn4 = colocated u0:372 sig4  ; __rec_drop___m17__Doc
     fn5 = u0:17 sig5  ; aipl_rec_alloc
     fn6 = u0:20 sig6  ; aipl_rec_inc_strong
     fn7 = u0:15 sig7  ; aipl_dec
@@ -65318,9 +65206,9 @@ function u0:194(i64, i64) apple_aarch64 {
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = colocated u0:117 sig10  ; __m18__bump
     fn11 = colocated u0:154 sig11  ; __m18__ty
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -65792,7 +65680,7 @@ function u0:195(i64, i64) apple_aarch64 {
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
     fn9 = u0:15 sig9  ; aipl_dec
     fn10 = u0:7 sig10  ; aipl_array_dec
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
     fn13 = u0:13 sig13  ; aipl_concat
     fn14 = u0:13 sig14  ; aipl_concat
@@ -65802,12 +65690,12 @@ function u0:195(i64, i64) apple_aarch64 {
     fn18 = colocated u0:118 sig18  ; __m18__expect
     fn19 = colocated u0:202 sig19  ; __m18__expr
     fn20 = colocated u0:118 sig20  ; __m18__expect
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
     fn23 = u0:13 sig23  ; aipl_concat
     fn24 = u0:13 sig24  ; aipl_concat
-    fn25 = colocated u0:362 sig25  ; __rec_drop___m17__Doc
-    fn26 = colocated u0:368 sig26  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:372 sig25  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:378 sig26  ; __arr_drop___m17__Doc
     fn27 = u0:8 sig27  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -67175,26 +67063,26 @@ function u0:196(i64, i64, i64) apple_aarch64 {
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = u0:18 sig10  ; aipl_rec_dec_strong
     fn11 = colocated u0:118 sig11  ; __m18__expect
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:13 sig15  ; aipl_concat
     fn16 = u0:13 sig16  ; aipl_concat
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
     fn19 = u0:8 sig19  ; aipl_array_new
     fn20 = colocated u0:118 sig20  ; __m18__expect
     fn21 = colocated u0:247 sig21  ; __m18__hugs_sole_arg
     fn22 = colocated u0:235 sig22  ; __m18__call_args_until
     fn23 = colocated u0:118 sig23  ; __m18__expect
     fn24 = colocated u0:118 sig24  ; __m18__expect
-    fn25 = colocated u0:362 sig25  ; __rec_drop___m17__Doc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
+    fn25 = colocated u0:372 sig25  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
     fn27 = u0:13 sig27  ; aipl_concat
     fn28 = u0:13 sig28  ; aipl_concat
     fn29 = colocated u0:250 sig29  ; __m18__call_arg_list
-    fn30 = colocated u0:362 sig30  ; __rec_drop___m17__Doc
-    fn31 = colocated u0:368 sig31  ; __arr_drop___m17__Doc
+    fn30 = colocated u0:372 sig30  ; __rec_drop___m17__Doc
+    fn31 = colocated u0:378 sig31  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64, v2: i64):
     call fn0(v2)
@@ -68998,13 +68886,13 @@ function u0:198(i64, i64) apple_aarch64 {
     fn21 = u0:18 sig21  ; aipl_rec_dec_strong
     fn22 = colocated u0:118 sig22  ; __m18__expect
     fn23 = colocated u0:185 sig23  ; __m18__block
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
     fn25 = u0:17 sig25  ; aipl_rec_alloc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
     fn27 = u0:13 sig27  ; aipl_concat
     fn28 = u0:13 sig28  ; aipl_concat
-    fn29 = colocated u0:362 sig29  ; __rec_drop___m17__Doc
-    fn30 = colocated u0:368 sig30  ; __arr_drop___m17__Doc
+    fn29 = colocated u0:372 sig29  ; __rec_drop___m17__Doc
+    fn30 = colocated u0:378 sig30  ; __arr_drop___m17__Doc
     fn31 = u0:8 sig31  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -70952,11 +70840,11 @@ function u0:200(i64, i64) apple_aarch64 {
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
     fn9 = colocated u0:118 sig9  ; __m18__expect
     fn10 = colocated u0:185 sig10  ; __m18__block
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
     fn16 = u0:8 sig16  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -72265,10 +72153,10 @@ function u0:203(i64, i64, i64) apple_aarch64 {
     fn8 = colocated u0:204 sig8  ; __m18__binop_expr
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = u0:18 sig10  ; aipl_rec_dec_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -72723,20 +72611,20 @@ function u0:204(i64, i64) apple_aarch64 {
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
     fn8 = u0:8 sig8  ; aipl_array_new
     fn9 = colocated u0:205 sig9  ; __m18__binop_tail
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:17 sig11  ; aipl_rec_alloc
-    fn12 = colocated u0:368 sig12  ; __arr_drop___m17__Doc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
+    fn12 = colocated u0:378 sig12  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
     fn15 = u0:4 sig15  ; aipl_arr_reserve
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
-    fn17 = colocated u0:369 sig17  ; __arr_retain___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:379 sig17  ; __arr_retain___m17__Doc
     fn18 = u0:2 sig18  ; aipl_arr_extend
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
     fn20 = colocated u0:41 sig20  ; __m17__has_hard$tail
     fn21 = u0:21 sig21  ; aipl_rec_inc_weak
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -73315,22 +73203,22 @@ function u0:205(i64, i64, i64) apple_aarch64 {
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
     fn17 = u0:8 sig17  ; aipl_array_new
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
     fn24 = u0:21 sig24  ; aipl_rec_inc_weak
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
-    fn26 = colocated u0:369 sig26  ; __arr_retain___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
+    fn26 = colocated u0:379 sig26  ; __arr_retain___m17__Doc
     fn27 = u0:9 sig27  ; aipl_array_push
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -74110,10 +73998,10 @@ function u0:207(i64, i64) apple_aarch64 {
     fn8 = u0:15 sig8  ; aipl_dec
     fn9 = u0:7 sig9  ; aipl_array_dec
     fn10 = u0:18 sig10  ; aipl_rec_dec_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
     fn16 = colocated u0:208 sig16  ; __m18__postfix
 
@@ -74535,24 +74423,24 @@ function u0:208(i64, i64) apple_aarch64 {
     fn7 = u0:8 sig7  ; aipl_array_new
     fn8 = colocated u0:209 sig8  ; __m18__postfix_segs
     fn9 = colocated u0:214 sig9  ; __m18__call_count
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:17 sig11  ; aipl_rec_alloc
-    fn12 = colocated u0:368 sig12  ; __arr_drop___m17__Doc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
-    fn15 = colocated u0:338 sig15  ; __map85
+    fn12 = colocated u0:378 sig12  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
+    fn15 = colocated u0:342 sig15  ; __map91
     fn16 = u0:4 sig16  ; aipl_arr_reserve
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
-    fn18 = colocated u0:369 sig18  ; __arr_retain___m17__Doc
-    fn19 = colocated u0:340 sig19  ; __map87
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:379 sig18  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:344 sig19  ; __map93
     fn20 = u0:2 sig20  ; aipl_arr_extend
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
-    fn23 = colocated u0:362 sig23  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:372 sig23  ; __rec_drop___m17__Doc
     fn24 = colocated u0:215 sig24  ; __m18__chain_docs
     fn25 = u0:21 sig25  ; aipl_rec_inc_weak
-    fn26 = colocated u0:368 sig26  ; __arr_drop___m17__Doc
-    fn27 = colocated u0:362 sig27  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:378 sig26  ; __arr_drop___m17__Doc
+    fn27 = colocated u0:372 sig27  ; __rec_drop___m17__Doc
     fn28 = colocated u0:41 sig28  ; __m17__has_hard$tail
 
 block0(v0: i64, v1: i64):
@@ -75386,16 +75274,16 @@ function u0:209(i64, i64, i64) apple_aarch64 {
     fn6 = u0:15 sig6  ; aipl_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
-    fn9 = colocated u0:377 sig9  ; __arr_drop___m18__Seg
-    fn10 = colocated u0:378 sig10  ; __arr_retain___m18__Seg
+    fn9 = colocated u0:386 sig9  ; __arr_drop___m18__Seg
+    fn10 = colocated u0:387 sig10  ; __arr_retain___m18__Seg
     fn11 = u0:9 sig11  ; aipl_array_push
     fn12 = colocated u0:211 sig12  ; __m18__index_seg
-    fn13 = colocated u0:377 sig13  ; __arr_drop___m18__Seg
-    fn14 = colocated u0:378 sig14  ; __arr_retain___m18__Seg
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:386 sig13  ; __arr_drop___m18__Seg
+    fn14 = colocated u0:387 sig14  ; __arr_retain___m18__Seg
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:17 sig16  ; aipl_rec_alloc
-    fn17 = colocated u0:377 sig17  ; __arr_drop___m18__Seg
-    fn18 = colocated u0:378 sig18  ; __arr_retain___m18__Seg
+    fn17 = colocated u0:386 sig17  ; __arr_drop___m18__Seg
+    fn18 = colocated u0:387 sig18  ; __arr_retain___m18__Seg
     fn19 = colocated u0:117 sig19  ; __m18__bump
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -76094,7 +75982,7 @@ function u0:210(i64, i64) apple_aarch64 {
     fn3 = colocated u0:117 sig3  ; __m18__bump
     fn4 = colocated u0:114 sig4  ; __m18__peek_text_n
     fn5 = u0:25 sig5  ; aipl_str_eq
-    fn6 = colocated u0:362 sig6  ; __rec_drop___m17__Doc
+    fn6 = colocated u0:372 sig6  ; __rec_drop___m17__Doc
     fn7 = u0:17 sig7  ; aipl_rec_alloc
     fn8 = u0:13 sig8  ; aipl_concat
     fn9 = u0:13 sig9  ; aipl_concat
@@ -76108,12 +75996,12 @@ function u0:210(i64, i64) apple_aarch64 {
     fn17 = u0:8 sig17  ; aipl_array_new
     fn18 = colocated u0:235 sig18  ; __m18__call_args_until
     fn19 = colocated u0:118 sig19  ; __m18__expect
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
     fn22 = u0:13 sig22  ; aipl_concat
     fn23 = u0:13 sig23  ; aipl_concat
     fn24 = colocated u0:250 sig24  ; __m18__call_arg_list
-    fn25 = colocated u0:368 sig25  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:378 sig25  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -77082,20 +76970,20 @@ function u0:211(i64, i64) apple_aarch64 {
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = colocated u0:213 sig9  ; __m18__index_or_from
     fn10 = colocated u0:118 sig10  ; __m18__expect
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
-    fn17 = colocated u0:369 sig17  ; __arr_retain___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:379 sig17  ; __arr_retain___m17__Doc
     fn18 = u0:4 sig18  ; aipl_arr_reserve
-    fn19 = colocated u0:368 sig19  ; __arr_drop___m17__Doc
-    fn20 = colocated u0:369 sig20  ; __arr_retain___m17__Doc
+    fn19 = colocated u0:378 sig19  ; __arr_drop___m17__Doc
+    fn20 = colocated u0:379 sig20  ; __arr_retain___m17__Doc
     fn21 = u0:2 sig21  ; aipl_arr_extend
-    fn22 = colocated u0:368 sig22  ; __arr_drop___m17__Doc
-    fn23 = colocated u0:369 sig23  ; __arr_retain___m17__Doc
-    fn24 = colocated u0:362 sig24  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:378 sig22  ; __arr_drop___m17__Doc
+    fn23 = colocated u0:379 sig23  ; __arr_retain___m17__Doc
+    fn24 = colocated u0:372 sig24  ; __rec_drop___m17__Doc
     fn25 = u0:10 sig25  ; aipl_array_push_mut
     fn26 = u0:18 sig26  ; aipl_rec_dec_strong
 
@@ -77825,10 +77713,10 @@ function u0:212(i64, i64) apple_aarch64 {
     fn4 = u0:15 sig4  ; aipl_dec
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:18 sig6  ; aipl_rec_dec_strong
-    fn7 = colocated u0:362 sig7  ; __rec_drop___m17__Doc
+    fn7 = colocated u0:372 sig7  ; __rec_drop___m17__Doc
     fn8 = u0:17 sig8  ; aipl_rec_alloc
     fn9 = u0:20 sig9  ; aipl_rec_inc_strong
-    fn10 = colocated u0:368 sig10  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:378 sig10  ; __arr_drop___m17__Doc
     fn11 = u0:8 sig11  ; aipl_array_new
 
 block0(v0: i64, v1: i64):
@@ -78140,16 +78028,16 @@ function u0:213(i64, i64) apple_aarch64 {
     fn6 = colocated u0:114 sig6  ; __m18__peek_text_n
     fn7 = u0:25 sig7  ; aipl_str_eq
     fn8 = u0:20 sig8  ; aipl_rec_inc_strong
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
     fn10 = u0:8 sig10  ; aipl_array_new
     fn11 = colocated u0:117 sig11  ; __m18__bump
     fn12 = colocated u0:114 sig12  ; __m18__peek_text_n
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
     fn14 = u0:17 sig14  ; aipl_rec_alloc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
     fn16 = colocated u0:202 sig16  ; __m18__expr
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -79050,14 +78938,14 @@ function u0:215(i64) -> i64 apple_aarch64 {
     fn0 = u0:8 sig0  ; aipl_array_new
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:362 sig3  ; __rec_drop___m17__Doc
+    fn3 = colocated u0:372 sig3  ; __rec_drop___m17__Doc
     fn4 = u0:17 sig4  ; aipl_rec_alloc
-    fn5 = colocated u0:368 sig5  ; __arr_drop___m17__Doc
-    fn6 = colocated u0:369 sig6  ; __arr_retain___m17__Doc
+    fn5 = colocated u0:378 sig5  ; __arr_drop___m17__Doc
+    fn6 = colocated u0:379 sig6  ; __arr_retain___m17__Doc
     fn7 = u0:10 sig7  ; aipl_array_push_mut
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
-    fn9 = colocated u0:368 sig9  ; __arr_drop___m17__Doc
-    fn10 = colocated u0:369 sig10  ; __arr_retain___m17__Doc
+    fn9 = colocated u0:378 sig9  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:379 sig10  ; __arr_retain___m17__Doc
     fn11 = u0:3 sig11  ; aipl_arr_inc
     fn12 = u0:7 sig12  ; aipl_array_dec
 
@@ -79248,7 +79136,7 @@ function u0:216(i64, i64) apple_aarch64 {
     fn12 = colocated u0:136 sig12  ; __m18__peek_is_n
     fn13 = colocated u0:136 sig13  ; __m18__peek_is_n
     fn14 = colocated u0:117 sig14  ; __m18__bump
-    fn15 = colocated u0:362 sig15  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:372 sig15  ; __rec_drop___m17__Doc
     fn16 = u0:17 sig16  ; aipl_rec_alloc
     fn17 = colocated u0:114 sig17  ; __m18__peek_text_n
     fn18 = u0:25 sig18  ; aipl_str_eq
@@ -79901,11 +79789,11 @@ function u0:217(i64, i64) apple_aarch64 {
     sig8 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
     fn1 = u0:34 sig1  ; aipl_str_starts_with
-    fn2 = colocated u0:362 sig2  ; __rec_drop___m17__Doc
+    fn2 = colocated u0:372 sig2  ; __rec_drop___m17__Doc
     fn3 = u0:17 sig3  ; aipl_rec_alloc
     fn4 = u0:20 sig4  ; aipl_rec_inc_strong
     fn5 = u0:18 sig5  ; aipl_rec_dec_strong
-    fn6 = colocated u0:362 sig6  ; __rec_drop___m17__Doc
+    fn6 = colocated u0:372 sig6  ; __rec_drop___m17__Doc
     fn7 = u0:3 sig7  ; aipl_arr_inc
     fn8 = u0:15 sig8  ; aipl_dec
 
@@ -80044,13 +79932,13 @@ function u0:218(i64, i64) apple_aarch64 {
     fn8 = colocated u0:114 sig8  ; __m18__peek_text_n
     fn9 = u0:25 sig9  ; aipl_str_eq
     fn10 = colocated u0:118 sig10  ; __m18__expect
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
     fn16 = u0:8 sig16  ; aipl_array_new
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
     fn18 = colocated u0:219 sig18  ; __m18__tuple_rest
     fn19 = colocated u0:118 sig19  ; __m18__expect
     fn20 = colocated u0:129 sig20  ; __m18__comma_list_docs
@@ -81111,8 +80999,8 @@ function u0:219(i64, i64, i64) apple_aarch64 {
     fn8 = colocated u0:202 sig8  ; __m18__expr
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
-    fn11 = colocated u0:368 sig11  ; __arr_drop___m17__Doc
-    fn12 = colocated u0:369 sig12  ; __arr_retain___m17__Doc
+    fn11 = colocated u0:378 sig11  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:379 sig12  ; __arr_retain___m17__Doc
     fn13 = u0:9 sig13  ; aipl_array_push
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -82141,7 +82029,7 @@ function u0:221(i64, i64) apple_aarch64 {
     fn8 = u0:25 sig8  ; aipl_str_eq
     fn9 = colocated u0:117 sig9  ; __m18__bump
     fn10 = colocated u0:118 sig10  ; __m18__expect
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
     fn13 = u0:18 sig13  ; aipl_rec_dec_strong
     fn14 = u0:8 sig14  ; aipl_array_new
@@ -83180,12 +83068,12 @@ function u0:222(i64, i64, i64) apple_aarch64 {
     fn9 = colocated u0:114 sig9  ; __m18__peek_text_n
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
     fn11 = colocated u0:223 sig11  ; __m18__dict_value
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
-    fn16 = colocated u0:368 sig16  ; __arr_drop___m17__Doc
-    fn17 = colocated u0:369 sig17  ; __arr_retain___m17__Doc
+    fn16 = colocated u0:378 sig16  ; __arr_drop___m17__Doc
+    fn17 = colocated u0:379 sig17  ; __arr_retain___m17__Doc
     fn18 = u0:9 sig18  ; aipl_array_push
     fn19 = colocated u0:114 sig19  ; __m18__peek_text_n
     fn20 = colocated u0:117 sig20  ; __m18__bump
@@ -83978,10 +83866,10 @@ function u0:223(i64, i64, i64, i64) apple_aarch64 {
     fn5 = u0:15 sig5  ; aipl_dec
     fn6 = u0:7 sig6  ; aipl_array_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = colocated u0:362 sig8  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:372 sig8  ; __rec_drop___m17__Doc
     fn9 = u0:17 sig9  ; aipl_rec_alloc
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
-    fn11 = colocated u0:368 sig11  ; __arr_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:378 sig11  ; __arr_drop___m17__Doc
     fn12 = u0:8 sig12  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
@@ -84347,16 +84235,16 @@ function u0:224(i64, i64) apple_aarch64 {
     fn20 = u0:20 sig20  ; aipl_rec_inc_strong
     fn21 = u0:7 sig21  ; aipl_array_dec
     fn22 = colocated u0:118 sig22  ; __m18__expect
-    fn23 = colocated u0:362 sig23  ; __rec_drop___m17__Doc
+    fn23 = colocated u0:372 sig23  ; __rec_drop___m17__Doc
     fn24 = u0:17 sig24  ; aipl_rec_alloc
-    fn25 = colocated u0:362 sig25  ; __rec_drop___m17__Doc
+    fn25 = colocated u0:372 sig25  ; __rec_drop___m17__Doc
     fn26 = colocated u0:250 sig26  ; __m18__call_arg_list
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
     fn28 = u0:18 sig28  ; aipl_rec_dec_strong
     fn29 = colocated u0:114 sig29  ; __m18__peek_text_n
     fn30 = colocated u0:117 sig30  ; __m18__bump
     fn31 = colocated u0:225 sig31  ; __m18__struct_atom
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
@@ -85499,17 +85387,17 @@ function u0:225(i64, i64, i64) apple_aarch64 {
     fn5 = u0:15 sig5  ; aipl_dec
     fn6 = u0:7 sig6  ; aipl_array_dec
     fn7 = colocated u0:118 sig7  ; __m18__expect
-    fn8 = colocated u0:362 sig8  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:372 sig8  ; __rec_drop___m17__Doc
     fn9 = u0:17 sig9  ; aipl_rec_alloc
     fn10 = u0:13 sig10  ; aipl_concat
     fn11 = u0:13 sig11  ; aipl_concat
     fn12 = u0:18 sig12  ; aipl_rec_dec_strong
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:13 sig15  ; aipl_concat
     fn16 = u0:13 sig16  ; aipl_concat
     fn17 = colocated u0:129 sig17  ; __m18__comma_list_docs
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -86135,13 +86023,13 @@ function u0:226(i64, i64, i64) apple_aarch64 {
     fn9 = colocated u0:227 sig9  ; __m18__struct_field_value
     fn10 = u0:7 sig10  ; aipl_array_dec
     fn11 = u0:18 sig11  ; aipl_rec_dec_strong
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
     fn13 = u0:17 sig13  ; aipl_rec_alloc
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
     fn16 = u0:8 sig16  ; aipl_array_new
-    fn17 = colocated u0:368 sig17  ; __arr_drop___m17__Doc
-    fn18 = colocated u0:369 sig18  ; __arr_retain___m17__Doc
+    fn17 = colocated u0:378 sig17  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:379 sig18  ; __arr_retain___m17__Doc
     fn19 = u0:9 sig19  ; aipl_array_push
     fn20 = colocated u0:114 sig20  ; __m18__peek_text_n
     fn21 = colocated u0:117 sig21  ; __m18__bump
@@ -86825,12 +86713,12 @@ function u0:227(i64, i64, i64, i64) apple_aarch64 {
     fn5 = u0:15 sig5  ; aipl_dec
     fn6 = u0:7 sig6  ; aipl_array_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = colocated u0:362 sig8  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:372 sig8  ; __rec_drop___m17__Doc
     fn9 = u0:17 sig9  ; aipl_rec_alloc
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:13 sig11  ; aipl_concat
     fn12 = u0:13 sig12  ; aipl_concat
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
     fn14 = u0:8 sig14  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
@@ -87189,32 +87077,32 @@ function u0:228(i64, i64) apple_aarch64 {
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
     fn9 = colocated u0:118 sig9  ; __m18__expect
     fn10 = colocated u0:186 sig10  ; __m18__block_layout
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:362 sig13  ; __rec_drop___m17__Doc
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:372 sig13  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
     fn15 = u0:8 sig15  ; aipl_array_new
     fn16 = colocated u0:114 sig16  ; __m18__peek_text_n
     fn17 = u0:25 sig17  ; aipl_str_eq
-    fn18 = colocated u0:362 sig18  ; __rec_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:372 sig18  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
     fn20 = colocated u0:41 sig20  ; __m17__has_hard$tail
     fn21 = u0:21 sig21  ; aipl_rec_inc_weak
     fn22 = colocated u0:117 sig22  ; __m18__bump
     fn23 = colocated u0:114 sig23  ; __m18__peek_text_n
     fn24 = colocated u0:228 sig24  ; __m18__if_expr
     fn25 = colocated u0:186 sig25  ; __m18__block_layout
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
-    fn28 = colocated u0:369 sig28  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
+    fn28 = colocated u0:379 sig28  ; __arr_retain___m17__Doc
     fn29 = u0:4 sig29  ; aipl_arr_reserve
-    fn30 = colocated u0:368 sig30  ; __arr_drop___m17__Doc
-    fn31 = colocated u0:369 sig31  ; __arr_retain___m17__Doc
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
+    fn30 = colocated u0:378 sig30  ; __arr_drop___m17__Doc
+    fn31 = colocated u0:379 sig31  ; __arr_retain___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
     fn33 = u0:10 sig33  ; aipl_array_push_mut
-    fn34 = colocated u0:368 sig34  ; __arr_drop___m17__Doc
-    fn35 = colocated u0:369 sig35  ; __arr_retain___m17__Doc
-    fn36 = colocated u0:362 sig36  ; __rec_drop___m17__Doc
+    fn34 = colocated u0:378 sig34  ; __arr_drop___m17__Doc
+    fn35 = colocated u0:379 sig35  ; __arr_retain___m17__Doc
+    fn36 = colocated u0:372 sig36  ; __rec_drop___m17__Doc
     fn37 = colocated u0:41 sig37  ; __m17__has_hard$tail
 
 block0(v0: i64, v1: i64):
@@ -89009,29 +88897,29 @@ function u0:229(i64, i64) apple_aarch64 {
     fn11 = u0:8 sig11  ; aipl_array_new
     fn12 = colocated u0:232 sig12  ; __m18__match_arms
     fn13 = colocated u0:118 sig13  ; __m18__expect
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:17 sig15  ; aipl_rec_alloc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:368 sig21  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:378 sig21  ; __arr_drop___m17__Doc
     fn22 = u0:1 sig22  ; aipl_arr_elem_ptr
-    fn23 = colocated u0:362 sig23  ; __rec_drop___m17__Doc
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
-    fn25 = colocated u0:369 sig25  ; __arr_retain___m17__Doc
+    fn23 = colocated u0:372 sig23  ; __rec_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:379 sig25  ; __arr_retain___m17__Doc
     fn26 = u0:9 sig26  ; aipl_array_push
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
-    fn28 = colocated u0:369 sig28  ; __arr_retain___m17__Doc
-    fn29 = colocated u0:362 sig29  ; __rec_drop___m17__Doc
-    fn30 = colocated u0:362 sig30  ; __rec_drop___m17__Doc
-    fn31 = colocated u0:362 sig31  ; __rec_drop___m17__Doc
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
+    fn28 = colocated u0:379 sig28  ; __arr_retain___m17__Doc
+    fn29 = colocated u0:372 sig29  ; __rec_drop___m17__Doc
+    fn30 = colocated u0:372 sig30  ; __rec_drop___m17__Doc
+    fn31 = colocated u0:372 sig31  ; __rec_drop___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
     fn33 = u0:21 sig33  ; aipl_rec_inc_weak
-    fn34 = colocated u0:362 sig34  ; __rec_drop___m17__Doc
-    fn35 = colocated u0:362 sig35  ; __rec_drop___m17__Doc
-    fn36 = colocated u0:368 sig36  ; __arr_drop___m17__Doc
+    fn34 = colocated u0:372 sig34  ; __rec_drop___m17__Doc
+    fn35 = colocated u0:372 sig35  ; __rec_drop___m17__Doc
+    fn36 = colocated u0:378 sig36  ; __arr_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0x6863_7461_6d15
@@ -90849,14 +90737,14 @@ function u0:230(i64, i64) apple_aarch64 {
     fn11 = colocated u0:186 sig11  ; __m18__block_layout
     fn12 = u0:18 sig12  ; aipl_rec_dec_strong
     fn13 = colocated u0:129 sig13  ; __m18__comma_list_docs
-    fn14 = colocated u0:362 sig14  ; __rec_drop___m17__Doc
+    fn14 = colocated u0:372 sig14  ; __rec_drop___m17__Doc
     fn15 = u0:17 sig15  ; aipl_rec_alloc
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
     fn17 = u0:13 sig17  ; aipl_concat
     fn18 = u0:13 sig18  ; aipl_concat
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:368 sig20  ; __arr_drop___m17__Doc
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:378 sig20  ; __arr_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
     fn22 = colocated u0:41 sig22  ; __m17__has_hard$tail
     fn23 = u0:21 sig23  ; aipl_rec_inc_weak
 
@@ -91919,14 +91807,14 @@ function u0:231(i64, i64, i64) apple_aarch64 {
     fn6 = colocated u0:118 sig6  ; __m18__expect
     fn7 = u0:7 sig7  ; aipl_array_dec
     fn8 = colocated u0:117 sig8  ; __m18__bump
-    fn9 = colocated u0:362 sig9  ; __rec_drop___m17__Doc
+    fn9 = colocated u0:372 sig9  ; __rec_drop___m17__Doc
     fn10 = u0:17 sig10  ; aipl_rec_alloc
     fn11 = u0:13 sig11  ; aipl_concat
     fn12 = u0:13 sig12  ; aipl_concat
     fn13 = u0:13 sig13  ; aipl_concat
     fn14 = u0:13 sig14  ; aipl_concat
-    fn15 = colocated u0:368 sig15  ; __arr_drop___m17__Doc
-    fn16 = colocated u0:369 sig16  ; __arr_retain___m17__Doc
+    fn15 = colocated u0:378 sig15  ; __arr_drop___m17__Doc
+    fn16 = colocated u0:379 sig16  ; __arr_retain___m17__Doc
     fn17 = u0:9 sig17  ; aipl_array_push
     fn18 = colocated u0:114 sig18  ; __m18__peek_text_n
     fn19 = colocated u0:117 sig19  ; __m18__bump
@@ -92505,14 +92393,14 @@ function u0:232(i64, i64, i64) apple_aarch64 {
     fn14 = colocated u0:114 sig14  ; __m18__peek_text_n
     fn15 = colocated u0:117 sig15  ; __m18__bump
     fn16 = colocated u0:126 sig16  ; __m18__trailing_comment
-    fn17 = colocated u0:362 sig17  ; __rec_drop___m17__Doc
+    fn17 = colocated u0:372 sig17  ; __rec_drop___m17__Doc
     fn18 = u0:17 sig18  ; aipl_rec_alloc
-    fn19 = colocated u0:362 sig19  ; __rec_drop___m17__Doc
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:368 sig21  ; __arr_drop___m17__Doc
+    fn19 = colocated u0:372 sig19  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:378 sig21  ; __arr_drop___m17__Doc
     fn22 = u0:8 sig22  ; aipl_array_new
-    fn23 = colocated u0:368 sig23  ; __arr_drop___m17__Doc
-    fn24 = colocated u0:369 sig24  ; __arr_retain___m17__Doc
+    fn23 = colocated u0:378 sig23  ; __arr_drop___m17__Doc
+    fn24 = colocated u0:379 sig24  ; __arr_retain___m17__Doc
     fn25 = u0:9 sig25  ; aipl_array_push
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -93671,7 +93559,7 @@ function u0:233(i64, i64) apple_aarch64 {
     fn2 = colocated u0:117 sig2  ; __m18__bump
     fn3 = u0:16 sig3  ; aipl_inc
     fn4 = u0:3 sig4  ; aipl_arr_inc
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
     fn6 = u0:17 sig6  ; aipl_rec_alloc
     fn7 = u0:20 sig7  ; aipl_rec_inc_strong
     fn8 = u0:15 sig8  ; aipl_dec
@@ -93688,11 +93576,11 @@ function u0:233(i64, i64) apple_aarch64 {
     fn19 = colocated u0:114 sig19  ; __m18__peek_text_n
     fn20 = colocated u0:234 sig20  ; __m18__qualified_case
     fn21 = colocated u0:114 sig21  ; __m18__peek_text_n
-    fn22 = colocated u0:362 sig22  ; __rec_drop___m17__Doc
+    fn22 = colocated u0:372 sig22  ; __rec_drop___m17__Doc
     fn23 = colocated u0:117 sig23  ; __m18__bump
     fn24 = colocated u0:201 sig24  ; __m18__ident_list
     fn25 = colocated u0:118 sig25  ; __m18__expect
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
     fn27 = u0:13 sig27  ; aipl_concat
     fn28 = u0:29 sig28  ; aipl_str_join
     fn29 = u0:13 sig29  ; aipl_concat
@@ -95230,13 +95118,13 @@ function u0:235(i64, i64, i64, i64) apple_aarch64 {
     fn6 = colocated u0:236 sig6  ; __m18__call_arg
     fn7 = u0:7 sig7  ; aipl_array_dec
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
-    fn9 = colocated u0:362 sig9  ; __rec_drop___m17__Doc
+    fn9 = colocated u0:372 sig9  ; __rec_drop___m17__Doc
     fn10 = u0:17 sig10  ; aipl_rec_alloc
     fn11 = u0:20 sig11  ; aipl_rec_inc_strong
-    fn12 = colocated u0:368 sig12  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:378 sig12  ; __arr_drop___m17__Doc
     fn13 = u0:8 sig13  ; aipl_array_new
-    fn14 = colocated u0:368 sig14  ; __arr_drop___m17__Doc
-    fn15 = colocated u0:369 sig15  ; __arr_retain___m17__Doc
+    fn14 = colocated u0:378 sig14  ; __arr_drop___m17__Doc
+    fn15 = colocated u0:379 sig15  ; __arr_retain___m17__Doc
     fn16 = u0:9 sig16  ; aipl_array_push
     fn17 = colocated u0:114 sig17  ; __m18__peek_text_n
     fn18 = colocated u0:117 sig18  ; __m18__bump
@@ -95787,21 +95675,21 @@ function u0:236(i64, i64) apple_aarch64 {
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:17 sig11  ; aipl_rec_alloc
-    fn12 = colocated u0:362 sig12  ; __rec_drop___m17__Doc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
+    fn12 = colocated u0:372 sig12  ; __rec_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
     fn14 = u0:8 sig14  ; aipl_array_new
     fn15 = colocated u0:136 sig15  ; __m18__peek_is_n
     fn16 = colocated u0:134 sig16  ; __m18__tok_text
     fn17 = colocated u0:117 sig17  ; __m18__bump
     fn18 = colocated u0:117 sig18  ; __m18__bump
     fn19 = colocated u0:202 sig19  ; __m18__expr
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:362 sig21  ; __rec_drop___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:372 sig21  ; __rec_drop___m17__Doc
     fn22 = u0:13 sig22  ; aipl_concat
     fn23 = u0:13 sig23  ; aipl_concat
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
     fn25 = colocated u0:114 sig25  ; __m18__peek_text_n
     fn26 = colocated u0:114 sig26  ; __m18__peek_text_n
     fn27 = colocated u0:238 sig27  ; __m18__lambda
@@ -95809,7 +95697,7 @@ function u0:236(i64, i64) apple_aarch64 {
     fn29 = colocated u0:134 sig29  ; __m18__tok_text
     fn30 = colocated u0:237 sig30  ; __m18__is_arg_end
     fn31 = colocated u0:117 sig31  ; __m18__bump
-    fn32 = colocated u0:362 sig32  ; __rec_drop___m17__Doc
+    fn32 = colocated u0:372 sig32  ; __rec_drop___m17__Doc
     fn33 = colocated u0:202 sig33  ; __m18__expr
 
 block0(v0: i64, v1: i64):
@@ -96901,22 +96789,22 @@ function u0:238(i64, i64) apple_aarch64 {
     fn13 = colocated u0:185 sig13  ; __m18__block
     fn14 = u0:18 sig14  ; aipl_rec_dec_strong
     fn15 = colocated u0:202 sig15  ; __m18__expr
-    fn16 = colocated u0:362 sig16  ; __rec_drop___m17__Doc
+    fn16 = colocated u0:372 sig16  ; __rec_drop___m17__Doc
     fn17 = u0:17 sig17  ; aipl_rec_alloc
-    fn18 = colocated u0:368 sig18  ; __arr_drop___m17__Doc
+    fn18 = colocated u0:378 sig18  ; __arr_drop___m17__Doc
     fn19 = u0:1 sig19  ; aipl_arr_elem_ptr
-    fn20 = colocated u0:362 sig20  ; __rec_drop___m17__Doc
-    fn21 = colocated u0:368 sig21  ; __arr_drop___m17__Doc
-    fn22 = colocated u0:369 sig22  ; __arr_retain___m17__Doc
+    fn20 = colocated u0:372 sig20  ; __rec_drop___m17__Doc
+    fn21 = colocated u0:378 sig21  ; __arr_drop___m17__Doc
+    fn22 = colocated u0:379 sig22  ; __arr_retain___m17__Doc
     fn23 = u0:9 sig23  ; aipl_array_push
-    fn24 = colocated u0:368 sig24  ; __arr_drop___m17__Doc
-    fn25 = colocated u0:369 sig25  ; __arr_retain___m17__Doc
-    fn26 = colocated u0:362 sig26  ; __rec_drop___m17__Doc
-    fn27 = colocated u0:368 sig27  ; __arr_drop___m17__Doc
-    fn28 = colocated u0:369 sig28  ; __arr_retain___m17__Doc
-    fn29 = colocated u0:368 sig29  ; __arr_drop___m17__Doc
-    fn30 = colocated u0:369 sig30  ; __arr_retain___m17__Doc
-    fn31 = colocated u0:362 sig31  ; __rec_drop___m17__Doc
+    fn24 = colocated u0:378 sig24  ; __arr_drop___m17__Doc
+    fn25 = colocated u0:379 sig25  ; __arr_retain___m17__Doc
+    fn26 = colocated u0:372 sig26  ; __rec_drop___m17__Doc
+    fn27 = colocated u0:378 sig27  ; __arr_drop___m17__Doc
+    fn28 = colocated u0:379 sig28  ; __arr_retain___m17__Doc
+    fn29 = colocated u0:378 sig29  ; __arr_drop___m17__Doc
+    fn30 = colocated u0:379 sig30  ; __arr_retain___m17__Doc
+    fn31 = colocated u0:372 sig31  ; __rec_drop___m17__Doc
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0
@@ -98106,7 +97994,7 @@ block67:
 ;   v285 = $inl287_self
 ;   v293 = body
 ;   ss8 = d
-;   ss9 = __idx$74856
+;   ss9 = __idx$74735
 ;   v491 = p
 ;   v493 = i
 ; __m18__lambda_params
@@ -98150,10 +98038,10 @@ function u0:239(i64, i64, i64) apple_aarch64 {
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = u0:20 sig10  ; aipl_rec_inc_strong
-    fn11 = colocated u0:362 sig11  ; __rec_drop___m17__Doc
+    fn11 = colocated u0:372 sig11  ; __rec_drop___m17__Doc
     fn12 = u0:17 sig12  ; aipl_rec_alloc
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
-    fn14 = colocated u0:369 sig14  ; __arr_retain___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
+    fn14 = colocated u0:379 sig14  ; __arr_retain___m17__Doc
     fn15 = u0:9 sig15  ; aipl_array_push
     fn16 = colocated u0:114 sig16  ; __m18__peek_text_n
     fn17 = colocated u0:117 sig17  ; __m18__bump
@@ -98768,12 +98656,12 @@ function u0:240(i64, i64, i64) apple_aarch64 {
     fn5 = u0:15 sig5  ; aipl_dec
     fn6 = u0:7 sig6  ; aipl_array_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = colocated u0:362 sig8  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:372 sig8  ; __rec_drop___m17__Doc
     fn9 = u0:17 sig9  ; aipl_rec_alloc
-    fn10 = colocated u0:362 sig10  ; __rec_drop___m17__Doc
+    fn10 = colocated u0:372 sig10  ; __rec_drop___m17__Doc
     fn11 = u0:13 sig11  ; aipl_concat
     fn12 = u0:13 sig12  ; aipl_concat
-    fn13 = colocated u0:368 sig13  ; __arr_drop___m17__Doc
+    fn13 = colocated u0:378 sig13  ; __arr_drop___m17__Doc
     fn14 = u0:8 sig14  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64):
@@ -99351,7 +99239,7 @@ function u0:242(i64, i64, i64, i64) apple_aarch64 {
     fn3 = colocated u0:113 sig3  ; __m18__peek
     fn4 = colocated u0:138 sig4  ; __m18__advance
     fn5 = colocated u0:243 sig5  ; __m18__drop_comments_before
-    fn6 = colocated u0:362 sig6  ; __rec_drop___m17__Doc
+    fn6 = colocated u0:372 sig6  ; __rec_drop___m17__Doc
     fn7 = u0:17 sig7  ; aipl_rec_alloc
     fn8 = u0:32 sig8  ; aipl_str_slice
     fn9 = u0:20 sig9  ; aipl_rec_inc_strong
@@ -100178,10 +100066,12 @@ function u0:246(i64, i64) -> i64 apple_aarch64 {
     ss1 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64, i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
-    fn2 = u0:7 sig2  ; aipl_array_dec
+    fn2 = colocated u0:346 sig2  ; __builtin_is_some_and$__builtin_Span$lam96
+    fn3 = u0:7 sig3  ; aipl_array_dec
 
 block0(v0: i64, v1: i64):
     v2 = load.i64 notrap aligned v0+16
@@ -100243,30 +100133,14 @@ block2:
     jump block3
 
 block3:
-    v37 = load.i64 notrap aligned v11
-    brif v37, block9, block8
-
-block8:
-    v38 = iconst.i64 0
-    jump block7(v38)  ; v38 = 0
-
-block9:
-    v39 = iconst.i64 8
-    v40 = iadd.i64 v11, v39  ; v39 = 8
-    v41 = load.i64 notrap aligned v40
-    v42 = icmp ult v41, v1
-    v43 = uextend.i64 v42
-    jump block7(v43)
-
-block7(v36: i64):
-    call fn2(v2)
+    v36 = call fn2(v11, v1)
+    call fn3(v2)
     return v36
 }
 
 ; source variables:
 ;   v0 = self
 ;   v1 = end
-;   v40 = c
 ; __m18__hugs_sole_arg
 function u0:247(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -100290,7 +100164,7 @@ function u0:247(i64) -> i64 apple_aarch64 {
     fn6 = colocated u0:134 sig6  ; __m18__tok_text
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = colocated u0:248 sig8  ; __m18__hug_close
-    fn9 = colocated u0:249 sig9  ; __m18__hug_fills_call
+    fn9 = colocated u0:348 sig9  ; __builtin_is_some_and$u64$lam100
 
 block0(v0: i64):
     v1 = call fn0(v0)
@@ -100379,19 +100253,7 @@ block10:
 block11(v42: i64):
     v47 = stack_addr.i64 ss1
     call fn8(v47, v0, v42)
-    v49 = load.i64 notrap aligned v47
-    brif v49, block14, block13
-
-block13:
-    v50 = iconst.i64 0
-    jump block12(v50)  ; v50 = 0
-
-block14:
-    v51 = load.i64 notrap aligned v47+8
-    v52 = call fn9(v0, v42, v51)
-    jump block12(v52)
-
-block12(v48: i64):
+    v48 = call fn9(v47, v0, v42)
     call fn7(v8)
     call fn7(v21)
     call fn7(v27)
@@ -100411,7 +100273,6 @@ block12(v48: i64):
 ;   v24 = $inl193_n
 ;   v31 = indirect
 ;   v42 = open_at
-;   v51 = close
 ; __m18__hug_close
 function u0:248(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -100649,15 +100510,15 @@ function u0:250(i64, i64) -> i64 apple_aarch64 {
     sig8 = (i64, i64) apple_aarch64
     sig9 = (i64) apple_aarch64
     sig10 = (i64, i64) -> i64 apple_aarch64
-    fn0 = colocated u0:362 sig0  ; __rec_drop___m17__Doc
+    fn0 = colocated u0:372 sig0  ; __rec_drop___m17__Doc
     fn1 = u0:17 sig1  ; aipl_rec_alloc
-    fn2 = colocated u0:362 sig2  ; __rec_drop___m17__Doc
+    fn2 = colocated u0:372 sig2  ; __rec_drop___m17__Doc
     fn3 = u0:1 sig3  ; aipl_arr_elem_ptr
     fn4 = u0:20 sig4  ; aipl_rec_inc_strong
-    fn5 = colocated u0:362 sig5  ; __rec_drop___m17__Doc
+    fn5 = colocated u0:372 sig5  ; __rec_drop___m17__Doc
     fn6 = u0:8 sig6  ; aipl_array_new
-    fn7 = colocated u0:362 sig7  ; __rec_drop___m17__Doc
-    fn8 = colocated u0:368 sig8  ; __arr_drop___m17__Doc
+    fn7 = colocated u0:372 sig7  ; __rec_drop___m17__Doc
+    fn8 = colocated u0:378 sig8  ; __arr_drop___m17__Doc
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
     fn10 = colocated u0:129 sig10  ; __m18__comma_list_docs
 
@@ -100869,7 +100730,7 @@ function u0:251(i64) -> i64 apple_aarch64 {
     fn1 = u0:30 sig1  ; aipl_str_len
     fn2 = u0:16 sig2  ; aipl_inc
     fn3 = u0:12 sig3  ; aipl_char_at
-    fn4 = colocated u0:366 sig4  ; __eq_char$opt
+    fn4 = colocated u0:376 sig4  ; __eq_char$opt
     fn5 = u0:10 sig5  ; aipl_array_push_mut
     fn6 = u0:3 sig6  ; aipl_arr_inc
     fn7 = u0:7 sig7  ; aipl_array_dec
@@ -101376,7 +101237,7 @@ function u0:259(i64) -> i64 tail {
     sig1 = (i64) -> i64 tail
     sig2 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
-    fn1 = colocated u0:343 sig1  ; __m6__trim_end_while$lam89$tail
+    fn1 = colocated u0:351 sig1  ; __m6__trim_end_while$lam102$tail
     fn2 = u0:15 sig2  ; aipl_dec
 
 block0(v0: i64):
@@ -101784,7 +101645,7 @@ function u0:266(i64) -> i64 tail {
     sig1 = (i64) -> i64 tail
     sig2 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
-    fn1 = colocated u0:346 sig1  ; __builtin_count_while$char$s0$lam91$tail
+    fn1 = colocated u0:354 sig1  ; __builtin_count_while$char$s0$lam104$tail
     fn2 = u0:15 sig2  ; aipl_dec
 
 block0(v0: i64):
@@ -102199,7 +102060,7 @@ function u0:272(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
     sig3 = (i64) apple_aarch64
-    fn0 = colocated u0:363 sig0  ; __rec_drop___m17__Work
+    fn0 = colocated u0:373 sig0  ; __rec_drop___m17__Work
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
     fn3 = u0:21 sig3  ; aipl_rec_inc_weak
@@ -102408,7 +102269,7 @@ function u0:274(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
     sig3 = (i64) apple_aarch64
-    fn0 = colocated u0:363 sig0  ; __rec_drop___m17__Work
+    fn0 = colocated u0:373 sig0  ; __rec_drop___m17__Work
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
     fn3 = u0:21 sig3  ; aipl_rec_inc_weak
@@ -102617,7 +102478,7 @@ function u0:276(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
     sig3 = (i64) apple_aarch64
-    fn0 = colocated u0:363 sig0  ; __rec_drop___m17__Work
+    fn0 = colocated u0:373 sig0  ; __rec_drop___m17__Work
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:20 sig2  ; aipl_rec_inc_strong
     fn3 = u0:21 sig3  ; aipl_rec_inc_weak
@@ -103417,8 +103278,8 @@ function u0:288(i64, i64) apple_aarch64 {
     fn2 = u0:30 sig2  ; aipl_str_len
     fn3 = u0:32 sig3  ; aipl_str_slice
     fn4 = u0:15 sig4  ; aipl_dec
-    fn5 = colocated u0:348 sig5  ; __builtin_trim_while$s0$lam93
-    fn6 = colocated u0:350 sig6  ; __builtin_opt_left_fold$char$i64$s0$lam95
+    fn5 = colocated u0:356 sig5  ; __builtin_trim_while$s0$lam106
+    fn6 = colocated u0:358 sig6  ; __builtin_opt_left_fold$char$i64$s0$lam108
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 0x2d05
@@ -103924,16 +103785,16 @@ function u0:298(i64, i64, i64) apple_aarch64 {
     fn0 = u0:8 sig0  ; aipl_array_new
     fn1 = u0:3 sig1  ; aipl_arr_inc
     fn2 = u0:30 sig2  ; aipl_str_len
-    fn3 = colocated u0:351 sig3  ; __m12__lex_step$__m13__AiplTok
+    fn3 = colocated u0:359 sig3  ; __m12__lex_step$__m13__AiplTok
     fn4 = u0:16 sig4  ; aipl_inc
     fn5 = u0:7 sig5  ; aipl_array_dec
     fn6 = u0:15 sig6  ; aipl_dec
     fn7 = u0:1 sig7  ; aipl_arr_elem_ptr
-    fn8 = colocated u0:379 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn9 = colocated u0:380 sig9  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn8 = colocated u0:388 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn9 = colocated u0:389 sig9  ; __arr_retain___m12__Token$__m13__AiplTok
     fn10 = u0:9 sig10  ; aipl_array_push
-    fn11 = colocated u0:379 sig11  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn12 = colocated u0:380 sig12  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn11 = colocated u0:388 sig11  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn12 = colocated u0:389 sig12  ; __arr_retain___m12__Token$__m13__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = iconst.i64 0
@@ -107405,8 +107266,161 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-; __lambda_75
+; __lambda_73
 function u0:327(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:390 sig0  ; __eq___m18__FmtKind
+
+block0(v0: i64, v1: i64):
+    v2 = iconst.i64 0
+    v3 = iadd v0, v2  ; v2 = 0
+    v4 = call fn0(v3, v1)
+    return v4
+}
+
+; source variables:
+;   v0 = t
+;   v1 = k
+; __builtin_is_some_and$__m18__FmtTok$lam75
+function u0:328(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:327 sig0  ; __lambda_73
+
+block0(v0: i64, v1: i64):
+    v3 = load.i64 notrap aligned v0
+    brif v3, block2, block3
+
+block2:
+    v4 = iconst.i64 8
+    v5 = iadd.i64 v0, v4  ; v4 = 8
+    v6 = call fn0(v5, v1)
+    jump block1(v6)
+
+block3:
+    v7 = iconst.i64 0
+    jump block1(v7)  ; v7 = 0
+
+block1(v2: i64):
+    return v2
+}
+
+; source variables:
+;   v0 = self
+;   v1 = $cap74
+;   v5 = x
+; __lambda_76
+function u0:329(i64, i64) -> i64 apple_aarch64 {
+    ss0 = explicit_slot 32, align = 8
+    ss1 = explicit_slot 8, align = 8
+    sig0 = (i64) apple_aarch64
+    sig1 = (i64, i64, i64) -> i64 apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64) apple_aarch64
+    fn0 = u0:3 sig0  ; aipl_arr_inc
+    fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
+    fn2 = colocated u0:361 sig2  ; __builtin_is_some_and$__m18__FmtTok$lam111
+    fn3 = u0:7 sig3  ; aipl_array_dec
+
+block0(v0: i64, v1: i64):
+    v2 = load.i64 notrap aligned v1+8
+    call fn0(v2)
+    v3 = load.i64 notrap aligned v1+24
+    v4 = iconst.i64 -4
+    v5 = band v2, v4  ; v4 = -4
+    v6 = load.i64 notrap aligned v5
+    v7 = iconst.i64 0
+    v8 = icmp sge v3, v7  ; v7 = 0
+    v9 = icmp slt v3, v6
+    v10 = band v8, v9
+    v11 = stack_addr.i64 ss0
+    brif v10, block1, block2
+
+block1:
+    v12 = iconst.i64 3
+    v13 = band.i64 v2, v12  ; v12 = 3
+    v14 = iconst.i64 0
+    v15 = icmp eq v13, v14  ; v14 = 0
+    brif v15, block4, block5
+
+block4:
+    v16 = iconst.i64 -4
+    v17 = band.i64 v2, v16  ; v16 = -4
+    v18 = iconst.i64 24
+    v19 = iadd v17, v18  ; v18 = 24
+    v20 = iconst.i64 24
+    v21 = imul.i64 v3, v20  ; v20 = 24
+    v22 = iadd v19, v21
+    v23 = stack_addr.i64 ss1
+    store notrap v22, v23
+    jump block6
+
+block5:
+    v24 = iconst.i64 24
+    v25 = call fn1(v2, v3, v24)  ; v24 = 24
+    v26 = stack_addr.i64 ss1
+    store notrap v25, v26
+    jump block6
+
+block6:
+    v27 = stack_addr.i64 ss1
+    v28 = load.i64 notrap v27
+    v29 = iconst.i64 1
+    store notrap aligned v29, v11  ; v29 = 1
+    v30 = iconst.i64 8
+    v31 = iadd.i64 v11, v30  ; v30 = 8
+    v32 = load.i64 notrap aligned v28
+    store notrap aligned v32, v31
+    v33 = load.i64 notrap aligned v28+8
+    store notrap aligned v33, v31+8
+    v34 = load.i64 notrap aligned v28+16
+    store notrap aligned v34, v31+16
+    jump block3
+
+block2:
+    v35 = iconst.i64 0
+    v36 = stack_addr.i64 ss0
+    store notrap v35, v36  ; v35 = 0
+    jump block3
+
+block3:
+    v37 = call fn2(v11, v0)
+    call fn3(v2)
+    return v37
+}
+
+; source variables:
+;   v0 = c
+;   v1 = self
+;   v1 = $inl169_self
+; __builtin_is_some_and$__builtin_Span$lam78
+function u0:330(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:329 sig0  ; __lambda_76
+
+block0(v0: i64, v1: i64):
+    v3 = load.i64 notrap aligned v0
+    brif v3, block2, block3
+
+block2:
+    v4 = iconst.i64 8
+    v5 = iadd.i64 v0, v4  ; v4 = 8
+    v6 = call fn0(v5, v1)
+    jump block1(v6)
+
+block3:
+    v7 = iconst.i64 0
+    jump block1(v7)  ; v7 = 0
+
+block1(v2: i64):
+    return v2
+}
+
+; source variables:
+;   v0 = self
+;   v1 = $cap77
+;   v5 = x
+; __lambda_81
+function u0:331(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
@@ -107428,8 +107442,8 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = a
 ;   v1 = b
-; __builtin_sort_by$__m18__ImportName$lam76
-function u0:328(i64) -> i64 apple_aarch64 {
+; __builtin_sort_by$__m18__ImportName$lam82
+function u0:332(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -107465,24 +107479,24 @@ function u0:328(i64) -> i64 apple_aarch64 {
     fn1 = u0:3 sig1  ; aipl_arr_inc
     fn2 = u0:1 sig2  ; aipl_arr_elem_ptr
     fn3 = u0:16 sig3  ; aipl_inc
-    fn4 = colocated u0:327 sig4  ; __lambda_75
+    fn4 = colocated u0:331 sig4  ; __lambda_81
     fn5 = u0:15 sig5  ; aipl_dec
-    fn6 = colocated u0:371 sig6  ; __arr_drop___m18__ImportName
-    fn7 = colocated u0:372 sig7  ; __arr_retain___m18__ImportName
+    fn6 = colocated u0:380 sig6  ; __arr_drop___m18__ImportName
+    fn7 = colocated u0:381 sig7  ; __arr_retain___m18__ImportName
     fn8 = u0:6 sig8  ; aipl_arr_slice
-    fn9 = colocated u0:371 sig9  ; __arr_drop___m18__ImportName
-    fn10 = colocated u0:372 sig10  ; __arr_retain___m18__ImportName
-    fn11 = colocated u0:371 sig11  ; __arr_drop___m18__ImportName
-    fn12 = colocated u0:372 sig12  ; __arr_retain___m18__ImportName
+    fn9 = colocated u0:380 sig9  ; __arr_drop___m18__ImportName
+    fn10 = colocated u0:381 sig10  ; __arr_retain___m18__ImportName
+    fn11 = colocated u0:380 sig11  ; __arr_drop___m18__ImportName
+    fn12 = colocated u0:381 sig12  ; __arr_retain___m18__ImportName
     fn13 = u0:4 sig13  ; aipl_arr_reserve
-    fn14 = colocated u0:371 sig14  ; __arr_drop___m18__ImportName
-    fn15 = colocated u0:372 sig15  ; __arr_retain___m18__ImportName
+    fn14 = colocated u0:380 sig14  ; __arr_drop___m18__ImportName
+    fn15 = colocated u0:381 sig15  ; __arr_retain___m18__ImportName
     fn16 = u0:10 sig16  ; aipl_array_push_mut
     fn17 = u0:7 sig17  ; aipl_array_dec
-    fn18 = colocated u0:371 sig18  ; __arr_drop___m18__ImportName
-    fn19 = colocated u0:372 sig19  ; __arr_retain___m18__ImportName
-    fn20 = colocated u0:371 sig20  ; __arr_drop___m18__ImportName
-    fn21 = colocated u0:372 sig21  ; __arr_retain___m18__ImportName
+    fn18 = colocated u0:380 sig18  ; __arr_drop___m18__ImportName
+    fn19 = colocated u0:381 sig19  ; __arr_retain___m18__ImportName
+    fn20 = colocated u0:380 sig20  ; __arr_drop___m18__ImportName
+    fn21 = colocated u0:381 sig21  ; __arr_retain___m18__ImportName
     fn22 = u0:2 sig22  ; aipl_arr_extend
 
 block0(v0: i64):
@@ -107817,12 +107831,12 @@ block3:
 ;   v99 = y
 ;   v96 = step
 ;   ss7 = __spread$0
-; __lambda_77
-function u0:329(i64) -> i64 apple_aarch64 {
+; __lambda_83
+function u0:333(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
-    fn0 = colocated u0:362 sig0  ; __rec_drop___m17__Doc
+    fn0 = colocated u0:372 sig0  ; __rec_drop___m17__Doc
     fn1 = u0:17 sig1  ; aipl_rec_alloc
     fn2 = u0:16 sig2  ; aipl_inc
 
@@ -107842,8 +107856,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = n
-; __map78$tail
-function u0:331(i64) -> i64 tail {
+; __map84$tail
+function u0:335(i64) -> i64 tail {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -107862,9 +107876,9 @@ function u0:331(i64) -> i64 tail {
     fn0 = u0:11 sig0  ; aipl_array_with_cap
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:16 sig2  ; aipl_inc
-    fn3 = colocated u0:329 sig3  ; __lambda_77
-    fn4 = colocated u0:368 sig4  ; __arr_drop___m17__Doc
-    fn5 = colocated u0:369 sig5  ; __arr_retain___m17__Doc
+    fn3 = colocated u0:333 sig3  ; __lambda_83
+    fn4 = colocated u0:378 sig4  ; __arr_drop___m17__Doc
+    fn5 = colocated u0:379 sig5  ; __arr_retain___m17__Doc
     fn6 = u0:10 sig6  ; aipl_array_push_mut
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = u0:18 sig8  ; aipl_rec_dec_strong
@@ -107968,18 +107982,18 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-; __map78
-function u0:330(i64) -> i64 apple_aarch64 {
+; __map84
+function u0:334(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
-    fn0 = colocated u0:331 sig0  ; __map78$tail
+    fn0 = colocated u0:335 sig0  ; __map84$tail
 
 block0(v0: i64):
     v1 = call fn0(v0)
     return v1
 }
 
-; __lambda_79
-function u0:332(i64, i64) -> i64 apple_aarch64 {
+; __lambda_85
+function u0:336(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     sig2 = (i64) apple_aarch64
@@ -108001,8 +108015,8 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = a
 ;   v1 = b
-; __builtin_sort_by$__m18__ImportEntry$lam80
-function u0:333(i64) -> i64 apple_aarch64 {
+; __builtin_sort_by$__m18__ImportEntry$lam86
+function u0:337(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -108041,25 +108055,25 @@ function u0:333(i64) -> i64 apple_aarch64 {
     fn2 = u0:1 sig2  ; aipl_arr_elem_ptr
     fn3 = u0:16 sig3  ; aipl_inc
     fn4 = u0:20 sig4  ; aipl_rec_inc_strong
-    fn5 = colocated u0:332 sig5  ; __lambda_79
+    fn5 = colocated u0:336 sig5  ; __lambda_85
     fn6 = u0:15 sig6  ; aipl_dec
     fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = colocated u0:375 sig8  ; __arr_drop___m18__ImportEntry
-    fn9 = colocated u0:376 sig9  ; __arr_retain___m18__ImportEntry
+    fn8 = colocated u0:384 sig8  ; __arr_drop___m18__ImportEntry
+    fn9 = colocated u0:385 sig9  ; __arr_retain___m18__ImportEntry
     fn10 = u0:6 sig10  ; aipl_arr_slice
-    fn11 = colocated u0:375 sig11  ; __arr_drop___m18__ImportEntry
-    fn12 = colocated u0:376 sig12  ; __arr_retain___m18__ImportEntry
-    fn13 = colocated u0:375 sig13  ; __arr_drop___m18__ImportEntry
-    fn14 = colocated u0:376 sig14  ; __arr_retain___m18__ImportEntry
+    fn11 = colocated u0:384 sig11  ; __arr_drop___m18__ImportEntry
+    fn12 = colocated u0:385 sig12  ; __arr_retain___m18__ImportEntry
+    fn13 = colocated u0:384 sig13  ; __arr_drop___m18__ImportEntry
+    fn14 = colocated u0:385 sig14  ; __arr_retain___m18__ImportEntry
     fn15 = u0:4 sig15  ; aipl_arr_reserve
-    fn16 = colocated u0:375 sig16  ; __arr_drop___m18__ImportEntry
-    fn17 = colocated u0:376 sig17  ; __arr_retain___m18__ImportEntry
+    fn16 = colocated u0:384 sig16  ; __arr_drop___m18__ImportEntry
+    fn17 = colocated u0:385 sig17  ; __arr_retain___m18__ImportEntry
     fn18 = u0:10 sig18  ; aipl_array_push_mut
     fn19 = u0:7 sig19  ; aipl_array_dec
-    fn20 = colocated u0:375 sig20  ; __arr_drop___m18__ImportEntry
-    fn21 = colocated u0:376 sig21  ; __arr_retain___m18__ImportEntry
-    fn22 = colocated u0:375 sig22  ; __arr_drop___m18__ImportEntry
-    fn23 = colocated u0:376 sig23  ; __arr_retain___m18__ImportEntry
+    fn20 = colocated u0:384 sig20  ; __arr_drop___m18__ImportEntry
+    fn21 = colocated u0:385 sig21  ; __arr_retain___m18__ImportEntry
+    fn22 = colocated u0:384 sig22  ; __arr_drop___m18__ImportEntry
+    fn23 = colocated u0:385 sig23  ; __arr_retain___m18__ImportEntry
     fn24 = u0:2 sig24  ; aipl_arr_extend
 
 block0(v0: i64):
@@ -108394,8 +108408,8 @@ block3:
 ;   v99 = y
 ;   v96 = step
 ;   ss7 = __spread$0
-; __lambda_81
-function u0:334(i64) -> i64 apple_aarch64 {
+; __lambda_87
+function u0:338(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     fn0 = u0:20 sig0  ; aipl_rec_inc_strong
 
@@ -108407,8 +108421,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = e
-; __map82$tail
-function u0:336(i64) -> i64 tail {
+; __map88$tail
+function u0:340(i64) -> i64 tail {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -108429,9 +108443,9 @@ function u0:336(i64) -> i64 tail {
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:16 sig2  ; aipl_inc
     fn3 = u0:20 sig3  ; aipl_rec_inc_strong
-    fn4 = colocated u0:334 sig4  ; __lambda_81
-    fn5 = colocated u0:368 sig5  ; __arr_drop___m17__Doc
-    fn6 = colocated u0:369 sig6  ; __arr_retain___m17__Doc
+    fn4 = colocated u0:338 sig4  ; __lambda_87
+    fn5 = colocated u0:378 sig5  ; __arr_drop___m17__Doc
+    fn6 = colocated u0:379 sig6  ; __arr_retain___m17__Doc
     fn7 = u0:10 sig7  ; aipl_array_push_mut
     fn8 = u0:15 sig8  ; aipl_dec
     fn9 = u0:18 sig9  ; aipl_rec_dec_strong
@@ -108535,282 +108549,362 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-; __map82
-function u0:335(i64) -> i64 apple_aarch64 {
+; __map88
+function u0:339(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
-    fn0 = colocated u0:336 sig0  ; __map82$tail
+    fn0 = colocated u0:340 sig0  ; __map88$tail
 
 block0(v0: i64):
     v1 = call fn0(v0)
     return v1
 }
 
-; __lambda_84
-function u0:337(i64) -> i64 apple_aarch64 {
-    sig0 = (i64) apple_aarch64
-    fn0 = u0:20 sig0  ; aipl_rec_inc_strong
-
-block0(v0: i64):
-    v1 = load.i64 notrap aligned v0+8
-    call fn0(v1)
-    return v1
-}
-
-; source variables:
-;   v0 = s
-; __map85
-function u0:338(i64) -> i64 apple_aarch64 {
-    ss0 = explicit_slot 8, align = 8
-    ss1 = explicit_slot 8, align = 8
-    ss2 = explicit_slot 8, align = 8
-    ss3 = explicit_slot 8, align = 8
-    sig0 = (i64, i64, i64) -> i64 apple_aarch64
-    sig1 = (i64, i64, i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    sig3 = (i64) -> i64 apple_aarch64
-    sig4 = (i64, i64) apple_aarch64
-    sig5 = (i64, i64) apple_aarch64
-    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
-    sig7 = (i64) apple_aarch64
-    sig8 = (i64) apple_aarch64
-    sig9 = (i64) apple_aarch64
-    fn0 = u0:11 sig0  ; aipl_array_with_cap
-    fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
-    fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:337 sig3  ; __lambda_84
-    fn4 = colocated u0:368 sig4  ; __arr_drop___m17__Doc
-    fn5 = colocated u0:369 sig5  ; __arr_retain___m17__Doc
-    fn6 = u0:10 sig6  ; aipl_array_push_mut
-    fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = u0:3 sig8  ; aipl_arr_inc
-    fn9 = u0:7 sig9  ; aipl_array_dec
-
-block0(v0: i64):
-    v1 = iconst.i64 -4
-    v2 = band v0, v1  ; v1 = -4
-    v3 = load.i64 notrap aligned v2
-    v4 = iconst.i64 0
-    v5 = iconst.i64 8
-    v6 = call fn0(v3, v4, v5)  ; v4 = 0, v5 = 8
-    v7 = stack_addr.i64 ss0
-    store notrap v6, v7
-    v8 = iconst.i64 0
-    v9 = stack_addr.i64 ss1
-    store notrap v8, v9  ; v8 = 0
-    jump block1
-
-block1:
-    v10 = stack_addr.i64 ss1
-    v11 = load.i64 notrap v10
-    v12 = iconst.i64 -4
-    v13 = band.i64 v0, v12  ; v12 = -4
-    v14 = load.i64 notrap aligned v13
-    v15 = icmp slt v11, v14
-    brif v15, block2, block3
-
-block2:
-    v16 = iconst.i64 3
-    v17 = band.i64 v0, v16  ; v16 = 3
-    v18 = iconst.i64 0
-    v19 = icmp eq v17, v18  ; v18 = 0
-    brif v19, block4, block5
-
-block4:
-    v20 = iconst.i64 -4
-    v21 = band.i64 v0, v20  ; v20 = -4
-    v22 = iconst.i64 24
-    v23 = iadd v21, v22  ; v22 = 24
-    v24 = iconst.i64 16
-    v25 = imul.i64 v11, v24  ; v24 = 16
-    v26 = iadd v23, v25
-    v27 = stack_addr.i64 ss2
-    store notrap v26, v27
-    jump block6
-
-block5:
-    v28 = iconst.i64 16
-    v29 = call fn1(v0, v11, v28)  ; v28 = 16
-    v30 = stack_addr.i64 ss2
-    store notrap v29, v30
-    jump block6
-
-block6:
-    v31 = stack_addr.i64 ss2
-    v32 = load.i64 notrap v31
-    v33 = load.i64 notrap aligned v32+8
-    call fn2(v33)
-    v34 = stack_addr.i64 ss0
-    v35 = load.i64 notrap v34
-    v36 = call fn3(v32)
-    v37 = func_addr.i64 fn4
-    v38 = func_addr.i64 fn5
-    v39 = iconst.i64 8
-    v40 = stack_addr.i64 ss3
-    store notrap v36, v40
-    v41 = stack_addr.i64 ss3
-    v42 = call fn6(v35, v41, v37, v38, v39)  ; v39 = 8
-    v43 = stack_addr.i64 ss0
-    store notrap v42, v43
-    v44 = iconst.i64 0
-    v45 = iconst.i64 0
-    v46 = load.i64 notrap aligned v32+8
-    call fn7(v46)
-    call fn7(v36)
-    v47 = iconst.i64 1
-    v48 = iadd.i64 v11, v47  ; v47 = 1
-    v49 = stack_addr.i64 ss1
-    store notrap v48, v49
-    jump block1
-
-block3:
-    v50 = iconst.i64 0
-    v51 = stack_addr.i64 ss0
-    v52 = load.i64 notrap v51
-    call fn8(v52)
-    v53 = stack_addr.i64 ss0
-    v54 = load.i64 notrap v53
-    call fn9(v54)
-    return v52
-}
-
-; source variables:
-;   v0 = $arr
-;   ss0 = $out
-;   v32 = $e
-; __lambda_86
-function u0:339(i64) -> i64 apple_aarch64 {
-    sig0 = (i64) apple_aarch64
-    fn0 = u0:20 sig0  ; aipl_rec_inc_strong
-
-block0(v0: i64):
-    v1 = load.i64 notrap aligned v0+8
-    call fn0(v1)
-    return v1
-}
-
-; source variables:
-;   v0 = s
-; __map87
-function u0:340(i64) -> i64 apple_aarch64 {
-    ss0 = explicit_slot 8, align = 8
-    ss1 = explicit_slot 8, align = 8
-    ss2 = explicit_slot 8, align = 8
-    ss3 = explicit_slot 8, align = 8
-    sig0 = (i64, i64, i64) -> i64 apple_aarch64
-    sig1 = (i64, i64, i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    sig3 = (i64) -> i64 apple_aarch64
-    sig4 = (i64, i64) apple_aarch64
-    sig5 = (i64, i64) apple_aarch64
-    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
-    sig7 = (i64) apple_aarch64
-    sig8 = (i64) apple_aarch64
-    sig9 = (i64) apple_aarch64
-    fn0 = u0:11 sig0  ; aipl_array_with_cap
-    fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
-    fn2 = u0:20 sig2  ; aipl_rec_inc_strong
-    fn3 = colocated u0:339 sig3  ; __lambda_86
-    fn4 = colocated u0:368 sig4  ; __arr_drop___m17__Doc
-    fn5 = colocated u0:369 sig5  ; __arr_retain___m17__Doc
-    fn6 = u0:10 sig6  ; aipl_array_push_mut
-    fn7 = u0:18 sig7  ; aipl_rec_dec_strong
-    fn8 = u0:3 sig8  ; aipl_arr_inc
-    fn9 = u0:7 sig9  ; aipl_array_dec
-
-block0(v0: i64):
-    v1 = iconst.i64 -4
-    v2 = band v0, v1  ; v1 = -4
-    v3 = load.i64 notrap aligned v2
-    v4 = iconst.i64 0
-    v5 = iconst.i64 8
-    v6 = call fn0(v3, v4, v5)  ; v4 = 0, v5 = 8
-    v7 = stack_addr.i64 ss0
-    store notrap v6, v7
-    v8 = iconst.i64 0
-    v9 = stack_addr.i64 ss1
-    store notrap v8, v9  ; v8 = 0
-    jump block1
-
-block1:
-    v10 = stack_addr.i64 ss1
-    v11 = load.i64 notrap v10
-    v12 = iconst.i64 -4
-    v13 = band.i64 v0, v12  ; v12 = -4
-    v14 = load.i64 notrap aligned v13
-    v15 = icmp slt v11, v14
-    brif v15, block2, block3
-
-block2:
-    v16 = iconst.i64 3
-    v17 = band.i64 v0, v16  ; v16 = 3
-    v18 = iconst.i64 0
-    v19 = icmp eq v17, v18  ; v18 = 0
-    brif v19, block4, block5
-
-block4:
-    v20 = iconst.i64 -4
-    v21 = band.i64 v0, v20  ; v20 = -4
-    v22 = iconst.i64 24
-    v23 = iadd v21, v22  ; v22 = 24
-    v24 = iconst.i64 16
-    v25 = imul.i64 v11, v24  ; v24 = 16
-    v26 = iadd v23, v25
-    v27 = stack_addr.i64 ss2
-    store notrap v26, v27
-    jump block6
-
-block5:
-    v28 = iconst.i64 16
-    v29 = call fn1(v0, v11, v28)  ; v28 = 16
-    v30 = stack_addr.i64 ss2
-    store notrap v29, v30
-    jump block6
-
-block6:
-    v31 = stack_addr.i64 ss2
-    v32 = load.i64 notrap v31
-    v33 = load.i64 notrap aligned v32+8
-    call fn2(v33)
-    v34 = stack_addr.i64 ss0
-    v35 = load.i64 notrap v34
-    v36 = call fn3(v32)
-    v37 = func_addr.i64 fn4
-    v38 = func_addr.i64 fn5
-    v39 = iconst.i64 8
-    v40 = stack_addr.i64 ss3
-    store notrap v36, v40
-    v41 = stack_addr.i64 ss3
-    v42 = call fn6(v35, v41, v37, v38, v39)  ; v39 = 8
-    v43 = stack_addr.i64 ss0
-    store notrap v42, v43
-    v44 = iconst.i64 0
-    v45 = iconst.i64 0
-    v46 = load.i64 notrap aligned v32+8
-    call fn7(v46)
-    call fn7(v36)
-    v47 = iconst.i64 1
-    v48 = iadd.i64 v11, v47  ; v47 = 1
-    v49 = stack_addr.i64 ss1
-    store notrap v48, v49
-    jump block1
-
-block3:
-    v50 = iconst.i64 0
-    v51 = stack_addr.i64 ss0
-    v52 = load.i64 notrap v51
-    call fn8(v52)
-    v53 = stack_addr.i64 ss0
-    v54 = load.i64 notrap v53
-    call fn9(v54)
-    return v52
-}
-
-; source variables:
-;   v0 = $arr
-;   ss0 = $out
-;   v32 = $e
-; __lambda_88
+; __lambda_90
 function u0:341(i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    fn0 = u0:20 sig0  ; aipl_rec_inc_strong
+
+block0(v0: i64):
+    v1 = load.i64 notrap aligned v0+8
+    call fn0(v1)
+    return v1
+}
+
+; source variables:
+;   v0 = s
+; __map91
+function u0:342(i64) -> i64 apple_aarch64 {
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 8, align = 8
+    ss2 = explicit_slot 8, align = 8
+    ss3 = explicit_slot 8, align = 8
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    sig1 = (i64, i64, i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64) -> i64 apple_aarch64
+    sig4 = (i64, i64) apple_aarch64
+    sig5 = (i64, i64) apple_aarch64
+    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    fn0 = u0:11 sig0  ; aipl_array_with_cap
+    fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
+    fn2 = u0:20 sig2  ; aipl_rec_inc_strong
+    fn3 = colocated u0:341 sig3  ; __lambda_90
+    fn4 = colocated u0:378 sig4  ; __arr_drop___m17__Doc
+    fn5 = colocated u0:379 sig5  ; __arr_retain___m17__Doc
+    fn6 = u0:10 sig6  ; aipl_array_push_mut
+    fn7 = u0:18 sig7  ; aipl_rec_dec_strong
+    fn8 = u0:3 sig8  ; aipl_arr_inc
+    fn9 = u0:7 sig9  ; aipl_array_dec
+
+block0(v0: i64):
+    v1 = iconst.i64 -4
+    v2 = band v0, v1  ; v1 = -4
+    v3 = load.i64 notrap aligned v2
+    v4 = iconst.i64 0
+    v5 = iconst.i64 8
+    v6 = call fn0(v3, v4, v5)  ; v4 = 0, v5 = 8
+    v7 = stack_addr.i64 ss0
+    store notrap v6, v7
+    v8 = iconst.i64 0
+    v9 = stack_addr.i64 ss1
+    store notrap v8, v9  ; v8 = 0
+    jump block1
+
+block1:
+    v10 = stack_addr.i64 ss1
+    v11 = load.i64 notrap v10
+    v12 = iconst.i64 -4
+    v13 = band.i64 v0, v12  ; v12 = -4
+    v14 = load.i64 notrap aligned v13
+    v15 = icmp slt v11, v14
+    brif v15, block2, block3
+
+block2:
+    v16 = iconst.i64 3
+    v17 = band.i64 v0, v16  ; v16 = 3
+    v18 = iconst.i64 0
+    v19 = icmp eq v17, v18  ; v18 = 0
+    brif v19, block4, block5
+
+block4:
+    v20 = iconst.i64 -4
+    v21 = band.i64 v0, v20  ; v20 = -4
+    v22 = iconst.i64 24
+    v23 = iadd v21, v22  ; v22 = 24
+    v24 = iconst.i64 16
+    v25 = imul.i64 v11, v24  ; v24 = 16
+    v26 = iadd v23, v25
+    v27 = stack_addr.i64 ss2
+    store notrap v26, v27
+    jump block6
+
+block5:
+    v28 = iconst.i64 16
+    v29 = call fn1(v0, v11, v28)  ; v28 = 16
+    v30 = stack_addr.i64 ss2
+    store notrap v29, v30
+    jump block6
+
+block6:
+    v31 = stack_addr.i64 ss2
+    v32 = load.i64 notrap v31
+    v33 = load.i64 notrap aligned v32+8
+    call fn2(v33)
+    v34 = stack_addr.i64 ss0
+    v35 = load.i64 notrap v34
+    v36 = call fn3(v32)
+    v37 = func_addr.i64 fn4
+    v38 = func_addr.i64 fn5
+    v39 = iconst.i64 8
+    v40 = stack_addr.i64 ss3
+    store notrap v36, v40
+    v41 = stack_addr.i64 ss3
+    v42 = call fn6(v35, v41, v37, v38, v39)  ; v39 = 8
+    v43 = stack_addr.i64 ss0
+    store notrap v42, v43
+    v44 = iconst.i64 0
+    v45 = iconst.i64 0
+    v46 = load.i64 notrap aligned v32+8
+    call fn7(v46)
+    call fn7(v36)
+    v47 = iconst.i64 1
+    v48 = iadd.i64 v11, v47  ; v47 = 1
+    v49 = stack_addr.i64 ss1
+    store notrap v48, v49
+    jump block1
+
+block3:
+    v50 = iconst.i64 0
+    v51 = stack_addr.i64 ss0
+    v52 = load.i64 notrap v51
+    call fn8(v52)
+    v53 = stack_addr.i64 ss0
+    v54 = load.i64 notrap v53
+    call fn9(v54)
+    return v52
+}
+
+; source variables:
+;   v0 = $arr
+;   ss0 = $out
+;   v32 = $e
+; __lambda_92
+function u0:343(i64) -> i64 apple_aarch64 {
+    sig0 = (i64) apple_aarch64
+    fn0 = u0:20 sig0  ; aipl_rec_inc_strong
+
+block0(v0: i64):
+    v1 = load.i64 notrap aligned v0+8
+    call fn0(v1)
+    return v1
+}
+
+; source variables:
+;   v0 = s
+; __map93
+function u0:344(i64) -> i64 apple_aarch64 {
+    ss0 = explicit_slot 8, align = 8
+    ss1 = explicit_slot 8, align = 8
+    ss2 = explicit_slot 8, align = 8
+    ss3 = explicit_slot 8, align = 8
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    sig1 = (i64, i64, i64) -> i64 apple_aarch64
+    sig2 = (i64) apple_aarch64
+    sig3 = (i64) -> i64 apple_aarch64
+    sig4 = (i64, i64) apple_aarch64
+    sig5 = (i64, i64) apple_aarch64
+    sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
+    sig7 = (i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    fn0 = u0:11 sig0  ; aipl_array_with_cap
+    fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
+    fn2 = u0:20 sig2  ; aipl_rec_inc_strong
+    fn3 = colocated u0:343 sig3  ; __lambda_92
+    fn4 = colocated u0:378 sig4  ; __arr_drop___m17__Doc
+    fn5 = colocated u0:379 sig5  ; __arr_retain___m17__Doc
+    fn6 = u0:10 sig6  ; aipl_array_push_mut
+    fn7 = u0:18 sig7  ; aipl_rec_dec_strong
+    fn8 = u0:3 sig8  ; aipl_arr_inc
+    fn9 = u0:7 sig9  ; aipl_array_dec
+
+block0(v0: i64):
+    v1 = iconst.i64 -4
+    v2 = band v0, v1  ; v1 = -4
+    v3 = load.i64 notrap aligned v2
+    v4 = iconst.i64 0
+    v5 = iconst.i64 8
+    v6 = call fn0(v3, v4, v5)  ; v4 = 0, v5 = 8
+    v7 = stack_addr.i64 ss0
+    store notrap v6, v7
+    v8 = iconst.i64 0
+    v9 = stack_addr.i64 ss1
+    store notrap v8, v9  ; v8 = 0
+    jump block1
+
+block1:
+    v10 = stack_addr.i64 ss1
+    v11 = load.i64 notrap v10
+    v12 = iconst.i64 -4
+    v13 = band.i64 v0, v12  ; v12 = -4
+    v14 = load.i64 notrap aligned v13
+    v15 = icmp slt v11, v14
+    brif v15, block2, block3
+
+block2:
+    v16 = iconst.i64 3
+    v17 = band.i64 v0, v16  ; v16 = 3
+    v18 = iconst.i64 0
+    v19 = icmp eq v17, v18  ; v18 = 0
+    brif v19, block4, block5
+
+block4:
+    v20 = iconst.i64 -4
+    v21 = band.i64 v0, v20  ; v20 = -4
+    v22 = iconst.i64 24
+    v23 = iadd v21, v22  ; v22 = 24
+    v24 = iconst.i64 16
+    v25 = imul.i64 v11, v24  ; v24 = 16
+    v26 = iadd v23, v25
+    v27 = stack_addr.i64 ss2
+    store notrap v26, v27
+    jump block6
+
+block5:
+    v28 = iconst.i64 16
+    v29 = call fn1(v0, v11, v28)  ; v28 = 16
+    v30 = stack_addr.i64 ss2
+    store notrap v29, v30
+    jump block6
+
+block6:
+    v31 = stack_addr.i64 ss2
+    v32 = load.i64 notrap v31
+    v33 = load.i64 notrap aligned v32+8
+    call fn2(v33)
+    v34 = stack_addr.i64 ss0
+    v35 = load.i64 notrap v34
+    v36 = call fn3(v32)
+    v37 = func_addr.i64 fn4
+    v38 = func_addr.i64 fn5
+    v39 = iconst.i64 8
+    v40 = stack_addr.i64 ss3
+    store notrap v36, v40
+    v41 = stack_addr.i64 ss3
+    v42 = call fn6(v35, v41, v37, v38, v39)  ; v39 = 8
+    v43 = stack_addr.i64 ss0
+    store notrap v42, v43
+    v44 = iconst.i64 0
+    v45 = iconst.i64 0
+    v46 = load.i64 notrap aligned v32+8
+    call fn7(v46)
+    call fn7(v36)
+    v47 = iconst.i64 1
+    v48 = iadd.i64 v11, v47  ; v47 = 1
+    v49 = stack_addr.i64 ss1
+    store notrap v48, v49
+    jump block1
+
+block3:
+    v50 = iconst.i64 0
+    v51 = stack_addr.i64 ss0
+    v52 = load.i64 notrap v51
+    call fn8(v52)
+    v53 = stack_addr.i64 ss0
+    v54 = load.i64 notrap v53
+    call fn9(v54)
+    return v52
+}
+
+; source variables:
+;   v0 = $arr
+;   ss0 = $out
+;   v32 = $e
+; __lambda_94
+function u0:345(i64, i64) -> i64 apple_aarch64 {
+block0(v0: i64, v1: i64):
+    v2 = load.i64 notrap aligned v0
+    v3 = icmp ult v2, v1
+    v4 = uextend.i64 v3
+    return v4
+}
+
+; source variables:
+;   v0 = c
+;   v1 = end
+; __builtin_is_some_and$__builtin_Span$lam96
+function u0:346(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:345 sig0  ; __lambda_94
+
+block0(v0: i64, v1: i64):
+    v3 = load.i64 notrap aligned v0
+    brif v3, block2, block3
+
+block2:
+    v4 = iconst.i64 8
+    v5 = iadd.i64 v0, v4  ; v4 = 8
+    v6 = call fn0(v5, v1)
+    jump block1(v6)
+
+block3:
+    v7 = iconst.i64 0
+    jump block1(v7)  ; v7 = 0
+
+block1(v2: i64):
+    return v2
+}
+
+; source variables:
+;   v0 = self
+;   v1 = $cap95
+;   v5 = x
+; __lambda_97
+function u0:347(i64, i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:249 sig0  ; __m18__hug_fills_call
+
+block0(v0: i64, v1: i64, v2: i64):
+    v3 = call fn0(v1, v2, v0)
+    return v3
+}
+
+; source variables:
+;   v0 = close
+;   v1 = self
+;   v2 = open_at
+; __builtin_is_some_and$u64$lam100
+function u0:348(i64, i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:347 sig0  ; __lambda_97
+
+block0(v0: i64, v1: i64, v2: i64):
+    v4 = load.i64 notrap aligned v0
+    brif v4, block2, block3
+
+block2:
+    v5 = load.i64 notrap aligned v0+8
+    v6 = call fn0(v5, v1, v2)
+    jump block1(v6)
+
+block3:
+    v7 = iconst.i64 0
+    jump block1(v7)  ; v7 = 0
+
+block1(v3: i64):
+    return v3
+}
+
+; source variables:
+;   v0 = self
+;   v1 = $cap98
+;   v2 = $cap99
+;   v5 = x
+; __lambda_101
+function u0:349(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 32
     v2 = icmp eq v0, v1  ; v1 = 32
@@ -108824,8 +108918,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = c
-; __m6__trim_end_while$lam89$tail
-function u0:343(i64) -> i64 tail {
+; __m6__trim_end_while$lam102$tail
+function u0:351(i64) -> i64 tail {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 56, align = 8
@@ -108837,7 +108931,7 @@ function u0:343(i64) -> i64 tail {
     sig4 = (i64) apple_aarch64
     fn0 = u0:27 sig0  ; aipl_str_iter_init
     fn1 = u0:28 sig1  ; aipl_str_iter_next
-    fn2 = colocated u0:341 sig2  ; __lambda_88
+    fn2 = colocated u0:349 sig2  ; __lambda_101
     fn3 = u0:32 sig3  ; aipl_str_slice
     fn4 = u0:15 sig4  ; aipl_dec
 
@@ -108940,18 +109034,18 @@ block3:
 ;   ss1 = __idx$285
 ;   v10 = c
 ;   v28 = i
-; __m6__trim_end_while$lam89
-function u0:342(i64) -> i64 apple_aarch64 {
+; __m6__trim_end_while$lam102
+function u0:350(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
-    fn0 = colocated u0:343 sig0  ; __m6__trim_end_while$lam89$tail
+    fn0 = colocated u0:351 sig0  ; __m6__trim_end_while$lam102$tail
 
 block0(v0: i64):
     v1 = call fn0(v0)
     return v1
 }
 
-; __lambda_90
-function u0:344(i64) -> i64 apple_aarch64 {
+; __lambda_103
+function u0:352(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 32
     v2 = icmp eq v0, v1  ; v1 = 32
@@ -108961,8 +109055,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = c
-; __builtin_count_while$char$s0$lam91$tail
-function u0:346(i64) -> i64 tail {
+; __builtin_count_while$char$s0$lam104$tail
+function u0:354(i64) -> i64 tail {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -108972,7 +109066,7 @@ function u0:346(i64) -> i64 tail {
     sig3 = (i64) apple_aarch64
     fn0 = u0:27 sig0  ; aipl_str_iter_init
     fn1 = u0:28 sig1  ; aipl_str_iter_next
-    fn2 = colocated u0:344 sig2  ; __lambda_90
+    fn2 = colocated u0:352 sig2  ; __lambda_103
     fn3 = u0:15 sig3  ; aipl_dec
 
 block0(v0: i64):
@@ -109067,18 +109161,18 @@ block3:
 ;   v0 = self
 ;   ss0 = n
 ;   v8 = x
-; __builtin_count_while$char$s0$lam91
-function u0:345(i64) -> i64 apple_aarch64 {
+; __builtin_count_while$char$s0$lam104
+function u0:353(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
-    fn0 = colocated u0:346 sig0  ; __builtin_count_while$char$s0$lam91$tail
+    fn0 = colocated u0:354 sig0  ; __builtin_count_while$char$s0$lam104$tail
 
 block0(v0: i64):
     v1 = call fn0(v0)
     return v1
 }
 
-; __lambda_92
-function u0:347(i64) -> i64 apple_aarch64 {
+; __lambda_105
+function u0:355(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
     v1 = iconst.i64 48
     v2 = icmp eq v0, v1  ; v1 = 48
@@ -109088,12 +109182,12 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = c
-; __builtin_trim_while$s0$lam93
-function u0:348(i64) -> i64 apple_aarch64 {
+; __builtin_trim_while$s0$lam106
+function u0:356(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 apple_aarch64
     sig1 = (i64) -> i64 apple_aarch64
     sig2 = (i64, i64, i64) -> i64 apple_aarch64
-    fn0 = colocated u0:352 sig0  ; __builtin_count_while$char$s0$lam96
+    fn0 = colocated u0:362 sig0  ; __builtin_count_while$char$s0$lam112
     fn1 = u0:30 sig1  ; aipl_str_len
     fn2 = u0:32 sig2  ; aipl_str_slice
 
@@ -109106,8 +109200,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = self
-; __lambda_94
-function u0:349(i64, i64, i64) apple_aarch64 {
+; __lambda_107
+function u0:357(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
     ss1 = explicit_slot 16, align = 8
 
@@ -109152,8 +109246,8 @@ block1:
 ; source variables:
 ;   v1 = acc
 ;   v2 = c
-; __builtin_opt_left_fold$char$i64$s0$lam95
-function u0:350(i64, i64, i64) apple_aarch64 {
+; __builtin_opt_left_fold$char$i64$s0$lam108
+function u0:358(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 56, align = 8
@@ -109167,7 +109261,7 @@ function u0:350(i64, i64, i64) apple_aarch64 {
     sig2 = (i64, i64, i64) apple_aarch64
     fn0 = u0:27 sig0  ; aipl_str_iter_init
     fn1 = u0:28 sig1  ; aipl_str_iter_next
-    fn2 = colocated u0:349 sig2  ; __lambda_94
+    fn2 = colocated u0:357 sig2  ; __lambda_107
 
 block0(v0: i64, v1: i64, v2: i64):
     v3 = stack_addr.i64 ss0
@@ -109296,7 +109390,7 @@ block13(v55: i64):
 ;   v11 = x
 ;   v30 = step
 ; __m12__lex_step$__m13__AiplTok
-function u0:351(i64, i64, i64, i64) apple_aarch64 {
+function u0:359(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -109347,27 +109441,27 @@ function u0:351(i64, i64, i64, i64) apple_aarch64 {
     fn2 = u0:30 sig2  ; aipl_str_len
     fn3 = u0:32 sig3  ; aipl_str_slice
     fn4 = colocated u0:78 sig4  ; __m12__char_run_len
-    fn5 = colocated u0:353 sig5  ; __m12__step_result$__m13__AiplTok
+    fn5 = colocated u0:363 sig5  ; __m12__step_result$__m13__AiplTok
     fn6 = u0:3 sig6  ; aipl_arr_inc
     fn7 = u0:15 sig7  ; aipl_dec
     fn8 = u0:7 sig8  ; aipl_array_dec
     fn9 = colocated u0:79 sig9  ; __m12__exact_len
-    fn10 = colocated u0:353 sig10  ; __m12__step_result$__m13__AiplTok
+    fn10 = colocated u0:363 sig10  ; __m12__step_result$__m13__AiplTok
     fn11 = colocated u0:80 sig11  ; __m12__keyword_len
-    fn12 = colocated u0:353 sig12  ; __m12__step_result$__m13__AiplTok
+    fn12 = colocated u0:363 sig12  ; __m12__step_result$__m13__AiplTok
     fn13 = colocated u0:81 sig13  ; __m12__delimited_len
-    fn14 = colocated u0:353 sig14  ; __m12__step_result$__m13__AiplTok
+    fn14 = colocated u0:363 sig14  ; __m12__step_result$__m13__AiplTok
     fn15 = colocated u0:83 sig15  ; __m12__between_len
-    fn16 = colocated u0:353 sig16  ; __m12__step_result$__m13__AiplTok
+    fn16 = colocated u0:363 sig16  ; __m12__step_result$__m13__AiplTok
     fn17 = colocated u0:84 sig17  ; __m12__nested_len
-    fn18 = colocated u0:353 sig18  ; __m12__step_result$__m13__AiplTok
-    fn19 = colocated u0:354 sig19  ; __m12__template_step$__m13__AiplTok
+    fn18 = colocated u0:363 sig18  ; __m12__step_result$__m13__AiplTok
+    fn19 = colocated u0:364 sig19  ; __m12__template_step$__m13__AiplTok
     fn20 = colocated u0:86 sig20  ; __m12__to_eol_len$tail
-    fn21 = colocated u0:353 sig21  ; __m12__step_result$__m13__AiplTok
+    fn21 = colocated u0:363 sig21  ; __m12__step_result$__m13__AiplTok
     fn22 = colocated u0:88 sig22  ; __m12__float_len
-    fn23 = colocated u0:353 sig23  ; __m12__step_result$__m13__AiplTok
+    fn23 = colocated u0:363 sig23  ; __m12__step_result$__m13__AiplTok
     fn24 = colocated u0:89 sig24  ; __m12__int_len
-    fn25 = colocated u0:353 sig25  ; __m12__step_result$__m13__AiplTok
+    fn25 = colocated u0:363 sig25  ; __m12__step_result$__m13__AiplTok
     fn26 = u0:8 sig26  ; aipl_array_new
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64):
@@ -115787,8 +115881,50 @@ block1082:
 ;   v1343 = finalize
 ;   v1570 = marker
 ;   v128 = res
-; __builtin_count_while$char$s0$lam96
-function u0:352(i64) -> i64 apple_aarch64 {
+; __lambda_109
+function u0:360(i64, i64) -> i64 apple_aarch64 {
+block0(v0: i64, v1: i64):
+    v2 = load.i64 notrap aligned v1
+    v3 = iconst.i64 8
+    v4 = iadd v0, v3  ; v3 = 8
+    v5 = load.i64 notrap aligned v4
+    v6 = icmp ult v2, v5
+    v7 = uextend.i64 v6
+    return v7
+}
+
+; source variables:
+;   v0 = t
+;   v1 = c
+; __builtin_is_some_and$__m18__FmtTok$lam111
+function u0:361(i64, i64) -> i64 apple_aarch64 {
+    sig0 = (i64, i64) -> i64 apple_aarch64
+    fn0 = colocated u0:360 sig0  ; __lambda_109
+
+block0(v0: i64, v1: i64):
+    v3 = load.i64 notrap aligned v0
+    brif v3, block2, block3
+
+block2:
+    v4 = iconst.i64 8
+    v5 = iadd.i64 v0, v4  ; v4 = 8
+    v6 = call fn0(v5, v1)
+    jump block1(v6)
+
+block3:
+    v7 = iconst.i64 0
+    jump block1(v7)  ; v7 = 0
+
+block1(v2: i64):
+    return v2
+}
+
+; source variables:
+;   v0 = self
+;   v1 = $cap110
+;   v5 = x
+; __builtin_count_while$char$s0$lam112
+function u0:362(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -115797,7 +115933,7 @@ function u0:352(i64) -> i64 apple_aarch64 {
     sig2 = (i64) -> i64 apple_aarch64
     fn0 = u0:27 sig0  ; aipl_str_iter_init
     fn1 = u0:28 sig1  ; aipl_str_iter_next
-    fn2 = colocated u0:347 sig2  ; __lambda_92
+    fn2 = colocated u0:355 sig2  ; __lambda_105
 
 block0(v0: i64):
     v1 = iconst.i64 0
@@ -115890,7 +116026,7 @@ block3:
 ;   ss0 = n
 ;   v8 = x
 ; __m12__step_result$__m13__AiplTok
-function u0:353(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:363(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 16, align = 8
@@ -115918,10 +116054,10 @@ function u0:353(i64, i64, i64, i64, i64) apple_aarch64 {
     fn3 = u0:32 sig3  ; aipl_str_slice
     fn4 = u0:16 sig4  ; aipl_inc
     fn5 = colocated u0:90 sig5  ; __m12__token_value
-    fn6 = colocated u0:355 sig6  ; __m12__apply_emit$__m13__AiplTok
+    fn6 = colocated u0:365 sig6  ; __m12__apply_emit$__m13__AiplTok
     fn7 = u0:15 sig7  ; aipl_dec
-    fn8 = colocated u0:379 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn9 = colocated u0:379 sig9  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn8 = colocated u0:388 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn9 = colocated u0:388 sig9  ; __arr_drop___m12__Token$__m13__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64):
     v5 = iconst.i64 0
@@ -117785,7 +117921,7 @@ block301:
 ;   v244 = kind
 ;   v284 = t
 ; __m12__template_step$__m13__AiplTok
-function u0:354(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:364(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -117806,7 +117942,7 @@ function u0:354(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn5 = u0:3 sig5  ; aipl_arr_inc
     fn6 = u0:15 sig6  ; aipl_dec
     fn7 = u0:7 sig7  ; aipl_array_dec
-    fn8 = colocated u0:356 sig8  ; __m12__template_scan$__m13__AiplTok
+    fn8 = colocated u0:366 sig8  ; __m12__template_scan$__m13__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64, v7: i64, v8: i64):
     v9 = call fn0(v1)
@@ -117917,7 +118053,7 @@ block3(v14: i64):
 ;   v7 = rules
 ;   v8 = unterminated
 ; __m12__apply_emit$__m13__AiplTok
-function u0:355(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:365(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
     ss1 = explicit_slot 24, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -119874,7 +120010,7 @@ block5(v10: i64):
 ;   v620 = f
 ;   v4 = $inl152_span
 ; __m12__template_scan$__m13__AiplTok
-function u0:356(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:366(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -119925,16 +120061,16 @@ function u0:356(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn6 = u0:0 sig6  ; aipl_arr_drop_str
     fn7 = u0:5 sig7  ; aipl_arr_retain_ptr
     fn8 = u0:9 sig8  ; aipl_array_push
-    fn9 = colocated u0:357 sig9  ; __m12__finalize_template$__m13__AiplTok
+    fn9 = colocated u0:367 sig9  ; __m12__finalize_template$__m13__AiplTok
     fn10 = u0:7 sig10  ; aipl_array_dec
     fn11 = u0:15 sig11  ; aipl_dec
     fn12 = u0:12 sig12  ; aipl_char_at
     fn13 = u0:0 sig13  ; aipl_arr_drop_str
     fn14 = u0:5 sig14  ; aipl_arr_retain_ptr
-    fn15 = colocated u0:358 sig15  ; __m12__interp_scan$__m13__AiplTok
-    fn16 = colocated u0:381 sig16  ; __arr_drop___m12__StepResult$__m13__AiplTok
-    fn17 = colocated u0:382 sig17  ; __arr_retain___m12__StepResult$__m13__AiplTok
-    fn18 = colocated u0:360 sig18  ; __builtin_is_some_and$char$lam99
+    fn15 = colocated u0:368 sig15  ; __m12__interp_scan$__m13__AiplTok
+    fn16 = colocated u0:391 sig16  ; __arr_drop___m12__StepResult$__m13__AiplTok
+    fn17 = colocated u0:392 sig17  ; __arr_retain___m12__StepResult$__m13__AiplTok
+    fn18 = colocated u0:370 sig18  ; __builtin_is_some_and$char$lam115
     fn19 = u0:14 sig19  ; aipl_concat_lazy
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64, v7: i64, v8: i64):
@@ -120549,7 +120685,7 @@ block37:
 ;   v198 = interp
 ;   v322 = m
 ; __m12__finalize_template$__m13__AiplTok
-function u0:357(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:367(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -120592,16 +120728,16 @@ function u0:357(i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     fn1 = u0:8 sig2  ; aipl_array_new
     fn2 = u0:1 sig3  ; aipl_arr_elem_ptr
     fn3 = u0:16 sig4  ; aipl_inc
-    fn4 = colocated u0:361 sig5  ; __m12__seg_emit$__m13__AiplTok
+    fn4 = colocated u0:371 sig5  ; __m12__seg_emit$__m13__AiplTok
     fn5 = u0:7 sig6  ; aipl_array_dec
     fn6 = u0:15 sig7  ; aipl_dec
-    fn7 = colocated u0:379 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn8 = colocated u0:380 sig9  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn7 = colocated u0:388 sig8  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn8 = colocated u0:389 sig9  ; __arr_retain___m12__Token$__m13__AiplTok
     fn9 = u0:9 sig10  ; aipl_array_push
-    fn10 = colocated u0:379 sig11  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn11 = colocated u0:380 sig12  ; __arr_retain___m12__Token$__m13__AiplTok
-    fn12 = colocated u0:379 sig13  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn13 = colocated u0:380 sig14  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn10 = colocated u0:388 sig11  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn11 = colocated u0:389 sig12  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn12 = colocated u0:388 sig13  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn13 = colocated u0:389 sig14  ; __arr_retain___m12__Token$__m13__AiplTok
 
 block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i64):
     call fn0(v3)
@@ -122028,7 +122164,7 @@ block206:
 ;   v346 = t
 ;   v439 = t
 ; __m12__interp_scan$__m13__AiplTok
-function u0:358(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:368(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     ss1 = explicit_slot 8, align = 8
     ss2 = explicit_slot 8, align = 8
@@ -122074,14 +122210,14 @@ function u0:358(i64, i64, i64, i64, i64) apple_aarch64 {
     fn4 = u0:7 sig4  ; aipl_array_dec
     fn5 = u0:15 sig5  ; aipl_dec
     fn6 = u0:12 sig6  ; aipl_char_at
-    fn7 = colocated u0:366 sig7  ; __eq_char$opt
-    fn8 = colocated u0:351 sig8  ; __m12__lex_step$__m13__AiplTok
+    fn7 = colocated u0:376 sig7  ; __eq_char$opt
+    fn8 = colocated u0:359 sig8  ; __m12__lex_step$__m13__AiplTok
     fn9 = u0:1 sig9  ; aipl_arr_elem_ptr
-    fn10 = colocated u0:379 sig10  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn11 = colocated u0:380 sig11  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn10 = colocated u0:388 sig10  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn11 = colocated u0:389 sig11  ; __arr_retain___m12__Token$__m13__AiplTok
     fn12 = u0:9 sig12  ; aipl_array_push
-    fn13 = colocated u0:379 sig13  ; __arr_drop___m12__Token$__m13__AiplTok
-    fn14 = colocated u0:380 sig14  ; __arr_retain___m12__Token$__m13__AiplTok
+    fn13 = colocated u0:388 sig13  ; __arr_drop___m12__Token$__m13__AiplTok
+    fn14 = colocated u0:389 sig14  ; __arr_retain___m12__Token$__m13__AiplTok
     fn15 = u0:32 sig15  ; aipl_str_slice
     fn16 = u0:25 sig16  ; aipl_str_eq
 
@@ -123039,8 +123175,8 @@ block116:
 ;   v142 = step
 ;   v220 = t
 ;   v313 = t
-; __lambda_97
-function u0:359(i64, i64) -> i64 apple_aarch64 {
+; __lambda_113
+function u0:369(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
@@ -123060,10 +123196,10 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = e
 ;   v1 = escapes
-; __builtin_is_some_and$char$lam99
-function u0:360(i64, i64) -> i64 apple_aarch64 {
+; __builtin_is_some_and$char$lam115
+function u0:370(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64) -> i64 apple_aarch64
-    fn0 = colocated u0:359 sig0  ; __lambda_97
+    fn0 = colocated u0:369 sig0  ; __lambda_113
 
 block0(v0: i64, v1: i64):
     v3 = load.i64 notrap aligned v0
@@ -123084,10 +123220,10 @@ block1(v2: i64):
 
 ; source variables:
 ;   v0 = self
-;   v1 = $cap98
+;   v1 = $cap114
 ;   v4 = x
 ; __m12__seg_emit$__m13__AiplTok
-function u0:361(i64, i64, i64, i64, i64) apple_aarch64 {
+function u0:371(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 32, align = 8
     ss2 = explicit_slot 32, align = 8
@@ -124794,7 +124930,7 @@ block1(v5: i64):
 ;   v553 = f
 ;   v4 = $inl155_span
 ; __rec_drop___m17__Doc
-function u0:362(i64) apple_aarch64 {
+function u0:372(i64) apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64) apple_aarch64
     sig2 = (i64) apple_aarch64
@@ -124871,7 +125007,7 @@ block1:
 }
 
 ; __rec_drop___m17__Work
-function u0:363(i64) apple_aarch64 {
+function u0:373(i64) apple_aarch64 {
     sig0 = (i64) apple_aarch64
     sig1 = (i64) apple_aarch64
     fn0 = u0:18 sig0  ; aipl_rec_dec_strong
@@ -124898,7 +125034,7 @@ block1:
 }
 
 ; __arr_drop___m12__TokenRule$__m13__AiplTok
-function u0:364(i64, i64) apple_aarch64 {
+function u0:374(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_dec
@@ -125132,7 +125268,7 @@ block3:
 }
 
 ; __arr_retain___m12__TokenRule$__m13__AiplTok
-function u0:365(i64, i64) apple_aarch64 {
+function u0:375(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
@@ -125366,7 +125502,7 @@ block3:
 }
 
 ; __arr_drop___m17__Doc
-function u0:368(i64, i64) apple_aarch64 {
+function u0:378(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:18 sig0  ; aipl_rec_dec_strong
@@ -125400,7 +125536,7 @@ block3:
 }
 
 ; __arr_retain___m17__Doc
-function u0:369(i64, i64) apple_aarch64 {
+function u0:379(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:20 sig0  ; aipl_rec_inc_strong
@@ -125434,7 +125570,7 @@ block3:
 }
 
 ; __arr_drop___m18__ImportName
-function u0:371(i64, i64) apple_aarch64 {
+function u0:380(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_dec
@@ -125472,7 +125608,7 @@ block3:
 }
 
 ; __arr_retain___m18__ImportName
-function u0:372(i64, i64) apple_aarch64 {
+function u0:381(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
@@ -125510,7 +125646,7 @@ block3:
 }
 
 ; __arr_drop___m18__VCase
-function u0:373(i64, i64) apple_aarch64 {
+function u0:382(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:18 sig0  ; aipl_rec_dec_strong
@@ -125548,7 +125684,7 @@ block3:
 }
 
 ; __arr_retain___m18__VCase
-function u0:374(i64, i64) apple_aarch64 {
+function u0:383(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:20 sig0  ; aipl_rec_inc_strong
@@ -125586,7 +125722,7 @@ block3:
 }
 
 ; __arr_drop___m18__ImportEntry
-function u0:375(i64, i64) apple_aarch64 {
+function u0:384(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64) apple_aarch64
@@ -125626,7 +125762,7 @@ block3:
 }
 
 ; __arr_retain___m18__ImportEntry
-function u0:376(i64, i64) apple_aarch64 {
+function u0:385(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64) apple_aarch64
@@ -125666,7 +125802,7 @@ block3:
 }
 
 ; __arr_drop___m18__Seg
-function u0:377(i64, i64) apple_aarch64 {
+function u0:386(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:18 sig0  ; aipl_rec_dec_strong
@@ -125702,7 +125838,7 @@ block3:
 }
 
 ; __arr_retain___m18__Seg
-function u0:378(i64, i64) apple_aarch64 {
+function u0:387(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:20 sig0  ; aipl_rec_inc_strong
@@ -125738,7 +125874,7 @@ block3:
 }
 
 ; __arr_drop___m12__Token$__m13__AiplTok
-function u0:379(i64, i64) apple_aarch64 {
+function u0:388(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:15 sig0  ; aipl_dec
@@ -125858,7 +125994,7 @@ block3:
 }
 
 ; __arr_retain___m12__Token$__m13__AiplTok
-function u0:380(i64, i64) apple_aarch64 {
+function u0:389(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:16 sig0  ; aipl_inc
@@ -125978,7 +126114,7 @@ block3:
 }
 
 ; __arr_drop___m12__StepResult$__m13__AiplTok
-function u0:381(i64, i64) apple_aarch64 {
+function u0:391(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:7 sig0  ; aipl_array_dec
@@ -126016,7 +126152,7 @@ block3:
 }
 
 ; __arr_retain___m12__StepResult$__m13__AiplTok
-function u0:382(i64, i64) apple_aarch64 {
+function u0:392(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     fn0 = u0:3 sig0  ; aipl_arr_inc
@@ -126054,7 +126190,7 @@ block3:
 }
 
 ; __eq_char$opt
-function u0:366(i64, i64) -> i64 apple_aarch64 {
+function u0:376(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
 
 block0(v0: i64, v1: i64):
@@ -126093,7 +126229,7 @@ block2:
 }
 
 ; __eq_str$opt
-function u0:367(i64, i64) -> i64 fast {
+function u0:377(i64, i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
     sig0 = (i64) apple_aarch64
     sig1 = (i64, i64) -> i64 apple_aarch64
@@ -126137,7 +126273,7 @@ block2:
 }
 
 ; __eq___m18__FmtKind
-function u0:370(i64, i64) -> i64 fast {
+function u0:390(i64, i64) -> i64 fast {
     ss0 = explicit_slot 8, align = 8
 
 block0(v0: i64, v1: i64):

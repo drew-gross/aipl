@@ -61,6 +61,7 @@ syntax:
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
   match arm grouping (i.e. ArmA | ArmB => { same_statement })
   unspread i.e. MyStruct { ..val_of_type_my_struct, some_field: override }
+  bump in walker.aipl contains mutations in a match, I thought we just banned that
 
 shim:
   better syntax
@@ -96,6 +97,7 @@ lint:
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
   recognize ad-hoc implementations of min/max an request using the function
   set w.pos = w.pos + 1; <--- should be set w.pos++;
+  forbid unnecessary allow
 
 errors:
   using Span without importing it gives a bad error

@@ -1,0 +1,40 @@
+import { print, == } from builtins;
+
+// `match (o) { some(v) => p, none => false }` asks one question — does the
+// optional hold a value the arm accepts — and `is_some_and` asks it in one
+// line, without naming the `none` case at all.
+//
+// The literal `false` arm is what makes this recognizable without consulting
+// types: arms must agree on a type, so a `false` arm proves the whole `match`
+// is a `bool`, and `some`/`none` only ever match an optional. Arm order does
+// not matter, so the second function below is flagged too.
+fn has_five(o: i64?) -> bool {
+    match (o) {
+        some(v) => v == 5,
+        none => false,
+    }
+}
+
+fn none_first(o: i64?) -> bool {
+    match (o) {
+        none => false,
+        some(v) => v == 5,
+    }
+}
+
+fn main() !prints {
+    print(has_five(some(5)).to_str());
+    print(none_first(some(5)).to_str());
+}
+--- errors ---
+error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_is_some_and.aipl:14:17
+   |
+14 |         none => false,
+   |                 ^^^^^
+
+error: this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_is_some_and.aipl:20:17
+   |
+20 |         none => false,
+   |                 ^^^^^

@@ -7,9 +7,12 @@ import { !, <=, == } from builtins;
 // in-file name `is_some_and` is only for this file's own tests, which read
 // exactly like user code.
 pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
+    // The `match_is_some_and` lint points at exactly this shape and advises
+    // `is_some_and` — which is what this *is*. Rewriting it in terms of itself
+    // is the one thing it can't do, so the lint is squelched here.
     match (self) {
         some(x) => pred(x),
-        none => false,
+        none => false, #[allow]
     }
 }.doc("""
     True when `self` is `some(x)` and `pred(x)` holds; `false` for `none` (the

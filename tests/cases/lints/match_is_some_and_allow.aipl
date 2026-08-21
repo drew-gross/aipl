@@ -1,0 +1,58 @@
+import { is_some_and, print, to_str, == } from builtins;
+
+// `#[allow]` keeps the long form — the escape hatch every lint carries.
+// `is_some_and`'s own definition needs exactly this, since it cannot be
+// rewritten in terms of itself.
+//
+// The marker goes on the `none => false` arm, which is where this lint points.
+// That is deliberate: `#[allow]` is line-scoped, so a lint spanning the whole
+// multi-line `match` could never be squelched — the only line able to carry the
+// marker would be the `match (..) {` header, and the formatter moves a marker
+// written there onto its own line, where it squelches nothing. A literal arm is
+// always one line, so it always takes a trailing marker and keeps it through
+// `aipl fmt`.
+fn has_five(o: i64?) -> bool {
+    match (o) {
+        some(v) => v == 5,
+        none => false, #[allow]
+    }
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn has_five_short(o: i64?) -> bool { o.is_some_and(|v| v == 5) }
+
+fn main() !prints {
+    print(has_five(some(5)).to_str());
+    print(has_five_short(some(5)).to_str());
+    print(has_five(some(4)).to_str());
+    print(has_five_short(some(4)).to_str());
+    print(has_five(none).to_str());
+    print(has_five_short(none).to_str());
+}
+--- stdout ---
+true
+true
+false
+false
+false
+false
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 355
+binary size: 2136
+  code: 904
+    __to_str_bool: 212
+    has_five: 36
+    has_five_short: 36
+    main: 620
+  data: 47
+  metadata: 1185
+builtin calls: 30
+  aipl_dec: 12
+  aipl_inc: 6
+  aipl_print: 6
+  aipl_write_bytes: 6

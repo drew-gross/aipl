@@ -15,6 +15,7 @@ import {
     contains,
     count,
     is_err_and,
+    is_some_and,
     join,
     len,
     map,
@@ -572,21 +573,12 @@ fn peek_is(self: W, k: FmtKind) -> bool { self.peek_is_n(0, k) }
 
 // Whether the token `n` past the cursor has kind `k`.
 fn peek_is_n(self: W, n: u64, k: FmtKind) -> bool {
-    match (self.toks[self.pos + n]) {
-        some(t) => t.kind == k,
-        none => false,
-    }
+    self.toks[self.pos + n].is_some_and(|t| t.kind == k)
 }
 
 // Whether an undrained comment sits before the token at the cursor.
 fn comment_before_cursor(self: W) -> bool {
-    match (self.comments[self.cpos]) {
-        none => false,
-        some(c) => match (self.peek()) {
-            some(t) => c.start < t.span.start,
-            none => false,
-        },
-    }
+    self.comments[self.cpos].is_some_and(|c| self.peek().is_some_and(|t| c.start < t.span.start))
 }
 
 // Step past one token, recording where it ended. `bump` without the text.
@@ -2218,10 +2210,7 @@ fn cur_tok(self: W) -> FmtTok {
 
 // Whether the next undrained comment begins before `end`.
 fn comment_starts_before(self: W, end: u64) -> bool {
-    match (self.comments[self.cpos]) {
-        none => false,
-        some(c) => c.start < end,
-    }
+    self.comments[self.cpos].is_some_and(|c| c.start < end)
 }
 
 // ---------- call-argument layout ----------
@@ -2249,10 +2238,7 @@ fn hugs_sole_arg(self: W) -> bool {
         return false;
     };
     let open_at = if (direct) { self.pos } else { self.pos + 1 };
-    match (self.hug_close(open_at)) {
-        none => false,
-        some(close) => self.hug_fills_call(open_at, close),
-    }
+    self.hug_close(open_at).is_some_and(|close| self.hug_fills_call(open_at, close))
 }
 
 // Index of the bracket closing the one at `start`, or `none` if unbalanced. A
@@ -2742,16 +2728,16 @@ binary size: 3053216
     __builtin_any$__m1__Doc$lam25: 32
     __builtin_any$__m1__Doc$lam25$tail: 324
     __builtin_count$char$s0: 232
-    __builtin_count_while$char$s0$lam48: 232
-    __builtin_count_while$char$s0$lam66: 296
-    __builtin_count_while$char$s0$lam71: 236
-    __builtin_count_while$char$s0$lam73: 244
-    __builtin_count_while$char$s0$lam79: 232
-    __builtin_count_while$char$s0$lam80: 232
+    __builtin_count_while$char$s0$lam51: 232
+    __builtin_count_while$char$s0$lam69: 296
+    __builtin_count_while$char$s0$lam74: 236
+    __builtin_count_while$char$s0$lam76: 244
+    __builtin_count_while$char$s0$lam82: 232
+    __builtin_count_while$char$s0$lam83: 232
     __builtin_int_parse: 744
-    __builtin_is_some_and$char$lam72: 48
+    __builtin_is_some_and$char$lam75: 48
     __builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12: 540
-    __builtin_opt_left_fold$char$i64$s0$lam60: 348
+    __builtin_opt_left_fold$char$i64$s0$lam63: 348
     __builtin_sort_by$ImportEntry$lam18: 1536
     __builtin_sort_by$ImportName$lam22: 3236
     __builtin_value_or_err$i64$str: 180
@@ -2770,7 +2756,7 @@ binary size: 3053216
     __lambda_35: 136
     __lambda_36: 48
     __lambda_37: 64
-    __lambda_59: 140
+    __lambda_62: 140
     __m10__unescape: 892
     __m11__process_raw_string: 32
     __m11__process_raw_string$tail: 600
@@ -2808,7 +2794,7 @@ binary size: 3053216
     __m9__step_result$__m8__AiplTok: 7140
     __m9__template_scan$__m8__AiplTok: 2772
     __m9__template_step$__m8__AiplTok: 556
-    __map50$own0: 320
+    __map53$own0: 320
     __rec_drop___m1__Doc: 184
     __rec_drop___m1__Work: 84
     __test$binding_ann: 4604
