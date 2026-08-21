@@ -28,6 +28,7 @@ import {
     split,
     value_or,
     wrapping_add as +,
+    wrapping_increment as ++,
     !,
     +++,
     <,
@@ -60,18 +61,6 @@ variant Doc =
 // deeper level; `Group(forced, inner)` flat-if-fits (`forced` = can-never-flat);
 // `IfBroken` text only when the group breaks; `BreakParent` a zero-width
 // force-break; `RawBlock` a verbatim multi-line atom re-aligned via `reindent_block`.
-
-// One step's outcome: where the cursor lands, the frames still to walk, and the
-// piece to append (if any).
-//
-// The output accumulator is deliberately *not* a field here: `go` keeps it in
-// its own `mut` binding and this struct reports what to append. That began as a
-// workaround for a codegen bug (a `mut` struct reassigned from a call on itself
-// in a loop aliased the call's sret buffer — see
-// `tests/cases/structs/mut_struct_reassigned_in_loop`), now fixed. It stays
-// because threading one accumulator is clearer than copying it through every
-// arm.
-struct Step { col: u64, work: Work, emit: str, emits: bool, done: bool }
 
 // The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 // frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
@@ -119,92 +108,88 @@ pub fn print_doc(doc: Doc, width: u64) -> str {
 }
 
 // The main layout loop: pop a frame, emit for its `Doc`, push any children, and
-// tail-recurse on the rest. `col` is the current column; `sp` (inside each
-// frame) is the indentation, in spaces, that a line break under that frame lands
-// at.
+// go round again. `col` is the current column; `sp` (inside each frame) is the
+// indentation, in spaces, that a line break under that frame lands at.
+//
+// Each arm updates the loop's own `mut` bindings directly. That needs `match`
+// arms to be statement blocks; before they were, an arm could only be a single
+// *expression*, so this was three functions threading a `Step { col, work, emit,
+// emits, done }` carrier back to the loop — one to dispatch on the work-list,
+// one on the `Doc`, and one for the `RawBlock` atom.
 fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
     mut col = col0;
     mut work = work0;
     mut acc = acc0;
     mut running = true;
     while (running) {
-        let st = go_step(width, col, work);
-        if (st.emits) {
-            set acc.push(st.emit);
+        match (work) {
+            WNil => {
+                set running = false;
+            },
+            WCons(sp, flat, d, rest) => match (d) {
+                Text(s) => {
+                    set acc.push(s);
+                    set col = col_after(col, s);
+                    set work = rest;
+                },
+                // A verbatim multi-line atom: re-lay it out around this frame's
+                // indent, then emit it.
+                RawBlock(s) => {
+                    let rendered = s.reindent_block(sp);
+                    set acc.push(rendered);
+                    set col = col_after(col, rendered);
+                    set work = rest;
+                },
+                Concat(ds) => {
+                    set work = prepend(ds, sp, flat, rest);
+                },
+                Line => if (flat) {
+                    set acc.push(" ");
+                    set col++;
+                    set work = rest;
+                } else {
+                    set acc.push(newline_str(sp));
+                    set col = sp;
+                    set work = rest;
+                },
+                SoftLine => if (flat) {
+                    set work = rest;
+                } else {
+                    set acc.push(newline_str(sp));
+                    set col = sp;
+                    set work = rest;
+                },
+                HardLine => {
+                    set acc.push(newline_str(sp));
+                    set col = sp;
+                    set work = rest;
+                },
+                BlankLine => {
+                    set acc.push(blank_str(sp));
+                    set col = sp;
+                    set work = rest;
+                },
+                Indent(inner) => {
+                    set work = WCons(sp + 4, flat, inner, rest);
+                },
+                Group(forced, inner) => {
+                    let mode = group_flat(forced, width, col, sp, inner, rest);
+                    set work = WCons(sp, mode, inner, rest);
+                },
+                IfBroken(s) => if (flat) {
+                    set work = rest;
+                } else {
+                    set acc.push(s);
+                    set col = col + s.len();
+                    set work = rest;
+                },
+                BreakParent => {
+                    set work = rest;
+                },
+            },
         };
-        set col = st.col;
-        set work = st.work;
-        set running = !st.done;
     }
     acc
-}
-
-// One iteration: pop a frame and report the next state. Split from `go` because
-// a `match` arm is an expression — it cannot assign to the loop's variables — so
-// each arm *returns* the next `Step` instead.
-fn go_step(width: u64, col: u64, work: Work) -> Step {
-    match (work) {
-        WNil => Step { col, work: WNil, emit: "", emits: false, done: true },
-        WCons(sp, flat, d, rest) => go_node(width, col, sp, flat, d, rest),
-    }
-}
-
-fn go_node(width: u64, col: u64, sp: u64, flat: bool, d: Doc, rest: Work) -> Step {
-    match (d) {
-        Text(s) => Step { col: col_after(col, s), work: rest, emit: s, emits: true, done: false },
-        RawBlock(s) => go_raw(col, sp, s, rest),
-        Concat(ds) => Step {
-            col,
-            work: prepend(ds, sp, flat, rest),
-            emit: "",
-            emits: false,
-            done: false,
-        },
-        Line => if (flat) {
-            Step { col: col + 1, work: rest, emit: " ", emits: true, done: false }
-        } else {
-            Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false }
-        },
-        SoftLine => if (flat) {
-            Step { col, work: rest, emit: "", emits: false, done: false }
-        } else {
-            Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false }
-        },
-        HardLine => Step { col: sp, work: rest, emit: newline_str(sp), emits: true, done: false },
-        BlankLine => Step { col: sp, work: rest, emit: blank_str(sp), emits: true, done: false },
-        Indent(inner) => Step {
-            col,
-            work: WCons(sp + 4, flat, inner, rest),
-            emit: "",
-            emits: false,
-            done: false,
-        },
-        Group(forced, inner) => Step {
-            col,
-            work: WCons(sp, group_flat(forced, width, col, sp, inner, rest), inner, rest),
-            emit: "",
-            emits: false,
-            done: false,
-        },
-        IfBroken(s) => if (flat) {
-            Step { col, work: rest, emit: "", emits: false, done: false }
-        } else {
-            Step { col: col + s.len(), work: rest, emit: s, emits: true, done: false }
-        },
-        BreakParent => Step { col, work: rest, emit: "", emits: false, done: false },
-    }
-}
-
-// One iteration: pop a frame and produce the next state. Split from `go` because
-// a `match` arm is an expression — it cannot assign to the loop's variables — so
-// each arm *returns* the next `Step` instead.
-
-// A `RawBlock`: re-lay-out the atom around its frame's indent, then emit it and
-// continue. Split out so the atom is computed once (a match arm is a single
-// expression).
-fn go_raw(col: u64, sp: u64, s: str, rest: Work) -> Step {
-    let rendered = s.reindent_block(sp);
-    Step { col: col_after(col, rendered), work: rest, emit: rendered, emits: true, done: false }
 }
 
 // Decide a group's mode: forced groups always break; otherwise the group is flat
@@ -339,13 +324,13 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 293
-deallocations: 293
+allocations: 284
+deallocations: 284
 reallocations: 0
-bytes allocated: 16748
-instructions executed: 25074
-binary size: 32728
-  code: 18432
+bytes allocated: 16100
+instructions executed: 21531
+binary size: 31352
+  code: 17568
     __arr_drop_Doc: 116
     __arr_retain_Doc: 116
     __builtin_any$Doc$lam3: 32
@@ -361,14 +346,14 @@ binary size: 32728
     fits$tail: 2636
     fits_atom: 44
     fits_atom$tail: 296
-    go: 4332
+    go: 3468
     has_hard: 32
     has_hard$tail: 664
     main: 3596
     print_doc: 1328
   data: 842
-  metadata: 13454
-builtin calls: 5180
+  metadata: 12942
+builtin calls: 4184
   aipl_arr_drop_str: 83
   aipl_arr_inc: 114
   aipl_arr_retain_ptr: 82
@@ -380,12 +365,12 @@ builtin calls: 5180
   aipl_array_with_cap: 12
   aipl_assert: 9
   aipl_concat_lazy: 22
-  aipl_dec: 865
-  aipl_inc: 551
-  aipl_rec_alloc: 156
-  aipl_rec_dec_strong: 1217
+  aipl_dec: 628
+  aipl_inc: 350
+  aipl_rec_alloc: 147
+  aipl_rec_dec_strong: 938
   aipl_rec_dec_weak: 105
-  aipl_rec_inc_strong: 1061
+  aipl_rec_inc_strong: 791
   aipl_rec_inc_weak: 105
   aipl_str_contains: 25
   aipl_str_data: 19

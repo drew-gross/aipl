@@ -470,21 +470,31 @@ gazelle! {
         // string-literal arm `"foo" => body` matches a `str` scrutinee; the
         // wildcard `_ => body` arrives as a `nullary_arm` (since `_` lexes as an
         // identifier) and is recognized downstream.
-        match_arm = IDENT LPAREN match_bindings RPAREN FATARROW expr => ctor_arm
+        match_arm = IDENT LPAREN match_bindings RPAREN FATARROW arm_body => ctor_arm
                   // `V.A(b0, ..) => body` / `V.A => body` — a variant-qualified
                   // constructor pattern. After the leading IDENT, one token of
                   // lookahead (`.` → qualified, `(` → ctor_arm, `=>` → nullary)
                   // picks the production.
-                  | IDENT DOT IDENT LPAREN match_bindings RPAREN FATARROW expr => qualified_ctor_arm
-                  | IDENT DOT IDENT FATARROW expr => qualified_nullary_arm
-                  | IDENT FATARROW expr => nullary_arm
-                  | NONE FATARROW expr => none_arm
-                  | STR FATARROW expr => str_arm
+                  | IDENT DOT IDENT LPAREN match_bindings RPAREN FATARROW arm_body => qualified_ctor_arm
+                  | IDENT DOT IDENT FATARROW arm_body => qualified_nullary_arm
+                  | IDENT FATARROW arm_body => nullary_arm
+                  | NONE FATARROW arm_body => none_arm
+                  | STR FATARROW arm_body => str_arm
                   // `'c' => body` — a char-literal arm, matching a `char`
                   // scrutinee by value. Like the `str` form it is open-domain,
                   // so such a match must end in `_`.
-                  | CHAR FATARROW expr => char_arm
-                  | LBRACKET args RBRACKET FATARROW expr => array_arm;
+                  | CHAR FATARROW arm_body => char_arm
+                  | LBRACKET args RBRACKET FATARROW arm_body => array_arm;
+        // An arm's body: a single expression, or a brace-delimited statement
+        // block whose trailing expression (if any) is the arm's value — exactly
+        // an `if` branch's shape. Factored into its own nonterminal rather than
+        // doubling all eight `match_arm` productions, which also keeps `expr`
+        // reachable from a *single* place here (see the `block_body` note above
+        // on what a second `expr` occurrence does to the LR tables). No AST
+        // change: `block` already builds an `Expr`, so both forms yield the same
+        // `MatchArm.body`. The choice is one token of lookahead — no expression
+        // begins with `{`.
+        arm_body = expr => expr | block => block;
         match_bindings = binding_list => present;
         binding_list = IDENT => first | binding_list COMMA IDENT => rest;
 
@@ -628,6 +638,7 @@ impl aipl::Types for Build {
     type ImportName = ImportName;
     type ImportNameList = Vec<ImportName>;
     type ImportNames = Vec<ImportName>;
+    type ArmBody = Expr;
     type MatchArm = MatchArm;
     /// A shim's `op = f` binding, and the lists built from it.
     type ShimBinding = (String, String);
@@ -2355,6 +2366,17 @@ impl gazelle::Action<aipl::MatchArmList<Self>> for Build {
                 prev.push(a);
                 prev
             }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::ArmBody<Self>> for Build {
+    fn build(&mut self, node: aipl::ArmBody<Self>) -> Result<Expr, Self::Error> {
+        // Both alternatives already carry an `Expr` — a block's value is the
+        // expression its `block_body` folds to — so the arm body is that value
+        // whichever form was written.
+        Ok(match node {
+            aipl::ArmBody::Expr(e) | aipl::ArmBody::Block(e) => e,
         })
     }
 }

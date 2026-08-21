@@ -241,21 +241,17 @@ fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
 // not-carried check in the driver fails).
 fn bump(self: W) -> WStr {
     match (self.peek()) {
-        some(t) => self.bump_tok(t),
+        some(t) => {
+            mut w = self;
+            set w.pos = w.pos + 1;
+            set w.last_end = t.span.end;
+            WStr { w, text: self.src[t.span] }
+        },
         // Past the end there is nothing to consume: the cursor stays put and the
         // text is empty, matching `peek_text`. The Rust version indexes and would
         // panic; every caller dispatches on `peek_text` first, so neither runs.
         none => WStr { w: self, text: "" },
     }
-}
-
-// Step over `t` (already known to be the token at the cursor). Split out because
-// a match arm is a single expression — it cannot open a statement block.
-fn bump_tok(self: W, t: FmtTok) -> WStr {
-    mut w = self;
-    set w.pos = w.pos + 1;
-    set w.last_end = t.span.end;
-    WStr { w, text: self.src[t.span] }
 }
 
 // Consume the next token, which must read exactly `want`.
@@ -2017,7 +2013,12 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
     while (w.peek_text() != "}") {
         let l = w.lead();
         let pat = l.w.pattern()?;
-        let body = pat.w.expect("=>")?.w.expr()?;
+        let after = pat.w.expect("=>")?.w;
+
+        // A statement-block arm (`P => { .. }`) lays out as a block, exactly like
+        // an `if` branch; every other arm body is a single expression. One token
+        // of lookahead decides, matching the grammar — no expression starts `{`.
+        let body = if (after.peek_text() == "{") { after.block()? } else { after.expr()? };
         let stepped = if (body.w.peek_text() == ",") { body.w.bump().w } else { body.w };
         // A same-line `// comment` after the arm rides on its line.
         let tc = stepped.trailing_comment();
@@ -2715,13 +2716,13 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20581
-deallocations: 20581
+allocations: 20457
+deallocations: 20457
 reallocations: 560
-bytes allocated: 1011492
-instructions executed: 3059404
-binary size: 3052576
-  code: 1747004
+bytes allocated: 1002564
+instructions executed: 2945436
+binary size: 3053216
+  code: 1747224
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2780,7 +2781,7 @@ binary size: 3052576
     __m1__fits$tail: 2636
     __m1__fits_atom: 44
     __m1__fits_atom$tail: 296
-    __m1__go: 4332
+    __m1__go: 3468
     __m1__has_hard: 32
     __m1__has_hard$tail: 664
     __m1__print_doc: 36
@@ -2866,7 +2867,7 @@ binary size: 3052576
     lead_loop: 1512
     let_stmt: 19204
     main: 152
-    match_arms: 5056
+    match_arms: 6140
     match_expr: 10744
     mut_stmt: 5364
     name_atom: 5572
@@ -2928,15 +2929,15 @@ binary size: 3052576
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1279832
-builtin calls: 499176
+  metadata: 1280252
+builtin calls: 467224
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140
-  aipl_arr_inc: 57833
+  aipl_arr_inc: 57842
   aipl_arr_reserve: 203
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 69
-  aipl_array_dec: 69623
+  aipl_array_dec: 69632
   aipl_array_new: 9833
   aipl_array_push: 1650
   aipl_array_push_mut: 1353
@@ -2945,24 +2946,24 @@ builtin calls: 499176
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 106166
-  aipl_inc: 85116
-  aipl_rec_alloc: 5717
-  aipl_rec_dec_strong: 48748
+  aipl_dec: 98473
+  aipl_inc: 78773
+  aipl_rec_alloc: 5593
+  aipl_rec_dec_strong: 39775
   aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 43031
+  aipl_rec_inc_strong: 34182
   aipl_rec_inc_weak: 3509
   aipl_str_cmp: 7
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 6019
+  aipl_str_eq: 6022
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31191
+  aipl_str_len: 31197
   aipl_str_repeat: 74
-  aipl_str_slice: 8481
+  aipl_str_slice: 8484
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3

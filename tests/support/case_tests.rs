@@ -300,6 +300,8 @@ case_tests! {
     cases_loops_for_loop_var_typed_as_char = "cases/loops/for_loop_var_typed_as_char",
     cases_loops_strlen_via_for = "cases/loops/strlen_via_for",
     cases_loops_while_loop = "cases/loops/while_loop",
+    cases_match_arms_block_arm_statements_only = "cases/match_arms/block_arm_statements_only",
+    cases_match_arms_statement_blocks = "cases/match_arms/statement_blocks",
     cases_methods_builtin_char_to_str_as_method = "cases/methods/builtin_char_to_str_as_method",
     cases_methods_builtin_print_as_method = "cases/methods/builtin_print_as_method",
     cases_methods_err_methods = "cases/methods/err_methods",

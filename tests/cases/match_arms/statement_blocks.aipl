@@ -1,0 +1,122 @@
+import { len, print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+
+// A `match` arm's body may be a brace-delimited statement block, exactly like an
+// `if` branch: statements first, and the trailing expression (if any) is the
+// arm's value. Before this, an arm was a single *expression*, so any arm needing
+// intermediate bindings had to become its own function returning a carrier
+// struct — the shape `doc.aipl`'s printer and `walker.aipl`'s token walker both
+// carried comments apologising for.
+//
+// The two forms mix freely within one `match`, and the block form works for
+// every pattern kind, which is what this covers: constructor arms with payload
+// bindings, `some`/`none`, string- and char-literal arms, and the wildcard.
+variant Shape = Dot | Line(u64) | Box(u64, u64)
+
+fn area(s: Shape) -> u64 {
+    match (s) {
+        // A single expression, as always.
+        Dot => 0,
+        Line(n) => {
+            let doubled = n + n;
+            doubled
+        },
+        Box(w, h) => {
+            let half = w + h;
+            let full = half + half;
+            full
+        },
+    }
+}
+
+fn opt(v: u64?) -> u64 {
+    match (v) {
+        some(n) => {
+            let m = n + 1;
+            m
+        },
+        none => 0,
+    }
+}
+
+// A block arm may open a loop and drive a `mut` binding declared inside it —
+// the whole point of the form.
+fn classify(s: str) -> str {
+    match (s) {
+        "" => "empty",
+        "a" => {
+            let n = s.len();
+            `single {n.to_str()}`
+        },
+        _ => {
+            mut count = 0;
+            for (let c : s) {
+                set count++;
+            }
+            `many {count.to_str()}`
+        },
+    }
+}
+
+fn shout(c: char) -> str {
+    match (c) {
+        'a' => {
+            let doubled = "AY";
+            doubled
+        },
+        _ => "?",
+    }
+}
+
+fn main() !prints {
+    print(area(Dot).to_str());
+    print(area(Line(3)).to_str());
+    print(area(Box(2, 5)).to_str());
+    print(opt(some(4)).to_str());
+    print(opt(none).to_str());
+    print(classify(""));
+    print(classify("a"));
+    print(classify("xyz"));
+    print(shout('a'));
+    print(shout('z'));
+}
+--- stdout ---
+0
+6
+14
+5
+0
+empty
+single 1
+many 3
+AY
+?
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 50
+instructions executed: 526
+binary size: 4016
+  code: 1928
+    __to_str_i64: 180
+    __to_str_u64: 180
+    area: 56
+    classify: 676
+    main: 808
+    opt: 28
+  data: 1
+  metadata: 2087
+builtin calls: 117
+  aipl_concat: 4
+  aipl_dec: 44
+  aipl_i64_len: 2
+  aipl_inc: 21
+  aipl_print: 10
+  aipl_str_data: 1
+  aipl_str_eq: 5
+  aipl_str_iter_init: 1
+  aipl_str_iter_next: 1
+  aipl_str_len: 9
+  aipl_u64_len: 12
+  aipl_write_i64: 1
+  aipl_write_u64: 6

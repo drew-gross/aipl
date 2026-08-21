@@ -1,0 +1,62 @@
+import { print, push, to_str, wrapping_increment as ++ } from builtins;
+
+// A block arm with no trailing expression is unit-valued, so a `match` used
+// purely for its effects needs no filler value in each arm. The arms below also
+// `set` a `mut` binding declared *outside* the `match` — the assignment that an
+// expression-only arm could never make, and the reason the printer in
+// `doc.aipl` used to thread its loop state through a returned struct.
+variant Ev = Tick | Tock | Reset(u64)
+
+fn main() !prints {
+    mut count: u64 = 0;
+    mut log = [];
+    for (let e : [Tick, Tock, Reset(7), Tick]) {
+        match (e) {
+            Tick => {
+                set count++;
+                set log.push("tick");
+            },
+            Tock => {
+                set log.push("tock");
+            },
+            Reset(n) => {
+                set count = n;
+                set log.push(`reset {n.to_str()}`);
+            },
+        };
+    }
+    print(count.to_str());
+    for (let entry : log) {
+        print(entry);
+    }
+}
+--- stdout ---
+8
+tick
+tock
+reset 7
+tick
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 3
+bytes allocated: 128
+instructions executed: 528
+binary size: 2680
+  code: 1216
+    __to_str_u64: 180
+    main: 1036
+  data: 1
+  metadata: 1463
+builtin calls: 62
+  aipl_arr_drop_str: 1
+  aipl_arr_retain_ptr: 4
+  aipl_array_dec: 2
+  aipl_array_new: 2
+  aipl_array_push_mut: 4
+  aipl_concat: 2
+  aipl_dec: 21
+  aipl_inc: 15
+  aipl_print: 5
+  aipl_u64_len: 4
+  aipl_write_u64: 2

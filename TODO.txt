@@ -58,10 +58,9 @@ utilitiy functions:
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : dct) syntax for dicts
-  match should allow statements
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
   match arm grouping (i.e. ArmA | ArmB => { same_statement })
-  match arms can be char literals
+  unspread i.e. MyStruct { ..val_of_type_my_struct, some_field: override }
 
 shim:
   better syntax
@@ -96,6 +95,7 @@ lint:
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
   recognize ad-hoc implementations of min/max an request using the function
+  set w.pos = w.pos + 1; <--- should be set w.pos++;
 
 errors:
   using Span without importing it gives a bad error
@@ -112,6 +112,8 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  sora
+  licm
   why does nextest listing take so long?
   we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass

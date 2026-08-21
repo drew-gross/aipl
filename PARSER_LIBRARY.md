@@ -13,7 +13,7 @@ each is sized to be finishable in one session.
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
 - [x] 1.5 Tail-call elimination — TODO.txt:467
-- [ ] 1.6 `match` arms as statement blocks; arm grouping; char-literal arms
+- [x] 1.6 `match` arms as statement blocks (arm grouping still open)
 - [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
 
 **Stage 2 — the library**
@@ -268,17 +268,64 @@ parameters, which are refcounted but neither `is_heap` nor boxed.
 the whole readability argument for this design; `doc.aipl` and `walker.aipl` can
 revert their work-stack rewrites.
 
-### 1.6 `match` arms as statement blocks — *recommended*
+### 1.6 `match` arms as statement blocks — **done** (2026-08-20)
 
-TODO.txt:51. Today an arm is a single expression, so the driver's central
-`match (rule)` — ten arms, each needing several statements — becomes ten helper
-functions returning carrier structs. Both `doc.aipl:144` and `walker.aipl:246`
-carry comments explaining that exact contortion. Beyond readability this costs
-~10 extra frames per rule node, so it compounds 1.5.
+An arm's body may now be a brace-delimited statement block, exactly like an `if`
+branch: statements first, and the trailing expression (if any) is the arm's
+value. `P => expr` and `P => { .. }` mix freely, and the block form works for
+every pattern kind.
 
-Also worth taking while in here, both cheap and both already on TODO.txt: arm
-grouping `A | B =>` (TODO.txt:53) and char-literal arms (TODO.txt:54). Token
-dispatch wants the first; the highlighter's classification wants the second.
+The change is small because it needed no new AST: `block` already builds an
+`Expr`, which is what `MatchArm.body` is. So it is one grammar nonterminal —
+
+```
+arm_body = expr => expr | block => block;
+```
+
+— shared by all eight `match_arm` productions, plus its builder. Factoring it
+rather than doubling the productions also keeps `expr` reachable from a *single*
+place in that subgrammar, which is what the `block_body` comment warns about:
+a second `expr` occurrence is what blew up gazelle's LR tables before. The choice
+is one token of lookahead, since no expression begins with `{`. Nothing in the
+checker, monomorphizer or codegen changed.
+
+**The formatter was the real work**, and this was the case CLAUDE.md flags as the
+one `scripts/handoff.sh` cannot bootstrap: `walker.aipl` compiles into
+`fmt.clif`, and handoff formats the corpus *before* regenerating IR, so the live
+formatter — which does not know the new syntax — is what would format sources
+written in it. The documented escape hatch works as written: `fill_staged_ir` →
+format the corpus under `AIPL_FMT_IR=…staged` → `fill_staged_ir` again (step 2
+shifts spans) → validate → promote.
+
+**Contortions removed** — the two the plan pointed at, both of which existed
+*only* because an arm was a single expression:
+
+- `walker.aipl`'s `bump` no longer needs `bump_tok`. The arm now opens its own
+  block and steps the cursor in place.
+- `doc.aipl`'s printer loop lost the `Step { col, work, emit, emits, done }`
+  carrier struct **and three functions** (`go_step`, `go_node`, `go_raw`). Each
+  arm now assigns the loop's own `mut` bindings directly, which is what the
+  carrier was faking. 89 lines became 66.
+
+That is measurably cheaper, not just shorter — the plan's "~10 extra frames per
+rule node" made concrete:
+
+| | instructions executed | change |
+|---|---|---|
+| `doc.aipl` | 25,074 → 21,531 | **−14%** |
+| `walker.aipl` | 3,059,404 → 2,945,436 | **−3.7%** |
+| `format_source.aipl` | 330,520 → 328,259 | −0.7% |
+
+**Coverage**: `tests/cases/match_arms/` (block arms across every pattern kind;
+statement-only arms driving a `mut` binding declared outside the `match`), plus
+block arms added to the `tests/fmt/match_and_variants.aipl` fixture — which pins
+that a statement-free block stays flat (`Empty => { 0 }`) while any block
+containing a `;` breaks one statement per line.
+
+**Not taken**: arm grouping `A | B =>` (still open on TODO.txt) — it needs a new
+`Pattern` variant and exhaustiveness/binding rules, so it is not the "cheap"
+add-on this section assumed. Char-literal arms turned out to be **already
+implemented** (`Pattern::Char`); that TODO entry is stale.
 
 ### 1.7 Deferred: hash-backed dicts and sets
 

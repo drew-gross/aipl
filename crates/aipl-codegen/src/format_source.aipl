@@ -70,13 +70,13 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 2188
-deallocations: 2188
+allocations: 2184
+deallocations: 2184
 reallocations: 6
-bytes allocated: 100657
-instructions executed: 330520
-binary size: 854768
-  code: 522992
+bytes allocated: 100369
+instructions executed: 328259
+binary size: 855400
+  code: 523212
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -196,7 +196,7 @@ binary size: 854768
     __m6__lead: 436
     __m6__lead_loop: 1512
     __m6__let_stmt: 19204
-    __m6__match_arms: 5056
+    __m6__match_arms: 6140
     __m6__match_expr: 10744
     __m6__mut_stmt: 5364
     __m6__name_atom: 5572
@@ -258,7 +258,7 @@ binary size: 854768
     __m7__fits$tail: 2636
     __m7__fits_atom: 44
     __m7__fits_atom$tail: 296
-    __m7__go: 4332
+    __m7__go: 3468
     __m7__has_hard: 32
     __m7__has_hard$tail: 664
     __m7__print_doc: 1328
@@ -273,8 +273,8 @@ binary size: 854768
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 329269
-builtin calls: 40170
+  metadata: 329681
+builtin calls: 39545
   aipl_arr_drop_str: 50
   aipl_arr_inc: 4601
   aipl_arr_reserve: 6
@@ -288,12 +288,12 @@ builtin calls: 40170
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 10457
-  aipl_inc: 8594
-  aipl_rec_alloc: 96
-  aipl_rec_dec_strong: 716
+  aipl_dec: 10308
+  aipl_inc: 8472
+  aipl_rec_alloc: 92
+  aipl_rec_dec_strong: 539
   aipl_rec_dec_weak: 47
-  aipl_rec_inc_strong: 620
+  aipl_rec_inc_strong: 447
   aipl_rec_inc_weak: 47
   aipl_str_contains: 292
   aipl_str_data: 32
