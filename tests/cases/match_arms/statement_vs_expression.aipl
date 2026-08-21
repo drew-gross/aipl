@@ -1,0 +1,102 @@
+import { print, to_str, wrapping_increment as ++ } from builtins;
+
+// A `match` is *either* a statement or an expression, never quietly both. Which
+// one it is comes from its arms; each kind then carries one obligation, and the
+// two are complementary, so no `match` can satisfy both.
+//
+//   arms produce nothing → statement: may assign to anything in scope, and must
+//                          sit where its value is discarded (so it ends in `;`)
+//   arms produce a value → expression: its value must be used, and no arm may
+//                          assign to a binding declared outside the `match`
+//
+// The point is that reading `let x = match (..) {..}` tells you the whole
+// effect of the `match`: it computed `x`. Anything that also mutates is spelled
+// as a statement, where a reader expects effects.
+variant Ev = Tick | Tock | Reset(u64)
+
+// Expression: every arm yields a value, nothing outside is touched.
+fn label(e: Ev) -> str {
+    match (e) {
+        Tick => "tick",
+        Tock => {
+            let loud = "TOCK";
+            loud
+        },
+        Reset(n) => `reset {n.to_str()}`,
+    }
+}
+
+fn main() !prints {
+    print(label(Tick));
+    print(label(Tock));
+    print(label(Reset(3)));
+
+    // Statement: arms yield nothing, so they may drive the surrounding `mut`
+    // bindings — and the `match` ends with `;`.
+    mut ticks: u64 = 0;
+    mut last = "";
+    for (let e : [Tick, Tock, Reset(9), Tick]) {
+        match (e) {
+            Tick => {
+                set ticks++;
+            },
+            Tock => {
+                set last = "tock";
+            },
+            Reset(n) => {
+                set ticks = n;
+                set last = "reset";
+            },
+        };
+    }
+    print(ticks.to_str());
+    print(last);
+
+    // An arm of an *expression* match may still use `mut` freely, as long as it
+    // declares what it assigns to.
+    let counted = match (Tock) {
+        Tick => 0,
+        Tock => {
+            mut n: u64 = 0;
+            for (let c : "abc") {
+                set n++;
+            }
+            n
+        },
+        Reset(k) => k,
+    };
+    print(counted.to_str());
+}
+--- stdout ---
+tick
+TOCK
+reset 3
+10
+reset
+3
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 96
+instructions executed: 554
+binary size: 3072
+  code: 1532
+    __to_str_u64: 180
+    label: 280
+    main: 1072
+  data: 1
+  metadata: 1539
+builtin calls: 54
+  aipl_array_dec: 1
+  aipl_array_new: 1
+  aipl_concat: 2
+  aipl_dec: 21
+  aipl_inc: 9
+  aipl_print: 6
+  aipl_str_data: 1
+  aipl_str_iter_init: 1
+  aipl_str_iter_next: 1
+  aipl_str_len: 2
+  aipl_u64_len: 6
+  aipl_write_u64: 3

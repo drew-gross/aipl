@@ -108,6 +108,77 @@ const KNOWN_EFFECTS: &[&str] = &[
     "clock",
 ];
 
+/// Whether an expression's value is used by whatever encloses it.
+///
+/// AIPL requires each `match` to be *either* a statement or an expression, and
+/// this is half of how that is decided (the other half is whether its arms
+/// produce a value):
+///
+/// - arms produce a value → an **expression** `match`: its value must be used
+///   ([`Pos::Value`]), and its arms may not assign to anything declared outside
+///   it, so that reading it is enough to know what it does;
+/// - arms produce nothing → a **statement** `match`: it may assign freely, and
+///   must sit where its (absent) value is discarded ([`Pos::Discard`]).
+///
+/// The practical effect is that a `match` run purely for effect is written
+/// `match (x) { .. };` — with the semicolon that makes it a statement.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pos {
+    /// The value is consumed: a binding's initializer, a call argument, a
+    /// block's trailing expression, an operand.
+    Value,
+    /// The value is thrown away: a `;`-terminated statement, or a loop body.
+    Discard,
+}
+
+/// The first assignment in `body` to a name `body` did not itself declare —
+/// i.e. a mutation reaching outside the expression. Returns the target's
+/// spelling and the `set`'s span.
+///
+/// `declared` starts as the names bound *inside* the arm (its pattern bindings)
+/// and grows as the walk enters `let`/`mut`/`for` scopes, so shadowing is
+/// handled: `mut n = 0; set n = 1;` inside an arm is local and fine, while a
+/// `set` of an enclosing `mut` is not. Only [`ExprKind::Assign`] mutates — plain
+/// `set`, a field store, and the `set recv.m(..)` writeback all parse to it — so
+/// this one walk covers every form.
+fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span)> {
+    match &body.kind {
+        ExprKind::Assign(lhs, val, rest) => {
+            if let Some((name, _)) = ast::assign_target(lhs) {
+                if !declared.contains(name) {
+                    return Some((name.to_string(), body.span.clone()));
+                }
+            }
+            outer_assign(val, declared).or_else(|| outer_assign(rest, declared))
+        }
+        // A binding is in scope for its body only, never its own initializer.
+        ExprKind::Let(name, _, val, rest) | ExprKind::LetMut(name, _, val, rest) => {
+            outer_assign(val, declared).or_else(|| {
+                let mut inner = declared.clone();
+                inner.insert(name.clone());
+                outer_assign(rest, &inner)
+            })
+        }
+        ExprKind::For(var, iter, rest) => outer_assign(iter, declared).or_else(|| {
+            let mut inner = declared.clone();
+            inner.insert(var.clone());
+            outer_assign(rest, &inner)
+        }),
+        ExprKind::Match(scrut, arms) => outer_assign(scrut, declared).or_else(|| {
+            arms.iter().find_map(|a| {
+                let mut inner = declared.clone();
+                inner.extend(a.pattern.bindings());
+                outer_assign(&a.body, &inner)
+            })
+        }),
+        // A lambda body is a separate function; its captures are checked there.
+        ExprKind::Lambda(_, _) => None,
+        _ => crate::children(body)
+            .into_iter()
+            .find_map(|c| outer_assign(c, declared)),
+    }
+}
+
 /// A bound name's type and whether it's reassignable (`let mut` / `mut self`).
 #[derive(Clone)]
 struct Binding {
@@ -1627,6 +1698,29 @@ impl Cx<'_> {
     }
 
     fn check_expr(&self, expr: &Expr, env: &Env, effects: &[String]) -> Result<Type, Error> {
+        self.check_expr_at(expr, env, effects, Pos::Value)
+    }
+
+    /// [`check_expr`], told whether this expression's value is *used*.
+    ///
+    /// Only `match` reads it (see [`Pos`]), but the answer has to be threaded
+    /// rather than looked up, because "discarded" is a property of where an
+    /// expression sits, not of the expression itself — and it reaches *through*
+    /// the forms that merely sequence or choose a value. `match (x) { .. };`
+    /// discards its arms' values, so an arm body is discarded too, and so is a
+    /// `match` nested inside that arm.
+    ///
+    /// Every other arm recurses through plain [`check_expr`], which resets to
+    /// [`Pos::Value`]. That is the safe polarity: a form added later treats its
+    /// children as used — the stricter reading — rather than silently inheriting
+    /// a `Discard` that lets an unchecked `match` through.
+    fn check_expr_at(
+        &self,
+        expr: &Expr,
+        env: &Env,
+        effects: &[String],
+        pos: Pos,
+    ) -> Result<Type, Error> {
         let span = expr.span.clone();
         Ok(match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
@@ -1741,8 +1835,8 @@ impl Cx<'_> {
                     "if condition",
                     c.span.clone(),
                 )?;
-                let tt = self.check_expr(t, env, effects)?;
-                let et = self.check_expr(e, env, effects)?;
+                let tt = self.check_expr_at(t, env, effects, pos)?;
+                let et = self.check_expr_at(e, env, effects, pos)?;
                 // One branch a bare literal, the other a narrow int: the literal
                 // takes the other's type (`if (b) { u8_val } else { 9 }`).
                 let tt = self.flex_int(t, &tt, &et)?;
@@ -1786,7 +1880,7 @@ impl Cx<'_> {
                         ));
                     }
                 }
-                let ft = self.check_expr(first, env, effects)?;
+                let ft = self.check_expr_at(first, env, effects, Pos::Discard)?;
                 // A discarded statement whose value is a result would silently
                 // drop its error — forbid it. The error must be handled: match on
                 // it, or propagate with `?`. (Binding it with `let` and then never
@@ -1798,7 +1892,7 @@ impl Cx<'_> {
                         first.span.clone(),
                     ));
                 }
-                self.check_expr(rest, env, effects)?
+                self.check_expr_at(rest, env, effects, pos)?
             }
             ExprKind::Return(value) => {
                 // The returned value must match the enclosing function's declared
@@ -1895,7 +1989,7 @@ impl Cx<'_> {
                         mutable: false,
                     },
                 );
-                self.check_expr(body, &env2, effects)?
+                self.check_expr_at(body, &env2, effects, pos)?
             }
             ExprKind::LetMut(name, ty, val, body) => {
                 let bt = self.check_binding(name, ty.as_ref(), val, body, env, effects)?;
@@ -1907,7 +2001,7 @@ impl Cx<'_> {
                         mutable: true,
                     },
                 );
-                self.check_expr(body, &env2, effects)?
+                self.check_expr_at(body, &env2, effects, pos)?
             }
             ExprKind::Assign(lhs, val, body) => {
                 let Some((name, path)) = ast::assign_target(lhs) else {
@@ -1967,7 +2061,7 @@ impl Cx<'_> {
                 // A bare literal takes the binding's (or field's) int type.
                 let vt = self.flex_int(val, &vt, &expected)?;
                 expect(&vt, &expected, "set", val.span.clone())?;
-                self.check_expr(body, env, effects)?
+                self.check_expr_at(body, env, effects, pos)?
             }
             ExprKind::For(_var, iter, body) => {
                 let it = self.check_expr(iter, env, effects)?;
@@ -1992,7 +2086,7 @@ impl Cx<'_> {
                         mutable: false,
                     },
                 );
-                self.check_expr(body, &env2, effects)?;
+                self.check_expr_at(body, &env2, effects, Pos::Discard)?;
                 Type::Primitive(Primitive::I64)
             }
             ExprKind::While(cond, body) => {
@@ -2005,7 +2099,7 @@ impl Cx<'_> {
                 )?;
                 // The body sees the enclosing scope (no loop binding); a `mut`
                 // tested/updated across iterations is declared before the loop.
-                self.check_expr(body, env, effects)?;
+                self.check_expr_at(body, env, effects, Pos::Discard)?;
                 Type::Primitive(Primitive::I64)
             }
             ExprKind::ArrayLit(elems) => {
@@ -2247,7 +2341,7 @@ impl Cx<'_> {
                     for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
                         env2.insert(name.clone(), Binding { ty, mutable: false });
                     }
-                    let t = self.check_expr(&arm.body, &env2, effects)?;
+                    let t = self.check_expr_at(&arm.body, &env2, effects, pos)?;
                     merged = Some(match merged {
                         None => (t, &arm.body),
                         Some((prev, prev_body)) => {
@@ -2259,7 +2353,9 @@ impl Cx<'_> {
                 }
                 let merged = merged.map(|(t, _)| t);
                 self.check_match_exhaustive(&st, arms, span.clone())?;
-                merged.unwrap_or(Type::Primitive(Primitive::I64))
+                let ty = merged.unwrap_or(Type::Primitive(Primitive::I64));
+                self.check_match_kind(&ty, arms, pos, span.clone())?;
+                ty
             }
             ExprKind::Call(name, args, method_style) => {
                 // For a method call the receiver is `args[0]`, and two rules
@@ -2288,6 +2384,69 @@ impl Cx<'_> {
                 self.check_call(name, args, env, effects, span.clone())?
             }
         })
+    }
+
+    /// Enforce that a `match` is *either* a statement or an expression, never
+    /// silently both. See [`Pos`] for the rule; this is where it is decided.
+    ///
+    /// The kind comes from the arms: a `match` whose arms produce no value is a
+    /// statement, one whose arms produce a value is an expression. Each then has
+    /// one obligation, and they are deliberately complementary — every `match`
+    /// satisfies exactly one, so there is no shape that quietly does both.
+    fn check_match_kind(
+        &self,
+        ty: &Type,
+        arms: &[ast::MatchArm],
+        pos: Pos,
+        span: Span,
+    ) -> Result<(), Error> {
+        match (ty, pos) {
+            // A statement `match` used as a statement — the whole point of the
+            // form, and the only shape allowed to assign to anything outside
+            // itself.
+            (Type::Unit, Pos::Discard) => Ok(()),
+            // A statement `match` in expression position: its arms yield
+            // nothing, so whatever is reading it gets nothing to read.
+            (Type::Unit, Pos::Value) => Err(Error::at(
+                "this `match` produces no value, so it is a statement — end it with \";\" \
+                 (to use it as an expression, every arm must produce a value)"
+                    .to_string(),
+                span,
+            )),
+            // An expression `match` whose value is thrown away. The arms went to
+            // the trouble of producing one, so dropping it is a mistake — either
+            // use it, or make the arms statements.
+            (_, Pos::Discard) => Err(Error::at(
+                format!(
+                    "this `match` produces {}, but its value is unused — bind it with \
+                     \"let\", return it, or make every arm a statement so the `match` is \
+                     a statement too",
+                    tyname(ty)
+                ),
+                span,
+            )),
+            // An expression `match` used as one: its arms must read as pure
+            // value-producers, so a `set` reaching outside is out. A statement
+            // `match` is where that belongs.
+            (_, Pos::Value) => {
+                for arm in arms {
+                    let declared: HashSet<String> = arm.pattern.bindings().into_iter().collect();
+                    if let Some((name, at)) = outer_assign(&arm.body, &declared) {
+                        return Err(Error::at(
+                            format!(
+                                "this arm assigns to {name:?}, which is declared outside \
+                                 the `match` — an expression `match` produces a value and \
+                                 may not also mutate. Make every arm a statement (ending \
+                                 the `match` with \";\"), or lift the assignment out and \
+                                 use the `match`'s value"
+                            ),
+                            at,
+                        ));
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 
     fn check_call(

@@ -322,6 +322,32 @@ block arms added to the `tests/fmt/match_and_variants.aipl` fixture — which pi
 that a statement-free block stays flat (`Empty => { 0 }`) while any block
 containing a `;` breaks one statement per line.
 
+**Statement vs expression `match`** (added right after, same PR). Allowing
+statement blocks in arms opened a hole: a `match` could produce a value *and*
+mutate its surroundings, so `let x = match (..) {..}` no longer told you what the
+`match` did. Each `match` now has to be one or the other, decided by its arms and
+enforced at its use site:
+
+| arms produce | kind | obligation |
+|---|---|---|
+| nothing | statement | may assign freely; must sit where its value is discarded — i.e. ends in `;` |
+| a value | expression | value must be used; no arm may assign to a binding declared outside the `match` |
+
+The two are complementary, so no `match` satisfies both. "Discarded" is a
+property of *position*, so it is threaded through `check_expr_at` (a `Pos`
+argument) rather than looked up — it has to reach through the forms that merely
+sequence or choose a value, since an arm of a discarded `match` is itself
+discarded. `check_expr` resets to `Pos::Value`, the stricter reading, so a form
+added later can't silently inherit a `Discard`.
+
+Cost across the corpus was **one character**: `tests/cases/results/basic.aipl`
+had a unit-valued `match` as a `.test` block's trailing expression and needed its
+`;`. The compiler's own 45 dogfooded files needed nothing — including the
+`doc.aipl` loop rewritten above, whose big statement `match` mutates the loop's
+own bindings and was already written with the semicolon. Nothing in codegen
+changed, so no `--- performance ---` section moved and no IR regeneration was
+involved.
+
 **Not taken**: arm grouping `A | B =>` (still open on TODO.txt) — it needs a new
 `Pattern` variant and exhaustiveness/binding rules, so it is not the "cheap"
 add-on this section assumed. Char-literal arms turned out to be **already

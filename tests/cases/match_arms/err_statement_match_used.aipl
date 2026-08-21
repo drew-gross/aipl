@@ -1,0 +1,23 @@
+import { print } from builtins;
+
+// A `match` whose arms produce nothing is a statement, so it cannot be read as
+// an expression — here it is the function body's trailing expression, which is
+// the value `run` returns. The fix is the `;` that makes it a statement.
+variant Ev = Tick | Tock
+
+fn run(e: Ev) !prints {
+    match (e) {
+        Tick => print("tick"),
+        Tock => print("tock"),
+    }
+}
+
+fn main() !prints {
+    run(Tick);
+}
+--- errors ---
+error: this `match` produces no value, so it is a statement — end it with ";" (to use it as an expression, every arm must produce a value)
+ --> ./tests/cases/match_arms/err_statement_match_used.aipl:9:12
+  |
+9 |     match (e) {
+  |            ^^^^

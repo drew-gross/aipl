@@ -112,6 +112,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  common subexpression elimination
   sora
   licm
   why does nextest listing take so long?
@@ -443,6 +444,8 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
+  clean things up with is_some_and
+  gap_has_blank and same_line should accept a span
 
 optimize string comparison by comparing more than one byte at a time
 
