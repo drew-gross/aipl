@@ -397,13 +397,18 @@ unfillable+='|^ *(SIGSEGV|ABORT|TIMEOUT) \['
 if grep -qE "$unfillable" "$STEP_OUT"; then
     fail "nextest (failure a refill can't fix)" "$(grep -nE "$unfillable" "$STEP_OUT" | head -20)"
 fi
+# The optional `<module>::` prefix on every name matched here: the suites under
+# tests/suites/ are `mod`s of the merged `compiler`/`dogfood` targets, so nextest
+# reports `dogfood_ir::checked_in_ir_is_current`, not the bare name. Matching only
+# the bare name silently reclassifies a regenerable staleness as a hard failure —
+# the run then stops at a step it was supposed to fix itself.
 # Any FAILED test that isn't a per-case test (each case is its own `#[test]`,
 # named `<prefix>_<display path>` for the three case roots — their fillable
 # mismatches are handled below), the case-list gate, or a known IR-staleness gate
 # is a real test failure. The unfillable grep above has already stopped on a case
 # that genuinely broke, so what reaches here is a stale section.
 bad="$(failed_tests "$STEP_OUT" \
-       | grep -vE '^((cases|examples|crates)_.*|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending)$' \
+       | grep -vE '^([A-Za-z0-9_]+::)?((cases|examples|crates)_.*|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending)$' \
        || true)"
 if [ -n "$bad" ]; then
     fail "nextest (failing test)" "$bad"
@@ -418,8 +423,8 @@ fi
 need_fill=0; need_ir=0; need_case_tests=0
 grep -qE '`[a-z ]+` mismatch|error mismatch|missing required `--- [a-z ]+ ---` section' \
     "$STEP_OUT" && need_fill=1
-failed_tests "$STEP_OUT" | grep -qE '^(checked_in_ir_is_current|no_staged_ir_pending)$' && need_ir=1
-failed_tests "$STEP_OUT" | grep -qx 'every_case_has_a_test' && need_case_tests=1
+failed_tests "$STEP_OUT" | grep -qE '^([A-Za-z0-9_]+::)?(checked_in_ir_is_current|no_staged_ir_pending)$' && need_ir=1
+failed_tests "$STEP_OUT" | grep -qE '^([A-Za-z0-9_]+::)?every_case_has_a_test$' && need_case_tests=1
 if [ $need_fill -eq 0 ] && [ $need_ir -eq 0 ] && [ $need_case_tests -eq 0 ]; then
     fail "nextest (unrecognized failure)" "$(tail -40 "$STEP_OUT")"
 fi

@@ -105,7 +105,7 @@ lint:
   advance and skip_comment have the  W { W { } } stuttering, why isn't the linter flagging it?
   lint fix mode
     first need an import-insert probably
-  "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects. But also, optimizations should be implemented so that after inlining, the arg isn't actually computed when the value isn't none.
+  "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects. But also, optimizations should be implemented so that after inlining, the arg isn't actually computed when the value isn't none (code sinking optimization)
 
 errors:
   using Span without importing it gives a bad error
@@ -260,6 +260,7 @@ error improvements:
 
 handoff:
   reimplement it in rust and/or aipl
+    then have nextest output json so we do less fragile output scraping
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
   Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.
@@ -277,7 +278,6 @@ improve the highlighter test: correct code should never highlight as a mismatche
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
-- lex_err/tok should accept a span argument instead of a start and end
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.
@@ -393,15 +393,11 @@ make a strip_trailing_whitespace if I can figure out a good name for it (that is
 
 Allow int literals to flex to the type they are being assinged to / passed as
 
-len should return unsigned int, including len-like functions
-
 narrower ints should take up less space
 
 add units to the language
 
 make repeat and indent accept unsigned int
-
-more retain elision (for arguments to functions that don't change the ref count)
 
 dead code elimination
 constant folding
@@ -462,7 +458,6 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
-  gap_has_blank and same_line and range_has_semi should accept a span
 
 optimize string comparison by comparing more than one byte at a time
 

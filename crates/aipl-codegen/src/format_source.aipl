@@ -74,9 +74,9 @@ allocations: 2184
 deallocations: 2184
 reallocations: 6
 bytes allocated: 100369
-instructions executed: 325775
-binary size: 854792
-  code: 522720
+instructions executed: 325796
+binary size: 854848
+  code: 522776
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -156,8 +156,8 @@ binary size: 854792
     __m6__binop_expr: 2888
     __m6__binop_tail: 3920
     __m6__block: 1012
-    __m6__block_entries: 3760
-    __m6__block_layout: 5112
+    __m6__block_entries: 3780
+    __m6__block_layout: 5124
     __m6__bump: 920
     __m6__call_arg: 4680
     __m6__call_arg_list: 636
@@ -194,7 +194,7 @@ binary size: 854792
     __m6__lambda_param_ty: 1456
     __m6__lambda_params: 3236
     __m6__lead: 436
-    __m6__lead_loop: 1512
+    __m6__lead_loop: 1520
     __m6__let_stmt: 19204
     __m6__match_arms: 6140
     __m6__match_expr: 10744
@@ -212,7 +212,7 @@ binary size: 854792
     __m6__postfix_segs: 3252
     __m6__program: 2784
     __m6__program_items: 4372
-    __m6__range_has_semi: 220
+    __m6__range_has_semi: 228
     __m6__range_tail: 2136
     __m6__sep_entry: 328
     __m6__set_member: 9644
@@ -234,7 +234,7 @@ binary size: 854792
     __m6__template_scan: 2248
     __m6__template_verbatim: 724
     __m6__tok_text: 368
-    __m6__trailing_comment: 1972
+    __m6__trailing_comment: 1980
     __m6__trim_last_break: 32
     __m6__trim_last_break$tail: 528
     __m6__tuple_binder: 1732

@@ -185,9 +185,9 @@ fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
     assert(w.next_start() == 0);
     // Once it is drained, the next entity is the `fn` token.
     assert(w.take_comment(0..5).next_start() == 6);
-    assert(w.same_line(6, 8));
-    assert(!w.same_line(0, 8)); // spans the newline after `// hi`
-    assert(!w.gap_has_blank(0, 8)); // one newline is not a blank line
+    assert(w.same_line(6..8));
+    assert(!w.same_line(0..8)); // spans the newline after `// hi`
+    assert(!w.gap_has_blank(0..8)); // one newline is not a blank line
 
     // --- lead --------------------------------------------------------------
     // The leading `// hi` is drained and emitted with a hard line after it (the
@@ -203,7 +203,7 @@ fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
     let blank_src = "// hi\n\nfn f() {}";
     let bw = new_walker(blank_src, [FmtTok { kind: Keyword, span: 7..9 }], [0..5]);
     // Two newlines in the gap after `// hi` — that *is* a blank line.
-    assert(bw.gap_has_blank(5, 7));
+    assert(bw.gap_has_blank(5..7));
     assert(bw.lead().doc == Concat([Text("// hi"), BlankLine]));
 
     // --- trailing_comment ---------------------------------------------------
@@ -295,12 +295,11 @@ fn next_start(self: W) -> u64 {
     }
 }
 
-// Whether the source between two offsets holds a blank line (two newlines).
-// (`lo`/`hi` where the Rust version says `from`/`to` — `from` is a keyword.)
-fn gap_has_blank(self: W, lo: u64, hi: u64) -> bool { 2 <= self.src[lo..hi].count('\n') }
+// Whether the source across a span holds a blank line (two newlines).
+fn gap_has_blank(self: W, span: Span) -> bool { 2 <= self.src[span].count('\n') }
 
-// Whether two offsets sit on the same source line.
-fn same_line(self: W, lo: u64, hi: u64) -> bool { !self.src[lo..hi].contains("\n") }
+// Whether a span's endpoints sit on the same source line.
+fn same_line(self: W, span: Span) -> bool { !self.src[span].contains("\n") }
 
 // ---------- comments ----------
 
@@ -330,7 +329,7 @@ fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -> WDoc {
         // comment, which the lexer cannot produce; `max` in the Rust version
         // guards the same impossible case.
         let gap_end = max(next, c.end);
-        let sep = if (stepped.gap_has_blank(c.end, gap_end)) { BlankLine } else { HardLine };
+        let sep = if (stepped.gap_has_blank(c.end..gap_end)) { BlankLine } else { HardLine };
         set acc.push(Text(w.src[c]));
         set acc.push(sep);
         set w = stepped;
@@ -351,7 +350,7 @@ fn trailing_comment(self: W) -> WDoc {
     };
     match (self.comments[self.cpos]) {
         none => WDoc { w: self, doc: Concat([]) },
-        some(c) => if (c.start < next_tok && self.same_line(self.last_end, c.start)) {
+        some(c) => if (c.start < next_tok && self.same_line(self.last_end..c.start)) {
             WDoc {
                 w: self.take_comment(c),
                 doc: Concat([Text(" "), Text(self.src[c]), BreakParent]),
@@ -1256,7 +1255,7 @@ fn block_layout(self: W) -> WDoc!FmtError {
     // form their own block first, so the distinction doesn't matter) always lays
     // out one line per statement. Only a pure single-expression body may stay
     // flat.
-    let has_stmt = e.w.range_has_semi(body_start, e.w.pos);
+    let has_stmt = e.w.range_has_semi(body_start..e.w.pos);
     let closed = e.w.expect("}")?.w;
     if (e.entries.len() == 0) {
         return ok(WDoc { w: closed, doc: Text("{}") });
@@ -1283,7 +1282,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
         let had_lead = !l.doc.is_empty_doc();
         set w = l.w;
         if (had_lead) {
-            let blank = w.gap_has_blank(prev_end, max(prev_end, w.last_end));
+            let blank = w.gap_has_blank(prev_end..max(prev_end, w.last_end));
             set entries.push(sep_entry(blank, 0 < entries.len()));
             set entries.push(l.doc);
 
@@ -1302,7 +1301,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
             let start = w.next_start();
             let stmt = w.statement()?;
             if (!had_lead) {
-                let blank = w.gap_has_blank(prev_end, start);
+                let blank = w.gap_has_blank(prev_end..start);
                 set entries.push(sep_entry(blank, 0 < entries.len()));
             };
             let tc = stmt.w.trailing_comment();
@@ -1326,9 +1325,9 @@ fn trim_last_break(self: Doc[]) -> Doc[] {
 // Whether any token in `[lo, hi)` is a `;`. A loop, not recursion: this scans
 // every token of a block, so on a large one the recursive form ran the native
 // stack out (AIPL does not guarantee tail-call elimination).
-fn range_has_semi(self: W, lo: u64, hi: u64) -> bool {
-    mut i = lo;
-    while (i < hi) {
+fn range_has_semi(self: W, span: Span) -> bool {
+    mut i = span.start;
+    while (i < span.end) {
         if (self.tok_text(i) == ";") {
             return true;
         };
@@ -2700,9 +2699,9 @@ allocations: 20457
 deallocations: 20457
 reallocations: 560
 bytes allocated: 1002564
-instructions executed: 2821440
-binary size: 3052600
-  code: 1746732
+instructions executed: 2822200
+binary size: 3052704
+  code: 1746832
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2792,7 +2791,7 @@ binary size: 3052600
     __rec_drop___m1__Doc: 184
     __rec_drop___m1__Work: 84
     __test$binding_ann: 4604
-    __test$new_walker: 10572
+    __test$new_walker: 10616
     __test$walker_of: 1210432
     __test_try_fail_FmtError: 64
     __to_str_FmtError: 812
@@ -2806,8 +2805,8 @@ binary size: 3052600
     binop_expr: 2888
     binop_tail: 3920
     block: 1012
-    block_entries: 3760
-    block_layout: 5112
+    block_entries: 3780
+    block_layout: 5124
     bump: 920
     call_arg: 4680
     call_arg_list: 636
@@ -2844,7 +2843,7 @@ binary size: 3052600
     lambda_param_ty: 1456
     lambda_params: 3236
     lead: 436
-    lead_loop: 1512
+    lead_loop: 1520
     let_stmt: 19204
     main: 152
     match_arms: 6140
@@ -2864,7 +2863,7 @@ binary size: 3052600
     postfix_segs: 3252
     program: 2784
     program_items: 4372
-    range_has_semi: 220
+    range_has_semi: 228
     range_tail: 2136
     rendered: 456
     sep_entry: 328
@@ -2888,7 +2887,7 @@ binary size: 3052600
     template_verbatim: 724
     tok_text: 368
     toks_of: 520
-    trailing_comment: 1972
+    trailing_comment: 1980
     trim_last_break: 32
     trim_last_break$tail: 528
     tuple_binder: 1732
@@ -2909,7 +2908,7 @@ binary size: 3052600
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1280128
+  metadata: 1280132
 builtin calls: 440280
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 140

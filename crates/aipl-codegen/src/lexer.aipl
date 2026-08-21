@@ -234,7 +234,7 @@ struct TokenRule<K> {
 // `skip` matches appear in neither.
 struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
-fn lex_err(message: str, start: u64, end: u64) -> LexError { message, span: start..end }
+fn lex_err(message: str, span: Span) -> LexError { message, span }
 
 // `CharRun`: length of the maximal run at the start of `self` — a `first`
 // char, then `cont` chars. 0 when the first char isn't in `first`.
@@ -855,7 +855,7 @@ fn rawtpl_kind(text: str, seg: Seg) -> Kind {
 
 // Test-block shorthands over the concrete `Kind` (each kind arm carries its own
 // content): an expected token, and a token-only result (no trivia).
-fn tok(kind: Kind, start: u64, end: u64) -> Token<Kind> { kind, span: start..end }
+fn tok(kind: Kind, span: Span) -> Token<Kind> { kind, span }
 
 fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { tokens, trivia: [] }
 
@@ -913,13 +913,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // Each kind is a variant arm carrying its content: an identifier holds its
     // text, and its span still slices the same text from the source.
-    assert(lex("foo", base)? == toks([tok(Ident("foo"), 0, 3)]));
-    assert(lex("x1", base)? == toks([tok(Ident("x1"), 0, 2)]));
-    assert(lex("1x", base)? == toks([tok(Digits, 0, 1), tok(Ident("x"), 1, 2)]));
-    assert(lex("  hi  ", base)? == toks([tok(Ident("hi"), 2, 4)]));
+    assert(lex("foo", base)? == toks([tok(Ident("foo"), 0..3)]));
+    assert(lex("x1", base)? == toks([tok(Ident("x1"), 0..2)]));
+    assert(lex("1x", base)? == toks([tok(Digits, 0..1), tok(Ident("x"), 1..2)]));
+    assert(lex("  hi  ", base)? == toks([tok(Ident("hi"), 2..4)]));
 
     // A byte no rule matches is a lex error carrying that byte's span.
-    assert(lex("a+1", base) == err(lex_err("unexpected character", 1, 2)));
+    assert(lex("a+1", base) == err(lex_err("unexpected character", 1..2)));
     match (lex("a+1", base)) {
         ok(ts) => assert(false),
         err(e) => assert("a+1"[e.span] == "+"),
@@ -935,9 +935,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Exact("="), emit: Bare(Op) },
         ident,
     ];
-    assert(lex("===", ops)? == toks([tok(Op, 0, 2), tok(Op, 2, 3)]));
-    assert(lex("a=b", ops)? == toks([tok(Ident("a"), 0, 1), tok(Op, 1, 2), tok(Ident("b"), 2, 3)]));
-    assert(lex("+", ops) == err(lex_err("unexpected character", 0, 1)));
+    assert(lex("===", ops)? == toks([tok(Op, 0..2), tok(Op, 2..3)]));
+    assert(lex("a=b", ops)? == toks([tok(Ident("a"), 0..1), tok(Op, 1..2), tok(Ident("b"), 2..3)]));
+    assert(lex("+", ops) == err(lex_err("unexpected character", 0..1)));
 
     // Keyword: a spelling matches only at an identifier boundary. One spelling
     // per rule, as with `Exact`; order among keyword rules is immaterial (the
@@ -945,25 +945,25 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let kw_if = TokenRule { matcher: Keyword("if", alnum), emit: Bare(Kw) };
     let kw_let = TokenRule { matcher: Keyword("let", alnum), emit: Bare(Kw) };
     let kws = [ws, kw_if, kw_let, ident];
-    assert(lex("iffy", kws)? == toks([tok(Ident("iffy"), 0, 4)]));
-    assert(lex("if fy", kws)? == toks([tok(Kw, 0, 2), tok(Ident("fy"), 3, 5)]));
-    assert(lex("if", kws)? == toks([tok(Kw, 0, 2)]));
+    assert(lex("iffy", kws)? == toks([tok(Ident("iffy"), 0..4)]));
+    assert(lex("if fy", kws)? == toks([tok(Kw, 0..2), tok(Ident("fy"), 3..5)]));
+    assert(lex("if", kws)? == toks([tok(Kw, 0..2)]));
 
     // Delimited: an `Of` emit carries the delimiter-stripped contents, left
     // *un-decoded* — with escapes off ("") that's the whole content verbatim, and
     // here none of the inputs carry a backslash so `Of(Str)` needs no decoding.
     // An unterminated token is a hard error at its open delimiter.
     let strs = [ws, TokenRule { matcher: Delimited("\"'", ""), emit: Of(Str) }, ident];
-    assert(lex("\"hi\" x", strs)? == toks([tok(Str("hi"), 0, 4), tok(Ident("x"), 5, 6)]));
-    assert(lex("''", strs)? == toks([tok(Str(""), 0, 2)]));
-    assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0, 3)));
+    assert(lex("\"hi\" x", strs)? == toks([tok(Str("hi"), 0..4), tok(Ident("x"), 5..6)]));
+    assert(lex("''", strs)? == toks([tok(Str(""), 0..2)]));
+    assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0..3)));
 
     // With escapes on, `escapes` still governs scanning (an unknown escape is a
     // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
     let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: Of(esc_str) }, ident];
-    assert(lex("\"a\\\"b\"", esc)? == toks([tok(Str("a\"b"), 0, 6)]));
-    assert(lex("\"a\\nb\"", esc)? == toks([tok(Str("a\nb"), 0, 6)]));
-    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence \\x", 2, 4)));
+    assert(lex("\"a\\\"b\"", esc)? == toks([tok(Str("a\"b"), 0..6)]));
+    assert(lex("\"a\\nb\"", esc)? == toks([tok(Str("a\nb"), 0..6)]));
+    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence \\x", 2..4)));
 
     // Try: a fallible string emit. `nonempty_str` decodes, then enforces a
     // content rule the *caller* owns — an empty string literal is an error whose
@@ -973,14 +973,14 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Delimited("\"", "nt\\\""), emit: Try(nonempty_str) },
         ident,
     ];
-    assert(lex("\"hi\"", nes)? == toks([tok(Str("hi"), 0, 4)]));
-    assert(lex("\"\"", nes) == err(lex_err("empty string literal", 0, 2)));
+    assert(lex("\"hi\"", nes)? == toks([tok(Str("hi"), 0..4)]));
+    assert(lex("\"\"", nes) == err(lex_err("empty string literal", 0..2)));
 
     // Between: a raw string `"""..."""` — a lone `"`/`""` inside is content.
     let q3 = "\"\"\"";
     let raw = [ws, TokenRule { matcher: Between(q3, q3), emit: Of(Raw) }, ident];
-    assert(lex("\"\"\"a\"b\"\"c\"\"\"", raw)? == toks([tok(Raw("a\"b\"\"c"), 0, 12)]));
-    assert(lex("\"\"\"hi\"\"", raw) == err(lex_err("unterminated delimited token", 0, 7)));
+    assert(lex("\"\"\"a\"b\"\"c\"\"\"", raw)? == toks([tok(Raw("a\"b\"\"c"), 0..12)]));
+    assert(lex("\"\"\"hi\"\"", raw) == err(lex_err("unterminated delimited token", 0..7)));
 
     // Nested: depth-tracked block comments — an inner `/* */` doesn't close the
     // outer. On the same input `Between` (`blk`) stops at the first `*/`.
@@ -988,12 +988,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let blk = [ws, TokenRule { matcher: Between("/*", "*/"), emit: Of(Block) }, ident];
     assert(
         lex("/* a /* b */ c */x", nest)? == toks([
-            tok(Block(" a /* b */ c "), 0, 17),
-            tok(Ident("x"), 17, 18),
+            tok(Block(" a /* b */ c "), 0..17),
+            tok(Ident("x"), 17..18),
         ]),
     );
-    assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0, 12)));
-    assert(lex("/* a /* b */", blk)? == toks([tok(Block(" a /* b "), 0, 12)]));
+    assert(lex("/* a /* b */", nest) == err(lex_err("unterminated delimited token", 0..12)));
+    assert(lex("/* a /* b */", blk)? == toks([tok(Block(" a /* b "), 0..12)]));
 
     // Char literals are not a library matcher: a consumer lexes one as a
     // single-quoted `Delimited` string and enforces the one-char shape in a
@@ -1007,39 +1007,39 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // bignum lexer never fails here.
     let minus = TokenRule { matcher: Exact("-"), emit: Bare(Op) };
     let ints = [ws, TokenRule { matcher: Int, emit: Try(int_tok) }, ident, minus];
-    assert(lex("42", ints)? == toks([tok(IntTok(42), 0, 2)]));
-    assert(lex("0 7", ints)? == toks([tok(IntTok(0), 0, 1), tok(IntTok(7), 2, 3)]));
+    assert(lex("42", ints)? == toks([tok(IntTok(42), 0..2)]));
+    assert(lex("0 7", ints)? == toks([tok(IntTok(0), 0..1), tok(IntTok(7), 2..3)]));
     assert(
-        lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0, 19)),
+        lex("9223372036854775808", ints) == err(lex_err("integer literal overflows i64", 0..19)),
     );
 
     // `-` glued to digits → one signed literal, wherever it appears (the `Int`
     // rule is before the `-` operator rule).
-    assert(lex("-5", ints)? == toks([tok(IntTok(-5), 0, 2)]));
-    assert(lex("a -5", ints)? == toks([tok(Ident("a"), 0, 1), tok(IntTok(-5), 2, 4)]));
+    assert(lex("-5", ints)? == toks([tok(IntTok(-5), 0..2)]));
+    assert(lex("a -5", ints)? == toks([tok(Ident("a"), 0..1), tok(IntTok(-5), 2..4)]));
 
     // A space after `-` makes `Int` decline, so the operator rule claims the `-`
     // and the digits are a separate `Int`: `- 5` is the operator, `-5` isn't.
     assert(
-        lex("a - 5", ints)? == toks([tok(Ident("a"), 0, 1), tok(Op, 2, 3), tok(IntTok(5), 4, 5)]),
+        lex("a - 5", ints)? == toks([tok(Ident("a"), 0..1), tok(Op, 2..3), tok(IntTok(5), 4..5)]),
     );
     assert(
-        lex("5 - 3", ints)? == toks([tok(IntTok(5), 0, 1), tok(Op, 2, 3), tok(IntTok(3), 4, 5)]),
+        lex("5 - 3", ints)? == toks([tok(IntTok(5), 0..1), tok(Op, 2..3), tok(IntTok(3), 4..5)]),
     );
 
     // `-` before a non-digit (a letter) also declines → the operator rule takes it
     // and the letters are a separate identifier (so a consumer gets unary `-x`).
-    assert(lex("-b", ints)? == toks([tok(Op, 0, 1), tok(Ident("b"), 1, 2)]));
+    assert(lex("-b", ints)? == toks([tok(Op, 0..1), tok(Ident("b"), 1..2)]));
 
     // Optional sign reaches the full range: i64::MIN parses (a positive run of the
     // same magnitude would overflow), one past it does not.
     assert(
         lex("-9223372036854775808", ints)? == toks([
-            tok(IntTok(0 - 9223372036854775807 - 1), 0, 20),
+            tok(IntTok(0 - 9223372036854775807 - 1), 0..20),
         ]),
     );
     assert(
-        lex("-9223372036854775809", ints) == err(lex_err("integer literal overflows i64", 0, 20)),
+        lex("-9223372036854775809", ints) == err(lex_err("integer literal overflows i64", 0..20)),
     );
 
     // The rule composes anywhere the full rule set runs, including a template
@@ -1054,9 +1054,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     ];
     assert(
         lex("`v{-5}`", tpls_signed)? == toks([
-            tok(TplHead("v"), 0, 3),
-            tok(IntTok(-5), 3, 5),
-            tok(TplTail(""), 6, 7),
+            tok(TplHead("v"), 0..3),
+            tok(IntTok(-5), 3..5),
+            tok(TplTail(""), 6..7),
         ]),
     );
 
@@ -1064,8 +1064,8 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // falls through to the digit rule.
     let dot = TokenRule { matcher: Exact("."), emit: Bare(Dot) };
     let flt = [ws, TokenRule { matcher: Float, emit: Bare(FloatTok) }, digits, ident, dot];
-    assert(lex("1.5e-3", flt)? == toks([tok(FloatTok, 0, 6)]));
-    assert(lex("1.", flt)? == toks([tok(Digits, 0, 1), tok(Dot, 1, 2)]));
+    assert(lex("1.5e-3", flt)? == toks([tok(FloatTok, 0..6)]));
+    assert(lex("1.", flt)? == toks([tok(Digits, 0..1), tok(Dot, 1..2)]));
 
     // Template: `text {expr} text`. `OfSeg` maps each segment's decoded text and
     // position (`Plain`/`Head`/`Middle`/`Tail`) to a `Kind` arm.
@@ -1074,47 +1074,47 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         emit: OfSeg(tpl_kind),
     };
     let tpls = [ws, tpl, ident, digits];
-    assert(lex("`hi`", tpls)? == toks([tok(Tpl("hi"), 0, 4)]));
+    assert(lex("`hi`", tpls)? == toks([tok(Tpl("hi"), 0..4)]));
     assert(
         lex("`a{x}b`", tpls)? == toks([
-            tok(TplHead("a"), 0, 3),
-            tok(Ident("x"), 3, 4),
-            tok(TplTail("b"), 5, 7),
+            tok(TplHead("a"), 0..3),
+            tok(Ident("x"), 3..4),
+            tok(TplTail("b"), 5..7),
         ]),
     );
     assert(
         lex("`{x}{y}`", tpls)? == toks([
-            tok(TplHead(""), 0, 2),
-            tok(Ident("x"), 2, 3),
-            tok(TplMid(""), 4, 5),
-            tok(Ident("y"), 5, 6),
-            tok(TplTail(""), 7, 8),
+            tok(TplHead(""), 0..2),
+            tok(Ident("x"), 2..3),
+            tok(TplMid(""), 4..5),
+            tok(Ident("y"), 5..6),
+            tok(TplTail(""), 7..8),
         ]),
     );
     // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
-    assert(lex("`a\\{b`", tpls)? == toks([tok(Tpl("a{b"), 0, 6)]));
-    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence \\q", 2, 4)));
-    assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0, 3)));
-    assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2, 3)));
+    assert(lex("`a\\{b`", tpls)? == toks([tok(Tpl("a{b"), 0..6)]));
+    assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence \\q", 2..4)));
+    assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0..3)));
+    assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2..3)));
     // Brace depth: braces lexed as their own tokens inside an interpolation nest.
     let lbrace = TokenRule { matcher: Exact("{"), emit: Bare(Punct) };
     let rbrace = TokenRule { matcher: Exact("}"), emit: Bare(Punct) };
     let tplb = [ws, tpl, lbrace, rbrace, ident, digits];
     assert(
         lex("`a{ {x} }b`", tplb)? == toks([
-            tok(TplHead("a"), 0, 3),
-            tok(Punct, 4, 5),
-            tok(Ident("x"), 5, 6),
-            tok(Punct, 6, 7),
-            tok(TplTail("b"), 9, 11),
+            tok(TplHead("a"), 0..3),
+            tok(Punct, 4..5),
+            tok(Ident("x"), 5..6),
+            tok(Punct, 6..7),
+            tok(TplTail("b"), 9..11),
         ]),
     );
     // Templates nest: an inner template between head and tail.
     assert(
         lex("`a{`x`}b`", tpls)? == toks([
-            tok(TplHead("a"), 0, 3),
-            tok(Tpl("x"), 3, 6),
-            tok(TplTail("b"), 7, 9),
+            tok(TplHead("a"), 0..3),
+            tok(Tpl("x"), 3..6),
+            tok(TplTail("b"), 7..9),
         ]),
     );
     // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
@@ -1123,12 +1123,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         emit: OfSeg(rawtpl_kind),
     };
     let tpl2 = [ws, raw3, tpl, ident, digits];
-    assert(lex("```a`b\\c```", tpl2)? == toks([tok(RawTpl("a`b\\c"), 0, 11)]));
+    assert(lex("```a`b\\c```", tpl2)? == toks([tok(RawTpl("a`b\\c"), 0..11)]));
     assert(
         lex("```a{x}b```", tpl2)? == toks([
-            tok(RawTplHead("a"), 0, 5),
-            tok(Ident("x"), 5, 6),
-            tok(RawTplTail("b"), 7, 11),
+            tok(RawTplHead("a"), 0..5),
+            tok(Ident("x"), 5..6),
+            tok(RawTplTail("b"), 7..11),
         ]),
     );
 
@@ -1139,8 +1139,8 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         emit: TrySeg(checked_seg),
     };
     let tsegs = [ws, tseg, ident, digits];
-    assert(lex("`hi`", tsegs)? == toks([tok(Tpl("hi"), 0, 4)]));
-    assert(lex("`TODO`", tsegs) == err(lex_err("TODO segment not allowed", 0, 6)));
+    assert(lex("`hi`", tsegs)? == toks([tok(Tpl("hi"), 0..4)]));
+    assert(lex("`TODO`", tsegs) == err(lex_err("TODO segment not allowed", 0..6)));
 
     // Trivia: a `trivia: true` rule is consumed like a skip rule, but each match
     // is recorded in the result's side-channel, out of the token stream.
@@ -1149,22 +1149,22 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let trv = [ws, cmt_t, allow_t, ident, digits];
     assert(
         lex("a #[allow] // b\nc", trv)? == LexResult {
-            tokens: [tok(Ident("a"), 0, 1), tok(Ident("c"), 16, 17)],
-            trivia: [tok(Allow, 2, 10), tok(Comment, 11, 15)],
+            tokens: [tok(Ident("a"), 0..1), tok(Ident("c"), 16..17)],
+            trivia: [tok(Allow, 2..10), tok(Comment, 11..15)],
         },
     );
     // Trivia inside a template interpolation rides up through the scan.
     let trvt = [ws, cmt_t, tpl, ident, digits];
     assert(
         lex("`a{x // c\n}b`", trvt)? == LexResult {
-            tokens: [tok(TplHead("a"), 0, 3), tok(Ident("x"), 3, 4), tok(TplTail("b"), 11, 13)],
-            trivia: [tok(Comment, 5, 9)],
+            tokens: [tok(TplHead("a"), 0..3), tok(Ident("x"), 3..4), tok(TplTail("b"), 11..13)],
+            trivia: [tok(Comment, 5..9)],
         },
     );
 
     // ToEol with skip: comments are dropped like whitespace.
     let cmt = [ws, TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true }, ident];
-    assert(lex("a // b\nc", cmt)? == toks([tok(Ident("a"), 0, 1), tok(Ident("c"), 7, 8)]));
+    assert(lex("a // b\nc", cmt)? == toks([tok(Ident("a"), 0..1), tok(Ident("c"), 7..8)]));
     assert(lex("// only", cmt)? == toks([]));
 
     // --- Rule sets resembling real languages. ---
@@ -1188,19 +1188,19 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     ];
     let jsrc = """{"pi": 3.14, "n": [1, true]}""";
     let jtoks = [
-        tok(Punct, 0, 1),
-        tok(Str("pi"), 1, 5),
-        tok(Punct, 5, 6),
-        tok(FloatTok, 7, 11),
-        tok(Punct, 11, 12),
-        tok(Str("n"), 13, 16),
-        tok(Punct, 16, 17),
-        tok(Punct, 18, 19),
-        tok(IntTok(1), 19, 20),
-        tok(Punct, 20, 21),
-        tok(Kw, 22, 26),
-        tok(Punct, 26, 27),
-        tok(Punct, 27, 28),
+        tok(Punct, 0..1),
+        tok(Str("pi"), 1..5),
+        tok(Punct, 5..6),
+        tok(FloatTok, 7..11),
+        tok(Punct, 11..12),
+        tok(Str("n"), 13..16),
+        tok(Punct, 16..17),
+        tok(Punct, 18..19),
+        tok(IntTok(1), 19..20),
+        tok(Punct, 20..21),
+        tok(Kw, 22..26),
+        tok(Punct, 26..27),
+        tok(Punct, 27..28),
     ];
     assert(lex(jsrc, json)? == toks(jtoks));
 
@@ -1223,13 +1223,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     ];
     let asrc = "let ok = s == \"hi\"; // check";
     let atoks = [
-        tok(Kw, 0, 3),
-        tok(Ident("ok"), 4, 6),
-        tok(Op, 7, 8),
-        tok(Ident("s"), 9, 10),
-        tok(Op, 11, 13),
-        tok(Str("hi"), 14, 18),
-        tok(Op, 18, 19),
+        tok(Kw, 0..3),
+        tok(Ident("ok"), 4..6),
+        tok(Op, 7..8),
+        tok(Ident("s"), 9..10),
+        tok(Op, 11..13),
+        tok(Str("hi"), 14..18),
+        tok(Op, 18..19),
     ];
     assert(lex(asrc, aipl)? == toks(atoks));
 })
@@ -1239,8 +1239,8 @@ deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
 instructions executed: 278556
-binary size: 1801704
-  code: 1132564
+binary size: 1799384
+  code: 1130244
     __arr_drop_StepResult$Kind: 140
     __arr_drop_Token$Kind: 492
     __arr_drop_TokenRule$Kind: 928
@@ -1285,7 +1285,7 @@ binary size: 1801704
     __lambda_8: 92
     __lambda_9: 60
     __m1__unescape: 892
-    __test$lex: 1045056
+    __test$lex: 1042736
     __test_try_fail_LexError: 64
     __to_str_LexError: 812
     apply_emit$Kind: 6844
