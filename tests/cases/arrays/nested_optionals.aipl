@@ -9,7 +9,7 @@ import { print, to_str } from builtins;
 fn unwrap2(x: i64??) -> i64 {
     match (x) {
         some(inner) => match (inner) {
-            some(v) => v,
+            some(v) => v, #[allow]
             none => -1,
         },
         none => -2,

@@ -5,7 +5,7 @@ import { == } from builtins;
 // monomorphizes per `T`; the type can be pinned by either argument.
 fn value_or<T: any>(self: T?, default: T) -> T {
     match (self) {
-        some(v) => v,
+        some(v) => v, #[allow]
         none => default,
     }
 }.test({

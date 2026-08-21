@@ -35,7 +35,7 @@ fn is_present(o: i64?) -> bool {
 // Not a bool at all.
 fn or_zero(o: i64?) -> i64 {
     match (o) {
-        some(v) => v,
+        some(v) => v, #[allow]
         none => 0,
     }
 }

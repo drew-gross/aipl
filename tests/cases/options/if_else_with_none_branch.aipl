@@ -1,12 +1,9 @@
-import { == } from builtins;
+import { value_or, == } from builtins;
 
 // none in else branch picks up the type from the some branch.
 fn maybe(want: bool) -> i64 {
     let x = if (want) { some(42) } else { none };
-    match (x) {
-        some(v) => v,
-        none => -1,
-    }
+    x.value_or(-1)
 }.test({
     assert(maybe(true) == 42);
     assert(maybe(false) == -1);
@@ -21,8 +18,8 @@ binary size: 1176
   code: 248
     main: 160
     maybe: 88
-  data: 94
-  metadata: 834
+  data: 93
+  metadata: 835
 builtin calls: 5
   aipl_assert: 2
   aipl_test_begin: 1

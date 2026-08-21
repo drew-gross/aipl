@@ -1,0 +1,64 @@
+import { print, to_str, value_or, wrapping_add as + } from builtins;
+
+// Shapes that look close but are deliberately left alone.
+
+// The `some` arm transforms the payload, so this is a `map`, not a `value_or`.
+fn plus_one(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v + 1,
+        none => 0,
+    }
+}
+
+// The `some` arm ignores its binding, so the payload never comes out.
+fn always_zero(o: i64?) -> i64 {
+    match (o) {
+        some(v) => 0,
+        none => 0,
+    }
+}
+
+fn fallback() -> i64 { 7 }
+
+// The default is a call. `value_or`'s argument is evaluated eagerly, but this
+// `none` arm runs only when the optional is empty — rewriting would call
+// `fallback()` even for a populated optional, so the lint stays quiet.
+fn or_call(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v,
+        none => fallback(),
+    }
+}
+
+fn main() !prints {
+    print(plus_one(some(5)).to_str());
+    print(always_zero(some(5)).to_str());
+    print(or_call(none).to_str());
+    // The rewrite itself must not flag.
+    print(some(3).value_or(0).to_str());
+}
+--- stdout ---
+6
+0
+7
+3
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 189
+binary size: 1616
+  code: 616
+    __to_str_i64: 180
+    main: 412
+    or_call: 24
+  data: 1
+  metadata: 999
+builtin calls: 28
+  aipl_dec: 8
+  aipl_i64_len: 8
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_write_i64: 4

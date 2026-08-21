@@ -1,12 +1,7 @@
-import { == } from builtins;
+import { value_or, == } from builtins;
 
 // Indexing yields an optional: some(elem) in bounds, none out of bounds.
-fn at(xs: i64[], i: i64) -> i64 {
-    match (xs[i]) {
-        some(v) => v,
-        none => -1,
-    }
-}.test({
+fn at(xs: i64[], i: i64) -> i64 { xs[i].value_or(-1) }.test({
     let xs = [5, 6, 7];
     // in-bounds element
     assert(at(xs, 1) == 6);
@@ -24,12 +19,12 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 236
-binary size: 2792
-  code: 1256
+binary size: 2776
+  code: 1248
     __eq_i64$opt: 100
-    __test$at: 1088
+    __test$at: 1080
     main: 68
-  data: 233
+  data: 225
   metadata: 1303
 builtin calls: 10
   aipl_array_dec: 1

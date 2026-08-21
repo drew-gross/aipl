@@ -1960,6 +1960,7 @@ pub mod lint {
         each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
         each_expr(program, &mut |e| eta_lambda(e, &mut hits));
         each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
+        each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
         each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
         // Only where a `++` flavor provably matches this file's `+` — see
         // `matching_increment`, which also names the import when it's missing.
@@ -2380,6 +2381,100 @@ pub mod lint {
                  to keep it)"
             ),
             none_arm.body.span.clone(),
+        ));
+    }
+
+    /// `match (o) { some(v) => v, none => d }` — an optional unwrapped to its
+    /// payload with a fallback. That is exactly `o.value_or(d)`.
+    ///
+    /// The `some` arm must hand back its own binding unchanged; that identity
+    /// arm is what separates this from a `map`, where the payload is transformed
+    /// on the way out. Arm order doesn't matter.
+    ///
+    /// The default is restricted to a literal or a bare name, and that bound is
+    /// about correctness rather than formatting: `value_or`'s default is an
+    /// ordinary call argument, so it is evaluated whether or not the optional is
+    /// empty, while a `none` arm runs only when it is. For a literal or a name
+    /// the difference is unobservable. For anything else — a call, an index,
+    /// arithmetic — the rewrite could move work, or an effect, to where it did
+    /// not happen before, so the lint stays quiet rather than advise a rewrite
+    /// that changes meaning.
+    fn match_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
+        let ExprKind::Match(scrut, arms) = &e.kind else {
+            return;
+        };
+        if arms.len() != 2 {
+            return;
+        }
+        let arm_named = |want: &str| {
+            arms.iter()
+                .find(|a| matches!(&a.pattern, Pattern::Ctor { name, .. } if name == want))
+        };
+        let (Some(some_arm), Some(none_arm)) = (arm_named("some"), arm_named("none")) else {
+            return;
+        };
+        let Pattern::Ctor { bindings, .. } = &some_arm.pattern else {
+            return;
+        };
+        let Pattern::Ctor {
+            bindings: none_binds,
+            ..
+        } = &none_arm.pattern
+        else {
+            return;
+        };
+        // `some` binds exactly its payload; `none` binds nothing.
+        let [binder] = &bindings[..] else {
+            return;
+        };
+        if !none_binds.is_empty() {
+            return;
+        }
+        // The identity arm. `some(v) => f(v)` is a `map`, not a `value_or`.
+        let ExprKind::Ident(payload) = &some_arm.body.kind else {
+            return;
+        };
+        if payload != binder {
+            return;
+        }
+        // Only an eagerly-evaluable default is safe to advise (see above). Their
+        // spans are exactly the token, so the source text splices back verbatim —
+        // including a string literal's own quotes and escapes, which
+        // reconstructing from the AST would have to re-derive.
+        if !matches!(
+            none_arm.body.kind,
+            ExprKind::Num(_)
+                | ExprKind::Bool(_)
+                | ExprKind::Str(_)
+                | ExprKind::Char(_)
+                | ExprKind::Ident(_)
+        ) {
+            return;
+        }
+        let sp = &none_arm.body.span;
+        let Some(default) = src.get(sp.start..sp.end) else {
+            return;
+        };
+        // Quote the scrutinee back only when it is a bare name, whose span is
+        // exactly its text — a call-shaped scrutinee's span stops before its
+        // parens (see `slice_from_zero`), so splicing it would produce advice
+        // that doesn't parse.
+        let call = match &scrut.kind {
+            ExprKind::Ident(name) => format!("{name}.value_or({default})"),
+            _ => format!(".value_or({default})"),
+        };
+        // Point at the `some(v) => v` arm's body, not the whole `match`.
+        // `#[allow]` is line-scoped (see `allow_squelch`), so a hit spanning the
+        // multi-line `match` could never be squelched. That lone identifier is
+        // always one line, so it always takes a trailing marker and keeps it
+        // through `aipl fmt` — and it is the arm that identifies the shape, since
+        // a default alone is something `value_or` has too.
+        hits.push(Error::at(
+            format!(
+                "this `match` hands back the optional's payload or a default — write \
+                 \"{call}\" instead (or append #[allow] to this line to keep it)"
+            ),
+            some_arm.body.span.clone(),
         ));
     }
 

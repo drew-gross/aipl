@@ -608,7 +608,7 @@ fn call_values_marshals_optional_array_return() {
 /// that reads every element, so a mis-sized stride or a wrong tag shows up as a
 /// wrong answer rather than passing unnoticed.
 const ARRAY_PARAM_SRC: &str = "\
-import { len, push, wrapping_add as +, wrapping_sub as -, wrapping_add as ++, +++ } from builtins;
+import { len, push, value_or, wrapping_add as +, wrapping_sub as -, wrapping_add as ++, +++ } from builtins;
 struct Span { start: i64, end: i64 }
 variant Token = Eof | Ident(str) | Count(i64)
 
@@ -649,10 +649,7 @@ pub fn grid_total(grid: i64[][]) -> i64 {
 pub fn somes(xs: i64?[]) -> i64 {
     mut n = 0;
     for (let x : xs) {
-        let add = match (x) {
-            some(v) => v,
-            none => 100,
-        };
+        let add = x.value_or(100);
         set n = n + add;
     }
     n
@@ -858,7 +855,7 @@ pub fn span_end(s: Span?) -> i64 {
 pub fn depth(n: i64??) -> i64 {
     match (n) {
         some(inner) => match (inner) {
-            some(v) => v,
+            some(v) => v, #[allow]
             none => -1,
         },
         none => -2,

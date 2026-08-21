@@ -17,21 +17,21 @@ fn main() !prints {
     // Nested match distinguishes out-of-bounds, present-but-none, and a value.
     let n0 = match (xs[0]) {
         some(inner) => match (inner) {
-            some(v) => v,
+            some(v) => v, #[allow]
             none => -1,
         },
         none => -2,
     };
     let n1 = match (xs[1]) {
         some(inner) => match (inner) {
-            some(v) => v,
+            some(v) => v, #[allow]
             none => -1,
         },
         none => -2,
     };
     let n9 = match (xs[9]) {
         some(inner) => match (inner) {
-            some(v) => v,
+            some(v) => v, #[allow]
             none => -1,
         },
         none => -2,

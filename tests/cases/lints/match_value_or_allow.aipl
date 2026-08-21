@@ -1,0 +1,56 @@
+import { print, to_str, value_or } from builtins;
+
+// `#[allow]` keeps the long form — the escape hatch every lint carries.
+// `value_or`'s own definition needs exactly this, since it cannot be rewritten
+// in terms of itself.
+//
+// The marker goes on the `some(v) => v` arm, which is where this lint points.
+// That is deliberate: `#[allow]` is line-scoped, so a lint spanning the whole
+// multi-line `match` could never be squelched — the only line able to carry the
+// marker would be the `match (..) {` header, and the formatter moves a marker
+// written there onto its own line, where it squelches nothing. A lone binding
+// is always one line, so it always takes a trailing marker and keeps it through
+// `aipl fmt`.
+fn or_zero(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v, #[allow]
+        none => 0,
+    }
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn or_zero_short(o: i64?) -> i64 { o.value_or(0) }
+
+fn main() !prints {
+    print(or_zero(some(5)).to_str());
+    print(or_zero_short(some(5)).to_str());
+    print(or_zero(none).to_str());
+    print(or_zero_short(none).to_str());
+}
+--- stdout ---
+5
+5
+0
+0
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 185
+binary size: 1648
+  code: 608
+    __to_str_i64: 180
+    main: 380
+    or_zero: 24
+    or_zero_short: 24
+  data: 1
+  metadata: 1039
+builtin calls: 28
+  aipl_dec: 8
+  aipl_i64_len: 8
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_write_i64: 4

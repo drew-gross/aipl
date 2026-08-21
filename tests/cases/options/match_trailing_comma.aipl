@@ -2,7 +2,7 @@ import { == } from builtins;
 
 fn unwrap(x: i64?) -> i64 {
     match (x) {
-        some(v) => v,
+        some(v) => v, #[allow]
         none => 0,
     }
 }.test({

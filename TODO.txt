@@ -103,6 +103,9 @@ lint:
   set w.pos = w.pos + 1; <--- should be set w.pos++;
   forbid unnecessary allow
   advance and skip_comment have the  W { W { } } stuttering, why isn't the linter flagging it?
+  lint fix mode
+    first need an import-insert probably
+  "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects. But also, optimizations should be implemented so that after inlining, the arg isn't actually computed when the value isn't none.
 
 errors:
   using Span without importing it gives a bad error
@@ -119,6 +122,10 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  operation fusion:
+    make the framework
+      vec.count() < n should fuse to stop counting when it hits n+1
+      vec.filter().count() should fuse to not materialize the filtered array
   2. Cap link concurrency during handoff (cargo build -j4 for the build steps). Doesn't reduce work, but caps peak RSS so the box stops swapping. Cheap to try, low risk.
   common subexpression elimination
   sora
@@ -455,7 +462,6 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
-  clean things up with is_some_and
   gap_has_blank and same_line and range_has_semi should accept a span
 
 optimize string comparison by comparing more than one byte at a time
