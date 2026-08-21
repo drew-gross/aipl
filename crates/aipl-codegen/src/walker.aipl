@@ -14,6 +14,7 @@ import {
     Span,
     contains,
     count,
+    intersperse,
     is_err_and,
     is_some_and,
     join,
@@ -415,14 +416,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
         return Text(`{s.open}{s.close}`);
     };
     let edge = if (s.spaced) { Line } else { SoftLine };
-    mut inner = [edge];
-    for (let i, item : items) {
-        if (0 < i) {
-            set inner.push(Text(","));
-            set inner.push(Line);
-        };
-        set inner.push(item);
-    }
+    let inner = [edge, ..items.intersperse(Concat([Text(","), Line]))];
     mut parts = [Text(s.open), Indent(Concat(inner))];
     if (s.trailing) {
         set parts.push(IfBroken(","));
@@ -915,13 +909,7 @@ fn program(self: W) -> WDoc!FmtError {
     // before any import can claim them.
     let h = self.lead();
     let p = h.w.program_items([], [])?;
-    mut out = [h.doc];
-    for (let i, d : sorted_imports(p.imports)) {
-        if (0 < i) {
-            set out.push(HardLine);
-        };
-        set out.push(d);
-    }
+    mut out = [h.doc, ..sorted_imports(p.imports).intersperse(HardLine)];
     let had_imports = 0 < p.imports.len();
     for (let i, d : p.items) {
         if (0 < i || had_imports) {
@@ -2062,13 +2050,7 @@ fn lambda(self: W) -> WDoc!FmtError {
         WDocs { w: ps.w.expect("|")?.w, docs: ps.docs }
     };
     let body = if (params.w.peek_text() == "{") { params.w.block()? } else { params.w.expr()? };
-    mut d = [Text("|")];
-    for (let i, p : params.docs) {
-        if (0 < i) {
-            set d.push(Text(", "));
-        };
-        set d.push(p);
-    }
+    mut d = [Text("|"), ..params.docs.intersperse(Text(", "))];
     set d.push(Text("| "));
     set d.push(body.doc);
     ok(WDoc { w: body.w, doc: Concat(d) })
@@ -2659,13 +2641,13 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20460
-deallocations: 20460
-reallocations: 560
-bytes allocated: 1002684
-instructions executed: 2822917
-binary size: 3060352
-  code: 1751428
+allocations: 20942
+deallocations: 20942
+reallocations: 862
+bytes allocated: 1025100
+instructions executed: 2849273
+binary size: 3061600
+  code: 1752048
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2682,8 +2664,8 @@ binary size: 3060352
     __arr_retain___m9__StepResult$__m8__AiplTok: 140
     __arr_retain___m9__Token$__m8__AiplTok: 364
     __arr_retain___m9__TokenRule$__m8__AiplTok: 800
-    __builtin_any$__m1__Doc$lam25: 32
-    __builtin_any$__m1__Doc$lam25$tail: 324
+    __builtin_any$__m1__Doc$lam21: 32
+    __builtin_any$__m1__Doc$lam21$tail: 324
     __builtin_count$char$s0: 232
     __builtin_count_while$char$s0$lam51: 232
     __builtin_count_while$char$s0$lam69: 296
@@ -2692,11 +2674,12 @@ binary size: 3060352
     __builtin_count_while$char$s0$lam82: 232
     __builtin_count_while$char$s0$lam83: 232
     __builtin_int_parse: 744
+    __builtin_intersperse$__m1__Doc: 408
     __builtin_is_some_and$char$lam75: 48
     __builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12: 540
     __builtin_opt_left_fold$char$i64$s0$lam63: 348
-    __builtin_sort_by$ImportEntry$lam18: 1536
-    __builtin_sort_by$ImportName$lam22: 3236
+    __builtin_sort_by$ImportEntry$lam36: 1536
+    __builtin_sort_by$ImportName$lam18: 3236
     __builtin_value_or_err$i64$str: 180
     __eq_FmtKind: 64
     __eq_FmtTok: 120
@@ -2705,14 +2688,14 @@ binary size: 3060352
     __eq___m1__Doc: 464
     __eq___m1__Doc$arr: 300
     __eq_char$opt: 100
-    __lambda_30: 100
-    __lambda_31: 68
-    __lambda_32: 136
-    __lambda_33: 152
-    __lambda_34: 108
-    __lambda_35: 136
-    __lambda_36: 48
-    __lambda_37: 64
+    __lambda_26: 100
+    __lambda_27: 68
+    __lambda_28: 136
+    __lambda_29: 152
+    __lambda_30: 108
+    __lambda_31: 136
+    __lambda_32: 48
+    __lambda_33: 64
     __lambda_62: 140
     __m10__unescape: 892
     __m11__process_raw_string: 32
@@ -2776,7 +2759,7 @@ binary size: 3060352
     call_arg_list: 636
     call_args_until: 2688
     chain_docs: 472
-    comma_list_docs: 3004
+    comma_list_docs: 3080
     comment_starts_before: 280
     construct_body: 3208
     dict_entries: 4264
@@ -2803,7 +2786,7 @@ binary size: 3060352
     index_seg: 3676
     is_line_break: 372
     item: 1064
-    lambda: 5920
+    lambda: 5924
     lambda_param_ty: 1456
     lambda_params: 3236
     lead: 436
@@ -2826,7 +2809,7 @@ binary size: 3060352
     peek_text_n: 32
     postfix: 4668
     postfix_segs: 3252
-    program: 2784
+    program: 2500
     program_items: 4372
     range_has_semi: 228
     range_tail: 2136
@@ -2839,6 +2822,7 @@ binary size: 3060352
     shim_bindings: 3048
     shim_expr: 5860
     slice_to: 1300
+    sorted_imports: 416
     spaced_default: 1692
     statement: 5168
     str_atom: 532
@@ -2873,39 +2857,39 @@ binary size: 3060352
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1283184
-builtin calls: 440430
+  metadata: 1283812
+builtin calls: 443787
   aipl_arr_drop_str: 2036
-  aipl_arr_extend: 140
-  aipl_arr_inc: 48882
-  aipl_arr_reserve: 203
+  aipl_arr_extend: 213
+  aipl_arr_inc: 49225
+  aipl_arr_reserve: 276
   aipl_arr_retain_ptr: 2032
-  aipl_arr_slice: 69
-  aipl_array_dec: 60675
-  aipl_array_new: 9836
-  aipl_array_push: 1650
-  aipl_array_push_mut: 1353
-  aipl_array_with_cap: 175
+  aipl_arr_slice: 78
+  aipl_array_dec: 61147
+  aipl_array_new: 10098
+  aipl_array_push: 1496
+  aipl_array_push_mut: 1605
+  aipl_array_with_cap: 187
   aipl_assert: 164
   aipl_char_at: 3930
   aipl_concat: 258
   aipl_concat_lazy: 199
-  aipl_dec: 94014
-  aipl_inc: 74304
-  aipl_rec_alloc: 5593
-  aipl_rec_dec_strong: 39789
-  aipl_rec_dec_weak: 3509
-  aipl_rec_inc_strong: 34196
-  aipl_rec_inc_weak: 3509
+  aipl_dec: 94119
+  aipl_inc: 74322
+  aipl_rec_alloc: 5946
+  aipl_rec_dec_strong: 40676
+  aipl_rec_dec_weak: 3565
+  aipl_rec_inc_strong: 34730
+  aipl_rec_inc_weak: 3565
   aipl_str_cmp: 7
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 6027
+  aipl_str_eq: 6029
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31207
+  aipl_str_len: 31211
   aipl_str_repeat: 74
   aipl_str_slice: 8489
   aipl_str_split: 934

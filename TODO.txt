@@ -54,7 +54,11 @@ clock:
 
 utilitiy functions:
   split with predicate, use in companion_files.aipl
-  interaclate, generic join, use in walker.aipl to replace 0 < i loops.
+  interaclate
+
+bugs:
+  mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
+  ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
 
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
@@ -62,9 +66,12 @@ syntax:
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
+  implement T+ for intersperse
+  rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
+  support join(self: T[], sep: T+ = []) (defaults for posiitonal args, can join with multiple)
 
 shim:
-  better syntax
+  better syntax (shim is a weird keyword)
   shim the rest of the effects
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
@@ -115,7 +122,7 @@ Spreading:
   optimize the bit packed and rope representations as well
 
 type checking:
-  we've seen a few problems where inlining or constand folding causes behaviour to change because after inlining type information is lost. Lets fix this by:
+  we've seen a few problems where inlining or constant folding causes behaviour to change because after inlining type information is lost. Lets fix this by:
     a) do all type checking before any optimization
     b) do inlining after monomorphization
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.

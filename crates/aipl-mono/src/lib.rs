@@ -4922,6 +4922,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_count_while", "builtin_count_while.aipl"),
     ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
     ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
+    ("__builtin_intersperse", "builtin_intersperse.aipl"),
     ("__builtin_map_err", "builtin_map_err.aipl"),
     ("__builtin_int_parse", "builtin_int_parse.aipl"),
     ("__builtin_trim_while", "builtin_trim_while.aipl"),

@@ -70,13 +70,13 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 2184
-deallocations: 2184
+allocations: 2208
+deallocations: 2208
 reallocations: 6
-bytes allocated: 100369
-instructions executed: 325796
-binary size: 862496
-  code: 527372
+bytes allocated: 101329
+instructions executed: 326428
+binary size: 863752
+  code: 527992
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -103,10 +103,11 @@ binary size: 862496
     __builtin_count_while$char$s0$lam69: 232
     __builtin_count_while$char$s0$lam71: 232
     __builtin_int_parse: 744
+    __builtin_intersperse$__m7__Doc: 408
     __builtin_is_some_and$char$lam59: 48
     __builtin_map_err$__m13__LexResult$__m12__AiplTok$__m13__LexError$__m6__FmtError$lam7: 540
     __builtin_opt_left_fold$char$i64$s0$lam38: 348
-    __builtin_sort_by$__m6__ImportEntry$lam23: 1536
+    __builtin_sort_by$__m6__ImportEntry$lam28: 1536
     __builtin_sort_by$__m6__ImportName$lam62: 3236
     __builtin_value_or_err$i64$str: 180
     __eq___m6__FmtKind: 64
@@ -163,7 +164,7 @@ binary size: 862496
     __m6__call_arg_list: 636
     __m6__call_args_until: 2688
     __m6__chain_docs: 472
-    __m6__comma_list_docs: 3004
+    __m6__comma_list_docs: 3080
     __m6__comment_starts_before: 280
     __m6__construct_body: 3208
     __m6__dict_entries: 4264
@@ -190,7 +191,7 @@ binary size: 862496
     __m6__index_seg: 3676
     __m6__is_line_break: 372
     __m6__item: 1064
-    __m6__lambda: 5920
+    __m6__lambda: 5924
     __m6__lambda_param_ty: 1456
     __m6__lambda_params: 3236
     __m6__lead: 436
@@ -211,7 +212,7 @@ binary size: 862496
     __m6__peek_text_n: 32
     __m6__postfix: 4668
     __m6__postfix_segs: 3252
-    __m6__program: 2784
+    __m6__program: 2500
     __m6__program_items: 4372
     __m6__range_has_semi: 228
     __m6__range_tail: 2136
@@ -223,6 +224,7 @@ binary size: 862496
     __m6__shim_bindings: 3048
     __m6__shim_expr: 5860
     __m6__slice_to: 1300
+    __m6__sorted_imports: 416
     __m6__spaced_default: 1692
     __m6__statement: 5168
     __m6__str_atom: 532
@@ -274,25 +276,26 @@ binary size: 862496
     fmt_prepare: 864
     main: 928
   data: 2507
-  metadata: 332617
-builtin calls: 39005
+  metadata: 333253
+builtin calls: 39141
   aipl_arr_drop_str: 50
-  aipl_arr_inc: 4421
-  aipl_arr_reserve: 6
+  aipl_arr_extend: 4
+  aipl_arr_inc: 4461
+  aipl_arr_reserve: 10
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6250
-  aipl_array_new: 1762
+  aipl_array_dec: 6306
+  aipl_array_new: 1774
   aipl_array_push: 42
   aipl_array_push_mut: 45
-  aipl_array_with_cap: 19
+  aipl_array_with_cap: 23
   aipl_assert: 10
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
   aipl_dec: 10218
   aipl_inc: 8382
-  aipl_rec_alloc: 92
-  aipl_rec_dec_strong: 539
+  aipl_rec_alloc: 100
+  aipl_rec_dec_strong: 547
   aipl_rec_dec_weak: 47
   aipl_rec_inc_strong: 447
   aipl_rec_inc_weak: 47

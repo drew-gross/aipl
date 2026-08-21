@@ -1,0 +1,71 @@
+import { len, push, <, == } from builtins;
+
+// The AIPL implementation of the `intersperse` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_intersperse` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.intersperse(sep)`
+// specializes through the ordinary generic machinery.
+//
+// The array counterpart of `join`: `join` is this followed by concatenation,
+// which only `str` can do — every element type can be interleaved, so that is
+// where the generic version stops. `Doc[]` is the motivating case, where the
+// result is handed to a `Concat`.
+pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
+    mut out = [];
+    for (let i, x : self) {
+        if (0 < i) {
+            set out.push(sep);
+        };
+        set out.push(x);
+    }
+    out
+}.doc("""
+    Insert `sep` between consecutive elements, returning a new array:
+    `[a, b, c].intersperse(s)` is `[a, s, b, s, c]`. An empty or single-element
+    array comes back unchanged — a separator only ever appears *between* two
+    elements, never leading or trailing.
+
+    Generic over the element type and callable as a method. For `str[]` prefer
+    `join`, which does this and concatenates the result in one step.
+""").test({
+    assert(["a", "b", "c"].intersperse("-").len() == 5);
+    assert(["a", "b", "c"].intersperse("-")[1] == some("-"));
+    assert(["a", "b"].intersperse("-")[0] == some("a"));
+    // A separator only goes *between*: no leading or trailing one.
+    assert(["a", "b"].intersperse("-").len() == 3);
+    // Fewer than two elements: nothing to separate.
+    assert(["a"].intersperse("-").len() == 1);
+    assert([1, 2, 3].intersperse(0).len() == 5);
+    assert([1, 2, 3].intersperse(0)[2] == some(2)); // elements at even indices
+    assert([1, 2, 3].intersperse(0)[3] == some(0)); // separators at odd ones
+    // Free-call form. (`char[]` is not supported here, same as `map`/`filter`.)
+    assert(intersperse([1, 2], 9)[1] == some(9));
+})
+--- performance ---
+allocations: 18
+deallocations: 18
+reallocations: 30
+bytes allocated: 752
+instructions executed: 2349
+binary size: 7072
+  code: 3464
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
+    intersperse$i64: 360
+    intersperse$str: 408
+    main: 2448
+  data: 647
+  metadata: 2961
+builtin calls: 213
+  aipl_arr_drop_str: 10
+  aipl_arr_inc: 9
+  aipl_arr_retain_ptr: 17
+  aipl_array_dec: 27
+  aipl_array_new: 18
+  aipl_array_push_mut: 35
+  aipl_assert: 9
+  aipl_dec: 47
+  aipl_inc: 36
+  aipl_str_eq: 2
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

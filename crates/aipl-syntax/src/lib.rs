@@ -1552,6 +1552,7 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
+fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
 // NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, `trim_while`, and
 // `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
@@ -1704,6 +1705,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "print",
     "split",
     "join",
+    "intersperse",
     "to_str",
     "map",
     "filter",

@@ -1,0 +1,64 @@
+import { intersperse, join, len, print, to_str, == } from builtins;
+
+// `intersperse(xs, sep)` inserts `sep` *between* consecutive elements, never
+// leading or trailing — the array counterpart of `join`.
+//
+// `join` is this followed by concatenation, which only `str` can do; every
+// element type can be interleaved, so that is where the generic version stops.
+// Callable free (`intersperse(xs, sep)`) or as a method (`xs.intersperse(sep)`).
+fn main() !prints {
+    // Between, not around: three elements give five slots.
+    print(["a", "b", "c"].intersperse("-").len().to_str());
+    print(["a", "b", "c"].intersperse("-").join(""));
+
+    // Fewer than two elements: nothing to separate, so the array is unchanged.
+    print(["a"].intersperse("-").len().to_str());
+    print([].intersperse("-").len().to_str());
+
+    // Generic over the element type — the separator is an ordinary element.
+    print([1, 2, 3].intersperse(0).len().to_str());
+    print(([1, 2, 3].intersperse(0)[1] == some(0)).to_str());
+
+    // Free-call form.
+    print(intersperse([7, 8], 9).len().to_str());
+}
+--- stdout ---
+5
+a-b-c
+1
+0
+5
+true
+3
+
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 20
+bytes allocated: 568
+instructions executed: 1640
+binary size: 5168
+  code: 2636
+    __builtin_intersperse$i64: 360
+    __builtin_intersperse$str: 408
+    __eq_i64$opt: 100
+    __to_str_bool: 212
+    __to_str_u64: 180
+    main: 1376
+  data: 47
+  metadata: 2485
+builtin calls: 179
+  aipl_arr_drop_str: 6
+  aipl_arr_inc: 8
+  aipl_arr_retain_ptr: 11
+  aipl_array_dec: 22
+  aipl_array_new: 14
+  aipl_array_push_mut: 24
+  aipl_dec: 40
+  aipl_inc: 25
+  aipl_print: 7
+  aipl_str_join: 1
+  aipl_str_len: 5
+  aipl_u64_len: 10
+  aipl_write_bytes: 1
+  aipl_write_u64: 5
