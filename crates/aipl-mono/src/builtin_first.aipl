@@ -1,0 +1,45 @@
+import { == } from builtins;
+
+// The AIPL implementation of the `first` builtin. Monomorphization registers
+// this under the canonical name `__builtin_first` (see `AIPL_BUILTIN_SOURCES`
+// in `lib.rs`), so a user's `xs.first()` resolves through the ordinary generic
+// machinery.
+//
+// Indexing already yields an optional — `some(elem)` in bounds, `none` out of
+// bounds — so the empty case needs no special handling: `[][0]` is `none`.
+pub fn first<T: any>(self: T[]) -> T? { self[0] }.doc("""
+    The first element, or `none` if the array is empty.
+""").test({
+    assert([1, 2, 3].first() == some(1));
+    assert([7].first() == some(7));
+    assert(first(["a", "b"]) == some("a")); // free-call form
+    // Empty: nothing to hand back.
+    assert([1, 2][..0].first() == none);
+})
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 224
+instructions executed: 370
+binary size: 3328
+  code: 1428
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
+    __test$first: 904
+    first$i64: 204
+    main: 72
+  data: 215
+  metadata: 1685
+builtin calls: 29
+  aipl_arr_drop_str: 1
+  aipl_arr_slice: 1
+  aipl_array_dec: 5
+  aipl_array_new: 4
+  aipl_assert: 4
+  aipl_dec: 6
+  aipl_inc: 4
+  aipl_str_eq: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

@@ -17,6 +17,8 @@ import {
     Span,
     contains,
     count_while,
+    drop_first,
+    first,
     int_parse,
     is_digit,
     is_some_and,
@@ -236,11 +238,12 @@ struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
 fn lex_err(message: str, span: Span) -> LexError { message, span }
 
-// `CharRun`: length of the maximal run at the start of `self` — a `first`
-// char, then `cont` chars. 0 when the first char isn't in `first`.
-fn char_run_len(self: str, first: str, cont: str) -> u64 {
-    if (self[0].is_some_and(|c| first.contains(c))) {
-        1 + self[1..].count_while(|c| cont.contains(c))
+// `CharRun`: length of the maximal run at the start of `self` — a `head`
+// char, then `cont` chars. 0 when the first char isn't in `head`.
+// (`head` rather than `first`, which is now a builtin this file calls.)
+fn char_run_len(self: str, head: str, cont: str) -> u64 {
+    if (self.first().is_some_and(|c| head.contains(c))) {
+        1 + self.drop_first().count_while(|c| cont.contains(c))
     } else {
         0
     }
@@ -270,12 +273,12 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
 // source is a hard error (`at` is the token's absolute start, so error spans
 // land in the real source).
 fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64!LexError {
-    if (!self[0].is_some_and(|c| delims.contains(c))) {
+    if (!self.first().is_some_and(|c| delims.contains(c))) {
         // A literal doesn't flex through `ok(..)`, so bind the type first.
         let declined: u64 = 0;
         return ok(declined);
     };
-    let d = self[0].value_or(' '); // in bounds: the guard above saw a char
+    let d = self.first().value_or(' '); // in bounds: the guard above saw a char
     mut i: u64 = 1;
     mut closed = false;
     while (!closed && i < self.len()) {
@@ -417,7 +420,7 @@ fn float_len(self: str) -> u64 {
 // signed literal while `- 5`/`-x` are the operator; put the operator first and
 // every `-` is the operator and `Int` is unsigned.
 fn int_len(self: str) -> u64 {
-    let signed = self[0] == some('-') && self[1].is_some_and(is_digit);
+    let signed = self.first() == some('-') && self[1].is_some_and(is_digit);
     let start: u64 = if (signed) { 1 } else { 0 };
     let digits = self[start..].count_while(is_digit);
     if (digits == 0) { 0 } else { start + digits }
@@ -1237,20 +1240,22 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 278556
-binary size: 1799384
-  code: 1130244
+instructions executed: 280464
+binary size: 1799344
+  code: 1130200
     __arr_drop_StepResult$Kind: 140
     __arr_drop_Token$Kind: 492
     __arr_drop_TokenRule$Kind: 928
     __arr_retain_StepResult$Kind: 140
     __arr_retain_Token$Kind: 492
     __arr_retain_TokenRule$Kind: 928
-    __builtin_count_while$char$s0$lam27: 296
+    __builtin_count_while$char$lam27: 296
     __builtin_count_while$char$s0$lam32: 236
     __builtin_count_while$char$s0$lam34: 244
     __builtin_count_while$char$s0$lam49: 232
-    __builtin_int_parse: 744
+    __builtin_drop_first$char$s0: 72
+    __builtin_first$char$s0: 136
+    __builtin_int_parse: 708
     __builtin_is_some_and$char$lam33: 48
     __builtin_opt_left_fold$char$i64$s0$lam38: 348
     __eq_Kind: 1136
@@ -1290,14 +1295,14 @@ binary size: 1799384
     apply_emit$Kind: 6844
     between_len: 744
     checked_seg: 1700
-    delimited_len: 1504
+    delimited_len: 1416
     esc_str: 112
     finalize_template$Kind: 5176
     float_len: 816
     int_tok: 1644
     interp_scan$Kind: 3568
     lex$Kind: 2884
-    lex_step$Kind: 25160
+    lex_step$Kind: 25032
     main: 68
     nested_len: 1044
     nonempty_str: 1684
@@ -1309,7 +1314,7 @@ binary size: 1799384
     toks: 128
     tpl_kind: 2980
   data: 8132
-  metadata: 661008
+  metadata: 661012
 builtin calls: 27491
   aipl_arr_drop_str: 22
   aipl_arr_inc: 3052

@@ -74,9 +74,9 @@ allocations: 2208
 deallocations: 2208
 reallocations: 6
 bytes allocated: 101329
-instructions executed: 326428
-binary size: 862896
-  code: 527524
+instructions executed: 327022
+binary size: 863528
+  code: 527812
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -96,13 +96,17 @@ binary size: 862896
     __builtin_any$__m7__Doc$lam91: 32
     __builtin_any$__m7__Doc$lam91$tail: 324
     __builtin_count$char$s0: 232
+    __builtin_count_while$char$lam53: 296
     __builtin_count_while$char$s0$lam42: 232
-    __builtin_count_while$char$s0$lam53: 296
     __builtin_count_while$char$s0$lam58: 236
     __builtin_count_while$char$s0$lam60: 244
     __builtin_count_while$char$s0$lam69: 232
     __builtin_count_while$char$s0$lam71: 232
-    __builtin_int_parse: 744
+    __builtin_drop_first$char$s0: 32
+    __builtin_drop_first$char$s0$tail: 104
+    __builtin_drop_last$str: 208
+    __builtin_first$char$s0: 136
+    __builtin_int_parse: 724
     __builtin_intersperse$__m7__Doc: 408
     __builtin_is_some_and$char$lam59: 48
     __builtin_map_err$__m13__LexResult$__m12__AiplTok$__m13__LexError$__m6__FmtError$lam7: 540
@@ -130,12 +134,12 @@ binary size: 862896
     __m12__tpl_kind: 2112
     __m13__apply_emit$__m12__AiplTok: 4964
     __m13__between_len: 744
-    __m13__delimited_len: 1504
+    __m13__delimited_len: 1416
     __m13__finalize_template$__m12__AiplTok: 4288
     __m13__float_len: 816
     __m13__interp_scan$__m12__AiplTok: 3120
     __m13__lex$__m12__AiplTok: 2436
-    __m13__lex_step$__m12__AiplTok: 22728
+    __m13__lex_step$__m12__AiplTok: 22620
     __m13__nested_len: 1044
     __m13__seg_emit$__m12__AiplTok: 4344
     __m13__step_result$__m12__AiplTok: 7140
@@ -144,8 +148,9 @@ binary size: 862896
     __m14__unescape: 892
     __m15__process_raw_string: 32
     __m15__process_raw_string$tail: 600
-    __m16__trim_prefix: 216
-    __m17__trim_suffix: 232
+    __m16__trim_prefix: 36
+    __m16__trim_prefix$tail: 168
+    __m17__trim_suffix: 292
     __m3__trim_end_while$lam3: 292
     __m4__split_test_sections: 928
     __m5__parse_test_section_header: 696
@@ -264,8 +269,8 @@ binary size: 862896
     __m7__go: 3468
     __m7__has_hard: 32
     __m7__has_hard$tail: 664
-    __m7__print_doc: 1328
-    __m8__reindent_block: 2308
+    __m7__print_doc: 1268
+    __m8__reindent_block: 2344
     __m9__dedent: 32
     __m9__dedent$tail: 1196
     __map44$own0: 320
@@ -276,8 +281,8 @@ binary size: 862896
     fmt_prepare: 864
     main: 928
   data: 2508
-  metadata: 332864
-builtin calls: 39141
+  metadata: 333208
+builtin calls: 39165
   aipl_arr_drop_str: 50
   aipl_arr_extend: 4
   aipl_arr_inc: 4461
@@ -292,8 +297,8 @@ builtin calls: 39141
   aipl_char_at: 453
   aipl_concat: 12
   aipl_concat_lazy: 8
-  aipl_dec: 10218
-  aipl_inc: 8382
+  aipl_dec: 10230
+  aipl_inc: 8394
   aipl_rec_alloc: 100
   aipl_rec_dec_strong: 547
   aipl_rec_dec_weak: 47

@@ -14,6 +14,7 @@ import {
     Span,
     contains,
     count,
+    first,
     intersperse,
     is_err_and,
     is_some_and,
@@ -2209,7 +2210,7 @@ fn hug_fills_call(self: W, open_at: u64, close: u64) -> bool {
 // comma list.
 fn call_arg_list(args: Doc[], hug: bool) -> Doc {
     if (hug && args.len() == 1) {
-        return Concat([Text("("), args[0].value_or(Concat([])), Text(")")]);
+        return Concat([Text("("), args.first().value_or(Concat([])), Text(")")]);
     };
     comma_list_docs(args, Parens)
 }
@@ -2638,9 +2639,9 @@ allocations: 20940
 deallocations: 20940
 reallocations: 862
 bytes allocated: 1025050
-instructions executed: 2849225
-binary size: 3060744
-  code: 1751580
+instructions executed: 2851965
+binary size: 3061376
+  code: 1751868
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2660,13 +2661,17 @@ binary size: 3060744
     __builtin_any$__m1__Doc$lam21: 32
     __builtin_any$__m1__Doc$lam21$tail: 324
     __builtin_count$char$s0: 232
+    __builtin_count_while$char$lam69: 296
     __builtin_count_while$char$s0$lam51: 232
-    __builtin_count_while$char$s0$lam69: 296
     __builtin_count_while$char$s0$lam74: 236
     __builtin_count_while$char$s0$lam76: 244
     __builtin_count_while$char$s0$lam82: 232
     __builtin_count_while$char$s0$lam83: 232
-    __builtin_int_parse: 744
+    __builtin_drop_first$char$s0: 32
+    __builtin_drop_first$char$s0$tail: 104
+    __builtin_drop_last$str: 208
+    __builtin_first$char$s0: 136
+    __builtin_int_parse: 724
     __builtin_intersperse$__m1__Doc: 408
     __builtin_is_some_and$char$lam75: 48
     __builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12: 540
@@ -2693,8 +2698,9 @@ binary size: 3060744
     __m10__unescape: 892
     __m11__process_raw_string: 32
     __m11__process_raw_string$tail: 600
-    __m12__trim_prefix: 216
-    __m13__trim_suffix: 232
+    __m12__trim_prefix: 36
+    __m12__trim_prefix$tail: 168
+    __m13__trim_suffix: 292
     __m1__col_after: 448
     __m1__fits: 36
     __m1__fits$tail: 2636
@@ -2704,8 +2710,8 @@ binary size: 3060744
     __m1__has_hard: 32
     __m1__has_hard$tail: 664
     __m1__print_doc: 36
-    __m1__print_doc$tail: 1348
-    __m2__reindent_block: 2308
+    __m1__print_doc$tail: 1288
+    __m2__reindent_block: 2344
     __m3__dedent: 32
     __m3__dedent$tail: 1196
     __m8__char_lit_emit: 1412
@@ -2716,12 +2722,12 @@ binary size: 3060744
     __m8__tpl_kind: 2112
     __m9__apply_emit$__m8__AiplTok: 4964
     __m9__between_len: 744
-    __m9__delimited_len: 1504
+    __m9__delimited_len: 1416
     __m9__finalize_template$__m8__AiplTok: 4288
     __m9__float_len: 816
     __m9__interp_scan$__m8__AiplTok: 3120
     __m9__lex$__m8__AiplTok: 2436
-    __m9__lex_step$__m8__AiplTok: 22728
+    __m9__lex_step$__m8__AiplTok: 22620
     __m9__nested_len: 1044
     __m9__seg_emit$__m8__AiplTok: 4344
     __m9__step_result$__m8__AiplTok: 7140
@@ -2850,8 +2856,8 @@ binary size: 3060744
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1283424
-builtin calls: 443727
+  metadata: 1283768
+builtin calls: 443865
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 213
   aipl_arr_inc: 49225
@@ -2867,8 +2873,8 @@ builtin calls: 443727
   aipl_char_at: 3930
   aipl_concat: 246
   aipl_concat_lazy: 199
-  aipl_dec: 94083
-  aipl_inc: 74310
+  aipl_dec: 94152
+  aipl_inc: 74379
   aipl_rec_alloc: 5946
   aipl_rec_dec_strong: 40676
   aipl_rec_dec_weak: 3565

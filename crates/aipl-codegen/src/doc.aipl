@@ -16,6 +16,7 @@
 import {
     any,
     contains,
+    drop_last,
     ends_with,
     is_space,
     join,
@@ -276,7 +277,7 @@ fn cleanup(out: str) -> str {
 
     // `lines()` drops exactly one trailing empty when the text ends in a newline;
     // `split` keeps it, so drop it here to match.
-    let lines = if (ended) { raw[..raw.len() - 1] } else { raw };
+    let lines = if (ended) { raw.drop_last() } else { raw };
     let body = lines.map(|line| line.trim_end_while(is_space)).join("\n");
     body +++ if (ended) { "\n" } else { "" }
 }.test({
@@ -320,20 +321,21 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 284
-deallocations: 284
+allocations: 285
+deallocations: 285
 reallocations: 0
-bytes allocated: 16100
-instructions executed: 21531
-binary size: 31352
-  code: 17568
+bytes allocated: 16148
+instructions executed: 21555
+binary size: 31712
+  code: 17748
     __arr_drop_Doc: 116
     __arr_retain_Doc: 116
     __builtin_any$Doc$lam3: 32
     __builtin_any$Doc$lam3$tail: 324
     __builtin_count_while$char$s0$lam15: 232
     __builtin_count_while$char$s0$lam25: 232
-    __m1__reindent_block: 3380
+    __builtin_drop_last$str: 208
+    __m1__reindent_block: 3412
     __map17$own0: 320
     __rec_drop_Doc: 184
     __rec_drop_Work: 84
@@ -346,23 +348,23 @@ binary size: 31352
     has_hard: 32
     has_hard$tail: 664
     main: 3596
-    print_doc: 1328
+    print_doc: 1268
   data: 842
-  metadata: 12942
-builtin calls: 4184
-  aipl_arr_drop_str: 83
-  aipl_arr_inc: 114
-  aipl_arr_retain_ptr: 82
-  aipl_arr_slice: 1
-  aipl_array_dec: 215
+  metadata: 13122
+builtin calls: 4194
+  aipl_arr_drop_str: 84
+  aipl_arr_inc: 115
+  aipl_arr_retain_ptr: 83
+  aipl_arr_slice: 2
+  aipl_array_dec: 217
   aipl_array_new: 54
   aipl_array_push: 34
   aipl_array_push_mut: 22
   aipl_array_with_cap: 12
   aipl_assert: 9
   aipl_concat_lazy: 22
-  aipl_dec: 628
-  aipl_inc: 350
+  aipl_dec: 630
+  aipl_inc: 352
   aipl_rec_alloc: 147
   aipl_rec_dec_strong: 938
   aipl_rec_dec_weak: 105

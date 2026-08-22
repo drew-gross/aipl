@@ -1,0 +1,52 @@
+import { first, last, len, wrapping_sub as -, <, == } from builtins;
+
+// The AIPL implementation of the `drop_last_n` builtin (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.
+//
+// The guard is deliberate rather than emergent. Without it, `len() - n` for
+// `n > len` wraps to a value that reads as a *negative* slice bound, which does
+// happen to produce an empty array — but that is an accident of how a wrapped
+// `u64` is interpreted, not a stated rule. Spelling the empty case out keeps the
+// contract independent of that.
+pub fn drop_last_n<T: any>(self: T[], n: u64) -> T[] {
+    if (self.len() < n) { self[..0] } else { self[..self.len() - n] }
+}.doc("""
+    Every element except the last `n`. Dropping `n >= len` gives an empty array,
+    mirroring `drop_n`.
+""").test({
+    assert([1, 2, 3].drop_last_n(1).len() == 2);
+    assert([1, 2, 3].drop_last_n(1).last() == some(2));
+    assert([1, 2, 3].drop_last_n(0).len() == 3);
+    // At and past the end: empty, not the whole array.
+    assert([1, 2, 3].drop_last_n(3).len() == 0);
+    assert([1, 2, 3].drop_last_n(99).len() == 0);
+    assert(drop_last_n(["a", "b"], 1).first() == some("a")); // free-call form
+})
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 584
+instructions executed: 458
+binary size: 4824
+  code: 2084
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
+    drop_last_n$i64: 196
+    main: 1640
+  data: 434
+  metadata: 2306
+builtin calls: 61
+  aipl_arr_drop_str: 2
+  aipl_arr_inc: 6
+  aipl_arr_retain_ptr: 1
+  aipl_arr_slice: 6
+  aipl_array_dec: 18
+  aipl_array_new: 6
+  aipl_assert: 6
+  aipl_dec: 7
+  aipl_inc: 5
+  aipl_str_eq: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

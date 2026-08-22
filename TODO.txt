@@ -62,6 +62,7 @@ bugs:
   nextest is reporting some tests as leaky
 
 syntax:
+  module level constants
   allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : dct) syntax for dicts
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;

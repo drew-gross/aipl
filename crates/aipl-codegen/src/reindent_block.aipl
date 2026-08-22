@@ -5,13 +5,16 @@
 // is that column (the opening line's indent) — unsigned, matching the `usize` the
 // Rust caller holds, and matching the unsigned counts `indent`/`repeat` take.
 import {
+    drop_first,
+    drop_last,
+    first,
     join,
+    last,
     len,
     repeat,
     trim,
     value_or,
     wrapping_add as +,
-    wrapping_sub as -,
     !=,
     &&,
     +++,
@@ -35,12 +38,12 @@ pub fn reindent_block(self: str, base: u64) -> str {
     // Only a semantically-inert blank closing line — leading whitespace then a
     // bare triple-quote / triple-backtick delimiter — is touched; anything else
     // (a content-bearing final line) leaves the atom byte-for-byte.
-    let closing = ls[n - 1].value_or("").trim();
+    let closing = ls.last().value_or("").trim();
     if (closing != "\"\"\"" && closing != "```") {
         return self;
     };
 
-    let opening = ls[0].value_or("");
+    let opening = ls.first().value_or("");
 
     // Reattach the delimiters around the content. Content lines (between the
     // delimiters) exist only when n > 2. A bare-delimiter opening (its line is
@@ -51,7 +54,7 @@ pub fn reindent_block(self: str, base: u64) -> str {
     // to just opening + closing.
     mut out = opening;
     if (n > 2) {
-        let content = ls[1..n - 1].join("\n");
+        let content = ls.drop_first().drop_last().join("\n");
         let body = if (opening == "\"\"\"" || opening == "```") {
             content.dedent().indent(base + 4)
         } else {
@@ -99,33 +102,33 @@ pub fn reindent_block(self: str, base: u64) -> str {
     assert(`"""hi\n  x\n      """`.reindent_block(2) == `"""hi\n  x\n  """`);
 })
 --- performance ---
-allocations: 93
-deallocations: 93
+allocations: 99
+deallocations: 99
 reallocations: 0
-bytes allocated: 3804
-instructions executed: 5276
-binary size: 11936
-  code: 5272
+bytes allocated: 4116
+instructions executed: 5414
+binary size: 12320
+  code: 5480
     __builtin_count_while$char$s0$lam13: 232
     __builtin_count_while$char$s0$lam3: 232
     __map5$own0: 320
     main: 1108
-    reindent_block: 3380
-  data: 1228
-  metadata: 5436
-builtin calls: 1374
-  aipl_arr_drop_str: 35
-  aipl_arr_inc: 26
-  aipl_arr_retain_ptr: 29
-  aipl_arr_slice: 6
-  aipl_array_dec: 66
+    reindent_block: 3588
+  data: 1229
+  metadata: 5611
+builtin calls: 1440
+  aipl_arr_drop_str: 41
+  aipl_arr_inc: 32
+  aipl_arr_retain_ptr: 35
+  aipl_arr_slice: 12
+  aipl_array_dec: 78
   aipl_array_new: 19
   aipl_array_push_mut: 23
   aipl_array_with_cap: 15
   aipl_assert: 9
   aipl_concat_lazy: 40
-  aipl_dec: 481
-  aipl_inc: 264
+  aipl_dec: 496
+  aipl_inc: 279
   aipl_str_data: 7
   aipl_str_eq: 37
   aipl_str_is_all_whitespace: 24

@@ -1,0 +1,44 @@
+import { len, wrapping_sub as -, == } from builtins;
+
+// The AIPL implementation of the `last` builtin (see `AIPL_BUILTIN_SOURCES` in
+// `lib.rs`); `first`'s mirror.
+//
+// On an empty array `len() - 1` wraps, and an out-of-range index is `none` —
+// the same answer the empty case wants, by the ordinary index rule rather than
+// a special case.
+pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.doc("""
+    The last element, or `none` if the array is empty.
+""").test({
+    assert([1, 2, 3].last() == some(3));
+    assert([7].last() == some(7));
+    assert(last(["a", "b"]) == some("b")); // free-call form
+    // Empty: `len() - 1` wraps, and an out-of-range index is `none`.
+    assert([1, 2][..0].last() == none);
+})
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 224
+instructions executed: 386
+binary size: 3344
+  code: 1444
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
+    __test$last: 912
+    last$i64: 212
+    main: 72
+  data: 214
+  metadata: 1686
+builtin calls: 29
+  aipl_arr_drop_str: 1
+  aipl_arr_slice: 1
+  aipl_array_dec: 5
+  aipl_array_new: 4
+  aipl_assert: 4
+  aipl_dec: 6
+  aipl_inc: 4
+  aipl_str_eq: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

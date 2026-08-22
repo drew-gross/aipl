@@ -1,0 +1,102 @@
+import {
+    drop_first,
+    drop_last,
+    drop_last_n,
+    drop_n,
+    first,
+    last,
+    len,
+    print,
+    to_str,
+} from builtins;
+
+// Ends and truncation, without index arithmetic.
+//
+// `first`/`last` hand back a `T?` — the array may be empty, and that is the
+// same optional an index yields. The four `drop_*` return a shorter array, and
+// all of them saturate: dropping more than there is gives an empty array rather
+// than an error, matching how an out-of-range slice clamps.
+fn main() !prints {
+    let xs = [1, 2, 3, 4];
+
+    print(xs.first().to_str());
+    print(xs.last().to_str());
+    print(xs.drop_first().len().to_str());
+    print(xs.drop_last().last().to_str());
+    print(xs.drop_n(2).first().to_str());
+    print(xs.drop_last_n(2).last().to_str());
+
+    // Saturating: dropping past the end is empty, never an error.
+    print(xs.drop_n(99).len().to_str());
+    print(xs.drop_last_n(99).len().to_str());
+
+    // Empty: no ends to take, and dropping leaves it empty.
+    let e = xs[..0];
+    print(e.first().to_str());
+    print(e.last().to_str());
+    print(e.drop_first().len().to_str());
+    print(e.drop_last().len().to_str());
+
+    // `str` counts as a list of `char` here, so the same six apply.
+    print("abc".first().to_str());
+    print("abc".drop_first());
+    print("abc".drop_last());
+}
+--- stdout ---
+some(1)
+some(4)
+3
+some(3)
+some(3)
+some(2)
+0
+0
+none
+none
+0
+0
+some('a')
+bc
+ab
+
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 458
+instructions executed: 1184
+binary size: 7544
+  code: 3700
+    __builtin_drop_first$i64: 32
+    __builtin_drop_first$i64$tail: 80
+    __builtin_drop_last$i64: 32
+    __builtin_drop_last$i64$tail: 80
+    __builtin_drop_last_n$i64: 36
+    __builtin_drop_last_n$i64$tail: 224
+    __builtin_drop_n$i64: 36
+    __builtin_drop_n$i64$tail: 96
+    __builtin_first$i64: 204
+    __builtin_last$i64: 212
+    __to_str_char$opt: 352
+    __to_str_i64$opt: 360
+    __to_str_u64: 180
+    main: 1776
+  data: 139
+  metadata: 3705
+builtin calls: 164
+  aipl_arr_inc: 16
+  aipl_arr_slice: 9
+  aipl_array_dec: 26
+  aipl_array_new: 1
+  aipl_char_at: 1
+  aipl_dec: 31
+  aipl_i64_len: 10
+  aipl_inc: 15
+  aipl_print: 15
+  aipl_str_alloc: 1
+  aipl_str_len: 3
+  aipl_str_slice: 2
+  aipl_u64_len: 10
+  aipl_write_bytes: 14
+  aipl_write_i64: 5
+  aipl_write_u64: 5

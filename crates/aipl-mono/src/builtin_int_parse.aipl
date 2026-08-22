@@ -1,4 +1,5 @@
 import {
+    drop_first,
     len,
     opt_left_fold as opt_fold,
     starts_with,
@@ -19,7 +20,7 @@ import {
 // this file's imports, loaded like any user file.
 pub fn int_parse(self: str) -> i64? {
     let neg = self.starts_with("-");
-    let body = if (neg) { self[1..] } else { self };
+    let body = if (neg) { self.drop_first() } else { self };
     if (body.len() == 0) {
         return none;
     };

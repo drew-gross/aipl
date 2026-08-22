@@ -1,9 +1,9 @@
 // Used by the raw-string processor to drop the newline that ends a blank
 // opening line.
-import { == } from builtins;
+import { drop_first, first, == } from builtins;
 
 pub fn trim_prefix(self: str, c: char) -> str {
-    if (self[0] == some(c)) { self[1..] } else { self }
+    if (self.first() == some(c)) { self.drop_first() } else { self }
 }.doc("Drops a single leading `c` if present, else returns `self` unchanged.").test({
     assert("\nrest".trim_prefix('\n') == "rest"); // leading char dropped
     assert("rest".trim_prefix('\n') == "rest"); // absent -> unchanged

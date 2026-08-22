@@ -1,0 +1,46 @@
+import { first, len, == } from builtins;
+
+// The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
+// in `lib.rs`).
+//
+// A start past the end already slices to empty, so dropping more than there is
+// needs no guard.
+pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.doc("""
+    Every element except the first `n`. Dropping `n >= len` gives an empty
+    array — the same clamping an out-of-range slice does.
+""").test({
+    assert([1, 2, 3].drop_n(1).len() == 2);
+    assert([1, 2, 3].drop_n(1).first() == some(2));
+    assert([1, 2, 3].drop_n(0).len() == 3);
+    // At and past the end: empty, not an error.
+    assert([1, 2, 3].drop_n(3).len() == 0);
+    assert([1, 2, 3].drop_n(99).len() == 0);
+    assert(drop_n(["a", "b"], 1).first() == some("b")); // free-call form
+})
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 584
+instructions executed: 377
+binary size: 4200
+  code: 1792
+    __eq_i64$opt: 100
+    __eq_str$opt: 148
+    drop_n$i64: 48
+    main: 1496
+  data: 389
+  metadata: 2019
+builtin calls: 49
+  aipl_arr_drop_str: 2
+  aipl_arr_retain_ptr: 1
+  aipl_arr_slice: 6
+  aipl_array_dec: 12
+  aipl_array_new: 6
+  aipl_assert: 6
+  aipl_dec: 7
+  aipl_inc: 5
+  aipl_str_eq: 1
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

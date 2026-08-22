@@ -1553,6 +1553,12 @@ fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
+fn __builtin_first<T: any>(self: T[]) -> T? { none }
+fn __builtin_last<T: any>(self: T[]) -> T? { none }
+fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
+fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
+fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
+fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, `trim_while`, and
 // `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
@@ -1706,6 +1712,12 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "split",
     "join",
     "intersperse",
+    "first",
+    "last",
+    "drop_first",
+    "drop_last",
+    "drop_n",
+    "drop_last_n",
     "to_str",
     "map",
     "filter",
