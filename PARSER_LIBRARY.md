@@ -5,23 +5,19 @@
 Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
-**Stage 1 — language work** — done, except one deferred item that blocks nothing
-- [ ] 1.0 *(deferred, not required)* hash-backed dicts/sets — TODO.txt D1
+**Stage 1 — the library**
+- [ ] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
+- [ ] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
+- [ ] 1.2 JSON end to end
 
-**Stage 2 — the library**
-- [ ] 2.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
-- [ ] 2.1 S-expressions end to end (incl. deep-nesting test as a built binary)
-- [ ] 2.2 JSON end to end
+**Stages 2-6**
+- [ ] 2 `ebnf.aipl` + FIRST sets
+- [ ] 3 Highlighter generator (oracle: `tests/highlighting.rs`)
+- [ ] 4 AIPL's grammar, differential-tested against gazelle
+- [ ] 5 Formatter generator
+- [ ] 6 Retire gazelle
 
-**Stages 3-7**
-- [ ] 3 `ebnf.aipl` + FIRST sets
-- [ ] 4 Highlighter generator (oracle: `tests/highlighting.rs`)
-- [ ] 5 AIPL's grammar, differential-tested against gazelle
-- [ ] 6 Formatter generator
-- [ ] 7 Retire gazelle
-
-The one remaining Stage 1 item is deferred and blocks nothing. Stage 2 onward is
-strictly sequential.
+The stages are strictly sequential.
 
 ## Context
 
@@ -52,37 +48,31 @@ set is plain data (`variant Matcher`, `TokenRule<K>[]`) interpreted by one
 `lex<K>` driver, with `lex_aipl.aipl` as just a table. This library is that idea
 one level up, and composes with it directly.
 
-## Why the language work came first
+## The language work this design assumes
 
 Pressure-testing the natural design against the compiler turned up a set of
 blockers — each with a workaround, and each workaround a distortion of the
 library. Building around them would have baked the compiler's limits into a file
-meant to outlive them, so the language was fixed first. **That work is done**;
-the design below is written against the fixed compiler.
+meant to outlive them, so the language was fixed first. **That work is done, and
+is no longer part of this project**; the design below is written against the
+fixed compiler and depends on all of it.
 
 What it bought, in the shape the library actually needs: a case can be matched
 without matching its payload (`same_case`, plus a `variant` bound), a generic
 variant's type parameter is inferred from the expected type, recursive types may
 recurse through an array, `match` arms may be statement blocks, and recursion is
 tail-call eliminated so parse depth is bounded by the input rather than the
-stack. Four shapes the design rests on that had no test anywhere in the repo
-were confirmed to work and are now locked in by cases — a fn value returning a
-boxed recursive variant, an `A[]` parameter where `A` is boxed, an array of
-structs each holding a boxed field, and a two-parameter generic variant. What is
-left below is one deferred performance item that blocks nothing.
+stack. Four shapes the design rests on that had no test anywhere in the repo were
+confirmed to work and are locked in by cases — a fn value returning a boxed
+recursive variant, an `A[]` parameter where `A` is boxed, an array of structs
+each holding a boxed field, and a two-parameter generic variant.
 
-## Stage 1 — Language work
+Hash-backed dicts and sets are on TODO.txt rather than here. They are the largest
+asymptotic win in the repo and would make packrat memoization affordable, but the
+link pass (Stage 1) turns rule references into array indices and FIRST sets
+(Stage 2) remove most of the need to memoize — so nothing below waits on them.
 
-### 1.0 Deferred: hash-backed dicts and sets
-
-TODO.txt D1 — dicts and sets are linear scans (`lib.rs:2816`, `dict_find`), which
-is the largest asymptotic win available in the repo, and would make both rule
-lookup by name and packrat memoization affordable. **Not required**: the link
-pass (Stage 2) turns rule references into array indices, and FIRST sets (Stage 4)
-remove most of the need to memoize. Listed so the dependency is explicit if the
-parser later wants memoization.
-
-## Stage 2 — The library, proven on two toy grammars
+## Stage 1 — The library, proven on two toy grammars
 
 New files, flat in `crates/aipl-codegen/src/` alongside `lexer.aipl` and
 `doc.aipl` (where every AIPL library file lives; a subdirectory only makes
@@ -145,7 +135,7 @@ must get right: **`link(grammar)`** runs once, rewriting `Named(str)` →
 `break` (`lexer.aipl:194-196` documents the lexer's version of the same
 invariant); and **furthest-failure tracking** for errors.
 
-### 2.1 S-expressions — the smallest grammar that is still recursive
+### 1.1 S-expressions — the smallest grammar that is still recursive
 
 ```
 // grammar_sexp.aipl — two productions, and every risky thing exercised once.
@@ -171,7 +161,7 @@ Before even that, the library's own `.test` blocks should cover each `Rule` arm
 in isolation against a hand-built token array — the equivalent of
 `walker.aipl`'s `toks_of`/`walker_of` fixtures (`walker.aipl:2253`).
 
-### 2.2 JSON
+### 1.2 JSON
 
 Adds what S-expressions leave out, still without precedence: several terminal
 classes (string, number, the three keywords), `ListOf` with a separator and a
@@ -181,7 +171,7 @@ JSON-flavored rule set to crib the token rules from. `grammar_json.aipl` supplie
 those rules, ~10 productions, and lowering to a `variant Json`.
 
 Precedence (`Climb`) has no exercise in either toy — it arrives with AIPL's
-grammar in Stage 5. If it needs proving sooner, the cheapest vehicle is a
+grammar in Stage 4. If it needs proving sooner, the cheapest vehicle is a
 four-operator arithmetic grammar bolted onto the S-expression lexer.
 
 ### Errors
@@ -198,24 +188,24 @@ already dogfooded — `caret_block.aipl:13` produces the `--> path:line:col | ^^
 block — so `struct ParseError { message: str, span: Span }` mirrors
 `lexer.aipl:100`'s `LexError` and feeds straight in.
 
-## Stages 3-6
+## Stages 2-6
 
-**3 — Introspection, proven.** `ebnf.aipl` dumps the grammar as EBNF; FIRST-set
-computation lets `OneOf` pick a branch without backtracking (also the answer to
-packrat being unaffordable while dicts are linear scans).
+**2 — Introspection, proven.** `ebnf.aipl` dumps the grammar as EBNF; FIRST-set
+computation lets `OneOf` pick a branch without backtracking (also why packrat
+memoization is not needed while dicts remain linear scans).
 
-**4 — The highlighter generator.** Generate
+**3 — The highlighter generator.** Generate
 `editors/vscode/syntaxes/aipl.tmLanguage.json` from the grammar. First because it
 **already has a strict oracle**: `tests/highlighting.rs` validates that file
 against every token of every case file and example. The target is regex- and
 line-based, so the generator emits token classification plus contextual patterns
 for the easy declarations — what the hand-written grammar does today.
 
-**5 — AIPL's own grammar**, differential-tested against gazelle across the whole
+**4 — AIPL's own grammar**, differential-tested against gazelle across the whole
 corpus, in the shape of
 `tests/lexer_dogfood.rs::dogfood_lex_hook_matches_fresh_compile_on_corpus`.
 
-**6 — The formatter generator**, targeting the existing `Doc`. `Layout` starts
+**5 — The formatter generator**, targeting the existing `Doc`. `Layout` starts
 from `walker.aipl`'s vocabulary (`ListStyle`, `comma_list_docs`, `match_expr`'s
 hard-broken block) with a `Custom(str)` escape hatch naming a hand-written layout
 function. Honest risk: most of `walker.aipl`'s bulk is *heuristics* — comment
@@ -223,11 +213,11 @@ attachment, call hugging, chain breaking, import sorting — and those will not
 fall out of a grammar. The realistic win is retiring the mechanical two thirds
 and shrinking the "teach two parsers" problem, not deleting the file.
 
-**7 — Retire gazelle.**
+**6 — Retire gazelle.**
 
-Stages 5-7 change the compiler's own parse path and pull these files into
+Stages 4-6 change the compiler's own parse path and pull these files into
 `DOGFOOD_SOURCE_FILES`; that is where IR regeneration, relink cost, and the
-formatter bootstrap deadlock start to matter. Stages 2-4 touch none of it.
+formatter bootstrap deadlock start to matter. Stages 1-3 touch none of it.
 
 ## Naming
 
@@ -258,7 +248,7 @@ file that also declares a `Kind` constructor trips the silent drop.
    `.test`-block requirement (`tests/ffi.rs:1109`).
 4. **Scoped case run** — `cargo test --test cases -- crates_aipl_codegen_src_parse`.
 5. **Losslessness** — assert that the CST's concatenated spans reconstruct the
-   source byte-for-byte. Stage 6 depends on this; it is the cheapest place to
+   source byte-for-byte. Stage 5 depends on this; it is the cheapest place to
    catch a regression.
 6. **Round-trip on each toy** — parse → lower → render → parse, for
    S-expressions first and then JSON. The deep-nesting case (~200 levels of
@@ -266,7 +256,7 @@ file that also declares a `Kind` constructor trips the silent drop.
    that can nest, and it must run as a **built binary**, not just under
    `aipl check` — otherwise it is measured against 256 MB instead of the 8 MB a
    shipped binary gets, and tail-call elimination goes untested.
-7. **Stage 4 oracle** — `cargo test --test highlighting` against the generated
+7. **Stage 3 oracle** — `cargo test --test highlighting` against the generated
    `.tmLanguage.json`, unchanged.
 8. **Finish** — `scripts/handoff.sh`, which regenerates the `#[test]` list for
    new case files and fills their `--- performance ---` sections. Expect churn: a
