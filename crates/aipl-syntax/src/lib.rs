@@ -277,6 +277,7 @@ pub mod ast {
     pub enum Bound {
         Any,
         Ord,
+        Variant,
     }
 
     impl Bound {
@@ -286,6 +287,7 @@ pub mod ast {
             match name {
                 "any" => Some(Bound::Any),
                 "ord" => Some(Bound::Ord),
+                "variant" => Some(Bound::Variant),
                 _ => None,
             }
         }
@@ -295,13 +297,19 @@ pub mod ast {
             match self {
                 Bound::Any => "any",
                 Bound::Ord => "ord",
+                Bound::Variant => "variant",
             }
         }
 
         /// Does `ty` satisfy this bound? `Any` accepts everything; `Ord`
         /// accepts only the primitives usable with `<`/`>` — integers and
         /// `char`.
-        pub fn accepts(&self, ty: &Type) -> bool {
+        ///
+        /// `Variant` accepts only a named variant type, which the `Type` alone
+        /// cannot decide — `Type::Named("Foo")` is equally a struct — so the
+        /// caller supplies `is_variant`, which answers it against the program's
+        /// type table.
+        pub fn accepts(&self, ty: &Type, is_variant: &dyn Fn(&str) -> bool) -> bool {
             match self {
                 Bound::Any => true,
                 Bound::Ord => matches!(
@@ -309,6 +317,7 @@ pub mod ast {
                     Type::Primitive(p)
                         if p.is_int() || *p == Primitive::Char || *p == Primitive::Str
                 ),
+                Bound::Variant => matches!(ty, Type::Named(n) if is_variant(n)),
             }
         }
     }
@@ -1553,6 +1562,7 @@ fn __builtin_value_or<T: any>(self: T?, default: T) -> T { default }
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
+fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
 fn __builtin_first<T: any>(self: T[]) -> T? { none }
 fn __builtin_last<T: any>(self: T[]) -> T? { none }
 fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
@@ -1712,6 +1722,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "split",
     "join",
     "intersperse",
+    "same_case",
     "first",
     "last",
     "drop_first",

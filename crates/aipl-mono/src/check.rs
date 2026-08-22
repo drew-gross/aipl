@@ -2834,7 +2834,7 @@ impl Cx<'_> {
         // structural and knows nothing about bounds.
         for tp in &sig.type_vars {
             if let Some(bound_ty) = map.get(&tp.name) {
-                if !tp.bound.accepts(bound_ty) {
+                if !tp.bound.accepts(bound_ty, &|n: &str| self.has_variant(n)) {
                     return Err(Error::at(
                         format!(
                             "fn {:?}: type parameter {:?} requires \"{}\", but was inferred as {}",

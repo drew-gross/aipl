@@ -1,0 +1,12 @@
+import { same_case } from builtins;
+
+// `same_case` carries a `variant` bound, so a scalar is rejected at the call
+// site — "do these share a constructor" has no meaning for a type that has no
+// constructors, and answering `==` instead would be a different question.
+fn main() -> i64 { if (same_case(1, 2)) { 1 } else { 0 } }
+--- errors ---
+error: fn "same_case": type parameter "T" requires "variant", but was inferred as i64
+ --> ./tests/cases/variants/err_same_case_not_variant.aipl:6:24
+  |
+6 | fn main() -> i64 { if (same_case(1, 2)) { 1 } else { 0 } }
+  |                        ^^^^^^^^^^^^^^

@@ -14347,6 +14347,51 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, nz);
             (b, Type::Primitive(Primitive::Bool))
         }
+        "__builtin_same_case" => {
+            // `a.same_case(b)`: do these share a constructor, payloads ignored?
+            //
+            // The `variant` bound guarantees both are named variants, and a
+            // variant's tag is the leading `i64` of its value — the same field
+            // `emit_render_variant` reads to pick a case. So this is two loads
+            // and a compare, and it never touches the payload: that is the whole
+            // point, since a generic driver cannot name the payload's type.
+            //
+            // Both operands are borrowed, like `hash` — nothing is consumed, so
+            // their scope-tracking is untouched.
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"same_case\" expects 2 arguments, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (a, a_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (b, b_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            // The bound is enforced by the checker; this catches a caller that
+            // reached codegen another way (a synthesized call, say) rather than
+            // silently reading a tag off something that has none.
+            for (t, e) in [(&a_ty, &args[0]), (&b_ty, &args[1])] {
+                let is_variant = matches!(t, Type::Named(n)
+                    if cx.structs.get(n).and_then(TypeDef::as_variant).is_some());
+                if !is_variant {
+                    return Err(Error::at(
+                        format!(
+                            "\"same_case\" is only callable on a variant, got {}",
+                            type_name(t)
+                        ),
+                        e.span.clone(),
+                    ));
+                }
+            }
+            let ta = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), a, 0);
+            let tb = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), b, 0);
+            let eq = builder.ins().icmp(IntCC::Equal, ta, tb);
+            let out = builder.ins().uextend(types::I64, eq);
+            (out, Type::Primitive(Primitive::Bool))
+        }
         "__builtin_is_space" => {
             // `c.is_space() -> bool` — true when c is ASCII whitespace.
             if args.len() != 1 {

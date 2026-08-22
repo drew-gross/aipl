@@ -162,7 +162,12 @@ gazelle! {
         // production.
         type_params = LANGLE type_param_list RANGLE => present | _ => empty;
         type_param_list = type_param => first | type_param_list COMMA type_param => rest;
-        type_param = IDENT COLON IDENT => type_param | IDENT => bare;
+        // `T: variant` spells its bound with the `variant` *keyword*, which
+        // does not lex as IDENT — hence a production of its own rather than
+        // another name handled in the build action.
+        type_param = IDENT COLON IDENT => type_param
+                   | IDENT COLON VARIANT => variant_bound
+                   | IDENT => bare;
 
         effects = effect_list => present | _ => empty;
         effect_list = effect => first | effect_list effect => rest;
@@ -1410,6 +1415,10 @@ impl gazelle::Action<aipl::TypeParam<Self>> for Build {
             aipl::TypeParam::Bare((name, _)) => TypeParam {
                 name,
                 bound: Bound::Any,
+            },
+            aipl::TypeParam::VariantBound((name, _)) => TypeParam {
+                name,
+                bound: Bound::Variant,
             },
             aipl::TypeParam::TypeParam((name, _), (bound_name, bound_span)) => {
                 let bound = Bound::from_name(&bound_name).ok_or_else(|| {

@@ -1,0 +1,57 @@
+import { print, same_case, to_str, == } from builtins;
+
+// `same_case(a, b)` asks whether two values share a constructor, ignoring any
+// payload. `==` on a variant is structural — it compares the payload too — so
+// "is this token a Name, whatever its text" has no spelling in terms of `==`.
+//
+// The `variant` bound restricts it to named variants: there is no sensible
+// answer for a scalar, so asking is a compile error rather than a silent one.
+variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64)
+
+fn main() !prints {
+    // Same case, different payloads — the question `==` cannot ask.
+    print(Name("x").same_case(Name("y")).to_str());
+    print((Name("x") == Name("y")).to_str()); // `==` says false: payloads differ
+
+    // Different cases.
+    print(Name("x").same_case(Space).to_str());
+    print(IntLit(1).same_case(Name("a")).to_str());
+
+    // A payload-free case, and a multi-payload one.
+    print(Space.same_case(Space).to_str());
+    print(StrLit("a", 1).same_case(StrLit("zzz", 99)).to_str());
+    print(StrLit("a", 1).same_case(IntLit(1)).to_str());
+
+    // Free-call form.
+    print(same_case(Name("p"), Name("q")).to_str());
+}
+--- stdout ---
+true
+false
+false
+false
+true
+true
+false
+true
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 665
+binary size: 4336
+  code: 2392
+    __eq_Tok: 336
+    __to_str_bool: 212
+    main: 1844
+  data: 47
+  metadata: 1897
+builtin calls: 58
+  aipl_dec: 29
+  aipl_inc: 10
+  aipl_print: 8
+  aipl_str_eq: 1
+  aipl_str_len: 2
+  aipl_write_bytes: 8
