@@ -9,12 +9,15 @@ each is sized to be finishable in one session.
 - [ ] 1.0 Reproducers: fn value returning a boxed variant; `A[]` param where `A`
       is boxed; array of structs holding a boxed field; two-param generic variant
 - [ ] 1.1 Generic-variant inference from expected type (`check.rs:605-635`)
-- [ ] 1.2 `case_index` / `case_name` builtins — match a case, not a payload
+- [ ] 1.2 `same_case` builtin + `variant` bound — **builtin landed**; the generic
+      driver still needs 1.8
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
 - [x] 1.5 Tail-call elimination — TODO.txt:467
 - [x] 1.6 `match` arms as statement blocks (arm grouping still open)
 - [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
+- [ ] 1.8 Bounds don't propagate through a generic caller — **blocks 1.2**, and
+      `ord` equally
 
 **Stage 2 — the library**
 - [ ] 2.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
@@ -28,9 +31,10 @@ each is sized to be finishable in one session.
 - [ ] 6 Formatter generator
 - [ ] 7 Retire gazelle
 
-Each Stage 1 item can land independently and is useful on its own — 1.3, 1.4 and
-1.5 fix bugs already on TODO.txt regardless of this library. Stage 2 onward is
-strictly sequential.
+Stage 1 items are otherwise independent and useful on their own — 1.3, 1.4 and
+1.5 fix bugs already on TODO.txt regardless of this library — with one ordering
+constraint: **1.2 cannot finish before 1.8**, since its generic driver is exactly
+what the missing bound propagation blocks. Stage 2 onward is strictly sequential.
 
 ## Context
 
@@ -108,24 +112,54 @@ arguments, so `Then([Spelling("("), Named("expr")])` types from the outside in.
 `PTok { class: u64, span: Span }` (the projection `walker.aipl` already does with
 `FmtTok`). Workable, but it pushes a mapping table onto every consumer.
 
-### 1.2 Match a variant's case without matching its payload — *required*
+### 1.2 Match a variant's case without matching its payload — *required* — **builtin landed** (2026-08-22)
 
-`==` on variants is structural (`check.rs:3053`), and a generic driver cannot
-`match` on a type parameter. So with `Term(K)` holding a token kind,
-`Term(Name(""))` matches only the *empty* identifier — **"any identifier" is
-inexpressible**, which is fatal for a grammar over a token type whose kinds carry
-payloads (`lex_aipl.aipl:59`: `Name(str)`, `IntLit(i64)`, `StrLit(str, StrStyle)`).
+`==` on variants is structural, and a generic driver cannot `match` on a type
+parameter (`"match" requires an optional or variant, got a type parameter`). So
+with `Term(K)` holding a token kind, `Term(Name(""))` matches only the *empty*
+identifier — **"any identifier" is inexpressible**, which is fatal for a grammar
+over a token type whose kinds carry payloads (`lex_aipl.aipl:59`: `Name(str)`,
+`IntLit(i64)`, `StrLit(str, StrStyle)`).
 
-Proposed: a builtin `case_index(v: T) -> u64` returning the constructor's
-discriminant, so the driver compares tags rather than values. The tag already
-exists in the runtime representation — `to_str` renders `Cons(1, Nil)`, so it is
-reading the same thing. A companion `case_name(v: T) -> str` is worth adding for
-diagnostics and for the EBNF/highlighter generators, but the parser hot path
-wants the integer.
+**Landed:** a `same_case(a, b) -> bool` builtin — "equal, ignoring the payload" —
+plus a new `variant` bound restricting it to named variants.
 
-*Alternative worth considering:* first-class payload-free case references (`Name`
-as a value of a "case tag" type). Cleaner at the use site, considerably larger to
-implement.
+`same_case` rather than the originally-proposed `case_index`, because a
+discriminant makes *declaration order observable*: reordering a variant's cases
+would become a silent breaking change, and it invites `case_index(t) == 3` magic
+numbers in the hot path. An equivalence relation exposes no representation, and
+is exactly what the driver needs. Implementation is native codegen (AIPL cannot
+inspect a type parameter's case — that is the whole problem) and cheap: the tag
+is the leading `i64` of a variant value, the same field `emit_render_variant`
+reads, so it is two loads and a compare.
+
+The `variant` bound exists so `same_case(1, 2)` is a compile error rather than
+answering some other question. `<T: variant>` needs its own grammar production
+(`variant` lexes as a keyword, not `IDENT`), and `Bound::accepts` needed an
+`is_variant` predicate — `Type::Named("Foo")` alone cannot distinguish a struct
+from a variant.
+
+`case_name(v) -> str` is still worth adding for diagnostics and the
+EBNF/highlighter generators; it leaks nothing new, since `to_str` already renders
+`Name("x")` from a `<K: any>` function. Too slow for the hot path, which
+`same_case` covers.
+
+**Still blocked — see 1.8.** `same_case` works wherever the token type is
+concrete, but the *generic* driver this item exists for does not compile:
+
+```
+fn matches<K: variant>(rule: Rule<K>, tok: K) -> bool {
+    match (rule) {
+        Term(want) => tok.same_case(want),   // error: requires "variant",
+        ..                                   //        but was inferred as a type parameter
+    }
+}
+```
+
+*Alternative still worth considering:* first-class payload-free case references
+(`Name` as a value of a "case tag" type). It removes the remaining wart — rules
+hold a dummy `Name("")` constructed purely to name a case — and is considerably
+larger to implement. `same_case` does not make it unnecessary, only unurgent.
 
 ### 1.3 Box types that recurse through an array — *required*
 
@@ -361,6 +395,38 @@ lookup by name and packrat memoization affordable. **Not required**: the link
 pass (Stage 2) turns rule references into array indices, and FIRST sets (Stage 4)
 remove most of the need to memoize. Listed so the dependency is explicit if the
 parser later wants memoization.
+
+### 1.8 Bounds don't propagate through a generic caller — *required for 1.2*
+
+A bound is only checked against a *concrete* type. Inside a generic body it is
+unsatisfiable, so a bounded builtin cannot be called from generic code at all:
+
+```
+fn smallest<T: ord>(xs: T[]) -> T? { xs.minimum() }
+error: fn "minimum": type parameter "T" requires "ord", but was inferred as a type parameter
+```
+
+This predates 1.2 and is not specific to the `variant` bound — `ord` has always
+had it, unnoticed because its users are all concrete. It is the only thing
+standing between the landed `same_case` and a working generic driver.
+
+The cause is deliberate and documented at `check.rs:9`: a generic body is checked
+abstractly, with **every** type variable replaced by a single `__typevar__`
+sentinel that "coerces only with itself". That erases *which* variable a type
+was, so at an inner call site there is no bound left to consult — the checker
+knows only "some type parameter".
+
+The fix is to give type variables identity in the abstract check — `__typevar__$K`,
+or a `Type::Var(name, bound)` — so `Bound::accepts` can ask whether the enclosing
+variable's bound implies the required one. Two consequences to weigh before
+starting:
+
+- Distinct variables would stop coercing with each other (`T` would no longer
+  unify with `U`). That is strictly more correct, and may surface real errors in
+  existing generic code that passes today.
+- Bound *implication* needs defining: `variant` and `ord` are unrelated, so this
+  is currently equality of bounds, not a lattice. Keep it equality until
+  something needs more.
 
 ### Cost note
 
