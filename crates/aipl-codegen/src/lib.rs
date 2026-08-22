@@ -4579,7 +4579,17 @@ fn compile_program<M: Module>(
             .chain(program.items.iter().cloned())
             .collect(),
     };
-    aipl_mono::check(&check_program)?;
+    // `check` hands back the program with the types of context-dependent
+    // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
+    // generic constructor. Everything downstream runs on *that*, because the
+    // passes below move expressions away from the context those types came from.
+    let checked = aipl_mono::check(&check_program)?;
+    // `check_program` is the synthesized builtin decls followed by the real
+    // program; take back the second half, now stamped. `check` neither reorders
+    // nor adds items, so the tail lines up by construction.
+    let program = &Program {
+        items: checked.items[checked.items.len() - program.items.len()..].to_vec(),
+    };
 
     // Optimization: inline single-use private functions (a no-op unless the
     // program has a `main` — see `inline_single_use`). Runs on the checked source
@@ -16122,7 +16132,49 @@ fn emit_slice<M: Module>(
     ))
 }
 
+/// Compile `expr`, preferring the type the checker recorded on it over the one
+/// derived here.
+///
+/// Codegen derives types from the AST just as the checker and monomorphizer do,
+/// so a context-dependent expression — a bare `none`, an empty `[]` — derives a
+/// `__none__`-style placeholder once whatever pinned it is out of view. Inlining
+/// puts expressions in exactly that position, which is why the answer is
+/// recorded at check time (see `Expr::ty`) and read back here.
+///
+/// Only a *placeholder* derivation is replaced: everywhere else what is derived
+/// here is at least as good, and a recorded type is not a licence to override a
+/// real one.
 fn compile_expr<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    scopes: &mut Vec<Vec<Tracked>>,
+    expr: &Expr,
+) -> Result<(Value, Type), Error> {
+    let (v, derived) = compile_expr_inner(module, builder, cx, scopes, expr)?;
+    let ty = match &expr.ty {
+        Some(locked) if has_placeholder_ty(&derived) && !has_placeholder_ty(locked) => {
+            (**locked).clone()
+        }
+        _ => derived,
+    };
+    Ok((v, ty))
+}
+
+/// Whether `t` still contains a "decided by context" placeholder.
+fn has_placeholder_ty(t: &Type) -> bool {
+    match t {
+        Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
+        Type::Optional(i) | Type::Array(i) | Type::Set(i) => has_placeholder_ty(i),
+        Type::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
+        Type::Result(a, b) => has_placeholder_ty(a) || has_placeholder_ty(b),
+        Type::Fn(ps, r) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(has_placeholder_ty),
+        _ => false,
+    }
+}
+
+fn compile_expr_inner<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,

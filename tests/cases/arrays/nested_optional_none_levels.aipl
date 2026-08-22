@@ -86,22 +86,16 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 213
-instructions executed: 1247
-binary size: 8008
-  code: 3932
+instructions executed: 1169
+binary size: 7344
+  code: 3520
     __to_str_i64: 180
     __to_str_i64$opt$opt: 516
     __to_str_i64$opt$opt$opt: 680
     __to_str_str$opt$opt: 600
-    main: 1508
-    none2: 52
-    none3: 52
-    snone2: 96
-    swrap2: 112
-    wrap2: 68
-    wrap3: 68
+    main: 1544
   data: 499
-  metadata: 3577
+  metadata: 3325
 builtin calls: 113
   aipl_dec: 28
   aipl_i64_len: 10

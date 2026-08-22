@@ -42,15 +42,13 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 355
-binary size: 2136
-  code: 904
+instructions executed: 351
+binary size: 2040
+  code: 880
     __to_str_bool: 212
-    has_five: 36
-    has_five_short: 36
-    main: 620
+    main: 668
   data: 47
-  metadata: 1185
+  metadata: 1113
 builtin calls: 30
   aipl_dec: 12
   aipl_inc: 6

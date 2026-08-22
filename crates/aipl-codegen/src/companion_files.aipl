@@ -148,8 +148,8 @@ allocations: 148
 deallocations: 148
 reallocations: 0
 bytes allocated: 5774
-instructions executed: 9396
-binary size: 23928
+instructions executed: 9393
+binary size: 23880
   code: 10596
     __arr_drop_Companion: 140
     __arr_retain_Companion: 140
@@ -157,14 +157,13 @@ binary size: 23928
     __eq_Companion$arr: 284
     __m2__parse_test_section_header: 696
     __test$companion_files: 4576
-    __test$companion_path: 1196
     __test_try_fail_str: 64
     __to_str_str: 252
     companion_files: 2088
     companion_path: 824
-    main: 112
+    main: 1308
   data: 3094
-  metadata: 10238
+  metadata: 10190
 builtin calls: 2490
   aipl_arr_drop_str: 12
   aipl_arr_inc: 27

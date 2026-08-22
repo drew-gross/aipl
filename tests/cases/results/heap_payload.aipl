@@ -38,15 +38,14 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 240
-instructions executed: 214
-binary size: 3048
-  code: 1468
-    greet: 360
-    lookup: 392
+instructions executed: 200
+binary size: 2936
+  code: 1392
+    greet: 676
     main: 308
     show: 408
   data: 27
-  metadata: 1553
+  metadata: 1517
 builtin calls: 78
   aipl_concat_lazy: 6
   aipl_dec: 34

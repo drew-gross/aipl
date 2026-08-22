@@ -48,14 +48,13 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 189
-binary size: 1616
-  code: 616
+instructions executed: 187
+binary size: 1568
+  code: 604
     __to_str_i64: 180
-    main: 412
-    or_call: 24
+    main: 424
   data: 1
-  metadata: 999
+  metadata: 963
 builtin calls: 28
   aipl_dec: 8
   aipl_i64_len: 8

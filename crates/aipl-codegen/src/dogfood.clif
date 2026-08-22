@@ -20601,6 +20601,10 @@ block12:
     store notrap aligned v43, v0
     v44 = load.i64 notrap aligned v33+8
     store notrap aligned v44, v0+8
+    v45 = load.i64 notrap aligned v33+16
+    store notrap aligned v45, v0+16
+    v46 = load.i64 notrap aligned v33+24
+    store notrap aligned v46, v0+24
     return
 }
 

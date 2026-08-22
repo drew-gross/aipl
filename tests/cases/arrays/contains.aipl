@@ -40,14 +40,12 @@ allocations: 30
 deallocations: 30
 reallocations: 0
 bytes allocated: 1568
-instructions executed: 2809
-binary size: 12392
-  code: 7388
-    __test$single: 7108
-    main: 76
-    single: 204
+instructions executed: 2804
+binary size: 12224
+  code: 7300
+    main: 7300
   data: 1067
-  metadata: 3937
+  metadata: 3857
 builtin calls: 135
   aipl_arr_drop_str: 4
   aipl_array_dec: 30

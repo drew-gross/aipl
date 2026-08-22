@@ -26,22 +26,18 @@ allocations: 7
 deallocations: 7
 reallocations: 9
 bytes allocated: 320
-instructions executed: 1386
-binary size: 4560
-  code: 2092
+instructions executed: 1374
+binary size: 4096
+  code: 1860
     __eq_str$arr: 352
     __to_str_i64: 180
-    main: 644
-    tag$lam1: 304
-    tag$lam3: 304
-    tag$lam5: 308
+    main: 1328
   data: 226
-  metadata: 2242
-builtin calls: 158
+  metadata: 2010
+builtin calls: 152
   aipl_arr_drop_str: 6
-  aipl_arr_inc: 3
   aipl_arr_retain_ptr: 9
-  aipl_array_dec: 10
+  aipl_array_dec: 7
   aipl_array_new: 7
   aipl_array_push_mut: 9
   aipl_assert: 3

@@ -52,17 +52,16 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 192
-instructions executed: 8253
-binary size: 4240
-  code: 2404
+instructions executed: 8190
+binary size: 4136
+  code: 2364
     __builtin_count_while$char$s0$lam4: 232
-    __builtin_int_parse: 744
-    __builtin_opt_left_fold$char$i64$s0$lam3: 348
+    __builtin_int_parse: 1052
     __eq_i64$opt: 100
     __lambda_2: 140
     main: 840
   data: 158
-  metadata: 1678
+  metadata: 1614
 builtin calls: 241
   aipl_dec: 48
   aipl_inc: 24

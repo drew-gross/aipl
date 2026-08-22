@@ -325,13 +325,13 @@ allocations: 285
 deallocations: 285
 reallocations: 0
 bytes allocated: 16148
-instructions executed: 21555
-binary size: 31712
-  code: 17748
+instructions executed: 21519
+binary size: 31520
+  code: 17620
     __arr_drop_Doc: 116
     __arr_retain_Doc: 116
-    __builtin_any$Doc$lam3: 32
-    __builtin_any$Doc$lam3$tail: 324
+    __builtin_any$Doc$lam7: 32
+    __builtin_any$Doc$lam7$tail: 324
     __builtin_count_while$char$s0$lam15: 232
     __builtin_count_while$char$s0$lam25: 232
     __builtin_drop_last$str: 208
@@ -344,19 +344,18 @@ binary size: 31712
     fits$tail: 2636
     fits_atom: 44
     fits_atom$tail: 296
-    go: 3468
     has_hard: 32
     has_hard$tail: 664
     main: 3596
-    print_doc: 1268
+    print_doc: 4608
   data: 842
-  metadata: 13122
-builtin calls: 4194
+  metadata: 13058
+builtin calls: 4176
   aipl_arr_drop_str: 84
-  aipl_arr_inc: 115
+  aipl_arr_inc: 106
   aipl_arr_retain_ptr: 83
   aipl_arr_slice: 2
-  aipl_array_dec: 217
+  aipl_array_dec: 208
   aipl_array_new: 54
   aipl_array_push: 34
   aipl_array_push_mut: 22

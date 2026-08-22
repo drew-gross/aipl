@@ -35,14 +35,13 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 294
-binary size: 2776
-  code: 1028
+instructions executed: 259
+binary size: 2848
+  code: 1080
     main: 516
-    parse_pos: 188
-    sum_pos: 324
+    sum_pos: 564
   data: 271
-  metadata: 1477
+  metadata: 1497
 builtin calls: 24
   aipl_assert: 3
   aipl_dec: 9

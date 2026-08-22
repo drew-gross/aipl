@@ -74,9 +74,9 @@ allocations: 2208
 deallocations: 2208
 reallocations: 6
 bytes allocated: 101329
-instructions executed: 327235
-binary size: 864376
-  code: 528356
+instructions executed: 326764
+binary size: 863888
+  code: 528388
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -96,24 +96,19 @@ binary size: 864376
     __builtin_any$__m7__Doc$lam91: 32
     __builtin_any$__m7__Doc$lam91$tail: 324
     __builtin_count$char$s0: 232
-    __builtin_count_while$char$lam53: 296
-    __builtin_count_while$char$s0$lam42: 232
-    __builtin_count_while$char$s0$lam58: 236
-    __builtin_count_while$char$s0$lam60: 244
-    __builtin_count_while$char$s0$lam69: 232
-    __builtin_count_while$char$s0$lam71: 232
+    __builtin_count_while$char$lam57: 296
+    __builtin_count_while$char$s0$lam46: 232
+    __builtin_count_while$char$s0$lam62: 236
+    __builtin_count_while$char$s0$lam64: 244
+    __builtin_count_while$char$s0$lam75: 232
+    __builtin_count_while$char$s0$lam77: 232
     __builtin_drop_first$char$s0: 32
     __builtin_drop_first$char$s0$tail: 104
     __builtin_drop_last$str: 208
     __builtin_first$char$s0: 136
-    __builtin_int_parse: 724
+    __builtin_int_parse: 1032
     __builtin_intersperse$__m7__Doc: 408
-    __builtin_is_some_and$char$lam59: 48
-    __builtin_map_err$__m13__LexResult$__m12__AiplTok$__m13__LexError$__m6__FmtError$lam7: 540
-    __builtin_opt_left_fold$char$i64$s0$lam38: 348
-    __builtin_sort_by$__m6__ImportEntry$lam28: 1536
-    __builtin_sort_by$__m6__ImportName$lam62: 3236
-    __builtin_value_or_err$i64$str: 180
+    __builtin_is_some_and$char$lam63: 48
     __eq___m6__FmtKind: 64
     __eq_char$opt: 100
     __eq_str$opt: 148
@@ -125,24 +120,22 @@ binary size: 864376
     __lambda_19: 136
     __lambda_20: 48
     __lambda_21: 64
-    __lambda_37: 140
+    __lambda_41: 140
     __m12__char_lit_emit: 1412
     __m12__dedent_segments: 168
     __m12__ident_cont: 16
-    __m12__int_lit: 1044
+    __m12__int_lit: 1132
     __m12__raw_tpl_kind: 2088
     __m12__tpl_kind: 2112
-    __m13__apply_emit$__m12__AiplTok: 4964
     __m13__between_len: 744
     __m13__delimited_len: 1416
-    __m13__finalize_template$__m12__AiplTok: 4288
+    __m13__finalize_template$__m12__AiplTok: 8480
     __m13__float_len: 816
     __m13__interp_scan$__m12__AiplTok: 3120
     __m13__lex$__m12__AiplTok: 2436
     __m13__lex_step$__m12__AiplTok: 22620
     __m13__nested_len: 1044
-    __m13__seg_emit$__m12__AiplTok: 4344
-    __m13__step_result$__m12__AiplTok: 7140
+    __m13__step_result$__m12__AiplTok: 12068
     __m13__template_scan$__m12__AiplTok: 2772
     __m13__template_step$__m12__AiplTok: 556
     __m14__unescape: 892
@@ -155,9 +148,8 @@ binary size: 864376
     __m4__split_test_sections: 928
     __m5__parse_test_section_header: 696
     __m6__array_atom: 2176
-    __m6__array_suffixes: 1248
-    __m6__atom: 2596
-    __m6__base_ty: 2248
+    __m6__atom: 3184
+    __m6__base_ty: 3928
     __m6__binding_ann: 1924
     __m6__binop_expr: 2888
     __m6__binop_tail: 3920
@@ -168,7 +160,6 @@ binary size: 864376
     __m6__call_arg: 4680
     __m6__call_arg_list: 636
     __m6__call_args_until: 2688
-    __m6__chain_docs: 472
     __m6__comma_list_docs: 3080
     __m6__comment_starts_before: 280
     __m6__construct_body: 3208
@@ -176,7 +167,7 @@ binary size: 864376
     __m6__dict_value: 1428
     __m6__dict_value_ty: 1300
     __m6__dot_seg: 5184
-    __m6__drop_trailing_break: 580
+    __m6__drop_trailing_break: 872
     __m6__err_here: 656
     __m6__expect: 1080
     __m6__expr: 700
@@ -184,23 +175,20 @@ binary size: 864376
     __m6__fn_body: 1224
     __m6__fn_item: 17724
     __m6__fn_return: 1696
-    __m6__for_stmt: 9924
-    __m6__format_program: 74964
+    __m6__for_stmt: 11804
+    __m6__format_program: 80228
     __m6__hug_close: 716
     __m6__hugs_sole_arg: 1268
     __m6__ident_list: 1660
     __m6__if_expr: 10916
-    __m6__import_item: 7956
-    __m6__import_names: 3240
+    __m6__import_item: 15528
     __m6__index_or_from: 3872
     __m6__index_seg: 3676
-    __m6__is_line_break: 372
     __m6__item: 932
     __m6__lambda: 5924
     __m6__lambda_param_ty: 1456
     __m6__lambda_params: 3236
-    __m6__lead: 436
-    __m6__lead_loop: 1520
+    __m6__lead: 1816
     __m6__let_stmt: 19204
     __m6__match_arms: 7768
     __m6__match_expr: 10744
@@ -210,12 +198,12 @@ binary size: 864376
     __m6__next_start: 532
     __m6__params_until: 9516
     __m6__paren_atom: 5316
-    __m6__paren_ty: 7608
+    __m6__paren_ty: 8688
     __m6__pattern: 7572
     __m6__pattern_alts: 2968
     __m6__peek_is: 288
     __m6__peek_text_n: 32
-    __m6__postfix: 4668
+    __m6__postfix: 5084
     __m6__postfix_segs: 3252
     __m6__program: 2500
     __m6__program_items: 4372
@@ -229,7 +217,7 @@ binary size: 864376
     __m6__shim_bindings: 3048
     __m6__shim_expr: 5860
     __m6__slice_to: 1300
-    __m6__sorted_imports: 416
+    __m6__sorted_imports: 1844
     __m6__spaced_default: 1692
     __m6__statement: 5168
     __m6__str_atom: 532
@@ -240,55 +228,46 @@ binary size: 864376
     __m6__struct_item: 5804
     __m6__take_comment: 232
     __m6__template_scan: 2248
-    __m6__template_verbatim: 724
     __m6__tok_text: 368
     __m6__trailing_comment: 1980
     __m6__trim_last_break: 32
-    __m6__trim_last_break$tail: 528
-    __m6__tuple_binder: 1732
+    __m6__trim_last_break$tail: 1168
     __m6__tuple_rest: 2688
     __m6__ty: 4432
     __m6__ty_list: 2288
-    __m6__type_param_list: 3044
-    __m6__type_params: 2272
-    __m6__type_suffixes: 1844
+    __m6__type_params: 5248
     __m6__unary: 1700
-    __m6__variant_body: 760
     __m6__variant_cases: 3804
-    __m6__variant_item: 4736
+    __m6__variant_item: 5640
     __m6__variant_payload: 2176
     __m6__while_stmt: 4272
     __m6__with_last: 36
     __m6__with_last$tail: 528
-    __m6__without_trailing_break: 696
     __m7__col_after: 448
     __m7__fits: 36
     __m7__fits$tail: 2636
     __m7__fits_atom: 44
     __m7__fits_atom$tail: 296
-    __m7__go: 3468
     __m7__has_hard: 32
     __m7__has_hard$tail: 664
-    __m7__print_doc: 1268
     __m8__reindent_block: 2344
     __m9__dedent: 32
     __m9__dedent$tail: 1196
-    __map44$own0: 320
+    __map48$own0: 320
     __rec_drop___m7__Doc: 184
     __rec_drop___m7__Work: 84
-    __test$fmt_layout: 764
     fmt_layout: 612
     fmt_prepare: 864
-    main: 928
+    main: 1644
   data: 2508
-  metadata: 333512
-builtin calls: 39207
+  metadata: 332992
+builtin calls: 39183
   aipl_arr_drop_str: 50
   aipl_arr_extend: 4
-  aipl_arr_inc: 4464
+  aipl_arr_inc: 4452
   aipl_arr_reserve: 10
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6309
+  aipl_array_dec: 6297
   aipl_array_new: 1774
   aipl_array_push: 42
   aipl_array_push_mut: 45

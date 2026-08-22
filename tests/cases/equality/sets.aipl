@@ -13,15 +13,14 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 488
-instructions executed: 583
-binary size: 4296
-  code: 2036
+instructions executed: 580
+binary size: 4232
+  code: 2020
     __eq_set$i64: 256
     __eq_set$none: 32
-    __test$eq_set: 1672
-    main: 76
+    main: 1732
   data: 243
-  metadata: 2017
+  metadata: 1969
 builtin calls: 99
   aipl_array_dec: 10
   aipl_array_push_mut: 21

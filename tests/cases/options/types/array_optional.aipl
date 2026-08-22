@@ -14,14 +14,12 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 120
-instructions executed: 193
-binary size: 2632
-  code: 1024
-    __test$pick: 680
-    main: 72
-    pick: 272
+instructions executed: 176
+binary size: 2760
+  code: 1136
+    main: 1136
   data: 123
-  metadata: 1485
+  metadata: 1501
 builtin calls: 31
   aipl_arr_drop_str: 1
   aipl_arr_inc: 4

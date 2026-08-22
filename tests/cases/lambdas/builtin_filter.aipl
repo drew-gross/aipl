@@ -31,18 +31,17 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 3430
-binary size: 7616
-  code: 4220
+instructions executed: 3427
+binary size: 7544
+  code: 4196
     __eq_i64$arr: 296
     __eq_str$arr: 352
     __filter7$own0: 272
     __map11$own0: 256
-    __test$is_even: 2936
     is_even: 32
-    main: 76
+    main: 2988
   data: 468
-  metadata: 2928
+  metadata: 2880
 builtin calls: 120
   aipl_arr_drop_str: 3
   aipl_arr_inc: 4

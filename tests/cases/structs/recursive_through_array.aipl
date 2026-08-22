@@ -51,19 +51,18 @@ allocations: 24
 deallocations: 24
 reallocations: 0
 bytes allocated: 1088
-instructions executed: 1811
-binary size: 5336
-  code: 2520
+instructions executed: 1803
+binary size: 5560
+  code: 2656
     __arr_drop_Tree: 116
     __arr_retain_Tree: 116
     __rec_drop_Tree: 36
     __to_str_Tree: 1028
     __to_str_i64: 180
-    leaf: 104
-    main: 668
+    main: 908
     total: 272
   data: 188
-  metadata: 2628
+  metadata: 2716
 builtin calls: 166
   aipl_arr_inc: 5
   aipl_array_dec: 14

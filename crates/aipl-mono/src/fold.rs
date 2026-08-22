@@ -156,7 +156,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
         ExprKind::Lambda(params, body) => ExprKind::Lambda(params.clone(), f(body)),
     };
     let kind = try_fold(&kind).unwrap_or(kind);
-    Expr::new(kind, e.span.clone())
+    Expr::rebuilt(kind, e)
 }
 
 /// Whether `v` is a literal that may be substituted for a `let` binding of

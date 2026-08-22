@@ -56,17 +56,14 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 218
-binary size: 2168
-  code: 852
+instructions executed: 212
+binary size: 2016
+  code: 812
     __to_str_bool: 212
     __to_str_i64: 180
-    five_or_flag: 36
-    main: 364
-    missing_or_five: 36
-    or_zero: 24
+    main: 420
   data: 47
-  metadata: 1269
+  metadata: 1157
 builtin calls: 22
   aipl_dec: 8
   aipl_i64_len: 2

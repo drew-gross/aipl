@@ -91,9 +91,9 @@ allocations: 18
 deallocations: 18
 reallocations: 0
 bytes allocated: 800
-instructions executed: 3570
-binary size: 27064
-  code: 14216
+instructions executed: 3440
+binary size: 26008
+  code: 13512
     __dict_drop_str$i64: 128
     __dict_retain_str$i64: 128
     __eq_set$i64: 256
@@ -111,19 +111,12 @@ binary size: 27064
     __to_str_str$arr$opt$err$Error: 1244
     __to_str_u64$err$Error: 540
     count_evens: 264
-    counts: 300
     evens: 476
     first_of_pair: 260
-    main: 2148
-    maybe: 120
-    maybe_strs: 288
-    narrow: 100
+    main: 2632
     pair: 316
-    point: 136
-    shape: 140
-    wide: 104
   data: 1851
-  metadata: 10997
+  metadata: 10645
 builtin calls: 347
   aipl_arr_drop_str: 1
   aipl_arr_inc: 17

@@ -24,9 +24,9 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 584
-instructions executed: 2331
-binary size: 6496
-  code: 3548
+instructions executed: 2328
+binary size: 6440
+  code: 3532
     __eq_i64$arr: 296
     __eq_str$arr: 352
     __filter1$own0: 272
@@ -35,10 +35,9 @@ binary size: 6496
     __filter5$own0: 272
     __filter7$own0: 368
     __map9$own0: 256
-    __test$keep_gt3: 1116
-    main: 72
+    main: 1172
   data: 426
-  metadata: 2522
+  metadata: 2482
 builtin calls: 101
   aipl_arr_drop_str: 2
   aipl_arr_inc: 6

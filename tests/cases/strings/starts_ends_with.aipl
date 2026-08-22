@@ -42,13 +42,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 292
-binary size: 6352
-  code: 1860
-    __test$is_dotfile: 1788
-    main: 72
+instructions executed: 289
+binary size: 6280
+  code: 1836
+    main: 1836
   data: 1279
-  metadata: 3213
+  metadata: 3165
 builtin calls: 151
   aipl_assert: 23
   aipl_dec: 47

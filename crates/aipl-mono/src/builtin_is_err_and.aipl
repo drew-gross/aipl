@@ -78,16 +78,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1402
-binary size: 10360
-  code: 4276
+instructions executed: 1339
+binary size: 10216
+  code: 4196
     __builtin_value_or_err$char$i64: 92
-    __builtin_value_or_err$char$str: 180
     check_len: 380
-    digit_of: 392
+    digit_of: 492
     main: 3232
   data: 1571
-  metadata: 4513
+  metadata: 4449
 builtin calls: 203
   aipl_assert: 18
   aipl_char_at: 11

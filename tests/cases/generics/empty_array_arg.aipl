@@ -11,14 +11,12 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 29
-binary size: 1128
-  code: 196
-    __test$g: 84
-    g$EmptyArray: 48
-    main: 64
+instructions executed: 24
+binary size: 1016
+  code: 160
+    main: 160
   data: 37
-  metadata: 895
+  metadata: 819
 builtin calls: 6
   aipl_array_dec: 1
   aipl_array_new: 1

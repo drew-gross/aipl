@@ -46,9 +46,9 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 384
-instructions executed: 857
-binary size: 9808
-  code: 4868
+instructions executed: 849
+binary size: 9552
+  code: 4724
     __dict_drop_i64$str: 128
     __dict_drop_str$i64: 128
     __dict_retain_i64$str: 128
@@ -57,12 +57,9 @@ binary size: 9808
     __eq_dict$str$i64: 252
     __eq_i64$opt: 100
     __eq_str$opt: 148
-    __test$ints: 1656
-    __test$make_empty: 548
-    main: 1308
-    make_empty: 44
+    main: 3412
   data: 863
-  metadata: 4077
+  metadata: 3965
 builtin calls: 162
   aipl_array_dec: 6
   aipl_array_push_mut: 11

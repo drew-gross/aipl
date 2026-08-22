@@ -710,15 +710,59 @@ pub mod ast {
     pub struct Expr {
         pub kind: ExprKind,
         pub span: Span,
+        /// The type the checker resolved for this expression, when knowing it
+        /// later matters more than re-deriving it.
+        ///
+        /// Only *context-dependent* expressions carry one: a bare `none`, an
+        /// empty `[]`/`#{}`/`#{:}`, an `ok`/`err` whose other side is a
+        /// placeholder, and a generic constructor its own arguments don't pin.
+        /// Their types come from where they sit, so any pass that *moves* them —
+        /// inlining, folding — would otherwise change what they mean. Recording
+        /// the type at the point the context is still visible makes the move
+        /// safe, and is why `check` returns a rewritten program rather than only
+        /// errors.
+        ///
+        /// `None` everywhere else: the type is recoverable from the expression
+        /// itself, and duplicating it would just be a second thing to keep true.
+        /// Boxed: `None` on the overwhelming majority of nodes, and `Expr` is
+        /// recursed over deeply enough during compilation that widening every
+        /// one of them by a whole `Type` costs real stack.
+        pub ty: Option<Box<Type>>,
     }
 
     impl Expr {
         pub fn new(kind: ExprKind, span: Span) -> Self {
-            Self { kind, span }
+            Self {
+                kind,
+                span,
+                ty: None,
+            }
+        }
+
+        /// `kind` in place of `like`'s, keeping its span *and* its recorded type.
+        ///
+        /// The idiom for a pass that rewrites an expression's children: building
+        /// with [`Expr::new`] instead silently drops [`Expr::ty`], which is
+        /// exactly the information the rewriting pass is liable to invalidate by
+        /// moving things around.
+        pub fn rebuilt(kind: ExprKind, like: &Expr) -> Self {
+            Self {
+                kind,
+                span: like.span.clone(),
+                ty: like.ty.clone(),
+            }
+        }
+
+        /// The same expression with its resolved type recorded — see [`Expr::ty`].
+        pub fn with_ty(mut self, ty: Type) -> Self {
+            self.ty = Some(Box::new(ty));
+            self
         }
     }
 
     impl PartialEq for Expr {
+        /// Ignores `span` *and* `ty`: both are derived from where an expression
+        /// sits rather than what it says, and tests compare shapes.
         fn eq(&self, other: &Self) -> bool {
             self.kind == other.kind
         }

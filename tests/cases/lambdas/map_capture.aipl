@@ -22,18 +22,15 @@ allocations: 6
 deallocations: 6
 reallocations: 6
 bytes allocated: 288
-instructions executed: 759
-binary size: 2944
-  code: 1376
+instructions executed: 751
+binary size: 2648
+  code: 1240
     __eq_i64$arr: 296
-    main: 552
-    map$lam1: 264
-    map$lam3: 264
+    main: 944
   data: 137
-  metadata: 1431
-builtin calls: 27
-  aipl_arr_inc: 2
-  aipl_array_dec: 8
+  metadata: 1271
+builtin calls: 23
+  aipl_array_dec: 6
   aipl_array_new: 6
   aipl_array_push_mut: 6
   aipl_assert: 2

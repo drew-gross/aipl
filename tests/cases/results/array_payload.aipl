@@ -47,21 +47,20 @@ allocations: 22
 deallocations: 22
 reallocations: 0
 bytes allocated: 888
-instructions executed: 1537
+instructions executed: 1520
 binary size: 8112
-  code: 3912
+  code: 3924
     __eq_i64$arr: 296
     __test$below: 988
-    __test$nothing: 460
+    __test$nothing: 620
     __test$tail_below: 604
     __test_try_fail_str: 64
     __to_str_str: 252
     below: 604
     main: 156
-    nothing: 148
     tail_below: 340
   data: 514
-  metadata: 3686
+  metadata: 3674
 builtin calls: 118
   aipl_arr_inc: 21
   aipl_arr_slice: 1

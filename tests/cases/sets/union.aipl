@@ -42,15 +42,14 @@ allocations: 17
 deallocations: 17
 reallocations: 0
 bytes allocated: 936
-instructions executed: 879
-binary size: 6904
-  code: 3372
+instructions executed: 875
+binary size: 6880
+  code: 3368
     __eq_set$i64: 256
     __eq_set$str: 256
-    empty_set: 44
-    main: 2816
+    main: 2856
   data: 419
-  metadata: 3113
+  metadata: 3093
 builtin calls: 289
   aipl_arr_drop_str: 4
   aipl_arr_retain_ptr: 10

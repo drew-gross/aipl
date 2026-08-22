@@ -1240,9 +1240,9 @@ allocations: 1678
 deallocations: 1678
 reallocations: 0
 bytes allocated: 79768
-instructions executed: 280464
-binary size: 1799344
-  code: 1130200
+instructions executed: 279218
+binary size: 1798984
+  code: 1129960
     __arr_drop_StepResult$Kind: 140
     __arr_drop_Token$Kind: 492
     __arr_drop_TokenRule$Kind: 928
@@ -1255,9 +1255,8 @@ binary size: 1799344
     __builtin_count_while$char$s0$lam49: 232
     __builtin_drop_first$char$s0: 72
     __builtin_first$char$s0: 136
-    __builtin_int_parse: 708
+    __builtin_int_parse: 980
     __builtin_is_some_and$char$lam33: 48
-    __builtin_opt_left_fold$char$i64$s0$lam38: 348
     __eq_Kind: 1136
     __eq_LexError: 168
     __eq_LexResult$Kind: 120
@@ -1292,12 +1291,11 @@ binary size: 1799344
     __test$lex: 1042736
     __test_try_fail_LexError: 64
     __to_str_LexError: 812
-    apply_emit$Kind: 6844
     between_len: 744
     checked_seg: 1700
     delimited_len: 1416
     esc_str: 112
-    finalize_template$Kind: 5176
+    finalize_template$Kind: 10932
     float_len: 816
     int_tok: 1644
     interp_scan$Kind: 3568
@@ -1307,14 +1305,13 @@ binary size: 1799344
     nested_len: 1044
     nonempty_str: 1684
     rawtpl_kind: 2944
-    seg_emit$Kind: 5912
-    step_result$Kind: 8548
+    step_result$Kind: 15384
     template_scan$Kind: 2772
     template_step$Kind: 556
     toks: 128
     tpl_kind: 2980
   data: 8132
-  metadata: 661012
+  metadata: 660892
 builtin calls: 27491
   aipl_arr_drop_str: 22
   aipl_arr_inc: 3052

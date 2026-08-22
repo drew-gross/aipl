@@ -17,13 +17,12 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 401
-instructions executed: 196
-binary size: 4608
-  code: 1540
-    __test$rejoin: 1464
-    main: 76
+instructions executed: 193
+binary size: 4552
+  code: 1528
+    main: 1528
   data: 545
-  metadata: 2523
+  metadata: 2479
 builtin calls: 133
   aipl_arr_drop_str: 6
   aipl_arr_inc: 7

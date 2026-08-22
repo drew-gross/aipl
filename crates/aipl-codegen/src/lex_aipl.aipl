@@ -641,9 +641,9 @@ allocations: 4723
 deallocations: 4723
 reallocations: 0
 bytes allocated: 275592
-instructions executed: 748104
-binary size: 220040
-  code: 141960
+instructions executed: 747432
+binary size: 219544
+  code: 141656
     __arr_drop___m1__StepResult$AiplTok: 140
     __arr_drop___m1__Token$AiplTok: 364
     __arr_drop___m1__TokenRule$AiplTok: 800
@@ -659,10 +659,8 @@ binary size: 220040
     __builtin_drop_first$char$s0: 32
     __builtin_drop_first$char$s0$tail: 104
     __builtin_first$char$s0: 136
-    __builtin_int_parse: 724
+    __builtin_int_parse: 1032
     __builtin_is_some_and$char$lam34: 48
-    __builtin_opt_left_fold$char$i64$s0$lam13: 348
-    __builtin_value_or_err$i64$str: 180
     __eq_AiplTok: 884
     __eq_StrStyle: 64
     __eq___builtin_Span: 104
@@ -682,17 +680,15 @@ binary size: 220040
     __lambda_6: 48
     __lambda_7: 64
     __m10__parse_test_section_header: 696
-    __m1__apply_emit$AiplTok: 4964
     __m1__between_len: 744
     __m1__delimited_len: 1416
-    __m1__finalize_template$AiplTok: 4288
+    __m1__finalize_template$AiplTok: 8480
     __m1__float_len: 816
     __m1__interp_scan$AiplTok: 3120
     __m1__lex$AiplTok: 2436
     __m1__lex_step$AiplTok: 22620
     __m1__nested_len: 1044
-    __m1__seg_emit$AiplTok: 4344
-    __m1__step_result$AiplTok: 7140
+    __m1__step_result$AiplTok: 12068
     __m1__template_scan$AiplTok: 2772
     __m1__template_step$AiplTok: 556
     __m2__unescape: 892
@@ -710,14 +706,14 @@ binary size: 220040
     char_lit_emit: 1412
     dedent_segments: 188
     ident_cont: 16
-    int_lit: 1044
+    int_lit: 1132
     lex_aipl: 46088
-    lex_aipl_tokens: 368
+    lex_aipl_tokens: 384
     main: 152
     raw_tpl_kind: 2088
     tpl_kind: 2112
   data: 7100
-  metadata: 70980
+  metadata: 70788
 builtin calls: 80923
   aipl_arr_drop_str: 9
   aipl_arr_inc: 7554

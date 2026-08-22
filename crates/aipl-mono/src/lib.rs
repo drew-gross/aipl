@@ -583,7 +583,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
                 .collect(),
         ),
     };
-    Expr::new(kind, e.span.clone())
+    Expr::rebuilt(kind, e)
 }
 
 /// Substitute template type variables in `t` with concrete types from `map`,
@@ -873,7 +873,7 @@ impl GenericLowerer {
                     .collect::<Result<_, Error>>()?,
             ),
         };
-        Ok(Expr::new(kind, e.span.clone()))
+        Ok(Expr::rebuilt(kind, e))
     }
 }
 
@@ -3907,8 +3907,25 @@ impl Mono<'_> {
     /// their mangled instances. Returns the rewritten expression and its type.
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
         let span = expr.span.clone();
-        let node = |kind| Expr::new(kind, span.clone());
-        Ok(match &expr.kind {
+        // Carries `Expr::ty` onto the rewritten node: codegen re-derives types
+        // from the AST too, so a lock that stops here would leave it deriving the
+        // placeholder all over again.
+        let node = |kind| Expr::rebuilt(kind, expr);
+        // A context-dependent expression carries the type the checker resolved
+        // for it (`Expr::ty`), recorded while the context was still in view. By
+        // now an inlining pass may have moved it out from under the very thing
+        // that decided its type, so the recorded answer is the reliable one.
+        //
+        // It is fed in as the *expected* type rather than used to short-circuit
+        // inference: a generic constructor still has to go through
+        // `infer_generic_variant_ctor` to have its instance instantiated and its
+        // arguments bound. Supplying the context it lost is enough, and leaves
+        // one code path instead of two that must agree.
+        let prev_expected = expr
+            .ty
+            .clone()
+            .map(|t| std::mem::replace(&mut self.cur_expected, Some(*t)));
+        let (rewritten, inferred) = match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             ExprKind::Unit => (expr.clone(), Type::Unit),
@@ -4776,7 +4793,21 @@ impl Mono<'_> {
                     (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
                 }
             }
-        })
+        };
+        if let Some(p) = prev_expected {
+            self.cur_expected = p;
+        }
+        // The literal shapes — a bare `none`, an empty collection, an `ok`/`err`
+        // with a placeholder side — infer a *placeholder* once their context is
+        // gone rather than failing. The rewritten expression is right either way;
+        // only the type needs correcting, and only when what was inferred is one
+        // of those placeholders: a constructor's own inferred type is the
+        // concrete instance and is better than the recorded application.
+        let ty = match &expr.ty {
+            Some(t) if has_placeholder(&inferred) && !has_placeholder(t) => (**t).clone(),
+            _ => inferred,
+        };
+        Ok((rewritten, ty))
     }
 }
 
@@ -5718,6 +5749,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
     Expr {
         kind,
         span: e.span.clone(),
+        ty: None,
     }
 }
 
@@ -6509,6 +6541,14 @@ fn is_inline_candidate(
         // only `Call`/`Ident` of this name in the whole program.
         && !binders.contains(&f.name)
         && f.sig.type_vars.is_empty()
+        // An `any`-bearing parameter (or return) is *specialized* by
+        // monomorphization, at the call site. Inlining removes the call, so the
+        // specialization never happens and the pseudo-type reaches codegen.
+        // `inline_small` has always had this guard; here it was masked by the
+        // context-literal check, which refused these calls for a different
+        // reason and has since been lifted.
+        && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
+        && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
             f.sig.is_mutating(),
@@ -6535,7 +6575,6 @@ fn is_inline_shape(
     !higher_order_or_variadic
         && !mutating
         && !contains_early_exit(body)
-        && !contains_context_literal(body)
         && !contains_inplace_hof_intrinsic(body)
         && !references_name(body, name)
 }
@@ -6676,6 +6715,70 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
     }
 }
 
+/// Whether `t` still contains a "decided by context" placeholder — the types a
+/// bare `none` / empty literal carries until something pins them.
+fn has_placeholder(t: &Type) -> bool {
+    match t {
+        Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
+        Type::Optional(i) | Type::Array(i) | Type::Set(i) => has_placeholder(i),
+        Type::Dict(k, v) => has_placeholder(k) || has_placeholder(v),
+        Type::Result(a, b) => has_placeholder(a) || has_placeholder(b),
+        Type::Fn(ps, r) => ps.iter().any(has_placeholder) || has_placeholder(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(has_placeholder),
+        _ => false,
+    }
+}
+
+/// [`children`], by mutable reference. Kept adjacent so the two stay in step:
+/// a new `ExprKind` arm has to be added to both, and the compiler says so.
+pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
+    match &mut e.kind {
+        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
+        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        ExprKind::Shim(_, _, body) => vec![body],
+        ExprKind::Num(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Char(_)
+        | ExprKind::Ident(_)
+        | ExprKind::None
+        | ExprKind::Unit => vec![],
+        ExprKind::Neg(x)
+        | ExprKind::Not(x)
+        | ExprKind::Field(x, _)
+        | ExprKind::Try(x)
+        | ExprKind::Return(x) => vec![x],
+        ExprKind::Binop(a, _, b)
+        | ExprKind::Seq(a, b)
+        | ExprKind::Index(a, b)
+        | ExprKind::Let(_, _, a, b)
+        | ExprKind::LetMut(_, _, a, b)
+        | ExprKind::Assign(_, a, b)
+        | ExprKind::For(_, a, b)
+        | ExprKind::While(a, b) => vec![a, b],
+        ExprKind::If(a, b, c) => vec![a, b, c],
+        ExprKind::Slice(a, b, c) => {
+            let mut v = vec![a.as_mut(), b.as_mut()];
+            if let Some(c) = c {
+                v.push(c);
+            }
+            v
+        }
+        ExprKind::Call(_, args, _)
+        | ExprKind::ArrayLit(args)
+        | ExprKind::SetLit(args)
+        | ExprKind::TupleLit(args) => args.iter_mut().collect(),
+        ExprKind::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
+        ExprKind::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
+        ExprKind::Match(s, arms) => {
+            let mut v = vec![s.as_mut()];
+            v.extend(arms.iter_mut().map(|a| &mut a.body));
+            v
+        }
+        ExprKind::Lambda(_, b) => vec![b],
+    }
+}
+
 /// Whether `e` (or any sub-expression) is an early exit — `return` or `?`.
 fn contains_early_exit(e: &Expr) -> bool {
     matches!(e.kind, ExprKind::Return(_) | ExprKind::Try(_))
@@ -6756,14 +6859,17 @@ fn replace_call(
 ) -> Expr {
     if !*replaced || sites == InlineSites::All {
         if let ExprKind::Call(name, args, _) = &e.kind {
-            // Skip if any argument is a context-typed literal (`none`, empty
-            // `[]`/`#{}`/`#{:}`, or a `some(..)`/`ok(..)` wrapping one): its type
-            // comes from `f`'s *parameter*, which a `let`-binding discards. Leave
-            // the call (so `inline_single_use` keeps `f`).
-            if name == fname
-                && args.len() == fparams.len()
-                && !args.iter().any(contains_context_literal)
-            {
+            // Context-typed arguments (`none`, empty `[]`/`#{}`/`#{:}`, an
+            // `ok(..)`/`some(..)` wrapping one) used to be skipped here: their
+            // type came from `f`'s *parameter*, which the `let`-binding this
+            // builds discards. They are now inlined like anything else, because
+            // the checker records each one's resolved type on the expression
+            // itself (`Expr::ty`) before any of this runs — so moving it no
+            // longer changes what it means.
+            //
+            // These are the *most* valuable inlinings, not the least: a literal
+            // argument is what gives the constant folder something to work with.
+            if name == fname && args.len() == fparams.len() {
                 *replaced = true;
                 return build_inlined(fparams, fbody, args, e.span.clone(), counter);
             }
@@ -6886,7 +6992,7 @@ fn replace_call(
         ),
         ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, counter, replaced))),
     };
-    Expr::new(kind, e.span.clone())
+    Expr::rebuilt(kind, e)
 }
 
 /// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
@@ -7070,7 +7176,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             ExprKind::Lambda(ps.clone(), Box::new(rename_params(b, &without_all(&names))))
         }
     };
-    Expr::new(kind, e.span.clone())
+    Expr::rebuilt(kind, e)
 }
 
 // ---- Ownership analysis -----------------------------------------------------

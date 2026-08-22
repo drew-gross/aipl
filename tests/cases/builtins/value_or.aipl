@@ -16,13 +16,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 113
-binary size: 2000
-  code: 524
-    __test$first_char: 452
-    main: 72
+instructions executed: 110
+binary size: 1936
+  code: 500
+    main: 500
   data: 301
-  metadata: 1175
+  metadata: 1135
 builtin calls: 12
   aipl_assert: 5
   aipl_char_at: 2

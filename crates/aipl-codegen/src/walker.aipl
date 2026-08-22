@@ -2649,9 +2649,9 @@ allocations: 20940
 deallocations: 20940
 reallocations: 862
 bytes allocated: 1025050
-instructions executed: 2853527
-binary size: 3062224
-  code: 1752412
+instructions executed: 2844142
+binary size: 3061448
+  code: 1752080
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2668,27 +2668,22 @@ binary size: 3062224
     __arr_retain___m9__StepResult$__m8__AiplTok: 140
     __arr_retain___m9__Token$__m8__AiplTok: 364
     __arr_retain___m9__TokenRule$__m8__AiplTok: 800
-    __builtin_any$__m1__Doc$lam21: 32
-    __builtin_any$__m1__Doc$lam21$tail: 324
+    __builtin_any$__m1__Doc$lam28: 32
+    __builtin_any$__m1__Doc$lam28$tail: 324
     __builtin_count$char$s0: 232
-    __builtin_count_while$char$lam69: 296
-    __builtin_count_while$char$s0$lam51: 232
-    __builtin_count_while$char$s0$lam74: 236
-    __builtin_count_while$char$s0$lam76: 244
-    __builtin_count_while$char$s0$lam82: 232
+    __builtin_count_while$char$lam71: 296
+    __builtin_count_while$char$s0$lam49: 232
+    __builtin_count_while$char$s0$lam61: 232
+    __builtin_count_while$char$s0$lam76: 236
+    __builtin_count_while$char$s0$lam78: 244
     __builtin_count_while$char$s0$lam83: 232
     __builtin_drop_first$char$s0: 32
     __builtin_drop_first$char$s0$tail: 104
     __builtin_drop_last$str: 208
     __builtin_first$char$s0: 136
-    __builtin_int_parse: 724
+    __builtin_int_parse: 1032
     __builtin_intersperse$__m1__Doc: 408
-    __builtin_is_some_and$char$lam75: 48
-    __builtin_map_err$__m9__LexResult$__m8__AiplTok$__m9__LexError$FmtError$lam12: 540
-    __builtin_opt_left_fold$char$i64$s0$lam63: 348
-    __builtin_sort_by$ImportEntry$lam36: 1536
-    __builtin_sort_by$ImportName$lam18: 3236
-    __builtin_value_or_err$i64$str: 180
+    __builtin_is_some_and$char$lam77: 48
     __eq_FmtKind: 64
     __eq_FmtTok: 120
     __eq_FmtTok$opt: 92
@@ -2696,15 +2691,15 @@ binary size: 3062224
     __eq___m1__Doc: 464
     __eq___m1__Doc$arr: 300
     __eq_char$opt: 100
-    __lambda_26: 100
-    __lambda_27: 68
-    __lambda_28: 136
-    __lambda_29: 152
-    __lambda_30: 108
-    __lambda_31: 136
-    __lambda_32: 48
-    __lambda_33: 64
-    __lambda_62: 140
+    __lambda_33: 100
+    __lambda_34: 68
+    __lambda_35: 136
+    __lambda_36: 152
+    __lambda_37: 108
+    __lambda_38: 136
+    __lambda_39: 48
+    __lambda_40: 64
+    __lambda_64: 140
     __m10__unescape: 892
     __m11__process_raw_string: 32
     __m11__process_raw_string$tail: 600
@@ -2716,34 +2711,31 @@ binary size: 3062224
     __m1__fits$tail: 2636
     __m1__fits_atom: 44
     __m1__fits_atom$tail: 296
-    __m1__go: 3468
     __m1__has_hard: 32
     __m1__has_hard$tail: 664
     __m1__print_doc: 36
-    __m1__print_doc$tail: 1288
+    __m1__print_doc$tail: 4628
     __m2__reindent_block: 2344
     __m3__dedent: 32
     __m3__dedent$tail: 1196
     __m8__char_lit_emit: 1412
     __m8__dedent_segments: 168
     __m8__ident_cont: 16
-    __m8__int_lit: 1044
+    __m8__int_lit: 1132
     __m8__raw_tpl_kind: 2088
     __m8__tpl_kind: 2112
-    __m9__apply_emit$__m8__AiplTok: 4964
     __m9__between_len: 744
     __m9__delimited_len: 1416
-    __m9__finalize_template$__m8__AiplTok: 4288
+    __m9__finalize_template$__m8__AiplTok: 8480
     __m9__float_len: 816
     __m9__interp_scan$__m8__AiplTok: 3120
     __m9__lex$__m8__AiplTok: 2436
     __m9__lex_step$__m8__AiplTok: 22620
     __m9__nested_len: 1044
-    __m9__seg_emit$__m8__AiplTok: 4344
-    __m9__step_result$__m8__AiplTok: 7140
+    __m9__step_result$__m8__AiplTok: 12068
     __m9__template_scan$__m8__AiplTok: 2772
     __m9__template_step$__m8__AiplTok: 556
-    __map53$own0: 320
+    __map51$own0: 320
     __rec_drop___m1__Doc: 184
     __rec_drop___m1__Work: 84
     __test$binding_ann: 4604
@@ -2752,11 +2744,10 @@ binary size: 3062224
     __test_try_fail_FmtError: 64
     __to_str_FmtError: 812
     array_atom: 2176
-    array_suffixes: 1248
     at: 36
     at$tail: 80
-    atom: 2596
-    base_ty: 2248
+    atom: 3184
+    base_ty: 3928
     binding_ann: 1924
     binop_expr: 2888
     binop_tail: 3920
@@ -2767,7 +2758,6 @@ binary size: 3062224
     call_arg: 4680
     call_arg_list: 636
     call_args_until: 2688
-    chain_docs: 472
     comma_list_docs: 3080
     comment_starts_before: 280
     construct_body: 3208
@@ -2775,7 +2765,7 @@ binary size: 3062224
     dict_value: 1428
     dict_value_ty: 1300
     dot_seg: 5184
-    drop_trailing_break: 580
+    drop_trailing_break: 872
     err_here: 656
     expect: 1080
     expr: 700
@@ -2783,23 +2773,20 @@ binary size: 3062224
     fn_body: 1224
     fn_item: 17724
     fn_return: 1696
-    for_stmt: 9924
-    format_program: 74948
+    for_stmt: 11804
+    format_program: 75384
     hug_close: 716
     hugs_sole_arg: 1268
     ident_list: 1660
     if_expr: 10916
-    import_item: 7956
-    import_names: 3240
+    import_item: 15528
     index_or_from: 3872
     index_seg: 3676
-    is_line_break: 372
     item: 932
     lambda: 5924
     lambda_param_ty: 1456
     lambda_params: 3236
-    lead: 436
-    lead_loop: 1520
+    lead: 1816
     let_stmt: 19204
     main: 152
     match_arms: 7768
@@ -2807,22 +2794,21 @@ binary size: 3062224
     mut_stmt: 5364
     name_atom: 5460
     named_ty: 3656
-    new_walker: 200
     next_start: 532
     params_until: 9516
     paren_atom: 5316
-    paren_ty: 7608
+    paren_ty: 8688
     pattern: 7572
     pattern_alts: 2968
     peek_is: 288
     peek_text_n: 32
-    postfix: 4668
+    postfix: 5084
     postfix_segs: 3252
     program: 2500
     program_items: 4372
     range_has_semi: 228
     range_tail: 2136
-    rendered: 456
+    rendered: 472
     sep_entry: 328
     set_member: 9644
     set_or_dict_atom: 5016
@@ -2831,7 +2817,7 @@ binary size: 3062224
     shim_bindings: 3048
     shim_expr: 5860
     slice_to: 1300
-    sorted_imports: 416
+    sorted_imports: 1844
     spaced_default: 1692
     statement: 5168
     str_atom: 532
@@ -2842,39 +2828,32 @@ binary size: 3062224
     struct_item: 5804
     take_comment: 232
     template_scan: 2248
-    template_verbatim: 724
     tok_text: 368
-    toks_of: 520
     trailing_comment: 1980
     trim_last_break: 32
-    trim_last_break$tail: 528
-    tuple_binder: 1732
+    trim_last_break$tail: 1168
     tuple_rest: 2688
     ty: 4432
     ty_list: 2288
-    type_param_list: 3044
-    type_params: 2272
-    type_suffixes: 1844
+    type_params: 5248
     unary: 1700
-    variant_body: 760
     variant_cases: 3804
-    variant_item: 4736
+    variant_item: 5640
     variant_payload: 2176
-    walker_of: 196
+    walker_of: 708
     while_stmt: 4272
     with_last: 36
     with_last$tail: 528
-    without_trailing_break: 696
   data: 25740
-  metadata: 1284072
-builtin calls: 444173
+  metadata: 1283628
+builtin calls: 443631
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 213
-  aipl_arr_inc: 49247
+  aipl_arr_inc: 48976
   aipl_arr_reserve: 276
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 78
-  aipl_array_dec: 61169
+  aipl_array_dec: 60898
   aipl_array_new: 10098
   aipl_array_push: 1496
   aipl_array_push_mut: 1605

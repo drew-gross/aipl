@@ -57,17 +57,16 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 419
-instructions executed: 644
-binary size: 6032
-  code: 2744
+instructions executed: 638
+binary size: 6304
+  code: 2932
     __rec_drop_Tree: 104
     __to_str_Tree: 1104
     __to_str_i64: 180
-    leaf: 192
-    main: 840
+    main: 1220
     total: 324
   data: 308
-  metadata: 2980
+  metadata: 3064
 builtin calls: 65
   aipl_dec: 6
   aipl_i64_len: 6

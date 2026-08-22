@@ -232,6 +232,20 @@ struct Cx<'a> {
     /// Separate from `current_ret` because `return` inside the value still
     /// means the *function's* return type.
     current_expected: std::cell::RefCell<Option<Type>>,
+    /// Types resolved for *context-dependent* expressions, keyed by source span
+    /// and stamped onto the program `check` returns (see `Expr::ty`).
+    ///
+    /// A bare `none` or empty `[]` types as a placeholder here and takes its
+    /// real type from wherever it sits; a generic constructor its arguments
+    /// don't pin takes its instance from the expected type. Both stop being
+    /// derivable the moment a later pass *moves* them, so the answer is recorded
+    /// while the context is still in view.
+    ///
+    /// `None` as a value means "seen with conflicting types" — the same span
+    /// resolved two ways, so nothing can be locked for it. That can't happen for
+    /// a real source expression, but a desugaring may reuse a span, and a wrong
+    /// lock is far worse than a missing one.
+    locks: std::cell::RefCell<HashMap<(usize, usize), Option<Type>>>,
     /// The bound declared for each of `current_type_params`, so a call inside a
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
@@ -281,6 +295,35 @@ impl<'a> Cx<'a> {
             return need == Bound::Any || have == Some(need);
         }
         need.accepts(ty, &|n: &str| self.has_variant(n))
+    }
+
+    /// Record `ty` as the resolved type of `e`, if `e` is one of the
+    /// context-dependent shapes worth locking and `ty` is concrete enough to be
+    /// worth recording. Idempotent; a conflicting second answer poisons the
+    /// entry rather than picking one.
+    fn lock(&self, e: &Expr, ty: &Type) {
+        if needs_lock(&e.kind) {
+            self.lock_span(&e.span, ty);
+        }
+    }
+
+    /// [`Cx::lock`] by span, for a resolution that has no `Expr` to hand — a
+    /// generic constructor, whose whole call is what gets an instance.
+    fn lock_span(&self, span: &Span, ty: &Type) {
+        if mentions_placeholder(ty) || mentions_typevar(ty) {
+            return;
+        }
+        let key = (span.start, span.end);
+        let mut locks = self.locks.borrow_mut();
+        match locks.get(&key) {
+            None => {
+                locks.insert(key, Some(ty.clone()));
+            }
+            Some(Some(prev)) if prev != ty => {
+                locks.insert(key, None);
+            }
+            _ => {}
+        }
     }
 
     fn has_variant(&self, name: &str) -> bool {
@@ -761,6 +804,15 @@ impl<'a> Cx<'a> {
                     })
             })
             .collect::<Result<_, _>>()?;
+        // Which instance this constructor makes came from the expected type as
+        // often as from its own arguments; record it so the answer survives a
+        // pass that moves the expression.
+        //
+        // Recorded as the *application* `Rule<Tok>` rather than the instance
+        // `Rule$Tok`: the instance name only decomposes back into base + args
+        // through a registry that is populated later, so an instance here is
+        // opaque exactly where it needs to be read.
+        self.lock_span(&span, &Type::Generic(base.to_string(), type_args.clone()));
         let inst = self.instantiate_generic(base, &type_args)?;
         // Check each argument against the concrete (substituted) payload type.
         let cases = self.variant_cases(&inst).expect("just instantiated");
@@ -784,7 +836,15 @@ impl<'a> Cx<'a> {
 /// Type-check `program`. The checker recovers at each item, so this returns
 /// *every* error found — in source order — or `Ok` if every function is
 /// well-formed.
-pub fn check(program: &Program) -> Result<(), Vec<Error>> {
+/// Type-check `program`, returning it with the types of context-dependent
+/// expressions stamped in (see [`Expr::ty`]).
+///
+/// The rewrite is why this returns a program rather than only errors: a bare
+/// `none`, an empty `[]`, or a generic constructor takes its type from where it
+/// sits, so a later pass that *moves* it — inlining, folding — would otherwise
+/// change what it means. Recording the answer here, while the context is still
+/// visible, is what makes those moves safe.
+pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     // struct name → [(field_name, field_type, has_default)]
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
@@ -873,6 +933,7 @@ pub fn check(program: &Program) -> Result<(), Vec<Error>> {
         current_fn: std::cell::RefCell::new(String::new()),
         current_type_params: std::cell::RefCell::new(Vec::new()),
         current_expected: std::cell::RefCell::new(None),
+        locks: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
@@ -916,11 +977,40 @@ pub fn check(program: &Program) -> Result<(), Vec<Error>> {
             }
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
+    if !errors.is_empty() {
+        return Err(errors);
     }
+    // Stamp what checking learned onto a copy. A span that resolved two ways is
+    // recorded as `None` and stamps nothing — see `Cx::locks`.
+    let locks = cx.locks.borrow();
+    let mut out = program.clone();
+    for item in &mut out.items {
+        if let Item::Fn(f) = item {
+            stamp_locks(&mut f.body, &locks);
+            if let Some(t) = f.test_body.as_mut() {
+                stamp_locks(t, &locks);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Apply [`Cx::locks`] to a body, in place.
+fn stamp_locks(e: &mut Expr, locks: &HashMap<(usize, usize), Option<Type>>) {
+    if needs_lock_span(&e.kind) {
+        if let Some(Some(ty)) = locks.get(&(e.span.start, e.span.end)) {
+            e.ty = Some(Box::new(ty.clone()));
+        }
+    }
+    for c in crate::children_mut(e) {
+        stamp_locks(c, locks);
+    }
+}
+
+/// Which expressions may carry a lock: the context-dependent shapes, plus any
+/// call (a generic constructor is one, and is locked by span).
+fn needs_lock_span(k: &ExprKind) -> bool {
+    needs_lock(k) || matches!(k, ExprKind::Call(..))
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the
@@ -1045,6 +1135,9 @@ impl Cx<'_> {
         // A bare-literal body flexes to a narrow-int return type (`fn g() -> u8
         // { 200 }`).
         let body_ty = self.flex_int(&f.body, &body_ty, &declared)?;
+        // The return type is the body's context, and inlining is precisely what
+        // takes it away.
+        self.lock(&f.body, &declared);
         coerce(&body_ty, &declared).map_err(|()| {
             Error::at(
                 format!(
@@ -1227,6 +1320,7 @@ impl Cx<'_> {
         // it can't resolve (abstract inside a generic body), where `coerce`'s
         // typevar rule applies instead.
         let declared = self.resolve_generic_ty(&declared).unwrap_or(declared);
+        self.lock(val, &declared);
         let vt = self.flex_int(val, &vt, &declared)?;
         // An annotated binding *converts* between integer widths rather than
         // merely checking: `let n: u8 = some_i64;` re-canonicalizes to 8 bits
@@ -2984,6 +3078,11 @@ impl Cx<'_> {
         effects: &[String],
         ctx: &str,
     ) -> Result<Type, Error> {
+        // The parameter type is this argument's context — the only place a bare
+        // `none` or `[]` learns what it is.
+        if let Some(exp) = expected {
+            self.lock(arg, exp);
+        }
         if let ExprKind::Lambda(params, body) = &arg.kind {
             let Some(Type::Fn(ptys, ret)) = expected else {
                 return Err(Error::at(
@@ -3480,6 +3579,40 @@ fn is_unknown(t: &Type) -> bool {
 /// still be looked up at an inner call site — without it a generic body knows
 /// only "some type parameter" and no bound can ever be satisfied (see
 /// `bound_satisfied`). An anonymous `any` has no name and gets the bare prefix.
+/// Whether an expression's type comes from where it *sits* rather than from what
+/// it says — so moving it (inlining, folding) would change its meaning unless the
+/// type was recorded first. See [`Expr::ty`].
+///
+/// Deliberately the same set the inliner used to refuse to move, plus generic
+/// constructions: `none` and the empty collection literals carry only a
+/// placeholder element type, `ok`/`err` leave their *other* side a placeholder,
+/// and a generic constructor whose arguments don't pin every variable takes them
+/// from the expected type.
+fn needs_lock(k: &ExprKind) -> bool {
+    match k {
+        ExprKind::None => true,
+        ExprKind::ArrayLit(v) | ExprKind::SetLit(v) => v.is_empty(),
+        ExprKind::DictLit(v) => v.is_empty(),
+        ExprKind::Call(n, _, _) => n == "ok" || n == "err" || n == "some",
+        _ => false,
+    }
+}
+
+/// Whether `t` still contains one of the checker's placeholder types — a type
+/// that means "decided by context", which is exactly what must not be recorded
+/// as an answer.
+fn mentions_placeholder(t: &Type) -> bool {
+    match t {
+        Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
+        Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_placeholder(i),
+        Type::Dict(k, v) => mentions_placeholder(k) || mentions_placeholder(v),
+        Type::Result(a, b) => mentions_placeholder(a) || mentions_placeholder(b),
+        Type::Fn(ps, r) => ps.iter().any(mentions_placeholder) || mentions_placeholder(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_placeholder),
+        _ => false,
+    }
+}
+
 fn typevar_ty(name: &str) -> Type {
     Type::Named(format!("{TYPEVAR}{name}"))
 }

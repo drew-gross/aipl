@@ -18,14 +18,13 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 73
-binary size: 1528
-  code: 316
-    __test$value_or: 220
-    main: 72
+instructions executed: 70
+binary size: 1464
+  code: 292
+    main: 268
     value_or$i64: 24
   data: 203
-  metadata: 1009
+  metadata: 969
 builtin calls: 6
   aipl_assert: 3
   aipl_test_begin: 1

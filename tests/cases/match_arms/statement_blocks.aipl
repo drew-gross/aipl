@@ -95,17 +95,16 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 50
-instructions executed: 526
-binary size: 4016
-  code: 1928
+instructions executed: 524
+binary size: 3976
+  code: 1916
     __to_str_i64: 180
     __to_str_u64: 180
     area: 56
     classify: 676
-    main: 808
-    opt: 28
+    main: 824
   data: 1
-  metadata: 2087
+  metadata: 2059
 builtin calls: 117
   aipl_concat: 4
   aipl_dec: 44

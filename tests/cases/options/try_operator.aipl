@@ -22,17 +22,16 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 318
-binary size: 3240
-  code: 1364
+instructions executed: 315
+binary size: 3192
+  code: 1356
     __eq_i64$opt: 100
     __eq_str$opt: 148
-    __test$add2: 672
     add2: 128
     bang: 244
-    main: 72
+    main: 736
   data: 287
-  metadata: 1589
+  metadata: 1549
 builtin calls: 30
   aipl_assert: 5
   aipl_concat_lazy: 1

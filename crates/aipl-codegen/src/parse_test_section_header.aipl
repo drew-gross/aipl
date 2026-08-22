@@ -42,15 +42,14 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 192
-instructions executed: 1229
-binary size: 7680
+instructions executed: 1226
+binary size: 7616
   code: 2652
     __eq_str$opt: 148
-    __test$parse_test_section_header: 1736
-    main: 72
+    main: 1808
     parse_test_section_header: 696
   data: 1473
-  metadata: 3555
+  metadata: 3491
 builtin calls: 334
   aipl_assert: 13
   aipl_dec: 116

@@ -26,6 +26,7 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
+  is_inline_shape -> remove all these restrictions
 
 misc cleanup:
   line_at.aipl should use .doc() instead of // header for docs

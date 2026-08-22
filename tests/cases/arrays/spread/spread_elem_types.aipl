@@ -23,15 +23,14 @@ allocations: 17
 deallocations: 17
 reallocations: 3
 bytes allocated: 574
-instructions executed: 891
-binary size: 7240
-  code: 3380
+instructions executed: 881
+binary size: 7312
+  code: 3452
     __eq_P: 72
     __eq_P$arr: 284
     __eq_bool$arr: 296
     __eq_i64$arr: 296
-    empty: 44
-    main: 2388
+    main: 2504
   data: 416
   metadata: 3444
 builtin calls: 113

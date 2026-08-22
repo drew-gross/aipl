@@ -39,17 +39,15 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 568
-instructions executed: 901
-binary size: 6760
-  code: 3164
-    __test$joined: 1156
-    __test$sum: 768
+instructions executed: 895
+binary size: 6608
+  code: 3092
     joined$vo1: 588
-    main: 112
+    main: 1964
     sum: 176
     sum$vo1: 364
   data: 524
-  metadata: 3072
+  metadata: 2992
 builtin calls: 129
   aipl_arr_drop_str: 3
   aipl_arr_inc: 4

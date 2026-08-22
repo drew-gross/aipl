@@ -49,14 +49,13 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 156
-instructions executed: 299
-binary size: 4416
-  code: 2068
-    first: 548
+instructions executed: 285
+binary size: 4312
+  code: 2000
+    first: 800
     main: 1200
-    nonempty: 320
   data: 165
-  metadata: 2183
+  metadata: 2147
 builtin calls: 78
   aipl_concat_lazy: 3
   aipl_dec: 35

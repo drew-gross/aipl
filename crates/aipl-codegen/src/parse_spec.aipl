@@ -180,15 +180,14 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24923
-binary size: 86368
-  code: 53792
+instructions executed: 24902
+binary size: 86264
+  code: 53752
     __arr_drop_Entry: 140
     __arr_retain_Entry: 140
     __builtin_count_while$char$s0$lam14: 232
     __builtin_drop_n$char$s0: 72
-    __builtin_int_parse: 712
-    __builtin_opt_left_fold$char$i64$s0$lam13: 348
+    __builtin_int_parse: 1020
     __eq_i64$opt: 100
     __eq_str$arr: 352
     __eq_str$opt: 148
@@ -202,7 +201,7 @@ binary size: 86368
     main: 72
     parse_spec: 3976
   data: 2532
-  metadata: 30044
+  metadata: 29980
 builtin calls: 4082
   aipl_arr_drop_str: 15
   aipl_arr_inc: 237

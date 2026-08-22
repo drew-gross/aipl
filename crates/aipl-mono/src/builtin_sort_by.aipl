@@ -86,34 +86,24 @@ allocations: 111
 deallocations: 111
 reallocations: 27
 bytes allocated: 4352
-instructions executed: 7886
-binary size: 24344
-  code: 14824
+instructions executed: 7846
+binary size: 22520
+  code: 13748
     __arr_drop_E: 140
     __arr_retain_E: 140
     __eq_i64$arr: 296
     __eq_str$arr: 352
-    main: 2648
-    sort_by$E$lam17: 1408
-    sort_by$i64$lam1: 1072
-    sort_by$i64$lam11: 1072
-    sort_by$i64$lam13: 1072
-    sort_by$i64$lam21: 1072
-    sort_by$i64$lam3: 1072
-    sort_by$i64$lam5: 1072
-    sort_by$i64$lam7: 1072
-    sort_by$i64$lam9: 1072
-    sort_by$str$lam15: 1264
+    main: 12820
   data: 754
-  metadata: 8766
-builtin calls: 901
+  metadata: 8018
+builtin calls: 881
   aipl_arr_drop_str: 13
   aipl_arr_extend: 27
-  aipl_arr_inc: 182
+  aipl_arr_inc: 172
   aipl_arr_reserve: 27
   aipl_arr_retain_ptr: 16
   aipl_arr_slice: 81
-  aipl_array_dec: 293
+  aipl_array_dec: 283
   aipl_array_new: 29
   aipl_array_push_mut: 30
   aipl_array_with_cap: 1

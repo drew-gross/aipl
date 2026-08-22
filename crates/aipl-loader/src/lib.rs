@@ -1209,6 +1209,7 @@ fn rewrite_expr(
     Expr {
         kind,
         span: e.span.clone(),
+        ty: None,
     }
 }
 

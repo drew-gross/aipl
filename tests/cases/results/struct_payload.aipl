@@ -38,14 +38,13 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 200
-instructions executed: 248
-binary size: 3232
-  code: 1520
+instructions executed: 226
+binary size: 3496
+  code: 1692
     __to_str_i64: 180
-    main: 992
-    parse: 348
+    main: 1512
   data: 27
-  metadata: 1685
+  metadata: 1777
 builtin calls: 66
   aipl_concat_lazy: 5
   aipl_dec: 27

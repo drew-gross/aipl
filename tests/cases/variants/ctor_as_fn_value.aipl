@@ -36,22 +36,19 @@ allocations: 19
 deallocations: 19
 reallocations: 10
 bytes allocated: 936
-instructions executed: 1869
-binary size: 8096
-  code: 4468
+instructions executed: 1861
+binary size: 7808
+  code: 4352
     __arr_drop_Shape: 136
     __arr_retain_Shape: 136
     __eq_Shape: 268
     __eq_Shape$arr: 284
-    main: 3020
-    pair_up$lam11: 312
-    pair_up$lam13: 312
+    main: 3528
   data: 411
-  metadata: 3217
-builtin calls: 92
+  metadata: 3045
+builtin calls: 88
   aipl_arr_drop_str: 1
-  aipl_arr_inc: 2
-  aipl_array_dec: 21
+  aipl_array_dec: 19
   aipl_array_new: 14
   aipl_array_push_mut: 10
   aipl_array_with_cap: 5

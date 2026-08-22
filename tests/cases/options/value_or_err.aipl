@@ -41,18 +41,15 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 190
-instructions executed: 470
-binary size: 4208
-  code: 2112
-    __builtin_value_or_err$char$i64: 92
-    __builtin_value_or_err$char$str: 180
-    __builtin_value_or_err$i64$str: 180
+instructions executed: 428
+binary size: 3848
+  code: 1920
     __to_str_i64: 180
     describe: 408
-    first_digit: 448
-    main: 624
+    first_digit: 672
+    main: 660
   data: 61
-  metadata: 2035
+  metadata: 1867
 builtin calls: 93
   aipl_char_at: 4
   aipl_concat: 8

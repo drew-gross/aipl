@@ -24,15 +24,14 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 336
-instructions executed: 211
-binary size: 2840
-  code: 1136
+instructions executed: 197
+binary size: 3288
+  code: 1392
     __rec_drop_List: 48
-    main: 560
-    pick: 424
+    main: 1240
     sum: 104
   data: 93
-  metadata: 1611
+  metadata: 1803
 builtin calls: 37
   aipl_assert: 2
   aipl_rec_alloc: 6

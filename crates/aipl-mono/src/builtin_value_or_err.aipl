@@ -94,19 +94,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1180
-binary size: 8648
-  code: 3928
-    digit_of: 456
-    main: 2444
-    maybe_int: 84
-    maybe_str: 188
+instructions executed: 1096
+binary size: 8544
+  code: 3936
+    digit_of: 564
+    main: 2796
     value_or_err$char$i64: 92
-    value_or_err$char$str: 180
     value_or_err$i64$str: 180
     value_or_err$str$str: 304
   data: 1179
-  metadata: 3541
+  metadata: 3429
 builtin calls: 118
   aipl_assert: 14
   aipl_char_at: 7
