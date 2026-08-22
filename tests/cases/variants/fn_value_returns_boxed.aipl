@@ -1,0 +1,65 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// A function *value* whose return type is a boxed recursive variant.
+//
+// The boxing matters: `Tree` refers to itself directly, so a `Tree` is a
+// refcounted pointer rather than an inline composite. Returning one through a
+// function *pointer* — where the callee is not known at the call site — is the
+// shape the parser library needs for a grammar's per-rule builder, and it is
+// what makes the return's ownership transfer indirect.
+variant Tree = Leaf(i64) | Node(Tree, Tree)
+
+fn leaf(n: i64) -> Tree { Leaf(n) }
+
+fn pair(n: i64) -> Tree { Node(Leaf(n), Leaf(n + 1)) }
+
+// The function arrives as a value; its result is owned by this frame and must be
+// released here, not by whoever supplied it.
+fn build(f: (i64) -> Tree, n: i64) -> Tree { f(n) }
+
+fn total(self: Tree) -> i64 {
+    match (self) {
+        Leaf(v) => v,
+        Node(l, r) => l.total() + r.total(),
+    }
+}
+
+fn main() !prints {
+    print(build(leaf, 5).total().to_str());
+    print(build(pair, 5).total().to_str());
+
+    // Called twice through the same fn value: the second build must not see a
+    // tree the first one freed.
+    print((build(pair, 1).total() + build(pair, 10).total()).to_str());
+}
+--- stdout ---
+5
+11
+24
+
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 560
+instructions executed: 331
+binary size: 2664
+  code: 1068
+    __rec_drop_Tree: 84
+    __to_str_i64: 180
+    build$lam1: 256
+    main: 388
+    total: 160
+  data: 1
+  metadata: 1595
+builtin calls: 65
+  aipl_dec: 6
+  aipl_i64_len: 6
+  aipl_inc: 3
+  aipl_print: 3
+  aipl_rec_alloc: 10
+  aipl_rec_dec_strong: 16
+  aipl_rec_dec_weak: 6
+  aipl_rec_inc_strong: 6
+  aipl_rec_inc_weak: 6
+  aipl_write_i64: 3

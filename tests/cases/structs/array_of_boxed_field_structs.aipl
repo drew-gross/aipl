@@ -1,0 +1,81 @@
+import { len, print, to_str, wrapping_add as + } from builtins;
+
+// An array of structs that each hold a boxed recursive field.
+//
+// The struct itself is an inline composite, but one of its fields is a
+// refcounted pointer — so copying a `Holder` out of the array is a *retain* of
+// that field, not a byte-wise copy of a value that owns heap. That distinction
+// is what `tests/cases/structs/boxed_field_with_array.aipl` locks in for a
+// single struct; this is the same shape one level up, held in an array.
+variant Tree = Leaf(i64) | Node(Tree, Tree)
+
+struct Holder { tag: i64, tree: Tree }
+
+fn total(self: Tree) -> i64 {
+    match (self) {
+        Leaf(v) => v,
+        Node(l, r) => l.total() + r.total(),
+    }
+}
+
+fn sum_holders(hs: Holder[]) -> i64 {
+    mut acc = 0;
+    for (let h : hs) {
+        set acc = acc + h.tag + h.tree.total();
+    }
+    acc
+}
+
+fn main() !prints {
+    let hs = [Holder { tag: 1, tree: Leaf(10) }, Holder { tag: 2, tree: Node(Leaf(20), Leaf(30)) }];
+    print(sum_holders(hs).to_str());
+    print(hs.len().to_str());
+    // Copying one out and reading it must not disturb the array's own reference.
+    let first = hs[0];
+    print(
+        match (first) {
+            some(h) => h.tree.total(),
+            none => 0,
+        }.to_str(),
+    );
+    print(sum_holders(hs).to_str());
+}
+--- stdout ---
+63
+2
+10
+63
+
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 288
+instructions executed: 585
+binary size: 4240
+  code: 2072
+    __arr_drop_Holder: 120
+    __arr_retain_Holder: 120
+    __rec_drop_Tree: 84
+    __to_str_i64: 180
+    __to_str_u64: 180
+    main: 952
+    sum_holders: 276
+    total: 160
+  data: 1
+  metadata: 2167
+builtin calls: 72
+  aipl_array_dec: 1
+  aipl_array_new: 1
+  aipl_dec: 8
+  aipl_i64_len: 6
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_rec_alloc: 4
+  aipl_rec_dec_strong: 19
+  aipl_rec_dec_weak: 2
+  aipl_rec_inc_strong: 15
+  aipl_rec_inc_weak: 2
+  aipl_u64_len: 2
+  aipl_write_i64: 3
+  aipl_write_u64: 1

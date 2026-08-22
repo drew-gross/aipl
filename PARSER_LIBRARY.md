@@ -5,9 +5,8 @@
 Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
-**Stage 1 — language work** (blocks Stage 2)
-- [ ] 1.0 Confirm four unproven shapes with reproducers
-- [ ] 1.1 *(deferred, not required)* hash-backed dicts/sets — TODO.txt D1
+**Stage 1 — language work** — done, except one deferred item that blocks nothing
+- [ ] 1.0 *(deferred, not required)* hash-backed dicts/sets — TODO.txt D1
 
 **Stage 2 — the library**
 - [ ] 2.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
@@ -21,8 +20,8 @@ each is sized to be finishable in one session.
 - [ ] 6 Formatter generator
 - [ ] 7 Retire gazelle
 
-Neither remaining Stage 1 item blocks Stage 2. Stage 2 onward is strictly
-sequential.
+The one remaining Stage 1 item is deferred and blocks nothing. Stage 2 onward is
+strictly sequential.
 
 ## Context
 
@@ -66,31 +65,15 @@ without matching its payload (`same_case`, plus a `variant` bound), a generic
 variant's type parameter is inferred from the expected type, recursive types may
 recurse through an array, `match` arms may be statement blocks, and recursion is
 tail-call eliminated so parse depth is bounded by the input rather than the
-stack. The two items left below are a verification task and a deferred
-performance one — neither blocks Stage 2.
+stack. Four shapes the design rests on that had no test anywhere in the repo
+were confirmed to work and are now locked in by cases — a fn value returning a
+boxed recursive variant, an `A[]` parameter where `A` is boxed, an array of
+structs each holding a boxed field, and a two-parameter generic variant. What is
+left below is one deferred performance item that blocks nothing.
 
 ## Stage 1 — Language work
 
-### 1.0 Confirm four unproven shapes
-
-Four shapes the design rests on still have **no test anywhere in the repo**, and
-may already work:
-
-- a fn value *returning* a boxed recursive variant
-- an `A[]` parameter where `A` is boxed
-- an array of structs that each hold a boxed field
-- a two-parameter generic *variant* — only two-parameter generic **structs** are
-  attested (`tests/cases/structs/generic_pair.aipl:5`), and a search of the
-  corpus finds no generic variant with two parameters
-
-Each gets a ~20-line case under `tests/cases/`. Confirming is the whole task: if
-a shape works the case locks it in, and if it doesn't the case is the reproducer
-the fix needs. Adjacent shapes are already covered —
-`tests/cases/structs/recursive_through_array.aipl` and
-`boxed_field_with_array.aipl` — so these four are what is left rather than a
-whole area.
-
-### 1.1 Deferred: hash-backed dicts and sets
+### 1.0 Deferred: hash-backed dicts and sets
 
 TODO.txt D1 — dicts and sets are linear scans (`lib.rs:2816`, `dict_find`), which
 is the largest asymptotic win available in the repo, and would make both rule
@@ -261,8 +244,11 @@ file that also declares a `Kind` constructor trips the silent drop.
 
 ## Verification
 
-1. **Stage 1 reproducers** — the four "unproven shape" cases (1.0) confirm or
-   refute before any fix is written.
+1. **Shape cases** — the four previously-unproven shapes are locked in by
+   `variants/fn_value_returns_boxed`, `variants/boxed_array_param`,
+   `structs/array_of_boxed_field_structs` and `generics/two_param_variant`. Their
+   `--- performance ---` sections assert balanced allocations, which is what
+   would move first if boxing regressed.
 2. **Corpus after a change that moves metrics everywhere** — anything touching
    codegen does. That is CLAUDE.md's "one sanctioned deviation": whole-corpus
    `fill_expected` once rather than handoff's per-case loop, then confirm from

@@ -1,0 +1,84 @@
+import { len, print, push, to_str, wrapping_add as + } from builtins;
+
+// An `A[]` parameter where `A` is a boxed recursive variant.
+//
+// Each element is a refcounted pointer, so passing the array borrows every one
+// of them: the callee must not release elements it did not take, and building a
+// new array from them has to retain. This is the parser library's node list —
+// a rule's children arrive as exactly this shape.
+variant Tree = Leaf(i64) | Node(Tree, Tree)
+
+fn total(self: Tree) -> i64 {
+    match (self) {
+        Leaf(v) => v,
+        Node(l, r) => l.total() + r.total(),
+    }
+}
+
+// Borrows: reads every element, keeps none.
+fn sum_all(ts: Tree[]) -> i64 {
+    mut acc = 0;
+    for (let t : ts) {
+        set acc = acc + t.total();
+    }
+    acc
+}
+
+// Retains: each element ends up owned by the returned array as well.
+fn wrap_each(ts: Tree[]) -> Tree[] {
+    mut out: Tree[] = [];
+    for (let t : ts) {
+        set out.push(Node(t, Leaf(0)));
+    }
+    out
+}
+
+fn main() !prints {
+    let ts = [Leaf(1), Node(Leaf(2), Leaf(3)), Leaf(4)];
+    print(sum_all(ts).to_str());
+    let wrapped = wrap_each(ts);
+    print(wrapped.len().to_str());
+    // The originals survive being wrapped — the wrap retained rather than moved.
+    print(sum_all(ts).to_str());
+    print(sum_all(wrapped).to_str());
+}
+--- stdout ---
+10
+3
+10
+10
+
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 3
+bytes allocated: 704
+instructions executed: 1054
+binary size: 4480
+  code: 2148
+    __arr_drop_Tree: 116
+    __arr_retain_Tree: 116
+    __rec_drop_Tree: 84
+    __to_str_i64: 180
+    __to_str_u64: 180
+    main: 1080
+    sum_all: 232
+    total: 160
+  data: 1
+  metadata: 2331
+builtin calls: 127
+  aipl_array_dec: 2
+  aipl_array_new: 2
+  aipl_array_push_mut: 3
+  aipl_dec: 8
+  aipl_i64_len: 6
+  aipl_inc: 4
+  aipl_print: 4
+  aipl_rec_alloc: 11
+  aipl_rec_dec_strong: 38
+  aipl_rec_dec_weak: 8
+  aipl_rec_inc_strong: 27
+  aipl_rec_inc_weak: 8
+  aipl_u64_len: 2
+  aipl_write_i64: 3
+  aipl_write_u64: 1

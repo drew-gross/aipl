@@ -1,0 +1,69 @@
+import { print, to_str } from builtins;
+
+// A generic *variant* with two type parameters.
+//
+// Two-parameter generic **structs** are attested
+// (`tests/cases/structs/generic_pair.aipl`), but until this case no generic
+// variant anywhere in the corpus took more than one — so the instantiation and
+// mangling of a second parameter went unexercised on the variant path. The
+// parser library wants it for a result-shaped node (`Ok(A) | Fail(B)`).
+variant Either<A: any, B: any> = Left(A) | Right(B)
+
+fn left_or<A: any, B: any>(e: Either<A, B>, fallback: A) -> A {
+    match (e) {
+        Left(a) => a,
+        Right(_) => fallback,
+    }
+}
+
+fn is_left<A: any, B: any>(e: Either<A, B>) -> bool {
+    match (e) {
+        Left(_) => true,
+        Right(_) => false,
+    }
+}
+
+fn main() !prints {
+    // Two distinct instantiations coexist, each mangled on *both* parameters.
+    let a: Either<i64, str> = Left(5);
+    let b: Either<i64, str> = Right("nope");
+    print(left_or(a, 0).to_str());
+    print(left_or(b, 0).to_str());
+
+    // A different pairing of the same parameters is a different instance.
+    let c: Either<str, i64> = Left("yes");
+    print(left_or(c, "fallback"));
+    print(is_left(c).to_str());
+
+    // Swapping only the second parameter is also a distinct instance.
+    let d: Either<i64, char> = Right('x');
+    print(is_left(d).to_str());
+}
+--- stdout ---
+5
+0
+yes
+true
+false
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 260
+binary size: 2488
+  code: 1036
+    __to_str_bool: 212
+    __to_str_i64: 180
+    left_or$i64$str: 28
+    main: 616
+  data: 79
+  metadata: 1373
+builtin calls: 31
+  aipl_dec: 12
+  aipl_i64_len: 4
+  aipl_inc: 6
+  aipl_print: 5
+  aipl_write_bytes: 2
+  aipl_write_i64: 2
