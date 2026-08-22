@@ -75,8 +75,8 @@ deallocations: 2208
 reallocations: 6
 bytes allocated: 101329
 instructions executed: 326428
-binary size: 863752
-  code: 527992
+binary size: 862896
+  code: 527524
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -173,7 +173,7 @@ binary size: 863752
     __m6__dot_seg: 5184
     __m6__drop_trailing_break: 580
     __m6__err_here: 656
-    __m6__expect: 1304
+    __m6__expect: 1080
     __m6__expr: 700
     __m6__fn_attrs: 5304
     __m6__fn_body: 680
@@ -190,7 +190,7 @@ binary size: 863752
     __m6__index_or_from: 3872
     __m6__index_seg: 3676
     __m6__is_line_break: 372
-    __m6__item: 1064
+    __m6__item: 932
     __m6__lambda: 5924
     __m6__lambda_param_ty: 1456
     __m6__lambda_params: 3236
@@ -200,7 +200,7 @@ binary size: 863752
     __m6__match_arms: 7768
     __m6__match_expr: 10744
     __m6__mut_stmt: 5364
-    __m6__name_atom: 5572
+    __m6__name_atom: 5460
     __m6__named_ty: 3656
     __m6__next_start: 532
     __m6__params_until: 9516
@@ -275,8 +275,8 @@ binary size: 863752
     fmt_layout: 612
     fmt_prepare: 864
     main: 928
-  data: 2507
-  metadata: 333253
+  data: 2508
+  metadata: 332864
 builtin calls: 39141
   aipl_arr_drop_str: 50
   aipl_arr_extend: 4

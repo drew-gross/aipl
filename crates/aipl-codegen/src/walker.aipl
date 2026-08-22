@@ -260,14 +260,9 @@ fn expect(self: W, want: str) -> WStr!FmtError {
     if (self.peek_text() == want) {
         ok(self.bump())
     } else {
-        err(self.err_here(`formatter: expected {quoted(want)}, found {quoted(self.peek_text())}`))
+        err(self.err_here(`formatter: expected "{want}", found "{self.peek_text()}"`))
     }
 }
-
-// `"x"` — the Rust walker's `{:?}` on a `&str`. Only ever applied to token text,
-// which is why this needs no escaping: a token that *contains* a quote is a
-// string literal, and those are never `expect`ed.
-fn quoted(s: str) -> str { `"{s}"` }
 
 // An error at the cursor. Past the last token there is no span to point at, so
 // the message says so and the span collapses to EOF — the AIPL stand-in for the
@@ -967,7 +962,7 @@ fn item(self: W) -> WDoc!FmtError {
     if (t == "variant") {
         return self.variant_item();
     };
-    err(self.err_here(`formatter: expected an item (fn/struct/variant/import), found {quoted(t)}`))
+    err(self.err_here(`formatter: expected an item (fn/struct/variant/import), found "{t}"`))
 }
 
 fn fn_item(self: W) -> WDoc!FmtError {
@@ -1779,9 +1774,7 @@ fn dict_value(self: W, lead: Doc, k: Doc) -> WDoc!FmtError {
 // `Name { field: value, .. }`.
 fn name_atom(self: W) -> WDoc!FmtError {
     if (!(self.peek_is(Ident) || self.peek_is(BuiltinType) || self.peek_is(Keyword))) {
-        return err(
-            self.err_here(`formatter: expected an expression, found {quoted(self.peek_text())}`),
-        );
+        return err(self.err_here(`formatter: expected an expression, found "{self.peek_text()}"`));
     };
     let n = self.bump();
     if (n.w.peek_text() == "(") {
@@ -2641,13 +2634,13 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20942
-deallocations: 20942
+allocations: 20940
+deallocations: 20940
 reallocations: 862
-bytes allocated: 1025100
-instructions executed: 2849273
-binary size: 3061600
-  code: 1752048
+bytes allocated: 1025050
+instructions executed: 2849225
+binary size: 3060744
+  code: 1751580
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2768,7 +2761,7 @@ binary size: 3061600
     dot_seg: 5184
     drop_trailing_break: 580
     err_here: 656
-    expect: 1304
+    expect: 1080
     expr: 700
     fn_attrs: 5304
     fn_body: 680
@@ -2785,7 +2778,7 @@ binary size: 3061600
     index_or_from: 3872
     index_seg: 3676
     is_line_break: 372
-    item: 1064
+    item: 932
     lambda: 5924
     lambda_param_ty: 1456
     lambda_params: 3236
@@ -2796,7 +2789,7 @@ binary size: 3061600
     match_arms: 7768
     match_expr: 10744
     mut_stmt: 5364
-    name_atom: 5572
+    name_atom: 5460
     named_ty: 3656
     new_walker: 200
     next_start: 532
@@ -2857,8 +2850,8 @@ binary size: 3061600
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1283812
-builtin calls: 443787
+  metadata: 1283424
+builtin calls: 443727
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 213
   aipl_arr_inc: 49225
@@ -2872,10 +2865,10 @@ builtin calls: 443787
   aipl_array_with_cap: 187
   aipl_assert: 164
   aipl_char_at: 3930
-  aipl_concat: 258
+  aipl_concat: 246
   aipl_concat_lazy: 199
-  aipl_dec: 94119
-  aipl_inc: 74322
+  aipl_dec: 94083
+  aipl_inc: 74310
   aipl_rec_alloc: 5946
   aipl_rec_dec_strong: 40676
   aipl_rec_dec_weak: 3565

@@ -59,6 +59,7 @@ utilitiy functions:
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
+  nextest is reporting some tests as leaky
 
 syntax:
   allow mut self so you don't have to do mut out = self; set out.push(...); out
