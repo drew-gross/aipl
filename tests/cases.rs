@@ -179,78 +179,31 @@ struct Spec {
     check: Option<String>,
 }
 
+/// Parse a case file into its [`Spec`].
+///
+/// Dogfooded: the sectioning, body trimming and per-section validation all live
+/// in the AIPL `parse_spec` (`crates/aipl-codegen/src/parse_spec.aipl`), reached
+/// through the FFI. This is only the marshaling shim that widens the flat
+/// `SpecFields` into the harness's own struct — there is deliberately no second
+/// implementation of the rules here to drift from it.
+///
+/// A malformed case (unknown section, non-integer `exit code`, unusable
+/// companion path) panics, as it did when the rules lived here: a case whose
+/// markup is wrong should stop the run, not silently lose an expectation.
 fn parse_spec(contents: &str) -> Spec {
-    let mut spec = Spec::default();
-    let mut current: Option<String> = None;
-    let mut buf = String::new();
-    for line in contents.lines() {
-        if let Some(name) = aipl::parse_test_section_header(line) {
-            finalize(&mut spec, current.as_deref(), std::mem::take(&mut buf));
-            current = Some(name);
-        } else {
-            buf.push_str(line);
-            buf.push('\n');
-        }
+    let f = aipl::parse_spec(contents).unwrap_or_else(|e| panic!("{e}"));
+    Spec {
+        source: f.source,
+        extra_files: f.extra_files,
+        expect_files: f.expect_files,
+        stdout: f.stdout,
+        stderr: f.stderr,
+        exit_code: f.exit_code,
+        errors: f.errors,
+        performance: f.performance,
+        cli: f.cli,
+        check: f.check,
     }
-    finalize(&mut spec, current.as_deref(), buf);
-    spec
-}
-
-fn finalize(spec: &mut Spec, current: Option<&str>, buf: String) {
-    let trimmed = strip_trailing_newlines(buf);
-    match current {
-        None => spec.source = trimmed,
-        Some("stdout") => spec.stdout = Some(trimmed),
-        Some("stderr") => spec.stderr = Some(trimmed),
-        Some("exit code") => {
-            spec.exit_code = Some(
-                trimmed
-                    .trim()
-                    .parse()
-                    .expect("exit code section must contain a single integer"),
-            );
-        }
-        Some("errors") => spec.errors = Some(trimmed),
-        Some("performance") => spec.performance = Some(trimmed),
-        Some("check") => spec.check = Some(trimmed),
-        // One CLI argument per line; an empty section means no arguments.
-        Some("cli") => spec.cli = trimmed.lines().map(str::to_string).collect(),
-        Some(name) if name.starts_with("expect file:") => {
-            let rel = name["expect file:".len()..].trim();
-            assert!(
-                !rel.is_empty(),
-                "`expect file:` section needs a path: `--- expect file: path/to/it ---`"
-            );
-            assert!(
-                !rel.contains('\\'),
-                "use `/` (not `\\`) in `expect file:` section paths: {rel:?}"
-            );
-            spec.expect_files.push((rel.to_string(), trimmed));
-        }
-        Some(name) if name.starts_with("file:") => {
-            let rel = name["file:".len()..].trim();
-            assert!(
-                !rel.is_empty(),
-                "`file:` section needs a path: `--- file: path/to/it.aipl ---`"
-            );
-            // `\` is a section path separator nuisance on Windows
-            // markup; force forward-slash from the source side and let
-            // PathBuf canonicalize on disk.
-            assert!(
-                !rel.contains('\\'),
-                "use `/` (not `\\`) in `file:` section paths: {rel:?}"
-            );
-            spec.extra_files.push((rel.to_string(), trimmed));
-        }
-        Some(other) => panic!("unknown section name {other:?}"),
-    }
-}
-
-fn strip_trailing_newlines(mut s: String) -> String {
-    while matches!(s.chars().last(), Some('\n') | Some('\r')) {
-        s.pop();
-    }
-    s
 }
 
 /// The result of running a single case.

@@ -21,7 +21,7 @@ pub use aipl_parser::{
 // Compiler passes and backends, each re-exported as a module so existing
 // `aipl::codegen::…`, `aipl::mono::…`, etc. paths keep resolving.
 pub use aipl_codegen as codegen;
-pub use aipl_codegen::FfiValue;
+pub use aipl_codegen::{parse_spec, FfiValue, SpecFields};
 pub use aipl_fmt as fmt;
 pub use aipl_linker as binary;
 pub use aipl_loader as loader;

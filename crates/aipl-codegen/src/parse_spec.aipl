@@ -1,0 +1,230 @@
+// A case file's `--- section ---` layout, parsed. The corpus harness (and
+// `aipl check`) drive every expectation in `tests/cases/**/*.aipl` off this:
+// the entry-point source is whatever precedes the first marker, and each marker
+// opens a section whose body runs to the next marker or EOF.
+import {
+    contains,
+    drop_n,
+    int_parse,
+    is_err_and,
+    len,
+    push,
+    starts_with,
+    trim,
+    value_or,
+    +++,
+    ==,
+    ||,
+} from builtins;
+import { lines as split_lines } from "./lines.aipl";
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+// One `--- file: p ---` / `--- expect file: p ---` companion: a path and the
+// body that follows it.
+struct Entry { path: str, contents: str }
+
+struct Spec {
+    source: str,
+    extra_files: Entry[],
+    expect_files: Entry[],
+    stdout: str?,
+    stderr: str?,
+    exit_code: i64?,
+    errors: str?,
+    performance: str?,
+    cli: str[],
+    check: str?,
+}
+
+pub fn parse_spec(src: str) -> Spec!str {
+    mut spec = Spec {
+        source: "",
+        extra_files: [],
+        expect_files: [],
+        stdout: none,
+        stderr: none,
+        exit_code: none,
+        errors: none,
+        performance: none,
+        cli: [],
+        check: none,
+    };
+
+    // The section currently being collected, or `""` for the entry-point source
+    // before the first marker. A validated section name is never empty, so this
+    // doubles as the "still in the preamble" flag.
+    mut current = "";
+    mut buf = "";
+    for (let line : src.split_lines()) {
+        let header = parse_test_section_header(line).value_or("");
+        if (header == "") {
+            set buf = buf +++ line +++ "\n";
+        } else {
+            set spec = finalize(spec, current, buf)?;
+            set current = header;
+            set buf = "";
+        };
+    }
+    finalize(spec, current, buf)
+}.doc("""
+    Parses a case file into its `Spec`: the entry-point source (everything before
+    the first `--- name ---` marker) plus one field per section. Section bodies
+    have their trailing newlines stripped. Unknown section names, a malformed
+    `exit code`, and an invalid companion path are errors rather than silent
+    omissions — a mistyped marker would otherwise drop an expectation and the
+    case would pass for the wrong reason.
+""").test({
+    // The preamble is the source; sections fill their fields.
+    let s = parse_spec("fn main() {}\n--- stdout ---\nhi\n")?;
+    assert(s.source == "fn main() {}");
+    assert(s.stdout == some("hi"));
+    assert(s.stderr == none);
+
+    // Trailing newlines are stripped from a body, interior ones kept.
+    let two = parse_spec("x\n--- stdout ---\na\nb\n\n\n")?;
+    assert(two.stdout == some("a\nb"));
+
+    // No markers at all: everything is source.
+    let bare = parse_spec("just source\n")?;
+    assert(bare.source == "just source");
+    assert(bare.stdout == none);
+
+    // `exit code` is parsed, and must be an integer.
+    assert(parse_spec("x\n--- exit code ---\n3\n")?.exit_code == some(3));
+    assert(parse_spec("x\n--- exit code ---\n-1\n")?.exit_code == some(-1));
+    assert(parse_spec("x\n--- exit code ---\nnope\n").is_err_and(|e| e.contains("integer")));
+
+    // `cli` is one argument per line — and an *empty* section is no arguments,
+    // not one empty argument (`lines("")` is `[""]`, unlike Rust's `str::lines`).
+    assert(parse_spec("x\n--- cli ---\na\nb\n")?.cli == ["a", "b"]);
+    assert(parse_spec("x\n--- cli ---\n")?.cli.len() == 0);
+
+    // Companions, both flavors.
+    let c = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
+    assert(c.extra_files.len() == 1);
+    assert(
+        match (c.extra_files[0]) {
+            some(f) => f.path,
+            none => "",
+        } == "m.aipl",
+    );
+    let e = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
+    assert(e.expect_files.len() == 1);
+    assert(
+        match (e.expect_files[0]) {
+            some(f) => f.contents,
+            none => "",
+        } == "written",
+    );
+
+    // Rejections: a mistyped marker, and unusable companion paths.
+    assert(parse_spec("x\n--- stdou ---\n").is_err_and(|m| m.contains("unknown section")));
+    assert(parse_spec("x\n--- file: ---\n").is_err_and(|m| m.contains("needs a path")));
+    assert(parse_spec("x\n--- file: a\\b ---\n").is_err_and(|m| m.contains("use \"/\"")));
+})
+
+// Fold one finished section into the spec. `name` is `""` for the preamble.
+fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
+    let body = buf.trim_end_while(|c| c == '\n' || c == '\r');
+    if (name == "") {
+        return ok(Spec { ..spec, source: body });
+    };
+
+    // Checked before the literal names because these carry a path after the
+    // prefix; `expect file:` first, though the two prefixes can't both match.
+    if (name.starts_with("expect file:")) {
+        let path = companion_path(name, "expect file:")?;
+        mut out = spec.expect_files;
+        set out.push(Entry { path, contents: body });
+        return ok(Spec { ..spec, expect_files: out });
+    };
+    if (name.starts_with("file:")) {
+        let path = companion_path(name, "file:")?;
+        mut out = spec.extra_files;
+        set out.push(Entry { path, contents: body });
+        return ok(Spec { ..spec, extra_files: out });
+    };
+    match (name) {
+        "stdout" => ok(Spec { ..spec, stdout: some(body) }),
+        "stderr" => ok(Spec { ..spec, stderr: some(body) }),
+        "errors" => ok(Spec { ..spec, errors: some(body) }),
+        "performance" => ok(Spec { ..spec, performance: some(body) }),
+        "check" => ok(Spec { ..spec, check: some(body) }),
+        // One argument per line. An empty section is *no* arguments: `lines("")`
+        // yields a single empty element, which would become one empty argument.
+        "cli" => ok(Spec { ..spec, cli: if (body == "") { [] } else { body.split_lines() } }),
+        "exit code" => match (body.trim().int_parse()) {
+            some(n) => ok(Spec { ..spec, exit_code: some(n) }),
+            none => err("exit code section must contain a single integer"),
+        },
+        _ => err(`unknown section name "{name}"`),
+    }
+}
+
+// The path a `file:`-style marker carries, validated. `\` is a path-separator
+// nuisance in this markup, so the source side is held to `/` and the harness
+// canonicalizes on disk.
+fn companion_path(name: str, prefix: str) -> str!str {
+    let path = name.drop_n(prefix.len()).trim();
+    if (path == "") {
+        return err(`"{prefix}" section needs a path: "--- {prefix} path/to/it ---"`);
+    };
+    if (path.contains("\\")) {
+        return err(`use "/" (not "\\") in "{prefix}" section paths: "{path}"`);
+    };
+    ok(path)
+}
+--- performance ---
+allocations: 182
+deallocations: 182
+reallocations: 0
+bytes allocated: 7038
+instructions executed: 24923
+binary size: 86368
+  code: 53792
+    __arr_drop_Entry: 140
+    __arr_retain_Entry: 140
+    __builtin_count_while$char$s0$lam14: 232
+    __builtin_drop_n$char$s0: 72
+    __builtin_int_parse: 712
+    __builtin_opt_left_fold$char$i64$s0$lam13: 348
+    __eq_i64$opt: 100
+    __eq_str$arr: 352
+    __eq_str$opt: 148
+    __lambda_12: 140
+    __m2__parse_test_section_header: 696
+    __test$parse_spec: 27712
+    __test_try_fail_str: 64
+    __to_str_str: 252
+    companion_path: 1104
+    finalize: 17532
+    main: 72
+    parse_spec: 3976
+  data: 2532
+  metadata: 30044
+builtin calls: 4082
+  aipl_arr_drop_str: 15
+  aipl_arr_inc: 237
+  aipl_array_dec: 294
+  aipl_array_new: 55
+  aipl_array_push: 2
+  aipl_assert: 18
+  aipl_concat: 10
+  aipl_concat_lazy: 76
+  aipl_dec: 1331
+  aipl_inc: 710
+  aipl_str_contains: 7
+  aipl_str_data: 67
+  aipl_str_ends_with: 12
+  aipl_str_eq: 143
+  aipl_str_iter_init: 31
+  aipl_str_iter_next: 67
+  aipl_str_len: 786
+  aipl_str_slice: 97
+  aipl_str_split: 14
+  aipl_str_starts_with: 76
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1
+  aipl_trim: 31

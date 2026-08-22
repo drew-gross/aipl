@@ -35,7 +35,6 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 self-hosting:
-  port parse_spec to aipl
   make formatter command that is fully self-hosted
   parser library in aipl (grammar as data; generates highlighter + formatter)
     -> plan and progress checkboxes live in PARSER_LIBRARY.md

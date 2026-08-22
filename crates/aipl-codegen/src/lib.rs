@@ -3531,6 +3531,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./indent.aipl",
     "./find_files.aipl",
     "./companion_files.aipl",
+    "./parse_spec.aipl",
 ];
 
 /// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
@@ -3624,6 +3625,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "lex_aipl_stripped",
     "find_files",
     "companion_files",
+    "parse_spec",
 ];
 
 /// The formatter engine's single FFI entry.
@@ -3866,6 +3868,113 @@ fn companion_files(src: &str) -> Result<Vec<(String, String)>, String> {
             other => panic!("dogfooded companion_files() call: {other:?}"),
         }
     })
+}
+
+/// One `--- name ---`-delimited case file, parsed by the dogfooded AIPL
+/// `parse_spec` (`str -> Spec!str`) and marshaled back as an [`FfiValue::Res`]
+/// of an [`FfiValue::Struct`]. Field order follows the AIPL declaration; each is
+/// looked up by name so a reordering there cannot silently shift a field here.
+/// No native fallback; panics if it can't be built or called.
+pub fn parse_spec(src: &str) -> Result<SpecFields, String> {
+    fn fields(v: &FfiValue, what: &str) -> Vec<(String, FfiValue)> {
+        match v {
+            FfiValue::Struct(f) => f.clone(),
+            other => panic!("dogfooded parse_spec() {what}: {other:?}"),
+        }
+    }
+    fn get<'a>(f: &'a [(String, FfiValue)], name: &str) -> &'a FfiValue {
+        match f.iter().find(|(n, _)| n == name) {
+            Some((_, v)) => v,
+            None => panic!("dogfooded parse_spec() Spec has no field {name:?}"),
+        }
+    }
+    fn as_str(f: &[(String, FfiValue)], name: &str) -> String {
+        match get(f, name) {
+            FfiValue::Str(s) => s.clone(),
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
+    fn opt_str(f: &[(String, FfiValue)], name: &str) -> Option<String> {
+        match get(f, name) {
+            FfiValue::Opt(None) => None,
+            FfiValue::Opt(Some(inner)) => match &**inner {
+                FfiValue::Str(s) => Some(s.clone()),
+                other => panic!("dogfooded parse_spec() Spec.{name} payload: {other:?}"),
+            },
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
+    fn str_array(f: &[(String, FfiValue)], name: &str) -> Vec<String> {
+        match get(f, name) {
+            FfiValue::Array(items) => items
+                .iter()
+                .map(|i| match i {
+                    FfiValue::Str(s) => s.clone(),
+                    other => panic!("dogfooded parse_spec() Spec.{name} element: {other:?}"),
+                })
+                .collect(),
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
+    fn entries(f: &[(String, FfiValue)], name: &str) -> Vec<(String, String)> {
+        match get(f, name) {
+            FfiValue::Array(items) => items
+                .iter()
+                .map(|i| {
+                    let e = fields(i, "Entry");
+                    (as_str(&e, "path"), as_str(&e, "contents"))
+                })
+                .collect(),
+            other => panic!("dogfooded parse_spec() Spec.{name}: {other:?}"),
+        }
+    }
+    DOGFOOD_ENGINE.with(|comp| {
+        match comp.call_values("parse_spec", &[FfiValue::Str(src.to_string())]) {
+            Ok(FfiValue::Res(Ok(ok))) => {
+                let f = fields(&ok, "Spec");
+                Ok(SpecFields {
+                    source: as_str(&f, "source"),
+                    extra_files: entries(&f, "extra_files"),
+                    expect_files: entries(&f, "expect_files"),
+                    stdout: opt_str(&f, "stdout"),
+                    stderr: opt_str(&f, "stderr"),
+                    exit_code: match get(&f, "exit_code") {
+                        FfiValue::Opt(None) => None,
+                        FfiValue::Opt(Some(inner)) => match &**inner {
+                            FfiValue::Int(n) => Some(*n as i32),
+                            other => panic!("dogfooded parse_spec() Spec.exit_code: {other:?}"),
+                        },
+                        other => panic!("dogfooded parse_spec() Spec.exit_code: {other:?}"),
+                    },
+                    errors: opt_str(&f, "errors"),
+                    performance: opt_str(&f, "performance"),
+                    cli: str_array(&f, "cli"),
+                    check: opt_str(&f, "check"),
+                })
+            }
+            Ok(FfiValue::Res(Err(e))) => match *e {
+                FfiValue::Str(msg) => Err(msg),
+                other => panic!("dogfooded parse_spec() err payload: {other:?}"),
+            },
+            other => panic!("dogfooded parse_spec() call: {other:?}"),
+        }
+    })
+}
+
+/// The marshaled result of [`parse_spec`] — the AIPL `Spec`, field for field.
+/// The cases harness wraps this in its own richer `Spec`.
+#[derive(Debug, Default)]
+pub struct SpecFields {
+    pub source: String,
+    pub extra_files: Vec<(String, String)>,
+    pub expect_files: Vec<(String, String)>,
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+    pub exit_code: Option<i32>,
+    pub errors: Option<String>,
+    pub performance: Option<String>,
+    pub cli: Vec<String>,
+    pub check: Option<String>,
 }
 
 /// The parser's trailing-whitespace hook (see [`install_parser_hooks`]): the

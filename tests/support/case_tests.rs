@@ -544,6 +544,7 @@ case_tests! {
     crates_aipl_codegen_src_line_at = "crates/aipl-codegen/src/line_at",
     crates_aipl_codegen_src_lines = "crates/aipl-codegen/src/lines",
     crates_aipl_codegen_src_normalize_output = "crates/aipl-codegen/src/normalize_output",
+    crates_aipl_codegen_src_parse_spec = "crates/aipl-codegen/src/parse_spec",
     crates_aipl_codegen_src_parse_test_section_header = "crates/aipl-codegen/src/parse_test_section_header",
     crates_aipl_codegen_src_process_raw_string = "crates/aipl-codegen/src/process_raw_string",
     crates_aipl_codegen_src_reindent_block = "crates/aipl-codegen/src/reindent_block",
