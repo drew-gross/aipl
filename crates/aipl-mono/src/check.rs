@@ -21,6 +21,7 @@
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast;
+use aipl_syntax::ast::Bound;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program,
     Signature, StructDecl, Type, VariantDecl,
@@ -223,6 +224,10 @@ struct Cx<'a> {
     /// Single slots for the same reason as `current_ret`: functions never nest.
     current_fn: std::cell::RefCell<String>,
     current_type_params: std::cell::RefCell<Vec<String>>,
+    /// The bound declared for each of `current_type_params`, so a call inside a
+    /// generic body can check a callee's bound against the *enclosing*
+    /// variable's (see `bound_satisfied`).
+    current_type_bounds: std::cell::RefCell<HashMap<String, Bound>>,
 }
 
 impl<'a> Cx<'a> {
@@ -249,6 +254,27 @@ impl<'a> Cx<'a> {
     fn add_syn_struct(&self, name: String, fields: Vec<(String, Type, bool)>) {
         self.syn_structs.borrow_mut().insert(name, fields);
     }
+    /// Does `ty` satisfy `need`?
+    ///
+    /// Concretely that is [`Bound::accepts`]. But inside a generic body every
+    /// type variable is an abstract sentinel, not a concrete type, so `accepts`
+    /// can never say yes — which used to make *any* bounded builtin uncallable
+    /// from generic code (`xs.minimum()` inside `fn f<T: ord>`). When the
+    /// inferred type is one of the enclosing function's own variables, the
+    /// question is instead whether that variable's declared bound implies the
+    /// one required here.
+    ///
+    /// Implication is deliberately just equality, plus `any` (which promises
+    /// nothing, so everything satisfies it): `ord` and `variant` are unrelated,
+    /// and inventing a lattice before something needs one would be guesswork.
+    fn bound_satisfied(&self, need: Bound, ty: &Type) -> bool {
+        if let Some(var) = typevar_name(ty) {
+            let have = self.current_type_bounds.borrow().get(var).copied();
+            return need == Bound::Any || have == Some(need);
+        }
+        need.accepts(ty, &|n: &str| self.has_variant(n))
+    }
+
     fn has_variant(&self, name: &str) -> bool {
         self.variants.contains_key(name) || self.syn_variants.borrow().contains_key(name)
     }
@@ -817,6 +843,7 @@ pub fn check(program: &Program) -> Result<(), Vec<Error>> {
         current_ret: std::cell::RefCell::new(Type::Unit),
         current_fn: std::cell::RefCell::new(String::new()),
         current_type_params: std::cell::RefCell::new(Vec::new()),
+        current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -978,6 +1005,12 @@ impl Cx<'_> {
         *self.current_ret.borrow_mut() = declared.clone();
         *self.current_fn.borrow_mut() = f.name.clone();
         *self.current_type_params.borrow_mut() = type_var_names.clone();
+        *self.current_type_bounds.borrow_mut() = f
+            .sig
+            .type_vars
+            .iter()
+            .map(|tp| (tp.name.clone(), tp.bound))
+            .collect();
         let body_ty = self.check_expr(&f.body, &env, &f.sig.effects)?;
         // A bare-literal body flexes to a narrow-int return type (`fn g() -> u8
         // { 200 }`).
@@ -2834,14 +2867,31 @@ impl Cx<'_> {
         // structural and knows nothing about bounds.
         for tp in &sig.type_vars {
             if let Some(bound_ty) = map.get(&tp.name) {
-                if !tp.bound.accepts(bound_ty, &|n: &str| self.has_variant(n)) {
+                if !self.bound_satisfied(tp.bound, bound_ty) {
+                    // Inside a generic body the argument is the *enclosing*
+                    // function's own type variable. Saying "inferred as type
+                    // parameter T" there would print the same name twice (the
+                    // callee's `T` and the caller's) and explain nothing — name
+                    // the enclosing variable's declared bound instead, which is
+                    // the thing that has to change.
+                    let detail = match typevar_name(bound_ty) {
+                        Some(v) => {
+                            let have = self.current_type_bounds.borrow().get(v).copied();
+                            format!(
+                                "but the enclosing {:?} is declared \"{}\"",
+                                v,
+                                have.unwrap_or(Bound::Any).name()
+                            )
+                        }
+                        None => format!("but was inferred as {}", tyname(bound_ty)),
+                    };
                     return Err(Error::at(
                         format!(
-                            "fn {:?}: type parameter {:?} requires \"{}\", but was inferred as {}",
+                            "fn {:?}: type parameter {:?} requires \"{}\", {}",
                             display(name),
                             tp.name,
                             tp.bound.name(),
-                            tyname(bound_ty)
+                            detail
                         ),
                         span.clone(),
                     ));
@@ -3379,12 +3429,26 @@ fn is_unknown(t: &Type) -> bool {
 /// a wildcard: it coerces only with itself, so the structural rules still bite
 /// (a `T` doesn't fit an `i64`, you can't `+`/`<`/`*` two `T`s — `T: any` makes
 /// no such promise) while `==`, container ops, binding, and `return T` work.
-fn typevar_ty() -> Type {
-    Type::Named("__typevar__".to_string())
+/// The sentinel carries the variable's *name* (`__typevar__$T`) so a bound can
+/// still be looked up at an inner call site — without it a generic body knows
+/// only "some type parameter" and no bound can ever be satisfied (see
+/// `bound_satisfied`). An anonymous `any` has no name and gets the bare prefix.
+fn typevar_ty(name: &str) -> Type {
+    Type::Named(format!("{TYPEVAR}{name}"))
 }
 
+const TYPEVAR: &str = "__typevar__$";
+
 fn is_typevar(t: &Type) -> bool {
-    matches!(t, Type::Named(n) if n == "__typevar__")
+    matches!(t, Type::Named(n) if n.starts_with(TYPEVAR))
+}
+
+/// The variable a typevar sentinel came from, or `None` for an anonymous `any`.
+fn typevar_name(t: &Type) -> Option<&str> {
+    match t {
+        Type::Named(n) => n.strip_prefix(TYPEVAR).filter(|s| !s.is_empty()),
+        _ => None,
+    }
 }
 
 /// Whether `t` contains the abstract `__typevar__` sentinel anywhere — i.e. it's
@@ -3393,7 +3457,7 @@ fn is_typevar(t: &Type) -> bool {
 /// abstract application inside a generic function, resolved at monomorphization).
 fn mentions_typevar(t: &Type) -> bool {
     match t {
-        Type::Named(n) => n == "__typevar__",
+        Type::Named(n) => n.starts_with(TYPEVAR),
         Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_typevar(i),
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
@@ -3421,8 +3485,8 @@ fn is_valid_elem(t: &Type) -> bool {
 /// type variables coerce only with themselves. Identity for a concrete signature.
 fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
-        Type::Any => typevar_ty(),
-        Type::Named(n) if type_params.iter().any(|p| p == n) => typevar_ty(),
+        Type::Any => typevar_ty(""),
+        Type::Named(n) if type_params.iter().any(|p| p == n) => typevar_ty(n),
         Type::Primitive(_)
         | Type::Named(_)
         | Type::Unit
@@ -3470,7 +3534,13 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
 /// too (e.g. an inferred `(i64) -> _` from a partly-resolved generic).
 fn tyname(t: &Type) -> String {
     match t {
-        Type::Named(n) if n == "__typevar__" => "a type parameter".to_string(),
+        // The sentinel carries its variable's name (see `typevar_ty`); name it in
+        // the message rather than leaking the mangling, and stay generic for an
+        // anonymous `any`, which has no name to give.
+        Type::Named(_) if is_typevar(t) => match typevar_name(t) {
+            Some(v) => format!("type parameter {v:?}"),
+            None => "a type parameter".to_string(),
+        },
         Type::Optional(inner) if is_typevar(inner) => "an optional type parameter".to_string(),
         Type::Array(inner) if is_typevar(inner) => "an array of a type parameter".to_string(),
         Type::Set(inner) if is_typevar(inner) => "a set of a type parameter".to_string(),
@@ -3546,6 +3616,14 @@ fn is_char_array(t: &Type) -> bool {
 
 fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     if actual == expected || is_unknown(actual) || is_unknown(expected) {
+        return Ok(());
+    }
+    // Type variables coerce with each other regardless of which variable they
+    // came from. Naming the sentinel (see `typevar_ty`) would otherwise have
+    // silently *tightened* this — `T` and `U` used to erase to one value and so
+    // compared equal above. Distinguishing them is a separate change with its
+    // own fanout; this keeps the naming purely additive.
+    if is_typevar(actual) && is_typevar(expected) {
         return Ok(());
     }
     // A bare `none` / empty `[]` carries the placeholder element `__none__`,

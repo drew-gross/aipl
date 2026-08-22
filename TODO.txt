@@ -35,6 +35,7 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 self-hosting:
+  port parse_spec to aipl
   make formatter command that is fully self-hosted
   parser library in aipl (grammar as data; generates highlighter + formatter)
     -> plan and progress checkboxes live in PARSER_LIBRARY.md
@@ -52,7 +53,7 @@ List files:
 clock:
   make units types
 
-utilitiy functions:
+utility functions:
   split with predicate, use in companion_files.aipl
   interaclate
 
@@ -63,7 +64,6 @@ bugs:
 
 syntax:
   module level constants
-  allow mut self so you don't have to do mut out = self; set out.push(...); out
   for (let i, c : dct) syntax for dicts
   allow leading | for multi-line variant e.g. variant A = | One | Two | Three;
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
@@ -151,12 +151,6 @@ optimizations:
   make arrays work sorta like strings i.e. have a rope representation
   we had a bug that only manifested after an optimization - lets make it so that all tests are run both with and without optimizations to avoid hitting this issue again
   claudes suggestions:
-    A. Dev loop — the biggest numbers in the repo
-
-    A3. The 5.9 MB runtime archive is written to a temp file on every link. link_with (crates/aipl-linker/src/lib.rs:44) writes libaipl_runtime.a next to the object, spawns clang, deletes the directory. Cases link twice each (production + instrumented) → ~760 links ≈ 4.5 GB of temp I/O per suite run. Cache it at a content-keyed path and reuse. Related: which("clang") re-scans PATH per link, and the archive is built with opt-level=3 but no -C debuginfo=0/strip (crates/aipl-linker/build.rs:50) — stripping shrinks the temp write, the link time, and ~12MB from the aipl binary itself (both archives are include_bytes!d).
-
-    A4. Each perf-checked case compiles and links the program twice — production for behavior, instrumented for counters (tests/cases.rs:1539). Unavoidable in general, but worth checking whether the production binary can be reused when a case has no behavior sections.
-
     B. Compiler speed
 
     B1. No opt_level is set anywhere — neither host_isa (:4367) nor the AOT builder (:6485), so Cranelift runs at its default none. Fast compiles, but aipl build emits unoptimized machine code. Splitting the setting (JIT stays none, AOT goes speed) is a two-line change with a plausibly large effect on wall-clock and code size.
@@ -460,8 +454,6 @@ self-inflicted: two long serial sweeps plus that leaked process pegging a core.
 Next step: re-run the case suite under the new codegen watching for a case that
 hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
-implement vec.back(), use it to simplify trim_suffix
-
 Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
 walker.aipl:
@@ -505,17 +497,6 @@ Reasons dec.aipl uses a cons list:
     Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
 
 signedness:
-
-    Lengths, offsets, cursors and spans are byte counts and should be u64 everywhere.
-    crates/aipl-codegen/src/lexer.aipl is now fully unsigned (see its SIGNEDNESS block);
-    these are the compiler-side gaps that forced a conversion, in order of value:
-
-    1. count_while returns i64 though it counts. Its sibling count returns u64, and so
-       does len, so the three disagree. Every length in lexer.aipl derives from it, which
-       is why the file was signed throughout; it now converts once, in ucount_while.
-       Making count_while u64 deletes that helper and its conversion outright.
-       (crates/aipl-mono/src/builtin_count_while.aipl:11)
-
     2. An integer literal doesn't flex through a constructor. In a fn returning u64!E,
        ok(0) types its payload i64 and is rejected, so the three "declined" sites in
        lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an

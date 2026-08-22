@@ -1,0 +1,72 @@
+import { minimum, print, same_case, to_str } from builtins;
+
+// A bound is satisfiable from inside another generic body: when a call's type
+// parameter resolves to one of the *enclosing* function's variables, the
+// enclosing variable's declared bound is what has to satisfy it.
+//
+// Without this, a bounded builtin could not be called from generic code at all
+// — every type variable looked alike to the checker, so there was no bound left
+// to consult and `xs.minimum()` below was a compile error.
+variant Tok = Space | Name(str) | IntLit(i64)
+
+// A grammar rule, generic over the token kind -- the parser-library shape.
+variant Rule<K: variant> = Term(K)
+
+// `ord` propagates: `minimum` needs `ord`, and `T` has it.
+fn smallest<T: ord>(xs: T[]) -> T? { xs.minimum() }
+
+// `variant` propagates: `same_case` needs `variant`, and `K` has it. This is
+// what makes a generic driver possible — it cannot name K's cases, and `==`
+// would compare payloads, so "any Name, whatever its text" needs `same_case`.
+fn matches<K: variant>(rule: Rule<K>, tok: K) -> bool {
+    match (rule) {
+        Term(want) => tok.same_case(want),
+    }
+}
+
+fn main() !prints {
+    print(smallest([3, 1, 2]).to_str());
+    print(smallest(['c', 'a']).to_str());
+
+    // The payload is ignored, so one rule matches every identifier.
+    print(matches(Term(Name("")), Name("ident")).to_str());
+    print(matches(Term(Name("")), Name("other")).to_str());
+    // and still discriminates between cases.
+    print(matches(Term(Name("")), Space).to_str());
+    print(matches(Term(IntLit(0)), IntLit(42)).to_str());
+}
+--- stdout ---
+some(1)
+some('a')
+true
+true
+false
+true
+
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 101
+instructions executed: 782
+binary size: 5040
+  code: 2592
+    __to_str_bool: 212
+    __to_str_char$opt: 352
+    __to_str_i64$opt: 360
+    main: 1528
+    matches$Tok: 140
+  data: 191
+  metadata: 2257
+builtin calls: 58
+  aipl_array_dec: 1
+  aipl_array_new: 1
+  aipl_char_at: 2
+  aipl_dec: 23
+  aipl_i64_len: 2
+  aipl_inc: 11
+  aipl_print: 6
+  aipl_str_alloc: 2
+  aipl_str_len: 1
+  aipl_write_bytes: 8
+  aipl_write_i64: 1

@@ -18,7 +18,7 @@ fn generic_body_unreachable(v: any[]) -> bool { len(v) }
 
 fn main() {}
 --- errors ---
-error: arithmetic operand: expected i64, got a type parameter
+error: arithmetic operand: expected i64, got type parameter "T"
   --> ./tests/cases/generics/err_generics.aipl:14:51
    |
 14 | fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }

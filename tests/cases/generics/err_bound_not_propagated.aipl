@@ -1,0 +1,34 @@
+import { minimum, same_case } from builtins;
+
+// The propagation is not a free pass: the enclosing variable's bound must
+// actually satisfy the one the callee declares. `any` promises nothing, so
+// neither call below is allowed, and the message names the enclosing variable
+// rather than repeating the callee's parameter name.
+variant Tok = Space | Name(str)
+
+fn wrong_ord<T: any>(xs: T[]) -> T? { xs.minimum() }
+
+fn wrong_variant<T: any>(a: T, b: T) -> bool { a.same_case(b) }
+
+// `ord` and `variant` are unrelated -- neither implies the other.
+fn ord_is_not_variant<T: ord>(a: T, b: T) -> bool { a.same_case(b) }
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: fn "minimum": type parameter "T" requires "ord", but the enclosing "T" is declared "any"
+ --> ./tests/cases/generics/err_bound_not_propagated.aipl:9:39
+  |
+9 | fn wrong_ord<T: any>(xs: T[]) -> T? { xs.minimum() }
+  |                                       ^^^^^^^^^^
+
+error: fn "same_case": type parameter "T" requires "variant", but the enclosing "T" is declared "any"
+  --> ./tests/cases/generics/err_bound_not_propagated.aipl:11:48
+   |
+11 | fn wrong_variant<T: any>(a: T, b: T) -> bool { a.same_case(b) }
+   |                                                ^^^^^^^^^^^^^
+
+error: fn "same_case": type parameter "T" requires "variant", but the enclosing "T" is declared "ord"
+  --> ./tests/cases/generics/err_bound_not_propagated.aipl:14:53
+   |
+14 | fn ord_is_not_variant<T: ord>(a: T, b: T) -> bool { a.same_case(b) }
+   |                                                     ^^^^^^^^^^^^^

@@ -9,15 +9,13 @@ each is sized to be finishable in one session.
 - [ ] 1.0 Reproducers: fn value returning a boxed variant; `A[]` param where `A`
       is boxed; array of structs holding a boxed field; two-param generic variant
 - [ ] 1.1 Generic-variant inference from expected type (`check.rs:605-635`)
-- [ ] 1.2 `same_case` builtin + `variant` bound — **builtin landed**; the generic
-      driver still needs 1.8
+- [x] 1.2 `same_case` builtin + `variant` bound — match a case, not a payload
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
 - [x] 1.5 Tail-call elimination — TODO.txt:467
 - [x] 1.6 `match` arms as statement blocks (arm grouping still open)
 - [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
-- [ ] 1.8 Bounds don't propagate through a generic caller — **blocks 1.2**, and
-      `ord` equally
+- [x] 1.8 Bounds propagate through a generic caller — unblocked 1.2; fixed `ord` too
 
 **Stage 2 — the library**
 - [ ] 2.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
@@ -31,10 +29,9 @@ each is sized to be finishable in one session.
 - [ ] 6 Formatter generator
 - [ ] 7 Retire gazelle
 
-Stage 1 items are otherwise independent and useful on their own — 1.3, 1.4 and
-1.5 fix bugs already on TODO.txt regardless of this library — with one ordering
-constraint: **1.2 cannot finish before 1.8**, since its generic driver is exactly
-what the missing bound propagation blocks. Stage 2 onward is strictly sequential.
+Stage 1 items are independent and useful on their own — 1.3, 1.4 and 1.5 fix bugs
+already on TODO.txt regardless of this library, and 1.8 fixed `ord` as much as it
+did `variant`. Stage 2 onward is strictly sequential.
 
 ## Context
 
@@ -112,7 +109,7 @@ arguments, so `Then([Spelling("("), Named("expr")])` types from the outside in.
 `PTok { class: u64, span: Span }` (the projection `walker.aipl` already does with
 `FmtTok`). Workable, but it pushes a mapping table onto every consumer.
 
-### 1.2 Match a variant's case without matching its payload — *required* — **builtin landed** (2026-08-22)
+### 1.2 Match a variant's case without matching its payload — **done** (2026-08-22)
 
 `==` on variants is structural, and a generic driver cannot `match` on a type
 parameter (`"match" requires an optional or variant, got a type parameter`). So
@@ -144,16 +141,17 @@ EBNF/highlighter generators; it leaks nothing new, since `to_str` already render
 `Name("x")` from a `<K: any>` function. Too slow for the hot path, which
 `same_case` covers.
 
-**Still blocked — see 1.8.** `same_case` works wherever the token type is
-concrete, but the *generic* driver this item exists for does not compile:
+The generic driver this item exists for needed one more thing — bounds were not
+satisfiable from inside a generic body at all — which landed as 1.8. With both,
+this compiles and "any identifier" is finally expressible:
 
 ```
 fn matches<K: variant>(rule: Rule<K>, tok: K) -> bool {
     match (rule) {
-        Term(want) => tok.same_case(want),   // error: requires "variant",
-        ..                                   //        but was inferred as a type parameter
+        Term(want) => tok.same_case(want),
     }
 }
+matches(Term(Name("")), Name("ident"))   // true, whatever the text
 ```
 
 *Alternative still worth considering:* first-class payload-free case references
@@ -396,7 +394,7 @@ pass (Stage 2) turns rule references into array indices, and FIRST sets (Stage 4
 remove most of the need to memoize. Listed so the dependency is explicit if the
 parser later wants memoization.
 
-### 1.8 Bounds don't propagate through a generic caller — *required for 1.2*
+### 1.8 Bounds propagate through a generic caller — **done** (2026-08-22)
 
 A bound is only checked against a *concrete* type. Inside a generic body it is
 unsatisfiable, so a bounded builtin cannot be called from generic code at all:
@@ -416,17 +414,22 @@ sentinel that "coerces only with itself". That erases *which* variable a type
 was, so at an inner call site there is no bound left to consult — the checker
 knows only "some type parameter".
 
-The fix is to give type variables identity in the abstract check — `__typevar__$K`,
-or a `Type::Var(name, bound)` — so `Bound::accepts` can ask whether the enclosing
-variable's bound implies the required one. Two consequences to weigh before
-starting:
+**Fixed** by giving the sentinel its variable's name (`__typevar__$T`) and, when
+a call's parameter resolves to one of the enclosing function's variables,
+checking that variable's declared bound instead of the (impossible) concrete
+one. Bound implication is deliberately just equality plus `any`, which promises
+nothing — `ord` and `variant` are unrelated, and a lattice would be guesswork
+until something needs it.
 
-- Distinct variables would stop coercing with each other (`T` would no longer
-  unify with `U`). That is strictly more correct, and may surface real errors in
-  existing generic code that passes today.
-- Bound *implication* needs defining: `variant` and `ord` are unrelated, so this
-  is currently equality of bounds, not a lattice. Keep it equality until
-  something needs more.
+Coercion was left exactly as permissive as before: **every type variable still
+coerces with every other**, via an explicit clause in `coerce`. Naming the
+sentinel would otherwise have tightened this as a silent side effect, since `T`
+and `U` used to erase to one value and compare equal. Distinguishing them is a
+real correctness improvement, but a separate change with its own fanout — this
+one is purely additive.
+
+Blast radius was one line in one fixture: an error message gained the parameter's
+name (`got a type parameter` → `got type parameter "T"`).
 
 ### Cost note
 
