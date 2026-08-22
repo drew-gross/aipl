@@ -8,7 +8,7 @@ each is sized to be finishable in one session.
 **Stage 1 — language work** (blocks Stage 2)
 - [ ] 1.0 Reproducers: fn value returning a boxed variant; `A[]` param where `A`
       is boxed; array of structs holding a boxed field; two-param generic variant
-- [ ] 1.1 Generic-variant inference from expected type (`check.rs:605-635`)
+- [x] 1.1 Generic-variant inference from expected type — landed; inlining caveat is 1.9
 - [x] 1.2 `same_case` builtin + `variant` bound — match a case, not a payload
 - [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
 - [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
@@ -87,27 +87,48 @@ field; and a two-parameter generic *variant* (only two-parameter generic structs
 are attested, at `tests/cases/structs/generic_pair.aipl:5`). Confirm before
 fixing.
 
-### 1.1 Infer a generic variant's type parameter from the expected type — *required*
+### 1.1 Infer a generic variant's type parameter from the expected type — **done** (2026-08-22)
 
-`infer_generic_variant_ctor` (`crates/aipl-mono/src/check.rs:605-635`) resolves a
-generic variant's parameter only from the constructor's own arguments, or via
-`sole_instance` (`check.rs:383-405`) when exactly one instance exists
-program-wide. So in `variant Rule<K>`, the arms `Spelling(str)` and `Named(str)`
-pin nothing and compile only while a single grammar exists in the program —
-adding a second grammar breaks the first. `Then([])` fails the same way, since
-`bind_field` skips empty array literals (`check.rs:307`).
+`infer_generic_variant_ctor` resolved a generic variant's parameter only from the
+constructor's own arguments, or via `sole_instance` when exactly one instance
+existed program-wide. So in `variant Rule<K>`, the arms `Spelling(str)` and
+`Named(str)` pinned nothing and compiled only while a single grammar existed —
+adding a second broke the first.
 
-This is closing a documented asymmetry, not new machinery: **generic structs
-already do this**, via `ret_generic_args` (`check.rs:518-522`), and the variant
-path's own doc comment (`check.rs:568-570`) already claims the behaviour it
-doesn't implement. The fix threads the expected type into the variant path.
-Requirement: it must flow *through* array literals and nested constructor
-arguments, so `Then([Spelling("("), Named("expr")])` types from the outside in.
+**Landed.** The variant path now consults the expected type before falling back
+to `sole_instance`, which is what the generic *struct* path already did
+(`ret_generic_args`). Two grammars now coexist.
 
-*Lifts:* the rule tree stays generic — `variant Rule<K>` as written.
-*Fallback:* make `Rule` non-generic and have consumers pre-classify tokens into
-`PTok { class: u64, span: Span }` (the projection `walker.aipl` already does with
-`FmtTok`). Workable, but it pushes a mapping table onto every consumer.
+Three things the original write-up missed, all found while fixing it:
+
+- **There are three inference implementations, not one.** The checker
+  (`check.rs`), the monomorphizer (`lib.rs`), and codegen each type this
+  construction. The checker and mono each had their own copy of the
+  variant/struct asymmetry and both needed the same fix; codegen needed mono to
+  hand it a *resolved* annotation. A fix to `check.rs` alone changes nothing
+  observable — mono re-infers and rejects what the checker just accepted.
+- **An annotation did not supply the expected type either.**
+  `let r: Rule<Tok> = Spelling("(")` failed, because the binding's value was
+  checked *before* the annotation was looked at. Both checker and mono now carry
+  an expected-type slot, kept separate from the return-type slot because a
+  `return` inside the value still means the enclosing function's return type.
+- **A written `Rule<Tok>` and its instance `Rule$Tok` are different `Type`
+  values.** Comparing them unresolved produced "declared Rule<Tok>, but its value
+  is Rule<Tok>" — a type reported as not being itself. Annotations are now
+  resolved before comparison.
+
+**Not covered: the array/nested requirement.** The original example
+`Then([Spelling("("), Named("expr")])` needs `Then(Rule<K>[])`, and an array of a
+*variant* is rejected outright ("array elements must be … got Rule<Tok>") — with
+or without this fix. That shape needs boxing (1.3's territory), not inference.
+Worth knowing: once inference stops failing early, that shape reaches
+instantiation and **overflows the stack** instead of erroring, since `Rule$Tok`
+contains `Rule$Tok[]`. A clean error there is a loose end.
+
+**Caveat: inlining still defeats it — see 1.9.** A function small enough, or
+called once, has its body relocated into a caller with a different return type,
+which discards the very context this item added. The test case is deliberately
+over the size limit and called twice.
 
 ### 1.2 Match a variant's case without matching its payload — **done** (2026-08-22)
 
@@ -430,6 +451,41 @@ one is purely additive.
 
 Blast radius was one line in one fixture: an error message gained the parameter's
 name (`got a type parameter` → `got type parameter "T"`).
+
+### 1.9 Inlining discards the expected type — *required for the last of 1.1*
+
+`inline_single_use` and `inline_small` move a function's body into its caller.
+The body's types can depend on the function's *return* type — that is exactly
+what 1.1 added — and the caller's return type is a different thing, so the
+context is lost. The checker (which runs before inlining) accepts the program;
+mono then rejects it:
+
+```
+fn paren() -> Rule<Tok> { Spelling("(") }        // fine on its own
+// once inlined into `fn main()`, `Rule`'s K has nothing to resolve from
+error: cannot infer type parameter "K" of generic variant "Rule"
+```
+
+So an **optimization makes a valid program fail to compile** — which is a defect
+independent of the parser library. It bites any function whose body is under
+`DEFAULT_INLINE_MAX_EXPRS` (4) *or* is private and called exactly once, which is
+most small constructors-with-a-return-type.
+
+The inliner already guards the mirror-image case on the *argument* side: it skips
+a call whose argument is a context-typed literal, because "its type comes from
+`f`'s parameter, which a `let`-binding discards". The return side has no such
+guard.
+
+Two ways out, in preference order:
+
+1. **Wrap, don't skip.** `build_inlined` can bind the spliced body to an
+   annotated `let` carrying the callee's return type. Annotations now supply the
+   expected type (1.1), so the context survives and the inlining still happens.
+   Scope it to generic return types — wrapping everything would move
+   `instructions executed` / `binary size` in every binary.
+2. **Skip.** Exclude candidates whose return type is a generic application. Blunt
+   and costs the optimization, but it is a two-line filter next to the existing
+   ones.
 
 ### Cost note
 

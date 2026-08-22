@@ -224,6 +224,14 @@ struct Cx<'a> {
     /// Single slots for the same reason as `current_ret`: functions never nest.
     current_fn: std::cell::RefCell<String>,
     current_type_params: std::cell::RefCell<Vec<String>>,
+    /// The type an expression is being checked *against*, when something more
+    /// local than the function's return type says so — currently an annotated
+    /// binding. Consulted before `current_ret` when a generic construction's
+    /// own arguments don't pin every type variable, so
+    /// `let r: Rule<Tok> = Spelling("(")` resolves from the annotation.
+    /// Separate from `current_ret` because `return` inside the value still
+    /// means the *function's* return type.
+    current_expected: std::cell::RefCell<Option<Type>>,
     /// The bound declared for each of `current_type_params`, so a call inside a
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
@@ -508,6 +516,11 @@ impl<'a> Cx<'a> {
     /// application of `base` (a `Generic` in a generic function, or a synthesized
     /// `Named` instance once concrete).
     fn ret_generic_args(&self, base: &str) -> Option<Vec<Type>> {
+        if let Some(exp) = self.current_expected.borrow().clone() {
+            if let Some(args) = self.find_generic_args(&exp, base) {
+                return Some(args);
+            }
+        }
         let ret = self.current_ret.borrow().clone();
         self.find_generic_args(&ret, base)
     }
@@ -702,10 +715,25 @@ impl<'a> Cx<'a> {
             arg_tys.push((at, arg.span.clone()));
         }
         // Resolve the type arguments from the constructor's payload. A variable
-        // that no argument pins (a nullary case like `Nothing`) falls back to the
-        // template's sole existing instance when there is exactly one — the
-        // unambiguous common case; with several instances it's a clear error.
-        let sole: Option<Vec<Type>> = if map.len() < tmpl.type_vars.len() {
+        // no argument pins — a nullary case, or a case whose payload mentions no
+        // type variable (`Spelling(str)` in a `Rule<K>`) — falls back, in order:
+        //
+        // 1. the enclosing function's expected return type, exactly as the
+        //    generic *struct* path does (`ret_generic_args`). This is direct
+        //    evidence, and `find_generic_args` looks through arrays and the other
+        //    containers, so a nested `Then([Spelling("("), ..])` types from the
+        //    outside in — every constructor in the body sees the same return type.
+        // 2. the template's sole existing instance, when there is exactly one.
+        //    That is a guess which merely happens to be unambiguous, so it is
+        //    tried second — and it is why adding a *second* instance used to
+        //    break the first one that relied on it.
+        let unpinned = map.len() < tmpl.type_vars.len();
+        let expected: Option<Vec<Type>> = if unpinned {
+            self.ret_generic_args(base)
+        } else {
+            None
+        };
+        let sole: Option<Vec<Type>> = if unpinned && expected.is_none() {
             self.sole_instance(base)
                 .and_then(|inst| self.instance_args(&inst).map(|(_, a)| a))
         } else {
@@ -718,7 +746,8 @@ impl<'a> Cx<'a> {
             .map(|(i, tv)| {
                 map.get(&tv.name)
                     .cloned()
-                    .or_else(|| sole.as_ref().map(|a| a[i].clone()))
+                    .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
+                    .or_else(|| sole.as_ref().and_then(|a| a.get(i).cloned()))
                     .ok_or_else(|| {
                         Error::at(
                             format!(
@@ -843,6 +872,7 @@ pub fn check(program: &Program) -> Result<(), Vec<Error>> {
         current_ret: std::cell::RefCell::new(Type::Unit),
         current_fn: std::cell::RefCell::new(String::new()),
         current_type_params: std::cell::RefCell::new(Vec::new()),
+        current_expected: std::cell::RefCell::new(None),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
@@ -1160,7 +1190,17 @@ impl Cx<'_> {
         env: &Env,
         effects: &[String],
     ) -> Result<Type, Error> {
-        let vt = self.check_expr(val, env, effects)?;
+        // The annotation is the value's expected type, so it must be in scope
+        // *while* the value is checked — a generic construction the value's own
+        // arguments don't pin (`let r: Rule<Tok> = Spelling("(")`) has nothing
+        // else to resolve from. Saved and restored rather than set, since
+        // bindings nest.
+        let prev = self
+            .current_expected
+            .replace(ty.map(|t| subst_typevars(t, &self.current_type_params.borrow())));
+        let checked = self.check_expr(val, env, effects);
+        *self.current_expected.borrow_mut() = prev;
+        let vt = checked?;
         if is_unit(&vt) {
             return Err(Error::at(
                 format!("cannot bind {name:?} to a value of type ()"),
@@ -1180,6 +1220,13 @@ impl Cx<'_> {
             &self.current_fn.borrow(),
         )?;
         let declared = subst_typevars(declared, &self.current_type_params.borrow());
+        // A written `Rule<Tok>` is a generic *application*; the value's type is
+        // the instance it resolves to (`Rule$Tok`). Resolve the annotation the
+        // same way before comparing, or the two spellings of one type fail to
+        // coerce — and the message says a type is not itself. Left as-written if
+        // it can't resolve (abstract inside a generic body), where `coerce`'s
+        // typevar rule applies instead.
+        let declared = self.resolve_generic_ty(&declared).unwrap_or(declared);
         let vt = self.flex_int(val, &vt, &declared)?;
         // An annotated binding *converts* between integer widths rather than
         // merely checking: `let n: u8 = some_i64;` re-canonicalizes to 8 bits

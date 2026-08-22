@@ -1174,6 +1174,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         spec_memo: HashMap::new(),
         skip_mut_desugar: false,
         cur_ret: Type::Unit,
+        cur_expected: None,
         dbg,
     };
 
@@ -1767,6 +1768,11 @@ struct Mono<'a> {
     /// generic construction whose fields don't pin every type variable from the
     /// expected type (mirrors the checker's `current_ret`).
     cur_ret: Type,
+    /// The type an expression is being inferred *against* when something more
+    /// local than the return type says so — an annotated binding. Mirrors the
+    /// checker's `current_expected`, and must, or mono rejects a program the
+    /// checker accepted.
+    cur_expected: Option<Type>,
     dbg: DebugOptions,
 }
 
@@ -3674,9 +3680,18 @@ impl Mono<'_> {
             self.bind_field(pty, &decay_concat(at), &vars, &mut map);
             rargs.push(ra);
         }
-        // A variable no argument pins (a nullary case) falls back to the sole
-        // existing instance of `base`, matching the checker.
-        let sole: Option<Vec<Type>> = if map.len() < tmpl.type_vars.len() {
+        // A variable no argument pins falls back to the enclosing function's
+        // return type first and the sole existing instance second — the same
+        // order, for the same reasons, as the checker's
+        // `infer_generic_variant_ctor`. Both copies have to agree: the checker
+        // accepting a program mono then rejects is a crash after a clean check.
+        let unpinned = map.len() < tmpl.type_vars.len();
+        let expected: Option<Vec<Type>> = if unpinned {
+            self.ret_generic_args(&base)
+        } else {
+            None
+        };
+        let sole: Option<Vec<Type>> = if unpinned && expected.is_none() {
             self.sole_instance(&base)
                 .and_then(|inst| self.instance_args(&inst).map(|(_, a)| a))
         } else {
@@ -3689,7 +3704,8 @@ impl Mono<'_> {
             .map(|(i, tv)| {
                 map.get(&tv.name)
                     .cloned()
-                    .or_else(|| sole.as_ref().map(|a| a[i].clone()))
+                    .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
+                    .or_else(|| sole.as_ref().and_then(|a| a.get(i).cloned()))
                     .ok_or_else(|| {
                         Error::at(
                             format!(
@@ -3758,6 +3774,11 @@ impl Mono<'_> {
     /// function's return type when the fields don't pin them (see the checker's
     /// `ret_generic_args`).
     fn ret_generic_args(&self, base: &str) -> Option<Vec<Type>> {
+        if let Some(exp) = self.cur_expected.clone() {
+            if let Some(args) = self.find_generic_args(&exp, base) {
+                return Some(args);
+            }
+        }
         let ret = self.cur_ret.clone();
         self.find_generic_args(&ret, base)
     }
@@ -4189,10 +4210,23 @@ impl Mono<'_> {
                 )
             }
             ExprKind::Let(name, ty, val, body) => {
-                let (rv, vt) = self.infer(val, env)?;
+                // The annotation is the value's expected type while it is
+                // inferred, not just a check afterwards — see `cur_expected`.
+                let prev = std::mem::replace(&mut self.cur_expected, ty.clone());
+                let inferred = self.infer(val, env);
+                self.cur_expected = prev;
+                let (rv, vt) = inferred?;
                 // An annotation is the binding's type, not merely a check on the
                 // initializer — it is also what *converts* an integer to another
                 // width, so the body must see the declared type.
+                // A written `Rule<Tok>` is a generic *application*; everything downstream
+                // works in resolved instances (`Rule$Tok`), so resolve it here rather
+                // than handing codegen a spelling it will compare unequal to the
+                // value's own type.
+                let ty = match ty {
+                    Some(t) => Some(self.resolve_generic_ty(t)?),
+                    None => None,
+                };
                 let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
@@ -4208,7 +4242,20 @@ impl Mono<'_> {
                 )
             }
             ExprKind::LetMut(name, ty, val, body) => {
-                let (rv, vt) = self.infer(val, env)?;
+                // The annotation is the value's expected type while it is
+                // inferred, not just a check afterwards — see `cur_expected`.
+                let prev = std::mem::replace(&mut self.cur_expected, ty.clone());
+                let inferred = self.infer(val, env);
+                self.cur_expected = prev;
+                let (rv, vt) = inferred?;
+                // A written `Rule<Tok>` is a generic *application*; everything downstream
+                // works in resolved instances (`Rule$Tok`), so resolve it here rather
+                // than handing codegen a spelling it will compare unequal to the
+                // value's own type.
+                let ty = match ty {
+                    Some(t) => Some(self.resolve_generic_ty(t)?),
+                    None => None,
+                };
                 let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);

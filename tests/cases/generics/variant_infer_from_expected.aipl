@@ -1,0 +1,92 @@
+import { print, to_str } from builtins;
+
+// A generic variant's type parameter resolves from the *expected* type when the
+// constructor's own arguments don't pin it — the rule generic structs already
+// had.
+//
+// `Spelling(str)` and `Named(str)` mention no `K`, so they pin nothing. Before,
+// such a constructor compiled only while exactly one instance of `Rule` existed
+// program-wide, and adding a second broke the first: the two grammars below
+// could not coexist.
+variant Tok = Space | Word(str)
+
+variant Tok2 = Dot | Num(i64)
+
+variant Rule<K: any> = Spelling(str) | Named(str) | Term(K)
+
+// Resolved from the declared return type.
+//
+// Deliberately larger than the inliner's size limit, and called more than once,
+// so the body stays in the function it was written in. Inlining relocates a body
+// into a caller with a different return type and discards exactly this context
+// — see PARSER_LIBRARY.md 1.9.
+fn paren(open: bool) -> Rule<Tok> {
+    let o = "(";
+    let c = ")";
+    let pick = if (open) { o } else { c };
+    Spelling(pick)
+}
+
+fn dot(first: bool) -> Rule<Tok2> {
+    let a = "a";
+    let b = "b";
+    let pick = if (first) { a } else { b };
+    Named(pick)
+}
+
+// Resolved from an annotation instead: the binding names the instance, and the
+// annotation is in scope while the value is checked.
+fn via_annotation() -> str {
+    let r: Rule<Tok> = Spelling("[");
+    r.to_str()
+}
+
+fn via_annotation2() -> str {
+    let r: Rule<Tok2> = Named("n");
+    r.to_str()
+}
+
+fn main() !prints {
+    print(to_str(paren(true)));
+    print(to_str(paren(false)));
+    print(to_str(dot(true)));
+    print(to_str(dot(false)));
+    print(via_annotation());
+    print(via_annotation2());
+    // A constructor that *does* pin K needs no help, and coexists with both.
+    print(to_str(Term(Space)));
+    print(to_str(Term(Dot)));
+}
+--- stdout ---
+Spelling("(")
+Spelling(")")
+Named("a")
+Named("b")
+Spelling("[")
+Named("n")
+Term(Space)
+Term(Dot)
+
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 225
+instructions executed: 1062
+binary size: 8336
+  code: 3984
+    __to_str_Rule$Tok: 1312
+    __to_str_Rule$Tok2: 1236
+    dot: 84
+    main: 1268
+    paren: 84
+  data: 635
+  metadata: 3717
+builtin calls: 96
+  aipl_dec: 22
+  aipl_inc: 8
+  aipl_print: 8
+  aipl_str_alloc: 8
+  aipl_str_data: 6
+  aipl_str_len: 12
+  aipl_write_bytes: 32

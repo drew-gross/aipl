@@ -195,6 +195,7 @@ case_tests! {
     cases_generics_same_length_distinct_types = "cases/generics/same_length_distinct_types",
     cases_generics_str_as_char_array = "cases/generics/str_as_char_array",
     cases_generics_value_or = "cases/generics/value_or",
+    cases_generics_variant_infer_from_expected = "cases/generics/variant_infer_from_expected",
     cases_hashing_basic = "cases/hashing/basic",
     cases_higher_order_in_test = "cases/higher-order-in-test",
     cases_imports_constructor_generic_scoping = "cases/imports/constructor_generic_scoping",
