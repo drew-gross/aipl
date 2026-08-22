@@ -484,6 +484,7 @@ case_tests! {
     cases_structs_returns_struct_return_with_str = "cases/structs/returns/struct_return_with_str",
     cases_structs_spread = "cases/structs/spread",
     cases_structs_spread_evaluates_base_once = "cases/structs/spread_evaluates_base_once",
+    cases_structs_spread_fn_body = "cases/structs/spread_fn_body",
     cases_structs_spread_nested = "cases/structs/spread_nested",
     cases_structs_to_str_struct_optional = "cases/structs/to_str_struct_optional",
     cases_syntax_err_call_missing_comma = "cases/syntax/err_call_missing_comma",

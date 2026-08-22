@@ -1,0 +1,53 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// The fn-body shorthand accepts a leading spread: `-> T { ..base, field: value }`
+// instead of the stuttering `-> T { T { ..base, field: value } }`. The declared
+// return type supplies the name, exactly as it does for the field-only form —
+// and next to a `..self` the repeated type name is pure noise, which is why
+// `fn_body_type_stutter` flags the long form here too.
+struct W { pos: u64, cpos: u64, last_end: u64 }
+
+fn advance(self: W, end: u64) -> W { ..self, pos: self.pos + 1, last_end: end }
+
+fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
+
+// At least one field must follow the spread: a bare `T { ..x }` is just `x`, so
+// there is nothing to spell. The field-only shorthand is unchanged.
+fn at(pos: u64) -> W { pos, cpos: 0, last_end: 0 }
+
+fn main() !prints {
+    let w = at(3);
+    let a = w.advance(9);
+    print(a.pos.to_str());
+    print(a.last_end.to_str());
+    print(a.cpos.to_str());
+    let s = a.skip_comment();
+    print(s.cpos.to_str());
+    // The spread's untouched fields carry through.
+    print(s.pos.to_str());
+}
+--- stdout ---
+4
+9
+0
+1
+4
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 217
+binary size: 1624
+  code: 600
+    __to_str_u64: 180
+    main: 420
+  data: 1
+  metadata: 1023
+builtin calls: 35
+  aipl_dec: 10
+  aipl_inc: 5
+  aipl_print: 5
+  aipl_u64_len: 10
+  aipl_write_u64: 5

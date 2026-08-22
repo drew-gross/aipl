@@ -28692,8 +28692,8 @@ block3(v6: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = want
-;   v1 = $inl194_self
-;   v1 = $inl195_self
+;   v1 = $inl196_self
+;   v1 = $inl197_self
 ; __m18__err_here
 function u0:121(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -29535,8 +29535,8 @@ block3:
 ;   v17 = stepped
 ;   v18 = next
 ;   v21 = gap_end
-;   v17 = $inl298_self
-;   v25 = $inl299_span
+;   v17 = $inl300_self
+;   v25 = $inl301_span
 ;   v35 = sep
 ; __m18__trailing_comment
 function u0:127(i64, i64) apple_aarch64 {
@@ -30037,8 +30037,8 @@ block16(v82: i64):
 ;   v40 = t
 ;   v37 = next_tok
 ;   v126 = c
-;   v1 = $inl304_self
-;   v134 = $inl305_span
+;   v1 = $inl306_self
+;   v134 = $inl307_span
 ; __m18__take_comment
 function u0:128(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -35296,11 +35296,11 @@ block11:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl196_self
+;   v9 = $inl198_self
 ;   v18 = first
-;   v20 = $inl197_self
+;   v20 = $inl199_self
 ;   v28 = r
-;   v97 = $inl198_self
+;   v97 = $inl200_self
 ; __m18__import_alias
 function u0:150(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -36898,11 +36898,11 @@ block48:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl199_self
+;   v1 = $inl201_self
 ;   v65 = inner
-;   v1 = $inl200_self
+;   v1 = $inl202_self
 ;   v244 = base
-;   v246 = $inl201_self
+;   v246 = $inl203_self
 ;   v330 = e
 ; __m18__paren_ty
 function u0:156(i64, i64) apple_aarch64 {
@@ -38363,9 +38363,9 @@ block54:
 ;   v67 = args
 ;   v137 = closed
 ;   v144 = list
-;   v137 = $inl202_self
+;   v137 = $inl204_self
 ;   v235 = r
-;   v137 = $inl203_self
+;   v137 = $inl205_self
 ;   v473 = e
 ;   v627 = arrs
 ;   ss14 = __spread$1
@@ -38824,9 +38824,9 @@ block18:
 ;   v3 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl204_self
+;   v10 = $inl206_self
 ;   v68 = t
-;   v81 = $inl205_self
+;   v81 = $inl207_self
 ; __m18__base_ty
 function u0:158(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -39321,7 +39321,7 @@ block25:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl206_self
+;   v1 = $inl208_self
 ;   v6 = head
 ;   v130 = suf
 ;   ss4 = __spread$2
@@ -40358,7 +40358,7 @@ block45:
 ; source variables:
 ;   v1 = self
 ;   v128 = k
-;   v130 = $inl207_self
+;   v130 = $inl209_self
 ;   v138 = rest
 ;   v357 = closed
 ;   ss7 = __spread$3
@@ -41407,7 +41407,7 @@ block28:
 ; source variables:
 ;   v1 = self
 ;   v2 = n
-;   v4 = $inl208_self
+;   v4 = $inl210_self
 ;   v177 = args
 ;   v259 = closed
 ; __m18__type_suffixes
@@ -41799,8 +41799,8 @@ block3:
 ;   ss0 = w
 ;   ss1 = acc
 ;   ss2 = more
-;   v13 = $inl209_self
-;   v71 = $inl210_self
+;   v13 = $inl211_self
+;   v71 = $inl212_self
 ;   v77 = $inl174_self
 ;   v78 = $inl175_n
 ; __m18__array_suffixes
@@ -42058,7 +42058,7 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl211_self
+;   v9 = $inl213_self
 ;   v15 = $inl176_self
 ;   v16 = $inl177_n
 ; __m18__type_params
@@ -42553,7 +42553,7 @@ block18:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl212_self
+;   v1 = $inl214_self
 ;   v90 = tps
 ;   v160 = closed
 ; __m18__type_param_list
@@ -43001,11 +43001,11 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl213_self
+;   v9 = $inl215_self
 ;   v18 = n
-;   v20 = $inl214_self
+;   v20 = $inl216_self
 ;   v28 = p
-;   v101 = $inl215_self
+;   v101 = $inl217_self
 ; __m18__param_bound
 function u0:166(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -44832,10 +44832,10 @@ block21:
 ;   ss2 = more
 ;   v14 = l
 ;   v20 = n
-;   v22 = $inl216_self
+;   v22 = $inl218_self
 ;   v30 = payload
 ;   v166 = tc
-;   v207 = $inl217_self
+;   v207 = $inl219_self
 ; __m18__variant_payload
 function u0:169(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -45529,7 +45529,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$32531
+;   ss1 = __idx$32513
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -46087,7 +46087,7 @@ block21:
 ;   ss2 = __spread$4
 ;   ss3 = out
 ;   v125 = had_imports
-;   ss4 = __idx$33576
+;   ss4 = __idx$33558
 ;   v155 = d
 ;   v157 = i
 ; __m18__program_items
@@ -46975,10 +46975,10 @@ block31:
 ;   ss0 = w
 ;   ss1 = imports
 ;   ss2 = items
-;   v11 = $inl294_self
+;   v11 = $inl296_self
 ;   v23 = l
-;   v46 = $inl295_self
-;   v68 = $inl218_self
+;   v46 = $inl297_self
+;   v68 = $inl220_self
 ;   v140 = im
 ;   v146 = tc
 ;   v288 = it
@@ -47217,7 +47217,7 @@ block14:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl219_self
+;   v1 = $inl221_self
 ;   v3 = t
 ; __m18__fn_item
 function u0:176(i64, i64) apple_aarch64 {
@@ -49692,7 +49692,7 @@ block88:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl220_self
+;   v1 = $inl222_self
 ;   v6 = head
 ;   v159 = n
 ;   v235 = tps
@@ -49701,161 +49701,295 @@ block88:
 ;   ss9 = __spread$5
 ;   v603 = sig
 ;   v604 = effs
-;   v606 = $inl221_self
+;   v606 = $inl223_self
 ;   v614 = ret
 ;   v920 = body
 ;   ss19 = __spread$6
 ;   v1102 = attrs
 ; __m18__fn_body
 function u0:177(i64, i64) apple_aarch64 {
-    ss0 = explicit_slot 56, align = 8
-    ss1 = explicit_slot 64, align = 8
+    ss0 = explicit_slot 64, align = 8
+    ss1 = explicit_slot 56, align = 8
     ss2 = explicit_slot 64, align = 8
+    ss3 = explicit_slot 56, align = 8
+    ss4 = explicit_slot 64, align = 8
+    ss5 = explicit_slot 64, align = 8
     sig0 = (i64, i64) -> i64 apple_aarch64
-    sig1 = (i64, i64) -> i64 apple_aarch64
-    sig2 = (i64) apple_aarch64
-    sig3 = (i64, i64) -> i64 apple_aarch64
-    sig4 = (i64, i64) apple_aarch64
-    sig5 = (i64) apple_aarch64
+    sig1 = (i64) apple_aarch64
+    sig2 = (i64, i64) -> i64 apple_aarch64
+    sig3 = (i64, i64) apple_aarch64
+    sig4 = (i64) apple_aarch64
+    sig5 = (i64, i64) -> i64 apple_aarch64
     sig6 = (i64, i64) apple_aarch64
     sig7 = (i64) apple_aarch64
-    sig8 = (i64) apple_aarch64
-    sig9 = (i64, i64) apple_aarch64
-    fn0 = colocated u0:135 sig0  ; __m18__tok_text
-    fn1 = colocated u0:116 sig1  ; __m18__peek_text_n
-    fn2 = u0:16 sig2  ; aipl_inc
-    fn3 = u0:25 sig3  ; aipl_str_eq
-    fn4 = colocated u0:119 sig4  ; __m18__bump
-    fn5 = u0:3 sig5  ; aipl_arr_inc
-    fn6 = colocated u0:178 sig6  ; __m18__construct_body
-    fn7 = u0:15 sig7  ; aipl_dec
-    fn8 = u0:7 sig8  ; aipl_array_dec
-    fn9 = colocated u0:186 sig9  ; __m18__block
+    sig8 = (i64, i64) apple_aarch64
+    sig9 = (i64) apple_aarch64
+    sig10 = (i64, i64) -> i64 apple_aarch64
+    sig11 = (i64, i64) apple_aarch64
+    sig12 = (i64, i64) apple_aarch64
+    sig13 = (i64, i64) apple_aarch64
+    fn0 = colocated u0:116 sig0  ; __m18__peek_text_n
+    fn1 = u0:16 sig1  ; aipl_inc
+    fn2 = u0:25 sig2  ; aipl_str_eq
+    fn3 = colocated u0:186 sig3  ; __m18__block
+    fn4 = u0:15 sig4  ; aipl_dec
+    fn5 = colocated u0:135 sig5  ; __m18__tok_text
+    fn6 = colocated u0:119 sig6  ; __m18__bump
+    fn7 = u0:3 sig7  ; aipl_arr_inc
+    fn8 = colocated u0:178 sig8  ; __m18__construct_body
+    fn9 = u0:7 sig9  ; aipl_array_dec
+    fn10 = colocated u0:135 sig10  ; __m18__tok_text
+    fn11 = colocated u0:119 sig11  ; __m18__bump
+    fn12 = colocated u0:178 sig12  ; __m18__construct_body
+    fn13 = colocated u0:186 sig13  ; __m18__block
 
 block0(v0: i64, v1: i64):
-    v2 = iconst.i64 2
-    v3 = load.i64 notrap aligned v1+24
-    v4 = iadd v3, v2  ; v2 = 2
-    v5 = call fn0(v1, v4)
-    v6 = iconst.i64 0
-    v7 = call fn1(v1, v6)  ; v6 = 0
-    v8 = iconst.i64 0x7b05
-    call fn2(v7)
-    v9 = call fn3(v7, v8)  ; v8 = 0x7b05
-    v10 = iconst.i64 0x3a05
-    call fn2(v5)
-    v11 = call fn3(v5, v10)  ; v10 = 0x3a05
-    v12 = iconst.i64 0x2c05
-    call fn2(v5)
-    v13 = call fn3(v5, v12)  ; v12 = 0x2c05
-    v14 = bor v11, v13
-    v15 = band v9, v14
-    brif v15, block1, block2
+    v2 = iconst.i64 0
+    v3 = call fn0(v1, v2)  ; v2 = 0
+    v4 = iconst.i64 0x7b05
+    call fn1(v3)
+    v5 = call fn2(v3, v4)  ; v4 = 0x7b05
+    v6 = iconst.i64 1
+    v7 = bxor v5, v6  ; v6 = 1
+    brif v7, block1, block2
 
 block1:
-    v17 = stack_addr.i64 ss0
-    call fn4(v17, v1)
-    v18 = iconst.i64 0
-    v19 = iadd v17, v18  ; v18 = 0
-    v20 = load.i64 notrap aligned v19
-    call fn2(v20)
-    v21 = load.i64 notrap aligned v19+8
-    call fn5(v21)
-    v22 = load.i64 notrap aligned v19+16
-    call fn5(v22)
-    v23 = stack_addr.i64 ss1
-    call fn6(v23, v19)
-    call fn7(v5)
-    call fn7(v7)
-    v24 = iconst.i64 0
-    v25 = iadd v17, v24  ; v24 = 0
-    v26 = load.i64 notrap aligned v25
-    call fn7(v26)
-    v27 = load.i64 notrap aligned v25+8
-    call fn8(v27)
-    v28 = load.i64 notrap aligned v25+16
-    call fn8(v28)
-    v29 = load.i64 notrap aligned v17+48
-    call fn7(v29)
-    v30 = load.i64 notrap aligned v19
-    call fn7(v30)
-    v31 = load.i64 notrap aligned v19+8
-    call fn8(v31)
-    v32 = load.i64 notrap aligned v19+16
-    call fn8(v32)
-    v33 = load.i64 notrap aligned v23
-    store notrap aligned v33, v0
-    v34 = load.i64 notrap aligned v23+8
-    store notrap aligned v34, v0+8
-    v35 = load.i64 notrap aligned v23+16
-    store notrap aligned v35, v0+16
-    v36 = load.i64 notrap aligned v23+24
-    store notrap aligned v36, v0+24
-    v37 = load.i64 notrap aligned v23+32
-    store notrap aligned v37, v0+32
-    v38 = load.i64 notrap aligned v23+40
-    store notrap aligned v38, v0+40
-    v39 = load.i64 notrap aligned v23+48
-    store notrap aligned v39, v0+48
-    v40 = load.i64 notrap aligned v23+56
-    store notrap aligned v40, v0+56
+    v9 = stack_addr.i64 ss0
+    call fn3(v9, v1)
+    call fn4(v3)
+    v10 = load.i64 notrap aligned v9
+    store notrap aligned v10, v0
+    v11 = load.i64 notrap aligned v9+8
+    store notrap aligned v11, v0+8
+    v12 = load.i64 notrap aligned v9+16
+    store notrap aligned v12, v0+16
+    v13 = load.i64 notrap aligned v9+24
+    store notrap aligned v13, v0+24
+    v14 = load.i64 notrap aligned v9+32
+    store notrap aligned v14, v0+32
+    v15 = load.i64 notrap aligned v9+40
+    store notrap aligned v15, v0+40
+    v16 = load.i64 notrap aligned v9+48
+    store notrap aligned v16, v0+48
+    v17 = load.i64 notrap aligned v9+56
+    store notrap aligned v17, v0+56
     return
 
 block4:
-    v41 = iconst.i64 0
-    v42 = iconst.i64 0
-    v43 = iconst.i64 0
-    v44 = iadd.i64 v17, v43  ; v43 = 0
-    v45 = load.i64 notrap aligned v44
-    call fn7(v45)
-    v46 = load.i64 notrap aligned v44+8
-    call fn8(v46)
-    v47 = load.i64 notrap aligned v44+16
-    call fn8(v47)
-    v48 = load.i64 notrap aligned v17+48
-    call fn7(v48)
-    v49 = load.i64 notrap aligned v19
-    call fn7(v49)
-    v50 = load.i64 notrap aligned v19+8
-    call fn8(v50)
-    v51 = load.i64 notrap aligned v19+16
-    call fn8(v51)
-    jump block3(v42)  ; v42 = 0
+    v18 = iconst.i64 0
+    v19 = iconst.i64 0
+    jump block3(v19)  ; v19 = 0
 
 block2:
-    v52 = iconst.i64 0
-    jump block3(v52)  ; v52 = 0
+    v20 = iconst.i64 0
+    jump block3(v20)  ; v20 = 0
 
-block3(v16: i64):
-    v53 = stack_addr.i64 ss2
-    call fn9(v53, v1)
-    call fn7(v5)
-    call fn7(v7)
-    v54 = load.i64 notrap aligned v53
-    store notrap aligned v54, v0
-    v55 = load.i64 notrap aligned v53+8
-    store notrap aligned v55, v0+8
-    v56 = load.i64 notrap aligned v53+16
-    store notrap aligned v56, v0+16
-    v57 = load.i64 notrap aligned v53+24
-    store notrap aligned v57, v0+24
-    v58 = load.i64 notrap aligned v53+32
-    store notrap aligned v58, v0+32
-    v59 = load.i64 notrap aligned v53+40
-    store notrap aligned v59, v0+40
-    v60 = load.i64 notrap aligned v53+48
-    store notrap aligned v60, v0+48
-    v61 = load.i64 notrap aligned v53+56
-    store notrap aligned v61, v0+56
+block3(v8: i64):
+    v21 = iconst.i64 1
+    v22 = load.i64 notrap aligned v1+24
+    v23 = iadd v22, v21  ; v21 = 1
+    v24 = call fn5(v1, v23)
+    v25 = iconst.i64 0x002e_2e09
+    call fn1(v24)
+    v26 = call fn2(v24, v25)  ; v25 = 0x002e_2e09
+    brif v26, block5, block6
+
+block5:
+    v28 = stack_addr.i64 ss1
+    call fn6(v28, v1)
+    v29 = iconst.i64 0
+    v30 = iadd v28, v29  ; v29 = 0
+    v31 = load.i64 notrap aligned v30
+    call fn1(v31)
+    v32 = load.i64 notrap aligned v30+8
+    call fn7(v32)
+    v33 = load.i64 notrap aligned v30+16
+    call fn7(v33)
+    v34 = stack_addr.i64 ss2
+    call fn8(v34, v30)
+    call fn4(v3)
+    call fn4(v24)
+    v35 = iconst.i64 0
+    v36 = iadd v28, v35  ; v35 = 0
+    v37 = load.i64 notrap aligned v36
+    call fn4(v37)
+    v38 = load.i64 notrap aligned v36+8
+    call fn9(v38)
+    v39 = load.i64 notrap aligned v36+16
+    call fn9(v39)
+    v40 = load.i64 notrap aligned v28+48
+    call fn4(v40)
+    v41 = load.i64 notrap aligned v30
+    call fn4(v41)
+    v42 = load.i64 notrap aligned v30+8
+    call fn9(v42)
+    v43 = load.i64 notrap aligned v30+16
+    call fn9(v43)
+    v44 = load.i64 notrap aligned v34
+    store notrap aligned v44, v0
+    v45 = load.i64 notrap aligned v34+8
+    store notrap aligned v45, v0+8
+    v46 = load.i64 notrap aligned v34+16
+    store notrap aligned v46, v0+16
+    v47 = load.i64 notrap aligned v34+24
+    store notrap aligned v47, v0+24
+    v48 = load.i64 notrap aligned v34+32
+    store notrap aligned v48, v0+32
+    v49 = load.i64 notrap aligned v34+40
+    store notrap aligned v49, v0+40
+    v50 = load.i64 notrap aligned v34+48
+    store notrap aligned v50, v0+48
+    v51 = load.i64 notrap aligned v34+56
+    store notrap aligned v51, v0+56
+    return
+
+block8:
+    v52 = iconst.i64 0
+    v53 = iconst.i64 0
+    v54 = iconst.i64 0
+    v55 = iadd.i64 v28, v54  ; v54 = 0
+    v56 = load.i64 notrap aligned v55
+    call fn4(v56)
+    v57 = load.i64 notrap aligned v55+8
+    call fn9(v57)
+    v58 = load.i64 notrap aligned v55+16
+    call fn9(v58)
+    v59 = load.i64 notrap aligned v28+48
+    call fn4(v59)
+    v60 = load.i64 notrap aligned v30
+    call fn4(v60)
+    v61 = load.i64 notrap aligned v30+8
+    call fn9(v61)
+    v62 = load.i64 notrap aligned v30+16
+    call fn9(v62)
+    jump block7(v53)  ; v53 = 0
+
+block6:
+    v63 = iconst.i64 0
+    jump block7(v63)  ; v63 = 0
+
+block7(v27: i64):
+    v64 = iconst.i64 2
+    v65 = load.i64 notrap aligned v1+24
+    v66 = iadd v65, v64  ; v64 = 2
+    v67 = call fn10(v1, v66)
+    v68 = iconst.i64 0x3a05
+    call fn1(v67)
+    v69 = call fn2(v67, v68)  ; v68 = 0x3a05
+    v70 = iconst.i64 0x2c05
+    call fn1(v67)
+    v71 = call fn2(v67, v70)  ; v70 = 0x2c05
+    v72 = bor v69, v71
+    brif v72, block9, block10
+
+block9:
+    v74 = stack_addr.i64 ss3
+    call fn11(v74, v1)
+    v75 = iconst.i64 0
+    v76 = iadd v74, v75  ; v75 = 0
+    v77 = load.i64 notrap aligned v76
+    call fn1(v77)
+    v78 = load.i64 notrap aligned v76+8
+    call fn7(v78)
+    v79 = load.i64 notrap aligned v76+16
+    call fn7(v79)
+    v80 = stack_addr.i64 ss4
+    call fn12(v80, v76)
+    call fn4(v3)
+    call fn4(v24)
+    call fn4(v67)
+    v81 = iconst.i64 0
+    v82 = iadd v74, v81  ; v81 = 0
+    v83 = load.i64 notrap aligned v82
+    call fn4(v83)
+    v84 = load.i64 notrap aligned v82+8
+    call fn9(v84)
+    v85 = load.i64 notrap aligned v82+16
+    call fn9(v85)
+    v86 = load.i64 notrap aligned v74+48
+    call fn4(v86)
+    v87 = load.i64 notrap aligned v76
+    call fn4(v87)
+    v88 = load.i64 notrap aligned v76+8
+    call fn9(v88)
+    v89 = load.i64 notrap aligned v76+16
+    call fn9(v89)
+    v90 = load.i64 notrap aligned v80
+    store notrap aligned v90, v0
+    v91 = load.i64 notrap aligned v80+8
+    store notrap aligned v91, v0+8
+    v92 = load.i64 notrap aligned v80+16
+    store notrap aligned v92, v0+16
+    v93 = load.i64 notrap aligned v80+24
+    store notrap aligned v93, v0+24
+    v94 = load.i64 notrap aligned v80+32
+    store notrap aligned v94, v0+32
+    v95 = load.i64 notrap aligned v80+40
+    store notrap aligned v95, v0+40
+    v96 = load.i64 notrap aligned v80+48
+    store notrap aligned v96, v0+48
+    v97 = load.i64 notrap aligned v80+56
+    store notrap aligned v97, v0+56
+    return
+
+block12:
+    v98 = iconst.i64 0
+    v99 = iconst.i64 0
+    v100 = iconst.i64 0
+    v101 = iadd.i64 v74, v100  ; v100 = 0
+    v102 = load.i64 notrap aligned v101
+    call fn4(v102)
+    v103 = load.i64 notrap aligned v101+8
+    call fn9(v103)
+    v104 = load.i64 notrap aligned v101+16
+    call fn9(v104)
+    v105 = load.i64 notrap aligned v74+48
+    call fn4(v105)
+    v106 = load.i64 notrap aligned v76
+    call fn4(v106)
+    v107 = load.i64 notrap aligned v76+8
+    call fn9(v107)
+    v108 = load.i64 notrap aligned v76+16
+    call fn9(v108)
+    jump block11(v99)  ; v99 = 0
+
+block10:
+    v109 = iconst.i64 0
+    jump block11(v109)  ; v109 = 0
+
+block11(v73: i64):
+    v110 = stack_addr.i64 ss5
+    call fn13(v110, v1)
+    call fn4(v3)
+    call fn4(v24)
+    call fn4(v67)
+    v111 = load.i64 notrap aligned v110
+    store notrap aligned v111, v0
+    v112 = load.i64 notrap aligned v110+8
+    store notrap aligned v112, v0+8
+    v113 = load.i64 notrap aligned v110+16
+    store notrap aligned v113, v0+16
+    v114 = load.i64 notrap aligned v110+24
+    store notrap aligned v114, v0+24
+    v115 = load.i64 notrap aligned v110+32
+    store notrap aligned v115, v0+32
+    v116 = load.i64 notrap aligned v110+40
+    store notrap aligned v116, v0+40
+    v117 = load.i64 notrap aligned v110+48
+    store notrap aligned v117, v0+48
+    v118 = load.i64 notrap aligned v110+56
+    store notrap aligned v118, v0+56
     return
 }
 
 ; source variables:
 ;   v1 = self
+;   v1 = $inl224_self
 ;   v1 = $inl178_self
-;   v2 = $inl179_n
-;   v5 = after
-;   v1 = $inl222_self
+;   v21 = $inl179_n
+;   v1 = $inl180_self
+;   v64 = $inl181_n
+;   v67 = after
 ; __m18__construct_body
 function u0:178(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -50529,10 +50663,10 @@ block28:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl180_self
-;   v2 = $inl181_n
 ;   v1 = $inl182_self
-;   v8 = $inl183_n
+;   v2 = $inl183_n
+;   v1 = $inl184_self
+;   v8 = $inl185_n
 ;   v14 = lone_shorthand
 ;   v64 = inits
 ;   v125 = closed
@@ -50793,7 +50927,7 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl223_self
+;   v9 = $inl225_self
 ;   v22 = e
 ; __m18__fn_return
 function u0:180(i64, i64, i64) apple_aarch64 {
@@ -52145,10 +52279,10 @@ block38:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl224_self
+;   v9 = $inl226_self
 ;   v22 = a
 ;   v99 = opened
-;   v99 = $inl225_self
+;   v99 = $inl227_self
 ;   v107 = arg
 ; __m18__params_until
 function u0:182(i64, i64, i64, i64) apple_aarch64 {
@@ -53819,20 +53953,20 @@ block47:
 ;   v3 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl226_self
+;   v10 = $inl228_self
 ;   v18 = l
-;   v20 = $inl227_self
+;   v20 = $inl229_self
 ;   v28 = m
 ;   v138 = n
 ;   v314 = t
 ;   ss9 = __spread$9
 ;   v371 = typed
-;   v373 = $inl228_self
+;   v373 = $inl230_self
 ;   ss15 = __mut_copy$89
 ;   v381 = v
-;   v482 = $inl229_self
+;   v482 = $inl231_self
 ;   v490 = d
-;   v672 = $inl230_self
+;   v672 = $inl232_self
 ; __m18__spaced_default
 function u0:183(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -56347,14 +56481,14 @@ block41:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl231_self
+;   v9 = $inl233_self
 ;   v18 = l
 ;   v24 = f
 ;   v182 = t
 ;   v202 = base
-;   v214 = $inl232_self
+;   v214 = $inl234_self
 ;   v222 = d
-;   v382 = $inl233_self
+;   v382 = $inl235_self
 ; __m18__block
 function u0:186(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -58434,7 +58568,7 @@ block49:
 ;   ss2 = prev_end
 ;   ss3 = open
 ;   v16 = l
-;   v17 = $inl333_self
+;   v17 = $inl335_self
 ;   v40 = ds
 ;   v47 = _
 ;   v49 = _
@@ -58443,14 +58577,14 @@ block49:
 ;   v55 = _
 ;   v56 = _
 ;   v64 = had_lead
-;   v88 = $inl300_self
-;   v100 = $inl301_span
+;   v88 = $inl302_self
+;   v100 = $inl303_span
 ;   v109 = blank
-;   v147 = $inl234_self
+;   v147 = $inl236_self
 ;   v167 = start
 ;   v230 = stmt
-;   v235 = $inl302_self
-;   v240 = $inl303_span
+;   v235 = $inl304_self
+;   v240 = $inl305_span
 ;   v249 = blank
 ;   v276 = tc
 ; __m18__trim_last_break$tail
@@ -59871,12 +60005,12 @@ block64:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl235_self
+;   v1 = $inl237_self
 ;   v3 = t
 ;   v110 = v
 ;   v180 = done
 ;   v406 = e
-;   v408 = $inl236_self
+;   v408 = $inl238_self
 ; __m18__let_stmt
 function u0:193(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -63348,12 +63482,12 @@ block134:
 ; source variables:
 ;   v1 = self
 ;   v4 = kw
-;   v4 = $inl237_self
+;   v4 = $inl239_self
 ;   v26 = ids
 ;   v283 = v
 ;   v389 = done
 ;   v611 = n
-;   v613 = $inl238_self
+;   v613 = $inl240_self
 ;   v640 = ids
 ;   v933 = v
 ;   v1051 = done
@@ -64786,7 +64920,7 @@ block18:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl239_self
+;   v1 = $inl241_self
 ;   v136 = t
 ; __m18__set_stmt
 function u0:196(i64, i64) apple_aarch64 {
@@ -66161,9 +66295,9 @@ block52:
 ; source variables:
 ;   v1 = self
 ;   v8 = n
-;   v10 = $inl240_self
+;   v10 = $inl242_self
 ;   v106 = done
-;   v244 = $inl241_self
+;   v244 = $inl243_self
 ;   v453 = v
 ;   v547 = done
 ; __m18__set_member
@@ -67726,7 +67860,7 @@ block68:
 ;   v1 = self
 ;   v2 = name
 ;   v3 = p
-;   v5 = $inl242_self
+;   v5 = $inl244_self
 ;   v89 = v
 ;   v171 = done
 ;   v406 = opened
@@ -67971,7 +68105,7 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl243_self
+;   v9 = $inl245_self
 ;   v22 = m
 ; __m18__for_stmt
 function u0:199(i64, i64) apple_aarch64 {
@@ -69634,9 +69768,9 @@ block68:
 ; source variables:
 ;   v1 = self
 ;   v131 = opened
-;   v131 = $inl244_self
+;   v131 = $inl246_self
 ;   v153 = b
-;   v155 = $inl245_self
+;   v155 = $inl247_self
 ;   v175 = item
 ;   v139 = binder
 ;   v466 = it
@@ -71108,10 +71242,10 @@ block3:
 ;   v3 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl246_self
-;   v15 = $inl296_self
+;   v10 = $inl248_self
+;   v15 = $inl298_self
 ;   v28 = n
-;   v41 = $inl247_self
+;   v41 = $inl249_self
 ; __m18__expr
 function u0:203(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -71726,9 +71860,9 @@ block15:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl248_self
-;   v15 = $inl184_self
-;   v16 = $inl185_n
+;   v9 = $inl250_self
+;   v15 = $inl186_self
+;   v16 = $inl187_n
 ;   v92 = rhs
 ; __m18__binop_expr
 function u0:205(i64, i64) apple_aarch64 {
@@ -73043,11 +73177,11 @@ block40:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl249_self
+;   v9 = $inl251_self
 ;   v15 = op
 ;   v21 = lead_rhs
 ;   v95 = rhs
-;   v96 = $inl334_self
+;   v96 = $inl336_self
 ;   v119 = ds
 ;   v126 = _
 ;   v128 = _
@@ -73530,8 +73664,8 @@ block3(v11: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl250_self
-;   v1 = $inl251_self
+;   v1 = $inl252_self
+;   v1 = $inl253_self
 ;   v12 = op
 ;   v70 = rest
 ; __m18__postfix
@@ -75093,7 +75227,7 @@ block34:
 ;   ss0 = w
 ;   ss1 = acc
 ;   ss2 = more
-;   v13 = $inl252_self
+;   v13 = $inl254_self
 ;   v15 = t
 ;   v73 = d
 ;   v176 = d
@@ -76078,7 +76212,7 @@ block28:
 ; source variables:
 ;   v1 = self
 ;   v8 = m
-;   v10 = $inl253_self
+;   v10 = $inl255_self
 ;   v140 = hug
 ;   v247 = args
 ;   v353 = closed
@@ -76845,7 +76979,7 @@ block35:
 ; source variables:
 ;   v1 = self
 ;   v4 = opened
-;   v4 = $inl254_self
+;   v4 = $inl256_self
 ;   v12 = inner
 ;   v221 = closed
 ;   ss6 = __spread$14
@@ -77973,9 +78107,9 @@ block34:
 ; source variables:
 ;   v1 = self
 ;   v45 = a
-;   v47 = $inl255_self
+;   v47 = $inl257_self
 ;   v147 = dots
-;   v147 = $inl256_self
+;   v147 = $inl258_self
 ;   v321 = b
 ; __m18__call_count
 function u0:215(i64) -> i64 apple_aarch64 {
@@ -78923,18 +79057,18 @@ block43(v276: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl307_self
-;   v2 = $inl308_k
 ;   v1 = $inl309_self
-;   v19 = $inl310_k
+;   v2 = $inl310_k
 ;   v1 = $inl311_self
-;   v83 = $inl312_k
+;   v19 = $inl312_k
 ;   v1 = $inl313_self
-;   v87 = $inl314_k
+;   v83 = $inl314_k
 ;   v1 = $inl315_self
-;   v92 = $inl316_k
+;   v87 = $inl316_k
+;   v1 = $inl317_self
+;   v92 = $inl318_k
 ;   v98 = b
-;   v1 = $inl257_self
+;   v1 = $inl259_self
 ;   v183 = t
 ; __m18__str_atom
 function u0:218(i64, i64) apple_aarch64 {
@@ -80119,7 +80253,7 @@ block48:
 ; source variables:
 ;   v1 = self
 ;   v60 = first
-;   v62 = $inl258_self
+;   v62 = $inl260_self
 ;   v145 = closed
 ;   v364 = rest
 ;   v446 = closed
@@ -80689,9 +80823,9 @@ block21:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl259_self
+;   v9 = $inl261_self
 ;   v18 = stepped
-;   v18 = $inl260_self
+;   v18 = $inl262_self
 ;   v166 = e
 ; __m18__array_atom
 function u0:221(i64, i64) apple_aarch64 {
@@ -82179,7 +82313,7 @@ block48:
 ; source variables:
 ;   v1 = self
 ;   v63 = opened
-;   v63 = $inl261_self
+;   v63 = $inl263_self
 ;   v151 = closed
 ;   v345 = entries
 ;   v424 = closed
@@ -82994,12 +83128,12 @@ block31:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl262_self
+;   v9 = $inl264_self
 ;   v18 = l
 ;   v83 = k
-;   v85 = $inl263_self
+;   v85 = $inl265_self
 ;   v93 = e
-;   v249 = $inl264_self
+;   v249 = $inl266_self
 ; __m18__dict_value
 function u0:224(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -84484,19 +84618,19 @@ block38:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl317_self
-;   v2 = $inl318_k
 ;   v1 = $inl319_self
-;   v6 = $inl320_k
+;   v2 = $inl320_k
 ;   v1 = $inl321_self
-;   v11 = $inl322_k
-;   v1 = $inl265_self
+;   v6 = $inl322_k
+;   v1 = $inl323_self
+;   v11 = $inl324_k
+;   v1 = $inl267_self
 ;   v50 = n
-;   v52 = $inl266_self
+;   v52 = $inl268_self
 ;   v72 = hug
 ;   v167 = args
 ;   v261 = closed
-;   v446 = $inl267_self
+;   v446 = $inl269_self
 ; __m18__struct_atom
 function u0:226(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -86174,14 +86308,14 @@ block34:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl268_self
+;   v9 = $inl270_self
 ;   v18 = l
-;   v20 = $inl269_self
+;   v20 = $inl271_self
 ;   v111 = v
 ;   v193 = f
-;   v195 = $inl270_self
+;   v195 = $inl272_self
 ;   v28 = e
-;   v392 = $inl271_self
+;   v392 = $inl273_self
 ; __m18__struct_field_value
 function u0:228(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -88319,10 +88453,10 @@ block81:
 ;   v251 = closed
 ;   v334 = then_b
 ;   v354 = head
-;   v366 = $inl272_self
+;   v366 = $inl274_self
 ;   v396 = $inl5_self
 ;   v508 = stepped
-;   v508 = $inl273_self
+;   v508 = $inl275_self
 ;   v516 = tail
 ;   ss11 = __spread$15
 ;   v762 = $inl6_self
@@ -91829,10 +91963,10 @@ block18:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl274_self
+;   v9 = $inl276_self
 ;   v18 = op
 ;   v90 = f
-;   v117 = $inl275_self
+;   v117 = $inl277_self
 ; __m18__match_arms
 function u0:233(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -93208,14 +93342,14 @@ block61:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl276_self
+;   v9 = $inl278_self
 ;   v18 = l
 ;   v83 = pat
 ;   v158 = alts
 ;   v244 = after
-;   v244 = $inl277_self
+;   v244 = $inl279_self
 ;   v252 = body
-;   v452 = $inl278_self
+;   v452 = $inl280_self
 ;   v460 = stepped
 ;   v498 = tc
 ; __m18__pattern_alts
@@ -93868,7 +94002,7 @@ block21:
 ;   v2 = first
 ;   ss0 = w
 ;   ss1 = parts
-;   v17 = $inl279_self
+;   v17 = $inl281_self
 ;   v89 = next
 ; __m18__pattern
 function u0:235(i64, i64) apple_aarch64 {
@@ -95302,18 +95436,18 @@ block53:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl323_self
-;   v2 = $inl324_k
 ;   v1 = $inl325_self
-;   v6 = $inl326_k
+;   v2 = $inl326_k
+;   v1 = $inl327_self
+;   v6 = $inl328_k
 ;   v12 = b
-;   v1 = $inl280_self
+;   v1 = $inl282_self
 ;   v166 = elems
 ;   v236 = closed
 ;   v360 = n
-;   v362 = $inl281_self
+;   v362 = $inl283_self
 ;   v370 = q
-;   v400 = $inl282_self
+;   v400 = $inl284_self
 ;   v518 = ids
 ;   v609 = closed
 ; __m18__qualified_case
@@ -95979,10 +96113,10 @@ block18:
 ;   v3 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl283_self
+;   v10 = $inl285_self
 ;   v18 = l
 ;   v83 = a
-;   v113 = $inl284_self
+;   v113 = $inl286_self
 ; __m18__call_arg
 function u0:238(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -97052,20 +97186,20 @@ block39(v442: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl285_self
+;   v1 = $inl287_self
 ;   v65 = v
-;   v1 = $inl327_self
-;   v184 = $inl328_k
-;   v1 = $inl186_self
-;   v188 = $inl187_n
+;   v1 = $inl329_self
+;   v184 = $inl330_k
+;   v1 = $inl188_self
+;   v188 = $inl189_n
 ;   v196 = n
 ;   v269 = v
-;   v1 = $inl286_self
-;   v1 = $inl287_self
-;   v1 = $inl329_self
-;   v432 = $inl330_k
-;   v1 = $inl188_self
-;   v436 = $inl189_n
+;   v1 = $inl288_self
+;   v1 = $inl289_self
+;   v1 = $inl331_self
+;   v432 = $inl332_k
+;   v1 = $inl190_self
+;   v436 = $inl191_n
 ;   v443 = b
 ; __m18__is_arg_end
 function u0:239(i64) -> i64 apple_aarch64 {
@@ -98298,11 +98432,11 @@ block58:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl288_self
+;   v1 = $inl290_self
 ;   v97 = opened
 ;   v159 = ps
 ;   v6 = params
-;   v285 = $inl289_self
+;   v285 = $inl291_self
 ;   v293 = body
 ;   ss8 = __spread$16
 ;   ss9 = d
@@ -98931,11 +99065,11 @@ block21:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v9 = $inl290_self
+;   v9 = $inl292_self
 ;   v18 = n
-;   v20 = $inl291_self
+;   v20 = $inl293_self
 ;   v28 = p
-;   v163 = $inl292_self
+;   v163 = $inl294_self
 ; __m18__lambda_param_ty
 function u0:242(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 56, align = 8
@@ -99942,8 +100076,8 @@ block20:
 ;   v3 = depth0
 ;   ss0 = w
 ;   ss1 = depth
-;   v10 = $inl297_self
-;   v21 = $inl335_self
+;   v10 = $inl299_self
+;   v21 = $inl337_self
 ;   v40 = t
 ;   v23 = t
 ;   v46 = stepped
@@ -100488,15 +100622,15 @@ block11(v42: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl293_self
+;   v0 = $inl295_self
 ;   v8 = t
 ;   v13 = direct
-;   v0 = $inl331_self
-;   v14 = $inl332_k
-;   v0 = $inl190_self
-;   v18 = $inl191_n
+;   v0 = $inl333_self
+;   v14 = $inl334_k
 ;   v0 = $inl192_self
-;   v24 = $inl193_n
+;   v18 = $inl193_n
+;   v0 = $inl194_self
+;   v24 = $inl195_n
 ;   v31 = indirect
 ;   v42 = open_at
 ; __m18__hug_close
@@ -107369,7 +107503,7 @@ block157:
 
 ; source variables:
 ;   v1 = t
-;   v3 = $inl306_k
+;   v3 = $inl308_k
 ;   v165 = _
 ;   v168 = _
 ;   v171 = _

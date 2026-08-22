@@ -361,7 +361,7 @@ fn trailing_comment(self: W) -> WDoc {
 
 // Consume comment `c`: step past it and mark it as the last thing emitted. The
 // Rust `pop_front` + `last_end` update, as one move.
-fn take_comment(self: W, c: Span) -> W { W { ..self, cpos: self.cpos + 1, last_end: c.end } }
+fn take_comment(self: W, c: Span) -> W { ..self, cpos: self.cpos + 1, last_end: c.end }
 
 // ---------- comma lists ----------
 
@@ -515,9 +515,9 @@ fn comment_before_cursor(self: W) -> bool {
 }
 
 // Step past one token, recording where it ended. `bump` without the text.
-fn advance(self: W, end: u64) -> W { W { ..self, pos: self.pos + 1, last_end: end } }
+fn advance(self: W, end: u64) -> W { ..self, pos: self.pos + 1, last_end: end }
 
-fn skip_comment(self: W) -> W { W { ..self, cpos: self.cpos + 1 } }
+fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
 
 // Whether `d` is the empty `Concat` that `lead`/`trailing_comment` hand back when
 // there was no comment — the "nothing here" doc.
@@ -1008,8 +1008,18 @@ fn fn_item(self: W) -> WDoc!FmtError {
 // may be named `str`, which the formatter classifies as a builtin type rather
 // than an identifier.
 fn fn_body(self: W) -> WDoc!FmtError {
+    if (self.peek_text() != "{") {
+        return self.block();
+    };
+
+    // `{ ..base, field: value }` — the spread form. Settled by the token right
+    // after the `{`, not the one after that: `..` cannot begin a statement, so
+    // there is nothing for it to be confused with.
+    if (self.peek_text_n(1) == "..") {
+        return self.bump().w.construct_body();
+    };
     let after = self.peek_text_n(2);
-    if (self.peek_text() == "{" && (after == ":" || after == ",")) {
+    if (after == ":" || after == ",") {
         return self.bump().w.construct_body();
     };
     self.block()
@@ -2639,9 +2649,9 @@ allocations: 20940
 deallocations: 20940
 reallocations: 862
 bytes allocated: 1025050
-instructions executed: 2851965
-binary size: 3061376
-  code: 1751868
+instructions executed: 2853527
+binary size: 3062224
+  code: 1752412
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2770,7 +2780,7 @@ binary size: 3061376
     expect: 1080
     expr: 700
     fn_attrs: 5304
-    fn_body: 680
+    fn_body: 1224
     fn_item: 17724
     fn_return: 1696
     for_stmt: 9924
@@ -2856,15 +2866,15 @@ binary size: 3061376
     with_last$tail: 528
     without_trailing_break: 696
   data: 25740
-  metadata: 1283768
-builtin calls: 443865
+  metadata: 1284072
+builtin calls: 444173
   aipl_arr_drop_str: 2036
   aipl_arr_extend: 213
-  aipl_arr_inc: 49225
+  aipl_arr_inc: 49247
   aipl_arr_reserve: 276
   aipl_arr_retain_ptr: 2032
   aipl_arr_slice: 78
-  aipl_array_dec: 61147
+  aipl_array_dec: 61169
   aipl_array_new: 10098
   aipl_array_push: 1496
   aipl_array_push_mut: 1605
@@ -2873,8 +2883,8 @@ builtin calls: 443865
   aipl_char_at: 3930
   aipl_concat: 246
   aipl_concat_lazy: 199
-  aipl_dec: 94152
-  aipl_inc: 74379
+  aipl_dec: 94262
+  aipl_inc: 74445
   aipl_rec_alloc: 5946
   aipl_rec_dec_strong: 40676
   aipl_rec_dec_weak: 3565
@@ -2884,13 +2894,13 @@ builtin calls: 443865
   aipl_str_contains: 2505
   aipl_str_data: 359
   aipl_str_ends_with: 124
-  aipl_str_eq: 6029
+  aipl_str_eq: 6051
   aipl_str_iter_init: 368
   aipl_str_iter_next: 359
   aipl_str_join: 252
-  aipl_str_len: 31211
+  aipl_str_len: 31255
   aipl_str_repeat: 74
-  aipl_str_slice: 8489
+  aipl_str_slice: 8511
   aipl_str_split: 934
   aipl_str_starts_with: 3202
   aipl_test_begin: 3

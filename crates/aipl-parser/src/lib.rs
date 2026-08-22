@@ -144,7 +144,14 @@ gazelle! {
         // (`,` → `many`, `}` → `one`) picks the production.
         construct_fields = IDENT COLON expr => one
                          | IDENT COLON expr COMMA field_inits => many
-                         | IDENT COMMA field_inits => many_shorthand;
+                         | IDENT COMMA field_inits => many_shorthand
+                         // `{ ..base, field: value }` — the shorthand's spread
+                         // form. Unambiguous after `LBRACE`: no statement or
+                         // expression starts with `..`, so the token picks this
+                         // production outright. At least one field must follow,
+                         // which is also the existing rule that a bare
+                         // `T { ..x }` is just `x`.
+                         | DOTDOT expr COMMA field_inits => spread_first;
         // Zero or more attributes attached to a function, in any order:
         // `.test({ .. })` (a test block the `check` command runs) and
         // `.doc("...")` (documentation surfaced by the `doc` command). The two
@@ -1110,6 +1117,24 @@ impl gazelle::Action<aipl::ConstructFields<Self>> for Build {
             aipl::ConstructFields::ManyShorthand((name, span), rest) => {
                 let value = Expr::new(ExprKind::Ident(name.clone()), span.clone());
                 (span, FieldInit { name, value }, rest)
+            }
+            // `{ ..base, rest.. }`. The spread rides as a nameless `FieldInit`
+            // holding an `ExprKind::Spread`, exactly as in a written struct
+            // literal — so the loader's `desugar_struct_spread` expands it with
+            // no knowledge that it came from the shorthand.
+            aipl::ConstructFields::SpreadFirst(base, rest) => {
+                // `..` itself carries no span through the grammar, so the list is
+                // spanned from the base expression — one token to its right.
+                let span = base.span.clone();
+                let value = Expr::new(ExprKind::Spread(Box::new(base)), span.clone());
+                (
+                    span,
+                    FieldInit {
+                        name: String::new(),
+                        value,
+                    },
+                    rest,
+                )
             }
         };
         let mut fields = vec![first];
