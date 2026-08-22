@@ -129,6 +129,9 @@ Spreading:
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
   optimize the bit packed and rope representations as well
 
+dict:
+  make hash based dicts
+
 type checking:
   we've seen a few problems where inlining or constant folding causes behaviour to change because after inlining type information is lost. Lets fix this by:
     a) do all type checking before any optimization

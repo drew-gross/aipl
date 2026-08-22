@@ -6,16 +6,8 @@ Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
 **Stage 1 — language work** (blocks Stage 2)
-- [ ] 1.0 Reproducers: fn value returning a boxed variant; `A[]` param where `A`
-      is boxed; array of structs holding a boxed field; two-param generic variant
-- [x] 1.1 Generic-variant inference from expected type — landed; inlining caveat is 1.9
-- [x] 1.2 `same_case` builtin + `variant` bound — match a case, not a payload
-- [x] 1.3 Box types recursing through an array (`lib.rs:6837`) — also TODO.txt:237
-- [x] 1.4 Fix `{ boxed field, array field }` — TODO.txt:320 (already fixed; case added)
-- [x] 1.5 Tail-call elimination — TODO.txt:467
-- [x] 1.6 `match` arms as statement blocks (arm grouping still open)
-- [ ] 1.7 *(deferred)* hash-backed dicts/sets — TODO.txt D1
-- [x] 1.8 Bounds propagate through a generic caller — unblocked 1.2; fixed `ord` too
+- [ ] 1.0 Confirm four unproven shapes with reproducers
+- [ ] 1.1 *(deferred, not required)* hash-backed dicts/sets — TODO.txt D1
 
 **Stage 2 — the library**
 - [ ] 2.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
@@ -29,9 +21,8 @@ each is sized to be finishable in one session.
 - [ ] 6 Formatter generator
 - [ ] 7 Retire gazelle
 
-Stage 1 items are independent and useful on their own — 1.3, 1.4 and 1.5 fix bugs
-already on TODO.txt regardless of this library, and 1.8 fixed `ord` as much as it
-did `variant`. Stage 2 onward is strictly sequential.
+Neither remaining Stage 1 item blocks Stage 2. Stage 2 onward is strictly
+sequential.
 
 ## Context
 
@@ -62,351 +53,44 @@ set is plain data (`variant Matcher`, `TokenRule<K>[]`) interpreted by one
 `lex<K>` driver, with `lex_aipl.aipl` as just a table. This library is that idea
 one level up, and composes with it directly.
 
-## Why the language work comes first
+## Why the language work came first
 
-Pressure-testing the natural design against the compiler turned up four blockers.
-Each has a workaround, but each workaround is a distortion of the library —
-and in every case the underlying defect is already on TODO.txt. Building the
-library around them would bake today's compiler limits into the shape of a file
-meant to outlive them, so **Stage 1 fixes the language and Stage 2 starts the
-library.** The design below is written against the *fixed* compiler, with the
-fallback noted where one exists.
+Pressure-testing the natural design against the compiler turned up a set of
+blockers — each with a workaround, and each workaround a distortion of the
+library. Building around them would have baked the compiler's limits into a file
+meant to outlive them, so the language was fixed first. **That work is done**;
+the design below is written against the fixed compiler.
 
-Two of these (variant-payload matching, tail calls) are not merely inconvenient:
-without them the library is materially worse, not just uglier.
+What it bought, in the shape the library actually needs: a case can be matched
+without matching its payload (`same_case`, plus a `variant` bound), a generic
+variant's type parameter is inferred from the expected type, recursive types may
+recurse through an array, `match` arms may be statement blocks, and recursion is
+tail-call eliminated so parse depth is bounded by the input rather than the
+stack. The two items left below are a verification task and a deferred
+performance one — neither blocks Stage 2.
 
 ## Stage 1 — Language work
 
-### 1.0 Reproducers first
+### 1.0 Confirm four unproven shapes
 
-Each item below gets a ~20-line failing case under `tests/cases/` before it gets
-a fix. Four of the shapes the design rests on have **no test anywhere in the
-repo** and may already work: a fn value *returning* a boxed recursive variant; an
-`A[]` parameter where `A` is boxed; an array of structs that each hold a boxed
-field; and a two-parameter generic *variant* (only two-parameter generic structs
-are attested, at `tests/cases/structs/generic_pair.aipl:5`). Confirm before
-fixing.
+Four shapes the design rests on still have **no test anywhere in the repo**, and
+may already work:
 
-### 1.1 Infer a generic variant's type parameter from the expected type — **done** (2026-08-22)
+- a fn value *returning* a boxed recursive variant
+- an `A[]` parameter where `A` is boxed
+- an array of structs that each hold a boxed field
+- a two-parameter generic *variant* — only two-parameter generic **structs** are
+  attested (`tests/cases/structs/generic_pair.aipl:5`), and a search of the
+  corpus finds no generic variant with two parameters
 
-`infer_generic_variant_ctor` resolved a generic variant's parameter only from the
-constructor's own arguments, or via `sole_instance` when exactly one instance
-existed program-wide. So in `variant Rule<K>`, the arms `Spelling(str)` and
-`Named(str)` pinned nothing and compiled only while a single grammar existed —
-adding a second broke the first.
+Each gets a ~20-line case under `tests/cases/`. Confirming is the whole task: if
+a shape works the case locks it in, and if it doesn't the case is the reproducer
+the fix needs. Adjacent shapes are already covered —
+`tests/cases/structs/recursive_through_array.aipl` and
+`boxed_field_with_array.aipl` — so these four are what is left rather than a
+whole area.
 
-**Landed.** The variant path now consults the expected type before falling back
-to `sole_instance`, which is what the generic *struct* path already did
-(`ret_generic_args`). Two grammars now coexist.
-
-Three things the original write-up missed, all found while fixing it:
-
-- **There are three inference implementations, not one.** The checker
-  (`check.rs`), the monomorphizer (`lib.rs`), and codegen each type this
-  construction. The checker and mono each had their own copy of the
-  variant/struct asymmetry and both needed the same fix; codegen needed mono to
-  hand it a *resolved* annotation. A fix to `check.rs` alone changes nothing
-  observable — mono re-infers and rejects what the checker just accepted.
-- **An annotation did not supply the expected type either.**
-  `let r: Rule<Tok> = Spelling("(")` failed, because the binding's value was
-  checked *before* the annotation was looked at. Both checker and mono now carry
-  an expected-type slot, kept separate from the return-type slot because a
-  `return` inside the value still means the enclosing function's return type.
-- **A written `Rule<Tok>` and its instance `Rule$Tok` are different `Type`
-  values.** Comparing them unresolved produced "declared Rule<Tok>, but its value
-  is Rule<Tok>" — a type reported as not being itself. Annotations are now
-  resolved before comparison.
-
-**Not covered: the array/nested requirement.** The original example
-`Then([Spelling("("), Named("expr")])` needs `Then(Rule<K>[])`, and an array of a
-*variant* is rejected outright ("array elements must be … got Rule<Tok>") — with
-or without this fix. That shape needs boxing (1.3's territory), not inference.
-Worth knowing: once inference stops failing early, that shape reaches
-instantiation and **overflows the stack** instead of erroring, since `Rule$Tok`
-contains `Rule$Tok[]`. A clean error there is a loose end.
-
-**Caveat: inlining still defeats it — see 1.9.** A function small enough, or
-called once, has its body relocated into a caller with a different return type,
-which discards the very context this item added. The test case is deliberately
-over the size limit and called twice.
-
-### 1.2 Match a variant's case without matching its payload — **done** (2026-08-22)
-
-`==` on variants is structural, and a generic driver cannot `match` on a type
-parameter (`"match" requires an optional or variant, got a type parameter`). So
-with `Term(K)` holding a token kind, `Term(Name(""))` matches only the *empty*
-identifier — **"any identifier" is inexpressible**, which is fatal for a grammar
-over a token type whose kinds carry payloads (`lex_aipl.aipl:59`: `Name(str)`,
-`IntLit(i64)`, `StrLit(str, StrStyle)`).
-
-**Landed:** a `same_case(a, b) -> bool` builtin — "equal, ignoring the payload" —
-plus a new `variant` bound restricting it to named variants.
-
-`same_case` rather than the originally-proposed `case_index`, because a
-discriminant makes *declaration order observable*: reordering a variant's cases
-would become a silent breaking change, and it invites `case_index(t) == 3` magic
-numbers in the hot path. An equivalence relation exposes no representation, and
-is exactly what the driver needs. Implementation is native codegen (AIPL cannot
-inspect a type parameter's case — that is the whole problem) and cheap: the tag
-is the leading `i64` of a variant value, the same field `emit_render_variant`
-reads, so it is two loads and a compare.
-
-The `variant` bound exists so `same_case(1, 2)` is a compile error rather than
-answering some other question. `<T: variant>` needs its own grammar production
-(`variant` lexes as a keyword, not `IDENT`), and `Bound::accepts` needed an
-`is_variant` predicate — `Type::Named("Foo")` alone cannot distinguish a struct
-from a variant.
-
-`case_name(v) -> str` is still worth adding for diagnostics and the
-EBNF/highlighter generators; it leaks nothing new, since `to_str` already renders
-`Name("x")` from a `<K: any>` function. Too slow for the hot path, which
-`same_case` covers.
-
-The generic driver this item exists for needed one more thing — bounds were not
-satisfiable from inside a generic body at all — which landed as 1.8. With both,
-this compiles and "any identifier" is finally expressible:
-
-```
-fn matches<K: variant>(rule: Rule<K>, tok: K) -> bool {
-    match (rule) {
-        Term(want) => tok.same_case(want),
-    }
-}
-matches(Term(Name("")), Name("ident"))   // true, whatever the text
-```
-
-*Alternative still worth considering:* first-class payload-free case references
-(`Name` as a value of a "case tag" type). It removes the remaining wart — rules
-hold a dummy `Name("")` constructed purely to name a case — and is considerably
-larger to implement. `same_case` does not make it unnecessary, only unurgent.
-
-### 1.3 Box types that recurse through an array — *required*
-
-`contained_named_types` (`crates/aipl-codegen/src/lib.rs:6837-6847`) walks
-`Named`/`Optional`/`Result` and drops arrays into `_ => {}`. So
-`variant Cst = Leaf(Span) | Tree(str, Cst[])` forms no containment cycle, is not
-boxed, stays an inline composite — and lands exactly on the segfault recorded at
-TODO.txt:237 (*"composites are copied byte-wise into the slot rather than stored
-as a refcounted pointer"*). Note `Doc` is **not** the precedent it appears to be:
-it is boxed because of `Indent(Doc)` and `Group(bool, Doc)`, *direct*
-self-references; `Concat(Doc[])` merely rides along.
-
-Two routes: add `Type::Array(inner) => contained_named_types(inner, out)` so
-these types become boxed (small change, plausibly fixes TODO.txt:237 outright
-since boxing supplies the refcounted pointer the TODO says is missing), or fix
-the inline-composite copy path so the current representation is correct
-(no layout change, deeper work). Recommend the first, verified against the
-Stage 1.0 reproducer.
-
-*Lifts:* the CST is the obvious `Tree(u64, Cst[])`.
-*Fallback:* a mutual cons-list (`CstList = CNil | CCons(Cst, CstList)`) to force
-the cycle — correct today, but it makes every child access a list walk.
-
-### 1.4 Fix `{ boxed recursive field, array field }` — *required* — **already fixed**
-
-TODO.txt:320, already marked *"`<--- fix this`"*: a struct holding both a
-recursive-variant field and an array field breaks the compiler.
-
-**Resolved without a code change.** That TODO line was an intermediate
-*narrowing note* for the composite `mut`-binding corruption, written in
-`f5ecdec` and fixed by the very next commit, `36b3301` ("Fix assignment in loop
-bug"), which shipped `tests/cases/structs/mut_struct_reassigned_in_loop.aipl`
-and narrowed further — the real trigger is one hidden-sret buffer per call site
-aliasing a composite `mut` binding across `set b = step(b);`, and it "needs no
-variant, no matched payload, no helper fn and no empty initial array". The line
-was simply never deleted. Verified by building the compiler at `f5ecdec`: the
-shape corrupts memory there and is clean on `main`.
-`tests/cases/structs/boxed_field_with_array.aipl` now locks the *type* shape in
-(it segfaults on that historical build); nothing in the library needs a
-fallback. `walker.aipl`
-threads around it and never violates it — `Step { col, work: Work, ... }` has a
-direct boxed field and no array; `WDocs { w: W, docs: Doc[] }` has an array of
-boxed values and no direct boxed field. This lands **with or before 1.3**, since
-boxing more types makes the broken shape more common.
-
-*Lifts:* `Climb(Rule, Prec[])` and natural carrier structs like
-`{ cst: Cst, kids: A[] }`.
-*Fallback:* move all side tables onto the `Grammar` and reference them by index.
-
-### 1.5 Tail-call elimination — **done** (2026-08-20)
-
-Implemented in `aipl-codegen`. A call in tail position lowers to cranelift's
-`return_call`, so a recursive walk reuses one frame and depth stops being bounded
-by the native stack — the 8 MB an `aipl build` binary gets, against the 256 MB
-the CLI and the cases harness raise themselves to. `doc.aipl` and `walker.aipl`
-can now drop their work-stack rewrites (not yet done — see *Lifts* below).
-
-Three things had to line up, and all three are settled before any function is
-declared, by `tail_call_plan`:
-
-**Calling convention.** `return_call` requires `CallConv::Tail` on the callee
-*and* the identical convention on the caller. So a participant's body moves to a
-`Linkage::Local` `<name>$tail` carrying that convention, and the exported
-`<name>` becomes a C-convention trampoline forwarding to it. **This contradicts
-the earlier "no wrappers needed" finding**, which counted the FFI surface as
-`main` + the `; entry` list + address-taken functions. It is wider than that:
-`Engine::call_values` can name *any* function, and neither it nor a `func_addr`
-function value can know whether the function it names happens to tail-recurse.
-Without the trampoline, adding a tail call to an AIPL function would silently
-make it uncallable from Rust. AIPL call sites skip the trampoline and call
-`<name>$tail` directly, so only the `return_call` sites pay for the convention.
-
-**Nothing may point into the caller's frame.** A participant may not take or
-return a composite (struct/optional/result) — those are passed and returned by
-the address of caller storage, and the frame is gone the moment control
-transfers.
-
-**Every refcounted argument must be the callee's own** — the real constraint, and
-what the measurement below was about. A tail call runs the caller's scope cleanup
-*before* transferring control, which is safe only if each argument still holds a
-reference that cleanup cannot release. Refcounting gives exactly that for a
-retained argument: the caller's `+1` is the callee's, and releasing any other
-reference can never consume it. So the rule is that every argument owning heap is
-`ParamInfo::retained` or moved in. Two things had to change to make that true of
-real code:
-
-- **Boxed parameters join the borrow protocol.** They were pure borrows — alive
-  across a call only by the caller's own reference, with neither side touching
-  the count — which fails the rule outright. A participant's boxed parameters are
-  marked `tail_owned` and pay the retain/release pair.
-- **A participant gives up retain elision.** An `inspect_only` heap parameter is a
-  borrow on the caller's reference by construction, so `inspect_only` is forced
-  off for participants.
-
-`hand_off_arg` also had to become type-aware: it retained through the bare
-`aipl_inc`, which dispatches on `str` tag bits, and boxed values count on their
-own block header via `aipl_rec_inc_strong`.
-
-**The measurement that shaped this (2026-08-20).** "Only where no drops are
-pending" was scoped as the conservative first cut. It is not a first cut — it is
-a no-op. Scanning `dogfood.clif`, `fmt.clif` and `doc.aipl` for calls in tail
-position:
-
-| shape | count |
-|---|---|
-| clean (nothing between call and return) | 76 |
-| drops/retains between | 37 |
-| other instructions between | 15 |
-| **of which self-calls** | **2** (both dirty) |
-
-**0 of the recursive tail-call cycles are fully eliminable under that rule.** A
-cycle is bounded only if *every* edge is, and every cycle has at least one
-drop-guarded edge. The reason is structural: a function that `match`es an owned
-boxed value binds its payload, and those bindings are released on scope exit —
-*after* the recursive call returns. `doc.aipl`'s `fits` is the canonical shape.
-Drop motion across the tail call is therefore the feature, not an optimization on
-top of it. (The same measurement is why self-call-to-loop, which needs no ABI
-change at all, was not worth doing: 128 of 130 tail calls are cross-function.)
-
-**Tail position** is computed in codegen rather than by a CLIF pass, because the
-soundness test needs types and per-parameter ownership, which the IR has lost. It
-propagates through the forms that only sequence or choose a value —
-`Seq`/`Let`/`LetMut`/`Assign` bodies, both `if` branches, every `match` arm — and
-is *created* by `return e`. It deliberately does not propagate through `Shim`
-(which restores its bindings afterwards) or `Try`. `compile_expr` clears the flag
-before every recursion, so an expression form added later is non-tail by default
-rather than silently inheriting a wrong `true`.
-
-**Coverage**: `tests/cases/tail_calls/` — a scalar accumulator at 300,000 deep, a
-boxed cons-list walk at 200,000, and a three-function cycle with no self-call.
-All three run as linked binaries on the OS-default 8 MB stack; the same programs
-written non-tail segfault at those depths.
-
-**Still open**: composite returns. A tail call returning via sret has to forward
-the caller's sret pointer rather than allocate its own; until it does,
-composite-returning functions are simply not participants. Same for dict
-parameters, which are refcounted but neither `is_heap` nor boxed.
-
-*Lifts:* the parser driver can be written as ordinary recursive descent, which is
-the whole readability argument for this design; `doc.aipl` and `walker.aipl` can
-revert their work-stack rewrites.
-
-### 1.6 `match` arms as statement blocks — **done** (2026-08-20)
-
-An arm's body may now be a brace-delimited statement block, exactly like an `if`
-branch: statements first, and the trailing expression (if any) is the arm's
-value. `P => expr` and `P => { .. }` mix freely, and the block form works for
-every pattern kind.
-
-The change is small because it needed no new AST: `block` already builds an
-`Expr`, which is what `MatchArm.body` is. So it is one grammar nonterminal —
-
-```
-arm_body = expr => expr | block => block;
-```
-
-— shared by all eight `match_arm` productions, plus its builder. Factoring it
-rather than doubling the productions also keeps `expr` reachable from a *single*
-place in that subgrammar, which is what the `block_body` comment warns about:
-a second `expr` occurrence is what blew up gazelle's LR tables before. The choice
-is one token of lookahead, since no expression begins with `{`. Nothing in the
-checker, monomorphizer or codegen changed.
-
-**The formatter was the real work**, and this was the case CLAUDE.md flags as the
-one `scripts/handoff.sh` cannot bootstrap: `walker.aipl` compiles into
-`fmt.clif`, and handoff formats the corpus *before* regenerating IR, so the live
-formatter — which does not know the new syntax — is what would format sources
-written in it. The documented escape hatch works as written: `fill_staged_ir` →
-format the corpus under `AIPL_FMT_IR=…staged` → `fill_staged_ir` again (step 2
-shifts spans) → validate → promote.
-
-**Contortions removed** — the two the plan pointed at, both of which existed
-*only* because an arm was a single expression:
-
-- `walker.aipl`'s `bump` no longer needs `bump_tok`. The arm now opens its own
-  block and steps the cursor in place.
-- `doc.aipl`'s printer loop lost the `Step { col, work, emit, emits, done }`
-  carrier struct **and three functions** (`go_step`, `go_node`, `go_raw`). Each
-  arm now assigns the loop's own `mut` bindings directly, which is what the
-  carrier was faking. 89 lines became 66.
-
-That is measurably cheaper, not just shorter — the plan's "~10 extra frames per
-rule node" made concrete:
-
-| | instructions executed | change |
-|---|---|---|
-| `doc.aipl` | 25,074 → 21,531 | **−14%** |
-| `walker.aipl` | 3,059,404 → 2,945,436 | **−3.7%** |
-| `format_source.aipl` | 330,520 → 328,259 | −0.7% |
-
-**Coverage**: `tests/cases/match_arms/` (block arms across every pattern kind;
-statement-only arms driving a `mut` binding declared outside the `match`), plus
-block arms added to the `tests/fmt/match_and_variants.aipl` fixture — which pins
-that a statement-free block stays flat (`Empty => { 0 }`) while any block
-containing a `;` breaks one statement per line.
-
-**Statement vs expression `match`** (added right after, same PR). Allowing
-statement blocks in arms opened a hole: a `match` could produce a value *and*
-mutate its surroundings, so `let x = match (..) {..}` no longer told you what the
-`match` did. Each `match` now has to be one or the other, decided by its arms and
-enforced at its use site:
-
-| arms produce | kind | obligation |
-|---|---|---|
-| nothing | statement | may assign freely; must sit where its value is discarded — i.e. ends in `;` |
-| a value | expression | value must be used; no arm may assign to a binding declared outside the `match` |
-
-The two are complementary, so no `match` satisfies both. "Discarded" is a
-property of *position*, so it is threaded through `check_expr_at` (a `Pos`
-argument) rather than looked up — it has to reach through the forms that merely
-sequence or choose a value, since an arm of a discarded `match` is itself
-discarded. `check_expr` resets to `Pos::Value`, the stricter reading, so a form
-added later can't silently inherit a `Discard`.
-
-Cost across the corpus was **one character**: `tests/cases/results/basic.aipl`
-had a unit-valued `match` as a `.test` block's trailing expression and needed its
-`;`. The compiler's own 45 dogfooded files needed nothing — including the
-`doc.aipl` loop rewritten above, whose big statement `match` mutates the loop's
-own bindings and was already written with the semicolon. Nothing in codegen
-changed, so no `--- performance ---` section moved and no IR regeneration was
-involved.
-
-**Not taken**: arm grouping `A | B =>` (still open on TODO.txt) — it needs a new
-`Pattern` variant and exhaustiveness/binding rules, so it is not the "cheap"
-add-on this section assumed. Char-literal arms turned out to be **already
-implemented** (`Pattern::Char`); that TODO entry is stale.
-
-### 1.7 Deferred: hash-backed dicts and sets
+### 1.1 Deferred: hash-backed dicts and sets
 
 TODO.txt D1 — dicts and sets are linear scans (`lib.rs:2816`, `dict_find`), which
 is the largest asymptotic win available in the repo, and would make both rule
@@ -414,85 +98,6 @@ lookup by name and packrat memoization affordable. **Not required**: the link
 pass (Stage 2) turns rule references into array indices, and FIRST sets (Stage 4)
 remove most of the need to memoize. Listed so the dependency is explicit if the
 parser later wants memoization.
-
-### 1.8 Bounds propagate through a generic caller — **done** (2026-08-22)
-
-A bound is only checked against a *concrete* type. Inside a generic body it is
-unsatisfiable, so a bounded builtin cannot be called from generic code at all:
-
-```
-fn smallest<T: ord>(xs: T[]) -> T? { xs.minimum() }
-error: fn "minimum": type parameter "T" requires "ord", but was inferred as a type parameter
-```
-
-This predates 1.2 and is not specific to the `variant` bound — `ord` has always
-had it, unnoticed because its users are all concrete. It is the only thing
-standing between the landed `same_case` and a working generic driver.
-
-The cause is deliberate and documented at `check.rs:9`: a generic body is checked
-abstractly, with **every** type variable replaced by a single `__typevar__`
-sentinel that "coerces only with itself". That erases *which* variable a type
-was, so at an inner call site there is no bound left to consult — the checker
-knows only "some type parameter".
-
-**Fixed** by giving the sentinel its variable's name (`__typevar__$T`) and, when
-a call's parameter resolves to one of the enclosing function's variables,
-checking that variable's declared bound instead of the (impossible) concrete
-one. Bound implication is deliberately just equality plus `any`, which promises
-nothing — `ord` and `variant` are unrelated, and a lattice would be guesswork
-until something needs it.
-
-Coercion was left exactly as permissive as before: **every type variable still
-coerces with every other**, via an explicit clause in `coerce`. Naming the
-sentinel would otherwise have tightened this as a silent side effect, since `T`
-and `U` used to erase to one value and compare equal. Distinguishing them is a
-real correctness improvement, but a separate change with its own fanout — this
-one is purely additive.
-
-Blast radius was one line in one fixture: an error message gained the parameter's
-name (`got a type parameter` → `got type parameter "T"`).
-
-### 1.9 Inlining discards the expected type — *required for the last of 1.1*
-
-`inline_single_use` and `inline_small` move a function's body into its caller.
-The body's types can depend on the function's *return* type — that is exactly
-what 1.1 added — and the caller's return type is a different thing, so the
-context is lost. The checker (which runs before inlining) accepts the program;
-mono then rejects it:
-
-```
-fn paren() -> Rule<Tok> { Spelling("(") }        // fine on its own
-// once inlined into `fn main()`, `Rule`'s K has nothing to resolve from
-error: cannot infer type parameter "K" of generic variant "Rule"
-```
-
-So an **optimization makes a valid program fail to compile** — which is a defect
-independent of the parser library. It bites any function whose body is under
-`DEFAULT_INLINE_MAX_EXPRS` (4) *or* is private and called exactly once, which is
-most small constructors-with-a-return-type.
-
-The inliner already guards the mirror-image case on the *argument* side: it skips
-a call whose argument is a context-typed literal, because "its type comes from
-`f`'s parameter, which a `let`-binding discards". The return side has no such
-guard.
-
-Two ways out, in preference order:
-
-1. **Wrap, don't skip.** `build_inlined` can bind the spliced body to an
-   annotated `let` carrying the callee's return type. Annotations now supply the
-   expected type (1.1), so the context survives and the inlining still happens.
-   Scope it to generic return types — wrapping everything would move
-   `instructions executed` / `binary size` in every binary.
-2. **Skip.** Exclude candidates whose return type is a generic application. Blunt
-   and costs the optimization, but it is a two-line filter next to the existing
-   ones.
-
-### Cost note
-
-1.3 and 1.5 move `instructions executed` and `binary size` in *every* binary.
-That is CLAUDE.md's "one sanctioned deviation" — run the whole-corpus
-`fill_expected` once rather than handoff's per-case loop, then confirm from the
-diff that only metric lines moved.
 
 ## Stage 2 — The library, proven on two toy grammars
 
@@ -506,7 +111,7 @@ cases by the harness and by `aipl check crates`.
 ```
 // grammar.aipl
 variant Rule<K> =
-    Term(K)                    // any token of this kind (case-tag match, 1.2)
+    Term(K)                    // any token of this kind (`same_case`)
   | Spelling(str)              // one token with this exact source text
   | Then(Rule<K>[])            // sequence
   | OneOf(Rule<K>[])           // ordered choice (PEG)
@@ -537,7 +142,7 @@ variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
 ```
 
 `Build` has a single arm that always pins `A` — deliberately no `NoLower` arm,
-since a payload-free arm reintroduces 1.1's inference problem even after the fix
+since a payload-free arm pins no type parameter of its own
 (there is nothing to infer *from*). Productions with nothing to lower pass a
 trivial named function.
 
@@ -568,8 +173,8 @@ variant Sexp = SAtom(str) | SList(Sexp[])
 ```
 
 Deliberately the floor, not an arbitrary warm-up. `Named("list")` reaching
-itself through `item` is what forces a **recursive CST** (Stage 1.3's boxing) and
-**unbounded parse depth** (Stage 1.5's tail calls), and lowering to `Sexp` is
+itself through `item` is what forces a **recursive CST** (boxing through an
+array) and **unbounded parse depth** (tail calls), and lowering to `Sexp` is
 what exercises `(Cst, A[]) -> A!ParseError` with a **boxed `A`** — the shape with
 no precedent anywhere in the repo. A non-recursive toy (a comma-separated integer
 list, key/value lines) would exercise none of those, which is the entire reason
@@ -614,7 +219,7 @@ block — so `struct ParseError { message: str, span: Span }` mirrors
 
 **3 — Introspection, proven.** `ebnf.aipl` dumps the grammar as EBNF; FIRST-set
 computation lets `OneOf` pick a branch without backtracking (also the answer to
-packrat being unaffordable pre-1.7).
+packrat being unaffordable while dicts are linear scans).
 
 **4 — The highlighter generator.** Generate
 `editors/vscode/syntaxes/aipl.tmLanguage.json` from the grammar. First because it
@@ -656,12 +261,12 @@ file that also declares a `Kind` constructor trips the silent drop.
 
 ## Verification
 
-1. **Stage 1 reproducers** — each language fix has a case that failed before it
-   and passes after; the four "unproven shape" cases confirm or refute before any
-   fix is written.
-2. **Corpus after each language change** — 1.3 and 1.5 especially. Whole-corpus
-   `fill_expected`, then confirm from the diff that no
-   `--- stdout ---`/`--- errors ---` body moved, only metrics.
+1. **Stage 1 reproducers** — the four "unproven shape" cases (1.0) confirm or
+   refute before any fix is written.
+2. **Corpus after a change that moves metrics everywhere** — anything touching
+   codegen does. That is CLAUDE.md's "one sanctioned deviation": whole-corpus
+   `fill_expected` once rather than handoff's per-case loop, then confirm from
+   the diff that no `--- stdout ---`/`--- errors ---` body moved, only metrics.
 3. **Per-file inner loop** — `cargo run -q -- check crates/aipl-codegen/src/parse.aipl`
    runs that file's `.test` blocks alone; this is also what enforces the
    `.test`-block requirement (`tests/ffi.rs:1109`).
@@ -674,7 +279,7 @@ file that also declares a `Kind` constructor trips the silent drop.
    `((((...))))`) belongs with S-expressions, since that is the first grammar
    that can nest, and it must run as a **built binary**, not just under
    `aipl check` — otherwise it is measured against 256 MB instead of the 8 MB a
-   shipped binary gets, and 1.5 goes untested.
+   shipped binary gets, and tail-call elimination goes untested.
 7. **Stage 4 oracle** — `cargo test --test highlighting` against the generated
    `.tmLanguage.json`, unchanged.
 8. **Finish** — `scripts/handoff.sh`, which regenerates the `#[test]` list for
