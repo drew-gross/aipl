@@ -1,0 +1,58 @@
+import { count, wrapping_increment as ++, ==, >= } from builtins;
+
+// The AIPL implementation of the `count_is_at_least` builtin. Registered under
+// `__builtin_count_is_at_least` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+//
+// A fused comparison: `count(x) >= limit` without counting past the point the answer is
+// settled. `count` itself always walks the whole collection; this stops at the
+// first element that decides it, which is the entire reason the fusion pass
+// exists.
+pub fn count_is_at_least<T: any>(self: T[], x: T, limit: u64) -> bool {
+    if (limit == 0) {
+        return true;
+    };
+    mut n: u64 = 0;
+    for (let e : self) {
+        if (e == x) {
+            set n++;
+            if (n >= limit) {
+                return true;
+            };
+        };
+    }
+    false
+}.doc("""
+    Fused form of `count(x) >= limit` — see `count`. Counts only as far as the answer
+    needs, so a an early match decides it without walking the rest.
+
+    Written by the compiler's operation-fusion pass, which rewrites
+    `xs.count(x) >= n` (and the mirrored `n <= xs.count(x)`) into this. Also
+    callable directly.
+""").test({
+    assert([1, 2, 2, 3].count_is_at_least(2, 2) == ([1, 2, 2, 3].count(2) >= 2));
+    assert([1, 2, 2, 3].count_is_at_least(2, 3) == ([1, 2, 2, 3].count(2) >= 3));
+    assert([1, 2, 2, 3].count_is_at_least(2, 1) == ([1, 2, 2, 3].count(2) >= 1));
+    assert([1, 2, 2, 3].count_is_at_least(2, 0) == ([1, 2, 2, 3].count(2) >= 0));
+    assert([1, 2, 3].count_is_at_least(9, 0) == ([1, 2, 3].count(9) >= 0)); // no matches
+    assert([].count_is_at_least(1, 0) == (0 >= 0)); // empty
+})
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 656
+instructions executed: 1189
+binary size: 4408
+  code: 2060
+    __builtin_count_is_at_least$i64: 304
+    count_is_at_least$i64: 304
+    main: 1452
+  data: 577
+  metadata: 1771
+builtin calls: 31
+  aipl_array_dec: 11
+  aipl_array_new: 11
+  aipl_assert: 6
+  aipl_test_begin: 1
+  aipl_test_end: 1
+  aipl_test_summary: 1

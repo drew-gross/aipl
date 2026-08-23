@@ -4603,6 +4603,15 @@ fn compile_program<M: Module>(
     // is never duplicated here first.
     let inlined = aipl_mono::inline_small(&inlined, inline_max_exprs());
 
+    // Optimization: fuse a composite expression into one builtin that computes
+    // the same answer with less work (`xs.count(x) < 4` stops at the fourth
+    // match). After inlining, so a comparison that only became visible by
+    // inlining is fused too; before folding, so a fused call's constant
+    // arguments still fold. The effect set comes from `check_program`, which is
+    // where the builtin signatures (and their `!prints`) live.
+    let inlined =
+        aipl_mono::fuse_operations(&inlined, &aipl_mono::effectful_fns(&check_program.items));
+
     // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
     // `check` so diagnostics always report against the unfolded source, and
     // after inlining so bodies folded here are the ones actually emitted.

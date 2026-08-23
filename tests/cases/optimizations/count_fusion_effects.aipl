@@ -1,0 +1,66 @@
+import { count, print, push, to_str, wrapping_increment as ++, < } from builtins;
+
+// Fusion is refused when either operand has an effect.
+//
+// Fusing changes how much of the collection is examined and moves the other
+// operand's evaluation ahead of the traversal. For pure operands neither is
+// observable — but an effect *is* the observable behaviour, and an optimization
+// that changes it is a bug. So the pass declines and the ordinary
+// `count`-then-compare runs.
+//
+// Measured on this shape in isolation: the same `many().count(2) < 3` runs in
+// 5,632 instructions fused and 13,943 when an effect in the bound blocks it —
+// the difference between stopping at the third match and walking all 201.
+// (Symbol lists are not evidence either way here: post-mono inlining folds a
+// single-use `count` into its caller, so the name disappears regardless.)
+fn many() -> i64[] {
+    mut xs = [2];
+    mut i: u64 = 0;
+    while (i < 200) {
+        set xs.push(2);
+        set i++;
+    }
+    xs
+}
+
+// The bound is computed by something that prints, so the comparison it appears
+// in cannot be fused.
+fn noisy_bound() !prints -> u64 {
+    print("bound");
+    3
+}
+
+fn main() !prints {
+    // Not fused: `noisy_bound()` prints. The count walks all 201 matches.
+    print((many().count(2) < noisy_bound()).to_str());
+    // Fused: same shape, pure bound.
+    print((many().count(2) < 3).to_str());
+}
+--- stdout ---
+bound
+false
+false
+
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 16
+bytes allocated: 80
+instructions executed: 19580
+binary size: 2480
+  code: 1140
+    __builtin_count_is_less_than$i64: 304
+    __to_str_bool: 212
+    main: 428
+    many: 196
+  data: 47
+  metadata: 1293
+builtin calls: 420
+  aipl_arr_inc: 2
+  aipl_array_dec: 4
+  aipl_array_new: 2
+  aipl_array_push_mut: 400
+  aipl_dec: 5
+  aipl_inc: 2
+  aipl_print: 3
+  aipl_write_bytes: 2

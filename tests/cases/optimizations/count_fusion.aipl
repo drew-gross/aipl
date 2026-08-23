@@ -1,0 +1,96 @@
+import { count, print, push, to_str, wrapping_increment as ++, !=, <, <=, ==, >, >= } from builtins;
+
+// Operation fusion: `xs.count(x)` compared against a bound collapses into one
+// builtin that stops as soon as the answer is settled, instead of counting the
+// whole collection and then comparing.
+//
+// All six comparisons fuse, in both operand orders — `n > xs.count(x)` is the
+// same claim as `xs.count(x) < n`, so one rule covers the mirrored form.
+//
+// The saving is in this case's `instructions executed`: `many()` holds 201
+// matches, and every answer below is decided within the first few elements.
+fn many() -> i64[] {
+    mut xs = [2];
+    mut i: u64 = 0;
+    while (i < 200) {
+        set xs.push(2);
+        set i++;
+    }
+    xs
+}
+
+fn small() -> i64[] { [1, 2, 2, 3, 2] }
+
+fn main() !prints {
+    // Decided after 3 matches, not 201.
+    print((many().count(2) < 3).to_str());
+    print((many().count(2) > 2).to_str());
+    print((many().count(2) >= 2).to_str());
+    print((many().count(2) != 2).to_str());
+
+    // Every comparison, against a count of 3.
+    print((small().count(2) < 4).to_str());
+    print((small().count(2) <= 2).to_str());
+    print((small().count(2) > 2).to_str());
+    print((small().count(2) >= 3).to_str());
+    print((small().count(2) == 3).to_str());
+    print((small().count(2) != 3).to_str());
+
+    // Mirrored: the bound on the left.
+    print((4 > small().count(2)).to_str());
+    print((2 >= small().count(2)).to_str());
+    print((3 == small().count(2)).to_str());
+    print((3 != small().count(2)).to_str());
+
+    // Zero bounds, where the early exit has to not fire too eagerly.
+    print((small().count(9) < 1).to_str());
+    print((small().count(9) >= 0).to_str());
+    print((small().count(2) < 0).to_str());
+}
+--- stdout ---
+false
+true
+true
+true
+true
+false
+true
+true
+true
+false
+true
+false
+true
+false
+true
+true
+false
+
+--- performance ---
+allocations: 17
+deallocations: 17
+reallocations: 32
+bytes allocated: 1096
+instructions executed: 25999
+binary size: 7816
+  code: 4752
+    __builtin_count_is_at_least$i64: 304
+    __builtin_count_is_at_most$i64: 276
+    __builtin_count_is_equal$i64: 284
+    __builtin_count_is_greater_than$i64: 276
+    __builtin_count_is_less_than$i64: 304
+    __builtin_count_is_not_equal$i64: 288
+    __to_str_bool: 212
+    main: 2612
+    many: 196
+  data: 47
+  metadata: 3017
+builtin calls: 927
+  aipl_arr_inc: 4
+  aipl_array_dec: 21
+  aipl_array_new: 17
+  aipl_array_push_mut: 800
+  aipl_dec: 34
+  aipl_inc: 17
+  aipl_print: 17
+  aipl_write_bytes: 17

@@ -1607,6 +1607,12 @@ fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
 fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
+fn __builtin_count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
+fn __builtin_count_is_at_most<T: any>(self: T[], x: T, limit: u64) -> bool { false }
+fn __builtin_count_is_greater_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
+fn __builtin_count_is_at_least<T: any>(self: T[], x: T, limit: u64) -> bool { false }
+fn __builtin_count_is_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false }
+fn __builtin_count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_first<T: any>(self: T[]) -> T? { none }
 fn __builtin_last<T: any>(self: T[]) -> T? { none }
 fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
@@ -1767,6 +1773,12 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "join",
     "intersperse",
     "same_case",
+    "count_is_less_than",
+    "count_is_at_most",
+    "count_is_greater_than",
+    "count_is_at_least",
+    "count_is_equal",
+    "count_is_not_equal",
     "first",
     "last",
     "drop_first",

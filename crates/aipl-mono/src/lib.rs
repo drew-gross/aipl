@@ -32,6 +32,9 @@ pub use check::check;
 mod fold;
 pub use fold::fold_constants;
 
+mod fuse;
+pub use fuse::{effectful_fns, fuse_operations};
+
 use aipl_syntax::{
     ast,
     ast::{
@@ -5001,6 +5004,27 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
     ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
     ("__builtin_intersperse", "builtin_intersperse.aipl"),
+    (
+        "__builtin_count_is_less_than",
+        "builtin_count_is_less_than.aipl",
+    ),
+    (
+        "__builtin_count_is_at_most",
+        "builtin_count_is_at_most.aipl",
+    ),
+    (
+        "__builtin_count_is_greater_than",
+        "builtin_count_is_greater_than.aipl",
+    ),
+    (
+        "__builtin_count_is_at_least",
+        "builtin_count_is_at_least.aipl",
+    ),
+    ("__builtin_count_is_equal", "builtin_count_is_equal.aipl"),
+    (
+        "__builtin_count_is_not_equal",
+        "builtin_count_is_not_equal.aipl",
+    ),
     ("__builtin_first", "builtin_first.aipl"),
     ("__builtin_last", "builtin_last.aipl"),
     ("__builtin_drop_first", "builtin_drop_first.aipl"),

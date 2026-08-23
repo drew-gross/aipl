@@ -136,9 +136,8 @@ type checking:
 
 optimizations:
   operation fusion:
-    make the framework
-      vec.count() < n should fuse to stop counting when it hits n+1
       vec.filter().count() should fuse to not materialize the filtered array
+      add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
   2. Cap link concurrency during handoff (cargo build -j4 for the build steps). Doesn't reduce work, but caps peak RSS so the box stops swapping. Cheap to try, low risk.
   common subexpression elimination
   sora
@@ -214,6 +213,7 @@ effects:
 
 perfmon:
   show regression and improvements
+  improve it in some way that it allows you to prove that an optimzation did or did not happen
   add tests that specifically exersize perf
   instead of splitting builtin and non-builtin calls, combine and show both size and calls for both
 
@@ -264,6 +264,11 @@ error improvements:
   import suggestions when missing an import
   if you get error "from its defining file" it should instead say the actual filename
   type errors from imported files point at the wrong filename. The fix is to carry the owning file onto Function and tag at the cx.check_fn(f) boundary in check.rs
+
+expression matcher:
+  implement it
+  use it for lint
+  use it for operation fusion
 
 handoff:
   reimplement it in rust and/or aipl
