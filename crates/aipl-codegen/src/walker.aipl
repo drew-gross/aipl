@@ -240,6 +240,22 @@ fn peek_text(self: W) -> str { self.peek_text_n(0) }
 
 fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
 
+// Is there another item to read before the closing `end` token?
+//
+// **Use this for every "scan until a closing token" loop.** The bare form
+//
+//     while (w.peek_text() != "}") { .. }        // WRONG
+//
+// spins forever on truncated input: past the last token `peek_text()` is `""`,
+// which never equals `"}"`, and `bump()` deliberately does not advance at the
+// end (see its comment) — so the loop makes no progress and never exits. That
+// is not hypothetical; it hung `aipl check` on a truncated import with no
+// output and no diagnostic, which is indistinguishable from a compiler hang.
+//
+// Folding the `at_end` check in here means a caller cannot forget it. The
+// `expect(end)` that follows the loop then reports the missing token properly.
+fn more_before(self: W, end: str) -> bool { !self.at_end() && self.peek_text() != end }
+
 // Consume the token at the cursor, returning its text. The caller has already
 // dispatched on it; comments before it must have been drained (else the final
 // not-carried check in the driver fails).
@@ -612,7 +628,7 @@ fn import_item(self: W) -> WImport!FmtError {
 fn import_names(self: W, acc0: ImportName[]) -> WKeys!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let first = w.bump();
         let r = if (first.w.peek_text() == "as") {
             first.w.import_alias(first.text)
@@ -700,7 +716,7 @@ fn paren_ty(self: W) -> WDoc!FmtError {
 fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != end) {
+    while (w.more_before(end)) {
         let t = w.ty()?;
         set acc.push(t.doc);
         set w = if (t.w.peek_text() == ",") { t.w.bump().w } else { t.w };
@@ -796,7 +812,7 @@ fn type_params(self: W) -> WDoc!FmtError {
 fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != ">") {
+    while (w.more_before(">")) {
         let n = w.bump();
         let p = if (n.w.peek_text() == ":") {
             n.w.param_bound(n.text)
@@ -1094,7 +1110,7 @@ fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
 fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != end) {
+    while (w.more_before(end)) {
         let l = w.lead();
         let m = if (l.w.peek_text() == "mut") {
             WDocs { w: l.w.bump().w, docs: [l.doc, Text("mut ")] }
@@ -1148,7 +1164,7 @@ fn struct_item(self: W) -> WDoc!FmtError {
 fn struct_fields(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let l = w.lead();
         let f = l.w.bump();
         let t = f.w.expect(":")?.w.ty()?;
@@ -1762,7 +1778,7 @@ fn set_or_dict_atom(self: W) -> WDoc!FmtError {
 fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let l = w.lead();
         let k = l.w.expr()?;
         let e = if (k.w.peek_text() == ":") {
@@ -1815,7 +1831,7 @@ fn struct_atom(self: W, name: str) -> WDoc!FmtError {
 fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let l = w.lead();
 
         // `..base` — a struct spread. It is one item, spelled tight against its
@@ -1915,7 +1931,7 @@ fn shim_expr(self: W) -> WDoc!FmtError {
 fn shim_bindings(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let op = w.bump();
         let f = op.w.expect("=")?.w.bump();
         set acc.push(Text(`{op.text} = {f.text}`));
@@ -1927,7 +1943,7 @@ fn shim_bindings(self: W, acc0: Doc[]) -> WDocs!FmtError {
 fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "}") {
+    while (w.more_before("}")) {
         let l = w.lead();
         let pat = l.w.pattern()?;
         let alts = pat.w.pattern_alts(pat.doc)?;
@@ -2002,7 +2018,7 @@ fn qualified_case(self: W, name: str) -> WStr {
 fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != end) {
+    while (w.more_before(end)) {
         let l = w.lead();
         let a = l.w.call_arg()?;
         set acc.push(Concat([l.doc, a.doc]));
@@ -2063,7 +2079,7 @@ fn lambda(self: W) -> WDoc!FmtError {
 fn lambda_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
-    while (w.peek_text() != "|") {
+    while (w.more_before("|")) {
         let n = w.bump();
         let p = if (n.w.peek_text() == ":") {
             n.w.lambda_param_ty(n.text)?
@@ -2565,6 +2581,34 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     let cw = new_walker(csrc, ctoks, [0..6, 17..24]);
     assert(cw.program().rendered(100)? == "// hdr\nfn a() {}\n\n// on b\nfn b() {}");
 
+    // --- truncated input terminates -------------------------------------------
+    // Every "scan until a closing token" loop goes through `more_before`, which
+    // folds in the end-of-input check. Without it these spin forever rather than
+    // failing: `peek_text()` past the last token is `""`, never the terminator,
+    // and `bump()` does not advance there — so the loop cannot progress and
+    // cannot exit. Each of these hung `aipl check` with no output before the
+    // wrapper existed.
+    assert(more_before(walker_of("import { len"), "}")); // more to read
+    assert(!walker_of("").more_before("}")); // nothing left: stop, don't spin
+    // An import whose `}` never arrives is an error, not a hang.
+    assert(
+        walker_of("import { len from builtins ;")
+            .import_item()
+            .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
+    );
+    // Truncated right after the brace: an error naming end-of-input, not a hang.
+    assert(
+        walker_of("import { len}")
+            .import_item()
+            .is_err_and(|e| e.message.contains("at end of input")),
+    );
+    // A well-formed import in the same shapes still parses.
+    assert(
+        walker_of("import { len } from builtins ;")
+            .import_item()?.doc
+            .at(100) == "import { len } from builtins;",
+    );
+
     // --- imports --------------------------------------------------------------
     // Names are sorted, and the braces get inner spaces when flat.
     assert(
@@ -2645,13 +2689,13 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20940
-deallocations: 20940
-reallocations: 862
-bytes allocated: 1025050
-instructions executed: 2844115
-binary size: 3061472
-  code: 1752096
+allocations: 21061
+deallocations: 21061
+reallocations: 880
+bytes allocated: 1031402
+instructions executed: 2866808
+binary size: 3115280
+  code: 1781792
     __arr_drop_ImportEntry: 140
     __arr_drop_ImportName: 140
     __arr_drop_Seg: 120
@@ -2668,22 +2712,22 @@ binary size: 3061472
     __arr_retain___m9__StepResult$__m8__AiplTok: 140
     __arr_retain___m9__Token$__m8__AiplTok: 364
     __arr_retain___m9__TokenRule$__m8__AiplTok: 800
-    __builtin_any$__m1__Doc$lam28: 32
-    __builtin_any$__m1__Doc$lam28$tail: 324
+    __builtin_any$__m1__Doc$lam32: 32
+    __builtin_any$__m1__Doc$lam32$tail: 324
     __builtin_count_is_at_least$char$s0: 312
-    __builtin_count_while$char$lam71: 296
-    __builtin_count_while$char$s0$lam49: 232
-    __builtin_count_while$char$s0$lam61: 232
-    __builtin_count_while$char$s0$lam76: 236
-    __builtin_count_while$char$s0$lam78: 244
-    __builtin_count_while$char$s0$lam83: 232
+    __builtin_count_while$char$lam75: 296
+    __builtin_count_while$char$s0$lam53: 232
+    __builtin_count_while$char$s0$lam65: 232
+    __builtin_count_while$char$s0$lam80: 236
+    __builtin_count_while$char$s0$lam82: 244
+    __builtin_count_while$char$s0$lam87: 232
     __builtin_drop_first$char$s0: 32
     __builtin_drop_first$char$s0$tail: 104
     __builtin_drop_last$str: 208
     __builtin_first$char$s0: 136
     __builtin_int_parse: 1032
     __builtin_intersperse$__m1__Doc: 408
-    __builtin_is_some_and$char$lam77: 48
+    __builtin_is_some_and$char$lam81: 48
     __eq_FmtKind: 64
     __eq_FmtTok: 120
     __eq_FmtTok$opt: 92
@@ -2691,15 +2735,15 @@ binary size: 3061472
     __eq___m1__Doc: 464
     __eq___m1__Doc$arr: 300
     __eq_char$opt: 100
-    __lambda_33: 100
-    __lambda_34: 68
-    __lambda_35: 136
-    __lambda_36: 152
-    __lambda_37: 108
-    __lambda_38: 136
-    __lambda_39: 48
-    __lambda_40: 64
-    __lambda_64: 140
+    __lambda_37: 100
+    __lambda_38: 68
+    __lambda_39: 136
+    __lambda_40: 152
+    __lambda_41: 108
+    __lambda_42: 136
+    __lambda_43: 48
+    __lambda_44: 64
+    __lambda_68: 140
     __m10__unescape: 892
     __m11__process_raw_string: 32
     __m11__process_raw_string$tail: 600
@@ -2735,12 +2779,12 @@ binary size: 3061472
     __m9__step_result$__m8__AiplTok: 12068
     __m9__template_scan$__m8__AiplTok: 2772
     __m9__template_step$__m8__AiplTok: 556
-    __map51$own0: 320
+    __map55$own0: 320
     __rec_drop___m1__Doc: 184
     __rec_drop___m1__Work: 84
     __test$binding_ann: 4604
     __test$new_walker: 10580
-    __test$walker_of: 1210432
+    __test$walker_of: 1240648
     __test_try_fail_FmtError: 64
     __to_str_FmtError: 812
     array_atom: 2176
@@ -2757,11 +2801,11 @@ binary size: 3061472
     bump: 920
     call_arg: 4680
     call_arg_list: 636
-    call_args_until: 2688
+    call_args_until: 2616
     comma_list_docs: 3080
     comment_starts_before: 280
     construct_body: 3208
-    dict_entries: 4264
+    dict_entries: 4204
     dict_value: 1428
     dict_value_ty: 1300
     dot_seg: 5184
@@ -2779,23 +2823,24 @@ binary size: 3061472
     hugs_sole_arg: 1268
     ident_list: 1660
     if_expr: 10916
-    import_item: 15528
+    import_item: 15468
     index_or_from: 3872
     index_seg: 3676
     item: 932
     lambda: 5924
     lambda_param_ty: 1456
-    lambda_params: 3236
+    lambda_params: 3176
     lead: 1812
     let_stmt: 19204
     main: 152
-    match_arms: 7768
+    match_arms: 7672
     match_expr: 10744
+    more_before: 208
     mut_stmt: 5364
     name_atom: 5460
     named_ty: 3656
     next_start: 532
-    params_until: 9516
+    params_until: 9448
     paren_atom: 5316
     paren_ty: 8688
     pattern: 7572
@@ -2814,7 +2859,7 @@ binary size: 3061472
     set_or_dict_atom: 5016
     set_or_dict_ty: 5976
     set_stmt: 7316
-    shim_bindings: 3048
+    shim_bindings: 2984
     shim_expr: 5860
     slice_to: 1300
     sorted_imports: 1844
@@ -2823,8 +2868,8 @@ binary size: 3061472
     str_atom: 532
     struct_atom: 2932
     struct_field_value: 1496
-    struct_fields: 5860
-    struct_inits: 5576
+    struct_fields: 5800
+    struct_inits: 5520
     struct_item: 5804
     take_comment: 232
     template_scan: 2248
@@ -2834,8 +2879,8 @@ binary size: 3061472
     trim_last_break$tail: 1168
     tuple_rest: 2688
     ty: 4432
-    ty_list: 2288
-    type_params: 5248
+    ty_list: 2216
+    type_params: 5188
     unary: 1700
     variant_cases: 3804
     variant_item: 5640
@@ -2844,43 +2889,43 @@ binary size: 3061472
     while_stmt: 4272
     with_last: 36
     with_last$tail: 528
-  data: 25740
-  metadata: 1283636
-builtin calls: 443631
-  aipl_arr_drop_str: 2036
-  aipl_arr_extend: 213
-  aipl_arr_inc: 48976
-  aipl_arr_reserve: 276
-  aipl_arr_retain_ptr: 2032
-  aipl_arr_slice: 78
-  aipl_array_dec: 60898
-  aipl_array_new: 10098
-  aipl_array_push: 1496
-  aipl_array_push_mut: 1605
-  aipl_array_with_cap: 187
-  aipl_assert: 164
-  aipl_char_at: 3930
-  aipl_concat: 246
-  aipl_concat_lazy: 199
-  aipl_dec: 94262
-  aipl_inc: 74445
-  aipl_rec_alloc: 5946
-  aipl_rec_dec_strong: 40676
-  aipl_rec_dec_weak: 3565
-  aipl_rec_inc_strong: 34730
-  aipl_rec_inc_weak: 3565
+  data: 26620
+  metadata: 1306868
+builtin calls: 447162
+  aipl_arr_drop_str: 2054
+  aipl_arr_extend: 215
+  aipl_arr_inc: 49502
+  aipl_arr_reserve: 278
+  aipl_arr_retain_ptr: 2050
+  aipl_arr_slice: 81
+  aipl_array_dec: 61477
+  aipl_array_new: 10128
+  aipl_array_push: 1514
+  aipl_array_push_mut: 1629
+  aipl_array_with_cap: 189
+  aipl_assert: 169
+  aipl_char_at: 4013
+  aipl_concat: 258
+  aipl_concat_lazy: 200
+  aipl_dec: 94946
+  aipl_inc: 75072
+  aipl_rec_alloc: 5991
+  aipl_rec_dec_strong: 40957
+  aipl_rec_dec_weak: 3591
+  aipl_rec_inc_strong: 34966
+  aipl_rec_inc_weak: 3591
   aipl_str_cmp: 7
-  aipl_str_contains: 2505
-  aipl_str_data: 359
-  aipl_str_ends_with: 124
-  aipl_str_eq: 6051
-  aipl_str_iter_init: 368
-  aipl_str_iter_next: 359
-  aipl_str_join: 252
-  aipl_str_len: 31255
+  aipl_str_contains: 2515
+  aipl_str_data: 360
+  aipl_str_ends_with: 125
+  aipl_str_eq: 6087
+  aipl_str_iter_init: 369
+  aipl_str_iter_next: 360
+  aipl_str_join: 254
+  aipl_str_len: 31428
   aipl_str_repeat: 74
-  aipl_str_slice: 8511
-  aipl_str_split: 934
+  aipl_str_slice: 8561
+  aipl_str_split: 942
   aipl_str_starts_with: 3202
   aipl_test_begin: 3
   aipl_test_end: 3

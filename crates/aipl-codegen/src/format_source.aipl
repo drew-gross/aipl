@@ -74,9 +74,9 @@ allocations: 2208
 deallocations: 2208
 reallocations: 6
 bytes allocated: 101329
-instructions executed: 326764
-binary size: 863952
-  code: 528440
+instructions executed: 326806
+binary size: 863000
+  code: 527920
     __arr_drop___m13__StepResult$__m12__AiplTok: 140
     __arr_drop___m13__Token$__m12__AiplTok: 364
     __arr_drop___m13__TokenRule$__m12__AiplTok: 800
@@ -159,11 +159,11 @@ binary size: 863952
     __m6__bump: 920
     __m6__call_arg: 4680
     __m6__call_arg_list: 636
-    __m6__call_args_until: 2688
+    __m6__call_args_until: 2616
     __m6__comma_list_docs: 3080
     __m6__comment_starts_before: 280
     __m6__construct_body: 3208
-    __m6__dict_entries: 4264
+    __m6__dict_entries: 4204
     __m6__dict_value: 1428
     __m6__dict_value_ty: 1300
     __m6__dot_seg: 5184
@@ -181,22 +181,23 @@ binary size: 863952
     __m6__hugs_sole_arg: 1268
     __m6__ident_list: 1660
     __m6__if_expr: 10916
-    __m6__import_item: 15528
+    __m6__import_item: 15468
     __m6__index_or_from: 3872
     __m6__index_seg: 3676
     __m6__item: 932
     __m6__lambda: 5924
     __m6__lambda_param_ty: 1456
-    __m6__lambda_params: 3236
+    __m6__lambda_params: 3176
     __m6__lead: 1812
     __m6__let_stmt: 19204
-    __m6__match_arms: 7768
+    __m6__match_arms: 7672
     __m6__match_expr: 10744
+    __m6__more_before: 208
     __m6__mut_stmt: 5364
     __m6__name_atom: 5460
     __m6__named_ty: 3656
     __m6__next_start: 532
-    __m6__params_until: 9516
+    __m6__params_until: 9448
     __m6__paren_atom: 5316
     __m6__paren_ty: 8688
     __m6__pattern: 7572
@@ -214,7 +215,7 @@ binary size: 863952
     __m6__set_or_dict_atom: 5016
     __m6__set_or_dict_ty: 5976
     __m6__set_stmt: 7316
-    __m6__shim_bindings: 3048
+    __m6__shim_bindings: 2984
     __m6__shim_expr: 5860
     __m6__slice_to: 1300
     __m6__sorted_imports: 1844
@@ -223,8 +224,8 @@ binary size: 863952
     __m6__str_atom: 532
     __m6__struct_atom: 2932
     __m6__struct_field_value: 1496
-    __m6__struct_fields: 5860
-    __m6__struct_inits: 5576
+    __m6__struct_fields: 5800
+    __m6__struct_inits: 5520
     __m6__struct_item: 5804
     __m6__take_comment: 232
     __m6__template_scan: 2248
@@ -234,8 +235,8 @@ binary size: 863952
     __m6__trim_last_break$tail: 1168
     __m6__tuple_rest: 2688
     __m6__ty: 4432
-    __m6__ty_list: 2288
-    __m6__type_params: 5248
+    __m6__ty_list: 2216
+    __m6__type_params: 5188
     __m6__unary: 1700
     __m6__variant_cases: 3804
     __m6__variant_item: 5640
@@ -260,14 +261,14 @@ binary size: 863952
     fmt_prepare: 864
     main: 1644
   data: 2508
-  metadata: 333004
-builtin calls: 39183
+  metadata: 332572
+builtin calls: 39189
   aipl_arr_drop_str: 50
   aipl_arr_extend: 4
-  aipl_arr_inc: 4452
+  aipl_arr_inc: 4455
   aipl_arr_reserve: 10
   aipl_arr_retain_ptr: 42
-  aipl_array_dec: 6297
+  aipl_array_dec: 6300
   aipl_array_new: 1774
   aipl_array_push: 42
   aipl_array_push_mut: 45
