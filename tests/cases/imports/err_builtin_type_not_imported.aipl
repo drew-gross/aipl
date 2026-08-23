@@ -1,0 +1,23 @@
+// `Span` is a builtin *type*, and like every builtin it has to be imported
+// before it can be named. Forgetting the import is reported the same way
+// wherever the name appears — a parameter, a struct field, or a variant payload
+// — and each says which import is missing.
+//
+// The field and payload positions used to be checked nowhere: a field slipped
+// through to a later mismatch between two types that both render as `Span`, and
+// a payload reached codegen and came back as "payload type Span is not
+// supported", which names the wrong problem — `Span` is a perfectly good payload
+// type, it just was not in scope.
+struct Tok { span: Span }
+
+variant Node = At(Span) | Nowhere
+
+fn lo(s: Span) -> u64 { s.start }
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: struct "Tok" field "span": unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+
+error: variant "Node" case "At" payload: unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`
+
+error: fn "lo": unknown type "Span" — "Span" is a builtin type; import it with `import { Span } from builtins;`

@@ -120,10 +120,6 @@ lint:
   "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects. But also, optimizations should be implemented so that after inlining, the arg isn't actually computed when the value isn't none (code sinking optimization)
   mut out = a; set out.mutating_method(b); foo(out) should just be foo(out.mutating_method(b))
 
-
-errors:
-  using Span without importing it gives a bad error
-
 Spreading:
   spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread

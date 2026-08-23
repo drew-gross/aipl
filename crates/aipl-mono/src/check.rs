@@ -954,6 +954,18 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                 continue;
             }
             for f in &s.fields {
+                // The field's *type* is a written type like any other, so it
+                // gets the same validation a parameter's does — including the
+                // "that's a builtin, import it" hint for `Span`. Without this a
+                // missing import surfaced only later, as a mismatch between two
+                // types that render identically.
+                if let Err(e) = cx.check_ty(
+                    &f.ty,
+                    &[],
+                    &format!("struct {:?} field {:?}", s.name, f.name),
+                ) {
+                    errors.push(e);
+                }
                 if let Some(default) = &f.default {
                     let checked = cx.check_expr(default, &HashMap::new(), &[]).and_then(|dt| {
                         expect(
@@ -964,6 +976,27 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                         )
                     });
                     if let Err(e) = checked {
+                        errors.push(e);
+                    }
+                }
+            }
+        }
+    }
+    for item in &program.items {
+        if let Item::Variant(v) = item {
+            // Same reasoning as a struct field. Until now an unimported `Span`
+            // in a payload reached codegen and was reported as "payload type
+            // Span is not supported", which points at the wrong problem.
+            if v.is_generic() {
+                continue;
+            }
+            for case in &v.cases {
+                for ty in &case.payload {
+                    if let Err(e) = cx.check_ty(
+                        ty,
+                        &[],
+                        &format!("variant {:?} case {:?} payload", v.name, case.name),
+                    ) {
                         errors.push(e);
                     }
                 }
@@ -1063,7 +1096,7 @@ impl Cx<'_> {
         // return type — there's no first-class function value to hand back.
         let type_var_names = f.sig.type_var_names();
         for p in &f.sig.params {
-            self.check_ty(&p.ty, &type_var_names, &f.name)?;
+            self.check_ty(&p.ty, &type_var_names, &format!("fn {:?}", f.name))?;
         }
         if let Some(rt) = &f.sig.return_ty {
             if matches!(rt, Type::Fn(_, _)) {
@@ -1073,7 +1106,7 @@ impl Cx<'_> {
                     tyname(rt)
                 )));
             }
-            self.check_ty(rt, &type_var_names, &f.name)?;
+            self.check_ty(rt, &type_var_names, &format!("fn {:?}", f.name))?;
         }
 
         // Keyword-parameter defaults are checked like struct field defaults: in
@@ -1153,7 +1186,10 @@ impl Cx<'_> {
 
     /// Validate that `t` names only known types (primitives, declared structs,
     /// in-scope type parameters) in valid positions.
-    fn check_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
+    /// Validate a written type. `ctx` is the already-formatted subject of any
+    /// message — `fn "lo"`, `struct "Tok" field "span"` — so the same checks
+    /// serve a parameter, a struct field and a variant payload alike.
+    fn check_ty(&self, t: &Type, type_params: &[String], ctx: &str) -> Result<(), Error> {
         match t {
             // Every primitive is a valid type in any general position.
             Type::Unit | Type::Primitive(_) => Ok(()),
@@ -1175,7 +1211,7 @@ impl Cx<'_> {
                 if ok {
                     Ok(())
                 } else {
-                    let mut msg = format!("fn {fname:?}: unknown type {n:?}");
+                    let mut msg = format!("{ctx}: unknown type {n:?}");
                     if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&n.as_str()) {
                         msg.push_str(&format!(
                             " — {n:?} is a builtin type; import it with `import {{ {n} }} from builtins;`"
@@ -1187,7 +1223,7 @@ impl Cx<'_> {
             // Array/optional element types: a scalar, `str`, a nested array, or
             // an optional (`T?[]`, `T??`) — never a struct.
             Type::Array(inner) | Type::Optional(inner) => {
-                self.check_elem_ty(inner, type_params, fname)
+                self.check_elem_ty(inner, type_params, ctx)
             }
             // A set element: a scalar (i64/bool/char), `str`, or a type
             // parameter (pinned to one of those when monomorphized). No nested
@@ -1197,7 +1233,7 @@ impl Cx<'_> {
                     Ok(())
                 } else {
                     Err(Error::msg(format!(
-                        "fn {fname:?}: a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                        "{ctx}: a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                         tyname(inner)
                     )))
                 }
@@ -1208,11 +1244,11 @@ impl Cx<'_> {
             Type::Dict(k, v) => {
                 if !(is_dict_key(k) || is_abstract_scalar_ty(k, type_params)) {
                     return Err(Error::msg(format!(
-                        "fn {fname:?}: a dict key must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
+                        "{ctx}: a dict key must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
                         tyname(k)
                     )));
                 }
-                self.check_elem_ty(v, type_params, fname)
+                self.check_elem_ty(v, type_params, ctx)
             }
             // A result `T!E`: either side may be *any* type that is valid on its
             // own, so this just recurses — which is also what applies each
@@ -1228,29 +1264,29 @@ impl Cx<'_> {
                 for (p, side) in [(ok, "Ok"), (err, "Err")] {
                     if let Type::Fn(_, _) = &**p {
                         return Err(Error::msg(format!(
-                            "fn {fname:?}: a result {side} payload cannot be a function, got {}",
+                            "{ctx}: a result {side} payload cannot be a function, got {}",
                             tyname(p)
                         )));
                     }
                 }
                 if !is_unit(ok) {
-                    self.check_ty(ok, type_params, fname)?;
+                    self.check_ty(ok, type_params, ctx)?;
                 }
-                self.check_ty(err, type_params, fname)
+                self.check_ty(err, type_params, ctx)
             }
             // A function type (a lambda parameter): validate its argument and
             // return types. `check_fn` separately forbids it as a *return* type.
             Type::Fn(params, ret) => {
                 for p in params {
-                    self.check_ty(p, type_params, fname)?;
+                    self.check_ty(p, type_params, ctx)?;
                 }
-                self.check_ty(ret, type_params, fname)
+                self.check_ty(ret, type_params, ctx)
             }
             // Tuple types are lowered to Named by lower_tuples before check
             // runs, but handle them permissively in case one arrives.
             Type::Tuple(elems) => {
                 for e in elems {
-                    self.check_ty(e, type_params, fname)?;
+                    self.check_ty(e, type_params, ctx)?;
                 }
                 Ok(())
             }
@@ -1258,7 +1294,7 @@ impl Cx<'_> {
             // check runs; validate the type arguments in case one arrives.
             Type::Generic(_, args) => {
                 for a in args {
-                    self.check_ty(a, type_params, fname)?;
+                    self.check_ty(a, type_params, ctx)?;
                 }
                 Ok(())
             }
@@ -1310,7 +1346,7 @@ impl Cx<'_> {
         self.check_ty(
             declared,
             &self.current_type_params.borrow(),
-            &self.current_fn.borrow(),
+            &format!("fn {:?}", self.current_fn.borrow()),
         )?;
         let declared = subst_typevars(declared, &self.current_type_params.borrow());
         // A written `Rule<Tok>` is a generic *application*; the value's type is
@@ -1357,7 +1393,7 @@ impl Cx<'_> {
         Ok(declared)
     }
 
-    fn check_elem_ty(&self, t: &Type, type_params: &[String], fname: &str) -> Result<(), Error> {
+    fn check_elem_ty(&self, t: &Type, type_params: &[String], ctx: &str) -> Result<(), Error> {
         match t {
             Type::Unit => Err(Error::msg("() is not allowed as an array/option element")),
             // A scalar primitive element: every integer width, plus
@@ -1381,23 +1417,23 @@ impl Cx<'_> {
                 {
                     Ok(()) // arrays and optionals of structs/variants are supported
                 } else {
-                    Err(Error::msg(format!("fn {fname:?}: unknown type {n:?}")))
+                    Err(Error::msg(format!("{ctx}: unknown type {n:?}")))
                 }
             }
             // Nested arrays (`T[][]`) and nested optionals (`T??`) are allowed.
             Type::Array(inner) | Type::Optional(inner) => {
-                self.check_elem_ty(inner, type_params, fname)
+                self.check_elem_ty(inner, type_params, ctx)
             }
             // A set/dict/result can't (yet) be an array/optional element (or a
             // dict value) — they're not nestable in other containers in v1.
             Type::Set(_) | Type::Dict(_, _) | Type::Result(_, _) => Err(Error::msg(format!(
-                "fn {fname:?}: a set, dict, or result cannot be an array, optional, or dict element"
+                "{ctx}: a set, dict, or result cannot be an array, optional, or dict element"
             ))),
             Type::Fn(_, _) => Err(Error::msg(format!(
-                "fn {fname:?}: arrays and optionals cannot contain function types"
+                "{ctx}: arrays and optionals cannot contain function types"
             ))),
             Type::Tuple(_) => Err(Error::msg(format!(
-                "fn {fname:?}: tuple types cannot be array or optional elements"
+                "{ctx}: tuple types cannot be array or optional elements"
             ))),
             // An (abstract) generic-struct/variant application `Token<K>` — a
             // valid element like any struct/variant (a concrete instance reaches
@@ -3862,16 +3898,29 @@ fn check_result_inspected(name: &str, vt: &Type, body: &Expr, span: Span) -> Res
 }
 
 fn expect(actual: &Type, expected: &Type, ctx: &str, span: Span) -> Result<(), Error> {
-    coerce(actual, expected).map_err(|()| {
-        Error::at(
-            format!(
-                "{ctx}: expected {}, got {}",
-                tyname(expected),
-                tyname(actual)
-            ),
-            span.clone(),
-        )
-    })
+    coerce(actual, expected)
+        .map_err(|()| Error::at(mismatch_msg(actual, expected, ctx), span.clone()))
+}
+
+/// "expected X, got Y" — and, when the two render *identically*, enough extra to
+/// tell them apart.
+///
+/// Distinct types can share a rendering: an unimported `Span` is the unknown
+/// `Named("Span")` while the builtin is `Named("__builtin_Span")`, and both
+/// display as `Span`; a written `Rule<Tok>` and its instance `Rule$Tok` do the
+/// same. Reporting "expected Span, got Span" says a type is not itself, which
+/// sends the reader looking for the wrong problem — so fall back to the internal
+/// names, which are ugly but at least differ.
+fn mismatch_msg(actual: &Type, expected: &Type, ctx: &str) -> String {
+    let (e, a) = (tyname(expected), tyname(actual));
+    if e != a {
+        return format!("{ctx}: expected {e}, got {a}");
+    }
+    format!(
+        "{ctx}: expected {e}, got a different type that is also written {a:?} \
+         (internally {expected:?} vs {actual:?}) — most often a builtin type used \
+         without importing it"
+    )
 }
 
 /// A length-like operand — an index, a slice bound, a `Span` field, or a
