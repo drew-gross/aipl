@@ -1,6 +1,6 @@
 // Used by the raw-string processor to drop the newline that ends a blank
 // opening line.
-import { drop_first, first, == } from builtins;
+import { drop_first, equal as ==, first } from builtins;
 
 pub fn trim_prefix(self: str, c: char) -> str {
     if (self.first() == some(c)) { self.drop_first() } else { self }

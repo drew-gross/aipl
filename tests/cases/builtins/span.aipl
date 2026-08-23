@@ -1,4 +1,4 @@
-import { Span, hash, print, to_str, == } from builtins;
+import { Span, equal as ==, hash, print, to_str } from builtins;
 
 fn main() !prints {
     let s = Span { start: 3, end: 7 };

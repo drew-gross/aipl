@@ -1,4 +1,4 @@
-import { filter, wrapping_add as +, !, +++, == } from builtins;
+import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
 
 // The AIPL implementation of the `left_fold` builtin. Monomorphization registers
 // this function under the canonical name `__builtin_left_fold` (see

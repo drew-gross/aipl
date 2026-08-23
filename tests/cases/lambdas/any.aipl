@@ -1,4 +1,11 @@
-import { any, filter, !, <, ==, > } from builtins;
+import {
+    any,
+    equal as ==,
+    filter,
+    greater_than as >,
+    less_than as <,
+    logical_not as !,
+} from builtins;
 
 // `arr.any(pred)` is true when at least one element satisfies `pred`
 // (short-circuits at the first that does; an empty array is false) — the dual of

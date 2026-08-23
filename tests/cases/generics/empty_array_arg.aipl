@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // An empty array literal passed to an `any[]` parameter pins the type
 // variable to the `EmptyArray` pseudo-type and produces a monomorphized

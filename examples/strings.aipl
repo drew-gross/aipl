@@ -1,4 +1,4 @@
-import { print, +++, == } from builtins;
+import { concat as +++, equal as ==, print } from builtins;
 
 // Strings: literal comparison, concatenation, and the `print` builtin.
 // `print` carries the `!prints` effect, so any caller has to declare it.

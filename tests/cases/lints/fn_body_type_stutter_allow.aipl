@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // `#[allow]` squelches the body-shorthand lint on its line, so this function
 // keeps naming `Point` twice (see err_lints.aipl for the lint itself).

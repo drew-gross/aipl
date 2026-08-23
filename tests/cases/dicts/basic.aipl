@@ -1,4 +1,4 @@
-import { contains_key, get, len, value_or, !, == } from builtins;
+import { contains_key, equal as ==, get, len, logical_not as !, value_or } from builtins;
 
 // A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
 // literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with

@@ -1,4 +1,4 @@
-import { hash, len, print, reverse, to_str, == } from builtins;
+import { equal as ==, hash, len, print, reverse, to_str } from builtins;
 
 // `str` and `char[]` share a runtime representation (a `char` is a single
 // byte, exactly like a `str`'s content), so they're mutually usable wherever

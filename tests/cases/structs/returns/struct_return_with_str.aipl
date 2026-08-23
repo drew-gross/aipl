@@ -1,4 +1,4 @@
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 // Returning a struct that owns a heap (`str`) field: the field is retained
 // for the caller and released when the returned struct is dropped — no leak

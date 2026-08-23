@@ -1,4 +1,4 @@
-import { filter, !, <=, == } from builtins;
+import { equal as ==, filter, less_than_or_equal as <=, logical_not as ! } from builtins;
 
 // The AIPL implementation of the `all` builtin. Monomorphization registers this
 // function under the canonical name `__builtin_all` (see `AIPL_BUILTIN_SOURCES`

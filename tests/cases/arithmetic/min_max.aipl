@@ -1,4 +1,4 @@
-import { len, max, min, wrapping_add as +, +++, == } from builtins;
+import { concat as +++, equal as ==, len, max, min, wrapping_add as + } from builtins;
 
 // `min`/`max` return the smaller / larger of two comparable values. They carry
 // the `ord` bound — the same one `minimum`/`maximum` use — so they work at any

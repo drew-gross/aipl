@@ -1,4 +1,4 @@
-import { wrapping_increment as ++, == } from builtins;
+import { equal as ==, wrapping_increment as ++ } from builtins;
 
 // `len` written in AIPL using the for-each-char loop + mutation.
 fn len(s: str) -> i64 {

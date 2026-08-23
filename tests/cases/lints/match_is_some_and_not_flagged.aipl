@@ -1,4 +1,4 @@
-import { print, to_str, == } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 // The shapes the lint deliberately leaves alone. Each is a `match` on an
 // optional that is *close* to the flagged form but has no `is_some_and`

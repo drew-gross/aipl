@@ -1,4 +1,4 @@
-import { saturating_sub as -, == } from builtins;
+import { equal as ==, saturating_sub as - } from builtins;
 
 // `import { saturating_sub as - }` binds `-` to clamping integer subtraction:
 // instead of wrapping on overflow (`wrapping_sub`), the result is pinned at the

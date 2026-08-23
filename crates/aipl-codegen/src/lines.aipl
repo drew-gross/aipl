@@ -1,4 +1,4 @@
-import { split, == } from builtins;
+import { equal as ==, split } from builtins;
 
 pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
     Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing

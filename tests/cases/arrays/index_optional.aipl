@@ -1,4 +1,4 @@
-import { value_or, == } from builtins;
+import { equal as ==, value_or } from builtins;
 
 // Indexing yields an optional: some(elem) in bounds, none out of bounds.
 fn at(xs: i64[], i: i64) -> i64 { xs[i].value_or(-1) }.test({

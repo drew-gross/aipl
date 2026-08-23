@@ -1,4 +1,4 @@
-import { %, == } from builtins;
+import { equal as ==, remainder as % } from builtins;
 
 fn m(x: i64, y: i64) -> i64 { x % y }.test({
     assert(m(17, 5) == 2);

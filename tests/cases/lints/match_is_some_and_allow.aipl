@@ -1,4 +1,4 @@
-import { is_some_and, print, to_str, == } from builtins;
+import { equal as ==, is_some_and, print, to_str } from builtins;
 
 // `#[allow]` keeps the long form — the escape hatch every lint carries.
 // `is_some_and`'s own definition needs exactly this, since it cannot be

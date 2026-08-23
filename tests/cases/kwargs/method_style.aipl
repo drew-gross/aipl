@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 fn bumped(self: i64, by: i64 = 7) -> i64 { self + by }.test({
     assert(1.bumped() == 8);

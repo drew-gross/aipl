@@ -1,4 +1,4 @@
-import { len, print, to_str, value_or, <, == } from builtins;
+import { equal as ==, len, less_than as <, print, to_str, value_or } from builtins;
 
 // A `let`/`mut` annotation may name the enclosing function's type parameter:
 // `mut out: T[] = [];`. Monomorphization substitutes type variables into a

@@ -5,23 +5,23 @@
 // is that column (the opening line's indent) — unsigned, matching the `usize` the
 // Rust caller holds, and matching the unsigned counts `indent`/`repeat` take.
 import {
+    concat as +++,
     drop_first,
     drop_last,
+    equal as ==,
     first,
+    greater_than as >,
     join,
     last,
     len,
+    less_than as <,
+    logical_and as &&,
+    logical_or as ||,
+    not_equal as !=,
     repeat,
     trim,
     value_or,
     wrapping_add as +,
-    !=,
-    &&,
-    +++,
-    <,
-    ==,
-    >,
-    ||,
 } from builtins;
 import { dedent } from "./dedent.aipl";
 import { indent } from "./indent.aipl";

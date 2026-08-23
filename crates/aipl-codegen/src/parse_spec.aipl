@@ -3,18 +3,18 @@
 // the entry-point source is whatever precedes the first marker, and each marker
 // opens a section whose body runs to the next marker or EOF.
 import {
+    concat as +++,
     contains,
     drop_n,
+    equal as ==,
     int_parse,
     is_err_and,
     len,
+    logical_or as ||,
     push,
     starts_with,
     trim,
     value_or,
-    +++,
-    ==,
-    ||,
 } from builtins;
 import { lines as split_lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";

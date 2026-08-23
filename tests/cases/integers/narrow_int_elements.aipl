@@ -1,5 +1,6 @@
 import {
     contains,
+    equal as ==,
     len,
     maximum,
     minimum,
@@ -10,7 +11,6 @@ import {
     to_str,
     value_or,
     wrapping_add as +,
-    ==,
 } from builtins;
 
 // Every integer width — not just the 64-bit pair — is a legal array and

@@ -1,6 +1,6 @@
 // Operators can be aliased to different operator names when imported, though
 // this is a bad idea and confusing. This documents that it's legal.
-import { print, to_str, wrapping_add as -, == } from builtins;
+import { equal as ==, print, to_str, wrapping_add as - } from builtins;
 
 fn compute(a: i64, b: i64) -> i64 { a - b }.test({
     // Using - which is actually wrapping_add

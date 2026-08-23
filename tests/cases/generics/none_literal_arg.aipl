@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A bare `none` passed to an `any?` parameter pins the type variable to the
 // `NoneLiteral` pseudo-type and monomorphizes the function for the none-only

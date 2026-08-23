@@ -1,5 +1,7 @@
 import {
     drop_first,
+    equal as ==,
+    greater_than as >,
     len,
     opt_left_fold as opt_fold,
     starts_with,
@@ -7,8 +9,6 @@ import {
     trim_while,
     wrapping_mul as *,
     wrapping_sub as -,
-    ==,
-    >,
 } from builtins;
 
 // The AIPL implementation of the `int_parse` builtin. Monomorphization

@@ -1,4 +1,4 @@
-import { len, push, <, == } from builtins;
+import { equal as ==, len, less_than as <, push } from builtins;
 
 // A result payload may be an array — on either side. Array payloads ride the
 // same generic machinery as struct payloads (a single refcounted pointer

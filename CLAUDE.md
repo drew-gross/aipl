@@ -232,18 +232,46 @@ Note that every `.aipl` under `crates/` is *also* discovered as a case, so
 adding a dogfooded source adds a case too — it needs the same `#[test]` entry
 and the same `--- performance ---` section any case does. Handoff fills both.
 
-## Operators must be imported
-Operators are not ambient — a file that uses `==`, `<`, `&&`, unary `-`/`!`, etc.
-must import each by spelling: `import { ==, < } from builtins;`. The `+` operator
-is special: it's the `wrapping_add` builtin aliased to `+`, so it's imported as
-`import { wrapping_add as + } from builtins;` (a bare `import { + }` is an error).
-The
-loader gates operator *usage* per file against its imports (unimported → compile
-error). So every new `.aipl` (test case, example, embedded compiler source, and
-each `--- file:` companion) that uses operators needs the matching import — and
-since the import shifts line numbers, refill any `--- errors ---`/`--- check ---`
-/`--- performance ---` sections (string-literal data symbols are span-named, so
-`binary size` shifts too).
+## Operators must be imported — always as `name as op`
+Operators are not ambient, and **none of them has a bare form**. Every operator is
+imported by aliasing its named builtin:
+`import { equal as ==, less_than as < } from builtins;`. A bare
+`import { ==, < }` is a compile error, exactly as `import { + }` is.
+
+Where an operator has more than one semantics the alias is what records the
+choice (`wrapping_add as +` vs `saturating_add as +`). Where it has only one, the
+alias buys uniformity: an import list shows every operator a file uses in one
+shape, so a reader never has to know which operators happen to be ambiguous.
+
+| operator | import as | operator | import as |
+|---|---|---|---|
+| `+` | `wrapping_add` / `saturating_add` | `==` | `equal` |
+| `-` | `wrapping_sub` / `saturating_sub` | `!=` | `not_equal` |
+| `*` | `wrapping_mul` | `<` | `less_than` |
+| `++` | `wrapping_increment` / `saturating_increment` | `>` | `greater_than` |
+| `/` | `divide` | `<=` | `less_than_or_equal` |
+| `%` | `remainder` | `>=` | `greater_than_or_equal` |
+| `+++` | `concat` | `&&` | `logical_and` |
+| `!` | `logical_not` | `\|\|` | `logical_or` |
+
+`OPERATOR_BUILTINS` (`crates/aipl-syntax/src/lib.rs`) is the single place these
+are declared — extend it rather than adding a per-operator special case. The
+loader's refusal message is generated from that table, so a new operator or
+flavor keeps its own diagnostic correct: one named form yields
+"import it aliased: `equal as ==`", several yields "pick a semantics, e.g.
+`wrapping_add as +` or `saturating_add as +`".
+
+The loader gates operator *usage* per file against its imports (unimported →
+compile error). So every new `.aipl` (test case, example, embedded compiler
+source, and each `--- file:` companion) that uses operators needs the matching
+import — and since the import shifts line numbers, refill any
+`--- errors ---`/`--- check ---`/`--- performance ---` sections (string-literal
+data symbols are span-named, so `binary size` shifts too).
+
+When rewriting imports across the corpus, anchor the match to line start
+(`^import {`): `walker.aipl`'s formatter tests hold `"import { == } from
+builtins;"` inside *string literals*, and rewriting those corrupts fixtures —
+both the input and its expected output.
 
 ## `match` is either a statement or an expression, never both
 An arm's body may be a single expression or a brace-delimited statement block

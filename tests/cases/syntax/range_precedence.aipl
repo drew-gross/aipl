@@ -1,4 +1,13 @@
-import { Span, print, to_str, wrapping_add as +, wrapping_mul as *, !, &&, == } from builtins;
+import {
+    Span,
+    equal as ==,
+    logical_and as &&,
+    logical_not as !,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
 
 // Where `..` sits in the precedence table. Loosest to tightest:
 //

@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, !=, == } from builtins;
+import { equal as ==, not_equal as !=, print, to_str, wrapping_add as + } from builtins;
 
 // A variant that reaches itself only *through an array*: `CTree` carries
 // `Cst[]`, and no case has a direct `Cst` payload. That is still a containment

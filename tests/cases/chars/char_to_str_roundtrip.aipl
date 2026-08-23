@@ -1,4 +1,4 @@
-import { print, to_str, == } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 // `to_str` on a char yields its Debug-style quoted form, `'X'`.
 fn main() !prints {

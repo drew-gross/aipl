@@ -8,7 +8,7 @@ import { + } from builtins; #[allow]
 
 fn main() {}
 --- errors ---
-error: the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins (add)
+error: the "+" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add as +` or `saturating_add as +` from builtins
  --> ./tests/cases/imports/err_bare_plus_operator.aipl:7:10
   |
 7 | import { + } from builtins; #[allow]

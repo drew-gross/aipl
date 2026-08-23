@@ -1,4 +1,4 @@
-import { <, == } from builtins;
+import { equal as ==, less_than as < } from builtins;
 
 // An `if`/`else if`/`else` ladder: each `else` is followed by another `if`
 // (the only brace-less `else` form), and the whole thing is a right-nested

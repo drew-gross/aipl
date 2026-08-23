@@ -1,4 +1,14 @@
-import { filter, map, wrapping_mul as *, wrapping_sub as -, !=, /, <, ==, > } from builtins;
+import {
+    divide as /,
+    equal as ==,
+    filter,
+    greater_than as >,
+    less_than as <,
+    map,
+    not_equal as !=,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
 
 // A named predicate.
 fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
@@ -32,7 +42,7 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 1032
 instructions executed: 3427
-binary size: 7544
+binary size: 7552
   code: 4196
     __eq_i64$arr: 296
     __eq_str$arr: 352
@@ -40,7 +50,7 @@ binary size: 7544
     __map11$own0: 256
     is_even: 32
     main: 2988
-  data: 468
+  data: 476
   metadata: 2880
 builtin calls: 120
   aipl_arr_drop_str: 3

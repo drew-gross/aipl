@@ -1,4 +1,4 @@
-import { && } from builtins;
+import { logical_and as && } from builtins;
 
 fn main() -> i64 { if (1 && 2) { 1 } else { 2 } }
 --- errors ---

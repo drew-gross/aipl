@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A generic struct instance can itself be a type argument to another generic
 // struct: constructing `Wrapper { inner: Box { value: 42 } }` infers the inner

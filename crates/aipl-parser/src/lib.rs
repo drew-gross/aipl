@@ -851,7 +851,7 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
             aipl::ImportName::AliasedPlusplus((name, span), _) => name_as_op(name, span, "++"),
             aipl::ImportName::AliasedBang((name, span)) => name_as_op(name, span, "!"),
-            // Operator imports (`import { ==, < } from builtins`). An `OP` token
+            // Operator imports (`import { equal as ==, less_than as < } from builtins`). An `OP` token
             // carries a span, so keep it — the unused-import lint reports at the
             // imported name, and without a span its caret would land on the
             // file's first line. The bare `-`/`<`/`>`/`||`/`!` tokens below

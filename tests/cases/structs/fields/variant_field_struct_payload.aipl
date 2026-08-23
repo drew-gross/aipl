@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 // Struct → variant → struct nesting (non-recursive): a variant whose payload
 // is a struct can itself be a field of another struct. The outer layout sizes

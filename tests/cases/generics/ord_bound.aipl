@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A generic bound `<T: ord>` restricts `T` to comparable scalars — currently
 // integers and char, the same primitives usable with `<`/`>`. Declaring it in

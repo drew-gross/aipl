@@ -1,4 +1,4 @@
-import { < } from builtins;
+import { less_than as < } from builtins;
 
 // `set n++;` uses the `++` operator, which must be imported on its own spelling
 // — importing `+` does not enable it, even though the two share an

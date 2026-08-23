@@ -1,4 +1,4 @@
-import { len, print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, len, print, to_str, wrapping_add as + } from builtins;
 
 // A boxed (recursive) value can be stored in ordinary containers. From a
 // container's view the reference is *external*, so it is strong-counted like

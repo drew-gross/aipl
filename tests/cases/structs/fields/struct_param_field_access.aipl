@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 struct Point { x: i64, y: i64 }
 

@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn first() -> str { "first" }.test({
     assert(first() == "first");

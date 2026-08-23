@@ -1,4 +1,4 @@
-import { wrapping_add as +, wrapping_sub as -, == } from builtins;
+import { equal as ==, wrapping_add as +, wrapping_sub as - } from builtins;
 
 fn neg(x: i64) -> i64 { -x }.test({
     assert(neg(5) == -5);

@@ -1,7 +1,7 @@
 // `*` has no bare form — like `+`/`-`, you import a multiply semantics:
 // `wrapping_mul as *` (the counterpart of `wrapping_add as +`). It wraps on
 // overflow like the other wrapping operators.
-import { print, to_str, wrapping_mul as *, == } from builtins;
+import { equal as ==, print, to_str, wrapping_mul as * } from builtins;
 
 fn main() !prints {
     print((6 * 7).to_str()); // 42

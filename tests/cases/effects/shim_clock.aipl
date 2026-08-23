@@ -1,4 +1,4 @@
-import { monotonic_now, now_nanos, print, to_str, ==, > } from builtins;
+import { equal as ==, greater_than as >, monotonic_now, now_nanos, print, to_str } from builtins;
 
 // A `shim <effect> { op = f, .. } { body }` installs stand-ins for an effect's
 // operations over the *dynamic* extent of `body`: every call made while it runs

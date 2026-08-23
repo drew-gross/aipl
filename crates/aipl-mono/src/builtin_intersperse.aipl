@@ -1,4 +1,4 @@
-import { len, push, <, == } from builtins;
+import { equal as ==, len, less_than as <, push } from builtins;
 
 // The AIPL implementation of the `intersperse` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_intersperse` (see

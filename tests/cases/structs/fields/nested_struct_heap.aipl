@@ -1,4 +1,4 @@
-import { value_or, +++, == } from builtins;
+import { concat as +++, equal as ==, value_or } from builtins;
 
 // A nested struct that holds heap data: the inner `Name` owns two `str`s (built
 // by concatenation, so they're genuinely heap-allocated, not static literals),

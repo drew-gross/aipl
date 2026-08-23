@@ -1,4 +1,4 @@
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 // Each branch allocates a fresh string; the merge value must hold
 // exactly one ref so the outer scope can dec safely.

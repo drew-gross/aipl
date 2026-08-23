@@ -1,4 +1,4 @@
-import { wrapping_mul as *, == } from builtins;
+import { equal as ==, wrapping_mul as * } from builtins;
 
 fn caller() -> i64 { callee(7) }.test({
     assert(caller() == 14);

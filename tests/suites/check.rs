@@ -59,9 +59,9 @@ fn check_tree(name: &str, files: &[(&str, &str)], args: &[&str]) -> (String, Str
 }
 
 const PASSES: &str =
-    "import { == } from builtins;\nfn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
+    "import { equal as ==} from builtins;\nfn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
 const FAILS: &str =
-    "import { == } from builtins;\nfn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
+    "import { equal as ==} from builtins;\nfn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
 /// Declared `i64`, returns `str` — fails the checker, so it never runs.
 const BROKEN: &str = "pub fn c() -> i64 { \"oops\" }\n";
 
@@ -196,7 +196,7 @@ fn a_missing_path_is_reported() {
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(
         "all_pass",
-        "import { ==, > } from builtins;\n\
+        "import { equal as ==, greater_than as >} from builtins;\n\
          fn a() -> i64 { 1 }.test({ assert(a() == 1); })\n\
          fn b() -> i64 { 2 }.test({ assert(b() == 2); assert(b() > 0); })\n",
     );
@@ -209,7 +209,7 @@ fn all_tests_pass_is_silent_and_exit_zero() {
 fn a_failing_assert_reports_and_exits_one() {
     let (stdout, _stderr, code) = check(
         "one_fail",
-        "import { == } from builtins;\n\
+        "import { equal as ==} from builtins;\n\
          fn foo() -> i64 { 42 }.test({ assert(foo() == 42); })\n\
          fn bar() -> i64 { 5 }.test({\n    assert(bar() == 6);\n})\n",
     );
@@ -231,7 +231,7 @@ fn a_failing_assert_reports_and_exits_one() {
 fn all_asserts_in_a_test_run_and_each_failure_is_reported() {
     let (stdout, _stderr, code) = check(
         "run_all",
-        "import { == } from builtins;\n\
+        "import { equal as ==} from builtins;\n\
          fn bar() -> i64 { 5 }.test({\n    assert(bar() == 6);\n    assert(bar() == 7);\n})\n",
     );
     // Both failing asserts report — the first failure doesn't abort the test.
@@ -248,7 +248,7 @@ fn a_test_may_call_effectful_functions() {
     // no effect annotation. (Its output lands in the check output.)
     let (stdout, _stderr, code) = check(
         "effects",
-        "import { print, == } from builtins;\n\
+        "import { print, equal as ==} from builtins;\n\
          fn greet() !prints { print(\"hi\") }.test({ greet(); assert(1 == 1); })\n",
     );
     assert!(

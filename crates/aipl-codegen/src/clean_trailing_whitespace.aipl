@@ -2,7 +2,7 @@
 // layout, so every span the walker copies verbatim refers to the cleaned text.
 // The language rejects trailing whitespace, so removing it can't change the
 // meaning of a program the parser would accept.
-import { join, map, ==, || } from builtins;
+import { equal as ==, join, logical_or as ||, map } from builtins;
 import { lines } from "./lines.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 

@@ -1,4 +1,11 @@
-import { print, to_str, wrapping_add as +, wrapping_mul as *, <, == } from builtins;
+import {
+    equal as ==,
+    less_than as <,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
 
 // Operators are imported individually by spelling, like any other builtin.
 

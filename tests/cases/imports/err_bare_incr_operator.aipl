@@ -6,7 +6,7 @@ import { ++ } from builtins; #[allow]
 
 fn main() {}
 --- errors ---
-error: the "++" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_increment as ++` or `saturating_increment as ++` from builtins (increment)
+error: the "++" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_increment as ++` or `saturating_increment as ++` from builtins
  --> ./tests/cases/imports/err_bare_incr_operator.aipl:5:10
   |
 5 | import { ++ } from builtins; #[allow]

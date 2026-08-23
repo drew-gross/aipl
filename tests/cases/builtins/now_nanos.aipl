@@ -1,4 +1,4 @@
-import { now_nanos, &&, <, > } from builtins;
+import { greater_than as >, less_than as <, logical_and as &&, now_nanos } from builtins;
 
 // `now_nanos` reads the system wall clock: nanoseconds since the Unix epoch, as
 // a `u64`. It carries the `!clock` effect, so every caller must declare it.

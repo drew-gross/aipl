@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A generic struct is a template: each construction infers its type argument
 // from the field values, monomorphizing to a distinct instance (`Box$i64`,

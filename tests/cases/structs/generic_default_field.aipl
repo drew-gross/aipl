@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A generic struct may mix a type-parameter field with an ordinary field that
 // carries a default. The default rides along with each instantiation.

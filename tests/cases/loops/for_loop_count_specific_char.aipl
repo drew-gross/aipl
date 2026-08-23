@@ -1,4 +1,4 @@
-import { wrapping_increment as ++, == } from builtins;
+import { equal as ==, wrapping_increment as ++ } from builtins;
 
 fn count_a(s: str) -> i64 {
     mut n = 0;

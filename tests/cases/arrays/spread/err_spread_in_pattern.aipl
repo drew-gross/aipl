@@ -1,6 +1,6 @@
 // An array *pattern* has no rest form — `..` there is rejected the same way it
 // is in a call argument list.
-import { == } from builtins;
+import { equal as ==} from builtins;
 
 fn main() -> i64 {
     let a = [1];

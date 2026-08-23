@@ -1,17 +1,17 @@
 import {
     contains_key,
+    equal as ==,
     get,
     has,
     len,
+    less_than as <,
+    logical_not as !,
+    not_equal as !=,
     print,
     to_str,
     value_or,
     wrapping_add as +,
     wrapping_sub as -,
-    !,
-    !=,
-    <,
-    ==,
 } from builtins;
 
 // The sized integer types (`i8`..`i64`, `u8`..`u64`) are storable *inside*

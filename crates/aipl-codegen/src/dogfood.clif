@@ -1594,7 +1594,7 @@ block25(v116: i64):
 ;   ss0 = out
 ;   ss1 = skipping
 ;   ss2 = line_start
-;   ss3 = __idx$1210
+;   ss3 = __idx$1319
 ;   v16 = c
 ;   v34 = i
 ;   v41 = line
@@ -2496,7 +2496,7 @@ block3:
 ;   ss1 = prev2
 ;   ss2 = ws_start
 ;   ss3 = line_start
-;   ss4 = __idx$1790
+;   ss4 = __idx$1881
 ;   v17 = c
 ;   v35 = i
 ;   v48 = s
@@ -27206,7 +27206,7 @@ block3:
 ;   ss0 = line
 ;   ss1 = line_start
 ;   ss2 = found
-;   ss3 = __idx$726
+;   ss3 = __idx$785
 ;   v16 = c
 ;   v34 = i
 ; __m2__lines
@@ -35843,7 +35843,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __lambda_2
@@ -35967,7 +35967,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __lambda_4
@@ -36658,7 +36658,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __lambda_15
@@ -39245,7 +39245,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __m4__trim_end_while$lam56
@@ -39383,7 +39383,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __builtin_drop_n$char$s0$tail
@@ -39540,7 +39540,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __builtin_last$str

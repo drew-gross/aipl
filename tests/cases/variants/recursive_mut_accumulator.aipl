@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 // Reassigning a `mut` binding of a *boxed* (recursive) type from inside a
 // nested scope — the classic `set acc = Cons(x, acc)` fold in a `for` body.

@@ -1,4 +1,4 @@
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 fn lead_empty() -> str { "" +++ "lone" }.test({
     assert(lead_empty() == "lone");

@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn t() -> bool { true }.test({
     assert(t() == true);

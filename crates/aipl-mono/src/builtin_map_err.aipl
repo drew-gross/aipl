@@ -1,4 +1,4 @@
-import { is_err_and, value_or_err, !, == } from builtins;
+import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins;
 
 // The AIPL implementation of the `map_err` builtin. Monomorphization registers
 // this function under the canonical name `__builtin_map_err` (see

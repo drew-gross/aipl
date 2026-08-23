@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A triple-quoted raw string trims one surrounding newline and de-dents its
 // contents, so this is exactly equal to "This is\na raw\nstring". The closing

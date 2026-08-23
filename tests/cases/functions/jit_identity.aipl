@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn id(x: i64) -> i64 { x }.test({
     assert(id(7) == 7);

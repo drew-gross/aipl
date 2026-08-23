@@ -4,7 +4,14 @@
 // line's byte range — from its first byte up to the '\n' terminator (or
 // source.len() for the last line). The range is a `Span`, so a caller can
 // slice the line straight out of the source with `source[at.span]`.
-import { Span, len, wrapping_add as +, wrapping_increment as ++, ==, >= } from builtins;
+import {
+    Span,
+    equal as ==,
+    greater_than_or_equal as >=,
+    len,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 
 struct LineAt { line: u64, span: Span }
 

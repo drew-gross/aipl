@@ -1,4 +1,4 @@
-import { wrapping_increment as ++, <, == } from builtins;
+import { equal as ==, less_than as <, wrapping_increment as ++ } from builtins;
 
 // `set n++;` increments a mut binding by one. `++` is its own operator with its
 // own flavors, imported separately from `+`: `wrapping_increment as ++` here,

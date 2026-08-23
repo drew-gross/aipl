@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, +++ } from builtins;
+import { concat as +++, print, to_str, wrapping_add as + } from builtins;
 
 // A generic variant may now be instantiated at several type arguments in one
 // program. Each instance (`Wrap$i64`, `Wrap$str`) is a distinct monomorphic

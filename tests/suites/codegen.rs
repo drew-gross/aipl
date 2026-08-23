@@ -123,7 +123,7 @@ fn concat_arg_emits_concat_specialized_instance() {
     // `contains_early_exit`). A plain `{ 0 }` body would simply be inlined into
     // `main` and no `label` instance of either kind would be emitted.
     let comp = compile(
-        "import { wrapping_add as +, +++ } from builtins;
+        "import { wrapping_add as +, concat as +++} from builtins;
          fn label(s: str) -> i64 { if (true) { return 0; }; 0 }
          fn main() -> i64 {
              label(\"abcdefgh\" +++ \"ijklmnop\") + label(\"qrstuvwx\" +++ \"yz012345\")

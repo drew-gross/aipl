@@ -18,7 +18,7 @@ fn calls_a_scalar_function() {
 #[test]
 fn bool_and_char_marshal_as_i64() {
     let src = "\
-import { %, == } from builtins;
+import { remainder as %, equal as ==} from builtins;
 pub fn is_even(n: i64) -> bool { n % 2 == 0 }
 pub fn echo_char(c: char) -> char { c }";
     let e = Engine::compile(src).unwrap();
@@ -74,7 +74,7 @@ fn call_values_marshals_str_args_with_int_return() {
     // str args + i64 return — the shape the compiler will use for
     // `common_space_prefix`: a char-walk counting the shared leading spaces.
     let src = "\
-import { wrapping_add as +, ==, && } from builtins;
+import { wrapping_add as +, equal as ==, logical_and as &&} from builtins;
 fn go(a: str, b: str, i: i64) -> i64 {
     match (a[i]) {
         some(x) => match (b[i]) {
@@ -121,7 +121,7 @@ fn call_values_marshals_str_return() {
     // Identity returns one of the (borrowed) argument buffers; concat builds a
     // fresh heap string. Both must round-trip and free cleanly.
     let src = "\
-import { +++ } from builtins;
+import { concat as +++} from builtins;
 pub fn id(s: str) -> str { s }
 pub fn shout(s: str) -> str { s +++ \" is loud!\" }";
     let e = Engine::compile(src).unwrap();
@@ -200,7 +200,7 @@ fn call_values_marshals_struct_return() {
     // `find_trailing_whitespace` to report a `Span`. Fields come back in
     // declaration order, each tagged with its name.
     let src = "\
-import { +++ } from builtins;
+import { concat as +++} from builtins;
 struct Span { start: i64, end: i64 }
 struct Tagged { name: str, ok: bool, code: char }
 pub fn span(a: i64, b: i64) -> Span { start: a, end: b }
@@ -367,7 +367,7 @@ fn call_values_rejects_unmarshalable_return() {
 /// A variant whose cases span a nullary case and scalar/`str`/`char` payloads —
 /// the shape the AIPL lexer's token type (`AiplTok`) uses.
 const VARIANT_SRC: &str = "\
-import { ==, +++ } from builtins;
+import { equal as ==, concat as +++} from builtins;
 variant Token = Eof | Ident(str) | Count(i64) | Mark(char)
 pub fn classify(n: i64) -> Token {
     if (n == 0) { Eof }
@@ -511,7 +511,7 @@ pub fn empty() -> Bag { Empty }";
 /// (bit-packed), `char` (str-shaped), nested arrays, structs, and variants — the
 /// last being the shape the AIPL lexer needs (a `Token[]` token stream).
 const ARRAY_SRC: &str = "\
-import { == } from builtins;
+import { equal as ==} from builtins;
 struct Span { start: i64, end: i64 }
 variant Token = Eof | Ident(str) | Count(i64)
 pub fn ints(n: i64) -> i64[] { if (n == 0) { [] } else { [10, 20, 30] } }
@@ -608,7 +608,7 @@ fn call_values_marshals_optional_array_return() {
 /// that reads every element, so a mis-sized stride or a wrong tag shows up as a
 /// wrong answer rather than passing unnoticed.
 const ARRAY_PARAM_SRC: &str = "\
-import { len, push, value_or, wrapping_add as +, wrapping_sub as -, wrapping_add as ++, +++ } from builtins;
+import { len, push, value_or, wrapping_add as +, wrapping_sub as -, wrapping_add as ++, concat as +++} from builtins;
 struct Span { start: i64, end: i64 }
 variant Token = Eof | Ident(str) | Count(i64)
 
@@ -1020,7 +1020,7 @@ fn doc_example_compile_sources() {
 /// [`Engine::call_values`]'s example: `str` arguments marshaled in, an `i64` out.
 #[test]
 fn doc_example_call_values() {
-    let src = "import { wrapping_add as +, ==, && } from builtins;\n\
+    let src = "import { wrapping_add as +, equal as ==, logical_and as &&} from builtins;\n\
                fn go(a: str, b: str, i: i64) -> i64 {\n\
                  match (a[i]) {\n\
                    some(x) => match (b[i]) {\n\

@@ -1,4 +1,4 @@
-import { has, len, !, == } from builtins;
+import { equal as ==, has, len, logical_not as ! } from builtins;
 
 // Set literals dedup at construction; `has`/`len` query them.
 fn build() -> #{i64} {

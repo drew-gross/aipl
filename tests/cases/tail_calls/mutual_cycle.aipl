@@ -1,4 +1,13 @@
-import { contains, ends_with, len, print, saturating_sub as -, to_str, ==, > } from builtins;
+import {
+    contains,
+    ends_with,
+    equal as ==,
+    greater_than as >,
+    len,
+    print,
+    saturating_sub as -,
+    to_str,
+} from builtins;
 
 // A three-function cycle, none of whose edges is a self-call. This is the shape
 // the compiler's own `doc.aipl` uses (`fits` / `fits_atom` / `fits_after`), and

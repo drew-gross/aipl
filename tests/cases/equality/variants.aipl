@@ -1,4 +1,4 @@
-import { !, !=, == } from builtins;
+import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
 // Variants compare by tag, then the active case's payload fields.
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty

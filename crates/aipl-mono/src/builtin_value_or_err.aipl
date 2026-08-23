@@ -1,4 +1,4 @@
-import { to_digit, == } from builtins;
+import { equal as ==, to_digit } from builtins;
 
 // The AIPL implementation of the `value_or_err` builtin: the bridge from the
 // optional world to the result world, and the `value_or` sibling that keeps a

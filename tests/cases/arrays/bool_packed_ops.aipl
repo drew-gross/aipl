@@ -1,4 +1,4 @@
-import { filter, len, map, push, !, ==, > } from builtins;
+import { equal as ==, filter, greater_than as >, len, logical_not as !, map, push } from builtins;
 
 // `push`, `map`, and `filter` on bit-packed `bool[]`, including growth across a
 // byte boundary.

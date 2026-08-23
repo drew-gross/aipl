@@ -1,4 +1,4 @@
-import { ==, >= } from builtins;
+import { equal as ==, greater_than_or_equal as >= } from builtins;
 
 fn ge(x: i64, y: i64) -> i64 { if (x >= y) { 1 } else { 0 } }.test({
     assert(ge(3, 3) == 1);

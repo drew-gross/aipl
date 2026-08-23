@@ -1,4 +1,4 @@
-import { first, last, len, wrapping_sub as -, <, == } from builtins;
+import { equal as ==, first, last, len, less_than as <, wrapping_sub as - } from builtins;
 
 // The AIPL implementation of the `drop_last_n` builtin (see
 // `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.

@@ -1,4 +1,4 @@
-import { value_or, wrapping_add as +, == } from builtins;
+import { equal as ==, value_or, wrapping_add as + } from builtins;
 
 // An optional may carry a *boxed* (recursive) variant payload the same way it
 // carries a str or array: the value is an 8-byte heap pointer that fits the

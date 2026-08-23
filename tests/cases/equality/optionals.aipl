@@ -1,4 +1,4 @@
-import { !, !=, == } from builtins;
+import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
 // Structural equality of optionals (including nesting and comparison to `none`).
 fn eq_opt(a: i64?, b: i64?) -> bool { a == b }.test({

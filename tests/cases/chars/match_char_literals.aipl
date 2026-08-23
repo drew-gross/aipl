@@ -1,4 +1,4 @@
-import { print, wrapping_add as +, == } from builtins;
+import { equal as ==, print, wrapping_add as + } from builtins;
 
 // `match` on a `char` dispatches on char-literal arms. Like a `str` match this
 // compares by value over an *open* domain — every `char` a scrutinee could hold

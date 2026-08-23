@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // Aliasing disables the in-place optimization: once `a` is bound to `b`, the
 // static analysis marks `a` non-exclusive, so further pushes copy-on-grow and

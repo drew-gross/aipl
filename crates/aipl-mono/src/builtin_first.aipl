@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // The AIPL implementation of the `first` builtin. Monomorphization registers
 // this under the canonical name `__builtin_first` (see `AIPL_BUILTIN_SOURCES`

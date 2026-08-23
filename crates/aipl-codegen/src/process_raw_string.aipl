@@ -1,7 +1,7 @@
 // The parser's raw-string hook: the compiler calls this through the FFI (see
 // `install_parser_hooks`) for every `"""..."""` literal, and `aipl check`
 // exercises it via the `.test` block below.
-import { ends_with, ==, || } from builtins;
+import { ends_with, equal as ==, logical_or as || } from builtins;
 import { dedent } from "./dedent.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 import { trim_prefix } from "./trim_prefix.aipl";

@@ -1,7 +1,7 @@
 // A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
-import { int_parse, join, split, value_or_err, == } from builtins;
+import { equal as ==, int_parse, join, split, value_or_err } from builtins;
 import {
     Bare,
     Between,

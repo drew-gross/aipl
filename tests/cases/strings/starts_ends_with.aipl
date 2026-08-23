@@ -1,4 +1,4 @@
-import { ends_with, starts_with, !, && } from builtins;
+import { ends_with, logical_and as &&, logical_not as !, starts_with } from builtins;
 
 // `s.starts_with(p)` / `s.ends_with(p)` test whether `s`'s bytes begin / end
 // with `p`'s. The pattern is variadic (`char*`): besides a `str` it accepts a

@@ -1,4 +1,9 @@
-import { wrapping_add as +, wrapping_sub as -, <=, == } from builtins;
+import {
+    equal as ==,
+    less_than_or_equal as <=,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
 
 // `rec` forwards its function parameter to itself recursively, then calls it at
 // the base case. Specialization is memoized by (callee, synthesized function),
@@ -19,8 +24,8 @@ binary size: 1024
     main: 108
     rec$lam1: 32
     rec$lam1$tail: 28
-  data: 52
-  metadata: 804
+  data: 53
+  metadata: 803
 builtin calls: 4
   aipl_assert: 1
   aipl_test_begin: 1

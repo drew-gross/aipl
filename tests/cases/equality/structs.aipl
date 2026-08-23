@@ -1,4 +1,4 @@
-import { !, !=, == } from builtins;
+import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
 // Structs compare field by field (recursing into heap fields like str).
 struct Point { x: i64, y: i64 }

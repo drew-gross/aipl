@@ -1,4 +1,4 @@
-import { Span, print, +++ } from builtins;
+import { Span, concat as +++, print } from builtins;
 
 // Passing a `Span` to the index operator slices: `s[span]` is sugar for
 // `s[span.start..span.end]`, with the same bound clamping as `s[start..end]`.

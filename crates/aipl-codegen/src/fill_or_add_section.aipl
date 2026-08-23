@@ -1,4 +1,13 @@
-import { len, wrapping_add as +, !, &&, +++, <, ==, || } from builtins;
+import {
+    concat as +++,
+    equal as ==,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    wrapping_add as +,
+} from builtins;
 import { lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

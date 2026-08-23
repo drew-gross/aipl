@@ -1,4 +1,4 @@
-import { print, saturating_sub as -, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, print, saturating_sub as -, to_str, wrapping_add as + } from builtins;
 
 // Tail-call elimination, in its simplest form: a call in tail position reuses
 // the caller's frame instead of stacking a new one, so recursion depth stops

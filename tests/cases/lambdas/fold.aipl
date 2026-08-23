@@ -1,4 +1,4 @@
-import { filter, left_fold as fold, wrapping_add as +, +++, == } from builtins;
+import { concat as +++, equal as ==, filter, left_fold as fold, wrapping_add as + } from builtins;
 
 // `xs.fold(init, f)` combines the elements left to right — `[a, b, c]` folds to
 // `f(f(f(init, a), b), c)`, with the accumulator first and the element second.

@@ -496,34 +496,29 @@ impl Loader {
                     }
                     canonical_impl.to_string()
                 } else if aipl_syntax::is_operator_name(&n.name) {
-                    // Operators with pluggable semantics (`+`, `-`, `*`) have no
-                    // bare form — you must pick a flavor and alias it. Everything
-                    // else (`==`, `/`, `+++`, …) is a bare builtin operator.
-                    // `saturating` is optional: `*` currently offers only
-                    // `wrapping_mul`.
-                    if let Some((verb, wrapping, saturating)) = match n.name.as_str() {
-                        "+" => Some(("add", "wrapping_add", Some("saturating_add"))),
-                        "-" => Some(("subtract", "wrapping_sub", Some("saturating_sub"))),
-                        "*" => Some(("multiply", "wrapping_mul", None)),
-                        // `set n++;` adds 1, so it has the same flavors its `+`
-                        // does — and picking one is what lets a file's increment
-                        // agree with its addition.
-                        "++" => Some((
-                            "increment",
-                            "wrapping_increment",
-                            Some("saturating_increment"),
-                        )),
-                        _ => None,
-                    } {
-                        let sat = saturating
-                            .map(|s| format!(" or `{s} as {}`", n.name))
-                            .unwrap_or_default();
+                    // No operator has a bare form: every one is imported as
+                    // `name as op`. Where a flavor choice exists (`+` is
+                    // wrapping or saturating) that spelling is what records the
+                    // choice; where it does not, the uniformity is the point —
+                    // an import list names every operator a file uses the same
+                    // way, so a reader never has to know which operators happen
+                    // to be ambiguous.
+                    let forms = aipl_syntax::operator_named_forms(&n.name);
+                    if !forms.is_empty() {
+                        let options = forms
+                            .iter()
+                            .map(|f| format!("`{f} as {}`", n.name))
+                            .collect::<Vec<_>>()
+                            .join(" or ");
+                        let pick = if forms.len() > 1 {
+                            "pick a semantics and import it aliased, e.g. "
+                        } else {
+                            "import it aliased: "
+                        };
                         return Err(Error::at(
                             format!(
-                                "the \"{}\" operator has no bare form; pick a semantics and \
-                                 import it aliased, e.g. `{wrapping} as {}`{sat} from builtins \
-                                 ({verb})",
-                                n.name, n.name
+                                "the {:?} operator has no bare form; {pick}{options} from builtins",
+                                n.name
                             ),
                             n.span.clone(),
                         ));

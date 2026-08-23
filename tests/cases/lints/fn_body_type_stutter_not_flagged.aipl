@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 // Shapes the body-shorthand lint must leave alone. Each involves a struct
 // literal in a function body, but none can be written as the shorthand — and a

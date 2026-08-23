@@ -1,4 +1,4 @@
-import { len, push, == } from builtins;
+import { equal as ==, len, push } from builtins;
 
 // Growable bool[]: start empty and push. `bs.push(x)` grows the variable in
 // place; a snapshot taken first (`let snap = bs`) keeps its own value, so a

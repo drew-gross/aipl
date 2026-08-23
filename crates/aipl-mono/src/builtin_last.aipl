@@ -1,4 +1,4 @@
-import { len, wrapping_sub as -, == } from builtins;
+import { equal as ==, len, wrapping_sub as - } from builtins;
 
 // The AIPL implementation of the `last` builtin (see `AIPL_BUILTIN_SOURCES` in
 // `lib.rs`); `first`'s mirror.

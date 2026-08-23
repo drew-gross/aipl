@@ -90,12 +90,6 @@ fn flip(op: char) -> char {
 /// supplies it because the effect declarations live with the builtin signatures,
 /// which this crate does not parse.
 pub fn fuse_operations(program: &Program, effectful: &HashSet<String>) -> Program {
-    eprintln!("EFFECTFUL SET ({}): {:?}", effectful.len(), {
-        let mut v: Vec<_> = effectful.iter().cloned().collect();
-        v.sort();
-        v.truncate(12);
-        v
-    });
     let mut out = program.clone();
     for item in &mut out.items {
         if let Item::Fn(f) = item {

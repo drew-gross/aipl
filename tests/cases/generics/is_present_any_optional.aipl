@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A generic over `any?`: monomorphized per optional inner type at each call.
 

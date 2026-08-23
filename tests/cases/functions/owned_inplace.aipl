@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // `extended` takes an array, appends to it, and returns it — the canonical
 // "take ownership and mutate" shape. The compiler emits an in-place `$mut`

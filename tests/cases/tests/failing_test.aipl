@@ -1,4 +1,4 @@
-import { ==, > } from builtins;
+import { equal as ==, greater_than as > } from builtins;
 
 // What happens when a user writes a failing test: `aipl check` reports each
 // failed assertion (with its source location) under a per-test FAIL header and

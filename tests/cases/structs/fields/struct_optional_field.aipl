@@ -1,4 +1,4 @@
-import { value_or, wrapping_add as +, +++, == } from builtins;
+import { concat as +++, equal as ==, value_or, wrapping_add as + } from builtins;
 
 // A struct may hold optional fields (`T?`), stored inline as 16-byte
 // {tag, value} composites. They're built with `some`/`none`, read back with

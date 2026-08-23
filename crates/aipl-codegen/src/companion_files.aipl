@@ -2,7 +2,18 @@
 // files it needs on disk beside it (modules it imports, fixtures its tests
 // read). `aipl check` stages these into the scratch directory it runs a file's
 // tests in, and the corpus harness stages the same set for a case's build.
-import { contains, is_err_and, len, push, starts_with, trim, value_or, !=, +++, == } from builtins;
+import {
+    concat as +++,
+    contains,
+    equal as ==,
+    is_err_and,
+    len,
+    not_equal as !=,
+    push,
+    starts_with,
+    trim,
+    value_or,
+} from builtins;
 import { lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

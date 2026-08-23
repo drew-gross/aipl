@@ -1,4 +1,4 @@
-import { !, == } from builtins;
+import { equal as ==, logical_not as ! } from builtins;
 
 fn not(x: bool) -> bool { !x }.test({
     assert(not(true) == false);

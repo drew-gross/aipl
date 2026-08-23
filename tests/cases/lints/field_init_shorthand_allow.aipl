@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // `#[allow]` squelches the field-init-shorthand lint on its line, so this
 // explicit `x: x` / `y: y` construction compiles as written (see

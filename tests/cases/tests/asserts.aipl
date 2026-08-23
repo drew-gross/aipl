@@ -1,4 +1,13 @@
-import { contains_key, get, len, print, value_or, wrapping_add as +, +++, == } from builtins;
+import {
+    concat as +++,
+    contains_key,
+    equal as ==,
+    get,
+    len,
+    print,
+    value_or,
+    wrapping_add as +,
+} from builtins;
 
 // Exercises the `aipl check` path (run by the cases harness on every `.test`
 // case) across a few value kinds: i64, str, array, and dict. The `main` run is

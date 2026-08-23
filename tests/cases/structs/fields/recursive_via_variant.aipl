@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 // A containment cycle that runs through *both* a struct and a variant: `S`
 // stores a `V`, and `V`'s `Node` case stores an `S`. The two form one

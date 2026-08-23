@@ -1,4 +1,4 @@
-import { len, push, == } from builtins;
+import { equal as ==, len, push } from builtins;
 
 // Growable char[]: `cs.push(x)` grows the variable in place (rebuilding a
 // fresh `str`-shaped value each time — `char[]` has no in-place-growable

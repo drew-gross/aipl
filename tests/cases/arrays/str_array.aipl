@@ -1,4 +1,4 @@
-import { len, push, wrapping_increment as ++, == } from builtins;
+import { equal as ==, len, push, wrapping_increment as ++ } from builtins;
 
 // A `str[]` is an array whose elements are heap-allocated strings. Build,
 // index (yields `str?`), push, and iterate — each operation retains/releases

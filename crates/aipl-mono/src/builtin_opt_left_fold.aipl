@@ -1,13 +1,13 @@
 import {
+    concat as +++,
+    equal as ==,
     filter,
     is_some,
+    logical_not as !,
     to_digit,
     value_or,
     wrapping_add as +,
     wrapping_mul as *,
-    !,
-    +++,
-    ==,
 } from builtins;
 
 // The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a

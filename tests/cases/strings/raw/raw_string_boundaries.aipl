@@ -1,4 +1,4 @@
-import { print, +++ } from builtins;
+import { concat as +++, print } from builtins;
 
 // Brackets make the exact boundaries visible. An empty raw string and one
 // holding only the trimmed surrounding newline are both ""; trailing spaces

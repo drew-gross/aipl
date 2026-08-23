@@ -1,4 +1,4 @@
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 // String materialized inline as a fn argument; lifetime must survive
 // the call.

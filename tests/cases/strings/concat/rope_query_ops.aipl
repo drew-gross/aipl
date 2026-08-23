@@ -1,4 +1,4 @@
-import { ends_with, len, print, starts_with, to_str, +++, == } from builtins;
+import { concat as +++, ends_with, equal as ==, len, print, starts_with, to_str } from builtins;
 
 // Query operations stream a rope's leaves instead of flattening it: equality,
 // prefix/suffix tests, indexing, and length all run without materializing. So

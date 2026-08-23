@@ -1,4 +1,4 @@
-import { !=, == } from builtins;
+import { equal as ==, not_equal as != } from builtins;
 
 fn beq(x: bool, y: bool) -> bool { x == y }.test({
     assert(beq(true, true) == true);

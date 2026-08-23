@@ -1,4 +1,12 @@
-import { print, to_str, wrapping_add as +, wrapping_increment as ++, !=, <, == } from builtins;
+import {
+    equal as ==,
+    less_than as <,
+    not_equal as !=,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 
 // A struct that holds *both* a direct boxed (recursive) field and an array
 // field, plus the variant spelling of the same mix — a `Climb`-shaped case

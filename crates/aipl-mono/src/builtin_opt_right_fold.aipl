@@ -1,15 +1,15 @@
 import {
+    concat as +++,
+    equal as ==,
     filter,
+    greater_than as >,
     is_some,
     len,
+    logical_and as &&,
+    logical_not as !,
     value_or,
     wrapping_add as +,
     wrapping_sub as -,
-    !,
-    &&,
-    +++,
-    ==,
-    >,
 } from builtins;
 
 // The AIPL implementation of the `opt_right_fold` builtin: `right_fold` with a

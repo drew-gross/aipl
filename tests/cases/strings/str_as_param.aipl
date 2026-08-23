@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn passthrough(s: str) -> str { s }.test({
     assert(passthrough("hi") == "hi");

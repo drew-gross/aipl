@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // Regression: a mutating method that rebuilds its receiver from a fresh array
 // grown in a loop, then moves it in with `set self = out`. The loop-grown local

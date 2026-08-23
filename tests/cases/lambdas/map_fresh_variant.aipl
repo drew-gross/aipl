@@ -1,4 +1,4 @@
-import { map, == } from builtins;
+import { equal as ==, map } from builtins;
 
 // map over a *fresh array literal* producing a variant. The in-place reuse
 // optimization (see map_in_place.aipl) must not apply: a variant is a

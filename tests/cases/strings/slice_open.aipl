@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // `s[start..]` slices from `start` to the end of the string (the open end runs
 // to `s`'s length, filled in by codegen — no `len` import needed). `start` is

@@ -1,4 +1,4 @@
-import { push, &&, == } from builtins;
+import { equal as ==, logical_and as &&, push } from builtins;
 
 // A mutating call used as a *value* is copy-and-modify: it returns a fresh array
 // with the element appended and leaves the receiver untouched. This holds for

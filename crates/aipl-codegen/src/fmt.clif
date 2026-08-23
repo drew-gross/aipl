@@ -2251,7 +2251,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = src
-;   v2 = __tpat$1385
+;   v2 = __tpat$1404
 ;   v3 = code
 ;   v4 = sections
 ; __m2__fmt_layout
@@ -45649,7 +45649,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$32513
+;   ss1 = __idx$32614
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -46207,7 +46207,7 @@ block21:
 ;   ss2 = __spread$4
 ;   ss3 = out
 ;   v125 = had_imports
-;   ss4 = __idx$33558
+;   ss4 = __idx$33659
 ;   v155 = d
 ;   v157 = i
 ; __m18__program_items
@@ -101804,7 +101804,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __lambda_2$tail
@@ -103427,7 +103427,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __m6__trim_end_while$lam26
@@ -103711,7 +103711,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __lambda_31
@@ -106003,7 +106003,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __builtin_last$str
@@ -106572,7 +106572,7 @@ block3:
 ;   v0 = self
 ;   v1 = sep
 ;   ss0 = out
-;   ss1 = __idx$696
+;   ss1 = __idx$718
 ;   v37 = x
 ;   v39 = i
 ; __lambda_67
@@ -110261,7 +110261,7 @@ block3:
 ; source variables:
 ;   v0 = self
 ;   ss0 = k
-;   ss1 = __idx$285
+;   ss1 = __idx$309
 ;   v10 = c
 ;   v28 = i
 ; __m6__trim_end_while$lam102

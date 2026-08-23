@@ -1,4 +1,4 @@
-import { !, !=, == } from builtins;
+import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
 // Arrays compare elementwise, in order, with length first. Nested arrays and
 // str elements recurse.

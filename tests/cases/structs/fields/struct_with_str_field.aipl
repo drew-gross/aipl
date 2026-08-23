@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // A struct may hold a `str` field. The field is retained when the struct
 // is constructed and released when the struct goes out of scope; reading

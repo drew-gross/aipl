@@ -1,4 +1,11 @@
-import { all, filter, !, <=, ==, > } from builtins;
+import {
+    all,
+    equal as ==,
+    filter,
+    greater_than as >,
+    less_than_or_equal as <=,
+    logical_not as !,
+} from builtins;
 
 // `arr.all(pred)` is true when every element satisfies `pred` (short-circuits at
 // the first that fails; an empty array is vacuously true). A higher-order

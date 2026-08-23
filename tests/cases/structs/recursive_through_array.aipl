@@ -1,4 +1,12 @@
-import { len, print, to_str, wrapping_add as +, wrapping_increment as ++, <, == } from builtins;
+import {
+    equal as ==,
+    len,
+    less_than as <,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 
 // The struct form of "recursion only through an array": `kids` is `Tree[]`,
 // and no field is a `Tree` (or a `Tree?`) directly. The cycle is real —

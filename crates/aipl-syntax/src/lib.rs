@@ -1314,7 +1314,39 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("wrapping_mul", "*", "__builtin_wrapping_mul"),
     ("wrapping_increment", "++", "__builtin_wrapping_add"),
     ("saturating_increment", "++", "__builtin_saturating_add"),
+    // The operators with a single semantics. They are listed here — rather than
+    // being importable bare — so that *every* operator is imported the same way:
+    // `name as op`. Reading an import list then tells you which operators a file
+    // uses and, where it matters, which flavor, without the reader having to
+    // know which operators happen to be ambiguous.
+    //
+    // Their canonical impl is the operator spelling itself: unlike `+`, there is
+    // nothing to dispatch between, so the view maps straight through.
+    ("equal", "==", "=="),
+    ("not_equal", "!=", "!="),
+    ("less_than", "<", "<"),
+    ("greater_than", ">", ">"),
+    ("less_than_or_equal", "<=", "<="),
+    ("greater_than_or_equal", ">=", ">="),
+    ("logical_and", "&&", "&&"),
+    ("logical_or", "||", "||"),
+    ("logical_not", "!", "!"),
+    ("concat", "+++", "+++"),
+    ("divide", "/", "/"),
+    ("remainder", "%", "%"),
 ];
+
+/// The named builtins that provide `op`, in [`OPERATOR_BUILTINS`] order.
+///
+/// Every operator has at least one, which is what lets the loader refuse a bare
+/// operator import uniformly and name the alias to write instead.
+pub fn operator_named_forms(op: &str) -> Vec<&'static str> {
+    OPERATOR_BUILTINS
+        .iter()
+        .filter(|(_, o, _)| *o == op)
+        .map(|(n, _, _)| *n)
+        .collect()
+}
 
 /// If `name` is a named operator builtin, the `(operator, canonical impl)` it
 /// provides — see [`OPERATOR_BUILTINS`].
@@ -1337,7 +1369,7 @@ pub fn operator_builtin_named(op: &str, canonical_impl: &str) -> Option<&'static
 }
 
 /// Whether `s` spells a built-in operator that must be imported to be used
-/// (e.g. `import { == } from builtins;`; `+` comes via `wrapping_add as +`).
+/// (e.g. `import { equal as == } from builtins;`; `+` comes via `wrapping_add as +`).
 /// Computed by the dogfooded AIPL `is_operator_name` via the embedding FFI (see
 /// [`set_is_operator_name_hook`]) — no native fallback.
 pub fn is_operator_name(s: &str) -> bool {

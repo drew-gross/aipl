@@ -1,4 +1,4 @@
-import { !, !=, == } from builtins;
+import { equal as ==, logical_not as !, not_equal as != } from builtins;
 
 // Set equality is order-independent: same size and same members.
 fn eq_set(a: #{i64}, b: #{i64}) -> bool { a == b }.test({

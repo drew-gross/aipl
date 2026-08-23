@@ -1,6 +1,6 @@
 // The compiler's own directory walk: `tests/fmt.rs` uses it to discover every
 // `.aipl` file whose formatting is enforced.
-import { ends_with, filter, list_files, sort, == } from builtins;
+import { ends_with, equal as ==, filter, list_files, sort } from builtins;
 
 pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
     ok(with_extension(list_files(dir)?, ext))

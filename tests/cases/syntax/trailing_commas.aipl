@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 // Trailing commas are accepted in params, struct fields, struct literal
 // field inits, and call args.

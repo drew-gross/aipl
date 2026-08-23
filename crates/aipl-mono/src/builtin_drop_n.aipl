@@ -1,4 +1,4 @@
-import { first, len, == } from builtins;
+import { equal as ==, first, len } from builtins;
 
 // The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
 // in `lib.rs`).

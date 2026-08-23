@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, print, to_str, wrapping_add as + } from builtins;
 
 // A function whose whole body is a struct literal of its declared return type
 // may drop the stutter: `-> Vec2 { Vec2 { x: 1, y: 2 } }` writes as

@@ -1,4 +1,4 @@
-import { print, same_case, to_str, == } from builtins;
+import { equal as ==, print, same_case, to_str } from builtins;
 
 // `same_case(a, b)` asks whether two values share a constructor, ignoring any
 // payload. `==` on a variant is structural — it compares the payload too — so

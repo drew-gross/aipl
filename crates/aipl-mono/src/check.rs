@@ -241,11 +241,19 @@ struct Cx<'a> {
     /// derivable the moment a later pass *moves* them, so the answer is recorded
     /// while the context is still in view.
     ///
-    /// `None` as a value means "seen with conflicting types" — the same span
-    /// resolved two ways, so nothing can be locked for it. That can't happen for
-    /// a real source expression, but a desugaring may reuse a span, and a wrong
-    /// lock is far worse than a missing one.
-    locks: std::cell::RefCell<HashMap<(usize, usize), Option<Type>>>,
+    /// Keyed by the *address* of the expression node in the program being
+    /// checked, which `stamp_locks` then walks in lockstep with its clone.
+    ///
+    /// Not by span: `check` runs over the synthesized builtin declarations
+    /// followed by the real program, and a span is a byte offset **within its
+    /// own file**. Offset 432 exists in both, so a span key silently applied one
+    /// file's answer to the other's expression — an empty `[]` in a builtin decl
+    /// stamping its `str[]` onto a user's `#{}` at the same offset. Node
+    /// identity has no such overlap.
+    ///
+    /// `None` as a value means "seen with conflicting types", so nothing can be
+    /// locked for it — a wrong lock is far worse than a missing one.
+    locks: std::cell::RefCell<HashMap<usize, Option<Type>>>,
     /// The bound declared for each of `current_type_params`, so a call inside a
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
@@ -303,17 +311,16 @@ impl<'a> Cx<'a> {
     /// entry rather than picking one.
     fn lock(&self, e: &Expr, ty: &Type) {
         if needs_lock(&e.kind) {
-            self.lock_span(&e.span, ty);
+            self.lock_node(node_id(e), ty);
         }
     }
 
-    /// [`Cx::lock`] by span, for a resolution that has no `Expr` to hand — a
-    /// generic constructor, whose whole call is what gets an instance.
-    fn lock_span(&self, span: &Span, ty: &Type) {
+    /// [`Cx::lock`] by node id, for a resolution reached without the `Expr` in
+    /// hand — a generic constructor, whose whole call is what gets an instance.
+    fn lock_node(&self, key: usize, ty: &Type) {
         if mentions_placeholder(ty) || mentions_typevar(ty) {
             return;
         }
-        let key = (span.start, span.end);
         let mut locks = self.locks.borrow_mut();
         match locks.get(&key) {
             None => {
@@ -730,6 +737,7 @@ impl<'a> Cx<'a> {
         env: &Env,
         effects: &[String],
         span: Span,
+        node: usize,
     ) -> Result<Type, Error> {
         // `ctor` is the variant-qualified `Case@Template`; cases are named bare.
         let bare = ctor.split('@').next().unwrap_or(ctor);
@@ -812,7 +820,7 @@ impl<'a> Cx<'a> {
         // `Rule$Tok`: the instance name only decomposes back into base + args
         // through a registry that is populated later, so an instance here is
         // opaque exactly where it needs to be read.
-        self.lock_span(&span, &Type::Generic(base.to_string(), type_args.clone()));
+        self.lock_node(node, &Type::Generic(base.to_string(), type_args.clone()));
         let inst = self.instantiate_generic(base, &type_args)?;
         // Check each argument against the concrete (substituted) payload type.
         let cases = self.variant_cases(&inst).expect("just instantiated");
@@ -1017,33 +1025,37 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     // recorded as `None` and stamps nothing — see `Cx::locks`.
     let locks = cx.locks.borrow();
     let mut out = program.clone();
-    for item in &mut out.items {
-        if let Item::Fn(f) = item {
-            stamp_locks(&mut f.body, &locks);
-            if let Some(t) = f.test_body.as_mut() {
-                stamp_locks(t, &locks);
+    // Walked in lockstep with the input: the clone is structurally identical, so
+    // the two trees line up node for node, and each output node is stamped from
+    // the *input* node's identity.
+    for (src, item) in program.items.iter().zip(&mut out.items) {
+        if let (Item::Fn(sf), Item::Fn(f)) = (src, item) {
+            stamp_locks(&sf.body, &mut f.body, &locks);
+            if let (Some(st), Some(t)) = (sf.test_body.as_ref(), f.test_body.as_mut()) {
+                stamp_locks(st, t, &locks);
             }
         }
     }
     Ok(out)
 }
 
-/// Apply [`Cx::locks`] to a body, in place.
-fn stamp_locks(e: &mut Expr, locks: &HashMap<(usize, usize), Option<Type>>) {
-    if needs_lock_span(&e.kind) {
-        if let Some(Some(ty)) = locks.get(&(e.span.start, e.span.end)) {
-            e.ty = Some(Box::new(ty.clone()));
-        }
-    }
-    for c in crate::children_mut(e) {
-        stamp_locks(c, locks);
-    }
+/// The identity of an expression node — its address in the program being
+/// checked. See [`Cx::locks`] for why this rather than its span.
+fn node_id(e: &Expr) -> usize {
+    e as *const Expr as usize
 }
 
-/// Which expressions may carry a lock: the context-dependent shapes, plus any
-/// call (a generic constructor is one, and is locked by span).
-fn needs_lock_span(k: &ExprKind) -> bool {
-    needs_lock(k) || matches!(k, ExprKind::Call(..))
+/// Apply [`Cx::locks`] to a body, in place.
+fn stamp_locks(src: &Expr, out: &mut Expr, locks: &HashMap<usize, Option<Type>>) {
+    if let Some(Some(ty)) = locks.get(&node_id(src)) {
+        out.ty = Some(Box::new(ty.clone()));
+    }
+    for (s, o) in crate::children(src)
+        .into_iter()
+        .zip(crate::children_mut(out))
+    {
+        stamp_locks(s, o, locks);
+    }
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the
@@ -1971,7 +1983,15 @@ impl Cx<'_> {
                     // its instance can't be inferred from a (missing) payload, so
                     // it's resolved from the expected type.
                     let base = &self.generic_ctors[name];
-                    self.infer_generic_variant_ctor(base, name, &[], env, effects, span.clone())?
+                    self.infer_generic_variant_ctor(
+                        base,
+                        name,
+                        &[],
+                        env,
+                        effects,
+                        span.clone(),
+                        node_id(expr),
+                    )?
                 } else if let Some(sig) = self.sigs.get(name.as_str()) {
                     // A named function as a first-class value: its type is the
                     // corresponding `Type::Fn`. A runtime function value is a
@@ -2603,7 +2623,7 @@ impl Cx<'_> {
                         }
                     }
                 }
-                self.check_call(name, args, env, effects, span.clone())?
+                self.check_call(name, args, env, effects, span.clone(), node_id(expr))?
             }
         })
     }
@@ -2678,6 +2698,8 @@ impl Cx<'_> {
         env: &Env,
         effects: &[String],
         span: Span,
+        // Identity of the call expression, for `Cx::lock_node`.
+        node: usize,
     ) -> Result<Type, Error> {
         // A variant constructor `Ctor(a, b, ...)` (unless shadowed by a local
         // function-typed binding, handled below): check each argument against
@@ -2713,7 +2735,7 @@ impl Cx<'_> {
             // A constructor of a generic variant template: resolve to a concrete
             // instance by inferring the type arguments.
             if let Some(base) = self.generic_ctors.get(name) {
-                return self.infer_generic_variant_ctor(base, name, args, env, effects, span);
+                return self.infer_generic_variant_ctor(base, name, args, env, effects, span, node);
             }
         }
         // The integer conversion builtins `i8(x)`/`u64(x)`/… are gone. A typed

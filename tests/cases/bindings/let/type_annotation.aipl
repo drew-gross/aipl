@@ -1,4 +1,4 @@
-import { get, len, print, to_str, value_or, wrapping_add as +, == } from builtins;
+import { equal as ==, get, len, print, to_str, value_or, wrapping_add as + } from builtins;
 
 // A `let` or `mut` binding may carry an explicit type: `let x: T = value;`.
 // Without one a binding simply takes its initializer's type, which is the right

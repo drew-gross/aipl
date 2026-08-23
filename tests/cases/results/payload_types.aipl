@@ -1,4 +1,4 @@
-import { get, len, print, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, get, len, print, to_str, wrapping_add as + } from builtins;
 
 // A result payload can be *any* value type, not a privileged handful. Each side
 // rides the same generic machinery — sized by its layout, written and refcounted

@@ -1,4 +1,4 @@
-import { &&, ==, || } from builtins;
+import { equal as ==, logical_and as &&, logical_or as || } from builtins;
 
 fn and(x: bool, y: bool) -> bool { x && y }.test({
     assert(and(true, false) == false);

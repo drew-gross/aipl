@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn classify(s: str) -> i64 { if (s == "hello") { 1 } else { 0 } }.test({
     assert(classify("hello") == 1);

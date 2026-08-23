@@ -1,4 +1,4 @@
-import { len, print, push, !, == } from builtins;
+import { equal as ==, len, logical_not as !, print, push } from builtins;
 
 // Regression test for corruption of a `mut` *struct* binding reassigned from a
 // call on itself inside a loop. The `mut str` sibling of this bug is

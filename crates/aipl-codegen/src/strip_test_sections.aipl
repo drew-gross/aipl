@@ -1,4 +1,11 @@
-import { len, wrapping_add as +, wrapping_increment as ++, !=, <, == } from builtins;
+import {
+    equal as ==,
+    len,
+    less_than as <,
+    not_equal as !=,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 
 pub fn strip_test_sections(src: str) -> str {

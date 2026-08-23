@@ -1,4 +1,4 @@
-import { value_or_err, !, == } from builtins;
+import { equal as ==, logical_not as !, value_or_err } from builtins;
 
 // The AIPL implementation of the `is_err_and` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_is_err_and` (see

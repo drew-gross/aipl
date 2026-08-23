@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // Pushing the *same* array `a` into `b` twice: `b` ends up holding two
 // references to the one `[1, 2, 3]` block (plus `a`'s own binding), so it has

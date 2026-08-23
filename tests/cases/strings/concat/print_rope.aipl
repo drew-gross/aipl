@@ -1,4 +1,4 @@
-import { print, +++ } from builtins;
+import { concat as +++, print } from builtins;
 
 // Printing a rope streams its leaves straight to stdout without materializing,
 // so no flattened buffer is allocated even when the result exceeds the inline

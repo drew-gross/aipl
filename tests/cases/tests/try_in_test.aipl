@@ -1,4 +1,4 @@
-import { wrapping_add as +, == } from builtins;
+import { equal as ==, wrapping_add as + } from builtins;
 
 // The `?` operator is allowed inside a `.test` body. On an `ok` it unwraps the
 // value in place and the test proceeds; on an `err` it fails the current test

@@ -12,7 +12,7 @@
 // the parser's errors are the good ones, and anything it accepts the walker must
 // handle, so a malformed program should fail with the parser's message rather
 // than whatever the walker makes of it.
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 import { clean_trailing_whitespace } from "./clean_trailing_whitespace.aipl";
 import { split_test_sections } from "./split_test_sections.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";

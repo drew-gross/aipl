@@ -1,4 +1,4 @@
-import { wrapping_add as +, wrapping_increment as ++, == } from builtins;
+import { equal as ==, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 // Every *check-phase* loop error, in one file, reported in one run. The four
 // `for`-syntax fixtures (`err_for_body_stmt_then_expr`,

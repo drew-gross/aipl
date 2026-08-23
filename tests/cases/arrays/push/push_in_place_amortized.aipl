@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // A uniquely-owned array (never aliased — only pushed) grows with amortized
 // doubling: `push` mutates it in place when there's spare capacity,

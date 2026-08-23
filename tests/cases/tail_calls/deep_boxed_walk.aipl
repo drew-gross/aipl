@@ -1,4 +1,4 @@
-import { len, print, saturating_sub as -, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, len, print, saturating_sub as -, to_str, wrapping_add as + } from builtins;
 
 // The shape that makes tail-call elimination worth having, and the one a
 // "eliminate only where no drops are pending" rule can never reach: a function

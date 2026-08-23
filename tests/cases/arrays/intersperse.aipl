@@ -1,4 +1,4 @@
-import { intersperse, join, len, print, to_str, == } from builtins;
+import { equal as ==, intersperse, join, len, print, to_str } from builtins;
 
 // `intersperse(xs, sep)` inserts `sep` *between* consecutive elements, never
 // leading or trailing — the array counterpart of `join`.

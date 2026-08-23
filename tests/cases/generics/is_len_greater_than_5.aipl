@@ -1,4 +1,4 @@
-import { len, ==, > } from builtins;
+import { equal as ==, greater_than as >, len } from builtins;
 
 // A generic function over `any[]`: written once, monomorphized per element
 // type at each call site.

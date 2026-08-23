@@ -1,4 +1,4 @@
-import { wrapping_add as +, wrapping_mul as *, == } from builtins;
+import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn f() -> i64 {
     let a = 1;

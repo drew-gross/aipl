@@ -1,4 +1,4 @@
-import { < } from builtins;
+import { less_than as < } from builtins;
 
 // Every *check-phase* result error, in one file, reported in one run.
 //

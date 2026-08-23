@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn unwrap(x: i64?) -> i64 {
     match (x) {

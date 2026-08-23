@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // `s[i]` indexes a string: the byte at `i` as a `char?` — `some(byte)` in
 // bounds, `none` out of bounds.

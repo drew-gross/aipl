@@ -1,4 +1,4 @@
-import { execute_program, print, +++ } from builtins;
+import { concat as +++, execute_program, print } from builtins;
 
 // A launch failure (program not found) is `err(message)` — the only case
 // that's `err` rather than `ok(ExecResult)`.

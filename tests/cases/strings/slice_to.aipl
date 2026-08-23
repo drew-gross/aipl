@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 // `s[..end]` slices from the start of the string to `end` (the open start is 0,
 // filled in by the parser — no `len` import needed). `end` is clamped to

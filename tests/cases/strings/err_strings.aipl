@@ -1,4 +1,4 @@
-import { Span, len, print, wrapping_add as +, == } from builtins;
+import { Span, equal as ==, len, print, wrapping_add as + } from builtins;
 
 // Every *check-phase* string error, in one file, reported in one run. The
 // checker recovers at each item, so each failing function below is recorded and

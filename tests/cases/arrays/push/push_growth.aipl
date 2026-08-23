@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // Growable arrays: start from an empty literal and push. `xs.push(x)` grows
 // the array variable in place. Snapshotting it first (`let b = a`) keeps `b`

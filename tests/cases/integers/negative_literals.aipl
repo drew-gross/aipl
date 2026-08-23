@@ -1,4 +1,4 @@
-import { <, == } from builtins;
+import { equal as ==, less_than as < } from builtins;
 
 // A negative integer literal lexes as a single token: a `-` immediately followed
 // by digits binds them into one literal (a space after the `-` would make it the

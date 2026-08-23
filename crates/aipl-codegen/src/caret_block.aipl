@@ -9,6 +9,7 @@
 //   {pad} | <indent>^^^
 import {
     Span,
+    equal as ==,
     len,
     max,
     min,
@@ -16,7 +17,6 @@ import {
     saturating_sub as -,
     to_str,
     wrapping_add as +,
-    ==,
 } from builtins;
 import { line_at } from "./line_at.aipl";
 

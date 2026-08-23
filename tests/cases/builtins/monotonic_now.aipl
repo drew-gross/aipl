@@ -1,4 +1,13 @@
-import { execute_program, monotonic_now, wrapping_sub as -, !, &&, <, >, >= } from builtins;
+import {
+    execute_program,
+    greater_than as >,
+    greater_than_or_equal as >=,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    monotonic_now,
+    wrapping_sub as -,
+} from builtins;
 
 // `monotonic_now` reads the system's monotonic clock in nanoseconds. It carries
 // the same `!clock` effect as `now_nanos`, but answers a different question:

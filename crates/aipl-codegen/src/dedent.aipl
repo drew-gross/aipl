@@ -1,13 +1,13 @@
 import {
     count_while,
+    equal as ==,
     filter,
     is_all_whitespace,
     join,
+    logical_not as !,
     map,
     minimum,
     value_or,
-    !,
-    ==,
 } from builtins;
 import { lines } from "./lines.aipl";
 

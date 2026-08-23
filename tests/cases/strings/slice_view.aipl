@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_increment as ++, +++, == } from builtins;
+import { concat as +++, equal as ==, print, to_str, wrapping_increment as ++ } from builtins;
 
 // A slice of a long (heap) string whose result is > 7 bytes shares the source's
 // buffer as a *view*. A view is still a plain `str`: it prints, renders with

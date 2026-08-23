@@ -1,4 +1,4 @@
-import { push, to_str, wrapping_add as +, == } from builtins;
+import { equal as ==, push, to_str, wrapping_add as + } from builtins;
 
 // A higher-order *method*: its first parameter is `self`, so it's callable as
 // `xs.tag(..)`. Method-call form is specialized for the lambda just like the

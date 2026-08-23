@@ -1,4 +1,4 @@
-import { to_str, wrapping_add as +, wrapping_increment as ++, == } from builtins;
+import { equal as ==, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 // Retain elision for *inspect-only* arguments. A heap argument is normally
 // borrowed across a call by a matched pair — the caller retains it, the callee

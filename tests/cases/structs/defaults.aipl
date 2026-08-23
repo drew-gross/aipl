@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 struct Point { x: i64 = 0, y: i64 = 0 }
 

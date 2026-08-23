@@ -1,4 +1,4 @@
-import { wrapping_add as +, <, == } from builtins;
+import { equal as ==, less_than as <, wrapping_add as + } from builtins;
 
 // The `?` operator unwraps an `ok` in place and short-circuits an `err` by
 // returning it from the enclosing (result-returning) function.

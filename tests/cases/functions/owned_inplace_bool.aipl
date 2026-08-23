@@ -1,4 +1,4 @@
-import { push, == } from builtins;
+import { equal as ==, push } from builtins;
 
 // Ownership-as-monomorphization on bool[]: `extended` takes an array, appends,
 // and returns it. A call on a *fresh* (uniquely-owned) literal is sent to the

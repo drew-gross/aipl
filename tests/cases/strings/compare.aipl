@@ -1,4 +1,10 @@
-import { !, <, <=, >, >= } from builtins;
+import {
+    greater_than as >,
+    greater_than_or_equal as >=,
+    less_than as <,
+    less_than_or_equal as <=,
+    logical_not as !,
+} from builtins;
 
 // `str` compares lexicographically by bytes — the same order the `sort` builtin
 // imposes on a `str[]`, so a sort by a derived `str` key agrees with `<`.

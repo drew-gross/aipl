@@ -1,4 +1,10 @@
-import { count, wrapping_increment as ++, <, ==, >= } from builtins;
+import {
+    count,
+    equal as ==,
+    greater_than_or_equal as >=,
+    less_than as <,
+    wrapping_increment as ++,
+} from builtins;
 
 // The AIPL implementation of the `count_is_less_than` builtin. Registered under
 // `__builtin_count_is_less_than` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).

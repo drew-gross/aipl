@@ -1,4 +1,4 @@
-import { print, zip_with, +++ } from builtins;
+import { concat as +++, print, zip_with } from builtins;
 
 fn show_strs(label: str, xs: str[]) !prints {
     print(label);

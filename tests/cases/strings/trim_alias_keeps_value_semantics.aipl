@@ -1,4 +1,4 @@
-import { trim, == } from builtins;
+import { equal as ==, trim } from builtins;
 
 // Aliasing disables the in-place trim: once `s` is captured by `t`, `s` is
 // non-exclusive, so `set s = trim(s)` builds a fresh string and the snapshot

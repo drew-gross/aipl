@@ -1,4 +1,9 @@
-import { !, &&, <=, >= } from builtins;
+import {
+    greater_than_or_equal as >=,
+    less_than_or_equal as <=,
+    logical_and as &&,
+    logical_not as !,
+} from builtins;
 
 pub fn int_fits(v: i64, name: str) -> bool {
     match (name) {

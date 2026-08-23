@@ -1,6 +1,6 @@
 // String-only; walks once, tracking the position just past the last
 // *non*-matching char.
-import { wrapping_add as +, !, == } from builtins;
+import { equal as ==, logical_not as !, wrapping_add as + } from builtins;
 
 pub fn trim_end_while(self: str, pred: (char) -> bool) -> str {
     mut k: u64 = 0; // end of the last non-matching run

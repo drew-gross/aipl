@@ -1,4 +1,16 @@
-import { count, print, push, to_str, wrapping_increment as ++, !=, <, <=, ==, >, >= } from builtins;
+import {
+    count,
+    equal as ==,
+    greater_than as >,
+    greater_than_or_equal as >=,
+    less_than as <,
+    less_than_or_equal as <=,
+    not_equal as !=,
+    print,
+    push,
+    to_str,
+    wrapping_increment as ++,
+} from builtins;
 
 // Operation fusion: `xs.count(x)` compared against a bound collapses into one
 // builtin that stops as soon as the answer is settled, instead of counting the

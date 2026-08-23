@@ -1,4 +1,4 @@
-import { wrapping_add as +, /, == } from builtins;
+import { divide as /, equal as ==, wrapping_add as + } from builtins;
 
 fn d(x: i64, y: i64) -> i64 { x / y }.test({
     // Truncating division (rounds toward zero): 20/4 = 5, -10/3 = -3.

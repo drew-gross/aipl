@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn flag(b: bool?) -> i64 {
     match (b) {

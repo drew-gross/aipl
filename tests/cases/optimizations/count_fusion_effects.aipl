@@ -1,4 +1,4 @@
-import { count, print, push, to_str, wrapping_increment as ++, < } from builtins;
+import { count, less_than as <, print, push, to_str, wrapping_increment as ++ } from builtins;
 
 // Fusion is refused when either operand has an effect.
 //

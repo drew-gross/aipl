@@ -1,4 +1,4 @@
-import { has, len, !, !=, +++, == } from builtins;
+import { concat as +++, equal as ==, has, len, logical_not as !, not_equal as != } from builtins;
 
 // Sets of strings: deduplicated and tested for membership by *content* (not
 // pointer identity), and freed/retained like a `str[]`.

@@ -1,4 +1,4 @@
-import { hash, !=, +++, == } from builtins;
+import { concat as +++, equal as ==, hash, not_equal as != } from builtins;
 
 // `hash(x) -> i64` is a deterministic structural hash, consistent with `==`:
 // equal values hash equal. It recurses over every type. Set/dict hashing is
