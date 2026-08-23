@@ -16,12 +16,24 @@ bytes allocated: 0
 instructions executed: 119
 binary size: 1696
   code: 588
-    __eq_i64$opt: 100
-    main: 488
   data: 194
   metadata: 914
-builtin calls: 6
-  aipl_assert: 3
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_i64$opt:
+    calls: 2
+    bytes: 100
+  aipl_assert:
+    calls: 3
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 488

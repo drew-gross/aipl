@@ -86,23 +86,57 @@ bytes allocated: 1096
 instructions executed: 25999
 binary size: 7816
   code: 4752
-    __builtin_count_is_at_least$i64: 304
-    __builtin_count_is_at_most$i64: 276
-    __builtin_count_is_equal$i64: 284
-    __builtin_count_is_greater_than$i64: 276
-    __builtin_count_is_less_than$i64: 304
-    __builtin_count_is_not_equal$i64: 288
-    __to_str_bool: 212
-    main: 2612
-    many: 196
   data: 47
   metadata: 3017
-builtin calls: 927
-  aipl_arr_inc: 4
-  aipl_array_dec: 21
-  aipl_array_new: 17
-  aipl_array_push_mut: 800
-  aipl_dec: 34
-  aipl_inc: 17
-  aipl_print: 17
-  aipl_write_bytes: 17
+functions:
+  __builtin_count_is_at_least$i64:
+    calls: 3
+    bytes: 304
+  __builtin_count_is_at_most$i64:
+    calls: 2
+    bytes: 276
+  __builtin_count_is_equal$i64:
+    calls: 2
+    bytes: 284
+  __builtin_count_is_greater_than$i64:
+    calls: 2
+    bytes: 276
+  __builtin_count_is_less_than$i64:
+    calls: 5
+    bytes: 304
+  __builtin_count_is_not_equal$i64:
+    calls: 3
+    bytes: 288
+  __to_str_bool:
+    calls: 17
+    bytes: 212
+  aipl_arr_inc:
+    calls: 4
+    bytes: 0
+  aipl_array_dec:
+    calls: 21
+    bytes: 0
+  aipl_array_new:
+    calls: 17
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 800
+    bytes: 0
+  aipl_dec:
+    calls: 34
+    bytes: 0
+  aipl_inc:
+    calls: 17
+    bytes: 0
+  aipl_print:
+    calls: 17
+    bytes: 0
+  aipl_write_bytes:
+    calls: 17
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 2612
+  many:
+    calls: 4
+    bytes: 196

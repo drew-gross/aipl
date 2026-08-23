@@ -93,19 +93,45 @@ bytes allocated: 0
 instructions executed: 5115
 binary size: 5312
   code: 2064
-    __eq___builtin_Span: 104
-    __eq___builtin_Span$opt: 92
-    find_trailing_whitespace: 560
-    line_end_span: 176
-    main: 1132
   data: 1110
   metadata: 2138
-builtin calls: 81
-  aipl_assert: 12
-  aipl_str_data: 11
-  aipl_str_iter_init: 12
-  aipl_str_iter_next: 11
-  aipl_str_len: 32
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq___builtin_Span:
+    calls: 7
+    bytes: 104
+  __eq___builtin_Span$opt:
+    calls: 12
+    bytes: 92
+  aipl_assert:
+    calls: 12
+    bytes: 0
+  aipl_str_data:
+    calls: 11
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 12
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 11
+    bytes: 0
+  aipl_str_len:
+    calls: 32
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  find_trailing_whitespace:
+    calls: 12
+    bytes: 560
+  line_end_span:
+    calls: 18
+    bytes: 176
+  main:
+    calls: 1
+    bytes: 1132

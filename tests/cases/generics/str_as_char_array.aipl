@@ -27,20 +27,48 @@ bytes allocated: 84
 instructions executed: 825
 binary size: 2896
   code: 1072
-    count_eq$char$s0: 232
-    main: 840
   data: 322
   metadata: 1502
-builtin calls: 29
-  aipl_array_dec: 1
-  aipl_array_new: 1
-  aipl_assert: 5
-  aipl_dec: 1
-  aipl_str_alloc: 1
-  aipl_str_data: 3
-  aipl_str_iter_init: 4
-  aipl_str_iter_next: 3
-  aipl_str_len: 7
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  aipl_array_dec:
+    calls: 1
+    bytes: 0
+  aipl_array_new:
+    calls: 1
+    bytes: 0
+  aipl_assert:
+    calls: 5
+    bytes: 0
+  aipl_dec:
+    calls: 1
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_data:
+    calls: 3
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 4
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 3
+    bytes: 0
+  aipl_str_len:
+    calls: 7
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  count_eq$char$s0:
+    calls: 3
+    bytes: 232
+  main:
+    calls: 1
+    bytes: 840

@@ -55,19 +55,45 @@ bytes allocated: 192
 instructions executed: 8190
 binary size: 4136
   code: 2364
-    __builtin_count_while$char$s0$lam4: 232
-    __builtin_int_parse: 1052
-    __eq_i64$opt: 100
-    __lambda_2: 140
-    main: 840
   data: 158
   metadata: 1614
-builtin calls: 241
-  aipl_dec: 48
-  aipl_inc: 24
-  aipl_str_data: 18
-  aipl_str_iter_init: 18
-  aipl_str_iter_next: 18
-  aipl_str_len: 91
-  aipl_str_slice: 13
-  aipl_str_starts_with: 11
+functions:
+  __builtin_count_while$char$s0$lam4:
+    calls: 9
+    bytes: 232
+  __builtin_int_parse:
+    calls: 11
+    bytes: 1052
+  __eq_i64$opt:
+    calls: 11
+    bytes: 100
+  __lambda_2:
+    calls: 86
+    bytes: 140
+  aipl_dec:
+    calls: 48
+    bytes: 0
+  aipl_inc:
+    calls: 24
+    bytes: 0
+  aipl_str_data:
+    calls: 18
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 18
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 18
+    bytes: 0
+  aipl_str_len:
+    calls: 91
+    bytes: 0
+  aipl_str_slice:
+    calls: 13
+    bytes: 0
+  aipl_str_starts_with:
+    calls: 11
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 840

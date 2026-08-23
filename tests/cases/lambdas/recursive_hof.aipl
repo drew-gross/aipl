@@ -21,13 +21,27 @@ bytes allocated: 0
 instructions executed: 48
 binary size: 1024
   code: 168
-    main: 108
-    rec$lam1: 32
-    rec$lam1$tail: 28
   data: 53
   metadata: 803
-builtin calls: 4
-  aipl_assert: 1
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  aipl_assert:
+    calls: 1
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 108
+  rec$lam1:
+    calls: 0
+    bytes: 32
+  rec$lam1$tail:
+    calls: 4
+    bytes: 28

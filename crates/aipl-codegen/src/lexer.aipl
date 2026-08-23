@@ -1243,95 +1243,273 @@ bytes allocated: 79768
 instructions executed: 279218
 binary size: 1798984
   code: 1129960
-    __arr_drop_StepResult$Kind: 140
-    __arr_drop_Token$Kind: 492
-    __arr_drop_TokenRule$Kind: 928
-    __arr_retain_StepResult$Kind: 140
-    __arr_retain_Token$Kind: 492
-    __arr_retain_TokenRule$Kind: 928
-    __builtin_count_while$char$lam27: 296
-    __builtin_count_while$char$s0$lam32: 236
-    __builtin_count_while$char$s0$lam34: 244
-    __builtin_count_while$char$s0$lam49: 232
-    __builtin_drop_first$char$s0: 72
-    __builtin_first$char$s0: 136
-    __builtin_int_parse: 980
-    __builtin_is_some_and$char$lam33: 48
-    __eq_Kind: 1136
-    __eq_LexError: 168
-    __eq_LexResult$Kind: 120
-    __eq_Token$Kind: 120
-    __eq_Token$Kind$arr: 284
-    __eq___builtin_Span: 104
-    __eq_char$opt: 100
-    __lambda_0: 92
-    __lambda_1: 60
-    __lambda_10: 48
-    __lambda_11: 64
-    __lambda_12: 48
-    __lambda_13: 64
-    __lambda_14: 48
-    __lambda_15: 64
-    __lambda_16: 48
-    __lambda_17: 64
-    __lambda_18: 92
-    __lambda_19: 60
-    __lambda_2: 92
-    __lambda_20: 92
-    __lambda_21: 60
-    __lambda_3: 60
-    __lambda_37: 140
-    __lambda_4: 92
-    __lambda_5: 60
-    __lambda_6: 92
-    __lambda_7: 60
-    __lambda_8: 92
-    __lambda_9: 60
-    __m1__unescape: 892
-    __test$lex: 1042736
-    __test_try_fail_LexError: 64
-    __to_str_LexError: 812
-    between_len: 744
-    checked_seg: 1700
-    delimited_len: 1416
-    esc_str: 112
-    finalize_template$Kind: 10932
-    float_len: 816
-    int_tok: 1644
-    interp_scan$Kind: 3568
-    lex$Kind: 2884
-    lex_step$Kind: 25032
-    main: 68
-    nested_len: 1044
-    nonempty_str: 1684
-    rawtpl_kind: 2944
-    step_result$Kind: 15384
-    template_scan$Kind: 2772
-    template_step$Kind: 556
-    toks: 128
-    tpl_kind: 2980
   data: 8132
   metadata: 660892
-builtin calls: 27491
-  aipl_arr_drop_str: 22
-  aipl_arr_inc: 3052
-  aipl_arr_retain_ptr: 30
-  aipl_array_dec: 4424
-  aipl_array_new: 1177
-  aipl_array_push: 195
-  aipl_assert: 59
-  aipl_char_at: 481
-  aipl_concat_lazy: 29
-  aipl_dec: 7285
-  aipl_inc: 6134
-  aipl_str_contains: 325
-  aipl_str_data: 131
-  aipl_str_eq: 111
-  aipl_str_iter_init: 140
-  aipl_str_iter_next: 131
-  aipl_str_len: 2615
-  aipl_str_slice: 842
-  aipl_str_starts_with: 305
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __arr_drop_StepResult$Kind:
+    calls: 8
+    bytes: 140
+  __arr_drop_Token$Kind:
+    calls: 268
+    bytes: 492
+  __arr_drop_TokenRule$Kind:
+    calls: 21
+    bytes: 928
+  __arr_retain_StepResult$Kind:
+    calls: 9
+    bytes: 140
+  __arr_retain_Token$Kind:
+    calls: 217
+    bytes: 492
+  __arr_retain_TokenRule$Kind:
+    calls: 0
+    bytes: 928
+  __builtin_count_while$char$lam27:
+    calls: 60
+    bytes: 296
+  __builtin_count_while$char$s0$lam32:
+    calls: 5
+    bytes: 236
+  __builtin_count_while$char$s0$lam34:
+    calls: 49
+    bytes: 244
+  __builtin_count_while$char$s0$lam49:
+    calls: 13
+    bytes: 232
+  __builtin_drop_first$char$s0:
+    calls: 65
+    bytes: 72
+  __builtin_first$char$s0:
+    calls: 254
+    bytes: 136
+  __builtin_int_parse:
+    calls: 13
+    bytes: 980
+  __builtin_is_some_and$char$lam33:
+    calls: 37
+    bytes: 48
+  __eq_Kind:
+    calls: 98
+    bytes: 1136
+  __eq_LexError:
+    calls: 13
+    bytes: 168
+  __eq_LexResult$Kind:
+    calls: 45
+    bytes: 120
+  __eq_Token$Kind:
+    calls: 98
+    bytes: 120
+  __eq_Token$Kind$arr:
+    calls: 90
+    bytes: 284
+  __eq___builtin_Span:
+    calls: 111
+    bytes: 104
+  __eq_char$opt:
+    calls: 85
+    bytes: 100
+  __lambda_0:
+    calls: 0
+    bytes: 92
+  __lambda_1:
+    calls: 28
+    bytes: 60
+  __lambda_10:
+    calls: 0
+    bytes: 48
+  __lambda_11:
+    calls: 1
+    bytes: 64
+  __lambda_12:
+    calls: 0
+    bytes: 48
+  __lambda_13:
+    calls: 8
+    bytes: 64
+  __lambda_14:
+    calls: 0
+    bytes: 48
+  __lambda_15:
+    calls: 2
+    bytes: 64
+  __lambda_16:
+    calls: 0
+    bytes: 48
+  __lambda_17:
+    calls: 2
+    bytes: 64
+  __lambda_18:
+    calls: 0
+    bytes: 92
+  __lambda_19:
+    calls: 2
+    bytes: 60
+  __lambda_2:
+    calls: 0
+    bytes: 92
+  __lambda_20:
+    calls: 0
+    bytes: 92
+  __lambda_21:
+    calls: 1
+    bytes: 60
+  __lambda_3:
+    calls: 2
+    bytes: 60
+  __lambda_37:
+    calls: 67
+    bytes: 140
+  __lambda_4:
+    calls: 0
+    bytes: 92
+  __lambda_5:
+    calls: 1
+    bytes: 60
+  __lambda_6:
+    calls: 0
+    bytes: 92
+  __lambda_7:
+    calls: 1
+    bytes: 60
+  __lambda_8:
+    calls: 0
+    bytes: 92
+  __lambda_9:
+    calls: 1
+    bytes: 60
+  __m1__unescape:
+    calls: 21
+    bytes: 892
+  __test$lex:
+    calls: 1
+    bytes: 1042736
+  __test_try_fail_LexError:
+    calls: 0
+    bytes: 64
+  __to_str_LexError:
+    calls: 0
+    bytes: 812
+  aipl_arr_drop_str:
+    calls: 22
+    bytes: 0
+  aipl_arr_inc:
+    calls: 3052
+    bytes: 0
+  aipl_arr_retain_ptr:
+    calls: 30
+    bytes: 0
+  aipl_array_dec:
+    calls: 4424
+    bytes: 0
+  aipl_array_new:
+    calls: 1177
+    bytes: 0
+  aipl_array_push:
+    calls: 195
+    bytes: 0
+  aipl_assert:
+    calls: 59
+    bytes: 0
+  aipl_char_at:
+    calls: 481
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 29
+    bytes: 0
+  aipl_dec:
+    calls: 7285
+    bytes: 0
+  aipl_inc:
+    calls: 6134
+    bytes: 0
+  aipl_str_contains:
+    calls: 325
+    bytes: 0
+  aipl_str_data:
+    calls: 131
+    bytes: 0
+  aipl_str_eq:
+    calls: 111
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 140
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 131
+    bytes: 0
+  aipl_str_len:
+    calls: 2615
+    bytes: 0
+  aipl_str_slice:
+    calls: 842
+    bytes: 0
+  aipl_str_starts_with:
+    calls: 305
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  between_len:
+    calls: 3
+    bytes: 744
+  checked_seg:
+    calls: 2
+    bytes: 1700
+  delimited_len:
+    calls: 26
+    bytes: 1416
+  esc_str:
+    calls: 2
+    bytes: 112
+  finalize_template$Kind:
+    calls: 13
+    bytes: 10932
+  float_len:
+    calls: 14
+    bytes: 816
+  int_tok:
+    calls: 13
+    bytes: 1644
+  interp_scan$Kind:
+    calls: 9
+    bytes: 3568
+  lex$Kind:
+    calls: 59
+    bytes: 2884
+  lex_step$Kind:
+    calls: 140
+    bytes: 25032
+  main:
+    calls: 1
+    bytes: 68
+  nested_len:
+    calls: 3
+    bytes: 1044
+  nonempty_str:
+    calls: 2
+    bytes: 1684
+  rawtpl_kind:
+    calls: 3
+    bytes: 2944
+  step_result$Kind:
+    calls: 405
+    bytes: 15384
+  template_scan$Kind:
+    calls: 16
+    bytes: 2772
+  template_step$Kind:
+    calls: 27
+    bytes: 556
+  toks:
+    calls: 43
+    bytes: 128
+  tpl_kind:
+    calls: 17
+    bytes: 2980

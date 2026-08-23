@@ -28,26 +28,66 @@ bytes allocated: 360
 instructions executed: 1742
 binary size: 4128
   code: 1352
-    main: 932
-    normalize_output: 420
   data: 558
   metadata: 2218
-builtin calls: 231
-  aipl_arr_drop_str: 8
-  aipl_arr_inc: 8
-  aipl_array_dec: 16
-  aipl_array_new: 8
-  aipl_assert: 8
-  aipl_dec: 69
-  aipl_inc: 16
-  aipl_str_data: 7
-  aipl_str_eq: 8
-  aipl_str_iter_init: 8
-  aipl_str_iter_next: 7
-  aipl_str_join: 8
-  aipl_str_len: 28
-  aipl_str_slice: 21
-  aipl_str_split: 8
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  aipl_arr_drop_str:
+    calls: 8
+    bytes: 0
+  aipl_arr_inc:
+    calls: 8
+    bytes: 0
+  aipl_array_dec:
+    calls: 16
+    bytes: 0
+  aipl_array_new:
+    calls: 8
+    bytes: 0
+  aipl_assert:
+    calls: 8
+    bytes: 0
+  aipl_dec:
+    calls: 69
+    bytes: 0
+  aipl_inc:
+    calls: 16
+    bytes: 0
+  aipl_str_data:
+    calls: 7
+    bytes: 0
+  aipl_str_eq:
+    calls: 8
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 8
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 7
+    bytes: 0
+  aipl_str_join:
+    calls: 8
+    bytes: 0
+  aipl_str_len:
+    calls: 28
+    bytes: 0
+  aipl_str_slice:
+    calls: 21
+    bytes: 0
+  aipl_str_split:
+    calls: 8
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 932
+  normalize_output:
+    calls: 8
+    bytes: 420

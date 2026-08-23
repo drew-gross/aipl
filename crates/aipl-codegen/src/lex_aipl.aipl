@@ -644,103 +644,297 @@ bytes allocated: 275592
 instructions executed: 747432
 binary size: 219544
   code: 141656
-    __arr_drop___m1__StepResult$AiplTok: 140
-    __arr_drop___m1__Token$AiplTok: 364
-    __arr_drop___m1__TokenRule$AiplTok: 800
-    __arr_retain___m1__StepResult$AiplTok: 140
-    __arr_retain___m1__Token$AiplTok: 364
-    __arr_retain___m1__TokenRule$AiplTok: 800
-    __builtin_count_while$char$lam28: 296
-    __builtin_count_while$char$s0$lam17: 232
-    __builtin_count_while$char$s0$lam33: 236
-    __builtin_count_while$char$s0$lam35: 244
-    __builtin_count_while$char$s0$lam36: 232
-    __builtin_count_while$char$s0$lam38: 232
-    __builtin_drop_first$char$s0: 32
-    __builtin_drop_first$char$s0$tail: 104
-    __builtin_first$char$s0: 136
-    __builtin_int_parse: 1032
-    __builtin_is_some_and$char$lam34: 48
-    __eq_AiplTok: 884
-    __eq_StrStyle: 64
-    __eq___builtin_Span: 104
-    __eq___m1__LexError: 168
-    __eq___m1__LexResult$AiplTok: 120
-    __eq___m1__Token$AiplTok: 120
-    __eq___m1__Token$AiplTok$arr: 284
-    __eq_char$opt: 100
-    __eq_str$opt: 148
-    __lambda_0: 100
-    __lambda_1: 68
-    __lambda_12: 140
-    __lambda_2: 108
-    __lambda_3: 136
-    __lambda_4: 108
-    __lambda_5: 136
-    __lambda_6: 48
-    __lambda_7: 64
-    __m10__parse_test_section_header: 696
-    __m1__between_len: 744
-    __m1__delimited_len: 1416
-    __m1__finalize_template$AiplTok: 8480
-    __m1__float_len: 816
-    __m1__interp_scan$AiplTok: 3120
-    __m1__lex$AiplTok: 2436
-    __m1__lex_step$AiplTok: 22620
-    __m1__nested_len: 1044
-    __m1__step_result$AiplTok: 12068
-    __m1__template_scan$AiplTok: 2772
-    __m1__template_step$AiplTok: 556
-    __m2__unescape: 892
-    __m3__process_raw_string: 1676
-    __m7__trim_prefix: 36
-    __m7__trim_prefix$tail: 168
-    __m8__trim_suffix: 292
-    __m9__strip_test_sections: 648
-    __map19$own0: 320
-    __test$lex_aipl: 15388
-    __test$lex_aipl_stripped: 1592
-    __test$lex_aipl_tokens: 1096
-    __test_try_fail___m1__LexError: 64
-    __to_str___m1__LexError: 812
-    char_lit_emit: 1412
-    dedent_segments: 188
-    ident_cont: 16
-    int_lit: 1132
-    lex_aipl: 46088
-    lex_aipl_tokens: 384
-    main: 152
-    raw_tpl_kind: 2088
-    tpl_kind: 2112
   data: 7100
   metadata: 70788
-builtin calls: 80923
-  aipl_arr_drop_str: 9
-  aipl_arr_inc: 7554
-  aipl_arr_retain_ptr: 9
-  aipl_array_dec: 11226
-  aipl_array_new: 3599
-  aipl_array_push: 69
-  aipl_array_push_mut: 4
-  aipl_array_with_cap: 4
-  aipl_assert: 20
-  aipl_char_at: 1365
-  aipl_concat_lazy: 12
-  aipl_dec: 24585
-  aipl_inc: 19372
-  aipl_str_contains: 1016
-  aipl_str_data: 88
-  aipl_str_ends_with: 3
-  aipl_str_eq: 30
-  aipl_str_is_all_whitespace: 4
-  aipl_str_iter_init: 90
-  aipl_str_iter_next: 88
-  aipl_str_join: 3
-  aipl_str_len: 8169
-  aipl_str_slice: 1982
-  aipl_str_split: 3
-  aipl_str_starts_with: 1610
-  aipl_test_begin: 3
-  aipl_test_end: 3
-  aipl_test_summary: 1
-  aipl_trim: 2
+functions:
+  __arr_drop___m1__StepResult$AiplTok:
+    calls: 1
+    bytes: 140
+  __arr_drop___m1__Token$AiplTok:
+    calls: 129
+    bytes: 364
+  __arr_drop___m1__TokenRule$AiplTok:
+    calls: 20
+    bytes: 800
+  __arr_retain___m1__StepResult$AiplTok:
+    calls: 1
+    bytes: 140
+  __arr_retain___m1__Token$AiplTok:
+    calls: 95
+    bytes: 364
+  __arr_retain___m1__TokenRule$AiplTok:
+    calls: 0
+    bytes: 800
+  __builtin_count_while$char$lam28:
+    calls: 49
+    bytes: 296
+  __builtin_count_while$char$s0$lam17:
+    calls: 0
+    bytes: 232
+  __builtin_count_while$char$s0$lam33:
+    calls: 2
+    bytes: 236
+  __builtin_count_while$char$s0$lam35:
+    calls: 28
+    bytes: 244
+  __builtin_count_while$char$s0$lam36:
+    calls: 4
+    bytes: 232
+  __builtin_count_while$char$s0$lam38:
+    calls: 2
+    bytes: 232
+  __builtin_drop_first$char$s0:
+    calls: 0
+    bytes: 32
+  __builtin_drop_first$char$s0$tail:
+    calls: 49
+    bytes: 104
+  __builtin_first$char$s0:
+    calls: 217
+    bytes: 136
+  __builtin_int_parse:
+    calls: 4
+    bytes: 1032
+  __builtin_is_some_and$char$lam34:
+    calls: 28
+    bytes: 48
+  __eq_AiplTok:
+    calls: 51
+    bytes: 884
+  __eq_StrStyle:
+    calls: 4
+    bytes: 64
+  __eq___builtin_Span:
+    calls: 56
+    bytes: 104
+  __eq___m1__LexError:
+    calls: 5
+    bytes: 168
+  __eq___m1__LexResult$AiplTok:
+    calls: 14
+    bytes: 120
+  __eq___m1__Token$AiplTok:
+    calls: 51
+    bytes: 120
+  __eq___m1__Token$AiplTok$arr:
+    calls: 29
+    bytes: 284
+  __eq_char$opt:
+    calls: 82
+    bytes: 100
+  __eq_str$opt:
+    calls: 3
+    bytes: 148
+  __lambda_0:
+    calls: 0
+    bytes: 100
+  __lambda_1:
+    calls: 16
+    bytes: 68
+  __lambda_12:
+    calls: 5
+    bytes: 140
+  __lambda_2:
+    calls: 0
+    bytes: 108
+  __lambda_3:
+    calls: 1
+    bytes: 136
+  __lambda_4:
+    calls: 0
+    bytes: 108
+  __lambda_5:
+    calls: 1
+    bytes: 136
+  __lambda_6:
+    calls: 0
+    bytes: 48
+  __lambda_7:
+    calls: 2
+    bytes: 64
+  __m10__parse_test_section_header:
+    calls: 3
+    bytes: 696
+  __m1__between_len:
+    calls: 24
+    bytes: 744
+  __m1__delimited_len:
+    calls: 45
+    bytes: 1416
+  __m1__finalize_template$AiplTok:
+    calls: 3
+    bytes: 8480
+  __m1__float_len:
+    calls: 0
+    bytes: 816
+  __m1__interp_scan$AiplTok:
+    calls: 1
+    bytes: 3120
+  __m1__lex$AiplTok:
+    calls: 20
+    bytes: 2436
+  __m1__lex_step$AiplTok:
+    calls: 91
+    bytes: 22620
+  __m1__nested_len:
+    calls: 56
+    bytes: 1044
+  __m1__step_result$AiplTok:
+    calls: 1712
+    bytes: 12068
+  __m1__template_scan$AiplTok:
+    calls: 3
+    bytes: 2772
+  __m1__template_step$AiplTok:
+    calls: 35
+    bytes: 556
+  __m2__unescape:
+    calls: 8
+    bytes: 892
+  __m3__process_raw_string:
+    calls: 2
+    bytes: 1676
+  __m7__trim_prefix:
+    calls: 0
+    bytes: 36
+  __m7__trim_prefix$tail:
+    calls: 4
+    bytes: 168
+  __m8__trim_suffix:
+    calls: 0
+    bytes: 292
+  __m9__strip_test_sections:
+    calls: 2
+    bytes: 648
+  __map19$own0:
+    calls: 2
+    bytes: 320
+  __test$lex_aipl:
+    calls: 1
+    bytes: 15388
+  __test$lex_aipl_stripped:
+    calls: 1
+    bytes: 1592
+  __test$lex_aipl_tokens:
+    calls: 1
+    bytes: 1096
+  __test_try_fail___m1__LexError:
+    calls: 0
+    bytes: 64
+  __to_str___m1__LexError:
+    calls: 0
+    bytes: 812
+  aipl_arr_drop_str:
+    calls: 9
+    bytes: 0
+  aipl_arr_inc:
+    calls: 7554
+    bytes: 0
+  aipl_arr_retain_ptr:
+    calls: 9
+    bytes: 0
+  aipl_array_dec:
+    calls: 11226
+    bytes: 0
+  aipl_array_new:
+    calls: 3599
+    bytes: 0
+  aipl_array_push:
+    calls: 69
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 4
+    bytes: 0
+  aipl_array_with_cap:
+    calls: 4
+    bytes: 0
+  aipl_assert:
+    calls: 20
+    bytes: 0
+  aipl_char_at:
+    calls: 1365
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 12
+    bytes: 0
+  aipl_dec:
+    calls: 24585
+    bytes: 0
+  aipl_inc:
+    calls: 19372
+    bytes: 0
+  aipl_str_contains:
+    calls: 1016
+    bytes: 0
+  aipl_str_data:
+    calls: 88
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 3
+    bytes: 0
+  aipl_str_eq:
+    calls: 30
+    bytes: 0
+  aipl_str_is_all_whitespace:
+    calls: 4
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 90
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 88
+    bytes: 0
+  aipl_str_join:
+    calls: 3
+    bytes: 0
+  aipl_str_len:
+    calls: 8169
+    bytes: 0
+  aipl_str_slice:
+    calls: 1982
+    bytes: 0
+  aipl_str_split:
+    calls: 3
+    bytes: 0
+  aipl_str_starts_with:
+    calls: 1610
+    bytes: 0
+  aipl_test_begin:
+    calls: 3
+    bytes: 0
+  aipl_test_end:
+    calls: 3
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  aipl_trim:
+    calls: 2
+    bytes: 0
+  char_lit_emit:
+    calls: 4
+    bytes: 1412
+  dedent_segments:
+    calls: 1
+    bytes: 188
+  ident_cont:
+    calls: 420
+    bytes: 16
+  int_lit:
+    calls: 4
+    bytes: 1132
+  lex_aipl:
+    calls: 20
+    bytes: 46088
+  lex_aipl_tokens:
+    calls: 2
+    bytes: 384
+  main:
+    calls: 1
+    bytes: 152
+  raw_tpl_kind:
+    calls: 1
+    bytes: 2088
+  tpl_kind:
+    calls: 3
+    bytes: 2112

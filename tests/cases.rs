@@ -25,13 +25,20 @@
 //!                          `deallocations: M`, `reallocations: K`,
 //!                          `bytes allocated: B`, `instructions executed: I`
 //!                          (CLIF instructions executed), and `binary size: S`
-//!                          (bytes of the compiler-emitted object code). The
+//!                          (bytes of the compiler-emitted object code), which
+//!                          breaks down into `code`/`data`/`metadata`. The
 //!                          harness builds a separate instrumented object, links
 //!                          it against the instrumented runtime, runs it, and
 //!                          checks the tallies (binary size is measured from the
-//!                          non-instrumented object). `binary size` breaks down
-//!                          into `code`/`data`/`metadata`, and `code` again into
-//!                          one line per function — which is also the list of
+//!                          non-instrumented object).
+//!                          A `functions:` block then lists every function the
+//!                          program ran or emitted code for — compiled AIPL
+//!                          functions and runtime builtins in one list — each
+//!                          with the two numbers that only make sense together:
+//!                          `calls:` (times entered) and `bytes:` (code size in
+//!                          this object). A builtin has no code here, so it
+//!                          reports 0 bytes; a function emitted but never called
+//!                          reports 0 calls. The byte side doubles as the list of
 //!                          instances monomorphization emitted, so a change in
 //!                          what gets specialized shows up as a diff here.
 //!                          Mutually exclusive with `errors`. REQUIRED on every
@@ -1421,12 +1428,24 @@ fn run_success_case(
     if spec.performance.is_some() || (fill && require_metrics) {
         let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
-        // the `binary size` metric — split into code/data/metadata for the report.
-        let sizes = BinSizes::of(&obj_bytes, &symbol_names);
+        // the `binary size` metric — split into code/data/metadata for the
+        // report, with `code`'s per-function parts going to the `functions:`
+        // block instead.
+        let (sizes, fn_sizes) = BinSizes::of(&obj_bytes, &symbol_names);
         fold_section!(
             outcome,
             run_performance_check(
-                ctx, orig_path, &measured, stem, spec, case_dir, perf, sizes, fill,
+                ctx,
+                orig_path,
+                &measured,
+                stem,
+                spec,
+                case_dir,
+                perf,
+                sizes,
+                fn_sizes,
+                &symbol_names,
+                fill,
             )
         );
     }
@@ -1439,6 +1458,7 @@ fn run_success_case(
 /// it against the instrumented runtime, run it, and verify (or fill in) the
 /// expected counts from a `--- performance ---` section. This object is separate
 /// from the behavior-check one so production/JIT runs carry no counter overhead.
+#[allow(clippy::too_many_arguments)]
 fn run_performance_check(
     ctx: &str,
     orig_path: &Path,
@@ -1448,6 +1468,8 @@ fn run_performance_check(
     case_dir: &Path,
     expected_body: &str,
     prod_sizes: BinSizes,
+    fn_sizes: Vec<(String, u64)>,
+    symbol_names: &HashMap<String, String>,
     fill: bool,
 ) -> Outcome {
     let obj_bytes = match ObjectCompilation::new(program, stem, debug_opts(), true)
@@ -1461,11 +1483,20 @@ fn run_performance_check(
             ))
         }
     };
-    let actual =
-        match measure_perf_stats(ctx, orig_path, &obj_bytes, stem, spec, case_dir, prod_sizes) {
-            Ok(v) => v,
-            Err(msg) => return Outcome::Fail(msg),
-        };
+    let actual = match measure_perf_stats(
+        ctx,
+        orig_path,
+        &obj_bytes,
+        stem,
+        spec,
+        case_dir,
+        prod_sizes,
+        fn_sizes,
+        symbol_names,
+    ) {
+        Ok(v) => v,
+        Err(msg) => return Outcome::Fail(msg),
+    };
 
     // Memory-leak gate: every heap allocation must be paired with a free. Checked
     // even in fill mode so `fill_expected` cannot bake in a leak.
@@ -1499,9 +1530,11 @@ fn run_performance_check(
 
 /// Build the instrumented variant of the case, run it with `AIPL_ALLOC_STATS`
 /// pointed at a temp file, and read back the `PerfStats`. The runtime reports
-/// the five execution counters; the `binary size` split (`prod_sizes`, measured
-/// by the harness from the production object) is folded in here so the whole
-/// `PerfStats` parses through one path.
+/// the five execution counters and each function's call count; the two things it
+/// cannot see — the `binary size` split and the per-function byte sizes, both
+/// measured by the harness from the production object — are folded in here, so
+/// the whole `PerfStats` still parses through one path.
+#[allow(clippy::too_many_arguments)]
 fn measure_perf_stats(
     ctx: &str,
     orig_path: &Path,
@@ -1510,6 +1543,8 @@ fn measure_perf_stats(
     spec: &Spec,
     case_dir: &Path,
     prod_sizes: BinSizes,
+    fn_sizes: Vec<(String, u64)>,
+    symbol_names: &HashMap<String, String>,
 ) -> Result<PerfStats, String> {
     let exe = case_dir.join(binary::default_exe_name(&format!("{stem}_instr")));
     if let Err(e) = binary::link_instrumented(obj_bytes, &exe) {
@@ -1542,12 +1577,24 @@ fn measure_perf_stats(
             stats_path.display()
         )
     })?;
-    // The runtime reports the execution counters; append the (harness-measured)
-    // binary size and its code/data/metadata split so the combined text parses
-    // into a full `PerfStats`.
+    // The runtime's call table is fixed-size; an overflow would quietly under-
+    // count, so it says so instead and that is a harness failure, not a metric.
+    if contents.contains("uncounted calls:") {
+        return Err(format!(
+            "{ctx}: the runtime's per-function call table overflowed, so the counts are\n\
+             incomplete. Raise `fn_calls::CAP` in crates/aipl-linker/runtime/aipl_runtime.rs.\n\
+             {contents}"
+        ));
+    }
+    // The runtime reports the execution counters and per-function call counts;
+    // append the (harness-measured) binary size split so the combined text
+    // parses into a full `PerfStats`, then fold the per-function byte sizes into
+    // the `functions:` block the counts opened.
     let contents = format!("{contents}\n{}", prod_sizes.render());
-    parse_perf_stats(&contents)
-        .ok_or_else(|| format!("{ctx}: malformed perf stats from runtime:\n{contents}"))
+    let mut stats = parse_perf_stats(&contents)
+        .ok_or_else(|| format!("{ctx}: malformed perf stats from runtime:\n{contents}"))?;
+    stats.merge_fn_sizes(symbol_names, fn_sizes);
+    Ok(stats)
 }
 
 /// Measured performance statistics for a case run. All six fields are required
@@ -1566,13 +1613,33 @@ struct PerfStats {
     bytes_allocated: u64,
     instructions: u64,
     binary_size: BinSizes,
-    /// How many times each runtime builtin ran, `(name, count)`, in the
-    /// runtime's (sorted) order and omitting the ones that never ran. See
-    /// `builtin_calls` in the runtime for why this is tracked beside
-    /// `instructions`: a call into the runtime is one CLIF instruction whatever
-    /// it does, so the instruction count alone can't see work crossing that
-    /// boundary — and these say which builtins a program leans on.
-    builtin_calls: Vec<(String, u64)>,
+    /// Every function the program ran or emitted code for, sorted by name — the
+    /// `functions:` block. Compiled AIPL functions and runtime builtins share
+    /// one list because the two questions a reader has (how often did this run,
+    /// how big is it) are the same questions either way; which side of the
+    /// runtime boundary a function sits on shows up as a `bytes: 0`, since only
+    /// this object's code is measured.
+    functions: Vec<FnStat>,
+}
+
+/// One `functions:` entry. `calls` is how many times the function was *entered*
+/// during the run (from the instrumented build's counters), `bytes` how much
+/// code it occupies in the emitted object.
+///
+/// The two are worth reading together, and neither alone tells the story. Call
+/// counts are what the `instructions executed` metric cannot see: a call into
+/// the runtime is one CLIF instruction however much work it does, so a builtin's
+/// count is the only sign of work crossing that boundary. Byte sizes are what
+/// monomorphization did: every emitted function appears, so a change in what
+/// gets specialized shows up here as an added or removed entry.
+#[derive(Clone, PartialEq, Eq)]
+struct FnStat {
+    name: String,
+    /// Times entered. `0` for a function that was emitted but never ran.
+    calls: u64,
+    /// Bytes of code in the object. `0` for a runtime builtin, which is linked
+    /// in from the separately-compiled runtime and has no code here.
+    bytes: u64,
 }
 
 impl PerfStats {
@@ -1588,12 +1655,45 @@ impl PerfStats {
             self.instructions,
             self.binary_size.render(),
         );
-        let total: u64 = self.builtin_calls.iter().map(|(_, n)| n).sum();
-        out.push_str(&format!("\nbuiltin calls: {total}"));
-        for (name, n) in &self.builtin_calls {
-            out.push_str(&format!("\n  {name}: {n}"));
+        out.push_str("\nfunctions:");
+        for f in &self.functions {
+            out.push_str(&format!(
+                "\n  {}:\n    calls: {}\n    bytes: {}",
+                f.name, f.calls, f.bytes
+            ));
         }
         out
+    }
+
+    /// Fold the object's per-function byte sizes into the call counts read back
+    /// from the run, producing the single sorted `functions:` list.
+    ///
+    /// The two arrive under different names: the runtime reports the *symbol*
+    /// it was handed, while `fn_sizes` has already been mapped to AIPL-level
+    /// names — so the counts are mapped through the same table first (see
+    /// [`ObjectCompilation::code_symbol_names`]). A builtin is in neither table
+    /// and keeps its own name.
+    ///
+    /// Neither side is a superset: a function that never ran contributes only
+    /// bytes, a builtin only calls.
+    fn merge_fn_sizes(&mut self, names: &HashMap<String, String>, fn_sizes: Vec<(String, u64)>) {
+        let mut by_name: HashMap<String, FnStat> = HashMap::new();
+        for f in self.functions.drain(..) {
+            let name = names.get(&f.name).cloned().unwrap_or(f.name);
+            by_name.insert(name.clone(), FnStat { name, ..f });
+        }
+        for (name, bytes) in fn_sizes {
+            by_name
+                .entry(name.clone())
+                .or_insert(FnStat {
+                    name,
+                    calls: 0,
+                    bytes: 0,
+                })
+                .bytes = bytes;
+        }
+        self.functions = by_name.into_values().collect();
+        self.functions.sort_by(|a, b| a.name.cmp(&b.name));
     }
 }
 
@@ -1610,21 +1710,17 @@ struct BinSizes {
     code: u64,
     data: u64,
     metadata: u64,
-    /// `code`, split per function: `(name, bytes)` sorted by name. Every
-    /// function the object defines appears, so this doubles as the list of
-    /// instances monomorphization emitted — which is why there is no separate
-    /// section for that. Sorted by *name* rather than by size so a function
-    /// that grows moves one line instead of reshuffling the list.
-    code_fns: Vec<(String, u64)>,
 }
 
 impl BinSizes {
     /// Split an object's bytes into code/data/metadata (see the struct docs),
-    /// and `code` further into its per-function parts. `names` maps object
-    /// symbols back to the AIPL names they were compiled from (see
-    /// [`ObjectCompilation::code_symbol_names`]); a symbol that isn't in it —
-    /// codegen's synthesized helpers — keeps its own name.
-    fn of(obj_bytes: &[u8], names: &HashMap<String, String>) -> BinSizes {
+    /// returning that alongside `code`'s per-function parts — which the caller
+    /// folds into the `functions:` block rather than reporting under `code:`,
+    /// since a function's size only makes sense next to how often it ran.
+    /// `names` maps object symbols back to the AIPL names they were compiled
+    /// from (see [`ObjectCompilation::code_symbol_names`]); a symbol that isn't
+    /// in it — codegen's synthesized helpers — keeps its own name.
+    fn of(obj_bytes: &[u8], names: &HashMap<String, String>) -> (BinSizes, Vec<(String, u64)>) {
         use object::{Object, ObjectSection, ObjectSymbol, SectionIndex, SectionKind, SymbolKind};
         let total = obj_bytes.len() as u64;
         let (mut code, mut data) = (0u64, 0u64);
@@ -1689,34 +1785,31 @@ impl BinSizes {
             }
         }
         code_fns.sort();
-        BinSizes {
-            total,
-            code,
-            data,
-            metadata: total.saturating_sub(code + data),
+        (
+            BinSizes {
+                total,
+                code,
+                data,
+                metadata: total.saturating_sub(code + data),
+            },
             code_fns,
-        }
+        )
     }
 
-    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split,
-    /// with `code`'s per-function parts nested under it.
+    /// The `binary size:` line plus its indented `code`/`data`/`metadata` split.
     fn render(&self) -> String {
-        let mut out = format!("binary size: {}\n  code: {}", self.total, self.code);
-        for (name, bytes) in &self.code_fns {
-            out.push_str(&format!("\n    {name}: {bytes}"));
-        }
-        out.push_str(&format!(
-            "\n  data: {}\n  metadata: {}",
-            self.data, self.metadata
-        ));
-        out
+        format!(
+            "binary size: {}\n  code: {}\n  data: {}\n  metadata: {}",
+            self.total, self.code, self.data, self.metadata
+        )
     }
 }
 
 /// Parse the `allocations:` / `deallocations:` / `reallocations:` / `bytes
 /// allocated:` / `instructions executed:` / `binary size:` lines (order-
-/// independent, surrounding whitespace ignored). All six are required; a
-/// missing line yields `None`.
+/// independent, surrounding whitespace ignored) plus the `functions:` block
+/// (which is positional — see below). All six scalars are required; a missing
+/// line yields `None`.
 fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     let mut allocations = None;
     let mut deallocations = None;
@@ -1727,40 +1820,49 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
     let mut code = None;
     let mut data = None;
     let mut metadata = None;
-    // Indented `<builtin>: <n>` lines follow the `builtin calls:` total. They
-    // are collected by position rather than by name, so a new builtin needs no
-    // change here.
-    let mut builtin_calls: Vec<(String, u64)> = Vec::new();
-    let mut in_builtins = false;
-    // Likewise the per-function `code` split: the deeper-indented `<fn>: <n>`
-    // lines that follow `code:`. Read by position, not by name — a function may
-    // legitimately be called `data` or `metadata`, so matching on the text would
-    // mistake it for the sibling line it sits under.
-    let mut code_fns: Vec<(String, u64)> = Vec::new();
-    let mut in_code = false;
+    // The `functions:` block: a `  <name>:` heading per function, then its
+    // `    calls:`/`    bytes:` lines. Read by *indent*, not by name — a
+    // function may legitimately be called `calls`, `bytes`, or `metadata`, so
+    // matching on the text would mistake a heading for a field (or for the
+    // sibling line the block sits next to). A missing field defaults to 0,
+    // which is what lets the runtime write calls-only entries the harness then
+    // fills sizes into.
+    let mut functions: Vec<FnStat> = Vec::new();
+    let mut in_functions = false;
     for raw in s.lines() {
         let line = raw.trim();
-        if line.starts_with("builtin calls:") {
-            in_builtins = true;
+        if line == "functions:" {
+            in_functions = true;
             continue;
         }
-        if in_builtins {
-            match (raw.starts_with("  "), line.rsplit_once(": ")) {
-                (true, Some((name, n))) if n.trim().parse::<u64>().is_ok() => {
-                    builtin_calls.push((name.trim().to_string(), n.trim().parse().unwrap()));
-                    continue;
+        if in_functions {
+            // A field of the entry above it (deeper indent), …
+            if raw.starts_with("    ") {
+                if let (Some(f), Some((key, v))) = (functions.last_mut(), line.split_once(": ")) {
+                    if let Ok(n) = v.trim().parse::<u64>() {
+                        match key.trim() {
+                            "calls" => {
+                                f.calls = n;
+                                continue;
+                            }
+                            "bytes" => {
+                                f.bytes = n;
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                 }
-                _ => in_builtins = false,
+            // … or a new entry's heading (`  <name>:`, no value).
+            } else if raw.starts_with("  ") && line.ends_with(':') {
+                functions.push(FnStat {
+                    name: line[..line.len() - 1].to_string(),
+                    calls: 0,
+                    bytes: 0,
+                });
+                continue;
             }
-        }
-        if in_code {
-            match (raw.starts_with("    "), line.rsplit_once(": ")) {
-                (true, Some((name, n))) if n.trim().parse::<u64>().is_ok() => {
-                    code_fns.push((name.trim().to_string(), n.trim().parse().unwrap()));
-                    continue;
-                }
-                _ => in_code = false,
-            }
+            in_functions = false;
         }
         if let Some(v) = line.strip_prefix("bytes allocated:") {
             bytes_allocated = v.trim().parse().ok();
@@ -1770,7 +1872,6 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             binary_size = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("code:") {
             code = v.trim().parse().ok();
-            in_code = true;
         } else if let Some(v) = line.strip_prefix("data:") {
             data = v.trim().parse().ok();
         } else if let Some(v) = line.strip_prefix("metadata:") {
@@ -1794,9 +1895,8 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             code: code?,
             data: data?,
             metadata: metadata?,
-            code_fns,
         },
-        builtin_calls,
+        functions,
     })
 }
 

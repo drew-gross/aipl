@@ -62,28 +62,72 @@ bytes allocated: 1088
 instructions executed: 1803
 binary size: 5560
   code: 2656
-    __arr_drop_Tree: 116
-    __arr_retain_Tree: 116
-    __rec_drop_Tree: 36
-    __to_str_Tree: 1028
-    __to_str_i64: 180
-    main: 908
-    total: 272
   data: 188
   metadata: 2716
-builtin calls: 166
-  aipl_arr_inc: 5
-  aipl_array_dec: 14
-  aipl_array_new: 9
-  aipl_dec: 10
-  aipl_i64_len: 14
-  aipl_inc: 3
-  aipl_print: 3
-  aipl_rec_alloc: 9
-  aipl_rec_dec_strong: 22
-  aipl_rec_inc_strong: 13
-  aipl_str_alloc: 6
-  aipl_str_data: 2
-  aipl_str_len: 4
-  aipl_write_bytes: 45
-  aipl_write_i64: 7
+functions:
+  __arr_drop_Tree:
+    calls: 5
+    bytes: 116
+  __arr_retain_Tree:
+    calls: 0
+    bytes: 116
+  __rec_drop_Tree:
+    calls: 9
+    bytes: 36
+  __to_str_Tree:
+    calls: 6
+    bytes: 1028
+  __to_str_i64:
+    calls: 1
+    bytes: 180
+  aipl_arr_inc:
+    calls: 5
+    bytes: 0
+  aipl_array_dec:
+    calls: 14
+    bytes: 0
+  aipl_array_new:
+    calls: 9
+    bytes: 0
+  aipl_dec:
+    calls: 10
+    bytes: 0
+  aipl_i64_len:
+    calls: 14
+    bytes: 0
+  aipl_inc:
+    calls: 3
+    bytes: 0
+  aipl_print:
+    calls: 3
+    bytes: 0
+  aipl_rec_alloc:
+    calls: 9
+    bytes: 0
+  aipl_rec_dec_strong:
+    calls: 22
+    bytes: 0
+  aipl_rec_inc_strong:
+    calls: 13
+    bytes: 0
+  aipl_str_alloc:
+    calls: 6
+    bytes: 0
+  aipl_str_data:
+    calls: 2
+    bytes: 0
+  aipl_str_len:
+    calls: 4
+    bytes: 0
+  aipl_write_bytes:
+    calls: 45
+    bytes: 0
+  aipl_write_i64:
+    calls: 7
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 908
+  total:
+    calls: 5
+    bytes: 272

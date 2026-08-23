@@ -92,26 +92,66 @@ bytes allocated: 0
 instructions executed: 1909
 binary size: 19120
   code: 9652
-    __builtin_value_or_err$char$i64: 92
-    __test$map_err: 6704
-    __test_try_fail_FmtError: 64
-    __test_try_fail_bool: 64
-    __test_try_fail_i64: 64
-    __to_str_FmtError: 540
-    __to_str_bool: 212
-    __to_str_i64: 180
-    lex: 380
-    main: 932
-    map_err$str$LexError$FmtError$lam0: 420
   data: 1719
   metadata: 7749
-builtin calls: 274
-  aipl_assert: 16
-  aipl_char_at: 2
-  aipl_dec: 128
-  aipl_inc: 95
-  aipl_str_eq: 20
-  aipl_str_len: 6
-  aipl_test_begin: 3
-  aipl_test_end: 3
-  aipl_test_summary: 1
+functions:
+  __builtin_value_or_err$char$i64:
+    calls: 2
+    bytes: 92
+  __test$map_err:
+    calls: 1
+    bytes: 6704
+  __test_try_fail_FmtError:
+    calls: 0
+    bytes: 64
+  __test_try_fail_bool:
+    calls: 0
+    bytes: 64
+  __test_try_fail_i64:
+    calls: 0
+    bytes: 64
+  __to_str_FmtError:
+    calls: 0
+    bytes: 540
+  __to_str_bool:
+    calls: 0
+    bytes: 212
+  __to_str_i64:
+    calls: 0
+    bytes: 180
+  aipl_assert:
+    calls: 16
+    bytes: 0
+  aipl_char_at:
+    calls: 2
+    bytes: 0
+  aipl_dec:
+    calls: 128
+    bytes: 0
+  aipl_inc:
+    calls: 95
+    bytes: 0
+  aipl_str_eq:
+    calls: 20
+    bytes: 0
+  aipl_str_len:
+    calls: 6
+    bytes: 0
+  aipl_test_begin:
+    calls: 3
+    bytes: 0
+  aipl_test_end:
+    calls: 3
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  lex:
+    calls: 12
+    bytes: 380
+  main:
+    calls: 1
+    bytes: 932
+  map_err$str$LexError$FmtError$lam0:
+    calls: 6
+    bytes: 420

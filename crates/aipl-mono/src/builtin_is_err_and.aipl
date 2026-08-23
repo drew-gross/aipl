@@ -81,19 +81,45 @@ bytes allocated: 0
 instructions executed: 1339
 binary size: 10216
   code: 4196
-    __builtin_value_or_err$char$i64: 92
-    check_len: 380
-    digit_of: 492
-    main: 3232
   data: 1571
   metadata: 4449
-builtin calls: 203
-  aipl_assert: 18
-  aipl_char_at: 11
-  aipl_dec: 82
-  aipl_inc: 60
-  aipl_str_eq: 15
-  aipl_str_len: 8
-  aipl_test_begin: 4
-  aipl_test_end: 4
-  aipl_test_summary: 1
+functions:
+  __builtin_value_or_err$char$i64:
+    calls: 2
+    bytes: 92
+  aipl_assert:
+    calls: 18
+    bytes: 0
+  aipl_char_at:
+    calls: 11
+    bytes: 0
+  aipl_dec:
+    calls: 82
+    bytes: 0
+  aipl_inc:
+    calls: 60
+    bytes: 0
+  aipl_str_eq:
+    calls: 15
+    bytes: 0
+  aipl_str_len:
+    calls: 8
+    bytes: 0
+  aipl_test_begin:
+    calls: 4
+    bytes: 0
+  aipl_test_end:
+    calls: 4
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  check_len:
+    calls: 5
+    bytes: 380
+  digit_of:
+    calls: 9
+    bytes: 492
+  main:
+    calls: 1
+    bytes: 3232

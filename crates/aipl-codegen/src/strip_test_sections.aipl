@@ -61,24 +61,60 @@ bytes allocated: 320
 instructions executed: 8824
 binary size: 7160
   code: 2628
-    __eq_char$opt: 100
-    __eq_str$opt: 148
-    __m1__parse_test_section_header: 696
-    main: 1036
-    strip_test_sections: 648
   data: 1079
   metadata: 3453
-builtin calls: 888
-  aipl_assert: 9
-  aipl_char_at: 128
-  aipl_dec: 271
-  aipl_inc: 202
-  aipl_str_ends_with: 5
-  aipl_str_eq: 14
-  aipl_str_len: 202
-  aipl_str_slice: 27
-  aipl_str_starts_with: 17
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
-  aipl_trim: 10
+functions:
+  __eq_char$opt:
+    calls: 128
+    bytes: 100
+  __eq_str$opt:
+    calls: 17
+    bytes: 148
+  __m1__parse_test_section_header:
+    calls: 17
+    bytes: 696
+  aipl_assert:
+    calls: 9
+    bytes: 0
+  aipl_char_at:
+    calls: 128
+    bytes: 0
+  aipl_dec:
+    calls: 271
+    bytes: 0
+  aipl_inc:
+    calls: 202
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 5
+    bytes: 0
+  aipl_str_eq:
+    calls: 14
+    bytes: 0
+  aipl_str_len:
+    calls: 202
+    bytes: 0
+  aipl_str_slice:
+    calls: 27
+    bytes: 0
+  aipl_str_starts_with:
+    calls: 17
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  aipl_trim:
+    calls: 10
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 1036
+  strip_test_sections:
+    calls: 9
+    bytes: 648

@@ -30,13 +30,27 @@ bytes allocated: 0
 instructions executed: 99
 binary size: 1448
   code: 436
-    __lambda_0: 60
-    apply$Tok: 100
-    main: 276
   data: 128
   metadata: 884
-builtin calls: 5
-  aipl_assert: 2
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __lambda_0:
+    calls: 1
+    bytes: 60
+  aipl_assert:
+    calls: 2
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  apply$Tok:
+    calls: 2
+    bytes: 100
+  main:
+    calls: 1
+    bytes: 276

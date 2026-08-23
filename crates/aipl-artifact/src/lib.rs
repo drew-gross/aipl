@@ -321,6 +321,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_rec_inc_weak"
         | "aipl_rec_dec_weak"
         | "aipl_count_insns"
+        | "aipl_count_call"
         | "aipl_test_begin"
         | "aipl_test_fail" => sig(1, false),
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;

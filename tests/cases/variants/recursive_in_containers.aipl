@@ -56,35 +56,93 @@ bytes allocated: 1333
 instructions executed: 3897
 binary size: 9160
   code: 4496
-    __arr_drop_List: 116
-    __arr_retain_List: 116
-    __rec_drop_List: 44
-    __to_str_Holder: 628
-    __to_str_List: 664
-    __to_str_List$arr: 736
-    __to_str_List$opt: 432
-    __to_str_i64: 180
-    __to_str_u64: 180
-    main: 1296
-    sumall: 104
   data: 389
   metadata: 4275
-builtin calls: 369
-  aipl_array_dec: 1
-  aipl_array_new: 1
-  aipl_dec: 53
-  aipl_i64_len: 34
-  aipl_inc: 5
-  aipl_print: 5
-  aipl_rec_alloc: 11
-  aipl_rec_dec_strong: 15
-  aipl_rec_dec_weak: 6
-  aipl_rec_inc_strong: 4
-  aipl_rec_inc_weak: 6
-  aipl_str_alloc: 19
-  aipl_str_data: 22
-  aipl_str_len: 44
-  aipl_u64_len: 2
-  aipl_write_bytes: 123
-  aipl_write_i64: 17
-  aipl_write_u64: 1
+functions:
+  __arr_drop_List:
+    calls: 1
+    bytes: 116
+  __arr_retain_List:
+    calls: 0
+    bytes: 116
+  __rec_drop_List:
+    calls: 11
+    bytes: 44
+  __to_str_Holder:
+    calls: 1
+    bytes: 628
+  __to_str_List:
+    calls: 42
+    bytes: 664
+  __to_str_List$arr:
+    calls: 1
+    bytes: 736
+  __to_str_List$opt:
+    calls: 1
+    bytes: 432
+  __to_str_i64:
+    calls: 1
+    bytes: 180
+  __to_str_u64:
+    calls: 1
+    bytes: 180
+  aipl_array_dec:
+    calls: 1
+    bytes: 0
+  aipl_array_new:
+    calls: 1
+    bytes: 0
+  aipl_dec:
+    calls: 53
+    bytes: 0
+  aipl_i64_len:
+    calls: 34
+    bytes: 0
+  aipl_inc:
+    calls: 5
+    bytes: 0
+  aipl_print:
+    calls: 5
+    bytes: 0
+  aipl_rec_alloc:
+    calls: 11
+    bytes: 0
+  aipl_rec_dec_strong:
+    calls: 15
+    bytes: 0
+  aipl_rec_dec_weak:
+    calls: 6
+    bytes: 0
+  aipl_rec_inc_strong:
+    calls: 4
+    bytes: 0
+  aipl_rec_inc_weak:
+    calls: 6
+    bytes: 0
+  aipl_str_alloc:
+    calls: 19
+    bytes: 0
+  aipl_str_data:
+    calls: 22
+    bytes: 0
+  aipl_str_len:
+    calls: 44
+    bytes: 0
+  aipl_u64_len:
+    calls: 2
+    bytes: 0
+  aipl_write_bytes:
+    calls: 123
+    bytes: 0
+  aipl_write_i64:
+    calls: 17
+    bytes: 0
+  aipl_write_u64:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 1296
+  sumall:
+    calls: 3
+    bytes: 104

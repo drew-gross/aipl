@@ -52,18 +52,42 @@ bytes allocated: 0
 instructions executed: 2695
 binary size: 3824
   code: 1600
-    __eq_LineAt: 96
-    __eq___builtin_Span: 104
-    line_at: 596
-    main: 804
   data: 617
   metadata: 1607
-builtin calls: 47
-  aipl_assert: 7
-  aipl_str_data: 6
-  aipl_str_iter_init: 7
-  aipl_str_iter_next: 6
-  aipl_str_len: 18
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_LineAt:
+    calls: 7
+    bytes: 96
+  __eq___builtin_Span:
+    calls: 7
+    bytes: 104
+  aipl_assert:
+    calls: 7
+    bytes: 0
+  aipl_str_data:
+    calls: 6
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 7
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 6
+    bytes: 0
+  aipl_str_len:
+    calls: 18
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  line_at:
+    calls: 7
+    bytes: 596
+  main:
+    calls: 1
+    bytes: 804

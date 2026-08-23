@@ -24,12 +24,24 @@ bytes allocated: 240
 instructions executed: 35
 binary size: 1368
   code: 444
-    main: 444
   data: 1
   metadata: 923
-builtin calls: 48
-  aipl_concat_lazy: 6
-  aipl_dec: 21
-  aipl_inc: 6
-  aipl_print: 3
-  aipl_str_len: 12
+functions:
+  aipl_concat_lazy:
+    calls: 6
+    bytes: 0
+  aipl_dec:
+    calls: 21
+    bytes: 0
+  aipl_inc:
+    calls: 6
+    bytes: 0
+  aipl_print:
+    calls: 3
+    bytes: 0
+  aipl_str_len:
+    calls: 12
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 444

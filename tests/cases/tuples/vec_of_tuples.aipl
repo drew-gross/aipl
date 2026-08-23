@@ -24,17 +24,39 @@ bytes allocated: 80
 instructions executed: 289
 binary size: 2104
   code: 924
-    __arr_drop___tuple$i64$str: 120
-    __arr_retain___tuple$i64$str: 120
-    __to_str_i64: 180
-    main: 504
   data: 1
   metadata: 1179
-builtin calls: 47
-  aipl_array_dec: 1
-  aipl_array_new: 1
-  aipl_dec: 18
-  aipl_i64_len: 6
-  aipl_inc: 12
-  aipl_print: 6
-  aipl_write_i64: 3
+functions:
+  __arr_drop___tuple$i64$str:
+    calls: 1
+    bytes: 120
+  __arr_retain___tuple$i64$str:
+    calls: 0
+    bytes: 120
+  __to_str_i64:
+    calls: 3
+    bytes: 180
+  aipl_array_dec:
+    calls: 1
+    bytes: 0
+  aipl_array_new:
+    calls: 1
+    bytes: 0
+  aipl_dec:
+    calls: 18
+    bytes: 0
+  aipl_i64_len:
+    calls: 6
+    bytes: 0
+  aipl_inc:
+    calls: 12
+    bytes: 0
+  aipl_print:
+    calls: 6
+    bytes: 0
+  aipl_write_i64:
+    calls: 3
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 504

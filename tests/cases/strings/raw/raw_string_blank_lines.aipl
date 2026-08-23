@@ -23,9 +23,15 @@ bytes allocated: 0
 instructions executed: 7
 binary size: 648
   code: 48
-    main: 48
   data: 31
   metadata: 569
-builtin calls: 2
-  aipl_dec: 1
-  aipl_print: 1
+functions:
+  aipl_dec:
+    calls: 1
+    bytes: 0
+  aipl_print:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 48

@@ -42,23 +42,57 @@ bytes allocated: 568
 instructions executed: 895
 binary size: 6608
   code: 3092
-    joined$vo1: 588
-    main: 1964
-    sum: 176
-    sum$vo1: 364
   data: 524
   metadata: 2992
-builtin calls: 129
-  aipl_arr_drop_str: 3
-  aipl_arr_inc: 4
-  aipl_array_dec: 14
-  aipl_array_new: 10
-  aipl_assert: 10
-  aipl_concat_lazy: 4
-  aipl_dec: 38
-  aipl_inc: 23
-  aipl_str_eq: 4
-  aipl_str_len: 14
-  aipl_test_begin: 2
-  aipl_test_end: 2
-  aipl_test_summary: 1
+functions:
+  aipl_arr_drop_str:
+    calls: 3
+    bytes: 0
+  aipl_arr_inc:
+    calls: 4
+    bytes: 0
+  aipl_array_dec:
+    calls: 14
+    bytes: 0
+  aipl_array_new:
+    calls: 10
+    bytes: 0
+  aipl_assert:
+    calls: 10
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 4
+    bytes: 0
+  aipl_dec:
+    calls: 38
+    bytes: 0
+  aipl_inc:
+    calls: 23
+    bytes: 0
+  aipl_str_eq:
+    calls: 4
+    bytes: 0
+  aipl_str_len:
+    calls: 14
+    bytes: 0
+  aipl_test_begin:
+    calls: 2
+    bytes: 0
+  aipl_test_end:
+    calls: 2
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  joined$vo1:
+    calls: 2
+    bytes: 588
+  main:
+    calls: 1
+    bytes: 1964
+  sum:
+    calls: 3
+    bytes: 176
+  sum$vo1:
+    calls: 2
+    bytes: 364

@@ -7,9 +7,15 @@ bytes allocated: 0
 instructions executed: 21
 binary size: 752
   code: 172
-    main: 172
   data: 1
   metadata: 579
-builtin calls: 2
-  aipl_str_iter_init: 1
-  aipl_str_len: 1
+functions:
+  aipl_str_iter_init:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 172

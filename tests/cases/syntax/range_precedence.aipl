@@ -66,18 +66,42 @@ bytes allocated: 42
 instructions executed: 213
 binary size: 2816
   code: 1084
-    __eq___builtin_Span: 104
-    __to_str___builtin_Span: 464
-    __to_str_bool: 212
-    main: 304
   data: 164
   metadata: 1568
-builtin calls: 26
-  aipl_dec: 6
-  aipl_inc: 3
-  aipl_print: 3
-  aipl_str_alloc: 1
-  aipl_str_slice: 1
-  aipl_u64_len: 4
-  aipl_write_bytes: 6
-  aipl_write_u64: 2
+functions:
+  __eq___builtin_Span:
+    calls: 1
+    bytes: 104
+  __to_str___builtin_Span:
+    calls: 1
+    bytes: 464
+  __to_str_bool:
+    calls: 1
+    bytes: 212
+  aipl_dec:
+    calls: 6
+    bytes: 0
+  aipl_inc:
+    calls: 3
+    bytes: 0
+  aipl_print:
+    calls: 3
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_slice:
+    calls: 1
+    bytes: 0
+  aipl_u64_len:
+    calls: 4
+    bytes: 0
+  aipl_write_bytes:
+    calls: 6
+    bytes: 0
+  aipl_write_u64:
+    calls: 2
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 304

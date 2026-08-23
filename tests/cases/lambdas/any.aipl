@@ -34,29 +34,75 @@ bytes allocated: 387
 instructions executed: 951
 binary size: 5560
   code: 2760
-    __builtin_any$char$lam8: 200
-    __builtin_any$i64$lam1: 192
-    __builtin_any$i64$lam12: 192
-    __builtin_any$i64$lam14: 192
-    __builtin_any$i64$lam16: 192
-    __builtin_any$i64$lam3: 192
-    __builtin_any$i64$lam5: 192
-    __builtin_any$i64$lam6: 192
-    __filter10$own0: 272
-    main: 944
   data: 436
   metadata: 2364
-builtin calls: 34
-  aipl_arr_inc: 1
-  aipl_array_dec: 8
-  aipl_array_new: 7
-  aipl_assert: 8
-  aipl_dec: 1
-  aipl_str_alloc: 1
-  aipl_str_data: 1
-  aipl_str_iter_init: 1
-  aipl_str_iter_next: 1
-  aipl_str_len: 2
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __builtin_any$char$lam8:
+    calls: 1
+    bytes: 200
+  __builtin_any$i64$lam1:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam12:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam14:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam16:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam3:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam5:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam6:
+    calls: 1
+    bytes: 192
+  __filter10$own0:
+    calls: 1
+    bytes: 272
+  aipl_arr_inc:
+    calls: 1
+    bytes: 0
+  aipl_array_dec:
+    calls: 8
+    bytes: 0
+  aipl_array_new:
+    calls: 7
+    bytes: 0
+  aipl_assert:
+    calls: 8
+    bytes: 0
+  aipl_dec:
+    calls: 1
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_data:
+    calls: 1
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 1
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 2
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 944

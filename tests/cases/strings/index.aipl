@@ -17,14 +17,30 @@ bytes allocated: 0
 instructions executed: 216
 binary size: 2104
   code: 652
-    __eq_char$opt: 100
-    main: 552
   data: 261
   metadata: 1191
-builtin calls: 18
-  aipl_assert: 5
-  aipl_char_at: 5
-  aipl_dec: 5
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_char$opt:
+    calls: 5
+    bytes: 100
+  aipl_assert:
+    calls: 5
+    bytes: 0
+  aipl_char_at:
+    calls: 5
+    bytes: 0
+  aipl_dec:
+    calls: 5
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 552

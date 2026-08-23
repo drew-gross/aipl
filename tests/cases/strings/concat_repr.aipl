@@ -54,28 +54,72 @@ bytes allocated: 346
 instructions executed: 538
 binary size: 4840
   code: 2212
-    __to_str_bool: 212
-    __to_str_char$opt: 352
-    __to_str_i64: 180
-    __to_str_u64: 180
-    main: 1288
   data: 115
   metadata: 2513
-builtin calls: 123
-  aipl_char_at: 1
-  aipl_concat_lazy: 8
-  aipl_dec: 46
-  aipl_i64_len: 2
-  aipl_inc: 18
-  aipl_print: 10
-  aipl_str_alloc: 1
-  aipl_str_data: 1
-  aipl_str_eq: 2
-  aipl_str_iter_init: 1
-  aipl_str_iter_next: 1
-  aipl_str_len: 23
-  aipl_str_slice: 1
-  aipl_u64_len: 2
-  aipl_write_bytes: 4
-  aipl_write_i64: 1
-  aipl_write_u64: 1
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 212
+  __to_str_char$opt:
+    calls: 1
+    bytes: 352
+  __to_str_i64:
+    calls: 1
+    bytes: 180
+  __to_str_u64:
+    calls: 1
+    bytes: 180
+  aipl_char_at:
+    calls: 1
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 8
+    bytes: 0
+  aipl_dec:
+    calls: 46
+    bytes: 0
+  aipl_i64_len:
+    calls: 2
+    bytes: 0
+  aipl_inc:
+    calls: 18
+    bytes: 0
+  aipl_print:
+    calls: 10
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_data:
+    calls: 1
+    bytes: 0
+  aipl_str_eq:
+    calls: 2
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 1
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 23
+    bytes: 0
+  aipl_str_slice:
+    calls: 1
+    bytes: 0
+  aipl_u64_len:
+    calls: 2
+    bytes: 0
+  aipl_write_bytes:
+    calls: 4
+    bytes: 0
+  aipl_write_i64:
+    calls: 1
+    bytes: 0
+  aipl_write_u64:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 1288

@@ -50,20 +50,48 @@ bytes allocated: 352
 instructions executed: 2661
 binary size: 5312
   code: 3552
-    __lambda_7: 8
-    __to_str_i64: 180
-    __zip8$own0$own1: 968
-    main: 2144
-    show: 252
   data: 1
   metadata: 1759
-builtin calls: 143
-  aipl_arr_inc: 1
-  aipl_array_dec: 9
-  aipl_array_new: 8
-  aipl_array_push_mut: 12
-  aipl_dec: 33
-  aipl_i64_len: 28
-  aipl_inc: 19
-  aipl_print: 19
-  aipl_write_i64: 14
+functions:
+  __lambda_7:
+    calls: 2
+    bytes: 8
+  __to_str_i64:
+    calls: 14
+    bytes: 180
+  __zip8$own0$own1:
+    calls: 1
+    bytes: 968
+  aipl_arr_inc:
+    calls: 1
+    bytes: 0
+  aipl_array_dec:
+    calls: 9
+    bytes: 0
+  aipl_array_new:
+    calls: 8
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 12
+    bytes: 0
+  aipl_dec:
+    calls: 33
+    bytes: 0
+  aipl_i64_len:
+    calls: 28
+    bytes: 0
+  aipl_inc:
+    calls: 19
+    bytes: 0
+  aipl_print:
+    calls: 19
+    bytes: 0
+  aipl_write_i64:
+    calls: 14
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 2144
+  show:
+    calls: 5
+    bytes: 252

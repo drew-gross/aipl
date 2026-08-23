@@ -19,13 +19,27 @@ bytes allocated: 0
 instructions executed: 44
 binary size: 1480
   code: 332
-    main: 332
   data: 142
   metadata: 1006
-builtin calls: 19
-  aipl_assert: 3
-  aipl_dec: 6
-  aipl_str_eq: 3
-  aipl_test_begin: 3
-  aipl_test_end: 3
-  aipl_test_summary: 1
+functions:
+  aipl_assert:
+    calls: 3
+    bytes: 0
+  aipl_dec:
+    calls: 6
+    bytes: 0
+  aipl_str_eq:
+    calls: 3
+    bytes: 0
+  aipl_test_begin:
+    calls: 3
+    bytes: 0
+  aipl_test_end:
+    calls: 3
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 332

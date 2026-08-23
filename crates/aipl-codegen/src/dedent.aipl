@@ -67,33 +67,87 @@ bytes allocated: 1641
 instructions executed: 7678
 binary size: 7848
   code: 3124
-    __builtin_count_while$char$s0$lam10: 232
-    __builtin_count_while$char$s0$lam3: 232
-    __map5$own0: 320
-    dedent: 1164
-    main: 1176
   data: 989
   metadata: 3735
-builtin calls: 872
-  aipl_arr_drop_str: 20
-  aipl_arr_inc: 30
-  aipl_arr_retain_ptr: 38
-  aipl_array_dec: 60
-  aipl_array_new: 10
-  aipl_array_push_mut: 38
-  aipl_array_with_cap: 20
-  aipl_assert: 10
-  aipl_dec: 245
-  aipl_inc: 163
-  aipl_str_data: 17
-  aipl_str_eq: 10
-  aipl_str_is_all_whitespace: 42
-  aipl_str_iter_init: 17
-  aipl_str_iter_next: 17
-  aipl_str_join: 10
-  aipl_str_len: 74
-  aipl_str_slice: 38
-  aipl_str_split: 10
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __builtin_count_while$char$s0$lam10:
+    calls: 17
+    bytes: 232
+  __builtin_count_while$char$s0$lam3:
+    calls: 0
+    bytes: 232
+  __map5$own0:
+    calls: 10
+    bytes: 320
+  aipl_arr_drop_str:
+    calls: 20
+    bytes: 0
+  aipl_arr_inc:
+    calls: 30
+    bytes: 0
+  aipl_arr_retain_ptr:
+    calls: 38
+    bytes: 0
+  aipl_array_dec:
+    calls: 60
+    bytes: 0
+  aipl_array_new:
+    calls: 10
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 38
+    bytes: 0
+  aipl_array_with_cap:
+    calls: 20
+    bytes: 0
+  aipl_assert:
+    calls: 10
+    bytes: 0
+  aipl_dec:
+    calls: 245
+    bytes: 0
+  aipl_inc:
+    calls: 163
+    bytes: 0
+  aipl_str_data:
+    calls: 17
+    bytes: 0
+  aipl_str_eq:
+    calls: 10
+    bytes: 0
+  aipl_str_is_all_whitespace:
+    calls: 42
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 17
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 17
+    bytes: 0
+  aipl_str_join:
+    calls: 10
+    bytes: 0
+  aipl_str_len:
+    calls: 74
+    bytes: 0
+  aipl_str_slice:
+    calls: 38
+    bytes: 0
+  aipl_str_split:
+    calls: 10
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  dedent:
+    calls: 10
+    bytes: 1164
+  main:
+    calls: 1
+    bytes: 1176

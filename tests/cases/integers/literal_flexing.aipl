@@ -91,18 +91,42 @@ bytes allocated: 0
 instructions executed: 435
 binary size: 2976
   code: 1328
-    __to_str_i64: 180
-    __to_str_u64: 180
-    __to_str_u8: 180
-    early_return: 20
-    main: 768
   data: 1
   metadata: 1647
-builtin calls: 77
-  aipl_dec: 22
-  aipl_i64_len: 8
-  aipl_inc: 11
-  aipl_print: 11
-  aipl_u64_len: 14
-  aipl_write_i64: 4
-  aipl_write_u64: 7
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 180
+  __to_str_u64:
+    calls: 4
+    bytes: 180
+  __to_str_u8:
+    calls: 3
+    bytes: 180
+  aipl_dec:
+    calls: 22
+    bytes: 0
+  aipl_i64_len:
+    calls: 8
+    bytes: 0
+  aipl_inc:
+    calls: 11
+    bytes: 0
+  aipl_print:
+    calls: 11
+    bytes: 0
+  aipl_u64_len:
+    calls: 14
+    bytes: 0
+  aipl_write_i64:
+    calls: 4
+    bytes: 0
+  aipl_write_u64:
+    calls: 7
+    bytes: 0
+  early_return:
+    calls: 1
+    bytes: 20
+  main:
+    calls: 1
+    bytes: 768

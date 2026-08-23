@@ -29,13 +29,27 @@ bytes allocated: 160
 instructions executed: 101
 binary size: 1992
   code: 772
-    main: 772
   data: 30
   metadata: 1190
-builtin calls: 53
-  aipl_concat_lazy: 4
-  aipl_dec: 22
-  aipl_inc: 9
-  aipl_print: 5
-  aipl_str_len: 8
-  aipl_str_slice: 5
+functions:
+  aipl_concat_lazy:
+    calls: 4
+    bytes: 0
+  aipl_dec:
+    calls: 22
+    bytes: 0
+  aipl_inc:
+    calls: 9
+    bytes: 0
+  aipl_print:
+    calls: 5
+    bytes: 0
+  aipl_str_len:
+    calls: 8
+    bytes: 0
+  aipl_str_slice:
+    calls: 5
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 772

@@ -278,6 +278,45 @@ mod builtin_calls {
     pub const AIPL_WRITE_U64: usize = 77;
 }
 
+// ---------- Per-AIPL-function call counts (instrumented build only) ----------
+//
+// The other half of the same story as `builtin_calls` above: how many times each
+// *compiled AIPL* function was entered. Codegen inserts `aipl_count_call(name)`
+// at the head of every function's entry block in the instrumented build, where
+// `name` points at a static NUL-terminated copy of that function's object-symbol
+// name — so, unlike the builtin list, the set of names is per-program and known
+// only to the object being run.
+//
+// That rules out a fixed table, so this is a small open-addressed one keyed on
+// the *pointer*: one name object per function means pointer identity is name
+// identity, and probing never has to compare strings. Sized generously against
+// the largest thing the corpus compiles (the dogfooded formatter, ~200
+// functions). Overflowing it would otherwise undercount invisibly, which is the
+// one failure mode worth engineering against: `OVERFLOW` tallies the calls that
+// found no slot, and the harness turns any nonzero into a hard failure naming
+// `CAP`.
+#[cfg(aipl_instrument)]
+mod fn_calls {
+    use core::sync::atomic::{AtomicU64, AtomicUsize};
+
+    /// Slot count. Power of two (the hash masks rather than divides), and kept
+    /// well above the real load factor so probe chains stay short.
+    pub const CAP: usize = 2048;
+
+    /// Name pointer per slot, `0` meaning empty. Paired by index with `COUNTS`.
+    pub static NAMES: [AtomicUsize; CAP] = [const { AtomicUsize::new(0) }; CAP];
+    pub static COUNTS: [AtomicU64; CAP] = [const { AtomicU64::new(0) }; CAP];
+    /// Calls that found no free slot — always 0 in practice; reported so a
+    /// too-small `CAP` shows up as a failure rather than as quietly low counts.
+    pub static OVERFLOW: AtomicU64 = AtomicU64::new(0);
+
+    /// Fibonacci hash of a name pointer. The low 3 bits are always 0 (data
+    /// objects are aligned), so shift them out before mixing.
+    pub fn slot_of(p: usize) -> usize {
+        ((p >> 3).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 40) as usize & (CAP - 1)
+    }
+}
+
 /// Tally one call to the builtin at `$idx`. Compiles to nothing in the default
 /// build, like every other counter here.
 macro_rules! count_builtin {
@@ -324,6 +363,40 @@ pub extern "C" fn aipl_count_insns(n: i64) {
     INSN_COUNT.fetch_add(n as u64, Ordering::Relaxed);
     #[cfg(not(aipl_instrument))]
     let _ = n;
+}
+
+/// Tally one entry into the compiled AIPL function whose object-symbol name is
+/// the static NUL-terminated string at `name`. Codegen emits one call per
+/// function, at the head of its entry block, in the instrumented build only —
+/// so a function that tail-calls itself counts every re-entry, and a `$tail`
+/// participant counts its trampoline separately from its body, matching how the
+/// two appear as separate symbols in the object's code breakdown.
+///
+/// Like `aipl_count_insns`, this is a no-op forwarder in the default build.
+#[no_mangle]
+pub extern "C" fn aipl_count_call(name: *const c_char) {
+    #[cfg(aipl_instrument)]
+    {
+        // Linear probe from the pointer's home slot: claim the first empty slot
+        // (this name's first call) or bump the one already holding it. Bounded
+        // by `CAP`, so a full table gives up rather than spinning.
+        let key = name as usize;
+        let mut i = fn_calls::slot_of(key);
+        for _ in 0..fn_calls::CAP {
+            let held = fn_calls::NAMES[i].load(Ordering::Relaxed);
+            if held == 0 {
+                fn_calls::NAMES[i].store(key, Ordering::Relaxed);
+            } else if held != key {
+                i = (i + 1) & (fn_calls::CAP - 1);
+                continue;
+            }
+            fn_calls::COUNTS[i].fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        fn_calls::OVERFLOW.fetch_add(1, Ordering::Relaxed);
+    }
+    #[cfg(not(aipl_instrument))]
+    let _ = name;
 }
 
 #[inline]
@@ -3664,10 +3737,17 @@ pub extern "C" fn main(argc: c_int, argv: *const *const c_char) -> c_int {
 //   reallocations: <K>
 //   bytes allocated: <B>
 //   instructions executed: <I>
-//   builtin calls: <C>
-//     <builtin>: <n>        (one line per builtin that ran)
+//   functions:
+//     <name>:               (one entry per function that ran, AIPL or builtin)
+//       calls: <n>
 // The test harness reads this back to verify a case's `--- performance ---`
-// section. Opened in binary mode so no `\n` -> `\r\n` translation occurs.
+// section. What it writes is that section minus the two things only the harness
+// can measure: the `binary size` block, and each function's `bytes:` line (read
+// from the object's symbols, which is also where functions that were *emitted
+// but never called* come from). The entries are written in no particular order —
+// builtins first, then the pointer-hashed AIPL table — because the harness sorts
+// the merged list by name anyway.
+// Opened in binary mode so no `\n` -> `\r\n` translation occurs.
 
 // Used by both the instrumented alloc-stats reporter and the (env-gated) perfmon
 // reporter, so declared unconditionally.
@@ -3694,6 +3774,18 @@ unsafe fn fput_u64(f: *mut c_void, n: u64) {
     }
 }
 
+/// One `functions:` entry: the name as a heading, then its call count on its own
+/// line. `bytes:` is the harness's to add — the runtime cannot see the object.
+#[cfg(aipl_instrument)]
+unsafe fn report_fn_calls(f: *mut c_void, name: *const c_char, n: u64) {
+    unsafe {
+        fputs(b"\n  \0".as_ptr() as *const c_char, f);
+        fputs(name, f);
+        fputs(b":\n    calls: \0".as_ptr() as *const c_char, f);
+        fput_u64(f, n);
+    }
+}
+
 #[cfg(aipl_instrument)]
 unsafe fn report_alloc_stats() {
     unsafe {
@@ -3715,24 +3807,34 @@ unsafe fn report_alloc_stats() {
         fput_u64(f, ALLOC_BYTES.load(Ordering::Relaxed));
         fputs(b"\ninstructions executed: \0".as_ptr() as *const c_char, f);
         fput_u64(f, INSN_COUNT.load(Ordering::Relaxed));
-        // Per-builtin call counts: a total, then one indented line per builtin
-        // that ran at all (a full 78-line block per case would bury the few
-        // entries that matter). `NAMES` is sorted, so the order is stable.
-        let mut total: u64 = 0;
-        for c in builtin_calls::COUNTS.iter() {
-            total += c.load(Ordering::Relaxed);
-        }
-        fputs(b"\nbuiltin calls: \0".as_ptr() as *const c_char, f);
-        fput_u64(f, total);
+        // One `functions:` block covering both halves of the call story: the
+        // runtime builtins (fixed list) and the compiled AIPL functions (the
+        // pointer-keyed table). Only entries that actually ran are written — a
+        // full 78-line builtin block per case would bury the few that matter,
+        // and a function with no calls and no code is nothing to report.
+        fputs(b"\nfunctions:\0".as_ptr() as *const c_char, f);
         for (i, name) in builtin_calls::NAMES.iter().enumerate() {
             let n = builtin_calls::COUNTS[i].load(Ordering::Relaxed);
             if n == 0 {
                 continue;
             }
-            fputs(b"\n  \0".as_ptr() as *const c_char, f);
-            fputs(name.as_ptr() as *const c_char, f);
-            fputs(b": \0".as_ptr() as *const c_char, f);
-            fput_u64(f, n);
+            report_fn_calls(f, name.as_ptr() as *const c_char, n);
+        }
+        for i in 0..fn_calls::CAP {
+            let name = fn_calls::NAMES[i].load(Ordering::Relaxed);
+            if name == 0 {
+                continue;
+            }
+            let n = fn_calls::COUNTS[i].load(Ordering::Relaxed);
+            report_fn_calls(f, name as *const c_char, n);
+        }
+        // Written only when it happened, and the harness treats its presence as
+        // a hard failure: a silently dropped tally would otherwise read as a
+        // real call-count change. See `fn_calls::OVERFLOW`.
+        let dropped = fn_calls::OVERFLOW.load(Ordering::Relaxed);
+        if dropped != 0 {
+            fputs(b"\nuncounted calls: \0".as_ptr() as *const c_char, f);
+            fput_u64(f, dropped);
         }
         fputs(b"\n\0".as_ptr() as *const c_char, f);
         fclose(f);

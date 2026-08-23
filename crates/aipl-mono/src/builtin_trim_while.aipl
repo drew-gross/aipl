@@ -30,26 +30,66 @@ bytes allocated: 0
 instructions executed: 863
 binary size: 5888
   code: 2744
-    __builtin_count_while$char$s0$lam14: 232
-    __builtin_count_while$char$s0$lam15: 232
-    __builtin_count_while$char$s0$lam16: 232
-    __builtin_count_while$char$s0$lam17: 232
-    __builtin_count_while$char$s0$lam18: 232
-    __builtin_count_while$char$s0$lam19: 232
-    __builtin_count_while$char$s0$lam20: 232
-    main: 1120
   data: 506
   metadata: 2638
-builtin calls: 91
-  aipl_assert: 7
-  aipl_dec: 21
-  aipl_inc: 7
-  aipl_str_data: 6
-  aipl_str_eq: 7
-  aipl_str_iter_init: 7
-  aipl_str_iter_next: 6
-  aipl_str_len: 20
-  aipl_str_slice: 7
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __builtin_count_while$char$s0$lam14:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam15:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam16:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam17:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam18:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam19:
+    calls: 1
+    bytes: 232
+  __builtin_count_while$char$s0$lam20:
+    calls: 1
+    bytes: 232
+  aipl_assert:
+    calls: 7
+    bytes: 0
+  aipl_dec:
+    calls: 21
+    bytes: 0
+  aipl_inc:
+    calls: 7
+    bytes: 0
+  aipl_str_data:
+    calls: 6
+    bytes: 0
+  aipl_str_eq:
+    calls: 7
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 7
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 6
+    bytes: 0
+  aipl_str_len:
+    calls: 20
+    bytes: 0
+  aipl_str_slice:
+    calls: 7
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 1120

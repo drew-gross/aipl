@@ -328,60 +328,168 @@ bytes allocated: 16148
 instructions executed: 21519
 binary size: 31520
   code: 17620
-    __arr_drop_Doc: 116
-    __arr_retain_Doc: 116
-    __builtin_any$Doc$lam7: 32
-    __builtin_any$Doc$lam7$tail: 324
-    __builtin_count_while$char$s0$lam15: 232
-    __builtin_count_while$char$s0$lam25: 232
-    __builtin_drop_last$str: 208
-    __m1__reindent_block: 3412
-    __map17$own0: 320
-    __rec_drop_Doc: 184
-    __rec_drop_Work: 84
-    col_after: 448
-    fits: 36
-    fits$tail: 2636
-    fits_atom: 44
-    fits_atom$tail: 296
-    has_hard: 32
-    has_hard$tail: 664
-    main: 3596
-    print_doc: 4608
   data: 842
   metadata: 13058
-builtin calls: 4176
-  aipl_arr_drop_str: 84
-  aipl_arr_inc: 106
-  aipl_arr_retain_ptr: 83
-  aipl_arr_slice: 2
-  aipl_array_dec: 208
-  aipl_array_new: 54
-  aipl_array_push: 34
-  aipl_array_push_mut: 22
-  aipl_array_with_cap: 12
-  aipl_assert: 9
-  aipl_concat_lazy: 22
-  aipl_dec: 630
-  aipl_inc: 352
-  aipl_rec_alloc: 147
-  aipl_rec_dec_strong: 938
-  aipl_rec_dec_weak: 105
-  aipl_rec_inc_strong: 791
-  aipl_rec_inc_weak: 105
-  aipl_str_contains: 25
-  aipl_str_data: 19
-  aipl_str_ends_with: 9
-  aipl_str_eq: 13
-  aipl_str_is_all_whitespace: 3
-  aipl_str_iter_init: 20
-  aipl_str_iter_next: 19
-  aipl_str_join: 21
-  aipl_str_len: 222
-  aipl_str_repeat: 9
-  aipl_str_slice: 71
-  aipl_str_split: 37
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
-  aipl_trim: 1
+functions:
+  __arr_drop_Doc:
+    calls: 8
+    bytes: 116
+  __arr_retain_Doc:
+    calls: 0
+    bytes: 116
+  __builtin_any$Doc$lam7:
+    calls: 0
+    bytes: 32
+  __builtin_any$Doc$lam7$tail:
+    calls: 5
+    bytes: 324
+  __builtin_count_while$char$s0$lam15:
+    calls: 0
+    bytes: 232
+  __builtin_count_while$char$s0$lam25:
+    calls: 1
+    bytes: 232
+  __builtin_drop_last$str:
+    calls: 1
+    bytes: 208
+  __m1__reindent_block:
+    calls: 1
+    bytes: 3412
+  __map17$own0:
+    calls: 1
+    bytes: 320
+  __rec_drop_Doc:
+    calls: 38
+    bytes: 184
+  __rec_drop_Work:
+    calls: 109
+    bytes: 84
+  aipl_arr_drop_str:
+    calls: 84
+    bytes: 0
+  aipl_arr_inc:
+    calls: 106
+    bytes: 0
+  aipl_arr_retain_ptr:
+    calls: 83
+    bytes: 0
+  aipl_arr_slice:
+    calls: 2
+    bytes: 0
+  aipl_array_dec:
+    calls: 208
+    bytes: 0
+  aipl_array_new:
+    calls: 54
+    bytes: 0
+  aipl_array_push:
+    calls: 34
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 22
+    bytes: 0
+  aipl_array_with_cap:
+    calls: 12
+    bytes: 0
+  aipl_assert:
+    calls: 9
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 22
+    bytes: 0
+  aipl_dec:
+    calls: 630
+    bytes: 0
+  aipl_inc:
+    calls: 352
+    bytes: 0
+  aipl_rec_alloc:
+    calls: 147
+    bytes: 0
+  aipl_rec_dec_strong:
+    calls: 938
+    bytes: 0
+  aipl_rec_dec_weak:
+    calls: 105
+    bytes: 0
+  aipl_rec_inc_strong:
+    calls: 791
+    bytes: 0
+  aipl_rec_inc_weak:
+    calls: 105
+    bytes: 0
+  aipl_str_contains:
+    calls: 25
+    bytes: 0
+  aipl_str_data:
+    calls: 19
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 9
+    bytes: 0
+  aipl_str_eq:
+    calls: 13
+    bytes: 0
+  aipl_str_is_all_whitespace:
+    calls: 3
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 20
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 19
+    bytes: 0
+  aipl_str_join:
+    calls: 21
+    bytes: 0
+  aipl_str_len:
+    calls: 222
+    bytes: 0
+  aipl_str_repeat:
+    calls: 9
+    bytes: 0
+  aipl_str_slice:
+    calls: 71
+    bytes: 0
+  aipl_str_split:
+    calls: 37
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  aipl_trim:
+    calls: 1
+    bytes: 0
+  col_after:
+    calls: 25
+    bytes: 448
+  fits:
+    calls: 0
+    bytes: 36
+  fits$tail:
+    calls: 42
+    bytes: 2636
+  fits_atom:
+    calls: 0
+    bytes: 44
+  fits_atom$tail:
+    calls: 16
+    bytes: 296
+  has_hard:
+    calls: 0
+    bytes: 32
+  has_hard$tail:
+    calls: 23
+    bytes: 664
+  main:
+    calls: 1
+    bytes: 3596
+  print_doc:
+    calls: 9
+    bytes: 4608

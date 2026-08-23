@@ -2411,6 +2411,12 @@ extern "C" fn aipl_arr_extend(
 #[no_mangle]
 extern "C" fn aipl_count_insns(_n: i64) {}
 
+/// Per-function call counter hook (arg = a pointer to the function's
+/// NUL-terminated symbol name). A no-op here for the same reason as
+/// `aipl_count_insns`: the JIT never instruments, so this only has to resolve.
+#[no_mangle]
+extern "C" fn aipl_count_call(_name: i64) {}
+
 // ---------- Test-runner runtime ----------
 //
 // The `check` command JIT-runs a synthesized `__test_main` driver: for each
@@ -4735,7 +4741,7 @@ fn compile_program<M: Module>(
     let rec_drop_pending = std::mem::take(&mut elem_rc.borrow_mut().rec_drop_pending);
     for (name, id) in rec_drop_pending {
         define_rec_drop_fn(
-            module, &mut ctx, &mut fbc, &builtins, &structs, id, &name, &mut ir,
+            module, &mut ctx, &mut fbc, &builtins, &structs, id, &name, &mut ir, instrument,
         )?;
     }
 
@@ -4754,6 +4760,7 @@ fn compile_program<M: Module>(
             &elem,
             RcOp::Drop,
             &mut ir,
+            instrument,
         )?;
         define_elem_rc_fn(
             module,
@@ -4765,6 +4772,7 @@ fn compile_program<M: Module>(
             &elem,
             RcOp::Retain,
             &mut ir,
+            instrument,
         )?;
     }
     // Dict pair drop/retain helpers. A pair helper's body only inc/decs and
@@ -4784,6 +4792,7 @@ fn compile_program<M: Module>(
             &v,
             RcOp::Drop,
             &mut ir,
+            instrument,
         )?;
         define_pair_rc_fn(
             module,
@@ -4796,6 +4805,7 @@ fn compile_program<M: Module>(
             &v,
             RcOp::Retain,
             &mut ir,
+            instrument,
         )?;
     }
 
@@ -4997,6 +5007,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         aipl_dict_contains_key as *const u8,
     );
     jit_builder.symbol("aipl_count_insns", aipl_count_insns as *const u8);
+    jit_builder.symbol("aipl_count_call", aipl_count_call as *const u8);
     jit_builder.symbol("aipl_str_hash", aipl_str_hash as *const u8);
     jit_builder.symbol("aipl_assert", aipl_assert as *const u8);
     jit_builder.symbol("aipl_test_fail", aipl_test_fail as *const u8);
@@ -7769,6 +7780,7 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_rec_inc_weak"
         | "aipl_rec_dec_weak"
         | "aipl_count_insns"
+        | "aipl_count_call"
         | "aipl_test_begin"
         | "aipl_test_fail" => sig(1, false),
         // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
@@ -8505,6 +8517,8 @@ fn define_fn<M: Module>(
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
         instrument_insn_count(module, &mut ctx.func, count_fn);
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, body_id, call_fn)?;
     }
 
     module
@@ -8562,17 +8576,14 @@ fn define_tail_trampoline<M: Module>(
     ir_out.push_str(&format!("{}\n", ctx.func.display()));
     if instrument {
         // The trampoline is a real frame the program executes, so it counts like
-        // any other. `aipl_count_insns` is declared by the body's own
-        // instrumentation, so look it up rather than declaring it again.
-        let count_fn = module
-            .declarations()
-            .get_name("aipl_count_insns")
-            .and_then(|d| match d {
-                cranelift_module::FuncOrDataId::Func(f) => Some(f),
-                cranelift_module::FuncOrDataId::Data(_) => None,
-            })
-            .ok_or_else(|| Error::msg("instrumented build without `aipl_count_insns`"))?;
+        // any other — and separately from the `$tail` body it forwards to, which
+        // is how the object's symbols count it too. Both hooks are declared by
+        // the body's own instrumentation, so look them up rather than declaring
+        // them again.
+        let count_fn = declared_import(module, "aipl_count_insns")?;
         instrument_insn_count(module, &mut ctx.func, count_fn);
+        let call_fn = declared_import(module, "aipl_count_call")?;
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
     module
         .define_function(id, ctx)
@@ -8760,6 +8771,78 @@ fn instrument_insn_count<M: Module>(module: &mut M, func: &mut Function, count_f
         let n_val = pos.ins().iconst(types::I64, n);
         pos.ins().call(fref, &[n_val]);
     }
+}
+
+/// Instrument `func` to tally how many times it is *entered*: at the head of the
+/// entry block, insert `aipl_count_call(<name>)`, where the argument points at a
+/// freshly-minted static copy of the function's own object-symbol name. The
+/// runtime keys its table on that pointer, so the name travels with the count
+/// and the compiler needs no side-channel to say what it compiled.
+///
+/// Runs *after* [`instrument_insn_count`] at every site, which is what keeps the
+/// two measurements independent: the block counts are read before these
+/// instructions exist, so turning call counting on doesn't move
+/// `instructions executed`.
+///
+/// The name is the *linkage* name (`__aipl_user_main`, `__to_str_3`,
+/// `foo$i64$tail`), not the AIPL-level one — the same key the object's symbols
+/// use, so the harness maps both back to display names through one table.
+fn instrument_call_count<M: Module>(
+    module: &mut M,
+    func: &mut Function,
+    id: FuncId,
+    count_fn: FuncId,
+) -> Result<(), Error> {
+    let Some(entry) = func.layout.entry_block() else {
+        return Ok(()); // unreachable: every defined function has an entry block
+    };
+    let Some(first) = func.layout.first_inst(entry) else {
+        return Ok(()); // unreachable: every block ends in a terminator
+    };
+    let sym = module
+        .declarations()
+        .get_function_decl(id)
+        .linkage_name(id)
+        .into_owned();
+    // One name object per `FuncId`, so the pointer the runtime sees identifies
+    // the function even when two of them would render the same text.
+    let data_id = module
+        .declare_data(
+            &format!("__aipl_fnname_{}", id.as_u32()),
+            Linkage::Local,
+            false,
+            false,
+        )
+        .map_err(|e| Error::msg(format!("declare fn name: {e}")))?;
+    let mut bytes = sym.into_bytes();
+    bytes.push(0);
+    let mut desc = DataDescription::new();
+    desc.define(bytes.into_boxed_slice());
+    module
+        .define_data(data_id, &desc)
+        .map_err(|e| Error::msg(format!("define fn name: {e}")))?;
+    let gv = module.declare_data_in_func(data_id, func);
+    let fref = module.declare_func_in_func(count_fn, func);
+    let mut pos = FuncCursor::new(func);
+    pos.goto_inst(first);
+    let name_val = pos.ins().symbol_value(types::I64, gv);
+    pos.ins().call(fref, &[name_val]);
+    Ok(())
+}
+
+/// The `FuncId` a runtime import was declared under, for the instrumentation
+/// paths that run without a [`Builtins`] in hand (a trampoline, a synthesized
+/// helper). Every such site runs after the import is already declared, so this
+/// looks it up rather than declaring a second one.
+fn declared_import<M: Module>(module: &M, sym: &str) -> Result<FuncId, Error> {
+    module
+        .declarations()
+        .get_name(sym)
+        .and_then(|d| match d {
+            cranelift_module::FuncOrDataId::Func(f) => Some(f),
+            cranelift_module::FuncOrDataId::Data(_) => None,
+        })
+        .ok_or_else(|| Error::msg(format!("instrumented build without `{sym}`")))
 }
 
 /// True when a refcount op on the str-repr value `v` is statically known to be
@@ -9855,6 +9938,7 @@ fn define_rec_drop_fn<M: Module>(
     id: FuncId,
     name: &str,
     ir_out: &mut String,
+    instrument: bool,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // payload ptr
@@ -9874,6 +9958,14 @@ fn define_rec_drop_fn<M: Module>(
         &ctx.func,
         &format!("{}\n", ctx.func.display()),
     ));
+    // These helpers carry no `instructions executed` instrumentation (their work
+    // is refcount traffic, already visible in the builtin counts), but they are
+    // real functions with real code in the object, so they are counted like any
+    // other in the per-function breakdown.
+    if instrument {
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+    }
     module
         .define_function(id, ctx)
         .map_err(|e| Error::msg(format!("define rec drop fn: {e}")))?;
@@ -11261,6 +11353,7 @@ fn define_pair_rc_fn<M: Module>(
     val_ty: &Type,
     op: RcOp,
     ir_out: &mut String,
+    instrument: bool,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // elems
@@ -11314,6 +11407,10 @@ fn define_pair_rc_fn<M: Module>(
         &ctx.func,
         &format!("{}\n", ctx.func.display()),
     ));
+    if instrument {
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+    }
     module
         .define_function(id, ctx)
         .map_err(|e| Error::msg(format!("define pair rc fn: {e}")))?;
@@ -11333,6 +11430,7 @@ fn define_elem_rc_fn<M: Module>(
     elem: &Type,
     op: RcOp,
     ir_out: &mut String,
+    instrument: bool,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // elems
@@ -11382,6 +11480,10 @@ fn define_elem_rc_fn<M: Module>(
         &ctx.func,
         &format!("{}\n", ctx.func.display()),
     ));
+    if instrument {
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+    }
     module
         .define_function(id, ctx)
         .map_err(|e| Error::msg(format!("define elem rc fn: {e}")))?;
@@ -12490,6 +12592,8 @@ fn define_test_fail_fn<M: Module>(
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
         instrument_insn_count(module, &mut ctx.func, count_fn);
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
     module
         .define_function(id, ctx)
@@ -12569,6 +12673,8 @@ fn define_eq_fn<M: Module>(
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
         instrument_insn_count(module, &mut ctx.func, count_fn);
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
     module
         .define_function(id, ctx)
@@ -12724,6 +12830,8 @@ fn define_tostr_fn<M: Module>(
     if instrument {
         let count_fn = builtins.id(module, "aipl_count_insns");
         instrument_insn_count(module, &mut ctx.func, count_fn);
+        let call_fn = builtins.id(module, "aipl_count_call");
+        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
     module
         .define_function(id, ctx)

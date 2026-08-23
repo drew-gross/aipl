@@ -58,15 +58,33 @@ bytes allocated: 156
 instructions executed: 285
 binary size: 4312
   code: 2000
-    first: 800
-    main: 1200
   data: 165
   metadata: 2147
-builtin calls: 78
-  aipl_concat_lazy: 3
-  aipl_dec: 35
-  aipl_inc: 24
-  aipl_print: 3
-  aipl_read_file_to_string: 3
-  aipl_str_eq: 2
-  aipl_str_len: 8
+functions:
+  aipl_concat_lazy:
+    calls: 3
+    bytes: 0
+  aipl_dec:
+    calls: 35
+    bytes: 0
+  aipl_inc:
+    calls: 24
+    bytes: 0
+  aipl_print:
+    calls: 3
+    bytes: 0
+  aipl_read_file_to_string:
+    calls: 3
+    bytes: 0
+  aipl_str_eq:
+    calls: 2
+    bytes: 0
+  aipl_str_len:
+    calls: 8
+    bytes: 0
+  first:
+    calls: 3
+    bytes: 800
+  main:
+    calls: 1
+    bytes: 1200

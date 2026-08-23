@@ -90,25 +90,63 @@ bytes allocated: 536
 instructions executed: 2305
 binary size: 8672
   code: 4964
-    __eq_i64$opt: 100
-    __eq_str$opt: 148
-    __filter5$own0: 284
-    is_big: 16
-    main: 3984
-    opt_right_fold$i64$i64$lam4: 432
   data: 852
   metadata: 2856
-builtin calls: 107
-  aipl_arr_drop_str: 1
-  aipl_arr_inc: 1
-  aipl_array_dec: 9
-  aipl_array_new: 8
-  aipl_assert: 10
-  aipl_concat_lazy: 3
-  aipl_dec: 33
-  aipl_inc: 26
-  aipl_str_eq: 1
-  aipl_str_len: 8
-  aipl_test_begin: 3
-  aipl_test_end: 3
-  aipl_test_summary: 1
+functions:
+  __eq_i64$opt:
+    calls: 8
+    bytes: 100
+  __eq_str$opt:
+    calls: 1
+    bytes: 148
+  __filter5$own0:
+    calls: 1
+    bytes: 284
+  aipl_arr_drop_str:
+    calls: 1
+    bytes: 0
+  aipl_arr_inc:
+    calls: 1
+    bytes: 0
+  aipl_array_dec:
+    calls: 9
+    bytes: 0
+  aipl_array_new:
+    calls: 8
+    bytes: 0
+  aipl_assert:
+    calls: 10
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 3
+    bytes: 0
+  aipl_dec:
+    calls: 33
+    bytes: 0
+  aipl_inc:
+    calls: 26
+    bytes: 0
+  aipl_str_eq:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 8
+    bytes: 0
+  aipl_test_begin:
+    calls: 3
+    bytes: 0
+  aipl_test_end:
+    calls: 3
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  is_big:
+    calls: 3
+    bytes: 16
+  main:
+    calls: 1
+    bytes: 3984
+  opt_right_fold$i64$i64$lam4:
+    calls: 2
+    bytes: 432

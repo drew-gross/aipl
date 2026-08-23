@@ -48,15 +48,33 @@ bytes allocated: 40
 instructions executed: 218
 binary size: 3736
   code: 1764
-    __to_str_unit$err$str: 436
-    main: 768
-    validate: 560
   data: 131
   metadata: 1841
-builtin calls: 29
-  aipl_concat_lazy: 1
-  aipl_dec: 13
-  aipl_inc: 9
-  aipl_print: 3
-  aipl_str_len: 2
-  aipl_write_bytes: 1
+functions:
+  __to_str_unit$err$str:
+    calls: 1
+    bytes: 436
+  aipl_concat_lazy:
+    calls: 1
+    bytes: 0
+  aipl_dec:
+    calls: 13
+    bytes: 0
+  aipl_inc:
+    calls: 9
+    bytes: 0
+  aipl_print:
+    calls: 3
+    bytes: 0
+  aipl_str_len:
+    calls: 2
+    bytes: 0
+  aipl_write_bytes:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 768
+  validate:
+    calls: 2
+    bytes: 560

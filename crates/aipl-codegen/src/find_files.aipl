@@ -41,26 +41,66 @@ bytes allocated: 936
 instructions executed: 1439
 binary size: 9992
   code: 4688
-    __eq_str$arr: 352
-    find_files: 776
-    main: 3560
   data: 798
   metadata: 4506
-builtin calls: 278
-  aipl_arr_drop_str: 15
-  aipl_arr_retain_ptr: 9
-  aipl_arr_sort: 6
-  aipl_array_dec: 28
-  aipl_array_new: 9
-  aipl_array_push_mut: 6
-  aipl_array_with_cap: 7
-  aipl_assert: 7
-  aipl_dec: 78
-  aipl_inc: 59
-  aipl_list_files: 1
-  aipl_str_ends_with: 13
-  aipl_str_eq: 7
-  aipl_str_len: 28
-  aipl_test_begin: 2
-  aipl_test_end: 2
-  aipl_test_summary: 1
+functions:
+  __eq_str$arr:
+    calls: 6
+    bytes: 352
+  aipl_arr_drop_str:
+    calls: 15
+    bytes: 0
+  aipl_arr_retain_ptr:
+    calls: 9
+    bytes: 0
+  aipl_arr_sort:
+    calls: 6
+    bytes: 0
+  aipl_array_dec:
+    calls: 28
+    bytes: 0
+  aipl_array_new:
+    calls: 9
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 6
+    bytes: 0
+  aipl_array_with_cap:
+    calls: 7
+    bytes: 0
+  aipl_assert:
+    calls: 7
+    bytes: 0
+  aipl_dec:
+    calls: 78
+    bytes: 0
+  aipl_inc:
+    calls: 59
+    bytes: 0
+  aipl_list_files:
+    calls: 1
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 13
+    bytes: 0
+  aipl_str_eq:
+    calls: 7
+    bytes: 0
+  aipl_str_len:
+    calls: 28
+    bytes: 0
+  aipl_test_begin:
+    calls: 2
+    bytes: 0
+  aipl_test_end:
+    calls: 2
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  find_files:
+    calls: 1
+    bytes: 776
+  main:
+    calls: 1
+    bytes: 3560

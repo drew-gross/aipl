@@ -38,24 +38,60 @@ bytes allocated: 157
 instructions executed: 638
 binary size: 4120
   code: 1908
-    __eq___builtin_Span: 104
-    __to_str_bool: 212
-    __to_str_i64$arr: 672
-    __to_str_u64: 180
-    main: 740
   data: 147
   metadata: 2065
-builtin calls: 58
-  aipl_arr_slice: 1
-  aipl_array_dec: 2
-  aipl_array_new: 1
-  aipl_dec: 14
-  aipl_i64_len: 6
-  aipl_inc: 7
-  aipl_print: 7
-  aipl_str_alloc: 1
-  aipl_str_slice: 2
-  aipl_u64_len: 6
-  aipl_write_bytes: 5
-  aipl_write_i64: 3
-  aipl_write_u64: 3
+functions:
+  __eq___builtin_Span:
+    calls: 1
+    bytes: 104
+  __to_str_bool:
+    calls: 1
+    bytes: 212
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 672
+  __to_str_u64:
+    calls: 3
+    bytes: 180
+  aipl_arr_slice:
+    calls: 1
+    bytes: 0
+  aipl_array_dec:
+    calls: 2
+    bytes: 0
+  aipl_array_new:
+    calls: 1
+    bytes: 0
+  aipl_dec:
+    calls: 14
+    bytes: 0
+  aipl_i64_len:
+    calls: 6
+    bytes: 0
+  aipl_inc:
+    calls: 7
+    bytes: 0
+  aipl_print:
+    calls: 7
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_slice:
+    calls: 2
+    bytes: 0
+  aipl_u64_len:
+    calls: 6
+    bytes: 0
+  aipl_write_bytes:
+    calls: 5
+    bytes: 0
+  aipl_write_i64:
+    calls: 3
+    bytes: 0
+  aipl_write_u64:
+    calls: 3
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 740

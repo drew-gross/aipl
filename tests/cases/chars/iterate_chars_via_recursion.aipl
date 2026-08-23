@@ -18,16 +18,36 @@ bytes allocated: 0
 instructions executed: 176
 binary size: 1432
   code: 424
-    count_a: 36
-    count_a$tail: 256
-    main: 132
   data: 53
   metadata: 955
-builtin calls: 32
-  aipl_assert: 1
-  aipl_char_at: 7
-  aipl_dec: 11
-  aipl_inc: 10
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  aipl_assert:
+    calls: 1
+    bytes: 0
+  aipl_char_at:
+    calls: 7
+    bytes: 0
+  aipl_dec:
+    calls: 11
+    bytes: 0
+  aipl_inc:
+    calls: 10
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  count_a:
+    calls: 0
+    bytes: 36
+  count_a$tail:
+    calls: 7
+    bytes: 256
+  main:
+    calls: 1
+    bytes: 132

@@ -37,16 +37,36 @@ bytes allocated: 44
 instructions executed: 165
 binary size: 2376
   code: 780
-    __to_str_unit$err$Error: 436
-    main: 344
   data: 211
   metadata: 1385
-builtin calls: 22
-  aipl_dec: 8
-  aipl_inc: 2
-  aipl_print: 2
-  aipl_str_alloc: 1
-  aipl_str_data: 1
-  aipl_str_len: 2
-  aipl_write_bytes: 4
-  aipl_write_string_to_file: 2
+functions:
+  __to_str_unit$err$Error:
+    calls: 2
+    bytes: 436
+  aipl_dec:
+    calls: 8
+    bytes: 0
+  aipl_inc:
+    calls: 2
+    bytes: 0
+  aipl_print:
+    calls: 2
+    bytes: 0
+  aipl_str_alloc:
+    calls: 1
+    bytes: 0
+  aipl_str_data:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 2
+    bytes: 0
+  aipl_write_bytes:
+    calls: 4
+    bytes: 0
+  aipl_write_string_to_file:
+    calls: 2
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 344

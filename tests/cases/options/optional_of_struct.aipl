@@ -35,18 +35,42 @@ bytes allocated: 0
 instructions executed: 334
 binary size: 3088
   code: 1284
-    __eq_Named: 152
-    __eq_Named$opt: 92
-    __eq_Point: 104
-    __eq_Point$opt: 92
-    main: 844
   data: 278
   metadata: 1526
-builtin calls: 29
-  aipl_assert: 5
-  aipl_dec: 11
-  aipl_inc: 8
-  aipl_str_eq: 2
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_Named:
+    calls: 1
+    bytes: 152
+  __eq_Named$opt:
+    calls: 1
+    bytes: 92
+  __eq_Point:
+    calls: 2
+    bytes: 104
+  __eq_Point$opt:
+    calls: 2
+    bytes: 92
+  aipl_assert:
+    calls: 5
+    bytes: 0
+  aipl_dec:
+    calls: 11
+    bytes: 0
+  aipl_inc:
+    calls: 8
+    bytes: 0
+  aipl_str_eq:
+    calls: 2
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 844

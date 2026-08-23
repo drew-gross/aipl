@@ -40,7 +40,7 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
-  a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing
+  a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing/
 
 self-hosting:
   make formatter command that is fully self-hosted
@@ -214,11 +214,15 @@ optimizations:
 effects:
   all effects should be shimmable actually
 
+allocator:
+  make own allocator
+
 perfmon:
   show regression and improvements
   improve it in some way that it allows you to prove that an optimzation did or did not happen
   add tests that specifically exersize perf
-  instead of splitting builtin and non-builtin calls, combine and show both size and calls for both
+  a function emitted but never entered reports calls: 0 — in walker.aipl, 49 of 193 functions turn out to be dead specializations
+  why are some functions 0 bytes?
 
 recovering check:
   check should error on lint failures, but still run tests and report results

@@ -21,12 +21,24 @@ bytes allocated: 0
 instructions executed: 111
 binary size: 1472
   code: 396
-    __eq_Vec2: 104
-    main: 292
   data: 168
   metadata: 908
-builtin calls: 6
-  aipl_assert: 3
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_Vec2:
+    calls: 2
+    bytes: 104
+  aipl_assert:
+    calls: 3
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 292

@@ -271,32 +271,84 @@ bytes allocated: 2981
 instructions executed: 11328
 binary size: 13120
   code: 4944
-    __eq_str$opt: 148
-    __m2__parse_test_section_header: 696
-    contains_section: 568
-    fill_or_add_section: 2152
-    main: 1380
   data: 3041
   metadata: 5135
-builtin calls: 1431
-  aipl_arr_drop_str: 10
-  aipl_array_dec: 10
-  aipl_array_new: 10
-  aipl_assert: 10
-  aipl_concat: 30
-  aipl_concat_lazy: 30
-  aipl_dec: 565
-  aipl_inc: 317
-  aipl_str_data: 9
-  aipl_str_ends_with: 12
-  aipl_str_eq: 34
-  aipl_str_iter_init: 10
-  aipl_str_iter_next: 9
-  aipl_str_len: 246
-  aipl_str_slice: 60
-  aipl_str_split: 10
-  aipl_str_starts_with: 32
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
-  aipl_trim: 24
+functions:
+  __eq_str$opt:
+    calls: 42
+    bytes: 148
+  __m2__parse_test_section_header:
+    calls: 32
+    bytes: 696
+  aipl_arr_drop_str:
+    calls: 10
+    bytes: 0
+  aipl_array_dec:
+    calls: 10
+    bytes: 0
+  aipl_array_new:
+    calls: 10
+    bytes: 0
+  aipl_assert:
+    calls: 10
+    bytes: 0
+  aipl_concat:
+    calls: 30
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 30
+    bytes: 0
+  aipl_dec:
+    calls: 565
+    bytes: 0
+  aipl_inc:
+    calls: 317
+    bytes: 0
+  aipl_str_data:
+    calls: 9
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 12
+    bytes: 0
+  aipl_str_eq:
+    calls: 34
+    bytes: 0
+  aipl_str_iter_init:
+    calls: 10
+    bytes: 0
+  aipl_str_iter_next:
+    calls: 9
+    bytes: 0
+  aipl_str_len:
+    calls: 246
+    bytes: 0
+  aipl_str_slice:
+    calls: 60
+    bytes: 0
+  aipl_str_split:
+    calls: 10
+    bytes: 0
+  aipl_str_starts_with:
+    calls: 32
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  aipl_trim:
+    calls: 24
+    bytes: 0
+  contains_section:
+    calls: 10
+    bytes: 568
+  fill_or_add_section:
+    calls: 10
+    bytes: 2152
+  main:
+    calls: 1
+    bytes: 1380

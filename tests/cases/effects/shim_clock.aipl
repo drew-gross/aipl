@@ -74,23 +74,57 @@ bytes allocated: 85
 instructions executed: 312
 binary size: 4552
   code: 2012
-    __to_str_bool: 212
-    __to_str_u64: 180
-    fixed_mono: 8
-    fixed_wall: 8
-    inner_mono: 8
-    inner_wall: 8
-    main: 1588
   data: 47
   metadata: 2493
-builtin calls: 88
-  aipl_concat: 4
-  aipl_dec: 21
-  aipl_inc: 9
-  aipl_now_nanos: 1
-  aipl_print: 4
-  aipl_shim_get: 16
-  aipl_shim_set: 20
-  aipl_u64_len: 8
-  aipl_write_bytes: 1
-  aipl_write_u64: 4
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 212
+  __to_str_u64:
+    calls: 4
+    bytes: 180
+  aipl_concat:
+    calls: 4
+    bytes: 0
+  aipl_dec:
+    calls: 21
+    bytes: 0
+  aipl_inc:
+    calls: 9
+    bytes: 0
+  aipl_now_nanos:
+    calls: 1
+    bytes: 0
+  aipl_print:
+    calls: 4
+    bytes: 0
+  aipl_shim_get:
+    calls: 16
+    bytes: 0
+  aipl_shim_set:
+    calls: 20
+    bytes: 0
+  aipl_u64_len:
+    calls: 8
+    bytes: 0
+  aipl_write_bytes:
+    calls: 1
+    bytes: 0
+  aipl_write_u64:
+    calls: 4
+    bytes: 0
+  fixed_mono:
+    calls: 1
+    bytes: 8
+  fixed_wall:
+    calls: 3
+    bytes: 8
+  inner_mono:
+    calls: 0
+    bytes: 8
+  inner_wall:
+    calls: 1
+    bytes: 8
+  main:
+    calls: 1
+    bytes: 1588

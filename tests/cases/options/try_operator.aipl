@@ -25,20 +25,48 @@ bytes allocated: 40
 instructions executed: 315
 binary size: 3192
   code: 1356
-    __eq_i64$opt: 100
-    __eq_str$opt: 148
-    add2: 128
-    bang: 244
-    main: 736
   data: 287
   metadata: 1549
-builtin calls: 30
-  aipl_assert: 5
-  aipl_concat_lazy: 1
-  aipl_dec: 9
-  aipl_inc: 7
-  aipl_str_eq: 1
-  aipl_str_len: 4
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_i64$opt:
+    calls: 3
+    bytes: 100
+  __eq_str$opt:
+    calls: 2
+    bytes: 148
+  add2:
+    calls: 3
+    bytes: 128
+  aipl_assert:
+    calls: 5
+    bytes: 0
+  aipl_concat_lazy:
+    calls: 1
+    bytes: 0
+  aipl_dec:
+    calls: 9
+    bytes: 0
+  aipl_inc:
+    calls: 7
+    bytes: 0
+  aipl_str_eq:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 4
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  bang:
+    calls: 2
+    bytes: 244
+  main:
+    calls: 1
+    bytes: 736

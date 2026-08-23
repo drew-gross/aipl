@@ -19,13 +19,27 @@ bytes allocated: 0
 instructions executed: 63
 binary size: 2056
   code: 388
-    main: 388
   data: 360
   metadata: 1308
-builtin calls: 24
-  aipl_assert: 7
-  aipl_dec: 7
-  aipl_str_is_all_whitespace: 7
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  aipl_assert:
+    calls: 7
+    bytes: 0
+  aipl_dec:
+    calls: 7
+    bytes: 0
+  aipl_str_is_all_whitespace:
+    calls: 7
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 388

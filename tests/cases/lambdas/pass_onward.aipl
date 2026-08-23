@@ -26,15 +26,33 @@ bytes allocated: 272
 instructions executed: 653
 binary size: 2624
   code: 1224
-    __eq_i64$arr: 296
-    main: 928
   data: 134
   metadata: 1266
-builtin calls: 22
-  aipl_array_dec: 6
-  aipl_array_new: 6
-  aipl_array_push_mut: 5
-  aipl_assert: 2
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __eq_i64$arr:
+    calls: 2
+    bytes: 296
+  aipl_array_dec:
+    calls: 6
+    bytes: 0
+  aipl_array_new:
+    calls: 6
+    bytes: 0
+  aipl_array_push_mut:
+    calls: 5
+    bytes: 0
+  aipl_assert:
+    calls: 2
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 928

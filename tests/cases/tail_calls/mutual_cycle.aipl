@@ -71,29 +71,75 @@ bytes allocated: 8400168
 instructions executed: 17700284
 binary size: 4576
   code: 2140
-    __rec_drop_Work: 84
-    __to_str_bool: 212
-    fits: 36
-    fits$tail: 356
-    fits_after: 40
-    fits_after$tail: 220
-    fits_atom: 40
-    fits_atom$tail: 348
-    main: 556
-    work_of: 36
-    work_of$tail: 212
   data: 47
   metadata: 2389
-builtin calls: 7950043
-  aipl_dec: 1950011
-  aipl_inc: 1200005
-  aipl_print: 4
-  aipl_rec_alloc: 150003
-  aipl_rec_dec_strong: 1350008
-  aipl_rec_dec_weak: 150000
-  aipl_rec_inc_strong: 1200005
-  aipl_rec_inc_weak: 150000
-  aipl_str_contains: 300001
-  aipl_str_ends_with: 300000
-  aipl_str_len: 1200002
-  aipl_write_bytes: 4
+functions:
+  __rec_drop_Work:
+    calls: 150003
+    bytes: 84
+  __to_str_bool:
+    calls: 4
+    bytes: 212
+  aipl_dec:
+    calls: 1950011
+    bytes: 0
+  aipl_inc:
+    calls: 1200005
+    bytes: 0
+  aipl_print:
+    calls: 4
+    bytes: 0
+  aipl_rec_alloc:
+    calls: 150003
+    bytes: 0
+  aipl_rec_dec_strong:
+    calls: 1350008
+    bytes: 0
+  aipl_rec_dec_weak:
+    calls: 150000
+    bytes: 0
+  aipl_rec_inc_strong:
+    calls: 1200005
+    bytes: 0
+  aipl_rec_inc_weak:
+    calls: 150000
+    bytes: 0
+  aipl_str_contains:
+    calls: 300001
+    bytes: 0
+  aipl_str_ends_with:
+    calls: 300000
+    bytes: 0
+  aipl_str_len:
+    calls: 1200002
+    bytes: 0
+  aipl_write_bytes:
+    calls: 4
+    bytes: 0
+  fits:
+    calls: 0
+    bytes: 36
+  fits$tail:
+    calls: 300003
+    bytes: 356
+  fits_after:
+    calls: 0
+    bytes: 40
+  fits_after$tail:
+    calls: 300002
+    bytes: 220
+  fits_atom:
+    calls: 0
+    bytes: 40
+  fits_atom$tail:
+    calls: 300001
+    bytes: 348
+  main:
+    calls: 1
+    bytes: 556
+  work_of:
+    calls: 0
+    bytes: 36
+  work_of$tail:
+    calls: 150001
+    bytes: 212

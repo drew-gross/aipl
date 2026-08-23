@@ -17,15 +17,33 @@ bytes allocated: 0
 instructions executed: 787
 binary size: 1728
   code: 408
-    is_even: 32
-    is_even$tail: 36
-    is_odd: 32
-    is_odd$tail: 36
-    main: 272
   data: 186
   metadata: 1134
-builtin calls: 9
-  aipl_assert: 4
-  aipl_test_begin: 2
-  aipl_test_end: 2
-  aipl_test_summary: 1
+functions:
+  aipl_assert:
+    calls: 4
+    bytes: 0
+  aipl_test_begin:
+    calls: 2
+    bytes: 0
+  aipl_test_end:
+    calls: 2
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  is_even:
+    calls: 0
+    bytes: 32
+  is_even$tail:
+    calls: 53
+    bytes: 36
+  is_odd:
+    calls: 0
+    bytes: 32
+  is_odd$tail:
+    calls: 4
+    bytes: 36
+  main:
+    calls: 1
+    bytes: 272

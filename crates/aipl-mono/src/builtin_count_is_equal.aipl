@@ -39,15 +39,33 @@ bytes allocated: 656
 instructions executed: 1785
 binary size: 4360
   code: 2020
-    __builtin_count_is_equal$i64: 284
-    count_is_equal$i64: 284
-    main: 1452
   data: 566
   metadata: 1774
-builtin calls: 31
-  aipl_array_dec: 11
-  aipl_array_new: 11
-  aipl_assert: 6
-  aipl_test_begin: 1
-  aipl_test_end: 1
-  aipl_test_summary: 1
+functions:
+  __builtin_count_is_equal$i64:
+    calls: 5
+    bytes: 284
+  aipl_array_dec:
+    calls: 11
+    bytes: 0
+  aipl_array_new:
+    calls: 11
+    bytes: 0
+  aipl_assert:
+    calls: 6
+    bytes: 0
+  aipl_test_begin:
+    calls: 1
+    bytes: 0
+  aipl_test_end:
+    calls: 1
+    bytes: 0
+  aipl_test_summary:
+    calls: 1
+    bytes: 0
+  count_is_equal$i64:
+    calls: 6
+    bytes: 284
+  main:
+    calls: 1
+    bytes: 1452

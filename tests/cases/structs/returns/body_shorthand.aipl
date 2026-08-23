@@ -76,18 +76,42 @@ bytes allocated: 208
 instructions executed: 704
 binary size: 4488
   code: 1768
-    __to_str_Named: 812
-    __to_str_Vec2: 464
-    main: 492
   data: 364
   metadata: 2356
-builtin calls: 92
-  aipl_dec: 12
-  aipl_i64_len: 20
-  aipl_inc: 5
-  aipl_print: 6
-  aipl_str_alloc: 5
-  aipl_str_data: 1
-  aipl_str_len: 2
-  aipl_write_bytes: 31
-  aipl_write_i64: 10
+functions:
+  __to_str_Named:
+    calls: 1
+    bytes: 812
+  __to_str_Vec2:
+    calls: 4
+    bytes: 464
+  aipl_dec:
+    calls: 12
+    bytes: 0
+  aipl_i64_len:
+    calls: 20
+    bytes: 0
+  aipl_inc:
+    calls: 5
+    bytes: 0
+  aipl_print:
+    calls: 6
+    bytes: 0
+  aipl_str_alloc:
+    calls: 5
+    bytes: 0
+  aipl_str_data:
+    calls: 1
+    bytes: 0
+  aipl_str_len:
+    calls: 2
+    bytes: 0
+  aipl_write_bytes:
+    calls: 31
+    bytes: 0
+  aipl_write_i64:
+    calls: 10
+    bytes: 0
+  main:
+    calls: 1
+    bytes: 492

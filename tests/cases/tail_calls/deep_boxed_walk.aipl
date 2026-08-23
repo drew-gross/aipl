@@ -37,24 +37,60 @@ bytes allocated: 11200056
 instructions executed: 8000062
 binary size: 2416
   code: 940
-    __rec_drop_List: 84
-    __to_str_u64: 180
-    build: 36
-    build$tail: 216
-    main: 156
-    total: 36
-    total$tail: 232
   data: 1
   metadata: 1475
-builtin calls: 2400011
-  aipl_dec: 400002
-  aipl_inc: 200001
-  aipl_print: 1
-  aipl_rec_alloc: 200001
-  aipl_rec_dec_strong: 600002
-  aipl_rec_dec_weak: 200000
-  aipl_rec_inc_strong: 400001
-  aipl_rec_inc_weak: 200000
-  aipl_str_len: 200000
-  aipl_u64_len: 2
-  aipl_write_u64: 1
+functions:
+  __rec_drop_List:
+    calls: 200001
+    bytes: 84
+  __to_str_u64:
+    calls: 1
+    bytes: 180
+  aipl_dec:
+    calls: 400002
+    bytes: 0
+  aipl_inc:
+    calls: 200001
+    bytes: 0
+  aipl_print:
+    calls: 1
+    bytes: 0
+  aipl_rec_alloc:
+    calls: 200001
+    bytes: 0
+  aipl_rec_dec_strong:
+    calls: 600002
+    bytes: 0
+  aipl_rec_dec_weak:
+    calls: 200000
+    bytes: 0
+  aipl_rec_inc_strong:
+    calls: 400001
+    bytes: 0
+  aipl_rec_inc_weak:
+    calls: 200000
+    bytes: 0
+  aipl_str_len:
+    calls: 200000
+    bytes: 0
+  aipl_u64_len:
+    calls: 2
+    bytes: 0
+  aipl_write_u64:
+    calls: 1
+    bytes: 0
+  build:
+    calls: 0
+    bytes: 36
+  build$tail:
+    calls: 200001
+    bytes: 216
+  main:
+    calls: 1
+    bytes: 156
+  total:
+    calls: 0
+    bytes: 36
+  total$tail:
+    calls: 200001
+    bytes: 232
