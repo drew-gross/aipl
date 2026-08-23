@@ -1392,70 +1392,70 @@ functions:
     bytes: 812
   aipl_arr_drop_str:
     calls: 22
-    bytes: 0
+    bytes: (external)
   aipl_arr_inc:
     calls: 3052
-    bytes: 0
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 30
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 4424
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 1177
-    bytes: 0
+    bytes: (external)
   aipl_array_push:
     calls: 195
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 59
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 481
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 29
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 7285
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 6134
-    bytes: 0
+    bytes: (external)
   aipl_str_contains:
     calls: 325
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 131
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 111
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 140
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 131
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 2615
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 842
-    bytes: 0
+    bytes: (external)
   aipl_str_starts_with:
     calls: 305
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   between_len:
     calls: 3
     bytes: 744

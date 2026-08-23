@@ -72,49 +72,49 @@ functions:
     bytes: 180
   aipl_array_dec:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 1
-    bytes: 0
+    bytes: (external)
   count_ones:
     calls: 4
     bytes: 212

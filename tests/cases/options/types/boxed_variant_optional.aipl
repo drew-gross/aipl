@@ -35,31 +35,31 @@ functions:
     bytes: 48
   aipl_assert:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_rec_alloc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_strong:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_weak:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_strong:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_weak:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1240

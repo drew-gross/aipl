@@ -36,46 +36,46 @@ functions:
     bytes: 352
   aipl_arr_drop_str:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_arr_elem_ptr:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_arr_reverse:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 15
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 32
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 15
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_reverse:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1648

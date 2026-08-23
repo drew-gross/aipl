@@ -20,10 +20,10 @@ binary size: 560
 functions:
   aipl_dec:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 44

@@ -36,9 +36,12 @@
 //!                          functions and runtime builtins in one list — each
 //!                          with the two numbers that only make sense together:
 //!                          `calls:` (times entered) and `bytes:` (code size in
-//!                          this object). A builtin has no code here, so it
-//!                          reports 0 bytes; a function emitted but never called
-//!                          reports 0 calls. The byte side doubles as the list of
+//!                          this object). A builtin is linked in from the runtime
+//!                          and has no code here, so it reports
+//!                          `bytes: (external)` rather than a misleading 0; a
+//!                          function emitted but never called reports 0 calls,
+//!                          which *is* a real count. The byte side doubles as
+//!                          the list of
 //!                          instances monomorphization emitted, so a change in
 //!                          what gets specialized shows up as a diff here.
 //!                          Mutually exclusive with `errors`. REQUIRED on every
@@ -114,6 +117,11 @@ use aipl::binary;
 use aipl::codegen::{Compilation, ObjectCompilation};
 use aipl::loader;
 use aipl::{DebugOptions, Error};
+
+/// What a `functions:` entry's `bytes:` line reads when the function has no code
+/// in the measured object — see [`FnStat::bytes`]. Not a number, so it can never
+/// be mistaken for a measured zero.
+const EXTERNAL_BYTES: &str = "(external)";
 
 /// The command that runs the ignored section-refresh helper ([`fill_expected`]).
 /// Surfaced in failure messages so a stale `--- performance ---`/`errors`/`check`
@@ -1617,8 +1625,8 @@ struct PerfStats {
     /// `functions:` block. Compiled AIPL functions and runtime builtins share
     /// one list because the two questions a reader has (how often did this run,
     /// how big is it) are the same questions either way; which side of the
-    /// runtime boundary a function sits on shows up as a `bytes: 0`, since only
-    /// this object's code is measured.
+    /// runtime boundary a function sits on shows up as a `bytes: (external)`,
+    /// since only this object's code is measured.
     functions: Vec<FnStat>,
 }
 
@@ -1637,9 +1645,15 @@ struct FnStat {
     name: String,
     /// Times entered. `0` for a function that was emitted but never ran.
     calls: u64,
-    /// Bytes of code in the object. `0` for a runtime builtin, which is linked
-    /// in from the separately-compiled runtime and has no code here.
-    bytes: u64,
+    /// Bytes of code in the object, or `None` — rendered `(external)` — for a
+    /// function with no code *here*: a runtime builtin, resolved at link time
+    /// from the separately-compiled runtime staticlib. Distinguished from a
+    /// number so the two zeros can't be confused: `calls: 0` is a real count (an
+    /// emitted specialization nothing reached), while a builtin's size is not
+    /// zero but unmeasured, and deliberately so — the runtime is identical for
+    /// every program, so folding it in would add the same large constant to
+    /// every case. The numbers that *are* present sum to `code:` exactly.
+    bytes: Option<u64>,
 }
 
 impl PerfStats {
@@ -1657,9 +1671,13 @@ impl PerfStats {
         );
         out.push_str("\nfunctions:");
         for f in &self.functions {
+            let bytes = match f.bytes {
+                Some(n) => n.to_string(),
+                None => EXTERNAL_BYTES.to_string(),
+            };
             out.push_str(&format!(
-                "\n  {}:\n    calls: {}\n    bytes: {}",
-                f.name, f.calls, f.bytes
+                "\n  {}:\n    calls: {}\n    bytes: {bytes}",
+                f.name, f.calls
             ));
         }
         out
@@ -1674,8 +1692,10 @@ impl PerfStats {
     /// [`ObjectCompilation::code_symbol_names`]). A builtin is in neither table
     /// and keeps its own name.
     ///
-    /// Neither side is a superset: a function that never ran contributes only
-    /// bytes, a builtin only calls.
+    /// Neither side is a superset, and that is exactly what identifies an
+    /// external: a function that never ran contributes only bytes, while an
+    /// entry `fn_sizes` never matches has no code in this object at all and
+    /// keeps its `None`.
     fn merge_fn_sizes(&mut self, names: &HashMap<String, String>, fn_sizes: Vec<(String, u64)>) {
         let mut by_name: HashMap<String, FnStat> = HashMap::new();
         for f in self.functions.drain(..) {
@@ -1688,9 +1708,9 @@ impl PerfStats {
                 .or_insert(FnStat {
                     name,
                     calls: 0,
-                    bytes: 0,
+                    bytes: None,
                 })
-                .bytes = bytes;
+                .bytes = Some(bytes);
         }
         self.functions = by_name.into_values().collect();
         self.functions.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1839,18 +1859,23 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
             // A field of the entry above it (deeper indent), …
             if raw.starts_with("    ") {
                 if let (Some(f), Some((key, v))) = (functions.last_mut(), line.split_once(": ")) {
-                    if let Ok(n) = v.trim().parse::<u64>() {
-                        match key.trim() {
-                            "calls" => {
-                                f.calls = n;
-                                continue;
-                            }
-                            "bytes" => {
-                                f.bytes = n;
-                                continue;
-                            }
-                            _ => {}
+                    let v = v.trim();
+                    match (key.trim(), v.parse::<u64>()) {
+                        ("calls", Ok(n)) => {
+                            f.calls = n;
+                            continue;
                         }
+                        ("bytes", Ok(n)) => {
+                            f.bytes = Some(n);
+                            continue;
+                        }
+                        // A builtin's size isn't 0, it's unmeasured — see
+                        // [`FnStat::bytes`].
+                        ("bytes", Err(_)) if v == EXTERNAL_BYTES => {
+                            f.bytes = None;
+                            continue;
+                        }
+                        _ => {}
                     }
                 }
             // … or a new entry's heading (`  <name>:`, no value).
@@ -1858,7 +1883,7 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
                 functions.push(FnStat {
                     name: line[..line.len() - 1].to_string(),
                     calls: 0,
-                    bytes: 0,
+                    bytes: None,
                 });
                 continue;
             }

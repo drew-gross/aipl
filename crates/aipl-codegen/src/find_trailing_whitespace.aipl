@@ -104,28 +104,28 @@ functions:
     bytes: 92
   aipl_assert:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 32
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   find_trailing_whitespace:
     calls: 12
     bytes: 560

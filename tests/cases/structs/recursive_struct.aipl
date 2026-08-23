@@ -74,40 +74,40 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_rec_alloc:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_strong:
     calls: 14
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_weak:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_strong:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_weak:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 3
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1220

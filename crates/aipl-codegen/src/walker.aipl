@@ -2974,118 +2974,118 @@ functions:
     bytes: 812
   aipl_arr_drop_str:
     calls: 2054
-    bytes: 0
+    bytes: (external)
   aipl_arr_extend:
     calls: 215
-    bytes: 0
+    bytes: (external)
   aipl_arr_inc:
     calls: 49502
-    bytes: 0
+    bytes: (external)
   aipl_arr_reserve:
     calls: 278
-    bytes: 0
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2050
-    bytes: 0
+    bytes: (external)
   aipl_arr_slice:
     calls: 81
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 61477
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 10128
-    bytes: 0
+    bytes: (external)
   aipl_array_push:
     calls: 1514
-    bytes: 0
+    bytes: (external)
   aipl_array_push_mut:
     calls: 1629
-    bytes: 0
+    bytes: (external)
   aipl_array_with_cap:
     calls: 189
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 169
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 4013
-    bytes: 0
+    bytes: (external)
   aipl_concat:
     calls: 258
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 200
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 94946
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 75072
-    bytes: 0
+    bytes: (external)
   aipl_rec_alloc:
     calls: 5991
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_strong:
     calls: 40957
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_weak:
     calls: 3591
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_strong:
     calls: 34966
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_weak:
     calls: 3591
-    bytes: 0
+    bytes: (external)
   aipl_str_cmp:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_contains:
     calls: 2515
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 360
-    bytes: 0
+    bytes: (external)
   aipl_str_ends_with:
     calls: 125
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 6087
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 369
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 360
-    bytes: 0
+    bytes: (external)
   aipl_str_join:
     calls: 254
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 31428
-    bytes: 0
+    bytes: (external)
   aipl_str_repeat:
     calls: 74
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 8561
-    bytes: 0
+    bytes: (external)
   aipl_str_split:
     calls: 942
-    bytes: 0
+    bytes: (external)
   aipl_str_starts_with:
     calls: 3202
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   array_atom:
     calls: 2
     bytes: 2176

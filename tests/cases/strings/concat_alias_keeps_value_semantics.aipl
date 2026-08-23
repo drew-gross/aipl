@@ -37,31 +37,31 @@ binary size: 2288
 functions:
   aipl_assert:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 24
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 16
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 784

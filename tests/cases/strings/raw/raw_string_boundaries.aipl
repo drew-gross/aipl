@@ -29,19 +29,19 @@ binary size: 1368
 functions:
   aipl_concat_lazy:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 21
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 12
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 444

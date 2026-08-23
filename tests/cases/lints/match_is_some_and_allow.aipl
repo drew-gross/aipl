@@ -53,16 +53,16 @@ functions:
     bytes: 212
   aipl_dec:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 6
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 668

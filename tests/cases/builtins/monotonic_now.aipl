@@ -65,43 +65,43 @@ binary size: 3944
 functions:
   aipl_arr_drop_str:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_arr_inc:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_execute_program:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_monotonic_now:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_shim_get:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1240

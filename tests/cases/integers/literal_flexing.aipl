@@ -105,25 +105,25 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 22
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 14
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 7
-    bytes: 0
+    bytes: (external)
   early_return:
     calls: 1
     bytes: 20

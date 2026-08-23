@@ -12,10 +12,10 @@ binary size: 752
 functions:
   aipl_str_iter_init:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 172

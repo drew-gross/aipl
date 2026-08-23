@@ -222,7 +222,7 @@ perfmon:
   improve it in some way that it allows you to prove that an optimzation did or did not happen
   add tests that specifically exersize perf
   a function emitted but never entered reports calls: 0 — in walker.aipl, 49 of 193 functions turn out to be dead specializations
-  why are some functions 0 bytes?
+  functions in external libs don't get size instrumented
 
 recovering check:
   check should error on lint failures, but still run tests and report results

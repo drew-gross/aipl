@@ -38,22 +38,22 @@ binary size: 1360
 functions:
   aipl_assert:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_now_nanos:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_shim_get:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 124

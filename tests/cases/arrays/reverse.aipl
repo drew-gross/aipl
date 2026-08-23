@@ -43,31 +43,31 @@ functions:
     bytes: 296
   aipl_arr_elem_ptr:
     calls: 10
-    bytes: 0
+    bytes: (external)
   aipl_arr_reverse:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 28
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1772

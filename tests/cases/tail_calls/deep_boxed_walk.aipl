@@ -48,37 +48,37 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 400002
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 200001
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_rec_alloc:
     calls: 200001
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_strong:
     calls: 600002
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_weak:
     calls: 200000
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_strong:
     calls: 400001
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_weak:
     calls: 200000
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 200000
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 1
-    bytes: 0
+    bytes: (external)
   build:
     calls: 0
     bytes: 36

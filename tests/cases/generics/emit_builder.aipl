@@ -70,25 +70,25 @@ functions:
     bytes: 180
   aipl_array_dec:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1084

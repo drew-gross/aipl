@@ -177,61 +177,61 @@ functions:
     bytes: 1600
   aipl_arr_inc:
     calls: 14
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 21
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 122
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 118
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_rec_alloc:
     calls: 19
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_strong:
     calls: 43
-    bytes: 0
+    bytes: (external)
   aipl_rec_dec_weak:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_strong:
     calls: 24
-    bytes: 0
+    bytes: (external)
   aipl_rec_inc_weak:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 57
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 56
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 112
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 399
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 59
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 2496

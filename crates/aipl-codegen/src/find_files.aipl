@@ -49,55 +49,55 @@ functions:
     bytes: 352
   aipl_arr_drop_str:
     calls: 15
-    bytes: 0
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_arr_sort:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 28
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_array_push_mut:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_array_with_cap:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 78
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 59
-    bytes: 0
+    bytes: (external)
   aipl_list_files:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_ends_with:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 28
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   find_files:
     calls: 1
     bytes: 776

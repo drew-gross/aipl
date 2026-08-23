@@ -32,31 +32,31 @@ functions:
     bytes: 256
   aipl_array_dec:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_array_push_mut:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_array_with_cap:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_set_contains:
     calls: 14
-    bytes: 0
+    bytes: (external)
   aipl_set_insert:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 996

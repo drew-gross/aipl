@@ -24,22 +24,22 @@ binary size: 2056
 functions:
   aipl_assert:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_is_all_whitespace:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 388

@@ -28,22 +28,22 @@ binary size: 984
 functions:
   aipl_arr_drop_str:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 2
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 264

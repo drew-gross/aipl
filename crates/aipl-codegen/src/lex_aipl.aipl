@@ -826,91 +826,91 @@ functions:
     bytes: 812
   aipl_arr_drop_str:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_arr_inc:
     calls: 7554
-    bytes: 0
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 9
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 11226
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 3599
-    bytes: 0
+    bytes: (external)
   aipl_array_push:
     calls: 69
-    bytes: 0
+    bytes: (external)
   aipl_array_push_mut:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_array_with_cap:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 20
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 1365
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 24585
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 19372
-    bytes: 0
+    bytes: (external)
   aipl_str_contains:
     calls: 1016
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 88
-    bytes: 0
+    bytes: (external)
   aipl_str_ends_with:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 30
-    bytes: 0
+    bytes: (external)
   aipl_str_is_all_whitespace:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 90
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 88
-    bytes: 0
+    bytes: (external)
   aipl_str_join:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 8169
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 1982
-    bytes: 0
+    bytes: (external)
   aipl_str_split:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_starts_with:
     calls: 1610
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_trim:
     calls: 2
-    bytes: 0
+    bytes: (external)
   char_lit_emit:
     calls: 4
     bytes: 1412

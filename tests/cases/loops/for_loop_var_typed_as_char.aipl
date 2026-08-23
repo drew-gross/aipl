@@ -19,16 +19,16 @@ binary size: 760
 functions:
   aipl_str_data:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 176

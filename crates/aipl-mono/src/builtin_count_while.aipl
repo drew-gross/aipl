@@ -49,49 +49,49 @@ binary size: 5472
 functions:
   aipl_arr_drop_str:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   count_while$char$lam11:
     calls: 1
     bytes: 232

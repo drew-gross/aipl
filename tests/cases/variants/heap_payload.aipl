@@ -34,37 +34,37 @@ functions:
     bytes: 180
   aipl_assert:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 22
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 10
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 2
-    bytes: 0
+    bytes: (external)
   describe:
     calls: 4
     bytes: 348

@@ -148,9 +148,9 @@ Two separate perf tracks:
 - **Deterministic, asserted**: the per-case `--- performance ---` sections
   (allocations, instructions executed, binary size, and a `functions:` block
   giving every function's call count and byte size in one list — builtins
-  included, at 0 bytes, since only this object's code is measured). These have
-  hard assertions and are filled/refreshed with the `fill_expected` ignored test
-  (see below).
+  included, at `bytes: (external)`, since only this object's code is measured).
+  These have hard assertions and are filled/refreshed with the `fill_expected`
+  ignored test (see below).
 - **Non-deterministic, *not* asserted**: `tests/performance_metrics.md` — a
   checked-in table of wall-clock (measured in-process, so process spawn/teardown
   is excluded), build time, and peak RSS per case. These drift run-to-run, so

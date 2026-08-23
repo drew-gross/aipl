@@ -32,22 +32,22 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 108

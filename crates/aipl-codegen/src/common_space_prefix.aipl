@@ -59,25 +59,25 @@ functions:
     bytes: 100
   aipl_assert:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 48
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 48
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 48
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   common_space_prefix:
     calls: 13
     bytes: 280

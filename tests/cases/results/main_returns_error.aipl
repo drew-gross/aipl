@@ -24,13 +24,13 @@ binary size: 1040
 functions:
   aipl_dec:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_print_error:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 288

@@ -47,67 +47,67 @@ binary size: 4280
 functions:
   aipl_arr_drop_str:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_arr_inc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_array_dec:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_array_new:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_array_push_mut:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_array_with_cap:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_assert:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_concat_lazy:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 135
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 73
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_is_all_whitespace:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_str_join:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 43
-    bytes: 0
+    bytes: (external)
   aipl_str_repeat:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_str_split:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   indent:
     calls: 6
     bytes: 576

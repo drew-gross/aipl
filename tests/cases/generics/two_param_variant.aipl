@@ -65,22 +65,22 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 2
-    bytes: 0
+    bytes: (external)
   left_or$i64$str:
     calls: 2
     bytes: 28

@@ -52,25 +52,25 @@ functions:
     bytes: 180
   aipl_char_at:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_concat:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 45
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 26
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 2
-    bytes: 0
+    bytes: (external)
   describe:
     calls: 3
     bytes: 408

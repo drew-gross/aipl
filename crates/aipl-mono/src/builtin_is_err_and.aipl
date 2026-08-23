@@ -89,31 +89,31 @@ functions:
     bytes: 92
   aipl_assert:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 11
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 82
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 60
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 15
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   check_len:
     calls: 5
     bytes: 380

@@ -28,16 +28,16 @@ binary size: 1192
 functions:
   aipl_assert:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   inc:
     calls: 1
     bytes: 8

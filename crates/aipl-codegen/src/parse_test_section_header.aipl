@@ -63,40 +63,40 @@ functions:
     bytes: 148
   aipl_assert:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 116
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 76
-    bytes: 0
+    bytes: (external)
   aipl_str_ends_with:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 71
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_starts_with:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_trim:
     calls: 15
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1808

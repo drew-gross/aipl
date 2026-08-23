@@ -59,46 +59,46 @@ functions:
     bytes: 180
   aipl_dec:
     calls: 31
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 3
-    bytes: 0
+    bytes: (external)
   aipl_str_hash:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_str_reverse:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 8
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 2
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 1104

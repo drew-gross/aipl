@@ -72,28 +72,28 @@ functions:
     bytes: 140
   aipl_dec:
     calls: 48
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 24
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 91
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 13
-    bytes: 0
+    bytes: (external)
   aipl_str_starts_with:
     calls: 11
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 840

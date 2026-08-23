@@ -111,52 +111,52 @@ functions:
     bytes: 180
   aipl_assert:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_concat:
     calls: 120
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 441
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 183
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 35
-    bytes: 0
+    bytes: (external)
   aipl_str_repeat:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_u64_len:
     calls: 48
-    bytes: 0
+    bytes: (external)
   aipl_write_u64:
     calls: 24
-    bytes: 0
+    bytes: (external)
   caret_block:
     calls: 6
     bytes: 1780

@@ -63,28 +63,28 @@ functions:
     bytes: 104
   aipl_assert:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_init:
     calls: 7
-    bytes: 0
+    bytes: (external)
   aipl_str_iter_next:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 18
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   line_at:
     calls: 7
     bytes: 596

@@ -87,31 +87,31 @@ functions:
     bytes: 464
   aipl_dec:
     calls: 12
-    bytes: 0
+    bytes: (external)
   aipl_i64_len:
     calls: 20
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_print:
     calls: 6
-    bytes: 0
+    bytes: (external)
   aipl_str_alloc:
     calls: 5
-    bytes: 0
+    bytes: (external)
   aipl_str_data:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_write_bytes:
     calls: 31
-    bytes: 0
+    bytes: (external)
   aipl_write_i64:
     calls: 10
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 492

@@ -26,34 +26,34 @@ functions:
     bytes: 100
   aipl_assert:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_char_at:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_dec:
     calls: 16
-    bytes: 0
+    bytes: (external)
   aipl_inc:
     calls: 10
-    bytes: 0
+    bytes: (external)
   aipl_str_eq:
     calls: 4
-    bytes: 0
+    bytes: (external)
   aipl_str_len:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_str_slice:
     calls: 2
-    bytes: 0
+    bytes: (external)
   aipl_test_begin:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_end:
     calls: 1
-    bytes: 0
+    bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: 0
+    bytes: (external)
   main:
     calls: 1
     bytes: 520
