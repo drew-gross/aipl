@@ -44,7 +44,7 @@ import { trim_end_while } from "./trim_end_while.aipl";
 // no module constants.)
 
 variant Doc =
-    Text(str)
+    | Text(str)
     | Concat(Doc[])
     | Line
     | SoftLine

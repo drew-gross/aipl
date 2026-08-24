@@ -57,7 +57,7 @@ import { unescape } from "./unescape.aipl";
 variant StrStyle = Quoted | TripleQuoted | Backtick | TripleBacktick
 
 variant AiplTok =
-    Space
+    | Space
     | LineComment
     | BlockComment
     | AllowMarker

@@ -91,7 +91,7 @@ variant Seg = Plain | Head | Middle | Tail
 // whole-token verdict like overflow; a matcher-level, byte-precise error (an
 // unterminated string, an unknown escape) still comes from scanning, not the emit.
 variant Emit<K> =
-    Bare(K)
+    | Bare(K)
     | Of((str) -> K)
     | OfSeg((str, Seg) -> K)
     | Try((str) -> K!str)
@@ -198,7 +198,7 @@ struct LexError { message: str, span: Span }
 // single-quoted `Delimited` string and enforces the one-char shape in a `Try`
 // emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
-    CharRun(str, str)
+    | CharRun(str, str)
     | Exact(str)
     | Keyword(str, str)
     | Delimited(str, str)
@@ -780,7 +780,7 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
 // template segments), text-recovered kinds are bare (their text is sliced from
 // the span). A real consumer writes its own such variant.
 variant Kind =
-    Ws
+    | Ws
     | Ident(str)
     | IntTok(i64)
     | Digits

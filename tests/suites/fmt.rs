@@ -44,9 +44,11 @@ fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut i = 0;
     while i < toks.len() {
         let (kind, sig) = &toks[i];
-        if sig == "," {
+        if sig == "," || sig == "|" {
             // Trailing commas are normalized by design (dropped when flat,
-            // added when broken); commas don't participate in the check.
+            // added when broken); commas don't participate in the check. A
+            // variant's *leading* `|` is normalized the same way (added when
+            // the cases break), so `|` sits out too.
             i += 1;
             continue;
         }

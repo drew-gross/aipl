@@ -87,10 +87,14 @@ fn verify_same_tokens(input: &str, output: &str) -> Result<(), Error> {
         .map_err(|e| Error::msg(format!("formatter produced unlexable output: {e}")))?;
     // Trailing commas are normalized by design (dropped when a list renders
     // flat, added when it breaks), so commas don't participate in the check.
+    // A variant's *leading* `|` is the same normalization at the other end
+    // (dropped flat, added when the cases break), so `|` sits out too — which
+    // also excludes the `|` separating match-pattern alternatives, the price of
+    // comparing multisets rather than positions.
     let texts = |toks: &[(FmtTokenKind, String)]| -> Vec<String> {
         let mut v: Vec<String> = toks
             .iter()
-            .filter(|(_, sig)| sig != ",")
+            .filter(|(_, sig)| sig != "," && sig != "|")
             .map(|(k, sig)| format!("{k:?} {sig}"))
             .collect();
         v.sort();

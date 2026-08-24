@@ -189,8 +189,15 @@ gazelle! {
         // a parenthesized positional payload. No terminator: the next item's
         // leading keyword ends the case list (only `|` continues it). An
         // optional `<T: any, ..>` makes it a generic variant template.
+        //
+        // A **leading** `|` before the first case is allowed and means nothing
+        // (`variant V = | A | B` is `variant V = A | B`), so a broken-across-
+        // lines declaration can align every case under one `|` — which is what
+        // `aipl fmt` emits when the cases don't fit on one line. Unambiguous
+        // after `=`: nothing else in the language starts with `|`.
         variant_decl = VARIANT IDENT type_params EQ variant_cases => variant_decl;
         variant_cases = variant_case => first
+                      | PIPE variant_case => first_leading_pipe
                       | variant_cases PIPE variant_case => rest;
         variant_case = IDENT => nullary
                      | IDENT LPAREN ty_arg_list RPAREN => with_payload;
@@ -965,7 +972,7 @@ impl gazelle::Action<aipl::VariantDecl<Self>> for Build {
 impl gazelle::Action<aipl::VariantCases<Self>> for Build {
     fn build(&mut self, node: aipl::VariantCases<Self>) -> Result<Vec<VariantCase>, Self::Error> {
         Ok(match node {
-            aipl::VariantCases::First(c) => vec![c],
+            aipl::VariantCases::First(c) | aipl::VariantCases::FirstLeadingPipe(_, c) => vec![c],
             aipl::VariantCases::Rest(mut prev, _pipe, c) => {
                 prev.push(c);
                 prev

@@ -1,0 +1,80 @@
+import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
+
+// A variant's first case may be preceded by a `|`. It means nothing — this
+// declares the same type `Circle(i64) | ..` would — but it lets every case line
+// up under one `|`, which is exactly the layout `aipl fmt` emits once the cases
+// are too wide to sit on one line.
+variant Shape =
+    | Circle(i64)
+    | Rectangle(i64, i64)
+    | Triangle(i64, i64, i64)
+    | RegularPolygon(i64, i64)
+    | Empty
+
+fn perimeter(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => 6 * r,
+        Rectangle(w, h) => 2 * (w + h),
+        Triangle(a, b, c) => a + b + c,
+        RegularPolygon(n, side) => n * side,
+        Empty => 0,
+    }
+}.test({
+    assert(perimeter(Circle(2)) == 12);
+    assert(perimeter(Rectangle(3, 4)) == 14);
+    assert(perimeter(Triangle(3, 4, 5)) == 12);
+    assert(perimeter(RegularPolygon(6, 2)) == 12);
+    assert(perimeter(Empty) == 0);
+
+    // The leading `|` is layout, not a case: the type has exactly the five
+    // cases named, and its values compare structurally like any other variant.
+    assert(Circle(2) == Circle(2));
+    assert(Empty == Empty);
+})
+
+// A one-case variant may carry the leading `|` too — but only where it earns
+// its keep: this one fits on a line, so canonical format has no `|` at all
+// (`aipl fmt` drops it, the way it drops a list's trailing comma when the list
+// goes flat). The dropped-on-input direction is covered by the formatter's own
+// fixture, `tests/fmt/variant_leading_pipe.aipl`.
+variant Only = Just(i64)
+
+fn unwrap(o: Only) -> i64 {
+    match (o) {
+        Just(v) => v,
+    }
+}.test({
+    assert(unwrap(Just(7)) == 7);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 286
+binary size: 3000
+  code: 1104
+  data: 472
+  metadata: 1424
+functions:
+  __eq_Shape:
+    calls: 2
+    bytes: 360
+  aipl_assert:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 624
+  perimeter:
+    calls: 5
+    bytes: 120

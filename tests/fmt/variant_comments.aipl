@@ -13,7 +13,7 @@ fn main() { }
 --- formatted ---
 variant Doc =
     // A verbatim atom.
-    Text(str)
+    | Text(str)
     // Detached: the blank line after a comment marks it standalone.
 
     | Concat(Doc[])

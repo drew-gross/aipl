@@ -63,7 +63,7 @@ import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
 // which token *text* alone cannot distinguish — an empty segment's `TplMid` is
 // the single character `{`, identical to a brace.
 variant FmtKind =
-    Keyword
+    | Keyword
     | Constant
     | BuiltinType
     | Ident
@@ -387,7 +387,7 @@ fn take_comment(self: W, c: Span) -> W { ..self, cpos: self.cpos + 1, last_end: 
 // `Angles`) take no trailing comma when broken — the grammar doesn't allow one
 // there.
 variant ListStyle =
-    Parens
+    | Parens
     | Brackets
     | HashBraces
     | SpacedBraces
@@ -839,12 +839,21 @@ struct VCase { lead: Doc, body: Doc }
 struct WCases { w: W, cases: VCase[] }
 
 // `variant V = A | B(i64)`. Flat when it fits; broken to one case per line with a
-// leading `| `. A case's leading comment sits above it and, being a hard line,
-// forces the broken layout.
+// leading `| ` — including the first case, so every case aligns under one `|`.
+// A case's leading comment sits above it and, being a hard line, forces the
+// broken layout.
 fn variant_item(self: W) -> WDoc!FmtError {
     let n = self.expect("variant")?.w.bump();
     let tps = n.w.type_params()?;
-    let cs = tps.w.expect("=")?.w.variant_cases([])?;
+    let eq = tps.w.expect("=")?.w;
+
+    // The source may already carry the leading `|` (the grammar allows it, and
+    // it is what this formatter emits when the cases break). Drop it here and
+    // let the layout decide whether to put one back. A comment written between
+    // `=` and that `|` is untouched — comments ride their own stream, so the
+    // first case's `lead()` still finds it.
+    let start = if (eq.peek_text() == "|") { eq.bump().w } else { eq };
+    let cs = start.variant_cases([])?;
     ok(WDoc {
         w: cs.w,
         doc: group(Concat([
@@ -890,7 +899,9 @@ fn variant_payload(self: W) -> WDoc!FmtError {
 }
 
 // The cases laid out: the first sits inline after `=`; each later one is preceded
-// by a `Line` and its `| ` separator, with its leading comments above it.
+// by a `Line` and its `| ` separator, with its leading comments above it. The
+// first case's `| ` is an `IfBroken`, so it appears only in the broken layout —
+// the same normalization a list's trailing comma gets, just at the other end.
 fn variant_body(cases: VCase[]) -> Doc[] {
     mut out = [];
     for (let i, c : cases) {
@@ -900,6 +911,8 @@ fn variant_body(cases: VCase[]) -> Doc[] {
         set out.push(c.lead);
         if (0 < i) {
             set out.push(Text("| "));
+        } else {
+            set out.push(IfBroken("| "));
         };
         set out.push(c.body);
     }
@@ -2674,10 +2687,23 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .rendered(100)? == "variant Opt<T> = Some(T) | Nil",
     );
 
-    // Too wide to fit: one case per line, `|` leading each continuation, indented
-    // one level under the `=`.
+    // A leading `|` in the source is accepted and dropped when the layout fits
+    // on one line — the same normalization a list's trailing comma gets.
+    assert(walker_of("variant V = | A | B").variant_item().rendered(100)? == "variant V = A | B");
+    assert(walker_of("variant V = | A").variant_item().rendered(100)? == "variant V = A");
+
+    // Too wide to fit: one case per line, every case (the first included) led by
+    // `|`, indented one level under the `=`.
     assert(
-        walker_of("variant V = A | B").variant_item().rendered(5)? == "variant V =\n    A\n    | B",
+        walker_of("variant V = A | B")
+            .variant_item()
+            .rendered(5)? == "variant V =\n    | A\n    | B",
+    );
+    // Same layout whether or not the source already had the leading `|`.
+    assert(
+        walker_of("variant V = | A | B")
+            .variant_item()
+            .rendered(5)? == "variant V =\n    | A\n    | B",
     );
 })
 
@@ -2689,15 +2715,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 21003
-deallocations: 21003
-reallocations: 880
-bytes allocated: 1029546
-instructions executed: 2866526
-binary size: 3114656
-  code: 1781452
-  data: 26620
-  metadata: 1306584
+allocations: 21309
+deallocations: 21309
+reallocations: 905
+bytes allocated: 1047420
+instructions executed: 2905479
+binary size: 3234144
+  code: 1848792
+  data: 27108
+  metadata: 1358244
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2709,10 +2735,10 @@ functions:
     calls: 11
     bytes: 120
   __arr_drop_VCase:
-    calls: 12
+    calls: 17
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1287
+    calls: 1301
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2733,10 +2759,10 @@ functions:
     calls: 13
     bytes: 120
   __arr_retain_VCase:
-    calls: 17
+    calls: 24
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1356
+    calls: 1380
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2751,7 +2777,7 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam32$tail:
-    calls: 467
+    calls: 491
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 41
@@ -2814,7 +2840,7 @@ functions:
     calls: 6
     bytes: 300
   __eq_char$opt:
-    calls: 2070
+    calls: 2123
     bytes: 100
   __lambda_37:
     calls: 0
@@ -2862,31 +2888,31 @@ functions:
     calls: 0
     bytes: 292
   __m1__col_after:
-    calls: 817
+    calls: 838
     bytes: 448
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1328
+    calls: 1374
     bytes: 2636
   __m1__fits_atom:
     calls: 0
     bytes: 44
   __m1__fits_atom$tail:
-    calls: 465
+    calls: 479
     bytes: 296
   __m1__has_hard:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1234
+    calls: 1297
     bytes: 664
   __m1__print_doc:
     calls: 0
     bytes: 36
   __m1__print_doc$tail:
-    calls: 125
+    calls: 128
     bytes: 4628
   __m2__reindent_block:
     calls: 0
@@ -2952,10 +2978,10 @@ functions:
     calls: 0
     bytes: 320
   __rec_drop___m1__Doc:
-    calls: 2485
+    calls: 2551
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 3506
+    calls: 3622
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -2965,7 +2991,7 @@ functions:
     bytes: 10580
   __test$walker_of:
     calls: 1
-    bytes: 1240648
+    bytes: 1307372
   __test_try_fail_FmtError:
     calls: 0
     bytes: 64
@@ -2973,106 +2999,106 @@ functions:
     calls: 0
     bytes: 812
   aipl_arr_drop_str:
-    calls: 2054
+    calls: 2109
     bytes: (external)
   aipl_arr_extend:
     calls: 215
     bytes: (external)
   aipl_arr_inc:
-    calls: 49502
+    calls: 50056
     bytes: (external)
   aipl_arr_reserve:
     calls: 278
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 2050
+    calls: 2108
     bytes: (external)
   aipl_arr_slice:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 61477
+    calls: 62127
     bytes: (external)
   aipl_array_new:
-    calls: 10128
+    calls: 10188
     bytes: (external)
   aipl_array_push:
-    calls: 1514
+    calls: 1547
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1629
+    calls: 1677
     bytes: (external)
   aipl_array_with_cap:
-    calls: 189
+    calls: 192
     bytes: (external)
   aipl_assert:
-    calls: 169
+    calls: 172
     bytes: (external)
   aipl_char_at:
-    calls: 4013
+    calls: 4066
     bytes: (external)
   aipl_concat:
-    calls: 258
+    calls: 264
     bytes: (external)
   aipl_concat_lazy:
-    calls: 200
+    calls: 205
     bytes: (external)
   aipl_dec:
-    calls: 94794
+    calls: 95724
     bytes: (external)
   aipl_inc:
-    calls: 75014
+    calls: 75716
     bytes: (external)
   aipl_rec_alloc:
-    calls: 5991
+    calls: 6173
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 40957
+    calls: 42261
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 3591
+    calls: 3710
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 34966
+    calls: 36088
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 3591
+    calls: 3710
     bytes: (external)
   aipl_str_cmp:
     calls: 7
     bytes: (external)
   aipl_str_contains:
-    calls: 2515
+    calls: 2550
     bytes: (external)
   aipl_str_data:
-    calls: 360
+    calls: 365
     bytes: (external)
   aipl_str_ends_with:
-    calls: 125
+    calls: 128
     bytes: (external)
   aipl_str_eq:
-    calls: 6087
+    calls: 6119
     bytes: (external)
   aipl_str_iter_init:
-    calls: 369
+    calls: 374
     bytes: (external)
   aipl_str_iter_next:
-    calls: 360
+    calls: 365
     bytes: (external)
   aipl_str_join:
-    calls: 254
+    calls: 260
     bytes: (external)
   aipl_str_len:
-    calls: 31334
+    calls: 31531
     bytes: (external)
   aipl_str_repeat:
-    calls: 74
+    calls: 76
     bytes: (external)
   aipl_str_slice:
-    calls: 8467
+    calls: 8540
     bytes: (external)
   aipl_str_split:
-    calls: 942
+    calls: 966
     bytes: (external)
   aipl_str_starts_with:
     calls: 3108
@@ -3123,7 +3149,7 @@ functions:
     calls: 46
     bytes: 5124
   bump:
-    calls: 909
+    calls: 928
     bytes: 920
   call_arg:
     calls: 11
@@ -3138,7 +3164,7 @@ functions:
     calls: 88
     bytes: 3080
   comment_starts_before:
-    calls: 271
+    calls: 276
     bytes: 280
   construct_body:
     calls: 0
@@ -3162,7 +3188,7 @@ functions:
     calls: 5
     bytes: 656
   expect:
-    calls: 391
+    calls: 397
     bytes: 1080
   expr:
     calls: 102
@@ -3219,7 +3245,7 @@ functions:
     calls: 3
     bytes: 3176
   lead:
-    calls: 265
+    calls: 270
     bytes: 1812
   let_stmt:
     calls: 3
@@ -3267,7 +3293,7 @@ functions:
     calls: 857
     bytes: 288
   peek_text_n:
-    calls: 2544
+    calls: 2573
     bytes: 32
   postfix:
     calls: 108
@@ -3288,7 +3314,7 @@ functions:
     calls: 102
     bytes: 2136
   rendered:
-    calls: 103
+    calls: 106
     bytes: 472
   sep_entry:
     calls: 33
@@ -3348,10 +3374,10 @@ functions:
     calls: 0
     bytes: 2248
   tok_text:
-    calls: 2964
+    calls: 2993
     bytes: 368
   trailing_comment:
-    calls: 68
+    calls: 73
     bytes: 1980
   trim_last_break:
     calls: 0
@@ -3369,22 +3395,22 @@ functions:
     calls: 11
     bytes: 2216
   type_params:
-    calls: 38
+    calls: 41
     bytes: 5188
   unary:
     calls: 110
     bytes: 1700
   variant_cases:
-    calls: 7
+    calls: 10
     bytes: 3804
   variant_item:
-    calls: 7
-    bytes: 5640
+    calls: 10
+    bytes: 6256
   variant_payload:
     calls: 3
     bytes: 2176
   walker_of:
-    calls: 117
+    calls: 120
     bytes: 708
   while_stmt:
     calls: 1

@@ -1,0 +1,51 @@
+// Flat: the leading `|` is dropped, like a list's trailing comma.
+variant Flat = | A | B(i64)
+// Already leading-piped and still flat — same result.
+variant Tight =
+    | A
+    | B
+// Too wide for one line: every case gets a `|`, the first one included.
+variant Shape = Circle(i64) | Rectangle(i64, i64) | Triangle(i64, i64, i64) | RegularPolygon(i64, i64) | Empty
+// Leading `|` on input, broken on output: idempotent either way.
+variant Shape2 =
+    | Circle(i64)
+    | Rectangle(i64, i64)
+    | Triangle(i64, i64, i64)
+    | RegularPolygon(i64, i64)
+    | Empty
+// A comment before the leading `|` stays above the first case.
+variant Doc =
+    // The first case.
+    | Text(str)
+    | Concat(Doc[])
+fn main() { }
+--- formatted ---
+// Flat: the leading `|` is dropped, like a list's trailing comma.
+variant Flat = A | B(i64)
+
+// Already leading-piped and still flat — same result.
+variant Tight = A | B
+
+// Too wide for one line: every case gets a `|`, the first one included.
+variant Shape =
+    | Circle(i64)
+    | Rectangle(i64, i64)
+    | Triangle(i64, i64, i64)
+    | RegularPolygon(i64, i64)
+    | Empty
+
+// Leading `|` on input, broken on output: idempotent either way.
+variant Shape2 =
+    | Circle(i64)
+    | Rectangle(i64, i64)
+    | Triangle(i64, i64, i64)
+    | RegularPolygon(i64, i64)
+    | Empty
+
+// A comment before the leading `|` stays above the first case.
+variant Doc =
+    // The first case.
+    | Text(str)
+    | Concat(Doc[])
+
+fn main() {}

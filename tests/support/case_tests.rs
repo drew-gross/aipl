@@ -530,6 +530,7 @@ case_tests! {
     cases_variants_generic_multi_instance = "cases/variants/generic_multi_instance",
     cases_variants_generic_option = "cases/variants/generic_option",
     cases_variants_heap_payload = "cases/variants/heap_payload",
+    cases_variants_leading_pipe = "cases/variants/leading_pipe",
     cases_variants_recursive_in_containers = "cases/variants/recursive_in_containers",
     cases_variants_recursive_list = "cases/variants/recursive_list",
     cases_variants_recursive_mut_accumulator = "cases/variants/recursive_mut_accumulator",
