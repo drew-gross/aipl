@@ -20729,9 +20729,9 @@ function u0:70(i64, i64) -> i64 apple_aarch64 {
     fn2 = u0:30 sig2  ; aipl_str_starts_with
 
 block0(v0: i64, v1: i64):
-    v2 = iconst.i64 0
-    v3 = call fn0(v1)
-    v4 = icmp ult v2, v3  ; v2 = 0
+    v2 = call fn0(v1)
+    v3 = iconst.i64 0
+    v4 = icmp ne v2, v3  ; v3 = 0
     v5 = uextend.i64 v4
     call fn1(v0)
     call fn1(v1)
@@ -20783,9 +20783,9 @@ block0(v0: i64, v1: i64, v2: i64):
     v11 = call fn3(v10, v2)
     v12 = iconst.i64 1
     v13 = bxor v11, v12  ; v12 = 1
-    v14 = iconst.i64 0
-    v15 = call fn0(v1)
-    v16 = icmp ult v14, v15  ; v14 = 0
+    v14 = call fn0(v1)
+    v15 = iconst.i64 0
+    v16 = icmp ne v14, v15  ; v15 = 0
     v17 = uextend.i64 v16
     v18 = band v17, v13
     call fn1(v0)
@@ -20954,9 +20954,9 @@ block11:
     v65 = iconst.i64 92
     v66 = icmp.i64 eq v58, v65  ; v65 = 92
     v67 = uextend.i64 v66
-    v68 = iconst.i64 0
-    v69 = call fn4(v4)
-    v70 = icmp ult v68, v69  ; v68 = 0
+    v68 = call fn4(v4)
+    v69 = iconst.i64 0
+    v70 = icmp ne v68, v69  ; v69 = 0
     v71 = uextend.i64 v70
     v72 = band v67, v71
     v73 = stack_addr.i64 ss3
@@ -21777,9 +21777,9 @@ function u0:77(i64, i64) -> i64 tail {
     fn4 = u0:14 sig4  ; aipl_dec
 
 block0(v0: i64, v1: i64):
-    v2 = iconst.i64 0
-    v3 = call fn0(v1)
-    v4 = icmp ult v2, v3  ; v2 = 0
+    v2 = call fn0(v1)
+    v3 = iconst.i64 0
+    v4 = icmp ne v2, v3  ; v3 = 0
     v5 = uextend.i64 v4
     call fn1(v0)
     call fn1(v1)
@@ -51311,9 +51311,9 @@ block12:
     v213 = iconst.i64 92
     v214 = icmp.i64 eq v118, v213  ; v213 = 92
     v215 = uextend.i64 v214
-    v216 = iconst.i64 0
-    v217 = call fn2(v4)
-    v218 = icmp ult v216, v217  ; v216 = 0
+    v216 = call fn2(v4)
+    v217 = iconst.i64 0
+    v218 = icmp ne v216, v217  ; v217 = 0
     v219 = uextend.i64 v218
     v220 = band v215, v219
     v221 = stack_addr.i64 ss3

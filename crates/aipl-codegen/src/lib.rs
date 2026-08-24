@@ -14803,12 +14803,19 @@ fn compile_call_expr<M: Module>(
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
-        "__builtin_len" => {
-            // `len(a) -> u64` — element/byte count. Reads `a` without consuming
-            // it (it stays live in the caller's scope), so no inc/dec.
+        "__builtin_len" | "__builtin_is_nonempty" => {
+            // `len(a) -> u64` — element/byte count — and `is_nonempty(a) -> bool`,
+            // which is that count compared against zero. One arm because they take
+            // the same receivers and read them the same way: neither consumes `a`
+            // (it stays live in the caller's scope), so no inc/dec.
+            let what = if name == "__builtin_len" {
+                "len"
+            } else {
+                "is_nonempty"
+            };
             if args.len() != 1 {
                 return Err(Error::at(
-                    format!("fn \"len\" expects 1 arg, got {}", args.len()),
+                    format!("fn \"{what}\" expects 1 arg, got {}", args.len()),
                     span.clone(),
                 ));
             }
@@ -14827,13 +14834,21 @@ fn compile_call_expr<M: Module>(
             } else {
                 return Err(Error::at(
                     format!(
-                        "\"len\" expects a str, array, set, or dict, got {}",
+                        "\"{what}\" expects a str, array, set, or dict, got {}",
                         type_name(&t)
                     ),
                     args[0].span.clone(),
                 ));
             };
-            (len, Type::Primitive(Primitive::U64))
+            if name == "__builtin_len" {
+                (len, Type::Primitive(Primitive::U64))
+            } else {
+                // `bool` is an i64 0/1 here like every other AIPL bool, so the
+                // comparison result is extended rather than kept 1-bit.
+                let nonzero = builder.ins().icmp_imm_s(IntCC::NotEqual, len, 0);
+                let out = builder.ins().uextend(types::I64, nonzero);
+                (out, Type::Primitive(Primitive::Bool))
+            }
         }
         "__builtin_sort" => {
             // `xs.sort() -> T[]` — a fresh array, elements ascending. Consumes

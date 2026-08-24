@@ -18,6 +18,7 @@ import {
     first,
     intersperse,
     is_err_and,
+    is_nonempty,
     is_some_and,
     join,
     len,
@@ -935,7 +936,7 @@ fn program(self: W) -> WDoc!FmtError {
     let h = self.lead();
     let p = h.w.program_items([], [])?;
     mut out = [h.doc, ..sorted_imports(p.imports).intersperse(HardLine)];
-    let had_imports = 0 < p.imports.len();
+    let had_imports = p.imports.is_nonempty();
     for (let i, d : p.items) {
         if (0 < i || had_imports) {
             set out.push(BlankLine);
@@ -1246,7 +1247,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
         set w = l.w;
         if (had_lead) {
             let blank = w.gap_has_blank(prev_end..max(prev_end, w.last_end));
-            set entries.push(sep_entry(blank, 0 < entries.len()));
+            set entries.push(sep_entry(blank, entries.is_nonempty()));
             set entries.push(l.doc);
 
             // `lead` already ends with a line break per comment; the next entry
@@ -1265,7 +1266,7 @@ fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError 
             let stmt = w.statement()?;
             if (!had_lead) {
                 let blank = w.gap_has_blank(prev_end..start);
-                set entries.push(sep_entry(blank, 0 < entries.len()));
+                set entries.push(sep_entry(blank, entries.is_nonempty()));
             };
             let tc = stmt.w.trailing_comment();
             set entries.push(stmt.doc);
@@ -2373,7 +2374,9 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     assert(format_program(`fn f() -> str \{ "a  b" }`, 100)? == `fn f() -> str \{ "a  b" }`);
     // A lex error surfaces as a formatter error rather than a panic.
     assert(
-        format_program(`fn f() -> str \{ "unterminated }`, 100).is_err_and(|e| 0 < e.message.len()),
+        format_program(`fn f() -> str \{ "unterminated }`, 100).is_err_and(
+            |e| e.message.is_nonempty(),
+        ),
     );
 
     // --- expressions ------------------------------------------------------------
@@ -2720,9 +2723,9 @@ deallocations: 21309
 reallocations: 905
 bytes allocated: 1047420
 instructions executed: 2905479
-binary size: 3234144
-  code: 1848792
-  data: 27108
+binary size: 3234064
+  code: 1848696
+  data: 27124
   metadata: 1358244
 functions:
   __arr_drop_ImportEntry:
@@ -2946,7 +2949,7 @@ functions:
     bytes: 676
   __m9__delimited_len:
     calls: 96
-    bytes: 1416
+    bytes: 1392
   __m9__finalize_template$__m8__AiplTok:
     calls: 0
     bytes: 8480
@@ -2961,7 +2964,7 @@ functions:
     bytes: 2436
   __m9__lex_step$__m8__AiplTok:
     calls: 131
-    bytes: 22620
+    bytes: 22608
   __m9__nested_len:
     calls: 84
     bytes: 940
@@ -2970,7 +2973,7 @@ functions:
     bytes: 12068
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2672
+    bytes: 2668
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 488
@@ -2991,7 +2994,7 @@ functions:
     bytes: 10580
   __test$walker_of:
     calls: 1
-    bytes: 1307372
+    bytes: 1307332
   __test_try_fail_FmtError:
     calls: 0
     bytes: 64
@@ -3144,7 +3147,7 @@ functions:
     bytes: 1012
   block_entries:
     calls: 46
-    bytes: 3756
+    bytes: 3744
   block_layout:
     calls: 46
     bytes: 5124
@@ -3303,7 +3306,7 @@ functions:
     bytes: 3252
   program:
     calls: 12
-    bytes: 2500
+    bytes: 2496
   program_items:
     calls: 12
     bytes: 4372

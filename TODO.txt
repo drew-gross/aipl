@@ -119,6 +119,7 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
+  is_nonempty lint should recognize x.len() != 0 and x.len() >= 1
   recognize and recommend min/max
   make a regex-like langauge for expressions to make lints easier to implement
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
@@ -139,6 +140,11 @@ Spreading:
 dict:
   make hash based dicts
 
+nonempty lists:
+  let vec: T[1-] = ... is a type that represents a non-empty list
+  T[-5] for list len 0-5
+  T[5] for list len exactly 5
+
 type checking:
   we've seen a few problems where inlining or constant folding causes behaviour to change because after inlining type information is lost. Lets fix this by:
     a) do all type checking before any optimization
@@ -146,6 +152,17 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  interp_scan has a bunch of inspiration:
+    for (let t : step.tokens) {set toks.push(t);} should just be set toks.extend(step.tokens)
+    if (src[i..step.end] == "{") {set depth++;}; should fuse to something
+    make a "count multiple" thing that counts instances of multiple needles in a given haystack
+      if (src[i..step.end] == "{") {
+          set depth++;
+      };
+      if (src[i..step.end] == "}") {
+          set depth = depth - 1;
+      }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
+
   operation fusion:
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)

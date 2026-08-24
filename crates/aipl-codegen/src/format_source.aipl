@@ -75,8 +75,8 @@ deallocations: 2204
 reallocations: 6
 bytes allocated: 101201
 instructions executed: 326734
-binary size: 863520
-  code: 528196
+binary size: 863464
+  code: 528140
   data: 2508
   metadata: 332816
 functions:
@@ -235,7 +235,7 @@ functions:
     bytes: 676
   __m13__delimited_len:
     calls: 24
-    bytes: 1416
+    bytes: 1392
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
     bytes: 8480
@@ -250,7 +250,7 @@ functions:
     bytes: 2436
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 22620
+    bytes: 22608
   __m13__nested_len:
     calls: 18
     bytes: 940
@@ -259,7 +259,7 @@ functions:
     bytes: 12068
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2672
+    bytes: 2668
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 488
@@ -313,7 +313,7 @@ functions:
     bytes: 1012
   __m6__block_entries:
     calls: 3
-    bytes: 3756
+    bytes: 3744
   __m6__block_layout:
     calls: 3
     bytes: 5124
@@ -469,7 +469,7 @@ functions:
     bytes: 3252
   __m6__program:
     calls: 4
-    bytes: 2500
+    bytes: 2496
   __m6__program_items:
     calls: 4
     bytes: 4372

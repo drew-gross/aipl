@@ -1,0 +1,111 @@
+import { is_nonempty, logical_not as ! } from builtins;
+
+// `is_nonempty` takes every receiver `len` does — array, `str`, set, dict — and
+// answers the one question `0 < x.len()` was ever asked to answer. The `str`,
+// set and dict receivers don't unify with the declared `(self: T[])` signature,
+// so each is dispatched by the checker and codegen alongside `len`'s.
+fn arrays(xs: i64[]) -> bool { xs.is_nonempty() }.test({
+    assert(arrays([1, 2, 3]));
+    assert(arrays([0]));
+    assert(!arrays([]));
+    // The free-call form is the same call.
+    assert(is_nonempty([1]));
+})
+
+fn strings(s: str) -> bool { s.is_nonempty() }.test({
+    assert(strings("hi"));
+
+    // A one-byte string, and the inline/heap split: neither representation
+    // stores a length field, so both go through `aipl_str_len`.
+    assert(strings(" "));
+    assert(strings("a string long enough to live on the heap rather than inline"));
+    assert(!strings(""));
+})
+
+fn nested(xs: str[][]) -> bool { xs.is_nonempty() }.test({
+    assert(nested([["a"], []]));
+    assert(!nested([]));
+
+    // An outer array of one empty inner array is itself non-empty — the count
+    // asked about is the receiver's own.
+    assert(nested([[]]));
+})
+
+fn sets(s: #{i64}) -> bool { s.is_nonempty() }.test({
+    assert(sets(#{1, 2}));
+    assert(!sets(#{}));
+})
+
+fn dicts(d: #{str: i64}) -> bool { d.is_nonempty() }.test({
+    assert(dicts(#{"a": 1}));
+    // `#{:}` is the empty *dict* (`#{}` is the empty set).
+    assert(!dicts(#{:}));
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 552
+instructions executed: 350
+binary size: 5808
+  code: 2116
+  data: 763
+  metadata: 2929
+functions:
+  __dict_drop_str$i64:
+    calls: 1
+    bytes: 128
+  __dict_retain_str$i64:
+    calls: 1
+    bytes: 128
+  aipl_arr_drop_arr:
+    calls: 2
+    bytes: (external)
+  aipl_arr_drop_str:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 14
+    bytes: (external)
+  aipl_array_new:
+    calls: 10
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
+    bytes: (external)
+  aipl_assert:
+    calls: 15
+    bytes: (external)
+  aipl_dec:
+    calls: 2
+    bytes: (external)
+  aipl_dict_insert:
+    calls: 1
+    bytes: (external)
+  aipl_inc:
+    calls: 1
+    bytes: (external)
+  aipl_set_contains:
+    calls: 2
+    bytes: (external)
+  aipl_set_insert:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 5
+    bytes: (external)
+  aipl_test_end:
+    calls: 5
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1860

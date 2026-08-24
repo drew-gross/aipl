@@ -7547,7 +7547,10 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         // rather than aliasing it — safe unless we're iterating
                         // that very binding.
                         f if builtin_is_mutating(f) => iterating,
-                        "__builtin_len" | "__builtin_to_str" | "__builtin_trim" => false,
+                        "__builtin_len"
+                        | "__builtin_is_nonempty"
+                        | "__builtin_to_str"
+                        | "__builtin_trim" => false,
                         _ => true,
                     }
                 } else {
@@ -7558,6 +7561,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                 let consuming = matches!(
                     fname.as_str(),
                     "__builtin_len"
+                        | "__builtin_is_nonempty"
                         | "__builtin_to_str"
                         | "__builtin_print"
                         | "__builtin_trim"

@@ -2780,15 +2780,20 @@ impl Cx<'_> {
                 Type::Result(none(), Box::new(t))
             });
         }
-        // `s.len()` / `len(s)` on a set, dict, or string: the builtin `len`
-        // signature is `(self: T[]) -> u64`, which doesn't unify with `#{T}` /
-        // `#{K: V}` / `str`, so dispatch those receivers here. (An array receiver
-        // falls through to the generic signature below.) For a string `len` is the
-        // byte length.
-        if name == "__builtin_len" && args.len() == 1 {
+        // `s.len()` / `len(s)` — and its `is_nonempty` companion — on a set,
+        // dict, or string: both signatures are `(self: T[]) -> ..`, which
+        // doesn't unify with `#{T}` / `#{K: V}` / `str`, so dispatch those
+        // receivers here. (An array receiver falls through to the generic
+        // signature below.) For a string `len` is the byte length, and
+        // `is_nonempty` asks whether there is any byte at all.
+        if matches!(name, "__builtin_len" | "__builtin_is_nonempty") && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             if matches!(t, Type::Set(_) | Type::Dict(_, _)) || is_str_repr(&t) {
-                return Ok(Type::Primitive(Primitive::U64));
+                return Ok(if name == "__builtin_len" {
+                    Type::Primitive(Primitive::U64)
+                } else {
+                    Type::Primitive(Primitive::Bool)
+                });
             }
         }
         // `a + b` / `a - b` resolve (in the loader) to a call to the file's bound

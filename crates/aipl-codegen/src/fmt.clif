@@ -20459,9 +20459,9 @@ function u0:80(i64, i64) -> i64 apple_aarch64 {
     fn2 = u0:34 sig2  ; aipl_str_starts_with
 
 block0(v0: i64, v1: i64):
-    v2 = iconst.i64 0
-    v3 = call fn0(v1)
-    v4 = icmp ult v2, v3  ; v2 = 0
+    v2 = call fn0(v1)
+    v3 = iconst.i64 0
+    v4 = icmp ne v2, v3  ; v3 = 0
     v5 = uextend.i64 v4
     call fn1(v0)
     call fn1(v1)
@@ -20513,9 +20513,9 @@ block0(v0: i64, v1: i64, v2: i64):
     v11 = call fn3(v10, v2)
     v12 = iconst.i64 1
     v13 = bxor v11, v12  ; v12 = 1
-    v14 = iconst.i64 0
-    v15 = call fn0(v1)
-    v16 = icmp ult v14, v15  ; v14 = 0
+    v14 = call fn0(v1)
+    v15 = iconst.i64 0
+    v16 = icmp ne v14, v15  ; v15 = 0
     v17 = uextend.i64 v16
     v18 = band v17, v13
     call fn1(v0)
@@ -20684,9 +20684,9 @@ block11:
     v65 = iconst.i64 92
     v66 = icmp.i64 eq v58, v65  ; v65 = 92
     v67 = uextend.i64 v66
-    v68 = iconst.i64 0
-    v69 = call fn4(v4)
-    v70 = icmp ult v68, v69  ; v68 = 0
+    v68 = call fn4(v4)
+    v69 = iconst.i64 0
+    v70 = icmp ne v68, v69  ; v69 = 0
     v71 = uextend.i64 v70
     v72 = band v67, v71
     v73 = stack_addr.i64 ss3
@@ -21507,9 +21507,9 @@ function u0:87(i64, i64) -> i64 tail {
     fn4 = u0:15 sig4  ; aipl_dec
 
 block0(v0: i64, v1: i64):
-    v2 = iconst.i64 0
-    v3 = call fn0(v1)
-    v4 = icmp ult v2, v3  ; v2 = 0
+    v2 = call fn0(v1)
+    v3 = iconst.i64 0
+    v4 = icmp ne v2, v3  ; v3 = 0
     v5 = uextend.i64 v4
     call fn1(v0)
     call fn1(v1)
@@ -45767,7 +45767,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$34151
+;   ss1 = __idx$34168
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -46039,13 +46039,13 @@ block1:
     v118 = stack_addr.i64 ss3
     store notrap v117, v118
     call fn2(v117)
-    v119 = iconst.i64 0
-    v120 = load.i64 notrap aligned v73+48
-    call fn2(v120)
-    v121 = iconst.i64 -4
-    v122 = band v120, v121  ; v121 = -4
-    v123 = load.i64 notrap aligned v122
-    v124 = icmp ult v119, v123  ; v119 = 0
+    v119 = load.i64 notrap aligned v73+48
+    call fn2(v119)
+    v120 = iconst.i64 -4
+    v121 = band v119, v120  ; v120 = -4
+    v122 = load.i64 notrap aligned v121
+    v123 = iconst.i64 0
+    v124 = icmp ne v122, v123  ; v123 = 0
     v125 = uextend.i64 v124
     v126 = iconst.i64 0
     v127 = stack_addr.i64 ss4
@@ -46287,7 +46287,7 @@ block21:
     v267 = stack_addr.i64 ss3
     v268 = load.i64 notrap v267
     call fn7(v268)
-    call fn7(v120)
+    call fn7(v119)
     call fn7(v128)
     v269 = iconst.i64 0
     v270 = iadd.i64 v226, v269  ; v269 = 0
@@ -46325,7 +46325,7 @@ block21:
 ;   ss2 = __spread$4
 ;   ss3 = out
 ;   v125 = had_imports
-;   ss4 = __idx$35255
+;   ss4 = __idx$35276
 ;   v155 = d
 ;   v157 = i
 ; __m18__program_items
@@ -58221,13 +58221,13 @@ block26:
     v107 = call fn8(v104, v105, v106)  ; v105 = 10, v106 = 2
     v108 = stack_addr.i64 ss1
     v109 = load.i64 notrap v108
-    v110 = iconst.i64 0
-    v111 = stack_addr.i64 ss1
-    v112 = load.i64 notrap v111
-    v113 = iconst.i64 -4
-    v114 = band v112, v113  ; v113 = -4
-    v115 = load.i64 notrap aligned v114
-    v116 = icmp ult v110, v115  ; v110 = 0
+    v110 = stack_addr.i64 ss1
+    v111 = load.i64 notrap v110
+    v112 = iconst.i64 -4
+    v113 = band v111, v112  ; v112 = -4
+    v114 = load.i64 notrap aligned v113
+    v115 = iconst.i64 0
+    v116 = icmp ne v114, v115  ; v115 = 0
     v117 = uextend.i64 v116
     v118 = call fn9(v107, v117)
     v119 = func_addr.i64 fn10
@@ -58468,13 +58468,13 @@ block45:
     v245 = call fn20(v242, v243, v244)  ; v243 = 10, v244 = 2
     v246 = stack_addr.i64 ss1
     v247 = load.i64 notrap v246
-    v248 = iconst.i64 0
-    v249 = stack_addr.i64 ss1
-    v250 = load.i64 notrap v249
-    v251 = iconst.i64 -4
-    v252 = band v250, v251  ; v251 = -4
-    v253 = load.i64 notrap aligned v252
-    v254 = icmp ult v248, v253  ; v248 = 0
+    v248 = stack_addr.i64 ss1
+    v249 = load.i64 notrap v248
+    v250 = iconst.i64 -4
+    v251 = band v249, v250  ; v250 = -4
+    v252 = load.i64 notrap aligned v251
+    v253 = iconst.i64 0
+    v254 = icmp ne v252, v253  ; v253 = 0
     v255 = uextend.i64 v254
     v256 = call fn21(v245, v255)
     v257 = func_addr.i64 fn22
@@ -121874,9 +121874,9 @@ block12:
     v213 = iconst.i64 92
     v214 = icmp.i64 eq v118, v213  ; v213 = 92
     v215 = uextend.i64 v214
-    v216 = iconst.i64 0
-    v217 = call fn2(v4)
-    v218 = icmp ult v216, v217  ; v216 = 0
+    v216 = call fn2(v4)
+    v217 = iconst.i64 0
+    v218 = icmp ne v216, v217  ; v217 = 0
     v219 = uextend.i64 v218
     v220 = band v215, v219
     v221 = stack_addr.i64 ss3
