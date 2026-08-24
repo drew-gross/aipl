@@ -110,7 +110,6 @@ utilities:
 
 lint:
   recognize and recommend min/max
-  x[0..] etc should just be x
   make a regex-like langauge for expressions to make lints easier to implement
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
@@ -221,7 +220,6 @@ perfmon:
   show regression and improvements
   improve it in some way that it allows you to prove that an optimzation did or did not happen
   add tests that specifically exersize perf
-  a function emitted but never entered reports calls: 0 — in walker.aipl, 49 of 193 functions turn out to be dead specializations
   functions in external libs don't get size instrumented
 
 recovering check:

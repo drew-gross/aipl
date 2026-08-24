@@ -2064,11 +2064,12 @@ pub mod lint {
         let allowed: std::collections::HashSet<usize> =
             allows.iter().map(|sp| line_of(src, sp.start)).collect();
         let mut hits: Vec<Error> = Vec::new();
-        // `slice_to_len` before `slice_from_zero`: `x[0..x.len()]` trips both,
-        // and only the first hit is reported. Dropping the end first gives
-        // `x[0..]`, which is already clean; dropping the start first would give
-        // `x[..x.len()]`, which still trips `slice_to_len` and costs a second
-        // round trip.
+        // The three slice lints partition the range forms rather than overlap:
+        // a whole-receiver range belongs to `slice_whole` and the other two bow
+        // out of it explicitly, so `x[0..x.len()]` yields one hit advising `x`
+        // instead of a chain of rewrites through `x[0..]` or `x[..x.len()]`.
+        // Order between them therefore carries no meaning.
+        each_expr(program, &mut |e| slice_whole(e, src, &mut hits));
         each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
         each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
         each_expr(program, &mut |e| eta_lambda(e, &mut hits));
@@ -2339,6 +2340,85 @@ pub mod lint {
         }
     }
 
+    /// True when `end` is exactly `len(obj)` — the receiver's own whole length,
+    /// however it was spelled (`x.len()` is stored as the free call `len(x)`).
+    /// Shared by the three slice lints, which divide the range forms between
+    /// them and so must agree on what "runs to the end" means.
+    fn end_is_receiver_len(end: &Expr, obj: &Expr) -> bool {
+        let ExprKind::Call(name, args, _) = &end.kind else {
+            return false;
+        };
+        name == "len" && args.len() == 1 && args[0] == *obj
+    }
+
+    /// `x[0..]` / `x[..x.len()]` / `x[0..x.len()]` — a slice whose range covers
+    /// the receiver end to end, which is what `x` already is. The slice is not
+    /// free: an array slice allocates a fresh block and copies every element
+    /// (`aipl_arr_slice`), so this is a redundant copy as well as a redundant
+    /// spelling. Dropping it is safe because AIPL arrays have value semantics —
+    /// mutating an aliased binding copies first (see
+    /// `cases/arrays/push_aliased_array`), so `y = x` cannot be surprised by a
+    /// later `set x[..]` the way a shared reference could.
+    ///
+    /// This is the whole-range corner of the three slice lints, and it takes
+    /// priority over both: [`slice_to_len`] would advise `x[0..]` and
+    /// [`slice_from_zero`] `x[..x.len()]`, each of which is still this shape and
+    /// would need a second round trip. Both bow out when this one applies, so a
+    /// full-range slice produces exactly one hit whichever way it was written.
+    ///
+    /// A start of `0` counts however it was written: `x[..y]` synthesizes a zero
+    /// with an empty span, and unlike its siblings this lint has no reason to
+    /// tell that from a written `0` — both cover the whole receiver, and the
+    /// advice names neither bound.
+    fn slice_whole(e: &Expr, src: &str, hits: &mut Vec<Error>) {
+        let ExprKind::Slice(obj, start, end) = &e.kind else {
+            return;
+        };
+        if !matches!(start.kind, ExprKind::Num(0)) {
+            return;
+        }
+        // An absent end already runs to the length; a present one has to say so.
+        if let Some(end) = end {
+            if !end_is_receiver_len(end, obj) {
+                return;
+            }
+        }
+        // Quote the receiver only when its span really ends where the `[`
+        // begins. A call-shaped span stops before its parens (the trap
+        // [`slice_from_zero`] documents for the end bound), so splicing
+        // `f(x)[0..]` would advise the bare `f`. Checking the source rather than
+        // the expression kind keeps every complete receiver quotable —
+        // `x.field`, `x.0` and `xs[i]` all name themselves fine.
+        let quotable = src[obj.span.end..].trim_start().starts_with('[');
+        let use_it = if quotable {
+            format!("use \"{}\" itself", &src[obj.span.clone()])
+        } else {
+            "use the receiver itself".to_string()
+        };
+        // Point at a bound rather than the whole expression: `#[allow]` is
+        // line-scoped (see `allow_squelch`), and a receiver may span lines, so
+        // the expression's own span could start on a line that can't carry the
+        // marker. A bound sits inside the brackets, always on the line the
+        // slice is written on. The written `0` is the natural target; when it
+        // was elided (`x[..x.len()]`) its span is empty, so the end bound —
+        // which must be present in that form — stands in.
+        let span = if start.span.is_empty() {
+            end.as_ref()
+                .expect("elided start implies an end bound")
+                .span
+                .clone()
+        } else {
+            start.span.clone()
+        };
+        hits.push(Error::at(
+            format!(
+                "slice covers the whole receiver — {use_it} \
+                 (or append #[allow] to this line to keep it)"
+            ),
+            span,
+        ));
+    }
+
     /// `x[y..x.len()]` — the end bound is the receiver's own length, which is
     /// what the open-ended form already means; recommend `x[y..]`. Purely
     /// syntactic: the receiver and the `len` argument must be the same
@@ -2348,20 +2428,18 @@ pub mod lint {
         let ExprKind::Slice(obj, start, Some(end)) = &e.kind else {
             return;
         };
-        let ExprKind::Call(name, args, _) = &end.kind else {
+        if !end_is_receiver_len(end, obj) {
             return;
-        };
-        if name != "len" || args.len() != 1 || args[0] != **obj {
+        }
+        // A zero start makes this the *whole* receiver, which is
+        // [`slice_whole`]'s to report — and its advice (`x`) is better than the
+        // `x[0..]` this one would give. The two are mutually exclusive, so
+        // neither has to run before the other.
+        if matches!(start.kind, ExprKind::Num(0)) {
             return;
         }
         let recv = &src[obj.span.clone()];
-        // `x[..x.len()]` synthesizes a zero start with an empty span; spell it
-        // back out, since `x[..]` is not a form.
-        let st = if start.span.is_empty() {
-            "0"
-        } else {
-            &src[start.span.clone()]
-        };
+        let st = &src[start.span.clone()];
         hits.push(Error::at(
             format!(
                 "slice end is the receiver's whole length — use the open-ended \
@@ -2380,10 +2458,16 @@ pub mod lint {
     /// Only flagged when there is an end bound. `x[0..]` is left alone on
     /// purpose: `x[..]` is not a form, so there would be nothing to recommend.
     fn slice_from_zero(e: &Expr, src: &str, hits: &mut Vec<Error>) {
-        let ExprKind::Slice(obj, start, Some(_end)) = &e.kind else {
+        let ExprKind::Slice(obj, start, Some(end)) = &e.kind else {
             return;
         };
         if !matches!(start.kind, ExprKind::Num(0)) || start.span.is_empty() {
+            return;
+        }
+        // `x[0..x.len()]` is the whole receiver — [`slice_whole`]'s to report,
+        // and in one step rather than the two this lint's `x[..x.len()]` would
+        // start.
+        if end_is_receiver_len(end, obj) {
             return;
         }
         // The end bound is deliberately *not* quoted back: a call-shaped end

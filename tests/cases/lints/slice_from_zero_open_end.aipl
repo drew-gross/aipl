@@ -1,24 +1,28 @@
 import { print, to_str } from builtins;
 
-// `x[0..]` is *not* flagged, even though the `0` is just as redundant: the
-// recommendation would have to be `x[..]`, which is not a form. So the lint
-// only fires when there is an end bound to keep. (An omitted start is
-// synthesized as a zero with an empty span, which is how a written `0` is told
-// apart from an elided one in the first place.)
+// The partial ranges, which no slice lint touches. Each drops exactly one bound
+// already, so there is nothing left to recommend:
+//
+//   - `x[1..]` — an open end with a start worth keeping. (`x[0..]` *is* flagged,
+//     by `slice_whole`, because a zero start makes it the whole receiver; an
+//     omitted start is synthesized as a zero with an empty span, which is how a
+//     written `0` is told apart from an elided one.)
+//   - `x[..2]` — an open start with a real end. Only a `len` end would make this
+//     the whole receiver.
 fn main() !prints {
     let xs = [10, 20, 30];
-    print(xs[0..].to_str());
+    print(xs[1..].to_str());
     print(xs[..2].to_str());
 }
 --- stdout ---
-[10, 20, 30]
+[20, 30]
 [10, 20]
 --- performance ---
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 214
-instructions executed: 684
+bytes allocated: 202
+instructions executed: 584
 binary size: 2424
   code: 1016
   data: 67
@@ -40,7 +44,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_i64_len:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_inc:
     calls: 2
@@ -52,10 +56,10 @@ functions:
     calls: 2
     bytes: (external)
   aipl_write_bytes:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_write_i64:
-    calls: 5
+    calls: 4
     bytes: (external)
   main:
     calls: 1

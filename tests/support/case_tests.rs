@@ -299,6 +299,7 @@ case_tests! {
     cases_lints_match_value_or_not_flagged = "cases/lints/match_value_or_not_flagged",
     cases_lints_slice_from_zero_allow = "cases/lints/slice_from_zero_allow",
     cases_lints_slice_from_zero_open_end = "cases/lints/slice_from_zero_open_end",
+    cases_lints_slice_whole_allow = "cases/lints/slice_whole_allow",
     cases_lints_unused_import_allow = "cases/lints/unused_import_allow",
     cases_loops_err_loops = "cases/loops/err_loops",
     cases_loops_errors_err_for_body_stmt_then_expr = "cases/loops/errors/err_for_body_stmt_then_expr",
