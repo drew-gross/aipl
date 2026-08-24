@@ -1,10 +1,15 @@
-import { ends_with, logical_not as !, starts_with } from builtins;
+import { ends_with, logical_not as !, starts_with, starts_with_at } from builtins;
 
 // `xs.starts_with(p)` / `xs.ends_with(p)` test whether `p`'s elements equal a
 // contiguous prefix / suffix of `xs`'s, by element-wise structural `==`. The
 // pattern is variadic (`T*`): besides a `T[]` it accepts a single `T` or a `T?`.
 // The empty pattern always matches; a pattern longer than `xs` never does.
 // Elements can be any comparable type (scalars, str, even nested arrays).
+//
+// `xs.starts_with_at(p, i)` is `xs[i..].starts_with(p)` without building the
+// slice — which for an array means without allocating a fresh block and copying
+// every remaining element. It is what the fusion pass rewrites that shape into
+// (see `cases/optimizations/slice_starts_with_fusion`), and callable directly.
 fn has_header(xs: i64[]) -> bool { xs.starts_with([0, 0]) }.test({
     let xs = [1, 2, 3, 4];
     assert(xs.starts_with([1, 2])); // common prefix
@@ -40,46 +45,66 @@ fn has_header(xs: i64[]) -> bool { xs.starts_with([0, 0]) }.test({
     assert([[1], [2, 3]].ends_with([[2, 3]]));
     assert(![[1], [2, 3]].starts_with([[2]]));
 
+    // `starts_with_at`: the same test, `i` elements in.
+    assert(xs.starts_with_at([3, 4], 2)); // matches at the offset
+    assert(xs.starts_with_at([1, 2], 0)); // offset 0 is plain starts_with
+    assert(!xs.starts_with_at([3, 4], 1)); // matches, but not there
+    assert(!xs.starts_with_at([3, 4, 5], 2)); // runs off the end
+    assert(xs.starts_with_at([], 2)); // empty pattern always matches
+
+    // The offset clamps exactly as a slice bound does, so an offset past the
+    // end leaves nothing to match but the empty pattern, and a negative one
+    // starts from the beginning.
+    assert(xs.starts_with_at([], 9));
+    assert(!xs.starts_with_at([4], 9));
+    assert(xs.starts_with_at([1, 2], -1));
+    // Variadic here too, and elements compare structurally as always.
+    assert(xs.starts_with_at(3, 2));
+    assert(xs.starts_with_at(some(3), 2));
+    assert(xs.starts_with_at(none, 2));
+    assert(["a", "bc", "d"].starts_with_at(["bc", "d"], 1));
+    assert([[1], [2, 3]].starts_with_at([[2, 3]], 1));
+
     assert(has_header([0, 0, 9])); // free helper / method form
     assert(!has_header([0, 9]));
 })
 --- performance ---
-allocations: 38
-deallocations: 38
+allocations: 53
+deallocations: 53
 reallocations: 0
-bytes allocated: 1736
-instructions executed: 2665
-binary size: 15248
-  code: 9112
-  data: 1316
-  metadata: 4820
+bytes allocated: 2416
+instructions executed: 3912
+binary size: 22512
+  code: 13744
+  data: 2092
+  metadata: 6676
 functions:
   __eq_i64$arr:
-    calls: 3
+    calls: 4
     bytes: 296
   aipl_arr_drop_arr:
-    calls: 6
-    bytes: (external)
-  aipl_arr_drop_str:
-    calls: 4
-    bytes: (external)
-  aipl_array_dec:
-    calls: 38
-    bytes: (external)
-  aipl_array_new:
-    calls: 38
-    bytes: (external)
-  aipl_assert:
-    calls: 25
-    bytes: (external)
-  aipl_dec:
-    calls: 18
-    bytes: (external)
-  aipl_inc:
     calls: 8
     bytes: (external)
+  aipl_arr_drop_str:
+    calls: 6
+    bytes: (external)
+  aipl_array_dec:
+    calls: 53
+    bytes: (external)
+  aipl_array_new:
+    calls: 53
+    bytes: (external)
+  aipl_assert:
+    calls: 38
+    bytes: (external)
+  aipl_dec:
+    calls: 27
+    bytes: (external)
+  aipl_inc:
+    calls: 12
+    bytes: (external)
   aipl_str_eq:
-    calls: 4
+    calls: 6
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -92,4 +117,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 8816
+    bytes: 13448

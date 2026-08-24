@@ -341,6 +341,8 @@ case_tests! {
     cases_optimizations_count_fusion = "cases/optimizations/count_fusion",
     cases_optimizations_count_fusion_effects = "cases/optimizations/count_fusion_effects",
     cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",
+    cases_optimizations_slice_starts_with_fusion = "cases/optimizations/slice_starts_with_fusion",
+    cases_optimizations_slice_starts_with_fusion_effects = "cases/optimizations/slice_starts_with_fusion_effects",
     cases_options_err_match_missing_arrow = "cases/options/err_match_missing_arrow",
     cases_options_err_match_str_literal = "cases/options/err_match_str_literal",
     cases_options_err_try_on_optional_needs_optional_return = "cases/options/err_try_on_optional_needs_optional_return",

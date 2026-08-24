@@ -637,15 +637,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4723
-deallocations: 4723
+allocations: 4679
+deallocations: 4679
 reallocations: 0
-bytes allocated: 275592
-instructions executed: 747432
-binary size: 219544
-  code: 141656
+bytes allocated: 274184
+instructions executed: 747138
+binary size: 218920
+  code: 141316
   data: 7100
-  metadata: 70788
+  metadata: 70504
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -757,7 +757,7 @@ functions:
     bytes: 696
   __m1__between_len:
     calls: 24
-    bytes: 744
+    bytes: 676
   __m1__delimited_len:
     calls: 45
     bytes: 1416
@@ -778,16 +778,16 @@ functions:
     bytes: 22620
   __m1__nested_len:
     calls: 56
-    bytes: 1044
+    bytes: 940
   __m1__step_result$AiplTok:
     calls: 1712
     bytes: 12068
   __m1__template_scan$AiplTok:
     calls: 3
-    bytes: 2772
+    bytes: 2672
   __m1__template_step$AiplTok:
     calls: 35
-    bytes: 556
+    bytes: 488
   __m2__unescape:
     calls: 8
     bytes: 892
@@ -858,10 +858,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_dec:
-    calls: 24585
+    calls: 24443
     bytes: (external)
   aipl_inc:
-    calls: 19372
+    calls: 19328
     bytes: (external)
   aipl_str_contains:
     calls: 1016
@@ -888,16 +888,19 @@ functions:
     calls: 3
     bytes: (external)
   aipl_str_len:
-    calls: 8169
+    calls: 8071
     bytes: (external)
   aipl_str_slice:
-    calls: 1982
+    calls: 1884
     bytes: (external)
   aipl_str_split:
     calls: 3
     bytes: (external)
   aipl_str_starts_with:
-    calls: 1610
+    calls: 1512
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 98
     bytes: (external)
   aipl_test_begin:
     calls: 3

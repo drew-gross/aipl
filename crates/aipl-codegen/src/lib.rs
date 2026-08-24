@@ -2665,6 +2665,58 @@ extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
     i64::from(starts)
 }
 
+/// `s.starts_with_at(prefix, at) -> bool` (1/0): whether `s`'s bytes from `at`
+/// onward begin with `prefix`'s — `s[at..].starts_with(prefix)` without building
+/// the slice. `at` clamps to `[0, len]` exactly as a slice bound does, so a start
+/// past the end leaves nothing to match but the empty prefix. Consumes (decs)
+/// both inputs, like the other str builtins; callers pre-inc.
+#[no_mangle]
+extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i64) -> i64 {
+    let sl = aipl_str_len(s);
+    let pl = aipl_str_len(prefix) as usize;
+    let lo = if at < 0 {
+        0
+    } else if at > sl {
+        sl as usize
+    } else {
+        at as usize
+    };
+    let starts = if (sl as usize) - lo < pl {
+        false
+    } else {
+        // Stream `s`, skipping the chunks that end before `lo` and comparing from
+        // there until the prefix is matched (or mismatches); `prefix` (usually a
+        // short literal) is read contiguously.
+        let mut pb = [0u8; 8];
+        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
+        let mut pos = 0usize; // bytes of `s` behind us
+        let mut off = 0usize; // bytes of `prefix` matched so far
+        let mut ok = true;
+        str_for_each_chunk(s, &mut |chunk| {
+            if off >= pl {
+                return false; // whole prefix matched — stop scanning `s`
+            }
+            let start = pos;
+            pos += chunk.len();
+            if pos <= lo {
+                return true; // wholly before the offset — nothing to compare yet
+            }
+            let from = lo.saturating_sub(start);
+            let take = std::cmp::min(chunk.len() - from, pl - off);
+            if chunk[from..from + take] != pbytes[off..off + take] {
+                ok = false;
+                return false;
+            }
+            off += take;
+            true
+        });
+        ok
+    };
+    aipl_dec(s);
+    aipl_dec(prefix);
+    i64::from(starts)
+}
+
 /// `s.ends_with(suffix) -> bool` (1/0): whether `s`'s bytes end with `suffix`'s.
 /// Consumes (decs) both inputs, like the other str builtins; callers pre-inc.
 /// The empty suffix always matches.
@@ -4949,6 +5001,10 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_eq", aipl_str_eq as *const u8);
     jit_builder.symbol("aipl_str_cmp", aipl_str_cmp as *const u8);
     jit_builder.symbol("aipl_str_starts_with", aipl_str_starts_with as *const u8);
+    jit_builder.symbol(
+        "aipl_str_starts_with_at",
+        aipl_str_starts_with_at as *const u8,
+    );
     jit_builder.symbol("aipl_str_contains", aipl_str_contains as *const u8);
     jit_builder.symbol("aipl_str_ends_with", aipl_str_ends_with as *const u8);
     jit_builder.symbol(
@@ -7834,9 +7890,11 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_write_i64"
         | "aipl_write_u64"
         | "aipl_write_string_to_file" => sig(2, true),
-        "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" | "aipl_str_slice" => {
-            sig(3, true)
-        }
+        "aipl_write_bytes"
+        | "aipl_array_new"
+        | "aipl_array_with_cap"
+        | "aipl_str_slice"
+        | "aipl_str_starts_with_at" => sig(3, true),
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
             sig(4, true)
         }
@@ -9979,12 +10037,12 @@ fn i64_slot(builder: &mut FunctionBuilder) -> StackSlot {
     builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3))
 }
 
-/// Emit `self.starts_with(other)` / `self.ends_with(other)` (`is_ends`) for two
-/// arrays of element type `elem`, returning an `i64` 0/1. True iff `other`'s
-/// elements equal a contiguous prefix (`!is_ends`) or suffix (`is_ends`) of
-/// `self`'s — i.e. `other` is no longer than `self` and every element matches at
-/// the aligned offset. Borrows both arrays (`emit_eq` balances its own per-
-/// element refs, like the array branch of `==`).
+/// Emit `self.starts_with(other)` / `self.starts_with_at(other, at)` /
+/// `self.ends_with(other)` for two arrays of element type `elem`, returning an
+/// `i64` 0/1. True iff `other`'s elements equal a contiguous run of `self`'s at
+/// the offset `end` selects — 0, `at`, or the aligned tail — with `other` no
+/// longer than what remains from there. Borrows both arrays (`emit_eq` balances
+/// its own per-element refs, like the array branch of `==`).
 fn emit_arr_starts_ends<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -9992,15 +10050,29 @@ fn emit_arr_starts_ends<M: Module>(
     self_ptr: Value,
     other_ptr: Value,
     elem: &Type,
-    is_ends: bool,
+    end: SeEnd,
+    at: Option<Value>,
 ) -> Result<Value, Error> {
     let Cx {
         structs, builtins, ..
     } = cx;
     let la = load_arr_len(builder, self_ptr);
     let lb = load_arr_len(builder, other_ptr);
-    // A pattern longer than the source can't be a prefix/suffix.
-    let fits = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lb, la);
+    // Where a `starts_with_at` comparison begins: `at` clamped to `[0, la]`
+    // exactly as a slice bound is, so an offset past the end leaves nothing to
+    // match but the empty pattern.
+    let lo = at.map(|at| {
+        let z = builder.ins().iconst(types::I64, 0);
+        let lo = builder.ins().smax(at, z);
+        builder.ins().smin(lo, la)
+    });
+    // A pattern longer than what remains from the offset can't match there.
+    // `starts_with`/`ends_with` start from 0, so all of the source remains.
+    let avail = match lo {
+        Some(lo) => builder.ins().isub(la, lo),
+        None => la,
+    };
+    let fits = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lb, avail);
     // Both arrays are the untyped empty literal (`[].starts_with([])`): there's
     // no element type to compare, so length-fits is the whole answer (and `lb`
     // is 0, so it's `true`). Skip the element loop — `emit_eq` can't lower a
@@ -10020,11 +10092,11 @@ fn emit_arr_starts_ends<M: Module>(
     let one = builder.ins().iconst(types::I64, 1);
     builder.ins().stack_store(types::I64, one, res, 0); // optimistic: all matched
                                                         // `ends_with` compares `self[la - lb + i]` to `other[i]`; `starts_with`
-                                                        // uses offset 0.
-    let offset = if is_ends {
-        builder.ins().isub(la, lb)
-    } else {
-        zero
+                                                        // uses offset 0, and `starts_with_at` the clamped `at`.
+    let offset = match end {
+        SeEnd::Starts => zero,
+        SeEnd::At => lo.expect("a `starts_with_at` call supplies its offset"),
+        SeEnd::Ends => builder.ins().isub(la, lb),
     };
     let idx = i64_slot(builder);
     builder.ins().stack_store(types::I64, zero, idx, 0);
@@ -13429,10 +13501,33 @@ enum SeShape {
     Opt,
 }
 
-/// Parse a (possibly shape-suffixed) `starts_with`/`ends_with` builtin name into
-/// `(is_ends, shape)`, or `None` if it isn't one. Mono appends `$ve`/`$vo` for
-/// the element/optional monomorphizations; the bare name is the sequence form.
-fn starts_ends_variant(name: &str) -> Option<(bool, SeShape)> {
+/// Which end a `starts_with`/`ends_with`/`starts_with_at` call matches against,
+/// and whether it carries an explicit offset. `Starts` and `At` are the same
+/// comparison — `At` just takes its start from a trailing argument instead of 0,
+/// which is exactly what makes it the fused form of `xs[at..].starts_with(p)`.
+#[derive(Clone, Copy, PartialEq)]
+enum SeEnd {
+    Starts,
+    At,
+    Ends,
+}
+
+impl SeEnd {
+    /// Argument count: the receiver and pattern, plus `At`'s offset.
+    fn arity(self) -> usize {
+        if self == SeEnd::At {
+            3
+        } else {
+            2
+        }
+    }
+}
+
+/// Parse a (possibly shape-suffixed) `starts_with`/`starts_with_at`/`ends_with`
+/// builtin name into `(end, shape)`, or `None` if it isn't one. Mono appends
+/// `$ve`/`$vo` for the element/optional monomorphizations; the bare name is the
+/// sequence form.
+fn starts_ends_variant(name: &str) -> Option<(SeEnd, SeShape)> {
     let (base, shape) = if let Some(b) = name.strip_suffix("$ve") {
         (b, SeShape::Elem)
     } else if let Some(b) = name.strip_suffix("$vo") {
@@ -13441,8 +13536,9 @@ fn starts_ends_variant(name: &str) -> Option<(bool, SeShape)> {
         (name, SeShape::Seq)
     };
     match base {
-        "__builtin_starts_with" => Some((false, shape)),
-        "__builtin_ends_with" => Some((true, shape)),
+        "__builtin_starts_with" => Some((SeEnd::Starts, shape)),
+        "__builtin_starts_with_at" => Some((SeEnd::At, shape)),
+        "__builtin_ends_with" => Some((SeEnd::Ends, shape)),
         _ => None,
     }
 }
@@ -13471,11 +13567,11 @@ fn emit_char_to_str(builder: &mut FunctionBuilder, c: Value) -> Value {
     builder.ins().bor_imm_u(shifted, 5)
 }
 
-/// `arr.starts_with(x)` / `arr.ends_with(x)` for a single element `x` of type
-/// `elem` — the `$ve` (element) monomorphization. True iff `arr` is non-empty
-/// and its first (`!is_ends`) or last (`is_ends`) element structurally equals
-/// `x`, with no intermediate array built. Borrows `arr`; `emit_eq` balances its
-/// own per-element refs.
+/// `arr.starts_with(x)` / `arr.starts_with_at(x, at)` / `arr.ends_with(x)` for a
+/// single element `x` of type `elem` — the `$ve` (element) monomorphization.
+/// True iff the element `end` selects — the first, the one at `at`, or the last
+/// — exists and structurally equals `x`, with no intermediate array built.
+/// Borrows `arr`; `emit_eq` balances its own per-element refs.
 fn emit_arr_starts_ends_elem<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -13483,7 +13579,8 @@ fn emit_arr_starts_ends_elem<M: Module>(
     arr: Value,
     elem_val: Value,
     elem: &Type,
-    is_ends: bool,
+    end: SeEnd,
+    at: Option<Value>,
 ) -> Result<Value, Error> {
     let Cx {
         structs, builtins, ..
@@ -13492,16 +13589,29 @@ fn emit_arr_starts_ends_elem<M: Module>(
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().stack_store(types::I64, zero, res, 0);
-    let nonempty = builder.ins().icmp(IntCC::SignedGreaterThan, len, zero);
+    // `at` clamps to 0 like a slice bound (a negative offset slices from the
+    // start); the upper end is the in-range test below.
+    let lo = at.map(|at| builder.ins().smax(at, zero));
+    let inrange = match end {
+        // The first element exists iff the array is non-empty — and so does the
+        // last, whose index is `len - 1`.
+        SeEnd::Starts | SeEnd::Ends => builder.ins().icmp(IntCC::SignedGreaterThan, len, zero),
+        // An offset at or past the end has no element there, so a one-element
+        // pattern can't match — the same answer `self[at..]` being empty gives.
+        SeEnd::At => {
+            let lo = lo.expect("a `starts_with_at` call supplies its offset");
+            builder.ins().icmp(IntCC::SignedLessThan, lo, len)
+        }
+    };
     let chk = builder.create_block();
     let merge = builder.create_block();
-    builder.ins().brif(nonempty, chk, &[], merge, &[]);
+    builder.ins().brif(inrange, chk, &[], merge, &[]);
     builder.switch_to_block(chk);
     builder.seal_block(chk);
-    let idx = if is_ends {
-        builder.ins().iadd_imm_s(len, -1)
-    } else {
-        zero
+    let idx = match end {
+        SeEnd::Starts => zero,
+        SeEnd::At => lo.expect("a `starts_with_at` call supplies its offset"),
+        SeEnd::Ends => builder.ins().iadd_imm_s(len, -1),
     };
     let e = load_array_elem(module, builder, builtins, arr, idx, elem, structs);
     let eq = emit_eq(module, builder, cx, e, elem_val, elem)?;
@@ -14908,19 +15018,21 @@ fn compile_call_expr<M: Module>(
             }
         }
         _ if starts_ends_variant(name).is_some() => {
-            // `s.starts_with(p)` / `s.ends_with(p) -> bool` over a `str` (byte
-            // compare) or `T[]` (element-wise structural compare). The pattern is
-            // variadic; monomorphization has already resolved its shape into the
-            // name suffix (`$ve` element, `$vo` optional, none = the sequence),
-            // so each shape is implemented directly here — its own
-            // monomorphization. The empty pattern always matches; a pattern
-            // longer than the receiver never does.
-            let (is_ends, shape) = starts_ends_variant(name).unwrap();
-            if args.len() != 2 {
+            // `s.starts_with(p)` / `s.starts_with_at(p, i)` / `s.ends_with(p)
+            // -> bool` over a `str` (byte compare) or `T[]` (element-wise
+            // structural compare). The pattern is variadic; monomorphization has
+            // already resolved its shape into the name suffix (`$ve` element,
+            // `$vo` optional, none = the sequence), so each shape is implemented
+            // directly here — its own monomorphization. The empty pattern always
+            // matches; a pattern longer than what remains from the offset never
+            // does.
+            let (end, shape) = starts_ends_variant(name).unwrap();
+            if args.len() != end.arity() {
                 return Err(Error::at(
                     format!(
-                        "{:?} expects 2 args, got {}",
+                        "{:?} expects {} args, got {}",
                         display_name(name),
+                        end.arity(),
                         args.len()
                     ),
                     span.clone(),
@@ -14928,6 +15040,11 @@ fn compile_call_expr<M: Module>(
             }
             let (recv, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (pat_v, pat_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            // `starts_with_at`'s offset, compiled once and shared by every shape.
+            let at = match args.get(2) {
+                Some(a) => Some(compile_expr(module, builder, cx, scopes, a)?.0),
+                None => None,
+            };
             let result = if is_str_shaped(&recv_ty) {
                 // `char*` pattern. The str runtime consumes (decs) both refs, so
                 // each str handed to it is pre-inc'd; a built 1-char string is
@@ -14935,10 +15052,10 @@ fn compile_call_expr<M: Module>(
                 // matches (a `""` prefix/suffix); `some(c)` compares the 1-char
                 // string. The element/optional value is materialized only as an
                 // inline string — no allocation.
-                let sym = if is_ends {
-                    "aipl_str_ends_with"
-                } else {
-                    "aipl_str_starts_with"
+                let sym = match end {
+                    SeEnd::Starts => "aipl_str_starts_with",
+                    SeEnd::At => "aipl_str_starts_with_at",
+                    SeEnd::Ends => "aipl_str_ends_with",
                 };
                 // The 1-char-or-whole `str` pattern to compare directly, or
                 // `None` for the optional shape (handled with a tag branch).
@@ -14951,7 +15068,9 @@ fn compile_call_expr<M: Module>(
                     emit_inc(builder, module, builtins, recv);
                     emit_inc(builder, module, builtins, pat);
                     let f = builtins.import(module, builder.func, sym);
-                    let inst = builder.ins().call(f, &[recv, pat]);
+                    let mut call_args = vec![recv, pat];
+                    call_args.extend(at);
+                    let inst = builder.ins().call(f, &call_args);
                     builder.inst_results(inst)[0]
                 } else {
                     // Optional `char?`: `none` → true; `some(c)` → str compare.
@@ -14980,7 +15099,9 @@ fn compile_call_expr<M: Module>(
                     let s = emit_char_to_str(builder, cv);
                     emit_inc(builder, module, builtins, recv);
                     let f = builtins.import(module, builder.func, sym);
-                    let inst = builder.ins().call(f, &[recv, s]);
+                    let mut call_args = vec![recv, s];
+                    call_args.extend(at);
+                    let inst = builder.ins().call(f, &call_args);
                     let r = builder.inst_results(inst)[0];
                     builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
@@ -15017,10 +15138,10 @@ fn compile_call_expr<M: Module>(
                 };
                 match shape {
                     SeShape::Seq => {
-                        emit_arr_starts_ends(module, builder, cx, recv, pat_v, &elem, is_ends)?
+                        emit_arr_starts_ends(module, builder, cx, recv, pat_v, &elem, end, at)?
                     }
                     SeShape::Elem => {
-                        emit_arr_starts_ends_elem(module, builder, cx, recv, pat_v, &elem, is_ends)?
+                        emit_arr_starts_ends_elem(module, builder, cx, recv, pat_v, &elem, end, at)?
                     }
                     SeShape::Opt => {
                         // `none` → true; `some(v)` → single-element compare.
@@ -15042,7 +15163,7 @@ fn compile_call_expr<M: Module>(
                         builder.seal_block(some_b);
                         let cv = component(builder, pat_v, OPT_VALUE_OFFSET, &elem, structs);
                         let r = emit_arr_starts_ends_elem(
-                            module, builder, cx, recv, cv, &elem, is_ends,
+                            module, builder, cx, recv, cv, &elem, end, at,
                         )?;
                         builder.ins().stack_store(types::I64, r, res, 0);
                         builder.ins().jump(merge, &[]);

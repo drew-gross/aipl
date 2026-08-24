@@ -182,6 +182,7 @@ mod builtin_calls {
         b"aipl_str_sort\0",
         b"aipl_str_split\0",
         b"aipl_str_starts_with\0",
+        b"aipl_str_starts_with_at\0",
         b"aipl_test_begin\0",
         b"aipl_test_end\0",
         b"aipl_test_fail\0",
@@ -264,18 +265,19 @@ mod builtin_calls {
     pub const AIPL_STR_SORT: usize = 63;
     pub const AIPL_STR_SPLIT: usize = 64;
     pub const AIPL_STR_STARTS_WITH: usize = 65;
-    pub const AIPL_TEST_BEGIN: usize = 66;
-    pub const AIPL_TEST_END: usize = 67;
-    pub const AIPL_TEST_FAIL: usize = 68;
-    pub const AIPL_TEST_FAIL_NONE: usize = 69;
-    pub const AIPL_TEST_SUMMARY: usize = 70;
-    pub const AIPL_TRIM: usize = 71;
-    pub const AIPL_TRIM_MUT: usize = 72;
-    pub const AIPL_U64_LEN: usize = 73;
-    pub const AIPL_WRITE_BYTES: usize = 74;
-    pub const AIPL_WRITE_I64: usize = 75;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 76;
-    pub const AIPL_WRITE_U64: usize = 77;
+    pub const AIPL_STR_STARTS_WITH_AT: usize = 66;
+    pub const AIPL_TEST_BEGIN: usize = 67;
+    pub const AIPL_TEST_END: usize = 68;
+    pub const AIPL_TEST_FAIL: usize = 69;
+    pub const AIPL_TEST_FAIL_NONE: usize = 70;
+    pub const AIPL_TEST_SUMMARY: usize = 71;
+    pub const AIPL_TRIM: usize = 72;
+    pub const AIPL_TRIM_MUT: usize = 73;
+    pub const AIPL_U64_LEN: usize = 74;
+    pub const AIPL_WRITE_BYTES: usize = 75;
+    pub const AIPL_WRITE_I64: usize = 76;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 77;
+    pub const AIPL_WRITE_U64: usize = 78;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------
@@ -3116,6 +3118,59 @@ pub extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
             }
             let take = core::cmp::min(chunk.len(), pl - off);
             if chunk[..take] != pbytes[off..off + take] {
+                ok = false;
+                return false;
+            }
+            off += take;
+            true
+        });
+        ok
+    };
+    aipl_dec(s);
+    aipl_dec(prefix);
+    i64::from(starts)
+}
+
+/// `s.starts_with_at(prefix, at) -> bool` (1/0): whether `s`'s bytes from `at`
+/// onward begin with `prefix`'s — `s[at..].starts_with(prefix)` without building
+/// the slice. `at` clamps to `[0, len]` exactly as a slice bound does, so a start
+/// past the end leaves nothing to match but the empty prefix. Consumes (decs)
+/// both inputs; callers pre-inc. Mirrors the JIT `aipl_str_starts_with_at`.
+#[no_mangle]
+pub extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i64) -> i64 {
+    count_builtin!(builtin_calls::AIPL_STR_STARTS_WITH_AT);
+    let sl = aipl_str_len(s);
+    let pl = aipl_str_len(prefix) as usize;
+    let lo = if at < 0 {
+        0
+    } else if at > sl {
+        sl as usize
+    } else {
+        at as usize
+    };
+    let starts = if (sl as usize) - lo < pl {
+        false
+    } else {
+        // Stream `s`, skipping the chunks that end before `lo` and comparing from
+        // there until the prefix is matched (or mismatches); `prefix` (usually a
+        // short literal) is read contiguously.
+        let mut pb = [0u8; 8];
+        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
+        let mut pos = 0usize; // bytes of `s` behind us
+        let mut off = 0usize; // bytes of `prefix` matched so far
+        let mut ok = true;
+        str_for_each_chunk(s, &mut |chunk| {
+            if off >= pl {
+                return false; // whole prefix matched — stop scanning `s`
+            }
+            let start = pos;
+            pos += chunk.len();
+            if pos <= lo {
+                return true; // wholly before the offset — nothing to compare yet
+            }
+            let from = lo.saturating_sub(start);
+            let take = core::cmp::min(chunk.len() - from, pl - off);
+            if chunk[from..from + take] != pbytes[off..off + take] {
                 ok = false;
                 return false;
             }

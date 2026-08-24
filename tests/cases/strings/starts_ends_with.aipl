@@ -1,10 +1,20 @@
-import { ends_with, logical_and as &&, logical_not as !, starts_with } from builtins;
+import {
+    ends_with,
+    logical_and as &&,
+    logical_not as !,
+    starts_with,
+    starts_with_at,
+} from builtins;
 
 // `s.starts_with(p)` / `s.ends_with(p)` test whether `s`'s bytes begin / end
 // with `p`'s. The pattern is variadic (`char*`): besides a `str` it accepts a
 // single `char` or a `char?` (an AIPL string is the char sequence). The empty
 // pattern always matches; a pattern longer than `s` never does. A view (long
 // slice) works as a receiver too.
+//
+// `s.starts_with_at(p, i)` is `s[i..].starts_with(p)` without building the
+// slice — the answer the fusion pass rewrites that shape into (see
+// `cases/optimizations/slice_starts_with_fusion`), and callable directly.
 fn is_dotfile(name: str) -> bool { name.starts_with(".") && !name.ends_with("/") }.test({
     assert("hello".starts_with("he")); // common prefix
     assert("hello".starts_with("hello")); // whole string
@@ -34,6 +44,25 @@ fn is_dotfile(name: str) -> bool { name.starts_with(".") && !name.ends_with("/")
     assert(v.ends_with("!"));
     assert(v.ends_with('!')); // char on a view receiver
 
+    // `starts_with_at`: the same test, `i` bytes in.
+    assert("hello".starts_with_at("llo", 2)); // matches at the offset
+    assert("hello".starts_with_at("hello", 0)); // offset 0 is plain starts_with
+    assert(!"hello".starts_with_at("llo", 1)); // matches, but not there
+    assert(!"hello".starts_with_at("lloX", 2)); // runs off the end
+    assert("hello".starts_with_at("", 2)); // empty pattern always matches
+
+    // The offset clamps exactly as a slice bound does, so an offset past the
+    // end leaves nothing to match but the empty pattern, and a negative one
+    // starts from the beginning.
+    assert("hello".starts_with_at("", 99));
+    assert(!"hello".starts_with_at("o", 99));
+    assert("hello".starts_with_at("he", -1));
+    // Variadic here too, and it reads a view receiver like the others.
+    assert("hello".starts_with_at('l', 2));
+    assert("hello".starts_with_at(some('l'), 2));
+    assert("hello".starts_with_at(none, 2));
+    assert(v.starts_with_at("rld", 2)); // "world!" from index 2
+
     assert(is_dotfile(".bashrc"));
     assert(!is_dotfile("README"));
 })
@@ -42,32 +71,35 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 289
-binary size: 6280
-  code: 1836
-  data: 1279
-  metadata: 3165
+instructions executed: 440
+binary size: 9008
+  code: 2704
+  data: 2015
+  metadata: 4289
 functions:
   aipl_assert:
-    calls: 23
+    calls: 35
     bytes: (external)
   aipl_dec:
-    calls: 47
+    calls: 69
     bytes: (external)
   aipl_inc:
-    calls: 7
+    calls: 9
     bytes: (external)
   aipl_str_ends_with:
     calls: 10
     bytes: (external)
   aipl_str_len:
-    calls: 47
+    calls: 69
     bytes: (external)
   aipl_str_slice:
     calls: 1
     bytes: (external)
   aipl_str_starts_with:
     calls: 13
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 11
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -80,4 +112,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1836
+    bytes: 2704

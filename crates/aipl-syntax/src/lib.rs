@@ -1594,6 +1594,12 @@ fn __builtin_is_all_whitespace(self: str) -> bool { false }
 // the checker / codegen (the `T[]` signature doesn't unify with `str`).
 fn __builtin_starts_with<T: any>(self: T[], prefix: T[]) -> bool { false }
 fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
+// `self[at..].starts_with(prefix)` without building the slice: the same answer,
+// comparing in place from `at`. `at` clamps like a slice bound, so an `at` past
+// the end matches only the empty pattern. The pattern is variadic exactly as
+// `starts_with`'s, and dispatched with it in the checker / codegen. Written by
+// the compiler's operation-fusion pass; also callable directly.
+fn __builtin_starts_with_at<T: any>(self: T[], prefix: T[], at: u64) -> bool { false }
 // True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
 // contiguous subsequence (substring), a `T` (or `char`) as a single element,
 // and a `T?` as its element when `some` — a `none` needle is nothing to find,
@@ -1830,6 +1836,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "trim",
     "is_all_whitespace",
     "starts_with",
+    "starts_with_at",
     "ends_with",
     "len",
     "push",

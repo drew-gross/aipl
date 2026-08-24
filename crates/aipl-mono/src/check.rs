@@ -2816,16 +2816,22 @@ impl Cx<'_> {
                 );
             }
         }
-        // `s.starts_with(p)` / `s.ends_with(p)` / `s.contains(n)`: the
-        // pattern/needle is variadic, so it accepts the sequence, a single
-        // element, or an optional element. A `str` receiver takes a `char*`
-        // pattern (a `str`, a `char`, or a `char?`); a `T[]` receiver takes a
-        // `T*` pattern (a `T[]`, a `T`, or a `T?`). Fully dispatched here
-        // rather than through the generic signature.
+        // `s.starts_with(p)` / `s.ends_with(p)` / `s.contains(n)` /
+        // `s.starts_with_at(p, i)`: the pattern/needle is variadic, so it
+        // accepts the sequence, a single element, or an optional element. A
+        // `str` receiver takes a `char*` pattern (a `str`, a `char`, or a
+        // `char?`); a `T[]` receiver takes a `T*` pattern (a `T[]`, a `T`, or a
+        // `T?`). Fully dispatched here rather than through the generic
+        // signature. `starts_with_at` carries one extra argument, the offset to
+        // match at — a slice bound in every respect, so it is checked as one.
+        let at_arity = usize::from(name == "__builtin_starts_with_at");
         if matches!(
             name,
-            "__builtin_starts_with" | "__builtin_ends_with" | "__builtin_contains"
-        ) && args.len() == 2
+            "__builtin_starts_with"
+                | "__builtin_ends_with"
+                | "__builtin_contains"
+                | "__builtin_starts_with_at"
+        ) && args.len() == 2 + at_arity
         {
             let recv = self.check_expr(&args[0], env, effects)?;
             let pat = self.check_expr(&args[1], env, effects)?;
@@ -2855,6 +2861,13 @@ impl Cx<'_> {
                         ),
                         args[1].span.clone(),
                     ));
+                }
+                // `starts_with_at`'s offset: the same operand a slice start is,
+                // checked the same way so `xs[i..].starts_with(p)` and its fused
+                // form accept exactly the same `i`.
+                if at_arity == 1 {
+                    let at = self.check_expr(&args[2], env, effects)?;
+                    expect_len_operand(&at, "starts_with_at offset", args[2].span.clone())?;
                 }
                 return Ok(Type::Primitive(Primitive::Bool));
             }

@@ -2689,15 +2689,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 21061
-deallocations: 21061
+allocations: 21003
+deallocations: 21003
 reallocations: 880
-bytes allocated: 1031402
-instructions executed: 2866808
-binary size: 3115280
-  code: 1781792
+bytes allocated: 1029546
+instructions executed: 2866526
+binary size: 3114656
+  code: 1781452
   data: 26620
-  metadata: 1306868
+  metadata: 1306584
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2917,7 +2917,7 @@ functions:
     bytes: 2112
   __m9__between_len:
     calls: 49
-    bytes: 744
+    bytes: 676
   __m9__delimited_len:
     calls: 96
     bytes: 1416
@@ -2938,16 +2938,16 @@ functions:
     bytes: 22620
   __m9__nested_len:
     calls: 84
-    bytes: 1044
+    bytes: 940
   __m9__step_result$__m8__AiplTok:
     calls: 3454
     bytes: 12068
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2772
+    bytes: 2672
   __m9__template_step$__m8__AiplTok:
     calls: 94
-    bytes: 556
+    bytes: 488
   __map55$own0:
     calls: 0
     bytes: 320
@@ -3018,10 +3018,10 @@ functions:
     calls: 200
     bytes: (external)
   aipl_dec:
-    calls: 94946
+    calls: 94794
     bytes: (external)
   aipl_inc:
-    calls: 75072
+    calls: 75014
     bytes: (external)
   aipl_rec_alloc:
     calls: 5991
@@ -3063,19 +3063,22 @@ functions:
     calls: 254
     bytes: (external)
   aipl_str_len:
-    calls: 31428
+    calls: 31334
     bytes: (external)
   aipl_str_repeat:
     calls: 74
     bytes: (external)
   aipl_str_slice:
-    calls: 8561
+    calls: 8467
     bytes: (external)
   aipl_str_split:
     calls: 942
     bytes: (external)
   aipl_str_starts_with:
-    calls: 3202
+    calls: 3108
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 94
     bytes: (external)
   aipl_test_begin:
     calls: 3

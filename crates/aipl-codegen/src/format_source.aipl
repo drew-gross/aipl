@@ -70,15 +70,15 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 2208
-deallocations: 2208
+allocations: 2204
+deallocations: 2204
 reallocations: 6
-bytes allocated: 101329
-instructions executed: 326806
-binary size: 863000
-  code: 527920
+bytes allocated: 101201
+instructions executed: 326734
+binary size: 862376
+  code: 527580
   data: 2508
-  metadata: 332572
+  metadata: 332288
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -232,7 +232,7 @@ functions:
     bytes: 2112
   __m13__between_len:
     calls: 12
-    bytes: 744
+    bytes: 676
   __m13__delimited_len:
     calls: 24
     bytes: 1416
@@ -253,16 +253,16 @@ functions:
     bytes: 22620
   __m13__nested_len:
     calls: 18
-    bytes: 1044
+    bytes: 940
   __m13__step_result$__m12__AiplTok:
     calls: 816
     bytes: 12068
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2772
+    bytes: 2672
   __m13__template_step$__m12__AiplTok:
     calls: 24
-    bytes: 556
+    bytes: 488
   __m14__unescape:
     calls: 0
     bytes: 892
@@ -663,10 +663,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 10245
+    calls: 10217
     bytes: (external)
   aipl_inc:
-    calls: 8403
+    calls: 8399
     bytes: (external)
   aipl_rec_alloc:
     calls: 100
@@ -705,16 +705,19 @@ functions:
     calls: 11
     bytes: (external)
   aipl_str_len:
-    calls: 3820
+    calls: 3796
     bytes: (external)
   aipl_str_slice:
-    calls: 993
+    calls: 969
     bytes: (external)
   aipl_str_split:
     calls: 25
     bytes: (external)
   aipl_str_starts_with:
-    calls: 767
+    calls: 743
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 24
     bytes: (external)
   aipl_test_begin:
     calls: 2

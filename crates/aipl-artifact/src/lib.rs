@@ -375,9 +375,11 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_write_i64"
         | "aipl_write_u64"
         | "aipl_write_string_to_file" => sig(2, true),
-        "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" | "aipl_str_slice" => {
-            sig(3, true)
-        }
+        "aipl_write_bytes"
+        | "aipl_array_new"
+        | "aipl_array_with_cap"
+        | "aipl_str_slice"
+        | "aipl_str_starts_with_at" => sig(3, true),
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
             sig(4, true)
         }

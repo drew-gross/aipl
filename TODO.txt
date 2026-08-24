@@ -123,7 +123,6 @@ lint:
   mut out = a; set out.mutating_method(b); foo(out) should just be foo(out.mutating_method(b))
 
 Spreading:
-  spreading (Foo { a: 1, b: 2, ..some_foo(), d: 4 })
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
   optimize the bit packed and rope representations as well
 
@@ -197,11 +196,6 @@ optimizations:
     D1. Sets and dicts are linear scans. aipl_set_contains (:2614) and dict_find (:2751) walk every element, so building an n-element set or dict is O(n²). There's already an FNV-1a hash (:2600) and a comment at :9584 anticipating "the eventual hash-dict/set use case" — this is the largest asymptotic win available to user programs.
 
     D2. aipl_arr_reserve only reuses in place at rc == 1 (:2201) — correct, but worth checking how often the corpus's push loops actually hit the fast path versus copying each time.
-
-    E. The dogfooded AIPL itself
-
-    E1. self[i..].starts_with(needle) inside byte loops allocates a view per character. crates/aipl-codegen/src/lexer.aipl:345, 367, 371, 653 and src[i..step.end] == "{" at :770. aipl_str_slice (:1131) copies for ≤7 bytes but allocates a 32-byte view block plus a retain for larger heap slices — so scanning for a delimiter allocates O(n) views. A starts_with_at(self, i, needle) builtin (no slice) removes it. This is likely most of lexer.aipl's 1678 allocations, and it runs on every raw string and comment in every compile.
-    - My note: This seems like a prime case for operation fusion
 
     F. Worth a look, lower confidence
 

@@ -1236,15 +1236,15 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1678
-deallocations: 1678
+allocations: 1638
+deallocations: 1638
 reallocations: 0
-bytes allocated: 79768
-instructions executed: 279218
-binary size: 1798984
-  code: 1129960
+bytes allocated: 78488
+instructions executed: 278798
+binary size: 1798376
+  code: 1129620
   data: 8132
-  metadata: 660892
+  metadata: 660624
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1418,10 +1418,10 @@ functions:
     calls: 29
     bytes: (external)
   aipl_dec:
-    calls: 7285
+    calls: 7105
     bytes: (external)
   aipl_inc:
-    calls: 6134
+    calls: 6094
     bytes: (external)
   aipl_str_contains:
     calls: 325
@@ -1439,13 +1439,16 @@ functions:
     calls: 131
     bytes: (external)
   aipl_str_len:
-    calls: 2615
+    calls: 2475
     bytes: (external)
   aipl_str_slice:
-    calls: 842
+    calls: 702
     bytes: (external)
   aipl_str_starts_with:
-    calls: 305
+    calls: 165
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 140
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1458,7 +1461,7 @@ functions:
     bytes: (external)
   between_len:
     calls: 3
-    bytes: 744
+    bytes: 676
   checked_seg:
     calls: 2
     bytes: 1700
@@ -1491,7 +1494,7 @@ functions:
     bytes: 68
   nested_len:
     calls: 3
-    bytes: 1044
+    bytes: 940
   nonempty_str:
     calls: 2
     bytes: 1684
@@ -1503,10 +1506,10 @@ functions:
     bytes: 15384
   template_scan$Kind:
     calls: 16
-    bytes: 2772
+    bytes: 2672
   template_step$Kind:
     calls: 27
-    bytes: 556
+    bytes: 488
   toks:
     calls: 43
     bytes: 128

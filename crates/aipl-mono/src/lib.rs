@@ -4738,15 +4738,19 @@ impl Mono<'_> {
                         Type::Primitive(Primitive::I64)
                     };
                     (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
-                } else if matches!(
+                } else if (matches!(
                     name.as_str(),
                     "__builtin_starts_with" | "__builtin_ends_with" | "__builtin_contains"
-                ) && atys.len() == 2
+                ) && atys.len() == 2)
+                    || (name.as_str() == "__builtin_starts_with_at" && atys.len() == 3)
                 {
-                    // The variadic pattern of `starts_with`/`ends_with`/`contains`
-                    // is resolved by shape into a distinct builtin (codegen
+                    // The variadic pattern of
+                    // `starts_with`/`starts_with_at`/`ends_with`/`contains` is
+                    // resolved by shape into a distinct builtin (codegen
                     // implements each): a `str` receiver takes a `char*` pattern,
-                    // an array a `T*` one.
+                    // an array a `T*` one. `starts_with_at`'s trailing offset is
+                    // an ordinary integer argument and plays no part in the
+                    // shape.
                     let seq_ty = if is_str_repr(&atys[0]) {
                         Type::Primitive(Primitive::Str)
                     } else {

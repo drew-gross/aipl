@@ -1,0 +1,95 @@
+import { less_than as <, print, push, starts_with, to_str, wrapping_increment as ++ } from builtins;
+
+// Fusion is refused when it would change what the program does — and the two
+// reasons are different in kind.
+//
+// An effect anywhere in the expression: fusing reorders the evaluation around
+// the traversal (a slice bound moves behind the remaining arguments), and an
+// effect *is* the observable behaviour, so the pass declines and the ordinary
+// slice-then-test runs.
+//
+// A bounded slice: `xs[i..j]` is a different receiver — its end truncates it —
+// so `starts_with_at`, which always runs to the end of `xs`, would answer a
+// different question. The second line below is exactly that difference: a
+// three-element pattern that doesn't fit in the two-element slice, but does fit
+// in the array behind it.
+fn many() -> i64[] {
+    mut xs = [7];
+    mut i: u64 = 0;
+    while (i < 200) {
+        set xs.push(7);
+        set i++;
+    }
+    xs
+}
+
+// The offset is computed by something that prints, so the call it appears in
+// cannot be fused.
+fn noisy_offset() !prints -> u64 {
+    print("offset");
+    1
+}
+
+fn main() !prints {
+    // Not fused: `noisy_offset()` prints. The tail is copied as usual.
+    print(many()[noisy_offset()..].starts_with([7, 7]).to_str());
+
+    // Not fused: the slice is bounded. Fusing would drop the bound and report
+    // `true` for a pattern that does not fit in the two elements sliced.
+    print(many()[1..3].starts_with([7, 7, 7]).to_str());
+    // Fused: same shape, pure offset, open-ended.
+    print(many()[1..].starts_with([7, 7]).to_str());
+}
+--- stdout ---
+offset
+true
+false
+true
+
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 24
+bytes allocated: 1952
+instructions executed: 16765
+binary size: 3464
+  code: 1844
+  data: 47
+  metadata: 1573
+functions:
+  __to_str_bool:
+    calls: 3
+    bytes: 212
+  aipl_arr_inc:
+    calls: 3
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 11
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 600
+    bytes: (external)
+  aipl_dec:
+    calls: 7
+    bytes: (external)
+  aipl_inc:
+    calls: 3
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1436
+  many:
+    calls: 3
+    bytes: 196

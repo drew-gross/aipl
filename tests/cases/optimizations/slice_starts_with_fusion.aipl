@@ -1,0 +1,116 @@
+import { less_than as <, print, push, starts_with, to_str, wrapping_increment as ++ } from builtins;
+
+// Operation fusion: `xs[i..].starts_with(p)` collapses into `starts_with_at`,
+// which compares in place from `i` rather than building the tail first and then
+// looking at its first few elements.
+//
+// The slice is the expensive half. An array slice allocates a fresh block and
+// copies every remaining element; a str slice allocates a view that has to be
+// refcounted and dropped. Neither is ever read past `p`'s length.
+//
+// Measured on this case with the fusion switched off: 16 allocations totalling
+// 3,880 bytes become 8 totalling 360 — mostly the 200-element copy `many()[1..]`
+// makes, twice over. `instructions executed` barely moves (12,127 -> 12,082),
+// because it counts a call into the runtime as one instruction however much work
+// it does, and `aipl_arr_slice` is where the copying happens. The `functions:`
+// list below is the readable evidence: no slice call survives.
+fn many() -> i64[] {
+    mut xs = [7];
+    mut i: u64 = 0;
+    while (i < 200) {
+        set xs.push(7);
+        set i++;
+    }
+    xs
+}
+
+fn main() !prints {
+    // Decided by two elements, not by copying the other 200.
+    print(many()[1..].starts_with([7, 7]).to_str());
+    print(many()[1..].starts_with([1, 2]).to_str());
+
+    // A str receiver: no view is built for the tail.
+    let s = "hello, world!";
+    print(s[7..].starts_with("wor").to_str());
+    print(s[7..].starts_with("hello").to_str());
+
+    // Every pattern shape fuses — the sequence, a single element, an optional.
+    print(s[7..].starts_with('w').to_str());
+    print(s[7..].starts_with(some('w')).to_str());
+    print(s[7..].starts_with(none).to_str());
+    let xs = [1, 2, 3, 4];
+    print(xs[2..].starts_with([3, 4]).to_str());
+    print(xs[2..].starts_with(3).to_str());
+    print(xs[2..].starts_with(some(3)).to_str());
+    print(xs[2..].starts_with(none).to_str());
+
+    // An offset past the end clamps exactly as the slice does: nothing is left
+    // there, so only the empty pattern matches.
+    print(xs[9..].starts_with([1]).to_str());
+    print(xs[9..].starts_with([]).to_str());
+}
+--- stdout ---
+true
+false
+true
+false
+true
+true
+true
+true
+true
+true
+true
+false
+true
+
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 16
+bytes allocated: 360
+instructions executed: 12082
+binary size: 6256
+  code: 3784
+  data: 79
+  metadata: 2393
+functions:
+  __to_str_bool:
+    calls: 13
+    bytes: 212
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 10
+    bytes: (external)
+  aipl_array_new:
+    calls: 8
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 400
+    bytes: (external)
+  aipl_dec:
+    calls: 34
+    bytes: (external)
+  aipl_inc:
+    calls: 14
+    bytes: (external)
+  aipl_print:
+    calls: 13
+    bytes: (external)
+  aipl_str_len:
+    calls: 8
+    bytes: (external)
+  aipl_str_starts_with_at:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 13
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3376
+  many:
+    calls: 2
+    bytes: 196
