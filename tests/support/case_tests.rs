@@ -340,6 +340,7 @@ case_tests! {
     cases_optimizations_const_fold_saturating = "cases/optimizations/const_fold_saturating",
     cases_optimizations_count_fusion = "cases/optimizations/count_fusion",
     cases_optimizations_count_fusion_effects = "cases/optimizations/count_fusion_effects",
+    cases_optimizations_inline_mutating_method = "cases/optimizations/inline_mutating_method",
     cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",
     cases_optimizations_slice_starts_with_fusion = "cases/optimizations/slice_starts_with_fusion",
     cases_optimizations_slice_starts_with_fusion_effects = "cases/optimizations/slice_starts_with_fusion_effects",

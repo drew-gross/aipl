@@ -6307,8 +6307,8 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
 /// Inline every single-use private function in `program` and drop it. Returns the
 /// rewritten program (a clone, unchanged when the gate below fails). Conservative
 /// (see `is_inline_candidate`): only direct, exactly-once, exact-arity calls to
-/// non-`pub`, non-generic, non-higher-order, non-mutating, `return`/`?`-free,
-/// non-recursive functions are inlined. Repeats to a fixpoint, since inlining
+/// non-`pub`, non-generic, non-higher-order, `return`/`?`-free, non-recursive
+/// functions are inlined. Repeats to a fixpoint, since inlining
 /// `f` into `g` can make `g` itself single-use.
 pub fn inline_single_use(program: &Program) -> Program {
     let has_fn = |n: &str| {
@@ -6340,11 +6340,15 @@ pub fn inline_single_use(program: &Program) -> Program {
 
         // Replace the single `Call(f, ..)` (it lives in exactly one body — `f`'s
         // name is never shadowed, see the `binders` guard).
-        let fparam_names: Vec<(String, Type)> = f
+        let fparam_names: Vec<InlineParam> = f
             .sig
             .params
             .iter()
-            .map(|p| (p.name.clone(), p.ty.clone()))
+            .map(|p| InlineParam {
+                name: p.name.clone(),
+                ty: p.ty.clone(),
+                mutable: p.mutable,
+            })
             .collect();
         let mut replaced = false;
         for it in &mut program.items {
@@ -6404,10 +6408,14 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             .cloned();
         let Some(f) = candidate else { break };
 
-        let fparam_names: Vec<(String, Type)> = f
+        let fparam_names: Vec<InlineParam> = f
             .params
             .iter()
-            .map(|p| (p.name.clone(), p.ty.clone()))
+            .map(|p| InlineParam {
+                name: p.name.clone(),
+                ty: p.ty.clone(),
+                mutable: p.mutable,
+            })
             .collect();
         let mut replaced = false;
         for g in &mut program.fns {
@@ -6555,7 +6563,6 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                             .params
                             .iter()
                             .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
-                        f.sig.is_mutating(),
                         &f.body,
                         &f.name,
                     ) =>
@@ -6567,11 +6574,15 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
         .collect();
 
     for f in candidates {
-        let fparams: Vec<(String, Type)> = f
+        let fparams: Vec<InlineParam> = f
             .sig
             .params
             .iter()
-            .map(|p| (p.name.clone(), p.ty.clone()))
+            .map(|p| InlineParam {
+                name: p.name.clone(),
+                ty: p.ty.clone(),
+                mutable: p.mutable,
+            })
             .collect();
         let mut replaced = false;
         for it in &mut program.items {
@@ -6641,7 +6652,6 @@ fn is_inline_candidate(
         && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
         && is_inline_shape(
             f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
-            f.sig.is_mutating(),
             &f.body,
             &f.name,
         )
@@ -6649,21 +6659,20 @@ fn is_inline_candidate(
 
 /// The shape checks shared by [`is_inline_candidate`] and
 /// [`is_inline_candidate_mono`]: not a higher-order template (those resolve via
-/// mono), not a mutating method, and the body has no early exit, no
-/// context-typed literal, no in-place HOF intrinsic, and no self-reference. The
-/// pre-mono caller additionally folds "or variadic" into `higher_order_or_variadic`
-/// — variadic resolution is also a mono job — but the post-mono [`ConcreteParam`]
-/// has no `variadic` field to check (`specialize_variadic` has already resolved
-/// every parameter by the time a [`ConcreteFn`] exists), so its caller passes
-/// just the higher-order check.
-fn is_inline_shape(
-    higher_order_or_variadic: bool,
-    mutating: bool,
-    body: &Expr,
-    name: &str,
-) -> bool {
+/// mono), and the body has no early exit, no in-place HOF intrinsic, and no
+/// self-reference. The pre-mono caller additionally folds "or variadic" into
+/// `higher_order_or_variadic` — variadic resolution is also a mono job — but the
+/// post-mono [`ConcreteParam`] has no `variadic` field to check
+/// (`specialize_variadic` has already resolved every parameter by the time a
+/// [`ConcreteFn`] exists), so its caller passes just the higher-order check.
+///
+/// A mutating method is *not* excluded. It used to be, because binding its
+/// `mut self` receiver with a plain `let` and taking the body's (void) value
+/// would have produced nonsense; [`build_inlined`] now binds that receiver
+/// `mut` and yields it, which is what a call to such a method means in either
+/// position it can appear.
+fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr, name: &str) -> bool {
     !higher_order_or_variadic
-        && !mutating
         && !contains_early_exit(body)
         && !contains_inplace_hof_intrinsic(body)
         && !references_name(body, name)
@@ -6701,7 +6710,6 @@ fn is_inline_candidate_mono(
         && !binders.contains(&f.name)
         && is_inline_shape(
             f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))),
-            f.is_mutating(),
             &f.body,
             &f.name,
         )
@@ -6941,7 +6949,7 @@ fn references_name(e: &Expr, name: &str) -> bool {
 fn replace_call(
     e: &Expr,
     fname: &str,
-    fparams: &[(String, Type)],
+    fparams: &[InlineParam],
     fbody: &Expr,
     counter: &mut usize,
     replaced: &mut bool,
@@ -7085,6 +7093,18 @@ fn replace_call(
     Expr::rebuilt(kind, e)
 }
 
+/// One parameter of the function being inlined — what [`build_inlined`] needs in
+/// order to bind it at the call site.
+struct InlineParam {
+    name: String,
+    ty: Type,
+    /// The `mut self` receiver of a mutating method. Only the *first* parameter
+    /// can ever carry this: the checker rejects `mut` on a parameter that isn't
+    /// the first, and on one not named `self`. It binds with `mut` rather than
+    /// `let`, and it is what the call produces — see [`build_inlined`].
+    mutable: bool,
+}
+
 /// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
 /// parameter to its argument via a `let`, in order, wrapping `f`'s body. Renaming
 /// the parameters to `$inl<N>_<name>` is required for correctness — an argument
@@ -7092,7 +7112,7 @@ fn replace_call(
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
 fn build_inlined(
-    fparams: &[(String, Type)],
+    fparams: &[InlineParam],
     fbody: &Expr,
     args: &[Expr],
     span: Span,
@@ -7101,15 +7121,40 @@ fn build_inlined(
     let mut map: HashMap<String, String> = HashMap::new();
     let fresh: Vec<String> = fparams
         .iter()
-        .map(|(pname, _)| {
-            let nm = format!("$inl{}_{}", *counter, pname);
+        .map(|p| {
+            let nm = format!("$inl{}_{}", *counter, p.name);
             *counter += 1;
-            map.insert(pname.clone(), nm.clone());
+            map.insert(p.name.clone(), nm.clone());
             nm
         })
         .collect();
     let mut expr = rename_params(fbody, &map);
-    for ((fp, (_, pty)), arg) in fresh.iter().zip(fparams).zip(args).rev() {
+
+    // A mutating method is declared void and mutates its receiver; what a call
+    // to it *produces* is that receiver, which is why its ABI return is the
+    // receiver's type (see `ConcreteFn::abi_return_type`). Its body therefore
+    // ends having assigned to the binding rather than having produced anything,
+    // so the inlined form has to name the binding afterwards to yield a value.
+    //
+    // The same shape is correct in both positions a mutating call can occupy,
+    // which is what makes this safe to do in one place:
+    //
+    //   * `set v.f(a)` parses to `set v = v.f(a)`, so the value lands back in
+    //     `v` — an in-place update, spelled as a copy the enclosing assignment
+    //     immediately writes back.
+    //   * In value position it is copy-and-modify (mono's desugar, or the
+    //     source as written pre-mono): the receiver was copied into this fresh
+    //     `mut` binding, so mutating it leaves the caller's own binding alone —
+    //     exactly what a value-position mutating call means.
+    if fparams.first().is_some_and(|p| p.mutable) {
+        let receiver = Expr::new(ExprKind::Ident(fresh[0].clone()), span.clone());
+        expr = Expr::new(
+            ExprKind::Seq(Box::new(expr), Box::new(receiver)),
+            span.clone(),
+        );
+    }
+
+    for ((fp, p), arg) in fresh.iter().zip(fparams).zip(args).rev() {
         // The binding carries the *parameter's* declared type, not whatever the
         // argument inferred. It matters for a narrow int: inlining `add8(100,
         // 50)` for `fn add8(a: i8, b: i8)` would otherwise bind two `i64`
@@ -7117,15 +7162,16 @@ fn build_inlined(
         // wrapping at 8. (Latent until integer conversions were removed —
         // arguments used to be written `i8(100)`, which carried the type
         // themselves.)
-        expr = Expr::new(
-            ExprKind::Let(
-                fp.clone(),
-                Some(pty.clone()),
-                Box::new(arg.clone()),
-                Box::new(expr),
-            ),
-            span.clone(),
-        );
+        let ty = Some(p.ty.clone());
+        let (init, body) = (Box::new(arg.clone()), Box::new(expr));
+        // A `mut self` receiver needs a reassignable binding, since the body it
+        // wraps is nothing but assignments to it.
+        let kind = if p.mutable {
+            ExprKind::LetMut(fp.clone(), ty, init, body)
+        } else {
+            ExprKind::Let(fp.clone(), ty, init, body)
+        };
+        expr = Expr::new(kind, span.clone());
     }
     expr
 }
@@ -7227,10 +7273,15 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                 })
                 .collect(),
         ),
-        // An `Assign` LHS is rooted at a `mut` local (parameters are
-        // immutable), so it never names a mapped parameter — keep it.
+        // The LHS is a place expression — a bare ident, or a field chain rooted
+        // at one. It used to be left alone on the grounds that it is rooted at a
+        // `mut` local and parameters are immutable, but a mutating method's
+        // `mut self` *is* a parameter: its body is a run of `set self... `, and
+        // leaving those unrenamed would assign to a binding the inlined
+        // expression never introduced. Renaming it is right either way — a
+        // caller-side local is simply absent from the map.
         ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
-            lhs.clone(),
+            Box::new(rename_params(lhs, map)),
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, map)),
         ),
