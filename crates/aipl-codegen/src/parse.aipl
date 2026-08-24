@@ -1,0 +1,1330 @@
+// The parser driver: one function that interprets a `Grammar` (see
+// `grammar.aipl`) over a token stream (see `lexer.aipl`) and yields a lossless
+// `Cst` (see `cst.aipl`), plus a second pass that lowers that tree to the
+// caller's own AST through each production's `build`. Together they are the
+// upper half of a front end whose lower half is already data-driven: a language
+// is a `TokenRule[]` and a `Grammar`, and nothing else.
+//
+// **PEG, not LR.** `OneOf` commits to its first matching alternative, so a
+// grammar is unambiguous by construction and a failed alternative simply
+// backtracks. Two consequences the driver has to handle, and does:
+//
+//   - *Left recursion does not work.* `expr -> expr "+" term` would call itself
+//     at the same position forever. Binary operators are spelled with `Climb`
+//     instead, which is why that rule exists.
+//   - *Errors need furthest-failure tracking.* Backtracking throws away the
+//     position where a parse got the furthest, which is nearly always where the
+//     mistake is. Every rule threads a `Far` — the deepest position anything was
+//     expected at, and the set of things expected there — through both success
+//     and failure, so the reported error is the deepest one, not the last.
+//
+// **Two passes, not one.** `parse_cst` builds the tree; `lower` walks it calling
+// `build`. Lowering during the parse would run a production's `build` inside
+// speculative alternatives that then backtrack — wasted allocation at best, and
+// at worst a `build` that legitimately fails aborting a parse that should simply
+// have tried the next alternative. `parse` is the two in sequence.
+//
+// Costs worth knowing before this drives something large: trivia is attached by
+// scanning the trivia list for each consumed token, so a parse is O(tokens ×
+// trivia); and with no memoization a heavily-backtracking grammar can be
+// exponential. Both are answered later in the plan — FIRST sets (Stage 2) remove
+// most backtracking — and neither matters at the sizes here.
+import {
+    contains,
+    count_while,
+    drop_last,
+    equal as ==,
+    first,
+    is_nonempty,
+    join,
+    last,
+    len,
+    less_than as <,
+    less_than_or_equal as <=,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    push,
+    same_case,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_sub as -,
+} from builtins;
+import { CLeaf, CTree, CTrivia, Cst, cst_show, cst_span, cst_text, is_tree } from "./cst.aipl";
+import {
+    Climb,
+    Grammar,
+    ListOf,
+    Many,
+    Maybe,
+    Mk,
+    Named,
+    NamedIdx,
+    OneOf,
+    ParseError,
+    Prec,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+    link,
+    many,
+    many1,
+    name_index,
+    prod_names,
+} from "./grammar.aipl";
+import { Bare, CharRun, LexResult, Of, ToEol, Token, TokenRule, lex } from "./lexer.aipl";
+
+// The furthest failure seen so far: the token position nothing could be matched
+// at, and the deduped labels of everything that *was* expected there.
+//
+// This is the reified form of what an LR table gives you for free — the state's
+// expected-symbol set — and it is why `Production.expect_as` exists: under
+// ordered choice a more specific alternative can fail deeper than the one that
+// was really meant, so a label collapsing a family of rules to one word ("an
+// expression") is what keeps the message readable.
+struct Far { pos: u64, expected: str[] }
+
+// One rule's result at one position: whether it matched, where it left off, the
+// CST children it contributed to its parent, and the furthest failure so far.
+//
+// `hit: false` is an ordinary non-match — the caller backtracks and tries
+// something else — and is *not* an error. A `ParseError` is reserved for what no
+// alternative could fix: a malformed grammar, or a `build` that refused.
+struct Step { hit: bool, pos: u64, kids: Cst[], far: Far }
+
+// What the driver parses against: the source (rule spellings and lowering both
+// need the text behind a span), the tokens, the trivia the lexer set aside, and
+// the linked productions.
+struct Parser<K: variant, A: any> {
+    src: str,
+    toks: Token<K>[],
+    trivia: Token<K>[],
+    prods: Production<K, A>[],
+}
+
+// `far` updated with "`label` was expected at `pos`". Deeper wins outright;
+// equally deep joins the expected set (deduped); shallower is discarded. An
+// empty label is a *transparent* production and records nothing.
+fn far_miss(far: Far, pos: u64, label: str) -> Far {
+    if (!label.is_nonempty() || pos < far.pos) {
+        return far;
+    };
+    if (far.pos < pos) {
+        return Far { pos, expected: [label] };
+    };
+    if (far.expected.contains(label)) {
+        return far;
+    };
+    mut ex: str[] = [];
+    for (let e : far.expected) {
+        set ex.push(e);
+    }
+    set ex.push(label);
+    Far { pos, expected: ex }
+}
+
+// A non-match that leaves `pos` where the rule started (the caller backtracks).
+fn no(far: Far, pos: u64) -> Step { hit: false, pos, kids: [], far }
+
+// A non-match that also records what was expected.
+fn miss(far: Far, pos: u64, label: str) -> Step { no(far_miss(far, pos, label), pos) }
+
+// The source text of token `i`, or `""` past the end. Empty is a safe sentinel
+// because no matcher in `lexer.aipl` ever produces an empty token.
+fn tok_text<K: variant, A: any>(p: Parser<K, A>, i: u64) -> str {
+    match (p.toks[i]) {
+        some(t) => p.src[t.span],
+        none => "",
+    }
+}
+
+// Where token `i - 1` ended — the start of the run of trivia that belongs in
+// front of token `i`. Derived from the token positions rather than remembered,
+// so backtracking can't leave it stale: re-consuming a token re-attaches exactly
+// the same trivia.
+fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64) -> u64 {
+    if (i == 0) {
+        return 0;
+    };
+    match (p.toks[i - 1]) {
+        some(t) => t.span.end,
+        none => 0,
+    }
+}
+
+// The CST children consuming token `i` contributes: every trivia record between
+// the previous token and this one, then the token's own leaf. Attaching trivia
+// *before* its following token is what makes the leaf spans tile the source with
+// no gaps, which is the whole losslessness property.
+fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
+    match (p.toks[i]) {
+        some(t) => {
+            let start = prev_end(p, i);
+            mut out: Cst[] = [];
+            for (let tr : p.trivia) {
+                if (start <= tr.span.start && tr.span.start < t.span.start) {
+                    set out.push(CTrivia(tr.span));
+                };
+            }
+            set out.push(CLeaf(t.span));
+            out
+        },
+        none => [],
+    }
+}
+
+// The trivia after the last token — a trailing comment or newline, which no
+// token consumption can pick up. Appended to the root node so the tree still
+// covers the source to its last byte.
+fn trailing_trivia<K: variant, A: any>(p: Parser<K, A>) -> Cst[] {
+    let start = prev_end(p, p.toks.len());
+    mut out: Cst[] = [];
+    for (let tr : p.trivia) {
+        if (start <= tr.span.start) {
+            set out.push(CTrivia(tr.span));
+        };
+    }
+    out
+}
+
+fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
+    match (root) {
+        CTree(i, kids) => {
+            mut out: Cst[] = [];
+            for (let k : kids) {
+                set out.push(k);
+            }
+            for (let k : trailing_trivia(p)) {
+                set out.push(k);
+            }
+            CTree(i, out)
+        },
+        CLeaf(sp) => CLeaf(sp),
+        CTrivia(sp) => CTrivia(sp),
+    }
+}
+
+// A token kind's name, for an error's expected set: `to_str` of a kind renders
+// as `Name("x")`, and the constructor alone is what a reader wants. Generic over
+// `K` because the driver is — it cannot name a language's kinds, only render one.
+fn kind_label<K: variant>(k: K) -> str {
+    let s = k.to_str();
+    s[..s.count_while(|c| c != '(')]
+}
+
+fn quoted(s: str) -> str {
+    let q = "`";
+    `{q}{s}{q}`
+}
+
+// ---------- the rules ----------
+
+// Match `r` at `pos`. `cur` is the index of the production being matched, which
+// only `Climb` needs (each operator application nests under it).
+fn match_rule<K: variant, A: any>(
+    p: Parser<K, A>,
+    r: Rule<K>,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    match (r) {
+        Term(k) => ok(match_term(p, k, pos, far)),
+        Spelling(s) => ok(match_spelling(p, s, pos, far)),
+        Then(rs) => match_then(p, rs, pos, cur, far),
+        OneOf(rs) => match_one_of(p, rs, pos, cur, far),
+        Many(sub, min) => match_many(p, sub, min, pos, cur, far),
+        Maybe(sub) => match_maybe(p, sub, pos, cur, far),
+        NamedIdx(i) => match_prod(p, i, pos, far),
+        ListOf(item, sep, trailing) => match_list_of(p, item, sep, trailing, pos, cur, far),
+        Climb(atom, precs) => match_climb(p, atom, precs, pos, cur, far),
+        // `link` rewrites every one of these; reaching one means the grammar was
+        // handed to the driver unlinked, which `parse_cst` makes impossible.
+        Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
+    }
+}
+
+// Any one token whose kind shares `k`'s constructor — the payload is ignored, so
+// `Term(Name(""))` matches every identifier.
+fn match_term<K: variant, A: any>(p: Parser<K, A>, k: K, pos: u64, far: Far) -> Step {
+    match (p.toks[pos]) {
+        some(t) => if (t.kind.same_case(k)) {
+            Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
+        } else {
+            miss(far, pos, kind_label(k))
+        },
+        none => miss(far, pos, kind_label(k)),
+    }
+}
+
+// One token spelled exactly `s`.
+fn match_spelling<K: variant, A: any>(p: Parser<K, A>, s: str, pos: u64, far: Far) -> Step {
+    if (pos < p.toks.len() && tok_text(p, pos) == s) {
+        Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
+    } else {
+        miss(far, pos, quoted(s))
+    }
+}
+
+// Every rule in order; children concatenate. A failure anywhere rewinds the
+// whole sequence to where it started — the caller decides what to try next.
+fn match_then<K: variant, A: any>(
+    p: Parser<K, A>,
+    rs: Rule<K>[],
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    mut cp = pos;
+    mut acc: Cst[] = [];
+    mut f = far;
+    for (let sub : rs) {
+        let st = match_rule(p, sub, cp, cur, f)?;
+        set f = st.far;
+        if (!st.hit) {
+            return ok(no(f, pos));
+        };
+        set cp = st.pos;
+        for (let k : st.kids) {
+            set acc.push(k);
+        }
+    }
+    ok(Step { hit: true, pos: cp, kids: acc, far: f })
+}
+
+// The first alternative that matches. Every alternative's expectations are kept
+// in `far` whether it matched or not, which is what makes "expected `(`, an
+// identifier, or a number" possible from a choice that failed on all three.
+fn match_one_of<K: variant, A: any>(
+    p: Parser<K, A>,
+    rs: Rule<K>[],
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    mut f = far;
+    for (let sub : rs) {
+        let st = match_rule(p, sub, pos, cur, f)?;
+        set f = st.far;
+        if (st.hit) {
+            return ok(st);
+        };
+    }
+    ok(no(f, pos))
+}
+
+// `sub` until it stops matching, at least `min` times.
+//
+// A rule that can match empty input would repeat forever here, and AIPL has no
+// `break` to escape with — so a zero-width iteration is refused outright, the
+// same invariant `lexer.aipl` keeps by having no matcher accept empty input.
+// It is a grammar bug, reported as one rather than hung on.
+fn match_many<K: variant, A: any>(
+    p: Parser<K, A>,
+    sub: Rule<K>,
+    min: u64,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    mut cp = pos;
+    mut acc: Cst[] = [];
+    mut f = far;
+    mut n: u64 = 0;
+    mut going = true;
+    while (going) {
+        let st = match_rule(p, sub, cp, cur, f)?;
+        set f = st.far;
+        if (st.hit) {
+            if (st.pos == cp) {
+                return err(ParseError {
+                    message: "a repetition matched empty input, which would repeat forever",
+                    span: 0..0,
+                });
+            };
+            set cp = st.pos;
+            for (let k : st.kids) {
+                set acc.push(k);
+            }
+            set n++;
+        } else {
+            set going = false;
+        };
+    }
+    if (n < min) {
+        return ok(no(f, pos));
+    };
+    ok(Step { hit: true, pos: cp, kids: acc, far: f })
+}
+
+// `sub`, or nothing. Always matches — but its expectations still reach `far`, so
+// an optional part that was *started* and then went wrong still reports.
+fn match_maybe<K: variant, A: any>(
+    p: Parser<K, A>,
+    sub: Rule<K>,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let st = match_rule(p, sub, pos, cur, far)?;
+    if (st.hit) {
+        return ok(st);
+    };
+    ok(Step { hit: true, pos, kids: [], far: st.far })
+}
+
+// A reference to production `i` — and the only rule that builds a node. The
+// production's own rule matches, and its children go into one `CTree(i, ..)`.
+//
+// A labelled production that fails *without getting anywhere* reports as its
+// label instead of as the expectations from inside it — the collapse
+// `SYMBOL_DISPLAY_NAMES` performs for the LR parser, where `expr`/`term`/`atom`
+// all render as "expression". It matters more here than there: under ordered
+// choice every alternative of a failed `OneOf` leaves its own expectation
+// behind, so an uncollapsed message lists the grammar's internals.
+//
+// "Without getting anywhere" is the operative test. When the production failed
+// *deeper* than it started, that deeper expectation is the useful one and the
+// label is not applied; when it failed at its own first token, the label
+// replaces what it expected there — but only what *this* production contributed,
+// since the incoming `far` (a sibling alternative's expectations at the same
+// position) is what the label is merged into. A transparent production (empty
+// `expect_as`) never collapses anything: its insides are the message.
+fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!ParseError {
+    match (p.prods[i]) {
+        some(prod) => {
+            let st = match_rule(p, prod.rule, pos, i, far)?;
+            if (st.hit) {
+                return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
+            };
+            if (pos < st.far.pos || !prod.expect_as.is_nonempty()) {
+                return ok(no(st.far, pos));
+            };
+            ok(no(far_miss(far, pos, prod.expect_as), pos))
+        },
+        none => err(ParseError { message: `no production at index {i}`, span: 0..0 }),
+    }
+}
+
+// Zero or more `item`s separated by `sep`. Always matches, because an empty list
+// is a list; a separator with nothing after it is consumed when `trailing` and
+// left alone otherwise, so `[1, 2,]` is either the list or a list followed by a
+// stray comma the enclosing rule then complains about.
+fn match_list_of<K: variant, A: any>(
+    p: Parser<K, A>,
+    item: Rule<K>,
+    sep: str,
+    trailing: bool,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let head = match_rule(p, item, pos, cur, far)?;
+    if (!head.hit) {
+        return ok(Step { hit: true, pos, kids: [], far: head.far });
+    };
+    mut acc: Cst[] = [];
+    for (let k : head.kids) {
+        set acc.push(k);
+    }
+    mut cp = head.pos;
+    mut f = head.far;
+    mut going = true;
+    while (going) {
+        if (cp < p.toks.len() && tok_text(p, cp) == sep) {
+            let sep_kids = leaf_at(p, cp);
+            let st = match_rule(p, item, cp + 1, cur, f)?;
+            set f = st.far;
+            if (st.hit) {
+                for (let k : sep_kids) {
+                    set acc.push(k);
+                }
+                for (let k : st.kids) {
+                    set acc.push(k);
+                }
+                set cp = st.pos;
+            } else {
+                if (trailing) {
+                    for (let k : sep_kids) {
+                        set acc.push(k);
+                    }
+                    set cp++;
+                };
+                set going = false;
+            };
+        } else {
+            set going = false;
+        };
+    }
+    ok(Step { hit: true, pos: cp, kids: acc, far: f })
+}
+
+// The precedence level `text` belongs to, if it binds at least as tightly as
+// `min_power`. Levels are scanned in order, so a spelling listed twice takes the
+// first. The empty string never matches — that is what `tok_text` returns past
+// the end of the tokens, so running out of input simply ends the climb.
+fn find_prec(precs: Prec[], text: str, min_power: u64) -> Prec? {
+    if (!text.is_nonempty()) {
+        return none;
+    };
+    for (let pr : precs) {
+        if (min_power <= pr.power && pr.ops.contains(text)) {
+            return some(pr);
+        };
+    }
+    none
+}
+
+fn match_climb<K: variant, A: any>(
+    p: Parser<K, A>,
+    atom: Rule<K>,
+    precs: Prec[],
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let any_power: u64 = 0;
+    climb(p, atom, precs, pos, any_power, cur, far)
+}
+
+// Precedence climbing: an atom, then any operator binding at least as tightly as
+// `min_power`, whose right-hand side is climbed at one power higher (or the same
+// power, for a right-associative level).
+//
+// Each application nests *both* operands under the enclosing production's index
+// while leaving the outermost one flat, so `match_prod`'s own wrap completes the
+// tree: `1 + 2 * 3` becomes `(expr (expr 1) + (expr (expr 2) * (expr 3)))` — one
+// node per operand, shaped by precedence rather than a flat run the lowering
+// would have to re-parse.
+fn climb<K: variant, A: any>(
+    p: Parser<K, A>,
+    atom: Rule<K>,
+    precs: Prec[],
+    pos: u64,
+    min_power: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let head = match_rule(p, atom, pos, cur, far)?;
+    if (!head.hit) {
+        return ok(head);
+    };
+    mut kids: Cst[] = [];
+    for (let k : head.kids) {
+        set kids.push(k);
+    }
+    mut cp = head.pos;
+    mut f = head.far;
+    mut going = true;
+    while (going) {
+        match (find_prec(precs, tok_text(p, cp), min_power)) {
+            some(pr) => {
+                let op_kids = leaf_at(p, cp);
+                let next_min = if (pr.right) { pr.power } else { pr.power + 1 };
+                let rhs = climb(p, atom, precs, cp + 1, next_min, cur, f)?;
+                set f = rhs.far;
+                if (rhs.hit) {
+                    mut nk: Cst[] = [CTree(cur, kids)];
+                    for (let k : op_kids) {
+                        set nk.push(k);
+                    }
+                    set nk.push(CTree(cur, rhs.kids));
+                    set kids = nk;
+                    set cp = rhs.pos;
+                } else {
+                    // An operator with nothing after it: leave it unconsumed for
+                    // the enclosing rule, which will report it.
+                    set going = false;
+                };
+            },
+            none => {
+                set going = false;
+            },
+        };
+    }
+    ok(Step { hit: true, pos: cp, kids, far: f })
+}
+
+// ---------- errors ----------
+
+// `a`, `a or b`, `a, b, or c` — the Oxford join the LR parser's
+// `friendly_syntax_error` renders its expected set with.
+fn oxford(items: str[]) -> str {
+    let n = items.len();
+    if (n == 0) {
+        return "";
+    };
+    let tail = items.last().value_or("");
+    if (n == 1) {
+        return tail;
+    };
+    if (n == 2) {
+        return `{items.first().value_or("")} or {tail}`;
+    };
+    `{items.drop_last().join(", ")}, or {tail}`
+}
+
+// The error a furthest failure describes: what was expected there, and what was
+// found instead. The span is the offending token's (or the empty span at the end
+// of the source), which is what `caret_block.aipl` renders the underline from.
+fn error_at<K: variant, A: any>(p: Parser<K, A>, far: Far) -> ParseError {
+    let found = if (far.pos < p.toks.len()) {
+        quoted(tok_text(p, far.pos))
+    } else {
+        "end of input"
+    };
+    let span = match (p.toks[far.pos]) {
+        some(t) => t.span,
+        none => p.src.len()..p.src.len(),
+    };
+    if (!far.expected.is_nonempty()) {
+        return ParseError { message: `unexpected {found}`, span };
+    };
+    ParseError { message: `expected {oxford(far.expected)}, found {found}`, span }
+}
+
+// ---------- entry points ----------
+
+pub fn parse_cst<K: variant, A: any>(
+    src: str,
+    lexed: LexResult<K>,
+    g: Grammar<K, A>,
+    start: str,
+) -> Cst!ParseError {
+    let linked: Grammar<K, A> = link(g)?;
+    match (name_index(prod_names(linked), start)) {
+        some(i) => {
+            let p = Parser { src, toks: lexed.tokens, trivia: lexed.trivia, prods: linked.prods };
+            let st = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
+            if (!st.hit) {
+                return err(error_at(p, st.far));
+            };
+            if (st.pos < p.toks.len()) {
+                return err(error_at(p, far_miss(st.far, st.pos, "end of input")));
+            };
+            match (st.kids.first()) {
+                some(root) => ok(with_trailing(p, root)),
+                none => err(ParseError { message: "the start rule built no node", span: 0..0 }),
+            }
+        },
+        none => err(ParseError { message: `no rule named "{start}"`, span: 0..0 }),
+    }
+}.doc("""
+    Parses `src` — already lexed into `lexed` — against grammar `g`, beginning at
+    the production named `start`, and returns the lossless concrete syntax tree.
+
+    `g` is linked here, so it may be handed over unlinked; linking is idempotent,
+    so a caller parsing repeatedly can `link` once and pay nothing again. Every
+    token must be consumed: input left over after the start rule succeeds is an
+    error, not a partial parse.
+
+    Fails with a `ParseError` carrying the span of the offending token — the
+    *furthest* position anything was expected at, not the last one tried — or the
+    empty span at the end of the source when the input simply ran out.
+""")
+
+pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!ParseError {
+    lower_node(src, node, g.prods)
+}.doc("""
+    Lowers a parsed tree to the caller's AST by calling each node's production
+    `build`, depth first: a node's children are lowered before it, and only its
+    *interior* children are passed (`cst_nodes`) — a leaf has no lowered value,
+    and its text is reachable from the node's own span.
+
+    Fails with whatever a `build` refused with, unchanged.
+""")
+
+fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
+    match (node) {
+        CTree(i, kids) => {
+            mut vals: A[] = [];
+            for (let k : kids) {
+                if (k.is_tree()) {
+                    set vals.push(lower_node(src, k, prods)?);
+                };
+            }
+            match (prods[i]) {
+                some(prod) => match (prod.build) {
+                    Mk(f) => f(src, node, vals),
+                },
+                none => err(ParseError {
+                    message: `no production at index {i}`,
+                    span: node.cst_span(),
+                }),
+            }
+        },
+        CLeaf(sp) => err(ParseError { message: "a token leaf has no lowered value", span: sp }),
+        CTrivia(sp) => err(ParseError { message: "trivia has no lowered value", span: sp }),
+    }
+}
+
+pub fn parse<K: variant, A: any>(
+    src: str,
+    lexed: LexResult<K>,
+    g: Grammar<K, A>,
+    start: str,
+) -> A!ParseError { lower(src, parse_cst(src, lexed, g, start)?, g) }.doc("""
+    `parse_cst` followed by `lower`: the source's AST, with the concrete tree
+    built and discarded in between. Use `parse_cst` when the tree itself is the
+    point (a formatter, a highlighter), and this when only the AST is.
+""").test({
+    // ---- Term: any token of a kind, payload ignored ----
+    let r_word: Rule<Tok> = Term(Word(""));
+    let g_word = g_of([one("w", r_word)]);
+    assert(shown("abc", g_word, "w")? == "(w abc)");
+    assert(msg_of("123", g_word, "w") == "expected Word, found `123`");
+    assert(msg_of("", g_word, "w") == "expected Word, found end of input");
+    // Every token must be consumed; a partial parse is an error, not a result.
+    assert(msg_of("a b", g_word, "w") == "expected end of input, found `b`");
+    // A start rule no production answers to.
+    assert(msg_of("a", g_word, "nope") == "no rule named \"nope\"");
+
+    // ---- Spelling: one token by its text ----
+    let r_open: Rule<Tok> = Spelling("(");
+    let g_open = g_of([one("o", r_open)]);
+    assert(shown("(", g_open, "o")? == "(o ()");
+    assert(msg_of("x", g_open, "o") == "expected `(`, found `x`");
+
+    // ---- Then: a sequence, children concatenated ----
+    let r_pair: Rule<Tok> = Then([Term(Word("")), Term(Num(""))]);
+    let g_pair = g_of([one("p", r_pair)]);
+    assert(shown("ab 12", g_pair, "p")? == "(p ab 12)");
+
+    // A failure part-way through rewinds the whole sequence, but the deepest
+    // expectation is what gets reported.
+    assert(msg_of("ab cd", g_pair, "p") == "expected Num, found `cd`");
+
+    // ---- OneOf: ordered choice, and the expected *set* it leaves behind ----
+    let r_atom: Rule<Tok> = OneOf([Term(Word("")), Term(Num("")), Spelling("(")]);
+    let g_atom = g_of([one("a", r_atom)]);
+    assert(shown("x", g_atom, "a")? == "(a x)");
+    assert(shown("7", g_atom, "a")? == "(a 7)");
+    // Three alternatives, three expectations, Oxford-joined.
+    assert(msg_of("]", g_atom, "a") == "expected Word, Num, or `(`, found `]`");
+    // Two joins with "or"; a repeated expectation is deduped, not doubled.
+    let r_dup: Rule<Tok> = OneOf([Term(Word("")), Term(Num("")), Term(Word(""))]);
+    assert(msg_of("]", g_of([one("a", r_dup)]), "a") == "expected Word or Num, found `]`");
+
+    // ---- Many: zero-or-more and one-or-more ----
+    let r_many: Rule<Tok> = many(Term(Word("")));
+    let g_many = g_of([one("m", r_many)]);
+    assert(shown("a b c", g_many, "m")? == "(m a b c)");
+    assert(shown("", g_many, "m")? == "(m)");
+    let r_many1: Rule<Tok> = many1(Term(Word("")));
+    assert(shown("a", g_of([one("m", r_many1)]), "m")? == "(m a)");
+    assert(msg_of("", g_of([one("m", r_many1)]), "m") == "expected Word, found end of input");
+
+    // A rule that can match empty input would repeat forever. It is refused,
+    // not hung on — the driver's counterpart of the lexer's "no matcher matches
+    // empty input" invariant.
+    let r_loop: Rule<Tok> = many(Maybe(Term(Word(""))));
+    assert(
+        msg_of(
+            "x",
+            g_of([one("l", r_loop)]),
+            "l",
+        ) == "a repetition matched empty input, which would repeat forever",
+    );
+
+    // ---- Maybe: present and absent ----
+    let r_opt: Rule<Tok> = Then([Term(Word("")), Maybe(Term(Num("")))]);
+    let g_opt = g_of([one("m", r_opt)]);
+    assert(shown("a 1", g_opt, "m")? == "(m a 1)");
+    assert(shown("a", g_opt, "m")? == "(m a)");
+
+    // ---- Named/NamedIdx: a reference reaching back through another production,
+    // which is what makes the CST (and the parse) genuinely recursive ----
+    let r_list: Rule<Tok> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
+    let r_item: Rule<Tok> = OneOf([Term(Word("")), Named("list")]);
+    let g_sexp = g_of([one("list", r_list), one("item", r_item)]);
+    assert(shown("(a b)", g_sexp, "list")? == "(list ( (item a) (item b) ))");
+    assert(
+        shown(
+            "(a (b) c)",
+            g_sexp,
+            "list",
+        )? == "(list ( (item a) (item (list ( (item b) ))) (item c) ))",
+    );
+    assert(msg_of("(a", g_sexp, "list") == "expected Word, `(`, or `)`, found end of input");
+
+    // ---- ListOf: separators, and the trailing-separator rule ----
+    let r_nums: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num("")), ",", false), Spelling("]")]);
+    let g_nums = g_of([one("l", r_nums)]);
+    assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
+    // An empty list is a list.
+    assert(shown("[]", g_nums, "l")? == "(l [ ])");
+
+    // With `trailing: false` the dangling separator is left for the enclosing
+    // rule, which is what reports it.
+    assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
+    let r_trail: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num("")), ",", true), Spelling("]")]);
+    assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
+
+    // ---- Climb: precedence and associativity ----
+    let plus = Prec { power: 1, right: false, ops: ["+"] };
+    let times = Prec { power: 2, right: false, ops: ["*"] };
+    let r_expr: Rule<Tok> = Climb(Term(Num("")), [plus, times]);
+    let g_expr = g_of([one("e", r_expr)]);
+    // A bare atom climbs to itself: no operator, no extra node.
+    assert(shown("1", g_expr, "e")? == "(e 1)");
+    // `*` binds tighter, so it nests inside the `+`.
+    assert(shown("1 + 2 * 3", g_expr, "e")? == "(e (e 1) + (e (e 2) * (e 3)))");
+    // ... and the other order proves it is precedence, not source order.
+    assert(shown("1 * 2 + 3", g_expr, "e")? == "(e (e (e 1) * (e 2)) + (e 3))");
+    // Equal power, left-associative: the left operand is the nested one.
+    assert(shown("1 + 2 + 3", g_expr, "e")? == "(e (e (e 1) + (e 2)) + (e 3))");
+    // The same level marked right-associative nests the other way.
+    let rpow = Prec { power: 1, right: true, ops: ["*"] };
+    let r_pow: Rule<Tok> = Climb(Term(Num("")), [rpow]);
+    assert(shown("1 * 2 * 3", g_of([one("e", r_pow)]), "e")? == "(e (e 1) * (e (e 2) * (e 3)))");
+
+    // An operator with nothing after it leaves the operator unconsumed, so the
+    // leftover-input check fires at the `+` — but the missing operand was
+    // expected one position *further*, and furthest-failure tracking is what
+    // makes that, rather than the `+`, the thing reported.
+    assert(msg_of("1 +", g_expr, "e") == "expected Num, found end of input");
+
+    // ---- expect_as: collapsing a family of rules to one word ----
+    //
+    // Unlabelled, the message is the grammar's internals; labelled, it is the
+    // one word a reader wants — and only when the production got nowhere, so a
+    // partly-matched one still reports the finer expectation.
+    let r_stmt: Rule<Tok> = Then([Named("expr"), Spelling(";")]);
+    let r_alt: Rule<Tok> = OneOf([Term(Word("")), Term(Num(""))]);
+    let plain = g_of([one("stmt", r_stmt), one("expr", r_alt)]);
+    assert(msg_of("]", plain, "stmt") == "expected Word or Num, found `]`");
+    let labelled = g_of([one("stmt", r_stmt), labelled_prod("expr", r_alt, "an expression")]);
+    assert(msg_of("]", labelled, "stmt") == "expected an expression, found `]`");
+    // Got somewhere, so the label steps aside for what actually went wrong.
+    assert(msg_of("a ]", labelled, "stmt") == "expected `;`, found `]`");
+
+    // ---- Trivia and losslessness ----
+    //
+    // With whitespace and comments lexed as trivia rather than skipped, every
+    // byte of the source ends up under exactly one leaf — including the run
+    // after the last token, which no token consumption can pick up.
+    let src = "  ( a  b ) // done\n";
+    let lexed = lex_toks(src, trivia_rules())?;
+    let tree = parse_cst(src, lexed, g_sexp, "list")?;
+    assert(tree.cst_text(src) == src);
+
+    // Where each piece landed, on a source small enough to read: leading trivia
+    // attaches in front of the token that follows it, and the comment and
+    // newline after the last token attach to the root.
+    let small = "(a) // x";
+    let small_tree = parse_cst(small, lex_toks(small, trivia_rules())?, g_sexp, "list")?;
+    assert(small_tree.cst_text(small) == small);
+    assert(small_tree.cst_show(small, prod_names(g_sexp)) == "(list ( (item a) ) ~  ~// x)");
+
+    // ---- Lowering ----
+    //
+    // Each node's `build` sees the already-lowered values of its *interior*
+    // children only, so `build_node` distinguishes a leaf from a branch by
+    // whether it got any. `Node` is boxed and recursive, and `build` reaches it
+    // through a function *value* — the shape this library was waiting on.
+    assert(parsed("(a b)", g_sexp, "list")? == NNode([NLeaf("a"), NLeaf("b")]));
+    assert(
+        parsed("(a (b) c)", g_sexp, "list")? == NNode([
+            NLeaf("a"),
+            NNode([NNode([NLeaf("b")])]),
+            NLeaf("c"),
+        ]),
+    );
+    // A `build` that refuses fails the parse with its own error, unchanged.
+    let refuser = g_of([Production { name: "w", rule: r_word, build: Mk(refuse) }]);
+    assert(parsed("abc", refuser, "w") == err(ParseError { message: "refused", span: 0..3 }));
+
+    // ---- link is not optional, and `parse_cst` does it ----
+    //
+    // A grammar handed over unlinked parses anyway; linking twice changes
+    // nothing.
+    assert(shown("(a b)", link(g_sexp)?, "list")? == "(list ( (item a) (item b) ))");
+})
+
+// ---------- test-only fixtures ----------
+//
+// A token kind, an AST, and a lexer for them. A real consumer brings its own of
+// each; these exist because a `Grammar<K, A>` cannot be written down without
+// both type arguments, and because parsing a *string* reads far better in a test
+// than a hand-built token array with hand-counted spans.
+
+variant Tok = Word(str) | Num(str) | Punct
+
+// Lower-case words, digit runs, and one-character punctuation. Whitespace is
+// skipped, so most assertions above are about grammar rather than layout;
+// `trivia_rules` is the same set with whitespace and comments *recorded*, which
+// is what the losslessness assertion needs.
+fn tok_rules() -> TokenRule<Tok>[] {
+    let alpha = "abcdefghijklmnopqrstuvwxyz";
+    let digit = "0123456789";
+    [
+        TokenRule { matcher: CharRun(" \t\n", " \t\n"), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
+        TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
+        TokenRule { matcher: CharRun("()[],;+*", ""), emit: Bare(Punct) },
+    ]
+}
+
+fn trivia_rules() -> TokenRule<Tok>[] {
+    let alpha = "abcdefghijklmnopqrstuvwxyz";
+    let digit = "0123456789";
+    [
+        TokenRule { matcher: CharRun(" \t\n", " \t\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
+        TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
+        TokenRule { matcher: CharRun("()[],;+*", ""), emit: Bare(Punct) },
+    ]
+}
+
+// Lexing and parsing report failure in the same shape but not the same type, so
+// the tests convert once here rather than at every call.
+fn lex_toks(src: str, rules: TokenRule<Tok>[]) -> LexResult<Tok>!ParseError {
+    match (src.lex(rules)) {
+        ok(r) => ok(r),
+        err(e) => err(ParseError { message: e.message, span: e.span }),
+    }
+}
+
+variant Node = NLeaf(str) | NNode(Node[])
+
+// The lowering every fixture production uses: a node with no interior children
+// is a leaf carrying its text, anything else a branch carrying its children.
+fn build_node(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
+    if (kids.is_nonempty()) {
+        return ok(NNode(kids));
+    };
+    ok(NLeaf(node.cst_text(src)))
+}
+
+// A `build` that always refuses, for the error-propagation assertion.
+fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
+    err(ParseError { message: "refused", span: node.cst_span() })
+}
+
+fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> { name, rule, build: Mk(build_node) }
+
+fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, Node> {
+    name,
+    rule,
+    build: Mk(build_node),
+    expect_as,
+}
+
+fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
+
+// Parse and render, so an assertion is one readable string rather than a nested
+// `CTree` literal.
+fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
+    let lexed = lex_toks(src, tok_rules())?;
+    let tree = parse_cst(src, lexed, g, start)?;
+    ok(tree.cst_show(src, prod_names(g)))
+}
+
+// The message a failed parse reports — and a distinguishable string when it
+// unexpectedly succeeded, so a broken assertion says which way it broke.
+fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
+    match (shown(src, g, start)) {
+        ok(s) => `unexpectedly parsed: {s}`,
+        err(e) => e.message,
+    }
+}
+
+fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
+    let lexed = lex_toks(src, tok_rules())?;
+    parse(src, lexed, g, start)
+}
+--- performance ---
+allocations: 3007
+deallocations: 3007
+reallocations: 275
+bytes allocated: 149372
+instructions executed: 398284
+binary size: 257960
+  code: 149116
+  data: 6956
+  metadata: 101888
+functions:
+  __arr_drop_Node:
+    calls: 11
+    bytes: 116
+  __arr_drop___m1__Cst:
+    calls: 347
+    bytes: 116
+  __arr_drop___m2__Prec:
+    calls: 2
+    bytes: 120
+  __arr_drop___m2__Production$Tok$Node:
+    calls: 73
+    bytes: 180
+  __arr_drop___m2__Rule$Tok:
+    calls: 99
+    bytes: 116
+  __arr_drop___m3__StepResult$Tok:
+    calls: 0
+    bytes: 140
+  __arr_drop___m3__Token$Tok:
+    calls: 232
+    bytes: 168
+  __arr_drop___m3__TokenRule$Tok:
+    calls: 42
+    bytes: 600
+  __arr_retain_Node:
+    calls: 10
+    bytes: 116
+  __arr_retain___m1__Cst:
+    calls: 431
+    bytes: 116
+  __arr_retain___m2__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m2__Production$Tok$Node:
+    calls: 67
+    bytes: 180
+  __arr_retain___m2__Rule$Tok:
+    calls: 142
+    bytes: 116
+  __arr_retain___m3__StepResult$Tok:
+    calls: 0
+    bytes: 140
+  __arr_retain___m3__Token$Tok:
+    calls: 191
+    bytes: 168
+  __arr_retain___m3__TokenRule$Tok:
+    calls: 0
+    bytes: 600
+  __builtin_count_while$char$lam13:
+    calls: 149
+    bytes: 296
+  __builtin_count_while$char$s0$lam18:
+    calls: 2
+    bytes: 236
+  __builtin_count_while$char$s0$lam20:
+    calls: 0
+    bytes: 244
+  __builtin_count_while$char$s0$lam35:
+    calls: 35
+    bytes: 236
+  __builtin_first$char$s0:
+    calls: 379
+    bytes: 136
+  __builtin_is_some_and$char$lam19:
+    calls: 0
+    bytes: 48
+  __eq_Node:
+    calls: 7
+    bytes: 184
+  __eq_Node$arr:
+    calls: 4
+    bytes: 300
+  __eq___builtin_Span:
+    calls: 1
+    bytes: 104
+  __eq___m2__ParseError:
+    calls: 1
+    bytes: 168
+  __eq_char$opt:
+    calls: 0
+    bytes: 100
+  __lambda_0:
+    calls: 0
+    bytes: 92
+  __lambda_1:
+    calls: 3
+    bytes: 60
+  __lambda_2:
+    calls: 0
+    bytes: 92
+  __lambda_3:
+    calls: 0
+    bytes: 60
+  __lambda_4:
+    calls: 0
+    bytes: 92
+  __lambda_5:
+    calls: 31
+    bytes: 60
+  __lambda_6:
+    calls: 0
+    bytes: 92
+  __lambda_7:
+    calls: 25
+    bytes: 60
+  __m1__cst_leaves:
+    calls: 33
+    bytes: 712
+  __m1__cst_show:
+    calls: 117
+    bytes: 1456
+  __m1__cst_span:
+    calls: 1
+    bytes: 460
+  __m1__cst_text:
+    calls: 7
+    bytes: 460
+  __m2__link$Tok$Node:
+    calls: 43
+    bytes: 1724
+  __m2__link_rule$Tok:
+    calls: 171
+    bytes: 4300
+  __m2__link_rules$Tok:
+    calls: 36
+    bytes: 716
+  __m2__many$Tok:
+    calls: 3
+    bytes: 104
+  __m2__name_index:
+    calls: 116
+    bytes: 404
+  __m2__prod_names$Tok$Node:
+    calls: 107
+    bytes: 496
+  __m3__between_len:
+    calls: 0
+    bytes: 676
+  __m3__delimited_len:
+    calls: 0
+    bytes: 1392
+  __m3__finalize_template$Tok:
+    calls: 0
+    bytes: 4684
+  __m3__float_len:
+    calls: 0
+    bytes: 816
+  __m3__interp_scan$Tok:
+    calls: 0
+    bytes: 2432
+  __m3__lex$Tok:
+    calls: 42
+    bytes: 1748
+  __m3__lex_step$Tok:
+    calls: 151
+    bytes: 18900
+  __m3__nested_len:
+    calls: 0
+    bytes: 940
+  __m3__step_result$Tok:
+    calls: 388
+    bytes: 6816
+  __m3__template_scan$Tok:
+    calls: 0
+    bytes: 2668
+  __m3__template_step$Tok:
+    calls: 0
+    bytes: 488
+  __rec_drop_Node:
+    calls: 16
+    bytes: 72
+  __rec_drop___m1__Cst:
+    calls: 196
+    bytes: 48
+  __rec_drop___m2__Rule$Tok:
+    calls: 223
+    bytes: 388
+  __test$parse:
+    calls: 1
+    bytes: 48576
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 64
+  __to_str_Tok:
+    calls: 35
+    bytes: 836
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 812
+  __to_str_u64:
+    calls: 0
+    bytes: 180
+  aipl_arr_drop_str:
+    calls: 296
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 8029
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 377
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 10351
+    bytes: (external)
+  aipl_array_new:
+    calls: 1700
+    bytes: (external)
+  aipl_array_push:
+    calls: 620
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 282
+    bytes: (external)
+  aipl_assert:
+    calls: 43
+    bytes: (external)
+  aipl_char_at:
+    calls: 379
+    bytes: (external)
+  aipl_concat:
+    calls: 418
+    bytes: (external)
+  aipl_dec:
+    calls: 12326
+    bytes: (external)
+  aipl_inc:
+    calls: 9889
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 435
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 2955
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 37
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 2520
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 37
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 25
+    bytes: (external)
+  aipl_str_contains:
+    calls: 502
+    bytes: (external)
+  aipl_str_data:
+    calls: 188
+    bytes: (external)
+  aipl_str_eq:
+    calls: 268
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 186
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 153
+    bytes: (external)
+  aipl_str_join:
+    calls: 56
+    bytes: (external)
+  aipl_str_len:
+    calls: 1585
+    bytes: (external)
+  aipl_str_slice:
+    calls: 846
+    bytes: (external)
+  aipl_str_starts_with:
+    calls: 9
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 140
+    bytes: (external)
+  build_node:
+    calls: 9
+    bytes: 440
+  climb$Tok$Node:
+    calls: 15
+    bytes: 2720
+  error_at$Tok$Node:
+    calls: 14
+    bytes: 1604
+  far_miss:
+    calls: 53
+    bytes: 1140
+  find_prec:
+    calls: 22
+    bytes: 848
+  kind_label$Tok:
+    calls: 35
+    bytes: 92
+  leaf_at$Tok$Node:
+    calls: 96
+    bytes: 1312
+  lex_toks:
+    calls: 42
+    bytes: 616
+  lower_node$Tok$Node:
+    calls: 10
+    bytes: 2352
+  main:
+    calls: 1
+    bytes: 72
+  match_list_of$Tok$Node:
+    calls: 4
+    bytes: 3112
+  match_many$Tok$Node:
+    calls: 15
+    bytes: 2008
+  match_maybe$Tok$Node:
+    calls: 4
+    bytes: 836
+  match_one_of$Tok$Node:
+    calls: 35
+    bytes: 1304
+  match_prod$Tok$Node:
+    calls: 84
+    bytes: 3184
+  match_rule$Tok$Node:
+    calls: 269
+    bytes: 4332
+  match_then$Tok$Node:
+    calls: 31
+    bytes: 1840
+  msg_of:
+    calls: 16
+    bytes: 404
+  no:
+    calls: 50
+    bytes: 164
+  oxford:
+    calls: 14
+    bytes: 1568
+  parse$Tok$Node:
+    calls: 3
+    bytes: 340
+  parse_cst$Tok$Node:
+    calls: 42
+    bytes: 4152
+  parsed:
+    calls: 3
+    bytes: 412
+  prev_end$Tok$Node:
+    calls: 122
+    bytes: 592
+  quoted:
+    calls: 25
+    bytes: 380
+  refuse:
+    calls: 1
+    bytes: 248
+  shown:
+    calls: 37
+    bytes: 740
+  tok_rules:
+    calls: 40
+    bytes: 1112
+  tok_text$Tok$Node:
+    calls: 81
+    bytes: 680
+  trivia_rules:
+    calls: 2
+    bytes: 1372

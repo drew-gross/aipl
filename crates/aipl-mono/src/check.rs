@@ -258,6 +258,12 @@ struct Cx<'a> {
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
     current_type_bounds: std::cell::RefCell<HashMap<String, Bound>>,
+    /// Instance names [`Cx::instance_args`] is part-way through recovering the
+    /// type arguments of. A *recursive* generic (`Rule<K> = Term(K) |
+    /// Then(Rule<K>, Rule<K>)`) has a payload naming its own instance, so
+    /// unifying that payload asks for the very arguments being recovered —
+    /// without this the two would call each other until the stack ran out.
+    resolving: std::cell::RefCell<HashSet<String>>,
 }
 
 impl<'a> Cx<'a> {
@@ -412,7 +418,13 @@ impl<'a> Cx<'a> {
                     .iter()
                     .map(|a| self.resolve_generic_ty(a))
                     .collect::<Result<_, _>>()?;
-                Type::Named(self.instantiate_generic(base, &args)?)
+                // An application with an abstract argument (`Rule<K>` in a
+                // generic body) names no instance yet — leave it applied.
+                if args.iter().any(mentions_typevar) {
+                    Type::Generic(base.clone(), args)
+                } else {
+                    Type::Named(self.instantiate_generic(base, &args)?)
+                }
             }
             Type::Optional(i) => Type::Optional(Box::new(self.resolve_generic_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.resolve_generic_ty(i)?)),
@@ -490,6 +502,20 @@ impl<'a> Cx<'a> {
     /// structure against the instance's concrete decl. `None` if `inst` isn't a
     /// generic instance or some type variable can't be pinned.
     fn instance_args(&self, inst: &str) -> Option<(String, Vec<Type>)> {
+        // Re-entry for the same instance means a recursive generic reached its
+        // own payload; that occurrence pins nothing this call doesn't already
+        // know, so bow out and let the type's other cases do the pinning.
+        if !self.resolving.borrow_mut().insert(inst.to_string()) {
+            return None;
+        }
+        let args = self.instance_args_inner(inst);
+        self.resolving.borrow_mut().remove(inst);
+        args
+    }
+
+    /// [`Cx::instance_args`] proper. Call that, never this: the guard it holds
+    /// is what keeps the mutual recursion below finite.
+    fn instance_args_inner(&self, inst: &str) -> Option<(String, Vec<Type>)> {
         for (base, tmpl) in self.generic_structs {
             if inst.starts_with(&format!("{base}$")) {
                 if let Some(inst_fields) = self.struct_fields(inst) {
@@ -821,6 +847,33 @@ impl<'a> Cx<'a> {
         // through a registry that is populated later, so an instance here is
         // opaque exactly where it needs to be read.
         self.lock_node(node, &Type::Generic(base.to_string(), type_args.clone()));
+        // Inside a generic function the arguments may still be abstract —
+        // `Many(r, 0)` where `r: Rule<K>` — and an abstract application has no
+        // instance to name: monomorphization pins it once `K` is. Check the
+        // arguments against the *template's* payload with the type arguments
+        // substituted in, which stays abstract on both sides, and hand back the
+        // application. Without this the construction resolved to a synthetic
+        // `Rule$__typevar___K` that nothing else in the body agreed with. The
+        // generic-*struct* path (`infer_generic_construct`) has always done this;
+        // no generic variant was ever *constructed* in a generic body before the
+        // parser library, only matched, which is why the two drifted apart.
+        if type_args.iter().any(mentions_typevar) {
+            let subst: HashMap<String, Type> = tmpl
+                .type_vars
+                .iter()
+                .map(|tv| tv.name.clone())
+                .zip(type_args.iter().cloned())
+                .collect();
+            for ((at, aspan), pty) in arg_tys.iter().zip(&case.payload) {
+                expect(
+                    at,
+                    &crate::subst_type_params(pty, &subst),
+                    &format!("constructor {bare:?} argument"),
+                    aspan.clone(),
+                )?;
+            }
+            return Ok(Type::Generic(base.to_string(), type_args));
+        }
         let inst = self.instantiate_generic(base, &type_args)?;
         // Check each argument against the concrete (substituted) payload type.
         let cases = self.variant_cases(&inst).expect("just instantiated");
@@ -943,6 +996,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
+        resolving: std::cell::RefCell::new(HashSet::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -2354,9 +2408,12 @@ impl Cx<'_> {
                 }
                 // A struct or variant element is valid too (must be declared); so
                 // is an (abstract) generic-struct/variant application `Token<K>`.
+                // `has_variant`, not `self.variants`: a *synthesized* generic
+                // instance (`Rule$Kind`, from `Rule<Kind>`) lives in the syn map,
+                // and one of those is as valid an element as any other variant.
                 let elem_ok = is_valid_elem(&elem_ty)
                     || matches!(&elem_ty, Type::Named(n)
-                        if self.has_struct(n) || self.variants.contains_key(n))
+                        if self.has_struct(n) || self.has_variant(n))
                     || matches!(&elem_ty, Type::Generic(..));
                 if !elems.is_empty() && !elem_ok {
                     return Err(Error::at(

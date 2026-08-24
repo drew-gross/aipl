@@ -6,7 +6,7 @@ Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
 **Stage 1 — the library**
-- [ ] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
+- [x] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
 - [ ] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
 - [ ] 1.2 JSON end to end
 
@@ -67,6 +67,25 @@ confirmed to work and are locked in by cases — a fn value returning a boxed
 recursive variant, an `A[]` parameter where `A` is boxed, an array of structs
 each holding a boxed field, and a two-parameter generic variant.
 
+**Stage 1.0 found four more gaps**, all in the same unexplored corner — nobody
+had ever written a *generic recursive* variant, which `Rule<K>` is — and all four
+are now fixed and locked in by `tests/cases/generics/recursive_variant.aipl`:
+
+- Recovering a generic instance's type arguments (`instance_args`, in
+  `aipl-mono`'s `check.rs` and `lib.rs` alike) unified the template against the
+  instance's own cases, so a case whose payload *is* that instance asked for the
+  arguments being recovered and recursed until the stack ran out. Declaring
+  `Rule<K>` at all crashed the compiler.
+- A generic variant *constructed* inside a generic body (`Many(r, 0)` where
+  `r: Rule<K>`) eagerly minted an instance named after the abstract type
+  variable, which nothing else agreed with. The generic-*struct* path had always
+  kept such an application unresolved; the variant path had never been asked,
+  since before this every generic variant in the repo was only ever matched.
+- A `match` on a generic instance read its payload types from the wrong map,
+  missing the synthesized instances entirely and typing every binding as `i64`.
+- An array literal of a concrete generic-variant instance (`Rule<Kind>[]`) was
+  rejected as an invalid element type, for the same wrong-map reason.
+
 Hash-backed dicts and sets are on TODO.txt rather than here. They are the largest
 asymptotic win in the repo and would make packrat memoization affordable, but the
 link pass (Stage 1) turns rule references into array indices and FIRST sets
@@ -102,11 +121,10 @@ struct Production<K, A> {
     rule: Rule<K>,
     expect_as: str,   // error display label; "" = transparent
     scope: str,       // highlighter scope hint
-    layout: Layout,   // formatter shape
     build: Build<A>,  // AST lowering
-}
+}                     // (`layout: Layout` joins this in Stage 5)
 
-variant Build<A> = Mk((Cst, A[]) -> A!ParseError)
+variant Build<A> = Mk((str, Cst, A[]) -> A!ParseError)
 struct Grammar<K, A> { prods: Production<K, A>[] }
 
 // cst.aipl — lossless: CTrivia puts comments in the tree, so concatenated
@@ -119,17 +137,24 @@ since a payload-free arm pins no type parameter of its own
 (there is nothing to infer *from*). Productions with nothing to lower pass a
 trivial named function.
 
+`build` takes the **source text** as well as the node: a `Cst` holds spans, not
+text, so without it a lowering function has no way to read what it matched.
+
 Function values carry three restrictions that shape `build`: they must be
 **effect-free** (`check.rs:1649`), **non-generic** (`check.rs:1639`), and
 **non-capturing** (`check.rs:1825`). So each is a named top-level
-`fn lower_<prod>(cst: Cst, kids: A[]) -> A!ParseError`. They also cannot be
+`fn lower_<prod>(src: str, cst: Cst, kids: A[]) -> A!ParseError`. They also cannot be
 compared with `==` (`check.rs:3059`), so a `.test` block asserts on parse
 *output*, never on the grammar value — the same constraint `lexer.aipl` lives
 with.
 
-The driver (`parse.aipl`) yields both the CST and the lowered AST in one pass;
-`parse_cst` skips `build` for consumers that only want the tree. Three things it
-must get right: **`link(grammar)`** runs once, rewriting `Named(str)` →
+The driver (`parse.aipl`) is **two passes, not one**: `parse_cst` builds the
+tree, `lower` walks it calling `build`, and `parse` is the two in sequence.
+Lowering *during* the parse would run `build` inside speculative alternatives
+that then backtrack — wasted allocation at best, and at worst a `build` that
+legitimately fails aborting a parse that should simply have tried the next
+alternative. `parse_cst` is also the entry point for consumers that only want
+the tree. Three things the driver must get right: **`link(grammar)`** runs once, rewriting `Named(str)` →
 `NamedIdx(u64)` and erroring on unresolved references; **a progress guard on
 `Many`**, since an inner rule matching empty input loops forever and AIPL has no
 `break` (`lexer.aipl:194-196` documents the lexer's version of the same
@@ -158,8 +183,17 @@ and any error-message subtlety. If the driver is wrong, it is wrong here in two
 productions rather than in ten.
 
 Before even that, the library's own `.test` blocks should cover each `Rule` arm
-in isolation against a hand-built token array — the equivalent of
-`walker.aipl`'s `toks_of`/`walker_of` fixtures (`walker.aipl:2253`).
+in isolation — done in `parse.aipl`, against a three-kind toy language lexed by
+`lexer.aipl` itself rather than a hand-built token array, since parsing a string
+reads better in a test than hand-counted spans and it exercises the intended
+composition at the same time. `Climb` is covered there too (precedence,
+both associativities), so it does not have to wait for Stage 4 to be proven.
+
+Two authoring notes from writing them, both compiler limits rather than design:
+an integer literal does not flex through a constructor, so `Many(r, 0)` is a type
+error and the `many`/`many1` helpers exist to absorb it; and most `Rule`
+constructors mention no `K`, so a rule wants an annotated binding
+(`let r: Rule<Kind> = ..`) for its type parameter to resolve.
 
 ### 1.2 JSON
 

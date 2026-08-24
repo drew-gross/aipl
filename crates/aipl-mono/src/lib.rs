@@ -1175,6 +1175,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         cur_lenv: HashMap::new(),
         lambda_envs: HashMap::new(),
         spec_memo: HashMap::new(),
+        resolving: std::cell::RefCell::new(HashSet::new()),
         skip_mut_desugar: false,
         cur_ret: Type::Unit,
         cur_expected: None,
@@ -1823,6 +1824,11 @@ struct Mono<'a> {
     /// Lets a forwarded lambda reuse a specialization, so recursive higher-order
     /// functions terminate.
     spec_memo: HashMap<(String, Vec<String>), String>,
+    /// Instance names [`Mono::instance_args`] is part-way through recovering the
+    /// type arguments of — the twin of the checker's `resolving`, and needed for
+    /// the same reason: a recursive generic's payload names its own instance, so
+    /// unifying it re-asks for the arguments being recovered.
+    resolving: std::cell::RefCell<HashSet<String>>,
     /// Set by the `Assign` arm just before inferring the RHS of an in-place
     /// `set recv.f(args)` writeback, and consumed by the `Call` arm: it keeps
     /// that one method call raw (a writeback that mutates `recv` in place)
@@ -3458,11 +3464,37 @@ impl Mono<'_> {
             Type::Result(ok, _) if ctor == "ok" && is_unit(ok) => vec![],
             Type::Result(ok, _) if ctor == "ok" => vec![(**ok).clone()],
             Type::Result(_, err) if ctor == "err" => vec![(**err).clone()],
+            // `syn_variants` as well as `variants`: a synthesized generic
+            // instance (`Rule$Tok`) is where a generic variant's payload types
+            // live, and without it every binding fell back to `i64` — which then
+            // failed to pin the type argument of any generic call it was passed to.
             Type::Named(name) => self
                 .variants
                 .get(name)
+                .or_else(|| self.syn_variants.get(name))
                 .and_then(|cases| cases.iter().find(|(c, _)| c == ctor))
                 .map(|(_, p)| p.clone())
+                .unwrap_or_else(|| vec![Type::Primitive(Primitive::I64); n]),
+            // An application still abstract (inside a generic body): take the
+            // template's payload with the application's arguments substituted in.
+            Type::Generic(base, args) => self
+                .generic_variants
+                .get(base)
+                .and_then(|tmpl| {
+                    let case = tmpl.cases.iter().find(|c| c.name == ctor)?;
+                    let map: HashMap<String, Type> = tmpl
+                        .type_vars
+                        .iter()
+                        .map(|tv| tv.name.clone())
+                        .zip(args.iter().cloned())
+                        .collect();
+                    Some(
+                        case.payload
+                            .iter()
+                            .map(|p| subst_type_params(p, &map))
+                            .collect::<Vec<_>>(),
+                    )
+                })
                 .unwrap_or_else(|| vec![Type::Primitive(Primitive::I64); n]),
             _ => vec![Type::Primitive(Primitive::I64); n],
         }
@@ -3648,6 +3680,19 @@ impl Mono<'_> {
     /// (`Emit$Tok` → `("Emit", [Tok])`) by unifying its generic template's
     /// structure against the instance's concrete decl.
     fn instance_args(&self, inst: &str) -> Option<(String, Vec<Type>)> {
+        // See the checker's `instance_args`: re-entry means a recursive
+        // generic's payload named its own instance, which pins nothing new.
+        if !self.resolving.borrow_mut().insert(inst.to_string()) {
+            return None;
+        }
+        let args = self.instance_args_inner(inst);
+        self.resolving.borrow_mut().remove(inst);
+        args
+    }
+
+    /// [`Mono::instance_args`] proper. Call that, never this: the guard it holds
+    /// is what keeps the mutual recursion below finite.
+    fn instance_args_inner(&self, inst: &str) -> Option<(String, Vec<Type>)> {
         for (base, tmpl) in self.generic_structs {
             if inst.starts_with(&format!("{base}$")) {
                 if let Some(fields) = self

@@ -1,0 +1,283 @@
+// The tree the parser driver (`parse.aipl`) builds: a *concrete* syntax tree,
+// lossless by construction. Every byte of the parsed source is covered by
+// exactly one leaf — `CLeaf` for a token the grammar matched, `CTrivia` for a
+// comment or a run of whitespace the lexer set aside — so concatenating a
+// tree's leaf spans in order reproduces the source byte for byte
+// (`cst_text`). That is what a formatter generator needs and what an AST
+// cannot give it: an AST has already thrown away the text that carries no
+// meaning, and a formatter's whole job is to put it back.
+//
+// An interior node is `CTree(prod, kids)`, where `prod` is a production's
+// index in the grammar's `prods` array — not its name. The index is what
+// `link` (see `grammar.aipl`) rewrites rule references into, so the driver
+// never compares strings while parsing; `cst_show` takes the name table when a
+// human needs to read one.
+//
+// The type is recursive *through an array*, so a `Cst` is a refcounted heap
+// block and the array holds strong references to its element nodes — see
+// `tests/cases/variants/recursive_through_array.aipl`.
+import {
+    Span,
+    equal as ==,
+    filter,
+    first,
+    join,
+    last,
+    len,
+    logical_not as !,
+    push,
+    value_or,
+} from builtins;
+
+variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
+
+// Whether `self` is an interior node. The parser's lowering pass hands a
+// production's `build` only the values of its *interior* children — a leaf has
+// no lowered value, and its text is reachable from the node's own span — so
+// this is the filter that decides what counts as a child.
+pub fn is_tree(self: Cst) -> bool {
+    match (self) {
+        CTree(_, _) => true,
+        CLeaf(_) => false,
+        CTrivia(_) => false,
+    }
+}
+
+// Every leaf span under `self`, in source order — token leaves and trivia
+// alike. The whole losslessness property is stated in terms of this list: the
+// spans are contiguous and cover the parsed source, so `cst_text` is just
+// "slice each one and join".
+pub fn cst_leaves(self: Cst) -> Span[] {
+    match (self) {
+        CLeaf(sp) => [sp],
+        CTrivia(sp) => [sp],
+        CTree(_, kids) => {
+            mut out: Span[] = [];
+            for (let k : kids) {
+                for (let sp : k.cst_leaves()) {
+                    set out.push(sp);
+                }
+            }
+            out
+        },
+    }
+}
+
+// The source text `self` covers, reconstructed from its leaf spans. For a whole
+// parse this equals the input exactly; that identity is the cheapest regression
+// test there is for the driver's trivia handling, so the `.test` blocks assert
+// it directly.
+pub fn cst_text(self: Cst, src: str) -> str {
+    mut parts: str[] = [];
+    for (let sp : self.cst_leaves()) {
+        set parts.push(src[sp]);
+    }
+    parts.join("")
+}
+
+// The span `self` covers: its first leaf's start through its last leaf's end.
+// A node with no leaves at all — an interior node for a production that matched
+// empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
+// extent, and reports the empty `0..0`.
+pub fn cst_span(self: Cst) -> Span {
+    let ls = self.cst_leaves();
+    match (ls.first()) {
+        some(f) => match (ls.last()) {
+            some(l) => f.start..l.end,
+            none => f,
+        },
+        none => 0..0,
+    }
+}
+
+// The interior children of `self` — its kids with the leaves dropped. This is
+// the child list a production's `build` is lowered against, so its order and
+// length are part of the contract between a grammar and its lowering functions:
+// one entry per `Named` reference the rule matched, in the order it matched them.
+pub fn cst_nodes(self: Cst) -> Cst[] {
+    match (self) {
+        CLeaf(_) => [],
+        CTrivia(_) => [],
+        CTree(_, kids) => kids.filter(is_tree),
+    }
+}
+
+// `self` rendered as an S-expression against the grammar's production names
+// (`prod_names`), for tests and for reading a tree by eye: a leaf as its source
+// text, a trivia leaf prefixed with `~`, an interior node as
+// `(name kid kid ...)`. A production index with no name in `names` renders as
+// `?` rather than failing — this is a debug rendering, not a checked one.
+pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
+    match (self) {
+        CLeaf(sp) => src[sp],
+        CTrivia(sp) => `~{src[sp]}`,
+        CTree(i, kids) => {
+            mut parts: str[] = [];
+            for (let k : kids) {
+                set parts.push(k.cst_show(src, names));
+            }
+            let name = names[i].value_or("?");
+            if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(" ")})` }
+        },
+    }
+}.test({
+    // `(expr 1 + 2)` over the source below, with the `+` surrounded by trivia
+    // the grammar skipped over. Built by hand: the driver's own output is
+    // exercised in `parse.aipl`, and this file's job is the tree, not the parse.
+    let src = "1 + 2";
+    let one: u64 = 1;
+    let t = CTree(one, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3), CTrivia(3..4), CLeaf(4..5)]);
+
+    assert(t.is_tree());
+    assert(!CLeaf(0..1).is_tree());
+    assert(!CTrivia(1..2).is_tree());
+
+    // Losslessness: the leaves tile the source, so the text comes back whole.
+    assert(t.cst_text(src) == src);
+    assert(t.cst_leaves().len() == 5);
+    assert(t.cst_span() == 0..5);
+
+    // A leaf is its own text and its own span.
+    assert(CLeaf(2..3).cst_text(src) == "+");
+    assert(CTrivia(1..2).cst_span() == 1..2);
+
+    // Nesting: an interior child contributes its own leaves to the parent, in
+    // place, so the parent still reconstructs the whole source.
+    let zero: u64 = 0;
+    let nested = CTree(zero, [CLeaf(0..1), CTrivia(1..2), CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+    assert(nested.cst_text(src) == src);
+    assert(nested.cst_span() == 0..5);
+    assert(nested.cst_nodes().len() == 1);
+    // `cst_nodes` is one level deep and drops leaves: three kids, one interior.
+    assert(nested.cst_nodes() == [CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+    assert(t.cst_nodes() == []);
+    assert(CLeaf(0..1).cst_nodes() == []);
+
+    // A node that matched nothing has no extent rather than a bogus one.
+    assert(CTree(zero, []).cst_span() == 0..0);
+    assert(CTree(zero, []).cst_text(src) == "");
+
+    let names = ["expr", "term"];
+    assert(t.cst_show(src, names) == "(term 1 ~  + ~  2)");
+
+    // Trivia renders as `~` followed by its verbatim text — here a space, which
+    // is why the whitespace doubles up next to the joining space.
+    assert(nested.cst_show(src, names) == "(expr 1 ~  (term +  2))");
+    assert(CTree(zero, []).cst_show(src, names) == "(expr)");
+    // An index past the end of the name table still renders.
+    let far: u64 = 9;
+    assert(CTree(far, []).cst_show(src, names) == "(?)");
+})
+--- performance ---
+allocations: 112
+deallocations: 112
+reallocations: 22
+bytes allocated: 5172
+instructions executed: 7242
+binary size: 19408
+  code: 10112
+  data: 1361
+  metadata: 7935
+functions:
+  __arr_drop_Cst:
+    calls: 7
+    bytes: 116
+  __arr_retain_Cst:
+    calls: 2
+    bytes: 116
+  __eq_Cst:
+    calls: 3
+    bytes: 196
+  __eq_Cst$arr:
+    calls: 4
+    bytes: 300
+  __eq___builtin_Span:
+    calls: 6
+    bytes: 104
+  __rec_drop_Cst:
+    calls: 24
+    bytes: 48
+  aipl_arr_drop_str:
+    calls: 21
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 94
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 34
+    bytes: (external)
+  aipl_array_dec:
+    calls: 173
+    bytes: (external)
+  aipl_array_new:
+    calls: 56
+    bytes: (external)
+  aipl_array_push:
+    calls: 20
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 29
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
+    bytes: (external)
+  aipl_assert:
+    calls: 20
+    bytes: (external)
+  aipl_concat:
+    calls: 22
+    bytes: (external)
+  aipl_dec:
+    calls: 189
+    bytes: (external)
+  aipl_inc:
+    calls: 105
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 24
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 72
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 48
+    bytes: (external)
+  aipl_str_eq:
+    calls: 8
+    bytes: (external)
+  aipl_str_join:
+    calls: 7
+    bytes: (external)
+  aipl_str_len:
+    calls: 24
+    bytes: (external)
+  aipl_str_slice:
+    calls: 19
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  cst_leaves:
+    calls: 34
+    bytes: 712
+  cst_show:
+    calls: 14
+    bytes: 1456
+  cst_span:
+    calls: 4
+    bytes: 460
+  cst_text:
+    calls: 4
+    bytes: 460
+  is_tree:
+    calls: 11
+    bytes: 112
+  main:
+    calls: 1
+    bytes: 6032

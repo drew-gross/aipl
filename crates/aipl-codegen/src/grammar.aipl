@@ -1,0 +1,484 @@
+// A grammar, expressed as data. `Rule` is a PEG combinator tree — sequence,
+// ordered choice, repetition, a rule reference — and a `Production` pairs one
+// rule with everything the passes downstream need to know about it: the CST node
+// name, the label errors should blame, the scope a highlighter should paint, and
+// the function that lowers a matched node to the caller's AST. One `Grammar` is
+// then the whole description of a language, interpreted by the driver in
+// `parse.aipl`, exactly as `lexer.aipl` interprets a `TokenRule[]`.
+//
+// This file is data and one pass over it (`link`); nothing here parses. The
+// split matters because the same grammar value is meant to feed more than the
+// parser — an EBNF dump, a highlighter, a formatter — and each of those wants
+// the description without the driver.
+//
+// **A rule set is written against a token *kind* type `K`**, the same `K` a
+// `lexer.aipl` rule set produces, so a language's lexer and grammar compose
+// directly: `Term(Name(""))` matches any token whose kind is a `Name`, payload
+// ignored (that's `same_case`, which is why `K` carries the `variant` bound).
+//
+// Two authoring notes that are compiler limits rather than design:
+//
+//   - An integer literal does not flex through a constructor, so `Many(r, 0)` is
+//     a type error (the `0` types as `i64`, the payload is `u64`). Use the
+//     `many`/`many1` helpers below, which absorb it once.
+//   - Most `Rule` constructors mention no `K` (`Spelling`, `Named`, `Then` over
+//     an array of them), so nothing in them pins the type parameter. Write each
+//     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
+//     and every constructor inside it resolves from that annotation. The `.test`
+//     blocks here and in `parse.aipl` are written in that idiom throughout.
+import { Span, equal as ==, not_equal as !=, push, wrapping_increment as ++ } from builtins;
+import { Cst } from "./cst.aipl";
+
+// Why a parse failed: a message, and the span of the offending source (absolute
+// into the parsed string — slice it to show the offender, or hand it to
+// `caret_block.aipl` for the rustc-style underline). Mirrors `lexer.aipl`'s
+// `LexError`, and for the same reason: the two halves of a front end should
+// report failure in one shape.
+//
+// A *grammar* error — an unresolved rule reference, a rule that can loop forever
+// — has no source to point at and carries the empty `0..0`.
+struct ParseError { message: str, span: Span }
+
+// One precedence level of a `Climb`: the operators that share it, how tightly
+// they bind (`power`, higher wins), and whether they associate to the right.
+// Levels are matched in order, so a spelling belongs to exactly one.
+struct Prec { power: u64, right: bool, ops: str[] }
+
+// One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG:
+// `OneOf` commits to the first alternative that matches, so alternatives are
+// tried in the order written and there is no ambiguity to resolve.
+//
+// - `Term(k)`: any one token whose kind shares `k`'s constructor — the payload
+//   is ignored, so `Term(Name(""))` matches every identifier. The one place a
+//   rule looks at a token's *kind* rather than its text.
+// - `Spelling(s)`: one token whose source text is exactly `s`. Punctuation and
+//   keywords, without having to name the kind that lexed them.
+// - `Then(rs)`: every rule in order; the matched children concatenate.
+// - `OneOf(rs)`: the first alternative that matches, in order.
+// - `Many(r, min)`: `r` repeated until it stops matching, at least `min` times —
+//   `0` is a PEG `*`, `1` a `+`. A rule that can match empty input would spin
+//   here forever, so the driver refuses one outright rather than hanging.
+// - `Maybe(r)`: `r`, or nothing. Always matches.
+// - `Named(n)`: a reference to the production called `n`. `link` rewrites every
+//   one of these to a `NamedIdx`, so the driver never compares strings.
+// - `NamedIdx(i)`: a reference to production `i`, and the *only* rule that
+//   builds a CST node — one `CTree(i, ..)` per reference matched.
+// - `ListOf(item, sep, trailing)`: zero or more `item`s separated by the
+//   spelling `sep`, with a trailing separator allowed when `trailing`. Always
+//   matches (an empty list is a list); a separator with no item after it is
+//   consumed when `trailing`, and left for the enclosing rule when not.
+// - `Climb(atom, precs)`: precedence climbing — an `atom`, then binary operators
+//   drawn from `precs`, nested by binding power. Each application nests under the
+//   *enclosing* production's index, so `1 + 2 * 3` yields a node per operand
+//   rather than one flat run.
+variant Rule<K: variant> =
+    | Term(K)
+    | Spelling(str)
+    | Then(Rule<K>[])
+    | OneOf(Rule<K>[])
+    | Many(Rule<K>, u64)
+    | Maybe(Rule<K>)
+    | Named(str)
+    | NamedIdx(u64)
+    | ListOf(Rule<K>, str, bool)
+    | Climb(Rule<K>, Prec[])
+
+// How a production's matched node becomes a value of the caller's AST type `A`:
+// a function from the source text, the node itself, and the already-lowered
+// values of its interior children (`cst_nodes`, in match order). It may fail —
+// a literal that overflows, a duplicate key — with a `ParseError` the driver
+// passes straight through.
+//
+// A one-arm variant rather than a bare function type, so a later arm can be
+// added without every grammar changing shape. It stays one arm deliberately: a
+// payload-free `NoLower` would pin no `A` of its own, leaving nothing to infer
+// the type parameter from, so a production with nothing to lower passes a
+// trivial named function instead.
+//
+// Function values are non-capturing and non-generic (`check.rs`), so each is a
+// named top-level `fn lower_x(src: str, node: Cst, kids: A[]) -> A!ParseError`.
+// They also can't be compared with `==`, which is why the tests below assert on
+// what a grammar *parses*, never on a grammar value — the same constraint
+// `lexer.aipl` lives with.
+variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
+
+// One named production: its rule, and what each downstream pass needs from it.
+//
+// `name` is both the reference target (`Named("expr")`) and the CST node's name.
+// `expect_as` is the label an error blames when this production fails having
+// matched nothing — the reified form of the LR parser's `SYMBOL_DISPLAY_NAMES`,
+// which collapses `expr`/`term`/`unary`/`atom` to one word. Empty means
+// *transparent*: a plumbing production never surfaces in a message, and the
+// finer expectations from inside it are what the reader sees. `scope` is the
+// highlighter hint (Stage 3); it is carried, not yet consumed.
+struct Production<K: variant, A: any> {
+    name: str,
+    rule: Rule<K>,
+    build: Build<A>,
+    expect_as: str = "",
+    scope: str = "",
+}
+
+// A whole language: its productions, in order. Position is identity — a
+// `NamedIdx` and a `CTree` both name a production by its index here — so the
+// order of this array is part of a linked grammar's meaning.
+struct Grammar<K: variant, A: any> { prods: Production<K, A>[] }
+
+// `r` repeated zero or more times (PEG `*`).
+pub fn many<K: variant>(r: Rule<K>) -> Rule<K> {
+    let min: u64 = 0;
+    Many(r, min)
+}
+
+// `r` repeated one or more times (PEG `+`).
+pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> {
+    let min: u64 = 1;
+    Many(r, min)
+}
+
+// The production names of `g`, in index order — the table `cst_show` renders a
+// tree against, and what `link` resolves references through.
+pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] {
+    mut out: str[] = [];
+    for (let p : g.prods) {
+        set out.push(p.name);
+    }
+    out
+}
+
+// The index of `n` in `names`, or `none`. Names are few and lookups happen once
+// per reference at link time, so a scan is the whole implementation.
+pub fn name_index(names: str[], n: str) -> u64? {
+    mut i: u64 = 0;
+    for (let x : names) {
+        if (x == n) {
+            return some(i);
+        };
+        set i++;
+    }
+    none
+}
+
+// One rule with every `Named(n)` in it rewritten to `NamedIdx(i)`. Fails when a
+// reference names no production — the error a grammar author most wants caught
+// before a parse rather than during one.
+fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
+    match (r) {
+        Named(n) => match (name_index(names, n)) {
+            some(i) => ok(NamedIdx(i)),
+            none => err(ParseError { message: `no rule named "{n}"`, span: 0..0 }),
+        },
+        Then(rs) => ok(Then(link_rules(rs, names)?)),
+        OneOf(rs) => ok(OneOf(link_rules(rs, names)?)),
+        Many(sub, min) => ok(Many(link_rule(sub, names)?, min)),
+        Maybe(sub) => ok(Maybe(link_rule(sub, names)?)),
+        ListOf(item, sep, trailing) => ok(ListOf(link_rule(item, names)?, sep, trailing)),
+        Climb(atom, precs) => ok(Climb(link_rule(atom, names)?, precs)),
+        Term(k) => ok(Term(k)),
+        Spelling(s) => ok(Spelling(s)),
+        NamedIdx(i) => ok(NamedIdx(i)),
+    }
+}
+
+fn link_rules<K: variant>(rs: Rule<K>[], names: str[]) -> Rule<K>[]!ParseError {
+    mut out: Rule<K>[] = [];
+    for (let r : rs) {
+        set out.push(link_rule(r, names)?);
+    }
+    ok(out)
+}
+
+pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
+    let names = prod_names(g);
+
+    // Two productions of one name would make `Named` mean whichever came first
+    // and leave the other unreachable — a typo that reads as a working grammar.
+    mut i: u64 = 0;
+    for (let n : names) {
+        match (name_index(names, n)) {
+            some(j) => if (j != i) {
+                return err(ParseError { message: `duplicate rule name "{n}"`, span: 0..0 });
+            },
+            none => {},
+        };
+        set i++;
+    }
+    mut out: Production<K, A>[] = [];
+    for (let p : g.prods) {
+        set out.push(Production { ..p, rule: link_rule(p.rule, names)? });
+    }
+    ok(Grammar { prods: out })
+}.doc("""
+    `g` with every rule reference resolved: each `Named(name)` rewritten to the
+    `NamedIdx(index)` of the production it names, so the driver resolves a
+    reference by indexing rather than by comparing strings. Fails when a
+    reference names no production, or when two productions share a name.
+
+    Idempotent — a `NamedIdx` passes through — so a grammar may be linked once
+    and reused, or handed to `parse` unlinked and linked per call.
+""").test({
+    // A tiny grammar over one token kind: `list -> "(" item* ")"`, `item -> atom
+    // | list`. Enough to have a reference reach back through another production,
+    // which is what linking has to get right.
+    let r_list: Rule<Kind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
+    let r_item: Rule<Kind> = OneOf([Term(Atom("")), Named("list")]);
+    let g: Grammar<Kind, Node> = Grammar {
+        prods: [
+            Production { name: "list", rule: r_list, build: Mk(keep) },
+            Production { name: "item", rule: r_item, build: Mk(keep), expect_as: "an item" },
+        ],
+    };
+
+    assert(prod_names(g) == ["list", "item"]);
+    assert(name_index(prod_names(g), "item") == some(1));
+    assert(name_index(prod_names(g), "nope") == none);
+
+    let linked = link(g)?;
+    let zero: u64 = 0;
+    let one: u64 = 1;
+    // `item`'s two alternatives: a terminal, and a reference now an index.
+    assert(rule_of(linked, one) == OneOf([Term(Atom("")), NamedIdx(zero)]));
+
+    // The reference nested two levels down inside `list` is rewritten too, and
+    // everything around it is left alone.
+    assert(
+        rule_of(linked, zero) == Then([Spelling("("), Many(NamedIdx(one), zero), Spelling(")")]),
+    );
+    // Linking preserves the fields a rewrite doesn't touch.
+    assert(prod_names(linked) == ["list", "item"]);
+    assert(expect_of(linked, one) == "an item");
+
+    // Idempotent: a linked grammar links again to itself.
+    assert(rule_of(link(linked)?, one) == OneOf([Term(Atom("")), NamedIdx(zero)]));
+
+    // Every rule shape carries its reference, and every one is rewritten.
+    let r_a: Rule<Kind> = Maybe(Named("a"));
+    let r_b: Rule<Kind> = ListOf(Named("a"), ",", true);
+    let r_c: Rule<Kind> = Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]);
+    let r_d: Rule<Kind> = many1(Named("b"));
+    let shapes: Grammar<Kind, Node> = Grammar {
+        prods: [
+            Production { name: "a", rule: r_a, build: Mk(keep) },
+            Production { name: "b", rule: r_b, build: Mk(keep) },
+            Production { name: "c", rule: r_c, build: Mk(keep) },
+            Production { name: "d", rule: r_d, build: Mk(keep) },
+        ],
+    };
+    let ls = link(shapes)?;
+    assert(rule_of(ls, zero) == Maybe(NamedIdx(zero)));
+    assert(rule_of(ls, one) == ListOf(NamedIdx(zero), ",", true));
+    let two: u64 = 2;
+    let three: u64 = 3;
+    assert(
+        rule_of(ls, two) == Climb(NamedIdx(zero), [Prec { power: 1, right: false, ops: ["+"] }]),
+    );
+    assert(rule_of(ls, three) == Many(NamedIdx(one), one));
+
+    // An unresolved reference is a grammar error, named in the message.
+    let r_missing: Rule<Kind> = Named("missing");
+    let bad: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: r_missing, build: Mk(keep) }],
+    };
+    assert(link(bad) == err(ParseError { message: "no rule named \"missing\"", span: 0..0 }));
+
+    // So is a duplicate name — the typo that otherwise reads as a working grammar.
+    let r_x: Rule<Kind> = Spelling("x");
+    let r_y: Rule<Kind> = Spelling("y");
+    let dup: Grammar<Kind, Node> = Grammar {
+        prods: [
+            Production { name: "a", rule: r_x, build: Mk(keep) },
+            Production { name: "a", rule: r_y, build: Mk(keep) },
+        ],
+    };
+    assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
+})
+
+// ---------- test-only fixtures ----------
+//
+// A token-kind type and an AST type for the `.test` block above. A real consumer
+// declares its own pair; these exist because a `Grammar<K, A>` cannot be written
+// down without both. (`Kind` rather than a `Kind` *constructor*: a constructor
+// colliding with another top-level name in the same file is silently dropped —
+// see the naming note in `PARSER_LIBRARY.md`.)
+variant Kind = Atom(str) | Open | Close
+
+variant Node = NAtom(str) | NList(Node[])
+
+// The trivial lowering a production with nothing to lower passes, and all these
+// fixtures need: `Build` has no payload-free arm to mean "don't".
+fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
+
+// The rule of production `i` of `g`, for the assertions above — a grammar value
+// can't be compared with `==` (it holds function values), but the rule inside one
+// can.
+fn rule_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> Rule<K> {
+    match (g.prods[i]) {
+        some(p) => p.rule,
+        none => Spelling(""),
+    }
+}
+
+fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
+    match (g.prods[i]) {
+        some(p) => p.expect_as,
+        none => "",
+    }
+}
+--- performance ---
+allocations: 109
+deallocations: 109
+reallocations: 18
+bytes allocated: 6814
+instructions executed: 11047
+binary size: 36968
+  code: 21140
+  data: 1620
+  metadata: 14208
+functions:
+  __arr_drop_Prec:
+    calls: 2
+    bytes: 120
+  __arr_drop_Production$Kind$Node:
+    calls: 12
+    bytes: 180
+  __arr_drop_Rule$Kind:
+    calls: 15
+    bytes: 116
+  __arr_retain_Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain_Production$Kind$Node:
+    calls: 13
+    bytes: 180
+  __arr_retain_Rule$Kind:
+    calls: 16
+    bytes: 116
+  __eq_Kind:
+    calls: 2
+    bytes: 148
+  __eq_ParseError:
+    calls: 2
+    bytes: 168
+  __eq_Prec:
+    calls: 1
+    bytes: 128
+  __eq_Prec$arr:
+    calls: 1
+    bytes: 284
+  __eq_Rule$Kind:
+    calls: 12
+    bytes: 808
+  __eq_Rule$Kind$arr:
+    calls: 3
+    bytes: 300
+  __eq___builtin_Span:
+    calls: 2
+    bytes: 104
+  __eq_str$arr:
+    calls: 3
+    bytes: 352
+  __eq_u64$opt:
+    calls: 2
+    bytes: 100
+  __rec_drop_Node:
+    calls: 0
+    bytes: 72
+  __rec_drop_Rule$Kind:
+    calls: 55
+    bytes: 360
+  __test$link:
+    calls: 1
+    bytes: 8044
+  __test_try_fail_ParseError:
+    calls: 0
+    bytes: 64
+  __to_str_ParseError:
+    calls: 0
+    bytes: 812
+  aipl_arr_drop_str:
+    calls: 13
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 72
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 19
+    bytes: (external)
+  aipl_array_dec:
+    calls: 122
+    bytes: (external)
+  aipl_array_new:
+    calls: 32
+    bytes: (external)
+  aipl_array_push:
+    calls: 18
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 19
+    bytes: (external)
+  aipl_assert:
+    calls: 14
+    bytes: (external)
+  aipl_concat:
+    calls: 4
+    bytes: (external)
+  aipl_dec:
+    calls: 467
+    bytes: (external)
+  aipl_inc:
+    calls: 406
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 55
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 235
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 12
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 180
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 12
+    bytes: (external)
+  aipl_str_eq:
+    calls: 45
+    bytes: (external)
+  aipl_str_len:
+    calls: 32
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  keep:
+    calls: 0
+    bytes: 256
+  link$Kind$Node:
+    calls: 5
+    bytes: 1724
+  link_rule$Kind:
+    calls: 25
+    bytes: 4208
+  link_rules$Kind:
+    calls: 4
+    bytes: 716
+  main:
+    calls: 1
+    bytes: 72
+  name_index:
+    calls: 20
+    bytes: 404
+  prod_names$Kind$Node:
+    calls: 9
+    bytes: 496
+  rule_of$Kind$Node:
+    calls: 7
+    bytes: 688

@@ -24,6 +24,9 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
+variant:
+  add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
+
 vscode extension:
   LSP
   go to definition
@@ -43,6 +46,7 @@ misc cleanup:
   having both min and minimum is kinda weird. Maybe combine somehow?
   min/max shouldn't allow mixed integer types
   split pub mod lint and pub mod ast into separate files
+  oxford -> replace with join(self: T[], sep: T* = [], final_sep: T* = sep) with supporting syntax
 
 integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
