@@ -1671,6 +1671,11 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // codegen; see `AIPL_BUILTIN_SOURCES` in aipl-mono.
 fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
+// Append every element of `other` to `self` — `push` for a whole array. A
+// builtin rather than an AIPL loop over `push` so it can size the destination
+// once: growing by `other.len()` in a single reserve turns N reallocations into
+// at most one, and the elements move as one `memcpy` plus one retain pass.
+fn __builtin_extend<T: any>(mut self: T[], other: T[]) {}
 // Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 // Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
@@ -1847,6 +1852,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "len",
     "is_nonempty",
     "push",
+    "extend",
     "is_some",
     "is_some_and",
     "is_err_and",

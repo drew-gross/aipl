@@ -27,6 +27,9 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 variant:
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
 
+type system:
+  apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
+
 vscode extension:
   LSP
   go to definition
@@ -123,6 +126,8 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
+  for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
+  mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]
   is_nonempty lint should recognize x.len() != 0 and x.len() >= 1
   recognize and recommend min/max
   make a regex-like langauge for expressions to make lints easier to implement
@@ -156,8 +161,8 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  combine adjacent reserves (even across expressions)
   interp_scan has a bunch of inspiration:
-    for (let t : step.tokens) {set toks.push(t);} should just be set toks.extend(step.tokens)
     if (src[i..step.end] == "{") {set depth++;}; should fuse to something
     make a "count multiple" thing that counts instances of multiple needles in a given haystack
       if (src[i..step.end] == "{") {

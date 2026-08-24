@@ -19,6 +19,7 @@
 import {
     Span,
     equal as ==,
+    extend,
     filter,
     first,
     join,
@@ -54,9 +55,7 @@ pub fn cst_leaves(self: Cst) -> Span[] {
         CTree(_, kids) => {
             mut out: Span[] = [];
             for (let k : kids) {
-                for (let sp : k.cst_leaves()) {
-                    set out.push(sp);
-                }
+                set out.extend(k.cst_leaves());
             }
             out
         },
@@ -171,13 +170,13 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
 --- performance ---
 allocations: 112
 deallocations: 112
-reallocations: 22
+reallocations: 25
 bytes allocated: 5172
-instructions executed: 7242
-binary size: 19408
-  code: 10112
+instructions executed: 6189
+binary size: 19384
+  code: 10036
   data: 1361
-  metadata: 7935
+  metadata: 7987
 functions:
   __arr_drop_Cst:
     calls: 7
@@ -200,8 +199,14 @@ functions:
   aipl_arr_drop_str:
     calls: 21
     bytes: (external)
+  aipl_arr_extend:
+    calls: 25
+    bytes: (external)
   aipl_arr_inc:
     calls: 94
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 25
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 34
@@ -216,7 +221,7 @@ functions:
     calls: 20
     bytes: (external)
   aipl_array_push_mut:
-    calls: 29
+    calls: 2
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
@@ -265,7 +270,7 @@ functions:
     bytes: (external)
   cst_leaves:
     calls: 34
-    bytes: 712
+    bytes: 636
   cst_show:
     calls: 14
     bytes: 1456

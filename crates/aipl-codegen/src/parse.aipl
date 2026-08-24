@@ -34,6 +34,7 @@ import {
     count_while,
     drop_last,
     equal as ==,
+    extend,
     first,
     is_nonempty,
     join,
@@ -121,9 +122,7 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
         return far;
     };
     mut ex: str[] = [];
-    for (let e : far.expected) {
-        set ex.push(e);
-    }
+    set ex.extend(far.expected);
     set ex.push(label);
     Far { pos, expected: ex }
 }
@@ -196,12 +195,8 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     match (root) {
         CTree(i, kids) => {
             mut out: Cst[] = [];
-            for (let k : kids) {
-                set out.push(k);
-            }
-            for (let k : trailing_trivia(p)) {
-                set out.push(k);
-            }
+            set out.extend(kids);
+            set out.extend(trailing_trivia(p));
             CTree(i, out)
         },
         CLeaf(sp) => CLeaf(sp),
@@ -290,9 +285,7 @@ fn match_then<K: variant, A: any>(
             return ok(no(f, pos));
         };
         set cp = st.pos;
-        for (let k : st.kids) {
-            set acc.push(k);
-        }
+        set acc.extend(st.kids);
     }
     ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
@@ -348,9 +341,7 @@ fn match_many<K: variant, A: any>(
                 });
             };
             set cp = st.pos;
-            for (let k : st.kids) {
-                set acc.push(k);
-            }
+            set acc.extend(st.kids);
             set n++;
         } else {
             set going = false;
@@ -429,9 +420,7 @@ fn match_list_of<K: variant, A: any>(
         return ok(Step { hit: true, pos, kids: [], far: head.far });
     };
     mut acc: Cst[] = [];
-    for (let k : head.kids) {
-        set acc.push(k);
-    }
+    set acc.extend(head.kids);
     mut cp = head.pos;
     mut f = head.far;
     mut going = true;
@@ -441,18 +430,12 @@ fn match_list_of<K: variant, A: any>(
             let st = match_rule(p, item, cp + 1, cur, f)?;
             set f = st.far;
             if (st.hit) {
-                for (let k : sep_kids) {
-                    set acc.push(k);
-                }
-                for (let k : st.kids) {
-                    set acc.push(k);
-                }
+                set acc.extend(sep_kids);
+                set acc.extend(st.kids);
                 set cp = st.pos;
             } else {
                 if (trailing) {
-                    for (let k : sep_kids) {
-                        set acc.push(k);
-                    }
+                    set acc.extend(sep_kids);
                     set cp++;
                 };
                 set going = false;
@@ -515,9 +498,7 @@ fn climb<K: variant, A: any>(
         return ok(head);
     };
     mut kids: Cst[] = [];
-    for (let k : head.kids) {
-        set kids.push(k);
-    }
+    set kids.extend(head.kids);
     mut cp = head.pos;
     mut f = head.far;
     mut going = true;
@@ -530,9 +511,7 @@ fn climb<K: variant, A: any>(
                 set f = rhs.far;
                 if (rhs.hit) {
                     mut nk: Cst[] = [CTree(cur, kids)];
-                    for (let k : op_kids) {
-                        set nk.push(k);
-                    }
+                    set nk.extend(op_kids);
                     set nk.push(CTree(cur, rhs.kids));
                     set kids = nk;
                     set cp = rhs.pos;
@@ -940,21 +919,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 3007
-deallocations: 3007
-reallocations: 275
-bytes allocated: 149372
-instructions executed: 398284
-binary size: 257960
-  code: 149116
+allocations: 2894
+deallocations: 2894
+reallocations: 394
+bytes allocated: 136460
+instructions executed: 380979
+binary size: 254864
+  code: 146820
   data: 6956
-  metadata: 101888
+  metadata: 101088
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 347
+    calls: 263
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -969,7 +948,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m3__Token$Tok:
-    calls: 232
+    calls: 194
     bytes: 168
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
@@ -978,7 +957,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 431
+    calls: 275
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -993,7 +972,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m3__Token$Tok:
-    calls: 191
+    calls: 116
     bytes: 168
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
@@ -1057,7 +1036,7 @@ functions:
     bytes: 60
   __m1__cst_leaves:
     calls: 33
-    bytes: 712
+    bytes: 636
   __m1__cst_show:
     calls: 117
     bytes: 1456
@@ -1093,16 +1072,16 @@ functions:
     bytes: 1392
   __m3__finalize_template$Tok:
     calls: 0
-    bytes: 4684
+    bytes: 4360
   __m3__float_len:
     calls: 0
     bytes: 816
   __m3__interp_scan$Tok:
     calls: 0
-    bytes: 2432
+    bytes: 2056
   __m3__lex$Tok:
     calls: 42
-    bytes: 1748
+    bytes: 1372
   __m3__lex_step$Tok:
     calls: 151
     bytes: 18900
@@ -1143,28 +1122,34 @@ functions:
     calls: 0
     bytes: 180
   aipl_arr_drop_str:
-    calls: 296
+    calls: 305
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 511
     bytes: (external)
   aipl_arr_inc:
-    calls: 8029
+    calls: 8246
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 511
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 377
+    calls: 373
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10351
+    calls: 10455
     bytes: (external)
   aipl_array_new:
     calls: 1700
     bytes: (external)
   aipl_array_push:
-    calls: 620
+    calls: 294
     bytes: (external)
   aipl_array_push_mut:
-    calls: 282
+    calls: 247
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1176,22 +1161,22 @@ functions:
     calls: 418
     bytes: (external)
   aipl_dec:
-    calls: 12326
+    calls: 12162
     bytes: (external)
   aipl_inc:
-    calls: 9889
+    calls: 9725
     bytes: (external)
   aipl_rec_alloc:
     calls: 435
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2955
+    calls: 2563
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2520
+    calls: 2128
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1243,13 +1228,13 @@ functions:
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 2720
+    bytes: 2544
   error_at$Tok$Node:
     calls: 14
     bytes: 1604
   far_miss:
     calls: 53
-    bytes: 1140
+    bytes: 1004
   find_prec:
     calls: 22
     bytes: 848
@@ -1270,10 +1255,10 @@ functions:
     bytes: 72
   match_list_of$Tok$Node:
     calls: 4
-    bytes: 3112
+    bytes: 2700
   match_many$Tok$Node:
     calls: 15
-    bytes: 2008
+    bytes: 1880
   match_maybe$Tok$Node:
     calls: 4
     bytes: 836
@@ -1288,7 +1273,7 @@ functions:
     bytes: 4332
   match_then$Tok$Node:
     calls: 31
-    bytes: 1840
+    bytes: 1712
   msg_of:
     calls: 16
     bytes: 404
@@ -1303,7 +1288,7 @@ functions:
     bytes: 340
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 4152
+    bytes: 3988
   parsed:
     calls: 3
     bytes: 412

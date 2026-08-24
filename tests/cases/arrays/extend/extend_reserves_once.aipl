@@ -1,0 +1,67 @@
+import { extend, len, print, to_str } from builtins;
+
+// `extend` grows the destination once, however many elements it appends.
+//
+// This case and its sibling `push_loop_reallocates` append the same twenty
+// elements to the same one-element array, and differ only in how. The
+// `reallocations:` and `instructions executed:` counters below are the
+// comparison, and they are asserted rather than described.
+//
+// That gap is the whole reason `extend` is a language builtin rather than an
+// AIPL loop over `push`: only the builtin knows the final length before it
+// writes anything, so it sizes the destination once and then moves the
+// elements as a single block copy. A loop of `push` has to rediscover the
+// length one element at a time, doubling the block whenever it runs out.
+fn source() -> i64[] { [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] }
+
+fn main() !prints {
+    mut out = [0];
+    set out.extend(source());
+    print(out.len().to_str());
+}
+--- stdout ---
+21
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 1
+bytes allocated: 232
+instructions executed: 157
+binary size: 1824
+  code: 812
+  data: 1
+  metadata: 1011
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 180
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_dec:
+    calls: 2
+    bytes: (external)
+  aipl_inc:
+    calls: 1
+    bytes: (external)
+  aipl_print:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 632

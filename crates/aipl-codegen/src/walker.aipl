@@ -2718,15 +2718,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 21309
-deallocations: 21309
-reallocations: 905
-bytes allocated: 1047420
-instructions executed: 2905479
-binary size: 3234064
-  code: 1848696
+allocations: 21241
+deallocations: 21241
+reallocations: 980
+bytes allocated: 1024604
+instructions executed: 2898757
+binary size: 3229264
+  code: 1845528
   data: 27124
-  metadata: 1358244
+  metadata: 1356612
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2747,7 +2747,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 168
+    calls: 100
     bytes: 364
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 8
@@ -2771,7 +2771,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 159
+    calls: 84
     bytes: 364
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -2952,16 +2952,16 @@ functions:
     bytes: 1392
   __m9__finalize_template$__m8__AiplTok:
     calls: 0
-    bytes: 8480
+    bytes: 7440
   __m9__float_len:
     calls: 0
     bytes: 816
   __m9__interp_scan$__m8__AiplTok:
     calls: 0
-    bytes: 3120
+    bytes: 2056
   __m9__lex$__m8__AiplTok:
     calls: 8
-    bytes: 2436
+    bytes: 1372
   __m9__lex_step$__m8__AiplTok:
     calls: 131
     bytes: 22608
@@ -3005,13 +3005,13 @@ functions:
     calls: 2109
     bytes: (external)
   aipl_arr_extend:
-    calls: 215
+    calls: 475
     bytes: (external)
   aipl_arr_inc:
-    calls: 50056
+    calls: 50232
     bytes: (external)
   aipl_arr_reserve:
-    calls: 278
+    calls: 538
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2108
@@ -3020,13 +3020,13 @@ functions:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 62127
+    calls: 62235
     bytes: (external)
   aipl_array_new:
     calls: 10188
     bytes: (external)
   aipl_array_push:
-    calls: 1547
+    calls: 1463
     bytes: (external)
   aipl_array_push_mut:
     calls: 1677
@@ -3047,10 +3047,10 @@ functions:
     calls: 205
     bytes: (external)
   aipl_dec:
-    calls: 95724
+    calls: 95548
     bytes: (external)
   aipl_inc:
-    calls: 75716
+    calls: 75540
     bytes: (external)
   aipl_rec_alloc:
     calls: 6173

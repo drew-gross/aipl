@@ -1,0 +1,59 @@
+import { extend, print } from builtins;
+
+// A `char[]` is str-shaped, so it has no in-place growable block: `extend`
+// builds one fresh buffer of the combined length and copies both sides in,
+// exactly as `push` does for a single char. Value semantics still hold.
+fn main() !prints {
+    mut cs = ['a'];
+    let more = ['b', 'c'];
+    set cs.extend(more);
+    print(cs);
+    print(more);
+
+    // A shared receiver is copied, so the alias keeps the old bytes.
+    mut d = ['x'];
+    let alias = d;
+    set d.extend(['y']);
+    print(d);
+    print(alias);
+}
+--- stdout ---
+abc
+bc
+xy
+x
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 112
+instructions executed: 91
+binary size: 1960
+  code: 764
+  data: 1
+  metadata: 1195
+functions:
+  aipl_dec:
+    calls: 10
+    bytes: (external)
+  aipl_inc:
+    calls: 4
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 6
+    bytes: (external)
+  aipl_str_data:
+    calls: 4
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 764

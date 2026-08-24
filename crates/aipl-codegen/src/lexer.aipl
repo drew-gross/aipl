@@ -20,6 +20,7 @@ import {
     count_while,
     drop_first,
     equal as ==,
+    extend,
     first,
     int_parse,
     is_digit,
@@ -726,12 +727,8 @@ fn finalize_template<K>(
             some(r) => r,
             none => StepResult { tokens: [], trivia: [], end: 0 },
         };
-        for (let t : run.tokens) {
-            set toks.push(t);
-        }
-        for (let t : run.trivia) {
-            set trivia.push(t);
-        }
+        set toks.extend(run.tokens);
+        set trivia.extend(run.trivia);
         set k++;
     }
     ok(StepResult { tokens: toks, trivia, end })
@@ -765,12 +762,8 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
             if (step.end == i) {
                 return err(LexError { message: "unexpected character", span: i..i + 1 });
             };
-            for (let t : step.tokens) {
-                set toks.push(t);
-            }
-            for (let t : step.trivia) {
-                set trivia.push(t);
-            }
+            set toks.extend(step.tokens);
+            set trivia.extend(step.trivia);
             if (src[i..step.end] == "{") {
                 set depth++;
             };
@@ -881,12 +874,8 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
             // source with the span to show it).
             return err(LexError { message: "unexpected character", span: pos..pos + 1 });
         };
-        for (let t : step.tokens) {
-            set tokens.push(t);
-        }
-        for (let t : step.trivia) {
-            set trivia.push(t);
-        }
+        set tokens.extend(step.tokens);
+        set trivia.extend(step.trivia);
         set pos = step.end;
     }
     ok(LexResult { tokens, trivia })
@@ -1245,21 +1234,21 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1638
-deallocations: 1638
-reallocations: 0
-bytes allocated: 78488
-instructions executed: 278798
-binary size: 1798336
-  code: 1129580
+allocations: 1657
+deallocations: 1657
+reallocations: 38
+bytes allocated: 75704
+instructions executed: 268149
+binary size: 1791480
+  code: 1125060
   data: 8132
-  metadata: 660624
+  metadata: 658288
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 268
+    calls: 287
     bytes: 492
   __arr_drop_TokenRule$Kind:
     calls: 21
@@ -1268,7 +1257,7 @@ functions:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 217
+    calls: 151
     bytes: 492
   __arr_retain_TokenRule$Kind:
     calls: 0
@@ -1402,20 +1391,26 @@ functions:
   aipl_arr_drop_str:
     calls: 22
     bytes: (external)
+  aipl_arr_extend:
+    calls: 292
+    bytes: (external)
   aipl_arr_inc:
-    calls: 3052
+    calls: 3221
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 292
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 30
     bytes: (external)
   aipl_array_dec:
-    calls: 4424
+    calls: 4612
     bytes: (external)
   aipl_array_new:
     calls: 1177
     bytes: (external)
   aipl_array_push:
-    calls: 195
+    calls: 72
     bytes: (external)
   aipl_assert:
     calls: 59
@@ -1427,10 +1422,10 @@ functions:
     calls: 29
     bytes: (external)
   aipl_dec:
-    calls: 7105
+    calls: 6989
     bytes: (external)
   aipl_inc:
-    calls: 6094
+    calls: 5978
     bytes: (external)
   aipl_str_contains:
     calls: 325
@@ -1482,7 +1477,7 @@ functions:
     bytes: 112
   finalize_template$Kind:
     calls: 13
-    bytes: 10932
+    bytes: 9436
   float_len:
     calls: 14
     bytes: 816
@@ -1491,10 +1486,10 @@ functions:
     bytes: 1644
   interp_scan$Kind:
     calls: 9
-    bytes: 3568
+    bytes: 2056
   lex$Kind:
     calls: 59
-    bytes: 2884
+    bytes: 1372
   lex_step$Kind:
     calls: 140
     bytes: 25020

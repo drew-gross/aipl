@@ -1,0 +1,200 @@
+import { extend, join, print, to_str, wrapping_add as + } from builtins;
+
+// `extend` is `push` for a whole array: `set dst.extend(src)` appends every
+// element of `src` to `dst` in place, leaving `src` untouched.
+//
+// It is a builtin rather than an AIPL loop over `push` so it can size the
+// destination once — see `extend_reserves_once`, where that is the assertion.
+variant Tree = Leaf(i64) | Node(Tree, Tree)
+
+fn total(self: Tree) -> i64 {
+    match (self) {
+        Leaf(v) => v,
+        Node(l, r) => l.total() + r.total(),
+    }
+}
+
+fn sum(ts: Tree[]) -> i64 {
+    mut acc = 0;
+    for (let t : ts) {
+        set acc = acc + t.total();
+    }
+    acc
+}
+
+fn main() !prints {
+    // The ordinary case, and an empty source, which is a no-op.
+    mut a = [1, 2];
+    set a.extend([3, 4]);
+    let empty: i64[] = [];
+    set a.extend(empty);
+    print(to_str(a));
+
+    // The source aliases the destination. Retaining the source is what makes
+    // the block shared, which forces the copy before anything is written — so
+    // the elements read are the original six, not a half-written array.
+    mut b = [1, 2, 3];
+    set b.extend(b);
+    print(to_str(b));
+
+    // Value semantics, as for `push`: a shared destination is copied first and
+    // the other holder sees nothing.
+    mut c = [1, 2];
+    let alias = c;
+    set c.extend([9]);
+    print(`{to_str(c)} {to_str(alias)}`);
+
+    // Heap elements are retained, not moved: the source is still usable.
+    mut s = ["a"];
+    let more = ["b", "c"];
+    set s.extend(more);
+    print(`{s.join(",")} {more.join(",")}`);
+
+    // Boxed recursive elements, through the same retain pass.
+    mut ts = [Leaf(1)];
+    let src = [Node(Leaf(2), Leaf(3)), Leaf(4)];
+    set ts.extend(src);
+    print(`{sum(ts).to_str()} {sum(src).to_str()}`);
+
+    // `bool[]` is bit-packed, so it has no pre-sized form and appends bit by
+    // bit — the answer is the same either way.
+    mut flags = [true, false];
+    set flags.extend([true, true]);
+    print(to_str(flags));
+
+    // Nested arrays, and a destination that starts as the untyped empty
+    // literal and takes its element type from the source.
+    mut nest = [];
+    set nest.extend([[1], [2]]);
+    set nest.extend([[3, 4]]);
+    print(to_str(nest));
+
+    // Growing repeatedly in a loop — the shape this builtin exists to replace.
+    mut loops = [];
+    for (let i : [1, 2, 3]) {
+        set loops.extend([i, i]);
+    }
+    print(to_str(loops));
+}
+--- stdout ---
+[1, 2, 3, 4]
+[1, 2, 3, 1, 2, 3]
+[1, 2, 9] [1, 2]
+a,b,c b,c
+10 9
+[true, false, true, true]
+[[1], [2], [3, 4]]
+[1, 1, 2, 2, 3, 3]
+--- performance ---
+allocations: 43
+deallocations: 43
+reallocations: 6
+bytes allocated: 1875
+instructions executed: 5049
+binary size: 13640
+  code: 7536
+  data: 331
+  metadata: 5773
+functions:
+  __arr_drop_Tree:
+    calls: 3
+    bytes: 116
+  __arr_retain_Tree:
+    calls: 2
+    bytes: 116
+  __rec_drop_Tree:
+    calls: 5
+    bytes: 84
+  __to_str_bool$arr:
+    calls: 1
+    bytes: 692
+  __to_str_i64:
+    calls: 2
+    bytes: 180
+  __to_str_i64$arr:
+    calls: 5
+    bytes: 672
+  __to_str_i64$arr$arr:
+    calls: 1
+    bytes: 1132
+  aipl_arr_drop_arr:
+    calls: 3
+    bytes: (external)
+  aipl_arr_drop_str:
+    calls: 3
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 12
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 14
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 11
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 46
+    bytes: (external)
+  aipl_array_new:
+    calls: 23
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_concat:
+    calls: 12
+    bytes: (external)
+  aipl_dec:
+    calls: 63
+    bytes: (external)
+  aipl_i64_len:
+    calls: 54
+    bytes: (external)
+  aipl_inc:
+    calls: 29
+    bytes: (external)
+  aipl_print:
+    calls: 8
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 5
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 17
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 2
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 12
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 2
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 6
+    bytes: (external)
+  aipl_str_join:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 5
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 46
+    bytes: (external)
+  aipl_write_i64:
+    calls: 27
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 4152
+  sum:
+    calls: 2
+    bytes: 232
+  total:
+    calls: 9
+    bytes: 160

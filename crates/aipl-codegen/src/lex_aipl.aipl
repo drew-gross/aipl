@@ -637,21 +637,21 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4679
-deallocations: 4679
-reallocations: 0
-bytes allocated: 274184
-instructions executed: 747138
-binary size: 218880
-  code: 141276
+allocations: 4666
+deallocations: 4666
+reallocations: 31
+bytes allocated: 270208
+instructions executed: 742918
+binary size: 214152
+  code: 138108
   data: 7100
-  metadata: 70504
+  metadata: 68944
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 129
+    calls: 116
     bytes: 364
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 20
@@ -660,7 +660,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 95
+    calls: 63
     bytes: 364
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -763,16 +763,16 @@ functions:
     bytes: 1392
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 8480
+    bytes: 7440
   __m1__float_len:
     calls: 0
     bytes: 816
   __m1__interp_scan$AiplTok:
     calls: 1
-    bytes: 3120
+    bytes: 2056
   __m1__lex$AiplTok:
     calls: 20
-    bytes: 2436
+    bytes: 1372
   __m1__lex_step$AiplTok:
     calls: 91
     bytes: 22608
@@ -827,20 +827,26 @@ functions:
   aipl_arr_drop_str:
     calls: 9
     bytes: (external)
+  aipl_arr_extend:
+    calls: 180
+    bytes: (external)
   aipl_arr_inc:
-    calls: 7554
+    calls: 7678
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 180
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 11226
+    calls: 11337
     bytes: (external)
   aipl_array_new:
     calls: 3599
     bytes: (external)
   aipl_array_push:
-    calls: 69
+    calls: 13
     bytes: (external)
   aipl_array_push_mut:
     calls: 4
@@ -858,10 +864,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_dec:
-    calls: 24443
+    calls: 24394
     bytes: (external)
   aipl_inc:
-    calls: 19328
+    calls: 19279
     bytes: (external)
   aipl_str_contains:
     calls: 1016

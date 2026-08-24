@@ -9467,6 +9467,52 @@ fn arr_base(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
 
 /// Load the length of an array (any repr) in Cranelift IR.  Strips the tag
 /// before reading, because tagged pointers are not valid addresses.
+/// Resolve the receiver of an in-place array mutation (`push`, `extend`) to its
+/// stack slot, its live type cell, whether static analysis proved it unaliased,
+/// and its current element type. `what` names the method in the diagnostics.
+///
+/// The receiver has to be a `mut` array *variable* by name: the whole point of
+/// the writeback form is storing the grown array back into that binding's slot,
+/// and there is no slot to write back to for anything else. Every other call
+/// position was already rewritten by mono into this one on a fresh local.
+fn mut_array_receiver(
+    env: &Env,
+    receiver: &Expr,
+    what: &str,
+) -> Result<(StackSlot, Rc<RefCell<Type>>, bool, Type), Error> {
+    let ExprKind::Ident(var) = &receiver.kind else {
+        return Err(Error::at(
+            format!("\"{what}\" must be called on a mutable array variable, e.g. \"xs.{what}(x)\""),
+            receiver.span.clone(),
+        ));
+    };
+    let (slot, ty_cell, exclusive) = match env.get(var) {
+        Some(EnvBinding::Mut(slot, cell, excl)) => (*slot, cell.clone(), *excl),
+        Some(EnvBinding::Immut(_, _)) => {
+            return Err(Error::at(
+                format!("cannot \"{what}\" to immutable binding {var:?}; declare it with \"mut\""),
+                receiver.span.clone(),
+            ));
+        }
+        None => {
+            return Err(Error::at(
+                format!("unknown identifier {var:?}"),
+                receiver.span.clone(),
+            ));
+        }
+    };
+    let elem_ty = match &*ty_cell.borrow() {
+        Type::Array(inner) => (**inner).clone(),
+        other => {
+            return Err(Error::at(
+                format!("\"{what}\" requires an array, got {}", type_name(other)),
+                receiver.span.clone(),
+            ));
+        }
+    };
+    Ok((slot, ty_cell, exclusive, elem_ty))
+}
+
 fn load_arr_len(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
     let u = arr_base(builder, arr_ptr);
     builder.ins().load(
@@ -15816,39 +15862,7 @@ fn compile_call_expr<M: Module>(
             }
             let receiver = &args[0];
             let value = &args[1];
-            let ExprKind::Ident(var) = &receiver.kind else {
-                return Err(Error::at(
-                    "\"push\" must be called on a mutable array variable, e.g. \"xs.push(x)\""
-                        .to_string(),
-                    receiver.span.clone(),
-                ));
-            };
-            let (slot, ty_cell, exclusive) = match env.get(var) {
-                Some(EnvBinding::Mut(slot, cell, excl)) => (*slot, cell.clone(), *excl),
-                Some(EnvBinding::Immut(_, _)) => {
-                    return Err(Error::at(
-                        format!(
-                            "cannot \"push\" to immutable binding {var:?}; declare it with \"mut\""
-                        ),
-                        receiver.span.clone(),
-                    ));
-                }
-                None => {
-                    return Err(Error::at(
-                        format!("unknown identifier {var:?}"),
-                        receiver.span.clone(),
-                    ));
-                }
-            };
-            let elem_ty = match &*ty_cell.borrow() {
-                Type::Array(inner) => (**inner).clone(),
-                other => {
-                    return Err(Error::at(
-                        format!("\"push\" requires an array, got {}", type_name(other)),
-                        receiver.span.clone(),
-                    ));
-                }
-            };
+            let (slot, ty_cell, exclusive, elem_ty) = mut_array_receiver(env, receiver, "push")?;
             let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, value)?;
             let elem_was_none = is_none_inner(&elem_ty);
@@ -16017,6 +16031,178 @@ fn compile_call_expr<M: Module>(
             // Refine the binding's element type (e.g. `mut a = []` → `i64[]`).
             *ty_cell.borrow_mut() = new_arr_ty;
             // `push` mutates; it produces no value.
+            (builder.ins().iconst(types::I64, 0), Type::Unit)
+        }
+        "__builtin_extend" => {
+            // `push` for a whole array, and the same in-place writeback form:
+            // receiver in `args[0]`, source array in `args[1]`, result stored
+            // back into the receiver's slot. Every other call position was
+            // rewritten into this one by mono, exactly as for `push`.
+            //
+            // The reason this is a builtin rather than an AIPL loop over `push`
+            // is the sizing: `aipl_arr_reserve` grows the destination once, to
+            // its final length, so appending N elements costs at most one
+            // reallocation instead of the log N a repeated `push` pays — and the
+            // elements then move as a single `memcpy` plus one retain pass.
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"extend\" expects 1 argument, got {}", args.len() - 1),
+                    span.clone(),
+                ));
+            }
+            let receiver = &args[0];
+            let source = &args[1];
+            let (slot, ty_cell, exclusive, elem_ty) = mut_array_receiver(env, receiver, "extend")?;
+            let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+            let mark = scope_depth(scopes);
+            let (src_ptr, src_ty) = compile_expr(module, builder, cx, scopes, source)?;
+            let src_owned = owned_temp_since(scopes, mark, src_ptr);
+            let src_elem = match &src_ty {
+                Type::Array(inner) => (**inner).clone(),
+                other => {
+                    return Err(Error::at(
+                        format!("\"extend\" requires an array, got {}", type_name(other)),
+                        source.span.clone(),
+                    ));
+                }
+            };
+            // The receiver takes its element type from the source when it is
+            // still the untyped empty literal, and otherwise the two must agree.
+            // An empty source pins nothing either way.
+            let elem_was_none = is_none_inner(&elem_ty);
+            let result_elem = if elem_was_none {
+                src_elem
+            } else {
+                if !is_none_inner(&src_elem) {
+                    expect_type(
+                        &src_ty,
+                        &Type::Array(Box::new(elem_ty.clone())),
+                        "extend source",
+                        source.span.clone(),
+                    )?;
+                }
+                elem_ty
+            };
+            let new_arr_ty = Type::Array(Box::new(result_elem.clone()));
+            if is_char_array(&new_arr_ty) {
+                // `char[]` is str-shaped, and `str` has no in-place growable
+                // form: build a fresh buffer of the combined length and copy
+                // both sides in, mirroring the `push` char path (and, for the
+                // same reason it does, refusing the untyped-empty transition —
+                // a loop body compiles once but runs many times, so "this is
+                // the first push" cannot be decided here).
+                if elem_was_none {
+                    return Err(Error::at(
+                        "cannot extend a char array that started as an untyped empty literal \
+                         (`mut cs = []`) — initialize it with a char first, e.g. \
+                         \"mut cs = ['a']\", since the first append can't be proven to run \
+                         only once"
+                            .to_string(),
+                        receiver.span.clone(),
+                    ));
+                }
+                let len_f = builtins.import(module, builder.func, "aipl_str_len");
+                let inst = builder.ins().call(len_f, &[arr_ptr]);
+                let old_len = builder.inst_results(inst)[0];
+                let inst = builder.ins().call(len_f, &[src_ptr]);
+                let add_len = builder.inst_results(inst)[0];
+                let new_len = builder.ins().iadd(old_len, add_len);
+                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
+                let inst = builder.ins().call(alloc_f, &[new_len]);
+                let buf = builder.inst_results(inst)[0];
+                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
+                let data_f = builtins.import(module, builder.func, "aipl_str_data");
+                let copy_f = builtins.import(module, builder.func, "aipl_write_bytes");
+                let inst = builder.ins().call(data_f, &[arr_ptr, scratch_addr]);
+                let src0 = builder.inst_results(inst)[0];
+                builder.ins().call(copy_f, &[buf, src0, old_len]);
+                let at = builder.ins().iadd(buf, old_len);
+                let inst = builder.ins().call(data_f, &[src_ptr, scratch_addr]);
+                let src1 = builder.inst_results(inst)[0];
+                builder.ins().call(copy_f, &[at, src1, add_len]);
+                builder.ins().stack_store(types::I64, buf, slot, 0);
+                // `aipl_str_len`/`aipl_str_data` only borrow, so — exactly as in
+                // the `push` char path — an exclusive receiver's old value is
+                // freed here and a possibly-shared one is left to the track that
+                // already owns it.
+                if exclusive {
+                    emit_rc(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        arr_ptr,
+                        &new_arr_ty,
+                        RcOp::Drop,
+                    );
+                } else {
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(buf, &new_arr_ty));
+                }
+                *ty_cell.borrow_mut() = new_arr_ty;
+                return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));
+            }
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &result_elem);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &result_elem);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&result_elem, structs));
+            // `aipl_arr_extend` consumes `src`. An owned temporary is moved in
+            // (its scope track has to go, or the block is dropped twice); a
+            // borrowed one gets the compensating pre-inc.
+            if src_owned {
+                let scope = scopes.last_mut().expect("scope");
+                scope.retain(|t| !matches!(t.owned, Owned::Value(x) if x == src_ptr));
+            } else {
+                emit_retain(builder, module, builtins, structs, src_ptr, &src_ty);
+            }
+            // `aipl_arr_reserve` has `aipl_array_push`'s ownership contract: it
+            // consumes one reference to the array and hands back one owned
+            // reference, growing in place when the block is uniquely owned and
+            // copying when it isn't. So the bookkeeping below is `push`'s,
+            // unchanged — including the aliasing case `a.extend(a)`, where the
+            // source's own retain is what makes the block shared and so forces
+            // the copy before anything is written.
+            //
+            // A bit-packed `bool[]` has no pre-sized form (`reserve` measures in
+            // whole elements), so it skips straight to `aipl_arr_extend`, which
+            // appends bit by bit through the copying push.
+            let grown = if is_bit_packed(&result_elem) {
+                arr_ptr
+            } else {
+                let len_v = load_arr_len(builder, src_ptr);
+                let local = builtins.import(module, builder.func, "aipl_arr_reserve");
+                let inst = builder
+                    .ins()
+                    .call(local, &[arr_ptr, len_v, drop_fn, retain_fn, esz]);
+                builder.inst_results(inst)[0]
+            };
+            let local = builtins.import(module, builder.func, "aipl_arr_extend");
+            let inst = builder
+                .ins()
+                .call(local, &[grown, src_ptr, drop_fn, retain_fn, esz]);
+            let new_ptr = builder.inst_results(inst)[0];
+            builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+            if !exclusive {
+                // Possibly shared: the slot's own reference was consumed by the
+                // reserve above (as `push` has it consumed by `aipl_array_push`);
+                // the extra retain plus value-track is the new version's region
+                // track, keeping it borrowable to this scope's exit.
+                emit_retain(builder, module, builtins, structs, new_ptr, &new_arr_ty);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(new_ptr, &new_arr_ty));
+            }
+            *ty_cell.borrow_mut() = new_arr_ty;
+            // `extend` mutates; it produces no value.
             (builder.ins().iconst(types::I64, 0), Type::Unit)
         }
         // The `i8(x)`/`u32(x)`/… conversion builtins were removed in favour of a

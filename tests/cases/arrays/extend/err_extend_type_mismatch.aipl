@@ -1,0 +1,16 @@
+import { extend } from builtins;
+
+// The source's element type has to match the destination's — the same check
+// `push` makes on a single element, one level up. (An untyped-empty destination
+// is the one exception: it takes its element type from the source, which is the
+// last case in `extend.aipl`.)
+fn main() {
+    mut xs = [1];
+    set xs.extend(["a"]);
+}
+--- errors ---
+error: extend source: expected i64[], got str[]
+ --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:9:19
+  |
+9 |     set xs.extend(["a"]);
+  |                   ^^^^

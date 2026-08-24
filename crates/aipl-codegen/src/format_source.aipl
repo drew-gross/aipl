@@ -70,21 +70,21 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 2204
-deallocations: 2204
-reallocations: 6
-bytes allocated: 101201
-instructions executed: 326734
-binary size: 863464
-  code: 528140
+allocations: 2192
+deallocations: 2192
+reallocations: 21
+bytes allocated: 98537
+instructions executed: 325210
+binary size: 858664
+  code: 524972
   data: 2508
-  metadata: 332816
+  metadata: 331184
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
     bytes: 140
   __arr_drop___m13__Token$__m12__AiplTok:
-    calls: 36
+    calls: 24
     bytes: 364
   __arr_drop___m13__TokenRule$__m12__AiplTok:
     calls: 4
@@ -108,7 +108,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m13__Token$__m12__AiplTok:
-    calls: 33
+    calls: 18
     bytes: 364
   __arr_retain___m13__TokenRule$__m12__AiplTok:
     calls: 0
@@ -238,16 +238,16 @@ functions:
     bytes: 1392
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
-    bytes: 8480
+    bytes: 7440
   __m13__float_len:
     calls: 0
     bytes: 816
   __m13__interp_scan$__m12__AiplTok:
     calls: 0
-    bytes: 3120
+    bytes: 2056
   __m13__lex$__m12__AiplTok:
     calls: 4
-    bytes: 2436
+    bytes: 1372
   __m13__lex_step$__m12__AiplTok:
     calls: 27
     bytes: 22608
@@ -624,25 +624,25 @@ functions:
     calls: 50
     bytes: (external)
   aipl_arr_extend:
-    calls: 4
+    calls: 58
     bytes: (external)
   aipl_arr_inc:
-    calls: 4455
+    calls: 4491
     bytes: (external)
   aipl_arr_reserve:
-    calls: 10
+    calls: 64
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 6300
+    calls: 6324
     bytes: (external)
   aipl_array_new:
     calls: 1774
     bytes: (external)
   aipl_array_push:
-    calls: 42
+    calls: 24
     bytes: (external)
   aipl_array_push_mut:
     calls: 45
@@ -663,10 +663,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 10217
+    calls: 10202
     bytes: (external)
   aipl_inc:
-    calls: 8399
+    calls: 8384
     bytes: (external)
   aipl_rec_alloc:
     calls: 100
