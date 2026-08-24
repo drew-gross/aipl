@@ -1592,6 +1592,68 @@ pub struct ConcreteFn {
     pub body: Expr,
 }
 
+/// Classification every consumer of a [`ConcreteFn`] needs, answered from the
+/// declaration alone.
+///
+/// These mirror the same questions [`Signature`] answers about a source
+/// function — [`Signature::return_type`] and [`Signature::is_mutating`] have the
+/// same names and the same meanings here — so the two ends of monomorphization
+/// read alike. They live on the type rather than in codegen because every one of
+/// them is a property of the function itself: no target, no layout, no ABI
+/// lowering is consulted, only what was declared.
+impl ConcreteFn {
+    /// The declared return type, with an absent one read as `Unit`.
+    ///
+    /// This is what the *body* is checked against. What a caller receives can
+    /// differ — see [`ConcreteFn::abi_return_type`].
+    pub fn return_type(&self) -> Type {
+        self.return_ty.clone().unwrap_or(Type::Unit)
+    }
+
+    /// A mutating method: `fn f(mut self: T, ...)`. It returns nothing to the
+    /// user and mutates its receiver.
+    pub fn is_mutating(&self) -> bool {
+        self.params.first().is_some_and(|p| p.mutable)
+    }
+
+    /// `main` declared with no return type: it returns nothing, and its exit
+    /// code is implicitly 0. As the program entry it still needs an `i64`
+    /// result, which codegen gives it (emitting 0) — but its body is
+    /// type-checked as unit, so a trailing expression (an attempt to return a
+    /// value) is an error.
+    pub fn is_unit_main(&self) -> bool {
+        self.name == "main" && self.return_ty.is_none()
+    }
+
+    /// `fn main() -> !Error`: an allowed entry variation. Its body yields a
+    /// void-Ok result; at the ABI level `main` still returns an `i64` exit code,
+    /// which codegen derives from the result — `ok()` → 0, `err(msg)` → print
+    /// `error: <msg>` and exit 1.
+    pub fn is_error_main(&self) -> bool {
+        self.name == "main"
+            && matches!(&self.return_ty, Some(Type::Result(ok, err)) if is_unit(ok) && is_error(err))
+    }
+
+    /// The type this function actually yields to a caller — what its signature
+    /// returns and what a call site sees.
+    ///
+    /// This is [`ConcreteFn::return_type`] except for the entry-style cases that
+    /// produce a value while their body is checked as unit: a mutating method
+    /// yields its (mutated) `self`, and either flavour of entry `main` yields an
+    /// `i64` exit code.
+    pub fn abi_return_type(&self) -> Type {
+        if self.is_mutating() {
+            self.params[0].ty.clone()
+        } else if self.is_unit_main() || self.is_error_main() {
+            // Both produce an `i64` exit code: a unit `main` always 0, an
+            // `!Error` `main` 0/1 derived from its result.
+            Type::Primitive(Primitive::I64)
+        } else {
+            self.return_type()
+        }
+    }
+}
+
 /// A fully-resolved parameter: `variadic` doesn't appear here because by the
 /// time a [`ConcreteFn`] exists, every variadic parameter has already been
 /// resolved to its per-call shape by `specialize_variadic` (its `ty` retyped to
@@ -6639,7 +6701,7 @@ fn is_inline_candidate_mono(
         && !binders.contains(&f.name)
         && is_inline_shape(
             f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))),
-            f.params.first().is_some_and(|p| p.mutable),
+            f.is_mutating(),
             &f.body,
             &f.name,
         )

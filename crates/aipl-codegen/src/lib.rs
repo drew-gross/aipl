@@ -4762,9 +4762,9 @@ fn compile_program<M: Module>(
                     tail_owned: participant && is_boxed(&p.ty, &structs),
                 })
                 .collect(),
-            return_ty: abi_return_ty(f),
+            return_ty: f.abi_return_type(),
             effects: f.effects.clone(),
-            is_mutating: is_mutating_fn(f),
+            is_mutating: f.is_mutating(),
         };
         funcs.insert(f.name.clone(), info);
         decls.push((id, f));
@@ -6836,46 +6836,6 @@ fn injected_cli_args_ty() -> Type {
     Type::Primitive(Primitive::I64)
 }
 
-/// `main` declared with no return type: it returns nothing, and its exit code
-/// is implicitly 0. As the program entry it still needs an `i64` result, so
-/// codegen gives it one (emitting 0) — but its body is type-checked as unit,
-/// so a trailing expression (an attempt to return a value) is an error.
-fn is_unit_main(f: &aipl_mono::ConcreteFn) -> bool {
-    f.name == "main" && f.return_ty.is_none()
-}
-
-/// `fn main() -> !Error`: an allowed entry variation. Its body yields a void-Ok
-/// result; at the ABI level `main` still returns an `i64` exit code, which
-/// codegen derives from the result — `ok()` → 0, `err(msg)` → print
-/// `error: <msg>` and exit 1.
-fn is_error_main(f: &aipl_mono::ConcreteFn) -> bool {
-    f.name == "main"
-        && matches!(&f.return_ty, Some(Type::Result(ok, err)) if is_unit(ok) && is_error(err))
-}
-
-/// A mutating method: `fn f(mut self: T, ...)`. It returns nothing to the
-/// user and mutates its receiver.
-fn is_mutating_fn(f: &aipl_mono::ConcreteFn) -> bool {
-    f.params.first().is_some_and(|p| p.mutable)
-}
-
-/// The type a function actually yields at the ABI level — what its signature
-/// returns and what a caller's `Call` sees. This is the *declared* return type
-/// except for two entry-style cases that produce a value while their body is
-/// checked as unit: a unit `main` yields its `i64` exit code, and a mutating
-/// method yields its (mutated) `self`.
-fn abi_return_ty(f: &aipl_mono::ConcreteFn) -> Type {
-    if is_mutating_fn(f) {
-        f.params[0].ty.clone()
-    } else if is_unit_main(f) || is_error_main(f) {
-        // Both produce an `i64` exit code: a unit `main` always 0, an `!Error`
-        // `main` 0/1 derived from its result (see `compile_function`).
-        Type::Primitive(Primitive::I64)
-    } else {
-        f.return_ty.clone().unwrap_or(Type::Unit)
-    }
-}
-
 /// Fill `sig`'s params and returns for `f`'s ABI: a hidden sret pointer when
 /// the (ABI) return is a struct, one i64 per declared parameter, then the
 /// result — nothing for unit/struct(sret), `(tag, value)` for an optional, a
@@ -6893,7 +6853,7 @@ fn build_signature(
     if tail {
         sig.call_conv = CallConv::Tail;
     }
-    let abi = abi_return_ty(f);
+    let abi = f.abi_return_type();
     // Composites — structs and optionals (possibly nested) — are returned
     // through a hidden caller-provided pointer (sret), uniformly.
     let returns_composite = sret_size(&abi, structs).is_some();
@@ -7033,12 +6993,14 @@ fn tail_safe_param(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
 /// whose ABI return is *derived* from the body (a unit or `!Error` `main`, a
 /// mutating method), anything returning through an sret pointer, and any
 /// parameter that fails [`tail_safe_param`].
+///
+/// Excluding `main` by name covers both entry-style mains on its own — each of
+/// `ConcreteFn::is_unit_main` and `is_error_main` requires that name — so only
+/// the mutating case needs asking about separately.
 fn tail_eligible(f: &aipl_mono::ConcreteFn, structs: &HashMap<String, TypeDef>) -> bool {
     f.name != "main"
-        && !is_mutating_fn(f)
-        && !is_unit_main(f)
-        && !is_error_main(f)
-        && sret_size(&abi_return_ty(f), structs).is_none()
+        && !f.is_mutating()
+        && sret_size(&f.abi_return_type(), structs).is_none()
         && f.params.iter().all(|p| tail_safe_param(&p.ty, structs))
 }
 
@@ -7063,14 +7025,14 @@ fn tail_call_plan(
         if !eligible[f.name.as_str()] {
             continue;
         }
-        let caller_unit = is_unit(&abi_return_ty(f));
+        let caller_unit = is_unit(&f.abi_return_type());
         for callee in tail_callees(&f.body) {
             // A name with no instance is a builtin or a codegen intrinsic; both
             // are reached through paths that never become a tail call.
             let Some(g) = by_name.get(callee.as_str()) else {
                 continue;
             };
-            if !eligible[callee.as_str()] || is_unit(&abi_return_ty(g)) != caller_unit {
+            if !eligible[callee.as_str()] || is_unit(&g.abi_return_type()) != caller_unit {
                 continue;
             }
             plan.insert(f.name.clone());
@@ -8373,12 +8335,12 @@ fn define_fn<M: Module>(
     // The body is checked against the *declared* return type; the *ABI* return
     // (what the signature emits) may differ for entry-style functions — a unit
     // `main` yields its i64 exit code, a mutating method its final `self`.
-    let declared_ret = func.return_ty.clone().unwrap_or(Type::Unit);
-    let abi_ret = abi_return_ty(func);
+    let declared_ret = func.return_type();
+    let abi_ret = func.abi_return_type();
     let ret_composite = sret_size(&abi_ret, structs).is_some();
-    let mutating = is_mutating_fn(func);
-    let unit_main = is_unit_main(func);
-    let error_main = is_error_main(func);
+    let mutating = func.is_mutating();
+    let unit_main = func.is_unit_main();
+    let error_main = func.is_error_main();
     // Synthesized `.test` bodies are named `__test$<fn>` (see `synthesize_test_program`).
     let in_test = func.name.starts_with("__test$");
     build_signature(&mut ctx.func.signature, func, structs, tail_id.is_some());
