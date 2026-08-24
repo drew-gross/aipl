@@ -270,8 +270,6 @@ expression matcher:
   use it for operation fusion
 
 handoff:
-  reimplement it in rust and/or aipl
-    then have nextest output json so we do less fragile output scraping
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
   Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.

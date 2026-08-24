@@ -51,13 +51,18 @@
 //! # Test runner
 //!
 //! `cargo nextest`, which runs each test in its own process (so one crashing
-//! case can't take the binary down with it) and reports a stable
-//! `FAIL [..] (n/m) <binary> <test>` line per failure — what [`discovery`]
-//! parses. One nextest difference this has to account for: it *defaults to
-//! fail-fast*, the opposite of `cargo test`, so every whole-suite run below
-//! passes `--no-fail-fast`. (It also skips doctests, of which the repo has none
-//! left — the documented examples are ordinary tests in `tests/ffi.rs`.)
-//! `--color never` keeps the captured output parseable.
+//! case can't take the binary down with it). Every step that actually *runs*
+//! tests asks for the machine-readable event stream ([`Cmd::json`]), so
+//! [`discovery`] reads structured records — each failure carrying its own
+//! output — rather than grepping a presentation format. The `--no-run` builds
+//! stay plain: nothing runs, so there are no events, and cargo's compile errors
+//! are the point.
+//!
+//! One nextest difference this has to account for: it *defaults to fail-fast*,
+//! the opposite of `cargo test`, so every whole-suite run below passes
+//! `--no-fail-fast`. (It also skips doctests, of which the repo has none left —
+//! the documented examples are ordinary tests in `tests/ffi.rs`.) `--color
+//! never` keeps the human half of the output readable.
 //!
 //! # Exit status
 //!
@@ -69,7 +74,7 @@ mod runner;
 
 use std::path::{Path, PathBuf};
 
-use runner::{Cmd, Runner, BOLD, DIM, GREEN, OFF};
+use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF};
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -109,10 +114,16 @@ tasks:
 /// failure by default and this gate needs to see *all* remediable staleness in
 /// one pass (see the discovery step).
 fn nextest() -> Cmd {
-    Cmd::new("cargo").args(["nextest", "run", "--color", "never", "--no-fail-fast"])
+    Cmd::new("cargo")
+        .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
+        .json()
 }
 
 /// Build every test target without running anything.
+///
+/// The only nextest step that is *not* [`Cmd::json`]: nothing runs, so there are
+/// no test events, and what this step reports on — cargo's compile errors — is
+/// build output rather than test results.
 fn nextest_build() -> Cmd {
     Cmd::new("cargo").args(["nextest", "run", "--no-run", "--color", "never"])
 }
@@ -120,16 +131,32 @@ fn nextest_build() -> Cmd {
 /// One `#[ignore]`d author helper, by exact name. nextest selects ignored tests
 /// with `--run-ignored only` rather than libtest's `-- --ignored <name>`.
 fn helper(name: &str) -> Cmd {
-    Cmd::new("cargo").args([
-        "nextest",
-        "run",
-        "--color",
-        "never",
-        "--run-ignored",
-        "only",
-        "-E",
-        &format!("test(={name})"),
-    ])
+    Cmd::new("cargo")
+        .args([
+            "nextest",
+            "run",
+            "--color",
+            "never",
+            "--run-ignored",
+            "only",
+            "-E",
+            &format!("test(={name})"),
+        ])
+        .json()
+}
+
+/// A helper step's summary, or a stop explaining why there wasn't one.
+///
+/// Every author helper diverges on purpose, so its message is in a failed test's
+/// record — see [`discovery`].
+fn helper_output(r: &mut Runner, label: &str) -> String {
+    match discovery::Run::parse(&r.out).helper_output() {
+        Ok(out) => out,
+        Err(why) => {
+            r.save_out();
+            r.fail(label, &why);
+        }
+    }
 }
 
 /// First `limit` lines of `out` matching `pred`, prefixed with their line
@@ -202,7 +229,7 @@ or discard it
 
     if !r.step("cargo fmt (Rust)", Cmd::new("cargo").args(["fmt"])) {
         r.save_out();
-        let detail = r.out.clone();
+        let detail = r.out.merged.clone();
         r.fail("cargo fmt", &detail);
     }
 
@@ -217,7 +244,7 @@ or discard it
     // of inside the formatting step.
     if !r.step("nextest --no-run (build)", nextest_build()) {
         r.save_out();
-        let detail = excerpt(&r.out, 30, |l| l.starts_with("error"));
+        let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
         r.fail("build", &detail);
     }
 
@@ -237,12 +264,13 @@ or discard it
     // invalidate aipl-mono — which the compile check below absorbs and reports
     // as its own step.
     r.step("aipl fmt (format_corpus)", helper("fmt::format_corpus"));
-    if r.out.contains("format failed:") {
+    let fmt_out = helper_output(&mut r, "aipl fmt");
+    if fmt_out.contains("format failed:") {
         r.save_out();
-        let detail = excerpt(&r.out, usize::MAX, |l| l.contains("format failed:"));
+        let detail = excerpt(&fmt_out, usize::MAX, |l| l.contains("format failed:"));
         r.fail("aipl fmt", &detail);
     }
-    if let Some(n) = reformatted_count(&r.out) {
+    if let Some(n) = reformatted_count(&fmt_out) {
         if n > 0 {
             eprintln!("{DIM}    (reformatted {n} .aipl file(s)){OFF}");
         }
@@ -255,7 +283,7 @@ or discard it
     // below. A no-op second or two when they changed nothing, the common case.
     if !r.step("nextest --no-run (compile check)", nextest_build()) {
         r.save_out();
-        let detail = excerpt(&r.out, 30, |l| l.starts_with("error"));
+        let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
         r.fail("compile", &detail);
     }
 
@@ -274,9 +302,23 @@ or discard it
         std::process::exit(0);
     }
     r.save_out(); // keep the discovery output for any failure message below
-    let out = r.out.clone();
+    let run = discovery::Run::parse(&r.out);
 
-    let unfillable = discovery::unfillable(&out);
+    // The run failed, so it ran tests, so the JSON stream must have carried
+    // events. None means the machine-readable interface moved — which would
+    // otherwise read as "nothing failed" and send the gate on to remediate
+    // staleness it never saw.
+    if !run.saw_events() {
+        r.fail(
+            "nextest (no JSON events)",
+            "The run failed but emitted no parseable events on stdout. nextest's libtest-json
+output is still experimental, so this most likely means the interface changed:
+check `cargo nextest run --help` for --message-format / --message-format-version
+and update MESSAGE_FORMAT_VERSION in xtask/src/runner.rs.",
+        );
+    }
+
+    let unfillable = run.unfillable();
     if !unfillable.is_empty() {
         r.fail(
             "nextest (failure a refill can't fix)",
@@ -284,14 +326,14 @@ or discard it
         );
     }
 
-    let hard = discovery::hard_failures(&out);
+    let hard = run.hard_failures();
     if !hard.is_empty() {
         r.fail("nextest (failing test)", &hard.join("\n"));
     }
 
-    let plan = discovery::plan(&out);
+    let plan = run.plan();
     if plan.is_empty() {
-        let detail = tail(&out, 40);
+        let detail = tail(&run.failure_output(), 40);
         r.fail("nextest (unrecognized failure)", &detail);
     }
 
@@ -305,9 +347,10 @@ or discard it
             "fill_case_tests (per-case #[test] list)",
             helper("fill_case_tests"),
         );
-        if !wrote_case_tests(&r.out) {
+        let out = helper_output(&mut r, "fill_case_tests");
+        if !wrote_case_tests(&out) {
             r.save_out();
-            let detail = tail(&r.out, 40);
+            let detail = tail(&out, 40);
             r.fail("fill_case_tests", &detail);
         }
     }
@@ -325,9 +368,10 @@ or discard it
                 "fill_expected (section refill — full corpus, no case path found)",
                 helper("fill_expected"),
             );
-            if !r.out.contains("refresh complete") {
+            let out = helper_output(&mut r, "fill_expected");
+            if !out.contains("refresh complete") {
                 r.save_out();
-                let detail = tail(&r.out, 40);
+                let detail = tail(&out, 40);
                 r.fail("fill_expected", &detail);
             }
         } else {
@@ -338,25 +382,20 @@ or discard it
                 // summary line reporting the case was seen (`matched > 0`, else
                 // the harness asserts before printing) with `0 failed` (no
                 // unfillable failure slipped in).
+                // Built from `helper` rather than spelled out, so it cannot
+                // drift from the other helper steps — writing the arguments
+                // longhand here is exactly how this one ended up without
+                // `Cmd::json` and with nothing to read.
                 r.step(
                     &format!("fill_expected (section refill — {case})"),
-                    Cmd::new("cargo")
-                        .args([
-                            "nextest",
-                            "run",
-                            "--color",
-                            "never",
-                            "--run-ignored",
-                            "only",
-                            "-E",
-                            "test(=fill_expected)",
-                        ])
-                        .env("AIPL_CASE", case),
+                    helper("fill_expected").env("AIPL_CASE", case),
                 );
-                if !scoped_fill_succeeded(&r.out) {
+                let label = format!("fill_expected ({case})");
+                let out = helper_output(&mut r, &label);
+                if !scoped_fill_succeeded(&out) {
                     r.save_out();
-                    let detail = tail(&r.out, 40);
-                    r.fail(&format!("fill_expected ({case})"), &detail);
+                    let detail = tail(&out, 40);
+                    r.fail(&label, &detail);
                 }
             }
         }
@@ -366,9 +405,10 @@ or discard it
 
     if plan.need_ir {
         r.step("fill_staged_ir", helper("dogfood_ir::fill_staged_ir"));
-        if !wrote_staged(&r.out) {
+        let out = helper_output(&mut r, "fill_staged_ir");
+        if !wrote_staged(&out) {
             r.save_out();
-            let detail = tail(&r.out, 40);
+            let detail = tail(&out, 40);
             r.fail("fill_staged_ir", &detail);
         }
 
@@ -377,7 +417,7 @@ or discard it
             helper("dogfood_ir::validate_staged_ir"),
         ) {
             r.save_out();
-            let detail = tail(&r.out, 40);
+            let detail = tail(&r.out.merged, 40);
             r.fail("validate_staged_ir", &detail);
         }
 
@@ -389,7 +429,7 @@ or discard it
         );
         if !ok {
             r.save_out();
-            let detail = excerpt(&r.out, 20, is_failure_line);
+            let detail = failure_excerpt(&r.out);
             r.fail(
                 "staged-IR corpus run (candidate IR is wrong — diff .staged vs live)",
                 &detail,
@@ -397,9 +437,10 @@ or discard it
         }
 
         r.step("promote_staged_ir", helper("dogfood_ir::promote_staged_ir"));
-        if !r.out.contains("promoted") {
+        let out = helper_output(&mut r, "promote_staged_ir");
+        if !out.contains("promoted") {
             r.save_out();
-            let detail = tail(&r.out, 40);
+            let detail = tail(&out, 40);
             r.fail("promote_staged_ir", &detail);
         }
     }
@@ -427,7 +468,7 @@ or discard it
         )
     {
         r.save_out();
-        let detail = excerpt(&r.out, 30, |l| l.starts_with("error"));
+        let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
         r.fail("rebuild after regeneration", &detail);
     }
 
@@ -435,7 +476,7 @@ or discard it
 
     if !r.step("nextest (final)", nextest()) {
         r.save_out();
-        let detail = excerpt(&r.out, 20, is_failure_line);
+        let detail = failure_excerpt(&r.out);
         r.fail("nextest (final — regeneration didn't settle)", &detail);
     }
 
@@ -468,9 +509,28 @@ or discard it
     std::process::exit(0);
 }
 
-/// Lines worth quoting from a failed corpus run.
-fn is_failure_line(l: &str) -> bool {
-    l.contains("mismatch") || l.contains("FAILED") || l.contains("Abort")
+/// The failing tests of a corpus run, each with the first line it printed.
+///
+/// Replaces the original's `grep -nE 'mismatch|FAILED|Abort'` over a flat blob:
+/// the JSON already knows which tests failed and what each one said, so the
+/// excerpt names them instead of quoting whichever nearby lines matched.
+fn failure_excerpt(out: &Output) -> String {
+    let run = discovery::Run::parse(out);
+    let mut lines: Vec<String> = run
+        .failures()
+        .iter()
+        .take(20)
+        .map(|f| match f.output.lines().find(|l| !l.trim().is_empty()) {
+            Some(first) => format!("{}: {}", f.name, first.trim()),
+            None => f.name.clone(),
+        })
+        .collect();
+    if lines.is_empty() {
+        // A failed run with no failed *test* — a build error, or nextest itself
+        // giving up. The human stream is all there is.
+        lines.push(tail(&out.stderr, 20));
+    }
+    lines.join("\n")
 }
 
 /// `reformatted <n> file(s)` from the formatter's summary.

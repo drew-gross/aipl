@@ -6,12 +6,13 @@ description = "Repo automation: the pre-handoff gate (`cargo handoff`)"
 license = "MIT"
 publish = false
 
-# `regex` only. This crate is the *first* thing to build on `cargo handoff`, so
-# every dependency is paid before the gate can even start — and `regex` is
-# already in the workspace graph (a dev-dependency of the root package), so it
-# costs nothing that wasn't built anyway.
+# `regex` and `serde_json` only. This crate is the *first* thing to build on
+# `cargo handoff`, so every dependency is paid before the gate can even start —
+# and both are already in the workspace graph (dev-dependencies of the root
+# package), so they cost nothing that wasn't built anyway.
 [dependencies]
 regex = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true
