@@ -40,13 +40,13 @@ runner — the cadence commands below are written for `cargo test`, and
 `cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
 **Where it lives.** `cargo handoff` is a cargo alias (`.cargo/config.toml`) for
-`cargo run -p xtask -- handoff`; the gate is the `xtask` crate. Its ordering
-rationale lives in the module docs of `xtask/src/main.rs`, the output parsing
-that decides which remediation steps run is in `xtask/src/discovery.rs` (with
-unit tests — those parsers are a contract with the harness's message format, so
-change one and its test tells you what else has to move), and the step runner,
-watchdog and machine diagnostics are in `xtask/src/runner.rs` and
-`xtask/src/machine.rs`.
+`cargo run -p handoff`; the gate is the `handoff` crate. Its ordering rationale
+lives in the module docs of `handoff/src/main.rs`, the output parsing that
+decides which remediation steps run is in `handoff/src/discovery.rs` (with unit
+tests — those parsers are a contract with nextest's JSON schema and the
+harness's message format, so change one and its test tells you what else has to
+move), and the step runner, watchdog and machine diagnostics are in
+`handoff/src/runner.rs` and `handoff/src/machine.rs`.
 
 **Don't hand-drive the sequence, and don't validate before it.** The gate is
 the validation *and* the order. Running its steps yourself — `cargo fmt`,

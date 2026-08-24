@@ -150,7 +150,7 @@ impl Run {
             return Err(
                 "the step produced no JSON events on stdout, so there is nothing to read. Either \
                  it was not built with `Cmd::json`, or nextest's experimental libtest-json \
-                 interface changed — check MESSAGE_FORMAT_VERSION in xtask/src/runner.rs."
+                 interface changed — check MESSAGE_FORMAT_VERSION in handoff/src/runner.rs."
                     .to_string(),
             );
         }

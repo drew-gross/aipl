@@ -1,15 +1,10 @@
-//! Repo automation. Today that is one command:
+//! `cargo handoff` — the one-command pre-handoff gate for this repo.
 //!
-//! ```text
-//! cargo handoff
-//! ```
-//!
-//! the one-command pre-handoff gate for this repo. It runs the finish-a-task
-//! sequence in dependency order, paying for the *expensive* regeneration steps
-//! (perf/section refill, dogfood-IR regen — each a full-corpus run) only when a
-//! test run proves they're needed, and stopping with a pointed message on any
-//! failure a refill can't fix. One command instead of hand-driving six, so it's
-//! the whole sequence in a fraction of the tokens.
+//! It runs the finish-a-task sequence in dependency order, paying for the
+//! *expensive* regeneration steps (perf/section refill, dogfood-IR regen — each
+//! a full-corpus run) only when a test run proves they're needed, and stopping
+//! with a pointed message on any failure a refill can't fix. One command instead
+//! of hand-driving six, so it's the whole sequence in a fraction of the tokens.
 //!
 //! # Order & why
 //!
@@ -77,38 +72,26 @@ use std::path::{Path, PathBuf};
 use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF};
 
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let task = args.next();
-    let extra: Vec<String> = args.collect();
-    match task.as_deref() {
-        Some("handoff") if extra.is_empty() => handoff(),
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if !args.is_empty() {
         // Refused rather than ignored: the gate is a several-minute run that
         // formats and rewrites files, and `cargo handoff --help` silently
         // *starting* one is a nasty way to find out it takes no arguments.
-        Some("handoff") => {
-            eprintln!(
-                "xtask: handoff takes no arguments (got {})\n\n{USAGE}",
-                extra.join(" ")
-            );
-            std::process::exit(2);
-        }
-        Some(other) => {
-            eprintln!("xtask: unknown task {other:?}\n\n{USAGE}");
-            std::process::exit(2);
-        }
-        None => {
-            eprintln!("{USAGE}");
-            std::process::exit(2);
-        }
+        eprintln!(
+            "handoff: takes no arguments (got {})\n\n{USAGE}",
+            args.join(" ")
+        );
+        std::process::exit(2);
     }
+    handoff();
 }
 
 const USAGE: &str = "\
-usage: cargo xtask <task>
+usage: cargo handoff
 
-tasks:
-  handoff   the pre-handoff gate — format, test, regenerate what a run proved
-            stale, and confirm green (also available as `cargo handoff`)";
+Runs the pre-handoff gate: format, test, regenerate what a run proved stale, and
+confirm green. Takes no arguments; `HANDOFF_STEP_TIMEOUT` and `HANDOFF_VERBOSE`
+tune it (see the module docs).";
 
 /// The whole suite. `--no-fail-fast` because nextest cancels on the first
 /// failure by default and this gate needs to see *all* remediable staleness in
@@ -314,7 +297,7 @@ or discard it
             "The run failed but emitted no parseable events on stdout. nextest's libtest-json
 output is still experimental, so this most likely means the interface changed:
 check `cargo nextest run --help` for --message-format / --message-format-version
-and update MESSAGE_FORMAT_VERSION in xtask/src/runner.rs.",
+and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         );
     }
 
@@ -596,7 +579,7 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|| {
             Path::new(env!("CARGO_MANIFEST_DIR"))
                 .parent()
-                .expect("xtask/ has a parent")
+                .expect("handoff/ has a parent")
                 .to_path_buf()
         })
 }

@@ -1,8 +1,8 @@
 [package]
-name = "xtask"
+name = "handoff"
 version = "0.1.0"
 edition = "2021"
-description = "Repo automation: the pre-handoff gate (`cargo handoff`)"
+description = "The pre-handoff gate for this repo (`cargo handoff`)"
 license = "MIT"
 publish = false
 
