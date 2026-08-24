@@ -24,6 +24,11 @@ better inlining — idea list (from the builtins-in-aipl work; none implemented 
   sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
+type checker:
+  separate types for concrete and generic - concrete loses Generic arm
+  any shouldn't be an arm, it should be a more generic "bound"
+  ConcatStr should disappear form type and fold into a more generic "representation" concept
+
 inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
