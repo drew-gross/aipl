@@ -2,12 +2,12 @@
 
 ## Committing
 Don't ask whether to commit, and don't offer to — I always handle commits
-myself. Finish a task at the green-and-formatted state (run the handoff script,
+myself. Finish a task at the green-and-formatted state (run `cargo handoff`,
 see below) and stop there; leave the working tree uncommitted.
 
-## Handoff (`scripts/handoff.sh`)
-`scripts/handoff.sh` **is** the pre-handoff validation — run it once, at the
-end of a task, as the whole finish-a-task gate. It runs the finish sequence in
+## Handoff (`cargo handoff`)
+`cargo handoff` **is** the pre-handoff validation — run it once, at the end of a
+task, as the whole finish-a-task gate. It runs the finish sequence in
 dependency order and pays for the expensive regeneration steps only when a test
 run proves they're needed: `cargo fmt` + `aipl fmt` the corpus, a discovery
 run, then (only if that surfaced fillable staleness) scoped
@@ -19,18 +19,18 @@ step and why on any failure a refill can't fix.
 
 **Every step is bounded by a wall-clock ceiling** — `HANDOFF_STEP_TIMEOUT`
 seconds, default 1800, `0` disables. A wedged `nextest` produces no output and
-makes no progress, so without a ceiling the script simply hangs and gets
+makes no progress, so without a ceiling the gate simply hangs and gets
 abandoned. On expiry it reports free RAM, swap usage and the busiest child
 process, then kills the step's whole descendant tree, because the cause is nearly
 always the machine rather than the tests: memory pressure (check swap — thrashing
 pins processes at 0% CPU in `_dyld_start`), or a first-exec code-signing scan on a
 freshly-linked test binary, which can idle ~2 minutes and looks exactly like a
 hang. Raise the ceiling on a genuinely slow box; don't switch to hand-driving.
-The script also clears orphaned `nextest --list --format terse` children at
+It also clears orphaned `nextest --list --format terse` children at
 startup — an interrupted run leaves them blocked on a dead pipe, and they
 accumulate across retries and slow each attempt for reasons that look unrelated.
 
-The script runs the suite with **`cargo nextest`** (each test in its own
+The gate runs the suite with **`cargo nextest`** (each test in its own
 process; requires `cargo install cargo-nextest`). One consequence it handles for
 you: nextest defaults to fail-fast, so every whole-suite run there passes
 `--no-fail-fast`. (Nextest also skips doctests; the repo has none left — the
@@ -39,7 +39,16 @@ rest of the suite.) Your own inner-loop runs can use either
 runner — the cadence commands below are written for `cargo test`, and
 `cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
-**Don't hand-drive the sequence, and don't validate before it.** The script is
+**Where it lives.** `cargo handoff` is a cargo alias (`.cargo/config.toml`) for
+`cargo run -p xtask -- handoff`; the gate is the `xtask` crate. Its ordering
+rationale lives in the module docs of `xtask/src/main.rs`, the output parsing
+that decides which remediation steps run is in `xtask/src/discovery.rs` (with
+unit tests — those parsers are a contract with the harness's message format, so
+change one and its test tells you what else has to move), and the step runner,
+watchdog and machine diagnostics are in `xtask/src/runner.rs` and
+`xtask/src/machine.rs`.
+
+**Don't hand-drive the sequence, and don't validate before it.** The gate is
 the validation *and* the order. Running its steps yourself — `cargo fmt`,
 `fill_case_tests`, `fill_expected`, the staged dogfood-IR flow — doesn't just
 pay for the corpus twice; it reorders steps that depend on each other, and the
@@ -47,13 +56,13 @@ breakage that follows looks exactly like a real bug, so you then debug your own
 sequencing.
 
 **If you find yourself wanting non-targeted validation before the handoff run,
-that is a bug report about the script — say so instead of working around it.**
+that is a bug report about the gate — say so instead of working around it.**
 Propose the improvement (and offer to implement it); don't build a parallel
 procedure. This is not hypothetical: a wedged `nextest` once sent an agent off to
 hand-roll the whole sequence, and it then kept using the hand-rolled version for
 hours after the machine recovered — re-implementing the staged-IR flow three
-times, at triple the cost, to reach conclusions one script run would have given.
-A blocker in the script is worth fixing once; routing around it is worth nothing
+times, at triple the cost, to reach conclusions one gate run would have given.
+A blocker in the gate is worth fixing once; routing around it is worth nothing
 and hides the blocker from the next person.
 
 The dependencies that bite:
@@ -68,13 +77,13 @@ The dependencies that bite:
 - **Section refills come after the discovery run**, which is what establishes
   which sections are genuinely stale rather than refreshing on suspicion.
 
-The script does all of this in dependency order and pays for the expensive
+The gate does all of this in dependency order and pays for the expensive
 regeneration only when a test run proved it necessary. The only thing worth
 running ahead of it is a **targeted** test for the code you just touched
 (`cargo test -- name_substring`, `cargo test --test <file>`, or a scoped
 `cargo test --test cases -- cases_generics`) as a fast inner-loop check — that's
-a dev-loop signal, not the handoff gate. When the change is ready, run the
-script and let it format, verify, and regenerate in one pass.
+a dev-loop signal, not the handoff gate. When the change is ready, run
+`cargo handoff` and let it format, verify, and regenerate in one pass.
 
 **The one sanctioned deviation.** When a change invalidates *hundreds* of
 `--- performance ---` sections at once (anything that moves a counter in every
@@ -105,9 +114,9 @@ of the dev loop. Prefer:
   and how many it filtered out)
 
 Targeted runs alone can miss regressions in unrelated areas, so they're the
-inner-loop signal, not the finish check — finish a task by running the handoff
-script (see the Handoff section above), which does the full `cargo test` (and
-formatting/regeneration) for you.
+inner-loop signal, not the finish check — finish a task by running
+`cargo handoff` (see the Handoff section above), which does the full
+`cargo test` (and formatting/regeneration) for you.
 
 Let the tests do the verifying. Prefer running `cargo test` (targeted, then
 full) over reading generated artifacts, diffs, or output by hand to convince
@@ -118,7 +127,7 @@ understand *why*, or for the rare thing no test covers.
 
 ## Formatting
 Every task ends formatted (`cargo fmt` for Rust, `aipl fmt` for `.aipl`). You
-don't run these by hand as a separate step — the handoff script (see the Handoff
+don't run these by hand as a separate step — `cargo handoff` (see the Handoff
 section above) formats first, then tests, so a single handoff run leaves the
 tree both green and formatted.
 
@@ -223,7 +232,7 @@ parser/loader API directly).
 **Adding or deleting a case file needs one extra step — which handoff takes for
 you.** Every case gets its own `#[test]`, and `#[test]` is compile-time while
 cases are discovered at run time — so the list lives in the checked-in
-`tests/support/case_tests.rs`. `scripts/handoff.sh` regenerates it when the tree
+`tests/support/case_tests.rs`. `cargo handoff` regenerates it when the tree
 and the list disagree, so adding or deleting a case is not a reason to run
 anything by hand. The command exists for when you want it directly:
 `cargo test --test cases -- --ignored fill_case_tests`. You don't have to
@@ -431,7 +440,7 @@ type layout changes, codegen restructuring, etc.) also invalidates the checked-i
 directly — it lets you validate candidate IR before it becomes the live IR the
 compiler runs on.
 
-> **`scripts/handoff.sh` already runs this entire flow**, in its correct place
+> **`cargo handoff` already runs this entire flow**, in its correct place
 > in the sequence: *after* the corpus is formatted (spans settled) and *after* a
 > discovery run has shown the IR is actually stale. Adding a dogfooded `.aipl`
 > or changing codegen is **not** a reason to run the steps below by hand — just
@@ -466,7 +475,7 @@ To get out of the loop:
 4. Validate + promote as below, then run handoff normally for the refills.
 
 This is not a licence to hand-drive generally: it announces itself as a hard
-`aipl fmt` failure, and it's the only ordering the script can't express.
+`aipl fmt` failure, and it's the only ordering the gate can't express.
 
 The steps, for those cases:
 

@@ -1,0 +1,4 @@
+# `cargo handoff` — the pre-handoff gate (see CLAUDE.md). An alias rather than a
+# script so it works from any directory in the repo and needs nothing on PATH.
+[alias]
+handoff = "run --quiet --package xtask -- handoff"

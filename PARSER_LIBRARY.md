@@ -258,7 +258,7 @@ file that also declares a `Kind` constructor trips the silent drop.
    shipped binary gets, and tail-call elimination goes untested.
 7. **Stage 3 oracle** — `cargo test --test highlighting` against the generated
    `.tmLanguage.json`, unchanged.
-8. **Finish** — `scripts/handoff.sh`, which regenerates the `#[test]` list for
+8. **Finish** — `cargo handoff`, which regenerates the `#[test]` list for
    new case files and fills their `--- performance ---` sections. Expect churn: a
    library case's perf section measures its `.test` driver, and for scale
    `walker.aipl` records 3,075,003 instructions.

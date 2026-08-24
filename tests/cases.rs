@@ -635,7 +635,7 @@ fn run_fill() {
         // Matched against the display path *with* its `.aipl` extension — the
         // exact text a per-case mismatch message brackets, so a failure's
         // `AIPL_CASE='<path>'` suggestion can be pasted back verbatim (which is
-        // what `scripts/handoff.sh` does to refill just the stale cases).
+        // what `cargo handoff` does to refill just the stale cases).
         if let Some(f) = &filter {
             let name = rel_with_prefix.to_string_lossy().replace('\\', "/");
             if !name.contains(f.as_str()) {
@@ -660,8 +660,8 @@ fn run_fill() {
         );
     }
 
-    // Summary. The filtered wording is a parsed contract — `scripts/handoff.sh`
-    // greps it to confirm a scoped refill ran clean — so keep it as it reads.
+    // Summary. The filtered wording is a parsed contract — `cargo handoff`
+    // parses it to confirm a scoped refill ran clean — so keep it as it reads.
     match &filter {
         Some(f) => eprintln!(
             "\n=== test cases [filter {f:?}]: {passed} passed, {} failed, {} refreshed ({matched} of {} matched) ===",

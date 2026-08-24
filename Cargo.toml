@@ -6,7 +6,10 @@ description = "AIPL language — facade crate tying the compiler crates together
 license = "MIT"
 
 [workspace]
-members = ["crates/*"]
+# `xtask` is not a compiler crate — it is this repo's automation (`cargo
+# handoff`), listed explicitly rather than swept up by the `crates/*` glob so
+# `crates/` stays "the compiler" and nothing else.
+members = ["crates/*", "xtask"]
 
 # Warnings are errors, workspace-wide. Set here (rather than via `RUSTFLAGS`)
 # because `[lints]` applies only to the crates in this workspace — `RUSTFLAGS`
