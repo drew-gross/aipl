@@ -85,7 +85,7 @@ variant Rule<K: variant> =
 
 // How a production's matched node becomes a value of the caller's AST type `A`:
 // a function from the source text, the node itself, and the already-lowered
-// values of its interior children (`cst_nodes`, in match order). It may fail —
+// values of its interior children (`nodes`, in match order). It may fail —
 // a literal that overflows, a duplicate key — with a `ParseError` the driver
 // passes straight through.
 //
@@ -136,7 +136,7 @@ pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> {
     Many(r, min)
 }
 
-// The production names of `g`, in index order — the table `cst_show` renders a
+// The production names of `g`, in index order — the table `show` renders a
 // tree against, and what `link` resolves references through.
 pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|p| p.name) }
 

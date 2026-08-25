@@ -83,7 +83,10 @@ self-hosting:
 highlighter:
   generate from parser
   improve the highlighter test: correct code should never highlight as a mismatched bracket
-  integrate syntect (somehow)
+  integrate syntect (somehow) (or just make something like syntect, or syncat)
+
+env:
+  make env a possible argument to main
 
 clean_trailing_whitespace.aipl:
   optimize: use char-by-char approach? make lines() streaming?

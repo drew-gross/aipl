@@ -3,14 +3,14 @@
 // exactly one leaf — `CLeaf` for a token the grammar matched, `CTrivia` for a
 // comment or a run of whitespace the lexer set aside — so concatenating a
 // tree's leaf spans in order reproduces the source byte for byte
-// (`cst_text`). That is what a formatter generator needs and what an AST
+// (`text`). That is what a formatter generator needs and what an AST
 // cannot give it: an AST has already thrown away the text that carries no
 // meaning, and a formatter's whole job is to put it back.
 //
 // An interior node is `CTree(prod, kids)`, where `prod` is a production's
 // index in the grammar's `prods` array — not its name. The index is what
 // `link` (see `grammar.aipl`) rewrites rule references into, so the driver
-// never compares strings while parsing; `cst_show` takes the name table when a
+// never compares strings while parsing; `show` takes the name table when a
 // human needs to read one.
 //
 // The type is recursive *through an array*, so a `Cst` is a refcounted heap
@@ -45,13 +45,13 @@ pub fn is_tree(self: Cst) -> bool {
 
 // Every leaf span under `self`, in source order — token leaves and trivia
 // alike. The whole losslessness property is stated in terms of this list: the
-// spans are contiguous and cover the parsed source, so `cst_text` is just
+// spans are contiguous and cover the parsed source, so `text` is just
 // "slice each one and join".
-pub fn cst_leaves(self: Cst) -> Span[] {
+pub fn leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) => [sp],
         CTrivia(sp) => [sp],
-        CTree(_, kids) => kids.map(cst_leaves).join(),
+        CTree(_, kids) => kids.map(leaves).join(),
     }
 }
 
@@ -59,14 +59,14 @@ pub fn cst_leaves(self: Cst) -> Span[] {
 // parse this equals the input exactly; that identity is the cheapest regression
 // test there is for the driver's trivia handling, so the `.test` blocks assert
 // it directly.
-pub fn cst_text(self: Cst, src: str) -> str { self.cst_leaves().map(|sp| src[sp]).join(sep="") }
+pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join(sep="") }
 
 // The span `self` covers: its first leaf's start through its last leaf's end.
 // A node with no leaves at all — an interior node for a production that matched
 // empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
 // extent, and reports the empty `0..0`.
-pub fn cst_span(self: Cst) -> Span {
-    let ls = self.cst_leaves();
+pub fn span(self: Cst) -> Span {
+    let ls = self.leaves();
     match (ls.first()) {
         some(f) => match (ls.last()) {
             some(l) => f.start..l.end,
@@ -80,7 +80,7 @@ pub fn cst_span(self: Cst) -> Span {
 // the child list a production's `build` is lowered against, so its order and
 // length are part of the contract between a grammar and its lowering functions:
 // one entry per `Named` reference the rule matched, in the order it matched them.
-pub fn cst_nodes(self: Cst) -> Cst[] {
+pub fn nodes(self: Cst) -> Cst[] {
     match (self) {
         CLeaf(_) => [],
         CTrivia(_) => [],
@@ -93,12 +93,12 @@ pub fn cst_nodes(self: Cst) -> Cst[] {
 // text, a trivia leaf prefixed with `~`, an interior node as
 // `(name kid kid ...)`. A production index with no name in `names` renders as
 // `?` rather than failing — this is a debug rendering, not a checked one.
-pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
+pub fn show(self: Cst, src: str, names: str[]) -> str {
     match (self) {
         CLeaf(sp) => src[sp],
         CTrivia(sp) => `~{src[sp]}`,
         CTree(i, kids) => {
-            let parts = kids.map(|k| k.cst_show(src, names));
+            let parts = kids.map(|k| k.show(src, names));
             let name = names[i].value_or("?");
             if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
         },
@@ -116,51 +116,51 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
     assert(!CTrivia(1..2).is_tree());
 
     // Losslessness: the leaves tile the source, so the text comes back whole.
-    assert(t.cst_text(src) == src);
-    assert(t.cst_leaves().len() == 5);
-    assert(t.cst_span() == 0..5);
+    assert(t.text(src) == src);
+    assert(t.leaves().len() == 5);
+    assert(t.span() == 0..5);
 
     // A leaf is its own text and its own span.
-    assert(CLeaf(2..3).cst_text(src) == "+");
-    assert(CTrivia(1..2).cst_span() == 1..2);
+    assert(CLeaf(2..3).text(src) == "+");
+    assert(CTrivia(1..2).span() == 1..2);
 
     // Nesting: an interior child contributes its own leaves to the parent, in
     // place, so the parent still reconstructs the whole source.
     let zero: u64 = 0;
     let nested = CTree(zero, [CLeaf(0..1), CTrivia(1..2), CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
-    assert(nested.cst_text(src) == src);
-    assert(nested.cst_span() == 0..5);
-    assert(nested.cst_nodes().len() == 1);
-    // `cst_nodes` is one level deep and drops leaves: three kids, one interior.
-    assert(nested.cst_nodes() == [CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
-    assert(t.cst_nodes() == []);
-    assert(CLeaf(0..1).cst_nodes() == []);
+    assert(nested.text(src) == src);
+    assert(nested.span() == 0..5);
+    assert(nested.nodes().len() == 1);
+    // `nodes` is one level deep and drops leaves: three kids, one interior.
+    assert(nested.nodes() == [CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+    assert(t.nodes() == []);
+    assert(CLeaf(0..1).nodes() == []);
 
     // A node that matched nothing has no extent rather than a bogus one.
-    assert(CTree(zero, []).cst_span() == 0..0);
-    assert(CTree(zero, []).cst_text(src) == "");
+    assert(CTree(zero, []).span() == 0..0);
+    assert(CTree(zero, []).text(src) == "");
 
     let names = ["expr", "term"];
-    assert(t.cst_show(src, names) == "(term 1 ~  + ~  2)");
+    assert(t.show(src, names) == "(term 1 ~  + ~  2)");
 
     // Trivia renders as `~` followed by its verbatim text — here a space, which
     // is why the whitespace doubles up next to the joining space.
-    assert(nested.cst_show(src, names) == "(expr 1 ~  (term +  2))");
-    assert(CTree(zero, []).cst_show(src, names) == "(expr)");
+    assert(nested.show(src, names) == "(expr 1 ~  (term +  2))");
+    assert(CTree(zero, []).show(src, names) == "(expr)");
     // An index past the end of the name table still renders.
     let far: u64 = 9;
-    assert(CTree(far, []).cst_show(src, names) == "(?)");
+    assert(CTree(far, []).show(src, names) == "(?)");
 })
 --- performance ---
 allocations: 110
 deallocations: 110
 reallocations: 0
 bytes allocated: 5532
-instructions executed: 6251
-binary size: 19344
-  code: 10028
-  data: 1361
-  metadata: 7955
+instructions executed: 6249
+binary size: 19176
+  code: 10024
+  data: 1269
+  metadata: 7883
 functions:
   __arr_drop_Cst:
     calls: 7
@@ -249,21 +249,21 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  cst_leaves:
-    calls: 34
-    bytes: 764
-  cst_show:
-    calls: 14
-    bytes: 1388
-  cst_span:
-    calls: 4
-    bytes: 460
-  cst_text:
-    calls: 4
-    bytes: 392
   is_tree:
     calls: 11
     bytes: 112
+  leaves:
+    calls: 34
+    bytes: 764
   main:
     calls: 1
-    bytes: 6032
+    bytes: 6028
+  show:
+    calls: 14
+    bytes: 1388
+  span:
+    calls: 4
+    bytes: 460
+  text:
+    calls: 4
+    bytes: 392

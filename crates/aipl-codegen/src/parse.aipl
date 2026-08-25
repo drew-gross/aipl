@@ -54,7 +54,7 @@ import {
     wrapping_increment as ++,
     wrapping_sub as -,
 } from builtins;
-import { CLeaf, CTree, CTrivia, Cst, cst_show, cst_span, cst_text, is_tree } from "./cst.aipl";
+import { CLeaf, CTree, CTrivia, Cst, is_tree, show, span, text } from "./cst.aipl";
 import {
     Climb,
     Grammar,
@@ -599,7 +599,7 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 }.doc("""
     Lowers a parsed tree to the caller's AST by calling each node's production
     `build`, depth first: a node's children are lowered before it, and only its
-    *interior* children are passed (`cst_nodes`) — a leaf has no lowered value,
+    *interior* children are passed (`nodes`) — a leaf has no lowered value,
     and its text is reachable from the node's own span.
 
     Fails with whatever a `build` refused with, unchanged.
@@ -620,7 +620,7 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
                 },
                 none => err(ParseError {
                     message: `no production at index {i}`,
-                    span: node.cst_span(),
+                    span: node.span(),
                 }),
             }
         },
@@ -777,15 +777,15 @@ pub fn parse<K: variant, A: any>(
     let src = "  ( a  b ) // done\n";
     let lexed = lex_toks(src, trivia_rules())?;
     let tree = parse_cst(src, lexed, g_sexp, "list")?;
-    assert(tree.cst_text(src) == src);
+    assert(tree.text(src) == src);
 
     // Where each piece landed, on a source small enough to read: leading trivia
     // attaches in front of the token that follows it, and the comment and
     // newline after the last token attach to the root.
     let small = "(a) // x";
     let small_tree = parse_cst(small, lex_toks(small, trivia_rules())?, g_sexp, "list")?;
-    assert(small_tree.cst_text(small) == small);
-    assert(small_tree.cst_show(small, prod_names(g_sexp)) == "(list ( (item a) ) ~  ~// x)");
+    assert(small_tree.text(small) == small);
+    assert(small_tree.show(small, prod_names(g_sexp)) == "(list ( (item a) ) ~  ~// x)");
 
     // ---- Lowering ----
     //
@@ -865,12 +865,12 @@ fn build_node(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
     if (kids.is_nonempty()) {
         return ok(NNode(kids));
     };
-    ok(NLeaf(node.cst_text(src)))
+    ok(NLeaf(node.text(src)))
 }
 
 // A `build` that always refuses, for the error-propagation assertion.
 fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
-    err(ParseError { message: "refused", span: node.cst_span() })
+    err(ParseError { message: "refused", span: node.span() })
 }
 
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> { name, rule, build: Mk(build_node) }
@@ -889,7 +889,7 @@ fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
 fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
     let lexed = lex_toks(src, tok_rules())?;
     let tree = parse_cst(src, lexed, g, start)?;
-    ok(tree.cst_show(src, prod_names(g)))
+    ok(tree.show(src, prod_names(g)))
 }
 
 // The message a failed parse reports — and a distinguishable string when it
@@ -911,10 +911,10 @@ deallocations: 2691
 reallocations: 232
 bytes allocated: 129500
 instructions executed: 384376
-binary size: 254880
+binary size: 254856
   code: 146796
-  data: 6956
-  metadata: 101128
+  data: 6948
+  metadata: 101112
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1021,16 +1021,16 @@ functions:
   __lambda_3:
     calls: 0
     bytes: 60
-  __m1__cst_leaves:
+  __m1__leaves:
     calls: 33
     bytes: 764
-  __m1__cst_show:
+  __m1__show:
     calls: 117
     bytes: 1388
-  __m1__cst_span:
+  __m1__span:
     calls: 1
     bytes: 460
-  __m1__cst_text:
+  __m1__text:
     calls: 7
     bytes: 392
   __m2__link$Tok$Node:
