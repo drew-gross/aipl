@@ -26,6 +26,7 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 variant:
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
+  make a case_name function to replace the jank in kind_label
 
 type system:
   apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
@@ -107,7 +108,12 @@ syntax:
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
   implement T+ for intersperse
   rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
-  support join(self: T[], sep: T+ = []) (defaults for posiitonal args, can join with multiple)
+  support join(self: T[], sep: T+ = []) (defaults for positional args, can join with multiple)
+
+default/kwargs:
+  A default cannot reference an earlier parameter — fn f(a: i64, b: i64 = a) gives "unknown identifier". Defaults are evaluated in an empty scope.
+  Lambdas can't declare defaults — parse error.
+  Variant constructors take no keyword arguments (Rect(w=1, h=2) → "has no keyword parameter"). Constructors aren't functions with signatures in this sense.
 
 shim:
   better syntax (shim is a weird keyword)
@@ -133,6 +139,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 parser:
+  change the plan to include a toy langauge that has binary operators with precedence
   implement the plan
 
 utilities:

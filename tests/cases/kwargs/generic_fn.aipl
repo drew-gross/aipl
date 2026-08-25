@@ -1,4 +1,6 @@
-// A generic function may declare a (concrete) keyword parameter.
+// A generic function may declare a keyword parameter of concrete type.
+// One typed by the function's own type variable works too, and defers its
+// check to the call site — see `generic_default`.
 import { len, print, to_str, wrapping_add as + } from builtins;
 
 fn padded_len<T: any>(xs: T[], extra: i64 = 10) -> i64 {

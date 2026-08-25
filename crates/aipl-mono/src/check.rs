@@ -1180,12 +1180,25 @@ impl Cx<'_> {
         // it is spliced into *call sites*, where none are in scope). Effects
         // are the function's own declared set: every caller must cover the
         // callee's effects anyway, so a spliced default's effects are covered
-        // wherever it lands. The expected type gets the same type-variable
-        // substitution as the body check, so a generic function stays checkable.
+        // wherever it lands.
+        //
+        // A default whose parameter type mentions a type variable (`pad: T = 0`)
+        // has no answer *here*: whether `0` is a `T` depends on the
+        // instantiation, and this check runs once for the template. So the
+        // expression is still checked on its own — an undefined callee inside it
+        // is an error now — but its *fit* against `T` waits for the call site,
+        // which is exactly where the keyword-argument pass splices it, as an
+        // ordinary argument of an ordinary generic call. Generic *struct* field
+        // defaults have always deferred the same way, for the same reason (the
+        // `s.is_generic()` skip in `check`); before this, the two disagreed and a
+        // `T`-typed parameter default was simply unwritable.
         for p in &f.sig.params {
             if let Some(default) = &p.default {
                 let dt = self.check_expr(default, &HashMap::new(), &f.sig.effects)?;
                 let pty = subst_typevars(&p.ty, &type_var_names);
+                if mentions_typevar(&pty) {
+                    continue;
+                }
                 let dt = self.flex_int(default, &dt, &pty)?;
                 expect(
                     &dt,
