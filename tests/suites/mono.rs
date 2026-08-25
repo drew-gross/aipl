@@ -348,13 +348,14 @@ fn empty_array_arg_pins_any_array_to_pseudo_type() {
 
 #[test]
 fn none_literal_pins_any_optional_to_pseudo_type() {
-    // `any?` with only a bare-`none` argument monomorphizes to the
-    // `NoneLiteral` pseudo-type instance.
+    // `any?` with only a bare-`none` argument pins nothing — no argument names
+    // the payload type, and none can. So the instance drops the parameter
+    // (`$dn0`) and declares the `none` in its body instead.
     let names = mono_names(
         "fn is_present(x: any?) -> bool { match (x) { some(v) => true, none => false } }
          fn main() -> i64 { if (is_present(none)) { 1 } else { 0 } }",
     );
-    assert_eq!(names, vec!["is_present$NoneLiteral", "main"]);
+    assert_eq!(names, vec!["is_present$NoneLiteral$dn0", "main"]);
 }
 
 #[test]
@@ -371,11 +372,14 @@ fn concrete_arg_still_wins_over_empty_marker() {
 
 #[test]
 fn empty_and_none_in_separate_any_params_get_distinct_markers() {
-    // Two anonymous `any` params are independent type variables; each is
-    // pinned to its own pseudo-type marker.
+    // Two anonymous `any` params are independent type variables, each pinned to
+    // its own pseudo-type marker — and the two markers are treated differently.
+    // The bare-`none` parameter is dropped from the instance (`$dn1`, at index
+    // 1); the empty-array one is still passed, since only the optional case has
+    // been converted so far.
     let names = mono_names(
         "fn h(xs: any[], x: any?) -> i64 { 0 }
          fn main() -> i64 { h([], none) }",
     );
-    assert_eq!(names, vec!["h$EmptyArray$NoneLiteral", "main"]);
+    assert_eq!(names, vec!["h$EmptyArray$NoneLiteral$dn1", "main"]);
 }

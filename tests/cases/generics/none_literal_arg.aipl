@@ -1,8 +1,16 @@
 import { equal as == } from builtins;
 
-// A bare `none` passed to an `any?` parameter pins the type variable to the
-// `NoneLiteral` pseudo-type and monomorphizes the function for the none-only
-// case. `match` over the param always takes the `none` arm.
+// A bare `none` passed to an `any?` parameter pins nothing: no argument names
+// the payload type, and none ever can. So the instance doesn't take the
+// parameter at all — monomorphization drops it (marking the instance `$dn0`)
+// and the body declares the `none` itself, which is all the caller was passing.
+// `match` over it always takes the `none` arm.
+//
+// This case asserts the *behaviour* — that the call still answers `false`. It
+// cannot see the parameter being dropped: the instance is single-use, so
+// inlining folds it into `main` and the counters below are identical either
+// way. The drop itself is asserted by name in
+// `mono::none_literal_pins_any_optional_to_pseudo_type`.
 fn is_present(x: any?) -> bool {
     match (x) {
         some(v) => true,

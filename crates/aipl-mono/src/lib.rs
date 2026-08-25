@@ -1801,6 +1801,11 @@ struct ParamSpec {
     str_kept: bool,
     concat: bool,
     variadic: VShape,
+    /// Nothing pinned this parameter's type but a bare `none` at the call site,
+    /// so the argument carries no information the instance can't supply itself:
+    /// the parameter is dropped and the body binds the `none` in its place. See
+    /// [`is_unpinned_optional`].
+    drop_none: bool,
 }
 
 /// How an instance specializes its template's signature — everything that
@@ -1946,6 +1951,18 @@ fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
 
 type Env = HashMap<String, Type>;
 
+/// Whether `ty` is an optional whose payload type nothing ever pinned.
+///
+/// After substitution a parameter declared `T?` reads as `Optional(NoneInner)`
+/// exactly when the only argument that could have pinned `T` was a bare `none`:
+/// a pinned `T` substitutes to a concrete payload, and a parameter cannot be
+/// *declared* with the placeholder. So this shape means "an optional that is
+/// necessarily empty, of a type nothing can name" — which is why the parameter
+/// can be dropped and the body left to declare the `none` itself.
+fn is_unpinned_optional(ty: &Type) -> bool {
+    matches!(ty, Type::Optional(inner) if is_none_inner(inner))
+}
+
 impl Mono<'_> {
     /// Process one (already concrete) function: type the body and rewrite every
     /// generic call within it to its mangled instance name.
@@ -1962,6 +1979,27 @@ impl Mono<'_> {
         for p in params {
             env.insert(p.name.clone(), p.ty.clone());
         }
+        // A parameter nothing pinned but a bare `none` is not a parameter of the
+        // instance at all: the body declares it. Wrapping rather than
+        // substituting keeps this one rewrite — later passes see an ordinary
+        // binding of an ordinary literal.
+        let dropped: Vec<&Param> = params
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| specs.get(*i).is_some_and(|s| s.drop_none))
+            .map(|(_, p)| p)
+            .collect();
+        let body = &dropped.iter().rev().fold(body.clone(), |b, p| {
+            Expr::new(
+                ExprKind::Let(
+                    p.name.clone(),
+                    None,
+                    Box::new(Expr::new(ExprKind::None, b.span.clone())),
+                    Box::new(b.clone()),
+                ),
+                b.span.clone(),
+            )
+        });
         // Lambdas synthesized while processing this body inherit its effects.
         self.cur_effects = effects.to_vec();
         self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
@@ -1980,6 +2018,7 @@ impl Mono<'_> {
             params: params
                 .iter()
                 .enumerate()
+                .filter(|(i, _)| !specs.get(*i).is_some_and(|s| s.drop_none))
                 .map(|(i, p)| ConcreteParam {
                     ty: settled(&p.ty, &format!("fn {name:?} parameter {:?}", p.name)),
                     name: p.name.clone(),
@@ -3386,8 +3425,9 @@ impl Mono<'_> {
     /// hasn't been seen, returning the name. Each specialization marker is folded
     /// into the mangled name so distinct specializations are distinct functions:
     /// `$<type>` per type arg, then `$own{i}` (owned), `$s{i}` (`char[]`-kept-as-
-    /// `str`), `$c{i}` (concat-str), `$ve{i}`/`$vo{i}` (variadic element/optional)
-    /// — grouped by marker, ascending parameter index within each group.
+    /// `str`), `$c{i}` (concat-str), `$ve{i}`/`$vo{i}` (variadic element/optional),
+    /// `$dn{i}` (dropped bare-`none` parameter) — grouped by marker, ascending
+    /// parameter index within each group.
     fn enqueue_full(&mut self, template: &str, specs: ParamSpecs) -> String {
         let mut mangled = template.to_string();
         for t in &specs.type_args {
@@ -3408,6 +3448,9 @@ impl Mono<'_> {
         }
         for i in specs.indices(|p| p.variadic == VShape::Opt) {
             mangled.push_str(&format!("$vo{i}"));
+        }
+        for i in specs.indices(|p| p.drop_none) {
+            mangled.push_str(&format!("$dn{i}"));
         }
         if self.emitted.insert(mangled.clone()) {
             self.dbg
@@ -4882,10 +4925,19 @@ impl Mono<'_> {
                                 } else {
                                     VShape::Seq
                                 },
+                                drop_none: is_unpinned_optional(&subst_vars(&p.ty, &tmap)),
                                 ..ParamSpec::default()
                             })
                             .collect()
                     };
+                    // The dropped parameters take their arguments with them —
+                    // each was a bare `none` the instance now declares itself.
+                    let rargs: Vec<Expr> = rargs
+                        .into_iter()
+                        .enumerate()
+                        .filter(|(i, _)| !params.get(*i).is_some_and(|p| p.drop_none))
+                        .map(|(_, a)| a)
+                        .collect();
                     let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
                     (node(ExprKind::Call(mangled, rargs, method_style)), ret)
                 } else if self.concrete.contains_key(name) {
