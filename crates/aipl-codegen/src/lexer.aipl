@@ -704,11 +704,12 @@ fn finalize_template<K>(
     let finals = finalize(seg_texts);
     mut toks = [];
     mut trivia = [];
+
+    // `finalize` returns one text per segment, so `finals` runs in lockstep with
+    // `seg_spans` and `interp_runs` — which is why the `none` fallbacks below are
+    // dead, and why `n` is the segment count whichever array it is taken from.
     let n = seg_texts.len();
-    mut k: u64 = 0;
-    while (k < n) {
-        // `k` is always in range (0..n), so the `none` fallbacks below are dead.
-        let txt = finals[k].value_or("");
+    for (let k, txt : finals) {
         let sp = match (seg_spans[k]) {
             some(s) => s,
             none => 0..0,
@@ -729,7 +730,6 @@ fn finalize_template<K>(
         };
         set toks.extend(run.tokens);
         set trivia.extend(run.trivia);
-        set k++;
     }
     ok(StepResult { tokens: toks, trivia, end })
 }
@@ -1238,11 +1238,11 @@ allocations: 1657
 deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
-instructions executed: 268149
-binary size: 1791480
-  code: 1125060
+instructions executed: 267533
+binary size: 1791320
+  code: 1124952
   data: 8132
-  metadata: 658288
+  metadata: 658236
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1422,10 +1422,10 @@ functions:
     calls: 29
     bytes: (external)
   aipl_dec:
-    calls: 6989
+    calls: 6968
     bytes: (external)
   aipl_inc:
-    calls: 5978
+    calls: 5957
     bytes: (external)
   aipl_str_contains:
     calls: 325
@@ -1477,7 +1477,7 @@ functions:
     bytes: 112
   finalize_template$Kind:
     calls: 13
-    bytes: 9436
+    bytes: 9328
   float_len:
     calls: 14
     bytes: 816

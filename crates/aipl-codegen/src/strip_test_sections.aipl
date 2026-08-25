@@ -1,29 +1,20 @@
-import {
-    equal as ==,
-    len,
-    less_than as <,
-    not_equal as !=,
-    wrapping_add as +,
-    wrapping_increment as ++,
-} from builtins;
+import { equal as ==, not_equal as !=, wrapping_add as + } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 
 pub fn strip_test_sections(src: str) -> str {
-    // Walk byte-by-byte (`s[i]` / slicing / len are all byte-indexed), tracking
-    // the start of the current line. At each line break, test the line just ended
-    // for a `--- name ---` marker; the first marker line is the cutoff, and we
-    // return everything before it. A trailing `\r` (CRLF) needs no special
+    // Walk byte-by-byte (the index and every slice below are byte-indexed),
+    // tracking the start of the current line. At each line break, test the line
+    // just ended for a `--- name ---` marker; the first marker line is the cutoff,
+    // and we return everything before it. A trailing `\r` (CRLF) needs no special
     // handling — `parse_test_section_header` trims it before matching.
     mut line_start: u64 = 0;
-    mut i: u64 = 0;
-    while (i < src.len()) {
-        if (src[i] == some('\n')) {
+    for (let i, c : src) {
+        if (c == '\n') {
             if (parse_test_section_header(src[line_start..i]) != none) {
                 return src[..line_start];
             };
             set line_start = i + 1;
         };
-        set i++;
     }
 
     // The final line has no trailing newline. (When `src` ends in `\n`,
@@ -58,15 +49,12 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 320
-instructions executed: 8824
-binary size: 7160
-  code: 2628
+instructions executed: 6997
+binary size: 7072
+  code: 2552
   data: 1079
-  metadata: 3453
+  metadata: 3441
 functions:
-  __eq_char$opt:
-    calls: 128
-    bytes: 100
   __eq_str$opt:
     calls: 17
     bytes: 148
@@ -76,14 +64,14 @@ functions:
   aipl_assert:
     calls: 9
     bytes: (external)
-  aipl_char_at:
-    calls: 128
-    bytes: (external)
   aipl_dec:
-    calls: 271
+    calls: 143
     bytes: (external)
   aipl_inc:
-    calls: 202
+    calls: 74
+    bytes: (external)
+  aipl_str_data:
+    calls: 8
     bytes: (external)
   aipl_str_ends_with:
     calls: 5
@@ -91,8 +79,14 @@ functions:
   aipl_str_eq:
     calls: 14
     bytes: (external)
+  aipl_str_iter_init:
+    calls: 9
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 8
+    bytes: (external)
   aipl_str_len:
-    calls: 202
+    calls: 86
     bytes: (external)
   aipl_str_slice:
     calls: 27
@@ -117,4 +111,4 @@ functions:
     bytes: 1036
   strip_test_sections:
     calls: 9
-    bytes: 648
+    bytes: 672

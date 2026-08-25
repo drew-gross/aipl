@@ -641,11 +641,11 @@ allocations: 4666
 deallocations: 4666
 reallocations: 31
 bytes allocated: 270208
-instructions executed: 742918
-binary size: 214152
-  code: 138108
+instructions executed: 742366
+binary size: 214000
+  code: 138028
   data: 7100
-  metadata: 68944
+  metadata: 68872
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -720,7 +720,7 @@ functions:
     calls: 29
     bytes: 284
   __eq_char$opt:
-    calls: 82
+    calls: 51
     bytes: 100
   __eq_str$opt:
     calls: 3
@@ -763,7 +763,7 @@ functions:
     bytes: 1392
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 7440
+    bytes: 7336
   __m1__float_len:
     calls: 0
     bytes: 816
@@ -805,7 +805,7 @@ functions:
     bytes: 292
   __m9__strip_test_sections:
     calls: 2
-    bytes: 648
+    bytes: 672
   __map19$own0:
     calls: 2
     bytes: 320
@@ -858,22 +858,22 @@ functions:
     calls: 20
     bytes: (external)
   aipl_char_at:
-    calls: 1365
+    calls: 1334
     bytes: (external)
   aipl_concat_lazy:
     calls: 12
     bytes: (external)
   aipl_dec:
-    calls: 24394
+    calls: 24359
     bytes: (external)
   aipl_inc:
-    calls: 19279
+    calls: 19244
     bytes: (external)
   aipl_str_contains:
     calls: 1016
     bytes: (external)
   aipl_str_data:
-    calls: 88
+    calls: 90
     bytes: (external)
   aipl_str_ends_with:
     calls: 3
@@ -885,16 +885,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_str_iter_init:
-    calls: 90
+    calls: 92
     bytes: (external)
   aipl_str_iter_next:
-    calls: 88
+    calls: 90
     bytes: (external)
   aipl_str_join:
     calls: 3
     bytes: (external)
   aipl_str_len:
-    calls: 8071
+    calls: 8043
     bytes: (external)
   aipl_str_slice:
     calls: 1884

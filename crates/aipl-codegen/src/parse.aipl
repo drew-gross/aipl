@@ -910,11 +910,11 @@ allocations: 2691
 deallocations: 2691
 reallocations: 232
 bytes allocated: 129500
-instructions executed: 384376
-binary size: 254856
-  code: 146796
+instructions executed: 384503
+binary size: 254704
+  code: 146692
   data: 6948
-  metadata: 101112
+  metadata: 101064
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1059,7 +1059,7 @@ functions:
     bytes: 1392
   __m3__finalize_template$Tok:
     calls: 0
-    bytes: 4360
+    bytes: 4256
   __m3__float_len:
     calls: 0
     bytes: 816

@@ -27,6 +27,8 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 variant:
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
   make a case_name function to replace the jank in kind_label
+  allow variant constructors to have defaults, get rid of many in grammar.aipl
+  Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
 
 type system:
   apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
@@ -153,6 +155,7 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
+  lint against manually incrementing a loop counter
   for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
   mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]
   is_nonempty lint should recognize x.len() != 0 and x.len() >= 1
@@ -366,8 +369,6 @@ lexer:
 check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
 
 have the clir IR include the human readable version of data section strings in comments
-
-Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
 
 improve dogfooding:
 - stop using global function ids.

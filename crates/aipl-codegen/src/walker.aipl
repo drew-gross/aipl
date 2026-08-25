@@ -2269,18 +2269,16 @@ fn call_arg_list(args: Doc[], hug: bool) -> Doc {
 fn toks_of(src: str) -> FmtTok[] {
     mut out = [];
     mut start: u64 = 0;
-    mut i: u64 = 0;
-    while (i < src.len()) {
-        if (src[i] == some(' ')) {
+    for (let i, c : src) {
+        if (c == ' ') {
             if (start < i) {
                 set out.push(FmtTok { kind: Ident, span: start..i });
             };
             set start = i + 1;
         };
-        set i++;
     }
-    if (start < i) {
-        set out.push(FmtTok { kind: Ident, span: start..i });
+    if (start < src.len()) {
+        set out.push(FmtTok { kind: Ident, span: start..src.len() });
     };
     out
 }
@@ -2726,11 +2724,11 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2898757
-binary size: 3229264
-  code: 1845528
+instructions executed: 2865819
+binary size: 3229160
+  code: 1845468
   data: 27124
-  metadata: 1356612
+  metadata: 1356568
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2847,7 +2845,7 @@ functions:
     calls: 6
     bytes: 300
   __eq_char$opt:
-    calls: 2123
+    calls: 54
     bytes: 100
   __lambda_37:
     calls: 0
@@ -2956,7 +2954,7 @@ functions:
     bytes: 1392
   __m9__finalize_template$__m8__AiplTok:
     calls: 0
-    bytes: 7440
+    bytes: 7336
   __m9__float_len:
     calls: 0
     bytes: 816
@@ -3042,7 +3040,7 @@ functions:
     calls: 172
     bytes: (external)
   aipl_char_at:
-    calls: 4066
+    calls: 1997
     bytes: (external)
   aipl_concat:
     calls: 264
@@ -3051,10 +3049,10 @@ functions:
     calls: 205
     bytes: (external)
   aipl_dec:
-    calls: 95548
+    calls: 93479
     bytes: (external)
   aipl_inc:
-    calls: 75540
+    calls: 73471
     bytes: (external)
   aipl_rec_alloc:
     calls: 6173
@@ -3078,7 +3076,7 @@ functions:
     calls: 2550
     bytes: (external)
   aipl_str_data:
-    calls: 365
+    calls: 482
     bytes: (external)
   aipl_str_ends_with:
     calls: 128
@@ -3087,16 +3085,16 @@ functions:
     calls: 6119
     bytes: (external)
   aipl_str_iter_init:
-    calls: 374
+    calls: 494
     bytes: (external)
   aipl_str_iter_next:
-    calls: 365
+    calls: 482
     bytes: (external)
   aipl_str_join:
     calls: 260
     bytes: (external)
   aipl_str_len:
-    calls: 31531
+    calls: 29816
     bytes: (external)
   aipl_str_repeat:
     calls: 76
@@ -3418,7 +3416,7 @@ functions:
     bytes: 2176
   walker_of:
     calls: 120
-    bytes: 708
+    bytes: 752
   while_stmt:
     calls: 1
     bytes: 4272

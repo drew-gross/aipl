@@ -1,29 +1,20 @@
-import {
-    equal as ==,
-    len,
-    less_than as <,
-    not_equal as !=,
-    wrapping_add as +,
-    wrapping_increment as ++,
-} from builtins;
+import { equal as ==, not_equal as !=, wrapping_add as + } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 
 pub fn split_test_sections(src: str) -> (str, str) {
     // Like `strip_test_sections`, but returns both halves. Walk byte-by-byte
-    // (`s[i]` / slicing / len are all byte-indexed), tracking the start of the
-    // current line. At each line break, test the line just ended for a
+    // (the index and every slice below are byte-indexed), tracking the start of
+    // the current line. At each line break, test the line just ended for a
     // `--- name ---` marker; the first marker line is the cutoff — everything
     // before it is the main source, everything from it on is the test sections.
     mut line_start: u64 = 0;
-    mut i: u64 = 0;
-    while (i < src.len()) {
-        if (src[i] == some('\n')) {
+    for (let i, c : src) {
+        if (c == '\n') {
             if (parse_test_section_header(src[line_start..i]) != none) {
                 return (src[..line_start], src[line_start..]);
             };
             set line_start = i + 1;
         };
-        set i++;
     }
 
     // The final line has no trailing newline; if it's a marker, split there.
@@ -64,18 +55,15 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 480
-instructions executed: 9330
-binary size: 9032
-  code: 3524
+instructions executed: 7503
+binary size: 8936
+  code: 3432
   data: 1316
-  metadata: 4192
+  metadata: 4188
 functions:
   __eq___tuple$str$str:
     calls: 9
     bytes: 224
-  __eq_char$opt:
-    calls: 128
-    bytes: 100
   __eq_str$opt:
     calls: 17
     bytes: 148
@@ -85,14 +73,14 @@ functions:
   aipl_assert:
     calls: 9
     bytes: (external)
-  aipl_char_at:
-    calls: 128
-    bytes: (external)
   aipl_dec:
-    calls: 331
+    calls: 203
     bytes: (external)
   aipl_inc:
-    calls: 244
+    calls: 116
+    bytes: (external)
+  aipl_str_data:
+    calls: 8
     bytes: (external)
   aipl_str_ends_with:
     calls: 5
@@ -100,8 +88,14 @@ functions:
   aipl_str_eq:
     calls: 23
     bytes: (external)
+  aipl_str_iter_init:
+    calls: 9
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 8
+    bytes: (external)
   aipl_str_len:
-    calls: 217
+    calls: 101
     bytes: (external)
   aipl_str_slice:
     calls: 32
@@ -126,4 +120,4 @@ functions:
     bytes: 1428
   split_test_sections:
     calls: 9
-    bytes: 928
+    bytes: 936
