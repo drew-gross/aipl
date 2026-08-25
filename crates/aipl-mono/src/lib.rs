@@ -3351,18 +3351,55 @@ impl Mono<'_> {
     ) -> Result<(Vec<Type>, Type), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
         // `&mut self` enqueue.
-        let (type_vars, param_tys, return_ty) = {
+        let (type_vars, param_tys, variadic, return_ty) = {
             let Generic { sig, .. } = &self.generics[gname];
             (
                 sig.type_var_names(),
                 sig.params.iter().map(|p| p.ty.clone()).collect::<Vec<_>>(),
+                sig.params.iter().map(|p| p.variadic).collect::<Vec<_>>(),
                 sig.return_ty.clone(),
             )
         };
         let var_set: HashSet<&str> = type_vars.iter().map(String::as_str).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
-        for (pty, aty) in param_tys.iter().zip(arg_tys) {
+        // Non-variadic parameters first: their arguments pin a type variable
+        // unambiguously, and a variadic's does not. `sep: T*` has sequence type
+        // `T[]`, and a `str` argument to it is either the sequence (`T = char`,
+        // since an AIPL string *is* the char sequence) or a single element
+        // (`T = str`) — indistinguishable in isolation. Binding the rest first
+        // usually settles `T`, and then the variadic only has to agree with it.
+        for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
+            if variadic[i] {
+                continue;
+            }
             self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
+        }
+        for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
+            if !variadic[i] {
+                continue;
+            }
+            // Bind against whichever half the argument actually is. With `T`
+            // already known, `variadic_shape` decides against the *substituted*
+            // sequence type; without it, the structural fallback (an array is
+            // the sequence, anything else an element) is the same rule the
+            // concrete path uses.
+            let seq = subst_vars(pty, &map);
+            let target = match variadic_shape(aty, &seq) {
+                VShape::Seq => pty.clone(),
+                VShape::Elem | VShape::Opt => variadic_elem_ty(pty),
+            };
+            let aty = match (variadic_shape(aty, &seq), aty) {
+                (VShape::Opt, Type::Optional(inner)) => (**inner).clone(),
+                _ => aty.clone(),
+            };
+            // A bare `none` (or an empty `[]`) carries only a placeholder
+            // element type and pins nothing — the same bow-out
+            // `collect_var_bindings` makes for every other parameter. Binding it
+            // would claim `T = __none__` and conflict with the real argument.
+            if is_none_inner(&aty) || matches!(&aty, Type::Array(e) if is_none_inner(e)) {
+                continue;
+            }
+            self.bind_generic_or(&target, &aty, &var_set, &mut map, gname, span.clone())?;
         }
         // Fallback pass: any type variable that no concrete arg pinned can
         // still be inferred from an empty-array or bare-`none` argument — the
@@ -4746,6 +4783,18 @@ impl Mono<'_> {
                                 owned: owned.contains(&i),
                                 str_kept: atys.get(i) == Some(&Type::Primitive(Primitive::Str))
                                     && subst_vars(&p.ty, &tmap) == chars,
+                                // A generic function's variadic parameter needs
+                                // the same per-shape specialization a concrete
+                                // one gets; without it every instance was the
+                                // sequence form and a bare element was rejected
+                                // by codegen's argument check.
+                                variadic: if p.variadic {
+                                    atys.get(i).map_or(VShape::Seq, |a| {
+                                        variadic_shape(a, &subst_vars(&p.ty, &tmap))
+                                    })
+                                } else {
+                                    VShape::Seq
+                                },
                                 ..ParamSpec::default()
                             })
                             .collect()

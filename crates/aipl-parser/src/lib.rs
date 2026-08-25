@@ -227,7 +227,8 @@ gazelle! {
         param = IDENT COLON ty => param
               | MUT IDENT COLON ty => mut_param
               | IDENT COLON ty OP => variadic_param
-              | IDENT COLON ty EQ expr => with_default;
+              | IDENT COLON ty EQ expr => with_default
+              | IDENT COLON ty OP EQ expr => variadic_with_default;
 
         return_ty = ARROW ty => present | _ => absent;
 
@@ -1359,6 +1360,26 @@ impl gazelle::Action<aipl::ParamList<Self>> for Build {
     }
 }
 
+/// The *sequence* type a variadic parameter's body sees, from its declared
+/// element type: a `char` sequence is an AIPL string (`char*` → `str`), every
+/// other element `T` uses `T[]` (`str*` → `str[]`, `i64*` → `i64[]`). The
+/// element type stays recoverable from it (see `variadic_elem`). Errors when the
+/// trailing operator isn't `*` — the grammar admits any operator token there, so
+/// this is where `T+`/`T?` are turned away.
+fn variadic_seq_ty(elem: Type, op: char, op_span: Span) -> Result<Type, Error> {
+    if op != '*' {
+        return Err(Error::at(
+            format!("expected \"*\" after a variadic parameter type, found {op:?}"),
+            op_span,
+        ));
+    }
+    Ok(if elem == Type::Primitive(Primitive::Char) {
+        Type::Primitive(Primitive::Str)
+    } else {
+        Type::Array(Box::new(elem))
+    })
+}
+
 impl gazelle::Action<aipl::Param<Self>> for Build {
     fn build(&mut self, node: aipl::Param<Self>) -> Result<Param, Self::Error> {
         Ok(match node {
@@ -1389,29 +1410,25 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
             // The stored type is the *sequence type* the body sees: `str` when
             // the element is `char` (an AIPL string is the char sequence),
             // otherwise `T[]`. The element type stays recoverable from it.
-            aipl::Param::VariadicParam((name, _), elem, (op, op_span)) => {
-                if op != '*' {
-                    return Err(Error::at(
-                        format!("expected \"*\" after a variadic parameter type, found {op:?}"),
-                        op_span,
-                    ));
-                }
-                // The element's sequence type: a `char` sequence is an AIPL
-                // string (`char*` → `str`); every other element `T` uses `T[]`
-                // (so `str*` is `str[]`, `i64*` is `i64[]`, etc.).
-                let ty = if elem == Type::Primitive(Primitive::Char) {
-                    Type::Primitive(Primitive::Str)
-                } else {
-                    Type::Array(Box::new(elem))
-                };
-                Param {
-                    name,
-                    ty,
-                    mutable: false,
-                    variadic: true,
-                    default: None,
-                }
-            }
+            aipl::Param::VariadicParam((name, _), elem, (op, op_span)) => Param {
+                name,
+                ty: variadic_seq_ty(elem, op, op_span)?,
+                mutable: false,
+                variadic: true,
+                default: None,
+            },
+            // `k: T* = expr` — both at once: variadic in what it accepts (a
+            // sequence, a bare element, or an optional one) and a keyword
+            // parameter in how it is passed, since the default is what makes a
+            // parameter one. Omitted, it takes the default; supplied, it must be
+            // named (`sep = ", "`).
+            aipl::Param::VariadicWithDefault((name, _), elem, (op, op_span), default) => Param {
+                name,
+                ty: variadic_seq_ty(elem, op, op_span)?,
+                mutable: false,
+                variadic: true,
+                default: Some(default),
+            },
         })
     }
 }

@@ -1,0 +1,17 @@
+import { len, print, to_str } from builtins;
+
+// A default makes a parameter keyword-only, and a variadic is no exception:
+// supplied, it must be named. `count(xs, 5)` is rejected even though `5` is a
+// perfectly good variadic argument — see `functions/variadic_default` for the
+// forms that do work.
+fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
+
+fn main() !prints {
+    print(to_str(count([1, 2], 5)));
+}
+--- errors ---
+error: fn "count" expects 1 positional arg(s), got 2 (its keyword parameter must be passed by keyword: "sep")
+  --> ./tests/cases/kwargs/err_variadic_default_positional.aipl:10:18
+   |
+10 |     print(to_str(count([1, 2], 5)));
+   |                  ^^^^^^^^^^^^^^^

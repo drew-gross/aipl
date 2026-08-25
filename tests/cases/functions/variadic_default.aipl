@@ -1,0 +1,101 @@
+import { len, print, to_str } from builtins;
+
+// A variadic parameter may carry a default: `T* = []`.
+//
+// The two halves compose without conflicting. It stays *variadic* in what it
+// accepts — the sequence, a single element, or an optional element — and the
+// default makes it a *keyword* parameter in how it's passed, exactly as a
+// default does anywhere else. So it is omitted or named, never positional.
+fn count<T: any>(self: T[], sep: T* = []) -> u64 { sep.len() }
+
+// `char*`'s sequence type is `str` (an AIPL string *is* the char sequence), so
+// its default is a string rather than an array.
+fn chars(self: char[], sep: char* = "") -> u64 { sep.len() }
+
+fn main() !prints {
+    // Omitted: the default applies.
+    print(to_str(count([1, 2])));
+    // Named: every variadic argument shape still works.
+    print(to_str(count([1, 2], sep=5)));
+    print(to_str(count([1, 2], sep=[5, 6])));
+    print(to_str(count([1, 2], sep=some(7))));
+    print(to_str(count([1, 2], sep=none)));
+
+    // The `str`/`char` ambiguity resolves from the *other* arguments, which are
+    // bound first precisely because a variadic's own argument can't settle it:
+    // with `T = str` a string is one element, with `T = char` it is the whole
+    // sequence.
+    print(to_str(count(["a"], sep="xy")));
+    print(to_str(chars(['a'], sep="xy")));
+    print(to_str(chars(['a'], sep='z')));
+    print(to_str(chars(['a'])));
+}
+--- stdout ---
+0
+1
+2
+1
+0
+1
+2
+1
+0
+--- performance ---
+allocations: 15
+deallocations: 15
+reallocations: 0
+bytes allocated: 566
+instructions executed: 548
+binary size: 4008
+  code: 1884
+  data: 1
+  metadata: 2123
+functions:
+  __to_str_u64:
+    calls: 9
+    bytes: 180
+  aipl_arr_drop_str:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 14
+    bytes: (external)
+  aipl_array_new:
+    calls: 12
+    bytes: (external)
+  aipl_dec:
+    calls: 23
+    bytes: (external)
+  aipl_inc:
+    calls: 9
+    bytes: (external)
+  aipl_print:
+    calls: 9
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 3
+    bytes: (external)
+  aipl_str_len:
+    calls: 3
+    bytes: (external)
+  aipl_u64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_u64:
+    calls: 9
+    bytes: (external)
+  chars:
+    calls: 2
+    bytes: 36
+  count$i64:
+    calls: 2
+    bytes: 12
+  count$i64$vo1:
+    calls: 2
+    bytes: 216
+  main:
+    calls: 1
+    bytes: 1440
