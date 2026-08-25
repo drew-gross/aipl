@@ -41,7 +41,8 @@ pub use sink::sink_bindings;
 use aipl_syntax::{
     ast,
     ast::{
-        is_unit, Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam,
+        is_unit, Bound, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType, ConcreteVariantCase,
+        ConcreteVariantDecl, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam,
         MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
         VariantCase, VariantDecl,
     },
@@ -1395,10 +1396,58 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     }
     structs.extend(syn_structs);
     variants_out.extend(syn_variants);
+    // The boundary. Everything past this point is concrete by construction, so
+    // a type variable that escaped instantiation is caught here — with a name to
+    // report — rather than reaching codegen and being mangled into a nonsense
+    // instance name.
     Ok(MonoProgram {
-        structs,
-        variants: variants_out,
+        structs: structs
+            .into_iter()
+            .map(|s| ConcreteStructDecl {
+                fields: s
+                    .fields
+                    .iter()
+                    .map(|f| ConcreteFieldDecl {
+                        name: f.name.clone(),
+                        ty: settled(&f.ty, &format!("struct {:?} field {:?}", s.name, f.name)),
+                    })
+                    .collect(),
+                name: s.name,
+            })
+            .collect(),
+        variants: variants_out
+            .into_iter()
+            .map(|v| ConcreteVariantDecl {
+                cases: v
+                    .cases
+                    .iter()
+                    .map(|c| ConcreteVariantCase {
+                        name: c.name.clone(),
+                        payload: c
+                            .payload
+                            .iter()
+                            .map(|t| settled(t, &format!("variant {:?} case {:?}", v.name, c.name)))
+                            .collect(),
+                    })
+                    .collect(),
+                name: v.name,
+            })
+            .collect(),
         fns: out_fns,
+    })
+}
+
+/// A type monomorphization has finished with, as a [`ConcreteType`].
+///
+/// Reaching the `None` case means an abstraction survived instantiation, which
+/// is a compiler bug: `what` names where it was found so the report points at
+/// the declaration rather than at whatever downstream pass first choked.
+pub(crate) fn settled(ty: &Type, what: &str) -> ConcreteType {
+    ty.to_concrete().unwrap_or_else(|| {
+        panic!(
+            "{what} is still abstract after monomorphization: {}",
+            aipl_syntax::type_name(ty)
+        )
     })
 }
 
@@ -1610,7 +1659,7 @@ pub struct ConcreteFn {
     pub name: String,
     pub params: Vec<ConcreteParam>,
     pub effects: Vec<String>,
-    pub return_ty: Option<Type>,
+    pub return_ty: Option<ConcreteType>,
     pub body: Expr,
 }
 
@@ -1628,8 +1677,8 @@ impl ConcreteFn {
     ///
     /// This is what the *body* is checked against. What a caller receives can
     /// differ — see [`ConcreteFn::abi_return_type`].
-    pub fn return_type(&self) -> Type {
-        self.return_ty.clone().unwrap_or(Type::Unit)
+    pub fn return_type(&self) -> ConcreteType {
+        self.return_ty.clone().unwrap_or(ConcreteType::Unit)
     }
 
     /// A mutating method: `fn f(mut self: T, ...)`. It returns nothing to the
@@ -1653,7 +1702,8 @@ impl ConcreteFn {
     /// `error: <msg>` and exit 1.
     pub fn is_error_main(&self) -> bool {
         self.name == "main"
-            && matches!(&self.return_ty, Some(Type::Result(ok, err)) if is_unit(ok) && is_error(err))
+            && matches!(&self.return_ty, Some(ConcreteType::Result(ok, err))
+                if aipl_syntax::concrete::is_unit(ok) && aipl_syntax::concrete::is_error(err))
     }
 
     /// The type this function actually yields to a caller — what its signature
@@ -1663,13 +1713,13 @@ impl ConcreteFn {
     /// produce a value while their body is checked as unit: a mutating method
     /// yields its (mutated) `self`, and either flavour of entry `main` yields an
     /// `i64` exit code.
-    pub fn abi_return_type(&self) -> Type {
+    pub fn abi_return_type(&self) -> ConcreteType {
         if self.is_mutating() {
             self.params[0].ty.clone()
         } else if self.is_unit_main() || self.is_error_main() {
             // Both produce an `i64` exit code: a unit `main` always 0, an
             // `!Error` `main` 0/1 derived from its result.
-            Type::Primitive(Primitive::I64)
+            ConcreteType::Primitive(Primitive::I64)
         } else {
             self.return_type()
         }
@@ -1685,7 +1735,7 @@ impl ConcreteFn {
 #[derive(Clone)]
 pub struct ConcreteParam {
     pub name: String,
-    pub ty: Type,
+    pub ty: ConcreteType,
     pub mutable: bool,
     /// Whether this instance *takes ownership* of the parameter: the caller
     /// transfers its sole reference instead of retaining, and the callee is
@@ -1723,8 +1773,8 @@ struct ConcreteTemplate {
 /// force codegen to share `Function` with the pre-mono source representation).
 #[derive(Clone)]
 pub struct MonoProgram {
-    pub structs: Vec<StructDecl>,
-    pub variants: Vec<VariantDecl>,
+    pub structs: Vec<ConcreteStructDecl>,
+    pub variants: Vec<ConcreteVariantDecl>,
     pub fns: Vec<ConcreteFn>,
 }
 
@@ -1931,14 +1981,16 @@ impl Mono<'_> {
                 .iter()
                 .enumerate()
                 .map(|(i, p)| ConcreteParam {
+                    ty: settled(&p.ty, &format!("fn {name:?} parameter {:?}", p.name)),
                     name: p.name.clone(),
-                    ty: p.ty.clone(),
                     mutable: p.mutable,
                     owned: specs.get(i).is_some_and(|s| s.owned),
                 })
                 .collect(),
             effects: effects.to_vec(),
-            return_ty: return_ty.clone(),
+            return_ty: return_ty
+                .as_ref()
+                .map(|t| settled(t, &format!("fn {name:?} return type"))),
             body,
         })
     }
@@ -6552,7 +6604,9 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             .iter()
             .map(|p| InlineParam {
                 name: p.name.clone(),
-                ty: p.ty.clone(),
+                // Widened for the `let` annotation the expansion produces;
+                // see `InlineParam::ty`.
+                ty: p.ty.widen(),
                 mutable: p.mutable,
             })
             .collect();
@@ -6852,7 +6906,9 @@ fn is_inline_candidate_mono(
         && !skip.contains(&f.name)
         && !binders.contains(&f.name)
         && is_inline_shape(
-            f.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))),
+            f.params
+                .iter()
+                .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
             &f.body,
             &f.name,
         )
@@ -7240,6 +7296,9 @@ fn replace_call(
 /// order to bind it at the call site.
 struct InlineParam {
     name: String,
+    /// Abstract, not [`ConcreteType`]: this becomes the annotation on the
+    /// `let` the inlined call expands to, and annotations live on `Expr`,
+    /// which is shared by both sides of monomorphization.
     ty: Type,
     /// The `mut self` receiver of a mutating method. Only the *first* parameter
     /// can ever carry this: the checker rejects `mut` on a parameter that isn't
@@ -7592,8 +7651,8 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
                 .map(|p| {
                     elidable
                         && !p.owned
-                        && is_heap(&p.ty)
-                        && !is_empty_array_placeholder(&p.ty)
+                        && is_heap(&p.ty.widen())
+                        && !is_empty_array_placeholder(&p.ty.widen())
                         && param_is_inspect_only(&p.name, &f.body)
                 })
                 .collect();

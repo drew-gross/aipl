@@ -4883,7 +4883,11 @@ fn compile_program<M: Module>(
                 .iter()
                 .enumerate()
                 .map(|(i, p)| ParamInfo {
-                    ty: p.ty.clone(),
+                    // Widened at the boundary: monomorphization now hands
+                    // codegen `ConcreteType`, while codegen's own machinery
+                    // still speaks the abstract representation. Migrating it is
+                    // the next slice of the split.
+                    ty: p.ty.widen(),
                     owned: p.owned,
                     // A participant gives up retain elision on its heap
                     // parameters: an inspect-only one is a borrow on the
@@ -4893,10 +4897,10 @@ fn compile_program<M: Module>(
                     inspect_only: !participant && inspects.get(i).copied().unwrap_or(false),
                     // …and for the same reason its boxed parameters, borrows by
                     // default, join the retain/release protocol.
-                    tail_owned: participant && is_boxed(&p.ty, &structs),
+                    tail_owned: participant && is_boxed(&p.ty.widen(), &structs),
                 })
                 .collect(),
-            return_ty: f.abi_return_type(),
+            return_ty: f.abi_return_type().widen(),
             effects: f.effects.clone(),
             is_mutating: f.is_mutating(),
         };
@@ -6988,7 +6992,7 @@ fn build_signature(
     if tail {
         sig.call_conv = CallConv::Tail;
     }
-    let abi = f.abi_return_type();
+    let abi = f.abi_return_type().widen();
     // Composites — structs and optionals (possibly nested) — are returned
     // through a hidden caller-provided pointer (sret), uniformly.
     let returns_composite = sret_size(&abi, structs).is_some();
@@ -6996,7 +7000,7 @@ fn build_signature(
         sig.params.push(AbiParam::new(types::I64));
     }
     for p in &f.params {
-        sig.params.push(AbiParam::new(cl_type_of(&p.ty)));
+        sig.params.push(AbiParam::new(cl_type_of(&p.ty.widen())));
     }
     if is_unit(&abi) || returns_composite {
         // Unit yields no result; a composite is written through the sret pointer.
@@ -7135,8 +7139,10 @@ fn tail_safe_param(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
 fn tail_eligible(f: &aipl_mono::ConcreteFn, structs: &HashMap<String, TypeDef>) -> bool {
     f.name != "main"
         && !f.is_mutating()
-        && sret_size(&f.abi_return_type(), structs).is_none()
-        && f.params.iter().all(|p| tail_safe_param(&p.ty, structs))
+        && sret_size(&f.abi_return_type().widen(), structs).is_none()
+        && f.params
+            .iter()
+            .all(|p| tail_safe_param(&p.ty.widen(), structs))
 }
 
 /// The functions that get `CallConv::Tail` (and so a `$tail` body plus an
@@ -7160,14 +7166,14 @@ fn tail_call_plan(
         if !eligible[f.name.as_str()] {
             continue;
         }
-        let caller_unit = is_unit(&f.abi_return_type());
+        let caller_unit = is_unit(&f.abi_return_type().widen());
         for callee in tail_callees(&f.body) {
             // A name with no instance is a builtin or a codegen intrinsic; both
             // are reached through paths that never become a tail call.
             let Some(g) = by_name.get(callee.as_str()) else {
                 continue;
             };
-            if !eligible[callee.as_str()] || is_unit(&g.abi_return_type()) != caller_unit {
+            if !eligible[callee.as_str()] || is_unit(&g.abi_return_type().widen()) != caller_unit {
                 continue;
             }
             plan.insert(f.name.clone());
@@ -7403,8 +7409,8 @@ impl ObjectCompilation {
 /// A struct or variant declaration, indexed by name for layout resolution.
 #[derive(Clone, Copy)]
 enum TypeDeclRef<'a> {
-    Struct(&'a StructDecl),
-    Variant(&'a aipl_syntax::ast::VariantDecl),
+    Struct(&'a aipl_syntax::ast::ConcreteStructDecl),
+    Variant(&'a aipl_syntax::ast::ConcreteVariantDecl),
 }
 
 fn build_struct_layouts(
@@ -7488,13 +7494,15 @@ fn contained_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
 /// a rebind copies a live value byte-wise instead of transferring a refcounted
 /// pointer. Function types are excluded: a function value is a bare code
 /// address that owns nothing, so it reaches no value at all.
-fn referenced_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
+/// Every named type `ty` reaches. The names are *borrowed* from `ty`, which is
+/// why this walks the concrete representation directly rather than widening at
+/// the call site: a widened temporary would not outlive the collection.
+fn referenced_named_types<'a>(ty: &'a aipl_syntax::ast::ConcreteType, out: &mut Vec<&'a str>) {
+    use aipl_syntax::ast::ConcreteType as C;
     match ty {
-        Type::Named(n) => out.push(n),
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
-            referenced_named_types(inner, out)
-        }
-        Type::Result(a, b) | Type::Dict(a, b) => {
+        C::Named(n) => out.push(n),
+        C::Optional(inner) | C::Array(inner) | C::Set(inner) => referenced_named_types(inner, out),
+        C::Result(a, b) | C::Dict(a, b) => {
             referenced_named_types(a, out);
             referenced_named_types(b, out);
         }
@@ -7655,7 +7663,7 @@ fn resolve_type_layout(
 /// Lay out a `struct`: fields are stored sequentially (no padding — every
 /// field size is a multiple of 8), nested composites inline.
 fn build_struct_layout(
-    decl: &StructDecl,
+    decl: &aipl_syntax::ast::ConcreteStructDecl,
     decls: &HashMap<&str, TypeDeclRef>,
     layouts: &mut HashMap<String, TypeDef>,
     on_stack: &mut HashSet<String>,
@@ -7670,9 +7678,9 @@ fn build_struct_layout(
         // unless it's boxed, in which case the field is an 8-byte pointer and
         // needs no size), or an optional of a scalar/str/array (a 16-byte
         // inline `{tag, value}` composite).
-        match &f.ty {
+        match &f.ty.widen() {
             // Every scalar: any integer width, `bool`, `char`, `str`.
-            _ if is_set_elem(&f.ty) => {}
+            _ if is_set_elem(&f.ty.widen()) => {}
             Type::Named(n) if decls.contains_key(n.as_str()) => {
                 if !rec.contains_key(n.as_str()) {
                     resolve_type_layout(n, decls, layouts, on_stack, rec)?;
@@ -7696,16 +7704,16 @@ fn build_struct_layout(
                     "struct {}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
                     decl.name,
                     f.name,
-                    type_name(&f.ty),
+                    type_name(&f.ty.widen()),
                 )));
             }
         }
         // The nested struct/variant (if any) is now resolved, so its size is
         // in `layouts`.
-        let size = field_size(&f.ty, layouts);
+        let size = field_size(&f.ty.widen(), layouts);
         fields.push(FieldLayout {
             name: f.name.clone(),
-            ty: f.ty.clone(),
+            ty: f.ty.widen(),
             offset,
         });
         // Advance to the next field
@@ -7723,7 +7731,7 @@ fn build_struct_layout(
 /// out (like a struct) from `VARIANT_PAYLOAD_OFFSET`, and the whole value is
 /// sized to the widest case so all cases share one payload region.
 fn build_variant_layout(
-    v: &aipl_syntax::ast::VariantDecl,
+    v: &aipl_syntax::ast::ConcreteVariantDecl,
     decls: &HashMap<&str, TypeDeclRef>,
     layouts: &mut HashMap<String, TypeDef>,
     on_stack: &mut HashSet<String>,
@@ -7740,6 +7748,7 @@ fn build_variant_layout(
             // so its size is known — unless boxed, in which case the field is
             // an 8-byte pointer; that's how a recursive sum type like a list
             // gets its indirection).
+            let ty = &ty.widen();
             let ok = match ty {
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
                 Type::Array(_) | Type::Optional(_) => true,
@@ -8471,7 +8480,7 @@ fn define_fn<M: Module>(
     // (what the signature emits) may differ for entry-style functions — a unit
     // `main` yields its i64 exit code, a mutating method its final `self`.
     let declared_ret = func.return_type();
-    let abi_ret = func.abi_return_type();
+    let abi_ret = func.abi_return_type().widen();
     let ret_composite = sret_size(&abi_ret, structs).is_some();
     let mutating = func.is_mutating();
     let unit_main = func.is_unit_main();
@@ -8517,7 +8526,7 @@ fn define_fn<M: Module>(
                 builder.ins().stack_store(types::I64, *v, slot, 0);
                 env.insert(
                     p.name.clone(),
-                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), false),
+                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.widen())), false),
                 );
                 bindings
                     .borrow_mut()
@@ -8528,12 +8537,12 @@ fn define_fn<M: Module>(
                 // that replaces it inside a loop body stays owned across
                 // iterations; the entry value-track below still keeps the entry
                 // version alive to fn exit for borrows.
-                if mut_binding_owns_slot_ref(&p.ty, structs) {
-                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
-                    scopes[0].push(Tracked::slot(slot, &p.ty));
+                if mut_binding_owns_slot_ref(&p.ty.widen(), structs) {
+                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty.widen());
+                    scopes[0].push(Tracked::slot(slot, &p.ty.widen()));
                 }
             } else {
-                env.insert(p.name.clone(), EnvBinding::Immut(*v, p.ty.clone()));
+                env.insert(p.name.clone(), EnvBinding::Immut(*v, p.ty.widen()));
                 bindings
                     .borrow_mut()
                     .push((p.name.clone(), format!("v{}", v.as_u32())));
@@ -8550,10 +8559,10 @@ fn define_fn<M: Module>(
             // back to the plain heap-parameter rule.
             let retained = match call_params.get(idx) {
                 Some(cp) => cp.retained(),
-                None => is_heap(&p.ty) && !p.owned,
+                None => is_heap(&p.ty.widen()) && !p.owned,
             };
             if retained {
-                scopes[0].push(Tracked::new(*v, &p.ty));
+                scopes[0].push(Tracked::new(*v, &p.ty.widen()));
             }
         }
 
@@ -8586,6 +8595,7 @@ fn define_fn<M: Module>(
         // an error. For a normal fn this also guards struct returns: the sret
         // copy below uses the declared layout.
         // A bare-literal body flexes to a narrow-int return type.
+        let declared_ret = declared_ret.widen();
         let body_ty = aipl_syntax::flex_int_ty(&func.body, &body_ty, &declared_ret);
         expect_type(
             &body_ty,

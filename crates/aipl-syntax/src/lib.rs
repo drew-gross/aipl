@@ -719,6 +719,136 @@ pub mod ast {
         ConcatStr,
     }
 
+    /// A type with every abstraction resolved — what exists *after*
+    /// monomorphization, and the only thing codegen ever sees.
+    ///
+    /// The same shape as [`Type`] minus the four variants that stand for
+    /// something not yet decided: [`Type::TypeVar`] and [`Type::Any`] (a
+    /// parameter monomorphization substitutes away), and [`Type::Tuple`] and
+    /// [`Type::Generic`] (surface syntax lowered to a synthetic named type
+    /// before type-checking). Dropping them is the point: an algorithm that
+    /// only runs post-mono can match exhaustively without an arm whose body is
+    /// `unreachable!()`, and the compiler enforces that it never receives one
+    /// rather than the author remembering to panic.
+    ///
+    /// The context-decided placeholders — `NoneInner`, `EmptyArrayArg`,
+    /// `NoneLiteralArg` — *are* here, because they genuinely reach codegen: an
+    /// empty `[]` still has an element type of some kind when its drop function
+    /// is picked. They are a different axis from abstractness (undecided rather
+    /// than universally quantified) and want their own treatment eventually.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum ConcreteType {
+        Unit,
+        Primitive(Primitive),
+        Named(String),
+        Optional(Box<ConcreteType>),
+        Array(Box<ConcreteType>),
+        Set(Box<ConcreteType>),
+        Dict(Box<ConcreteType>, Box<ConcreteType>),
+        Result(Box<ConcreteType>, Box<ConcreteType>),
+        Fn(Vec<ConcreteType>, Box<ConcreteType>),
+        NoneInner,
+        EmptyArrayArg,
+        NoneLiteralArg,
+        ConcatStr,
+    }
+
+    impl Type {
+        /// This type with every abstraction resolved, or `None` if it still
+        /// mentions one — a type variable, a bare `any`, or a tuple/generic
+        /// application that should have been lowered.
+        ///
+        /// The failure is the useful half: monomorphization converts here, so a
+        /// variable that escaped instantiation is caught at the boundary with a
+        /// name to report, instead of reaching codegen and being mangled into a
+        /// nonsense instance.
+        pub fn to_concrete(&self) -> Option<ConcreteType> {
+            Some(match self {
+                Type::TypeVar(_) | Type::Any | Type::Tuple(_) | Type::Generic(..) => return None,
+                Type::Unit => ConcreteType::Unit,
+                Type::Primitive(p) => ConcreteType::Primitive(*p),
+                Type::Named(n) => ConcreteType::Named(n.clone()),
+                Type::NoneInner => ConcreteType::NoneInner,
+                Type::EmptyArrayArg => ConcreteType::EmptyArrayArg,
+                Type::NoneLiteralArg => ConcreteType::NoneLiteralArg,
+                Type::ConcatStr => ConcreteType::ConcatStr,
+                Type::Optional(i) => ConcreteType::Optional(Box::new(i.to_concrete()?)),
+                Type::Array(i) => ConcreteType::Array(Box::new(i.to_concrete()?)),
+                Type::Set(i) => ConcreteType::Set(Box::new(i.to_concrete()?)),
+                Type::Dict(k, v) => {
+                    ConcreteType::Dict(Box::new(k.to_concrete()?), Box::new(v.to_concrete()?))
+                }
+                Type::Result(a, b) => {
+                    ConcreteType::Result(Box::new(a.to_concrete()?), Box::new(b.to_concrete()?))
+                }
+                Type::Fn(ps, r) => ConcreteType::Fn(
+                    ps.iter()
+                        .map(Type::to_concrete)
+                        .collect::<Option<Vec<_>>>()?,
+                    Box::new(r.to_concrete()?),
+                ),
+            })
+        }
+    }
+
+    impl ConcreteType {
+        /// This type widened back to the abstract representation, for the
+        /// pre-mono machinery that still speaks [`Type`]. Always succeeds —
+        /// every concrete variant has an abstract counterpart.
+        pub fn widen(&self) -> Type {
+            match self {
+                ConcreteType::Unit => Type::Unit,
+                ConcreteType::Primitive(p) => Type::Primitive(*p),
+                ConcreteType::Named(n) => Type::Named(n.clone()),
+                ConcreteType::NoneInner => Type::NoneInner,
+                ConcreteType::EmptyArrayArg => Type::EmptyArrayArg,
+                ConcreteType::NoneLiteralArg => Type::NoneLiteralArg,
+                ConcreteType::ConcatStr => Type::ConcatStr,
+                ConcreteType::Optional(i) => Type::Optional(Box::new(i.widen())),
+                ConcreteType::Array(i) => Type::Array(Box::new(i.widen())),
+                ConcreteType::Set(i) => Type::Set(Box::new(i.widen())),
+                ConcreteType::Dict(k, v) => Type::Dict(Box::new(k.widen()), Box::new(v.widen())),
+                ConcreteType::Result(a, b) => {
+                    Type::Result(Box::new(a.widen()), Box::new(b.widen()))
+                }
+                ConcreteType::Fn(ps, r) => Type::Fn(
+                    ps.iter().map(ConcreteType::widen).collect(),
+                    Box::new(r.widen()),
+                ),
+            }
+        }
+    }
+
+    /// A struct declaration monomorphization has finished with: no type
+    /// parameters (a template is instantiated per use, so what survives is
+    /// always an instance) and no field defaults (already expanded into the
+    /// construction sites that omitted them).
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConcreteStructDecl {
+        pub name: String,
+        pub fields: Vec<ConcreteFieldDecl>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConcreteFieldDecl {
+        pub name: String,
+        pub ty: ConcreteType,
+    }
+
+    /// A variant declaration monomorphization has finished with — the
+    /// [`ConcreteStructDecl`] counterpart for sum types.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConcreteVariantDecl {
+        pub name: String,
+        pub cases: Vec<ConcreteVariantCase>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConcreteVariantCase {
+        pub name: String,
+        pub payload: Vec<ConcreteType>,
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct FieldInit {
         pub name: String,
@@ -1753,6 +1883,90 @@ pub fn is_concat_str(t: &Type) -> bool {
 /// `Error` type (currently a string under the hood), or the internal concat-str
 /// representation. These share all codegen machinery — refcounting, equality,
 /// hashing, rendering.
+/// The [`ast::ConcreteType`] counterparts of the shared type predicates below.
+///
+/// Deliberately the *same names* in their own module, so a consumer that works
+/// post-monomorphization switches representation by changing its `use` line and
+/// nothing else. The bodies mirror their abstract twins arm for arm; where one
+/// of those has a case for an abstract variant, the concrete version simply has
+/// no such case to write.
+pub mod concrete {
+    use super::ast::{ConcreteType, Primitive};
+    use super::ERROR;
+
+    pub fn is_unit(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::Unit)
+    }
+
+    pub fn is_error(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::Named(s) if s == ERROR)
+    }
+
+    pub fn error_ty() -> ConcreteType {
+        ConcreteType::Named(ERROR.into())
+    }
+
+    pub fn is_concat_str(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::ConcatStr)
+    }
+
+    pub fn is_none_inner(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::NoneInner)
+    }
+
+    pub fn is_int_ty(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::Primitive(p) if p.is_int())
+    }
+
+    pub fn is_str_repr(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
+    }
+
+    pub fn is_set_elem(t: &ConcreteType) -> bool {
+        is_int_ty(t)
+            || matches!(
+                t,
+                ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
+            )
+    }
+
+    pub fn is_dict_key(t: &ConcreteType) -> bool {
+        is_set_elem(t)
+    }
+
+    pub fn is_array_elem(t: &ConcreteType) -> bool {
+        is_int_ty(t)
+            || matches!(
+                t,
+                ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
+                    | ConcreteType::Array(_)
+            )
+    }
+
+    pub fn type_name(t: &ConcreteType) -> String {
+        match t {
+            ConcreteType::Unit => "()".into(),
+            ConcreteType::Primitive(p) => p.name().into(),
+            ConcreteType::Named(s) => s.clone(),
+            ConcreteType::Optional(inner) => format!("{}?", type_name(inner)),
+            ConcreteType::Array(inner) => format!("{}[]", type_name(inner)),
+            ConcreteType::Set(inner) => format!("#{{{}}}", type_name(inner)),
+            ConcreteType::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
+            ConcreteType::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
+            ConcreteType::Fn(params, ret) => {
+                let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
+                format!("({ps}) -> {}", type_name(ret))
+            }
+            // Spelled exactly as the abstract `type_name` spells them, so a
+            // diagnostic reads the same whichever side of mono produced it.
+            ConcreteType::NoneInner => "__none__".into(),
+            ConcreteType::EmptyArrayArg => "EmptyArray".into(),
+            ConcreteType::NoneLiteralArg => "NoneLiteral".into(),
+            ConcreteType::ConcatStr => "__concat_str__".into(),
+        }
+    }
+}
+
 pub fn is_str_repr(t: &Type) -> bool {
     matches!(t, Type::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
 }
