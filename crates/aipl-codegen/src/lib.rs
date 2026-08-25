@@ -9239,6 +9239,10 @@ fn hand_off_arg<M: Module>(
 /// iff a component does.
 fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
     match ty {
+        // Monomorphization substitutes every type variable away, so codegen
+        // cannot be handed one: reaching here means a generic instance escaped
+        // instantiation, which is a compiler bug rather than a program error.
+        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
@@ -9846,6 +9850,10 @@ fn emit_rc_w<M: Module>(
         return;
     }
     match ty {
+        // Monomorphization substitutes every type variable away, so codegen
+        // cannot be handed one: reaching here means a generic instance escaped
+        // instantiation, which is a compiler bug rather than a program error.
+        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
         // `str` (and `Error`, a refcounted str pointer, and `char[]`, which
         // shares `str`'s representation — see `is_char_array`) — inc/dec the
         // pointer.
@@ -13256,6 +13264,10 @@ struct ElemRc {
 /// and reads better besides — `dict$str$i64$arr` over `str$i64$arr`.
 fn type_symbol(ty: &Type) -> String {
     match ty {
+        // Monomorphization substitutes every type variable away, so codegen
+        // cannot be handed one: reaching here means a generic instance escaped
+        // instantiation, which is a compiler bug rather than a program error.
+        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
         Type::Primitive(p) => p.name().to_string(),
         Type::Named(n) => sanitize_symbol(n),
         Type::Optional(inner) => format!("{}$opt", type_symbol(inner)),

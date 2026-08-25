@@ -59,7 +59,13 @@ inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
 
+value_or for structs:
+  1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
+  2. value_or → AIPL, with laziness from codegen rather than post-mono sinking.
+  3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
+
 misc cleanup:
+  loop in leaf_at can be a filter
   line_at.aipl should use .doc() instead of // header for docs
   caret_block.aipl should use .doc() instead of // header for docs
   having both min and minimum is kinda weird. Maybe combine somehow?
@@ -158,7 +164,6 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
-  match (self.peek()) {none => FmtTok { kind: Punct, span: 0..0 },some(t) => t,} <-- lint should force this to value_or
   lint against manually incrementing a loop counter
   for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
   mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]

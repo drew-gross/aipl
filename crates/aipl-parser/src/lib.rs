@@ -3667,6 +3667,12 @@ pub fn parse(input: &str) -> Result<Program, Error> {
             }
         }
     }
+
+    // A declaration's own type parameters stop being ordinary names here, at the
+    // one point every path shares: source files reach the checker through the
+    // loader, but the builtin signatures are parsed directly.
+    aipl_syntax::promote_type_vars(&mut program);
+
     Ok(program)
 }
 

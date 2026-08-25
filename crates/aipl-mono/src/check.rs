@@ -77,6 +77,9 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         }
         Type::Primitive(p) => p.name().into(),
         Type::Named(n) => n.replace(['$', '!'], "_"),
+        // Spelled exactly as the old `Named("__typevar__$T")` sentinel mangled,
+        // so instance names generated before and after this split agree.
+        Type::TypeVar(v) => format!("{}{v}", TYPEVAR.replace('$', "_")),
         Type::Array(e) => format!("arr_{}", mangle_type(e)),
         Type::Optional(e) => format!("opt_{}", mangle_type(e)),
         Type::Set(e) => format!("set_{}", mangle_type(e)),
@@ -1151,7 +1154,9 @@ fn stamp_locks(src: &Expr, out: &mut Expr, locks: &HashMap<usize, Option<Type>>)
 /// (set elements, dict keys, etc.).
 fn is_abstract_scalar_ty(t: &Type, type_params: &[String]) -> bool {
     matches!(t, Type::Any | Type::NoneInner)
-        || matches!(t, Type::Named(n) if type_params.iter().any(|tp| tp == n))
+        // A variable of *this* signature. The anonymous one an `any` normalized
+        // to carries an empty name and belongs to whatever signature holds it.
+        || matches!(t, Type::TypeVar(n) if n.is_empty() || type_params.iter().any(|tp| tp == n))
 }
 
 impl Cx<'_> {
@@ -1306,8 +1311,9 @@ impl Cx<'_> {
             // Every primitive is a valid type in any general position.
             Type::Unit | Type::Primitive(_) => Ok(()),
             // The anonymous generic bound is valid anywhere a type-parameter
-            // name is (that's what it desugars to during monomorphization).
-            Type::Any => Ok(()),
+            // name is (that's what it desugars to during monomorphization), and
+            // so is the parameter itself.
+            Type::Any | Type::TypeVar(_) => Ok(()),
             // These are compiler-internal pseudo-types, never part of a
             // declared signature a user wrote — but `check_ty` also runs on
             // synthesized types (e.g. a struct field's inferred default), so
@@ -1517,8 +1523,10 @@ impl Cx<'_> {
             // differs, and everything that reads an element (rendering,
             // comparison, `sort`) dispatches on `int_bits`/`int_signed`.
             Type::Primitive(_) => Ok(()),
-            // The anonymous generic bound and the bare-`none`/empty-container
-            // marker are abstract scalars — always a valid element.
+            // A type parameter, the anonymous generic bound, and the
+            // bare-`none`/empty-container marker are abstract scalars — always a
+            // valid element.
+            Type::TypeVar(_) => Ok(()),
             Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => Ok(()),
             // A concat-str has the `str` runtime representation.
             Type::ConcatStr => Ok(()),
@@ -3817,19 +3825,19 @@ fn mentions_placeholder(t: &Type) -> bool {
 }
 
 fn typevar_ty(name: &str) -> Type {
-    Type::Named(format!("{TYPEVAR}{name}"))
+    Type::TypeVar(name.to_string())
 }
 
 const TYPEVAR: &str = "__typevar__$";
 
 fn is_typevar(t: &Type) -> bool {
-    matches!(t, Type::Named(n) if n.starts_with(TYPEVAR))
+    matches!(t, Type::TypeVar(_))
 }
 
 /// The variable a typevar sentinel came from, or `None` for an anonymous `any`.
 fn typevar_name(t: &Type) -> Option<&str> {
     match t {
-        Type::Named(n) => n.strip_prefix(TYPEVAR).filter(|s| !s.is_empty()),
+        Type::TypeVar(n) => Some(n.as_str()).filter(|s| !s.is_empty()),
         _ => None,
     }
 }
@@ -3840,13 +3848,20 @@ fn typevar_name(t: &Type) -> Option<&str> {
 /// abstract application inside a generic function, resolved at monomorphization).
 fn mentions_typevar(t: &Type) -> bool {
     match t {
-        Type::Named(n) => n.starts_with(TYPEVAR),
+        Type::TypeVar(_) => true,
         Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_typevar(i),
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
         Type::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_typevar),
-        _ => false,
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
     }
 }
 
@@ -3869,8 +3884,12 @@ fn is_valid_elem(t: &Type) -> bool {
 fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
         Type::Any => typevar_ty(""),
-        Type::Named(n) if type_params.iter().any(|p| p == n) => typevar_ty(n),
-        Type::Primitive(_)
+        // A declared parameter is already a `TypeVar` (`promote_type_vars`, at
+        // the end of parsing); `type_params` now only decides which variables
+        // belong to *this* signature, and every variable in a body does.
+        Type::TypeVar(n) if n.is_empty() || type_params.iter().any(|p| p == n) => t.clone(),
+        Type::TypeVar(_)
+        | Type::Primitive(_)
         | Type::Named(_)
         | Type::Unit
         | Type::NoneInner
@@ -3920,7 +3939,7 @@ fn tyname(t: &Type) -> String {
         // The sentinel carries its variable's name (see `typevar_ty`); name it in
         // the message rather than leaking the mangling, and stay generic for an
         // anonymous `any`, which has no name to give.
-        Type::Named(_) if is_typevar(t) => match typevar_name(t) {
+        Type::TypeVar(_) => match typevar_name(t) {
             Some(v) => format!("type parameter {v:?}"),
             None => "a type parameter".to_string(),
         },
@@ -4189,7 +4208,7 @@ pub(crate) fn collect_var_bindings(
     map: &mut HashMap<String, Type>,
 ) {
     match (param_ty, arg_ty) {
-        (Type::Named(v), a) if vars.contains(v.as_str()) => {
+        (Type::TypeVar(v), a) if vars.contains(v.as_str()) => {
             map.entry(v.clone()).or_insert_with(|| a.clone());
         }
         // A bare `none`/empty `[]` argument carries no element type (`__none__`),
@@ -4241,11 +4260,12 @@ pub(crate) fn collect_var_bindings(
 /// in `vars` (concrete types, anonymous `any`) are left as-is.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Type {
     match t {
-        Type::Named(v) if vars.contains(v.as_str()) => {
+        Type::TypeVar(v) if vars.contains(v.as_str()) => {
             map.get(v).cloned().unwrap_or_else(unknown_ty)
         }
         Type::Primitive(_)
         | Type::Named(_)
+        | Type::TypeVar(_)
         | Type::Unit
         | Type::Any
         | Type::NoneInner

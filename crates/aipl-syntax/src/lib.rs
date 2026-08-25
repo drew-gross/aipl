@@ -396,6 +396,8 @@ pub mod ast {
             Type::Unit
             | Type::Primitive(_)
             | Type::Named(_)
+            // A variable `any` already normalized into is no longer an `any`.
+            | Type::TypeVar(_)
             | Type::NoneInner
             | Type::EmptyArrayArg
             | Type::NoneLiteralArg
@@ -619,11 +621,30 @@ pub mod ast {
         /// A built-in scalar primitive (`i64`, `bool`, `str`, …). See
         /// [`Primitive`].
         Primitive(Primitive),
-        /// A name that isn't a primitive: a user struct or variant, a generic
-        /// type parameter (`T`), or the builtin `Error` type. (Compiler
-        /// pseudo-type sentinels that used to overload this — `__none__`,
-        /// `any`, etc. — have their own dedicated variants below instead.)
+        /// A name that isn't a primitive: a user struct or variant, or the
+        /// builtin `Error` type. (Compiler pseudo-type sentinels that used to
+        /// overload this — `__none__`, `any`, etc. — have their own dedicated
+        /// variants below instead, and so does a generic type parameter: see
+        /// [`Type::TypeVar`].)
         Named(String),
+        /// A generic type parameter — the `T` of `fn f<T: any>(x: T)`, and the
+        /// synthetic variable an anonymous `any` normalizes to (which carries an
+        /// empty name).
+        ///
+        /// Its own variant rather than a [`Type::Named`] holding the variable's
+        /// name, because the two are not interchangeable and telling them apart
+        /// by string was the source of real bugs: a substitution keyed by name
+        /// rewrote a *struct* that happened to share a type parameter's name,
+        /// and "does this type mention `T`" could not distinguish the parameter
+        /// from a type called `T`. The passes also disagreed about the encoding
+        /// — the checker used a `__typevar__$T` sentinel, monomorphization the
+        /// bare name — so a type crossing between them meant two different
+        /// things.
+        ///
+        /// Anything holding one of these is *abstract*: it is not a runtime type
+        /// and codegen never sees it, because monomorphization substitutes every
+        /// one away before then.
+        TypeVar(String),
         /// `T?` — optional T. Represented at runtime as a 16-byte
         /// stack value `{ tag: i64, value: i64 }` (tag 0 = None,
         /// 1 = Some), passed by pointer like a struct.
@@ -1741,6 +1762,10 @@ pub fn type_name(t: &Type) -> String {
         Type::Unit => "()".into(),
         Type::Primitive(p) => p.name().into(),
         Type::Named(s) => s.clone(),
+        // A variable renders as the parameter the user wrote; the anonymous one
+        // an `any` normalized to has no name to show, so it renders as `any`.
+        Type::TypeVar(v) if v.is_empty() => "any".into(),
+        Type::TypeVar(v) => v.clone(),
         Type::Optional(inner) => format!("{}?", type_name(inner)),
         Type::Array(inner) => format!("{}[]", type_name(inner)),
         Type::Set(inner) => format!("#{{{}}}", type_name(inner)),
@@ -1996,6 +2021,161 @@ pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
 }
 
 /// Visit `e` and every expression nested inside it, pre-order.
+/// Rewrite every mention of a declaration's own type parameters from
+/// [`ast::Type::Named`] to [`ast::Type::TypeVar`], throughout its signature,
+/// its field/payload types, and any annotation inside its body.
+///
+/// Run once at the end of parsing, which is the earliest point the distinction
+/// is knowable and the last point at which *every* path agrees on it: source
+/// files reach the checker through the loader, but the builtin signatures are
+/// parsed directly (`native_builtin_decls`), and a promotion living in the
+/// loader would leave those spelling `T` as an ordinary name. Doing it here
+/// means no later pass has to ask "is this `Named` really a variable?" — the
+/// question the string-sentinel encodings existed to answer, each differently.
+///
+/// A type parameter shadows a struct of the same name, which is what the
+/// previous name-keyed substitutions effectively assumed and could not enforce.
+pub fn promote_type_vars(program: &mut ast::Program) {
+    for item in &mut program.items {
+        match item {
+            ast::Item::Fn(f) => {
+                let vars: Vec<String> = f.sig.type_var_names();
+                for p in &mut f.sig.params {
+                    promote_ty(&mut p.ty, &vars);
+                }
+                if let Some(r) = &mut f.sig.return_ty {
+                    promote_ty(r, &vars);
+                }
+                promote_in_expr(&mut f.body, &vars);
+                if let Some(t) = &mut f.test_body {
+                    promote_in_expr(t, &vars);
+                }
+            }
+            ast::Item::Struct(s) => {
+                let vars: Vec<String> = s.type_vars.iter().map(|v| v.name.clone()).collect();
+                for fd in &mut s.fields {
+                    promote_ty(&mut fd.ty, &vars);
+                    if let Some(d) = &mut fd.default {
+                        promote_in_expr(d, &vars);
+                    }
+                }
+            }
+            ast::Item::Variant(v) => {
+                let vars: Vec<String> = v.type_vars.iter().map(|t| t.name.clone()).collect();
+                for case in &mut v.cases {
+                    for ty in &mut case.payload {
+                        promote_ty(ty, &vars);
+                    }
+                }
+            }
+            ast::Item::Import(_) => {}
+        }
+    }
+}
+
+/// [`promote_type_vars`] for one type: every `Named` whose name is one of
+/// `vars` becomes a `TypeVar`, recursively.
+fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
+    use ast::Type as T;
+    match ty {
+        T::Named(n) if vars.iter().any(|v| v == n) => *ty = T::TypeVar(n.clone()),
+        T::Unit
+        | T::Primitive(_)
+        | T::Named(_)
+        | T::TypeVar(_)
+        | T::Any
+        | T::NoneInner
+        | T::EmptyArrayArg
+        | T::NoneLiteralArg
+        | T::ConcatStr => {}
+        T::Optional(i) | T::Array(i) | T::Set(i) => promote_ty(i, vars),
+        T::Dict(a, b) | T::Result(a, b) => {
+            promote_ty(a, vars);
+            promote_ty(b, vars);
+        }
+        T::Tuple(es) | T::Generic(_, es) => {
+            for e in es {
+                promote_ty(e, vars);
+            }
+        }
+        T::Fn(ps, r) => {
+            for p in ps {
+                promote_ty(p, vars);
+            }
+            promote_ty(r, vars);
+        }
+    }
+}
+
+/// [`promote_type_vars`] for the annotations inside a body — `let x: T[] = ..`,
+/// `mut n: T = ..`, and a lambda parameter's declared type.
+fn promote_in_expr(e: &mut ast::Expr, vars: &[String]) {
+    use ast::ExprKind as K;
+    match &mut e.kind {
+        K::Let(_, ty, _, _) | K::LetMut(_, ty, _, _) => {
+            if let Some(t) = ty {
+                promote_ty(t, vars);
+            }
+        }
+        K::Lambda(params, _) => {
+            for p in params {
+                if let Some(t) = &mut p.ty {
+                    promote_ty(t, vars);
+                }
+            }
+        }
+        _ => {}
+    }
+    for child in each_subexpr_mut(e) {
+        promote_in_expr(child, vars);
+    }
+}
+
+/// The direct sub-expressions of `e`, mutably — the shape [`each_subexpr`]
+/// walks, for passes that rewrite rather than inspect.
+fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
+    use ast::ExprKind as K;
+    match &mut e.kind {
+        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
+            vec![]
+        }
+        K::Shim(_, _, body) => vec![body.as_mut()],
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+            args.iter_mut().collect()
+        }
+        K::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
+        K::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
+        K::Binop(a, _, b)
+        | K::Seq(a, b)
+        | K::Index(a, b)
+        | K::Let(_, _, a, b)
+        | K::LetMut(_, _, a, b)
+        | K::For(_, a, b)
+        | K::While(a, b) => vec![a.as_mut(), b.as_mut()],
+        K::Assign(a, b, c) | K::If(a, b, c) => vec![a.as_mut(), b.as_mut(), c.as_mut()],
+        K::Neg(x)
+        | K::Not(x)
+        | K::Field(x, _)
+        | K::Try(x)
+        | K::Return(x)
+        | K::KwArg(_, x)
+        | K::Spread(x)
+        | K::Lambda(_, x) => vec![x.as_mut()],
+        K::Match(scrutinee, arms) => {
+            let mut v = vec![scrutinee.as_mut()];
+            v.extend(arms.iter_mut().map(|a| &mut a.body));
+            v
+        }
+        K::Slice(a, b, c) => {
+            let mut v = vec![a.as_mut(), b.as_mut()];
+            if let Some(c) = c {
+                v.push(c.as_mut());
+            }
+            v
+        }
+    }
+}
+
 pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
     use ast::ExprKind as K;
     f(e);
@@ -2337,6 +2517,8 @@ pub mod lint {
             Type::Named(n) => {
                 out.insert(n.clone());
             }
+            // A type parameter is bound by the signature, not imported.
+            Type::TypeVar(_) => {}
             Type::Generic(base, args) => {
                 out.insert(base.clone());
                 for a in args {

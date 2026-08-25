@@ -434,6 +434,7 @@ fn lt_ty(
             }
             Type::Named(name)
         }
+        Type::TypeVar(v) => Type::TypeVar(v.clone()),
         Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
         Type::Set(inner) => Type::Set(Box::new(lt_ty(inner, fields_map, order))),
         Type::Optional(inner) => Type::Optional(Box::new(lt_ty(inner, fields_map, order))),
@@ -599,7 +600,10 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
 /// name) is left unchanged.
 fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
-        Type::Named(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
+        // Only a *variable* substitutes. Keying this on `Named` meant a struct
+        // that happened to share a template parameter's name was rewritten too.
+        Type::TypeVar(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
+        Type::Named(_) => t.clone(),
         Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
         Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
         Type::Set(i) => Type::Set(Box::new(subst_type_params(i, map))),
@@ -5023,7 +5027,7 @@ fn collect_bindings(
     span: Span,
 ) -> Result<(), Error> {
     match param_ty {
-        Type::Named(v) if vars.contains(v.as_str()) => bind(v, arg_ty, map, gname, span.clone()),
+        Type::TypeVar(v) if vars.contains(v.as_str()) => bind(v, arg_ty, map, gname, span.clone()),
         Type::Optional(inner) if ty_contains_var(inner, vars) => match arg_ty {
             Type::Optional(a) if !is_none_inner(a) => {
                 collect_bindings(inner, a, vars, map, gname, span.clone())
@@ -5131,12 +5135,12 @@ fn bind(
 fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     match (param_ty, arg_ty) {
         (Type::Array(inner), Type::Array(a))
-            if matches!(inner.as_ref(), Type::Named(n) if n == v) && is_none_inner(a) =>
+            if matches!(inner.as_ref(), Type::TypeVar(n) if n == v) && is_none_inner(a) =>
         {
             Some(Type::EmptyArrayArg)
         }
         (Type::Optional(inner), Type::Optional(a))
-            if matches!(inner.as_ref(), Type::Named(n) if n == v) && is_none_inner(a) =>
+            if matches!(inner.as_ref(), Type::TypeVar(n) if n == v) && is_none_inner(a) =>
         {
             Some(Type::NoneLiteralArg)
         }
@@ -5437,7 +5441,7 @@ fn builtin_sig(name: &str) -> Option<&'static Signature> {
 /// still be pinned by a different parameter — see [`declared_builtin_return`]).
 fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
     match param_ty {
-        Type::Named(p) if p == v => Some(arg_ty.clone()),
+        Type::TypeVar(p) if p == v => Some(arg_ty.clone()),
         Type::Optional(inner) if ty_mentions(inner, v) => match arg_ty {
             Type::Optional(a) => bind_builtin_var(inner, a, v),
             _ => None,
@@ -5771,6 +5775,7 @@ fn normalize_param_ty(
         ))),
         Type::Primitive(_)
         | Type::Named(_)
+        | Type::TypeVar(_)
         | Type::Unit
         | Type::NoneInner
         | Type::EmptyArrayArg
@@ -5828,10 +5833,11 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             let name = format!("$any{counter}");
             *counter += 1;
             type_vars.push(name.clone());
-            Type::Named(name)
+            Type::TypeVar(name)
         }
         Type::Primitive(_)
         | Type::Named(_)
+        | Type::TypeVar(_)
         | Type::Unit
         | Type::NoneInner
         | Type::EmptyArrayArg
@@ -5987,10 +5993,13 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
-        Type::Named(v) => map
+        // A variable is what a substitution map is keyed by; an ordinary name
+        // stands for itself however the map is populated.
+        Type::TypeVar(v) => map
             .get(v)
             .cloned()
-            .unwrap_or_else(|| Type::Named(v.clone())),
+            .unwrap_or_else(|| Type::TypeVar(v.clone())),
+        Type::Named(n) => Type::Named(n.clone()),
         Type::Optional(inner) => {
             let i = subst_vars(inner, map);
             if is_none_literal_arg(&i) {
@@ -6048,7 +6057,10 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         | Type::NoneLiteralArg
         | Type::ConcatStr => false,
         Type::Any => name == "any",
-        Type::Named(n) => n == name,
+        // Only a variable can *be* the name asked about; a struct called `T` is
+        // not the type parameter `T`.
+        Type::TypeVar(n) => n == name,
+        Type::Named(_) => false,
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
@@ -6070,7 +6082,8 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => false,
-        Type::Named(v) => vars.contains(v.as_str()),
+        Type::TypeVar(v) => vars.contains(v.as_str()),
+        Type::Named(_) => false,
         Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
             ty_contains_var(inner, vars)
         }
@@ -6617,7 +6630,11 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         }
         Type::Fn(ps, r) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
         Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_abstract_type),
-        Type::Unit | Type::Primitive(_) | Type::Named(_) => false,
+        // A type *variable* is abstract in the ordinary sense, but a generic
+        // signature is already excluded by the candidate filter before this runs
+        // (see the doc comment), so counting one here would change nothing but
+        // could only misfire. Left as it behaved when a variable was a `Named`.
+        Type::Unit | Type::Primitive(_) | Type::Named(_) | Type::TypeVar(_) => false,
     }
 }
 

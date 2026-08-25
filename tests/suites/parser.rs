@@ -859,12 +859,40 @@ fn generic_type_params_parse() {
             bound: Bound::Any
         }]
     );
+    // A declared parameter is a `TypeVar`, not a `Named` that happens to match
+    // one — `promote_type_vars` settles that at the end of parsing, so no later
+    // pass has to re-derive it from the signature.
     assert_eq!(
         f.sig.params[0].ty,
-        Type::Optional(Box::new(Type::Named("T".into())))
+        Type::Optional(Box::new(Type::TypeVar("T".into())))
     );
-    assert_eq!(f.sig.params[1].ty, Type::Named("T".into()));
-    assert_eq!(f.sig.return_ty, Some(Type::Named("T".into())));
+    assert_eq!(f.sig.params[1].ty, Type::TypeVar("T".into()));
+    assert_eq!(f.sig.return_ty, Some(Type::TypeVar("T".into())));
+}
+
+/// Promotion is scoped to the declaration that introduces the variable: a
+/// *struct* named `T` stays an ordinary name. Substitutions used to be keyed by
+/// name alone and so could not tell these two apart — a struct sharing a
+/// template parameter's spelling was rewritten along with the parameter.
+#[test]
+fn type_param_promotion_is_scoped_to_its_declaration() {
+    let p = parse(
+        "struct T { x: i64 }\nfn takes(a: T) -> T { a }\nfn generic<T: any>(a: T) -> T { a }",
+    )
+    .unwrap();
+    assert_eq!(fn_item(&p, 1).sig.params[0].ty, Type::Named("T".into()));
+    assert_eq!(fn_item(&p, 2).sig.params[0].ty, Type::TypeVar("T".into()));
+}
+
+/// Annotations *inside* a generic body are promoted too — they mention the
+/// signature's variables just as its parameter list does.
+#[test]
+fn type_params_in_body_annotations_are_promoted() {
+    let p = parse("fn f<T: any>(xs: T[]) -> T[] { let ys: T[] = xs; ys }").unwrap();
+    let ExprKind::Let(_, Some(ty), _, _) = &fn_item(&p, 0).body.kind else {
+        panic!("expected the body to be a `let`");
+    };
+    assert_eq!(*ty, Type::Array(Box::new(Type::TypeVar("T".into()))));
 }
 
 #[test]

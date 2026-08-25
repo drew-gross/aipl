@@ -862,10 +862,13 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         Type::EmptyArrayArg => Type::EmptyArrayArg,
         Type::NoneLiteralArg => Type::NoneLiteralArg,
         Type::ConcatStr => Type::ConcatStr,
+        // Already promoted by `promote_type_vars` at the end of parsing: a type
+        // parameter is bound by its own declaration, so there is no name to
+        // resolve through the file's view.
+        Type::TypeVar(v) => Type::TypeVar(v.clone()),
         Type::Named(s) => {
-            if is_builtin_type(s) || type_vars.iter().any(|v| v.name == *s) {
-                // Builtin type (`Error`) or a local generic type variable →
-                // keep as-is.
+            if is_builtin_type(s) {
+                // Builtin type (`Error`) → keep as-is.
                 Type::Named(s.clone())
             } else {
                 // User-defined struct/variant name → look up the mangled name
