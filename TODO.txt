@@ -98,6 +98,7 @@ clock:
 utility functions:
   split with predicate, use in companion_files.aipl
   interaclate
+  try_map that is like map when pred can error
 
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)

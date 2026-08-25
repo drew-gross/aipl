@@ -488,8 +488,7 @@ fn climb<K: variant, A: any>(
     if (!head.hit) {
         return ok(head);
     };
-    mut kids: Cst[] = [];
-    set kids.extend(head.kids);
+    mut kids = head.kids;
     mut cp = head.pos;
     mut f = head.far;
     mut going = true;
@@ -907,21 +906,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2697
-deallocations: 2697
-reallocations: 257
-bytes allocated: 129172
-instructions executed: 384516
-binary size: 254856
-  code: 146840
+allocations: 2691
+deallocations: 2691
+reallocations: 232
+bytes allocated: 129500
+instructions executed: 384376
+binary size: 254880
+  code: 146796
   data: 6956
-  metadata: 101060
+  metadata: 101128
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 236
+    calls: 222
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -945,7 +944,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 252
+    calls: 238
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -965,22 +964,22 @@ functions:
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 600
-  __builtin_count_while$char$lam22:
+  __builtin_count_while$char$lam23:
     calls: 149
     bytes: 296
-  __builtin_count_while$char$s0$lam27:
+  __builtin_count_while$char$s0$lam28:
     calls: 2
     bytes: 236
-  __builtin_count_while$char$s0$lam29:
+  __builtin_count_while$char$s0$lam30:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam44:
+  __builtin_count_while$char$s0$lam45:
     calls: 35
     bytes: 236
   __builtin_first$char$s0:
     calls: 379
     bytes: 136
-  __builtin_is_some_and$char$lam28:
+  __builtin_is_some_and$char$lam29:
     calls: 0
     bytes: 48
   __eq_Node:
@@ -1024,7 +1023,7 @@ functions:
     bytes: 60
   __m1__cst_leaves:
     calls: 33
-    bytes: 636
+    bytes: 764
   __m1__cst_show:
     calls: 117
     bytes: 1388
@@ -1109,38 +1108,44 @@ functions:
   __to_str_u64:
     calls: 0
     bytes: 180
+  aipl_arr_drop_arr:
+    calls: 11
+    bytes: (external)
   aipl_arr_drop_str:
     calls: 216
     bytes: (external)
   aipl_arr_extend:
-    calls: 455
+    calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8215
+    calls: 8273
+    bytes: (external)
+  aipl_arr_join:
+    calls: 11
     bytes: (external)
   aipl_arr_reserve:
-    calls: 482
+    calls: 443
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 295
+    calls: 320
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10222
+    calls: 10299
     bytes: (external)
   aipl_array_new:
-    calls: 1508
+    calls: 1494
     bytes: (external)
   aipl_array_push:
     calls: 151
     bytes: (external)
   aipl_array_push_mut:
-    calls: 395
+    calls: 420
     bytes: (external)
   aipl_array_with_cap:
-    calls: 162
+    calls: 173
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1155,19 +1160,19 @@ functions:
     calls: 12006
     bytes: (external)
   aipl_inc:
-    calls: 9569
+    calls: 9594
     bytes: (external)
   aipl_rec_alloc:
     calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2497
+    calls: 2483
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2057
+    calls: 2043
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1219,7 +1224,7 @@ functions:
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 2932
+    bytes: 2760
   error_at$Tok$Node:
     calls: 14
     bytes: 1604

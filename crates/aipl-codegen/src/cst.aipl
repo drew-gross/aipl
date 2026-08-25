@@ -19,7 +19,6 @@
 import {
     Span,
     equal as ==,
-    extend,
     filter,
     first,
     join,
@@ -52,13 +51,7 @@ pub fn cst_leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) => [sp],
         CTrivia(sp) => [sp],
-        CTree(_, kids) => {
-            mut out: Span[] = [];
-            for (let k : kids) {
-                set out.extend(k.cst_leaves());
-            }
-            out
-        },
+        CTree(_, kids) => kids.map(cst_leaves).join(),
     }
 }
 
@@ -159,15 +152,15 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
     assert(CTree(far, []).cst_show(src, names) == "(?)");
 })
 --- performance ---
-allocations: 92
-deallocations: 92
-reallocations: 25
-bytes allocated: 4292
-instructions executed: 6125
-binary size: 19088
-  code: 9900
+allocations: 110
+deallocations: 110
+reallocations: 0
+bytes allocated: 5532
+instructions executed: 6251
+binary size: 19344
+  code: 10028
   data: 1361
-  metadata: 7827
+  metadata: 7955
 functions:
   __arr_drop_Cst:
     calls: 7
@@ -187,32 +180,32 @@ functions:
   __rec_drop_Cst:
     calls: 24
     bytes: 48
+  aipl_arr_drop_arr:
+    calls: 7
+    bytes: (external)
   aipl_arr_drop_str:
     calls: 7
     bytes: (external)
-  aipl_arr_extend:
-    calls: 25
-    bytes: (external)
   aipl_arr_inc:
-    calls: 65
+    calls: 133
     bytes: (external)
-  aipl_arr_reserve:
-    calls: 25
+  aipl_arr_join:
+    calls: 9
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 20
+    calls: 45
     bytes: (external)
   aipl_array_dec:
-    calls: 124
+    calls: 235
     bytes: (external)
   aipl_array_new:
     calls: 47
     bytes: (external)
   aipl_array_push_mut:
-    calls: 22
+    calls: 47
     bytes: (external)
   aipl_array_with_cap:
-    calls: 12
+    calls: 21
     bytes: (external)
   aipl_assert:
     calls: 20
@@ -224,7 +217,7 @@ functions:
     calls: 159
     bytes: (external)
   aipl_inc:
-    calls: 75
+    calls: 100
     bytes: (external)
   aipl_rec_alloc:
     calls: 24
@@ -258,7 +251,7 @@ functions:
     bytes: (external)
   cst_leaves:
     calls: 34
-    bytes: 636
+    bytes: 764
   cst_show:
     calls: 14
     bytes: 1388
