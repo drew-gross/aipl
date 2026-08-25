@@ -54,7 +54,7 @@ pub fn reindent_block(self: str, base: u64) -> str {
     // to just opening + closing.
     mut out = opening;
     if (n > 2) {
-        let content = ls.drop_first().drop_last().join("\n");
+        let content = ls.drop_first().drop_last().join(sep="\n");
         let body = if (opening == "\"\"\"" || opening == "```") {
             content.dedent().indent(base + 4)
         } else {

@@ -1340,7 +1340,7 @@ fn let_stmt(self: W) -> WDoc!FmtError {
         let done = v.w.expect(";")?.w;
         return ok(WDoc {
             w: done,
-            doc: Concat([Text(`let ({ids.names.join(", ")}) = `), v.doc, Text(";")]),
+            doc: Concat([Text(`let ({ids.names.join(sep=", ")}) = `), v.doc, Text(";")]),
         });
     };
     let n = kw.bump();
@@ -1350,7 +1350,11 @@ fn let_stmt(self: W) -> WDoc!FmtError {
         let done = v.w.expect(";")?.w;
         return ok(WDoc {
             w: done,
-            doc: Concat([Text(`let {n.text} \{ {ids.names.join(", ")} } = `), v.doc, Text(";")]),
+            doc: Concat([
+                Text(`let {n.text} \{ {ids.names.join(sep=", ")} } = `),
+                v.doc,
+                Text(";"),
+            ]),
         });
     };
     let a = n.w.binding_ann()?;
@@ -1462,8 +1466,8 @@ fn tuple_binder(self: W) -> WStr {
     // The `)` here closes the binder; `for_stmt`'s own `expect(")")` closes the
     // header, so consume this one.
     match (ids.w.expect(")")) {
-        ok(s) => WStr { w: s.w, text: `({ids.names.join(", ")})` },
-        err(_) => WStr { w: ids.w, text: `({ids.names.join(", ")})` },
+        ok(s) => WStr { w: s.w, text: `({ids.names.join(sep=", ")})` },
+        err(_) => WStr { w: ids.w, text: `({ids.names.join(sep=", ")})` },
     }
 }
 
@@ -2020,7 +2024,7 @@ fn pattern(self: W) -> WDoc!FmtError {
     };
     let ids = q.w.bump().w.ident_list(")", []);
     let closed = ids.w.expect(")")?.w;
-    ok(WDoc { w: closed, doc: Text(`{q.text}({ids.names.join(", ")})`) })
+    ok(WDoc { w: closed, doc: Text(`{q.text}({ids.names.join(sep=", ")})`) })
 }
 
 fn qualified_case(self: W, name: str) -> WStr {

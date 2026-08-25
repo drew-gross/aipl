@@ -66,7 +66,7 @@ pub fn cst_leaves(self: Cst) -> Span[] {
 // parse this equals the input exactly; that identity is the cheapest regression
 // test there is for the driver's trivia handling, so the `.test` blocks assert
 // it directly.
-pub fn cst_text(self: Cst, src: str) -> str { self.cst_leaves().map(|sp| src[sp]).join("") }
+pub fn cst_text(self: Cst, src: str) -> str { self.cst_leaves().map(|sp| src[sp]).join(sep="") }
 
 // The span `self` covers: its first leaf's start through its last leaf's end.
 // A node with no leaves at all — an interior node for a production that matched
@@ -107,7 +107,7 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
         CTree(i, kids) => {
             let parts = kids.map(|k| k.cst_show(src, names));
             let name = names[i].value_or("?");
-            if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(" ")})` }
+            if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
         },
     }
 }.test({

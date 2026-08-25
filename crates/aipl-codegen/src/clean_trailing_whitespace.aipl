@@ -7,7 +7,7 @@ import { lines } from "./lines.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
 pub fn clean_trailing_whitespace(src: str) -> str {
-    src.lines().map(|l| l.trim_end_while(|c| c == ' ' || c == '\t')).join("\n")
+    src.lines().map(|l| l.trim_end_while(|c| c == ' ' || c == '\t')).join(sep="\n")
 }.doc("""
     `src` with the trailing space/tab run removed from every line. Line endings
     are preserved exactly — splitting and rejoining on `\\n` puts back what was

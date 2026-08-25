@@ -9,7 +9,7 @@ fn empty() -> i64[] { [] }
 
 fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
     assert(chars() == ['a', 'b', 'c']);
-    assert([..["x", "y"], "z"].join("-") == "x-y-z");
+    assert([..["x", "y"], "z"].join(sep="-") == "x-y-z");
     assert([..[true], false] == [true, false]);
     assert([..[P { x: 1 }], P { x: 2 }] == [P { x: 1 }, P { x: 2 }]);
 

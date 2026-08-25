@@ -1414,8 +1414,21 @@ enum VShape {
 fn variadic_shape(arg_ty: &Type, seq_ty: &Type) -> VShape {
     if matches!(arg_ty, Type::Optional(_)) {
         VShape::Opt
-    } else if matches!(seq_ty, Type::Primitive(Primitive::Str)) {
-        if is_str_repr(arg_ty) {
+    } else if matches!(arg_ty, Type::EmptyArrayArg)
+        || matches!(arg_ty, Type::Array(e) if is_none_inner(e))
+    {
+        // An empty `[]` is the empty *sequence*, whatever the element type —
+        // it carries no element that could make it the single-element shape.
+        // Checked before the str-shaped branch, which would otherwise read it
+        // as one element of a `char` sequence.
+        VShape::Seq
+    } else if is_str_repr(seq_ty) || check::is_char_array(seq_ty) {
+        // A `char` sequence is str-shaped however it is spelled. A *declared*
+        // `char*` parameter has sequence type `str`, but a generic `T*` keeps
+        // `T[]` and only becomes `char[]` once `T` is substituted — the same
+        // representation, so both have to take this branch or a `str` argument
+        // to a `T = char` instance is misread as a single element.
+        if is_str_repr(arg_ty) || check::is_char_array(arg_ty) {
             VShape::Seq
         } else {
             VShape::Elem

@@ -3562,7 +3562,13 @@ impl Cx<'_> {
             'C' => {
                 if is_unknown(lt) || is_unknown(rt) {
                     Ok(unknown_ty())
-                } else if is_str_repr(lt) && is_str_repr(rt) {
+                } else if (is_str_repr(lt) || is_char_array(lt))
+                    && (is_str_repr(rt) || is_char_array(rt))
+                {
+                    // `char[]` is the same representation as `str` (see
+                    // `is_char_array`), and generic returns can hand back the
+                    // `char[]` spelling — `join`'s `-> T[]` at `T = char` is
+                    // exactly that. Accept either spelling on either side.
                     Ok(Type::Primitive(Primitive::Str))
                 } else {
                     Err(Error::at(
@@ -3936,7 +3942,7 @@ fn is_pattern_literal(e: &Expr) -> bool {
 /// sound: an actual `char[]` value and an actual `str` value are
 /// bit-identical, so treating the two types as freely interchangeable never
 /// mismatches a value's real layout.
-fn is_char_array(t: &Type) -> bool {
+pub(crate) fn is_char_array(t: &Type) -> bool {
     matches!(t, Type::Array(inner) if **inner == Type::Primitive(Primitive::Char))
 }
 

@@ -178,7 +178,7 @@ fn tpl_kind(text: str, seg: Seg) -> AiplTok {
 // segment, since a `{` always opens an interpolation), de-dented as one block
 // via the dogfooded `process_raw_string`, then split back. A no-interpolation
 // raw template is the one-segment case (de-dent that single segment).
-fn dedent_segments(segs: str[]) -> str[] { process_raw_string(segs.join("{")).split("{") }
+fn dedent_segments(segs: str[]) -> str[] { process_raw_string(segs.join(sep="{")).split("{") }
 
 // The `OfSeg` emit for the ```` ```...``` ```` raw-template rule: like `tpl_kind`,
 // but the delimiter scans verbatim (empty `escapes`), so the segment text isn't

@@ -102,7 +102,7 @@ fn has_hard(self: Doc) -> bool {
 // preserved when present (the Rust `print`'s belt-and-braces cleanup).
 pub fn print_doc(doc: Doc, width: u64) -> str {
     let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
-    cleanup(pieces.join(""))
+    cleanup(pieces.join(sep=""))
 }
 
 // The main layout loop: pop a frame, emit for its `Doc`, push any children, and
@@ -270,7 +270,7 @@ fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(sp) }
 fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 
 // Strip trailing whitespace from every line and preserve a final newline when
-// the rendered text had one (mirrors `str::lines().map(trim_end).join("\n")`).
+// the rendered text had one (mirrors `str::lines().map(trim_end).join(sep="\n")`).
 fn cleanup(out: str) -> str {
     let ended = out.ends_with("\n");
     let raw = out.split("\n");
@@ -278,7 +278,7 @@ fn cleanup(out: str) -> str {
     // `lines()` drops exactly one trailing empty when the text ends in a newline;
     // `split` keeps it, so drop it here to match.
     let lines = if (ended) { raw.drop_last() } else { raw };
-    let body = lines.map(|line| line.trim_end_while(is_space)).join("\n");
+    let body = lines.map(|line| line.trim_end_while(is_space)).join(sep="\n");
     body +++ if (ended) { "\n" } else { "" }
 }.test({
     // Plain text is emitted verbatim.

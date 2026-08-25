@@ -65,6 +65,9 @@ misc cleanup:
   split pub mod lint and pub mod ast into separate files
   oxford -> replace with join(self: T[], sep: T* = [], final_sep: T* = sep) with supporting syntax
 
+join:
+  join([]) errors now, should just propagate empty array probably?
+
 integer signedness problems:
   2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
@@ -330,6 +333,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  switch the nextest --no-build to the corresponding cargo build so that we get better progress output
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
   Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.

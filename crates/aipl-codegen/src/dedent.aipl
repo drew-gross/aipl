@@ -25,7 +25,7 @@ pub fn dedent(self: str) -> str {
 
     // Rebuild: strip the first `n` bytes from each non-blank line (blank lines
     // become empty), rejoined with `\n` so the original line count is preserved.
-    ls.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join("\n")
+    ls.map(|line| if (!line.is_all_whitespace()) { line[n..] } else { "" }).join(sep="\n")
 }.doc("""
     Strips the common leading-space indentation shared by every non-blank line — the
     de-denting the parser applies to raw-string contents. Blank lines (empty or

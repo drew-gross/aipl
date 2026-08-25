@@ -1543,7 +1543,13 @@ fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
 // Concatenate the parts with `sep` between consecutive elements.
-fn __builtin_join(self: str[], sep: str) -> str { "" }
+// Flatten a sequence of sequences, placing `sep` between consecutive parts:
+// `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element* type, so
+// the receiver is one level deeper than it looks — for `T = char` it reads
+// `str[] -> str` with a `char*` (i.e. `str`) separator, which is the string
+// join. `sep` is variadic (a sequence, one element, or an optional one) and
+// defaults to empty, so `xs.join()` concatenates; supplied, it is named.
+fn __builtin_join<T: any>(self: T[][], sep: T* = []) -> T[] { [] }
 
 // The file builtins return a Result; the `ok(..)` body coerces to the declared
 // `..!Error` (codegen builds the real ok/err).

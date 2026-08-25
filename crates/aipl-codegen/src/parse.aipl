@@ -533,7 +533,7 @@ fn oxford(items: str[]) -> str {
     if (n == 2) {
         return `{items.first().value_or("")} or {tail}`;
     };
-    `{items.drop_last().join(", ")}, or {tail}`
+    `{items.drop_last().join(sep=", ")}, or {tail}`
 }
 
 // The error a furthest failure describes: what was expected there, and what was

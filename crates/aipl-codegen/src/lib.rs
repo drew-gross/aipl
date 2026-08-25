@@ -2404,6 +2404,133 @@ extern "C" fn aipl_arr_extend(
     dst
 }
 
+/// Join a `T[][]` into a `T[]`, placing `sep`'s elements between consecutive
+/// parts. The array counterpart of `aipl_str_join`, and native for the same
+/// reason: the output length is known before anything is written — every part's
+/// length is O(1) and the separator appears exactly `n - 1` times — so the whole
+/// result is *one* exact-size allocation with no growth chain, and each part
+/// moves as a single block copy.
+///
+/// `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`, not the
+/// parts. Consumes (decs) both `parts` and `sep`, as `aipl_str_join` does.
+/// Mirrors `aipl_arr_join` in the linker runtime.
+#[no_mangle]
+extern "C" fn aipl_arr_join(
+    parts: *const u8,
+    sep: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    let parts_heap = aipl_arr_ensure_heap(parts);
+    let sep_heap = aipl_arr_ensure_heap(sep);
+    let n = if parts_heap.is_null() {
+        0
+    } else {
+        unsafe { array_len_of(parts_heap) }
+    };
+    let sep_len = if sep_heap.is_null() {
+        0
+    } else {
+        unsafe { array_len_of(sep_heap) }
+    };
+    // A bit-packed `bool[]` has no byte-addressable elements to memcpy, so it
+    // falls back to appending one bit at a time through the copying push. Rare
+    // enough not to be worth a packed fast path; correct either way.
+    if elem_size == ELEM_BITPACKED {
+        let mut out = aipl_array_new(0, drop_fn, ELEM_BITPACKED);
+        for i in 0..n {
+            if i > 0 {
+                for k in 0..sep_len {
+                    let bit = i64::from(aipl_arr_load_bit(sep_heap, k as i64) != 0);
+                    out = aipl_array_push(
+                        out,
+                        &bit as *const i64 as *const u8,
+                        drop_fn,
+                        retain_fn,
+                        ELEM_BITPACKED,
+                    );
+                }
+            }
+            let part = unsafe { part_at(parts_heap, i) };
+            let plen = if part.is_null() {
+                0
+            } else {
+                unsafe { array_len_of(part) }
+            };
+            for k in 0..plen {
+                let bit = i64::from(aipl_arr_load_bit(part, k as i64) != 0);
+                out = aipl_array_push(
+                    out,
+                    &bit as *const i64 as *const u8,
+                    drop_fn,
+                    retain_fn,
+                    ELEM_BITPACKED,
+                );
+            }
+            aipl_array_dec(part);
+        }
+        aipl_array_dec(parts_heap);
+        aipl_array_dec(sep_heap);
+        return out;
+    }
+    let esz = elem_size.max(8) as usize;
+    // Measure first — this is the whole point of the builtin being native.
+    let mut total = sep_len * n.saturating_sub(1);
+    let mut lens: Vec<(usize, *const u8)> = Vec::with_capacity(n);
+    for i in 0..n {
+        let part = unsafe { part_at(parts_heap, i) };
+        let plen = if part.is_null() {
+            0
+        } else {
+            unsafe { array_len_of(part) }
+        };
+        total += plen;
+        lens.push((plen, part));
+    }
+    // One allocation, sized exactly.
+    let out = alloc_array(total, total.max(1), drop_fn, elem_size);
+    unsafe {
+        let dst = out.add(ARR_ELEMS_OFFSET) as *mut u8;
+        let mut pos = 0usize;
+        for (i, (plen, part)) in lens.iter().enumerate() {
+            if i > 0 && sep_len > 0 {
+                let from = sep_heap.add(ARR_ELEMS_OFFSET);
+                std::ptr::copy_nonoverlapping(from, dst.add(pos * esz), sep_len * esz);
+                pos += sep_len;
+            }
+            if *plen > 0 {
+                let from = part.add(ARR_ELEMS_OFFSET);
+                std::ptr::copy_nonoverlapping(from, dst.add(pos * esz), plen * esz);
+                pos += plen;
+            }
+        }
+        // Every element was copied by value; the result co-owns each one.
+        elem_rc(retain_fn, dst, total);
+    }
+    for (_, part) in lens {
+        aipl_array_dec(part);
+    }
+    aipl_array_dec(parts_heap);
+    aipl_array_dec(sep_heap);
+    out
+}
+
+/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. The
+/// extra `inc` before `aipl_arr_ensure_heap` is what makes both representations
+/// balance: a heap part comes back as itself with the borrowed reference turned
+/// into an owned one, and a reversed view is consumed and replaced by a fresh
+/// array — either way the caller releases exactly one reference.
+unsafe fn part_at(parts: *const u8, i: usize) -> *const u8 {
+    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) as *const i64 };
+    let p = unsafe { std::ptr::read(elems.add(i)) } as *const u8;
+    if p.is_null() {
+        return p;
+    }
+    aipl_arr_inc(p);
+    aipl_arr_ensure_heap(p)
+}
+
 /// Executed-instruction counter hook. Codegen emits one call per basic block
 /// (arg = the block's instruction count). The JIT path never reports perf
 /// counts (those come from the AOT instrumented runtime), so this is a no-op
@@ -5043,6 +5170,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_array_push_mut", aipl_array_push_mut as *const u8);
     jit_builder.symbol("aipl_arr_reserve", aipl_arr_reserve as *const u8);
     jit_builder.symbol("aipl_arr_extend", aipl_arr_extend as *const u8);
+    jit_builder.symbol("aipl_arr_join", aipl_arr_join as *const u8);
     jit_builder.symbol("aipl_array_dec", aipl_array_dec as *const u8);
     jit_builder.symbol("aipl_arr_inc", aipl_arr_inc as *const u8);
     jit_builder.symbol("aipl_rec_alloc", aipl_rec_alloc as *const u8);
@@ -7864,7 +7992,8 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_array_push_mut"
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
-        | "aipl_arr_extend" => sig(5, true),
+        | "aipl_arr_extend"
+        | "aipl_arr_join" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
         other => panic!("unknown builtin import symbol {other:?}"),
@@ -7959,7 +8088,6 @@ fn register_builtins(
     const SIG_REGS: &[(&str, &str)] = &[
         ("__builtin_print", "aipl_print"),
         ("__builtin_split", "aipl_str_split"),
-        ("__builtin_join", "aipl_str_join"),
         ("__builtin_read_file_to_string", "aipl_read_file_to_string"),
         (
             "__builtin_write_string_to_file",
@@ -14984,6 +15112,164 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(out, &arr_ty));
             (out, arr_ty)
         }
+        "__builtin_join" => {
+            // `parts.join(sep=s) -> T[]` — the parts flattened with `s` between
+            // consecutive ones. Generic in the element type `T`, so the receiver
+            // is a `T[][]`; for `T = char` that is a `str[]` and the whole thing
+            // is the string join, which keeps its own runtime fast path.
+            //
+            // Native rather than an AIPL loop because the output length is known
+            // before anything is written, so both paths allocate the result
+            // exactly once instead of growing it.
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"join\" expects 1 argument, got {}", args.len() - 1),
+                    span.clone(),
+                ));
+            }
+            let (parts, pt) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let (sep, st) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            // Both runtime entry points consume their arguments; the callers here
+            // are borrowing, so each gets a compensating pre-inc.
+            let inner = match &pt {
+                Type::Array(e) => (**e).clone(),
+                other => {
+                    return Err(Error::at(
+                        format!(
+                            "\"join\" expects an array of arrays, got {}",
+                            type_name(other)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
+            };
+            // `join([], sep=", ")`: an empty parts array carries only the
+            // `__none__` placeholder element, so it pins no `T`. The separator
+            // is the one other place `T` appears, so it is what decides — the
+            // result is empty either way, and what is really being chosen is
+            // which representation that empty result has.
+            let inner = if is_none_inner(&inner) {
+                match &st {
+                    t if is_str_repr(t) || is_char_array(t) => Type::Primitive(Primitive::Str),
+                    Type::Primitive(Primitive::Char) => Type::Primitive(Primitive::Str),
+                    // Both sides empty: nothing anywhere names `T`.
+                    Type::Array(e) if is_none_inner(e) => {
+                        return Err(Error::at(
+                            "\"join\" cannot tell what it is joining: the parts and the \
+                             separator are both empty, so neither names an element type"
+                                .to_string(),
+                            args[0].span.clone(),
+                        ));
+                    }
+                    // A `T[]` separator is already the parts' element type; a
+                    // bare `T` is one level down.
+                    Type::Array(_) => st.clone(),
+                    other => Type::Array(Box::new(other.clone())),
+                }
+            } else {
+                inner
+            };
+            if is_str_repr(&inner) || is_char_array(&inner) {
+                // `str[]` (i.e. `char[][]`): the string join, whose separator is
+                // itself a `str`.
+                emit_retain(builder, module, builtins, structs, parts, &pt);
+                // A variadic separator arrives in whichever shape the call site
+                // wrote. For an AIPL-bodied function `specialize_variadic`
+                // normalizes a bare element into a one-item sequence with a
+                // prologue; a *native* builtin has no body to prepend one to, so
+                // the wrapping happens here instead.
+                let sep = if matches!(st, Type::Primitive(Primitive::Char)) {
+                    let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
+                    let one = builder.ins().iconst(types::I64, 1);
+                    let inst = builder.ins().call(alloc, &[one]);
+                    let buf = builder.inst_results(inst)[0];
+                    builder.ins().istore8(MemFlagsData::trusted(), sep, buf, 0);
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(buf, &Type::Primitive(Primitive::Str)));
+                    buf
+                } else {
+                    sep
+                };
+                emit_inc(builder, module, builtins, sep);
+                let f = builtins.import(module, builder.func, "aipl_str_join");
+                let inst = builder.ins().call(f, &[parts, sep]);
+                let out = builder.inst_results(inst)[0];
+                let out_ty = Type::Primitive(Primitive::Str);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(out, &out_ty));
+                (out, out_ty)
+            } else {
+                let elem = match &inner {
+                    Type::Array(e) => (**e).clone(),
+                    other => {
+                        return Err(Error::at(
+                            format!(
+                                "\"join\" expects an array of arrays, got an array of {}",
+                                type_name(other)
+                            ),
+                            args[0].span.clone(),
+                        ));
+                    }
+                };
+                let out_ty = Type::Array(Box::new(elem.clone()));
+                emit_retain(builder, module, builtins, structs, parts, &pt);
+                // The element helpers describe `T`, not the parts: the runtime
+                // copies and retains the innermost elements.
+                let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+                let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+                let esz = builder
+                    .ins()
+                    .iconst(types::I64, runtime_elem_size(&elem, structs));
+                // See the str path: a native builtin gets no `specialize_variadic`
+                // prologue, so a bare element is wrapped into a one-item sequence
+                // here. An `Array` argument is already the sequence.
+                let sep = if matches!(st, Type::Array(_)) {
+                    emit_retain(builder, module, builtins, structs, sep, &out_ty);
+                    sep
+                } else {
+                    let slot = if is_composite(&elem, structs) {
+                        sep
+                    } else {
+                        let sl = builder.create_sized_stack_slot(StackSlotData::new(
+                            StackSlotKind::ExplicitSlot,
+                            8,
+                            3,
+                        ));
+                        builder.ins().stack_store(types::I64, sep, sl, 0);
+                        builder.ins().stack_addr(types::I64, sl, 0)
+                    };
+                    let new_f = builtins.import(module, builder.func, "aipl_array_new");
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    let inst = builder.ins().call(new_f, &[zero, drop_fn, esz]);
+                    let empty = builder.inst_results(inst)[0];
+                    let push = builtins.import(module, builder.func, "aipl_array_push");
+                    let inst = builder
+                        .ins()
+                        .call(push, &[empty, slot, drop_fn, retain_fn, esz]);
+                    let one = builder.inst_results(inst)[0];
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .push(Tracked::new(one, &out_ty));
+                    emit_retain(builder, module, builtins, structs, one, &out_ty);
+                    one
+                };
+                let f = builtins.import(module, builder.func, "aipl_arr_join");
+                let inst = builder
+                    .ins()
+                    .call(f, &[parts, sep, drop_fn, retain_fn, esz]);
+                let out = builder.inst_results(inst)[0];
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(out, &out_ty));
+                (out, out_ty)
+            }
+        }
         "__builtin_reverse" => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
             // elements (or bytes) in reverse order. Consumes `self` (callers pre-inc).
@@ -16059,6 +16345,10 @@ fn compile_call_expr<M: Module>(
             let src_owned = owned_temp_since(scopes, mark, src_ptr);
             let src_elem = match &src_ty {
                 Type::Array(inner) => (**inner).clone(),
+                // A `str` *is* the `char` sequence (see `is_char_array`), so it
+                // is a valid source for a `char[]` receiver — and the only shape
+                // a `char*` variadic ever arrives as.
+                _ if is_str_repr(&src_ty) => Type::Primitive(Primitive::Char),
                 other => {
                     return Err(Error::at(
                         format!("\"extend\" requires an array, got {}", type_name(other)),
@@ -17367,8 +17657,17 @@ fn compile_expr_inner<M: Module>(
             // string refcounts allocated by the value are already tracked
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
-            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            let (v, t) = binding_ty(builder, value, v, &t, ty.as_ref(), name)?;
+            let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
+            let (v, t) = binding_ty(builder, value, v, &actual, ty.as_ref(), name)?;
+            // An annotated empty `[]` bound at `char[]` must become the
+            // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
+            // and a `str` are the same representation, and every `char[]`
+            // operation (`push`, `extend`, `len`) reads it through the string
+            // runtime. Without this the binding held an array block that
+            // `aipl_str_len` then read as a string — a silent miscompile that
+            // aborted on the first `push`. Call sites already coerced this way
+            // (see `coerce_empty_to_char_array`); bindings did not.
+            let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
             let mut new_env = env.clone();
             cx.bindings
@@ -17388,8 +17687,17 @@ fn compile_expr_inner<M: Module>(
             )?
         }
         ExprKind::LetMut(name, ty, value, body) => {
-            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
-            let (v, t) = binding_ty(builder, value, v, &t, ty.as_ref(), name)?;
+            let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
+            let (v, t) = binding_ty(builder, value, v, &actual, ty.as_ref(), name)?;
+            // An annotated empty `[]` bound at `char[]` must become the
+            // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
+            // and a `str` are the same representation, and every `char[]`
+            // operation (`push`, `extend`, `len`) reads it through the string
+            // runtime. Without this the binding held an array block that
+            // `aipl_str_len` then read as a string — a silent miscompile that
+            // aborted on the first `push`. Call sites already coerced this way
+            // (see `coerce_empty_to_char_array`); bindings did not.
+            let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
             // 8-byte slot, 8-byte aligned: fits any i64/bool/char/str.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(

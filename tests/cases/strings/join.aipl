@@ -1,15 +1,15 @@
 import { equal as ==, join, split } from builtins;
 
-// `join(parts, sep)` concatenates the parts with `sep` *between* consecutive
+// `join(parts, sep=sep)` concatenates the parts with `sep` *between* consecutive
 // elements — none before the first or after the last. `[]` -> `""`, `[x]` -> `x`.
-// Callable free (`join(xs, sep)`) or as a method (`xs.join(sep)`).
-fn rejoin(s: str, sep: str) -> str { s.split(sep).join(sep) }.test({
-    assert(["a", "b", "c"].join("hi") == "ahibhic");
-    assert(["a", "b", "c"].join("") == "abc"); // empty separator
-    assert(["solo"].join(", ") == "solo"); // single element: no separator
-    assert(join([], ", ") == ""); // empty array
-    assert(["", "x", ""].join("-") == "-x-"); // empty parts are kept
-    assert(["one", "two"].join(" big sep ") == "one big sep two"); // heap result
+// Callable free (`join(xs, sep=sep)`) or as a method (`xs.join(sep=sep)`).
+fn rejoin(s: str, sep: str) -> str { s.split(sep).join(sep=sep) }.test({
+    assert(["a", "b", "c"].join(sep="hi") == "ahibhic");
+    assert(["a", "b", "c"].join(sep="") == "abc"); // empty separator
+    assert(["solo"].join(sep=", ") == "solo"); // single element: no separator
+    assert(join([], sep=", ") == ""); // empty array
+    assert(["", "x", ""].join(sep="-") == "-x-"); // empty parts are kept
+    assert(["one", "two"].join(sep=" big sep ") == "one big sep two"); // heap result
     assert(rejoin("a,bb,ccc", ",") == "a,bb,ccc"); // split then join round-trips
 })
 --- performance ---
@@ -18,9 +18,9 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 401
 instructions executed: 193
-binary size: 4552
+binary size: 4576
   code: 1528
-  data: 545
+  data: 569
   metadata: 2479
 functions:
   aipl_arr_drop_str:

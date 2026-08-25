@@ -48,7 +48,7 @@ fn main() !prints {
     mut s = ["a"];
     let more = ["b", "c"];
     set s.extend(more);
-    print(`{s.join(",")} {more.join(",")}`);
+    print(`{s.join(sep=",")} {more.join(sep=",")}`);
 
     // Boxed recursive elements, through the same retain pass.
     mut ts = [Leaf(1)];

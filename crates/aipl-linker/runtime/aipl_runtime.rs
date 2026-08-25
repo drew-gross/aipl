@@ -123,6 +123,7 @@ mod builtin_calls {
         b"aipl_arr_elem_ptr\0",
         b"aipl_arr_extend\0",
         b"aipl_arr_inc\0",
+        b"aipl_arr_join\0",
         b"aipl_arr_load_bit\0",
         b"aipl_arr_reserve\0",
         b"aipl_arr_retain_opt\0",
@@ -206,78 +207,79 @@ mod builtin_calls {
     pub const AIPL_ARR_ELEM_PTR: usize = 4;
     pub const AIPL_ARR_EXTEND: usize = 5;
     pub const AIPL_ARR_INC: usize = 6;
-    pub const AIPL_ARR_LOAD_BIT: usize = 7;
-    pub const AIPL_ARR_RESERVE: usize = 8;
-    pub const AIPL_ARR_RETAIN_OPT: usize = 9;
-    pub const AIPL_ARR_RETAIN_PTR: usize = 10;
-    pub const AIPL_ARR_REVERSE: usize = 11;
-    pub const AIPL_ARR_SLICE: usize = 12;
-    pub const AIPL_ARR_SORT: usize = 13;
-    pub const AIPL_ARRAY_DEC: usize = 14;
-    pub const AIPL_ARRAY_NEW: usize = 15;
-    pub const AIPL_ARRAY_PUSH: usize = 16;
-    pub const AIPL_ARRAY_PUSH_MUT: usize = 17;
-    pub const AIPL_ARRAY_WITH_CAP: usize = 18;
-    pub const AIPL_ASSERT: usize = 19;
-    pub const AIPL_CHAR_AT: usize = 20;
-    pub const AIPL_CONCAT: usize = 21;
-    pub const AIPL_CONCAT_LAZY: usize = 22;
-    pub const AIPL_CONCAT_MUT: usize = 23;
-    pub const AIPL_DEC: usize = 24;
-    pub const AIPL_DICT_CONTAINS_KEY: usize = 25;
-    pub const AIPL_DICT_GET: usize = 26;
-    pub const AIPL_DICT_INSERT: usize = 27;
-    pub const AIPL_EXECUTE_PROGRAM: usize = 28;
-    pub const AIPL_I64_LEN: usize = 29;
-    pub const AIPL_INC: usize = 30;
-    pub const AIPL_LIST_FILES: usize = 31;
-    pub const AIPL_MONOTONIC_NOW: usize = 32;
-    pub const AIPL_NOW_NANOS: usize = 33;
-    pub const AIPL_PRINT: usize = 34;
-    pub const AIPL_PRINT_ERROR: usize = 35;
-    pub const AIPL_READ_FILE_TO_STRING: usize = 36;
-    pub const AIPL_REC_ALLOC: usize = 37;
-    pub const AIPL_REC_DEC_STRONG: usize = 38;
-    pub const AIPL_REC_DEC_WEAK: usize = 39;
-    pub const AIPL_REC_INC_STRONG: usize = 40;
-    pub const AIPL_REC_INC_WEAK: usize = 41;
-    pub const AIPL_SET_CONTAINS: usize = 42;
-    pub const AIPL_SET_INSERT: usize = 43;
-    pub const AIPL_SET_UNION: usize = 44;
-    pub const AIPL_SET_UNION_MUT: usize = 45;
-    pub const AIPL_SHIM_GET: usize = 46;
-    pub const AIPL_SHIM_SET: usize = 47;
-    pub const AIPL_STR_ALLOC: usize = 48;
-    pub const AIPL_STR_CMP: usize = 49;
-    pub const AIPL_STR_CONTAINS: usize = 50;
-    pub const AIPL_STR_DATA: usize = 51;
-    pub const AIPL_STR_ENDS_WITH: usize = 52;
-    pub const AIPL_STR_EQ: usize = 53;
-    pub const AIPL_STR_HASH: usize = 54;
-    pub const AIPL_STR_IS_ALL_WHITESPACE: usize = 55;
-    pub const AIPL_STR_ITER_INIT: usize = 56;
-    pub const AIPL_STR_ITER_NEXT: usize = 57;
-    pub const AIPL_STR_JOIN: usize = 58;
-    pub const AIPL_STR_LEN: usize = 59;
-    pub const AIPL_STR_REPEAT: usize = 60;
-    pub const AIPL_STR_REVERSE: usize = 61;
-    pub const AIPL_STR_SLICE: usize = 62;
-    pub const AIPL_STR_SORT: usize = 63;
-    pub const AIPL_STR_SPLIT: usize = 64;
-    pub const AIPL_STR_STARTS_WITH: usize = 65;
-    pub const AIPL_STR_STARTS_WITH_AT: usize = 66;
-    pub const AIPL_TEST_BEGIN: usize = 67;
-    pub const AIPL_TEST_END: usize = 68;
-    pub const AIPL_TEST_FAIL: usize = 69;
-    pub const AIPL_TEST_FAIL_NONE: usize = 70;
-    pub const AIPL_TEST_SUMMARY: usize = 71;
-    pub const AIPL_TRIM: usize = 72;
-    pub const AIPL_TRIM_MUT: usize = 73;
-    pub const AIPL_U64_LEN: usize = 74;
-    pub const AIPL_WRITE_BYTES: usize = 75;
-    pub const AIPL_WRITE_I64: usize = 76;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 77;
-    pub const AIPL_WRITE_U64: usize = 78;
+    pub const AIPL_ARR_JOIN: usize = 7;
+    pub const AIPL_ARR_LOAD_BIT: usize = 8;
+    pub const AIPL_ARR_RESERVE: usize = 9;
+    pub const AIPL_ARR_RETAIN_OPT: usize = 10;
+    pub const AIPL_ARR_RETAIN_PTR: usize = 11;
+    pub const AIPL_ARR_REVERSE: usize = 12;
+    pub const AIPL_ARR_SLICE: usize = 13;
+    pub const AIPL_ARR_SORT: usize = 14;
+    pub const AIPL_ARRAY_DEC: usize = 15;
+    pub const AIPL_ARRAY_NEW: usize = 16;
+    pub const AIPL_ARRAY_PUSH: usize = 17;
+    pub const AIPL_ARRAY_PUSH_MUT: usize = 18;
+    pub const AIPL_ARRAY_WITH_CAP: usize = 19;
+    pub const AIPL_ASSERT: usize = 20;
+    pub const AIPL_CHAR_AT: usize = 21;
+    pub const AIPL_CONCAT: usize = 22;
+    pub const AIPL_CONCAT_LAZY: usize = 23;
+    pub const AIPL_CONCAT_MUT: usize = 24;
+    pub const AIPL_DEC: usize = 25;
+    pub const AIPL_DICT_CONTAINS_KEY: usize = 26;
+    pub const AIPL_DICT_GET: usize = 27;
+    pub const AIPL_DICT_INSERT: usize = 28;
+    pub const AIPL_EXECUTE_PROGRAM: usize = 29;
+    pub const AIPL_I64_LEN: usize = 30;
+    pub const AIPL_INC: usize = 31;
+    pub const AIPL_LIST_FILES: usize = 32;
+    pub const AIPL_MONOTONIC_NOW: usize = 33;
+    pub const AIPL_NOW_NANOS: usize = 34;
+    pub const AIPL_PRINT: usize = 35;
+    pub const AIPL_PRINT_ERROR: usize = 36;
+    pub const AIPL_READ_FILE_TO_STRING: usize = 37;
+    pub const AIPL_REC_ALLOC: usize = 38;
+    pub const AIPL_REC_DEC_STRONG: usize = 39;
+    pub const AIPL_REC_DEC_WEAK: usize = 40;
+    pub const AIPL_REC_INC_STRONG: usize = 41;
+    pub const AIPL_REC_INC_WEAK: usize = 42;
+    pub const AIPL_SET_CONTAINS: usize = 43;
+    pub const AIPL_SET_INSERT: usize = 44;
+    pub const AIPL_SET_UNION: usize = 45;
+    pub const AIPL_SET_UNION_MUT: usize = 46;
+    pub const AIPL_SHIM_GET: usize = 47;
+    pub const AIPL_SHIM_SET: usize = 48;
+    pub const AIPL_STR_ALLOC: usize = 49;
+    pub const AIPL_STR_CMP: usize = 50;
+    pub const AIPL_STR_CONTAINS: usize = 51;
+    pub const AIPL_STR_DATA: usize = 52;
+    pub const AIPL_STR_ENDS_WITH: usize = 53;
+    pub const AIPL_STR_EQ: usize = 54;
+    pub const AIPL_STR_HASH: usize = 55;
+    pub const AIPL_STR_IS_ALL_WHITESPACE: usize = 56;
+    pub const AIPL_STR_ITER_INIT: usize = 57;
+    pub const AIPL_STR_ITER_NEXT: usize = 58;
+    pub const AIPL_STR_JOIN: usize = 59;
+    pub const AIPL_STR_LEN: usize = 60;
+    pub const AIPL_STR_REPEAT: usize = 61;
+    pub const AIPL_STR_REVERSE: usize = 62;
+    pub const AIPL_STR_SLICE: usize = 63;
+    pub const AIPL_STR_SORT: usize = 64;
+    pub const AIPL_STR_SPLIT: usize = 65;
+    pub const AIPL_STR_STARTS_WITH: usize = 66;
+    pub const AIPL_STR_STARTS_WITH_AT: usize = 67;
+    pub const AIPL_TEST_BEGIN: usize = 68;
+    pub const AIPL_TEST_END: usize = 69;
+    pub const AIPL_TEST_FAIL: usize = 70;
+    pub const AIPL_TEST_FAIL_NONE: usize = 71;
+    pub const AIPL_TEST_SUMMARY: usize = 72;
+    pub const AIPL_TRIM: usize = 73;
+    pub const AIPL_TRIM_MUT: usize = 74;
+    pub const AIPL_U64_LEN: usize = 75;
+    pub const AIPL_WRITE_BYTES: usize = 76;
+    pub const AIPL_WRITE_I64: usize = 77;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 78;
+    pub const AIPL_WRITE_U64: usize = 79;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------
@@ -3458,6 +3460,137 @@ pub extern "C" fn aipl_arr_extend(
         aipl_array_dec(src_heap);
         dst
     }
+}
+
+/// Join a `T[][]` into a `T[]`, placing `sep`'s elements between consecutive
+/// parts. The array counterpart of `aipl_str_join`, and native for the same
+/// reason: the output length is known before anything is written, so the result
+/// is one exact-size allocation and each part moves as a single block copy.
+/// `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`. Consumes
+/// both arguments. Mirrors `aipl_arr_join` in codegen.
+#[no_mangle]
+pub extern "C" fn aipl_arr_join(
+    parts: *const u8,
+    sep: *const u8,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_ARR_JOIN);
+    unsafe {
+        let parts_heap = aipl_arr_ensure_heap(parts);
+        let sep_heap = aipl_arr_ensure_heap(sep);
+        let n = if parts_heap.is_null() {
+            0
+        } else {
+            array_len(parts_heap)
+        };
+        let sep_len = if sep_heap.is_null() {
+            0
+        } else {
+            array_len(sep_heap)
+        };
+        // A bit-packed `bool[]` has no byte-addressable elements to copy, so it
+        // appends one bit at a time through the copying push.
+        if elem_size == ELEM_BITPACKED {
+            let mut out = aipl_array_new(0, drop_fn, ELEM_BITPACKED);
+            let mut i = 0;
+            while i < n {
+                if i > 0 {
+                    let mut k = 0;
+                    while k < sep_len {
+                        let bit = i64::from(arr_load_bit_rt(sep_heap, k));
+                        out = aipl_array_push(
+                            out,
+                            &bit as *const i64 as *const u8,
+                            drop_fn,
+                            retain_fn,
+                            ELEM_BITPACKED,
+                        );
+                        k += 1;
+                    }
+                }
+                let part = part_at_rt(parts_heap, i);
+                let plen = if part.is_null() { 0 } else { array_len(part) };
+                let mut k = 0;
+                while k < plen {
+                    let bit = i64::from(arr_load_bit_rt(part, k));
+                    out = aipl_array_push(
+                        out,
+                        &bit as *const i64 as *const u8,
+                        drop_fn,
+                        retain_fn,
+                        ELEM_BITPACKED,
+                    );
+                    k += 1;
+                }
+                aipl_array_dec(part);
+                i += 1;
+            }
+            aipl_array_dec(parts_heap);
+            aipl_array_dec(sep_heap);
+            return out;
+        }
+        let esz = core::cmp::max(elem_size, 8) as usize;
+        // Measure first — this is the whole point of the builtin being native.
+        let mut total = sep_len * n.saturating_sub(1);
+        let mut i = 0;
+        while i < n {
+            let part = part_at_rt(parts_heap, i);
+            if !part.is_null() {
+                total += array_len(part);
+            }
+            aipl_array_dec(part);
+            i += 1;
+        }
+        // One allocation, sized exactly.
+        let out = array_alloc(total, core::cmp::max(total, 1), drop_fn, elem_size);
+        let dst = out.add(ARR_ELEMS_OFFSET) as *mut u8;
+        let mut pos = 0usize;
+        i = 0;
+        while i < n {
+            if i > 0 && sep_len > 0 {
+                let from = sep_heap.add(ARR_ELEMS_OFFSET);
+                memcpy(
+                    dst.add(pos * esz) as *mut c_void,
+                    from as *const c_void,
+                    sep_len * esz,
+                );
+                pos += sep_len;
+            }
+            let part = part_at_rt(parts_heap, i);
+            let plen = if part.is_null() { 0 } else { array_len(part) };
+            if plen > 0 {
+                let from = part.add(ARR_ELEMS_OFFSET);
+                memcpy(
+                    dst.add(pos * esz) as *mut c_void,
+                    from as *const c_void,
+                    plen * esz,
+                );
+                pos += plen;
+            }
+            aipl_array_dec(part);
+            i += 1;
+        }
+        // Every element was copied by value; the result co-owns each one.
+        elem_rc(retain_fn, dst, total);
+        aipl_array_dec(parts_heap);
+        aipl_array_dec(sep_heap);
+        out
+    }
+}
+
+/// Part `i` of a `T[][]`, materialized to a heap array the caller owns. The
+/// `inc` before `aipl_arr_ensure_heap` is what makes both representations
+/// balance — see codegen's `part_at`.
+unsafe fn part_at_rt(parts: *const u8, i: usize) -> *const u8 {
+    let elems = unsafe { parts.add(ARR_ELEMS_OFFSET) as *const i64 };
+    let p = unsafe { *elems.add(i) } as *const u8;
+    if p.is_null() {
+        return p;
+    }
+    aipl_arr_inc(p);
+    aipl_arr_ensure_heap(p)
 }
 
 /// Read element `i` of set/array `src` as an i64 (bit-unpacked `bool` when

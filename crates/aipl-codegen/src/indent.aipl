@@ -13,7 +13,10 @@ pub fn indent(self: str, target: u64) -> str {
     // Add `target` spaces to each non-blank line, keeping its own (already
     // dedented) relative indent. A blank line stays empty — indenting it would
     // add trailing whitespace (illegal), and a dedented block emits blanks empty.
-    self.lines().map(|line| if (line.is_all_whitespace()) { "" } else { pad +++ line }).join("\n")
+    self
+        .lines()
+        .map(|line| if (line.is_all_whitespace()) { "" } else { pad +++ line })
+        .join(sep="\n")
 }.doc("""
     Indents every non-blank line of `self` by `target` spaces, keeping each line's
     own relative indentation; blank (empty or all-whitespace) lines are emitted

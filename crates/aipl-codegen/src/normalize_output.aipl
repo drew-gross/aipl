@@ -7,9 +7,9 @@ import { equal as ==, join, logical_or as ||, split } from builtins;
 import { trim_end_while } from "./trim_end_while.aipl";
 
 pub fn normalize_output(self: str) -> str {
-    // `split("\r\n").join("\n")` is `replace("\r\n", "\n")` (non-overlapping,
+    // `split("\r\n").join(sep="\n")` is `replace("\r\n", "\n")` (non-overlapping,
     // left-to-right), then drop the trailing run of newline bytes.
-    self.split("\r\n").join("\n").trim_end_while(|c| c == '\n' || c == '\r')
+    self.split("\r\n").join(sep="\n").trim_end_while(|c| c == '\n' || c == '\r')
 }.doc("Normalizes captured program output for the cases harness: collapses CRLF line endings to LF, then strips the trailing run of `\\n`/`\\r`. A lone interior CR is left untouched.").test({
     assert(normalize_output("plain") == "plain"); // nothing to change
     assert(normalize_output("") == ""); // empty input

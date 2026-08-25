@@ -9,7 +9,7 @@ import { equal as ==, intersperse, join, len, print, to_str } from builtins;
 fn main() !prints {
     // Between, not around: three elements give five slots.
     print(["a", "b", "c"].intersperse("-").len().to_str());
-    print(["a", "b", "c"].intersperse("-").join(""));
+    print(["a", "b", "c"].intersperse("-").join(sep=""));
 
     // Fewer than two elements: nothing to separate, so the array is unchanged.
     print(["a"].intersperse("-").len().to_str());
