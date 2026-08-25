@@ -33,8 +33,22 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::{
     ast::{
-        ConcreteType, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive,
-        Program, Signature as AstSignature, StructDecl,
+        ConcreteType,
+        Expr,
+        ExprKind,
+        Function as AstFn,
+        Item,
+        MatchArm,
+        Param,
+        Pattern,
+        Primitive,
+        Program,
+        Signature as AstSignature,
+        StructDecl,
+        // The abstract representation, for the pre-monomorphization plumbing
+        // codegen still owns: the checker's inputs, and `main`'s CLI-args
+        // rewrite — both of which edit source signatures.
+        Type,
     },
     concrete::{
         error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
@@ -3636,7 +3650,7 @@ pub fn build_test_program(program: &Program) -> Program {
             type_vars: Vec::new(),
             params: Vec::new(),
             effects: all_effects(),
-            return_ty: Some(aipl_syntax::ast::Type::Primitive(Primitive::I64)),
+            return_ty: Some(Type::Primitive(Primitive::I64)),
         },
         body,
         test_body: None,
@@ -5873,7 +5887,7 @@ impl Compilation {
     pub fn takes_cli_args(&self, name: &str) -> bool {
         self.funcs
             .get(name)
-            .is_some_and(|i| i.params.len() == 1 && i.params[0].ty == cli_args_ty())
+            .is_some_and(|i| i.params.len() == 1 && i.params[0].ty == registered_cli_args_ty())
     }
 
     /// Run a function taking a single `str[]`, passing `args` as that array.
@@ -6972,7 +6986,17 @@ pub const BINARY_USER_MAIN: &str = "__aipl_user_main";
 pub const MAIN_WANTS_ARGS_SYMBOL: &str = "__aipl_main_wants_args";
 
 /// The type of `main`'s CLI-arguments parameter: `str[]`.
-fn cli_args_ty() -> ConcreteType {
+fn cli_args_ty() -> Type {
+    Type::Array(Box::new(Type::Primitive(Primitive::Str)))
+}
+
+/// [`cli_args_ty`] as it appears in a *registered* signature — the same `str[]`,
+/// after monomorphization.
+///
+/// Spelled out rather than converted from its source twin: this is a two-node
+/// type, and stating each side plainly beats a conversion whose only job is to
+/// cross a boundary that isn't really being crossed.
+fn registered_cli_args_ty() -> ConcreteType {
     ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)))
 }
 
@@ -6986,8 +7010,8 @@ fn cli_args_ty() -> ConcreteType {
 /// never given, emitting one `aipl_array_dec(null)` per program run. An
 /// ignored pointer-sized word lowers to the same ABI and owns nothing, so no
 /// drop is registered and no call is emitted.
-fn injected_cli_args_ty() -> ConcreteType {
-    ConcreteType::Primitive(Primitive::I64)
+fn injected_cli_args_ty() -> Type {
+    Type::Primitive(Primitive::I64)
 }
 
 /// Fill `sig`'s params and returns for `f`'s ABI: a hidden sret pointer when
@@ -7255,12 +7279,12 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
         match f.sig.params.as_slice() {
             [] => f.sig.params.push(Param {
                 name: "__cli_args".to_string(),
-                ty: injected_cli_args_ty().widen(),
+                ty: injected_cli_args_ty(),
                 mutable: false,
                 variadic: false,
                 default: None,
             }),
-            [p] if p.ty == cli_args_ty().widen() => wants_args = true,
+            [p] if p.ty == cli_args_ty() => wants_args = true,
             _ => {
                 return Err(Error::msg(
                     "\"main\" must take either no parameters or a single \"str[]\" (the CLI arguments)"

@@ -65,6 +65,8 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  why does quoted use str literals instead of char literals?
+  trailing_trivia should be a filter map
   loop in leaf_at can be a filter
   line_at.aipl should use .doc() instead of // header for docs
   caret_block.aipl should use .doc() instead of // header for docs

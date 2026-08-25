@@ -7538,6 +7538,21 @@ fn is_heap(t: &Type) -> bool {
         || matches!(t, Type::Array(_) | Type::Set(_) | Type::Dict(_, _))
 }
 
+/// [`is_heap`] over the post-monomorphization representation, for the analyses
+/// that run on [`ConcreteFn`]s.
+///
+/// Spelled out rather than widening at the call site: which representation an
+/// analysis speaks is a property of *when* it runs, and saying so once here
+/// beats converting at each use as though a boundary were being crossed.
+fn is_heap_concrete(t: &ConcreteType) -> bool {
+    *t == ConcreteType::Primitive(Primitive::Str)
+        || aipl_syntax::concrete::is_error(t)
+        || matches!(
+            t,
+            ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _)
+        )
+}
+
 /// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so
 /// it can be *moved* into an owning parameter rather than borrowed: an array
 /// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
@@ -7651,8 +7666,8 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
                 .map(|p| {
                     elidable
                         && !p.owned
-                        && is_heap(&p.ty.widen())
-                        && !is_empty_array_placeholder(&p.ty.widen())
+                        && is_heap_concrete(&p.ty)
+                        && !is_empty_array_placeholder(&p.ty)
                         && param_is_inspect_only(&p.name, &f.body)
                 })
                 .collect();
@@ -7665,8 +7680,8 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
 /// `coerce_empty_to_char_array` *releases* such a value when it flows into a
 /// `char[]` position, which only balances if the callee holds a reference —
 /// so these never elide.
-fn is_empty_array_placeholder(ty: &Type) -> bool {
-    matches!(ty, Type::Array(inner) if is_none_inner(inner))
+fn is_empty_array_placeholder(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Array(inner) if aipl_syntax::concrete::is_none_inner(inner))
 }
 
 /// Whether every use of the parameter `name` in `body` merely inspects it: no
