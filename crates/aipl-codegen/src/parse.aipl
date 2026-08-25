@@ -121,10 +121,7 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
     if (far.expected.contains(label)) {
         return far;
     };
-    mut ex: str[] = [];
-    set ex.extend(far.expected);
-    set ex.push(label);
-    Far { pos, expected: ex }
+    Far { pos, expected: [..far.expected, label] }
 }
 
 // A non-match that leaves `pos` where the rule started (the caller backtracks).
@@ -193,12 +190,7 @@ fn trailing_trivia<K: variant, A: any>(p: Parser<K, A>) -> Cst[] {
 
 fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     match (root) {
-        CTree(i, kids) => {
-            mut out: Cst[] = [];
-            set out.extend(kids);
-            set out.extend(trailing_trivia(p));
-            CTree(i, out)
-        },
+        CTree(i, kids) => CTree(i, [..kids, ..trailing_trivia(p)]),
         CLeaf(sp) => CLeaf(sp),
         CTrivia(sp) => CTrivia(sp),
     }
@@ -419,8 +411,7 @@ fn match_list_of<K: variant, A: any>(
     if (!head.hit) {
         return ok(Step { hit: true, pos, kids: [], far: head.far });
     };
-    mut acc: Cst[] = [];
-    set acc.extend(head.kids);
+    mut acc = head.kids;
     mut cp = head.pos;
     mut f = head.far;
     mut going = true;
@@ -510,10 +501,7 @@ fn climb<K: variant, A: any>(
                 let rhs = climb(p, atom, precs, cp + 1, next_min, cur, f)?;
                 set f = rhs.far;
                 if (rhs.hit) {
-                    mut nk: Cst[] = [CTree(cur, kids)];
-                    set nk.extend(op_kids);
-                    set nk.push(CTree(cur, rhs.kids));
-                    set kids = nk;
+                    set kids = [CTree(cur, kids), ..op_kids, CTree(cur, rhs.kids)];
                     set cp = rhs.pos;
                 } else {
                     // An operator with nothing after it: leave it unconsumed for
@@ -919,21 +907,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2894
-deallocations: 2894
-reallocations: 394
-bytes allocated: 136460
-instructions executed: 380979
-binary size: 254864
-  code: 146820
+allocations: 2697
+deallocations: 2697
+reallocations: 257
+bytes allocated: 129172
+instructions executed: 384516
+binary size: 254856
+  code: 146840
   data: 6956
-  metadata: 101088
+  metadata: 101060
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 263
+    calls: 236
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -957,7 +945,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 275
+    calls: 252
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -977,22 +965,22 @@ functions:
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 600
-  __builtin_count_while$char$lam13:
+  __builtin_count_while$char$lam22:
     calls: 149
     bytes: 296
-  __builtin_count_while$char$s0$lam18:
+  __builtin_count_while$char$s0$lam27:
     calls: 2
     bytes: 236
-  __builtin_count_while$char$s0$lam20:
+  __builtin_count_while$char$s0$lam29:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam44:
     calls: 35
     bytes: 236
   __builtin_first$char$s0:
     calls: 379
     bytes: 136
-  __builtin_is_some_and$char$lam19:
+  __builtin_is_some_and$char$lam28:
     calls: 0
     bytes: 48
   __eq_Node:
@@ -1016,36 +1004,36 @@ functions:
   __lambda_1:
     calls: 3
     bytes: 60
+  __lambda_13:
+    calls: 0
+    bytes: 92
+  __lambda_14:
+    calls: 31
+    bytes: 60
+  __lambda_15:
+    calls: 0
+    bytes: 92
+  __lambda_16:
+    calls: 25
+    bytes: 60
   __lambda_2:
     calls: 0
     bytes: 92
   __lambda_3:
     calls: 0
     bytes: 60
-  __lambda_4:
-    calls: 0
-    bytes: 92
-  __lambda_5:
-    calls: 31
-    bytes: 60
-  __lambda_6:
-    calls: 0
-    bytes: 92
-  __lambda_7:
-    calls: 25
-    bytes: 60
   __m1__cst_leaves:
     calls: 33
     bytes: 636
   __m1__cst_show:
     calls: 117
-    bytes: 1456
+    bytes: 1388
   __m1__cst_span:
     calls: 1
     bytes: 460
   __m1__cst_text:
     calls: 7
-    bytes: 460
+    bytes: 392
   __m2__link$Tok$Node:
     calls: 43
     bytes: 1724
@@ -1101,7 +1089,7 @@ functions:
     calls: 16
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 196
+    calls: 201
     bytes: 48
   __rec_drop___m2__Rule$Tok:
     calls: 223
@@ -1122,34 +1110,37 @@ functions:
     calls: 0
     bytes: 180
   aipl_arr_drop_str:
-    calls: 305
+    calls: 216
     bytes: (external)
   aipl_arr_extend:
-    calls: 511
+    calls: 455
     bytes: (external)
   aipl_arr_inc:
-    calls: 8246
+    calls: 8215
     bytes: (external)
   aipl_arr_reserve:
-    calls: 511
+    calls: 482
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 373
+    calls: 295
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10455
+    calls: 10222
     bytes: (external)
   aipl_array_new:
-    calls: 1700
+    calls: 1508
     bytes: (external)
   aipl_array_push:
-    calls: 294
+    calls: 151
     bytes: (external)
   aipl_array_push_mut:
-    calls: 247
+    calls: 395
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 162
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1161,22 +1152,22 @@ functions:
     calls: 418
     bytes: (external)
   aipl_dec:
-    calls: 12162
+    calls: 12006
     bytes: (external)
   aipl_inc:
-    calls: 9725
+    calls: 9569
     bytes: (external)
   aipl_rec_alloc:
-    calls: 435
+    calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2563
+    calls: 2497
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2128
+    calls: 2057
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1228,13 +1219,13 @@ functions:
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 2544
+    bytes: 2932
   error_at$Tok$Node:
     calls: 14
     bytes: 1604
   far_miss:
     calls: 53
-    bytes: 1004
+    bytes: 956
   find_prec:
     calls: 22
     bytes: 848
@@ -1255,7 +1246,7 @@ functions:
     bytes: 72
   match_list_of$Tok$Node:
     calls: 4
-    bytes: 2700
+    bytes: 2500
   match_many$Tok$Node:
     calls: 15
     bytes: 1880
@@ -1288,12 +1279,12 @@ functions:
     bytes: 340
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 3988
+    bytes: 3404
   parsed:
     calls: 3
     bytes: 412
   prev_end$Tok$Node:
-    calls: 122
+    calls: 148
     bytes: 592
   quoted:
     calls: 25
@@ -1310,6 +1301,9 @@ functions:
   tok_text$Tok$Node:
     calls: 81
     bytes: 680
+  trailing_trivia$Tok$Node:
+    calls: 52
+    bytes: 600
   trivia_rules:
     calls: 2
     bytes: 1372

@@ -38,6 +38,19 @@ type checker:
   separate types for concrete and generic - concrete loses Generic arm
   any shouldn't be an arm, it should be a more generic "bound"
   ConcatStr should disappear form type and fold into a more generic "representation" concept
+  repeated type vars:
+    builtins with a repeated type var (push, extend, min, max, value_or) are never
+    conflict-checked — collect_var_bindings uses or_insert_with, so the first arg pins
+    T and later args are never compared against it. check.rs:3100 delegates "the
+    concrete fit" to codegen on purpose, so these only error on *monomorphized* code:
+    a bad call reachable only from a .test block errors under `aipl check` (which seeds
+    __test_main) and compiles clean under run/build. Consequence today: an
+    --- errors --- fixture for one of these must put the bad call in main or it passes
+    by hand and fails in the harness (bit err_extend_type_mismatch).
+    Fix: after pass 1, check each non-fn arg against the substituted param type when its
+    var is already pinned — leaves the literal any[] params that comment is protecting
+    alone. Expect fanout: errors move checker-ward so existing --- errors --- fixtures
+    change message and span, plus latent mismatches in never-monomorphized corpus code.
 
 inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
@@ -175,6 +188,10 @@ optimizations:
   operation fusion:
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
+      a.map(...).join() fuses to flat_map
+      a.extend(v.map(...)) fuses to map_extend
+      also fuse x.extend(y.filter().map())
+
   2. Cap link concurrency during handoff (cargo build -j4 for the build steps). Doesn't reduce work, but caps peak RSS so the box stops swapping. Cheap to try, low risk.
   common subexpression elimination
   sora

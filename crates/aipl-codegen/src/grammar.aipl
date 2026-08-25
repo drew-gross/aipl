@@ -26,7 +26,7 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, not_equal as !=, push, wrapping_increment as ++ } from builtins;
+import { Span, equal as ==, map, not_equal as !=, push, wrapping_increment as ++ } from builtins;
 import { Cst } from "./cst.aipl";
 
 // Why a parse failed: a message, and the span of the offending source (absolute
@@ -138,13 +138,7 @@ pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> {
 
 // The production names of `g`, in index order — the table `cst_show` renders a
 // tree against, and what `link` resolves references through.
-pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] {
-    mut out: str[] = [];
-    for (let p : g.prods) {
-        set out.push(p.name);
-    }
-    out
-}
+pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|p| p.name) }
 
 // The index of `n` in `names`, or `none`. Names are few and lookups happen once
 // per reference at link time, so a scan is the whole implementation.
@@ -327,13 +321,13 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
 --- performance ---
 allocations: 109
 deallocations: 109
-reallocations: 18
-bytes allocated: 6814
+reallocations: 0
+bytes allocated: 6966
 instructions executed: 11047
-binary size: 36968
+binary size: 37008
   code: 21140
   data: 1620
-  metadata: 14208
+  metadata: 14248
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -408,13 +402,16 @@ functions:
     calls: 122
     bytes: (external)
   aipl_array_new:
-    calls: 32
+    calls: 23
     bytes: (external)
   aipl_array_push:
     calls: 18
     bytes: (external)
   aipl_array_push_mut:
     calls: 19
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 9
     bytes: (external)
   aipl_assert:
     calls: 14

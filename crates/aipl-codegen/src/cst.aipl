@@ -26,7 +26,7 @@ import {
     last,
     len,
     logical_not as !,
-    push,
+    map,
     value_or,
 } from builtins;
 
@@ -66,13 +66,7 @@ pub fn cst_leaves(self: Cst) -> Span[] {
 // parse this equals the input exactly; that identity is the cheapest regression
 // test there is for the driver's trivia handling, so the `.test` blocks assert
 // it directly.
-pub fn cst_text(self: Cst, src: str) -> str {
-    mut parts: str[] = [];
-    for (let sp : self.cst_leaves()) {
-        set parts.push(src[sp]);
-    }
-    parts.join("")
-}
+pub fn cst_text(self: Cst, src: str) -> str { self.cst_leaves().map(|sp| src[sp]).join("") }
 
 // The span `self` covers: its first leaf's start through its last leaf's end.
 // A node with no leaves at all — an interior node for a production that matched
@@ -111,10 +105,7 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
         CLeaf(sp) => src[sp],
         CTrivia(sp) => `~{src[sp]}`,
         CTree(i, kids) => {
-            mut parts: str[] = [];
-            for (let k : kids) {
-                set parts.push(k.cst_show(src, names));
-            }
+            let parts = kids.map(|k| k.cst_show(src, names));
             let name = names[i].value_or("?");
             if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(" ")})` }
         },
@@ -168,15 +159,15 @@ pub fn cst_show(self: Cst, src: str, names: str[]) -> str {
     assert(CTree(far, []).cst_show(src, names) == "(?)");
 })
 --- performance ---
-allocations: 112
-deallocations: 112
+allocations: 92
+deallocations: 92
 reallocations: 25
-bytes allocated: 5172
-instructions executed: 6189
-binary size: 19384
-  code: 10036
+bytes allocated: 4292
+instructions executed: 6125
+binary size: 19088
+  code: 9900
   data: 1361
-  metadata: 7987
+  metadata: 7827
 functions:
   __arr_drop_Cst:
     calls: 7
@@ -197,34 +188,31 @@ functions:
     calls: 24
     bytes: 48
   aipl_arr_drop_str:
-    calls: 21
+    calls: 7
     bytes: (external)
   aipl_arr_extend:
     calls: 25
     bytes: (external)
   aipl_arr_inc:
-    calls: 94
+    calls: 65
     bytes: (external)
   aipl_arr_reserve:
     calls: 25
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 34
-    bytes: (external)
-  aipl_array_dec:
-    calls: 173
-    bytes: (external)
-  aipl_array_new:
-    calls: 56
-    bytes: (external)
-  aipl_array_push:
     calls: 20
     bytes: (external)
+  aipl_array_dec:
+    calls: 124
+    bytes: (external)
+  aipl_array_new:
+    calls: 47
+    bytes: (external)
   aipl_array_push_mut:
-    calls: 2
+    calls: 22
     bytes: (external)
   aipl_array_with_cap:
-    calls: 3
+    calls: 12
     bytes: (external)
   aipl_assert:
     calls: 20
@@ -233,10 +221,10 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 189
+    calls: 159
     bytes: (external)
   aipl_inc:
-    calls: 105
+    calls: 75
     bytes: (external)
   aipl_rec_alloc:
     calls: 24
@@ -273,13 +261,13 @@ functions:
     bytes: 636
   cst_show:
     calls: 14
-    bytes: 1456
+    bytes: 1388
   cst_span:
     calls: 4
     bytes: 460
   cst_text:
     calls: 4
-    bytes: 460
+    bytes: 392
   is_tree:
     calls: 11
     bytes: 112
