@@ -1,0 +1,77 @@
+import { is_nonempty, len, print, to_str } from builtins;
+
+// A binding only one branch uses is computed inside that branch, not ahead of
+// it. `big` is built on every call to `size`, but only the `flag` arm ever
+// looks at it — so the sinking pass moves the binding into that arm and the
+// other call stops paying for a string it throws away.
+//
+// Both calls below run and only one takes the arm that needs the string, so the
+// program builds it exactly once. The `allocations:` counter is the assertion:
+// without sinking it would be one higher.
+fn label(n: i64) -> str { `value {n} padded out well past the inline-string limit` }
+
+fn size(flag: bool, n: i64) -> u64 {
+    let big = label(n);
+    if (flag) { big.len() } else { 0 }
+}
+
+// The flags come from `is_nonempty` rather than `true`/`false` so that constant
+// folding can't collapse the branch before this pass sees it — a folded-away
+// branch is nothing to sink into, and the case would then assert nothing.
+fn main() !prints {
+    print(size("".is_nonempty(), 1).to_str());
+    print(size("x".is_nonempty(), 2).to_str());
+}
+--- stdout ---
+0
+52
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 69
+instructions executed: 137
+binary size: 2216
+  code: 824
+  data: 63
+  metadata: 1329
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 180
+  __to_str_u64:
+    calls: 2
+    bytes: 180
+  aipl_concat:
+    calls: 2
+    bytes: (external)
+  aipl_dec:
+    calls: 11
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_inc:
+    calls: 4
+    bytes: (external)
+  aipl_print:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 3
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 220
+  size:
+    calls: 2
+    bytes: 244

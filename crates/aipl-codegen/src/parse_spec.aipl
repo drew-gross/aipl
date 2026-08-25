@@ -180,7 +180,7 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24902
+instructions executed: 24826
 binary size: 86264
   code: 53752
   data: 2532

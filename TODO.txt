@@ -138,6 +138,7 @@ types:
 numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
   make the rest of the .len() wrappers in walker return u64
+  divide by zero behaviour <--- investigate
 
 mod_aipl:
   create it
@@ -172,7 +173,7 @@ lint:
   advance and skip_comment have the  W { W { } } stuttering, why isn't the linter flagging it?
   lint fix mode
     first need an import-insert probably
-  "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects. But also, optimizations should be implemented so that after inlining, the arg isn't actually computed when the value isn't none (code sinking optimization)
+  "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects.
   mut out = a; set out.mutating_method(b); foo(out) should just be foo(out.mutating_method(b))
 
 Spreading:
@@ -197,6 +198,7 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 optimizations:
+  fancier code sinking: if a value is computed outside a branch, but used e.g. 2/3 arms of a match, code sinking should still be made to work somehow.
   generators! Maybe even implicitly transform array builders into generators
   try_map should be native, so it can pre-allocate and so it can fuse
   combine adjacent reserves (even across expressions)
@@ -538,8 +540,6 @@ self-inflicted: two long serial sweeps plus that leaked process pegging a core.
 Next step: re-run the case suite under the new codegen watching for a case that
 hangs, and check for stray spinning `aipl` processes before blaming the suite.
 
-Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
-
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   replace is_binop with is_operator_name
@@ -552,6 +552,8 @@ sort optimization:
   make sort_by a builtin so it can be faster
   make stable_sort and unstable_sort (qsort)
   get rid of the mut out = self[0..0] workaround
+  the sibling limitation sort_by documents in a comment — "a function-typed parameter cannot be captured into a nested lambda" — is a different restriction and still stands. It's what forces sort_by's hand-rolled insertion scan instead of a count_while, and it's the next thing in this area that would pay for itself.
+  Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
 test procedure improvements:
   figureout why listing takes so long in nextest

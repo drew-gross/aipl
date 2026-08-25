@@ -1,0 +1,65 @@
+import { print, to_str } from builtins;
+
+// A value with an effect does not sink. Only one arm reads `v`, so the shape is
+// the one this pass looks for — but computing it is *observable*, and moving it
+// into the arm would mean the `false` call never prints at all.
+//
+// The interleaving below is the assertion: "computing" appears for both calls,
+// including the one that discards the result.
+fn noisy(n: i64) !prints -> i64 {
+    print(`computing {n}`);
+    n
+}
+
+fn size(flag: bool, n: i64) !prints -> i64 {
+    let v = noisy(n);
+    if (flag) { v } else { 0 }
+}
+
+fn main() !prints {
+    print(size(false, 1).to_str());
+    print(size(true, 2).to_str());
+}
+--- stdout ---
+computing 1
+0
+computing 2
+2
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 112
+instructions executed: 176
+binary size: 1768
+  code: 608
+  data: 28
+  metadata: 1132
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 180
+  aipl_concat:
+    calls: 4
+    bytes: (external)
+  aipl_dec:
+    calls: 20
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_inc:
+    calls: 8
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 172
+  size:
+    calls: 2
+    bytes: 256

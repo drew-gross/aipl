@@ -312,9 +312,9 @@ allocations: 109
 deallocations: 109
 reallocations: 0
 bytes allocated: 6966
-instructions executed: 11783
-binary size: 38672
-  code: 22204
+instructions executed: 11755
+binary size: 38656
+  code: 22188
   data: 1620
   metadata: 14848
 functions:
@@ -458,7 +458,7 @@ functions:
     bytes: 256
   link$Kind$Node:
     calls: 5
-    bytes: 1032
+    bytes: 1016
   link_rule$Kind:
     calls: 25
     bytes: 4208

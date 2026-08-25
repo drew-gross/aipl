@@ -74,7 +74,7 @@ allocations: 2192
 deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
-instructions executed: 324578
+instructions executed: 324388
 binary size: 858496
   code: 524876
   data: 2508
@@ -627,7 +627,7 @@ functions:
     calls: 58
     bytes: (external)
   aipl_arr_inc:
-    calls: 4491
+    calls: 4488
     bytes: (external)
   aipl_arr_reserve:
     calls: 64
@@ -636,7 +636,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 6324
+    calls: 6321
     bytes: (external)
   aipl_array_new:
     calls: 1774
@@ -663,10 +663,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 10157
+    calls: 10154
     bytes: (external)
   aipl_inc:
-    calls: 8339
+    calls: 8336
     bytes: (external)
   aipl_rec_alloc:
     calls: 100
@@ -705,7 +705,7 @@ functions:
     calls: 11
     bytes: (external)
   aipl_str_len:
-    calls: 3754
+    calls: 3751
     bytes: (external)
   aipl_str_slice:
     calls: 969

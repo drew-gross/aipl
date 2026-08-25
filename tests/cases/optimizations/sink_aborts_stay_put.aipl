@@ -1,0 +1,69 @@
+import { divide as /, is_nonempty, len, print, to_str, wrapping_add as + } from builtins;
+
+// A value that can abort does not sink. `q` is read by one arm only, so the
+// shape is the one this pass looks for — but a division traps on a zero
+// divisor, and deferring it into the arm would turn a program that dies into
+// one that quietly returns 0.
+//
+// The block is transitive: `scaled` never divides, it only calls something
+// that does, and that is enough to pin a binding of its result.
+//
+// Kept observable without actually dying: the divisor here is nonzero, and the
+// `instructions executed:` counter below is the assertion. The three divisions
+// still run on the path that discards their result — if the binding sank into
+// the arm that never runs, they would vanish from the count.
+//
+// The divisor comes from `len` rather than a literal so that constant folding
+// can't evaluate the divisions away before this pass ever sees them.
+fn ratio(n: u64, d: u64) -> u64 { n / d }
+
+fn scaled(n: u64, d: u64) -> u64 { ratio(n, d) + ratio(n + 1, d) + ratio(n + 2, d) }
+
+fn pick(flag: bool, d: u64) -> u64 {
+    let q = scaled(10, d);
+    if (flag) { q } else { 0 }
+}
+
+// `flag` comes from `is_nonempty` rather than `false` so constant folding can't
+// collapse the branch away before this pass sees it, and the divisor from `len`
+// so the divisions survive folding too.
+fn main() !prints {
+    print(pick("".is_nonempty(), "ab".len()).to_str());
+}
+--- stdout ---
+0
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 58
+binary size: 1256
+  code: 392
+  data: 1
+  metadata: 863
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 180
+  aipl_dec:
+    calls: 2
+    bytes: (external)
+  aipl_inc:
+    calls: 1
+    bytes: (external)
+  aipl_print:
+    calls: 1
+    bytes: (external)
+  aipl_str_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 212

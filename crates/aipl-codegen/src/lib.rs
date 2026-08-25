@@ -4802,6 +4802,13 @@ fn compile_program<M: Module>(
     // after inlining so bodies folded here are the ones actually emitted.
     let folded = aipl_mono::fold_constants(&inlined);
 
+    // Optimization: sink a binding only one branch uses into that branch, so the
+    // arms that ignore its value stop computing it. After inlining, which is
+    // what creates most of them (a call's arguments become bindings ahead of the
+    // inlined body, and that body often branches), and after folding, so a
+    // binding folded down to a literal is already gone rather than sunk.
+    let folded = aipl_mono::sink_bindings(&folded, &aipl_mono::effectful_fns(&check_program.items));
+
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
     let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;

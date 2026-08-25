@@ -1,0 +1,74 @@
+import { is_nonempty, len, print, to_str, wrapping_add as + } from builtins;
+
+// A branch that is followed by more statements still sinks. The binding is
+// scoped over the whole remainder of the function, but nothing after the branch
+// reads it — so its scope narrows to the branch, and from there it moves into
+// the one arm that uses it.
+//
+// Narrowing reorders nothing: the value, then the branch, then the tail, in
+// that order either way. It is only the second step, moving into the arm, that
+// defers anything.
+//
+// As in `sink_into_branch`, `allocations:` is the assertion: two calls, one
+// string built.
+fn label(n: u64) -> str { `value {n} padded out well past the inline-string limit` }
+
+fn size(flag: bool, n: u64) -> u64 {
+    mut out: u64 = 0;
+    let big = label(n);
+    if (flag) {
+        set out = big.len();
+    } else {
+        set out = 1;
+    };
+    out + 1
+}
+
+fn main() !prints {
+    print(size("".is_nonempty(), 1).to_str());
+    print(size("x".is_nonempty(), 2).to_str());
+}
+--- stdout ---
+2
+53
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 69
+instructions executed: 157
+binary size: 1904
+  code: 672
+  data: 63
+  metadata: 1169
+functions:
+  __to_str_u64:
+    calls: 3
+    bytes: 180
+  aipl_concat:
+    calls: 2
+    bytes: (external)
+  aipl_dec:
+    calls: 11
+    bytes: (external)
+  aipl_inc:
+    calls: 4
+    bytes: (external)
+  aipl_print:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 3
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 220
+  size:
+    calls: 2
+    bytes: 272

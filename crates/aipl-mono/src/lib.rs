@@ -35,6 +35,9 @@ pub use fold::fold_constants;
 mod fuse;
 pub use fuse::{effectful_fns, fuse_operations};
 
+mod sink;
+pub use sink::sink_bindings;
+
 use aipl_syntax::{
     ast,
     ast::{

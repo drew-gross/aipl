@@ -907,9 +907,9 @@ allocations: 2701
 deallocations: 2701
 reallocations: 232
 bytes allocated: 129972
-instructions executed: 390072
-binary size: 257344
-  code: 148372
+instructions executed: 390024
+binary size: 257328
+  code: 148356
   data: 6948
   metadata: 102024
 functions:
@@ -1044,7 +1044,7 @@ functions:
     bytes: 392
   __m2__link$Tok$Node:
     calls: 43
-    bytes: 1032
+    bytes: 1016
   __m2__link_rule$Tok:
     calls: 171
     bytes: 4300
