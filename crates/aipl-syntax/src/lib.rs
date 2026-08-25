@@ -1669,8 +1669,8 @@ fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
-// NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, `trim_while`, and
-// `value_or_err` are
+// NOTE: `all`, `count_while`, `is_some_and`, `int_parse`, `trim_while`,
+// `try_map`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -1842,6 +1842,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "drop_last_n",
     "to_str",
     "map",
+    "try_map",
     "filter",
     "all",
     "any",

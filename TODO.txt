@@ -191,6 +191,7 @@ type checking:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 optimizations:
+  try_map should be native, so it can pre-allocate and so it can fuse
   combine adjacent reserves (even across expressions)
   interp_scan has a bunch of inspiration:
     if (src[i..step.end] == "{") {set depth++;}; should fuse to something

@@ -615,6 +615,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_right_fold = "crates/aipl-mono/src/builtin_right_fold",
     crates_aipl_mono_src_builtin_sort_by = "crates/aipl-mono/src/builtin_sort_by",
     crates_aipl_mono_src_builtin_trim_while = "crates/aipl-mono/src/builtin_trim_while",
+    crates_aipl_mono_src_builtin_try_map = "crates/aipl-mono/src/builtin_try_map",
     crates_aipl_mono_src_builtin_value_or_err = "crates/aipl-mono/src/builtin_value_or_err",
     examples_arrays = "examples/arrays",
     examples_hello = "examples/hello",

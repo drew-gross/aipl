@@ -35,6 +35,7 @@ import {
     drop_last,
     equal as ==,
     extend,
+    filter,
     first,
     is_nonempty,
     join,
@@ -49,6 +50,7 @@ import {
     push,
     same_case,
     to_str,
+    try_map,
     value_or,
     wrapping_add as +,
     wrapping_increment as ++,
@@ -608,12 +610,7 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
     match (node) {
         CTree(i, kids) => {
-            mut vals: A[] = [];
-            for (let k : kids) {
-                if (k.is_tree()) {
-                    set vals.push(lower_node(src, k, prods)?);
-                };
-            }
+            let vals = kids.filter(is_tree).try_map(|k| lower_node(src, k, prods))?;
             match (prods[i]) {
                 some(prod) => match (prod.build) {
                     Mk(f) => f(src, node, vals),
@@ -906,21 +903,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2691
-deallocations: 2691
+allocations: 2701
+deallocations: 2701
 reallocations: 232
-bytes allocated: 129500
-instructions executed: 384503
-binary size: 254704
-  code: 146692
+bytes allocated: 129972
+instructions executed: 385685
+binary size: 255816
+  code: 147392
   data: 6948
-  metadata: 101064
+  metadata: 101476
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 222
+    calls: 226
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -944,7 +941,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 238
+    calls: 245
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -973,7 +970,7 @@ functions:
   __builtin_count_while$char$s0$lam30:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam45:
+  __builtin_count_while$char$s0$lam53:
     calls: 35
     bytes: 236
   __builtin_first$char$s0:
@@ -982,6 +979,12 @@ functions:
   __builtin_is_some_and$char$lam29:
     calls: 0
     bytes: 48
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam48:
+    calls: 10
+    bytes: 716
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam33:
+    calls: 36
+    bytes: 716
   __eq_Node:
     calls: 7
     bytes: 184
@@ -1041,7 +1044,7 @@ functions:
     bytes: 4300
   __m2__link_rules$Tok:
     calls: 36
-    bytes: 716
+    bytes: 84
   __m2__many$Tok:
     calls: 3
     bytes: 104
@@ -1118,7 +1121,7 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8273
+    calls: 8283
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1133,7 +1136,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10299
+    calls: 10319
     bytes: (external)
   aipl_array_new:
     calls: 1494
@@ -1142,10 +1145,10 @@ functions:
     calls: 151
     bytes: (external)
   aipl_array_push_mut:
-    calls: 420
+    calls: 427
     bytes: (external)
   aipl_array_with_cap:
-    calls: 173
+    calls: 183
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1166,13 +1169,13 @@ functions:
     calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2483
+    calls: 2497
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2043
+    calls: 2057
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1245,7 +1248,7 @@ functions:
     bytes: 616
   lower_node$Tok$Node:
     calls: 10
-    bytes: 2352
+    bytes: 2252
   main:
     calls: 1
     bytes: 72

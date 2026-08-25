@@ -1,0 +1,189 @@
+import { equal as ==, is_err_and, len, less_than as <, push } from builtins;
+
+// The AIPL implementation of the `try_map` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_try_map` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.try_map(f)` resolves
+// through the ordinary generic / higher-order machinery — the in-file name
+// `try_map` is only for this file's own tests, which read exactly like user
+// code.
+//
+// `map` cannot call a fallible `f`: a `U[]` has nowhere to put an error, so
+// every mapping that can fail had to be spelled out as a loop over `push` with
+// `?` — the one array-building shape `map` could not absorb. This is that loop,
+// written once.
+pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
+    mut out: U[] = [];
+    for (let x : self) {
+        set out.push(f(x)?);
+    }
+    ok(out)
+}.doc("""
+    `self` with `f` applied to each element, short-circuiting on failure: the
+    result is `ok` of every mapped value, in order, or the *first* `err` that
+    `f` returned — after which no further element is mapped. Generic over the
+    element type, the mapped type and the error type, and callable as a method:
+    `xs.try_map(f)`.
+
+    The fallible counterpart of `map`, and what a `for` loop over
+    `set out.push(f(x)?)` is written as.
+""").test({
+    // Every element succeeds: the mapped values come back in order.
+    assert([1, 2, 3].try_map(label)? == ["n1", "n2", "n3"]);
+    assert(try_map([1, 2], label)? == ["n1", "n2"]); // function-call form too
+
+    // The mapped type differs from the element type (`i64` -> `str` above,
+    // `str` -> `i64` here), and the error type from both.
+    assert(["a", "bb"].try_map(width)? == [1, 2]);
+
+    // An empty array never calls `f`, so it cannot fail.
+    let empty: i64[] = [];
+    assert(empty.try_map(label)? == []);
+
+    // A failure anywhere is the whole result.
+    assert([1, -2].try_map(label).is_err_and(|e| e == "negative -2"));
+
+    // The *first* failure wins and nothing after it is mapped — which is what
+    // distinguishes this from collecting every error.
+    assert([1, -2, -3].try_map(label).is_err_and(|e| e == "negative -2"));
+    assert([-3, -2].try_map(label).is_err_and(|e| e == "negative -3"));
+
+    // A lambda, including one that captures — the form the call sites use to
+    // pass a fallible function its extra arguments.
+    let floor = 0;
+    assert([1, 2].try_map(|n| if (n < floor) { err("under") } else { ok(n) })? == [1, 2]);
+    assert(
+        [1, -2]
+            .try_map(|n| if (n < floor) { err("under") } else { ok(n) })
+            .is_err_and(|e| e == "under"),
+    );
+})
+
+// Fails on a negative input, so a test can place a failure at a chosen position
+// and name which one came back.
+fn label(n: i64) -> str!str { if (n < 0) { err(`negative {n}`) } else { ok(`n{n}`) } }.test({
+    assert(label(1)? == "n1");
+    assert(label(-2).is_err_and(|e| e == "negative -2"));
+})
+
+// A second fallible mapping whose ok, err and element types all differ from
+// `label`'s, so the tests cover `try_map` being generic in all three.
+fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }.test({
+    assert(width("abc")? == 3);
+    assert(width("").is_err_and(|c| c == 'e'));
+})
+--- performance ---
+allocations: 43
+deallocations: 43
+reallocations: 0
+bytes allocated: 1704
+instructions executed: 3241
+binary size: 17632
+  code: 9344
+  data: 1115
+  metadata: 7173
+functions:
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
+  __eq_str$arr:
+    calls: 3
+    bytes: 352
+  __eq_u64$arr:
+    calls: 1
+    bytes: 296
+  __test$label:
+    calls: 1
+    bytes: 432
+  __test$try_map:
+    calls: 1
+    bytes: 3588
+  __test$width:
+    calls: 1
+    bytes: 188
+  __test_try_fail_char:
+    calls: 0
+    bytes: 64
+  __test_try_fail_str:
+    calls: 0
+    bytes: 64
+  __to_str_char:
+    calls: 0
+    bytes: 184
+  __to_str_i64:
+    calls: 12
+    bytes: 180
+  __to_str_str:
+    calls: 0
+    bytes: 252
+  aipl_arr_drop_str:
+    calls: 10
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 26
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 10
+    bytes: (external)
+  aipl_array_dec:
+    calls: 61
+    bytes: (external)
+  aipl_array_new:
+    calls: 23
+    bytes: (external)
+  aipl_array_push:
+    calls: 12
+    bytes: (external)
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_concat:
+    calls: 24
+    bytes: (external)
+  aipl_dec:
+    calls: 169
+    bytes: (external)
+  aipl_i64_len:
+    calls: 24
+    bytes: (external)
+  aipl_inc:
+    calls: 92
+    bytes: (external)
+  aipl_str_eq:
+    calls: 15
+    bytes: (external)
+  aipl_str_len:
+    calls: 17
+    bytes: (external)
+  aipl_test_begin:
+    calls: 3
+    bytes: (external)
+  aipl_test_end:
+    calls: 3
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 12
+    bytes: (external)
+  label:
+    calls: 12
+    bytes: 564
+  main:
+    calls: 1
+    bytes: 156
+  try_map$i64$i64$str$lam11:
+    calls: 1
+    bytes: 688
+  try_map$i64$i64$str$lam9:
+    calls: 1
+    bytes: 688
+  try_map$i64$str$str$lam0:
+    calls: 6
+    bytes: 616
+  try_map$str$u64$char$lam1:
+    calls: 1
+    bytes: 564
+  width:
+    calls: 4
+    bytes: 172

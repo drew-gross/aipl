@@ -26,7 +26,7 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, map, not_equal as !=, push } from builtins;
+import { Span, equal as ==, map, not_equal as !=, push, try_map } from builtins;
 import { Cst } from "./cst.aipl";
 
 // Why a parse failed: a message, and the span of the offending source (absolute
@@ -173,11 +173,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
 }
 
 fn link_rules<K: variant>(rs: Rule<K>[], names: str[]) -> Rule<K>[]!ParseError {
-    mut out: Rule<K>[] = [];
-    for (let r : rs) {
-        set out.push(link_rule(r, names)?);
-    }
-    ok(out)
+    rs.try_map(|r| link_rule(r, names))
 }
 
 pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
@@ -319,11 +315,11 @@ allocations: 109
 deallocations: 109
 reallocations: 0
 bytes allocated: 6966
-instructions executed: 11099
-binary size: 37008
-  code: 21140
+instructions executed: 11143
+binary size: 37168
+  code: 21224
   data: 1620
-  metadata: 14248
+  metadata: 14324
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -343,6 +339,9 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam4:
+    calls: 4
+    bytes: 716
   __eq_Kind:
     calls: 2
     bytes: 148
@@ -462,7 +461,7 @@ functions:
     bytes: 4208
   link_rules$Kind:
     calls: 4
-    bytes: 716
+    bytes: 84
   main:
     calls: 1
     bytes: 72

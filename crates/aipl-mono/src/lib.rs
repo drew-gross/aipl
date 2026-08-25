@@ -5205,6 +5205,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_drop_n", "builtin_drop_n.aipl"),
     ("__builtin_drop_last_n", "builtin_drop_last_n.aipl"),
     ("__builtin_map_err", "builtin_map_err.aipl"),
+    ("__builtin_try_map", "builtin_try_map.aipl"),
     ("__builtin_int_parse", "builtin_int_parse.aipl"),
     ("__builtin_trim_while", "builtin_trim_while.aipl"),
     ("__builtin_value_or_err", "builtin_value_or_err.aipl"),
