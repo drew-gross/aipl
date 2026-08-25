@@ -1179,6 +1179,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         skip_mut_desugar: false,
         cur_ret: Type::Unit,
         cur_expected: None,
+        try_errs: Vec::new(),
         dbg,
     };
 
@@ -1857,6 +1858,12 @@ struct Mono<'a> {
     /// checker's `current_expected`, and must, or mono rejects a program the
     /// checker accepted.
     cur_expected: Option<Type>,
+    /// Error types propagated by a `?` while inferring the expression currently
+    /// in progress, read back by [`Mono::fn_arg_return`] so a lambda whose only
+    /// mention of its error type is a `?` still pins a higher-order function's
+    /// error variable. Mirrors the checker's own `try_errs` — see
+    /// [`check::err_side_from_tries`].
+    try_errs: Vec<Type>,
     dbg: DebugOptions,
 }
 
@@ -2105,7 +2112,10 @@ impl Mono<'_> {
                 for (p, t) in params.iter().zip(arg_tys) {
                     benv.insert(p.name.clone(), t.clone());
                 }
+                let mark = self.try_errs.len();
                 let (_, ty) = self.infer(body, &benv)?;
+                let ty = check::err_side_from_tries(ty, &self.try_errs[mark..]);
+                self.try_errs.truncate(mark);
                 Ok(Some(ty))
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => Ok(Some(self.ref_return(g, arg_tys))),
@@ -4313,7 +4323,12 @@ impl Mono<'_> {
                 // optional; codegen emits the unwrap / early-return of `err`/`none`.
                 let (rin, it) = self.infer(inner, env)?;
                 let ok = match it {
-                    Type::Result(ok, _) => *ok,
+                    Type::Result(ok, e) => {
+                        // What this `?` propagates; `fn_arg_return` reads these
+                        // back to type a lambda that fails only through a `?`.
+                        self.try_errs.push(*e);
+                        *ok
+                    }
                     Type::Optional(inner) => *inner,
                     _ => Type::NoneInner,
                 };

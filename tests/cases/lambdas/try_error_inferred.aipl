@@ -1,0 +1,138 @@
+import { equal as ==, is_err_and, map, print, to_str, try_map } from builtins;
+
+// A lambda that can fail *only* through a `?` still names its error type.
+//
+// `ok(v)` mentions no error, so it types as `v!__none__`. That is right for a
+// value but wrong for a lambda, whose failures leave through the `?` in its
+// body rather than through an `err(..)` the literal spells out. So a callback
+// like `|x| ok(W { n: f(x)? })` used to carry a placeholder error side — and a
+// higher-order function whose error type appears *nowhere but the callback*
+// (`E` in `(T) -> U!E`) then had nothing anywhere to pin `E` from, and the call
+// was rejected as uninferrable.
+//
+// The `?` is what names it: propagating an `i64!str` out of the lambda makes
+// the lambda's own type `W!str`.
+struct Wrapped { n: i64, tag: str }
+
+fn checked(n: i64) -> i64!str { if (n == 0) { err("zero") } else { ok(n) } }
+
+// A user-defined higher-order function of the same shape as the `try_map`
+// builtin: `E` is mentioned by the callback and by nothing else.
+fn apply_to<T: any, U: any, E: any>(self: T, f: (T) -> U!E) -> U!E { f(self) }
+
+fn main() !prints {
+    // Through a user-defined generic, both ways.
+    let one = apply_to(3, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+    print(if (one.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+    let zero = apply_to(0, |n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+    print(if (zero.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+
+    // Through `try_map` — the call shape this inference was needed for. Every
+    // element is wrapped, and the first failure comes back whole.
+    let ws = [3, 4].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+    print(
+        match (ws) {
+            ok(list) => list.map(|w| w.n).to_str(),
+            err(e) => e,
+        },
+    );
+    let bad = [3, 0, 5].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
+    print(if (bad.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
+
+    // An explicit `err(..)` still wins: a lambda that names its own error type
+    // keeps it, and this inference only fills a side nothing else named.
+    let named = [3].try_map(|n| if (n == 3) { err("three") } else { ok(checked(n)?) });
+    print(if (named.is_err_and(|e| e == "three")) { "three" } else { "ok" });
+}
+--- stdout ---
+ok
+err
+[3, 4]
+err
+three
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 448
+instructions executed: 1276
+binary size: 11024
+  code: 6704
+  data: 67
+  metadata: 4253
+functions:
+  __arr_drop_Wrapped:
+    calls: 3
+    bytes: 120
+  __arr_retain_Wrapped:
+    calls: 4
+    bytes: 120
+  __builtin_try_map$i64$Wrapped$str$lam13:
+    calls: 1
+    bytes: 612
+  __builtin_try_map$i64$Wrapped$str$lam9:
+    calls: 1
+    bytes: 612
+  __builtin_try_map$i64$i64$str$lam17:
+    calls: 1
+    bytes: 556
+  __lambda_0:
+    calls: 1
+    bytes: 424
+  __lambda_12:
+    calls: 2
+    bytes: 424
+  __lambda_16:
+    calls: 1
+    bytes: 400
+  __lambda_4:
+    calls: 1
+    bytes: 424
+  __lambda_8:
+    calls: 2
+    bytes: 424
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 672
+  aipl_arr_inc:
+    calls: 8
+    bytes: (external)
+  aipl_array_dec:
+    calls: 18
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_array_push:
+    calls: 3
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_dec:
+    calls: 45
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_inc:
+    calls: 33
+    bytes: (external)
+  aipl_print:
+    calls: 5
+    bytes: (external)
+  aipl_str_eq:
+    calls: 3
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1916

@@ -26,7 +26,7 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, map, not_equal as !=, push, try_map } from builtins;
+import { Span, equal as ==, map, not_equal as !=, try_map } from builtins;
 import { Cst } from "./cst.aipl";
 
 // Why a parse failed: a message, and the span of the offending source (absolute
@@ -189,11 +189,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             none => {},
         };
     }
-    mut out: Production<K, A>[] = [];
-    for (let p : g.prods) {
-        set out.push(Production { ..p, rule: link_rule(p.rule, names)? });
-    }
-    ok(Grammar { prods: out })
+    let prods = g.prods.try_map(|p| ok(Production { ..p, rule: link_rule(p.rule, names)? }))?;
+    ok(Grammar { prods })
 }.doc("""
     `g` with every rule reference resolved: each `Named(name)` rewritten to the
     `NamedIdx(index)` of the production it names, so the driver resolves a
@@ -315,11 +312,11 @@ allocations: 109
 deallocations: 109
 reallocations: 0
 bytes allocated: 6966
-instructions executed: 11143
-binary size: 37168
-  code: 21224
+instructions executed: 11783
+binary size: 38672
+  code: 22204
   data: 1620
-  metadata: 14324
+  metadata: 14848
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -339,7 +336,10 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam4:
+  __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam4:
+    calls: 4
+    bytes: 928
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam7:
     calls: 4
     bytes: 716
   __eq_Kind:
@@ -369,6 +369,9 @@ functions:
   __eq_u64$opt:
     calls: 2
     bytes: 100
+  __lambda_2:
+    calls: 9
+    bytes: 744
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -388,13 +391,13 @@ functions:
     calls: 13
     bytes: (external)
   aipl_arr_inc:
-    calls: 72
+    calls: 75
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 19
     bytes: (external)
   aipl_array_dec:
-    calls: 122
+    calls: 125
     bytes: (external)
   aipl_array_new:
     calls: 23
@@ -415,22 +418,22 @@ functions:
     calls: 4
     bytes: (external)
   aipl_dec:
-    calls: 467
+    calls: 493
     bytes: (external)
   aipl_inc:
-    calls: 406
+    calls: 432
     bytes: (external)
   aipl_rec_alloc:
     calls: 55
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 235
+    calls: 243
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 12
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 180
+    calls: 188
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 12
@@ -455,7 +458,7 @@ functions:
     bytes: 256
   link$Kind$Node:
     calls: 5
-    bytes: 1724
+    bytes: 1032
   link_rule$Kind:
     calls: 25
     bytes: 4208

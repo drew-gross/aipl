@@ -47,6 +47,12 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
     assert([1, -2, -3].try_map(label).is_err_and(|e| e == "negative -2"));
     assert([-3, -2].try_map(label).is_err_and(|e| e == "negative -3"));
 
+    // A lambda that can fail *only* through a `?`: `ok(..)` names no error
+    // type, so the `?` is the one thing that pins `E` (see
+    // `tests/cases/lambdas/try_error_inferred.aipl`).
+    assert([1, 2].try_map(|n| ok(label(n)?))? == ["n1", "n2"]);
+    assert([1, -2].try_map(|n| ok(label(n)?)).is_err_and(|e| e == "negative -2"));
+
     // A lambda, including one that captures — the form the call sites use to
     // pass a fallible function its extra arguments.
     let floor = 0;
@@ -72,31 +78,37 @@ fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }.
     assert(width("").is_err_and(|c| c == 'e'));
 })
 --- performance ---
-allocations: 43
-deallocations: 43
+allocations: 53
+deallocations: 53
 reallocations: 0
-bytes allocated: 1704
-instructions executed: 3241
-binary size: 17632
-  code: 9344
-  data: 1115
-  metadata: 7173
+bytes allocated: 2096
+instructions executed: 4134
+binary size: 22632
+  code: 12292
+  data: 1291
+  metadata: 9049
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 296
   __eq_str$arr:
-    calls: 3
+    calls: 4
     bytes: 352
   __eq_u64$arr:
     calls: 1
     bytes: 296
+  __lambda_10:
+    calls: 2
+    bytes: 284
+  __lambda_8:
+    calls: 2
+    bytes: 284
   __test$label:
     calls: 1
     bytes: 432
   __test$try_map:
     calls: 1
-    bytes: 3588
+    bytes: 4736
   __test$width:
     calls: 1
     bytes: 188
@@ -110,49 +122,49 @@ functions:
     calls: 0
     bytes: 184
   __to_str_i64:
-    calls: 12
+    calls: 16
     bytes: 180
   __to_str_str:
     calls: 0
     bytes: 252
   aipl_arr_drop_str:
-    calls: 10
+    calls: 14
     bytes: (external)
   aipl_arr_inc:
-    calls: 26
+    calls: 32
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 10
+    calls: 14
     bytes: (external)
   aipl_array_dec:
-    calls: 61
+    calls: 75
     bytes: (external)
   aipl_array_new:
-    calls: 23
+    calls: 28
     bytes: (external)
   aipl_array_push:
-    calls: 12
-    bytes: (external)
-  aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_concat:
-    calls: 24
-    bytes: (external)
-  aipl_dec:
-    calls: 169
-    bytes: (external)
-  aipl_i64_len:
-    calls: 24
-    bytes: (external)
-  aipl_inc:
-    calls: 92
-    bytes: (external)
-  aipl_str_eq:
     calls: 15
     bytes: (external)
+  aipl_assert:
+    calls: 15
+    bytes: (external)
+  aipl_concat:
+    calls: 32
+    bytes: (external)
+  aipl_dec:
+    calls: 223
+    bytes: (external)
+  aipl_i64_len:
+    calls: 32
+    bytes: (external)
+  aipl_inc:
+    calls: 123
+    bytes: (external)
+  aipl_str_eq:
+    calls: 18
+    bytes: (external)
   aipl_str_len:
-    calls: 17
+    calls: 19
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -164,22 +176,28 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_i64:
-    calls: 12
+    calls: 16
     bytes: (external)
   label:
-    calls: 12
+    calls: 16
     bytes: 564
   main:
     calls: 1
     bytes: 156
-  try_map$i64$i64$str$lam11:
+  try_map$i64$i64$str$lam15:
     calls: 1
     bytes: 688
-  try_map$i64$i64$str$lam9:
+  try_map$i64$i64$str$lam17:
     calls: 1
     bytes: 688
   try_map$i64$str$str$lam0:
     calls: 6
+    bytes: 616
+  try_map$i64$str$str$lam11:
+    calls: 1
+    bytes: 616
+  try_map$i64$str$str$lam9:
+    calls: 1
     bytes: 616
   try_map$str$u64$char$lam1:
     calls: 1

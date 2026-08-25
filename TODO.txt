@@ -71,7 +71,7 @@ join:
   join([]) errors now, should just propagate empty array probably?
 
 integer signedness problems:
-  2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some.
+  2. Literals don't flex through a constructor — ok(0) in a -> u64!E function types its payload i64, so three "declined" sites need let declined: u64 = 0; first. Literals flex fine into an annotated let, a parameter, or a struct field — just not through ok/err/some. Should do this after bounds so "flex" types can propagate as un-chosed bounds until restricted as which point they propagate back through.
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
@@ -104,6 +104,8 @@ utility functions:
   split with predicate, use in companion_files.aipl
   interaclate
   try_map that is like map when pred can error
+  count_if
+  do we need intersperse now that we've souped up join?
 
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
@@ -155,6 +157,7 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
+  match (self.peek()) {none => FmtTok { kind: Punct, span: 0..0 },some(t) => t,} <-- lint should force this to value_or
   lint against manually incrementing a loop counter
   for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
   mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]
@@ -190,7 +193,11 @@ type checking:
     b) do inlining after monomorphization
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
+chain_docs:
+  rewrite this somehow, there must be a better way
+
 optimizations:
+  generators! Maybe even implicitly transform array builders into generators
   try_map should be native, so it can pre-allocate and so it can fuse
   combine adjacent reserves (even across expressions)
   interp_scan has a bunch of inspiration:
@@ -204,6 +211,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+      count fusions should apply to count_if also
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
       a.map(...).join() fuses to flat_map
@@ -535,6 +543,8 @@ Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   replace is_binop with is_operator_name
+  check if the w "loops" can be improved using mut self arguments
+  SpacedBracesNoTrailing seems like it shouldn't be necessary if the writer knows whether to add trailing or not based on breaks
 
 optimize string comparison by comparing more than one byte at a time
 

@@ -31,6 +31,34 @@ use aipl_syntax::{
     Error, Span,
 };
 
+/// A lambda body's type with its error side filled in from a `?` the body
+/// propagated.
+///
+/// `ok(v)` names no error, so it types as `v!__none__` — which is right for a
+/// value but wrong for a *lambda*, whose failures leave through the `?` in its
+/// body rather than through an `err(..)` the literal mentions. Without this,
+/// `xs.try_map(|p| ok(T { .. f(p)? .. }))` leaves `try_map`'s `E` unpinned and
+/// unpinnable: `E` appears nowhere but the callback's own type, and the only
+/// thing naming it is the `?`.
+///
+/// `tries` is what the `?`s in the body propagated, in order; the first one that
+/// names a real error type wins. A body whose error side is already concrete
+/// keeps it, so an explicit `err(..)` always outranks this inference — and a
+/// body with conflicting `?` error types still fails where it did before, in the
+/// enclosing-return check.
+pub(crate) fn err_side_from_tries(body_ty: Type, tries: &[Type]) -> Type {
+    let Type::Result(ok, e) = &body_ty else {
+        return body_ty;
+    };
+    if !is_none_inner(e) {
+        return body_ty;
+    }
+    match tries.iter().find(|t| !is_none_inner(t)) {
+        Some(named) => Type::Result(ok.clone(), Box::new(named.clone())),
+        None => body_ty,
+    }
+}
+
 /// Mangle a type into a fragment usable inside a synthetic struct/variant name
 /// (all `$`/`!`/nesting flattened to `_`). Shared by [`tuple_struct_name`] and
 /// [`generic_instance_name`] so the two naming schemes agree on how a type is
@@ -264,6 +292,10 @@ struct Cx<'a> {
     /// unifying that payload asks for the very arguments being recovered —
     /// without this the two would call each other until the stack ran out.
     resolving: std::cell::RefCell<HashSet<String>>,
+    /// Error types propagated by a `?` while checking the expression currently
+    /// in progress — see [`err_side_from_tries`], which reads the entries a
+    /// lambda body pushed.
+    try_errs: std::cell::RefCell<Vec<Type>>,
 }
 
 impl<'a> Cx<'a> {
@@ -997,6 +1029,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         locks: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
+        try_errs: std::cell::RefCell::new(Vec::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -2269,7 +2302,13 @@ impl Cx<'_> {
                 }
                 // Effect-free body: check with an empty effect context so any
                 // effectful call inside is reported.
+                let mark = self.try_errs.borrow().len();
                 let body_ty = self.check_expr(body, &env2, &[])?;
+                let body_ty = {
+                    let errs = self.try_errs.borrow();
+                    err_side_from_tries(body_ty, &errs[mark..])
+                };
+                self.try_errs.borrow_mut().truncate(mark);
                 Type::Fn(ptys, Box::new(body_ty))
             }
             ExprKind::TupleLit(elems) => {
@@ -2551,7 +2590,13 @@ impl Cx<'_> {
                 // fits) is enforced in codegen, where the return type is in scope.
                 let it = self.check_expr(inner, env, effects)?;
                 match it {
-                    Type::Result(ok, _) => (*ok).clone(),
+                    Type::Result(ok, e) => {
+                        // What this `?` propagates. A lambda body reads these
+                        // back to learn its own error type — see
+                        // `err_side_from_tries`.
+                        self.try_errs.borrow_mut().push((*e).clone());
+                        (*ok).clone()
+                    }
                     Type::Optional(inner) => (*inner).clone(),
                     other => {
                         return Err(Error::at(
@@ -3317,7 +3362,13 @@ impl Cx<'_> {
                 },
             );
         }
+        let mark = self.try_errs.borrow().len();
         let body_ty = self.check_expr(body, &env2, effects)?;
+        let body_ty = {
+            let errs = self.try_errs.borrow();
+            err_side_from_tries(body_ty, &errs[mark..])
+        };
+        self.try_errs.borrow_mut().truncate(mark);
         coerce(&body_ty, expected_ret).map_err(|()| {
             Error::at(
                 format!(

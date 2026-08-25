@@ -907,11 +907,11 @@ allocations: 2701
 deallocations: 2701
 reallocations: 232
 bytes allocated: 129972
-instructions executed: 385685
-binary size: 255816
-  code: 147392
+instructions executed: 390072
+binary size: 257344
+  code: 148372
   data: 6948
-  metadata: 101476
+  metadata: 102024
 functions:
   __arr_drop_Node:
     calls: 11
@@ -961,28 +961,31 @@ functions:
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 600
-  __builtin_count_while$char$lam23:
+  __builtin_count_while$char$lam26:
     calls: 149
     bytes: 296
-  __builtin_count_while$char$s0$lam28:
+  __builtin_count_while$char$s0$lam31:
     calls: 2
     bytes: 236
-  __builtin_count_while$char$s0$lam30:
+  __builtin_count_while$char$s0$lam33:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam53:
+  __builtin_count_while$char$s0$lam56:
     calls: 35
     bytes: 236
   __builtin_first$char$s0:
     calls: 379
     bytes: 136
-  __builtin_is_some_and$char$lam29:
+  __builtin_is_some_and$char$lam32:
     calls: 0
     bytes: 48
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam48:
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam51:
     calls: 10
     bytes: 716
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam33:
+  __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam15:
+    calls: 43
+    bytes: 928
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam36:
     calls: 36
     bytes: 716
   __eq_Node:
@@ -1007,15 +1010,18 @@ functions:
     calls: 3
     bytes: 60
   __lambda_13:
+    calls: 55
+    bytes: 744
+  __lambda_16:
     calls: 0
     bytes: 92
-  __lambda_14:
+  __lambda_17:
     calls: 31
     bytes: 60
-  __lambda_15:
+  __lambda_18:
     calls: 0
     bytes: 92
-  __lambda_16:
+  __lambda_19:
     calls: 25
     bytes: 60
   __lambda_2:
@@ -1038,7 +1044,7 @@ functions:
     bytes: 392
   __m2__link$Tok$Node:
     calls: 43
-    bytes: 1724
+    bytes: 1032
   __m2__link_rule$Tok:
     calls: 171
     bytes: 4300
@@ -1121,7 +1127,7 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8283
+    calls: 8326
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1136,7 +1142,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10319
+    calls: 10362
     bytes: (external)
   aipl_array_new:
     calls: 1494
@@ -1160,22 +1166,22 @@ functions:
     calls: 418
     bytes: (external)
   aipl_dec:
-    calls: 12006
+    calls: 12171
     bytes: (external)
   aipl_inc:
-    calls: 9594
+    calls: 9759
     bytes: (external)
   aipl_rec_alloc:
     calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2497
+    calls: 2552
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2057
+    calls: 2112
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
