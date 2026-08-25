@@ -33,11 +33,14 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::{
     ast::{
-        is_unit, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive,
-        Program, Signature as AstSignature, StructDecl, Type,
+        ConcreteType, Expr, ExprKind, Function as AstFn, Item, MatchArm, Param, Pattern, Primitive,
+        Program, Signature as AstSignature, StructDecl,
     },
-    error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner, is_set_elem,
-    is_str_repr, type_name, IMPORTABLE_BUILTINS,
+    concrete::{
+        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
+        is_set_elem, is_str_repr, is_unit, type_name,
+    },
+    IMPORTABLE_BUILTINS,
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
@@ -3265,7 +3268,7 @@ enum FuncLink {
 /// puts them on [`aipl_mono::ConcreteParam`]).
 #[derive(Clone)]
 struct ParamInfo {
-    ty: Type,
+    ty: ConcreteType,
     /// This instance takes ownership of the parameter (set by monomorphization).
     /// At a call site the corresponding argument — always a fresh, uniquely-owned
     /// heap value — is *moved* in (no retain) rather than borrowed, and the
@@ -3295,7 +3298,7 @@ struct ParamInfo {
 impl ParamInfo {
     /// A plainly borrowed parameter — the shape every builtin and every
     /// rebuilt-from-IR entry takes: the caller retains, the callee releases.
-    fn borrowed(ty: Type) -> Self {
+    fn borrowed(ty: ConcreteType) -> Self {
         Self {
             ty,
             owned: false,
@@ -3334,7 +3337,7 @@ struct FuncInfo {
     /// only the FFI and `func_addr` go through the trampoline.
     tail_id: Option<FuncId>,
     params: Vec<ParamInfo>,
-    return_ty: Type,
+    return_ty: ConcreteType,
     effects: Vec<String>,
     /// `true` for a mutating method (`fn f(mut self: T, ...)`): it returns
     /// nothing to the user, mutates its receiver, and must be called as
@@ -3346,8 +3349,8 @@ struct FuncInfo {
 impl FuncInfo {
     /// Just the parameter types, in order — for the places that describe the
     /// function's *type* rather than its calling convention (a function value's
-    /// `Type::Fn`, the dogfood-IR manifest, FFI argument checking).
-    fn param_types(&self) -> impl Iterator<Item = &Type> {
+    /// `ConcreteType::Fn`, the dogfood-IR manifest, FFI argument checking).
+    fn param_types(&self) -> impl Iterator<Item = &ConcreteType> {
         self.params.iter().map(|p| &p.ty)
     }
 }
@@ -3372,7 +3375,7 @@ struct StructLayout {
 #[derive(Clone)]
 struct FieldLayout {
     name: String,
-    ty: Type,
+    ty: ConcreteType,
     offset: u32,
 }
 
@@ -3633,7 +3636,7 @@ pub fn build_test_program(program: &Program) -> Program {
             type_vars: Vec::new(),
             params: Vec::new(),
             effects: all_effects(),
-            return_ty: Some(Type::Primitive(Primitive::I64)),
+            return_ty: Some(aipl_syntax::ast::Type::Primitive(Primitive::I64)),
         },
         body,
         test_body: None,
@@ -4887,7 +4890,7 @@ fn compile_program<M: Module>(
                     // codegen `ConcreteType`, while codegen's own machinery
                     // still speaks the abstract representation. Migrating it is
                     // the next slice of the split.
-                    ty: p.ty.widen(),
+                    ty: p.ty.clone(),
                     owned: p.owned,
                     // A participant gives up retain elision on its heap
                     // parameters: an inspect-only one is a borrow on the
@@ -4897,10 +4900,10 @@ fn compile_program<M: Module>(
                     inspect_only: !participant && inspects.get(i).copied().unwrap_or(false),
                     // …and for the same reason its boxed parameters, borrows by
                     // default, join the retain/release protocol.
-                    tail_owned: participant && is_boxed(&p.ty.widen(), &structs),
+                    tail_owned: participant && is_boxed(&p.ty, &structs),
                 })
                 .collect(),
-            return_ty: f.abi_return_type().widen(),
+            return_ty: f.abi_return_type(),
             effects: f.effects.clone(),
             is_mutating: f.is_mutating(),
         };
@@ -5233,26 +5236,26 @@ fn new_jit_module() -> Result<JITModule, Error> {
 /// `Token[]`), and structs/variants (the bare type name, e.g. `Span`, whose
 /// layout is carried separately on a `; struct`/`; variant` manifest line).
 /// Anything else can't cross the FFI and is rejected here.
-fn ffi_type_tag(t: &Type) -> Result<String, Error> {
+fn ffi_type_tag(t: &ConcreteType) -> Result<String, Error> {
     Ok(match t {
         // Every scalar the FFI marshals — any integer width (`i64`, `u64`, `u8`,
         // …), `bool`, `char` — plus `str`. The tag is the type's own spelling,
         // which `ffi_type_from_tag` reads back with `Primitive::from_name`.
-        Type::Primitive(p) if is_ffi_scalar(t) || is_str_repr(t) => p.name().to_string(),
-        Type::Unit => "unit".to_string(),
-        Type::Optional(inner) => format!("{}?", ffi_type_tag(inner)?),
-        Type::Result(ok, err) => format!("{}!{}", ffi_type_tag(ok)?, ffi_type_tag(err)?),
+        ConcreteType::Primitive(p) if is_ffi_scalar(t) || is_str_repr(t) => p.name().to_string(),
+        ConcreteType::Unit => "unit".to_string(),
+        ConcreteType::Optional(inner) => format!("{}?", ffi_type_tag(inner)?),
+        ConcreteType::Result(ok, err) => format!("{}!{}", ffi_type_tag(ok)?, ffi_type_tag(err)?),
         // An array of results would read back ambiguously (`A!B[]` already
         // means a result whose err side is an array), so it's rejected; no
         // other element type contains `!`.
-        Type::Array(elem) if matches!(**elem, Type::Result(_, _)) => {
+        ConcreteType::Array(elem) if matches!(**elem, ConcreteType::Result(_, _)) => {
             return Err(Error::msg(
                 "dogfood entry type is an array of results; that can't be tagged unambiguously"
                     .to_string(),
             ))
         }
-        Type::Array(elem) => format!("{}[]", ffi_type_tag(elem)?),
-        Type::Named(n) => n.clone(),
+        ConcreteType::Array(elem) => format!("{}[]", ffi_type_tag(elem)?),
+        ConcreteType::Named(n) => n.clone(),
         _ => {
             return Err(Error::msg(format!(
                 "dogfood entry type {} is not FFI-serializable (only i64/bool/char/str, \
@@ -5271,9 +5274,13 @@ fn ffi_type_tag(t: &Type) -> Result<String, Error> {
 /// check doubles as the visited set, so a (hypothetical) type cycle can't
 /// recurse forever. Used to gather the layouts a set of dogfood entries needs
 /// serialized.
-fn collect_named_types(t: &Type, structs: &HashMap<String, TypeDef>, out: &mut Vec<String>) {
+fn collect_named_types(
+    t: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+    out: &mut Vec<String>,
+) {
     match t {
-        Type::Named(n) if !is_error(t) => {
+        ConcreteType::Named(n) if !is_error(t) => {
             if out.iter().any(|s| s == n) {
                 return;
             }
@@ -5295,47 +5302,47 @@ fn collect_named_types(t: &Type, structs: &HashMap<String, TypeDef>, out: &mut V
                 None => {}
             }
         }
-        Type::Optional(inner) => collect_named_types(inner, structs, out),
-        Type::Result(ok, err) => {
+        ConcreteType::Optional(inner) => collect_named_types(inner, structs, out),
+        ConcreteType::Result(ok, err) => {
             collect_named_types(ok, structs, out);
             collect_named_types(err, structs, out);
         }
-        Type::Array(elem) => collect_named_types(elem, structs, out),
+        ConcreteType::Array(elem) => collect_named_types(elem, structs, out),
         _ => {}
     }
 }
 
-/// Inverse of [`ffi_type_tag`]: parse a manifest type tag back into a `Type`. A
+/// Inverse of [`ffi_type_tag`]: parse a manifest type tag back into a `ConcreteType`. A
 /// trailing `?` is an `Optional` layer over the rest; an unsuffixed tag
 /// containing `!` is a `Result` (`{ok}!{err}`, each side parsed the same way —
 /// `!` can't appear in a bare tag otherwise, since identifiers don't carry it);
 /// then a trailing `[]` is an `Array` layer (after the `!` split, so `A!B[]`
 /// is a result whose err side is an array — arrays of results are never
-/// emitted); a non-keyword tag is a struct/variant type name ([`Type::Named`])
+/// emitted); a non-keyword tag is a struct/variant type name ([`ConcreteType::Named`])
 /// whose layout the `; struct`/`; variant` lines supply.
-fn ffi_type_from_tag(tag: &str) -> Result<Type, Error> {
+fn ffi_type_from_tag(tag: &str) -> Result<ConcreteType, Error> {
     if let Some(base) = tag.strip_suffix('?') {
-        return Ok(Type::Optional(Box::new(ffi_type_from_tag(base)?)));
+        return Ok(ConcreteType::Optional(Box::new(ffi_type_from_tag(base)?)));
     }
     if let Some((ok, err)) = tag.split_once('!') {
-        return Ok(Type::Result(
+        return Ok(ConcreteType::Result(
             Box::new(ffi_type_from_tag(ok)?),
             Box::new(ffi_type_from_tag(err)?),
         ));
     }
     if let Some(base) = tag.strip_suffix("[]") {
-        return Ok(Type::Array(Box::new(ffi_type_from_tag(base)?)));
+        return Ok(ConcreteType::Array(Box::new(ffi_type_from_tag(base)?)));
     }
     if tag == "unit" {
-        return Ok(Type::Unit);
+        return Ok(ConcreteType::Unit);
     }
     // A primitive spelling (`i64`, `u32`, `bool`, `char`, `str`, …) is that
     // primitive; anything else names a struct/variant. A user type can't collide
     // here: in type position the parser already resolves a primitive spelling to
     // the primitive, so a declaration of that name is unreachable as a type.
     Ok(match Primitive::from_name(tag) {
-        Some(p) => Type::Primitive(p),
-        None => Type::Named(tag.to_string()),
+        Some(p) => ConcreteType::Primitive(p),
+        None => ConcreteType::Named(tag.to_string()),
     })
 }
 
@@ -5972,10 +5979,10 @@ impl Compilation {
         let ret_is_str = is_str_repr(&info.return_ty);
         // An optional `T?` (possibly nested) — scalar, `str`, or struct core — is
         // returned through a hidden sret pointer (see the sret path below).
-        let ret_is_opt = matches!(info.return_ty, Type::Optional(_));
+        let ret_is_opt = matches!(info.return_ty, ConcreteType::Optional(_));
         // A `Result<ok, err>` — each side a scalar/`str`/`Unit`/struct — is also
         // sret-returned, same shape as an optional but tagged/sized differently.
-        let ret_is_result = matches!(info.return_ty, Type::Result(_, _));
+        let ret_is_result = matches!(info.return_ty, ConcreteType::Result(_, _));
         // A `struct` returned directly (not under an optional); read back field by
         // field from the sret buffer.
         let ret_struct = ffi_struct_layout(&info.return_ty, &self.structs);
@@ -6107,7 +6114,7 @@ impl Compilation {
 
         // An array is pointer-like (a single `i64` return, not sret): the callee
         // handed us one reference on the block, which `read_ffi_array` releases.
-        if let Type::Array(elem) = &info.return_ty {
+        if let ConcreteType::Array(elem) = &info.return_ty {
             let result = unsafe { read_ffi_array(r, elem, true, &self.structs) };
             return Ok(result);
         }
@@ -6162,19 +6169,23 @@ impl Compilation {
 /// integer width (each already canonicalized into an `i64` register at the ABI),
 /// `bool`, or `char`. A `u64` past `i64::MAX` round-trips by bit pattern, so the
 /// host sees it as a negative [`FfiValue::Int`].
-fn is_ffi_scalar(t: &Type) -> bool {
-    is_int_ty(t) || matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
+fn is_ffi_scalar(t: &ConcreteType) -> bool {
+    is_int_ty(t)
+        || matches!(
+            t,
+            ConcreteType::Primitive(Primitive::Bool | Primitive::Char)
+        )
 }
 
 /// The [`StructLayout`] for `t` if it names a `struct` (not a variant), else
 /// `None` — the gate the FFI uses to decide whether to marshal a value field by
 /// field.
 fn ffi_struct_layout<'a>(
-    t: &Type,
+    t: &ConcreteType,
     structs: &'a HashMap<String, TypeDef>,
 ) -> Option<&'a StructLayout> {
     match t {
-        Type::Named(n) => structs.get(n).and_then(TypeDef::as_struct),
+        ConcreteType::Named(n) => structs.get(n).and_then(TypeDef::as_struct),
         _ => None,
     }
 }
@@ -6182,11 +6193,11 @@ fn ffi_struct_layout<'a>(
 /// The [`VariantLayout`] for `t` if it names a `variant` (not a struct), else
 /// `None` — the FFI's gate for marshaling a variant by tag + payload.
 fn ffi_variant_layout<'a>(
-    t: &Type,
+    t: &ConcreteType,
     structs: &'a HashMap<String, TypeDef>,
 ) -> Option<&'a VariantLayout> {
     match t {
-        Type::Named(n) => structs.get(n).and_then(TypeDef::as_variant),
+        ConcreteType::Named(n) => structs.get(n).and_then(TypeDef::as_variant),
         _ => None,
     }
 }
@@ -6203,7 +6214,7 @@ fn ffi_variant_layout<'a>(
 /// (`call_values` then dispatches on the type's shape.)
 fn check_ffi_return(
     name: &str,
-    ty: &Type,
+    ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Result<(), Error> {
     if is_ffi_scalar(ty) || is_str_repr(ty) || is_unit(ty) {
@@ -6211,17 +6222,17 @@ fn check_ffi_return(
     }
     match ty {
         // Peel optional layers down to the (shared, flattened) core.
-        Type::Optional(inner) => check_ffi_return(name, inner, structs),
+        ConcreteType::Optional(inner) => check_ffi_return(name, inner, structs),
         // Each side independently: same rules as a bare return.
-        Type::Result(ok, err) => {
+        ConcreteType::Result(ok, err) => {
             check_ffi_return(name, ok, structs)?;
             check_ffi_return(name, err, structs)
         }
         // An array marshals if its element type does (recursively). `char[]` —
         // whose element is a scalar — is read specially (str-shaped) but validates
         // the same way.
-        Type::Array(elem) => check_ffi_return(name, elem, structs),
-        Type::Named(_) => {
+        ConcreteType::Array(elem) => check_ffi_return(name, elem, structs),
+        ConcreteType::Named(_) => {
             if let Some(layout) = ffi_struct_layout(ty, structs) {
                 // Each field must itself be marshalable — a field may be a nested
                 // struct/variant/array/optional (stored inline), so recurse.
@@ -6325,7 +6336,7 @@ fn build_borrowed_str(bytes: &[u8]) -> (i64, Option<(*mut u8, usize)>) {
 // FFI argument writers.
 //
 // The mirror of the return-value readers below: given a host [`FfiValue`] and
-// the parameter's declared `Type`, produce the value the callee expects, in the
+// the parameter's declared `ConcreteType`, produce the value the callee expects, in the
 // callee's own representation. The rule matches `check_ffi_return`'s, so an
 // argument can be any shape a return value can be.
 //
@@ -6434,7 +6445,7 @@ impl Drop for ArgBufs {
 /// The `Err` describes the mismatch without naming the function or parameter
 /// index; [`Compilation::call_values`] prefixes those.
 fn ffi_arg_abi(
-    ty: &Type,
+    ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
@@ -6453,7 +6464,7 @@ fn ffi_arg_abi(
 /// scalar, a `str`, or an array — is represented by. Composites don't come here;
 /// see [`ffi_arg_abi`].
 fn ffi_arg_word(
-    ty: &Type,
+    ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
@@ -6462,7 +6473,7 @@ fn ffi_arg_word(
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
         FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
         FfiValue::Array(elems) => match ty {
-            Type::Array(elem) => build_borrowed_array(elem, elems, structs, bufs),
+            ConcreteType::Array(elem) => build_borrowed_array(elem, elems, structs, bufs),
             _ => Err(mismatch(ty, v)),
         },
         _ => Err(mismatch(ty, v)),
@@ -6471,7 +6482,7 @@ fn ffi_arg_word(
 
 /// The error for an [`FfiValue`] that doesn't match the parameter type it was
 /// passed for — naming both sides, since the pairing is the whole mistake.
-fn mismatch(ty: &Type, v: &FfiValue) -> String {
+fn mismatch(ty: &ConcreteType, v: &FfiValue) -> String {
     format!(
         "is {} but was given an FfiValue::{}; pass the matching variant (Int for \
          i64/bool/char, Str for str, Array for an array, Struct for a struct, Variant for a \
@@ -6504,12 +6515,12 @@ fn ffi_value_kind(v: &FfiValue) -> &'static str {
 /// than using a block (see [`is_char_array`]), so it's built as packed bytes;
 /// `bool[]` is bit-packed, one bit per element.
 fn build_borrowed_array(
-    elem: &Type,
+    elem: &ConcreteType,
     elems: &[FfiValue],
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
 ) -> Result<i64, String> {
-    if matches!(elem, Type::Primitive(Primitive::Char)) {
+    if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
         let mut s = String::with_capacity(elems.len());
         for e in elems {
             match e {
@@ -6563,7 +6574,7 @@ fn build_borrowed_array(
 /// written here, but the callee may still copy it around).
 unsafe fn write_ffi_arg(
     dst: *mut u8,
-    ty: &Type,
+    ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
@@ -6623,13 +6634,13 @@ unsafe fn write_ffi_arg(
         }
         return Ok(());
     }
-    if matches!(ty, Type::Optional(_)) {
+    if matches!(ty, ConcreteType::Optional(_)) {
         // Flattened `{ i64 tag, core }`: the tag counts the `some` layers (`0` =
         // `none`) and every layer shares the one core slot, so peel `Opt`s and
         // `Optional`s together and write the depth reached. See
         // `read_ffi_optional_tag`, which reconstructs the nesting from it.
         let (mut cur_ty, mut cur_v, mut depth) = (ty, v, 0i64);
-        while let Type::Optional(inner) = cur_ty {
+        while let ConcreteType::Optional(inner) = cur_ty {
             let FfiValue::Opt(o) = cur_v else {
                 return Err(mismatch(cur_ty, cur_v));
             };
@@ -6657,7 +6668,7 @@ unsafe fn write_ffi_arg(
             );
         }
     }
-    if let Type::Result(ok, err) = ty {
+    if let ConcreteType::Result(ok, err) = ty {
         // `{ i64 tag, value }` like an optional, but the tag is `1` = Ok / `0` =
         // Err and the slot is sized to the wider side. A `Unit` side (`!Error`'s
         // ok case) has no value to write — the zeroed slot stands in for it.
@@ -6721,7 +6732,7 @@ unsafe fn read_ffi_str_value(raw: i64, owned: bool) -> String {
 /// cores (see [`read_ffi_core`]).
 unsafe fn read_ffi_borrowed(
     at: *const u8,
-    ty: &Type,
+    ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
@@ -6732,9 +6743,13 @@ unsafe fn read_ffi_borrowed(
         return unsafe { read_ffi_variant(at, layout, owned, structs) };
     }
     match ty {
-        Type::Optional(_) => unsafe { read_ffi_optional(at as *const i64, ty, owned, structs) },
-        Type::Result(_, _) => unsafe { read_ffi_result(at as *const i64, ty, owned, structs) },
-        Type::Array(elem) => {
+        ConcreteType::Optional(_) => unsafe {
+            read_ffi_optional(at as *const i64, ty, owned, structs)
+        },
+        ConcreteType::Result(_, _) => unsafe {
+            read_ffi_result(at as *const i64, ty, owned, structs)
+        },
+        ConcreteType::Array(elem) => {
             // The 8-byte word is the array value (a tagged block pointer, or — for
             // `char[]`, which shares `str`'s representation — an inline/heap `str`).
             let raw = unsafe { *(at as *const i64) };
@@ -6760,12 +6775,12 @@ unsafe fn read_ffi_borrowed(
 /// carrying one reference when `owned`.
 unsafe fn read_ffi_array(
     raw: i64,
-    elem: &Type,
+    elem: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     // `char[]` is str-shaped: decode the packed bytes to codepoints.
-    if matches!(elem, Type::Primitive(Primitive::Char)) {
+    if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
         let chars = unsafe { read_ffi_str_value(raw, owned) }
             .chars()
             .map(|c| FfiValue::Int(c as i64))
@@ -6808,7 +6823,7 @@ unsafe fn read_ffi_array(
 /// optional whose core is a marshalable type.
 unsafe fn read_ffi_optional(
     buf: *const i64,
-    ty: &Type,
+    ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
@@ -6825,12 +6840,12 @@ unsafe fn read_ffi_optional(
 /// filled, with `ok`/`err` each a marshalable type or `Unit`.
 unsafe fn read_ffi_result(
     buf: *const i64,
-    ty: &Type,
+    ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let (ok_ty, err_ty) = match ty {
-        Type::Result(ok, err) => (ok.as_ref(), err.as_ref()),
+        ConcreteType::Result(ok, err) => (ok.as_ref(), err.as_ref()),
         _ => unreachable!("read_ffi_result on a non-result type"),
     };
     let tag = unsafe { *buf };
@@ -6851,19 +6866,19 @@ unsafe fn read_ffi_result(
 /// `none` (tag `0`) or the non-optional core.
 unsafe fn read_ffi_optional_tag(
     buf: *const i64,
-    ty: &Type,
+    ty: &ConcreteType,
     tag: i64,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let inner = match ty {
-        Type::Optional(inner) => inner.as_ref(),
+        ConcreteType::Optional(inner) => inner.as_ref(),
         _ => unreachable!("read_ffi_optional_tag on a non-optional type"),
     };
     if tag == 0 {
         return FfiValue::Opt(None);
     }
-    let value = if matches!(inner, Type::Optional(_)) {
+    let value = if matches!(inner, ConcreteType::Optional(_)) {
         unsafe { read_ffi_optional_tag(buf, inner, tag - 1, owned, structs) }
     } else {
         unsafe { read_ffi_core(buf, inner, owned, structs) }
@@ -6876,7 +6891,7 @@ unsafe fn read_ffi_optional_tag(
 /// [`read_ffi_borrowed`] at byte offset 8.
 unsafe fn read_ffi_core(
     buf: *const i64,
-    ty: &Type,
+    ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
@@ -6957,8 +6972,8 @@ pub const BINARY_USER_MAIN: &str = "__aipl_user_main";
 pub const MAIN_WANTS_ARGS_SYMBOL: &str = "__aipl_main_wants_args";
 
 /// The type of `main`'s CLI-arguments parameter: `str[]`.
-fn cli_args_ty() -> Type {
-    Type::Array(Box::new(Type::Primitive(Primitive::Str)))
+fn cli_args_ty() -> ConcreteType {
+    ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)))
 }
 
 /// The type of the *injected* CLI-arguments parameter — the one added to a
@@ -6971,8 +6986,8 @@ fn cli_args_ty() -> Type {
 /// never given, emitting one `aipl_array_dec(null)` per program run. An
 /// ignored pointer-sized word lowers to the same ABI and owns nothing, so no
 /// drop is registered and no call is emitted.
-fn injected_cli_args_ty() -> Type {
-    Type::Primitive(Primitive::I64)
+fn injected_cli_args_ty() -> ConcreteType {
+    ConcreteType::Primitive(Primitive::I64)
 }
 
 /// Fill `sig`'s params and returns for `f`'s ABI: a hidden sret pointer when
@@ -6992,7 +7007,7 @@ fn build_signature(
     if tail {
         sig.call_conv = CallConv::Tail;
     }
-    let abi = f.abi_return_type().widen();
+    let abi = f.abi_return_type();
     // Composites — structs and optionals (possibly nested) — are returned
     // through a hidden caller-provided pointer (sret), uniformly.
     let returns_composite = sret_size(&abi, structs).is_some();
@@ -7000,7 +7015,7 @@ fn build_signature(
         sig.params.push(AbiParam::new(types::I64));
     }
     for p in &f.params {
-        sig.params.push(AbiParam::new(cl_type_of(&p.ty.widen())));
+        sig.params.push(AbiParam::new(cl_type_of(&p.ty)));
     }
     if is_unit(&abi) || returns_composite {
         // Unit yields no result; a composite is written through the sret pointer.
@@ -7123,7 +7138,7 @@ fn tail_callees(body: &Expr) -> Vec<String> {
 /// callee can hold a reference of its own (`str`/array/set directly, a boxed
 /// value via `tail_owned`). A dict — refcounted but neither — is left out
 /// rather than reasoned about.
-fn tail_safe_param(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+fn tail_safe_param(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     !is_composite(ty, structs) && (!needs_drop(ty, structs) || is_heap(ty) || is_boxed(ty, structs))
 }
 
@@ -7139,10 +7154,8 @@ fn tail_safe_param(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
 fn tail_eligible(f: &aipl_mono::ConcreteFn, structs: &HashMap<String, TypeDef>) -> bool {
     f.name != "main"
         && !f.is_mutating()
-        && sret_size(&f.abi_return_type().widen(), structs).is_none()
-        && f.params
-            .iter()
-            .all(|p| tail_safe_param(&p.ty.widen(), structs))
+        && sret_size(&f.abi_return_type(), structs).is_none()
+        && f.params.iter().all(|p| tail_safe_param(&p.ty, structs))
 }
 
 /// The functions that get `CallConv::Tail` (and so a `$tail` body plus an
@@ -7166,14 +7179,14 @@ fn tail_call_plan(
         if !eligible[f.name.as_str()] {
             continue;
         }
-        let caller_unit = is_unit(&f.abi_return_type().widen());
+        let caller_unit = is_unit(&f.abi_return_type());
         for callee in tail_callees(&f.body) {
             // A name with no instance is a builtin or a codegen intrinsic; both
             // are reached through paths that never become a tail call.
             let Some(g) = by_name.get(callee.as_str()) else {
                 continue;
             };
-            if !eligible[callee.as_str()] || is_unit(&g.abi_return_type().widen()) != caller_unit {
+            if !eligible[callee.as_str()] || is_unit(&g.abi_return_type()) != caller_unit {
                 continue;
             }
             plan.insert(f.name.clone());
@@ -7184,7 +7197,7 @@ fn tail_call_plan(
 }
 
 /// The declared type of an environment binding.
-fn env_binding_type(b: &EnvBinding) -> Type {
+fn env_binding_type(b: &EnvBinding) -> ConcreteType {
     match b {
         EnvBinding::Immut(_, t) => t.clone(),
         EnvBinding::Mut(_, t, _) => t.borrow().clone(),
@@ -7197,8 +7210,8 @@ fn env_binding_type(b: &EnvBinding) -> Type {
 /// sret pointer, and every parameter (and the scalar result) is an i64.
 fn fn_value_signature<M: Module>(
     module: &M,
-    ptys: &[Type],
-    ret: &Type,
+    ptys: &[ConcreteType],
+    ret: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Signature {
     let mut sig = module.make_signature();
@@ -7242,12 +7255,12 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
         match f.sig.params.as_slice() {
             [] => f.sig.params.push(Param {
                 name: "__cli_args".to_string(),
-                ty: injected_cli_args_ty(),
+                ty: injected_cli_args_ty().widen(),
                 mutable: false,
                 variadic: false,
                 default: None,
             }),
-            [p] if p.ty == cli_args_ty() => wants_args = true,
+            [p] if p.ty == cli_args_ty().widen() => wants_args = true,
             _ => {
                 return Err(Error::msg(
                     "\"main\" must take either no parameters or a single \"str[]\" (the CLI arguments)"
@@ -7469,11 +7482,11 @@ fn build_struct_layouts(
 /// runtime). That distinction is what this answers, so it is the walk
 /// `contains_scc_ref` wants — for "does this type reach that one at all",
 /// which is what boxing is decided from, see `referenced_named_types`.
-fn contained_named_types<'a>(ty: &'a Type, out: &mut Vec<&'a str>) {
+fn contained_named_types<'a>(ty: &'a ConcreteType, out: &mut Vec<&'a str>) {
     match ty {
-        Type::Named(n) => out.push(n),
-        Type::Optional(inner) => contained_named_types(inner, out),
-        Type::Result(ok, err) => {
+        ConcreteType::Named(n) => out.push(n),
+        ConcreteType::Optional(inner) => contained_named_types(inner, out),
+        ConcreteType::Result(ok, err) => {
             contained_named_types(ok, out);
             contained_named_types(err, out);
         }
@@ -7678,42 +7691,42 @@ fn build_struct_layout(
         // unless it's boxed, in which case the field is an 8-byte pointer and
         // needs no size), or an optional of a scalar/str/array (a 16-byte
         // inline `{tag, value}` composite).
-        match &f.ty.widen() {
+        match &f.ty {
             // Every scalar: any integer width, `bool`, `char`, `str`.
-            _ if is_set_elem(&f.ty.widen()) => {}
-            Type::Named(n) if decls.contains_key(n.as_str()) => {
+            _ if is_set_elem(&f.ty) => {}
+            ConcreteType::Named(n) if decls.contains_key(n.as_str()) => {
                 if !rec.contains_key(n.as_str()) {
                     resolve_type_layout(n, decls, layouts, on_stack, rec)?;
                 }
             }
-            Type::Array(_) => {}
+            ConcreteType::Array(_) => {}
             // A function value is stored as its 8-byte code address (an i64);
             // it owns nothing, so like a scalar it needs no drop.
-            Type::Fn(_, _) => {}
+            ConcreteType::Fn(_, _) => {}
             // An optional of a scalar/str/array, or of a *boxed* (recursive)
             // type — the latter is an 8-byte pointer core, so `Tree?` is a
             // 16-byte `{tag, ptr}` inline composite (this is how a recursive
             // struct spells "maybe a child": `left: Tree?`).
-            Type::Optional(inner)
+            ConcreteType::Optional(inner)
                 if is_set_elem(inner)
-                    || matches!(inner.as_ref(), Type::Array(_))
-                    || matches!(inner.as_ref(), Type::Named(n) if rec.contains_key(n.as_str())) => {
-            }
+                    || matches!(inner.as_ref(), ConcreteType::Array(_))
+                    || matches!(inner.as_ref(), ConcreteType::Named(n) if rec.contains_key(n.as_str())) =>
+                {}
             _ => {
                 return Err(Error::msg(format!(
                     "struct {}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
                     decl.name,
                     f.name,
-                    type_name(&f.ty.widen()),
+                    type_name(&f.ty),
                 )));
             }
         }
         // The nested struct/variant (if any) is now resolved, so its size is
         // in `layouts`.
-        let size = field_size(&f.ty.widen(), layouts);
+        let size = field_size(&f.ty, layouts);
         fields.push(FieldLayout {
             name: f.name.clone(),
-            ty: f.ty.widen(),
+            ty: f.ty.clone(),
             offset,
         });
         // Advance to the next field
@@ -7748,14 +7761,14 @@ fn build_variant_layout(
             // so its size is known — unless boxed, in which case the field is
             // an 8-byte pointer; that's how a recursive sum type like a list
             // gets its indirection).
-            let ty = &ty.widen();
+            let ty = ty;
             let ok = match ty {
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
-                Type::Array(_) | Type::Optional(_) => true,
+                ConcreteType::Array(_) | ConcreteType::Optional(_) => true,
                 // A function value is an 8-byte code address, stored inline like
                 // a scalar; it owns no heap, so it needs no drop.
-                Type::Fn(_, _) => true,
-                Type::Named(n) if decls.contains_key(n.as_str()) => {
+                ConcreteType::Fn(_, _) => true,
+                ConcreteType::Named(n) if decls.contains_key(n.as_str()) => {
                     if !rec.contains_key(n.as_str()) {
                         resolve_type_layout(n, decls, layouts, on_stack, rec)?;
                     }
@@ -7794,7 +7807,7 @@ fn build_variant_layout(
     })
 }
 
-fn cl_type_of(_t: &Type) -> types::Type {
+fn cl_type_of(_t: &ConcreteType) -> types::Type {
     types::I64
 }
 
@@ -8071,8 +8084,8 @@ fn register_builtins(
         funcs: &mut HashMap<String, FuncInfo>,
         name: &str,
         sym: &'static str,
-        params: Vec<Type>,
-        return_ty: Type,
+        params: Vec<ConcreteType>,
+        return_ty: ConcreteType,
         effects: &[&str],
     ) {
         funcs.insert(
@@ -8126,8 +8139,17 @@ fn register_builtins(
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
-        let params: Vec<Type> = f.sig.param_types();
-        let return_ty = f.sig.return_type();
+        // Every `SIG_REGS` entry names a builtin with a direct runtime symbol,
+        // and those are monomorphic — a generic builtin (`map`, `filter`) is
+        // resolved at its call site and never registered here. So the signature
+        // is concrete, and the `expect` states that rather than assuming it.
+        let concretize = |t: &aipl_syntax::ast::Type| {
+            t.to_concrete().unwrap_or_else(|| {
+                panic!("builtin {name:?} has a generic signature but a direct runtime symbol")
+            })
+        };
+        let params: Vec<ConcreteType> = f.sig.param_types().iter().map(concretize).collect();
+        let return_ty = concretize(&f.sig.return_type());
         let effects: Vec<&str> = f.sig.effects.iter().map(String::as_str).collect();
         reg(funcs, name, sym, params, return_ty, &effects);
     }
@@ -8138,10 +8160,10 @@ fn register_builtins(
         "__aipl_concat",
         "aipl_concat",
         vec![
-            Type::Primitive(Primitive::Str),
-            Type::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
         ],
-        Type::Primitive(Primitive::Str),
+        ConcreteType::Primitive(Primitive::Str),
         &[],
     );
     reg(
@@ -8149,10 +8171,10 @@ fn register_builtins(
         "__aipl_concat_lazy",
         "aipl_concat_lazy",
         vec![
-            Type::Primitive(Primitive::Str),
-            Type::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
         ],
-        Type::Primitive(Primitive::Str),
+        ConcreteType::Primitive(Primitive::Str),
         &[],
     );
     reg(
@@ -8160,18 +8182,18 @@ fn register_builtins(
         "__aipl_concat_mut",
         "aipl_concat_mut",
         vec![
-            Type::Primitive(Primitive::Str),
-            Type::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
+            ConcreteType::Primitive(Primitive::Str),
         ],
-        Type::Primitive(Primitive::Str),
+        ConcreteType::Primitive(Primitive::Str),
         &[],
     );
     reg(
         funcs,
         "__aipl_trim_mut",
         "aipl_trim_mut",
-        vec![Type::Primitive(Primitive::Str)],
-        Type::Primitive(Primitive::Str),
+        vec![ConcreteType::Primitive(Primitive::Str)],
+        ConcreteType::Primitive(Primitive::Str),
         &[],
     );
     Builtins {
@@ -8190,11 +8212,11 @@ fn register_builtins(
 /// add bindings), so the refinement is visible to later statements.
 #[derive(Clone)]
 enum EnvBinding {
-    Immut(Value, Type),
+    Immut(Value, ConcreteType),
     /// A mutable binding in a stack slot. The `bool` is the *exclusive* flag:
     /// set when static analysis proved the binding's array is never aliased, so
     /// `push` may mutate it in place. Always false for non-array bindings.
-    Mut(StackSlot, Rc<RefCell<Type>>, bool),
+    Mut(StackSlot, Rc<RefCell<ConcreteType>>, bool),
 }
 
 type Env = HashMap<String, EnvBinding>;
@@ -8207,7 +8229,7 @@ fn env_load(
     name: &str,
     env: &Env,
     span: Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let binding = env
         .get(name)
         .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
@@ -8226,7 +8248,7 @@ fn env_load(
 /// with any concrete element in either direction — recursively through matching
 /// optional/array layers, so e.g. `some(some(none))` (`__none__???`) fits
 /// `i64???` and `[[]]` fits `i64[][]`.
-fn coercible(actual: &Type, expected: &Type) -> bool {
+fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
     if actual == expected || is_none_inner(actual) || is_none_inner(expected) {
         return true;
     }
@@ -8240,11 +8262,15 @@ fn coercible(actual: &Type, expected: &Type) -> bool {
         return true;
     }
     match (actual, expected) {
-        (Type::Optional(a), Type::Optional(b)) => coercible(a, b),
-        (Type::Array(a), Type::Array(b)) => coercible(a, b),
-        (Type::Set(a), Type::Set(b)) => coercible(a, b),
-        (Type::Dict(ak, av), Type::Dict(bk, bv)) => coercible(ak, bk) && coercible(av, bv),
-        (Type::Result(ao, ae), Type::Result(bo, be)) => coercible(ao, bo) && coercible(ae, be),
+        (ConcreteType::Optional(a), ConcreteType::Optional(b)) => coercible(a, b),
+        (ConcreteType::Array(a), ConcreteType::Array(b)) => coercible(a, b),
+        (ConcreteType::Set(a), ConcreteType::Set(b)) => coercible(a, b),
+        (ConcreteType::Dict(ak, av), ConcreteType::Dict(bk, bv)) => {
+            coercible(ak, bk) && coercible(av, bv)
+        }
+        (ConcreteType::Result(ao, ae), ConcreteType::Result(bo, be)) => {
+            coercible(ao, bo) && coercible(ae, be)
+        }
         _ => false,
     }
 }
@@ -8253,7 +8279,7 @@ fn coercible(actual: &Type, expected: &Type) -> bool {
 /// type both coerce to, or `None` if they're incompatible. A `__none__` element
 /// on either side takes the other's, recursively through matching layers (the
 /// type-level counterpart of `coercible`).
-fn merge_types(a: &Type, b: &Type) -> Option<Type> {
+fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
     if a == b || is_none_inner(b) {
         return Some(a.clone());
     }
@@ -8261,30 +8287,34 @@ fn merge_types(a: &Type, b: &Type) -> Option<Type> {
         return Some(b.clone());
     }
     // `Error` and `str` share a representation; their common type is a plain str.
-    if (is_error(a) && *b == Type::Primitive(Primitive::Str))
-        || (*a == Type::Primitive(Primitive::Str) && is_error(b))
+    if (is_error(a) && *b == ConcreteType::Primitive(Primitive::Str))
+        || (*a == ConcreteType::Primitive(Primitive::Str) && is_error(b))
     {
-        return Some(Type::Primitive(Primitive::Str));
+        return Some(ConcreteType::Primitive(Primitive::Str));
     }
     // `char[]` and `str` share a representation too (see `is_char_array`);
     // their common type is a plain str (`emit_eq` dispatches identically for
     // either — see `is_str_shaped` — so the choice is just a label).
-    if (is_char_array(a) && *b == Type::Primitive(Primitive::Str))
-        || (*a == Type::Primitive(Primitive::Str) && is_char_array(b))
+    if (is_char_array(a) && *b == ConcreteType::Primitive(Primitive::Str))
+        || (*a == ConcreteType::Primitive(Primitive::Str) && is_char_array(b))
     {
-        return Some(Type::Primitive(Primitive::Str));
+        return Some(ConcreteType::Primitive(Primitive::Str));
     }
     match (a, b) {
-        (Type::Optional(x), Type::Optional(y)) => {
-            Some(Type::Optional(Box::new(merge_types(x, y)?)))
+        (ConcreteType::Optional(x), ConcreteType::Optional(y)) => {
+            Some(ConcreteType::Optional(Box::new(merge_types(x, y)?)))
         }
-        (Type::Array(x), Type::Array(y)) => Some(Type::Array(Box::new(merge_types(x, y)?))),
-        (Type::Set(x), Type::Set(y)) => Some(Type::Set(Box::new(merge_types(x, y)?))),
-        (Type::Dict(xk, xv), Type::Dict(yk, yv)) => Some(Type::Dict(
+        (ConcreteType::Array(x), ConcreteType::Array(y)) => {
+            Some(ConcreteType::Array(Box::new(merge_types(x, y)?)))
+        }
+        (ConcreteType::Set(x), ConcreteType::Set(y)) => {
+            Some(ConcreteType::Set(Box::new(merge_types(x, y)?)))
+        }
+        (ConcreteType::Dict(xk, xv), ConcreteType::Dict(yk, yv)) => Some(ConcreteType::Dict(
             Box::new(merge_types(xk, yk)?),
             Box::new(merge_types(xv, yv)?),
         )),
-        (Type::Result(xo, xe), Type::Result(yo, ye)) => Some(Type::Result(
+        (ConcreteType::Result(xo, xe), ConcreteType::Result(yo, ye)) => Some(ConcreteType::Result(
             Box::new(merge_types(xo, yo)?),
             Box::new(merge_types(xe, ye)?),
         )),
@@ -8292,7 +8322,12 @@ fn merge_types(a: &Type, b: &Type) -> Option<Type> {
     }
 }
 
-fn expect_type(actual: &Type, expected: &Type, context: &str, span: Span) -> Result<(), Error> {
+fn expect_type(
+    actual: &ConcreteType,
+    expected: &ConcreteType,
+    context: &str,
+    span: Span,
+) -> Result<(), Error> {
     if coercible(actual, expected) {
         return Ok(());
     }
@@ -8313,14 +8348,19 @@ fn expect_type(actual: &Type, expected: &Type, context: &str, span: Span) -> Res
 /// every `xs[xs.len() - 1]` or every `xs[i]`. Both occupy the same 64-bit
 /// register and bounds are clamped to `[0, len]` either way, so a negative
 /// `i64` and an out-of-range `u64` already behave identically.
-fn expect_len_operand(actual: &Type, context: &str, span: Span) -> Result<(), Error> {
+fn expect_len_operand(actual: &ConcreteType, context: &str, span: Span) -> Result<(), Error> {
     if matches!(
         actual,
-        Type::Primitive(Primitive::I64) | Type::Primitive(Primitive::U64)
+        ConcreteType::Primitive(Primitive::I64) | ConcreteType::Primitive(Primitive::U64)
     ) {
         return Ok(());
     }
-    expect_type(actual, &Type::Primitive(Primitive::I64), context, span)
+    expect_type(
+        actual,
+        &ConcreteType::Primitive(Primitive::I64),
+        context,
+        span,
+    )
 }
 
 /// The type a `let`/`mut` binding takes, given its initializer's compiled type
@@ -8335,21 +8375,21 @@ fn binding_ty(
     builder: &mut FunctionBuilder,
     value: &Expr,
     v: Value,
-    actual: &Type,
-    declared: Option<&Type>,
+    actual: &ConcreteType,
+    declared: Option<&ConcreteType>,
     name: &str,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let Some(declared) = declared else {
         return Ok((v, actual.clone()));
     };
-    let actual = aipl_syntax::flex_int_ty(value, actual, declared);
+    let actual = flex_int_ty(value, actual, declared);
     // Widths that genuinely differ: the annotation *converts*, which is what
     // replaced the `u8(..)` form — re-canonicalize the i64-register value to the
     // declared width (wrapping for a narrowing, extending for a widening),
     // exactly as the old conversion builtin did. Skipped when flexing already
     // settled the type, so a literal initializer emits no extra instructions.
     if actual != *declared {
-        if let (Type::Primitive(pa), Type::Primitive(pd)) = (&actual, declared) {
+        if let (ConcreteType::Primitive(pa), ConcreteType::Primitive(pd)) = (&actual, declared) {
             if pa.is_int() && pd.is_int() {
                 return Ok((canon_int(builder, v, *pd), declared.clone()));
             }
@@ -8368,7 +8408,7 @@ fn binding_ty(
 /// nothing) to a name. Such a value can't be stored or used; the call
 /// belongs in statement position instead (`print(x);`, not
 /// `let _ = print(x);`).
-fn reject_unit_binding(ty: &Type, name: &str, span: Span) -> Result<(), Error> {
+fn reject_unit_binding(ty: &ConcreteType, name: &str, span: Span) -> Result<(), Error> {
     if is_unit(ty) {
         return Err(Error::at(
             format!(
@@ -8480,7 +8520,7 @@ fn define_fn<M: Module>(
     // (what the signature emits) may differ for entry-style functions — a unit
     // `main` yields its i64 exit code, a mutating method its final `self`.
     let declared_ret = func.return_type();
-    let abi_ret = func.abi_return_type().widen();
+    let abi_ret = func.abi_return_type();
     let ret_composite = sret_size(&abi_ret, structs).is_some();
     let mutating = func.is_mutating();
     let unit_main = func.is_unit_main();
@@ -8526,7 +8566,7 @@ fn define_fn<M: Module>(
                 builder.ins().stack_store(types::I64, *v, slot, 0);
                 env.insert(
                     p.name.clone(),
-                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.widen())), false),
+                    EnvBinding::Mut(slot, Rc::new(RefCell::new(p.ty.clone())), false),
                 );
                 bindings
                     .borrow_mut()
@@ -8537,12 +8577,12 @@ fn define_fn<M: Module>(
                 // that replaces it inside a loop body stays owned across
                 // iterations; the entry value-track below still keeps the entry
                 // version alive to fn exit for borrows.
-                if mut_binding_owns_slot_ref(&p.ty.widen(), structs) {
-                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty.widen());
-                    scopes[0].push(Tracked::slot(slot, &p.ty.widen()));
+                if mut_binding_owns_slot_ref(&p.ty, structs) {
+                    emit_retain(&mut builder, module, builtins, structs, *v, &p.ty);
+                    scopes[0].push(Tracked::slot(slot, &p.ty));
                 }
             } else {
-                env.insert(p.name.clone(), EnvBinding::Immut(*v, p.ty.widen()));
+                env.insert(p.name.clone(), EnvBinding::Immut(*v, p.ty.clone()));
                 bindings
                     .borrow_mut()
                     .push((p.name.clone(), format!("v{}", v.as_u32())));
@@ -8559,10 +8599,10 @@ fn define_fn<M: Module>(
             // back to the plain heap-parameter rule.
             let retained = match call_params.get(idx) {
                 Some(cp) => cp.retained(),
-                None => is_heap(&p.ty.widen()) && !p.owned,
+                None => is_heap(&p.ty) && !p.owned,
             };
             if retained {
-                scopes[0].push(Tracked::new(*v, &p.ty.widen()));
+                scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
 
@@ -8595,8 +8635,7 @@ fn define_fn<M: Module>(
         // an error. For a normal fn this also guards struct returns: the sret
         // copy below uses the declared layout.
         // A bare-literal body flexes to a narrow-int return type.
-        let declared_ret = declared_ret.widen();
-        let body_ty = aipl_syntax::flex_int_ty(&func.body, &body_ty, &declared_ret);
+        let body_ty = flex_int_ty(&func.body, &body_ty, &declared_ret);
         expect_type(
             &body_ty,
             &declared_ret,
@@ -9128,17 +9167,17 @@ enum Owned {
 #[derive(Clone)]
 struct Tracked {
     owned: Owned,
-    ty: Type,
+    ty: ConcreteType,
 }
 
 impl Tracked {
-    fn new(val: Value, ty: &Type) -> Self {
+    fn new(val: Value, ty: &ConcreteType) -> Self {
         Tracked {
             owned: Owned::Value(val),
             ty: ty.clone(),
         }
     }
-    fn slot(slot: StackSlot, ty: &Type) -> Self {
+    fn slot(slot: StackSlot, ty: &ConcreteType) -> Self {
         Tracked {
             owned: Owned::Slot(slot),
             ty: ty.clone(),
@@ -9225,7 +9264,7 @@ fn hand_off_arg<M: Module>(
     structs: &HashMap<String, TypeDef>,
     scopes: &mut [Vec<Tracked>],
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     moved: bool,
 ) {
     if moved {
@@ -9247,12 +9286,8 @@ fn hand_off_arg<M: Module>(
 /// Whether a value of type `ty` owns any heap references that must be released
 /// when it dies. Strings and arrays are heap; a struct/optional needs a drop
 /// iff a component does.
-fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     match ty {
-        // Monomorphization substitutes every type variable away, so codegen
-        // cannot be handed one: reaching here means a generic instance escaped
-        // instantiation, which is a compiler bug rather than a program error.
-        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
@@ -9261,10 +9296,10 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
         // bare `none` optional's payload is garbage), so this reaches codegen
         // (e.g. picking an empty array literal's element drop-fn) but is
         // always vacuously drop-free.
-        Type::Primitive(_) | Type::Unit | Type::NoneInner => false,
+        ConcreteType::Primitive(_) | ConcreteType::Unit | ConcreteType::NoneInner => false,
         // Already handled by the `is_str_repr` guard above.
-        Type::ConcatStr => unreachable!(),
-        Type::Named(n) => match structs.get(n) {
+        ConcreteType::ConcatStr => unreachable!(),
+        ConcreteType::Named(n) => match structs.get(n) {
             // A boxed (recursive) value owns its heap block, so it always
             // drops — and answering without recursing into the fields is what
             // keeps this terminating on a recursive type.
@@ -9277,21 +9312,19 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
                 .any(|c| c.fields.iter().any(|f| needs_drop(&f.ty, structs))),
             None => false,
         },
-        Type::Array(_) | Type::Set(_) | Type::Dict(_, _) => true,
-        Type::Optional(inner) => needs_drop(inner, structs),
+        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => true,
+        ConcreteType::Optional(inner) => needs_drop(inner, structs),
         // A result needs cleanup if either payload does (only the active one is
         // released, dispatched on the tag — see `emit_rc`).
-        Type::Result(ok, err) => needs_drop(ok, structs) || needs_drop(err, structs),
+        ConcreteType::Result(ok, err) => needs_drop(ok, structs) || needs_drop(err, structs),
         // Function types are erased by monomorphization; never a runtime value.
-        Type::Fn(_, _) => false,
+        ConcreteType::Fn(_, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
-        Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
         // Generic applications are lowered to Named by lower_generics before codegen.
-        Type::Generic(..) => unreachable!("Type::Generic must be lowered before codegen"),
         // `Any`/`EmptyArrayArg`/`NoneLiteralArg` are resolved away by
         // monomorphization (the latter two collapse to `Array`/`Optional` of
         // `NoneInner` — see `subst_vars`) — codegen never sees them directly.
-        Type::Any | Type::EmptyArrayArg | Type::NoneLiteralArg => {
+        ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
             unreachable!("compiler pseudo-type reached codegen")
         }
     }
@@ -9303,23 +9336,23 @@ fn needs_drop(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
 /// an 8-byte heap pointer, stored and copied like an array's — though since
 /// that pointer addresses the type's usual payload layout, every layout read
 /// (fields, tag, equality, rendering) is shared with the inline path.
-fn is_composite(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, Type::Optional(_) | Type::Result(_, _))
-        || matches!(ty, Type::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
+fn is_composite(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
+        || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
 }
 
 /// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
 /// pointers to a refcounted heap payload. See the "Recursive (boxed) type
 /// runtime" section.
-fn is_boxed(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, Type::Named(n) if structs.get(n).is_some_and(TypeDef::boxed))
+fn is_boxed(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(TypeDef::boxed))
 }
 
 /// Whether `ty` *contains* (directly or through optional/result layers, which
 /// store their core inline) a reference to a boxed type of recursion group
 /// `scc` — i.e. whether storing a value of `ty` into a boxed value of that
 /// group creates an internal (weak-counted) reference.
-fn contains_scc_ref(ty: &Type, scc: u32, structs: &HashMap<String, TypeDef>) -> bool {
+fn contains_scc_ref(ty: &ConcreteType, scc: u32, structs: &HashMap<String, TypeDef>) -> bool {
     let mut refs = Vec::new();
     contained_named_types(ty, &mut refs);
     refs.iter()
@@ -9332,7 +9365,7 @@ fn component(
     builder: &mut FunctionBuilder,
     base: Value,
     offset: u32,
-    ty: &Type,
+    ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
     if is_composite(ty, structs) {
@@ -9351,7 +9384,7 @@ fn store_array_elem(
     builder: &mut FunctionBuilder,
     slot: Value,
     v: Value,
-    src_ty: &Type,
+    src_ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) {
     if is_composite(src_ty, structs) {
@@ -9373,13 +9406,13 @@ fn emit_build_some(
     builder: &mut FunctionBuilder,
     slot: Value,
     x_val: Value,
-    x_ty: &Type,
+    x_ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) {
     let core = opt_core(x_ty);
     let (tag, core_val) = match x_ty {
         // Wrapping an optional: bump its tag, reuse its core value (at offset 8).
-        Type::Optional(_) => {
+        ConcreteType::Optional(_) => {
             let inner_tag = builder
                 .ins()
                 .load(types::I64, MemFlagsData::trusted(), x_val, 0);
@@ -9409,20 +9442,20 @@ fn emit_build_some(
 /// Whether an array of element type `elem` is bit-packed (only plain `bool`).
 /// A `bool?`, `bool[]`, or struct-with-`bool` element is *not* — packing is for
 /// the bare `bool` element alone.
-fn is_bit_packed(elem: &Type) -> bool {
-    matches!(elem, Type::Primitive(Primitive::Bool))
+fn is_bit_packed(elem: &ConcreteType) -> bool {
+    matches!(elem, ConcreteType::Primitive(Primitive::Bool))
 }
 
 /// Whether `ty` is `char[]` — the one array element type that shares `str`'s
 /// runtime representation entirely (tag scheme, heap layout, refcounting)
 /// rather than the generic array block, since a `char` is a single byte and
 /// `str`'s content is just packed bytes (see the "Representation dispatch"
-/// doc above `StrRepr`). `char[]` stays a distinct compile-time `Type` (it
+/// doc above `StrRepr`). `char[]` stays a distinct compile-time `ConcreteType` (it
 /// still displays and type-checks as `char[]`, not `str`) — only its runtime
 /// construction/access/refcounting is redirected to the `str` runtime, at
 /// every site that would otherwise use the generic array runtime.
-fn is_char_array(ty: &Type) -> bool {
-    matches!(ty, Type::Array(elem) if **elem == Type::Primitive(Primitive::Char))
+fn is_char_array(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Array(elem) if **elem == ConcreteType::Primitive(Primitive::Char))
 }
 
 /// Whether a `mut` binding of type `ty` follows the slot-owned-reference model:
@@ -9444,8 +9477,8 @@ fn is_char_array(ty: &Type) -> bool {
 /// representation that isn't a pointer), `str` has its own established slot
 /// model, and sets/dicts keep the value-track model until a case demands
 /// otherwise.
-fn mut_binding_owns_slot_ref(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
-    (matches!(ty, Type::Array(_)) && !is_char_array(ty)) || is_boxed(ty, structs)
+fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty)) || is_boxed(ty, structs)
 }
 
 /// Whether `ty`'s runtime value is str-shaped: a real `str`/`Error`/concat-str
@@ -9456,12 +9489,12 @@ fn mut_binding_owns_slot_ref(ty: &Type, structs: &HashMap<String, TypeDef>) -> b
 /// many other consumers (FFI marshaling, monomorphization's generic-instance
 /// naming, the concat-str pseudo-type, etc.), which weren't audited for a
 /// `char[]` value flowing through them.
-fn is_str_shaped(ty: &Type) -> bool {
+fn is_str_shaped(ty: &ConcreteType) -> bool {
     is_str_repr(ty) || is_char_array(ty)
 }
 
 /// A bare `[]` literal has no element type to infer from, so it's built as the
-/// generic (array-shaped) empty collection — `Type::Array(NoneInner)` — same
+/// generic (array-shaped) empty collection — `ConcreteType::Array(NoneInner)` — same
 /// as an empty `i64[]`/`bool[]`/etc., since those all happen to share one
 /// physical empty-array representation. `char[]` doesn't: it's str-shaped
 /// (see `is_char_array`), so an empty array-shaped value passed where a
@@ -9477,10 +9510,10 @@ fn coerce_empty_to_char_array<M: Module>(
     builtins: &Builtins,
     scopes: &mut [Vec<Tracked>],
     v: Value,
-    actual: &Type,
-    expected: &Type,
+    actual: &ConcreteType,
+    expected: &ConcreteType,
 ) -> Value {
-    let is_empty_placeholder = matches!(actual, Type::Array(inner) if is_none_inner(inner));
+    let is_empty_placeholder = matches!(actual, ConcreteType::Array(inner) if is_none_inner(inner));
     if is_char_array(expected) && is_empty_placeholder {
         let dec = builtins.import(module, builder.func, "aipl_array_dec");
         builder.ins().call(dec, &[v]);
@@ -9596,7 +9629,7 @@ fn emit_str_iter_next<M: Module>(
 
 /// The `elem_size` argument handed to the array runtime: a byte stride, or the
 /// sentinel 0 for a bit-packed `bool` array.
-fn runtime_elem_size(elem: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
+fn runtime_elem_size(elem: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     if is_bit_packed(elem) {
         0
     } else {
@@ -9628,7 +9661,7 @@ fn mut_array_receiver(
     env: &Env,
     receiver: &Expr,
     what: &str,
-) -> Result<(StackSlot, Rc<RefCell<Type>>, bool, Type), Error> {
+) -> Result<(StackSlot, Rc<RefCell<ConcreteType>>, bool, ConcreteType), Error> {
     let ExprKind::Ident(var) = &receiver.kind else {
         return Err(Error::at(
             format!("\"{what}\" must be called on a mutable array variable, e.g. \"xs.{what}(x)\""),
@@ -9651,7 +9684,7 @@ fn mut_array_receiver(
         }
     };
     let elem_ty = match &*ty_cell.borrow() {
-        Type::Array(inner) => (**inner).clone(),
+        ConcreteType::Array(inner) => (**inner).clone(),
         other => {
             return Err(Error::at(
                 format!("\"{what}\" requires an array, got {}", type_name(other)),
@@ -9678,7 +9711,7 @@ fn load_array_elem<M: Module>(
     builtins: &Builtins,
     arr_ptr: Value,
     idx: Value,
-    elem: &Type,
+    elem: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Value {
     // Inline tag check: fast heap path, slow extern path for non-heap reprs.
@@ -9785,7 +9818,7 @@ fn seq_len<M: Module>(
     builder: &mut FunctionBuilder,
     builtins: &Builtins,
     ptr: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) -> Value {
     if is_char_array(ty) {
         let f = builtins.import(module, builder.func, "aipl_str_len");
@@ -9806,11 +9839,11 @@ fn seq_elem<M: Module>(
     structs: &HashMap<String, TypeDef>,
     ptr: Value,
     idx: Value,
-    arr_ty: &Type,
+    arr_ty: &ConcreteType,
 ) -> Value {
     if is_char_array(arr_ty) {
         load_char_array_byte(module, builder, builtins, ptr, idx)
-    } else if let Type::Array(elem) = arr_ty {
+    } else if let ConcreteType::Array(elem) = arr_ty {
         load_array_elem(module, builder, builtins, ptr, idx, elem, structs)
     } else {
         unreachable!("seq_elem called with a non-array type")
@@ -9833,7 +9866,7 @@ fn emit_rc<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     op: RcOp,
 ) {
     emit_rc_w(builder, module, builtins, structs, v, ty, op, None);
@@ -9852,7 +9885,7 @@ fn emit_rc_w<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     op: RcOp,
     weak_scc: Option<u32>,
 ) {
@@ -9860,10 +9893,6 @@ fn emit_rc_w<M: Module>(
         return;
     }
     match ty {
-        // Monomorphization substitutes every type variable away, so codegen
-        // cannot be handed one: reaching here means a generic instance escaped
-        // instantiation, which is a compiler bug rather than a program error.
-        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
         // `str` (and `Error`, a refcounted str pointer, and `char[]`, which
         // shares `str`'s representation — see `is_char_array`) — inc/dec the
         // pointer.
@@ -9881,8 +9910,8 @@ fn emit_rc_w<M: Module>(
             builder.ins().call(local, &[v]);
         }
         // Other primitives own no heap (and `needs_drop` gated them out above).
-        Type::Primitive(_) | Type::Unit => {}
-        Type::Array(_) | Type::Set(_) | Type::Dict(_, _) => {
+        ConcreteType::Primitive(_) | ConcreteType::Unit => {}
+        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
             // A set/dict shares the array heap block, so refcounting is
             // identical. Retain bumps the block's refcount (co-ownership of the
             // whole array — elements are untouched). Drop routes through
@@ -9898,7 +9927,7 @@ fn emit_rc_w<M: Module>(
             let local = builtins.import(module, builder.func, sym);
             builder.ins().call(local, &[v]);
         }
-        Type::Named(n) => match structs.get(n) {
+        ConcreteType::Named(n) => match structs.get(n) {
             // A boxed (recursive) value counts as one reference to its heap
             // block — never recursed into here; releasing the payload is the
             // job of the block's stored drop-fn when the counts reach zero.
@@ -9919,7 +9948,7 @@ fn emit_rc_w<M: Module>(
             Some(TypeDef::Struct(_)) => {
                 // Recurse over the struct's heap-bearing fields. Clone the field
                 // list so we don't borrow `structs` across the recursive calls.
-                let fields: Vec<(u32, Type)> = structs[n]
+                let fields: Vec<(u32, ConcreteType)> = structs[n]
                     .as_struct()
                     .map(|l| l.fields.iter().map(|f| (f.offset, f.ty.clone())).collect())
                     .unwrap_or_default();
@@ -9937,7 +9966,7 @@ fn emit_rc_w<M: Module>(
             }
             None => {}
         },
-        Type::Optional(_) => {
+        ConcreteType::Optional(_) => {
             // The flattened slot holds {tag, core}; the core heap is owned only
             // when the whole chain is `some` (tag == depth). `some^k(none)` for
             // k < depth carries no heap, so its garbage value is never touched.
@@ -9960,43 +9989,42 @@ fn emit_rc_w<M: Module>(
             builder.switch_to_block(merge);
             builder.seal_block(merge);
         }
-        Type::Result(ok_ty, err_ty) => {
+        ConcreteType::Result(ok_ty, err_ty) => {
             // tag 1 = Ok, 0 = Err; the 8-byte value at `OPT_VALUE_OFFSET` holds
             // the active payload. Release/retain whichever side is live (and only
             // when that side carries heap).
             let tag = builder
                 .ins()
                 .load(types::I64, MemFlagsData::trusted(), v, 0);
-            let rc_side = |b: &mut FunctionBuilder, m: &mut M, want_tag: i64, side: &Type| {
-                if !needs_drop(side, structs) {
-                    return;
-                }
-                let is_side = b.ins().icmp_imm_s(IntCC::Equal, tag, want_tag);
-                let then_b = b.create_block();
-                let merge = b.create_block();
-                b.ins().brif(is_side, then_b, &[], merge, &[]);
-                b.switch_to_block(then_b);
-                b.seal_block(then_b);
-                let sv = component(b, v, OPT_VALUE_OFFSET, side, structs);
-                emit_rc_w(b, m, builtins, structs, sv, side, op, weak_scc);
-                b.ins().jump(merge, &[]);
-                b.switch_to_block(merge);
-                b.seal_block(merge);
-            };
+            let rc_side =
+                |b: &mut FunctionBuilder, m: &mut M, want_tag: i64, side: &ConcreteType| {
+                    if !needs_drop(side, structs) {
+                        return;
+                    }
+                    let is_side = b.ins().icmp_imm_s(IntCC::Equal, tag, want_tag);
+                    let then_b = b.create_block();
+                    let merge = b.create_block();
+                    b.ins().brif(is_side, then_b, &[], merge, &[]);
+                    b.switch_to_block(then_b);
+                    b.seal_block(then_b);
+                    let sv = component(b, v, OPT_VALUE_OFFSET, side, structs);
+                    emit_rc_w(b, m, builtins, structs, sv, side, op, weak_scc);
+                    b.ins().jump(merge, &[]);
+                    b.switch_to_block(merge);
+                    b.seal_block(merge);
+                };
             rc_side(builder, module, 1, ok_ty);
             rc_side(builder, module, 0, err_ty);
         }
         // Unreachable: `needs_drop` returns false for function types (erased by
         // monomorphization), so this arm is guarded out above.
-        Type::Fn(_, _) => {}
+        ConcreteType::Fn(_, _) => {}
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
-        Type::Tuple(_) => unreachable!("Type::Tuple must be lowered before codegen"),
-        Type::Generic(..) => unreachable!("Type::Generic must be lowered before codegen"),
         // Already handled by the `is_str_repr` guard above.
-        Type::ConcatStr => unreachable!(),
+        ConcreteType::ConcatStr => unreachable!(),
         // `needs_drop` panics on these (resolved away by monomorphization), so
         // the guard above already returned.
-        Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => {
+        ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
             unreachable!()
         }
     }
@@ -10017,14 +10045,14 @@ fn emit_variant_rc<M: Module>(
 ) {
     // Clone (tag, heap fields) per case so we don't borrow `structs` across the
     // recursive `emit_rc` calls. Skip cases with no heap payload.
-    let cases: Vec<(usize, Vec<(u32, Type)>)> = structs[name]
+    let cases: Vec<(usize, Vec<(u32, ConcreteType)>)> = structs[name]
         .as_variant()
         .map(|vl| {
             vl.cases
                 .iter()
                 .enumerate()
                 .filter_map(|(tag, c)| {
-                    let hf: Vec<(u32, Type)> = c
+                    let hf: Vec<(u32, ConcreteType)> = c
                         .fields
                         .iter()
                         .filter(|f| needs_drop(&f.ty, structs))
@@ -10079,7 +10107,7 @@ fn emit_boxed_payload_drop<M: Module>(
     let scc = Some(structs[name].scc());
     match &structs[name] {
         TypeDef::Struct(_) => {
-            let fields: Vec<(u32, Type)> = structs[name]
+            let fields: Vec<(u32, ConcreteType)> = structs[name]
                 .as_struct()
                 .map(|l| l.fields.iter().map(|f| (f.offset, f.ty.clone())).collect())
                 .unwrap_or_default();
@@ -10210,7 +10238,7 @@ fn emit_arr_starts_ends<M: Module>(
     cx: Cx,
     self_ptr: Value,
     other_ptr: Value,
-    elem: &Type,
+    elem: &ConcreteType,
     end: SeEnd,
     at: Option<Value>,
 ) -> Result<Value, Error> {
@@ -10302,17 +10330,17 @@ fn emit_arr_starts_ends<M: Module>(
 /// Whether `ty`'s structural equality is emitted through a synthesized per-type
 /// `__eq_<n>` helper (composites) rather than inline (scalars and `str`-shaped
 /// values — `str`/`Error`/`char[]` — which are a single `icmp`/`aipl_str_eq`).
-fn uses_eq_helper(ty: &Type, structs: &HashMap<String, TypeDef>) -> bool {
+fn uses_eq_helper(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     if is_str_shaped(ty) {
         return false;
     }
     match ty {
-        Type::Optional(_)
-        | Type::Array(_)
-        | Type::Set(_)
-        | Type::Dict(_, _)
-        | Type::Result(_, _) => true,
-        Type::Named(n) => structs
+        ConcreteType::Optional(_)
+        | ConcreteType::Array(_)
+        | ConcreteType::Set(_)
+        | ConcreteType::Dict(_, _)
+        | ConcreteType::Result(_, _) => true,
+        ConcreteType::Named(n) => structs
             .get(n)
             .is_some_and(|d| d.as_struct().is_some() || d.as_variant().is_some()),
         _ => false,
@@ -10330,7 +10358,7 @@ fn emit_eq<M: Module>(
     cx: Cx,
     lv: Value,
     rv: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) -> Result<Value, Error> {
     if uses_eq_helper(ty, cx.structs) {
         let id = eq_func(module, cx, ty);
@@ -10344,7 +10372,7 @@ fn emit_eq<M: Module>(
 
 /// Declare (once, cached) the per-type `__eq_<n>(lv, rv) -> i64` helper for `ty`.
 /// Returns its id; the body is defined later from `eq_pending`.
-fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
+fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     let key = type_name(ty);
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(id) = er.eq_fns.get(&key) {
@@ -10385,14 +10413,14 @@ fn emit_eq_body<M: Module>(
     cx: Cx,
     lv: Value,
     rv: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) -> Result<Value, Error> {
     let builtins = cx.builtins;
     let structs = cx.structs;
     Ok(match ty {
         // All integer widths (and bool/char) compare by their canonical i64
         // register value — distinct values have distinct canonical reps.
-        Type::Primitive(p) if !matches!(p, Primitive::Str) => {
+        ConcreteType::Primitive(p) if !matches!(p, Primitive::Str) => {
             let b = builder.ins().icmp(IntCC::Equal, lv, rv);
             builder.ins().uextend(types::I64, b)
         }
@@ -10407,7 +10435,7 @@ fn emit_eq_body<M: Module>(
             let inst = builder.ins().call(f, &[lv, rv]);
             builder.inst_results(inst)[0]
         }
-        Type::Optional(_) => {
+        ConcreteType::Optional(_) => {
             let depth = opt_depth(ty) as i64;
             let core = opt_core(ty);
             let tl = builder
@@ -10447,7 +10475,7 @@ fn emit_eq_body<M: Module>(
             builder.seal_block(merge);
             builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
-        Type::Array(elem) => {
+        ConcreteType::Array(elem) => {
             let ll = load_arr_len(builder, lv);
             let rl = load_arr_len(builder, rv);
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
@@ -10502,7 +10530,7 @@ fn emit_eq_body<M: Module>(
                 builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
-        Type::Set(elem) => {
+        ConcreteType::Set(elem) => {
             // Order-independent: same length and every element of the left set is
             // a member of the right (distinct elements + equal sizes ⇒ equal sets).
             let ll = load_arr_len(builder, lv);
@@ -10543,7 +10571,7 @@ fn emit_eq_body<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_set_contains");
                 let str_cmp = builder.ins().iconst(
                     types::I64,
-                    i64::from(**elem == Type::Primitive(Primitive::Str)),
+                    i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
                 );
                 let inst = builder.ins().call(f, &[rv, xptr, esz, str_cmp]);
                 let c = builder.inst_results(inst)[0];
@@ -10568,10 +10596,10 @@ fn emit_eq_body<M: Module>(
                 builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
-        Type::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
+        ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
             // Clone field (offset, type) pairs so we don't borrow `structs` across
             // the recursive calls. AND-fold every field's equality.
-            let fields: Vec<(u32, Type)> = structs[n]
+            let fields: Vec<(u32, ConcreteType)> = structs[n]
                 .as_struct()
                 .map(|l| l.fields.iter().map(|f| (f.offset, f.ty.clone())).collect())
                 .unwrap_or_default();
@@ -10588,10 +10616,10 @@ fn emit_eq_body<M: Module>(
             }
             builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
-        Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
+        ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
             // Clone each case's (tag, payload fields) so we don't borrow `structs`
             // across the recursive calls.
-            let cases: Vec<(usize, Vec<(u32, Type)>)> = structs[n]
+            let cases: Vec<(usize, Vec<(u32, ConcreteType)>)> = structs[n]
                 .as_variant()
                 .map(|vl| {
                     vl.cases
@@ -10652,7 +10680,7 @@ fn emit_eq_body<M: Module>(
             builder.seal_block(merge);
             builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
-        Type::Dict(k, v) => {
+        ConcreteType::Dict(k, v) => {
             // Equal iff same length and every left pair's key is bound in the
             // right to an equal value (distinct keys + equal sizes ⇒ equal maps).
             let ll = load_arr_len(builder, lv);
@@ -10664,7 +10692,7 @@ fn emit_eq_body<M: Module>(
                 let pair_size = 8 + elem_size_of(v, structs);
                 let str_cmp = builder.ins().iconst(
                     types::I64,
-                    i64::from(**k == Type::Primitive(Primitive::Str)),
+                    i64::from(**k == ConcreteType::Primitive(Primitive::Str)),
                 );
                 let psz = builder.ins().iconst(types::I64, pair_size);
                 let res = i64_slot(builder);
@@ -10736,7 +10764,7 @@ fn emit_eq_body<M: Module>(
                 builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
-        Type::Result(ok_ty, err_ty) => {
+        ConcreteType::Result(ok_ty, err_ty) => {
             // Equal iff same tag and the active payload (by that side's type)
             // is equal. tag 1 = Ok, 0 = Err; both payloads live at the value
             // offset.
@@ -10763,7 +10791,7 @@ fn emit_eq_body<M: Module>(
             // A side that is unit (void-Ok `!E`) carries no payload, and a
             // `__none__` side is unconstructible (so its branch is dead) — either
             // way equal tags suffice, so compare the payload only for real types.
-            let payload_trivial = |t: &Type| is_unit(t) || is_none_inner(t);
+            let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
             builder.switch_to_block(ok_b);
             builder.seal_block(ok_b);
             let e = if payload_trivial(ok_ty) {
@@ -10809,7 +10837,7 @@ enum CtorShape {
     /// A user-defined variant case, resolved statically via `variant_ctor`.
     Variant {
         tag: usize,
-        fields: Vec<(u32, Type)>,
+        fields: Vec<(u32, ConcreteType)>,
     },
 }
 
@@ -10855,7 +10883,7 @@ fn compile_ctor_eq<M: Module>(
     op: char,
     l: &Expr,
     r: &Expr,
-) -> Result<Option<(Value, Type)>, Error> {
+) -> Result<Option<(Value, ConcreteType)>, Error> {
     let structs = cx.structs;
     let builtins = cx.builtins;
     let (other, ctor_expr, shape) = match (ctor_shape(cx, l), ctor_shape(cx, r)) {
@@ -10874,7 +10902,7 @@ fn compile_ctor_eq<M: Module>(
     let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
     let (expect_tag, fields) = match shape {
         CtorShape::Result { is_ok } => {
-            let Type::Result(ok_ty, err_ty) = &ot else {
+            let ConcreteType::Result(ok_ty, err_ty) = &ot else {
                 return Err(Error::at(
                     format!(
                         "\"{opn}\" between a result and {}: both sides must be the same type",
@@ -10898,7 +10926,7 @@ fn compile_ctor_eq<M: Module>(
             (i64::from(is_ok), fields)
         }
         CtorShape::Variant { tag, fields } => {
-            if !matches!(&ot, Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some())
+            if !matches!(&ot, ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some())
             {
                 return Err(Error::at(
                     format!(
@@ -10978,7 +11006,7 @@ fn compile_ctor_eq<M: Module>(
     } else {
         eq
     };
-    Ok(Some((result, Type::Primitive(Primitive::Bool))))
+    Ok(Some((result, ConcreteType::Primitive(Primitive::Bool))))
 }
 
 /// splitmix64 finalizer: a strong avalanche mix of an i64. Used to hash scalars
@@ -11025,7 +11053,7 @@ fn emit_seq_hash<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     arr: Value,
-    elem: &Type,
+    elem: &ConcreteType,
     seed: Value,
     commutative: bool,
 ) -> Result<Value, Error> {
@@ -11075,10 +11103,10 @@ fn emit_hash<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) -> Result<Value, Error> {
     Ok(match ty {
-        Type::Primitive(p) if !matches!(p, Primitive::Str) => emit_scalar_hash(builder, v),
+        ConcreteType::Primitive(p) if !matches!(p, Primitive::Str) => emit_scalar_hash(builder, v),
         // `str` (and `Error`, and `char[]` — see `is_str_shaped`) hashes by
         // its byte content.
         _ if is_str_shaped(ty) => {
@@ -11086,7 +11114,7 @@ fn emit_hash<M: Module>(
             let inst = builder.ins().call(f, &[v]);
             builder.inst_results(inst)[0]
         }
-        Type::Optional(_) => {
+        ConcreteType::Optional(_) => {
             // hash(tag), combined with the core's hash only when fully `some`
             // (tag == depth) — so `none`/`some^k(none)` hash by tag alone.
             let depth = opt_depth(ty) as i64;
@@ -11112,7 +11140,7 @@ fn emit_hash<M: Module>(
             builder.seal_block(merge);
             builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
-        Type::Array(elem) => {
+        ConcreteType::Array(elem) => {
             let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
@@ -11121,7 +11149,7 @@ fn emit_hash<M: Module>(
                 emit_seq_hash(module, builder, builtins, structs, v, elem, seed, false)?
             }
         }
-        Type::Set(elem) => {
+        ConcreteType::Set(elem) => {
             let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
@@ -11134,14 +11162,14 @@ fn emit_hash<M: Module>(
         // type; a per-type hash helper (like `to_str`/`eq`) would be needed.
         // Recursive types aren't valid set/dict keys yet, so reject rather than
         // loop the compiler.
-        Type::Named(_) if is_boxed(ty, structs) => {
+        ConcreteType::Named(_) if is_boxed(ty, structs) => {
             return Err(Error::msg(format!(
                 "hash: hashing recursive type {} is not yet supported",
                 type_name(ty)
             )));
         }
-        Type::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
-            let fields: Vec<(u32, Type)> = structs[n]
+        ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
+            let fields: Vec<(u32, ConcreteType)> = structs[n]
                 .as_struct()
                 .map(|l| l.fields.iter().map(|f| (f.offset, f.ty.clone())).collect())
                 .unwrap_or_default();
@@ -11157,8 +11185,8 @@ fn emit_hash<M: Module>(
             }
             builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
-        Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
-            let cases: Vec<(usize, Vec<(u32, Type)>)> = structs[n]
+        ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
+            let cases: Vec<(usize, Vec<(u32, ConcreteType)>)> = structs[n]
                 .as_variant()
                 .map(|vl| {
                     vl.cases
@@ -11206,7 +11234,7 @@ fn emit_hash<M: Module>(
             builder.seal_block(merge);
             builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
-        Type::Dict(key_ty, val_ty) => {
+        ConcreteType::Dict(key_ty, val_ty) => {
             // Order-independent over pairs (matching dict `==`): fold each pair's
             // (key, value) combine commutatively. Within a pair the combine is
             // order-sensitive so `{1: 2}` and `{2: 1}` differ.
@@ -11254,7 +11282,7 @@ fn emit_hash<M: Module>(
                 builder.ins().stack_load(types::I64, types::I64, acc, 0)
             }
         }
-        Type::Result(ok_ty, err_ty) => {
+        ConcreteType::Result(ok_ty, err_ty) => {
             // hash(tag) combined with the active payload's hash (by its type).
             let tag = builder
                 .ins()
@@ -11269,7 +11297,7 @@ fn emit_hash<M: Module>(
             builder.ins().brif(is_ok, ok_b, &[], err_b, &[]);
             // A unit (void-Ok) or `__none__` (unconstructible) side carries no
             // payload — its hash is just the tag's.
-            let payload_trivial = |t: &Type| is_unit(t) || is_none_inner(t);
+            let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
             builder.switch_to_block(ok_b);
             builder.seal_block(ok_b);
             if !payload_trivial(ok_ty) {
@@ -11307,7 +11335,7 @@ fn emit_drop<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) {
     emit_rc(builder, module, builtins, structs, v, ty, RcOp::Drop);
 }
@@ -11318,7 +11346,7 @@ fn emit_retain<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) {
     emit_rc(builder, module, builtins, structs, v, ty, RcOp::Retain);
 }
@@ -11345,7 +11373,7 @@ fn own_value_into_slot<M: Module>(
     structs: &HashMap<String, TypeDef>,
     scopes: &mut [Vec<Tracked>],
     v: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     value: &Expr,
     owned_params: &HashSet<String>,
 ) {
@@ -11397,9 +11425,9 @@ fn own_value_into_slot<M: Module>(
 
 /// The innermost non-optional type of `ty`, peeling every `Optional` layer. The
 /// whole optional chain shares one value field sized for this core.
-fn opt_core(ty: &Type) -> &Type {
+fn opt_core(ty: &ConcreteType) -> &ConcreteType {
     match ty {
-        Type::Optional(inner) => opt_core(inner),
+        ConcreteType::Optional(inner) => opt_core(inner),
         _ => ty,
     }
 }
@@ -11407,9 +11435,9 @@ fn opt_core(ty: &Type) -> &Type {
 /// The number of `Optional` layers wrapping `ty` (0 if not an optional). This is
 /// the maximum tag of the flattened representation — the tag equals the depth
 /// exactly when the core value is present.
-fn opt_depth(ty: &Type) -> u32 {
+fn opt_depth(ty: &ConcreteType) -> u32 {
     match ty {
-        Type::Optional(inner) => 1 + opt_depth(inner),
+        ConcreteType::Optional(inner) => 1 + opt_depth(inner),
         _ => 0,
     }
 }
@@ -11423,18 +11451,20 @@ const OPT_VALUE_OFFSET: u32 = 8;
 /// of nesting depth (see "Optional representation" above); a struct is its
 /// layout size. Known at compile time, so it's passed to the array runtime as a
 /// constant rather than stored.
-fn elem_size_of(ty: &Type, structs: &HashMap<String, TypeDef>) -> i64 {
+fn elem_size_of(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     match ty {
-        Type::Optional(_) => OPT_VALUE_OFFSET as i64 + elem_size_of(opt_core(ty), structs),
+        ConcreteType::Optional(_) => OPT_VALUE_OFFSET as i64 + elem_size_of(opt_core(ty), structs),
         // A result is `{ tag, value }` where `value` is sized to the wider
         // payload (8 bytes for v1's scalar/str payloads → 16 total).
-        Type::Result(ok, err) => {
+        ConcreteType::Result(ok, err) => {
             OPT_VALUE_OFFSET as i64 + elem_size_of(ok, structs).max(elem_size_of(err, structs))
         }
         // A boxed (recursive) type is an 8-byte pointer element.
-        Type::Named(n) => structs
-            .get(n)
-            .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 }),
+        ConcreteType::Named(n) => {
+            structs
+                .get(n)
+                .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
+        }
         _ => 8,
     }
 }
@@ -11449,20 +11479,22 @@ fn array_drop_fn_addr<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
-    elem: &Type,
+    elem: &ConcreteType,
 ) -> Value {
     let b = cx.builtins;
     let id = match elem {
-        Type::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_drop_str")),
+        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_drop_str")),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
         // a `str` element is, not via the generic array-element drop-fn.
-        Type::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_drop_str")),
-        Type::Array(_) => Some(b.id(module, "aipl_arr_drop_arr")),
-        Type::Optional(inner) if matches!(inner.as_ref(), Type::Primitive(Primitive::Str)) => {
+        ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_drop_str")),
+        ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_drop_arr")),
+        ConcreteType::Optional(inner)
+            if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
+        {
             Some(b.id(module, "aipl_arr_drop_opt_str"))
         }
-        Type::Optional(inner) if matches!(inner.as_ref(), Type::Array(_)) => {
+        ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_drop_opt_arr"))
         }
         _ if needs_drop(elem, cx.structs) => Some(elem_rc_ids(module, cx, elem).0),
@@ -11478,16 +11510,18 @@ fn array_retain_fn_addr<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
-    elem: &Type,
+    elem: &ConcreteType,
 ) -> Value {
     let b = cx.builtins;
     let id = match elem {
-        Type::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
-        Type::Array(_) => Some(b.id(module, "aipl_arr_retain_ptr")),
-        Type::Optional(inner) if matches!(inner.as_ref(), Type::Primitive(Primitive::Str)) => {
+        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
+        ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_retain_ptr")),
+        ConcreteType::Optional(inner)
+            if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
+        {
             Some(b.id(module, "aipl_arr_retain_opt"))
         }
-        Type::Optional(inner) if matches!(inner.as_ref(), Type::Array(_)) => {
+        ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_retain_opt"))
         }
         _ if needs_drop(elem, cx.structs) => Some(elem_rc_ids(module, cx, elem).1),
@@ -11499,7 +11533,7 @@ fn array_retain_fn_addr<M: Module>(
 /// Declare (once, cached) the per-element-type `(drop, retain)` helper functions
 /// for `elem` and record them to be defined after the main function loop. The
 /// element type's own size/layout drives the generated loop body.
-fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &Type) -> (FuncId, FuncId) {
+fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &ConcreteType) -> (FuncId, FuncId) {
     let key = type_name(elem);
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(ids) = er.fns.get(&key) {
@@ -11525,7 +11559,12 @@ fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &Type) -> (FuncId, FuncI
 /// Declare (once, cached) the `(drop, retain)` helpers for a dict's pair-array
 /// elements, where each element is `[key: K][value: V]`. Mirrors `elem_rc_ids`
 /// but the generated body releases/retains both halves of every pair.
-fn pair_rc_ids<M: Module>(module: &mut M, cx: Cx, k: &Type, v: &Type) -> (FuncId, FuncId) {
+fn pair_rc_ids<M: Module>(
+    module: &mut M,
+    cx: Cx,
+    k: &ConcreteType,
+    v: &ConcreteType,
+) -> (FuncId, FuncId) {
     let key = (type_name(k), type_name(v));
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(ids) = er.pair_fns.get(&key) {
@@ -11556,8 +11595,8 @@ fn pair_rc_fn_addrs<M: Module>(
     builder: &mut FunctionBuilder,
     module: &mut M,
     cx: Cx,
-    k: &Type,
-    v: &Type,
+    k: &ConcreteType,
+    v: &ConcreteType,
 ) -> (Value, Value) {
     if needs_drop(k, cx.structs) || needs_drop(v, cx.structs) {
         let (d, r) = pair_rc_ids(module, cx, k, v);
@@ -11582,8 +11621,8 @@ fn define_pair_rc_fn<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     id: FuncId,
-    key_ty: &Type,
-    val_ty: &Type,
+    key_ty: &ConcreteType,
+    val_ty: &ConcreteType,
     op: RcOp,
     ir_out: &mut String,
     instrument: bool,
@@ -11660,7 +11699,7 @@ fn define_elem_rc_fn<M: Module>(
     builtins: &Builtins,
     structs: &HashMap<String, TypeDef>,
     id: FuncId,
-    elem: &Type,
+    elem: &ConcreteType,
     op: RcOp,
     ir_out: &mut String,
     instrument: bool,
@@ -11869,7 +11908,7 @@ fn emit_render<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     value: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     let b = cx.builtins;
@@ -11877,7 +11916,7 @@ fn emit_render<M: Module>(
         // Signed integers (i8/i16/i32/i64) render via the signed formatter — the
         // canonical i64 register value is the signed value. Unsigned ones use the
         // unsigned formatter (u64 can exceed i64's range).
-        Type::Primitive(p) if p.is_int() => {
+        ConcreteType::Primitive(p) if p.is_int() => {
             let (len_fn, write_fn) = if p.int_signed() {
                 ("aipl_i64_len", "aipl_write_i64")
             } else {
@@ -11897,7 +11936,7 @@ fn emit_render<M: Module>(
             }
             len
         }
-        Type::Primitive(Primitive::Bool) => {
+        ConcreteType::Primitive(Primitive::Bool) => {
             // "true" (4) or "false" (5).
             let four = builder.ins().iconst(types::I64, 4);
             let five = builder.ins().iconst(types::I64, 5);
@@ -11910,7 +11949,7 @@ fn emit_render<M: Module>(
             }
             len
         }
-        Type::Primitive(Primitive::Char) => {
+        ConcreteType::Primitive(Primitive::Char) => {
             // 'c' — three bytes.
             if let Sink::Write(_) = sink {
                 let quote = builder.ins().iconst(types::I64, b'\'' as i64);
@@ -11955,20 +11994,26 @@ fn emit_render<M: Module>(
         // read via the same byte cursor `for`-loop iteration uses, since
         // `value` is a real `str` underneath, not a generic array block.
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
-        Type::Array(elem) => emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?,
-        Type::Set(elem) => emit_render_seq(module, builder, cx, value, elem, sink, b'{', b'}')?,
-        Type::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
-        Type::Optional(_) => emit_render_optional(module, builder, cx, value, ty, sink)?,
-        Type::Result(ok, err) => emit_render_result(module, builder, cx, value, ok, err, sink)?,
+        ConcreteType::Array(elem) => {
+            emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?
+        }
+        ConcreteType::Set(elem) => {
+            emit_render_seq(module, builder, cx, value, elem, sink, b'{', b'}')?
+        }
+        ConcreteType::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
+        ConcreteType::Optional(_) => emit_render_optional(module, builder, cx, value, ty, sink)?,
+        ConcreteType::Result(ok, err) => {
+            emit_render_result(module, builder, cx, value, ok, err, sink)?
+        }
         // A boxed (recursive) type is rendered by calling its own `to_str`
         // helper and splicing the result — so the recursion runs through
         // function calls (terminating at a base case) instead of inlining the
         // structure into itself forever. The helper's own body renders one
         // level inline (`define_tostr_fn` enters `emit_render_named` directly).
-        Type::Named(_) if is_boxed(ty, cx.structs) => {
+        ConcreteType::Named(_) if is_boxed(ty, cx.structs) => {
             emit_render_boxed(module, builder, cx, value, ty, sink)?
         }
-        Type::Named(_) => emit_render_named(module, builder, cx, value, ty, sink)?,
+        ConcreteType::Named(_) => emit_render_named(module, builder, cx, value, ty, sink)?,
         other => {
             return Err(Error::msg(format!(
                 "to_str: rendering {} is not yet supported",
@@ -11988,10 +12033,10 @@ fn emit_render_named<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     value: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
-    let Type::Named(n) = ty else {
+    let ConcreteType::Named(n) = ty else {
         unreachable!("emit_render_named called with a non-Named type");
     };
     if cx.structs.get(n).and_then(TypeDef::as_struct).is_some() {
@@ -12012,7 +12057,7 @@ fn emit_render_boxed<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     value: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     let b = cx.builtins;
@@ -12040,7 +12085,7 @@ fn emit_render_boxed<M: Module>(
         b,
         cx.structs,
         s,
-        &Type::Primitive(Primitive::Str),
+        &ConcreteType::Primitive(Primitive::Str),
     );
     Ok(len)
 }
@@ -12183,7 +12228,7 @@ fn emit_render_optional<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     slot_ptr: Value,
-    opt_ty: &Type,
+    opt_ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     let tag = builder
@@ -12213,7 +12258,7 @@ fn render_opt_level<M: Module>(
     slot_ptr: Value,
     tag: Value,
     depth: u32,
-    core: &Type,
+    core: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     let some_b = builder.create_block();
@@ -12258,8 +12303,8 @@ fn emit_render_result<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     slot_ptr: Value,
-    ok_ty: &Type,
-    err_ty: &Type,
+    ok_ty: &ConcreteType,
+    err_ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     let tag = builder
@@ -12273,7 +12318,7 @@ fn emit_render_result<M: Module>(
 
     // A unit (void-Ok `!E`) side renders as `ok()`; a `__none__` side is
     // unconstructible (dead branch) — render the bare ctor either way.
-    let payload_trivial = |t: &Type| is_unit(t) || is_none_inner(t);
+    let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
     builder.switch_to_block(ok_b);
     builder.seal_block(ok_b);
     let len = if payload_trivial(ok_ty) {
@@ -12325,7 +12370,7 @@ fn emit_render_struct<M: Module>(
         .get(sname)
         .and_then(TypeDef::as_struct)
         .expect("struct layout");
-    let fields: Vec<(String, u32, Type)> = layout
+    let fields: Vec<(String, u32, ConcreteType)> = layout
         .fields
         .iter()
         .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
@@ -12365,7 +12410,7 @@ fn emit_render_variant<M: Module>(
 ) -> Result<Value, Error> {
     // Snapshot (ctor, fields) per case so we don't borrow `cx.structs` across
     // the recursive `emit_render` calls.
-    let cases: Vec<(String, Vec<(u32, Type)>)> = cx.structs[name]
+    let cases: Vec<(String, Vec<(u32, ConcreteType)>)> = cx.structs[name]
         .as_variant()
         .expect("variant layout")
         .cases
@@ -12500,7 +12545,7 @@ fn emit_render_char_array<M: Module>(
         builder,
         cx,
         byte_i64,
-        &Type::Primitive(Primitive::Char),
+        &ConcreteType::Primitive(Primitive::Char),
         sink,
     )?;
     add_len(builder, len_slot, elem_len);
@@ -12527,7 +12572,7 @@ fn emit_render_seq<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     arr: Value,
-    elem_ty: &Type,
+    elem_ty: &ConcreteType,
     sink: Sink,
     open: u8,
     close: u8,
@@ -12603,8 +12648,8 @@ fn emit_render_dict<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     dict: Value,
-    key_ty: &Type,
-    val_ty: &Type,
+    key_ty: &ConcreteType,
+    val_ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
     // An untyped empty `#{:}` has no key/value renderer to recurse into.
@@ -12688,7 +12733,7 @@ fn emit_to_str<M: Module>(
     cx: Cx,
     scopes: &mut [Vec<Tracked>],
     value: Value,
-    ty: &Type,
+    ty: &ConcreteType,
 ) -> Result<Value, Error> {
     let id = tostr_func(module, cx, ty);
     let fref = module.declare_func_in_func(id, builder.func);
@@ -12698,17 +12743,17 @@ fn emit_to_str<M: Module>(
     // scope exit (an inline result no-ops; a heap result is freed via `aipl_dec`,
     // which dispatches on the low bit).
     let result = builder.inst_results(inst)[0];
-    scopes
-        .last_mut()
-        .expect("scope")
-        .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
+    scopes.last_mut().expect("scope").push(Tracked::new(
+        result,
+        &ConcreteType::Primitive(Primitive::Str),
+    ));
     Ok(result)
 }
 
 /// Declare (once, cached) the per-type `__to_str_<n>(value) -> str` rendering
 /// helper for `ty`, recording it to be defined after the main function loop
 /// (when the build context is free). Returns its function id.
-fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
+fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     let key = type_name(ty);
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(id) = er.tostr_fns.get(&key) {
@@ -12729,7 +12774,7 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &Type) -> FuncId {
 /// Declare (once, cached) the per-err-type `__test_try_fail_<n>(payload)` helper
 /// for `err_ty` — the shared body a test `?` calls on an err. Returns its id; the
 /// body is defined later from `test_fail_pending`.
-fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &Type) -> FuncId {
+fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &ConcreteType) -> FuncId {
     let key = type_name(err_ty);
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(id) = er.test_fail_fns.get(&key) {
@@ -12762,7 +12807,7 @@ fn define_test_fail_fn<M: Module>(
     str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
-    err_ty: &Type,
+    err_ty: &ConcreteType,
     ir_out: &mut String,
     instrument: bool,
 ) -> Result<(), Error> {
@@ -12778,7 +12823,7 @@ fn define_test_fail_fn<M: Module>(
 
         let env: Env = HashMap::new();
         let owned_params: HashSet<String> = HashSet::new();
-        let unit = Type::Unit;
+        let unit = ConcreteType::Unit;
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
         let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
         let cx = Cx {
@@ -12813,7 +12858,7 @@ fn define_test_fail_fn<M: Module>(
             builtins,
             structs,
             msg,
-            &Type::Primitive(Primitive::Str),
+            &ConcreteType::Primitive(Primitive::Str),
         );
         builder.ins().return_(&[]);
         builder.finalize(module.target_config());
@@ -12851,7 +12896,7 @@ fn define_eq_fn<M: Module>(
     str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
-    ty: &Type,
+    ty: &ConcreteType,
     ir_out: &mut String,
     instrument: bool,
 ) -> Result<(), Error> {
@@ -12872,7 +12917,7 @@ fn define_eq_fn<M: Module>(
         // `Cx` is irrelevant to a borrow-only comparison, so feed trivial values.
         let env: Env = HashMap::new();
         let owned_params: HashSet<String> = HashSet::new();
-        let unit = Type::Unit;
+        let unit = ConcreteType::Unit;
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
         let cx = Cx {
             env: &env,
@@ -12933,7 +12978,7 @@ fn define_tostr_fn<M: Module>(
     str_data: &RefCell<StrLiterals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
-    ty: &Type,
+    ty: &ConcreteType,
     ir_out: &mut String,
     instrument: bool,
 ) -> Result<(), Error> {
@@ -12952,7 +12997,7 @@ fn define_tostr_fn<M: Module>(
         // rest of `Cx` is irrelevant to rendering, so feed it trivial values.
         let env: Env = HashMap::new();
         let owned_params: HashSet<String> = HashSet::new();
-        let unit = Type::Unit;
+        let unit = ConcreteType::Unit;
         // A synthesized renderer has no source-level bindings, so its legend is
         // empty (and never printed — this Cx isn't on the `define_fn` path).
         let no_bindings: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
@@ -13173,7 +13218,7 @@ struct Cx<'a> {
     /// The enclosing function's ABI return type. Used by the `__map_result`
     /// intrinsic to reinterpret an in-place-mapped buffer as the result element
     /// type (the buffer's static type is the *input* element type).
-    ret_ty: &'a Type,
+    ret_ty: &'a ConcreteType,
     /// The enclosing function's hidden struct-return pointer, when it returns a
     /// composite (struct/optional/result). The `?` operator's early Err return
     /// copies the propagated error into it. `None` for a scalar/unit return.
@@ -13214,24 +13259,24 @@ struct Cx<'a> {
 #[derive(Default)]
 struct ElemRc {
     fns: HashMap<String, (FuncId, FuncId)>,
-    pending: Vec<(Type, FuncId, FuncId)>,
+    pending: Vec<(ConcreteType, FuncId, FuncId)>,
     // Per-`(key, value)` drop/retain helpers for a dict's pair-array elements (a
     // pair is `[key][value]`, so its cleanup releases the key *and* the value).
     pair_fns: HashMap<(String, String), (FuncId, FuncId)>,
-    pair_pending: Vec<(Type, Type, FuncId, FuncId)>,
+    pair_pending: Vec<(ConcreteType, ConcreteType, FuncId, FuncId)>,
     // Per-type `to_str` rendering helpers: `__to_str_<n>(value) -> str`. Maps a
     // type name to its function id; `tostr_pending` lists the ones still to be
     // defined (with the type to render). One function per type, so the rendering
     // IR is generated once instead of inlined at every `to_str` site.
     tostr_fns: HashMap<String, FuncId>,
-    tostr_pending: Vec<(Type, FuncId)>,
+    tostr_pending: Vec<(ConcreteType, FuncId)>,
     // Per-error-type test-fail helpers: `__test_try_fail_<n>(payload)`. A `?` on
     // an err inside a `.test` body calls this (passing the err payload) instead
     // of inlining the render + `aipl_test_fail` + rendered-str drop at every `?`
     // site — so each site is just "read payload, call helper". Keyed by the err
     // type's name; `test_fail_pending` lists the ones still to be defined.
     test_fail_fns: HashMap<String, FuncId>,
-    test_fail_pending: Vec<(Type, FuncId)>,
+    test_fail_pending: Vec<(ConcreteType, FuncId)>,
     // Per-type structural-equality helpers: `__eq_<n>(lv, rv) -> i64`. A `==`/`!=`
     // (or a nested comparison) on a composite type calls its helper instead of
     // inlining the whole structural comparison at every site. Keyed by the type's
@@ -13239,7 +13284,7 @@ struct ElemRc {
     // request further helpers (its composite fields/elements), so the drain
     // loops until `eq_pending` is empty.
     eq_fns: HashMap<String, FuncId>,
-    eq_pending: Vec<(Type, FuncId)>,
+    eq_pending: Vec<(ConcreteType, FuncId)>,
     // Per-boxed-type payload drop helpers: `__rec_drop_<n>(payload_ptr)`. Stored
     // in each boxed block's header and called by the runtime when the block is
     // freed; it releases the payload's contained values (weak-dec'ing same-group
@@ -13272,41 +13317,28 @@ struct ElemRc {
 /// element (`#{str}` and `str` both reduce to `str`), and between a dict and a
 /// two-field shape. Spelling the containers out keeps distinct types distinct
 /// and reads better besides — `dict$str$i64$arr` over `str$i64$arr`.
-fn type_symbol(ty: &Type) -> String {
+fn type_symbol(ty: &ConcreteType) -> String {
     match ty {
-        // Monomorphization substitutes every type variable away, so codegen
-        // cannot be handed one: reaching here means a generic instance escaped
-        // instantiation, which is a compiler bug rather than a program error.
-        Type::TypeVar(v) => unreachable!("type variable {v:?} reached codegen unsubstituted"),
-        Type::Primitive(p) => p.name().to_string(),
-        Type::Named(n) => sanitize_symbol(n),
-        Type::Optional(inner) => format!("{}$opt", type_symbol(inner)),
-        Type::Array(inner) => format!("{}$arr", type_symbol(inner)),
-        Type::Set(inner) => format!("set${}", type_symbol(inner)),
-        Type::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
-        Type::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
-        Type::Fn(params, ret) => {
+        ConcreteType::Primitive(p) => p.name().to_string(),
+        ConcreteType::Named(n) => sanitize_symbol(n),
+        ConcreteType::Optional(inner) => format!("{}$opt", type_symbol(inner)),
+        ConcreteType::Array(inner) => format!("{}$arr", type_symbol(inner)),
+        ConcreteType::Set(inner) => format!("set${}", type_symbol(inner)),
+        ConcreteType::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
+        ConcreteType::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
+        ConcreteType::Fn(params, ret) => {
             let ps = params.iter().map(type_symbol).collect::<Vec<_>>().join("$");
             format!("fn${ps}$to${}", type_symbol(ret))
         }
-        Type::Tuple(elems) => {
-            let es = elems.iter().map(type_symbol).collect::<Vec<_>>().join("$");
-            format!("tuple${es}")
-        }
-        Type::Generic(name, args) => {
-            let as_ = args.iter().map(type_symbol).collect::<Vec<_>>().join("$");
-            format!("{}${as_}", sanitize_symbol(name))
-        }
         // Unit and the compiler pseudo-types. None of these reaches a generated
-        // helper today, but naming them keeps this exhaustive, so a new `Type`
+        // helper today, but naming them keeps this exhaustive, so a new `ConcreteType`
         // variant has to make a decision here rather than silently collapsing
         // onto another type's symbol.
-        Type::Unit => "unit".to_string(),
-        Type::Any => "any".to_string(),
-        Type::NoneInner => "none".to_string(),
-        Type::EmptyArrayArg => "empty_arr".to_string(),
-        Type::NoneLiteralArg => "none_lit".to_string(),
-        Type::ConcatStr => "concat_str".to_string(),
+        ConcreteType::Unit => "unit".to_string(),
+        ConcreteType::NoneInner => "none".to_string(),
+        ConcreteType::EmptyArrayArg => "empty_arr".to_string(),
+        ConcreteType::NoneLiteralArg => "none_lit".to_string(),
+        ConcreteType::ConcatStr => "concat_str".to_string(),
     }
 }
 
@@ -13353,7 +13385,7 @@ enum MatchPlan {
     /// Optional: tag != 0 routes to arm `some`, else arm `none`. `inner` is the
     /// some arm's binding type.
     Optional {
-        inner: Type,
+        inner: ConcreteType,
         some: usize,
         none: usize,
     },
@@ -13361,7 +13393,7 @@ enum MatchPlan {
     /// the case's payload `(offset, type)` fields.
     Variant {
         arm_tags: Vec<usize>,
-        payloads: Vec<Vec<(u32, Type)>>,
+        payloads: Vec<Vec<(u32, ConcreteType)>>,
     },
 }
 
@@ -13369,13 +13401,13 @@ enum MatchPlan {
 /// tag + payload layout. Mirrors the checker's exhaustiveness/arity rules (it's
 /// a backstop, and codegen runs on monomorphized output the checker already saw).
 fn plan_match(
-    scrut_ty: &Type,
+    scrut_ty: &ConcreteType,
     arms: &[MatchArm],
     structs: &HashMap<String, TypeDef>,
     scrut_span: Span,
 ) -> Result<MatchPlan, Error> {
     match scrut_ty {
-        Type::Optional(inner) => {
+        ConcreteType::Optional(inner) => {
             let find = |ctor: &str| {
                 arms.iter()
                     .position(|a| a.pattern.ctor_name() == Some(ctor))
@@ -13403,7 +13435,7 @@ fn plan_match(
                 none,
             })
         }
-        Type::Result(ok, err) => {
+        ConcreteType::Result(ok, err) => {
             // A Result matches like a 2-case variant: tag 1 = ok, 0 = err, with a
             // single payload field at OPT_VALUE_OFFSET typed by the active side.
             let find = |ctor: &str| {
@@ -13438,7 +13470,7 @@ fn plan_match(
             payloads[err_i] = vec![(OPT_VALUE_OFFSET, (**err).clone())];
             Ok(MatchPlan::Variant { arm_tags, payloads })
         }
-        Type::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
+        ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some() => {
             let vl = structs[n].as_variant().expect("variant layout");
             let mut arm_tags = Vec::with_capacity(arms.len());
             let mut payloads = Vec::with_capacity(arms.len());
@@ -13505,7 +13537,7 @@ fn bind_match_arm(
     ptr: Value,
     tag: Value,
     structs: &HashMap<String, TypeDef>,
-) -> Vec<(String, Value, Type)> {
+) -> Vec<(String, Value, ConcreteType)> {
     match plan {
         MatchPlan::Optional { inner, some, .. } => {
             if i != *some {
@@ -13514,7 +13546,7 @@ fn bind_match_arm(
             // Unwrap one optional layer: a non-optional core is read in place; a
             // nested optional is materialized in a fresh slot with `tag - 1`
             // (sharing the core value) — see "Optional representation".
-            let value = if matches!(inner, Type::Optional(_)) {
+            let value = if matches!(inner, ConcreteType::Optional(_)) {
                 let core = opt_core(inner);
                 let islot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -13554,7 +13586,7 @@ fn bind_match_arm(
 fn variant_ctor(
     structs: &HashMap<String, TypeDef>,
     name: &str,
-) -> Option<(String, usize, Vec<(u32, Type)>)> {
+) -> Option<(String, usize, Vec<(u32, ConcreteType)>)> {
     let (ctor, inst) = name.split_once('@')?;
     let vl = structs.get(inst)?.as_variant()?;
     let (tag, case) = vl.case(ctor)?;
@@ -13577,10 +13609,10 @@ fn compile_variant<M: Module>(
     scopes: &mut Vec<Vec<Tracked>>,
     vname: &str,
     tag: usize,
-    fields: &[(u32, Type)],
+    fields: &[(u32, ConcreteType)],
     args: &[Expr],
     span: Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     if args.len() != fields.len() {
         return Err(Error::at(
             format!(
@@ -13591,7 +13623,7 @@ fn compile_variant<M: Module>(
             span.clone(),
         ));
     }
-    let vty = Type::Named(vname.to_string());
+    let vty = ConcreteType::Named(vname.to_string());
     let size = cx.structs[vname].size();
     // A boxed (recursive) variant lives on the heap behind a refcounted block;
     // a normal one lives in a fresh stack slot. Either way `base` addresses the
@@ -13618,7 +13650,7 @@ fn compile_variant<M: Module>(
         let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         // A bare literal takes the payload field's int type.
-        let actual = aipl_syntax::flex_int_ty(arg, &actual, fty);
+        let actual = flex_int_ty(arg, &actual, fty);
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
         let dst = builder.ins().iadd_imm_s(base, *offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
@@ -13743,7 +13775,7 @@ fn emit_arr_starts_ends_elem<M: Module>(
     cx: Cx,
     arr: Value,
     elem_val: Value,
-    elem: &Type,
+    elem: &ConcreteType,
     end: SeEnd,
     at: Option<Value>,
 ) -> Result<Value, Error> {
@@ -13797,7 +13829,7 @@ fn emit_arr_contains_elem<M: Module>(
     cx: Cx,
     arr: Value,
     elem_val: Value,
-    elem: &Type,
+    elem: &ConcreteType,
 ) -> Result<Value, Error> {
     let Cx {
         structs, builtins, ..
@@ -13854,7 +13886,7 @@ fn emit_arr_contains_seq<M: Module>(
     cx: Cx,
     self_ptr: Value,
     other_ptr: Value,
-    elem: &Type,
+    elem: &ConcreteType,
 ) -> Result<Value, Error> {
     let Cx {
         structs, builtins, ..
@@ -13954,11 +13986,11 @@ fn compile_indirect_call<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     name: &str,
-    ptys: &[Type],
-    ret: &Type,
+    ptys: &[ConcreteType],
+    ret: &ConcreteType,
     args: &[Expr],
     span: Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let Cx {
         env,
         structs,
@@ -13981,7 +14013,7 @@ fn compile_indirect_call<M: Module>(
     for (idx, (arg, expected)) in args.iter().zip(ptys).enumerate() {
         let before = scope_depth(scopes);
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
-        let actual = aipl_syntax::flex_int_ty(arg, &actual, expected);
+        let actual = flex_int_ty(arg, &actual, expected);
         expect_type(
             &actual,
             expected,
@@ -14047,7 +14079,7 @@ fn compile_call<M: Module>(
     info: &FuncInfo,
     args: &[Expr],
     span: Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let Cx {
         structs,
         builtins,
@@ -14092,7 +14124,7 @@ fn compile_call<M: Module>(
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
         // A bare literal argument flexes to a narrow-int parameter (its
         // i64-register value is already canonical when it fits — checker-verified).
-        let actual = aipl_syntax::flex_int_ty(arg, &actual, expected);
+        let actual = flex_int_ty(arg, &actual, expected);
         expect_type(
             &actual,
             expected,
@@ -14232,7 +14264,7 @@ fn compile_call_expr<M: Module>(
     args: &[Expr],
     style: bool,
     span: Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let Cx {
         env,
         funcs,
@@ -14258,9 +14290,9 @@ fn compile_call_expr<M: Module>(
     let cx = Cx { tail: false, ..cx };
     // A free call whose callee is a local holding a function value is an
     // indirect call (mono resolved HOF-parameter calls to concrete callees, so
-    // any surviving call through a `Type::Fn` binding is a runtime one).
+    // any surviving call through a `ConcreteType::Fn` binding is a runtime one).
     if !style {
-        if let Some(Type::Fn(ptys, ret)) = env.get(name).map(env_binding_type) {
+        if let Some(ConcreteType::Fn(ptys, ret)) = env.get(name).map(env_binding_type) {
             return compile_indirect_call(
                 module, builder, cx, scopes, name, &ptys, &ret, args, span,
             );
@@ -14286,20 +14318,24 @@ fn compile_call_expr<M: Module>(
             }
             let (lv, lt) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (rv, rt) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            let lt = aipl_syntax::flex_int_ty(&args[0], &lt, &rt);
-            let rt = aipl_syntax::flex_int_ty(&args[1], &rt, &lt);
+            let lt = flex_int_ty(&args[0], &lt, &rt);
+            let rt = flex_int_ty(&args[1], &rt, &lt);
             let p = match (&lt, &rt) {
-                (Type::Primitive(a), Type::Primitive(b)) if a.is_int() && a == b => *a,
+                (ConcreteType::Primitive(a), ConcreteType::Primitive(b))
+                    if a.is_int() && a == b =>
+                {
+                    *a
+                }
                 _ => {
                     expect_type(
                         &lt,
-                        &Type::Primitive(Primitive::I64),
+                        &ConcreteType::Primitive(Primitive::I64),
                         "arithmetic operand",
                         args[0].span.clone(),
                     )?;
                     expect_type(
                         &rt,
-                        &Type::Primitive(Primitive::I64),
+                        &ConcreteType::Primitive(Primitive::I64),
                         "arithmetic operand",
                         args[1].span.clone(),
                     )?;
@@ -14316,7 +14352,7 @@ fn compile_call_expr<M: Module>(
                 let saturating = name.starts_with("__builtin_saturating_");
                 emit_int_addsub(builder, lv, rv, p, sub, saturating)
             };
-            (out, Type::Primitive(p))
+            (out, ConcreteType::Primitive(p))
         }
         "__builtin_to_str" => {
             // Generic `to_str(x)`: render by the argument's static type.
@@ -14328,7 +14364,7 @@ fn compile_call_expr<M: Module>(
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
-            (s, Type::Primitive(Primitive::Str))
+            (s, ConcreteType::Primitive(Primitive::Str))
         }
         "__template_interp" => {
             // Template-literal interpolation: pass `str` through as-is; convert
@@ -14345,10 +14381,10 @@ fn compile_call_expr<M: Module>(
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             if is_str_repr(&t) {
-                (v, Type::Primitive(Primitive::Str))
+                (v, ConcreteType::Primitive(Primitive::Str))
             } else {
                 let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
-                (s, Type::Primitive(Primitive::Str))
+                (s, ConcreteType::Primitive(Primitive::Str))
             }
         }
         "__builtin_hash" => {
@@ -14363,7 +14399,7 @@ fn compile_call_expr<M: Module>(
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let h = emit_hash(module, builder, cx.builtins, cx.structs, v, &t)?;
-            (h, Type::Primitive(Primitive::I64))
+            (h, ConcreteType::Primitive(Primitive::I64))
         }
         "__builtin_minimum" | "__builtin_maximum" => {
             // `arr.minimum()` / `arr.maximum()`: smallest / largest element as
@@ -14383,7 +14419,7 @@ fn compile_call_expr<M: Module>(
             let is_min = name == "__builtin_minimum";
             let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let elem = match &arr_ty {
-                Type::Array(e) => (**e).clone(),
+                ConcreteType::Array(e) => (**e).clone(),
                 _ => {
                     return Err(Error::at(
                         format!("{:?} of one argument expects an array", display_name(name)),
@@ -14391,7 +14427,7 @@ fn compile_call_expr<M: Module>(
                     ))
                 }
             };
-            let opt_ty = Type::Optional(Box::new(elem.clone()));
+            let opt_ty = ConcreteType::Optional(Box::new(elem.clone()));
             // Result slot: a scalar optional `{tag, value}` (no heap, no drop).
             let rslot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -14491,8 +14527,8 @@ fn compile_call_expr<M: Module>(
             let (b, bt) = compile_expr(module, builder, cx, scopes, &args[1])?;
             // A bare integer literal flexes to the other side's width, so
             // `n.max(1)` needs no conversion on the `1` whatever `n` is.
-            let at = aipl_syntax::flex_int_ty(&args[0], &at, &bt);
-            let bt = aipl_syntax::flex_int_ty(&args[1], &bt, &at);
+            let at = flex_int_ty(&args[0], &at, &bt);
+            let bt = flex_int_ty(&args[1], &bt, &at);
             let want = if name == "__builtin_min" {
                 "min"
             } else {
@@ -14510,7 +14546,8 @@ fn compile_call_expr<M: Module>(
                         span.clone(),
                     ));
                 }
-                if !matches!(&at, Type::Primitive(p) if p.is_int() || *p == Primitive::Char) {
+                if !matches!(&at, ConcreteType::Primitive(p) if p.is_int() || *p == Primitive::Char)
+                {
                     return Err(Error::at(
                         format!(
                             "{want:?} compares integers, chars or strs, not {}",
@@ -14535,7 +14572,7 @@ fn compile_call_expr<M: Module>(
                 builder.ins().icmp_imm_s(cc, c, 0)
             } else {
                 let signed = match &at {
-                    Type::Primitive(p) if p.is_int() => p.int_signed(),
+                    ConcreteType::Primitive(p) if p.is_int() => p.int_signed(),
                     _ => false, // `char` is a byte — unsigned
                 };
                 let cc = match (want_min, signed) {
@@ -14575,14 +14612,14 @@ fn compile_call_expr<M: Module>(
             let (s_v, s_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             expect_type(
                 &s_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "split receiver",
                 args[0].span.clone(),
             )?;
             let (sep_v, sep_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
             expect_type(
                 &sep_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "split separator",
                 args[1].span.clone(),
             )?;
@@ -14591,7 +14628,7 @@ fn compile_call_expr<M: Module>(
             let f = builtins.import(module, builder.func, "aipl_str_split");
             let inst = builder.ins().call(f, &[s_v, sep_v]);
             let result = builder.inst_results(inst)[0];
-            let ty = Type::Array(Box::new(Type::Primitive(Primitive::Str)));
+            let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -14612,7 +14649,7 @@ fn compile_call_expr<M: Module>(
             let (name_v, name_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             expect_type(
                 &name_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "read_file_to_string filename",
                 args[0].span.clone(),
             )?;
@@ -14622,8 +14659,8 @@ fn compile_call_expr<M: Module>(
             let local = builtins.import(module, builder.func, "aipl_read_file_to_string");
             let inst = builder.ins().call(local, &[name_v]);
             let raw = builder.inst_results(inst)[0];
-            let result_ty = Type::Result(
-                Box::new(Type::Primitive(Primitive::Str)),
+            let result_ty = ConcreteType::Result(
+                Box::new(ConcreteType::Primitive(Primitive::Str)),
                 Box::new(error_ty()),
             );
             let ptr = emit_file_result(
@@ -14662,7 +14699,7 @@ fn compile_call_expr<M: Module>(
             // Both are shimmable operations, so the call routes through the
             // shim slot: an installed shim wins, otherwise the real clock.
             let v = emit_shimmable_call(module, builder, builtins, pretty, sym);
-            (v, Type::Primitive(Primitive::U64))
+            (v, ConcreteType::Primitive(Primitive::U64))
         }
         "__builtin_list_files" => {
             // `(str) -> str[]!str`: ok(paths) on success, err(message) on any
@@ -14679,7 +14716,7 @@ fn compile_call_expr<M: Module>(
             let (dir_v, dir_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             expect_type(
                 &dir_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "list_files directory",
                 args[0].span.clone(),
             )?;
@@ -14689,8 +14726,10 @@ fn compile_call_expr<M: Module>(
             let local = builtins.import(module, builder.func, "aipl_list_files");
             let inst = builder.ins().call(local, &[dir_v]);
             let raw = builder.inst_results(inst)[0];
-            let result_ty = Type::Result(
-                Box::new(Type::Array(Box::new(Type::Primitive(Primitive::Str)))),
+            let result_ty = ConcreteType::Result(
+                Box::new(ConcreteType::Array(Box::new(ConcreteType::Primitive(
+                    Primitive::Str,
+                )))),
                 Box::new(error_ty()),
             );
             let ptr = emit_file_result(
@@ -14723,14 +14762,14 @@ fn compile_call_expr<M: Module>(
             let (path_v, path_t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             expect_type(
                 &path_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "write_string_to_file path",
                 args[0].span.clone(),
             )?;
             let (data_v, data_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
             expect_type(
                 &data_t,
-                &Type::Primitive(Primitive::Str),
+                &ConcreteType::Primitive(Primitive::Str),
                 "write_string_to_file contents",
                 args[1].span.clone(),
             )?;
@@ -14740,7 +14779,8 @@ fn compile_call_expr<M: Module>(
             let local = builtins.import(module, builder.func, "aipl_write_string_to_file");
             let inst = builder.ins().call(local, &[path_v, data_v]);
             let code = builder.inst_results(inst)[0];
-            let result_ty = Type::Result(Box::new(Type::Unit), Box::new(error_ty()));
+            let result_ty =
+                ConcreteType::Result(Box::new(ConcreteType::Unit), Box::new(error_ty()));
             let ptr = emit_file_result(
                 module,
                 builder,
@@ -14766,7 +14806,7 @@ fn compile_call_expr<M: Module>(
             }
             let (opt_ptr, opt_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let inner = match &opt_ty {
-                Type::Optional(i) => (**i).clone(),
+                ConcreteType::Optional(i) => (**i).clone(),
                 _ => {
                     return Err(Error::at(
                         format!(
@@ -14785,7 +14825,7 @@ fn compile_call_expr<M: Module>(
             } else {
                 // A bare literal default flexes to the optional's element type,
                 // so `some(u8(3)).value_or(0)` needs no conversion on the `0`.
-                let default_ty = aipl_syntax::flex_int_ty(&args[1], &default_ty, &inner);
+                let default_ty = flex_int_ty(&args[1], &default_ty, &inner);
                 expect_type(
                     &default_ty,
                     &inner,
@@ -14840,7 +14880,7 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (ptr, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if !matches!(&recv_ty, Type::Optional(_)) {
+            if !matches!(&recv_ty, ConcreteType::Optional(_)) {
                 return Err(Error::at(
                     format!(
                         "\"is_some\" is only callable on an optional, got {}",
@@ -14856,7 +14896,7 @@ fn compile_call_expr<M: Module>(
                 .load(types::I64, MemFlagsData::trusted(), ptr, 0);
             let nz = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
             let b = builder.ins().uextend(types::I64, nz);
-            (b, Type::Primitive(Primitive::Bool))
+            (b, ConcreteType::Primitive(Primitive::Bool))
         }
         "__builtin_same_case" => {
             // `a.same_case(b)`: do these share a constructor, payloads ignored?
@@ -14881,7 +14921,7 @@ fn compile_call_expr<M: Module>(
             // reached codegen another way (a synthesized call, say) rather than
             // silently reading a tag off something that has none.
             for (t, e) in [(&a_ty, &args[0]), (&b_ty, &args[1])] {
-                let is_variant = matches!(t, Type::Named(n)
+                let is_variant = matches!(t, ConcreteType::Named(n)
                     if cx.structs.get(n).and_then(TypeDef::as_variant).is_some());
                 if !is_variant {
                     return Err(Error::at(
@@ -14901,7 +14941,7 @@ fn compile_call_expr<M: Module>(
                 .load(types::I64, MemFlagsData::trusted(), b, 0);
             let eq = builder.ins().icmp(IntCC::Equal, ta, tb);
             let out = builder.ins().uextend(types::I64, eq);
-            (out, Type::Primitive(Primitive::Bool))
+            (out, ConcreteType::Primitive(Primitive::Bool))
         }
         "__builtin_is_space" => {
             // `c.is_space() -> bool` — true when c is ASCII whitespace.
@@ -14912,7 +14952,7 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+            if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"is_space\" is only callable on a char, got {}",
@@ -14930,7 +14970,7 @@ fn compile_call_expr<M: Module>(
             let or2 = builder.ins().bor(lf, cr);
             let result = builder.ins().bor(or1, or2);
             let b = builder.ins().uextend(types::I64, result);
-            (b, Type::Primitive(Primitive::Bool))
+            (b, ConcreteType::Primitive(Primitive::Bool))
         }
         "__builtin_is_digit" => {
             // `c.is_digit() -> bool` — true when c is '0'..'9'.
@@ -14941,7 +14981,7 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+            if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"is_digit\" is only callable on a char, got {}",
@@ -14959,7 +14999,7 @@ fn compile_call_expr<M: Module>(
                 .icmp_imm_s(IntCC::UnsignedLessThanOrEqual, c, 57);
             let result = builder.ins().band(ge_0, le_9);
             let b = builder.ins().uextend(types::I64, result);
-            (b, Type::Primitive(Primitive::Bool))
+            (b, ConcreteType::Primitive(Primitive::Bool))
         }
         "__builtin_to_digit" => {
             // `c.to_digit() -> i64?` — an ASCII digit '0'..'9' to its 0..9
@@ -14971,7 +15011,7 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if !matches!(&recv_ty, Type::Primitive(Primitive::Char)) {
+            if !matches!(&recv_ty, ConcreteType::Primitive(Primitive::Char)) {
                 return Err(Error::at(
                     format!(
                         "\"to_digit\" is only callable on a char, got {}",
@@ -14993,7 +15033,7 @@ fn compile_call_expr<M: Module>(
             let is_digit = builder.ins().band(ge_0, le_9);
             let tag = builder.ins().uextend(types::I64, is_digit);
             let value = builder.ins().iadd_imm_s(c, -48);
-            let opt_ty = Type::Optional(Box::new(Type::Primitive(Primitive::I64)));
+            let opt_ty = ConcreteType::Optional(Box::new(ConcreteType::Primitive(Primitive::I64)));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 elem_size_of(&opt_ty, structs) as u32,
@@ -15030,7 +15070,10 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_str_len");
                 let inst = builder.ins().call(f, &[ptr]);
                 builder.inst_results(inst)[0]
-            } else if matches!(t, Type::Array(_) | Type::Set(_) | Type::Dict(_, _)) {
+            } else if matches!(
+                t,
+                ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _)
+            ) {
                 // A set/dict shares the array layout, so its element/pair count is
                 // the same `len` field.
                 load_arr_len(builder, ptr)
@@ -15044,13 +15087,13 @@ fn compile_call_expr<M: Module>(
                 ));
             };
             if name == "__builtin_len" {
-                (len, Type::Primitive(Primitive::U64))
+                (len, ConcreteType::Primitive(Primitive::U64))
             } else {
                 // `bool` is an i64 0/1 here like every other AIPL bool, so the
                 // comparison result is extended rather than kept 1-bit.
                 let nonzero = builder.ins().icmp_imm_s(IntCC::NotEqual, len, 0);
                 let out = builder.ins().uextend(types::I64, nonzero);
-                (out, Type::Primitive(Primitive::Bool))
+                (out, ConcreteType::Primitive(Primitive::Bool))
             }
         }
         "__builtin_sort" => {
@@ -15077,7 +15120,7 @@ fn compile_call_expr<M: Module>(
                 let out_ty = if is_char_array(&t) {
                     t.clone()
                 } else {
-                    Type::Primitive(Primitive::Str)
+                    ConcreteType::Primitive(Primitive::Str)
                 };
                 scopes
                     .last_mut()
@@ -15085,7 +15128,7 @@ fn compile_call_expr<M: Module>(
                     .push(Tracked::new(out, &out_ty));
                 return Ok((out, out_ty));
             }
-            let Type::Array(elem) = &t else {
+            let ConcreteType::Array(elem) = &t else {
                 return Err(Error::at(
                     format!("\"sort\" expects an array, got {}", type_name(&t)),
                     args[0].span.clone(),
@@ -15099,10 +15142,10 @@ fn compile_call_expr<M: Module>(
             // unsigned comparisons order them correctly — only the choice
             // between the two arms depends on the width's signedness.
             let kind = match &elem {
-                Type::Primitive(Primitive::Str) => SORT_KIND_STR,
+                ConcreteType::Primitive(Primitive::Str) => SORT_KIND_STR,
                 // A `char` is a byte value, so it orders as an unsigned word.
-                Type::Primitive(Primitive::Char) => SORT_KIND_UNSIGNED,
-                Type::Primitive(p) if p.is_int() => {
+                ConcreteType::Primitive(Primitive::Char) => SORT_KIND_UNSIGNED,
+                ConcreteType::Primitive(p) if p.is_int() => {
                     if p.int_signed() {
                         SORT_KIND_SIGNED
                     } else {
@@ -15134,7 +15177,7 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .call(f, &[ptr, drop_fn, retain_fn, esz, kind_v]);
             let out = builder.inst_results(inst)[0];
-            let arr_ty = Type::Array(Box::new(elem));
+            let arr_ty = ConcreteType::Array(Box::new(elem));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -15161,7 +15204,7 @@ fn compile_call_expr<M: Module>(
             // Both runtime entry points consume their arguments; the callers here
             // are borrowing, so each gets a compensating pre-inc.
             let inner = match &pt {
-                Type::Array(e) => (**e).clone(),
+                ConcreteType::Array(e) => (**e).clone(),
                 other => {
                     return Err(Error::at(
                         format!(
@@ -15179,10 +15222,14 @@ fn compile_call_expr<M: Module>(
             // which representation that empty result has.
             let inner = if is_none_inner(&inner) {
                 match &st {
-                    t if is_str_repr(t) || is_char_array(t) => Type::Primitive(Primitive::Str),
-                    Type::Primitive(Primitive::Char) => Type::Primitive(Primitive::Str),
+                    t if is_str_repr(t) || is_char_array(t) => {
+                        ConcreteType::Primitive(Primitive::Str)
+                    }
+                    ConcreteType::Primitive(Primitive::Char) => {
+                        ConcreteType::Primitive(Primitive::Str)
+                    }
                     // Both sides empty: nothing anywhere names `T`.
-                    Type::Array(e) if is_none_inner(e) => {
+                    ConcreteType::Array(e) if is_none_inner(e) => {
                         return Err(Error::at(
                             "\"join\" cannot tell what it is joining: the parts and the \
                              separator are both empty, so neither names an element type"
@@ -15192,8 +15239,8 @@ fn compile_call_expr<M: Module>(
                     }
                     // A `T[]` separator is already the parts' element type; a
                     // bare `T` is one level down.
-                    Type::Array(_) => st.clone(),
-                    other => Type::Array(Box::new(other.clone())),
+                    ConcreteType::Array(_) => st.clone(),
+                    other => ConcreteType::Array(Box::new(other.clone())),
                 }
             } else {
                 inner
@@ -15207,7 +15254,7 @@ fn compile_call_expr<M: Module>(
                 // normalizes a bare element into a one-item sequence with a
                 // prologue; a *native* builtin has no body to prepend one to, so
                 // the wrapping happens here instead.
-                let sep = if matches!(st, Type::Primitive(Primitive::Char)) {
+                let sep = if matches!(st, ConcreteType::Primitive(Primitive::Char)) {
                     let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
                     let one = builder.ins().iconst(types::I64, 1);
                     let inst = builder.ins().call(alloc, &[one]);
@@ -15216,7 +15263,7 @@ fn compile_call_expr<M: Module>(
                     scopes
                         .last_mut()
                         .expect("scope")
-                        .push(Tracked::new(buf, &Type::Primitive(Primitive::Str)));
+                        .push(Tracked::new(buf, &ConcreteType::Primitive(Primitive::Str)));
                     buf
                 } else {
                     sep
@@ -15225,7 +15272,7 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_str_join");
                 let inst = builder.ins().call(f, &[parts, sep]);
                 let out = builder.inst_results(inst)[0];
-                let out_ty = Type::Primitive(Primitive::Str);
+                let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -15233,7 +15280,7 @@ fn compile_call_expr<M: Module>(
                 (out, out_ty)
             } else {
                 let elem = match &inner {
-                    Type::Array(e) => (**e).clone(),
+                    ConcreteType::Array(e) => (**e).clone(),
                     other => {
                         return Err(Error::at(
                             format!(
@@ -15244,7 +15291,7 @@ fn compile_call_expr<M: Module>(
                         ));
                     }
                 };
-                let out_ty = Type::Array(Box::new(elem.clone()));
+                let out_ty = ConcreteType::Array(Box::new(elem.clone()));
                 emit_retain(builder, module, builtins, structs, parts, &pt);
                 // The element helpers describe `T`, not the parts: the runtime
                 // copies and retains the innermost elements.
@@ -15256,7 +15303,7 @@ fn compile_call_expr<M: Module>(
                 // See the str path: a native builtin gets no `specialize_variadic`
                 // prologue, so a bare element is wrapped into a one-item sequence
                 // here. An `Array` argument is already the sequence.
-                let sep = if matches!(st, Type::Array(_)) {
+                let sep = if matches!(st, ConcreteType::Array(_)) {
                     emit_retain(builder, module, builtins, structs, sep, &out_ty);
                     sep
                 } else {
@@ -15314,11 +15361,11 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_str_reverse");
                 let inst = builder.ins().call(f, &[ptr]);
                 let result = builder.inst_results(inst)[0];
-                scopes
-                    .last_mut()
-                    .expect("scope")
-                    .push(Tracked::new(result, &Type::Primitive(Primitive::Str)));
-                (result, Type::Primitive(Primitive::Str))
+                scopes.last_mut().expect("scope").push(Tracked::new(
+                    result,
+                    &ConcreteType::Primitive(Primitive::Str),
+                ));
+                (result, ConcreteType::Primitive(Primitive::Str))
             } else if is_char_array(&t) {
                 // Str-shaped (see `is_char_array`), but — unlike a bare `str`
                 // receiver above — keeps its nominal `char[]` type.
@@ -15331,7 +15378,7 @@ fn compile_call_expr<M: Module>(
                     .expect("scope")
                     .push(Tracked::new(result, &t));
                 (result, t)
-            } else if let Type::Array(elem) = &t {
+            } else if let ConcreteType::Array(elem) = &t {
                 let elem = (**elem).clone();
                 emit_inc(builder, module, builtins, ptr);
                 let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
@@ -15342,7 +15389,7 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_arr_reverse");
                 let inst = builder.ins().call(f, &[ptr, drop_fn, retain_fn, esz]);
                 let view = builder.inst_results(inst)[0];
-                let arr_ty = Type::Array(Box::new(elem));
+                let arr_ty = ConcreteType::Array(Box::new(elem));
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -15451,7 +15498,7 @@ fn compile_call_expr<M: Module>(
                 // `T[]` pattern — element-wise structural compare. Borrows both
                 // arrays; `emit_eq` balances its own per-element refs.
                 let self_elem = match &recv_ty {
-                    Type::Array(e) => (**e).clone(),
+                    ConcreteType::Array(e) => (**e).clone(),
                     other => {
                         return Err(Error::at(
                             format!(
@@ -15470,7 +15517,7 @@ fn compile_call_expr<M: Module>(
                 } else {
                     match (shape, &pat_ty) {
                         (SeShape::Elem, t) => t.clone(),
-                        (_, Type::Array(e) | Type::Optional(e)) => (**e).clone(),
+                        (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
                         (_, t) => t.clone(),
                     }
                 };
@@ -15511,7 +15558,7 @@ fn compile_call_expr<M: Module>(
                     }
                 }
             };
-            (result, Type::Primitive(Primitive::Bool))
+            (result, ConcreteType::Primitive(Primitive::Bool))
         }
         _ if contains_shape(name).is_some() => {
             // `s.contains(n) -> bool` over a `str` (byte window compare) or
@@ -15582,7 +15629,7 @@ fn compile_call_expr<M: Module>(
                 // `T*` needle — element-wise structural compare. Borrows both
                 // arrays; `emit_eq` balances its own per-element refs.
                 let self_elem = match &recv_ty {
-                    Type::Array(e) => (**e).clone(),
+                    ConcreteType::Array(e) => (**e).clone(),
                     other => {
                         return Err(Error::at(
                             format!(
@@ -15600,7 +15647,7 @@ fn compile_call_expr<M: Module>(
                 } else {
                     match (shape, &ndl_ty) {
                         (SeShape::Elem, t) => t.clone(),
-                        (_, Type::Array(e) | Type::Optional(e)) => (**e).clone(),
+                        (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
                         (_, t) => t.clone(),
                     }
                 };
@@ -15638,7 +15685,7 @@ fn compile_call_expr<M: Module>(
                     }
                 }
             };
-            (result, Type::Primitive(Primitive::Bool))
+            (result, ConcreteType::Primitive(Primitive::Bool))
         }
         "__char_to_str" => {
             // Internal: a single `char` to a one-char inline `str`. Emitted by
@@ -15652,7 +15699,7 @@ fn compile_call_expr<M: Module>(
             let (c, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             (
                 emit_char_to_str(builder, c),
-                Type::Primitive(Primitive::Str),
+                ConcreteType::Primitive(Primitive::Str),
             )
         }
         "__builtin_has" => {
@@ -15666,7 +15713,7 @@ fn compile_call_expr<M: Module>(
             }
             let (set_ptr, set_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let elem = match &set_ty {
-                Type::Set(inner) => (**inner).clone(),
+                ConcreteType::Set(inner) => (**inner).clone(),
                 other => {
                     return Err(Error::at(
                         format!("\"has\" expects a set, got {}", type_name(other)),
@@ -15680,12 +15727,12 @@ fn compile_call_expr<M: Module>(
             if is_none_inner(&elem) {
                 (
                     builder.ins().iconst(types::I64, 0),
-                    Type::Primitive(Primitive::Bool),
+                    ConcreteType::Primitive(Primitive::Bool),
                 )
             } else {
                 // A bare literal queried against a narrow-element set flexes,
                 // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
-                let x_ty = aipl_syntax::flex_int_ty(&args[1], &x_ty, &elem);
+                let x_ty = flex_int_ty(&args[1], &x_ty, &elem);
                 expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
                 // The runtime reads the queried value through a pointer; spill
                 // the scalar (a `bool` is read back as i64) and pass its address.
@@ -15702,12 +15749,12 @@ fn compile_call_expr<M: Module>(
                 let f = builtins.import(module, builder.func, "aipl_set_contains");
                 let str_cmp = builder.ins().iconst(
                     types::I64,
-                    i64::from(elem == Type::Primitive(Primitive::Str)),
+                    i64::from(elem == ConcreteType::Primitive(Primitive::Str)),
                 );
                 let inst = builder.ins().call(f, &[set_ptr, x_ptr, esz, str_cmp]);
                 (
                     builder.inst_results(inst)[0],
-                    Type::Primitive(Primitive::Bool),
+                    ConcreteType::Primitive(Primitive::Bool),
                 )
             }
         }
@@ -15727,7 +15774,7 @@ fn compile_call_expr<M: Module>(
             // Both sides must be the same set type (up to an empty-`#{}` operand,
             // whose element merges to the concrete side).
             let merged = merge_types(&a_ty, &b_ty);
-            let Some(result_ty @ Type::Set(_)) = merged else {
+            let Some(result_ty @ ConcreteType::Set(_)) = merged else {
                 return Err(Error::at(
                     format!(
                         "\"union\" expects two sets of the same type, got {} and {}",
@@ -15737,7 +15784,7 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             };
-            let Type::Set(elem) = &result_ty else {
+            let ConcreteType::Set(elem) = &result_ty else {
                 unreachable!()
             };
             emit_inc(builder, module, builtins, a_ptr);
@@ -15749,7 +15796,7 @@ fn compile_call_expr<M: Module>(
                 .iconst(types::I64, runtime_elem_size(elem, structs));
             let str_cmp = builder.ins().iconst(
                 types::I64,
-                i64::from(**elem == Type::Primitive(Primitive::Str)),
+                i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
             );
             let f = builtins.import(module, builder.func, "aipl_set_union");
             let inst = builder
@@ -15774,7 +15821,7 @@ fn compile_call_expr<M: Module>(
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (key_ty, val_ty) = match &dict_ty {
-                Type::Dict(k, v) => ((**k).clone(), (**v).clone()),
+                ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
                     return Err(Error::at(
                         format!("\"get\" expects a dict, got {}", type_name(other)),
@@ -15783,7 +15830,7 @@ fn compile_call_expr<M: Module>(
                 }
             };
             let (key_v, key_t) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            let result_ty = Type::Optional(Box::new(val_ty.clone()));
+            let result_ty = ConcreteType::Optional(Box::new(val_ty.clone()));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 elem_size_of(&result_ty, structs) as u32,
@@ -15796,7 +15843,7 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_store(types::I64, zero, slot, 0);
                 (sbase, result_ty)
             } else {
-                let key_t = aipl_syntax::flex_int_ty(&args[1], &key_t, &key_ty);
+                let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
                 expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
                 // Spill the key and pass its address (a `bool` reads back as i64,
                 // a `str` as its pointer).
@@ -15811,7 +15858,7 @@ fn compile_call_expr<M: Module>(
                 let psz = builder.ins().iconst(types::I64, pair_size);
                 let str_cmp = builder.ins().iconst(
                     types::I64,
-                    i64::from(key_ty == Type::Primitive(Primitive::Str)),
+                    i64::from(key_ty == ConcreteType::Primitive(Primitive::Str)),
                 );
                 let f = builtins.import(module, builder.func, "aipl_dict_get");
                 let inst = builder.ins().call(f, &[dict_ptr, key_ptr, psz, str_cmp]);
@@ -15859,7 +15906,7 @@ fn compile_call_expr<M: Module>(
             }
             let (dict_ptr, dict_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (key_ty, val_ty) = match &dict_ty {
-                Type::Dict(k, v) => ((**k).clone(), (**v).clone()),
+                ConcreteType::Dict(k, v) => ((**k).clone(), (**v).clone()),
                 other => {
                     return Err(Error::at(
                         format!("\"contains_key\" expects a dict, got {}", type_name(other)),
@@ -15871,10 +15918,10 @@ fn compile_call_expr<M: Module>(
             if is_none_inner(&key_ty) {
                 (
                     builder.ins().iconst(types::I64, 0),
-                    Type::Primitive(Primitive::Bool),
+                    ConcreteType::Primitive(Primitive::Bool),
                 )
             } else {
-                let key_t = aipl_syntax::flex_int_ty(&args[1], &key_t, &key_ty);
+                let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
                 expect_type(&key_t, &key_ty, "contains_key key", args[1].span.clone())?;
                 let ks = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -15887,13 +15934,13 @@ fn compile_call_expr<M: Module>(
                 let psz = builder.ins().iconst(types::I64, pair_size);
                 let str_cmp = builder.ins().iconst(
                     types::I64,
-                    i64::from(key_ty == Type::Primitive(Primitive::Str)),
+                    i64::from(key_ty == ConcreteType::Primitive(Primitive::Str)),
                 );
                 let f = builtins.import(module, builder.func, "aipl_dict_contains_key");
                 let inst = builder.ins().call(f, &[dict_ptr, key_ptr, psz, str_cmp]);
                 (
                     builder.inst_results(inst)[0],
-                    Type::Primitive(Primitive::Bool),
+                    ConcreteType::Primitive(Primitive::Bool),
                 )
             }
         }
@@ -15908,7 +15955,7 @@ fn compile_call_expr<M: Module>(
             let off = builder.ins().imul_imm_s(w, 8);
             let addr = builder.ins().iadd(base, off);
             builder.ins().store(MemFlagsData::trusted(), e, addr, 0);
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__filter_drop" => {
             // Internal (in-place `filter`): release a filtered-out element. The
@@ -15917,7 +15964,7 @@ fn compile_call_expr<M: Module>(
             // it. A no-op for scalar elements (`needs_drop` is false).
             let (e, ety) = compile_expr(module, builder, cx, scopes, &args[0])?;
             emit_drop(builder, module, builtins, structs, e, &ety);
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__filter_truncate" => {
             // Internal (in-place `filter`): set the array's length to `w`. The
@@ -15928,7 +15975,7 @@ fn compile_call_expr<M: Module>(
             builder
                 .ins()
                 .store(MemFlagsData::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__map_set" => {
             // Internal (in-place `map`): `__map_set(arr, i, new, old)` overwrites
@@ -15960,7 +16007,7 @@ fn compile_call_expr<M: Module>(
                 a_ptr,
                 ARR_DROPFN_OFFSET as i32,
             );
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__map_result" => {
             // Internal (in-place `map`): hand the reused buffer back reinterpreted
@@ -15993,7 +16040,7 @@ fn compile_call_expr<M: Module>(
             let esz = builder.ins().iconst(types::I64, 8); // elem_size
             let inst = builder.ins().call(with_cap, &[cap, zero, esz]);
             let ptr = builder.inst_results(inst)[0];
-            let arr_ty = Type::Array(Box::new(Type::NoneInner));
+            let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -16020,8 +16067,8 @@ fn compile_call_expr<M: Module>(
             let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let arr_owned = owned_temp_since(scopes, before, arr_ptr);
             let elem = match &arr_ty {
-                Type::Array(inner) => (**inner).clone(),
-                _ => Type::NoneInner,
+                ConcreteType::Array(inner) => (**inner).clone(),
+                _ => ConcreteType::NoneInner,
             };
             // Representations with their own append lowering opt out: hand the
             // array back untouched and let the plain `push` path handle them.
@@ -16185,8 +16232,8 @@ fn compile_call_expr<M: Module>(
             // the first pushed value; otherwise the value must match.
             let result_elem = if elem_was_none {
                 let ok = is_array_elem(&x_ty)
-                    || matches!(&x_ty, Type::Optional(_))
-                    || matches!(&x_ty, Type::Named(n) if structs.contains_key(n));
+                    || matches!(&x_ty, ConcreteType::Optional(_))
+                    || matches!(&x_ty, ConcreteType::Named(n) if structs.contains_key(n));
                 if !ok {
                     return Err(Error::at(
                         format!(
@@ -16199,7 +16246,7 @@ fn compile_call_expr<M: Module>(
                 x_ty
             } else {
                 // A bare literal pushed onto a narrow-element array flexes.
-                let x_ty = aipl_syntax::flex_int_ty(value, &x_ty, &elem_ty);
+                let x_ty = flex_int_ty(value, &x_ty, &elem_ty);
                 expect_type(&x_ty, &elem_ty, "push element", value.span.clone())?;
                 elem_ty
             };
@@ -16223,7 +16270,7 @@ fn compile_call_expr<M: Module>(
                 builder.ins().stack_store(types::I64, x_v, s, 0);
                 builder.ins().stack_addr(types::I64, s, 0)
             };
-            let new_arr_ty = Type::Array(Box::new(result_elem));
+            let new_arr_ty = ConcreteType::Array(Box::new(result_elem));
             if is_char_array(&new_arr_ty) {
                 // `char[]` is str-shaped (see `is_char_array`) and `str` has no
                 // in-place-growable form yet: every push rebuilds a fresh
@@ -16346,7 +16393,7 @@ fn compile_call_expr<M: Module>(
             // Refine the binding's element type (e.g. `mut a = []` → `i64[]`).
             *ty_cell.borrow_mut() = new_arr_ty;
             // `push` mutates; it produces no value.
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__builtin_extend" => {
             // `push` for a whole array, and the same in-place writeback form:
@@ -16373,11 +16420,11 @@ fn compile_call_expr<M: Module>(
             let (src_ptr, src_ty) = compile_expr(module, builder, cx, scopes, source)?;
             let src_owned = owned_temp_since(scopes, mark, src_ptr);
             let src_elem = match &src_ty {
-                Type::Array(inner) => (**inner).clone(),
+                ConcreteType::Array(inner) => (**inner).clone(),
                 // A `str` *is* the `char` sequence (see `is_char_array`), so it
                 // is a valid source for a `char[]` receiver — and the only shape
                 // a `char*` variadic ever arrives as.
-                _ if is_str_repr(&src_ty) => Type::Primitive(Primitive::Char),
+                _ if is_str_repr(&src_ty) => ConcreteType::Primitive(Primitive::Char),
                 other => {
                     return Err(Error::at(
                         format!("\"extend\" requires an array, got {}", type_name(other)),
@@ -16395,14 +16442,14 @@ fn compile_call_expr<M: Module>(
                 if !is_none_inner(&src_elem) {
                     expect_type(
                         &src_ty,
-                        &Type::Array(Box::new(elem_ty.clone())),
+                        &ConcreteType::Array(Box::new(elem_ty.clone())),
                         "extend source",
                         source.span.clone(),
                     )?;
                 }
                 elem_ty
             };
-            let new_arr_ty = Type::Array(Box::new(result_elem.clone()));
+            let new_arr_ty = ConcreteType::Array(Box::new(result_elem.clone()));
             if is_char_array(&new_arr_ty) {
                 // `char[]` is str-shaped, and `str` has no in-place growable
                 // form: build a fresh buffer of the combined length and copy
@@ -16466,7 +16513,7 @@ fn compile_call_expr<M: Module>(
                         .push(Tracked::new(buf, &new_arr_ty));
                 }
                 *ty_cell.borrow_mut() = new_arr_ty;
-                return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
             let drop_fn = array_drop_fn_addr(builder, module, cx, &result_elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, &result_elem);
@@ -16522,7 +16569,7 @@ fn compile_call_expr<M: Module>(
             }
             *ty_cell.borrow_mut() = new_arr_ty;
             // `extend` mutates; it produces no value.
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         // The `i8(x)`/`u32(x)`/… conversion builtins were removed in favour of a
         // typed binding (`let n: u8 = x;`), which is where `canon_int` now runs.
@@ -16545,7 +16592,10 @@ fn compile_call_expr<M: Module>(
             // `ok()` with no argument is the void success of a `!E` result: tag 1
             // with an unused (zeroed) value region, Ok side `unit`.
             if is_ok && args.is_empty() {
-                let res_ty = Type::Result(Box::new(Type::Unit), Box::new(Type::NoneInner));
+                let res_ty = ConcreteType::Result(
+                    Box::new(ConcreteType::Unit),
+                    Box::new(ConcreteType::NoneInner),
+                );
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     elem_size_of(&res_ty, structs) as u32,
@@ -16579,7 +16629,7 @@ fn compile_call_expr<M: Module>(
             match &t {
                 // `ok()` (no argument) is how a void success is written; `ok(x)`
                 // needs an `x` that exists.
-                Type::Unit => {
+                ConcreteType::Unit => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be () — write `ok()` for a void success"),
                         args[0].span.clone(),
@@ -16587,7 +16637,7 @@ fn compile_call_expr<M: Module>(
                 }
                 // Function types are erased by monomorphization: a function is
                 // never a runtime value, so it can't be carried in one.
-                Type::Fn(_, _) => {
+                ConcreteType::Fn(_, _) => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be a function ({})", type_name(&t)),
                         args[0].span.clone(),
@@ -16596,9 +16646,9 @@ fn compile_call_expr<M: Module>(
                 _ => {}
             }
             let res_ty = if is_ok {
-                Type::Result(Box::new(t.clone()), Box::new(Type::NoneInner))
+                ConcreteType::Result(Box::new(t.clone()), Box::new(ConcreteType::NoneInner))
             } else {
-                Type::Result(Box::new(Type::NoneInner), Box::new(t.clone()))
+                ConcreteType::Result(Box::new(ConcreteType::NoneInner), Box::new(t.clone()))
             };
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -16633,8 +16683,8 @@ fn compile_call_expr<M: Module>(
                 _ if is_set_elem(&t) => {}
                 // A struct (`Point?`) is stored inline, as is a nested optional
                 // (`some(some(..))` → `T??`) and an array.
-                Type::Named(n) if structs.contains_key(n) => {}
-                Type::Array(_) | Type::Optional(_) => {}
+                ConcreteType::Named(n) if structs.contains_key(n) => {}
+                ConcreteType::Array(_) | ConcreteType::Optional(_) => {}
                 _ => {
                     return Err(Error::at(
                         format!(
@@ -16648,7 +16698,7 @@ fn compile_call_expr<M: Module>(
             // Flattened optional: `8 (tag) + sizeof(Core)`, independent of the
             // nesting depth (a nested `some(some(..))` reuses one core value
             // field, just with a higher tag).
-            let opt_ty = Type::Optional(Box::new(t.clone()));
+            let opt_ty = ConcreteType::Optional(Box::new(t.clone()));
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 elem_size_of(&opt_ty, structs) as u32,
@@ -16731,7 +16781,7 @@ fn compile_call_expr<M: Module>(
             }
             *ty_cell.borrow_mut() = info.return_ty.clone();
             // A mutating method yields nothing.
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         _ => {
             // A variant constructor `Ctor(args..)` builds an inline tagged value.
@@ -16799,17 +16849,17 @@ fn emit_slice<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     recv_v: Value,
-    recv_ty: &Type,
+    recv_ty: &ConcreteType,
     a_v: Value,
     b_v: Option<Value>,
     recv_span: &Span,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let structs = cx.structs;
     let builtins = cx.builtins;
     // Exact `str` plus `char[]`, not the broader `is_str_shaped` — matching
     // the char-at scope in `ExprKind::Index` (`Error`/concat-str receivers
     // aren't part of the slice surface).
-    if *recv_ty == Type::Primitive(Primitive::Str) || is_char_array(recv_ty) {
+    if *recv_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(recv_ty) {
         let b_v = match b_v {
             Some(b) => b,
             None => {
@@ -16827,7 +16877,7 @@ fn emit_slice<M: Module>(
             .push(Tracked::new(result, recv_ty));
         return Ok((result, recv_ty.clone()));
     }
-    if let Type::Array(elem) = recv_ty {
+    if let ConcreteType::Array(elem) = recv_ty {
         let elem = (**elem).clone();
         let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
         let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
@@ -16870,11 +16920,12 @@ fn compile_expr<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     expr: &Expr,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     let (v, derived) = compile_expr_inner(module, builder, cx, scopes, expr)?;
-    let ty = match &expr.ty {
+    let locked = expr.ty.as_ref().and_then(|t| t.to_concrete());
+    let ty = match &locked {
         Some(locked) if has_placeholder_ty(&derived) && !has_placeholder_ty(locked) => {
-            (**locked).clone()
+            locked.clone()
         }
         _ => derived,
     };
@@ -16882,14 +16933,17 @@ fn compile_expr<M: Module>(
 }
 
 /// Whether `t` still contains a "decided by context" placeholder.
-fn has_placeholder_ty(t: &Type) -> bool {
+fn has_placeholder_ty(t: &ConcreteType) -> bool {
     match t {
-        Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
-        Type::Optional(i) | Type::Array(i) | Type::Set(i) => has_placeholder_ty(i),
-        Type::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
-        Type::Result(a, b) => has_placeholder_ty(a) || has_placeholder_ty(b),
-        Type::Fn(ps, r) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
-        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(has_placeholder_ty),
+        ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
+            true
+        }
+        ConcreteType::Optional(i) | ConcreteType::Array(i) | ConcreteType::Set(i) => {
+            has_placeholder_ty(i)
+        }
+        ConcreteType::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
+        ConcreteType::Result(a, b) => has_placeholder_ty(a) || has_placeholder_ty(b),
+        ConcreteType::Fn(ps, r) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
         _ => false,
     }
 }
@@ -16900,7 +16954,7 @@ fn compile_expr_inner<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     expr: &Expr,
-) -> Result<(Value, Type), Error> {
+) -> Result<(Value, ConcreteType), Error> {
     // Destructure into the names the body already uses, so only the signature
     // and call sites change. `cx` itself stays in scope for `..cx` spreads.
     let Cx {
@@ -16933,7 +16987,7 @@ fn compile_expr_inner<M: Module>(
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
-        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), Type::Unit),
+        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), ConcreteType::Unit),
         ExprKind::Shim(_, bindings, body) => {
             // Install each bound function's address into its operation's slot
             // for the dynamic extent of `body`, then put back whatever was
@@ -17034,19 +17088,19 @@ fn compile_expr_inner<M: Module>(
             let dead = builder.create_block();
             builder.switch_to_block(dead);
             builder.seal_block(dead);
-            (builder.ins().iconst(types::I64, 0), Type::Unit)
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         ExprKind::Num(n) => (
             builder.ins().iconst(types::I64, *n),
-            Type::Primitive(Primitive::I64),
+            ConcreteType::Primitive(Primitive::I64),
         ),
         ExprKind::Bool(b) => (
             builder.ins().iconst(types::I64, if *b { 1 } else { 0 }),
-            Type::Primitive(Primitive::Bool),
+            ConcreteType::Primitive(Primitive::Bool),
         ),
         ExprKind::Char(c) => (
             builder.ins().iconst(types::I64, i64::from(*c)),
-            Type::Primitive(Primitive::Char),
+            ConcreteType::Primitive(Primitive::Char),
         ),
         ExprKind::Str(s) => {
             let content = s.as_bytes();
@@ -17058,7 +17112,7 @@ fn compile_expr_inner<M: Module>(
                 let packed = pack_inline(content) as usize as i64;
                 return Ok((
                     builder.ins().iconst(types::I64, packed),
-                    Type::Primitive(Primitive::Str),
+                    ConcreteType::Primitive(Primitive::Str),
                 ));
             }
             // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
@@ -17082,8 +17136,8 @@ fn compile_expr_inner<M: Module>(
             scopes
                 .last_mut()
                 .expect("scope")
-                .push(Tracked::new(ptr, &Type::Primitive(Primitive::Str)));
-            (ptr, Type::Primitive(Primitive::Str))
+                .push(Tracked::new(ptr, &ConcreteType::Primitive(Primitive::Str)));
+            (ptr, ConcreteType::Primitive(Primitive::Str))
         }
         ExprKind::Ident(name) => {
             // A local binding shadows everything; an unbound name may be a
@@ -17114,7 +17168,7 @@ fn compile_expr_inner<M: Module>(
                 };
                 let fref = module.declare_func_in_func(id, builder.func);
                 let addr = builder.ins().func_addr(types::I64, fref);
-                let ty = Type::Fn(
+                let ty = ConcreteType::Fn(
                     info.param_types().cloned().collect(),
                     Box::new(info.return_ty.clone()),
                 );
@@ -17126,7 +17180,7 @@ fn compile_expr_inner<M: Module>(
         ExprKind::None => {
             // Allocate a 16-byte slot with tag = 0. Value field stays
             // undefined (callers must check is_some before touching it).
-            // Type is Optional(__none__) — implicitly converts to any
+            // ConcreteType is Optional(__none__) — implicitly converts to any
             // Optional(T) via expect_type.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -17136,7 +17190,10 @@ fn compile_expr_inner<M: Module>(
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().stack_store(types::I64, zero, slot, 0);
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            (ptr, Type::Optional(Box::new(Type::NoneInner)))
+            (
+                ptr,
+                ConcreteType::Optional(Box::new(ConcreteType::NoneInner)),
+            )
         }
         // The only expression that can *become* a tail call: `tail` rides down
         // to `compile_call`, which decides whether this particular callee
@@ -17210,7 +17267,7 @@ fn compile_expr_inner<M: Module>(
                     expect_len_operand(&actual, &ctx, init.value.span.clone())?;
                 } else {
                     // A bare literal takes the field's int type.
-                    let actual = aipl_syntax::flex_int_ty(&init.value, &actual, &fty);
+                    let actual = flex_int_ty(&init.value, &actual, &fty);
                     expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
                 match (slot, heap) {
@@ -17272,7 +17329,7 @@ fn compile_expr_inner<M: Module>(
                     emit_retain(builder, module, builtins, structs, v, &fty);
                 }
             }
-            let sty = Type::Named(name.clone());
+            let sty = ConcreteType::Named(name.clone());
             let ptr = match (slot, heap) {
                 (_, Some(base)) => base,
                 (Some(slot), _) => builder.ins().stack_addr(types::I64, slot, 0),
@@ -17288,7 +17345,7 @@ fn compile_expr_inner<M: Module>(
         }
         ExprKind::Field(obj, field_name) => {
             let (obj_ptr, obj_ty) = compile_expr(module, builder, cx, scopes, obj)?;
-            let Type::Named(ref struct_name) = obj_ty else {
+            let ConcreteType::Named(ref struct_name) = obj_ty else {
                 return Err(Error::at(
                     format!(
                         "field access on non-struct value of type {}",
@@ -17339,23 +17396,26 @@ fn compile_expr_inner<M: Module>(
             let (v, t) = compile_expr(module, builder, cx, scopes, inner)?;
             expect_type(
                 &t,
-                &Type::Primitive(Primitive::I64),
+                &ConcreteType::Primitive(Primitive::I64),
                 "unary \"-\"",
                 inner.span.clone(),
             )?;
-            (builder.ins().ineg(v), Type::Primitive(Primitive::I64))
+            (
+                builder.ins().ineg(v),
+                ConcreteType::Primitive(Primitive::I64),
+            )
         }
         ExprKind::Not(inner) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, inner)?;
             expect_type(
                 &t,
-                &Type::Primitive(Primitive::Bool),
+                &ConcreteType::Primitive(Primitive::Bool),
                 "unary \"!\"",
                 inner.span.clone(),
             )?;
             (
                 builder.ins().bxor_imm_u(v, 1),
-                Type::Primitive(Primitive::Bool),
+                ConcreteType::Primitive(Primitive::Bool),
             )
         }
         ExprKind::Binop(l, op, r) => {
@@ -17369,8 +17429,8 @@ fn compile_expr_inner<M: Module>(
             // A bare literal operand flexes to the other's integer type — its
             // i64-register value is already the canonical narrow rep (the checker
             // verified the fit), so only the static type needs relabeling.
-            let lt = aipl_syntax::flex_int_ty(l, &lt, &rt);
-            let rt = aipl_syntax::flex_int_ty(r, &rt, &lt);
+            let lt = flex_int_ty(l, &lt, &rt);
+            let rt = flex_int_ty(r, &rt, &lt);
             match op {
                 // `+` is integer add only. User `+` resolves to a call to its
                 // bound `wrapping_add`/`saturating_add` (intrinsified above), so a
@@ -17379,7 +17439,7 @@ fn compile_expr_inner<M: Module>(
                 // `+++` (`'C'`).
                 '+' => {
                     if is_int_ty(&lt) && lt == rt {
-                        let Type::Primitive(p) = &lt else {
+                        let ConcreteType::Primitive(p) = &lt else {
                             unreachable!()
                         };
                         (
@@ -17389,17 +17449,20 @@ fn compile_expr_inner<M: Module>(
                     } else {
                         expect_type(
                             &lt,
-                            &Type::Primitive(Primitive::I64),
+                            &ConcreteType::Primitive(Primitive::I64),
                             "arithmetic operand",
                             l.span.clone(),
                         )?;
                         expect_type(
                             &rt,
-                            &Type::Primitive(Primitive::I64),
+                            &ConcreteType::Primitive(Primitive::I64),
                             "arithmetic operand",
                             r.span.clone(),
                         )?;
-                        (builder.ins().iadd(lv, rv), Type::Primitive(Primitive::I64))
+                        (
+                            builder.ins().iadd(lv, rv),
+                            ConcreteType::Primitive(Primitive::I64),
+                        )
                     }
                 }
                 // `+++` string concatenation. `Error` is str-represented, so it
@@ -17418,8 +17481,8 @@ fn compile_expr_inner<M: Module>(
                         scopes
                             .last_mut()
                             .expect("scope")
-                            .push(Tracked::new(ret, &Type::Primitive(Primitive::Str)));
-                        (ret, Type::Primitive(Primitive::Str))
+                            .push(Tracked::new(ret, &ConcreteType::Primitive(Primitive::Str)));
+                        (ret, ConcreteType::Primitive(Primitive::Str))
                     } else {
                         return Err(Error::at(
                             "\"+++\" concatenates strings: both sides must be str".to_string(),
@@ -17429,7 +17492,7 @@ fn compile_expr_inner<M: Module>(
                 }
                 '-' | '*' | '/' | '%' => {
                     if is_int_ty(&lt) && lt == rt {
-                        let Type::Primitive(p) = &lt else {
+                        let ConcreteType::Primitive(p) = &lt else {
                             unreachable!()
                         };
                         let signed = p.int_signed();
@@ -17446,13 +17509,13 @@ fn compile_expr_inner<M: Module>(
                     } else {
                         expect_type(
                             &lt,
-                            &Type::Primitive(Primitive::I64),
+                            &ConcreteType::Primitive(Primitive::I64),
                             "arithmetic operand",
                             l.span.clone(),
                         )?;
                         expect_type(
                             &rt,
-                            &Type::Primitive(Primitive::I64),
+                            &ConcreteType::Primitive(Primitive::I64),
                             "arithmetic operand",
                             r.span.clone(),
                         )?;
@@ -17463,7 +17526,7 @@ fn compile_expr_inner<M: Module>(
                             '%' => builder.ins().srem(lv, rv),
                             _ => unreachable!(),
                         };
-                        (v, Type::Primitive(Primitive::I64))
+                        (v, ConcreteType::Primitive(Primitive::I64))
                     }
                 }
                 'E' | 'N' => {
@@ -17473,7 +17536,8 @@ fn compile_expr_inner<M: Module>(
                     // `none`/`[]`/`#{}` operand against the other side — then walk
                     // it with `emit_eq`. `!=` is the bitwise negation of `==`.
                     let opn = if *op == 'E' { "==" } else { "!=" };
-                    if matches!(lt, Type::Fn(_, _)) || matches!(rt, Type::Fn(_, _)) {
+                    if matches!(lt, ConcreteType::Fn(_, _)) || matches!(rt, ConcreteType::Fn(_, _))
+                    {
                         return Err(Error::at(
                             format!("\"{opn}\" is not supported for function values"),
                             span.clone(),
@@ -17495,7 +17559,7 @@ fn compile_expr_inner<M: Module>(
                     } else {
                         eq
                     };
-                    (result, Type::Primitive(Primitive::Bool))
+                    (result, ConcreteType::Primitive(Primitive::Bool))
                 }
                 '<' | '>' | 'L' | 'G' => {
                     // `str` orders lexicographically by bytes — the same order
@@ -17515,7 +17579,7 @@ fn compile_expr_inner<M: Module>(
                         let b = builder.ins().icmp(cc, c, zero);
                         return Ok((
                             builder.ins().uextend(types::I64, b),
-                            Type::Primitive(Primitive::Bool),
+                            ConcreteType::Primitive(Primitive::Bool),
                         ));
                     }
                     // Unsigned integers compare with the unsigned predicates;
@@ -17523,17 +17587,17 @@ fn compile_expr_inner<M: Module>(
                     // are kept canonically sign-/zero-extended, so an i64-register
                     // comparison is correct either way.
                     let signed = match &lt {
-                        Type::Primitive(p) if is_int_ty(&lt) && lt == rt => p.int_signed(),
+                        ConcreteType::Primitive(p) if is_int_ty(&lt) && lt == rt => p.int_signed(),
                         _ => {
                             expect_type(
                                 &lt,
-                                &Type::Primitive(Primitive::I64),
+                                &ConcreteType::Primitive(Primitive::I64),
                                 "comparison operand",
                                 l.span.clone(),
                             )?;
                             expect_type(
                                 &rt,
-                                &Type::Primitive(Primitive::I64),
+                                &ConcreteType::Primitive(Primitive::I64),
                                 "comparison operand",
                                 r.span.clone(),
                             )?;
@@ -17554,19 +17618,19 @@ fn compile_expr_inner<M: Module>(
                     let b = builder.ins().icmp(cc, lv, rv);
                     (
                         builder.ins().uextend(types::I64, b),
-                        Type::Primitive(Primitive::Bool),
+                        ConcreteType::Primitive(Primitive::Bool),
                     )
                 }
                 'A' | 'O' => {
                     expect_type(
                         &lt,
-                        &Type::Primitive(Primitive::Bool),
+                        &ConcreteType::Primitive(Primitive::Bool),
                         "logical operand",
                         l.span.clone(),
                     )?;
                     expect_type(
                         &rt,
-                        &Type::Primitive(Primitive::Bool),
+                        &ConcreteType::Primitive(Primitive::Bool),
                         "logical operand",
                         r.span.clone(),
                     )?;
@@ -17575,7 +17639,7 @@ fn compile_expr_inner<M: Module>(
                         'O' => builder.ins().bor(lv, rv),
                         _ => unreachable!(),
                     };
-                    (v, Type::Primitive(Primitive::Bool))
+                    (v, ConcreteType::Primitive(Primitive::Bool))
                 }
                 other => {
                     return Err(Error::at(format!("unsupported op {other:?}"), span.clone()));
@@ -17586,7 +17650,7 @@ fn compile_expr_inner<M: Module>(
             let (cond_v, cond_ty) = compile_expr(module, builder, cx, scopes, cond)?;
             expect_type(
                 &cond_ty,
-                &Type::Primitive(Primitive::Bool),
+                &ConcreteType::Primitive(Primitive::Bool),
                 "if condition",
                 cond.span.clone(),
             )?;
@@ -17631,8 +17695,8 @@ fn compile_expr_inner<M: Module>(
             //
             // A bare integer literal in one branch also takes the other's int
             // type (`if (b) { u8_val } else { 9 }`), matching the checker.
-            let then_ty = aipl_syntax::flex_int_ty(then_e, &then_ty, &else_ty);
-            let else_ty = aipl_syntax::flex_int_ty(else_e, &else_ty, &then_ty);
+            let then_ty = flex_int_ty(then_e, &then_ty, &else_ty);
+            let else_ty = flex_int_ty(else_e, &else_ty, &then_ty);
             let merged_ty = merge_types(&then_ty, &else_ty).ok_or_else(|| {
                 Error::at(
                     format!(
@@ -17687,7 +17751,11 @@ fn compile_expr_inner<M: Module>(
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
             let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
-            let (v, t) = binding_ty(builder, value, v, &actual, ty.as_ref(), name)?;
+            // The `let`'s annotation rides on `Expr`, which both sides of
+            // monomorphization share, so it is abstract; by the time codegen
+            // reads it every variable in it has been substituted.
+            let declared = ty.as_ref().and_then(|t| t.to_concrete());
+            let (v, t) = binding_ty(builder, value, v, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
             // and a `str` are the same representation, and every `char[]`
@@ -17717,7 +17785,11 @@ fn compile_expr_inner<M: Module>(
         }
         ExprKind::LetMut(name, ty, value, body) => {
             let (v, actual) = compile_expr(module, builder, cx, scopes, value)?;
-            let (v, t) = binding_ty(builder, value, v, &actual, ty.as_ref(), name)?;
+            // The `let`'s annotation rides on `Expr`, which both sides of
+            // monomorphization share, so it is abstract; by the time codegen
+            // reads it every variable in it has been substituted.
+            let declared = ty.as_ref().and_then(|t| t.to_concrete());
+            let (v, t) = binding_ty(builder, value, v, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
             // and a `str` are the same representation, and every `char[]`
@@ -17745,11 +17817,11 @@ fn compile_expr_inner<M: Module>(
                 // A reserved-capacity array (`map`'s pre-sized output) is just as
                 // fresh and unaliased as an `[..]` literal, so it's eligible for
                 // the in-place `push` path too.
-                Type::Array(_) => {
+                ConcreteType::Array(_) => {
                     matches!(&value.kind, ExprKind::ArrayLit(_))
                         || matches!(&value.kind, ExprKind::Call(n, _, _) if n == "__builtin_with_capacity")
                 }
-                Type::Primitive(Primitive::Str) => matches!(&value.kind, ExprKind::Str(_)),
+                ConcreteType::Primitive(Primitive::Str) => matches!(&value.kind, ExprKind::Str(_)),
                 _ => false,
             };
             // `mut y = p` where `p` is a moved-in owned parameter: take ownership
@@ -17883,7 +17955,7 @@ fn compile_expr_inner<M: Module>(
             // grows `s`'s buffer (realloc) and appends `r`, instead of building
             // a fresh string each time. The binding is slot-tracked, so the
             // (possibly relocated) buffer is still dropped exactly once.
-            if exclusive && expected_ty == Type::Primitive(Primitive::Str) {
+            if exclusive && expected_ty == ConcreteType::Primitive(Primitive::Str) {
                 // In-place concat: `set s = s + r` grows s's buffer (realloc) and
                 // appends r, instead of building a fresh string each time. The
                 // binding is slot-tracked, so the (possibly relocated) buffer is
@@ -17894,7 +17966,7 @@ fn compile_expr_inner<M: Module>(
                         let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
                         expect_type(
                             &rt,
-                            &Type::Primitive(Primitive::Str),
+                            &ConcreteType::Primitive(Primitive::Str),
                             "concat operand",
                             r.span.clone(),
                         )?;
@@ -17936,7 +18008,7 @@ fn compile_expr_inner<M: Module>(
             // `a`'s element type is still `__none__` (a `mut a = #{}`); that falls
             // through to the copy path, which merges to `b`'s concrete type.
             if exclusive {
-                if let Type::Set(elem) = &expected_ty {
+                if let ConcreteType::Set(elem) = &expected_ty {
                     // `set a = a.union(b)` / `set a = union(a, b)` both fold to
                     // the call `union(a, b)` with args `[a, b]`.
                     let other = match &value.kind {
@@ -17963,7 +18035,7 @@ fn compile_expr_inner<M: Module>(
                             .iconst(types::I64, runtime_elem_size(elem, structs));
                         let str_cmp = builder.ins().iconst(
                             types::I64,
-                            i64::from(**elem == Type::Primitive(Primitive::Str)),
+                            i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
                         );
                         let local = builtins.import(module, builder.func, "aipl_set_union_mut");
                         let inst = builder
@@ -17991,7 +18063,7 @@ fn compile_expr_inner<M: Module>(
             };
             let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             // A bare literal takes the binding's int type.
-            let t = aipl_syntax::flex_int_ty(value, &t, &expected_ty);
+            let t = flex_int_ty(value, &t, &expected_ty);
             expect_type(&t, &expected_ty, "set", value.span.clone())?;
             if let Some(old) = old {
                 if arr_slot_ref {
@@ -18077,19 +18149,20 @@ fn compile_expr_inner<M: Module>(
             // representation — including a rope, leaf-by-leaf without
             // materializing — so the header just pulls the next byte (`-1` at the
             // end). For an array this is unused.
-            let str_cursor = if it_ty == Type::Primitive(Primitive::Str) || is_char_array(&it_ty) {
-                let cur = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    ITER_SIZE as u32,
-                    3,
-                ));
-                let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
-                let init_f = builtins.import(module, builder.func, "aipl_str_iter_init");
-                builder.ins().call(init_f, &[cur_addr, it_ptr]);
-                cur_addr
-            } else {
-                it_ptr // unused for the array branch
-            };
+            let str_cursor =
+                if it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty) {
+                    let cur = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        ITER_SIZE as u32,
+                        3,
+                    ));
+                    let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
+                    let init_f = builtins.import(module, builder.func, "aipl_str_iter_init");
+                    builder.ins().call(init_f, &[cur_addr, it_ptr]);
+                    cur_addr
+                } else {
+                    it_ptr // unused for the array branch
+                };
 
             // Index slot, initialized to 0.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
@@ -18111,7 +18184,7 @@ fn compile_expr_inner<M: Module>(
             builder.switch_to_block(header);
             let i = builder.ins().stack_load(types::I64, types::I64, slot, 0);
             let (var_value, var_ty) = match &it_ty {
-                t if *t == Type::Primitive(Primitive::Str) || is_char_array(t) => {
+                t if *t == ConcreteType::Primitive(Primitive::Str) || is_char_array(t) => {
                     // Pull the next byte from the cursor; `-1` signals the end (so
                     // a rope is walked leaf-by-leaf, never flattened, and we never
                     // index out of bounds).
@@ -18121,9 +18194,9 @@ fn compile_expr_inner<M: Module>(
                             .ins()
                             .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
                     builder.ins().brif(more, body_block, &[], exit, &[]);
-                    (byte_i64, Type::Primitive(Primitive::Char))
+                    (byte_i64, ConcreteType::Primitive(Primitive::Char))
                 }
-                Type::Array(inner) => {
+                ConcreteType::Array(inner) => {
                     let elem_ty = (**inner).clone();
                     let len = load_arr_len(builder, it_ptr);
                     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
@@ -18156,7 +18229,7 @@ fn compile_expr_inner<M: Module>(
 
             // Body: bind var, run body in fresh refcount scope, advance i.
             // (For the array case we already switched to body_block above.)
-            if it_ty == Type::Primitive(Primitive::Str) || is_char_array(&it_ty) {
+            if it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty) {
                 builder.switch_to_block(body_block);
             }
             builder.seal_block(body_block);
@@ -18203,7 +18276,7 @@ fn compile_expr_inner<M: Module>(
             builder.seal_block(exit);
             (
                 builder.ins().iconst(types::I64, 0),
-                Type::Primitive(Primitive::I64),
+                ConcreteType::Primitive(Primitive::I64),
             )
         }
         ExprKind::While(cond, body) => {
@@ -18224,7 +18297,7 @@ fn compile_expr_inner<M: Module>(
             let (cond_v, cond_ty) = compile_expr(module, builder, cx, scopes, cond)?;
             expect_type(
                 &cond_ty,
-                &Type::Primitive(Primitive::Bool),
+                &ConcreteType::Primitive(Primitive::Bool),
                 "while condition",
                 cond.span.clone(),
             )?;
@@ -18257,7 +18330,7 @@ fn compile_expr_inner<M: Module>(
             builder.seal_block(exit);
             (
                 builder.ins().iconst(types::I64, 0),
-                Type::Primitive(Primitive::I64),
+                ConcreteType::Primitive(Primitive::I64),
             )
         }
         ExprKind::Match(scrutinee, arms) => {
@@ -18275,7 +18348,7 @@ fn compile_expr_inner<M: Module>(
             // comparison per arm, with the `_` arm as the fallthrough. No length,
             // no elements and no refcounting, so it gets its own short path
             // rather than riding the sequence machinery below.
-            let plan = if matches!(&scrut_ty, Type::Primitive(Primitive::Char)) {
+            let plan = if matches!(&scrut_ty, ConcreteType::Primitive(Primitive::Char)) {
                 for (i, arm) in arms.iter().enumerate() {
                     let Pattern::Char(c) = &arm.pattern else {
                         continue; // the `_` arm — the fallthrough jump below
@@ -18292,7 +18365,7 @@ fn compile_expr_inner<M: Module>(
                     .expect("a char match has a `_` arm (checked)");
                 builder.ins().jump(arm_blocks[wildcard], &[]);
                 None
-            } else if is_str_repr(&scrut_ty) || matches!(&scrut_ty, Type::Array(_)) {
+            } else if is_str_repr(&scrut_ty) || matches!(&scrut_ty, ConcreteType::Array(_)) {
                 // Route each arm to its block: a `str`-literal arm (`"foo"`, str
                 // scrutinee) by content equality, an array pattern (`[a, 'x', b]`)
                 // by exact length then elementwise equality of its *literal*
@@ -18303,11 +18376,11 @@ fn compile_expr_inner<M: Module>(
                 // balances the refs it consumes); its one real drop is left to
                 // enclosing-scope tracking.
                 let seq_ty = match &scrut_ty {
-                    Type::Array(_) => scrut_ty.clone(),
-                    _ => Type::Array(Box::new(Type::Primitive(Primitive::Char))),
+                    ConcreteType::Array(_) => scrut_ty.clone(),
+                    _ => ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Char))),
                 };
-                let elem_ty: Type = match &seq_ty {
-                    Type::Array(e) => (**e).clone(),
+                let elem_ty: ConcreteType = match &seq_ty {
+                    ConcreteType::Array(e) => (**e).clone(),
                     _ => unreachable!("seq_ty is always an array"),
                 };
                 let wildcard = arms
@@ -18434,7 +18507,7 @@ fn compile_expr_inner<M: Module>(
                 Some((plan, tag))
             };
 
-            let mut merged_ty: Option<Type> = None;
+            let mut merged_ty: Option<ConcreteType> = None;
             // The arm that produced `merged_ty`, so an earlier literal arm can
             // still flex to a later narrow-int one.
             let mut merged_body: Option<&Expr> = None;
@@ -18452,11 +18525,13 @@ fn compile_expr_inner<M: Module>(
                         if let Pattern::Array(elems) = &arm.pattern {
                             // A `str` scrutinee is read as its `char[]` view.
                             let seq_ty = match &scrut_ty {
-                                Type::Array(_) => scrut_ty.clone(),
-                                _ => Type::Array(Box::new(Type::Primitive(Primitive::Char))),
+                                ConcreteType::Array(_) => scrut_ty.clone(),
+                                _ => ConcreteType::Array(Box::new(ConcreteType::Primitive(
+                                    Primitive::Char,
+                                ))),
                             };
-                            let elem_ty: Type = match &seq_ty {
-                                Type::Array(e) => (**e).clone(),
+                            let elem_ty: ConcreteType = match &seq_ty {
+                                ConcreteType::Array(e) => (**e).clone(),
                                 _ => unreachable!("seq_ty is always an array"),
                             };
                             elems
@@ -18528,9 +18603,9 @@ fn compile_expr_inner<M: Module>(
                         at
                     }
                     Some(prev) => {
-                        let at = aipl_syntax::flex_int_ty(&arm.body, &at, &prev);
+                        let at = flex_int_ty(&arm.body, &at, &prev);
                         let prev = match merged_body {
-                            Some(b) => aipl_syntax::flex_int_ty(b, &prev, &at),
+                            Some(b) => flex_int_ty(b, &prev, &at),
                             None => prev,
                         };
                         let m = merge_types(&prev, &at).ok_or_else(|| {
@@ -18552,7 +18627,7 @@ fn compile_expr_inner<M: Module>(
             builder.switch_to_block(merge);
             builder.seal_block(merge);
             let result = builder.block_params(merge)[0];
-            let merged_ty = merged_ty.unwrap_or(Type::Primitive(Primitive::I64));
+            let merged_ty = merged_ty.unwrap_or(ConcreteType::Primitive(Primitive::I64));
             if needs_drop(&merged_ty, structs) {
                 scopes
                     .last_mut()
@@ -18565,22 +18640,22 @@ fn compile_expr_inner<M: Module>(
             // All elements must share one primitive type. An empty
             // literal has element type `__none__` and coerces to any
             // concrete `T[]` (mirrors bare `none`).
-            let mut elem_ty: Option<Type> = None;
+            let mut elem_ty: Option<ConcreteType> = None;
             // Each element carries whether it's a fresh temporary we exclusively
             // own: true when compiling it grew the scope and left its result as the
             // last-tracked entry (a call result, constructor, …). The store loop
             // below then *moves* such an element into the array (no retain, no
             // separate scope-exit drop) instead of co-owning it. A borrowed place
             // (a bare variable) tracks nothing new, so it's co-owned as before.
-            let mut vals: Vec<(Value, Type, bool)> = Vec::with_capacity(elems.len());
+            let mut vals: Vec<(Value, ConcreteType, bool)> = Vec::with_capacity(elems.len());
             for el in elems {
                 let before = scope_depth(scopes);
                 let (v, mut t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
                         let ok = is_array_elem(&t)
-                            || matches!(&t, Type::Optional(_))
-                            || matches!(&t, Type::Named(n) if structs.contains_key(n));
+                            || matches!(&t, ConcreteType::Optional(_))
+                            || matches!(&t, ConcreteType::Named(n) if structs.contains_key(n));
                         if !ok {
                             return Err(Error::at(
                                 format!(
@@ -18595,15 +18670,15 @@ fn compile_expr_inner<M: Module>(
                     // A bare literal element flexes to the element type the
                     // first element established, so `[u64_max(), 1]` is `u64[]`.
                     Some(expected) => {
-                        t = aipl_syntax::flex_int_ty(el, &t, expected);
+                        t = flex_int_ty(el, &t, expected);
                         expect_type(&t, expected, "array element", el.span.clone())?;
                     }
                 }
                 let owned_temp = owned_temp_since(scopes, before, v);
                 vals.push((v, t, owned_temp));
             }
-            let elem = elem_ty.unwrap_or(Type::NoneInner);
-            let arr_ty = Type::Array(Box::new(elem.clone()));
+            let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);
+            let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
             if is_char_array(&arr_ty) {
                 // `char[]` is str-shaped (see `is_char_array`): build a heap
                 // `str` buffer and write each element's byte directly, rather
@@ -18685,7 +18760,7 @@ fn compile_expr_inner<M: Module>(
             // `str` drop/retain helpers (so it frees/retains its strings) and
             // membership compares by content; scalars need neither. An empty
             // `#{}` is `__none__`-typed and coerces to any `T{}`.
-            let mut elem_ty: Option<Type> = None;
+            let mut elem_ty: Option<ConcreteType> = None;
             let mut vals = Vec::with_capacity(elems.len());
             for el in elems {
                 let (v, t) = compile_expr(module, builder, cx, scopes, el)?;
@@ -18706,7 +18781,7 @@ fn compile_expr_inner<M: Module>(
                 }
                 vals.push(v);
             }
-            let elem = elem_ty.unwrap_or(Type::NoneInner);
+            let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);
             let esz = runtime_elem_size(&elem, structs);
             let esz_v = builder.ins().iconst(types::I64, esz);
             // `str` elements are heap: store the array `str` drop/retain helpers
@@ -18715,7 +18790,7 @@ fn compile_expr_inner<M: Module>(
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let str_cmp = builder.ins().iconst(
                 types::I64,
-                i64::from(elem == Type::Primitive(Primitive::Str)),
+                i64::from(elem == ConcreteType::Primitive(Primitive::Str)),
             );
             let cap = builder.ins().iconst(types::I64, elems.len() as i64);
             let with_cap = builtins.import(module, builder.func, "aipl_array_with_cap");
@@ -18738,7 +18813,7 @@ fn compile_expr_inner<M: Module>(
                     .call(insert, &[ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp]);
                 ptr = builder.inst_results(inst)[0];
             }
-            let set_ty = Type::Set(Box::new(elem));
+            let set_ty = ConcreteType::Set(Box::new(elem));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -18753,8 +18828,8 @@ fn compile_expr_inner<M: Module>(
             // block carries the pair drop/retain helpers so it frees/retains each
             // pair's key and value; key membership compares by content for `str`.
             // An empty `#{:}` is `__none__`-typed and coerces to any `#{K: V}`.
-            let mut key_ty: Option<Type> = None;
-            let mut val_ty: Option<Type> = None;
+            let mut key_ty: Option<ConcreteType> = None;
+            let mut val_ty: Option<ConcreteType> = None;
             let mut vals = Vec::with_capacity(pairs.len());
             for (k, v) in pairs {
                 let (kv, kt) = compile_expr(module, builder, cx, scopes, k)?;
@@ -18780,14 +18855,14 @@ fn compile_expr_inner<M: Module>(
                 }
                 vals.push((kv, vv));
             }
-            let key = key_ty.unwrap_or(Type::NoneInner);
-            let val = val_ty.unwrap_or(Type::NoneInner);
+            let key = key_ty.unwrap_or(ConcreteType::NoneInner);
+            let val = val_ty.unwrap_or(ConcreteType::NoneInner);
             let pair_size = 8 + elem_size_of(&val, structs);
             let psz = builder.ins().iconst(types::I64, pair_size);
             let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key, &val);
             let str_cmp = builder.ins().iconst(
                 types::I64,
-                i64::from(key == Type::Primitive(Primitive::Str)),
+                i64::from(key == ConcreteType::Primitive(Primitive::Str)),
             );
             let cap = builder.ins().iconst(types::I64, pairs.len() as i64);
             let with_cap = builtins.import(module, builder.func, "aipl_array_with_cap");
@@ -18812,7 +18887,7 @@ fn compile_expr_inner<M: Module>(
                     .call(insert, &[ptr, pbase, drop_fn, retain_fn, psz, str_cmp]);
                 ptr = builder.inst_results(inst)[0];
             }
-            let dict_ty = Type::Dict(Box::new(key), Box::new(val));
+            let dict_ty = ConcreteType::Dict(Box::new(key), Box::new(val));
             scopes
                 .last_mut()
                 .expect("scope")
@@ -18827,7 +18902,7 @@ fn compile_expr_inner<M: Module>(
             // `s[span.start..span.end]`: load the two bound fields from the
             // struct (evaluated once, receiver first) and slice exactly like
             // `ExprKind::Slice`.
-            if matches!(&idx_t, Type::Named(n) if n == "__builtin_Span") {
+            if matches!(&idx_t, ConcreteType::Named(n) if n == "__builtin_Span") {
                 let layout = structs
                     .get("__builtin_Span")
                     .and_then(TypeDef::as_struct)
@@ -18836,7 +18911,7 @@ fn compile_expr_inner<M: Module>(
                     })?;
                 // `Span`'s bounds are `u64` (a byte offset is never negative);
                 // both signednesses read the same 8-byte scalar here.
-                let bound_ty = Type::Primitive(Primitive::U64);
+                let bound_ty = ConcreteType::Primitive(Primitive::U64);
                 let mut bound = |field: &str| -> Result<Value, Error> {
                     let f = layout.field(field).ok_or_else(|| {
                         Error::at(
@@ -18868,17 +18943,17 @@ fn compile_expr_inner<M: Module>(
             // (Exact-`str` plus `char[]`, not the broader `is_str_shaped`: the
             // original check was an exact `Str` match, not `is_str_repr` — kept
             // that scope, since `Error`/concat-str indexing wasn't audited.)
-            if recv_ty == Type::Primitive(Primitive::Str) || is_char_array(&recv_ty) {
+            if recv_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&recv_ty) {
                 let ptr = emit_char_at(builder, module, builtins, recv_v, idx_v);
                 return Ok((
                     ptr,
-                    Type::Optional(Box::new(Type::Primitive(Primitive::Char))),
+                    ConcreteType::Optional(Box::new(ConcreteType::Primitive(Primitive::Char))),
                 ));
             }
 
             let arr_ptr = recv_v;
             let elem_ty = match &recv_ty {
-                Type::Array(inner) => (**inner).clone(),
+                ConcreteType::Array(inner) => (**inner).clone(),
                 _ => {
                     return Err(Error::at(
                         format!("cannot index a value of type {}", type_name(&recv_ty)),
@@ -18892,7 +18967,7 @@ fn compile_expr_inner<M: Module>(
             // wraps one more optional layer, so the result is a genuine `T??`
             // whose flattened slot is `8 (tag) + sizeof(Core)`, independent of
             // the element's own (possibly wider) array stride `esz`.
-            let result_ty = Type::Optional(Box::new(elem_ty.clone()));
+            let result_ty = ConcreteType::Optional(Box::new(elem_ty.clone()));
             // Guard the load behind a branch so an out-of-bounds index
             // never dereferences past the allocation.
             let len = load_arr_len(builder, arr_ptr);
@@ -18975,11 +19050,11 @@ fn compile_expr_inner<M: Module>(
             // result's `{tag, value@8}` layout (tag != 0 = some, 0 = none), so the
             // branch structure mirrors the Ok/Err split; only the early-returned
             // husk differs (a fresh `none`, tag 0, carries no payload).
-            if let Type::Optional(inner_ty) = &rty {
+            if let ConcreteType::Optional(inner_ty) = &rty {
                 let val_ty = (**inner_ty).clone();
                 // A `.test` body absorbs the `none` by failing the test (below),
                 // exactly as it absorbs an `err` — so it needs no optional return.
-                if !cx.in_test && !matches!(cx.ret_ty, Type::Optional(_)) {
+                if !cx.in_test && !matches!(cx.ret_ty, ConcreteType::Optional(_)) {
                     return Err(Error::at(
                         "\"?\" on an optional can only be used in a function that returns an \
                          optional, or in a test"
@@ -19044,7 +19119,7 @@ fn compile_expr_inner<M: Module>(
                 return Ok((val, val_ty));
             }
 
-            let Type::Result(ok_in, err_in) = &rty else {
+            let ConcreteType::Result(ok_in, err_in) = &rty else {
                 return Err(Error::at(
                     format!(
                         "\"?\" operand must be a result or an optional, got {}",
@@ -19061,7 +19136,7 @@ fn compile_expr_inner<M: Module>(
             // err type — skip the coercibility check for it.
             if !cx.in_test {
                 let ret_err = match cx.ret_ty {
-                    Type::Result(_, ret_err) => Some(ret_err),
+                    ConcreteType::Result(_, ret_err) => Some(ret_err),
                     _ if cx.error_main => None, // err type is `Error`
                     _ => {
                         return Err(Error::at(
@@ -19180,7 +19255,7 @@ fn compile_expr_inner<M: Module>(
             let owned_temp = move_owned_temp(scopes, scope_len_before, rptr);
             // A void-Ok (`!E`) unwraps to unit — there's no payload to read.
             if is_unit(&ok_ty) {
-                return Ok((builder.ins().iconst(types::I64, 0), Type::Unit));
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
             let val = component(builder, rptr, OPT_VALUE_OFFSET, &ok_ty, structs);
             if needs_drop(&ok_ty, structs) {
@@ -19210,12 +19285,12 @@ fn alloc_struct_slot(builder: &mut FunctionBuilder, layout: &StructLayout) -> St
 /// "Optional representation"); a nested struct is stored inline at its own size;
 /// every other allowed field type is an 8-byte scalar or heap pointer. The
 /// nested struct's layout must already be resolved.
-fn field_size(ty: &Type, structs: &HashMap<String, TypeDef>) -> u32 {
+fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
     match ty {
-        Type::Optional(_) => elem_size_of(ty, structs) as u32,
+        ConcreteType::Optional(_) => elem_size_of(ty, structs) as u32,
         // A boxed (recursive) type is stored as an 8-byte pointer; only a
         // non-boxed struct/variant is inlined at its full size.
-        Type::Named(n) => structs
+        ConcreteType::Named(n) => structs
             .get(n)
             .map_or(8, |t| if t.boxed() { 8 } else { t.size() }),
         _ => 8,
@@ -19226,10 +19301,12 @@ fn field_size(ty: &Type, structs: &HashMap<String, TypeDef>) -> u32 {
 /// if it's a plain 8-byte value. Both optionals (`{tag, value}`, possibly
 /// nested) and structs are returned this way — uniformly, by pointer. A boxed
 /// (recursive) type is a plain 8-byte pointer value, like an array.
-fn sret_size(ty: &Type, structs: &HashMap<String, TypeDef>) -> Option<u32> {
+fn sret_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> Option<u32> {
     match ty {
-        Type::Optional(_) | Type::Result(_, _) => Some(elem_size_of(ty, structs) as u32),
-        Type::Named(n) => structs.get(n).and_then(|t| (!t.boxed()).then(|| t.size())),
+        ConcreteType::Optional(_) | ConcreteType::Result(_, _) => {
+            Some(elem_size_of(ty, structs) as u32)
+        }
+        ConcreteType::Named(n) => structs.get(n).and_then(|t| (!t.boxed()).then(|| t.size())),
         _ => None,
     }
 }
@@ -19243,7 +19320,7 @@ fn copy_composite(
     builder: &mut FunctionBuilder,
     dst: Value,
     src: Value,
-    ty: &Type,
+    ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) {
     let size = sret_size(ty, structs).unwrap_or(8);
@@ -19262,10 +19339,10 @@ fn copy_composite(
 /// True for heap-allocated, refcounted value types (str, arrays, and sets —
 /// sets share the array heap block). These get tracked for `dec` at scope exit
 /// and `inc`'d when handed to a callee or returned.
-fn is_heap(t: &Type) -> bool {
-    *t == Type::Primitive(Primitive::Str)
+fn is_heap(t: &ConcreteType) -> bool {
+    *t == ConcreteType::Primitive(Primitive::Str)
         || is_error(t)
-        || matches!(t, Type::Array(_) | Type::Set(_))
+        || matches!(t, ConcreteType::Array(_) | ConcreteType::Set(_))
 }
 
 /// The name to show in diagnostics for a (possibly canonicalized) fn

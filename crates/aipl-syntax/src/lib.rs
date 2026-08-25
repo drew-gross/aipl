@@ -1943,6 +1943,21 @@ pub mod concrete {
             )
     }
 
+    /// [`super::flex_int_ty`] over the post-monomorphization representation: a
+    /// bare integer literal takes the width of the type it is being fitted
+    /// against. Widens, delegates, and narrows back — the fitting rule reads
+    /// the `Expr`, which is shared by both sides of monomorphization and so
+    /// speaks the abstract type.
+    pub fn flex_int_ty(
+        e: &super::ast::Expr,
+        ety: &ConcreteType,
+        other: &ConcreteType,
+    ) -> ConcreteType {
+        super::flex_int_ty(e, &ety.widen(), &other.widen())
+            .to_concrete()
+            .unwrap_or_else(|| ety.clone())
+    }
+
     pub fn type_name(t: &ConcreteType) -> String {
         match t {
             ConcreteType::Unit => "()".into(),
