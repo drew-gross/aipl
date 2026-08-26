@@ -56,6 +56,8 @@ use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Program};
 
+use crate::{ConcreteFn, MonoProgram};
+
 /// Builtins whose call can abort the program, so deferring one past a branch
 /// could turn a program that dies into one that doesn't. `/` and `%` trap on a
 /// zero divisor (and on `i64::MIN / -1`); `__assert` is what `assert(c)` lowers
@@ -101,13 +103,19 @@ fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -> HashSet<S
             _ => None,
         })
         .collect();
+    close_over_calls(&bodies, effectful)
+}
+
+/// [`undeferrable_fns`]'s fixpoint, over whichever `(name, body)` pairs the
+/// caller has — source items before monomorphization, concrete instances after.
+fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> HashSet<String> {
     let mut blocked: HashSet<String> = effectful.clone();
     blocked.extend(ABORTING_BUILTINS.iter().map(|s| (*s).to_string()));
     // A fixpoint rather than one pass: `a` calling `b` calling a divider makes
     // `a` undeferrable too, and the items are in no particular order.
     loop {
         let mut grew = false;
-        for (name, body) in &bodies {
+        for (name, body) in bodies {
             if !blocked.contains(*name) && reaches_blocked(body, &blocked) {
                 blocked.insert((*name).to_string());
                 grew = true;
@@ -272,5 +280,54 @@ fn mentions_free(e: &Expr, name: &str) -> bool {
             !params.iter().any(|p| p.name == name) && mentions_free(body, name)
         }
         _ => crate::children(e).iter().any(|c| mentions_free(c, name)),
+    }
+}
+
+/// Sink again over the *monomorphized* program, after post-mono inlining.
+///
+/// The pre-mono run cannot see two things. AIPL-implemented builtins
+/// (`AIPL_BUILTIN_SOURCES`) are loaded on demand *during* monomorphization, so
+/// at that point they are not in the program at all; and the lambdas mono lifts
+/// into their own functions, together with any instance that ends up called
+/// once, are only folded into their callers afterwards. Either can expose a
+/// binding that one branch reads and the others ignore.
+///
+/// The case this exists for is `value_or`: its default is an ordinary argument,
+/// so a caller evaluates it either way — until the instance is inlined and the
+/// binding holding it turns out to sit directly ahead of a `match` whose `none`
+/// arm is its only reader.
+///
+/// `builtin_effects` carries the effect declarations under their *pre-mono*
+/// names, which is how `__builtin_print` is still recognized as effectful here:
+/// mono mangles user instances but leaves builtin call names alone, so neither
+/// set alone covers both.
+pub fn sink_bindings_post_mono(
+    program: &MonoProgram,
+    builtin_effects: &HashSet<String>,
+) -> MonoProgram {
+    let mut effectful = builtin_effects.clone();
+    effectful.extend(
+        program
+            .fns
+            .iter()
+            .filter(|f| !f.effects.is_empty())
+            .map(|f| f.name.clone()),
+    );
+    let bodies: Vec<(&str, &Expr)> = program
+        .fns
+        .iter()
+        .map(|f| (f.name.as_str(), &f.body))
+        .collect();
+    let blocked = close_over_calls(&bodies, &effectful);
+    MonoProgram {
+        fns: program
+            .fns
+            .iter()
+            .map(|f| ConcreteFn {
+                body: sink_expr(&f.body, &blocked),
+                ..f.clone()
+            })
+            .collect(),
+        ..program.clone()
     }
 }

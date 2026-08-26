@@ -4834,7 +4834,16 @@ fn compile_program<M: Module>(
     // specializations: those lifted lambdas (and any other now-single-use
     // instance) are each called from exactly one site, so fold them back in. Only
     // possible post-mono — the lambdas don't exist until mono creates them.
-    let program = &aipl_mono::inline_single_use_post_mono(&monomorphized);
+    let program = aipl_mono::inline_single_use_post_mono(&monomorphized);
+    // Sink again over the monomorphized program: mono instantiates the
+    // AIPL-implemented builtins the pre-mono run could not see, and post-mono
+    // inlining folds each lifted lambda and single-use instance into its caller
+    // — so bindings that only one branch reads become visible here that were not
+    // visible there. `value_or`'s default is the motivating case.
+    let program = &aipl_mono::sink_bindings_post_mono(
+        &program,
+        &aipl_mono::effectful_fns(&check_program.items),
+    );
 
     let mut ctx = module.make_context();
     let mut fbc = FunctionBuilderContext::new();

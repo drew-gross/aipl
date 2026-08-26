@@ -41,15 +41,15 @@ fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
     assert(b.get(true).value_or("?") == "yes");
 })
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 18
+deallocations: 18
 reallocations: 0
-bytes allocated: 1008
-instructions executed: 1460
-binary size: 12360
-  code: 6672
+bytes allocated: 976
+instructions executed: 1452
+binary size: 12352
+  code: 6660
   data: 854
-  metadata: 4834
+  metadata: 4838
 functions:
   __builtin_value_or$str:
     calls: 2
@@ -109,10 +109,10 @@ functions:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 24
+    calls: 23
     bytes: (external)
   aipl_array_new:
-    calls: 6
+    calls: 5
     bytes: (external)
   aipl_array_push_mut:
     calls: 16
@@ -155,4 +155,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4024
+    bytes: 4012

@@ -21,11 +21,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 352
-instructions executed: 1091
-binary size: 6256
-  code: 3380
+instructions executed: 1090
+binary size: 6264
+  code: 3384
   data: 508
-  metadata: 2368
+  metadata: 2372
 functions:
   __eq_char$opt:
     calls: 2
@@ -74,4 +74,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2908
+    bytes: 2912

@@ -180,11 +180,11 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24802
+instructions executed: 24785
 binary size: 86264
-  code: 53752
+  code: 53756
   data: 2532
-  metadata: 29980
+  metadata: 29976
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -200,7 +200,7 @@ functions:
     bytes: 72
   __builtin_int_parse:
     calls: 3
-    bytes: 1016
+    bytes: 1020
   __eq_i64$opt:
     calls: 2
     bytes: 100

@@ -25,13 +25,13 @@ fn grid3() -> str[][] {
     assert(len(g2) == 3);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 480
-instructions executed: 1237
-binary size: 5120
-  code: 2636
+bytes allocated: 448
+instructions executed: 1230
+binary size: 5112
+  code: 2628
   data: 200
   metadata: 2284
 functions:
@@ -57,10 +57,10 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 21
+    calls: 20
     bytes: (external)
   aipl_array_new:
-    calls: 9
+    calls: 8
     bytes: (external)
   aipl_array_push:
     calls: 1
@@ -88,4 +88,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1836
+    bytes: 1828

@@ -637,15 +637,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4668
-deallocations: 4668
+allocations: 4666
+deallocations: 4666
 reallocations: 31
-bytes allocated: 270272
-instructions executed: 742457
+bytes allocated: 270208
+instructions executed: 742384
 binary size: 214104
-  code: 138064
+  code: 138068
   data: 7100
-  metadata: 68940
+  metadata: 68936
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -694,7 +694,7 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 4
-    bytes: 1028
+    bytes: 1032
   __builtin_is_some_and$char$lam34:
     calls: 28
     bytes: 48
@@ -843,10 +843,10 @@ functions:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 11339
+    calls: 11337
     bytes: (external)
   aipl_array_new:
-    calls: 3601
+    calls: 3599
     bytes: (external)
   aipl_array_push:
     calls: 13

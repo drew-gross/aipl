@@ -72,9 +72,9 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 240
-instructions executed: 642
-binary size: 7288
-  code: 2808
+instructions executed: 640
+binary size: 7296
+  code: 2816
   data: 1246
   metadata: 3234
 functions:
@@ -119,7 +119,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2392
+    bytes: 2400
   value_or$Color:
     calls: 2
     bytes: 24

@@ -104132,20 +104132,20 @@ block15:
     jump block16(v49)  ; v49 = 0
 
 block16(v41: i64):
-    v50 = iconst.i64 -9223372036854775808
     brif.i64 v3, block18, block19
 
 block18:
-    v52 = stack_addr.i64 ss4
-    v53 = iconst.i64 1
-    store notrap aligned v53, v52  ; v53 = 1
-    v54 = iconst.i64 8
-    v55 = iadd v52, v54  ; v54 = 8
-    store.i64 notrap aligned v37, v55
-    jump block20(v52)
+    v51 = stack_addr.i64 ss4
+    v52 = iconst.i64 1
+    store notrap aligned v52, v51  ; v52 = 1
+    v53 = iconst.i64 8
+    v54 = iadd v51, v53  ; v53 = 8
+    store.i64 notrap aligned v37, v54
+    jump block20(v51)
 
 block19:
-    v56 = icmp.i64 eq v37, v50  ; v50 = -9223372036854775808
+    v55 = iconst.i64 -9223372036854775808
+    v56 = icmp.i64 eq v37, v55  ; v55 = -9223372036854775808
     v57 = uextend.i64 v56
     brif v57, block21, block22
 
@@ -104170,12 +104170,12 @@ block22:
 block23(v58: i64):
     jump block20(v58)
 
-block20(v51: i64):
+block20(v50: i64):
     call fn3(v4)
     call fn3(v19)
-    v68 = load.i64 notrap aligned v51
+    v68 = load.i64 notrap aligned v50
     store notrap aligned v68, v0
-    v69 = load.i64 notrap aligned v51+8
+    v69 = load.i64 notrap aligned v50+8
     store notrap aligned v69, v0+8
     return
 }
@@ -104186,7 +104186,7 @@ block20(v51: i64):
 ;   v4 = body
 ;   v19 = digits
 ;   v37 = v
-;   v50 = min
+;   v55 = min
 ; __builtin_value_or_err$i64$str
 function u0:297(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8

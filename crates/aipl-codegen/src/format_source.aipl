@@ -75,8 +75,8 @@ deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
 instructions executed: 324388
-binary size: 858952
-  code: 525068
+binary size: 858960
+  code: 525076
   data: 2508
   metadata: 331376
 functions:
@@ -169,7 +169,7 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 0
-    bytes: 1028
+    bytes: 1032
   __builtin_intersperse$__m7__Doc:
     calls: 8
     bytes: 408
@@ -547,7 +547,7 @@ functions:
     bytes: 232
   __m6__template_scan:
     calls: 0
-    bytes: 2244
+    bytes: 2248
   __m6__tok_text:
     calls: 51
     bytes: 368

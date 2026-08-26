@@ -46,11 +46,11 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 384
-instructions executed: 860
-binary size: 9576
-  code: 4712
+instructions executed: 859
+binary size: 9584
+  code: 4716
   data: 863
-  metadata: 4001
+  metadata: 4005
 functions:
   __builtin_value_or$str:
     calls: 4
@@ -123,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3312
+    bytes: 3316

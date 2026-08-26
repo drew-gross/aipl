@@ -1,0 +1,63 @@
+import { len, print, to_str, value_or } from builtins;
+
+// `value_or`'s default is an ordinary argument, so on the face of it a caller
+// pays for it whether or not the optional is empty. It doesn't, and the reason
+// is three passes meeting: monomorphization instantiates `value_or`, post-mono
+// inlining folds the instance into its caller, and the binding holding the
+// default then sits directly ahead of a `match` that only the `none` arm reads
+// — which is exactly the shape the sinking pass moves into that arm.
+//
+// So the two calls below build one string between them, not two. The
+// `allocations:` counter is the assertion.
+fn fallback(n: u64) -> str { `fallback {n} padded out well past the inline limit` }
+
+fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }
+
+fn main() !prints {
+    print(text(some("found"), 1).to_str());
+    print(text(none, 2).to_str());
+}
+--- stdout ---
+5
+48
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 92
+instructions executed: 161
+binary size: 2096
+  code: 732
+  data: 88
+  metadata: 1276
+functions:
+  __to_str_u64:
+    calls: 3
+    bytes: 180
+  aipl_concat:
+    calls: 2
+    bytes: (external)
+  aipl_dec:
+    calls: 14
+    bytes: (external)
+  aipl_inc:
+    calls: 7
+    bytes: (external)
+  aipl_print:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 272
+  text:
+    calls: 2
+    bytes: 280

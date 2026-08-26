@@ -2713,9 +2713,9 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2859239
-binary size: 3229616
-  code: 1845660
+instructions executed: 2859234
+binary size: 3229624
+  code: 1845668
   data: 27124
   metadata: 1356832
 functions:
@@ -2808,7 +2808,7 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 1
-    bytes: 1028
+    bytes: 1032
   __builtin_intersperse$__m1__Doc:
     calls: 142
     bytes: 408
@@ -3378,7 +3378,7 @@ functions:
     bytes: 232
   template_scan:
     calls: 0
-    bytes: 2244
+    bytes: 2248
   tok_text:
     calls: 2993
     bytes: 368
