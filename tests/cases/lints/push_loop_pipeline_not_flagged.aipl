@@ -1,0 +1,240 @@
+import {
+    filter,
+    join,
+    len,
+    less_than as <,
+    less_than_or_equal as <=,
+    map,
+    print,
+    push,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// The shapes the push-loop lint must leave alone. It rewrites exactly one
+// shape — a `mut acc = [];` whose very next statement is a loop doing nothing
+// but pushing one element, optionally behind an else-less `if` — so everything
+// here compiles.
+
+fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+
+fn show_u(xs: u64[]) -> str { xs.map(to_str).join(sep=",") }
+
+// The loop does something else as well. A pipeline has nowhere to put it.
+fn logged(xs: i64[]) !prints -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        print(x.to_str());
+        set out.push(x);
+    }
+    out
+}
+
+// An `if`/`else` pushing from both arms. This one *is* a `map` — of the `if`
+// expression — but the lint reads the guard as a `filter`, and a guard with an
+// else is not one. Recognizing it would mean a second rule with a different
+// rewrite, so it is left alone rather than mis-advised.
+fn signs(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (0 < x) {
+            set out.push(1);
+        } else {
+            set out.push(0);
+        };
+    }
+    out
+}
+
+// The guard reads the array being built, so it depends on how much the loop has
+// already done — a "take the first two" loop, which no `filter` predicate can
+// express.
+fn first_two(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (out.len() < 2) {
+            set out.push(x);
+        };
+    }
+    out
+}
+
+// So does the pushed element: the running length is the index this element
+// lands at, which a `map` lambda cannot see.
+fn indexed(xs: u64[]) -> u64[] {
+    mut out: u64[] = [];
+    for (let x : xs) {
+        set out.push(x + out.len());
+    }
+    out
+}
+
+// The seed already holds something, so the array is not just the loop's output.
+fn with_head(xs: i64[]) -> i64[] {
+    mut out = [0];
+    for (let x : xs) {
+        set out.push(x * 2);
+    }
+    out
+}
+
+// A statement between the seed and the loop. The rewrite moves the loop's work
+// up to the seed, past whatever sits in between — so the lint requires the loop
+// to be the very next statement rather than reasoning about what a statement
+// there might do.
+fn offset(xs: u64[]) -> u64[] {
+    mut out: u64[] = [];
+    let n = xs.len();
+    for (let x : xs) {
+        set out.push(x + n);
+    }
+    out
+}
+
+// Two pushes per element. The loop emits more elements than it consumes, which
+// is an `extend`, not a `map`.
+fn doubled_up(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        set out.push(x);
+        set out.push(x);
+    }
+    out
+}
+
+// Two seeds and one loop, which pairs with neither: `out`'s next statement is
+// the second seed rather than the loop, and the loop that does follow `tmp`
+// pushes somewhere else. The seed and the push have to name the same array,
+// and the loop has to be the seed's very next statement.
+fn nested_targets(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    mut tmp: i64[] = [];
+    for (let x : xs) {
+        set out.push(x * 2);
+    }
+    [..out, ..tmp]
+}
+
+// A `while` loop. Its condition is not an iteration, so there is nothing to
+// build a pipeline over.
+fn counted(n: i64) -> i64[] {
+    mut out: i64[] = [];
+    mut i = 0;
+    while (i < n) {
+        set out.push(i * 2);
+        set i++;
+    }
+    out
+}
+
+fn main() !prints {
+    print(show(logged([1, 2])));
+    print(show(signs([-1, 3])));
+    print(show(first_two([1, 2, 3])));
+    print(show_u(indexed([5, 5, 5])));
+    print(show(with_head([1, 2])));
+    print(show_u(offset([1, 2])));
+    print(show(doubled_up([7])));
+    print(show(nested_targets([1, 2])));
+    print(show(counted(3)));
+    // The rewrite itself must not flag.
+    print(show([1, 5, 3].filter(|x| 2 <= x).map(|x| x * 2)));
+}
+--- stdout ---
+1
+2
+1,2
+0,1
+1,2
+5,6,7
+0,2,4
+3,4
+7,7
+2,4
+0,2,4
+10,6
+--- performance ---
+allocations: 32
+deallocations: 32
+reallocations: 18
+bytes allocated: 1416
+instructions executed: 3751
+binary size: 12120
+  code: 7404
+  data: 1
+  metadata: 4715
+functions:
+  __filter10$own0:
+    calls: 1
+    bytes: 276
+  __map12$own0:
+    calls: 1
+    bytes: 256
+  __to_str_i64:
+    calls: 20
+    bytes: 180
+  __to_str_u64:
+    calls: 5
+    bytes: 180
+  aipl_arr_drop_str:
+    calls: 10
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 21
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 23
+    bytes: (external)
+  aipl_array_dec:
+    calls: 53
+    bytes: (external)
+  aipl_array_new:
+    calls: 19
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 41
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 10
+    bytes: (external)
+  aipl_dec:
+    calls: 80
+    bytes: (external)
+  aipl_i64_len:
+    calls: 40
+    bytes: (external)
+  aipl_inc:
+    calls: 35
+    bytes: (external)
+  aipl_print:
+    calls: 12
+    bytes: (external)
+  aipl_str_join:
+    calls: 10
+    bytes: (external)
+  aipl_str_len:
+    calls: 23
+    bytes: (external)
+  aipl_u64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_i64:
+    calls: 20
+    bytes: (external)
+  aipl_write_u64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 6512

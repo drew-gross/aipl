@@ -6,7 +6,9 @@ import { equal as ==, push, wrapping_add as +, wrapping_mul as * } from builtins
 // (taking `x` plus the captured `hi`), specializes `map` for it, and forwards
 // `hi` at the call.
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
-    mut out = [];
+    // A user-defined `map` — the builtin the push-loop lint recommends is what
+    // this case exists to reimplement.
+    mut out = []; #[allow]
     for (let x : xs) {
         set out.push(f(x));
     }

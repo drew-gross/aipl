@@ -11,7 +11,10 @@ import { equal as ==, push, remainder as % } from builtins;
 fn is_even(x: i64) -> bool { x % 2 == 0 }
 
 fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
-    mut result = [];
+    // The hand-written filter loop is the shape under test — the lint that
+    // wants `arr.filter(pred)` would delete the lambda specialization this
+    // regression is about.
+    mut result = []; #[allow]
     for (let item : arr) {
         if (pred(item)) {
             set result.push(item);

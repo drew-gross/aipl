@@ -121,6 +121,7 @@ utility functions:
   try_map that is like map when pred can error
   count_if
   do we need intersperse now that we've souped up join?
+  find (plus linter that require use of find)
 
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
@@ -193,6 +194,8 @@ lint:
     first need an import-insert probably
   "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects.
   mut out = a; set out.mutating_method(b); foo(out) should just be foo(out.mutating_method(b))
+  push_loop_pipeline:
+    remove restriction that it must start with an empty array
 
 Spreading:
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
@@ -226,6 +229,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+      make a filter-map fusion that pre-reserves and re-uses the input array if unique
       count fusions should apply to count_if also
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)

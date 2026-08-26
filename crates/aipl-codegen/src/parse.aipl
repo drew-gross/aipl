@@ -46,6 +46,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     not_equal as !=,
     push,
     same_case,
@@ -164,12 +165,9 @@ fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
     match (p.toks[i]) {
         some(t) => {
             let start = prev_end(p, i);
-            mut out: Cst[] = [];
-            for (let tr : p.trivia) {
-                if (start <= tr.span.start && tr.span.start < t.span.start) {
-                    set out.push(CTrivia(tr.span));
-                };
-            }
+            mut out = p.trivia
+                .filter(|tr| start <= tr.span.start && tr.span.start < t.span.start)
+                .map(|tr| CTrivia(tr.span));
             set out.push(CLeaf(t.span));
             out
         },
@@ -182,13 +180,7 @@ fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
 // covers the source to its last byte.
 fn trailing_trivia<K: variant, A: any>(p: Parser<K, A>) -> Cst[] {
     let start = prev_end(p, p.toks.len());
-    mut out: Cst[] = [];
-    for (let tr : p.trivia) {
-        if (start <= tr.span.start) {
-            set out.push(CTrivia(tr.span));
-        };
-    }
-    out
+    p.trivia.filter(|tr| start <= tr.span.start).map(|tr| CTrivia(tr.span))
 }
 
 fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
@@ -900,21 +892,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2701
-deallocations: 2701
-reallocations: 232
-bytes allocated: 129972
-instructions executed: 393283
-binary size: 260392
-  code: 150340
+allocations: 2945
+deallocations: 2945
+reallocations: 128
+bytes allocated: 139108
+instructions executed: 398717
+binary size: 261464
+  code: 151028
   data: 6948
-  metadata: 103104
+  metadata: 103488
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 226
+    calls: 230
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -929,7 +921,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m3__Token$Tok:
-    calls: 194
+    calls: 202
     bytes: 168
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
@@ -938,7 +930,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 245
+    calls: 249
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -953,7 +945,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m3__Token$Tok:
-    calls: 116
+    calls: 130
     bytes: 168
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
@@ -967,16 +959,16 @@ functions:
   __builtin_count_while$char$s0$lam33:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam56:
+  __builtin_count_while$char$s0$lam67:
     calls: 35
     bytes: 236
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam51:
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam56:
     calls: 10
     bytes: 716
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam15:
     calls: 43
     bytes: 928
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam36:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam41:
     calls: 36
     bytes: 716
   __eq_Node:
@@ -1112,7 +1104,7 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8324
+    calls: 8516
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1127,19 +1119,19 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10360
+    calls: 10796
     bytes: (external)
   aipl_array_new:
-    calls: 1494
+    calls: 1346
     bytes: (external)
   aipl_array_push:
-    calls: 151
+    calls: 247
     bytes: (external)
   aipl_array_push_mut:
-    calls: 427
+    calls: 345
     bytes: (external)
   aipl_array_with_cap:
-    calls: 183
+    calls: 479
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1160,13 +1152,13 @@ functions:
     calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2731
+    calls: 2735
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2291
+    calls: 2295
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1230,7 +1222,7 @@ functions:
     bytes: 848
   leaf_at$Tok$Node:
     calls: 96
-    bytes: 1312
+    bytes: 1692
   lex_toks:
     calls: 42
     bytes: 616
@@ -1296,7 +1288,7 @@ functions:
     bytes: 680
   trailing_trivia$Tok$Node:
     calls: 52
-    bytes: 600
+    bytes: 908
   trivia_rules:
     calls: 2
     bytes: 1372

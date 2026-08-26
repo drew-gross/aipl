@@ -26,7 +26,9 @@ fn sum_all(ts: Tree[]) -> i64 {
 
 // Retains: each element ends up owned by the returned array as well.
 fn wrap_each(ts: Tree[]) -> Tree[] {
-    mut out: Tree[] = [];
+    // The explicit push loop is the shape under test — it is what has to
+    // retain each borrowed element.
+    mut out: Tree[] = []; #[allow]
     for (let t : ts) {
         set out.push(Node(t, Leaf(0)));
     }

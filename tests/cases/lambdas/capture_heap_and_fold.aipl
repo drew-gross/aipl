@@ -17,7 +17,9 @@ fn reduce(xs: i64[], seed: i64, f: (i64, i64) -> i64) -> i64 {
 // heap value (`label`, a str) and using it on every element — exercising
 // refcounting of a captured heap value used many times.
 fn tag(xs: i64[], f: (i64) -> str) -> str[] {
-    mut out = [];
+    // Hand-written on purpose: the captured heap value has to be used once per
+    // element by *this* loop.
+    mut out = []; #[allow]
     for (let x : xs) {
         set out.push(f(x));
     }

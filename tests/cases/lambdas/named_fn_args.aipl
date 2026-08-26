@@ -28,7 +28,8 @@ fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
 // A higher-order *method* (first parameter is `self`), so it's also callable as
 // `xs.each(f)`. Applies `f` to every element.
 fn each(self: i64[], f: (i64) -> i64) -> i64[] {
-    mut out = [];
+    // A user-defined HOF, so the loop stays.
+    mut out = []; #[allow]
     for (let x : self) {
         set out.push(f(x));
     }

@@ -48,7 +48,9 @@ fn shift<K: variant>(self: Rule<K>, by: u64) -> Rule<K> {
 }
 
 fn shift_all<K: variant>(rs: Rule<K>[], by: u64) -> Rule<K>[] {
-    mut out: Rule<K>[] = [];
+    // Kept as a loop: the point is the generic recursive payload, not how the
+    // array is built.
+    mut out: Rule<K>[] = []; #[allow]
     for (let r : rs) {
         set out.push(r.shift(by));
     }

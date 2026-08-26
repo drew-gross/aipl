@@ -17,7 +17,8 @@ fn extend2(mut self: i64[], a: i64, b: i64) {
     assert(xs == [1, 2, 3, 4]);
 
     // `set`-push in a loop grows the receiver in place.
-    mut ys = [];
+    // `set`-push in a loop is exactly what this case tests.
+    mut ys = []; #[allow]
     for (let x : [7, 8, 9]) {
         set ys.push(x);
     }

@@ -1,7 +1,9 @@
 import { equal as ==, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
-    mut out = [];
+    // A user-defined `map`, which is the point — so the lint asking for the
+    // builtin one is squelched here, as it is in every hand-written HOF below.
+    mut out = []; #[allow]
     for (let x : xs) {
         set out.push(f(x));
     }

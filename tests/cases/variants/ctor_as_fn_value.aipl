@@ -22,7 +22,8 @@ fn labels(ss: str[]) -> Shape[] { ss.map(Label) }.test({
 // A user-defined HOF and a multi-payload constructor: `Rect` is passed where
 // a two-parameter function is expected.
 fn pair_up(xs: i64[], f: (i64, i64) -> Shape) -> Shape[] {
-    mut out = [];
+    // A two-parameter `f`, so there is no `map` spelling for this one anyway.
+    mut out = []; #[allow]
     for (let x : xs) {
         set out.push(f(x, x + 1));
     }

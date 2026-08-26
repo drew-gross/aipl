@@ -1,4 +1,4 @@
-import { equal as ==, len, less_than as <, push } from builtins;
+import { equal as ==, filter, len, less_than as < } from builtins;
 
 // A result payload may be an array — on either side. Array payloads ride the
 // same generic machinery as struct payloads (a single refcounted pointer
@@ -8,12 +8,7 @@ import { equal as ==, len, less_than as <, push } from builtins;
 
 // Ok side: the values below a threshold, or an error when none are.
 fn below(xs: i64[], cap: i64) -> i64[]!str {
-    mut out = [];
-    for (let x : xs) {
-        if (x < cap) {
-            set out.push(x);
-        };
-    }
+    let out = xs.filter(|x| x < cap);
     if (out.len() == 0) { err("none below") } else { ok(out) }
 }.test({
     assert(below([1, 5, 2, 9], 3)? == [1, 2]);
@@ -43,15 +38,15 @@ fn tail_below(xs: i64[], cap: i64) -> i64[]!str {
     assert(tail_below([9], 3) == err("none below"));
 })
 --- performance ---
-allocations: 22
-deallocations: 22
+allocations: 17
+deallocations: 17
 reallocations: 0
-bytes allocated: 888
-instructions executed: 1520
-binary size: 8112
-  code: 3924
+bytes allocated: 760
+instructions executed: 1483
+binary size: 8024
+  code: 3860
   data: 514
-  metadata: 3674
+  metadata: 3650
 functions:
   __eq_i64$arr:
     calls: 4
@@ -72,18 +67,21 @@ functions:
     calls: 0
     bytes: 252
   aipl_arr_inc:
-    calls: 21
+    calls: 11
     bytes: (external)
   aipl_arr_slice:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 43
+    calls: 28
     bytes: (external)
   aipl_array_new:
-    calls: 16
+    calls: 11
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
+    calls: 5
+    bytes: (external)
+  aipl_array_with_cap:
     calls: 5
     bytes: (external)
   aipl_assert:
@@ -109,7 +107,7 @@ functions:
     bytes: (external)
   below:
     calls: 5
-    bytes: 604
+    bytes: 540
   main:
     calls: 1
     bytes: 156

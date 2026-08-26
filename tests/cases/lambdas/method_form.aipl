@@ -4,7 +4,8 @@ import { equal as ==, push, to_str, wrapping_add as + } from builtins;
 // `xs.tag(..)`. Method-call form is specialized for the lambda just like the
 // function-call form (the receiver becomes the leading `self` argument).
 fn tag(self: i64[], f: (i64) -> str) -> str[] {
-    mut out = [];
+    // The hand-written loop is what makes this a higher-order *method*.
+    mut out = []; #[allow]
     for (let x : self) {
         set out.push(f(x));
     }

@@ -1,0 +1,103 @@
+import { len, less_than_or_equal as <=, print, push, to_str, wrapping_mul as * } from builtins;
+
+// `mut out = []; for (let x : xs) { if (..) { set out.push(..); } }` — an array
+// seeded empty and filled by a loop that does nothing else. `filter` and `map`
+// say that in one expression, and say it up front: the reader learns what the
+// array *is* without having to run three statements to find out that nothing
+// else happens to `out`.
+//
+// Both halves are optional, and which are present picks the advice.
+
+// Both: a guard and a transformed element.
+fn scaled_above(xs: i64[], lo: i64) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (lo <= x) {
+            set out.push(x * 2);
+        };
+    }
+    out
+}
+
+// No guard — every element is pushed, transformed. That is a `map` alone.
+fn doubled(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        set out.push(x * 2);
+    }
+    out
+}
+
+// The element pushed unchanged — a `filter` alone. The longhand
+// `set out = out.push(x);` is the same statement written out, so it is flagged
+// the same way.
+fn above(xs: i64[], lo: i64) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        if (lo <= x) {
+            set out = out.push(x);
+        };
+    }
+    out
+}
+
+// Neither: the loop copies the array one element at a time, so the array itself
+// is the answer and there is no pipeline to build.
+fn copied(xs: i64[]) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : xs) {
+        set out.push(x);
+    }
+    out
+}
+
+fn evens(n: i64) -> i64[] { [n, n * 2] }
+
+// A call-shaped iterable can't be quoted back into the advice — its span stops
+// before its parens — so the message names neither it nor a receiver, and the
+// chain reads as the method calls to append.
+fn from_call(n: i64) -> i64[] {
+    mut out: i64[] = [];
+    for (let x : evens(n)) {
+        set out.push(x * 2);
+    }
+    out
+}
+
+fn main() !prints {
+    print(scaled_above([1, 5], 2).len().to_str());
+    print(doubled([1, 5]).len().to_str());
+    print(above([1, 5], 2).len().to_str());
+    print(copied([1, 5]).len().to_str());
+    print(from_call(3).len().to_str());
+}
+--- errors ---
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..);" and drop the loop, importing `filter` and `map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:13:22
+   |
+13 |     mut out: i64[] = [];
+   |                      ^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..);" and drop the loop, importing `map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:24:22
+   |
+24 |     mut out: i64[] = [];
+   |                      ^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..);" and drop the loop, importing `filter` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:35:22
+   |
+35 |     mut out: i64[] = [];
+   |                      ^
+
+error: "out" is seeded empty and filled by this loop and nothing else — it is "xs" already — assign that and drop the loop (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:47:22
+   |
+47 |     mut out: i64[] = [];
+   |                      ^
+
+error: "out" is seeded empty and filled by this loop and nothing else — write "mut out = <iterable>.map(|x| ..);" and drop the loop, importing `map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_loop_pipeline.aipl:60:22
+   |
+60 |     mut out: i64[] = [];
+   |                      ^
