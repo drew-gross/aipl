@@ -180,11 +180,11 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24785
-binary size: 86264
-  code: 53756
+instructions executed: 24775
+binary size: 86216
+  code: 53732
   data: 2532
-  metadata: 29976
+  metadata: 29952
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -195,12 +195,9 @@ functions:
   __builtin_count_while$char$s0$lam14:
     calls: 3
     bytes: 232
-  __builtin_drop_n$char$s0:
-    calls: 5
-    bytes: 72
   __builtin_int_parse:
     calls: 3
-    bytes: 1020
+    bytes: 1052
   __eq_i64$opt:
     calls: 2
     bytes: 100
@@ -299,7 +296,7 @@ functions:
     bytes: (external)
   companion_path:
     calls: 4
-    bytes: 1104
+    bytes: 1120
   finalize:
     calls: 25
     bytes: 17532

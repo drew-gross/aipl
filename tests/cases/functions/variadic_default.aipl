@@ -45,11 +45,11 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 566
-instructions executed: 548
-binary size: 4008
-  code: 1884
+instructions executed: 540
+binary size: 3904
+  code: 1840
   data: 1
-  metadata: 2123
+  metadata: 2063
 functions:
   __to_str_u64:
     calls: 9
@@ -87,15 +87,9 @@ functions:
   aipl_write_u64:
     calls: 9
     bytes: (external)
-  chars:
-    calls: 2
-    bytes: 36
-  count$i64:
-    calls: 2
-    bytes: 12
   count$i64$vo1:
     calls: 2
     bytes: 216
   main:
     calls: 1
-    bytes: 1440
+    bytes: 1444

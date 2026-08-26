@@ -641,11 +641,11 @@ allocations: 4666
 deallocations: 4666
 reallocations: 31
 bytes allocated: 270208
-instructions executed: 742384
-binary size: 214104
-  code: 138068
+instructions executed: 739679
+binary size: 214328
+  code: 138432
   data: 7100
-  metadata: 68936
+  metadata: 68796
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -683,24 +683,9 @@ functions:
   __builtin_count_while$char$s0$lam38:
     calls: 2
     bytes: 232
-  __builtin_drop_first$char$s0:
-    calls: 0
-    bytes: 32
-  __builtin_drop_first$char$s0$tail:
-    calls: 49
-    bytes: 104
-  __builtin_first$char$s0:
-    calls: 217
-    bytes: 136
   __builtin_int_parse:
     calls: 4
-    bytes: 1032
-  __builtin_is_some_and$char$lam34:
-    calls: 28
-    bytes: 48
-  __builtin_value_or$char:
-    calls: 30
-    bytes: 24
+    bytes: 1052
   __eq_AiplTok:
     calls: 51
     bytes: 884
@@ -763,13 +748,13 @@ functions:
     bytes: 676
   __m1__delimited_len:
     calls: 45
-    bytes: 1412
+    bytes: 1500
   __m1__finalize_template$AiplTok:
     calls: 3
     bytes: 7336
   __m1__float_len:
     calls: 0
-    bytes: 816
+    bytes: 904
   __m1__interp_scan$AiplTok:
     calls: 1
     bytes: 2056
@@ -778,7 +763,7 @@ functions:
     bytes: 1372
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 22608
+    bytes: 22756
   __m1__nested_len:
     calls: 56
     bytes: 940
@@ -787,7 +772,7 @@ functions:
     bytes: 12068
   __m1__template_scan$AiplTok:
     calls: 3
-    bytes: 2660
+    bytes: 2668
   __m1__template_step$AiplTok:
     calls: 35
     bytes: 488
@@ -796,13 +781,10 @@ functions:
     bytes: 892
   __m3__process_raw_string:
     calls: 2
-    bytes: 1680
+    bytes: 1676
   __m7__trim_prefix:
-    calls: 0
-    bytes: 36
-  __m7__trim_prefix$tail:
     calls: 4
-    bytes: 168
+    bytes: 216
   __m8__trim_suffix:
     calls: 0
     bytes: 292
@@ -867,10 +849,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_dec:
-    calls: 24359
+    calls: 24308
     bytes: (external)
   aipl_inc:
-    calls: 19244
+    calls: 19193
     bytes: (external)
   aipl_str_contains:
     calls: 1016
@@ -929,15 +911,12 @@ functions:
   dedent_segments:
     calls: 1
     bytes: 188
-  ident_cont:
-    calls: 420
-    bytes: 16
   int_lit:
     calls: 4
     bytes: 1132
   lex_aipl:
     calls: 20
-    bytes: 46088
+    bytes: 46452
   lex_aipl_tokens:
     calls: 2
     bytes: 384

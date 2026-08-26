@@ -6956,6 +6956,98 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
     program
 }
 
+/// [`inline_small`] over the *monomorphized* program: fold a small body into
+/// **every** caller, not just a single one.
+///
+/// The single-use pass cannot reach a body with two callers, however tiny — and
+/// tiny-with-several-callers is exactly the shape the AIPL-implemented builtins
+/// have. `value_or`/`value_or_err` are three lines and called from everywhere;
+/// until their `match` is in the caller's body, the sinking pass cannot see that
+/// the default is read on one arm only, and every caller pays for it eagerly.
+///
+/// Runs after monomorphization because that is when those builtins exist at all:
+/// they are loaded on demand while instantiating, so the pre-mono `inline_small`
+/// never sees them.
+///
+/// Candidates are chosen once, from the program as it arrives — inlining only
+/// grows callers, so re-selecting could never add to the set, while re-walking
+/// it risks an unbounded ping-pong between two small mutually-calling functions.
+pub fn inline_small_post_mono(
+    program: &MonoProgram,
+    max_exprs: usize,
+    externally_called: &HashSet<String>,
+) -> MonoProgram {
+    let mut program = program.clone();
+    let mut counter = 0usize;
+    let binders = collect_binders_mono(&program);
+    // See `inline_single_use_post_mono`: with no single entry, any function may
+    // be called by name from Rust, so none may be elided.
+    let library = !program
+        .fns
+        .iter()
+        .any(|f| f.name == "main" || f.name == "__test_main");
+    let candidates: Vec<ConcreteFn> = program
+        .fns
+        .iter()
+        .filter(|f| {
+            body_size(&f.body) <= max_exprs
+                && f.name != "main"
+                && f.name != "__test_main"
+                // A `.test` body's name changes what `?` means inside it — see
+                // `is_inline_candidate_mono`.
+                && !f.name.starts_with("__test$")
+                && !binders.contains(&f.name)
+                && is_inline_shape(
+                    f.params
+                        .iter()
+                        .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
+                    &f.body,
+                    &f.name,
+                )
+        })
+        .cloned()
+        .collect();
+
+    for f in candidates {
+        let fparams: Vec<InlineParam> = f
+            .params
+            .iter()
+            .map(|p| InlineParam {
+                name: p.name.clone(),
+                ty: p.ty.widen(),
+                mutable: p.mutable,
+            })
+            .collect();
+        let mut replaced = false;
+        for g in &mut program.fns {
+            // Not into itself: `is_inline_shape` rejected a self-referencing
+            // body, but a candidate is still its own function.
+            if g.name == f.name {
+                continue;
+            }
+            g.body = replace_call(
+                &g.body,
+                &f.name,
+                &fparams,
+                &f.body,
+                &mut counter,
+                &mut replaced,
+                InlineSites::All,
+            );
+        }
+        // Unlike the pre-mono pass, nothing downstream will drop the orphan for
+        // us — an unreferenced function still reaches codegen — so drop it here
+        // once nothing names it and nothing outside can ask for it.
+        if replaced && !library && !externally_called.contains(&f.name) {
+            let counts = use_counts_mono(&program);
+            if counts.get(&f.name) == Some(&0) {
+                program.fns.retain(|g| g.name != f.name);
+            }
+        }
+    }
+    program
+}
+
 fn is_inline_candidate(
     f: &Function,
     counts: &HashMap<String, usize>,

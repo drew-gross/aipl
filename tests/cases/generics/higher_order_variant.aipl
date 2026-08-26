@@ -27,18 +27,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 102
-binary size: 1504
-  code: 460
+instructions executed: 87
+binary size: 1416
+  code: 416
   data: 128
-  metadata: 916
+  metadata: 872
 functions:
   __lambda_0:
     calls: 1
     bytes: 60
   __test$to_i:
     calls: 1
-    bytes: 228
+    bytes: 284
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -51,9 +51,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  apply$Tok:
-    calls: 2
-    bytes: 100
   main:
     calls: 1
     bytes: 72

@@ -68,30 +68,30 @@ struct Point { x: i64, y: i64 }
 
 variant Color = Red | Blue
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 240
-instructions executed: 643
-binary size: 7360
-  code: 2832
+bytes allocated: 200
+instructions executed: 554
+binary size: 7064
+  code: 2792
   data: 1246
-  metadata: 3282
+  metadata: 3026
 functions:
   __eq_Point:
     calls: 1
     bytes: 104
   __test$value_or:
     calls: 1
-    bytes: 2344
+    bytes: 2616
   aipl_arr_inc:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 8
     bytes: (external)
   aipl_array_new:
-    calls: 5
+    calls: 4
     bytes: (external)
   aipl_assert:
     calls: 18
@@ -103,7 +103,7 @@ functions:
     calls: 9
     bytes: (external)
   aipl_inc:
-    calls: 5
+    calls: 4
     bytes: (external)
   aipl_str_eq:
     calls: 2
@@ -123,21 +123,3 @@ functions:
   main:
     calls: 1
     bytes: 72
-  value_or$Color:
-    calls: 2
-    bytes: 24
-  value_or$Point:
-    calls: 3
-    bytes: 32
-  value_or$char:
-    calls: 3
-    bytes: 24
-  value_or$i64:
-    calls: 4
-    bytes: 24
-  value_or$i64[]:
-    calls: 2
-    bytes: 120
-  value_or$str:
-    calls: 2
-    bytes: 88

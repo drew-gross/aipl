@@ -94,18 +94,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1097
-binary size: 8696
-  code: 4000
+instructions executed: 995
+binary size: 9480
+  code: 4612
   data: 1179
-  metadata: 3517
+  metadata: 3689
 functions:
   __test$digit_of:
     calls: 1
     bytes: 496
   __test$value_or_err:
     calls: 1
-    bytes: 2252
+    bytes: 3332
   aipl_assert:
     calls: 14
     bytes: (external)
@@ -132,16 +132,7 @@ functions:
     bytes: (external)
   digit_of:
     calls: 5
-    bytes: 564
+    bytes: 672
   main:
     calls: 1
     bytes: 112
-  value_or_err$char$i64:
-    calls: 2
-    bytes: 92
-  value_or_err$i64$str:
-    calls: 9
-    bytes: 180
-  value_or_err$str$str:
-    calls: 2
-    bytes: 304

@@ -19,26 +19,17 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 184
-instructions executed: 479
-binary size: 3768
-  code: 2084
+instructions executed: 475
+binary size: 3424
+  code: 1844
   data: 1
-  metadata: 1683
+  metadata: 1579
 functions:
-  __arr_drop_concat_str:
-    calls: 1
-    bytes: 116
-  __arr_retain_concat_str:
-    calls: 0
-    bytes: 116
-  __lambda_0:
-    calls: 2
-    bytes: 84
   __zip1$own0$own1:
     calls: 1
-    bytes: 1348
+    bytes: 1424
   aipl_arr_drop_str:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_arr_inc:
     calls: 1

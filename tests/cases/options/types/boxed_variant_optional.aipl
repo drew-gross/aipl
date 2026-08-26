@@ -20,33 +20,30 @@ fn pick(b: bool) -> List? { if (b) { some(Cons(1, Cons(2, Nil))) } else { none }
     assert(absent.sum() == 9); // default used
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 336
-instructions executed: 207
-binary size: 3496
-  code: 1480
+bytes allocated: 280
+instructions executed: 197
+binary size: 3520
+  code: 1496
   data: 93
-  metadata: 1923
+  metadata: 1931
 functions:
-  __builtin_value_or$List:
-    calls: 2
-    bytes: 120
   __rec_drop_List:
-    calls: 6
+    calls: 5
     bytes: 48
   __test$pick:
     calls: 1
-    bytes: 1136
+    bytes: 1272
   aipl_assert:
     calls: 2
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6
+    calls: 5
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 14
+    calls: 13
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 3

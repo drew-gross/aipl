@@ -41,11 +41,11 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 3574
-binary size: 7712
-  code: 4308
+instructions executed: 3550
+binary size: 7744
+  code: 4380
   data: 476
-  metadata: 2928
+  metadata: 2888
 functions:
   __eq_i64$arr:
     calls: 6
@@ -61,7 +61,7 @@ functions:
     bytes: 256
   __test$is_even:
     calls: 1
-    bytes: 2936
+    bytes: 3128
   aipl_arr_drop_str:
     calls: 3
     bytes: (external)
@@ -107,9 +107,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  is_even:
-    calls: 12
-    bytes: 120
   main:
     calls: 1
     bytes: 76

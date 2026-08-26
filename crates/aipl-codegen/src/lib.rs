@@ -4848,6 +4848,11 @@ fn compile_program<M: Module>(
         .chain(["main".to_string(), "__test_main".to_string()])
         .collect();
     let program = aipl_mono::inline_single_use_post_mono(&monomorphized, &externally_called);
+    // Then the small bodies, at *every* call site. This is what the sinking pass
+    // below needs to see through a call: `value_or`'s `match` has to be in the
+    // caller before a binding can be moved into one of its arms.
+    let program =
+        aipl_mono::inline_small_post_mono(&program, inline_max_exprs(), &externally_called);
     // Sink again over the monomorphized program: mono instantiates the
     // AIPL-implemented builtins the pre-mono run could not see, and post-mono
     // inlining folds each lifted lambda and single-use instance into its caller

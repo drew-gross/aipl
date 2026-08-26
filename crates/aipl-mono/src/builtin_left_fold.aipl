@@ -48,21 +48,18 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 507
-instructions executed: 1174
-binary size: 6136
-  code: 2724
+instructions executed: 1160
+binary size: 6024
+  code: 2692
   data: 726
-  metadata: 2686
+  metadata: 2606
 functions:
   __filter11$own0:
     calls: 1
-    bytes: 284
+    bytes: 272
   __test$left_fold:
     calls: 1
     bytes: 2008
-  add:
-    calls: 4
-    bytes: 8
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -114,12 +111,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  is_big:
-    calls: 3
-    bytes: 16
   left_fold$i64$i64$lam10:
     calls: 2
     bytes: 180
   main:
     calls: 1
-    bytes: 228
+    bytes: 232

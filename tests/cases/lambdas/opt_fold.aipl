@@ -41,15 +41,12 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 384
-instructions executed: 2343
-binary size: 7240
-  code: 3668
+instructions executed: 2277
+binary size: 7192
+  code: 3700
   data: 792
-  metadata: 2780
+  metadata: 2700
 functions:
-  __builtin_value_or$i64:
-    calls: 19
-    bytes: 24
   __eq_i64$opt:
     calls: 9
     bytes: 100
@@ -61,7 +58,7 @@ functions:
     bytes: 136
   __test$parses_a_digit_run:
     calls: 1
-    bytes: 2844
+    bytes: 2892
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -109,7 +106,7 @@ functions:
     bytes: (external)
   digits_to_int:
     calls: 5
-    bytes: 344
+    bytes: 352
   main:
     calls: 1
     bytes: 72

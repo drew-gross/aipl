@@ -312,11 +312,11 @@ allocations: 109
 deallocations: 109
 reallocations: 0
 bytes allocated: 6966
-instructions executed: 11755
-binary size: 38656
-  code: 22188
+instructions executed: 11711
+binary size: 38528
+  code: 22104
   data: 1620
-  metadata: 14848
+  metadata: 14804
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -462,9 +462,6 @@ functions:
   link_rule$Kind:
     calls: 25
     bytes: 4208
-  link_rules$Kind:
-    calls: 4
-    bytes: 84
   main:
     calls: 1
     bytes: 72

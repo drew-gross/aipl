@@ -78,15 +78,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1345
-binary size: 10504
-  code: 4308
+instructions executed: 1330
+binary size: 10440
+  code: 4304
   data: 1571
-  metadata: 4625
+  metadata: 4565
 functions:
-  __builtin_value_or_err$char$i64:
-    calls: 2
-    bytes: 92
   __test$check_len:
     calls: 1
     bytes: 388
@@ -95,7 +92,7 @@ functions:
     bytes: 584
   __test$is_err_and:
     calls: 1
-    bytes: 2036
+    bytes: 2124
   __test$is_not_a_digit:
     calls: 1
     bytes: 144

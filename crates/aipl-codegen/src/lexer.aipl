@@ -1232,11 +1232,11 @@ allocations: 1657
 deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
-instructions executed: 267705
+instructions executed: 265480
 binary size: 1791424
-  code: 1124988
+  code: 1125136
   data: 8132
-  metadata: 658304
+  metadata: 658156
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1268,21 +1268,9 @@ functions:
   __builtin_count_while$char$s0$lam49:
     calls: 13
     bytes: 232
-  __builtin_drop_first$char$s0:
-    calls: 65
-    bytes: 72
-  __builtin_first$char$s0:
-    calls: 254
-    bytes: 136
   __builtin_int_parse:
     calls: 13
-    bytes: 980
-  __builtin_is_some_and$char$lam33:
-    calls: 37
-    bytes: 48
-  __builtin_value_or$char:
-    calls: 81
-    bytes: 24
+    bytes: 1052
   __eq_Kind:
     calls: 98
     bytes: 1136
@@ -1468,7 +1456,7 @@ functions:
     bytes: 1700
   delimited_len:
     calls: 26
-    bytes: 1412
+    bytes: 1500
   esc_str:
     calls: 2
     bytes: 112
@@ -1477,7 +1465,7 @@ functions:
     bytes: 9328
   float_len:
     calls: 14
-    bytes: 816
+    bytes: 904
   int_tok:
     calls: 13
     bytes: 1644
@@ -1489,7 +1477,7 @@ functions:
     bytes: 1372
   lex_step$Kind:
     calls: 140
-    bytes: 25020
+    bytes: 25192
   main:
     calls: 1
     bytes: 68
@@ -1507,7 +1495,7 @@ functions:
     bytes: 15384
   template_scan$Kind:
     calls: 16
-    bytes: 2660
+    bytes: 2668
   template_step$Kind:
     calls: 27
     bytes: 488

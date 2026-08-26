@@ -74,11 +74,11 @@ allocations: 2192
 deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
-instructions executed: 324394
-binary size: 859112
-  code: 525140
+instructions executed: 323518
+binary size: 859632
+  code: 525916
   data: 2508
-  metadata: 331464
+  metadata: 331208
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -155,39 +155,15 @@ functions:
   __builtin_count_while$char$s0$lam77:
     calls: 0
     bytes: 232
-  __builtin_drop_first$char$s0:
-    calls: 0
-    bytes: 32
-  __builtin_drop_first$char$s0$tail:
-    calls: 12
-    bytes: 104
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_first$char$s0:
-    calls: 78
-    bytes: 136
   __builtin_int_parse:
     calls: 0
-    bytes: 1032
+    bytes: 1052
   __builtin_intersperse$__m7__Doc:
     calls: 8
     bytes: 408
-  __builtin_is_some_and$char$lam63:
-    calls: 12
-    bytes: 48
-  __builtin_value_or$__builtin_Span:
-    calls: 0
-    bytes: 32
-  __builtin_value_or$__m7__Doc:
-    calls: 0
-    bytes: 120
-  __builtin_value_or$char:
-    calls: 0
-    bytes: 24
-  __builtin_value_or$str:
-    calls: 0
-    bytes: 88
   __eq___m6__FmtKind:
     calls: 0
     bytes: 64
@@ -230,9 +206,6 @@ functions:
   __m12__dedent_segments:
     calls: 0
     bytes: 168
-  __m12__ident_cont:
-    calls: 84
-    bytes: 16
   __m12__int_lit:
     calls: 0
     bytes: 1132
@@ -247,13 +220,13 @@ functions:
     bytes: 676
   __m13__delimited_len:
     calls: 24
-    bytes: 1412
+    bytes: 1500
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
-    bytes: 7328
+    bytes: 7336
   __m13__float_len:
     calls: 0
-    bytes: 816
+    bytes: 904
   __m13__interp_scan$__m12__AiplTok:
     calls: 0
     bytes: 2056
@@ -262,7 +235,7 @@ functions:
     bytes: 1372
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 22608
+    bytes: 22756
   __m13__nested_len:
     calls: 18
     bytes: 940
@@ -271,7 +244,7 @@ functions:
     bytes: 12068
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2660
+    bytes: 2668
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 488
@@ -286,10 +259,7 @@ functions:
     bytes: 600
   __m16__trim_prefix:
     calls: 0
-    bytes: 36
-  __m16__trim_prefix$tail:
-    calls: 0
-    bytes: 168
+    bytes: 216
   __m17__trim_suffix:
     calls: 0
     bytes: 292
@@ -307,25 +277,25 @@ functions:
     bytes: 2176
   __m6__atom:
     calls: 0
-    bytes: 3184
+    bytes: 3192
   __m6__base_ty:
     calls: 0
-    bytes: 3928
+    bytes: 3940
   __m6__binding_ann:
     calls: 0
-    bytes: 1924
+    bytes: 1932
   __m6__binop_expr:
     calls: 0
     bytes: 2888
   __m6__binop_tail:
     calls: 0
-    bytes: 3920
+    bytes: 3924
   __m6__block:
     calls: 3
     bytes: 1012
   __m6__block_entries:
     calls: 3
-    bytes: 3744
+    bytes: 3752
   __m6__block_layout:
     calls: 3
     bytes: 5124
@@ -334,13 +304,13 @@ functions:
     bytes: 920
   __m6__call_arg:
     calls: 0
-    bytes: 4680
+    bytes: 4700
   __m6__call_arg_list:
     calls: 0
-    bytes: 612
+    bytes: 688
   __m6__call_args_until:
     calls: 0
-    bytes: 2616
+    bytes: 2624
   __m6__comma_list_docs:
     calls: 3
     bytes: 3080
@@ -352,7 +322,7 @@ functions:
     bytes: 3208
   __m6__dict_entries:
     calls: 0
-    bytes: 4204
+    bytes: 4216
   __m6__dict_value:
     calls: 0
     bytes: 1428
@@ -361,154 +331,151 @@ functions:
     bytes: 1300
   __m6__dot_seg:
     calls: 0
-    bytes: 5184
+    bytes: 5188
   __m6__drop_trailing_break:
     calls: 0
-    bytes: 908
+    bytes: 964
   __m6__err_here:
     calls: 0
     bytes: 656
   __m6__expect:
     calls: 15
-    bytes: 1080
+    bytes: 1092
   __m6__expr:
     calls: 0
     bytes: 700
   __m6__fn_attrs:
     calls: 3
-    bytes: 5304
+    bytes: 5316
   __m6__fn_body:
     calls: 3
-    bytes: 1224
+    bytes: 1228
   __m6__fn_item:
     calls: 3
-    bytes: 17724
+    bytes: 17716
   __m6__fn_return:
     calls: 0
     bytes: 1696
   __m6__for_stmt:
     calls: 0
-    bytes: 11804
+    bytes: 11872
   __m6__format_program:
     calls: 4
-    bytes: 80228
+    bytes: 80448
   __m6__hug_close:
     calls: 0
     bytes: 716
   __m6__hugs_sole_arg:
     calls: 0
-    bytes: 1268
+    bytes: 1276
   __m6__ident_list:
     calls: 0
-    bytes: 1660
+    bytes: 1664
   __m6__if_expr:
     calls: 0
-    bytes: 10916
+    bytes: 10928
   __m6__import_item:
     calls: 0
-    bytes: 15468
+    bytes: 15488
   __m6__index_or_from:
     calls: 0
-    bytes: 3872
+    bytes: 3884
   __m6__index_seg:
     calls: 0
-    bytes: 3676
+    bytes: 3680
   __m6__item:
     calls: 3
-    bytes: 932
+    bytes: 936
   __m6__lambda:
     calls: 0
-    bytes: 5924
+    bytes: 5932
   __m6__lambda_param_ty:
     calls: 0
     bytes: 1456
   __m6__lambda_params:
     calls: 0
-    bytes: 3176
+    bytes: 3184
   __m6__lead:
     calls: 10
-    bytes: 1808
+    bytes: 1812
   __m6__let_stmt:
     calls: 0
-    bytes: 19204
+    bytes: 19208
   __m6__match_arms:
     calls: 0
-    bytes: 7672
+    bytes: 7696
   __m6__match_expr:
     calls: 0
     bytes: 10744
   __m6__more_before:
     calls: 3
-    bytes: 208
+    bytes: 212
   __m6__mut_stmt:
     calls: 0
     bytes: 5364
   __m6__name_atom:
     calls: 0
-    bytes: 5460
+    bytes: 5476
   __m6__named_ty:
     calls: 0
-    bytes: 3656
+    bytes: 3660
   __m6__next_start:
     calls: 0
     bytes: 532
   __m6__params_until:
     calls: 3
-    bytes: 9448
+    bytes: 9464
   __m6__paren_atom:
     calls: 0
-    bytes: 5316
+    bytes: 5324
   __m6__paren_ty:
     calls: 0
-    bytes: 8688
+    bytes: 8720
   __m6__pattern:
     calls: 0
-    bytes: 7572
+    bytes: 7588
   __m6__pattern_alts:
     calls: 0
-    bytes: 2968
+    bytes: 2972
   __m6__peek_is:
     calls: 0
     bytes: 288
-  __m6__peek_text_n:
-    calls: 45
-    bytes: 32
   __m6__postfix:
     calls: 0
     bytes: 5084
   __m6__postfix_segs:
     calls: 0
-    bytes: 3252
+    bytes: 3256
   __m6__program:
     calls: 4
     bytes: 2496
   __m6__program_items:
     calls: 4
-    bytes: 4372
+    bytes: 4376
   __m6__range_has_semi:
     calls: 3
     bytes: 228
   __m6__range_tail:
     calls: 0
-    bytes: 2136
+    bytes: 2140
   __m6__sep_entry:
     calls: 0
     bytes: 328
   __m6__set_member:
     calls: 0
-    bytes: 9644
+    bytes: 9640
   __m6__set_or_dict_atom:
     calls: 0
-    bytes: 5016
+    bytes: 5024
   __m6__set_or_dict_ty:
     calls: 0
-    bytes: 5976
+    bytes: 5984
   __m6__set_stmt:
     calls: 0
-    bytes: 7316
+    bytes: 7324
   __m6__shim_bindings:
     calls: 0
-    bytes: 2984
+    bytes: 2988
   __m6__shim_expr:
     calls: 0
     bytes: 5860
@@ -523,7 +490,7 @@ functions:
     bytes: 1692
   __m6__statement:
     calls: 0
-    bytes: 5168
+    bytes: 5180
   __m6__str_atom:
     calls: 0
     bytes: 532
@@ -535,10 +502,10 @@ functions:
     bytes: 1496
   __m6__struct_fields:
     calls: 0
-    bytes: 5800
+    bytes: 5812
   __m6__struct_inits:
     calls: 0
-    bytes: 5520
+    bytes: 5528
   __m6__struct_item:
     calls: 0
     bytes: 5804
@@ -559,28 +526,28 @@ functions:
     bytes: 32
   __m6__trim_last_break$tail:
     calls: 0
-    bytes: 1164
+    bytes: 1224
   __m6__tuple_rest:
     calls: 0
-    bytes: 2688
+    bytes: 2696
   __m6__ty:
     calls: 0
-    bytes: 4432
+    bytes: 4452
   __m6__ty_list:
     calls: 0
-    bytes: 2216
+    bytes: 2224
   __m6__type_params:
     calls: 3
-    bytes: 5188
+    bytes: 5200
   __m6__unary:
     calls: 0
-    bytes: 1700
+    bytes: 1712
   __m6__variant_cases:
     calls: 0
-    bytes: 3804
+    bytes: 3812
   __m6__variant_item:
     calls: 0
-    bytes: 6256
+    bytes: 6268
   __m6__variant_payload:
     calls: 0
     bytes: 2176
@@ -595,7 +562,7 @@ functions:
     bytes: 528
   __m7__col_after:
     calls: 18
-    bytes: 424
+    bytes: 452
   __m7__fits:
     calls: 0
     bytes: 36
@@ -616,7 +583,7 @@ functions:
     bytes: 664
   __m8__reindent_block:
     calls: 0
-    bytes: 2292
+    bytes: 2356
   __m9__dedent:
     calls: 0
     bytes: 32
@@ -681,10 +648,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 10154
+    calls: 10142
     bytes: (external)
   aipl_inc:
-    calls: 8336
+    calls: 8324
     bytes: (external)
   aipl_rec_alloc:
     calls: 100

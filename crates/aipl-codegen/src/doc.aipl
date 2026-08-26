@@ -325,11 +325,11 @@ allocations: 285
 deallocations: 285
 reallocations: 0
 bytes allocated: 16148
-instructions executed: 21491
-binary size: 31640
+instructions executed: 21482
+binary size: 31592
   code: 17648
   data: 842
-  metadata: 13150
+  metadata: 13102
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -352,12 +352,9 @@ functions:
   __builtin_drop_last$str:
     calls: 1
     bytes: 208
-  __builtin_value_or$str:
-    calls: 3
-    bytes: 88
   __m1__reindent_block:
     calls: 1
-    bytes: 3368
+    bytes: 3428
   __map17$own0:
     calls: 1
     bytes: 320
@@ -474,7 +471,7 @@ functions:
     bytes: (external)
   col_after:
     calls: 25
-    bytes: 424
+    bytes: 452
   fits:
     calls: 0
     bytes: 36

@@ -74,51 +74,30 @@ allocations: 15
 deallocations: 15
 reallocations: 0
 bytes allocated: 800
-instructions executed: 3969
-binary size: 12744
-  code: 8724
+instructions executed: 3945
+binary size: 12112
+  code: 8376
   data: 93
-  metadata: 3927
+  metadata: 3643
 functions:
-  __arr_drop_concat_str:
-    calls: 1
-    bytes: 116
-  __arr_retain_concat_str:
-    calls: 0
-    bytes: 116
-  __lambda_0:
-    calls: 2
-    bytes: 8
-  __lambda_10:
-    calls: 3
-    bytes: 8
-  __lambda_12:
-    calls: 3
-    bytes: 28
-  __lambda_14:
-    calls: 2
-    bytes: 84
-  __lambda_2:
-    calls: 2
-    bytes: 8
   __to_str_i64:
     calls: 15
     bytes: 180
   __zip1$own0$own1:
     calls: 1
-    bytes: 968
+    bytes: 952
   __zip11$own0$own1:
     calls: 1
-    bytes: 968
+    bytes: 952
   __zip13$own0$own1:
     calls: 1
-    bytes: 976
+    bytes: 968
   __zip15$own0$own1:
     calls: 1
-    bytes: 1348
+    bytes: 1424
   __zip3$own0$own1:
     calls: 1
-    bytes: 968
+    bytes: 952
   __zip5$own0:
     calls: 1
     bytes: 464
@@ -126,7 +105,7 @@ functions:
     calls: 1
     bytes: 464
   aipl_arr_drop_str:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_arr_inc:
     calls: 8

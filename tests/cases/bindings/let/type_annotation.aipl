@@ -85,15 +85,12 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 565
-instructions executed: 629
-binary size: 7848
-  code: 4160
+instructions executed: 623
+binary size: 7784
+  code: 4152
   data: 1
-  metadata: 3687
+  metadata: 3631
 functions:
-  __builtin_value_or$u8:
-    calls: 2
-    bytes: 24
   __dict_drop_str$i64:
     calls: 1
     bytes: 128
@@ -171,4 +168,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2440
+    bytes: 2456

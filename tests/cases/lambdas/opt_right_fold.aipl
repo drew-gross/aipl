@@ -39,18 +39,12 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1264
-instructions executed: 2682
-binary size: 10000
-  code: 5460
+instructions executed: 2642
+binary size: 9904
+  code: 5448
   data: 630
-  metadata: 3910
+  metadata: 3826
 functions:
-  __builtin_value_or$i64:
-    calls: 4
-    bytes: 24
-  __builtin_value_or$str:
-    calls: 6
-    bytes: 88
   __eq_List:
     calls: 5
     bytes: 124
@@ -68,7 +62,7 @@ functions:
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 3800
+    bytes: 3900
   aipl_arr_drop_str:
     calls: 2
     bytes: (external)

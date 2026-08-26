@@ -39,15 +39,15 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 324
-instructions executed: 1201
-binary size: 6472
-  code: 3164
+instructions executed: 1193
+binary size: 6408
+  code: 3144
   data: 597
-  metadata: 2711
+  metadata: 2667
 functions:
   __filter13$own0:
     calls: 1
-    bytes: 284
+    bytes: 272
   __test$all:
     calls: 1
     bytes: 824
@@ -107,7 +107,7 @@ functions:
     bytes: 204
   all$i64$lam12:
     calls: 1
-    bytes: 196
+    bytes: 204
   all$i64$lam15:
     calls: 1
     bytes: 204
@@ -120,9 +120,6 @@ functions:
   all$i64$lam5:
     calls: 1
     bytes: 204
-  is_nine:
-    calls: 4
-    bytes: 16
   main:
     calls: 1
     bytes: 112

@@ -91,15 +91,12 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 575
-instructions executed: 2574
-binary size: 9920
-  code: 5368
+instructions executed: 2498
+binary size: 9824
+  code: 5412
   data: 1063
-  metadata: 3489
+  metadata: 3349
 functions:
-  __builtin_value_or$i64:
-    calls: 20
-    bytes: 24
   __eq_i64$opt:
     calls: 10
     bytes: 100
@@ -108,7 +105,7 @@ functions:
     bytes: 148
   __filter5$own0:
     calls: 1
-    bytes: 284
+    bytes: 272
   __lambda_12:
     calls: 3
     bytes: 136
@@ -120,7 +117,7 @@ functions:
     bytes: 96
   __test$opt_left_fold:
     calls: 1
-    bytes: 3912
+    bytes: 3988
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -172,12 +169,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  is_big:
-    calls: 3
-    bytes: 16
   main:
     calls: 1
-    bytes: 184
+    bytes: 192
   opt_left_fold$i64$i64$lam4:
     calls: 2
-    bytes: 332
+    bytes: 344
