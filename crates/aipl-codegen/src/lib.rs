@@ -7540,6 +7540,66 @@ fn contained_named_types<'a>(ty: &'a ConcreteType, out: &mut Vec<&'a str>) {
 /// a rebind copies a live value byte-wise instead of transferring a refcounted
 /// pointer. Function types are excluded: a function value is a bare code
 /// address that owns nothing, so it reaches no value at all.
+/// The largest value of integer type `p`, as the i64 bit pattern a canonicalized
+/// value of that type holds. `u64::MAX` is all-ones, which reads as `-1` in an
+/// i64 register — that is the representation, not a sign.
+fn int_max_bits(p: Primitive) -> i64 {
+    let bits = p.int_bits().expect("integer type");
+    if p.int_signed() {
+        // Shifted down from `i64::MAX` rather than built up from a shifted `1`:
+        // at 64 bits the latter is `i64::MIN`, and subtracting one from it
+        // overflows.
+        i64::MAX >> (64 - bits)
+    } else if bits == 64 {
+        -1
+    } else {
+        (1i64 << bits) - 1
+    }
+}
+
+/// The smallest value of signed integer type `p`, as an i64 bit pattern. Shifted
+/// down from `i64::MIN` for the same reason [`int_max_bits`] shifts.
+fn int_min_bits(p: Primitive) -> i64 {
+    i64::MIN >> (64 - p.int_bits().expect("integer type"))
+}
+
+/// `a / b`, saturating instead of trapping.
+///
+/// Cranelift's `sdiv`/`udiv` trap on a zero divisor, and `sdiv` traps again on
+/// `MIN / -1` (whose true quotient is one past `MAX`). AIPL has no aborts, so
+/// both answer `MAX` for the operand type — the same "clamp at the end of the
+/// range" rule `saturating_add` follows, which is why the builtin is spelled
+/// `saturating_divide`.
+///
+/// Written branch-free: the divisor is replaced by `1` whenever it would trap,
+/// so the division instruction never sees a case it cannot answer, and a
+/// `select` swaps in `MAX` afterwards. That keeps the whole thing three
+/// instructions and straight-line, with no block to split the caller's flow.
+fn saturating_div(builder: &mut FunctionBuilder, a: Value, b: Value, p: Primitive) -> Value {
+    let zero = builder.ins().iconst(types::I64, 0);
+    let one = builder.ins().iconst(types::I64, 1);
+    let max = builder.ins().iconst(types::I64, int_max_bits(p));
+    let div_by_zero = builder.ins().icmp(IntCC::Equal, b, zero);
+    let overflows = if p.int_signed() {
+        // `MIN / -1` overflows the range; every other signed pair is fine.
+        let min = builder.ins().iconst(types::I64, int_min_bits(p));
+        let neg_one = builder.ins().iconst(types::I64, -1);
+        let a_min = builder.ins().icmp(IntCC::Equal, a, min);
+        let b_neg = builder.ins().icmp(IntCC::Equal, b, neg_one);
+        let both = builder.ins().band(a_min, b_neg);
+        builder.ins().bor(div_by_zero, both)
+    } else {
+        div_by_zero
+    };
+    let safe_b = builder.ins().select(overflows, one, b);
+    let quotient = if p.int_signed() {
+        builder.ins().sdiv(a, safe_b)
+    } else {
+        builder.ins().udiv(a, safe_b)
+    };
+    builder.ins().select(overflows, max, quotient)
+}
+
 /// Every named type `ty` reaches. The names are *borrowed* from `ty`, which is
 /// why this walks the concrete representation directly rather than widening at
 /// the call site: a widened temporary would not outlive the collection.
@@ -17454,8 +17514,7 @@ fn compile_expr_inner<M: Module>(
                         let raw = match op {
                             '-' => builder.ins().isub(lv, rv),
                             '*' => builder.ins().imul(lv, rv),
-                            '/' if signed => builder.ins().sdiv(lv, rv),
-                            '/' => builder.ins().udiv(lv, rv),
+                            '/' => saturating_div(builder, lv, rv, *p),
                             '%' if signed => builder.ins().srem(lv, rv),
                             '%' => builder.ins().urem(lv, rv),
                             _ => unreachable!(),
@@ -17477,7 +17536,7 @@ fn compile_expr_inner<M: Module>(
                         let v = match op {
                             '-' => builder.ins().isub(lv, rv),
                             '*' => builder.ins().imul(lv, rv),
-                            '/' => builder.ins().sdiv(lv, rv),
+                            '/' => saturating_div(builder, lv, rv, Primitive::I64),
                             '%' => builder.ins().srem(lv, rv),
                             _ => unreachable!(),
                         };

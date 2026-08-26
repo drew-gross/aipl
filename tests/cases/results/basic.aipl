@@ -1,4 +1,4 @@
-import { concat as +++, divide as /, equal as ==, print, to_str } from builtins;
+import { concat as +++, equal as ==, print, saturating_divide as /, to_str } from builtins;
 
 // A result `T!E` is `ok(v)` or `err(e)` — an inline `{tag, value}` (tag 1 = ok,
 // 0 = err), matched like an optional. `ok`/`err` are constructors like
@@ -34,9 +34,9 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 134
-binary size: 2072
-  code: 824
+instructions executed: 146
+binary size: 2136
+  code: 888
   data: 32
   metadata: 1216
 functions:
@@ -66,7 +66,7 @@ functions:
     bytes: (external)
   describe:
     calls: 2
-    bytes: 480
+    bytes: 544
   main:
     calls: 1
     bytes: 164

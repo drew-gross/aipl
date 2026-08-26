@@ -1,5 +1,4 @@
 import {
-    divide as /,
     equal as ==,
     greater_than as >,
     greater_than_or_equal as >=,
@@ -10,6 +9,7 @@ import {
     logical_or as ||,
     not_equal as !=,
     remainder as %,
+    saturating_divide as /,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,

@@ -1,4 +1,4 @@
-import { divide as /, equal as ==, value_or, wrapping_add as + } from builtins;
+import { equal as ==, saturating_divide as /, value_or, wrapping_add as + } from builtins;
 
 // Optional returns: callee emits (tag, value) as two i64s; caller
 // reconstructs a 16-byte slot. Unwrap with the `value_or` builtin.
@@ -14,8 +14,8 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 124
-binary size: 1768
-  code: 604
+binary size: 1704
+  code: 540
   data: 194
   metadata: 970
 functions:
@@ -39,4 +39,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 480
+    bytes: 416

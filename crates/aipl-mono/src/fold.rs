@@ -278,10 +278,13 @@ fn fold_binop(l: &Expr, op: char, r: &Expr) -> Option<ExprKind> {
                 '+' => ExprKind::Num(a.wrapping_add(b)),
                 '-' => ExprKind::Num(a.wrapping_sub(b)),
                 '*' => ExprKind::Num(a.wrapping_mul(b)),
-                // `sdiv`/`srem` trap on a zero divisor and on `i64::MIN / -1`;
-                // `checked_*` returns `None` exactly then, leaving the trap to
-                // run time.
-                '/' => ExprKind::Num(a.checked_div(b)?),
+                // `/` saturates rather than trapping: a zero divisor and
+                // `i64::MIN / -1` both answer `i64::MAX` (see
+                // `saturating_div` in codegen, which this must agree with).
+                // `checked_div` returns `None` in exactly those two cases.
+                '/' => ExprKind::Num(a.checked_div(b).unwrap_or(i64::MAX)),
+                // `srem` still traps on the same pairs, so leave those to run
+                // time rather than fold an answer the runtime won't produce.
                 '%' => ExprKind::Num(a.checked_rem(b)?),
                 '<' => ExprKind::Bool(a < b),
                 '>' => ExprKind::Bool(a > b),

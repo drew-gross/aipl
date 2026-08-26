@@ -1,8 +1,8 @@
 import {
-    divide as /,
     equal as ==,
     greater_than as >,
     print,
+    saturating_divide as /,
     to_str,
     wrapping_add as +,
     wrapping_mul as *,

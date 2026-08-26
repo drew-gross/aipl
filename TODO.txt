@@ -70,6 +70,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  parser lib should use value_or_err more
   why does quoted use str literals instead of char literals?
   trailing_trivia should be a filter map
   loop in leaf_at can be a filter
@@ -125,6 +126,9 @@ bugs:
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky
 
+math:
+  % should not abort. (what should it do? TBD)
+
 syntax:
   module level constants
   for (let i, c : dct) syntax for dicts
@@ -171,6 +175,7 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
 
 lint:
+  match none -> err(...) should lint to value_or_err
   lint against manually incrementing a loop counter
   for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
   mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]
@@ -294,6 +299,9 @@ optimizations:
 
 effects:
   all effects should be shimmable actually
+
+assert:
+  assert should not cause the test to stop, we can keep running the subsequent lines in most cases (e.g. past write file effects at least until all effects are shimmed) and then it gets baked into a return, not an abort
 
 allocator:
   make own allocator

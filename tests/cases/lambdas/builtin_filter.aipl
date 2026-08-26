@@ -1,11 +1,11 @@
 import {
-    divide as /,
     equal as ==,
     filter,
     greater_than as >,
     less_than as <,
     map,
     not_equal as !=,
+    saturating_divide as /,
     wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
@@ -41,9 +41,9 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 3427
-binary size: 7552
-  code: 4196
+instructions executed: 3571
+binary size: 7640
+  code: 4284
   data: 476
   metadata: 2880
 functions:
@@ -106,7 +106,7 @@ functions:
     bytes: (external)
   is_even:
     calls: 12
-    bytes: 32
+    bytes: 120
   main:
     calls: 1
     bytes: 2988

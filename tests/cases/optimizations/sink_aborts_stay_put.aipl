@@ -1,21 +1,24 @@
-import { divide as /, is_nonempty, len, print, to_str, wrapping_add as + } from builtins;
+import { is_nonempty, len, print, remainder as %, to_str, wrapping_add as + } from builtins;
 
 // A value that can abort does not sink. `q` is read by one arm only, so the
-// shape is the one this pass looks for — but a division traps on a zero
-// divisor, and deferring it into the arm would turn a program that dies into
-// one that quietly returns 0.
+// shape is the one this pass looks for — but `%` traps on a zero divisor, and
+// deferring it into the arm would turn a program that dies into one that
+// quietly returns 0.
 //
-// The block is transitive: `scaled` never divides, it only calls something
-// that does, and that is enough to pin a binding of its result.
+// (`/` used to be the example here. It saturates now, so it no longer blocks
+// anything — `%` is what is left that can still abort.)
+//
+// The block is transitive: `scaled` never takes a remainder, it only calls
+// something that does, and that is enough to pin a binding of its result.
 //
 // Kept observable without actually dying: the divisor here is nonzero, and the
-// `instructions executed:` counter below is the assertion. The three divisions
+// `instructions executed:` counter below is the assertion. The three remainders
 // still run on the path that discards their result — if the binding sank into
 // the arm that never runs, they would vanish from the count.
 //
 // The divisor comes from `len` rather than a literal so that constant folding
-// can't evaluate the divisions away before this pass ever sees them.
-fn ratio(n: u64, d: u64) -> u64 { n / d }
+// can't evaluate the remainders away before this pass ever sees them.
+fn ratio(n: u64, d: u64) -> u64 { n % d }
 
 fn scaled(n: u64, d: u64) -> u64 { ratio(n, d) + ratio(n + 1, d) + ratio(n + 2, d) }
 
@@ -38,10 +41,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 58
-binary size: 1256
-  code: 392
+binary size: 1264
+  code: 404
   data: 1
-  metadata: 863
+  metadata: 859
 functions:
   __to_str_u64:
     calls: 1
@@ -66,4 +69,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 212
+    bytes: 224

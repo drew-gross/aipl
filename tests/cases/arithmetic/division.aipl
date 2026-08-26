@@ -1,34 +1,63 @@
-import { divide as /, equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, saturating_divide as /, wrapping_add as +, wrapping_sub as - } from builtins;
 
+// Division saturates rather than trapping — the language has no aborts, which
+// is why the builtin is named `saturating_divide`. The two cases a machine
+// divide cannot answer both give the largest value of the operand type:
+//
+//   - a zero divisor, whose quotient is unbounded
+//   - `MIN / -1`, whose true quotient is one past `MAX`
+//
+// That is the same "clamp at the end of the range" rule `saturating_add`
+// follows, so the two read alike at a call site.
 fn d(x: i64, y: i64) -> i64 { x / y }.test({
     // Truncating division (rounds toward zero): 20/4 = 5, -10/3 = -3.
     assert(d(20, 4) == 5);
     assert(d(-10, 3) == -3);
     assert(d(20, 4) + d(-10, 3) == 2);
+
+    // A zero divisor saturates instead of dying. Both operands come through
+    // parameters so constant folding can't answer these before codegen does.
+    assert(d(10, 0) == 9223372036854775807);
+    assert(d(-10, 0) == 9223372036854775807);
+    assert(d(0, 0) == 9223372036854775807);
+
+    // `MIN / -1` is the other unanswerable pair, and saturates the same way.
+    assert(d(-9223372036854775807 - 1, -1) == 9223372036854775807);
+
+    // `MIN / 1` is *not* an overflow — it is exactly representable.
+    assert(d(-9223372036854775807 - 1, 1) == -9223372036854775807 - 1);
+})
+
+// The literal form folds at compile time, and must land on the same answers:
+// the folder and `saturating_div` in codegen are one rule in two places.
+fn folded() -> i64 { 10 / 0 }.test({
+    assert(folded() == 9223372036854775807);
+    assert(1 / 0 == 9223372036854775807);
+    assert(7 / 2 == 3);
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 26
-binary size: 1152
-  code: 144
-  data: 140
-  metadata: 868
+instructions executed: 80
+binary size: 2552
+  code: 408
+  data: 670
+  metadata: 1474
 functions:
   aipl_assert:
-    calls: 3
+    calls: 11
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 144
+    bytes: 408

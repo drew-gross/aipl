@@ -59,10 +59,14 @@ use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Program};
 use crate::{ConcreteFn, MonoProgram};
 
 /// Builtins whose call can abort the program, so deferring one past a branch
-/// could turn a program that dies into one that doesn't. `/` and `%` trap on a
-/// zero divisor (and on `i64::MIN / -1`); `__assert` is what `assert(c)` lowers
-/// to, and its whole purpose is to abort.
-const ABORTING_BUILTINS: &[&str] = &["__builtin_divide", "__builtin_remainder", "__assert"];
+/// could turn a program that dies into one that doesn't. `__assert` is what
+/// `assert(c)` lowers to, and its whole purpose is to abort.
+///
+/// `/` used to be here. It saturates now — a zero divisor and `i64::MIN / -1`
+/// both answer `MAX` — so it can be deferred like any other arithmetic. `%`
+/// still traps on those pairs, and is caught structurally below rather than by
+/// name: it resolves to the operator, not to a call.
+const ABORTING_BUILTINS: &[&str] = &["__assert"];
 
 /// Sink every binding in `program` that only one branch of the following
 /// `if`/`match` uses. `effectful` is the set of functions whose signature
@@ -133,7 +137,7 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         ExprKind::Call(name, _, _) => blocked.contains(name),
-        ExprKind::Binop(_, op, _) => *op == '/' || *op == '%',
+        ExprKind::Binop(_, op, _) => *op == '%',
         ExprKind::Shim(..) => true,
         _ => false,
     };

@@ -1483,7 +1483,7 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("logical_or", "||", "||"),
     ("logical_not", "!", "!"),
     ("concat", "+++", "+++"),
-    ("divide", "/", "/"),
+    ("saturating_divide", "/", "/"),
     ("remainder", "%", "%"),
 ];
 
