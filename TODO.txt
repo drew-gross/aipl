@@ -64,6 +64,7 @@ type checker:
 inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
+    If we hardcode the list of functions that must be materialized because they are used in FFI, we eliminate a restriction
 
 value_or for structs:
   1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
@@ -447,7 +448,7 @@ the arg contract being different for builtins caused problems for retain elision
 
 docs:
   make a docs renderer
-  go through and convert all the // header docs to proper docs
+  make /// docs a thing for things that should be documented (and only for those things)
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 

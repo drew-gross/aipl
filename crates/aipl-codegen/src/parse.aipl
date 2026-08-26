@@ -52,6 +52,7 @@ import {
     to_str,
     try_map,
     value_or,
+    value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
     wrapping_sub as -,
@@ -381,19 +382,18 @@ fn match_maybe<K: variant, A: any>(
 // position) is what the label is merged into. A transparent production (empty
 // `expect_as`) never collapses anything: its insides are the message.
 fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!ParseError {
-    match (p.prods[i]) {
-        some(prod) => {
-            let st = match_rule(p, prod.rule, pos, i, far)?;
-            if (st.hit) {
-                return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
-            };
-            if (pos < st.far.pos || !prod.expect_as.is_nonempty()) {
-                return ok(no(st.far, pos));
-            };
-            ok(no(far_miss(far, pos, prod.expect_as), pos))
-        },
-        none => err(ParseError { message: `no production at index {i}`, span: 0..0 }),
-    }
+    let prod = p.prods[i].value_or_err(ParseError {
+        message: `no production at index {i}`,
+        span: 0..0,
+    })?;
+    let st = match_rule(p, prod.rule, pos, i, far)?;
+    if (st.hit) {
+        return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
+    };
+    if (pos < st.far.pos || !prod.expect_as.is_nonempty()) {
+        return ok(no(st.far, pos));
+    };
+    ok(no(far_miss(far, pos, prod.expect_as), pos))
 }
 
 // Zero or more `item`s separated by `sep`. Always matches, because an empty list
@@ -565,23 +565,22 @@ pub fn parse_cst<K: variant, A: any>(
     start: str,
 ) -> Cst!ParseError {
     let linked: Grammar<K, A> = link(g)?;
-    match (name_index(prod_names(linked), start)) {
-        some(i) => {
-            let p = Parser { src, toks: lexed.tokens, trivia: lexed.trivia, prods: linked.prods };
-            let st = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
-            if (!st.hit) {
-                return err(error_at(p, st.far));
-            };
-            if (st.pos < p.toks.len()) {
-                return err(error_at(p, far_miss(st.far, st.pos, "end of input")));
-            };
-            match (st.kids.first()) {
-                some(root) => ok(with_trailing(p, root)),
-                none => err(ParseError { message: "the start rule built no node", span: 0..0 }),
-            }
-        },
-        none => err(ParseError { message: `no rule named "{start}"`, span: 0..0 }),
-    }
+    let i = name_index(prod_names(linked), start).value_or_err(ParseError {
+        message: `no rule named "{start}"`,
+        span: 0..0,
+    })?;
+    let p = Parser { src, toks: lexed.tokens, trivia: lexed.trivia, prods: linked.prods };
+    let st = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
+    if (!st.hit) {
+        return err(error_at(p, st.far));
+    };
+    if (st.pos < p.toks.len()) {
+        return err(error_at(p, far_miss(st.far, st.pos, "end of input")));
+    };
+    let root = st.kids
+        .first()
+        .value_or_err(ParseError { message: "the start rule built no node", span: 0..0 })?;
+    ok(with_trailing(p, root))
 }.doc("""
     Parses `src` — already lexed into `lexed` — against grammar `g`, beginning at
     the production named `start`, and returns the lossless concrete syntax tree.
@@ -611,14 +610,12 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
     match (node) {
         CTree(i, kids) => {
             let vals = kids.filter(is_tree).try_map(|k| lower_node(src, k, prods))?;
-            match (prods[i]) {
-                some(prod) => match (prod.build) {
-                    Mk(f) => f(src, node, vals),
-                },
-                none => err(ParseError {
-                    message: `no production at index {i}`,
-                    span: node.span(),
-                }),
+            let prod = prods[i].value_or_err(ParseError {
+                message: `no production at index {i}`,
+                span: node.span(),
+            })?;
+            match (prod.build) {
+                Mk(f) => f(src, node, vals),
             }
         },
         CLeaf(sp) => err(ParseError { message: "a token leaf has no lowered value", span: sp }),
@@ -903,15 +900,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2701
-deallocations: 2701
+allocations: 2972
+deallocations: 2972
 reallocations: 232
-bytes allocated: 129972
-instructions executed: 390216
-binary size: 257504
-  code: 148424
+bytes allocated: 141592
+instructions executed: 408481
+binary size: 260272
+  code: 150100
   data: 6948
-  metadata: 102132
+  metadata: 103224
 functions:
   __arr_drop_Node:
     calls: 11
@@ -994,6 +991,9 @@ functions:
   __builtin_value_or$str:
     calls: 64
     bytes: 88
+  __builtin_value_or_err$__m2__Production$Tok$Node$__m2__ParseError:
+    calls: 94
+    bytes: 652
   __eq_Node:
     calls: 7
     bytes: 184
@@ -1037,13 +1037,13 @@ functions:
     calls: 0
     bytes: 60
   __m1__leaves:
-    calls: 33
+    calls: 76
     bytes: 764
   __m1__show:
     calls: 117
     bytes: 1376
   __m1__span:
-    calls: 1
+    calls: 11
     bytes: 460
   __m1__text:
     calls: 7
@@ -1121,10 +1121,10 @@ functions:
     calls: 0
     bytes: 812
   __to_str_u64:
-    calls: 0
+    calls: 94
     bytes: 180
   aipl_arr_drop_arr:
-    calls: 11
+    calls: 31
     bytes: (external)
   aipl_arr_drop_str:
     calls: 216
@@ -1133,34 +1133,34 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8326
+    calls: 8493
     bytes: (external)
   aipl_arr_join:
-    calls: 11
+    calls: 31
     bytes: (external)
   aipl_arr_reserve:
     calls: 443
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 320
+    calls: 353
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10362
+    calls: 10645
     bytes: (external)
   aipl_array_new:
-    calls: 1494
+    calls: 1537
     bytes: (external)
   aipl_array_push:
     calls: 151
     bytes: (external)
   aipl_array_push_mut:
-    calls: 427
+    calls: 460
     bytes: (external)
   aipl_array_with_cap:
-    calls: 183
+    calls: 203
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1169,25 +1169,25 @@ functions:
     calls: 379
     bytes: (external)
   aipl_concat:
-    calls: 418
+    calls: 606
     bytes: (external)
   aipl_dec:
-    calls: 12171
+    calls: 13393
     bytes: (external)
   aipl_inc:
-    calls: 9759
+    calls: 10544
     bytes: (external)
   aipl_rec_alloc:
     calls: 440
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2552
+    calls: 2764
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 37
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2112
+    calls: 2324
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 37
@@ -1231,8 +1231,14 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_u64_len:
+    calls: 188
+    bytes: (external)
   aipl_write_bytes:
     calls: 140
+    bytes: (external)
+  aipl_write_u64:
+    calls: 94
     bytes: (external)
   build_node:
     calls: 9
@@ -1260,7 +1266,7 @@ functions:
     bytes: 616
   lower_node$Tok$Node:
     calls: 10
-    bytes: 2252
+    bytes: 2384
   main:
     calls: 1
     bytes: 72
@@ -1278,7 +1284,7 @@ functions:
     bytes: 1304
   match_prod$Tok$Node:
     calls: 84
-    bytes: 3184
+    bytes: 3448
   match_rule$Tok$Node:
     calls: 269
     bytes: 4332
@@ -1299,7 +1305,7 @@ functions:
     bytes: 340
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 3404
+    bytes: 4032
   parsed:
     calls: 3
     bytes: 412
