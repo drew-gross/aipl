@@ -41,12 +41,15 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 348
-instructions executed: 928
-binary size: 5472
-  code: 2628
+instructions executed: 931
+binary size: 5536
+  code: 2644
   data: 544
-  metadata: 2300
+  metadata: 2348
 functions:
+  __test$count_while:
+    calls: 1
+    bytes: 896
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -115,4 +118,4 @@ functions:
     bytes: 324
   main:
     calls: 1
-    bytes: 952
+    bytes: 72

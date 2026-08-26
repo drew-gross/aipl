@@ -68,15 +68,18 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 627
-instructions executed: 1653
-binary size: 7280
-  code: 3580
-  data: 740
-  metadata: 2960
+instructions executed: 1656
+binary size: 7352
+  code: 3604
+  data: 743
+  metadata: 3005
 functions:
   __filter4$own0:
     calls: 1
     bytes: 284
+  __test$right_fold:
+    calls: 1
+    bytes: 2804
   add:
     calls: 4
     bytes: 8
@@ -130,7 +133,7 @@ functions:
     bytes: 16
   main:
     calls: 1
-    bytes: 3008
+    bytes: 228
   right_fold$i64$i64$lam5:
     calls: 2
     bytes: 264

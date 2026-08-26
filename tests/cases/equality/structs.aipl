@@ -24,11 +24,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 216
-binary size: 2280
-  code: 712
+instructions executed: 219
+binary size: 2336
+  code: 728
   data: 226
-  metadata: 1342
+  metadata: 1382
 functions:
   __eq_Named:
     calls: 2
@@ -36,6 +36,9 @@ functions:
   __eq_Point:
     calls: 3
     bytes: 104
+  __test$eq_point:
+    calls: 1
+    bytes: 400
   aipl_assert:
     calls: 5
     bytes: (external)
@@ -62,4 +65,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 456
+    bytes: 72

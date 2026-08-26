@@ -21,12 +21,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 131
-binary size: 1280
-  code: 400
+instructions executed: 134
+binary size: 1336
+  code: 424
   data: 86
-  metadata: 794
+  metadata: 826
 functions:
+  __test$bump:
+    calls: 1
+    bytes: 352
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -41,4 +44,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 400
+    bytes: 72

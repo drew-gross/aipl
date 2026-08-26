@@ -19,12 +19,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 114
-binary size: 3488
-  code: 1092
+instructions executed: 117
+binary size: 3544
+  code: 1108
   data: 441
-  metadata: 1955
+  metadata: 1995
 functions:
+  __test$take_prefix:
+    calls: 1
+    bytes: 1036
   aipl_assert:
     calls: 8
     bytes: (external)
@@ -54,4 +57,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1092
+    bytes: 72

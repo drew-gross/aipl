@@ -57,12 +57,21 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 72
-instructions executed: 204
-binary size: 3944
-  code: 1240
+instructions executed: 213
+binary size: 4176
+  code: 1296
   data: 607
-  metadata: 2097
+  metadata: 2273
 functions:
+  __test$elapsed_over_a_one_second_sleep:
+    calls: 1
+    bytes: 484
+  __test$is_about_one_second:
+    calls: 1
+    bytes: 424
+  __test$readings_never_go_backwards:
+    calls: 1
+    bytes: 236
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -104,4 +113,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1240
+    bytes: 152

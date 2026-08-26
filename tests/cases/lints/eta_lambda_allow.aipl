@@ -12,15 +12,18 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 168
-instructions executed: 476
-binary size: 2816
+instructions executed: 479
+binary size: 2856
   code: 1108
   data: 97
-  metadata: 1611
+  metadata: 1651
 functions:
   __eq_str$arr:
     calls: 1
     bytes: 352
+  __test$stringify:
+    calls: 1
+    bytes: 504
   __to_str_i64:
     calls: 3
     bytes: 180
@@ -71,4 +74,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 576
+    bytes: 72

@@ -21,11 +21,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 235
-binary size: 2136
-  code: 720
+instructions executed: 238
+binary size: 2192
+  code: 736
   data: 218
-  metadata: 1198
+  metadata: 1238
 functions:
   __eq_i64$opt:
     calls: 4
@@ -33,6 +33,9 @@ functions:
   __eq_i64$opt$opt:
     calls: 2
     bytes: 100
+  __test$eq_opt:
+    calls: 1
+    bytes: 460
   aipl_assert:
     calls: 6
     bytes: (external)
@@ -47,4 +50,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 520
+    bytes: 76

@@ -20,11 +20,11 @@ allocations: 6
 deallocations: 6
 reallocations: 2
 bytes allocated: 288
-instructions executed: 550
-binary size: 2832
-  code: 1384
+instructions executed: 553
+binary size: 2864
+  code: 1376
   data: 114
-  metadata: 1334
+  metadata: 1374
 functions:
   __eq_V:
     calls: 3
@@ -32,6 +32,9 @@ functions:
   __eq_V$arr:
     calls: 2
     bytes: 284
+  __test$nums:
+    calls: 1
+    bytes: 920
   aipl_array_dec:
     calls: 6
     bytes: (external)
@@ -58,4 +61,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1000
+    bytes: 72

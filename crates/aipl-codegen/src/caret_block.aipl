@@ -97,15 +97,18 @@ allocations: 77
 deallocations: 77
 reallocations: 0
 bytes allocated: 2830
-instructions executed: 4423
-binary size: 9184
-  code: 3496
+instructions executed: 4426
+binary size: 9256
+  code: 3520
   data: 1720
-  metadata: 3968
+  metadata: 4016
 functions:
   __m1__line_at:
     calls: 6
     bytes: 596
+  __test$caret_block:
+    calls: 1
+    bytes: 892
   __to_str_u64:
     calls: 24
     bytes: 180
@@ -162,4 +165,4 @@ functions:
     bytes: 1780
   main:
     calls: 1
-    bytes: 940
+    bytes: 72

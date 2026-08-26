@@ -62,6 +62,7 @@ type checker:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 inlining:
+  post-mono version of inline_small
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
     If we hardcode the list of functions that must be materialized because they are used in FFI, we eliminate a restriction
@@ -322,6 +323,7 @@ recovering check:
 tests:
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
+  make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
 
 lex json
 find a more natural way of testing builtins

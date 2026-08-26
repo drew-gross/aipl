@@ -18,15 +18,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 111
-binary size: 1472
-  code: 396
+instructions executed: 114
+binary size: 1536
+  code: 420
   data: 168
-  metadata: 908
+  metadata: 948
 functions:
   __eq_Vec2:
     calls: 2
     bytes: 104
+  __test$choose:
+    calls: 1
+    bytes: 240
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -41,4 +44,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 292
+    bytes: 76

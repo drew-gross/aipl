@@ -18,12 +18,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 48
-binary size: 1024
-  code: 168
+instructions executed: 51
+binary size: 1080
+  code: 192
   data: 53
-  metadata: 803
+  metadata: 835
 functions:
+  __test$rec:
+    calls: 1
+    bytes: 64
   aipl_assert:
     calls: 1
     bytes: (external)
@@ -38,7 +41,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 108
+    bytes: 68
   rec$lam1:
     calls: 0
     bytes: 32

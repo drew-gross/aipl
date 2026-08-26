@@ -40,15 +40,21 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 323
-instructions executed: 1016
-binary size: 6256
-  code: 3028
+instructions executed: 1022
+binary size: 6360
+  code: 3060
   data: 589
-  metadata: 2639
+  metadata: 2711
 functions:
   __filter13$own0:
     calls: 1
     bytes: 284
+  __test$any:
+    calls: 1
+    bytes: 820
+  __test$is_nine:
+    calls: 1
+    bytes: 76
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -120,4 +126,4 @@ functions:
     bytes: 16
   main:
     calls: 1
-    bytes: 976
+    bytes: 112

@@ -4834,7 +4834,20 @@ fn compile_program<M: Module>(
     // specializations: those lifted lambdas (and any other now-single-use
     // instance) are each called from exactly one site, so fold them back in. Only
     // possible post-mono — the lambdas don't exist until mono creates them.
-    let program = aipl_mono::inline_single_use_post_mono(&monomorphized);
+    // Inline single-use instances. The functions an *external* caller reaches by
+    // name — the FFI engines' entries, and the `check` driver's `__test_main` —
+    // are named here so they are never elided; they can still be inlined into
+    // any AIPL caller, since keeping the definition is all an external call
+    // needs. `DOGFOOD_ENTRIES`/`FMT_ENTRIES` are the same lists the engines are
+    // built and validated against, so this can't drift from what FFI actually
+    // calls.
+    let externally_called: std::collections::HashSet<String> = DOGFOOD_ENTRIES
+        .iter()
+        .chain(FMT_ENTRIES)
+        .map(|s| (*s).to_string())
+        .chain(["main".to_string(), "__test_main".to_string()])
+        .collect();
+    let program = aipl_mono::inline_single_use_post_mono(&monomorphized, &externally_called);
     // Sink again over the monomorphized program: mono instantiates the
     // AIPL-implemented builtins the pre-mono run could not see, and post-mono
     // inlining folds each lifted lambda and single-use instance into its caller

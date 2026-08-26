@@ -74,11 +74,11 @@ allocations: 2192
 deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
-instructions executed: 324388
-binary size: 858960
-  code: 525076
+instructions executed: 324394
+binary size: 859112
+  code: 525140
   data: 2508
-  metadata: 331376
+  metadata: 331464
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -632,6 +632,12 @@ functions:
   __rec_drop___m7__Work:
     calls: 48
     bytes: 84
+  __test$fmt_layout:
+    calls: 1
+    bytes: 764
+  __test$fmt_prepare:
+    calls: 1
+    bytes: 832
   aipl_arr_drop_str:
     calls: 50
     bytes: (external)
@@ -751,4 +757,4 @@ functions:
     bytes: 864
   main:
     calls: 1
-    bytes: 1644
+    bytes: 112

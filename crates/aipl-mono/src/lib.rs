@@ -6696,13 +6696,20 @@ pub fn inline_single_use(program: &Program) -> Program {
 /// lifted lambdas (synthesized, each called from exactly one specialization) and
 /// other single-use instances fold away. Still gated to `main` binaries, so FFI
 /// engines and the `check` driver are untouched.
-pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
-    if !program.fns.iter().any(|f| f.name == "main")
-        || program.fns.iter().any(|f| f.name == "__test_main")
-    {
-        return program.clone();
-    }
-
+pub fn inline_single_use_post_mono(
+    program: &MonoProgram,
+    externally_called: &HashSet<String>,
+) -> MonoProgram {
+    // A program with no single entry point is a *library*: an FFI engine loaded
+    // for its `pub` entries, or a fragment a Rust caller compiled to invoke by
+    // name through `Compilation::run_*`. Any function in one may be called from
+    // outside, so none may be elided — `externally_called` cannot enumerate the
+    // callers of an open API. Inlining into AIPL callers is still safe there,
+    // and still what lets the sinking pass see through a call.
+    let library = !program
+        .fns
+        .iter()
+        .any(|f| f.name == "main" || f.name == "__test_main");
     let mut program = program.clone();
     let mut counter = 0usize;
     let mut skip: HashSet<String> = HashSet::new();
@@ -6742,7 +6749,15 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             g.body = body;
         }
         if replaced {
-            program.fns.retain(|g| g.name != f.name);
+            // Inlining and *eliding* are separate decisions. A function called
+            // once from AIPL can be folded into that caller and still be
+            // emitted, which is all an external caller needs — so an entry stays
+            // in the program whether or not any AIPL code still calls it.
+            if library || externally_called.contains(&f.name) {
+                skip.insert(f.name.clone());
+            } else {
+                program.fns.retain(|g| g.name != f.name);
+            }
         } else {
             skip.insert(f.name.clone());
         }
@@ -7021,6 +7036,12 @@ fn is_inline_candidate_mono(
 ) -> bool {
     counts.get(&f.name) == Some(&1)
         && f.name != "main"
+        // A `.test` body is not an ordinary function: codegen dispatches on the
+        // *name* `__test$<fn>` to make `?` fail the current test rather than
+        // propagate (see `in_test` in codegen). Folding one into `__test_main`
+        // would silently change what `?` means inside it.
+        && !f.name.starts_with("__test$")
+        && f.name != "__test_main"
         && !skip.contains(&f.name)
         && !binders.contains(&f.name)
         && is_inline_shape(

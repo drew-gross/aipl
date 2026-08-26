@@ -24,15 +24,18 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 296
-instructions executed: 914
-binary size: 3392
-  code: 1352
+instructions executed: 917
+binary size: 3448
+  code: 1364
   data: 304
-  metadata: 1736
+  metadata: 1780
 functions:
   __eq_bool$arr:
     calls: 4
     bytes: 296
+  __test$appended:
+    calls: 1
+    bytes: 996
   aipl_arr_inc:
     calls: 6
     bytes: (external)
@@ -59,4 +62,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1056
+    bytes: 72

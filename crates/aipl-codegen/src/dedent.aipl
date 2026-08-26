@@ -64,11 +64,11 @@ allocations: 35
 deallocations: 35
 reallocations: 0
 bytes allocated: 1641
-instructions executed: 7678
-binary size: 7848
-  code: 3128
+instructions executed: 7681
+binary size: 7904
+  code: 3144
   data: 989
-  metadata: 3731
+  metadata: 3771
 functions:
   __builtin_count_while$char$s0$lam10:
     calls: 17
@@ -79,6 +79,9 @@ functions:
   __map5$own0:
     calls: 10
     bytes: 320
+  __test$dedent:
+    calls: 1
+    bytes: 1116
   aipl_arr_drop_str:
     calls: 20
     bytes: (external)
@@ -150,4 +153,4 @@ functions:
     bytes: 1168
   main:
     calls: 1
-    bytes: 1176
+    bytes: 76

@@ -23,12 +23,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 231
-binary size: 3464
-  code: 1316
+instructions executed: 234
+binary size: 3520
+  code: 1332
   data: 263
-  metadata: 1885
+  metadata: 1925
 functions:
+  __test$describe:
+    calls: 1
+    bytes: 732
   __to_str_i64:
     calls: 2
     bytes: 180
@@ -70,4 +73,4 @@ functions:
     bytes: 348
   main:
     calls: 1
-    bytes: 788
+    bytes: 72

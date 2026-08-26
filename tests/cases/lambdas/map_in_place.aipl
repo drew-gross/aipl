@@ -44,11 +44,11 @@ allocations: 16
 deallocations: 16
 reallocations: 1
 bytes allocated: 817
-instructions executed: 2809
-binary size: 8072
-  code: 4464
+instructions executed: 2812
+binary size: 8128
+  code: 4476
   data: 468
-  metadata: 3140
+  metadata: 3184
 functions:
   __eq_bool$arr:
     calls: 1
@@ -77,6 +77,9 @@ functions:
   __map9$own0:
     calls: 1
     bytes: 252
+  __test$doubled:
+    calls: 1
+    bytes: 1612
   __to_str_i64:
     calls: 3
     bytes: 180
@@ -130,4 +133,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1676
+    bytes: 76

@@ -15,12 +15,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 74
-binary size: 1360
-  code: 352
+instructions executed: 77
+binary size: 1416
+  code: 376
   data: 139
-  metadata: 869
+  metadata: 901
 functions:
+  __test$code:
+    calls: 1
+    bytes: 304
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -35,4 +38,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 352
+    bytes: 72

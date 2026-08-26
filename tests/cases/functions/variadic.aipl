@@ -39,12 +39,18 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 568
-instructions executed: 895
-binary size: 6608
-  code: 3092
+instructions executed: 901
+binary size: 6760
+  code: 3164
   data: 524
-  metadata: 2992
+  metadata: 3072
 functions:
+  __test$joined:
+    calls: 1
+    bytes: 1156
+  __test$sum:
+    calls: 1
+    bytes: 768
   aipl_arr_drop_str:
     calls: 3
     bytes: (external)
@@ -89,7 +95,7 @@ functions:
     bytes: 588
   main:
     calls: 1
-    bytes: 1964
+    bytes: 112
   sum:
     calls: 3
     bytes: 176

@@ -49,11 +49,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2695
-binary size: 3824
-  code: 1600
+instructions executed: 2698
+binary size: 3888
+  code: 1624
   data: 617
-  metadata: 1607
+  metadata: 1647
 functions:
   __eq_LineAt:
     calls: 7
@@ -61,6 +61,9 @@ functions:
   __eq___builtin_Span:
     calls: 7
     bytes: 104
+  __test$line_at:
+    calls: 1
+    bytes: 752
   aipl_assert:
     calls: 7
     bytes: (external)
@@ -90,4 +93,4 @@ functions:
     bytes: 596
   main:
     calls: 1
-    bytes: 804
+    bytes: 76

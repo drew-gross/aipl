@@ -14,15 +14,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 83
-binary size: 1488
-  code: 408
+instructions executed: 86
+binary size: 1560
+  code: 432
   data: 130
-  metadata: 950
+  metadata: 998
 functions:
   __eq_char$opt:
     calls: 1
     bytes: 100
+  __test$second_is_e:
+    calls: 1
+    bytes: 260
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -43,4 +46,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 308
+    bytes: 72

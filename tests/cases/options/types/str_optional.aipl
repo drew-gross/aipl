@@ -13,11 +13,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 182
-binary size: 2976
-  code: 1208
+instructions executed: 185
+binary size: 3024
+  code: 1224
   data: 233
-  metadata: 1535
+  metadata: 1567
 functions:
   __builtin_value_or$str:
     calls: 2
@@ -25,6 +25,9 @@ functions:
   __eq_str$opt:
     calls: 1
     bytes: 148
+  __test$pick:
+    calls: 1
+    bytes: 916
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -48,4 +51,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 972
+    bytes: 72

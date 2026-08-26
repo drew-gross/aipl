@@ -46,11 +46,11 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 552
-instructions executed: 350
-binary size: 5808
-  code: 2116
+instructions executed: 365
+binary size: 6168
+  code: 2276
   data: 763
-  metadata: 2929
+  metadata: 3129
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -58,6 +58,21 @@ functions:
   __dict_retain_str$i64:
     calls: 1
     bytes: 128
+  __test$arrays:
+    calls: 1
+    bytes: 452
+  __test$dicts:
+    calls: 1
+    bytes: 304
+  __test$nested:
+    calls: 1
+    bytes: 448
+  __test$sets:
+    calls: 1
+    bytes: 328
+  __test$strings:
+    calls: 1
+    bytes: 244
   aipl_arr_drop_arr:
     calls: 2
     bytes: (external)
@@ -108,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1860
+    bytes: 244

@@ -89,18 +89,24 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1909
-binary size: 19120
-  code: 9652
+instructions executed: 1915
+binary size: 19240
+  code: 9692
   data: 1719
-  metadata: 7749
+  metadata: 7829
 functions:
   __builtin_value_or_err$char$i64:
     calls: 2
     bytes: 92
+  __test$lex:
+    calls: 1
+    bytes: 456
   __test$map_err:
     calls: 1
     bytes: 6704
+  __test$to_fmt:
+    calls: 1
+    bytes: 360
   __test_try_fail_FmtError:
     calls: 0
     bytes: 64
@@ -151,7 +157,7 @@ functions:
     bytes: 380
   main:
     calls: 1
-    bytes: 932
+    bytes: 156
   map_err$str$LexError$FmtError$lam0:
     calls: 6
     bytes: 420

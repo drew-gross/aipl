@@ -51,12 +51,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 276
-binary size: 5624
-  code: 1768
+instructions executed: 279
+binary size: 5672
+  code: 1776
   data: 1038
-  metadata: 2818
+  metadata: 2858
 functions:
+  __test$clamp_low:
+    calls: 1
+    bytes: 1704
   aipl_assert:
     calls: 20
     bytes: (external)
@@ -89,4 +92,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1768
+    bytes: 72

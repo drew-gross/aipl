@@ -94,11 +94,11 @@ allocations: 111
 deallocations: 111
 reallocations: 27
 bytes allocated: 4352
-instructions executed: 7846
-binary size: 22520
-  code: 13748
+instructions executed: 7849
+binary size: 22584
+  code: 13764
   data: 754
-  metadata: 8018
+  metadata: 8066
 functions:
   __arr_drop_E:
     calls: 10
@@ -112,6 +112,9 @@ functions:
   __eq_str$arr:
     calls: 2
     bytes: 352
+  __test$sort_by:
+    calls: 1
+    bytes: 12760
   aipl_arr_drop_str:
     calls: 13
     bytes: (external)
@@ -168,4 +171,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 12820
+    bytes: 76

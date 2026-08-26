@@ -45,11 +45,11 @@ allocations: 18
 deallocations: 18
 reallocations: 0
 bytes allocated: 976
-instructions executed: 1452
-binary size: 12352
-  code: 6660
+instructions executed: 1467
+binary size: 12848
+  code: 6936
   data: 854
-  metadata: 4838
+  metadata: 5058
 functions:
   __builtin_value_or$str:
     calls: 2
@@ -105,6 +105,21 @@ functions:
   __eq_i64$opt$opt:
     calls: 2
     bytes: 100
+  __test$array_values:
+    calls: 1
+    bytes: 1328
+  __test$char_keys:
+    calls: 1
+    bytes: 752
+  __test$heap_str_values:
+    calls: 1
+    bytes: 664
+  __test$optional_values:
+    calls: 1
+    bytes: 788
+  __test$struct_values:
+    calls: 1
+    bytes: 524
   aipl_arr_inc:
     calls: 9
     bytes: (external)
@@ -155,4 +170,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4012
+    bytes: 232
