@@ -2167,23 +2167,12 @@ fn drop_comments_before(self: W, end: u64) -> W {
 }
 
 // The next undrained comment. Callers test `comment_starts_before` first, so the
-// empty fallback is unreachable — `value_or` cannot unwrap a struct optional, so
-// this is the `match` form.
-fn cur_comment(self: W) -> Span {
-    match (self.comments[self.cpos]) {
-        none => 0..0,
-        some(c) => c,
-    }
-}
+// empty fallback is unreachable.
+fn cur_comment(self: W) -> Span { self.comments[self.cpos].value_or(0..0) }
 
 // The token at the cursor. Callers test `at_end` first, so the fallback is
-// unreachable (same `match`-not-`value_or` reason as `cur_comment`).
-fn cur_tok(self: W) -> FmtTok {
-    match (self.peek()) {
-        none => FmtTok { kind: Punct, span: 0..0 },
-        some(t) => t,
-    }
-}
+// unreachable.
+fn cur_tok(self: W) -> FmtTok { self.peek().value_or(FmtTok { kind: Punct, span: 0..0 }) }
 
 // Whether the next undrained comment begins before `end`.
 fn comment_starts_before(self: W, end: u64) -> bool {
@@ -2724,11 +2713,11 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2859091
-binary size: 3229160
-  code: 1845468
+instructions executed: 2859239
+binary size: 3229616
+  code: 1845660
   data: 27124
-  metadata: 1356568
+  metadata: 1356832
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2819,13 +2808,25 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 1
-    bytes: 1032
+    bytes: 1028
   __builtin_intersperse$__m1__Doc:
     calls: 142
     bytes: 408
   __builtin_is_some_and$char$lam81:
     calls: 50
     bytes: 48
+  __builtin_value_or$__builtin_Span:
+    calls: 6
+    bytes: 32
+  __builtin_value_or$__m1__Doc:
+    calls: 0
+    bytes: 120
+  __builtin_value_or$char:
+    calls: 21
+    bytes: 24
+  __builtin_value_or$str:
+    calls: 0
+    bytes: 88
   __eq_FmtKind:
     calls: 857
     bytes: 64
@@ -2894,7 +2895,7 @@ functions:
     bytes: 292
   __m1__col_after:
     calls: 838
-    bytes: 448
+    bytes: 424
   __m1__fits:
     calls: 0
     bytes: 36
@@ -2921,13 +2922,13 @@ functions:
     bytes: 4628
   __m2__reindent_block:
     calls: 0
-    bytes: 2344
+    bytes: 2292
   __m3__dedent:
     calls: 0
     bytes: 32
   __m3__dedent$tail:
     calls: 0
-    bytes: 1196
+    bytes: 1200
   __m8__char_lit_emit:
     calls: 0
     bytes: 1412
@@ -2951,10 +2952,10 @@ functions:
     bytes: 676
   __m9__delimited_len:
     calls: 96
-    bytes: 1392
+    bytes: 1412
   __m9__finalize_template$__m8__AiplTok:
     calls: 0
-    bytes: 7336
+    bytes: 7328
   __m9__float_len:
     calls: 0
     bytes: 816
@@ -2975,7 +2976,7 @@ functions:
     bytes: 12068
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2668
+    bytes: 2660
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 488
@@ -3161,7 +3162,7 @@ functions:
     bytes: 4680
   call_arg_list:
     calls: 18
-    bytes: 636
+    bytes: 612
   call_args_until:
     calls: 20
     bytes: 2616
@@ -3188,7 +3189,7 @@ functions:
     bytes: 5184
   drop_trailing_break:
     calls: 0
-    bytes: 872
+    bytes: 908
   err_here:
     calls: 5
     bytes: 656
@@ -3251,7 +3252,7 @@ functions:
     bytes: 3176
   lead:
     calls: 270
-    bytes: 1812
+    bytes: 1808
   let_stmt:
     calls: 3
     bytes: 19204
@@ -3377,7 +3378,7 @@ functions:
     bytes: 232
   template_scan:
     calls: 0
-    bytes: 2248
+    bytes: 2244
   tok_text:
     calls: 2993
     bytes: 368
@@ -3389,7 +3390,7 @@ functions:
     bytes: 32
   trim_last_break$tail:
     calls: 0
-    bytes: 1168
+    bytes: 1164
   tuple_rest:
     calls: 1
     bytes: 2688

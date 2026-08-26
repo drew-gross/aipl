@@ -20,12 +20,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 88
-instructions executed: 199
-binary size: 2984
-  code: 1116
+instructions executed: 205
+binary size: 3088
+  code: 1164
   data: 175
-  metadata: 1693
+  metadata: 1749
 functions:
+  __builtin_value_or$str:
+    calls: 2
+    bytes: 88
   aipl_arr_drop_str:
     calls: 2
     bytes: (external)
@@ -67,4 +70,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1116
+    bytes: 1076

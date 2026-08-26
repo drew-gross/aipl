@@ -75,10 +75,10 @@ deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
 instructions executed: 324388
-binary size: 858496
-  code: 524876
+binary size: 858952
+  code: 525068
   data: 2508
-  metadata: 331112
+  metadata: 331376
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -169,13 +169,25 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 0
-    bytes: 1032
+    bytes: 1028
   __builtin_intersperse$__m7__Doc:
     calls: 8
     bytes: 408
   __builtin_is_some_and$char$lam63:
     calls: 12
     bytes: 48
+  __builtin_value_or$__builtin_Span:
+    calls: 0
+    bytes: 32
+  __builtin_value_or$__m7__Doc:
+    calls: 0
+    bytes: 120
+  __builtin_value_or$char:
+    calls: 0
+    bytes: 24
+  __builtin_value_or$str:
+    calls: 0
+    bytes: 88
   __eq___m6__FmtKind:
     calls: 0
     bytes: 64
@@ -235,10 +247,10 @@ functions:
     bytes: 676
   __m13__delimited_len:
     calls: 24
-    bytes: 1392
+    bytes: 1412
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
-    bytes: 7336
+    bytes: 7328
   __m13__float_len:
     calls: 0
     bytes: 816
@@ -259,7 +271,7 @@ functions:
     bytes: 12068
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2668
+    bytes: 2660
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 488
@@ -325,7 +337,7 @@ functions:
     bytes: 4680
   __m6__call_arg_list:
     calls: 0
-    bytes: 636
+    bytes: 612
   __m6__call_args_until:
     calls: 0
     bytes: 2616
@@ -352,7 +364,7 @@ functions:
     bytes: 5184
   __m6__drop_trailing_break:
     calls: 0
-    bytes: 872
+    bytes: 908
   __m6__err_here:
     calls: 0
     bytes: 656
@@ -415,7 +427,7 @@ functions:
     bytes: 3176
   __m6__lead:
     calls: 10
-    bytes: 1812
+    bytes: 1808
   __m6__let_stmt:
     calls: 0
     bytes: 19204
@@ -535,7 +547,7 @@ functions:
     bytes: 232
   __m6__template_scan:
     calls: 0
-    bytes: 2248
+    bytes: 2244
   __m6__tok_text:
     calls: 51
     bytes: 368
@@ -547,7 +559,7 @@ functions:
     bytes: 32
   __m6__trim_last_break$tail:
     calls: 0
-    bytes: 1168
+    bytes: 1164
   __m6__tuple_rest:
     calls: 0
     bytes: 2688
@@ -583,7 +595,7 @@ functions:
     bytes: 528
   __m7__col_after:
     calls: 18
-    bytes: 448
+    bytes: 424
   __m7__fits:
     calls: 0
     bytes: 36
@@ -604,13 +616,13 @@ functions:
     bytes: 664
   __m8__reindent_block:
     calls: 0
-    bytes: 2344
+    bytes: 2292
   __m9__dedent:
     calls: 0
     bytes: 32
   __m9__dedent$tail:
     calls: 0
-    bytes: 1196
+    bytes: 1200
   __map48$own0:
     calls: 0
     bytes: 320

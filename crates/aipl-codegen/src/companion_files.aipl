@@ -159,11 +159,11 @@ allocations: 148
 deallocations: 148
 reallocations: 0
 bytes allocated: 5774
-instructions executed: 9375
+instructions executed: 9366
 binary size: 23880
-  code: 10596
+  code: 10600
   data: 3094
-  metadata: 10190
+  metadata: 10186
 functions:
   __arr_drop_Companion:
     calls: 11
@@ -217,7 +217,7 @@ functions:
     calls: 954
     bytes: (external)
   aipl_inc:
-    calls: 534
+    calls: 512
     bytes: (external)
   aipl_str_contains:
     calls: 11
@@ -263,7 +263,7 @@ functions:
     bytes: (external)
   companion_files:
     calls: 12
-    bytes: 2088
+    bytes: 2092
   companion_path:
     calls: 15
     bytes: 824

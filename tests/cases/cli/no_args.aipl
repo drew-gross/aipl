@@ -12,11 +12,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 33
-binary size: 1192
-  code: 360
+instructions executed: 32
+binary size: 1200
+  code: 364
   data: 30
-  metadata: 802
+  metadata: 806
 functions:
   aipl_arr_drop_str:
     calls: 1
@@ -31,11 +31,11 @@ functions:
     calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_print:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 360
+    bytes: 364

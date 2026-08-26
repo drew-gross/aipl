@@ -46,12 +46,15 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 384
-instructions executed: 849
-binary size: 9552
-  code: 4724
+instructions executed: 860
+binary size: 9576
+  code: 4712
   data: 863
-  metadata: 3965
+  metadata: 4001
 functions:
+  __builtin_value_or$str:
+    calls: 4
+    bytes: 88
   __dict_drop_i64$str:
     calls: 4
     bytes: 128
@@ -120,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3412
+    bytes: 3312

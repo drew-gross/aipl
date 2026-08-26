@@ -1,0 +1,140 @@
+import { equal as ==, len } from builtins;
+
+// The AIPL implementation of the `value_or` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_value_or` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `o.value_or(d)` resolves
+// through the ordinary generic machinery — the in-file name `value_or` is only
+// for this file's own tests, which read exactly like user code.
+//
+// Written in AIPL rather than emitted natively so it works for *every* payload
+// type. The native version was a tag `select` over a single i64 value, so it
+// refused an optional whose payload is an inline struct or variant and told
+// callers to "use match to unwrap" — which is how the compiler's own
+// `walker.aipl` ended up spelling this out by hand. A generic AIPL body has no
+// such restriction: the `match` it expands to is the one those callers were
+// writing themselves.
+pub fn value_or<T: any>(self: T?, default: T) -> T {
+    match (self) {
+        some(v) => v, #[allow]
+        // `value_or` cannot be written in terms of itself
+        none => default,
+    }
+}.doc("""
+    The optional's payload when it has one, otherwise `default`. Generic over the
+    payload type — including inline structs and variants — and callable as a
+    method: `o.value_or(d)`.
+
+    `default` is an ordinary argument, so it is evaluated whether or not the
+    optional is empty. Keep it cheap; reach for a `match` when it isn't.
+""").test({
+    // Scalars.
+    assert(some(5).value_or(9) == 5);
+    assert(none.value_or(9) == 9);
+    assert(some('a').value_or('z') == 'a');
+    assert(some(true).value_or(false));
+
+    // `str`, whose payload is a pointer rather than an immediate.
+    assert(some("here").value_or("fallback") == "here");
+    assert(none.value_or("fallback") == "fallback");
+
+    // An inline struct payload — the case the native implementation refused,
+    // and the reason callers had to spell the `match` out by hand.
+    assert(some(Point { x: 1, y: 2 }).value_or(Point { x: 7, y: 8 }).x == 1);
+    assert(none.value_or(Point { x: 7, y: 8 }).x == 7);
+    assert(some(Point { x: 1, y: 2 }).value_or(Point { x: 7, y: 8 }) == Point { x: 1, y: 2 });
+
+    // An inline variant payload, for the same reason.
+    assert(some(Red).value_or(Blue) == Red);
+    assert(none.value_or(Blue) == Blue);
+
+    // An array payload, whose fallback is a fresh allocation.
+    assert(some([1, 2, 3]).value_or([0]).len() == 3);
+    assert(none.value_or([9, 9]).len() == 2);
+
+    // A narrower integer than the literal default's `i64`: the literal takes the
+    // payload's width rather than pinning `T` against it.
+    let n: u64 = "abc".len();
+    assert(some(n).value_or(0) == 3);
+
+    // The free-call form, and indexing — where the optional comes from a real
+    // fallible operation rather than a literal `some`/`none`.
+    assert(value_or([1, 2][0], 0) == 1);
+    assert([1, 2][9].value_or(0) == 0);
+    assert("ab"[0].value_or('z') == 'a');
+    assert(""[0].value_or('z') == 'z');
+})
+
+struct Point { x: i64, y: i64 }
+
+variant Color = Red | Blue
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 240
+instructions executed: 642
+binary size: 7288
+  code: 2808
+  data: 1246
+  metadata: 3234
+functions:
+  __eq_Point:
+    calls: 1
+    bytes: 104
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_assert:
+    calls: 18
+    bytes: (external)
+  aipl_char_at:
+    calls: 2
+    bytes: (external)
+  aipl_dec:
+    calls: 9
+    bytes: (external)
+  aipl_inc:
+    calls: 5
+    bytes: (external)
+  aipl_str_eq:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 1
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2392
+  value_or$Color:
+    calls: 2
+    bytes: 24
+  value_or$Point:
+    calls: 3
+    bytes: 32
+  value_or$char:
+    calls: 3
+    bytes: 24
+  value_or$i64:
+    calls: 4
+    bytes: 24
+  value_or$i64[]:
+    calls: 2
+    bytes: 120
+  value_or$str:
+    calls: 2
+    bytes: 88

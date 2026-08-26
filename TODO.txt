@@ -67,7 +67,6 @@ inlining:
 
 value_or for structs:
   1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
-  2. value_or → AIPL, with laziness from codegen rather than post-mono sinking.
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
@@ -152,7 +151,7 @@ types:
 numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
   make the rest of the .len() wrappers in walker return u64
-  divide by zero behaviour <--- investigate
+  divide by zero behaviour <--- investigate, should implement saturating div probably
 
 mod_aipl:
   create it
@@ -205,6 +204,7 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 optimizations:
+  code sinking after mono and inlining so that opt.value_or(expensive()) doesn't compute expensive() when v isn't none
   constant match arm elimination
   fancier code sinking: if a value is computed outside a branch, but used e.g. 2/3 arms of a match, code sinking should still be made to work somehow.
   generators! Maybe even implicitly transform array builders into generators
@@ -349,6 +349,7 @@ A bug the tests caught, not the compiler. ['c','a','b'].sort() returned [] at fi
 The sort-only ordering primitive is costing more than it saves. Sorting by a key with a non-string payload isn't expressible, so import_item encodes its sort key into the string — bucket digit, name, space, spelling — leaning on space (32) sorting below every character legal in an import name, then splits it back out. It's correct and matches Rust's tuple order, but it's a trick.
 
 error improvements:
+  tests/cases/kwargs/err_generic_default_conflicts.aipl is showing a mangled name in it's error. This should type check against the bound and see that T (any) isn't compatible with 0 (num)
   import suggestions when missing an import
   if you get error "from its defining file" it should instead say the actual filename
   type errors from imported files point at the wrong filename. The fix is to carry the owning file onto Function and tag at the cx.check_fn(f) boundary in check.rs

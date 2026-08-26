@@ -1951,6 +1951,14 @@ fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
 
 type Env = HashMap<String, Type>;
 
+/// Whether `ty` names a type variable that `map` has not pinned yet — what
+/// decides whether a deferred (literal-typed) argument still has something to
+/// contribute.
+fn mentions_unbound(ty: &Type, vars: &HashSet<&str>, map: &HashMap<String, Type>) -> bool {
+    vars.iter()
+        .any(|v| ty_mentions(ty, v) && !map.contains_key(*v))
+}
+
 /// Whether `ty` is an optional whose payload type nothing ever pinned.
 ///
 /// After substitution a parameter declared `T?` reads as `Optional(NoneInner)`
@@ -3472,6 +3480,7 @@ impl Mono<'_> {
         &mut self,
         gname: &str,
         arg_tys: &[Type],
+        flexible: &[bool],
         span: Span,
     ) -> Result<(Vec<Type>, Type), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
@@ -3493,8 +3502,26 @@ impl Mono<'_> {
         // since an AIPL string *is* the char sequence) or a single element
         // (`T = str`) — indistinguishable in isolation. Binding the rest first
         // usually settles `T`, and then the variadic only has to agree with it.
+        // A bare integer literal types as `i64` but flexes to whatever width
+        // its context wants, so it must not be the thing that *pins* a type
+        // variable: `some_u64.value_or(0)` would bind `T` twice and conflict,
+        // `u64` against the literal's `i64`. Deferred to the pass below, which
+        // binds only what nothing else settled — the same bow-out an empty `[]`
+        // or a bare `none` takes.
+        let mut deferred: Vec<(&Type, &Type)> = Vec::new();
         for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
             if variadic[i] {
+                continue;
+            }
+            if flexible.get(i).copied().unwrap_or(false) {
+                deferred.push((pty, aty));
+                continue;
+            }
+            // A bare `none` or an empty `[]` carries only a placeholder element
+            // type and pins nothing — the same bow-out the variadic pass below
+            // and `collect_var_bindings` both make. Binding it would claim
+            // `T = __none__` and conflict with whatever really pinned `T`.
+            if is_none_inner(aty) || matches!(aty, Type::Array(e) if is_none_inner(e)) {
                 continue;
             }
             self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
@@ -3525,6 +3552,25 @@ impl Mono<'_> {
                 continue;
             }
             self.bind_generic_or(&target, &aty, &var_set, &mut map, gname, span.clone())?;
+        }
+        // The deferred literals, now that everything with a width of its own has
+        // had its say. A literal still pins a variable nothing else reached
+        // (`pick(none, 0)` is an `i64` instance); it just no longer overrides one.
+        for (pty, aty) in deferred {
+            // Unpinned: the literal is all there is, so it pins (`pick(none, 7)`
+            // is an `i64` instance). Pinned to an integer: the literal flexes to
+            // that width, which is the whole point of deferring it. Pinned to
+            // anything else: flexing cannot apply, so the mismatch is real and
+            // binding it reports the conflict here — at the call, naming the
+            // variable — rather than leaving it to surface later against a
+            // synthesized binding.
+            let flexes = !mentions_unbound(pty, &var_set, &map)
+                && var_set.iter().all(|v| {
+                    !ty_mentions(pty, v) || map.get(*v).is_some_and(aipl_syntax::is_int_ty)
+                });
+            if !flexes {
+                self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
+            }
         }
         // Fallback pass: any type variable that no concrete arg pinned can
         // still be inferred from an empty-array or bare-`none` argument — the
@@ -4886,7 +4932,17 @@ impl Mono<'_> {
                 // store-back path owns the receiver); only free calls compute the
                 // owned-parameter set used for the move optimization.
                 if self.generics.contains_key(name) {
-                    let (type_args, ret) = self.instantiate_types(name, &atys, span.clone())?;
+                    // Which arguments are bare integer literals, and so flex to
+                    // a width rather than fixing one (see `instantiate_types`).
+                    let flexible: Vec<bool> = args
+                        .iter()
+                        .map(|a| {
+                            matches!(&a.kind, ExprKind::Num(_))
+                                || matches!(&a.kind, ExprKind::Neg(x) if matches!(x.kind, ExprKind::Num(_)))
+                        })
+                        .collect();
+                    let (type_args, ret) =
+                        self.instantiate_types(name, &atys, &flexible, span.clone())?;
                     let owned = if method_style {
                         Vec::new()
                     } else {
@@ -5223,8 +5279,9 @@ fn bind(
         Some(prev) if prev == ty => Ok(()),
         Some(prev) => Err(Error::at(
             format!(
-                "conflicting types for \"{}\" in \"{gname}\": {} vs {}",
+                "conflicting types for \"{}\" in \"{}\": {} vs {}",
                 display_var(v),
+                display_fn(gname),
                 type_name(prev),
                 type_name(ty)
             ),
@@ -5334,6 +5391,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_try_map", "builtin_try_map.aipl"),
     ("__builtin_int_parse", "builtin_int_parse.aipl"),
     ("__builtin_trim_while", "builtin_trim_while.aipl"),
+    ("__builtin_value_or", "builtin_value_or.aipl"),
     ("__builtin_value_or_err", "builtin_value_or_err.aipl"),
 ];
 
@@ -6209,6 +6267,14 @@ fn display_var(v: &str) -> &str {
     } else {
         v
     }
+}
+
+/// A function name as a *user* would write it: an AIPL-implemented builtin is
+/// registered under its canonical `__builtin_` name, which no user identifier
+/// can spell, so a diagnostic that quoted it back would name something the
+/// reader cannot find in their own source.
+fn display_fn(name: &str) -> &str {
+    name.strip_prefix("__builtin_").unwrap_or(name)
 }
 
 // ---- Lambda lifting ---------------------------------------------------------

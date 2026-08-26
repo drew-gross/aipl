@@ -710,10 +710,7 @@ fn finalize_template<K>(
     // dead, and why `n` is the segment count whichever array it is taken from.
     let n = seg_texts.len();
     for (let k, txt : finals) {
-        let sp = match (seg_spans[k]) {
-            some(s) => s,
-            none => 0..0,
-        };
+        let sp = seg_spans[k].value_or(0..0);
         let seg = if (n == 1) {
             Plain
         } else {
@@ -724,10 +721,7 @@ fn finalize_template<K>(
 
         // The interpolation after segment `k`; an empty run after the final
         // segment, so the loops below are simply skipped there.
-        let run = match (interp_runs[k]) {
-            some(r) => r,
-            none => StepResult { tokens: [], trivia: [], end: 0 },
-        };
+        let run = interp_runs[k].value_or(StepResult { tokens: [], trivia: [], end: 0 });
         set toks.extend(run.tokens);
         set trivia.extend(run.trivia);
     }
@@ -1234,15 +1228,15 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1657
-deallocations: 1657
+allocations: 1673
+deallocations: 1673
 reallocations: 38
-bytes allocated: 75704
-instructions executed: 267533
-binary size: 1791320
-  code: 1124952
+bytes allocated: 76216
+instructions executed: 268182
+binary size: 1791416
+  code: 1124984
   data: 8132
-  metadata: 658236
+  metadata: 658300
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1282,10 +1276,13 @@ functions:
     bytes: 136
   __builtin_int_parse:
     calls: 13
-    bytes: 980
+    bytes: 976
   __builtin_is_some_and$char$lam33:
     calls: 37
     bytes: 48
+  __builtin_value_or$char:
+    calls: 81
+    bytes: 24
   __eq_Kind:
     calls: 98
     bytes: 1136
@@ -1404,10 +1401,10 @@ functions:
     calls: 30
     bytes: (external)
   aipl_array_dec:
-    calls: 4612
+    calls: 4628
     bytes: (external)
   aipl_array_new:
-    calls: 1177
+    calls: 1193
     bytes: (external)
   aipl_array_push:
     calls: 72
@@ -1471,7 +1468,7 @@ functions:
     bytes: 1700
   delimited_len:
     calls: 26
-    bytes: 1392
+    bytes: 1412
   esc_str:
     calls: 2
     bytes: 112
@@ -1510,7 +1507,7 @@ functions:
     bytes: 15384
   template_scan$Kind:
     calls: 16
-    bytes: 2668
+    bytes: 2660
   template_step$Kind:
     calls: 27
     bytes: 488

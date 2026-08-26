@@ -907,11 +907,11 @@ allocations: 2701
 deallocations: 2701
 reallocations: 232
 bytes allocated: 129972
-instructions executed: 390024
-binary size: 257328
-  code: 148356
+instructions executed: 390216
+binary size: 257504
+  code: 148424
   data: 6948
-  metadata: 102024
+  metadata: 102132
 functions:
   __arr_drop_Node:
     calls: 11
@@ -988,6 +988,12 @@ functions:
   __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam36:
     calls: 36
     bytes: 716
+  __builtin_value_or$char:
+    calls: 0
+    bytes: 24
+  __builtin_value_or$str:
+    calls: 64
+    bytes: 88
   __eq_Node:
     calls: 7
     bytes: 184
@@ -1035,7 +1041,7 @@ functions:
     bytes: 764
   __m1__show:
     calls: 117
-    bytes: 1388
+    bytes: 1376
   __m1__span:
     calls: 1
     bytes: 460
@@ -1065,7 +1071,7 @@ functions:
     bytes: 676
   __m3__delimited_len:
     calls: 0
-    bytes: 1392
+    bytes: 1412
   __m3__finalize_template$Tok:
     calls: 0
     bytes: 4256
@@ -1089,7 +1095,7 @@ functions:
     bytes: 6816
   __m3__template_scan$Tok:
     calls: 0
-    bytes: 2668
+    bytes: 2660
   __m3__template_step$Tok:
     calls: 0
     bytes: 488
@@ -1287,7 +1293,7 @@ functions:
     bytes: 164
   oxford:
     calls: 14
-    bytes: 1568
+    bytes: 1524
   parse$Tok$Node:
     calls: 3
     bytes: 340

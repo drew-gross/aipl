@@ -21,9 +21,28 @@ fn none_first(o: i64?) -> i64 {
     }
 }
 
+struct Pt { x: i64, y: i64 }
+
+// An inline *struct* default is flagged too. It used not to be — not for
+// formatting reasons, but because `value_or` was emitted natively as a tag
+// select over one i64 payload and genuinely could not unwrap such an optional.
+// It is AIPL-implemented now and generic over every payload, so the rewrite the
+// lint advises is one that compiles.
+//
+// The message names the default rather than quoting it: a construction's span
+// stops at its last token, before the closing brace, so quoting it would print
+// advice that doesn't parse.
+fn or_origin(o: Pt?) -> Pt {
+    match (o) {
+        some(v) => v,
+        none => Pt { x: 0, y: 0 },
+    }
+}
+
 fn main() !prints {
     print(or_zero(some(5)).to_str());
     print(none_first(none).to_str());
+    print(or_origin(none).x.to_str());
 }
 --- errors ---
 error: this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead (or append #[allow] to this line to keep it)
@@ -36,4 +55,10 @@ error: this `match` hands back the optional's payload or a default — write "o.
   --> ./tests/cases/lints/err_match_value_or.aipl:20:20
    |
 20 |         some(v) => v,
+   |                    ^
+
+error: this `match` hands back the optional's payload or a default — write it as "o.value_or(..)" with that arm's value as the default (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or.aipl:37:20
+   |
+37 |         some(v) => v,
    |                    ^

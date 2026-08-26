@@ -13,12 +13,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 177
-binary size: 2872
-  code: 1164
+instructions executed: 182
+binary size: 2976
+  code: 1208
   data: 233
-  metadata: 1475
+  metadata: 1535
 functions:
+  __builtin_value_or$str:
+    calls: 2
+    bytes: 88
   __eq_str$opt:
     calls: 1
     bytes: 148
@@ -45,4 +48,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1016
+    bytes: 972

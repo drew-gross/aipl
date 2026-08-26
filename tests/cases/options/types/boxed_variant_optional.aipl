@@ -24,12 +24,15 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 336
-instructions executed: 197
-binary size: 3288
-  code: 1392
+instructions executed: 204
+binary size: 3448
+  code: 1464
   data: 93
-  metadata: 1803
+  metadata: 1891
 functions:
+  __builtin_value_or$List:
+    calls: 2
+    bytes: 120
   __rec_drop_List:
     calls: 6
     bytes: 48
@@ -40,13 +43,13 @@ functions:
     calls: 6
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 13
+    calls: 14
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 3
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7
+    calls: 8
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 3
@@ -62,7 +65,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1240
+    bytes: 1192
   sum:
     calls: 5
     bytes: 104

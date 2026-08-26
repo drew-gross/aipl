@@ -180,7 +180,7 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24826
+instructions executed: 24802
 binary size: 86264
   code: 53752
   data: 2532
@@ -200,7 +200,7 @@ functions:
     bytes: 72
   __builtin_int_parse:
     calls: 3
-    bytes: 1020
+    bytes: 1016
   __eq_i64$opt:
     calls: 2
     bytes: 100
@@ -253,7 +253,7 @@ functions:
     calls: 1331
     bytes: (external)
   aipl_inc:
-    calls: 710
+    calls: 672
     bytes: (external)
   aipl_str_contains:
     calls: 7
@@ -308,4 +308,4 @@ functions:
     bytes: 72
   parse_spec:
     calls: 13
-    bytes: 3976
+    bytes: 3980

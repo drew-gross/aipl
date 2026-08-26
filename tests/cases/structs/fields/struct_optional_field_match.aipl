@@ -2,11 +2,15 @@ import { equal as ==, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // `match` on an optional struct field reads the inline {tag, value} storage
 // directly — here through a struct passed by reference as a parameter.
+//
+// `value_or` would say the same thing more briefly, and the lint says so; the
+// `#[allow]` keeps the long form because exercising *this* codegen path is the
+// whole point of the case.
 struct Cell { v: i64? }
 
 fn describe(c: Cell) -> i64 {
     match (c.v) {
-        some(x) => x,
+        some(x) => x, #[allow]
         none => 0 - 1,
     }
 }.test({

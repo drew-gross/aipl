@@ -106,11 +106,11 @@ allocations: 99
 deallocations: 99
 reallocations: 0
 bytes allocated: 4116
-instructions executed: 5414
-binary size: 12320
-  code: 5480
+instructions executed: 5464
+binary size: 12424
+  code: 5528
   data: 1229
-  metadata: 5611
+  metadata: 5667
 functions:
   __builtin_count_while$char$s0$lam13:
     calls: 7
@@ -118,6 +118,9 @@ functions:
   __builtin_count_while$char$s0$lam3:
     calls: 0
     bytes: 232
+  __builtin_value_or$str:
+    calls: 15
+    bytes: 88
   __map5$own0:
     calls: 5
     bytes: 320
@@ -204,4 +207,4 @@ functions:
     bytes: 1108
   reindent_block:
     calls: 9
-    bytes: 3588
+    bytes: 3548

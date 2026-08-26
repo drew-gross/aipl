@@ -39,12 +39,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 181
-binary size: 1552
-  code: 584
+instructions executed: 186
+binary size: 1608
+  code: 588
   data: 1
-  metadata: 967
+  metadata: 1019
 functions:
+  __builtin_value_or$i64:
+    calls: 2
+    bytes: 24
   __to_str_i64:
     calls: 4
     bytes: 180
@@ -65,4 +68,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 404
+    bytes: 384

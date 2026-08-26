@@ -91,12 +91,15 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 575
-instructions executed: 2516
-binary size: 9720
-  code: 5368
+instructions executed: 2574
+binary size: 9792
+  code: 5320
   data: 1060
-  metadata: 3292
+  metadata: 3412
 functions:
+  __builtin_value_or$i64:
+    calls: 20
+    bytes: 24
   __eq_i64$opt:
     calls: 10
     bytes: 100
@@ -168,7 +171,7 @@ functions:
     bytes: 16
   main:
     calls: 1
-    bytes: 4204
+    bytes: 4144
   opt_left_fold$i64$i64$lam4:
     calls: 2
-    bytes: 344
+    bytes: 332

@@ -53,11 +53,11 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 8834
-binary size: 8472
-  code: 3880
+instructions executed: 8840
+binary size: 8480
+  code: 3884
   data: 696
-  metadata: 3896
+  metadata: 3900
 functions:
   __builtin_count_while$char$s0$lam12:
     calls: 9
@@ -154,4 +154,4 @@ functions:
     bytes: 816
   process_raw_string:
     calls: 7
-    bytes: 1672
+    bytes: 1676
