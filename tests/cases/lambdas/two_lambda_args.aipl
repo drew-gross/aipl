@@ -1,0 +1,130 @@
+import {
+    equal as ==,
+    less_than_or_equal as <=,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// Two function-typed parameters, each given its own lambda at the call site.
+//
+// Monomorphization specializes a higher-order function per *function value* it
+// receives, so two lambda parameters mean two independent specialization keys
+// on one call: each lambda is lifted to its own synthesized function, with its
+// own captures threaded through. That is what the cases below pin down —
+// different captures per lambda, two structurally identical lambdas at
+// different parameters, a pair whose two types differ, and a pair forwarded
+// onward together.
+
+fn combine(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { f(x) + g(x) }.test({
+    assert(combine(5, |x| x + 1, |x| x * 2) == 16);
+
+    // The two lambdas capture different variables, so each specialization has
+    // to carry its own.
+    let lo = 10;
+    let hi = 100;
+    assert(combine(5, |x| x + lo, |x| x + hi) == 120);
+
+    // The same variable captured by both.
+    let k = 3;
+    assert(combine(5, |x| x + k, |x| x * k) == 23);
+
+    // Two structurally identical lambdas — one per parameter, not one shared
+    // between them.
+    assert(combine(5, |x| x + 1, |x| x + 1) == 12);
+
+    // A named function is interchangeable with a lambda in either position.
+    assert(combine(5, double, |x| x + 1) == 16);
+    assert(combine(5, |x| x + 1, double) == 16);
+    assert(combine(5, double, double) == 20);
+})
+
+fn double(x: i64) -> i64 { x * 2 }
+
+// The two parameters need not have the same type: `keep` is a predicate and
+// `f` a mapping, so neither specialization could stand in for the other.
+fn scale_if(x: i64, keep: (i64) -> bool, f: (i64) -> i64) -> i64 {
+    if (keep(x)) { f(x) } else { x }
+}.test({
+    let lo = 2;
+    let k = 10;
+    assert(scale_if(3, |x| lo <= x, |x| x * k) == 30);
+    assert(scale_if(1, |x| lo <= x, |x| x * k) == 1);
+    // A second call with a different pair specializes separately.
+    assert(scale_if(3, |x| x <= lo, |x| x + k) == 3);
+})
+
+// Neither parameter is called here: both are forwarded onward, so `combine`
+// specializes for the same two synthesized functions one hop further out and
+// each lambda's captures are threaded through both hops. (`pass_onward.aipl`
+// is the one-parameter version of this.)
+fn apply_both(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { combine(x, f, g) }.test({
+    let k = 7;
+    assert(apply_both(2, |x| x + k, |x| x * k) == 23);
+})
+
+// Different *return* types too, so the two specializations don't even agree on
+// shape: `f` yields an i64 that `g` then renders.
+fn render(n: i64, f: (i64) -> i64, g: (i64) -> str) -> str { g(f(n)) }.test({
+    assert(render(3, |x| x + 1, |x| ```n={x}```) == "n=4");
+    let unit = "px";
+    assert(render(3, |x| x * 2, |x| ```{x}{unit}```) == "6px");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 308
+binary size: 5328
+  code: 1684
+  data: 990
+  metadata: 2654
+functions:
+  __test$apply_both:
+    calls: 1
+    bytes: 76
+  __test$combine:
+    calls: 1
+    bytes: 412
+  __test$render:
+    calls: 1
+    bytes: 620
+  __test$scale_if:
+    calls: 1
+    bytes: 196
+  __to_str_i64:
+    calls: 2
+    bytes: 180
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_concat:
+    calls: 6
+    bytes: (external)
+  aipl_dec:
+    calls: 24
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_inc:
+    calls: 8
+    bytes: (external)
+  aipl_str_eq:
+    calls: 2
+    bytes: (external)
+  aipl_test_begin:
+    calls: 4
+    bytes: (external)
+  aipl_test_end:
+    calls: 4
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 200

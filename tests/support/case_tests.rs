@@ -290,6 +290,7 @@ case_tests! {
     cases_lambdas_recursive_hof = "cases/lambdas/recursive_hof",
     cases_lambdas_right_fold = "cases/lambdas/right_fold",
     cases_lambdas_try_error_inferred = "cases/lambdas/try_error_inferred",
+    cases_lambdas_two_lambda_args = "cases/lambdas/two_lambda_args",
     cases_lambdas_zip_concat_minimal = "cases/lambdas/zip_concat_minimal",
     cases_lambdas_zip_with = "cases/lambdas/zip_with",
     cases_lambdas_zip_with_owned = "cases/lambdas/zip_with_owned",

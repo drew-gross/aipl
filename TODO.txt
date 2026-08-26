@@ -30,6 +30,7 @@ variant:
   make a case_name function to replace the jank in kind_label
   allow variant constructors to have defaults, get rid of many in grammar.aipl
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
+  Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 type system:
   apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
@@ -122,11 +123,22 @@ utility functions:
   count_if
   do we need intersperse now that we've souped up join?
   find (plus linter that require use of find)
+  zip, to allow iterating over lists in pairs
 
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky
+  a fn-typed parameter can't be forwarded to a builtin HOF
+      fn scale(xs: i64[], f: (i64) -> i64) -> i64[] { xs.map(f) }
+      -> error: fn "map" arg 1: expected (i64) -> _, got (i64) -> i64
+      A lambda literal (xs.map(|x| ..)) works, and a top-level fn name
+      (xs.map(double), see lambdas/named_fn_args) works; forwarding to a
+      *user-defined* HOF works too (lambdas/pass_onward). Only a fn-typed
+      parameter reaching a builtin fails: the builtin's placeholder return
+      type `_` doesn't unify with the parameter's concrete i64.
+      Found while writing lambdas/two_lambda_args, whose first draft was
+      `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 math:
   % should not abort. (what should it do? TBD)
@@ -139,6 +151,7 @@ syntax:
   implement T+ for intersperse
   rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
   support join(self: T[], sep: T+ = []) (defaults for positional args, can join with multiple)
+  some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>
 
 default/kwargs:
   A default cannot reference an earlier parameter — fn f(a: i64, b: i64 = a) gives "unknown identifier". Defaults are evaluated in an empty scope.
@@ -229,15 +242,15 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-      make a filter-map fusion that pre-reserves and re-uses the input array if unique
+      make a filter-map fusion that pre-reserves and re-uses the input array if owned and sizing is right
       count fusions should apply to count_if also
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
       a.map(...).join() fuses to flat_map
       a.extend(v.map(...)) fuses to map_extend
       also fuse x.extend(y.filter().map())
+      pretty much all chains of array operations can be fused actually... maybe we need a more generic fuser?
 
-  2. Cap link concurrency during handoff (cargo build -j4 for the build steps). Doesn't reduce work, but caps peak RSS so the box stops swapping. Cheap to try, low risk.
   common subexpression elimination
   sora
   licm
