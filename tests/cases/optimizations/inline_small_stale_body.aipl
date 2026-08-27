@@ -1,0 +1,65 @@
+import { equal as == } from builtins;
+
+// `inline_small_post_mono` picks its candidates once, up front, but every
+// candidate's body keeps changing as *earlier* candidates are inlined into it.
+// Splicing the up-front snapshot back in revives a call to a function an earlier
+// round had already expanded away and dropped, and codegen then fails with
+// "call to undefined fn". So each candidate's body is re-read when its turn
+// comes.
+//
+// The shape that hits it: `shout` reaches codegen through two routes at once —
+// directly, from its own `.test` driver, and indirectly, baked into the
+// lambda-specialized instance of the higher-order `apply` (`apply$str$str$s0$lam0`).
+// `shout` is inlined into every site and dropped; the stale copy of that
+// instance then puts the call back. Two `apply` calls rather than one, so the
+// instance is not single-use and survives to the small-body pass, where the
+// ordering is what matters.
+fn apply<T: any, U: any>(x: T, f: (T) -> U) -> U { f(x) }.test({
+    assert(apply("a", shout) == "a!");
+    assert(apply("b", shout) == "b!");
+})
+
+fn shout(self: str) -> str { `{self}!` }.test({
+    assert(shout("hi") == "hi!");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 65
+binary size: 2208
+  code: 672
+  data: 157
+  metadata: 1379
+functions:
+  __test$apply:
+    calls: 1
+    bytes: 372
+  aipl_assert:
+    calls: 3
+    bytes: (external)
+  aipl_concat:
+    calls: 6
+    bytes: (external)
+  aipl_dec:
+    calls: 24
+    bytes: (external)
+  aipl_inc:
+    calls: 6
+    bytes: (external)
+  aipl_str_eq:
+    calls: 3
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 300

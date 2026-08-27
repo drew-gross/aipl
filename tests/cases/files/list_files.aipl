@@ -1,4 +1,4 @@
-import { len, list_files, print, sort, to_str } from builtins;
+import { len, list_files, map_ok, print, sort, to_str } from builtins;
 
 // `list_files` walks a directory tree into a `str[]!Error`: `ok(paths)` of every
 // file at or below it (recursively, each path prefixed with the directory it was
@@ -9,12 +9,7 @@ import { len, list_files, print, sort, to_str } from builtins;
 
 // The filesystem yields entries in an unspecified order, so sorting is what makes
 // a listing printable. Directories are descended into, never listed themselves.
-fn sorted_listing(dir: str) !list_files -> str[]!Error {
-    match (list_files(dir)) {
-        ok(paths) => ok(paths.sort()),
-        err(e) => err(e),
-    }
-}
+fn sorted_listing(dir: str) !list_files -> str[]!Error { list_files(dir).map_ok(sort) }
 
 // `?` unwraps the listing instead of matching on it, and the array it yields is
 // released with the rest of this scope — the balanced allocation/deallocation
@@ -48,11 +43,11 @@ allocations: 19
 deallocations: 19
 reallocations: 8
 bytes allocated: 801
-instructions executed: 1424
-binary size: 6776
-  code: 3172
-  data: 403
-  metadata: 3201
+instructions executed: 1392
+binary size: 9072
+  code: 4416
+  data: 523
+  metadata: 4133
 functions:
   __to_str_i64$err$Error:
     calls: 1
@@ -88,7 +83,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 23
+    calls: 19
     bytes: (external)
   aipl_list_files:
     calls: 5
@@ -116,7 +111,4 @@ functions:
     bytes: 324
   main:
     calls: 1
-    bytes: 680
-  sorted_listing:
-    calls: 4
-    bytes: 548
+    bytes: 2472

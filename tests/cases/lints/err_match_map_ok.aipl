@@ -1,0 +1,85 @@
+import { print, to_str } from builtins;
+
+// `match (r) { ok(v) => ok(g), err(e) => err(e) }` rewrites a result's value
+// side and passes its error straight through, which is exactly what `map_ok`
+// does — in one line, without naming either case. The mirror of the
+// `map_err` lint next door.
+//
+// The `err` arm handing its own binding back to `err` is what makes this a
+// `map_ok`. Arm order does not matter, so the second function below is flagged
+// too.
+
+fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
+
+fn bumped(r: i64!str) -> i64!str {
+    match (r) {
+        ok(v) => ok(v + 1),
+        err(e) => err(e),
+    }
+}
+
+fn err_first(r: i64!str) -> i64!str {
+    match (r) {
+        err(e) => err(e),
+        ok(v) => ok(v + 2),
+    }
+}
+
+fn double(x: i64) -> i64 { x * 2 }
+
+// A *call* in the `ok` arm is flagged too. Unlike `value_or`, there is no
+// eager/lazy question to guard against: `map_ok` takes a function, which runs on
+// the value path exactly when the arm did.
+fn doubled(r: i64!str) -> i64!str {
+    match (r) {
+        ok(v) => ok(double(v)),
+        err(e) => err(e),
+    }
+}
+
+// A call-shaped scrutinee has no name to quote back — its span stops before its
+// parens — so the message names the method without a receiver.
+fn parsed_and_doubled(s: str) -> i64!str {
+    match (parse(s)) {
+        ok(v) => ok(double(v)),
+        err(e) => err(e),
+    }
+}
+
+fn or_zero(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => 0,
+    }
+}
+
+fn main() !prints {
+    print(or_zero(bumped(parse("1"))).to_str());
+    print(or_zero(err_first(parse("1"))).to_str());
+    print(or_zero(doubled(parse("1"))).to_str());
+    print(or_zero(parsed_and_doubled("1")).to_str());
+}
+--- errors ---
+error: this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_map_ok.aipl:17:19
+   |
+17 |         err(e) => err(e),
+   |                   ^^^^^
+
+error: this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_map_ok.aipl:23:19
+   |
+23 |         err(e) => err(e),
+   |                   ^^^^^
+
+error: this `match` rewrites the result's value side and passes its error through — write "r.map_ok(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_map_ok.aipl:36:19
+   |
+36 |         err(e) => err(e),
+   |                   ^^^^^
+
+error: this `match` rewrites the result's value side and passes its error through — write ".map_ok(|v| ..)" instead (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_map_ok.aipl:45:19
+   |
+45 |         err(e) => err(e),
+   |                   ^^^^^

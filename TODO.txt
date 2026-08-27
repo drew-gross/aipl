@@ -72,6 +72,8 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  token_value in lexer.aipl should leverage more having multiple arms to same value
+  shift_all can be a map
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
   parser lib should use value_or_err more
   why does quoted use str literals instead of char literals?

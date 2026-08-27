@@ -1,0 +1,83 @@
+import { equal as ==, map_ok, print, to_str, wrapping_add as + } from builtins;
+
+// `#[allow]` keeps the long form — the escape hatch every lint carries.
+// `map_ok`'s own definition needs exactly this, since it cannot be written in
+// terms of itself.
+//
+// The marker goes on the `err(e) => err(e)` arm, which is where this lint
+// points. That is deliberate: `#[allow]` is line-scoped, so a lint spanning the
+// whole multi-line `match` could never be squelched — the only line able to
+// carry the marker would be the `match (..) {` header, and the formatter moves a
+// marker written there onto its own line, where it squelches nothing. The
+// pass-through arm is always one line (the `ok` arm's replacement need not be),
+// so it always takes a trailing marker and keeps it through `aipl fmt`.
+
+fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
+
+fn bumped(r: i64!str) -> i64!str {
+    match (r) {
+        ok(v) => ok(v + 1),
+        err(e) => err(e), #[allow]
+    }
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn bumped_short(r: i64!str) -> i64!str { r.map_ok(|v| v + 1) }
+
+fn show(r: i64!str) -> str {
+    match (r) {
+        ok(v) => v.to_str(),
+        err(e) => e,
+    }
+}
+
+fn main() !prints {
+    print(show(bumped(parse("1"))));
+    print(show(bumped_short(parse("1"))));
+    print(show(bumped(parse("x"))));
+    print(show(bumped_short(parse("x"))));
+}
+--- stdout ---
+2
+2
+not a one
+not a one
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 347
+binary size: 3976
+  code: 2080
+  data: 27
+  metadata: 1869
+functions:
+  __to_str_i64:
+    calls: 2
+    bytes: 180
+  aipl_dec:
+    calls: 26
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_inc:
+    calls: 16
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_str_eq:
+    calls: 4
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1900

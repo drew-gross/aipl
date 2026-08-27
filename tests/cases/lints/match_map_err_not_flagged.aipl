@@ -25,7 +25,8 @@ fn wrap_and_replace(r: i64!str) -> i64!Wrapped {
 
 // `err(e) => err(e)` rebuilds the result unchanged, so the whole `match` is its
 // own scrutinee. `map_err(|e| e)` would be a longer way to write that nothing,
-// so the lint stays quiet rather than advising it.
+// so the lint stays quiet rather than advising it — and so does `map_ok`'s, from
+// the other side (see `match_map_ok_not_flagged.aipl`).
 fn passthrough(r: i64!str) -> i64!str {
     match (r) {
         ok(v) => ok(v),

@@ -1,0 +1,138 @@
+import { equal as ==, is_err_and, len, logical_not as !, map_err } from builtins;
+
+// The AIPL implementation of the `map_ok` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_map_ok` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_ok(f)` specializes
+// through the ordinary generic / higher-order machinery — the in-file name
+// `map_ok` is only for this file's own tests, which read exactly like user code.
+//
+// The mirror of `map_err`: this one rewrites the *value* side and leaves the
+// error alone. `?` already covers the case where the error type is the enclosing
+// function's, so what is left for this is the result that is handed straight
+// back or stored rather than unwrapped — where a hand-written `match` would
+// otherwise rebuild both sides in order to change one.
+pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
+    match (self) {
+        ok(v) => ok(f(v)),
+        err(e) => err(e), #[allow]
+    }
+}.doc("""
+    `self` with its value side rewritten by `f`: `ok(v)` becomes `ok(f(v))`, and
+    `err(e)` passes through untouched (`f` is not called). Generic over both
+    value types and the error type, and callable as a method: `r.map_ok(f)`.
+
+    The mirror of `map_err`. Where the error is the enclosing function's anyway,
+    `f(r?)` says the same thing more directly; this is for the result that is
+    returned or stored rather than unwrapped.
+""").test({
+    // ok: the value is rewritten, and the error type is carried along.
+    assert(lex("fine").map_ok(shout)? == "fine!");
+
+    // err: the error passes through untouched, and `f` never runs.
+    assert(lex("bad").map_ok(shout).is_err_and(|e| e.message == "unexpected"));
+    assert(lex("bad").map_ok(shout).is_err_and(|e| e.span == 3));
+
+    // A lambda rather than a named function.
+    assert(lex("fine").map_ok(|s| `[{s}]`)? == "[fine]");
+
+    // The value type may change shape entirely: str to i64, and to a struct.
+    assert(lex("fine").map_ok(len)? == 4);
+    assert(lex("fine").map_ok(|s| Tagged { text: s, n: 1 })?.text == "fine");
+
+    // Free-call form.
+    assert(map_ok(lex("fine"), shout)? == "fine!");
+
+    // A captured value.
+    let suffix = "?";
+    assert(lex("fine").map_ok(|s| `{s}{suffix}`)? == "fine?");
+
+    // Chained: mapping twice composes, and the error still survives both.
+    assert(lex("fine").map_ok(shout).map_ok(len)? == 5);
+    assert(lex("bad").map_ok(shout).map_ok(len).is_err_and(|e| e.span == 3));
+
+    // The mirror image, composed: each side is rewritten by its own mapper and
+    // neither disturbs the other.
+    assert(lex("fine").map_ok(shout).map_err(|e| e.span)? == "fine!");
+    assert(lex("bad").map_ok(shout).map_err(|e| e.span).is_err_and(|c| c == 3));
+})
+
+struct LexError { message: str, span: i64 }
+
+struct Tagged { text: str, n: i64 }
+
+// A named conversion, so the tests cover passing a function rather than a
+// lambda.
+fn shout(self: str) -> str { `{self}!` }.test({
+    assert(shout("hi") == "hi!");
+})
+
+// Fails with a struct error, so the tests above cover an error payload that is
+// carried through untouched rather than a bare message.
+fn lex(s: str) -> str!LexError {
+    if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
+}.test({
+    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
+    assert(!lex("fine").is_err_and(|e| e.span == 3));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1824
+binary size: 27488
+  code: 15100
+  data: 1332
+  metadata: 11056
+functions:
+  __test$lex:
+    calls: 1
+    bytes: 456
+  __test$map_ok:
+    calls: 1
+    bytes: 13076
+  __test_try_fail_LexError:
+    calls: 0
+    bytes: 64
+  __test_try_fail_i64:
+    calls: 0
+    bytes: 64
+  __to_str_LexError:
+    calls: 0
+    bytes: 540
+  __to_str_i64:
+    calls: 0
+    bytes: 180
+  aipl_assert:
+    calls: 15
+    bytes: (external)
+  aipl_concat:
+    calls: 16
+    bytes: (external)
+  aipl_dec:
+    calls: 177
+    bytes: (external)
+  aipl_inc:
+    calls: 116
+    bytes: (external)
+  aipl_str_eq:
+    calls: 23
+    bytes: (external)
+  aipl_str_len:
+    calls: 20
+    bytes: (external)
+  aipl_test_begin:
+    calls: 3
+    bytes: (external)
+  aipl_test_end:
+    calls: 3
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  lex:
+    calls: 14
+    bytes: 380
+  main:
+    calls: 1
+    bytes: 340

@@ -5733,6 +5733,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_drop_n", "builtin_drop_n.aipl"),
     ("__builtin_drop_last_n", "builtin_drop_last_n.aipl"),
     ("__builtin_map_err", "builtin_map_err.aipl"),
+    ("__builtin_map_ok", "builtin_map_ok.aipl"),
     ("__builtin_try_map", "builtin_try_map.aipl"),
     ("__builtin_int_parse", "builtin_int_parse.aipl"),
     ("__builtin_trim_while", "builtin_trim_while.aipl"),
@@ -7354,6 +7355,14 @@ pub fn inline_small_post_mono(
         .collect();
 
     for f in candidates {
+        // Re-read the candidate's *current* body. The list is fixed up front,
+        // but every body in it changes as earlier candidates are inlined — and
+        // splicing a stale snapshot back in would revive calls to a function an
+        // earlier round already expanded away and dropped, leaving codegen with
+        // a call to a definition that no longer exists.
+        let Some(f) = program.fns.iter().find(|g| g.name == f.name).cloned() else {
+            continue;
+        };
         let fparams: Vec<InlineParam> = f
             .params
             .iter()
