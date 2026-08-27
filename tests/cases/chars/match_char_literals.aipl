@@ -7,9 +7,7 @@ import { equal as ==, print, wrapping_add as + } from builtins;
 // length, elements or refcounting behind it.
 fn kind(c: char) -> str {
     match (c) {
-        'a' => "vowel",
-        'e' => "vowel",
-        'i' => "vowel",
+        'a' | 'e' | 'i' => "vowel",
         ' ' => "space",
         _ => "consonant",
     }

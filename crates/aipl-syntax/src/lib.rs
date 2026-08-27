@@ -1140,7 +1140,20 @@ pub mod ast {
         /// `some(v)`, `ok(v)`/`err(e)`, or a variant case — with its positional
         /// payload `bindings` (empty for a nullary case). The scrutinee's type
         /// decides which `name`s are legal.
-        Ctor { name: String, bindings: Vec<String> },
+        ///
+        /// `ignore_payload` is the `Ctor(..)` form: the case carries a payload
+        /// the arm doesn't look at, so nothing is bound and the arity isn't
+        /// written out. It is *not* the same as the nullary `Ctor`, which claims
+        /// the case has no payload at all and is still an error when it does —
+        /// so a reader can tell "this case is empty" from "I'm ignoring what it
+        /// holds" without knowing the variant. Implies `bindings.is_empty()`;
+        /// monomorphization expands it to one `_` binder per payload slot
+        /// (`expand_ignored_payload`), so codegen never sees the form.
+        Ctor {
+            name: String,
+            bindings: Vec<String>,
+            ignore_payload: bool,
+        },
         /// A string-literal pattern `"lit" => body` (matches a `str` scrutinee by
         /// content).
         Str(String),

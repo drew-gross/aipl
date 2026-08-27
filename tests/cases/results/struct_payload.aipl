@@ -12,10 +12,10 @@ fn parse(valid: bool) -> Point!str {
 }.test({
     match (parse(true)) {
         ok(p) => assert(p.x == 1 && p.y == 2 && p.label == "hi"),
-        err(e) => assert(false),
+        err(..) => assert(false),
     };
     match (parse(false)) {
-        ok(p) => assert(false),
+        ok(..) => assert(false),
         err(e) => assert(e == "bad point"),
     };
 })
@@ -26,7 +26,7 @@ fn main() !prints {
         err(e) => print("err: " +++ e),
     };
     match (parse(false)) {
-        ok(p) => print("ok"),
+        ok(..) => print("ok"),
         err(e) => print("err: " +++ e),
     };
 }

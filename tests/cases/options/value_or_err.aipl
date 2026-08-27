@@ -26,7 +26,7 @@ fn main() !prints {
     // The error is any type, not just a message — here an i64 code. And the
     // result is an ordinary value, so it needn't be propagated with `?`.
     let code = match (""[0].value_or_err(404)) {
-        ok(c) => 0,
+        ok(..) => 0,
         err(n) => n,
     };
     print(`code {code}`);

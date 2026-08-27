@@ -84,8 +84,7 @@ pub fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
 // a forced inner group means the outer can't be flat either.
 fn has_hard(self: Doc) -> bool {
     match (self) {
-        Text(s) => s.contains("\n"),
-        RawBlock(s) => s.contains("\n"),
+        Text(s) | RawBlock(s) => s.contains("\n"),
         Concat(ds) => ds.any(has_hard),
         Line | SoftLine => false,
         IfBroken(_) => false,
@@ -210,8 +209,7 @@ fn fits(budget: u64, work: Work) -> bool {
     match (work) {
         WNil => true,
         WCons(sp, flat, d, rest) => match (d) {
-            Text(s) => fits_atom(budget, s, flat, rest),
-            RawBlock(s) => fits_atom(budget, s, flat, rest),
+            Text(s) | RawBlock(s) => fits_atom(budget, s, flat, rest),
             Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
             Line => if (flat) { fits_after(budget, 1, rest) } else { true },
             SoftLine => if (flat) { fits(budget, rest) } else { true },

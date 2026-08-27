@@ -41,10 +41,10 @@ fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }.t
 fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
     let start = monotonic_now();
     match ("sleep".execute_program(args=["1"])) {
-        ok(r) => monotonic_now() - start,
+        ok(..) => monotonic_now() - start,
         // A launch failure reads as no elapsed time at all, which fails the
         // check below — `sleep` has to actually run for this to mean anything.
-        err(e) => 0,
+        err(..) => 0,
     }
 }.test({
     // Sleeping a second has to show up as roughly a billion nanoseconds. This is

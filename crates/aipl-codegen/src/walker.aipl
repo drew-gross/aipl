@@ -475,12 +475,9 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
 // token text alone cannot recover; everything else folds to its syntactic class.
 fn fmt_kind(k: AiplTok) -> FmtKind {
     match (k) {
-        TemplateHead(_) => TplHead,
-        RawTemplateHead(_) => TplHead,
-        TemplateMid(_) => TplMid,
-        RawTemplateMid(_) => TplMid,
-        TemplateTail(_) => TplTail,
-        RawTemplateTail(_) => TplTail,
+        TemplateHead(..) | RawTemplateHead(..) => TplHead,
+        TemplateMid(..) | RawTemplateMid(..) => TplMid,
+        TemplateTail(..) | RawTemplateTail(..) => TplTail,
         Fn | If | Else | Struct | Variant | Import | From | As => Keyword,
         Pub | Let | For | While | Mut | Set | Match | Return | Shim | Builtins => Keyword,
         True | False | None => Constant,
@@ -2713,7 +2710,7 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2850765
+instructions executed: 2851482
 binary size: 3229592
   code: 1846072
   data: 27124

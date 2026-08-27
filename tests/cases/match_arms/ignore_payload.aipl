@@ -1,0 +1,140 @@
+import { print, to_str, wrapping_sub as - } from builtins;
+
+// `Ctor(..)` matches a case *and ignores what it carries*, so an arm never has
+// to name a payload it doesn't read — or even know how many slots there are.
+//
+// It is deliberately not the same as the nullary `Ctor`, which says the case has
+// no payload at all and stays an error when it does: a reader can tell "this
+// case is empty" from "I'm ignoring what it holds" without going to look up the
+// variant.
+variant Shape = Circle(i64) | Rect(i64, i64) | Point | Line(i64, i64, i64, i64)
+
+fn arity_free(s: Shape) -> str {
+    match (s) {
+        // Two, four and one slots — none of them spelled out.
+        Rect(..) => "rect",
+        Line(..) => "line",
+        Circle(..) => "circle",
+        Point => "point",
+    }
+}
+
+// An alternation may mix the two: `Point` binds nothing because it has nothing,
+// `Circle(..)` binds nothing because this arm isn't looking.
+fn is_flat(s: Shape) -> bool {
+    match (s) {
+        Point | Circle(..) => true,
+        Rect(..) | Line(..) => false,
+    }
+}
+
+// And alternatives that *do* bind may be grouped, as long as every one of them
+// binds the same names in the same order — so the shared body means the same
+// thing whichever alternative matched.
+variant Span2 = Between(i64, i64) | Nested(i64, i64) | Empty
+
+fn width(s: Span2) -> i64 {
+    match (s) {
+        Between(lo, hi) | Nested(lo, hi) => hi - lo,
+        Empty => 0,
+    }
+}
+
+// The builtin constructors take `(..)` too. A void-Ok result has no payload on
+// its `ok` side, so that one stays the nullary `ok`.
+fn present(o: i64?) -> bool {
+    match (o) {
+        some(..) => true,
+        none => false,
+    }
+}
+
+fn succeeded(r: i64!str) -> bool {
+    match (r) {
+        ok(..) => true,
+        err(..) => false,
+    }
+}
+
+fn quiet(r: !str) -> bool {
+    match (r) {
+        ok => true,
+        err(..) => false,
+    }
+}
+
+fn boom() -> !str { err("no") }
+
+fn fine() -> !str { ok() }
+
+fn main() !prints {
+    print(arity_free(Rect(1, 2)));
+    print(arity_free(Line(1, 2, 3, 4)));
+    print(arity_free(Circle(5)));
+    print(arity_free(Point));
+    print(is_flat(Point).to_str());
+    print(is_flat(Rect(1, 2)).to_str());
+    print(width(Between(2, 9)).to_str());
+    print(width(Nested(3, 5)).to_str());
+    print(width(Empty).to_str());
+    print(present(some(1)).to_str());
+    print(present(none).to_str());
+    print(succeeded(ok(1)).to_str());
+    print(succeeded(err("x")).to_str());
+    print(quiet(fine()).to_str());
+    print(quiet(boom()).to_str());
+}
+--- stdout ---
+rect
+line
+circle
+point
+true
+false
+7
+2
+0
+true
+false
+true
+false
+true
+false
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 770
+binary size: 4496
+  code: 2648
+  data: 47
+  metadata: 1801
+functions:
+  __to_str_bool:
+    calls: 8
+    bytes: 212
+  __to_str_i64:
+    calls: 3
+    bytes: 180
+  aipl_dec:
+    calls: 32
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_inc:
+    calls: 17
+    bytes: (external)
+  aipl_print:
+    calls: 15
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2256

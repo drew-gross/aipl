@@ -894,11 +894,11 @@ allocations: 2797
 deallocations: 2797
 reallocations: 122
 bytes allocated: 134260
-instructions executed: 394191
+instructions executed: 395217
 binary size: 260536
-  code: 150420
+  code: 150424
   data: 6948
-  metadata: 103168
+  metadata: 103164
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1061,7 +1061,7 @@ functions:
     bytes: 940
   __m3__step_result$Tok:
     calls: 388
-    bytes: 6816
+    bytes: 6820
   __m3__template_scan$Tok:
     calls: 0
     bytes: 2668

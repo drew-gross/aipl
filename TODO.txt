@@ -197,6 +197,7 @@ utilities:
   zip, to allow iterating over lists in pairs
 
 lint:
+  match with same arm val should use Case1 | Case2 => arm_val
   match none -> err(...) should lint to value_or_err
   lint against manually incrementing a loop counter
   for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)

@@ -1,0 +1,21 @@
+// Alternatives of one arm must bind the same names in the same order. They may
+// bind — `Between(lo, hi) | Nested(lo, hi)` is exactly what the grouping is for
+// — but only when every branch offers the body the same names, or the body would
+// mean something different depending on which alternative matched.
+//
+// Here `B` has a second slot `A` doesn't, so `y` would be unbound half the time.
+variant V = A(i64) | B(i64, i64)
+
+fn first(v: V) -> i64 {
+    match (v) {
+        A(x) | B(x, y) => x,
+    }
+}
+
+fn main() -> i64 { first(A(1)) }
+--- errors ---
+error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds "x", "y"
+  --> ./tests/cases/match_arms/err_alternation_binding_mismatch.aipl:11:9
+   |
+11 |         A(x) | B(x, y) => x,
+   |         ^^^^^^^^

@@ -1,0 +1,20 @@
+// `Ctor(..)` says "this case carries a payload I'm not reading". On a case that
+// carries nothing there is nothing to not-read, so it is refused rather than
+// quietly accepted: the two spellings are meant to tell a reader whether the
+// case has a payload, and one that lies about it would defeat the point.
+variant V = A(i64) | B
+
+fn f(v: V) -> i64 {
+    match (v) {
+        A(..) => 1,
+        B(..) => 2,
+    }
+}
+
+fn main() -> i64 { f(B) }
+--- errors ---
+error: constructor "B@V" carries no payload, so ".." ignores nothing — write "B" instead
+  --> ./tests/cases/match_arms/err_ignore_payload_nullary.aipl:10:9
+   |
+10 |         B(..) => 2,
+   |         ^

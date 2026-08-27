@@ -18,7 +18,7 @@ fn describe(a: i64, b: i64) -> str {
     let r = safe_div(9, 3);
     match (r) {
         ok(v) => assert(v == 3),
-        err(e) => assert(false),
+        err(..) => assert(false),
     };
 })
 

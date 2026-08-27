@@ -490,44 +490,44 @@ gazelle! {
         // string-literal arm `"foo" => body` matches a `str` scrutinee; the
         // wildcard `_ => body` arrives as a `nullary_arm` (since `_` lexes as an
         // identifier) and is recognized downstream.
-        match_arm = IDENT LPAREN match_bindings RPAREN FATARROW arm_body => ctor_arm
-                  // `V.A(b0, ..) => body` / `V.A => body` — a variant-qualified
-                  // constructor pattern. After the leading IDENT, one token of
-                  // lookahead (`.` → qualified, `(` → ctor_arm, `=>` → nullary)
-                  // picks the production.
-                  | IDENT DOT IDENT LPAREN match_bindings RPAREN FATARROW arm_body => qualified_ctor_arm
-                  | IDENT DOT IDENT FATARROW arm_body => qualified_nullary_arm
-                  | IDENT FATARROW arm_body => nullary_arm
-                  | NONE FATARROW arm_body => none_arm
-                  | STR FATARROW arm_body => str_arm
-                  // `'c' => body` — a char-literal arm, matching a `char`
-                  // scrutinee by value. Like the `str` form it is open-domain,
-                  // so such a match must end in `_`.
-                  | CHAR FATARROW arm_body => char_arm
+        // One `pattern` covers both the standalone arm and an alternative of an
+        // alternation, so there is a single place that spells what a pattern
+        // looks like — and, with it, a single point of decision: after a
+        // `pattern` the next token is `=>` (a standalone arm) or `|` (an
+        // alternation), which is exactly one token of lookahead.
+        match_arm = pattern FATARROW arm_body => single_arm
                   | LBRACKET args RBRACKET FATARROW arm_body => array_arm
                   // `A | B | C => body` — several patterns sharing one body.
-                  // Only binding-free patterns may be grouped: an alternative
-                  // that bound a payload would have to bind the same names, at
-                  // the same types, in every branch, and nothing downstream is
-                  // set up to check that. So `some(v) | none` is a parse error,
-                  // not a silently-wrong binding.
+                  // Every alternative must bind the *same* names in the same
+                  // order (checked in `MatchArm`'s action): binding-free
+                  // patterns group freely, and two cases whose payloads line up
+                  // may group by naming them alike
+                  // (`Between(o, c) | Nested(o, c)`). What is refused is
+                  // alternatives that disagree — `some(v) | none` — which would
+                  // leave `v` unbound in one branch.
                   //
                   // Expanded here into one `MatchArm` per pattern (the body is
                   // cloned), so no later stage sees an alternation at all —
                   // exhaustiveness, codegen and the lints all keep working on
                   // the shape they already understand.
                   | alt_heads FATARROW arm_body => alt_arm;
-        // Two or more binding-free patterns. A *single* pattern is already
-        // covered by the productions above, so this starts at a pair — which is
-        // also what keeps the grammar LR(1): after an IDENT, one token of
-        // lookahead (`|` here, `=>` / `(` / `.` there) picks the production.
-        alt_heads = alt_head PIPE alt_head => alt_pair
-                  | alt_heads PIPE alt_head => alt_more;
-        alt_head = IDENT => alt_nullary
-                 | IDENT DOT IDENT => alt_qualified
-                 | NONE => alt_none
-                 | STR => alt_str
-                 | CHAR => alt_char;
+        // Two or more patterns. A *single* pattern is already `single_arm`, so
+        // this starts at a pair.
+        alt_heads = pattern PIPE pattern => alt_pair
+                  | alt_heads PIPE pattern => alt_more;
+        // `V.A(b0, ..)` / `V.A` — a variant-qualified constructor pattern. After
+        // the leading IDENT, one token of lookahead (`.` → qualified, `(` →
+        // payload, otherwise nullary) picks the production.
+        pattern = IDENT => pat_nullary
+                | IDENT LPAREN ctor_payload RPAREN => pat_ctor
+                | IDENT DOT IDENT => pat_qualified
+                | IDENT DOT IDENT LPAREN ctor_payload RPAREN => pat_qualified_ctor
+                | NONE => pat_none
+                | STR => pat_str
+                // `'c'` — a char-literal pattern, matching a `char` scrutinee by
+                // value. Like the `str` form it is open-domain, so such a match
+                // must end in `_`.
+                | CHAR => pat_char;
         // An arm's body: a single expression, or a brace-delimited statement
         // block whose trailing expression (if any) is the arm's value — exactly
         // an `if` branch's shape. Factored into its own nonterminal rather than
@@ -539,6 +539,18 @@ gazelle! {
         // begins with `{`.
         arm_body = expr => expr | block => block;
         match_bindings = binding_list => present;
+        // A constructor pattern's payload. `Ctor(b0, b1)` names each slot;
+        // `Ctor(..)` says the case carries a payload this arm doesn't read,
+        // without writing out its arity. The second is deliberately distinct
+        // from a nullary `Ctor`, which asserts the case has *no* payload and
+        // stays an error when it does — so a reader can tell "this case is
+        // empty" from "I'm ignoring what it holds" without knowing the variant.
+        //
+        // Its own nonterminal rather than an extra `match_bindings` production:
+        // that one is shared with `let (a, b) = ..` and `for (let (a, b) : ..)`,
+        // where `..` would mean nothing.
+        ctor_payload = binding_list => named
+                     | DOTDOT => ignored;
         binding_list = IDENT => first | binding_list COMMA IDENT => rest;
 
         args = arg_list => present
@@ -673,6 +685,9 @@ impl aipl::Types for Build {
     type VariantCases = Vec<VariantCase>;
     type VariantCase = VariantCase;
     type MatchBindings = Vec<String>;
+    /// A constructor pattern's payload: the binder names, and whether the arm
+    /// wrote `(..)` to say it isn't reading them.
+    type CtorPayload = (Vec<String>, bool);
     type BindingList = Vec<String>;
     type FieldDecl = FieldDecl;
     type FieldDeclList = Vec<FieldDecl>;
@@ -692,7 +707,9 @@ impl aipl::Types for Build {
     // One written arm can produce several: see the `alt_arm` production.
     type MatchArm = Vec<MatchArm>;
     type AltHeads = Vec<(Pattern, Span)>;
-    type AltHead = (Pattern, Span);
+    /// One pattern, with its own span — the shape both a standalone arm and an
+    /// alternative of an alternation are built from.
+    type Pattern = (Pattern, Span);
     /// A shim's `op = f` binding, and the lists built from it.
     type ShimBinding = (String, String);
     type ShimBindingList = Vec<(String, String)>;
@@ -2455,39 +2472,59 @@ impl gazelle::Action<aipl::ShimBinding<Self>> for Build {
     }
 }
 
-impl gazelle::Action<aipl::AltHead<Self>> for Build {
-    /// One binding-free pattern inside an alternation, with its own span.
-    fn build(&mut self, node: aipl::AltHead<Self>) -> Result<(Pattern, Span), Self::Error> {
+impl gazelle::Action<aipl::Pattern<Self>> for Build {
+    /// One pattern, with its own span. Shared by the standalone arm and by every
+    /// alternative of an alternation, so the two can never drift apart.
+    fn build(&mut self, node: aipl::Pattern<Self>) -> Result<(Pattern, Span), Self::Error> {
         Ok(match node {
-            // `_` lexes as an identifier, so it arrives here like any nullary
-            // name — same as the standalone `nullary_arm` production.
-            aipl::AltHead::AltNullary((name, span)) => (
+            // `_` lexes as an identifier, so the wildcard arrives here like any
+            // nullary name.
+            aipl::Pattern::PatNullary((name, span)) => (
                 if name == "_" {
                     Pattern::Wildcard
                 } else {
                     Pattern::Ctor {
                         name,
                         bindings: Vec::new(),
+                        ignore_payload: false,
                     }
                 },
                 span,
             ),
-            aipl::AltHead::AltQualified((v, span), (a, _)) => (
+            aipl::Pattern::PatCtor((name, span), (bindings, ignore_payload)) => (
+                Pattern::Ctor {
+                    name,
+                    bindings,
+                    ignore_payload,
+                },
+                span,
+            ),
+            aipl::Pattern::PatQualified((v, span), (a, _)) => (
                 Pattern::Ctor {
                     name: format!("{v}.{a}"),
                     bindings: Vec::new(),
+                    ignore_payload: false,
                 },
                 span,
             ),
-            aipl::AltHead::AltNone(span) => (
+            aipl::Pattern::PatQualifiedCtor((v, span), (a, _), (bindings, ignore_payload)) => (
+                Pattern::Ctor {
+                    name: format!("{v}.{a}"),
+                    bindings,
+                    ignore_payload,
+                },
+                span,
+            ),
+            aipl::Pattern::PatNone(span) => (
                 Pattern::Ctor {
                     name: "none".to_string(),
                     bindings: Vec::new(),
+                    ignore_payload: false,
                 },
                 span,
             ),
-            aipl::AltHead::AltStr((lit, span)) => (Pattern::Str(lit), span),
-            aipl::AltHead::AltChar((c, span)) => (Pattern::Char(c), span),
+            aipl::Pattern::PatStr((lit, span)) => (Pattern::Str(lit), span),
+            aipl::Pattern::PatChar((c, span)) => (Pattern::Char(c), span),
         })
     }
 }
@@ -2549,6 +2586,31 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
         // that is exactly the code already written out longhand, so it costs
         // nothing; a large shared body is duplicated, which is the tradeoff.
         if let aipl::MatchArm::AltArm(heads, body) = node {
+            // Every alternative must bind the same names in the same order, so
+            // the shared body means the same thing whichever one matched. Two
+            // cases whose payloads line up may therefore group by naming them
+            // alike (`Between(o, c) | Nested(o, c)`), and binding-free patterns
+            // group as they always have — including `A(..)`, which binds
+            // nothing. Alternatives that disagree are refused here rather than
+            // left to fail as an unbound name somewhere in the body.
+            let (first, first_span) = &heads[0];
+            let want = first.bindings();
+            for (pattern, span) in &heads[1..] {
+                let got = pattern.bindings();
+                if got != want {
+                    return Err(Error::at(
+                        format!(
+                            "alternatives of one arm must bind the same names: {} binds {}, \
+                             but {} binds {}",
+                            pattern_label(first),
+                            binder_list(&want),
+                            pattern_label(pattern),
+                            binder_list(&got),
+                        ),
+                        join_spans(first_span, span),
+                    ));
+                }
+            }
             return Ok(heads
                 .into_iter()
                 .map(|(pattern, span)| MatchArm {
@@ -2559,62 +2621,17 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
                 .collect());
         }
         Ok(vec![match node {
-            aipl::MatchArm::CtorArm((name, span), bindings, body) => MatchArm {
-                pattern: Pattern::Ctor { name, bindings },
-                body,
-                span,
-            },
-            // `V.A(b0, ..) => body` — a variant-qualified constructor pattern. The
-            // dotted name is carried through as `V.A`; the loader resolves it to
-            // the qualified constructor (like `V.A(..)` in expression position).
-            aipl::MatchArm::QualifiedCtorArm((v, span), (a, _), bindings, body) => MatchArm {
-                pattern: Pattern::Ctor {
-                    name: format!("{v}.{a}"),
-                    bindings,
+            // The arm's span is its *pattern's*, so a diagnostic points at what
+            // selected the arm rather than at everything it does. The one
+            // exception is a char pattern, whose span is a single quoted byte —
+            // too narrow to read — so it takes the whole arm.
+            aipl::MatchArm::SingleArm((pattern, span), body) => MatchArm {
+                span: match &pattern {
+                    Pattern::Char(_) => join_spans(&span, &body.span),
+                    _ => span,
                 },
+                pattern,
                 body,
-                span,
-            },
-            aipl::MatchArm::QualifiedNullaryArm((v, span), (a, _), body) => MatchArm {
-                pattern: Pattern::Ctor {
-                    name: format!("{v}.{a}"),
-                    bindings: Vec::new(),
-                },
-                body,
-                span,
-            },
-            // A bare identifier is a nullary constructor — except `_`, which is
-            // the wildcard (it lexes as an identifier, so it arrives here).
-            aipl::MatchArm::NullaryArm((name, span), body) => MatchArm {
-                pattern: if name == "_" {
-                    Pattern::Wildcard
-                } else {
-                    Pattern::Ctor {
-                        name,
-                        bindings: Vec::new(),
-                    }
-                },
-                body,
-                span,
-            },
-            aipl::MatchArm::NoneArm(span, body) => MatchArm {
-                pattern: Pattern::Ctor {
-                    name: "none".to_string(),
-                    bindings: Vec::new(),
-                },
-                body,
-                span,
-            },
-            // `"foo" => body`: a string-literal pattern (for a `str` scrutinee).
-            aipl::MatchArm::CharArm((c, span), body) => MatchArm {
-                pattern: Pattern::Char(c),
-                span: join_spans(&span, &body.span),
-                body,
-            },
-            aipl::MatchArm::StrArm((lit, span), body) => MatchArm {
-                pattern: Pattern::Str(lit),
-                body,
-                span,
             },
             // `[e0, e1, ...] => body`: an array-literal pattern (for an array
             // scrutinee). The elements are validated as literals by the checker.
@@ -2632,10 +2649,45 @@ impl gazelle::Action<aipl::MatchArm<Self>> for Build {
     }
 }
 
+/// How a pattern is named in the "alternatives must bind the same names"
+/// diagnostic — the constructor for a constructor pattern, and a description for
+/// the literal forms, which bind nothing and so only ever appear on the side
+/// that binds nothing.
+fn pattern_label(p: &Pattern) -> String {
+    match p {
+        Pattern::Ctor { name, .. } => format!("\"{name}\""),
+        Pattern::Str(_) => "a string pattern".to_string(),
+        Pattern::Char(_) => "a char pattern".to_string(),
+        Pattern::Array(_) => "an array pattern".to_string(),
+        Pattern::Wildcard => "\"_\"".to_string(),
+    }
+}
+
+fn binder_list(names: &[String]) -> String {
+    if names.is_empty() {
+        return "nothing".to_string();
+    }
+    names
+        .iter()
+        .map(|n| format!("\"{n}\""))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 impl gazelle::Action<aipl::MatchBindings<Self>> for Build {
     fn build(&mut self, node: aipl::MatchBindings<Self>) -> Result<Vec<String>, Self::Error> {
         let aipl::MatchBindings::Present(list) = node;
         Ok(list)
+    }
+}
+
+impl gazelle::Action<aipl::CtorPayload<Self>> for Build {
+    fn build(&mut self, node: aipl::CtorPayload<Self>) -> Result<(Vec<String>, bool), Self::Error> {
+        Ok(match node {
+            aipl::CtorPayload::Named(list) => (list, false),
+            // `Ctor(..)` — the payload is there and this arm isn't reading it.
+            aipl::CtorPayload::Ignored => (Vec::new(), true),
+        })
     }
 }
 
@@ -3841,6 +3893,8 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("EQ", "="),
     ("QUESTION", "?"),
     ("FATARROW", "=>"),
+    // Surfaces after a match pattern, where an alternation may follow.
+    ("PIPE", "|"),
     ("BANG", "!"),
     ("PLUSPLUS", "++"),
     ("MINUS", "-"),
@@ -3872,6 +3926,11 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("field_init", "field"),
     ("construct_fields", "field"),
     ("arg_list", "expression"),
+    // A constructor pattern's payload: named binders, or `..` for "there is one
+    // and this arm isn't reading it".
+    ("ctor_payload", "a payload binding or `..`"),
+    ("binding_list", "a payload binding"),
+    ("match_bindings", "a name"),
     ("effect", "effect"),
     ("effects", "effect"),
     ("effect_list", "effect"),

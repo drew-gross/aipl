@@ -19,8 +19,7 @@ variant Rule<K: variant> = Term(K) | Then(Rule<K>[]) | Repeat(Rule<K>) | Idx(u64
 // paths are walked on a generic instance.
 fn size<K: variant>(self: Rule<K>) -> u64 {
     match (self) {
-        Term(_) => 1,
-        Idx(_) => 1,
+        Term(..) | Idx(..) => 1,
         Repeat(inner) => 1 + inner.size(),
         Then(rs) => {
             mut n: u64 = 1;

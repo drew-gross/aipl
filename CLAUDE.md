@@ -285,6 +285,35 @@ When rewriting imports across the corpus, anchor the match to line start
 builtins;"` inside *string literals*, and rewriting those corrupts fixtures —
 both the input and its expected output.
 
+## Match patterns: name only what you read, and never repeat an arm body
+Two rules, and between them no arm should ever have to spell out a payload it
+ignores or duplicate another arm's body:
+
+- **`Ctor(..)` matches a case and ignores what it carries.** No binder names, no
+  arity to keep in step with the variant. It is deliberately *not* the same as
+  the nullary `Ctor`, which asserts the case has no payload and stays an error
+  when it does — the two spellings are what tell a reader whether a case carries
+  anything, without going to look. `..` on a payload-free case is refused for the
+  same reason. Prefer it to `Ctor(_, _)`; reach for `_` per slot only when some
+  slots *are* read (`Ctor(x, _)`).
+- **Alternatives may bind.** `A | B => body` requires only that every alternative
+  binds the same names in the same order, so two cases whose payloads line up
+  share one arm: `Between(o, c) | Nested(o, c) => ..`. Mixing is fine —
+  `Point | Circle(..)` binds nothing either way. What is refused is alternatives
+  that disagree (`some(v) | none`), which would leave `v` unbound in one branch.
+
+So a `match` with two identical arm bodies is a `match` with one arm missing a
+`|`. The exception is width: a 16-way alternation runs past 100 columns and the
+formatter then breaks it one-per-line — back to the arms it replaced — so
+`is_operator_name.aipl` and `walker.aipl`'s `fmt_kind` group *by meaning* across
+a few lines on purpose.
+
+Grouping is source-level only: each alternative becomes its own `MatchArm` in the
+parser, and `Ctor(..)` expands to one `_` binder per slot in monomorphization
+(the first pass that knows the case's arity). Every pass downstream —
+exhaustiveness, codegen, the lints — only ever sees one pattern per arm with its
+binders named.
+
 ## `match` is either a statement or an expression, never both
 An arm's body may be a single expression or a brace-delimited statement block
 (statements, then an optional trailing expression that is the arm's value). Which

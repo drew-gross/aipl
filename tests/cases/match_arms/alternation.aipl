@@ -2,6 +2,10 @@ import { print, to_str } from builtins;
 
 // Several patterns may share one body: `A | B | C => body`.
 //
+// Alternatives may bind, as long as every one of them binds the same names in
+// the same order — see `ignore_payload.aipl` for that and for the `Ctor(..)`
+// form, and `err_alternation_binding_mismatch.aipl` for what is refused.
+//
 // Grouping is source-level only — each alternative becomes its own arm before
 // anything else looks at the `match`, so exhaustiveness, codegen and the lints
 // all see exactly the shape they would have seen written longhand. Writing the
@@ -13,8 +17,7 @@ variant Class = Keyword | Other
 fn classify(t: Tok) -> Class {
     match (t) {
         Fn | If | Else => Keyword,
-        Name(_) => Other,
-        Num(_) => Other,
+        Name(..) | Num(..) => Other,
     }
 }
 

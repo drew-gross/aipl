@@ -4,7 +4,7 @@ import { concat as +++, execute_program, print } from builtins;
 // that's `err` rather than `ok(ExecResult)`.
 fn main() !prints !execute_program {
     match (execute_program("no_such_binary_xyz_123", args=["a", "b"])) {
-        ok(r) => print("ok"),
+        ok(..) => print("ok"),
         err(e) => print("err:[" +++ e +++ "]"),
     };
 }

@@ -20,9 +20,9 @@ fn shape(n: i64) -> Shape!str {
         ok(s) => match (s) {
             Empty => assert(false),
             Square(side) => assert(side == 4),
-            Named(name) => assert(false),
+            Named(..) => assert(false),
         },
-        err(e) => assert(false),
+        err(..) => assert(false),
     };
 })
 

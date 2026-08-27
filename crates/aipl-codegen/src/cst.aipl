@@ -37,9 +37,8 @@ variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
 // this is the filter that decides what counts as a child.
 pub fn is_tree(self: Cst) -> bool {
     match (self) {
-        CTree(_, _) => true,
-        CLeaf(_) => false,
-        CTrivia(_) => false,
+        CTree(..) => true,
+        CLeaf(..) | CTrivia(..) => false,
     }
 }
 
@@ -49,8 +48,7 @@ pub fn is_tree(self: Cst) -> bool {
 // "slice each one and join".
 pub fn leaves(self: Cst) -> Span[] {
     match (self) {
-        CLeaf(sp) => [sp],
-        CTrivia(sp) => [sp],
+        CLeaf(sp) | CTrivia(sp) => [sp],
         CTree(_, kids) => kids.map(leaves).join(),
     }
 }
@@ -69,7 +67,7 @@ pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join(s
 pub fn token_leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) => [sp],
-        CTrivia(_) => [],
+        CTrivia(..) => [],
         CTree(_, kids) => kids.map(token_leaves).join(),
     }
 }
@@ -102,8 +100,7 @@ pub fn span(self: Cst) -> Span {
 // one entry per `Named` reference the rule matched, in the order it matched them.
 pub fn nodes(self: Cst) -> Cst[] {
     match (self) {
-        CLeaf(_) => [],
-        CTrivia(_) => [],
+        CLeaf(..) | CTrivia(..) => [],
         CTree(_, kids) => kids.filter(is_tree),
     }
 }

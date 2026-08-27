@@ -1697,8 +1697,12 @@ impl Cx<'_> {
         }
         // The non-constructor patterns only apply to a `str` / array / `char`
         // scrutinee.
-        let (name, bindings) = match &arm.pattern {
-            Pattern::Ctor { name, bindings } => (name, bindings),
+        let (name, bindings, ignore_payload) = match &arm.pattern {
+            Pattern::Ctor {
+                name,
+                bindings,
+                ignore_payload,
+            } => (name, bindings, *ignore_payload),
             Pattern::Str(_) => {
                 return Err(Error::at(
                     format!("string-literal pattern matches a str, not {}", tyname(st)),
@@ -1781,10 +1785,35 @@ impl Cx<'_> {
                 ))
             }
         };
+        // `Ctor(..)` binds nothing on purpose, so there is no arity to agree
+        // with — but it still has to be a case that *has* a payload, or it is
+        // saying something untrue about the variant and the nullary `Ctor` is
+        // the honest spelling.
+        if ignore_payload {
+            if payload.is_empty() {
+                return Err(Error::at(
+                    format!(
+                        "constructor {name:?} carries no payload, so \"..\" ignores nothing — \
+                         write {:?} instead",
+                        name.split('@').next().unwrap_or(name),
+                    ),
+                    arm.span.clone(),
+                ));
+            }
+            return Ok(payload);
+        }
         if bindings.len() != payload.len() {
+            let hint = if bindings.is_empty() && !payload.is_empty() {
+                format!(
+                    " (write \"{}(..)\" to match it without naming the payload)",
+                    name.split('@').next().unwrap_or(name)
+                )
+            } else {
+                String::new()
+            };
             return Err(Error::at(
                 format!(
-                    "constructor {name:?} binds {} value(s), but {} given",
+                    "constructor {name:?} binds {} value(s), but {} given{hint}",
                     payload.len(),
                     bindings.len()
                 ),

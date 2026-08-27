@@ -65,27 +65,27 @@ fn maybe_str(present: bool) -> str? { if (present) { some("hi") } else { none } 
 fn unwrap(r: i64!str, default: i64) -> i64 {
     match (r) {
         ok(v) => v,
-        err(e) => default,
+        err(..) => default,
     }
 }
 
 fn unwrap_str(r: str!str, default: str) -> str {
     match (r) {
         ok(v) => v,
-        err(e) => default,
+        err(..) => default,
     }
 }
 
 fn message(r: i64!str) -> str {
     match (r) {
-        ok(v) => "",
+        ok(..) => "",
         err(e) => e,
     }
 }
 
 fn code(r: char!i64) -> i64 {
     match (r) {
-        ok(v) => 0,
+        ok(..) => 0,
         err(e) => e,
     }
 }

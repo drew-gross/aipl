@@ -1,0 +1,19 @@
+// The other direction: a bare `Ctor` claims the case has no payload, and stays
+// an error when it does. The message names the `(..)` form, since "I don't care
+// what it holds" is the usual reason someone reaches for the bare name here.
+variant V = A(i64) | B
+
+fn f(v: V) -> i64 {
+    match (v) {
+        A => 1,
+        B => 2,
+    }
+}
+
+fn main() -> i64 { f(B) }
+--- errors ---
+error: constructor "A@V" binds 1 value(s), but 0 given (write "A(..)" to match it without naming the payload)
+ --> ./tests/cases/match_arms/err_nullary_for_payload.aipl:8:9
+  |
+8 |         A => 1,
+  |         ^

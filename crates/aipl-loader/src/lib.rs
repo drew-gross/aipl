@@ -725,7 +725,12 @@ pub fn unmangled_name(name: &str) -> &str {
 /// constructors (`some`/`ok`/`err`/`none`) and non-constructor patterns are left
 /// as-is; an out-of-scope constructor is left bare for the checker to reject.
 fn resolve_pattern(pat: &Pattern, view: &HashMap<String, String>, sc: &Scope) -> Pattern {
-    let Pattern::Ctor { name, bindings } = pat else {
+    let Pattern::Ctor {
+        name,
+        bindings,
+        ignore_payload,
+    } = pat
+    else {
         return pat.clone();
     };
     if matches!(name.as_str(), "some" | "ok" | "err" | "none") {
@@ -748,6 +753,7 @@ fn resolve_pattern(pat: &Pattern, view: &HashMap<String, String>, sc: &Scope) ->
     Pattern::Ctor {
         name: resolved.unwrap_or_else(|| name.clone()),
         bindings: bindings.clone(),
+        ignore_payload: *ignore_payload,
     }
 }
 

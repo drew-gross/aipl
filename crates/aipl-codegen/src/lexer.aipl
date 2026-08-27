@@ -446,15 +446,13 @@ fn int_len(self: str) -> u64 {
 // attaches each segment's value itself.
 fn token_value(m: Matcher, text: str) -> TokenValue {
     match (m) {
-        CharRun(first, cont) => NoValue,
-        Exact(spelling) => NoValue,
-        Keyword(spelling, boundary) => NoValue,
-        Delimited(delims, escapes) => StrVal(text[1..text.len() - 1]),
-        Between(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
-        Template(delim, escapes, finalize) => NoValue,
-        ToEol(marker) => NoValue,
-        Float | Int => NoValue,
+        Delimited(..) => StrVal(text[1..text.len() - 1]),
+        // The two bracketing matchers strip the same way — their delimiters are
+        // the only difference, and the arm reads both out of the case it matched.
+        Between(open, close) | Nested(open, close) => {
+            StrVal(text[open.len()..text.len() - close.len()])
+        },
+        CharRun(..) | Exact(..) | Keyword(..) | Template(..) | ToEol(..) | Float | Int => NoValue,
     }
 }
 
@@ -475,12 +473,11 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
     match (e) {
         Bare(k) => ok(k),
         Of(f) => ok(f(content)),
-        OfSeg(f) => err(seg_only(span)),
         // A fallible emit yields `K!str` — a kind or an error *message*; pair the
         // message with the token's `span` to make the `LexError` the lexer
         // surfaces.
         Try(f) => f(content).map_err(|message| LexError { message, span }),
-        TrySeg(f) => err(seg_only(span)),
+        OfSeg(..) | TrySeg(..) => err(seg_only(span)),
     }
 }
 
@@ -583,9 +580,7 @@ fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
     match (e) {
         OfSeg(f) => ok(f(text, seg)),
         TrySeg(f) => f(text, seg).map_err(|message| LexError { message, span }),
-        Bare(k) => err(seg_needs_ofseg(span)),
-        Of(f) => err(seg_needs_ofseg(span)),
-        Try(f) => err(seg_needs_ofseg(span)),
+        Bare(..) | Of(..) | Try(..) => err(seg_needs_ofseg(span)),
     }
 }
 
@@ -909,7 +904,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // A byte no rule matches is a lex error carrying that byte's span.
     assert(lex("a+1", base) == err(lex_err("unexpected character", 1..2)));
     match (lex("a+1", base)) {
-        ok(ts) => assert(false),
+        ok(..) => assert(false),
         err(e) => assert("a+1"[e.span] == "+"),
     };
 
@@ -1226,7 +1221,7 @@ allocations: 1657
 deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
-instructions executed: 265480
+instructions executed: 265822
 binary size: 1791416
   code: 1125136
   data: 8124

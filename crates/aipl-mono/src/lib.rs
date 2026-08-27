@@ -594,6 +594,29 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
     Expr::rebuilt(kind, e)
 }
 
+/// `Ctor(..)` with its payload spelled out: one `_` binder per slot, and the
+/// flag cleared. Any other pattern is returned unchanged.
+///
+/// `..` says "this case carries a payload I'm not reading", which is a statement
+/// about the *case*, not about the arm — so it cannot be resolved until the
+/// scrutinee's type is known. Monomorphization is the first pass that knows it,
+/// and expanding here means the flag never escapes: exhaustiveness, codegen and
+/// the lints all keep working on the named-binder shape they already understand.
+fn expand_ignored_payload(pattern: &Pattern, arity: usize) -> Pattern {
+    match pattern {
+        Pattern::Ctor {
+            name,
+            ignore_payload: true,
+            ..
+        } => Pattern::Ctor {
+            name: name.clone(),
+            bindings: vec!["_".to_string(); arity],
+            ignore_payload: false,
+        },
+        other => other.clone(),
+    }
+}
+
 /// Substitute template type variables in `t` with concrete types from `map`,
 /// recursing through every compound type — including nested generic
 /// applications, so a generic field like `inner: Box<T>` becomes `Box<i64>`
@@ -1572,6 +1595,7 @@ fn specialize_variadic(
                             pattern: Pattern::Ctor {
                                 name: "some".into(),
                                 bindings: vec![xn],
+                                ignore_payload: false,
                             },
                             body: some_body,
                             span: span.clone(),
@@ -1580,6 +1604,7 @@ fn specialize_variadic(
                             pattern: Pattern::Ctor {
                                 name: "none".into(),
                                 bindings: Vec::new(),
+                                ignore_payload: false,
                             },
                             body: none_body,
                             span: span.clone(),
@@ -3259,6 +3284,7 @@ impl Mono<'_> {
                             pattern: Pattern::Ctor {
                                 name: "some".to_string(),
                                 bindings: vec![other_el.to_string()],
+                                ignore_payload: false,
                             },
                             body: some_body,
                             span: span.clone(),
@@ -3267,6 +3293,7 @@ impl Mono<'_> {
                             pattern: Pattern::Ctor {
                                 name: "none".to_string(),
                                 bindings: Vec::new(),
+                                ignore_payload: false,
                             },
                             body: none_body,
                             span: span.clone(),
@@ -3397,6 +3424,7 @@ impl Mono<'_> {
                             pattern: Pattern::Ctor {
                                 name: "some".to_string(),
                                 bindings: vec!["$v".to_string()],
+                                ignore_payload: false,
                             },
                             body: push,
                             span: span.clone(),
@@ -3405,6 +3433,7 @@ impl Mono<'_> {
                             pattern: Pattern::Ctor {
                                 name: "none".to_string(),
                                 bindings: Vec::new(),
+                                ignore_payload: false,
                             },
                             body: Expr::new(ExprKind::Unit, span.clone()),
                             span: span.clone(),
@@ -5025,7 +5054,7 @@ impl Mono<'_> {
                     // identifier element to the element type (`char` for a `str`).
                     // String-literal / wildcard arms bind nothing.
                     let bind_tys = match &arm.pattern {
-                        Pattern::Ctor { name, bindings } => {
+                        Pattern::Ctor { name, bindings, .. } => {
                             self.match_payload_tys(&st, name, bindings.len())
                         }
                         Pattern::Array(_) => {
@@ -5037,13 +5066,19 @@ impl Mono<'_> {
                         }
                         Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
                     };
+                    // `Ctor(..)` is expanded here and nowhere else: this is the
+                    // first point that knows how many slots the case has. It
+                    // becomes one `_` binder per slot — the spelling an arm that
+                    // ignores part of its payload already uses — so every pass
+                    // downstream, codegen included, only ever sees named binders.
+                    let pattern = expand_ignored_payload(&arm.pattern, bind_tys.len());
                     let mut env2 = env.clone();
-                    for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
+                    for (name, ty) in pattern.bindings().iter().zip(bind_tys) {
                         env2.insert(name.clone(), ty);
                     }
                     let (rb, t) = self.infer(&arm.body, &env2)?;
                     rarms.push(MatchArm {
-                        pattern: arm.pattern.clone(),
+                        pattern,
                         body: rb,
                         span: arm.span.clone(),
                     });

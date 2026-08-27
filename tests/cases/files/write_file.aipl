@@ -11,7 +11,7 @@ fn write_to(path: str, contents: str) !write_files -> !str {
     // ok() on a writable path.
     match (write_to("rt.txt", "ok")) {
         ok => assert(true),
-        err(e) => assert(false),
+        err(..) => assert(false),
     };
     // err(message) when the directory doesn't exist.
     match (write_to("no_such_dir/x.txt", "data")) {

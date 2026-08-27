@@ -13,7 +13,7 @@ import { equal as == } from builtins;
 // `mono::none_literal_pins_any_optional_to_pseudo_type`.
 fn is_present(x: any?) -> bool {
     match (x) {
-        some(v) => true,
+        some(..) => true,
         none => false,
     }
 }.test({
