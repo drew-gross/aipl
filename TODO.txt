@@ -242,7 +242,6 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-      make a filter-map fusion that pre-reserves and re-uses the input array if owned and sizing is right
       count fusions should apply to count_if also
       vec.filter().count() should fuse to not materialize the filtered array
       add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
@@ -250,6 +249,8 @@ optimizations:
       a.extend(v.map(...)) fuses to map_extend
       also fuse x.extend(y.filter().map())
       pretty much all chains of array operations can be fused actually... maybe we need a more generic fuser?
+      make an edsl that can be used for fusion and lints
+      maybe fusions are less necessary if generators and a convert-to-generators pass is made?
 
   common subexpression elimination
   sora

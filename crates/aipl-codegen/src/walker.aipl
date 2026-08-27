@@ -2714,10 +2714,10 @@ deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
 instructions executed: 2850765
-binary size: 3230168
-  code: 1846456
+binary size: 3229592
+  code: 1846072
   data: 27124
-  metadata: 1356588
+  metadata: 1356396
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2776,22 +2776,22 @@ functions:
   __builtin_count_is_at_least$char$s0:
     calls: 41
     bytes: 312
-  __builtin_count_while$char$lam75:
+  __builtin_count_while$char$lam74:
     calls: 69
     bytes: 296
-  __builtin_count_while$char$s0$lam53:
+  __builtin_count_while$char$s0$lam52:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam65:
+  __builtin_count_while$char$s0$lam64:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam80:
+  __builtin_count_while$char$s0$lam79:
     calls: 1
     bytes: 236
-  __builtin_count_while$char$s0$lam82:
+  __builtin_count_while$char$s0$lam81:
     calls: 50
     bytes: 244
-  __builtin_count_while$char$s0$lam87:
+  __builtin_count_while$char$s0$lam86:
     calls: 1
     bytes: 232
   __builtin_drop_last$str:
@@ -2848,7 +2848,7 @@ functions:
   __lambda_44:
     calls: 0
     bytes: 64
-  __lambda_68:
+  __lambda_67:
     calls: 1
     bytes: 140
   __m10__unescape:
@@ -2901,7 +2901,7 @@ functions:
     bytes: 32
   __m3__dedent$tail:
     calls: 0
-    bytes: 1200
+    bytes: 1136
   __m8__char_lit_emit:
     calls: 0
     bytes: 1412
@@ -2950,9 +2950,6 @@ functions:
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 488
-  __map55$own0:
-    calls: 0
-    bytes: 320
   __rec_drop___m1__Doc:
     calls: 2551
     bytes: 184

@@ -64,21 +64,18 @@ allocations: 35
 deallocations: 35
 reallocations: 0
 bytes allocated: 1641
-instructions executed: 7681
-binary size: 7904
-  code: 3144
+instructions executed: 6490
+binary size: 7328
+  code: 2768
   data: 989
-  metadata: 3771
+  metadata: 3571
 functions:
-  __builtin_count_while$char$s0$lam10:
-    calls: 17
-    bytes: 232
-  __builtin_count_while$char$s0$lam3:
+  __builtin_count_while$char$s0$lam2:
     calls: 0
     bytes: 232
-  __map5$own0:
-    calls: 10
-    bytes: 320
+  __builtin_count_while$char$s0$lam9:
+    calls: 17
+    bytes: 232
   __test$dedent:
     calls: 1
     bytes: 1116
@@ -86,13 +83,13 @@ functions:
     calls: 20
     bytes: (external)
   aipl_arr_inc:
-    calls: 30
+    calls: 10
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 38
+    calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 60
+    calls: 40
     bytes: (external)
   aipl_array_new:
     calls: 10
@@ -107,10 +104,10 @@ functions:
     calls: 10
     bytes: (external)
   aipl_dec:
-    calls: 245
+    calls: 211
     bytes: (external)
   aipl_inc:
-    calls: 163
+    calls: 129
     bytes: (external)
   aipl_str_data:
     calls: 17
@@ -150,7 +147,7 @@ functions:
     bytes: (external)
   dedent:
     calls: 10
-    bytes: 1168
+    bytes: 1112
   main:
     calls: 1
     bytes: 76

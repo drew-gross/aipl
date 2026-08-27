@@ -325,11 +325,11 @@ allocations: 285
 deallocations: 285
 reallocations: 0
 bytes allocated: 16148
-instructions executed: 21482
-binary size: 31592
-  code: 17648
+instructions executed: 21400
+binary size: 31024
+  code: 17272
   data: 842
-  metadata: 13102
+  metadata: 12910
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -343,10 +343,10 @@ functions:
   __builtin_any$Doc$lam7$tail:
     calls: 5
     bytes: 324
-  __builtin_count_while$char$s0$lam15:
+  __builtin_count_while$char$s0$lam14:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam25:
+  __builtin_count_while$char$s0$lam24:
     calls: 1
     bytes: 232
   __builtin_drop_last$str:
@@ -354,10 +354,7 @@ functions:
     bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 3428
-  __map17$own0:
-    calls: 1
-    bytes: 320
+    bytes: 3372
   __rec_drop_Doc:
     calls: 38
     bytes: 184
@@ -371,16 +368,16 @@ functions:
     calls: 84
     bytes: (external)
   aipl_arr_inc:
-    calls: 106
+    calls: 104
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 83
+    calls: 82
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 208
+    calls: 206
     bytes: (external)
   aipl_array_new:
     calls: 54
@@ -401,10 +398,10 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 630
+    calls: 628
     bytes: (external)
   aipl_inc:
-    calls: 352
+    calls: 350
     bytes: (external)
   aipl_rec_alloc:
     calls: 147

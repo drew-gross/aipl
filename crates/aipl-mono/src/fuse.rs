@@ -8,6 +8,12 @@
 //! appears — so the pair collapses into `count_is_less_than`, which stops there.
 //! The same holds for every comparison, in both operand orders.
 //!
+//! [`CHAIN_FUSIONS`] is a call whose *receiver* is another call.
+//! `xs.filter(p).map(f)` walks the elements twice and builds an array between
+//! the two passes, so the pair collapses into `filter_map`, which selects and
+//! maps in one — and, when the source is uniquely owned and the element sizing
+//! allows, into the source's own buffer.
+//!
 //! [`SLICE_FUSIONS`] is a call on a sliced receiver. `xs[i..].starts_with(p)`
 //! builds the whole tail of `xs` — for an array, a fresh block with every
 //! element copied — only to look at its first few elements, so it collapses into
@@ -18,7 +24,9 @@
 //! Add a row to the table for its family and implement the builtin it names. A
 //! [`FUSIONS`] row says "*this* call, compared with *this* operator, is *that*
 //! call"; a [`SLICE_FUSIONS`] row says "*this* call, on a receiver sliced from
-//! `i`, is *that* call, with `i` as its last argument". Either way the driver
+//! `i`, is *that* call, with `i` as its last argument"; a [`CHAIN_FUSIONS`] row
+//! says "*this* call, on the result of *that* one, is *this third* call, taking
+//! both argument lists". Either way the driver
 //! handles the rest — finding the shape (in both operand orders, for a
 //! comparison) and refusing when it would change observable behaviour. Nothing
 //! else needs to know the family exists.
@@ -100,6 +108,26 @@ const SLICE_FUSIONS: &[SliceFusion] = &[SliceFusion {
     into: "__builtin_starts_with_at",
 }];
 
+/// One fusable chain shape: a call to `outer` whose receiver is a call to
+/// `inner` becomes a single call to `into`, taking the inner call's arguments
+/// followed by the outer's remaining ones.
+///
+/// Both surface forms reach this the same way: `xs.filter(p).map(f)` and
+/// `map(filter(xs, p), f)` fold to the same argument lists, so a row does not
+/// have to say which was written.
+struct ChainFusion {
+    inner: &'static str,
+    outer: &'static str,
+    into: &'static str,
+}
+
+/// Every chain shape the pass knows. See the module docs for how to add one.
+const CHAIN_FUSIONS: &[ChainFusion] = &[ChainFusion {
+    inner: "__builtin_filter",
+    outer: "__builtin_map",
+    into: "__builtin_filter_map",
+}];
+
 /// `a OP b` and `b flip(OP) a` are the same claim, which is what lets one
 /// [`FUSIONS`] row cover both operand orders. `==`/`!=` are symmetric.
 fn flip(op: char) -> char {
@@ -151,7 +179,7 @@ fn try_fuse(e: &Expr, effectful: &HashSet<String>) -> Option<Expr> {
         // The call on the left reads with `op` as written; on the right, the same
         // claim with the operator mirrored.
         ExprKind::Binop(l, op, r) => build(l, *op, r, e).or_else(|| build(r, flip(*op), l, e)),
-        ExprKind::Call(..) => build_slice(e),
+        ExprKind::Call(..) => build_slice(e).or_else(|| build_chain(e)),
         _ => None,
     }?;
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:
@@ -177,6 +205,32 @@ fn build_slice(whole: &Expr) -> Option<Expr> {
     fused.push((**start).clone());
     // Spanned as the whole call: that is the source the user wrote, and what any
     // later diagnostic should point at.
+    Some(Expr::rebuilt(
+        ExprKind::Call(f.into.to_string(), fused, *method_style),
+        whole,
+    ))
+}
+
+/// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's
+/// `into`, taking the inner argument list followed by the outer's rest.
+///
+/// Bottom-up traversal means the receiver has already been fused if it could
+/// be, so a row composes with the others rather than racing them.
+fn build_chain(whole: &Expr) -> Option<Expr> {
+    let ExprKind::Call(name, args, method_style) = &whole.kind else {
+        return None;
+    };
+    let (recv, rest) = args.split_first()?;
+    let ExprKind::Call(inner_name, inner_args, _) = &recv.kind else {
+        return None;
+    };
+    let f = CHAIN_FUSIONS
+        .iter()
+        .find(|f| f.outer == name && f.inner == inner_name)?;
+    let mut fused = inner_args.clone();
+    fused.extend(rest.iter().cloned());
+    // Spanned as the whole chain: that is the source the user wrote, and what
+    // any later diagnostic should point at.
     Some(Expr::rebuilt(
         ExprKind::Call(f.into.to_string(), fused, *method_style),
         whole,

@@ -1,0 +1,211 @@
+import {
+    concat as +++,
+    equal as ==,
+    filter_map,
+    len,
+    less_than_or_equal as <=,
+    to_str,
+    trim,
+    wrapping_mul as *,
+} from builtins;
+
+// `xs.filter_map(keep, f)` selects and maps in **one** pass — what
+// `xs.filter(keep).map(f)` computes in two, with an array in between. The
+// compiler writes it for you wherever it sees that chain (see
+// `optimizations/filter_map_fusion`); it is also worth writing by hand where
+// the two halves belong together.
+//
+// Two separate lambdas, each lifted and specialized on its own and each
+// carrying its own captures — `two_lambda_args` is what pins that machinery
+// down.
+//
+// There are two bodies behind the one name, and which one runs is invisible
+// except in the numbers. When the source array is uniquely owned and the
+// element sizing allows, the result is compacted into the source's own buffer;
+// otherwise a fresh output is reserved to the source length up front, so the
+// loop never reallocates. Every pair of functions below is written to agree
+// across that split.
+
+// A borrowed source: `xs` is a parameter, so something else owns it and the
+// result goes into a fresh buffer.
+fn scaled_above(xs: i64[], lo: i64) -> i64[] { xs.filter_map(|x| lo <= x, |x| x * 2) }.test({
+    assert(scaled_above([1, 5, 3], 2) == [10, 6]);
+    assert(scaled_above([1, 5, 3], 0) == [2, 10, 6]); // everything kept
+    assert(scaled_above([1, 5, 3], 9) == []); // nothing kept
+    assert(scaled_above([], 2) == []);
+    // The free-call form folds to the same argument list, so it is the same call.
+    assert(filter_map([1, 5, 3], |x| 2 <= x, |x| x * 2) == [10, 6]);
+})
+
+fn fresh(n: i64) -> i64[] { [n, n * 2, n * 3, n * 4] }
+
+// A uniquely-owned source — a call result nothing else holds — so the kept
+// elements are compacted into the buffer `fresh` just returned.
+fn from_call(n: i64, lo: i64) -> i64[] { fresh(n).filter_map(|x| lo <= x, |x| x * 10) }.test({
+    assert(from_call(1, 3) == [30, 40]);
+    assert(from_call(1, 0) == [10, 20, 30, 40]);
+    assert(from_call(1, 99) == []);
+    // The in-place result agrees with the borrowed one element for element.
+    assert(from_call(1, 3) == scaled_above(fresh(1), 3).filter_map(|x| 0 <= x, |x| x * 5));
+})
+
+// Heap elements on both sides, filtered in place: a kept element is released by
+// the slot write that replaces it, a rejected one by the loop's other arm. The
+// allocation count below is what proves neither is released twice nor leaked.
+fn labels(lo: u64) -> str[] {
+    [trim(" a "), trim(" bb "), trim(" ccc ")].filter_map(|s| lo <= s.len(), |s| s +++ "!")
+}.test({
+    assert(labels(2) == ["bb!", "ccc!"]);
+    assert(labels(0) == ["a!", "bb!", "ccc!"]);
+    assert(labels(9) == []);
+})
+
+// `U` differs from `T`, so the reused buffer's stored element drop-fn is wrong
+// the moment the first slot is written, and has to be patched to `U`'s.
+fn widened(lo: i64) -> str[] { [1, 5, 3].filter_map(|x| lo <= x, to_str) }.test({
+    assert(widened(2) == ["5", "3"]);
+    assert(widened(9) == []);
+})
+
+// Each lambda captures its own variable, and neither can see the other's.
+fn between(xs: i64[], lo: i64, k: i64) -> i64[] { xs.filter_map(|x| lo <= x, |x| x * k) }.test({
+    assert(between([1, 5, 3], 2, 100) == [500, 300]);
+    // A named function is interchangeable with a lambda in either position.
+    assert(between([1, 5, 3], 0, 1) == [1, 5, 3]);
+})
+
+// A composite element type has no 8-byte slot to reuse, so this one takes the
+// copying path whatever it is called with — and computes the same answer.
+struct Pt { x: i64, y: i64 }
+
+fn xs_of(ps: Pt[], lo: i64) -> i64[] { ps.filter_map(|p| lo <= p.x, |p| p.x * p.y) }.test({
+    assert(xs_of([Pt { x: 1, y: 2 }, Pt { x: 5, y: 3 }], 2) == [15]);
+})
+--- performance ---
+allocations: 51
+deallocations: 51
+reallocations: 0
+bytes allocated: 2632
+instructions executed: 5771
+binary size: 14640
+  code: 7648
+  data: 1171
+  metadata: 5821
+functions:
+  __eq_i64$arr:
+    calls: 12
+    bytes: 296
+  __eq_str$arr:
+    calls: 5
+    bytes: 352
+  __filter_map2$own0:
+    calls: 1
+    bytes: 292
+  __filter_map24$own0:
+    calls: 0
+    bytes: 36
+  __filter_map24$own0$tail:
+    calls: 3
+    bytes: 468
+  __filter_map5$own0:
+    calls: 1
+    bytes: 292
+  __filter_map7$own0:
+    calls: 1
+    bytes: 300
+  __filter_map9$own0:
+    calls: 1
+    bytes: 300
+  __test$between:
+    calls: 1
+    bytes: 496
+  __test$from_call:
+    calls: 1
+    bytes: 668
+  __test$labels:
+    calls: 1
+    bytes: 464
+  __test$scaled_above:
+    calls: 1
+    bytes: 1032
+  __test$widened:
+    calls: 1
+    bytes: 400
+  __test$xs_of:
+    calls: 1
+    bytes: 516
+  __to_str_i64:
+    calls: 2
+    bytes: 180
+  aipl_arr_drop_str:
+    calls: 7
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 18
+    bytes: (external)
+  aipl_array_dec:
+    calls: 64
+    bytes: (external)
+  aipl_array_new:
+    calls: 34
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 21
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 12
+    bytes: (external)
+  aipl_assert:
+    calls: 17
+    bytes: (external)
+  aipl_concat_lazy:
+    calls: 5
+    bytes: (external)
+  aipl_dec:
+    calls: 70
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_inc:
+    calls: 33
+    bytes: (external)
+  aipl_str_eq:
+    calls: 7
+    bytes: (external)
+  aipl_str_len:
+    calls: 29
+    bytes: (external)
+  aipl_test_begin:
+    calls: 6
+    bytes: (external)
+  aipl_test_end:
+    calls: 6
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_trim:
+    calls: 9
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  between:
+    calls: 2
+    bytes: 304
+  from_call:
+    calls: 4
+    bytes: 436
+  labels:
+    calls: 0
+    bytes: 32
+  labels$tail:
+    calls: 3
+    bytes: 196
+  main:
+    calls: 1
+    bytes: 284
+  scaled_above:
+    calls: 5
+    bytes: 304

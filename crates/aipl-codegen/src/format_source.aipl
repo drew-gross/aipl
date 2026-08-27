@@ -75,10 +75,10 @@ deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
 instructions executed: 323518
-binary size: 859632
-  code: 525916
+binary size: 859056
+  code: 525532
   data: 2508
-  metadata: 331208
+  metadata: 331016
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -128,31 +128,31 @@ functions:
   __arr_retain___m7__Doc:
     calls: 30
     bytes: 116
-  __builtin_any$__m7__Doc$lam91:
+  __builtin_any$__m7__Doc$lam90:
     calls: 0
     bytes: 32
-  __builtin_any$__m7__Doc$lam91$tail:
+  __builtin_any$__m7__Doc$lam90$tail:
     calls: 0
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 0
     bytes: 312
-  __builtin_count_while$char$lam57:
+  __builtin_count_while$char$lam56:
     calls: 12
     bytes: 296
-  __builtin_count_while$char$s0$lam46:
+  __builtin_count_while$char$s0$lam45:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam62:
+  __builtin_count_while$char$s0$lam61:
     calls: 0
     bytes: 236
-  __builtin_count_while$char$s0$lam64:
+  __builtin_count_while$char$s0$lam63:
     calls: 12
     bytes: 244
-  __builtin_count_while$char$s0$lam75:
+  __builtin_count_while$char$s0$lam74:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam77:
+  __builtin_count_while$char$s0$lam76:
     calls: 0
     bytes: 232
   __builtin_drop_last$str:
@@ -589,10 +589,7 @@ functions:
     bytes: 32
   __m9__dedent$tail:
     calls: 0
-    bytes: 1200
-  __map48$own0:
-    calls: 0
-    bytes: 320
+    bytes: 1136
   __rec_drop___m7__Doc:
     calls: 52
     bytes: 184

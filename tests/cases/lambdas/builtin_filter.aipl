@@ -41,11 +41,11 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 1032
-instructions executed: 3550
-binary size: 7744
-  code: 4380
+instructions executed: 3371
+binary size: 7336
+  code: 4096
   data: 476
-  metadata: 2888
+  metadata: 2764
 functions:
   __eq_i64$arr:
     calls: 6
@@ -56,23 +56,20 @@ functions:
   __filter7$own0:
     calls: 1
     bytes: 272
-  __map11$own0:
-    calls: 1
-    bytes: 256
   __test$is_even:
     calls: 1
-    bytes: 3128
+    bytes: 3100
   aipl_arr_drop_str:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 20
+    calls: 18
     bytes: (external)
   aipl_array_new:
     calls: 9

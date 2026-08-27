@@ -1805,6 +1805,11 @@ fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false
 
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
+// `self.filter(keep).map(f)` in one pass over the elements, instead of one pass
+// each with an array between them. Written by the compiler's operation-fusion
+// pass; also callable directly, and worth writing by hand when the two halves
+// belong together.
+fn __builtin_filter_map<T: any, U: any>(self: T[], keep: (T) -> bool, f: (T) -> U) -> U[] { [] }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
 fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
 fn __builtin_count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
@@ -2097,6 +2102,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "map",
     "try_map",
     "filter",
+    "filter_map",
     "all",
     "any",
     "left_fold",

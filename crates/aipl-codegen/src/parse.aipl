@@ -892,15 +892,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2945
-deallocations: 2945
-reallocations: 128
-bytes allocated: 139108
-instructions executed: 398717
-binary size: 261464
-  code: 151028
+allocations: 2797
+deallocations: 2797
+reallocations: 122
+bytes allocated: 134260
+instructions executed: 394191
+binary size: 260536
+  code: 150420
   data: 6948
-  metadata: 103488
+  metadata: 103168
 functions:
   __arr_drop_Node:
     calls: 11
@@ -921,7 +921,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m3__Token$Tok:
-    calls: 202
+    calls: 194
     bytes: 168
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
@@ -945,7 +945,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m3__Token$Tok:
-    calls: 130
+    calls: 116
     bytes: 168
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
@@ -959,16 +959,16 @@ functions:
   __builtin_count_while$char$s0$lam33:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam67:
+  __builtin_count_while$char$s0$lam65:
     calls: 35
     bytes: 236
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam56:
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam55:
     calls: 10
     bytes: 716
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam15:
     calls: 43
     bytes: 928
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam41:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam40:
     calls: 36
     bytes: 716
   __eq_Node:
@@ -1119,7 +1119,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10796
+    calls: 10648
     bytes: (external)
   aipl_array_new:
     calls: 1346
@@ -1128,10 +1128,10 @@ functions:
     calls: 247
     bytes: (external)
   aipl_array_push_mut:
-    calls: 345
+    calls: 331
     bytes: (external)
   aipl_array_with_cap:
-    calls: 479
+    calls: 331
     bytes: (external)
   aipl_assert:
     calls: 43
@@ -1222,7 +1222,7 @@ functions:
     bytes: 848
   leaf_at$Tok$Node:
     calls: 96
-    bytes: 1692
+    bytes: 1388
   lex_toks:
     calls: 42
     bytes: 616
@@ -1288,7 +1288,7 @@ functions:
     bytes: 680
   trailing_trivia$Tok$Node:
     calls: 52
-    bytes: 908
+    bytes: 604
   trivia_rules:
     calls: 2
     bytes: 1372

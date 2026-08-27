@@ -50,18 +50,12 @@ allocations: 12
 deallocations: 12
 reallocations: 2
 bytes allocated: 488
-instructions executed: 1024
-binary size: 5368
-  code: 2904
+instructions executed: 872
+binary size: 4880
+  code: 2580
   data: 1
-  metadata: 2463
+  metadata: 2299
 functions:
-  __map8$own0:
-    calls: 0
-    bytes: 32
-  __map8$own0$tail:
-    calls: 2
-    bytes: 260
   __to_str_i64:
     calls: 4
     bytes: 180
@@ -69,13 +63,13 @@ functions:
     calls: 2
     bytes: (external)
   aipl_arr_inc:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 22
+    calls: 20
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -109,13 +103,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1772
+    bytes: 1796
   scaled_above:
     calls: 2
     bytes: 300
   scaled_above_short:
-    calls: 0
-    bytes: 36
-  scaled_above_short$tail:
     calls: 2
-    bytes: 324
+    bytes: 304

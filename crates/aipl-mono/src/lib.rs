@@ -2412,6 +2412,368 @@ impl Mono<'_> {
         fn_name
     }
 
+    /// Thread a lifted lambda's captures through a synthesized wrapper: one
+    /// `$capN` parameter per capture appended to `params`, the matching argument
+    /// appended to `call_args`, and the identifiers the inner call passes on.
+    ///
+    /// Shared by the array-building expansions, which all have the same problem:
+    /// the lambda became a top-level function, so whatever it read from the
+    /// enclosing scope has to arrive as an argument, forwarded one hop through
+    /// the loop function that calls it.
+    fn thread_captures(
+        &mut self,
+        captures: &[(String, Type)],
+        params: &mut Vec<Param>,
+        call_args: &mut Vec<Expr>,
+        env: &Env,
+        span: &Span,
+    ) -> Result<Vec<Expr>, Error> {
+        let mut idents = Vec::with_capacity(captures.len());
+        for (cn, ct) in captures {
+            let cap = format!("$cap{}", self.synth);
+            self.synth += 1;
+            params.push(Param {
+                name: cap.clone(),
+                ty: ct.clone(),
+                mutable: false,
+                variadic: false,
+                default: None,
+            });
+            idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
+            call_args.push(
+                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
+                    .0,
+            );
+        }
+        Ok(idents)
+    }
+
+    /// Expand the builtin `arr.filter_map(keep, f)` (or the free-call
+    /// `filter_map(arr, keep, f)`) into a synthesized function that selects and
+    /// maps in **one** pass — the fused form of `arr.filter(keep).map(f)`, which
+    /// makes two, with a whole array in between.
+    ///
+    /// Both lambdas are lifted like any other (each one's captures threaded
+    /// through independently — see [`Mono::thread_captures`]), and the loop
+    /// function holds one of two bodies, exactly as `filter` and `map` do:
+    ///
+    /// - **In place**, when the source is a fresh, uniquely-owned heap array and
+    ///   each mapped `U` fits where a `T` was: the two-pointer compaction
+    ///   `filter` uses, except the write stores `f($e)` rather than `$e`. `$w`
+    ///   trails the read cursor, so a kept element's mapped value lands at or
+    ///   before the slot it came from and no unread element is ever clobbered.
+    ///   The buffer is then truncated to `$w` and handed back as `U[]`.
+    /// - **Copying**, otherwise: an output reserved to the source length — an
+    ///   upper bound, since at most every element survives — so the `push` loop
+    ///   never reallocates.
+    ///
+    /// Reuse needs both halves of "owned and sized right". Ownership is
+    /// [`is_fresh_heap`]: an array literal or a call result, which nothing else
+    /// holds a reference to. Sizing is the same `reusable` predicate `map` uses
+    /// on both `T` and `U` — 8-byte non-composites, excluding `bool` (bit-packed)
+    /// and `char` (which makes the array str-shaped, 1 byte per element).
+    /// `__map_set` writes the slot and patches the array's stored element
+    /// drop-fn, which is what lets `U` differ from `T`; it releases the `old`
+    /// value it is *handed* rather than whatever occupied the slot, so it serves
+    /// a compacting write (`$w < $r`) as well as `map`'s in-place one.
+    fn expand_filter_map(
+        &mut self,
+        arr: &Expr,
+        pred: &Expr,
+        lambda: &Expr,
+        env: &Env,
+        span: Span,
+    ) -> Result<(Expr, Type), Error> {
+        let (rarr, arr_ty) = self.infer(arr, env)?;
+        let Type::Array(elem) = &arr_ty else {
+            return Err(Error::at(
+                format!("filter_map expects an array, got {}", type_name(&arr_ty)),
+                arr.span.clone(),
+            ));
+        };
+        let elem = (**elem).clone();
+        let effects = self.cur_effects.clone();
+
+        // The predicate `(T) -> bool`, resolved exactly as `filter` resolves its
+        // own: a lambda literal is lifted, a bare name used directly.
+        let (pred_fn, pred_captures): (String, Vec<(String, Type)>) = match &pred.kind {
+            ExprKind::Lambda(params, body) => {
+                if params.len() != 1 {
+                    return Err(Error::at(
+                        format!(
+                            "filter_map's predicate takes 1 parameter, got {}",
+                            params.len()
+                        ),
+                        pred.span.clone(),
+                    ));
+                }
+                let captures = free_vars(body, params, env);
+                let fname = self.synth_lambda(
+                    params,
+                    body,
+                    from_ref(&elem),
+                    &Type::Primitive(Primitive::Bool),
+                    &captures,
+                );
+                (fname, captures)
+            }
+            ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
+                self.enqueue_concrete(g);
+                (g.clone(), Vec::new())
+            }
+            _ => {
+                return Err(Error::at(
+                    "filter_map expects a lambda or a function name as its predicate, e.g. \
+                     \"xs.filter_map(|x| .., |x| ..)\""
+                        .to_string(),
+                    pred.span.clone(),
+                ));
+            }
+        };
+
+        // The mapping `(T) -> U`, resolved exactly as `map` resolves its own.
+        let (map_fn, map_captures, u): (String, Vec<(String, Type)>, Type) = match &lambda.kind {
+            ExprKind::Lambda(params, body) => {
+                if params.len() != 1 {
+                    return Err(Error::at(
+                        format!(
+                            "filter_map's mapping lambda takes 1 parameter, got {}",
+                            params.len()
+                        ),
+                        lambda.span.clone(),
+                    ));
+                }
+                let captures = free_vars(body, params, env);
+                let mut benv = env.clone();
+                benv.insert(params[0].name.clone(), elem.clone());
+                let (_, u) = self.infer(body, &benv)?;
+                let fname = self.synth_lambda(params, body, from_ref(&elem), &u, &captures);
+                (fname, captures, u)
+            }
+            ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
+                let u = self.ref_return(g, from_ref(&elem));
+                self.enqueue_concrete(g);
+                (g.clone(), Vec::new(), u)
+            }
+            _ => {
+                return Err(Error::at(
+                    "filter_map expects a lambda or a function name as its mapping, e.g. \
+                     \"xs.filter_map(|x| .., |x| ..)\""
+                        .to_string(),
+                    lambda.span.clone(),
+                ));
+            }
+        };
+
+        // Same gate as `map`'s, and for the same reasons — see its `reusable`
+        // comment for why each kind is excluded.
+        let reusable = |t: &Type| {
+            !matches!(t, Type::Optional(_))
+                && !matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
+                && !matches!(t, Type::Named(n) if self.structs.contains_key(n)
+                    || self.syn_structs.contains_key(n)
+                    || self.variants.contains_key(n))
+        };
+        let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
+
+        // The loop function: `(xs: T[], pred captures.., map captures..) -> U[]`.
+        let mut fm_params = vec![Param {
+            name: "$arr".to_string(),
+            ty: Type::Array(Box::new(elem.clone())),
+            mutable: false,
+            variadic: false,
+            default: None,
+        }];
+        let mut call_args = vec![rarr];
+        let pred_caps =
+            self.thread_captures(&pred_captures, &mut fm_params, &mut call_args, env, &span)?;
+        let map_caps =
+            self.thread_captures(&map_captures, &mut fm_params, &mut call_args, env, &span)?;
+
+        let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
+        let mut pred_args = vec![id("$e")];
+        pred_args.extend(pred_caps);
+        let cond = Expr::new(ExprKind::Call(pred_fn, pred_args, false), span.clone());
+        let mut map_args = vec![id("$e")];
+        map_args.extend(map_caps);
+        let mapped = Expr::new(ExprKind::Call(map_fn, map_args, false), span.clone());
+
+        let incr = |name: &str| {
+            Expr::new(
+                ExprKind::Assign(
+                    Box::new(id(name)),
+                    Box::new(Expr::new(
+                        ExprKind::Binop(
+                            Box::new(id(name)),
+                            '+',
+                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
+                        ),
+                        span.clone(),
+                    )),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
+                ),
+                span.clone(),
+            )
+        };
+
+        let fm_body = if in_place {
+            // body: `mut $a = $arr;
+            //        mut $w = 0;
+            //        for (let $e : $a) {
+            //            if (keep($e, caps..)) { __map_set($a, $w, f($e, caps..), $e); set $w = $w + 1; }
+            //            else { __filter_drop($e); }
+            //        }
+            //        __filter_truncate($a, $w); __map_result($a)`
+            // `filter`'s compaction with `map`'s slot write: `__map_set` stores
+            // the mapped value at the write cursor and releases the element it
+            // was made from, so the read element's ownership ends here whether it
+            // was kept or not. The `for` reads `len` each step, so the truncation
+            // to `$w` has to come after the loop.
+            let set = Expr::new(
+                ExprKind::Call(
+                    "__map_set".to_string(),
+                    vec![id("$a"), id("$w"), mapped, id("$e")],
+                    false,
+                ),
+                span.clone(),
+            );
+            let then_branch = Expr::new(
+                ExprKind::Seq(Box::new(set), Box::new(incr("$w"))),
+                span.clone(),
+            );
+            let drop_e = Expr::new(
+                ExprKind::Call("__filter_drop".to_string(), vec![id("$e")], false),
+                span.clone(),
+            );
+            let guarded = Expr::new(
+                ExprKind::If(Box::new(cond), Box::new(then_branch), Box::new(drop_e)),
+                span.clone(),
+            );
+            let loop_ = Expr::new(
+                ExprKind::For("$e".to_string(), Box::new(id("$a")), Box::new(guarded)),
+                span.clone(),
+            );
+            let trunc = Expr::new(
+                ExprKind::Call(
+                    "__filter_truncate".to_string(),
+                    vec![id("$a"), id("$w")],
+                    false,
+                ),
+                span.clone(),
+            );
+            // The reused buffer now holds `U` elements while `$a`'s static type
+            // is still `T[]`; `__map_result` re-types it (a runtime no-op).
+            let result = Expr::new(
+                ExprKind::Call("__map_result".to_string(), vec![id("$a")], false),
+                span.clone(),
+            );
+            let after = Expr::new(
+                ExprKind::Seq(Box::new(trunc), Box::new(result)),
+                span.clone(),
+            );
+            let inner = Expr::new(
+                ExprKind::LetMut(
+                    "$w".to_string(),
+                    None,
+                    Box::new(Expr::new(ExprKind::Num(0), span.clone())),
+                    Box::new(Expr::new(
+                        ExprKind::Seq(Box::new(loop_), Box::new(after)),
+                        span.clone(),
+                    )),
+                ),
+                span.clone(),
+            );
+            Expr::new(
+                ExprKind::LetMut(
+                    "$a".to_string(),
+                    None,
+                    Box::new(id("$arr")),
+                    Box::new(inner),
+                ),
+                span.clone(),
+            )
+        } else {
+            // Copying path: `mut $out = with_capacity(len($arr));
+            //                for (let $e : $arr) { if (keep($e, caps..)) { $out.push(f($e, caps..)); } else {} }
+            //                $out`
+            // The reservation is `filter`'s upper bound rather than `map`'s exact
+            // count — at most every element survives — so the `push` loop still
+            // never reallocates, and over-reserving costs one buffer that is
+            // already the size the unfused pair would have allocated anyway.
+            let push = set_push(id("$out"), mapped, span.clone());
+            let guarded = Expr::new(
+                ExprKind::If(
+                    Box::new(cond),
+                    Box::new(push),
+                    Box::new(Expr::new(ExprKind::Unit, span.clone())),
+                ),
+                span.clone(),
+            );
+            let loop_ = Expr::new(
+                ExprKind::For("$e".to_string(), Box::new(id("$arr")), Box::new(guarded)),
+                span.clone(),
+            );
+            // `with_capacity` pre-sizes only 8-byte-element buffers; an optional
+            // (16-byte) or bit-packed `bool` output starts from an empty `[]`
+            // that the first push sizes correctly for its representation.
+            let out_init = if matches!(&u, Type::Optional(_))
+                || matches!(&u, Type::Primitive(Primitive::Bool))
+            {
+                Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+            } else {
+                Expr::new(
+                    ExprKind::Call(
+                        "__builtin_with_capacity".to_string(),
+                        vec![Expr::new(
+                            ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
+                            span.clone(),
+                        )],
+                        false,
+                    ),
+                    span.clone(),
+                )
+            };
+            Expr::new(
+                ExprKind::LetMut(
+                    "$out".to_string(),
+                    None,
+                    Box::new(out_init),
+                    Box::new(Expr::new(
+                        ExprKind::Seq(Box::new(loop_), Box::new(id("$out"))),
+                        span.clone(),
+                    )),
+                ),
+                span.clone(),
+            )
+        };
+
+        let fm_name = format!("__filter_map{}", self.synth);
+        self.synth += 1;
+        let ret = Type::Array(Box::new(decay_concat(u)));
+        self.concrete.insert(
+            fm_name.clone(),
+            ConcreteTemplate {
+                params: fm_params,
+                effects,
+                return_ty: Some(ret.clone()),
+                body: fm_body,
+            },
+        );
+        // The in-place body consumes its array parameter, so emit the *owned*
+        // instance (the fresh argument is moved in, not retained). The copying
+        // body just borrows it.
+        let mangled = if in_place {
+            self.enqueue(&fm_name, &[], &[0])
+        } else {
+            self.enqueue_concrete(&fm_name);
+            fm_name
+        };
+        Ok((
+            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
+            ret,
+        ))
+    }
+
     /// Expand the builtin `arr.map(|x| body)` (or `map(arr, |x| body)`) into a
     /// synthesized mapping function with a proper declared return type `U[]`
     /// (where `U` is the lambda body's type). The lambda is lifted like any
@@ -2509,23 +2871,8 @@ impl Mono<'_> {
             default: None,
         }];
         let mut call_args = vec![rarr];
-        let mut cap_idents: Vec<Expr> = Vec::new();
-        for (cn, ct) in &captures {
-            let cap = format!("$cap{}", self.synth);
-            self.synth += 1;
-            map_params.push(Param {
-                name: cap.clone(),
-                ty: ct.clone(),
-                mutable: false,
-                variadic: false,
-                default: None,
-            });
-            cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
-            call_args.push(
-                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
-                    .0,
-            );
-        }
+        let cap_idents =
+            self.thread_captures(&captures, &mut map_params, &mut call_args, env, &span)?;
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut lam_args = vec![id("$e")];
         lam_args.extend(cap_idents);
@@ -3209,23 +3556,8 @@ impl Mono<'_> {
             default: None,
         }];
         let mut call_args = vec![rarr];
-        let mut cap_idents: Vec<Expr> = Vec::new();
-        for (cn, ct) in &captures {
-            let cap = format!("$cap{}", self.synth);
-            self.synth += 1;
-            filter_params.push(Param {
-                name: cap.clone(),
-                ty: ct.clone(),
-                mutable: false,
-                variadic: false,
-                default: None,
-            });
-            cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
-            call_args.push(
-                self.infer(&Expr::new(ExprKind::Ident(cn.clone()), span.clone()), env)?
-                    .0,
-            );
-        }
+        let cap_idents =
+            self.thread_captures(&captures, &mut filter_params, &mut call_args, env, &span)?;
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut pred_args = vec![id("$e")];
         pred_args.extend(cap_idents);
@@ -4801,6 +5133,19 @@ impl Mono<'_> {
                         ));
                     }
                     return self.expand_filter(&args[0], &args[1], env, span.clone());
+                }
+                if name == "__builtin_filter_map" {
+                    if args.len() != 3 {
+                        return Err(Error::at(
+                            format!(
+                                "filter_map takes an array, a predicate and a mapping, got {} \
+                                 argument(s)",
+                                args.len()
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                    return self.expand_filter_map(&args[0], &args[1], &args[2], env, span.clone());
                 }
                 if name == "__builtin_zip_with" {
                     if args.len() != 3 {
@@ -8014,8 +8359,9 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         | "__builtin_print"
                         | "__builtin_trim"
                         // In-place-filter/map intrinsics mutate the array in place
-                        // without aliasing it (see `expand_filter`/`expand_map`), so
-                        // they don't disqualify the array binding from being exclusive.
+                        // without aliasing it (see `expand_filter`/`expand_map`/
+                        // `expand_filter_map`), so they don't disqualify the array
+                        // binding from being exclusive.
                         | "__filter_keep"
                         | "__filter_truncate"
                         | "__map_set"

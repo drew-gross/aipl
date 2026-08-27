@@ -1,0 +1,184 @@
+import {
+    filter,
+    filter_map,
+    len,
+    less_than as <,
+    less_than_or_equal as <=,
+    map,
+    print,
+    push,
+    to_str,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// Operation fusion: `xs.filter(keep).map(f)` collapses into `filter_map`, which
+// selects and maps in one pass instead of walking the elements twice with a
+// whole array built between the two.
+//
+// The intermediate is the expensive half. Unfused, `filter` produces an array
+// of the kept elements and `map` then walks *that* — a second traversal, a
+// second per-element call, and a buffer that exists only to be consumed. Fused,
+// one loop tests each element and writes the mapped value straight to the
+// output; and when the source is uniquely owned and the element sizing allows,
+// that output *is* the source's buffer, compacted in place and truncated.
+//
+// Measured on this case with the fusion switched off: 16 allocations totalling
+// 6,998 bytes become 14 totalling 5,334, and 103,650 instructions become
+// 90,496. Where the saving comes from depends on the element type, which is why
+// both shapes are here:
+//
+//   - A *scalar* element saves the traversal but not the allocation. `filter`
+//     and `map` each already had an in-place path, so the unfused pair was
+//     already reusing one buffer — it just walked it twice.
+//   - A *composite* element saves the allocation too. Neither half can work in
+//     place on a 16-byte element, so unfused there are two output arrays; fused
+//     there is one, reserved to the source length up front.
+//
+// The `functions:` list below is the readable evidence: two `__filter_map*`
+// specializations and no `__filter*`/`__map*` pair beside them. Unfused it
+// reads `__filter7`, `__map4`, `__map4$tail`, `__map9` — and one
+// `__filter_map13`, which is `spelled_out` below, the call the other two fuse
+// into.
+
+fn many() -> i64[] {
+    mut xs = [0];
+    mut n = 0;
+    while (n < 200) {
+        set n++;
+        set xs.push(n);
+    }
+    xs
+}
+
+// A borrowed source: the fused loop reserves one output and fills it. Unfused,
+// `filter` reserves that same output and `map` then walks it a second time.
+fn borrowed(xs: i64[], lo: i64) -> i64[] { xs.filter(|x| lo <= x).map(|x| x * 2) }
+
+// A uniquely-owned source — nothing else holds `many()`'s buffer — so the fused
+// form compacts into it and never allocates at all.
+fn owned(lo: i64) -> i64[] { many().filter(|x| lo <= x).map(|x| x * 2) }
+
+// Written out by hand, this is what the two above fuse *to*: same call, same
+// synthesized loop, so the three share one `__filter_map` specialization
+// wherever their element types agree.
+fn spelled_out(lo: i64) -> i64[] { many().filter_map(|x| lo <= x, |x| x * 2) }
+
+struct Pt { x: i64, y: i64 }
+
+fn pts() -> Pt[] {
+    mut ps = [Pt { x: 0, y: 0 }];
+    mut n = 0;
+    while (n < 100) {
+        set n++;
+        set ps.push(Pt { x: n, y: 2 });
+    }
+    ps
+}
+
+// A composite element has no 8-byte slot to overwrite, so *neither* half can
+// work in place: unfused, `filter` builds an array of the kept `Pt`s and `map`
+// then builds a second array from that one. This is where the fusion saves an
+// allocation rather than only a traversal — there is one output, reserved once
+// to the source length.
+fn points(lo: i64) -> i64[] { pts().filter(|p| lo <= p.x).map(|p| p.x * p.y) }
+
+fn main() !prints {
+    let xs = many();
+    print(borrowed(xs, 150).len().to_str());
+    print(owned(150).len().to_str());
+    print(spelled_out(150).len().to_str());
+    // The fused chain and the hand-written call agree element for element.
+    print(borrowed(xs, 199)[0].to_str());
+    print(owned(199)[0].to_str());
+    print(spelled_out(199)[0].to_str());
+    // The composite-element chain, where the intermediate array is the cost.
+    print(points(1).len().to_str());
+    print(points(1)[0].to_str());
+}
+--- stdout ---
+51
+51
+51
+some(398)
+some(398)
+some(398)
+100
+some(2)
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 54
+bytes allocated: 5334
+instructions executed: 90496
+binary size: 6208
+  code: 3532
+  data: 67
+  metadata: 2609
+functions:
+  __filter_map11$own0:
+    calls: 2
+    bytes: 308
+  __filter_map7$own0:
+    calls: 2
+    bytes: 308
+  __to_str_i64$opt:
+    calls: 4
+    bytes: 360
+  __to_str_u64:
+    calls: 4
+    bytes: 180
+  aipl_arr_inc:
+    calls: 13
+    bytes: (external)
+  aipl_array_dec:
+    calls: 24
+    bytes: (external)
+  aipl_array_new:
+    calls: 7
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1453
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
+    bytes: (external)
+  aipl_dec:
+    calls: 16
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_inc:
+    calls: 8
+    bytes: (external)
+  aipl_print:
+    calls: 8
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 3
+    bytes: (external)
+  aipl_u64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 4
+    bytes: (external)
+  borrowed:
+    calls: 2
+    bytes: 304
+  main:
+    calls: 1
+    bytes: 1400
+  many:
+    calls: 5
+    bytes: 196
+  points:
+    calls: 2
+    bytes: 476
