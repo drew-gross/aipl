@@ -47,6 +47,7 @@ import {
     logical_not as !,
     logical_or as ||,
     map,
+    map_err,
     not_equal as !=,
     push,
     same_case,
@@ -837,10 +838,7 @@ fn trivia_rules() -> TokenRule<Tok>[] {
 // Lexing and parsing report failure in the same shape but not the same type, so
 // the tests convert once here rather than at every call.
 fn lex_toks(src: str, rules: TokenRule<Tok>[]) -> LexResult<Tok>!ParseError {
-    match (src.lex(rules)) {
-        ok(r) => ok(r),
-        err(e) => err(ParseError { message: e.message, span: e.span }),
-    }
+    src.lex(rules).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
 variant Node = NLeaf(str) | NNode(Node[])
@@ -950,25 +948,25 @@ functions:
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 600
-  __builtin_count_while$char$lam26:
+  __builtin_count_while$char$lam28:
     calls: 149
     bytes: 296
-  __builtin_count_while$char$s0$lam31:
+  __builtin_count_while$char$s0$lam33:
     calls: 2
     bytes: 236
-  __builtin_count_while$char$s0$lam33:
+  __builtin_count_while$char$s0$lam35:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam65:
+  __builtin_count_while$char$s0$lam70:
     calls: 35
     bytes: 236
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam55:
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam57:
     calls: 10
     bytes: 716
-  __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam15:
+  __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam17:
     calls: 43
     bytes: 928
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam40:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam42:
     calls: 36
     bytes: 716
   __eq_Node:
@@ -992,24 +990,24 @@ functions:
   __lambda_1:
     calls: 3
     bytes: 60
-  __lambda_13:
+  __lambda_15:
     calls: 55
     bytes: 744
-  __lambda_16:
-    calls: 0
-    bytes: 92
-  __lambda_17:
-    calls: 31
-    bytes: 60
   __lambda_18:
     calls: 0
     bytes: 92
   __lambda_19:
-    calls: 25
+    calls: 31
     bytes: 60
   __lambda_2:
     calls: 0
     bytes: 92
+  __lambda_20:
+    calls: 0
+    bytes: 92
+  __lambda_21:
+    calls: 25
+    bytes: 60
   __lambda_3:
     calls: 0
     bytes: 60

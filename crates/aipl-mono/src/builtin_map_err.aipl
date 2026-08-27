@@ -15,7 +15,7 @@ import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins
 // `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
 pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     match (self) {
-        ok(v) => ok(v),
+        ok(v) => ok(v), #[allow]
         err(e) => err(f(e)),
     }
 }.doc("""

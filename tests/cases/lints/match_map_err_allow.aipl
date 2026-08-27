@@ -1,0 +1,85 @@
+import { equal as ==, map_err, print, to_str } from builtins;
+
+// `#[allow]` keeps the long form — the escape hatch every lint carries.
+// `map_err`'s own definition needs exactly this, since it cannot be written in
+// terms of itself.
+//
+// The marker goes on the `ok(v) => ok(v)` arm, which is where this lint points.
+// That is deliberate: `#[allow]` is line-scoped, so a lint spanning the whole
+// multi-line `match` could never be squelched — the only line able to carry the
+// marker would be the `match (..) {` header, and the formatter moves a marker
+// written there onto its own line, where it squelches nothing. The
+// pass-through arm is always one line (the `err` arm's replacement need not
+// be), so it always takes a trailing marker and keeps it through `aipl fmt`.
+
+struct Wrapped { message: str, code: i64 }
+
+fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
+
+fn wrap(r: i64!str) -> i64!Wrapped {
+    match (r) {
+        ok(v) => ok(v), #[allow]
+        err(e) => err(Wrapped { message: e, code: 7 }),
+    }
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn wrap_short(r: i64!str) -> i64!Wrapped { r.map_err(|e| Wrapped { message: e, code: 7 }) }
+
+fn code_of(r: i64!Wrapped) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => e.code,
+    }
+}
+
+fn main() !prints {
+    print(code_of(wrap(parse("1"))).to_str());
+    print(code_of(wrap_short(parse("1"))).to_str());
+    print(code_of(wrap(parse("x"))).to_str());
+    print(code_of(wrap_short(parse("x"))).to_str());
+}
+--- stdout ---
+1
+1
+7
+7
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 455
+binary size: 4456
+  code: 2368
+  data: 27
+  metadata: 2061
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 180
+  aipl_dec:
+    calls: 30
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_inc:
+    calls: 18
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_str_eq:
+    calls: 4
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2188

@@ -26,7 +26,16 @@
 // a token-kind type, a `TokenRule[]` for it, an AST, one `lower_*` per
 // production, and a `Grammar` tying them together. Nothing else — the parse
 // itself is `parse.aipl`'s, unmodified.
-import { equal as ==, first, join, less_than as <, map, repeat, wrapping_add as + } from builtins;
+import {
+    equal as ==,
+    first,
+    join,
+    less_than as <,
+    map,
+    map_err,
+    repeat,
+    wrapping_add as +,
+} from builtins;
 import { Cst, show, text, token_text } from "./cst.aipl";
 import {
     Grammar,
@@ -111,10 +120,7 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
 // Lexing and parsing report failure in the same shape but not the same type, so
 // the conversion happens once, here.
 fn lex_sexp(src: str) -> LexResult<SexpKind>!ParseError {
-    match (src.lex(sexp_rules())) {
-        ok(r) => ok(r),
-        err(e) => err(ParseError { message: e.message, span: e.span }),
-    }
+    src.lex(sexp_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
 pub fn sexp_cst(src: str) -> Cst!ParseError {
@@ -328,25 +334,25 @@ functions:
   __arr_retain___m3__TokenRule$SexpKind:
     calls: 0
     bytes: 572
-  __builtin_count_while$char$lam24:
+  __builtin_count_while$char$lam26:
     calls: 930
     bytes: 296
-  __builtin_count_while$char$s0$lam29:
+  __builtin_count_while$char$s0$lam31:
     calls: 5
     bytes: 236
-  __builtin_count_while$char$s0$lam31:
+  __builtin_count_while$char$s0$lam33:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam64:
+  __builtin_count_while$char$s0$lam69:
     calls: 854
     bytes: 236
-  __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam40:
+  __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam42:
     calls: 867
     bytes: 716
-  __builtin_try_map$__m2__Production$SexpKind$Sexp$__m2__Production$SexpKind$Sexp$__m2__ParseError$lam15:
+  __builtin_try_map$__m2__Production$SexpKind$Sexp$__m2__Production$SexpKind$Sexp$__m2__ParseError$lam17:
     calls: 23
     bytes: 928
-  __builtin_try_map$__m2__Rule$SexpKind$__m2__Rule<SexpKind>$__m2__ParseError$lam54:
+  __builtin_try_map$__m2__Rule$SexpKind$__m2__Rule<SexpKind>$__m2__ParseError$lam56:
     calls: 46
     bytes: 716
   __eq_Sexp:
@@ -364,7 +370,7 @@ functions:
   __lambda_11:
     calls: 41
     bytes: 60
-  __lambda_13:
+  __lambda_15:
     calls: 46
     bytes: 744
   __m1__leaves:

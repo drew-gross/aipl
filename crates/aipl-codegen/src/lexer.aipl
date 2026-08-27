@@ -31,6 +31,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map_err,
     not_equal as !=,
     push,
     starts_with,
@@ -477,12 +478,8 @@ fn apply_emit<K>(e: Emit<K>, text: str, value: TokenValue, span: Span) -> K!LexE
         OfSeg(f) => err(seg_only(span)),
         // A fallible emit yields `K!str` — a kind or an error *message*; pair the
         // message with the token's `span` to make the `LexError` the lexer
-        // surfaces. (Inlined rather than a helper: the checker can't infer the
-        // helper's `K` from a bare type-parameter argument.)
-        Try(f) => match (f(content)) {
-            ok(k) => ok(k),
-            err(message) => err(LexError { message, span }),
-        },
+        // surfaces.
+        Try(f) => f(content).map_err(|message| LexError { message, span }),
         TrySeg(f) => err(seg_only(span)),
     }
 }
@@ -585,10 +582,7 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
 fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
     match (e) {
         OfSeg(f) => ok(f(text, seg)),
-        TrySeg(f) => match (f(text, seg)) {
-            ok(k) => ok(k),
-            err(message) => err(LexError { message, span }),
-        },
+        TrySeg(f) => f(text, seg).map_err(|message| LexError { message, span }),
         Bare(k) => err(seg_needs_ofseg(span)),
         Of(f) => err(seg_needs_ofseg(span)),
         Try(f) => err(seg_needs_ofseg(span)),
@@ -1233,9 +1227,9 @@ deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
 instructions executed: 265480
-binary size: 1791424
+binary size: 1791416
   code: 1125136
-  data: 8132
+  data: 8124
   metadata: 658156
 functions:
   __arr_drop_StepResult$Kind:

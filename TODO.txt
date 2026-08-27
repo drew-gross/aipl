@@ -132,6 +132,9 @@ bugs:
       Found while writing lambdas/two_lambda_args, whose first draft was
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
+HOF:
+  lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
+
 math:
   % should not abort. (what should it do? TBD)
 
@@ -144,6 +147,8 @@ syntax:
   rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
   support join(self: T[], sep: T+ = []) (defaults for positional args, can join with multiple)
   some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>
+  allow defining functions in functions so that test utils can live closer to where they are used
+  map should take any container and return the same container (then replace map_ok)
 
 default/kwargs:
   A default cannot reference an earlier parameter — fn f(a: i64, b: i64 = a) gives "unknown identifier". Defaults are evaluated in an empty scope.
@@ -188,7 +193,6 @@ utilities:
   do we need intersperse now that we've souped up join?
   find (plus linter that require use of find)
   zip, to allow iterating over lists in pairs
-  map_err + lint to enforce it
 
 lint:
   match none -> err(...) should lint to value_or_err

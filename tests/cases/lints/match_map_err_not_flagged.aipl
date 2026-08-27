@@ -1,0 +1,103 @@
+import { equal as ==, map_err, print, to_str, wrapping_add as + } from builtins;
+
+// Shapes that look close but are deliberately left alone.
+
+struct Wrapped { message: str }
+
+fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }
+
+// The `ok` arm transforms the value, so this rewrites both sides — more than
+// `map_err` can express.
+fn wrap_and_bump(r: i64!str) -> i64!Wrapped {
+    match (r) {
+        ok(v) => ok(v + 1),
+        err(e) => err(Wrapped { message: e }),
+    }
+}
+
+// The `ok` arm ignores its binding, so the value does not pass through.
+fn wrap_and_replace(r: i64!str) -> i64!Wrapped {
+    match (r) {
+        ok(v) => ok(0),
+        err(e) => err(Wrapped { message: e }),
+    }
+}
+
+// `err(e) => err(e)` rebuilds the result unchanged, so the whole `match` is its
+// own scrutinee. `map_err(|e| e)` would be a longer way to write that nothing,
+// so the lint stays quiet rather than advising it.
+fn passthrough(r: i64!str) -> i64!str {
+    match (r) {
+        ok(v) => ok(v),
+        err(e) => err(e),
+    }
+}
+
+// The `err` arm leaves the result world entirely — this is an unwrap, not a
+// conversion.
+fn or_zero(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => 0,
+    }
+}
+
+fn main() !prints {
+    print(code_of(wrap_and_bump(parse("1"))).to_str());
+    print(code_of(wrap_and_replace(parse("1"))).to_str());
+    print(or_zero(passthrough(parse("x"))).to_str());
+    print(or_zero(parse("1")).to_str());
+    // The rewrite itself must not flag.
+    print(code_of(parse("x").map_err(|e| Wrapped { message: e })).to_str());
+}
+
+fn code_of(r: i64!Wrapped) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => -1,
+    }
+}
+--- stdout ---
+2
+0
+0
+1
+-1
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 485
+binary size: 4664
+  code: 2488
+  data: 27
+  metadata: 2149
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 180
+  aipl_dec:
+    calls: 32
+    bytes: (external)
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_inc:
+    calls: 17
+    bytes: (external)
+  aipl_print:
+    calls: 5
+    bytes: (external)
+  aipl_str_eq:
+    calls: 5
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2308
