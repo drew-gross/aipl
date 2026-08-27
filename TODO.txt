@@ -72,6 +72,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
   parser lib should use value_or_err more
   why does quoted use str literals instead of char literals?
   trailing_trivia should be a filter map
@@ -115,15 +116,6 @@ List files:
 
 clock:
   make units types
-
-utility functions:
-  split with predicate, use in companion_files.aipl
-  interaclate
-  try_map that is like map when pred can error
-  count_if
-  do we need intersperse now that we've souped up join?
-  find (plus linter that require use of find)
-  zip, to allow iterating over lists in pairs
 
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
@@ -188,6 +180,15 @@ parser:
 
 utilities:
   add is_some, lint against match none->false+some(_)->true
+  msg_of needs to be some kind of builtin
+  split with predicate, use in companion_files.aipl
+  interaclate
+  try_map that is like map when pred can error
+  count_if
+  do we need intersperse now that we've souped up join?
+  find (plus linter that require use of find)
+  zip, to allow iterating over lists in pairs
+  map_err + lint to enforce it
 
 lint:
   match none -> err(...) should lint to value_or_err

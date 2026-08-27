@@ -7,7 +7,7 @@ each is sized to be finishable in one session.
 
 **Stage 1 — the library**
 - [x] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
-- [ ] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
+- [x] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
 - [ ] 1.2 JSON end to end
 
 **Stages 2-6**
@@ -61,11 +61,13 @@ What it bought, in the shape the library actually needs: a case can be matched
 without matching its payload (`same_case`, plus a `variant` bound), a generic
 variant's type parameter is inferred from the expected type, recursive types may
 recurse through an array, `match` arms may be statement blocks, and recursion is
-tail-call eliminated so parse depth is bounded by the input rather than the
-stack. Four shapes the design rests on that had no test anywhere in the repo were
-confirmed to work and are locked in by cases — a fn value returning a boxed
-recursive variant, an `A[]` parameter where `A` is boxed, an array of structs
-each holding a boxed field, and a two-parameter generic variant.
+tail-call eliminated. (That last one turns out **not** to reach the parse itself:
+a recursive-descent call is never in tail position, so parse depth stays bounded
+by the stack — see 1.1 below for the measured limit.) Four shapes the design
+rests on that had no test anywhere in the repo were confirmed to work and are
+locked in by cases — a fn value returning a boxed recursive variant, an `A[]`
+parameter where `A` is boxed, an array of structs each holding a boxed field, and
+a two-parameter generic variant.
 
 **Stage 1.0 found four more gaps**, all in the same unexplored corner — nobody
 had ever written a *generic recursive* variant, which `Rule<K>` is — and all four
@@ -194,6 +196,28 @@ an integer literal does not flex through a constructor, so `Many(r, 0)` is a typ
 error and the `many`/`many1` helpers exist to absorb it; and most `Rule`
 constructors mention no `K`, so a rule wants an annotated binding
 (`let r: Rule<Kind> = ..`) for its type parameter to resolve.
+
+**What 1.1 landed** (`grammar_sexp.aipl`, plus one addition to `cst.aipl`):
+
+- A lowering function needs a token's *spelling*, and `text` is the lossless
+  view — it includes the trivia attached in front of the token, so an atom lowered
+  through it carries the preceding blank line. `cst.aipl` grew the meaningful
+  counterpart, **`token_leaves`/`token_text`**: the same walk with `CTrivia`
+  dropped. Every lowering that reads a leaf wants it, so it belongs in the
+  library rather than in each grammar.
+- **The deep-nesting test is a `.test` block, and that is already a built
+  binary.** A library case's `--- performance ---` is measured by AOT-linking the
+  synthesized `.test` driver and running it (`tests/cases.rs`, `measured_program`
+  → `measure_perf_stats`), so the same block runs twice: under `aipl check` on
+  the CLI's 256 MB thread stack, and as an ordinary binary on 8 MB. No separate
+  case file is needed — and none is possible, since `tests/cases/` files are
+  staged into a temp dir where a relative import into `crates/` would not resolve.
+- **Parse depth is stack-bound, not heap-bound.** Recursive descent spends a frame
+  per level and none of those calls is in tail position, so tail-call elimination
+  does not apply to the parse itself. Measured against the 8 MB a shipped binary
+  gets: 1,000 levels of `((( ... )))` parse, render and re-parse fine; 2,000
+  segfaults. The test sits at 200, which leaves ~5x headroom while still being
+  deep enough that a regression in frame size would show.
 
 ### 1.2 JSON
 

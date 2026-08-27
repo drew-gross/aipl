@@ -61,6 +61,26 @@ pub fn leaves(self: Cst) -> Span[] {
 // it directly.
 pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join(sep="") }
 
+// Every *token* leaf span under `self`, in source order — `leaves` with the
+// trivia dropped. The two are the lossless/meaningful pair: `leaves` keeps the
+// comments and whitespace because reconstructing the source needs them, and this
+// one drops them because a lowering function reading a token's spelling does not
+// want the blank line in front of it.
+pub fn token_leaves(self: Cst) -> Span[] {
+    match (self) {
+        CLeaf(sp) => [sp],
+        CTrivia(_) => [],
+        CTree(_, kids) => kids.map(token_leaves).join(),
+    }
+}
+
+// The text of the tokens under `self`, trivia dropped and nothing inserted
+// between them — what a production's `build` reads a matched token's spelling
+// from. Written for the single-token node that is the usual case; over a wider
+// node the tokens run together (`( a b )` reads back as `(ab)`), which is why
+// `text` and not this one is what reconstructs source.
+pub fn token_text(self: Cst, src: str) -> str { self.token_leaves().map(|sp| src[sp]).join(sep="") }
+
 // The span `self` covers: its first leaf's start through its last leaf's end.
 // A node with no leaves at all — an interior node for a production that matched
 // empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
@@ -124,6 +144,13 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(CLeaf(2..3).text(src) == "+");
     assert(CTrivia(1..2).span() == 1..2);
 
+    // `token_text` is `text` with the trivia dropped — the spelling a lowering
+    // function reads, rather than the bytes a formatter reproduces.
+    assert(t.token_leaves() == [0..1, 2..3, 4..5]);
+    assert(t.token_text(src) == "1+2");
+    assert(CTrivia(1..2).token_text(src) == "");
+    assert(CTree(one, [CTrivia(1..2), CLeaf(2..3)]).token_text(src) == "+");
+
     // Nesting: an interior child contributes its own leaves to the parent, in
     // place, so the parent still reconstructs the whole source.
     let zero: u64 = 0;
@@ -152,18 +179,18 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(CTree(far, []).show(src, names) == "(?)");
 })
 --- performance ---
-allocations: 110
-deallocations: 110
+allocations: 141
+deallocations: 141
 reallocations: 0
-bytes allocated: 5532
-instructions executed: 6229
-binary size: 19432
-  code: 10208
-  data: 1269
-  metadata: 7955
+bytes allocated: 7036
+instructions executed: 7895
+binary size: 23408
+  code: 12480
+  data: 1557
+  metadata: 9371
 functions:
   __arr_drop_Cst:
-    calls: 7
+    calls: 8
     bytes: 116
   __arr_retain_Cst:
     calls: 2
@@ -175,73 +202,76 @@ functions:
     calls: 4
     bytes: 300
   __eq___builtin_Span:
-    calls: 6
+    calls: 9
     bytes: 104
+  __eq___builtin_Span$arr:
+    calls: 1
+    bytes: 284
   __rec_drop_Cst:
-    calls: 24
+    calls: 28
     bytes: 48
   __test$show:
     calls: 1
-    bytes: 6248
+    bytes: 7108
   aipl_arr_drop_arr:
-    calls: 7
+    calls: 10
     bytes: (external)
   aipl_arr_drop_str:
-    calls: 7
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 133
-    bytes: (external)
-  aipl_arr_join:
     calls: 9
     bytes: (external)
+  aipl_arr_inc:
+    calls: 185
+    bytes: (external)
+  aipl_arr_join:
+    calls: 12
+    bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 45
+    calls: 61
     bytes: (external)
   aipl_array_dec:
-    calls: 235
+    calls: 326
     bytes: (external)
   aipl_array_new:
-    calls: 47
+    calls: 65
     bytes: (external)
   aipl_array_push_mut:
-    calls: 47
+    calls: 63
     bytes: (external)
   aipl_array_with_cap:
-    calls: 21
+    calls: 27
     bytes: (external)
   aipl_assert:
-    calls: 20
+    calls: 24
     bytes: (external)
   aipl_concat:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 159
+    calls: 179
     bytes: (external)
   aipl_inc:
-    calls: 99
+    calls: 118
     bytes: (external)
   aipl_rec_alloc:
-    calls: 24
+    calls: 28
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 72
+    calls: 88
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 48
+    calls: 60
     bytes: (external)
   aipl_str_eq:
-    calls: 8
+    calls: 11
     bytes: (external)
   aipl_str_join:
-    calls: 7
+    calls: 10
     bytes: (external)
   aipl_str_len:
-    calls: 24
+    calls: 28
     bytes: (external)
   aipl_str_slice:
-    calls: 19
+    calls: 23
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -266,4 +296,10 @@ functions:
     bytes: 460
   text:
     calls: 4
+    bytes: 392
+  token_leaves:
+    calls: 16
+    bytes: 736
+  token_text:
+    calls: 3
     bytes: 392

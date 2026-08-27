@@ -1,0 +1,657 @@
+// S-expressions: the library's first end-to-end target, and deliberately the
+// floor rather than a warm-up. Two productions —
+//
+//     list -> "(" item* ")"
+//     item -> Atom | list
+//
+// — where `item` reaches `list` and `list` reaches back through `item`, which is
+// the whole point: a non-recursive toy (a comma-separated integer list, key/value
+// lines) would exercise none of what the driver is actually built on. This one
+// forces a **recursive CST** (a `Cst` boxed through an array), a **parse as deep
+// as its input**, and a lowering to a **boxed AST** reached through a function
+// *value* — the `(str, Cst, A[]) -> A!ParseError` shape with `A` boxed.
+//
+// Recursive descent spends a stack frame per level and none of those calls is in
+// tail position, so parse depth is bounded by the stack rather than by the heap.
+// Measured on the 8 MB an ordinary binary gets: `((( ... )))` nests fine at 1,000
+// levels and segfaults somewhere before 2,000, which is why the deep test below
+// sits at 200 — deep enough that a regression in frame size would show, with room
+// to spare.
+//
+// It deliberately omits precedence, more than one terminal class, separators, and
+// error-message subtlety: if the driver is wrong, it is wrong here in two
+// productions rather than in ten. `grammar_json.aipl` adds the rest.
+//
+// The file is also the worked example of what a consumer of this library brings:
+// a token-kind type, a `TokenRule[]` for it, an AST, one `lower_*` per
+// production, and a `Grammar` tying them together. Nothing else — the parse
+// itself is `parse.aipl`'s, unmodified.
+import { equal as ==, first, join, less_than as <, map, repeat, wrapping_add as + } from builtins;
+import { Cst, show, text, token_text } from "./cst.aipl";
+import {
+    Grammar,
+    Mk,
+    Named,
+    OneOf,
+    ParseError,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+    many,
+    prod_names,
+} from "./grammar.aipl";
+import { Bare, CharRun, LexResult, Of, ToEol, TokenRule, lex } from "./lexer.aipl";
+import { parse, parse_cst } from "./parse.aipl";
+
+// The token kinds. One terminal class carrying its text, and one bare kind for
+// the parentheses — the grammar matches those by `Spelling`, so their kind never
+// has to be distinguished.
+variant SexpKind = Atom(str) | Punct
+
+// The AST an S-expression lowers to: a bare atom, or a list of them. Recursive
+// through an array, so a `Sexp` is a refcounted heap block — the shape a
+// `build` function value had to be proven able to return.
+variant Sexp = SAtom(str) | SList(Sexp[])
+
+// Whitespace and `;` comments are recorded as **trivia** rather than skipped, so
+// the concrete tree covers every byte of the source and reconstructs it exactly
+// (asserted below). An atom is a run of the usual Lisp symbol characters, which
+// includes digits — this grammar has no number type, so `12` is just an atom.
+fn sexp_rules() -> TokenRule<SexpKind>[] {
+    let space = " \t\r\n";
+    let sym = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/<>=!?_.";
+    [
+        TokenRule { matcher: CharRun(space, space), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: ToEol(";"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(sym, sym), emit: Of(Atom) },
+        TokenRule { matcher: CharRun("()", ""), emit: Bare(Punct) },
+    ]
+}
+
+// A `list` node's children are exactly its interior `item`s — the parentheses
+// are leaves, and leaves have no lowered value — so the list *is* its kids.
+fn lower_list(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError { ok(SList(kids)) }
+
+// An `item` is one of its two alternatives, told apart by whether it got an
+// interior child: the `list` branch lowered one, and the `Atom` branch matched a
+// bare token, whose spelling is the node's own text with trivia dropped.
+fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
+    match (kids.first()) {
+        some(inner) => ok(inner),
+        none => ok(SAtom(node.token_text(src))),
+    }
+}
+
+pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
+    let r_list: Rule<SexpKind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
+    let r_item: Rule<SexpKind> = OneOf([Term(Atom("")), Named("list")]);
+    Grammar {
+        prods: [
+            Production { name: "list", rule: r_list, build: Mk(lower_list) },
+            Production {
+                name: "item",
+                rule: r_item,
+                build: Mk(lower_item),
+                expect_as: "an s-expression",
+            },
+        ],
+    }
+}.doc("""
+    The S-expression grammar: `list -> "(" item* ")"` and `item -> Atom | list`,
+    with `item` as the start rule so a bare atom is as much a program as a list
+    is.
+
+    `item` is labelled and `list` is transparent, so a failure inside a list
+    reports as "an s-expression" rather than as the grammar's internals — the
+    collapse `expect_as` exists for.
+""")
+
+// Lexing and parsing report failure in the same shape but not the same type, so
+// the conversion happens once, here.
+fn lex_sexp(src: str) -> LexResult<SexpKind>!ParseError {
+    match (src.lex(sexp_rules())) {
+        ok(r) => ok(r),
+        err(e) => err(ParseError { message: e.message, span: e.span }),
+    }
+}
+
+pub fn sexp_cst(src: str) -> Cst!ParseError {
+    parse_cst(src, lex_sexp(src)?, sexp_grammar(), "item")
+}.doc("""
+    The lossless concrete tree for `src` — every byte of it under exactly one
+    leaf, comments and whitespace included. Use this when the tree is the point;
+    `parse_sexp` when only the `Sexp` is.
+""").test({
+    // The tree the two productions build: one `item` node per element, and a
+    // `list` node inside the `item` that took that alternative. The parentheses
+    // are leaves of the `list`, since only a rule *reference* builds a node.
+    //
+    // The `~ ` leaves are the recorded whitespace, sitting in front of the token
+    // that follows them — which is what makes the leaves tile the source.
+    assert(shown("(a b)")? == "(item (list ( (item a) (item ~  b) )))");
+    assert(shown("a")? == "(item a)");
+    assert(shown("()")? == "(item (list ( )))");
+    assert(shown("(a (b))")? == "(item (list ( (item a) (item (list ~  ( (item b) ))) )))");
+
+    // Losslessness: every byte of the source is under exactly one leaf, so the
+    // leaves concatenate back to it — including the leading comment, the run
+    // between two tokens, and the trailing newline no token consumption reaches.
+    let src = "; head\n( a  b )\n";
+    assert(sexp_cst(src)?.text(src) == src);
+
+    // Where each piece landed, on a source small enough to read: trivia attaches
+    // in front of the token that follows it, and what follows the last token
+    // attaches to the root.
+    let small = "(a) ; tail";
+    assert(shown(small)? == "(item (list ( (item a) )) ~  ~; tail)");
+})
+
+pub fn parse_sexp(src: str) -> Sexp!ParseError {
+    parse(src, lex_sexp(src)?, sexp_grammar(), "item")
+}.doc("""
+    The `Sexp` `src` denotes: lex, parse to a concrete tree, lower it through
+    the grammar's `build` functions.
+
+    Fails with a `ParseError` carrying the span of the offending token, from
+    either half of the front end — a lex error is reported in the same shape.
+""").test({
+    // ---- the two productions, and the recursion between them ----
+    assert(parse_sexp("a")? == SAtom("a"));
+    assert(parse_sexp("()")? == SList([]));
+    assert(parse_sexp("(a b)")? == SList([SAtom("a"), SAtom("b")]));
+    assert(
+        parse_sexp("(a (b c) d)")? == SList([
+            SAtom("a"),
+            SList([SAtom("b"), SAtom("c")]),
+            SAtom("d"),
+        ]),
+    );
+    // Nesting with nothing else in it — the shape the deep test scales up.
+    assert(parse_sexp("(((x)))")? == SList([SList([SList([SAtom("x")])])]));
+
+    // An atom is any run of symbol characters; this grammar has no numbers.
+    assert(parse_sexp("(+ 1 2)")? == SList([SAtom("+"), SAtom("1"), SAtom("2")]));
+
+    // ---- trivia is invisible to the AST ----
+    //
+    // Layout and comments are recorded rather than skipped, and lowering
+    // reads spellings with `token_text`, so neither reaches the `Sexp`.
+    let spaced = """
+        ; a list
+        ( a   ; the first
+          b )
+    """;
+    assert(parse_sexp(spaced)? == SList([SAtom("a"), SAtom("b")]));
+
+    // ---- errors ----
+    assert(msg_of("(a") == "expected an s-expression or `)`, found end of input");
+    assert(msg_of(")") == "expected an s-expression, found `)`");
+    assert(msg_of("") == "expected an s-expression, found end of input");
+    // Every token must be consumed: two expressions is not one.
+    assert(msg_of("a b") == "expected end of input, found `b`");
+    // A lex failure reports in the same shape as a parse failure.
+    assert(msg_of("(a #b)") == "unexpected character");
+})
+
+pub fn render_sexp(self: Sexp) -> str {
+    match (self) {
+        SAtom(a) => a,
+        SList(xs) => `({xs.map(render_sexp).join(sep=" ")})`,
+    }
+}.doc("""
+    `self` printed back as S-expression source, in the one canonical spelling:
+    atoms as themselves, a list as its elements joined by single spaces.
+
+    Round-trips with `parse_sexp` — `parse_sexp(render_sexp(v)) == v` for every
+    `v` — which is what makes the pair a usable end-to-end check of the library.
+""").test({
+    // ---- round trip: parse -> lower -> render -> parse ----
+    //
+    // Rendering is canonical, so the second parse is what the assertion turns
+    // on: whatever layout the source had, the value survives the round trip.
+    let src = "(define (square x) (* x x))";
+    let v = parse_sexp(src)?;
+    assert(v.render_sexp() == src);
+    assert(parse_sexp(v.render_sexp())? == v);
+
+    // ... including from a source `render_sexp` would never have written.
+    let messy = "( a  ; comment\n   (b) )";
+    let mv = parse_sexp(messy)?;
+    assert(mv.render_sexp() == "(a (b))");
+    assert(parse_sexp(mv.render_sexp())? == mv);
+    assert(render_sexp(SList([])) == "()");
+
+    // ---- deep nesting, on the 8 MB stack a shipped binary gets ----
+    //
+    // 200 levels of `((((...))))`. Under `aipl check` this runs on the CLI's
+    // 256 MB thread stack, which would prove nothing; the case harness also
+    // links this `.test` driver into an ordinary binary and runs *that*, and
+    // that run is what the depth is aimed at.
+    let n: u64 = 200;
+    let opens = "(".repeat(n);
+    let closes = ")".repeat(n);
+    let deep = `{opens}{closes}`;
+    let dv = parse_sexp(deep)?;
+    assert(dv.depth() == n);
+
+    // Rendering and re-parsing at that depth too — every pass over the tree is
+    // as deep as the input, not just the parse.
+    assert(dv.render_sexp() == deep);
+    assert(parse_sexp(dv.render_sexp())? == dv);
+})
+
+// ---------- test-only helpers ----------
+
+// How deeply `self` nests: an atom is 0, a list one more than its deepest
+// element. The deep-nesting assertion's whole content — a parse that silently
+// stopped early would show up here as a shallower tree.
+fn depth(self: Sexp) -> u64 {
+    match (self) {
+        SAtom(_) => 0,
+        SList(xs) => {
+            mut best: u64 = 0;
+            for (let x : xs) {
+                let d = x.depth();
+                if (best < d) {
+                    set best = d;
+                };
+            }
+            best + 1
+        },
+    }
+}
+
+// The message a failed parse reports — and a distinguishable string when it
+// unexpectedly succeeded, so a broken assertion says which way it broke.
+fn msg_of(src: str) -> str {
+    match (parse_sexp(src)) {
+        ok(v) => `unexpectedly parsed: {v.render_sexp()}`,
+        err(e) => e.message,
+    }
+}
+
+// The concrete tree, rendered against the production names — the debug view a
+// tree assertion reads better as than a nested `CTree` literal.
+fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar()))) }
+--- performance ---
+allocations: 29355
+deallocations: 29355
+reallocations: 1767
+bytes allocated: 1339316
+instructions executed: 4262152
+binary size: 177272
+  code: 107144
+  data: 4284
+  metadata: 65844
+functions:
+  __arr_drop_Sexp:
+    calls: 862
+    bytes: 116
+  __arr_drop___m1__Cst:
+    calls: 3515
+    bytes: 116
+  __arr_drop___m2__Production$SexpKind$Sexp:
+    calls: 74
+    bytes: 180
+  __arr_drop___m2__Rule$SexpKind:
+    calls: 171
+    bytes: 116
+  __arr_drop___m3__StepResult$SexpKind:
+    calls: 0
+    bytes: 140
+  __arr_drop___m3__Token$SexpKind:
+    calls: 981
+    bytes: 136
+  __arr_drop___m3__TokenRule$SexpKind:
+    calls: 24
+    bytes: 572
+  __arr_retain_Sexp:
+    calls: 873
+    bytes: 116
+  __arr_retain___m1__Cst:
+    calls: 3554
+    bytes: 116
+  __arr_retain___m2__Production$SexpKind$Sexp:
+    calls: 69
+    bytes: 180
+  __arr_retain___m2__Rule$SexpKind:
+    calls: 184
+    bytes: 116
+  __arr_retain___m3__StepResult$SexpKind:
+    calls: 0
+    bytes: 140
+  __arr_retain___m3__Token$SexpKind:
+    calls: 935
+    bytes: 136
+  __arr_retain___m3__TokenRule$SexpKind:
+    calls: 0
+    bytes: 572
+  __builtin_count_while$char$lam24:
+    calls: 930
+    bytes: 296
+  __builtin_count_while$char$s0$lam29:
+    calls: 5
+    bytes: 236
+  __builtin_count_while$char$s0$lam31:
+    calls: 0
+    bytes: 244
+  __builtin_count_while$char$s0$lam64:
+    calls: 854
+    bytes: 236
+  __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam40:
+    calls: 867
+    bytes: 716
+  __builtin_try_map$__m2__Production$SexpKind$Sexp$__m2__Production$SexpKind$Sexp$__m2__ParseError$lam15:
+    calls: 23
+    bytes: 928
+  __builtin_try_map$__m2__Rule$SexpKind$__m2__Rule<SexpKind>$__m2__ParseError$lam54:
+    calls: 46
+    bytes: 716
+  __eq_Sexp:
+    calls: 228
+    bytes: 184
+  __eq_Sexp$arr:
+    calls: 214
+    bytes: 300
+  __eq_char$opt:
+    calls: 0
+    bytes: 100
+  __lambda_10:
+    calls: 0
+    bytes: 92
+  __lambda_11:
+    calls: 41
+    bytes: 60
+  __lambda_13:
+    calls: 46
+    bytes: 744
+  __m1__leaves:
+    calls: 14
+    bytes: 764
+  __m1__show:
+    calls: 36
+    bytes: 1392
+  __m1__token_leaves:
+    calls: 74
+    bytes: 736
+  __m2__link$SexpKind$Sexp:
+    calls: 23
+    bytes: 1016
+  __m2__link_rule$SexpKind:
+    calls: 184
+    bytes: 4208
+  __m2__name_index:
+    calls: 115
+    bytes: 404
+  __m2__prod_names$SexpKind$Sexp:
+    calls: 51
+    bytes: 496
+  __m3__between_len:
+    calls: 0
+    bytes: 676
+  __m3__delimited_len:
+    calls: 0
+    bytes: 1500
+  __m3__finalize_template$SexpKind:
+    calls: 0
+    bytes: 3740
+  __m3__float_len:
+    calls: 0
+    bytes: 904
+  __m3__interp_scan$SexpKind:
+    calls: 0
+    bytes: 2056
+  __m3__lex$SexpKind:
+    calls: 24
+    bytes: 1372
+  __m3__lex_step$SexpKind:
+    calls: 936
+    bytes: 18424
+  __m3__nested_len:
+    calls: 0
+    bytes: 940
+  __m3__step_result$SexpKind:
+    calls: 3585
+    bytes: 5976
+  __m3__template_scan$SexpKind:
+    calls: 0
+    bytes: 2668
+  __m3__template_step$SexpKind:
+    calls: 0
+    bytes: 488
+  __m5__climb$SexpKind$Sexp:
+    calls: 0
+    bytes: 2760
+  __m5__error_at$SexpKind$Sexp:
+    calls: 4
+    bytes: 1444
+  __m5__far_miss:
+    calls: 1712
+    bytes: 956
+  __m5__find_prec:
+    calls: 0
+    bytes: 848
+  __m5__leaf_at$SexpKind$Sexp:
+    calls: 890
+    bytes: 1208
+  __m5__lower_node$SexpKind$Sexp:
+    calls: 867
+    bytes: 3224
+  __m5__match_list_of$SexpKind$Sexp:
+    calls: 0
+    bytes: 2500
+  __m5__match_many$SexpKind$Sexp:
+    calls: 426
+    bytes: 1880
+  __m5__match_maybe$SexpKind$Sexp:
+    calls: 0
+    bytes: 836
+  __m5__match_one_of$SexpKind$Sexp:
+    calls: 893
+    bytes: 1304
+  __m5__match_prod$SexpKind$Sexp:
+    calls: 1747
+    bytes: 3772
+  __m5__match_rule$SexpKind$Sexp:
+    calls: 6070
+    bytes: 4336
+  __m5__match_then$SexpKind$Sexp:
+    calls: 854
+    bytes: 1712
+  __m5__oxford:
+    calls: 4
+    bytes: 1576
+  __m5__parse$SexpKind$Sexp:
+    calls: 17
+    bytes: 340
+  __m5__parse_cst$SexpKind$Sexp:
+    calls: 23
+    bytes: 4032
+  __m5__prev_end$SexpKind$Sexp:
+    calls: 928
+    bytes: 464
+  __m5__quoted:
+    calls: 431
+    bytes: 380
+  __m5__tok_text$SexpKind$Sexp:
+    calls: 1282
+    bytes: 548
+  __m5__trailing_trivia$SexpKind$Sexp:
+    calls: 38
+    bytes: 548
+  __rec_drop_Sexp:
+    calls: 464
+    bytes: 72
+  __rec_drop___m1__Cst:
+    calls: 1840
+    bytes: 48
+  __rec_drop___m2__Rule$SexpKind:
+    calls: 408
+    bytes: 360
+  __test$parse_sexp:
+    calls: 1
+    bytes: 3712
+  __test$render_sexp:
+    calls: 1
+    bytes: 2704
+  __test$sexp_cst:
+    calls: 1
+    bytes: 1972
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 64
+  __to_str_SexpKind:
+    calls: 854
+    bytes: 528
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 812
+  __to_str_u64:
+    calls: 0
+    bytes: 180
+  aipl_arr_drop_arr:
+    calls: 33
+    bytes: (external)
+  aipl_arr_drop_str:
+    calls: 2217
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 3610
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 97761
+    bytes: (external)
+  aipl_arr_join:
+    calls: 33
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 4061
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 1530
+    bytes: (external)
+  aipl_array_dec:
+    calls: 118271
+    bytes: (external)
+  aipl_array_new:
+    calls: 14814
+    bytes: (external)
+  aipl_array_push:
+    calls: 1905
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1997
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2336
+    bytes: (external)
+  aipl_assert:
+    calls: 26
+    bytes: (external)
+  aipl_char_at:
+    calls: 2685
+    bytes: (external)
+  aipl_concat:
+    calls: 3504
+    bytes: (external)
+  aipl_dec:
+    calls: 110766
+    bytes: (external)
+  aipl_inc:
+    calls: 93819
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 2712
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 31710
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 51
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 28998
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 51
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 854
+    bytes: (external)
+  aipl_str_contains:
+    calls: 3623
+    bytes: (external)
+  aipl_str_data:
+    calls: 2622
+    bytes: (external)
+  aipl_str_eq:
+    calls: 1929
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 1789
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 1768
+    bytes: (external)
+  aipl_str_join:
+    calls: 457
+    bytes: (external)
+  aipl_str_len:
+    calls: 18381
+    bytes: (external)
+  aipl_str_repeat:
+    calls: 2
+    bytes: (external)
+  aipl_str_slice:
+    calls: 7642
+    bytes: (external)
+  aipl_str_starts_with:
+    calls: 900
+    bytes: (external)
+  aipl_test_begin:
+    calls: 3
+    bytes: (external)
+  aipl_test_end:
+    calls: 3
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3416
+    bytes: (external)
+  depth:
+    calls: 200
+    bytes: 316
+  lex_sexp:
+    calls: 24
+    bytes: 1724
+  lower_item:
+    calls: 448
+    bytes: 964
+  lower_list:
+    calls: 419
+    bytes: 256
+  main:
+    calls: 1
+    bytes: 152
+  msg_of:
+    calls: 5
+    bytes: 428
+  parse_sexp:
+    calls: 18
+    bytes: 384
+  render_sexp:
+    calls: 427
+    bytes: 608
+  sexp_cst:
+    calls: 6
+    bytes: 384
+  sexp_grammar:
+    calls: 28
+    bytes: 1028
+  shown:
+    calls: 5
+    bytes: 416

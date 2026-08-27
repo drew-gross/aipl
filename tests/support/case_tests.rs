@@ -580,6 +580,7 @@ case_tests! {
     crates_aipl_codegen_src_find_trailing_whitespace = "crates/aipl-codegen/src/find_trailing_whitespace",
     crates_aipl_codegen_src_format_source = "crates/aipl-codegen/src/format_source",
     crates_aipl_codegen_src_grammar = "crates/aipl-codegen/src/grammar",
+    crates_aipl_codegen_src_grammar_sexp = "crates/aipl-codegen/src/grammar_sexp",
     crates_aipl_codegen_src_indent = "crates/aipl-codegen/src/indent",
     crates_aipl_codegen_src_int_fits = "crates/aipl-codegen/src/int_fits",
     crates_aipl_codegen_src_is_operator_name = "crates/aipl-codegen/src/is_operator_name",
