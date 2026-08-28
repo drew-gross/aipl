@@ -1,0 +1,796 @@
+// A four-operator calculator: the library's third end-to-end target, and the one
+// that exercises `Climb`. Neither earlier toy has an infix operator at all —
+// S-expressions put the operator first and JSON has none — so precedence
+// climbing was proven only by `parse.aipl`'s own unit tests, which stop at the
+// concrete tree. This one lowers through that tree and then *evaluates* the
+// result, which is the assertion that a wrong shape cannot survive.
+//
+//     expr  -> Climb(unary, [+ -  |  * / %  |  ^ right])
+//     unary -> "-" unary | atom
+//     atom  -> Num | "(" expr ")"
+//
+// Three things it pins down that a tree-shape assertion alone would not:
+//
+//   - **Precedence and associativity, as arithmetic.** `2 + 3 * 4` is 14 and not
+//     20; `2 ^ 3 ^ 2` is 512 (right-associative) and not 64; `10 - 3 - 2` is 5
+//     (left-associative) and not 9.
+//   - **What `Climb` hands a lowering function.** Each operand nests under the
+//     *enclosing* production's index, so a binary node arrives as two interior
+//     children with the operator between them as a direct leaf — read with
+//     `own_token_text`, which exists for exactly this (see `cst.aipl`).
+//   - **A `build` that legitimately fails.** An integer literal too big for an
+//     `i64` is a lowering error, not a parse error, and it propagates out of
+//     `parse` unchanged. That is the case the two-pass design was chosen for: run
+//     during the parse it would have aborted alternatives that should simply have
+//     been retried.
+//
+// Unary minus is *not* a `Climb` operator — `Climb` is binary — so it lives in
+// the atom rule, which is what makes it bind tighter than every infix operator:
+// `-2 ^ 2` is `(-2) ^ 2`.
+import {
+    equal as ==,
+    first,
+    int_parse,
+    is_nonempty,
+    last,
+    len,
+    less_than as <,
+    map_err,
+    remainder as %,
+    saturating_divide as /,
+    to_str,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+import { Cst, own_token_text, show, span, text } from "./cst.aipl";
+import {
+    Climb,
+    Grammar,
+    Mk,
+    Named,
+    OneOf,
+    ParseError,
+    Prec,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+    prod_names,
+} from "./grammar.aipl";
+import { Bare, CharRun, Int, LexResult, TokenRule, lex } from "./lexer.aipl";
+import { parse, parse_cst } from "./parse.aipl";
+
+// Two token kinds: digit runs, and every one-character operator or bracket. The
+// grammar tells the operators apart by `Spelling`, so their kind never has to.
+variant CalcTok = Num | Punct
+
+// The AST. `Bin` carries the operator's spelling rather than a case per
+// operator — the grammar already lists them in its `Prec` table, and one arm in
+// `eval_calc` per spelling keeps the two in step without a third enumeration.
+variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
+
+// Whitespace is trivia rather than skipped, so the concrete tree covers every
+// byte and reconstructs the source exactly.
+//
+// The punctuation rule sits *ahead* of `Int`, which makes every `-` its own
+// token and `Int` unsigned. That is the ordering this grammar needs: negation is
+// a rule (`unary`), so a `-` the lexer had swallowed into the literal would be
+// invisible to it — `1 -2` would lex as two numbers and parse as nothing.
+fn calc_rules() -> TokenRule<CalcTok>[] {
+    [
+        TokenRule { matcher: CharRun(" \t\r\n", " \t\r\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun("+-*/%^()", ""), emit: Bare(Punct) },
+        TokenRule { matcher: Int, emit: Bare(Num) },
+    ]
+}
+
+// ---------- lowering ----------
+
+// A `Climb` node is either a bare atom that climbed to itself — one interior
+// child, no operator — or an application: two interior children with the
+// operator as a direct leaf between them.
+fn lower_expr(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+    let lhs = kids
+        .first()
+        .value_or_err(ParseError { message: "an expression matched nothing", span: node.span() })?;
+    match (kids.last()) {
+        some(rhs) => if (kids.len() == 2) {
+            ok(Bin(node.own_token_text(src), lhs, rhs))
+        } else {
+            ok(lhs)
+        },
+        none => ok(lhs),
+    }
+}
+
+// `-` then a unary, or a bare atom. The two are told apart by whether this node
+// matched a `-` of its own: the atom branch matches no token directly at all.
+fn lower_unary(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+    let inner = kids
+        .first()
+        .value_or_err(ParseError {
+            message: "a unary expression has no operand",
+            span: node.span(),
+        })?;
+    if (node.own_token_text(src).is_nonempty()) {
+        return ok(Neg(inner));
+    };
+    ok(inner)
+}
+
+// A parenthesized expression lowered one interior child, and a literal lowered
+// none — so the absence of a child is what says "this is a number", and its text
+// is the node's own.
+//
+// The one `build` here that can fail: a literal too big for an `i64`. It is a
+// lowering error, not a parse error, and `parse` hands it back unchanged.
+fn lower_atom(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+    match (kids.first()) {
+        some(inner) => ok(inner),
+        none => {
+            let text = node.own_token_text(src);
+            let v = text
+                .int_parse()
+                .value_or_err(ParseError {
+                    message: `integer literal "{text}" overflows i64`,
+                    span: node.span(),
+                })?;
+            ok(Lit(v))
+        },
+    }
+}
+
+pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
+    // Higher `power` binds tighter. `^` is the one right-associative level, which
+    // is what makes `2 ^ 3 ^ 2` nest to the right where `-` nests to the left.
+    let r_expr: Rule<CalcTok> = Climb(
+        Named("unary"),
+        [
+            Prec { power: 1, right: false, ops: ["+", "-"] },
+            Prec { power: 2, right: false, ops: ["*", "/", "%"] },
+            Prec { power: 3, right: true, ops: ["^"] },
+        ],
+    );
+    let r_unary: Rule<CalcTok> = OneOf([Then([Spelling("-"), Named("unary")]), Named("atom")]);
+    let r_atom: Rule<CalcTok> = OneOf([
+        Term(Num),
+        Then([Spelling("("), Named("expr"), Spelling(")")]),
+    ]);
+    Grammar {
+        prods: [
+            // `unary` and `atom` share one label, which is the whole point of
+            // `expect_as`: unlabelled, a failure at the start of an operand
+            // reports "expected `-` or an expression" — the `-` being the first
+            // alternative of `unary` leaking out, when a unary minus *is* an
+            // expression. One label on both collapses them to the word a reader
+            // wants, exactly as the LR parser's `SYMBOL_DISPLAY_NAMES` collapses
+            // `expr`/`term`/`unary`/`atom`. `expr` stays transparent so a
+            // half-matched expression still reports what it was really missing.
+            Production { name: "expr", rule: r_expr, build: Mk(lower_expr) },
+            Production {
+                name: "unary",
+                rule: r_unary,
+                build: Mk(lower_unary),
+                expect_as: "an expression",
+            },
+            Production {
+                name: "atom",
+                rule: r_atom,
+                build: Mk(lower_atom),
+                expect_as: "an expression",
+            },
+        ],
+    }
+}.doc("""
+    The calculator grammar: `+ - * / % ^` over integer literals, with `^`
+    right-associative and unary `-` binding tighter than any of them.
+
+    Only `atom` is labelled, so a failure deep in an expression reports as "an
+    expression" rather than as the three productions it is made of.
+""")
+
+fn lex_calc(src: str) -> LexResult<CalcTok>!ParseError {
+    src.lex(calc_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
+}
+
+pub fn calc_cst(src: str) -> Cst!ParseError {
+    parse_cst(src, lex_calc(src)?, calc_grammar(), "expr")
+}.doc("""
+    The lossless concrete tree for `src`. Use this when the tree is the point;
+    `parse_calc` when only the `Calc` is.
+""").test({
+    // What `Climb` actually builds: one node per operand, nested by binding
+    // power, with the operator a direct leaf of the node that applies it. The
+    // outermost application is flat because `match_prod`'s own wrap completes it.
+    // Trivia attaches in front of the token that follows it, which is why the
+    // space before `+` is a leaf of the outer node and the one before `2` is a
+    // leaf of the atom.
+    assert(shown("1 + 2")? == "(expr (expr (unary (atom 1))) ~  + (expr (unary (atom ~  2))))");
+
+    // `*` binds tighter, so it nests inside the `+` — and the other order proves
+    // it is precedence and not source order.
+    assert(depth_of("1 + 2 * 3")? == 3);
+    assert(depth_of("1 * 2 + 3")? == 3);
+
+    // Losslessness: every byte under exactly one leaf, so the leaves concatenate
+    // back to the source.
+    let src = " -( 1 + 2 ) * 3 ";
+    assert(calc_cst(src)?.text(src) == src);
+})
+
+pub fn parse_calc(src: str) -> Calc!ParseError {
+    parse(src, lex_calc(src)?, calc_grammar(), "expr")
+}.doc("""
+    The `Calc` `src` denotes: lex, parse to a concrete tree, lower it through
+    the grammar's `build` functions.
+
+    Fails with a `ParseError` from either half of the front end, or from a
+    lowering that refused — an integer literal too big for an `i64`.
+""").test({
+    // ---- atoms ----
+    assert(parse_calc("7")? == Lit(7));
+    assert(parse_calc("(7)")? == Lit(7));
+    assert(parse_calc("-7")? == Neg(Lit(7)));
+    // Unary is its own rule, so it stacks.
+    assert(parse_calc("--7")? == Neg(Neg(Lit(7))));
+
+    // ---- precedence, as a shape ----
+    assert(parse_calc("1 + 2")? == Bin("+", Lit(1), Lit(2)));
+    assert(parse_calc("1 + 2 * 3")? == Bin("+", Lit(1), Bin("*", Lit(2), Lit(3))));
+    assert(parse_calc("1 * 2 + 3")? == Bin("+", Bin("*", Lit(1), Lit(2)), Lit(3)));
+
+    // ---- a `build` that refuses ----
+    //
+    // Too big for an `i64`: a *lowering* error, raised after the parse
+    // succeeded, and propagated out unchanged.
+    let too_big = """integer literal "99999999999999999999" overflows i64""";
+    assert(msg_of("99999999999999999999") == too_big);
+    // ... and it is the whole parse that fails, not just that operand.
+    assert(msg_of("1 + 99999999999999999999") == too_big);
+
+    // ---- errors ----
+    assert(msg_of("") == "expected an expression, found end of input");
+    assert(msg_of("1 +") == "expected an expression, found end of input");
+    assert(msg_of("(1") == "expected `)`, found end of input");
+    assert(msg_of("1 2") == "expected end of input, found `2`");
+    assert(msg_of("@") == "unexpected character");
+})
+
+// Fully parenthesized, so the rendering *is* the tree shape — which is what
+// makes the precedence assertions below readable, and what makes the round trip
+// exact rather than approximate.
+pub fn render_calc(self: Calc) -> str {
+    match (self) {
+        Lit(v) => v.to_str(),
+        Neg(x) => `-{x.render_calc()}`,
+        Bin(op, l, r) => `({l.render_calc()} {op} {r.render_calc()})`,
+    }
+}.doc("""
+    `self` printed back as source, fully parenthesized — every application gets
+    brackets, so the text shows the tree and needs no precedence rules to read.
+
+    Round-trips with `parse_calc`: `parse_calc(render_calc(v)) == v`.
+""").test({
+    // ---- precedence and associativity, made visible ----
+    assert(render_calc(parse_calc("1 + 2 * 3")?) == "(1 + (2 * 3))");
+    assert(render_calc(parse_calc("1 * 2 + 3")?) == "((1 * 2) + 3)");
+    // Equal power, left-associative.
+    assert(render_calc(parse_calc("1 - 2 - 3")?) == "((1 - 2) - 3)");
+    assert(render_calc(parse_calc("1 + 2 + 3")?) == "((1 + 2) + 3)");
+    // The one right-associative level nests the other way.
+    assert(render_calc(parse_calc("2 ^ 3 ^ 2")?) == "(2 ^ (3 ^ 2))");
+    // Unary is tighter than every infix operator, since it is in the atom rule.
+    assert(render_calc(parse_calc("-2 ^ 2")?) == "(-2 ^ 2)");
+    assert(render_calc(parse_calc("-2 * 3")?) == "(-2 * 3)");
+    // Parentheses override, and disappear into the shape.
+    assert(render_calc(parse_calc("(1 + 2) * 3")?) == "((1 + 2) * 3)");
+
+    // ---- round trip ----
+    let v = parse_calc("1 + 2 * 3 - 4 ^ 2 ^ 1 / -5 % 6")?;
+    assert(parse_calc(v.render_calc())? == v);
+    assert(parse_calc(render_calc(Neg(Neg(Lit(3)))))? == Neg(Neg(Lit(3))));
+})
+
+// The value of `self`. Integer arithmetic throughout, with the saturating
+// division the language provides (so a zero divisor yields a value rather than a
+// trap) — a calculator's semantics are its own, and this one's are deliberately
+// total.
+pub fn eval_calc(self: Calc) -> i64 {
+    match (self) {
+        Lit(v) => v,
+        Neg(x) => 0 - x.eval_calc(),
+        Bin(op, l, r) => {
+            let a = l.eval_calc();
+            let b = r.eval_calc();
+            match (op) {
+                "+" => a + b,
+                "-" => a - b,
+                "*" => a * b,
+                "/" => a / b,
+                "%" => a % b,
+                "^" => pow(a, b),
+                _ => 0,
+            }
+        },
+    }
+}.doc("""
+    `self` evaluated as integer arithmetic. Division is saturating and `^` is
+    integer exponentiation with a negative exponent yielding 0, so evaluation is
+    total — a calculator's arithmetic policy is its own, not the parser's.
+""").test({
+    // The assertion a wrong tree cannot survive: precedence as arithmetic.
+    assert(eval("2 + 3 * 4")? == 14);
+    assert(eval("2 * 3 + 4")? == 10);
+    assert(eval("(2 + 3) * 4")? == 20);
+    // Left-associative: `10 - 3 - 2` is 5, not 9.
+    assert(eval("10 - 3 - 2")? == 5);
+    assert(eval("100 / 10 / 2")? == 5);
+    // Right-associative: `2 ^ 3 ^ 2` is 2^9, not 8^2.
+    assert(eval("2 ^ 3 ^ 2")? == 512);
+    assert(eval("(2 ^ 3) ^ 2")? == 64);
+    // Unary minus, and the mixed expression that needs all three levels.
+    assert(eval("-3 * -4")? == 12);
+    assert(eval("1 + 2 * 3 ^ 2")? == 19);
+    assert(eval("7 % 3 + 1")? == 2);
+    // Total, not trapping.
+    assert(eval("1 / 0")? == 9223372036854775807);
+    assert(eval("2 ^ -1")? == 0);
+})
+
+// Integer exponentiation by repeated multiplication. A negative exponent has no
+// integer value, so it yields 0 rather than failing — see `eval_calc`'s doc.
+fn pow(base: i64, exp: i64) -> i64 {
+    if (exp < 0) {
+        return 0;
+    };
+    mut acc: i64 = 1;
+    mut i: i64 = 0;
+    while (i < exp) {
+        set acc = acc * base;
+        set i++;
+    }
+    acc
+}
+
+// ---------- test-only helpers ----------
+
+fn eval(src: str) -> i64!ParseError { ok(parse_calc(src)?.eval_calc()) }
+
+fn msg_of(src: str) -> str {
+    match (parse_calc(src)) {
+        ok(v) => `unexpectedly parsed: {v.render_calc()}`,
+        err(e) => e.message,
+    }
+}
+
+fn shown(src: str) -> str!ParseError { ok(calc_cst(src)?.show(src, prod_names(calc_grammar()))) }
+
+// How deeply a parsed expression nests — the cheap shape check for a `Climb`
+// that grouped its operands wrongly: a flat run would come back shallower.
+fn depth_of(src: str) -> u64!ParseError { ok(depth(parse_calc(src)?)) }
+
+fn depth(self: Calc) -> u64 {
+    match (self) {
+        Lit(..) => 1,
+        Neg(x) => 1 + x.depth(),
+        Bin(_, l, r) => {
+            let a = l.depth();
+            let b = r.depth();
+            if (a < b) { 1 + b } else { 1 + a }
+        },
+    }
+}
+--- performance ---
+allocations: 8308
+deallocations: 8308
+reallocations: 408
+bytes allocated: 411348
+instructions executed: 1172045
+binary size: 189720
+  code: 112984
+  data: 5716
+  metadata: 71020
+functions:
+  __arr_drop_Calc:
+    calls: 348
+    bytes: 116
+  __arr_drop___m1__Cst:
+    calls: 1046
+    bytes: 116
+  __arr_drop___m2__Prec:
+    calls: 41
+    bytes: 120
+  __arr_drop___m2__Production$CalcTok$Calc:
+    calls: 161
+    bytes: 180
+  __arr_drop___m2__Rule$CalcTok:
+    calls: 524
+    bytes: 116
+  __arr_drop___m3__StepResult$CalcTok:
+    calls: 0
+    bytes: 140
+  __arr_drop___m3__TokenRule$CalcTok:
+    calls: 41
+    bytes: 512
+  __arr_retain_Calc:
+    calls: 407
+    bytes: 116
+  __arr_retain___m1__Cst:
+    calls: 1046
+    bytes: 116
+  __arr_retain___m2__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m2__Production$CalcTok$Calc:
+    calls: 200
+    bytes: 180
+  __arr_retain___m2__Rule$CalcTok:
+    calls: 560
+    bytes: 116
+  __arr_retain___m3__StepResult$CalcTok:
+    calls: 0
+    bytes: 140
+  __arr_retain___m3__TokenRule$CalcTok:
+    calls: 0
+    bytes: 512
+  __builtin_count_while$char$lam28:
+    calls: 234
+    bytes: 296
+  __builtin_count_while$char$s0$lam33:
+    calls: 0
+    bytes: 236
+  __builtin_count_while$char$s0$lam35:
+    calls: 104
+    bytes: 244
+  __builtin_count_while$char$s0$lam45:
+    calls: 94
+    bytes: 232
+  __builtin_count_while$char$s0$lam71:
+    calls: 15
+    bytes: 236
+  __builtin_int_parse:
+    calls: 94
+    bytes: 1052
+  __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam44:
+    calls: 387
+    bytes: 716
+  __builtin_try_map$__m2__Production$CalcTok$Calc$__m2__Production$CalcTok$Calc$__m2__ParseError$lam14:
+    calls: 40
+    bytes: 928
+  __builtin_try_map$__m2__Rule$CalcTok$__m2__Rule<CalcTok>$__m2__ParseError$lam58:
+    calls: 160
+    bytes: 716
+  __eq_Calc:
+    calls: 31
+    bytes: 316
+  __eq_char$opt:
+    calls: 104
+    bytes: 100
+  __lambda_12:
+    calls: 120
+    bytes: 744
+  __lambda_21:
+    calls: 95
+    bytes: 140
+  __m1__leaves:
+    calls: 36
+    bytes: 764
+  __m1__own_token_text:
+    calls: 268
+    bytes: 1056
+  __m1__show:
+    calls: 12
+    bytes: 1392
+  __m1__span:
+    calls: 2
+    bytes: 460
+  __m2__link$CalcTok$Calc:
+    calls: 40
+    bytes: 1016
+  __m2__link_rule$CalcTok:
+    calls: 520
+    bytes: 4092
+  __m2__name_index:
+    calls: 320
+    bytes: 404
+  __m2__prod_names$CalcTok$Calc:
+    calls: 81
+    bytes: 496
+  __m3__between_len:
+    calls: 0
+    bytes: 676
+  __m3__delimited_len:
+    calls: 0
+    bytes: 1500
+  __m3__finalize_template$CalcTok:
+    calls: 0
+    bytes: 3108
+  __m3__float_len:
+    calls: 0
+    bytes: 904
+  __m3__interp_scan$CalcTok:
+    calls: 0
+    bytes: 2040
+  __m3__lex$CalcTok:
+    calls: 41
+    bytes: 1356
+  __m3__lex_step$CalcTok:
+    calls: 338
+    bytes: 17596
+  __m3__nested_len:
+    calls: 0
+    bytes: 940
+  __m3__step_result$CalcTok:
+    calls: 648
+    bytes: 4952
+  __m3__template_scan$CalcTok:
+    calls: 0
+    bytes: 2668
+  __m3__template_step$CalcTok:
+    calls: 0
+    bytes: 488
+  __m5__climb$CalcTok$Calc:
+    calls: 117
+    bytes: 2760
+  __m5__error_at$CalcTok$Calc:
+    calls: 4
+    bytes: 1260
+  __m5__far_miss:
+    calls: 141
+    bytes: 956
+  __m5__find_prec:
+    calls: 177
+    bytes: 848
+  __m5__leaf_at$CalcTok$Calc:
+    calls: 204
+    bytes: 976
+  __m5__lower_node$CalcTok$Calc:
+    calls: 387
+    bytes: 2828
+  __m5__match_list_of$CalcTok$Calc:
+    calls: 0
+    bytes: 2632
+  __m5__match_many$CalcTok$Calc:
+    calls: 0
+    bytes: 1880
+  __m5__match_maybe$CalcTok$Calc:
+    calls: 0
+    bytes: 836
+  __m5__match_one_of$CalcTok$Calc:
+    calls: 247
+    bytes: 1304
+  __m5__match_prod$CalcTok$Calc:
+    calls: 300
+    bytes: 3772
+  __m5__match_rule$CalcTok$Calc:
+    calls: 980
+    bytes: 4072
+  __m5__match_then$CalcTok$Calc:
+    calls: 145
+    bytes: 1712
+  __m5__oxford:
+    calls: 4
+    bytes: 1576
+  __m5__parse$CalcTok$Calc:
+    calls: 38
+    bytes: 340
+  __m5__parse_cst$CalcTok$Calc:
+    calls: 40
+    bytes: 4032
+  __m5__prev_end$CalcTok$Calc:
+    calls: 276
+    bytes: 292
+  __m5__quoted:
+    calls: 121
+    bytes: 380
+  __m5__tok_text$CalcTok$Calc:
+    calls: 336
+    bytes: 368
+  __m5__trailing_trivia$CalcTok$Calc:
+    calls: 72
+    bytes: 492
+  __rec_drop_Calc:
+    calls: 181
+    bytes: 132
+  __rec_drop___m1__Cst:
+    calls: 790
+    bytes: 48
+  __rec_drop___m2__Rule$CalcTok:
+    calls: 1053
+    bytes: 324
+  __test$calc_cst:
+    calls: 1
+    bytes: 1132
+  __test$eval_calc:
+    calls: 1
+    bytes: 1544
+  __test$parse_calc:
+    calls: 1
+    bytes: 3720
+  __test$render_calc:
+    calls: 1
+    bytes: 4716
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 64
+  __to_str_CalcTok:
+    calls: 15
+    bytes: 280
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 812
+  __to_str_i64:
+    calls: 31
+    bytes: 180
+  __to_str_u64:
+    calls: 0
+    bytes: 180
+  aipl_arr_drop_arr:
+    calls: 17
+    bytes: (external)
+  aipl_arr_drop_str:
+    calls: 517
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 837
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 23273
+    bytes: (external)
+  aipl_arr_join:
+    calls: 17
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 890
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 540
+    bytes: (external)
+  aipl_array_dec:
+    calls: 29162
+    bytes: (external)
+  aipl_array_new:
+    calls: 3309
+    bytes: (external)
+  aipl_array_push:
+    calls: 1032
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1234
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1305
+    bytes: (external)
+  aipl_assert:
+    calls: 40
+    bytes: (external)
+  aipl_char_at:
+    calls: 752
+    bytes: (external)
+  aipl_concat:
+    calls: 914
+    bytes: (external)
+  aipl_dec:
+    calls: 31154
+    bytes: (external)
+  aipl_i64_len:
+    calls: 62
+    bytes: (external)
+  aipl_inc:
+    calls: 25474
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 2024
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 15404
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 219
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 13380
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 219
+    bytes: (external)
+  aipl_str_contains:
+    calls: 774
+    bytes: (external)
+  aipl_str_data:
+    calls: 534
+    bytes: (external)
+  aipl_str_eq:
+    calls: 1298
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 539
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 534
+    bytes: (external)
+  aipl_str_join:
+    calls: 276
+    bytes: (external)
+  aipl_str_len:
+    calls: 5200
+    bytes: (external)
+  aipl_str_slice:
+    calls: 1874
+    bytes: (external)
+  aipl_str_starts_with:
+    calls: 94
+    bytes: (external)
+  aipl_test_begin:
+    calls: 4
+    bytes: (external)
+  aipl_test_end:
+    calls: 4
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 15
+    bytes: (external)
+  aipl_write_i64:
+    calls: 31
+    bytes: (external)
+  calc_cst:
+    calls: 2
+    bytes: 384
+  calc_grammar:
+    calls: 41
+    bytes: 1904
+  depth:
+    calls: 10
+    bytes: 288
+  depth_of:
+    calls: 2
+    bytes: 300
+  eval:
+    calls: 12
+    bytes: 280
+  eval_calc:
+    calls: 0
+    bytes: 32
+  eval_calc$tail:
+    calls: 59
+    bytes: 976
+  lex_calc:
+    calls: 41
+    bytes: 1388
+  lower_atom:
+    calls: 105
+    bytes: 1208
+  lower_expr:
+    calls: 162
+    bytes: 1656
+  lower_unary:
+    calls: 115
+    bytes: 1232
+  main:
+    calls: 1
+    bytes: 192
+  msg_of:
+    calls: 7
+    bytes: 428
+  parse_calc:
+    calls: 39
+    bytes: 384
+  pow:
+    calls: 0
+    bytes: 36
+  pow$tail:
+    calls: 6
+    bytes: 120
+  render_calc:
+    calls: 57
+    bytes: 848
+  shown:
+    calls: 1
+    bytes: 416

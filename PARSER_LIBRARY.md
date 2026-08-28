@@ -9,6 +9,7 @@ each is sized to be finishable in one session.
 - [x] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
 - [x] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
 - [x] 1.2 JSON end to end
+- [x] 1.3 A calculator end to end — `Climb`, lowered and evaluated
 
 **Stages 2-6**
 - [ ] 2 `ebnf.aipl` + FIRST sets
@@ -261,9 +262,49 @@ has the first two):
   is stripped while a trailing one is kept. JSON sources that begin with `"` read
   more predictably as ordinary escaped literals.
 
-Precedence (`Climb`) has no exercise in either toy — it arrives with AIPL's
-grammar in Stage 4. If it needs proving sooner, the cheapest vehicle is a
-four-operator arithmetic grammar bolted onto the S-expression lexer.
+### 1.3 A calculator — `Climb`, end to end
+
+Neither earlier toy has an infix operator at all, so precedence climbing was
+proven only by `parse.aipl`'s own unit tests, which stop at the concrete tree.
+`grammar_calc.aipl` is the four-operator arithmetic grammar this section used to
+propose, and it goes one step further than the other two toys: it **evaluates**
+the lowered tree, which is the assertion a wrong shape cannot survive.
+
+```
+expr  -> Climb(unary, [+ -  |  * / %  |  ^ right])
+unary -> "-" unary | atom
+atom  -> Num | "(" expr ")"
+```
+
+`render_calc` prints fully parenthesized, so a rendering *is* a tree shape and
+the precedence assertions read as `"1 + 2 * 3"` → `"(1 + (2 * 3))"`. Evaluation
+then pins the same facts as arithmetic: 14 rather than 20, `2 ^ 3 ^ 2` = 512
+rather than 64 (right-associative), `10 - 3 - 2` = 5 rather than 9 (left).
+
+**What 1.3 landed:**
+
+- **`cst.aipl` grew `own_tokens`/`own_token_text`** — the tokens a node matched
+  *directly*, one level down. It is the mirror of `nodes` (direct branches), and
+  it is what a lowering function reads an operator from: `Climb` nests both
+  operands under the enclosing production's index and leaves the operator as a
+  direct leaf between them, so `token_text` would hand back the whole
+  expression's tokens run together. Third such helper the toys have asked for,
+  after 1.1's `token_leaves`/`token_text`.
+- **`expect_as` earned its keep, visibly.** Unlabelled, an empty input reported
+  "expected `-` or an expression" — the `-` being the first alternative of
+  `unary` leaking out, when a unary minus *is* an expression. Labelling `unary`
+  and `atom` with the same word collapses them, exactly as the LR parser's
+  `SYMBOL_DISPLAY_NAMES` collapses `expr`/`term`/`unary`/`atom`. Worth knowing
+  for Stage 4: under ordered choice this is not a nicety, it is what keeps a
+  message from listing the grammar.
+- **Unary minus is not a `Climb` operator.** `Climb` is binary, so negation lives
+  in the atom rule — which is also what makes it bind tighter than every infix
+  level (`-2 ^ 2` is `(-2) ^ 2`). A prefix-operator table is a thing `Rule` does
+  not have and, on this evidence, does not need.
+- **The two-pass design paid off concretely.** An integer literal too big for an
+  `i64` is a *lowering* failure raised after the parse succeeded, and it
+  propagates out of `parse` unchanged. Run during the parse it would have aborted
+  alternatives that should simply have been retried.
 
 ### Errors
 
@@ -342,7 +383,9 @@ file that also declares a `Kind` constructor trips the silent drop.
    source byte-for-byte. Stage 5 depends on this; it is the cheapest place to
    catch a regression.
 6. **Round-trip on each toy** — parse → lower → render → parse, for
-   S-expressions first and then JSON. The deep-nesting case (~200 levels of
+   S-expressions, then JSON, then the calculator (whose rendering is fully
+   parenthesized, so the round trip is exact and the text shows the tree). The
+   deep-nesting case (~200 levels of
    `((((...))))`) belongs with S-expressions, since that is the first grammar
    that can nest, and it must run as a **built binary**, not just under
    `aipl check` — otherwise it is measured against 256 MB instead of the 8 MB a

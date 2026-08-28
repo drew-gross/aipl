@@ -20,6 +20,7 @@ import {
     Span,
     equal as ==,
     filter,
+    filter_map,
     first,
     join,
     last,
@@ -105,6 +106,45 @@ pub fn nodes(self: Cst) -> Cst[] {
     }
 }
 
+// The token leaves `self` matched *directly* — one level down, not recursed
+// into. The mirror of `nodes`: that one is a node's direct branches, this its
+// direct leaves, and between them they are everything the node itself matched.
+//
+// This is what a lowering function reads an operator or a keyword from. A
+// `Climb` node's two operands arrive as interior children and the operator
+// between them is a direct leaf, so `own_token_text` is the operator and nothing
+// else — where `token_text` would hand back the whole expression's tokens run
+// together. Trivia is dropped here as it is there.
+pub fn own_tokens(self: Cst) -> Span[] {
+    match (self) {
+        CLeaf(..) | CTrivia(..) => [],
+        CTree(_, kids) => kids.filter_map(is_leaf, leaf_span),
+    }
+}
+
+// The source text of `self`'s direct token leaves, run together with nothing
+// between them — the operator of a binary node, the keyword that opened a form.
+pub fn own_token_text(self: Cst, src: str) -> str {
+    self.own_tokens().map(|sp| src[sp]).join(sep="")
+}
+
+// Whether `self` is a token leaf: not an interior node, and not trivia.
+fn is_leaf(self: Cst) -> bool {
+    match (self) {
+        CLeaf(..) => true,
+        CTree(..) | CTrivia(..) => false,
+    }
+}
+
+// The span of a leaf, for `own_tokens`'s `filter_map`. A non-leaf never reaches
+// it (the filter runs first), and reports the empty span rather than failing.
+fn leaf_span(self: Cst) -> Span {
+    match (self) {
+        CLeaf(sp) => sp,
+        CTrivia(..) | CTree(..) => 0..0,
+    }
+}
+
 // `self` rendered as an S-expression against the grammar's production names
 // (`prod_names`), for tests and for reading a tree by eye: a leaf as its source
 // text, a trivia leaf prefixed with `~`, an interior node as
@@ -157,6 +197,18 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(nested.nodes().len() == 1);
     // `nodes` is one level deep and drops leaves: three kids, one interior.
     assert(nested.nodes() == [CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+
+    // `own_tokens` is the mirror — one level deep, leaves only — so between them
+    // they are everything `nested` matched directly. The interior child's own
+    // leaves belong to it, not to the parent, which is what separates this from
+    // `token_leaves`.
+    assert(nested.own_tokens() == [0..1]);
+    assert(nested.own_token_text(src) == "1");
+    // (the last leaf spans `" 2"`, hence the space this one keeps)
+    assert(nested.token_text(src) == "1+ 2");
+    assert(t.own_tokens() == [0..1, 2..3, 4..5]);
+    assert(CLeaf(0..1).own_tokens() == []);
+    assert(CTree(zero, []).own_token_text(src) == "");
     assert(t.nodes() == []);
     assert(CLeaf(0..1).nodes() == []);
 
@@ -176,15 +228,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(CTree(far, []).show(src, names) == "(?)");
 })
 --- performance ---
-allocations: 141
-deallocations: 141
-reallocations: 0
-bytes allocated: 7036
-instructions executed: 7895
-binary size: 23408
-  code: 12480
-  data: 1557
-  metadata: 9371
+allocations: 165
+deallocations: 165
+reallocations: 1
+bytes allocated: 8204
+instructions executed: 9860
+binary size: 30024
+  code: 16424
+  data: 1941
+  metadata: 11659
 functions:
   __arr_drop_Cst:
     calls: 8
@@ -199,76 +251,76 @@ functions:
     calls: 4
     bytes: 300
   __eq___builtin_Span:
-    calls: 9
+    calls: 13
     bytes: 104
   __eq___builtin_Span$arr:
-    calls: 1
+    calls: 4
     bytes: 284
   __rec_drop_Cst:
-    calls: 28
+    calls: 30
     bytes: 48
   __test$show:
     calls: 1
-    bytes: 7108
+    bytes: 9996
   aipl_arr_drop_arr:
-    calls: 10
-    bytes: (external)
-  aipl_arr_drop_str:
-    calls: 9
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 185
-    bytes: (external)
-  aipl_arr_join:
     calls: 12
     bytes: (external)
+  aipl_arr_drop_str:
+    calls: 11
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 221
+    bytes: (external)
+  aipl_arr_join:
+    calls: 14
+    bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 61
+    calls: 70
     bytes: (external)
   aipl_array_dec:
-    calls: 326
+    calls: 389
     bytes: (external)
   aipl_array_new:
-    calls: 65
+    calls: 76
     bytes: (external)
   aipl_array_push_mut:
-    calls: 63
+    calls: 77
     bytes: (external)
   aipl_array_with_cap:
-    calls: 27
+    calls: 36
     bytes: (external)
   aipl_assert:
-    calls: 24
+    calls: 30
     bytes: (external)
   aipl_concat:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 179
+    calls: 199
     bytes: (external)
   aipl_inc:
-    calls: 118
+    calls: 130
     bytes: (external)
   aipl_rec_alloc:
-    calls: 28
+    calls: 30
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 88
+    calls: 106
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 60
+    calls: 76
     bytes: (external)
   aipl_str_eq:
-    calls: 11
+    calls: 14
     bytes: (external)
   aipl_str_join:
-    calls: 10
+    calls: 13
     bytes: (external)
   aipl_str_len:
-    calls: 28
+    calls: 32
     bytes: (external)
   aipl_str_slice:
-    calls: 23
+    calls: 27
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -285,6 +337,9 @@ functions:
   main:
     calls: 1
     bytes: 72
+  own_token_text:
+    calls: 2
+    bytes: 1056
   show:
     calls: 14
     bytes: 1392
@@ -295,8 +350,8 @@ functions:
     calls: 4
     bytes: 392
   token_leaves:
-    calls: 16
+    calls: 22
     bytes: 736
   token_text:
-    calls: 3
+    calls: 4
     bytes: 392
