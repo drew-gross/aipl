@@ -616,6 +616,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_all = "crates/aipl-mono/src/builtin_all",
     crates_aipl_mono_src_builtin_any = "crates/aipl-mono/src/builtin_any",
     crates_aipl_mono_src_builtin_count = "crates/aipl-mono/src/builtin_count",
+    crates_aipl_mono_src_builtin_count_if = "crates/aipl-mono/src/builtin_count_if",
     crates_aipl_mono_src_builtin_count_is_at_least = "crates/aipl-mono/src/builtin_count_is_at_least",
     crates_aipl_mono_src_builtin_count_is_at_most = "crates/aipl-mono/src/builtin_count_is_at_most",
     crates_aipl_mono_src_builtin_count_is_equal = "crates/aipl-mono/src/builtin_count_is_equal",

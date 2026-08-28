@@ -1,0 +1,132 @@
+import {
+    equal as ==,
+    filter,
+    greater_than as >,
+    logical_not as !,
+    wrapping_increment as ++,
+} from builtins;
+
+// The AIPL implementation of the `count_if` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_count_if` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count_if(pred)` resolves
+// through the ordinary generic / higher-order machinery — the in-file name
+// `count_if` is only for this file's own tests, which read exactly like user
+// code.
+//
+// It completes the trio: `count` counts elements equal to a *value*,
+// `count_while` counts a *leading run* matching a predicate, and this counts
+// *every* element matching a predicate, anywhere. Unsigned, like `len`: a count
+// is never negative.
+pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
+    mut n: u64 = 0;
+    for (let x : self) {
+        if (pred(x)) {
+            set n++;
+        };
+    }
+    n
+}.doc("""
+    Counts how many elements of `self` satisfy `pred`, examining every element.
+    Generic over the element type and callable as a method: `xs.count_if(pred)`.
+    A `str` receiver iterates its chars, since `str` and `char[]` share a
+    representation.
+
+    See `count` for the equal-to-a-value form, and `count_while` for the
+    leading-run form that stops at the first element failing `pred`.
+""").test({
+    assert([1, 2, 3, 4].count_if(|x| x > 2) == 2);
+    assert([1, 2, 3].count_if(|x| x > 9) == 0); // nothing matches
+    assert([1, 2, 3].count_if(|x| x > 0) == 3); // everything matches
+    // Unlike `count_while`, a match anywhere counts — not just a leading run.
+    assert([5, 1, 5].count_if(|x| x > 2) == 2);
+    assert(count_if([2, 2], |x| x == 2) == 2); // function-call form too
+
+    // Generic over the element type — the same definition serves char and str.
+    assert(['a', 'b', 'a'].count_if(|c| c == 'a') == 2);
+    assert(["go", "stop", "go"].count_if(|s| s == "go") == 2);
+    // A `str` receiver iterates its chars.
+    assert("a\nb\nc".count_if(|c| c == '\n') == 2);
+    assert("abc".count_if(|c| c == '\n') == 0);
+
+    assert([8, 9, 9].count_if(is_nine) == 2); // a named predicate, no lambda
+    let limit = 3;
+    assert([1, 5, 9].count_if(|x| x > limit) == 2); // a captured bound
+    // Zero on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).count_if(|x| x == 99) == 0);
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 516
+instructions executed: 2005
+binary size: 7728
+  code: 3884
+  data: 933
+  metadata: 2911
+functions:
+  __filter21$own0:
+    calls: 1
+    bytes: 272
+  __test$count_if:
+    calls: 1
+    bytes: 3420
+  __test$is_nine:
+    calls: 1
+    bytes: 76
+  aipl_arr_drop_str:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 10
+    bytes: (external)
+  aipl_array_new:
+    calls: 9
+    bytes: (external)
+  aipl_assert:
+    calls: 14
+    bytes: (external)
+  aipl_dec:
+    calls: 13
+    bytes: (external)
+  aipl_inc:
+    calls: 6
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_str_data:
+    calls: 3
+    bytes: (external)
+  aipl_str_eq:
+    calls: 3
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 3
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 3
+    bytes: (external)
+  aipl_str_len:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 116

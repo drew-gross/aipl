@@ -5737,6 +5737,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_opt_right_fold", "builtin_opt_right_fold.aipl"),
     ("__builtin_count", "builtin_count.aipl"),
     ("__builtin_count_while", "builtin_count_while.aipl"),
+    ("__builtin_count_if", "builtin_count_if.aipl"),
     ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
     ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
     ("__builtin_intersperse", "builtin_intersperse.aipl"),
