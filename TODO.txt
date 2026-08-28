@@ -10,7 +10,6 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 variant:
   add a "variant without" option for concrete/generic type that lets you still pass a conrete type to functions that accept generic
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
-  make a case_name function to replace the jank in kind_label
   allow variant constructors to have defaults, get rid of many in grammar.aipl
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
@@ -202,6 +201,7 @@ parser:
   remove power from prec and use order within the list
 
 utilities:
+  take_while that is the counterpart of trim_while
   push into a string should work
   add is_some, lint against match none->false+some(_)->true
   split with predicate, use in companion_files.aipl

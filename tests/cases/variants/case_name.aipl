@@ -1,0 +1,99 @@
+import { case_name, equal as ==, print, to_str } from builtins;
+
+// `case_name(v)` is the name of the case `v` was built with, with no payload:
+// `to_str` with everything after the constructor left off. It reads only the
+// tag, which is what lets one implementation serve every variant — the same
+// reason `same_case` is generic (see `same_case.aipl`).
+//
+// The pair divides the two questions a reader has about a tag: `same_case`
+// compares two of them, `case_name` names one.
+variant Tok = Space | Name(str) | IntLit(i64) | StrLit(str, i64) | InterpolatedText(str)
+
+// Generic over `K`, the shape a driver that cannot name a language's kinds
+// needs — and the reason this is a builtin rather than a per-variant `match`.
+fn label<K: variant>(k: K) -> str { k.case_name() }
+
+fn main() !prints {
+    // The payload is not read, so it does not appear and does not matter.
+    print(Name("x").case_name());
+    print(Name("a longer payload entirely").case_name());
+    print(IntLit(42).case_name());
+
+    // A payload-free case, and a multi-payload one.
+    print(Space.case_name());
+    print(StrLit("a", 1).case_name());
+
+    // A case name of more than 7 bytes is a static literal rather than an
+    // inline one — the same split every `str` constant goes through.
+    print(InterpolatedText("x").case_name());
+
+    // What it replaces: `to_str` renders the payload too, so a caller wanting
+    // just the case had to render it and cut the string back at the `(`.
+    print(Name("x").to_str());
+
+    // Free-call form, and through a generic function.
+    print(case_name(Space));
+    print(label(IntLit(1)));
+    print(label(Space));
+
+    // It is a `str` like any other.
+    print((Name("x").case_name() == "Name").to_str());
+    print((Name("x").case_name() == Space.case_name()).to_str());
+}
+--- stdout ---
+Name
+Name
+IntLit
+Space
+StrLit
+InterpolatedText
+Name("x")
+Space
+IntLit
+Space
+true
+false
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 26
+instructions executed: 574
+binary size: 10000
+  code: 5724
+  data: 487
+  metadata: 3789
+functions:
+  __to_str_Tok:
+    calls: 1
+    bytes: 1504
+  __to_str_bool:
+    calls: 2
+    bytes: 212
+  aipl_dec:
+    calls: 38
+    bytes: (external)
+  aipl_inc:
+    calls: 15
+    bytes: (external)
+  aipl_print:
+    calls: 12
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_str_data:
+    calls: 1
+    bytes: (external)
+  aipl_str_eq:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 4008

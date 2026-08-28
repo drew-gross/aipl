@@ -386,11 +386,11 @@ allocations: 8308
 deallocations: 8308
 reallocations: 408
 bytes allocated: 411348
-instructions executed: 1172479
-binary size: 194592
-  code: 116116
-  data: 5716
-  metadata: 72760
+instructions executed: 1169584
+binary size: 193632
+  code: 115564
+  data: 5668
+  metadata: 72400
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -446,9 +446,6 @@ functions:
   __builtin_count_while$char$s0$lam46:
     calls: 94
     bytes: 232
-  __builtin_count_while$char$s0$lam72:
-    calls: 15
-    bytes: 236
   __builtin_int_parse:
     calls: 94
     bytes: 1052
@@ -568,7 +565,7 @@ functions:
     bytes: 3772
   __m5__match_rule$CalcTok$Calc:
     calls: 980
-    bytes: 4072
+    bytes: 4036
   __m5__match_then$CalcTok$Calc:
     calls: 145
     bytes: 1712
@@ -617,9 +614,6 @@ functions:
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 64
-  __to_str_CalcTok:
-    calls: 15
-    bytes: 280
   __to_str___m2__ParseError:
     calls: 0
     bytes: 812
@@ -675,7 +669,7 @@ functions:
     calls: 914
     bytes: (external)
   aipl_dec:
-    calls: 31175
+    calls: 31160
     bytes: (external)
   aipl_i64_len:
     calls: 62
@@ -702,25 +696,25 @@ functions:
     calls: 774
     bytes: (external)
   aipl_str_data:
-    calls: 534
+    calls: 519
     bytes: (external)
   aipl_str_eq:
     calls: 1298
     bytes: (external)
   aipl_str_iter_init:
-    calls: 539
+    calls: 524
     bytes: (external)
   aipl_str_iter_next:
-    calls: 534
+    calls: 519
     bytes: (external)
   aipl_str_join:
     calls: 276
     bytes: (external)
   aipl_str_len:
-    calls: 5200
+    calls: 5170
     bytes: (external)
   aipl_str_slice:
-    calls: 1874
+    calls: 1859
     bytes: (external)
   aipl_str_starts_with:
     calls: 94
@@ -733,9 +727,6 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 15
     bytes: (external)
   aipl_write_i64:
     calls: 31

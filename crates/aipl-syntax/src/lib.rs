@@ -1825,6 +1825,11 @@ fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 fn __builtin_filter_map<T: any, U: any>(self: T[], keep: (T) -> bool, f: (T) -> U) -> U[] { [] }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
 fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
+// The name of the case `self` was built with, without its payload:
+// `Name("x").case_name()` is `"Name"`, and a payload-free `Space` is
+// `"Space"`. The tag names the case, so this reads no payload — which is
+// what lets it be generic over every variant, like `same_case`.
+fn __builtin_case_name<T: variant>(self: T) -> str { "" }
 fn __builtin_count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_count_is_at_most<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_count_is_greater_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
@@ -2099,6 +2104,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "join",
     "intersperse",
     "same_case",
+    "case_name",
     "count_is_less_than",
     "count_is_at_most",
     "count_is_greater_than",

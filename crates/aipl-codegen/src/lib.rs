@@ -12234,6 +12234,46 @@ fn emit_str_literal<M: Module>(
     Ok(builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64))
 }
 
+/// A `str` value for compile-time-constant `content`, laid out exactly as a
+/// `str` literal written in source. Returns the value and whether the caller
+/// owes it scope tracking: an inline value is a plain constant with nothing to
+/// drop, while a static pointer is tracked like any other `str`.
+///
+/// Shared by the [`ExprKind::Str`] arm and `case_name`, so a case name and an
+/// equal literal in source reach the same interned data object — and so the
+/// SSO cutoff is stated once rather than at each producer.
+fn emit_const_str<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    content: &[u8],
+) -> Result<(Value, bool), Error> {
+    // SSO: a literal of <= 7 bytes is an *inline* str value — emit it as a
+    // constant, with no data object, allocation, or refcount. (inc/dec no-op on
+    // it; the surrounding scope-drop is a no-op too, so it needs no tracking.)
+    if content.len() <= 7 {
+        let packed = pack_inline(content) as usize as i64;
+        return Ok((builder.ins().iconst(types::I64, packed), false));
+    }
+    // Static literal: emit [len: i64][refcount = STATIC][bytes][NUL] into the
+    // data section; the pointer points past both header words. The data object
+    // is interned by content (see `StrLiterals`), so the same literal — a
+    // struct-field default materialized at many sites, a case name that is also
+    // written in source, or any repeated text — shares one object and one
+    // content-hash symbol name.
+    let data_id = cx.str_data.borrow_mut().intern(module, content, || {
+        let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
+        bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
+        bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
+        bytes.extend_from_slice(content);
+        bytes.push(0);
+        bytes.into_boxed_slice()
+    })?;
+    let gv = module.declare_data_in_func(data_id, builder.func);
+    let base = builder.ins().symbol_value(types::I64, gv);
+    Ok((builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64), true))
+}
+
 /// Build a file-op `Result` value `{tag, value@8}` from a runtime call's raw
 /// result. Success is `raw != 0` (a non-null contents pointer for read, or `1`
 /// for write): tag 1, value = `raw` when `ok_is_value` (read's contents str)
@@ -14976,6 +15016,88 @@ fn compile_call_expr<M: Module>(
             let out = builder.ins().uextend(types::I64, eq);
             (out, ConcreteType::Primitive(Primitive::Bool))
         }
+        "__builtin_case_name" => {
+            // `v.case_name()`: the name of the case `v` was built with, as a
+            // `str`. Like `same_case`, this reads only the tag — the leading
+            // `i64` of a variant value, the same field `emit_render_variant`
+            // switches on — so it never touches the payload, which is what lets
+            // one implementation serve every variant.
+            //
+            // It is `to_str` with the payload left off, and that is the point:
+            // `to_str(v)` renders `Name("x")`, so callers wanting just the case
+            // had to render the payload and then cut the string back at the
+            // `(`. Here the tag picks a constant directly.
+            //
+            // The receiver is borrowed, like `same_case` — nothing is consumed,
+            // so its scope tracking is untouched.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"case_name\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (v, v_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // The bound is enforced by the checker; this catches a caller that
+            // reached codegen another way (a synthesized call, say) rather than
+            // silently reading a tag off something that has none.
+            let ConcreteType::Named(vname) = &v_ty else {
+                return Err(Error::at(
+                    format!(
+                        "\"case_name\" is only callable on a variant, got {}",
+                        type_name(&v_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            };
+            let Some(cases) = cx
+                .structs
+                .get(vname)
+                .and_then(TypeDef::as_variant)
+                .map(|v| v.cases.iter().map(|c| c.name.clone()).collect::<Vec<_>>())
+            else {
+                return Err(Error::at(
+                    format!(
+                        "\"case_name\" is only callable on a variant, got {}",
+                        type_name(&v_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            };
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
+            let merge = builder.create_block();
+            builder.append_block_param(merge, types::I64);
+            for (k, ctor) in cases.iter().enumerate() {
+                let case_b = builder.create_block();
+                let next_b = builder.create_block();
+                let is_k = builder.ins().icmp_imm_s(IntCC::Equal, tag, k as i64);
+                builder.ins().brif(is_k, case_b, &[], next_b, &[]);
+                builder.switch_to_block(case_b);
+                builder.seal_block(case_b);
+                let (name_v, _) = emit_const_str(module, builder, cx, ctor.as_bytes())?;
+                builder.ins().jump(merge, &[BlockArg::Value(name_v)]);
+                builder.switch_to_block(next_b);
+                builder.seal_block(next_b);
+            }
+            // Unreachable at runtime (the tag always names a case), but the
+            // fallthrough block must still produce a value for `merge`. An
+            // empty inline str is the harmless one.
+            let (empty, _) = emit_const_str(module, builder, cx, b"")?;
+            builder.ins().jump(merge, &[BlockArg::Value(empty)]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            let out = builder.block_params(merge)[0];
+            // Every arm produced an inline or STATIC-refcount `str`, both of
+            // which no-op on drop — but track the merged value anyway, so a
+            // `case_name` result is scoped exactly like the `str` literal it
+            // could have been written as.
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(out, &ConcreteType::Primitive(Primitive::Str)));
+            (out, ConcreteType::Primitive(Primitive::Str))
+        }
         "__builtin_is_space" => {
             // `c.is_space() -> bool` — true when c is ASCII whitespace.
             if args.len() != 1 {
@@ -17136,41 +17258,14 @@ fn compile_expr_inner<M: Module>(
             ConcreteType::Primitive(Primitive::Char),
         ),
         ExprKind::Str(s) => {
-            let content = s.as_bytes();
-            // SSO: a literal of <= 7 bytes is an *inline* str value — emit it as a
-            // constant, with no data object, allocation, or refcount. (inc/dec
-            // no-op on it; the surrounding scope-drop is a no-op too, so it needs
-            // no tracking.)
-            if content.len() <= 7 {
-                let packed = pack_inline(content) as usize as i64;
-                return Ok((
-                    builder.ins().iconst(types::I64, packed),
-                    ConcreteType::Primitive(Primitive::Str),
-                ));
+            let (v, tracked) = emit_const_str(module, builder, cx, s.as_bytes())?;
+            if tracked {
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(v, &ConcreteType::Primitive(Primitive::Str)));
             }
-            // Static literal: emit [refcount: STATIC_REFCOUNT][bytes][null]
-            // into the data section. Pointer points past the 8-byte header. The
-            // data object is interned by content (see `StrLiterals`), so the same
-            // literal — a struct-field default materialized at many sites, or any
-            // repeated text — shares one object and one content-hash symbol name.
-            let data_id = cx.str_data.borrow_mut().intern(module, content, || {
-                // Static string layout: [len: i64][refcount = STATIC][bytes][NUL];
-                // the pointer points past both header words.
-                let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
-                bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
-                bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-                bytes.extend_from_slice(content);
-                bytes.push(0);
-                bytes.into_boxed_slice()
-            })?;
-            let gv = module.declare_data_in_func(data_id, builder.func);
-            let base = builder.ins().symbol_value(types::I64, gv);
-            let ptr = builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64);
-            scopes
-                .last_mut()
-                .expect("scope")
-                .push(Tracked::new(ptr, &ConcreteType::Primitive(Primitive::Str)));
-            (ptr, ConcreteType::Primitive(Primitive::Str))
+            (v, ConcreteType::Primitive(Primitive::Str))
         }
         ExprKind::Ident(name) => {
             // A local binding shadows everything; an unbound name may be a

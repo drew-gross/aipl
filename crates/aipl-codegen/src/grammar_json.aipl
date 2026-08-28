@@ -418,11 +418,11 @@ allocations: 11422
 deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
-instructions executed: 1555519
-binary size: 212432
-  code: 127212
-  data: 6492
-  metadata: 78728
+instructions executed: 1537093
+binary size: 210768
+  code: 126364
+  data: 6348
+  metadata: 78056
 functions:
   __arr_drop_Json:
     calls: 125
@@ -475,9 +475,6 @@ functions:
   __builtin_count_while$char$s0$lam36:
     calls: 308
     bytes: 244
-  __builtin_count_while$char$s0$lam71:
-    calls: 74
-    bytes: 236
   __builtin_try_map$__m1__Cst$Json$__m2__ParseError$lam45:
     calls: 142
     bytes: 716
@@ -606,7 +603,7 @@ functions:
     bytes: 3772
   __m5__match_rule$JsonTok$Json:
     calls: 1251
-    bytes: 4336
+    bytes: 4388
   __m5__match_then$JsonTok$Json:
     calls: 235
     bytes: 1712
@@ -655,9 +652,6 @@ functions:
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 64
-  __to_str_JsonTok:
-    calls: 74
-    bytes: 664
   __to_str___m2__ParseError:
     calls: 0
     bytes: 812
@@ -713,7 +707,7 @@ functions:
     calls: 45
     bytes: (external)
   aipl_dec:
-    calls: 57177
+    calls: 57103
     bytes: (external)
   aipl_inc:
     calls: 47561
@@ -737,25 +731,25 @@ functions:
     calls: 899
     bytes: (external)
   aipl_str_data:
-    calls: 562
+    calls: 435
     bytes: (external)
   aipl_str_eq:
     calls: 3961
     bytes: (external)
   aipl_str_iter_init:
-    calls: 531
+    calls: 457
     bytes: (external)
   aipl_str_iter_next:
-    calls: 509
+    calls: 435
     bytes: (external)
   aipl_str_join:
     calls: 63
     bytes: (external)
   aipl_str_len:
-    calls: 12679
+    calls: 12425
     bytes: (external)
   aipl_str_slice:
-    calls: 2594
+    calls: 2520
     bytes: (external)
   aipl_str_starts_with:
     calls: 517
@@ -768,9 +762,6 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 233
     bytes: (external)
   escape_json:
     calls: 30

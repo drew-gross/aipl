@@ -30,8 +30,8 @@
 // exponential. Both are answered later in the plan — FIRST sets remove most
 // backtracking — and neither matters at the sizes here.
 import {
+    case_name,
     contains,
-    count_while,
     drop_last,
     equal as ==,
     extend,
@@ -48,10 +48,8 @@ import {
     logical_or as ||,
     map,
     map_err,
-    not_equal as !=,
     push,
     same_case,
-    to_str,
     try_map,
     value_or,
     value_or_err,
@@ -193,14 +191,6 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     }
 }
 
-// A token kind's name, for an error's expected set: `to_str` of a kind renders
-// as `Name("x")`, and the constructor alone is what a reader wants. Generic over
-// `K` because the driver is — it cannot name a language's kinds, only render one.
-fn kind_label<K: variant>(k: K) -> str {
-    let s = k.to_str();
-    s[..s.count_while(|c| c != '(')]
-}
-
 fn quoted(s: str) -> str {
     let q = "`";
     `{q}{s}{q}`
@@ -240,9 +230,9 @@ fn match_term<K: variant, A: any>(p: Parser<K, A>, k: K, pos: u64, far: Far) -> 
         some(t) => if (t.kind.same_case(k)) {
             Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
         } else {
-            miss(far, pos, kind_label(k))
+            miss(far, pos, k.case_name())
         },
-        none => miss(far, pos, kind_label(k)),
+        none => miss(far, pos, k.case_name()),
     }
 }
 
@@ -894,15 +884,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2798
-deallocations: 2798
+allocations: 2773
+deallocations: 2773
 reallocations: 122
-bytes allocated: 134300
-instructions executed: 395300
-binary size: 287696
-  code: 167060
-  data: 6948
-  metadata: 113688
+bytes allocated: 133675
+instructions executed: 384795
+binary size: 285656
+  code: 166000
+  data: 6780
+  metadata: 112876
 functions:
   __arr_drop_Node:
     calls: 11
@@ -961,9 +951,6 @@ functions:
   __builtin_count_while$char$s0$lam35:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam70:
-    calls: 35
-    bytes: 236
   __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam57:
     calls: 10
     bytes: 716
@@ -1090,9 +1077,6 @@ functions:
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 64
-  __to_str_Tok:
-    calls: 35
-    bytes: 836
   __to_str___m2__ParseError:
     calls: 0
     bytes: 812
@@ -1148,7 +1132,7 @@ functions:
     calls: 424
     bytes: (external)
   aipl_dec:
-    calls: 12754
+    calls: 12719
     bytes: (external)
   aipl_inc:
     calls: 10330
@@ -1168,32 +1152,29 @@ functions:
   aipl_rec_inc_weak:
     calls: 37
     bytes: (external)
-  aipl_str_alloc:
-    calls: 25
-    bytes: (external)
   aipl_str_contains:
     calls: 502
     bytes: (external)
   aipl_str_data:
-    calls: 188
+    calls: 118
     bytes: (external)
   aipl_str_eq:
     calls: 268
     bytes: (external)
   aipl_str_iter_init:
-    calls: 186
+    calls: 151
     bytes: (external)
   aipl_str_iter_next:
-    calls: 153
+    calls: 118
     bytes: (external)
   aipl_str_join:
     calls: 56
     bytes: (external)
   aipl_str_len:
-    calls: 1586
+    calls: 1446
     bytes: (external)
   aipl_str_slice:
-    calls: 846
+    calls: 811
     bytes: (external)
   aipl_str_starts_with:
     calls: 9
@@ -1206,9 +1187,6 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 140
     bytes: (external)
   build_node:
     calls: 9
@@ -1254,7 +1232,7 @@ functions:
     bytes: 3772
   match_rule$Tok$Node:
     calls: 269
-    bytes: 4596
+    bytes: 4608
   match_then$Tok$Node:
     calls: 31
     bytes: 1712

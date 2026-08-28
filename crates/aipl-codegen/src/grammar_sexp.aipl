@@ -279,15 +279,15 @@ fn msg_of(src: str) -> str { parse_sexp(src).map_ok(render_sexp).failure_message
 // tree assertion reads better as than a nested `CTree` literal.
 fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar()))) }
 --- performance ---
-allocations: 29355
-deallocations: 29355
+allocations: 28501
+deallocations: 28501
 reallocations: 1767
-bytes allocated: 1339316
-instructions executed: 4270832
-binary size: 180816
-  code: 109376
-  data: 4284
-  metadata: 67156
+bytes allocated: 1317966
+instructions executed: 4005238
+binary size: 179384
+  code: 108592
+  data: 4188
+  metadata: 66604
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -340,9 +340,6 @@ functions:
   __builtin_count_while$char$s0$lam34:
     calls: 0
     bytes: 244
-  __builtin_count_while$char$s0$lam70:
-    calls: 854
-    bytes: 236
   __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam43:
     calls: 867
     bytes: 716
@@ -462,7 +459,7 @@ functions:
     bytes: 3772
   __m5__match_rule$SexpKind$Sexp:
     calls: 6070
-    bytes: 4336
+    bytes: 4316
   __m5__match_then$SexpKind$Sexp:
     calls: 854
     bytes: 1712
@@ -508,9 +505,6 @@ functions:
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 64
-  __to_str_SexpKind:
-    calls: 854
-    bytes: 528
   __to_str___m2__ParseError:
     calls: 0
     bytes: 812
@@ -563,7 +557,7 @@ functions:
     calls: 3504
     bytes: (external)
   aipl_dec:
-    calls: 110781
+    calls: 109927
     bytes: (external)
   aipl_inc:
     calls: 93834
@@ -583,35 +577,32 @@ functions:
   aipl_rec_inc_weak:
     calls: 51
     bytes: (external)
-  aipl_str_alloc:
-    calls: 854
-    bytes: (external)
   aipl_str_contains:
     calls: 3623
     bytes: (external)
   aipl_str_data:
-    calls: 2622
+    calls: 914
     bytes: (external)
   aipl_str_eq:
     calls: 1929
     bytes: (external)
   aipl_str_iter_init:
-    calls: 1789
+    calls: 935
     bytes: (external)
   aipl_str_iter_next:
-    calls: 1768
+    calls: 914
     bytes: (external)
   aipl_str_join:
     calls: 457
     bytes: (external)
   aipl_str_len:
-    calls: 18381
+    calls: 14965
     bytes: (external)
   aipl_str_repeat:
     calls: 2
     bytes: (external)
   aipl_str_slice:
-    calls: 7642
+    calls: 6788
     bytes: (external)
   aipl_str_starts_with:
     calls: 900
@@ -624,9 +615,6 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
-    bytes: (external)
-  aipl_write_bytes:
-    calls: 3416
     bytes: (external)
   depth:
     calls: 200

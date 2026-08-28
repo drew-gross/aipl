@@ -1,0 +1,14 @@
+import { case_name, print } from builtins;
+
+// `case_name` carries a `variant` bound, so a scalar is rejected at the call
+// site — a type with no constructors has no case to name, and there is nothing
+// sensible to return instead.
+fn main() !prints {
+    print(case_name(1));
+}
+--- errors ---
+error: fn "case_name": type parameter "T" requires "variant", but was inferred as i64
+ --> ./tests/cases/variants/err_case_name_not_variant.aipl:7:11
+  |
+7 |     print(case_name(1));
+  |           ^^^^^^^^^^^
