@@ -67,11 +67,14 @@ and hides the blocker from the next person.
 
 The dependencies that bite:
 
-- **Formatting shifts spans, so it must come first.** `aipl fmt` moves spans,
-  string-literal data symbols are span-named, and the checked-in `.clif` plus
-  every `--- performance ---`/`--- errors ---`/`--- check ---` section is
-  span-sensitive. Stage IR (or refill sections) before formatting and what you
-  just validated is already stale.
+- **Formatting moves line numbers, so it must come first.** A rendered
+  diagnostic embeds its own `--> path:line:col` and caret row, so every
+  `--- errors ---`/`--- check ---` section is line-sensitive: reformat after
+  refilling one and what you just validated is already stale. (Data symbols are
+  *not* in this set — a string literal's symbol is a content hash, so it keeps
+  its name when unrelated source above it moves, and `binary size` and the
+  checked-in `.clif` no longer churn for an edit that touches no literal. See
+  `StrLiterals` in `aipl-codegen/src/lib.rs`.)
 - **A new or deleted case file needs its `#[test]` list regenerated before a
   suite run means anything** — until then the case simply never runs.
 - **Section refills come after the discovery run**, which is what establishes
@@ -143,14 +146,15 @@ the whole corpus at once with the author helper
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
 lexer token stream, so it preserves comments/literals verbatim and leaves
-trailing `--- section ---` blocks byte-for-byte. Because it is span-driven,
-reformatting shifts spans and therefore invalidates the usual downstream
-artifacts — treat a corpus reformat like any span-shifting change: refill
-`--- performance ---`/`--- errors ---`/`--- check ---` sections with
-`fill_expected` afterward (the checked-in `dogfood.clif` is renumbered and
-stays stable, so it normally needs no regeneration — the `checked_in_ir_is_current`
-test will tell you if it does). Fixture files under `tests/fmt/*.aipl` are
-*intentionally* misformatted inputs and are exempt from the enforcement test.
+trailing `--- section ---` blocks byte-for-byte. Reformatting moves line numbers,
+which invalidates any section holding a rendered diagnostic: refill
+`--- errors ---`/`--- check ---` sections with `fill_expected` afterward. It does
+not move `--- performance ---` on its own (see the handoff note above on
+content-hashed literal symbols), and the checked-in `dogfood.clif` is renumbered
+and stays stable, so neither normally needs regenerating — the
+`checked_in_ir_is_current` test will tell you if the IR does. Fixture files under
+`tests/fmt/*.aipl` are *intentionally* misformatted inputs and are exempt from
+the enforcement test.
 
 ## Performance monitoring (non-deterministic)
 Two separate perf tracks:
@@ -277,8 +281,9 @@ The loader gates operator *usage* per file against its imports (unimported →
 compile error). So every new `.aipl` (test case, example, embedded compiler
 source, and each `--- file:` companion) that uses operators needs the matching
 import — and since the import shifts line numbers, refill any
-`--- errors ---`/`--- check ---`/`--- performance ---` sections (string-literal
-data symbols are span-named, so `binary size` shifts too).
+`--- errors ---`/`--- check ---` sections. `--- performance ---` does *not* need
+one: string-literal symbols are content-hashed, so a line shift on its own leaves
+`binary size` alone.
 
 When rewriting imports across the corpus, anchor the match to line start
 (`^import {`): `walker.aipl`'s formatter tests hold `"import { == } from
@@ -483,7 +488,7 @@ directly — it lets you validate candidate IR before it becomes the live IR the
 compiler runs on.
 
 > **`cargo handoff` already runs this entire flow**, in its correct place
-> in the sequence: *after* the corpus is formatted (spans settled) and *after* a
+> in the sequence: *after* the corpus is formatted (the sources settled) and *after* a
 > discovery run has shown the IR is actually stale. Adding a dogfooded `.aipl`
 > or changing codegen is **not** a reason to run the steps below by hand — just
 > hand off. Reach for them only to localize a failure handoff already reported,
@@ -512,8 +517,8 @@ To get out of the loop:
 1. `fill_staged_ir` — builds a `fmt.clif.staged` that understands the new form.
 2. Format the corpus with the staged formatter:
    `AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test compiler -- --ignored fmt::format_corpus`
-3. `fill_staged_ir` **again** — step 2 shifted spans, so the IR from step 1 is
-   already stale.
+3. `fill_staged_ir` **again** — step 2 rewrote the very sources the IR is
+   generated from, so the artifact from step 1 no longer matches them.
 4. Validate + promote as below, then run handoff normally for the refills.
 
 This is not a licence to hand-drive generally: it announces itself as a hard
