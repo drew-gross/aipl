@@ -1,0 +1,825 @@
+// JSON: the library's second end-to-end target, and the one that adds everything
+// S-expressions deliberately left out — several terminal classes rather than one,
+// `ListOf` with a separator and a trailing-comma rule, an `OneOf` across six
+// alternatives, and a heterogeneous AST. Still no precedence; that arrives with
+// AIPL's own grammar in Stage 4.
+//
+// Complete but tiny: eight productions and one `variant Json`, against a rule set
+// cribbed from `lexer.aipl`'s own JSON-flavored test table.
+//
+// Two things worth reading before the grammar:
+//
+//   - **Numbers stay text.** `JNumber` carries the source spelling rather than a
+//     parsed value. JSON's number syntax is wider than any one AIPL type (an
+//     arbitrary-precision integer is legal JSON), so *what a number means* is the
+//     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
+//     hand over their digits unparsed for the same reason.
+//   - **`JMember` is where a uniform lowering type shows its seam.** `Build<A>`
+//     pins one `A` for every production in a grammar, so the `member` production
+//     — whose natural result is a key/value *pair*, not a JSON value — has to
+//     lower to a `Json` too. It gets a case of its own, meaningful only as an
+//     element of a `JObject`. That is the honest cost of one lowering type per
+//     grammar, and it is worth knowing before Stage 4, where AIPL's own AST has
+//     many more shapes than its expression type.
+import {
+    equal as ==,
+    first,
+    join,
+    len,
+    less_than as <,
+    map,
+    map_err,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_sub as -,
+} from builtins;
+import { Cst, show, span, text, token_leaves, token_text } from "./cst.aipl";
+import {
+    Grammar,
+    ListOf,
+    Maybe,
+    Mk,
+    Named,
+    OneOf,
+    ParseError,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+    prod_names,
+} from "./grammar.aipl";
+import {
+    Bare,
+    CharRun,
+    Delimited,
+    Exact,
+    Float,
+    Int,
+    Keyword,
+    LexResult,
+    Of,
+    TokenRule,
+    lex,
+} from "./lexer.aipl";
+import { parse, parse_cst } from "./parse.aipl";
+import { unescape } from "./unescape.aipl";
+
+// The token kinds: three terminal classes that carry meaning, and one bare kind
+// for the punctuation the grammar matches by `Spelling`.
+//
+// `Str` keeps its delimiter-stripped contents (the lexer's `Delimited` computes
+// them), but the concrete tree holds *spans*, not values — so lowering reads the
+// quoted source text back out and strips it itself. The payload is what makes a
+// string token tell itself apart from a number, which is all `Term` needs.
+variant JsonTok = Str(str) | Num | Kw | Punct
+
+// The AST. `JNumber` keeps the source spelling (see the header); `JMember` is a
+// key/value pair and is meaningful only inside a `JObject`.
+variant Json =
+    | JNull
+    | JBool(bool)
+    | JNumber(str)
+    | JString(str)
+    | JArray(Json[])
+    | JObject(Json[])
+    | JMember(str, Json)
+
+// Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
+// covers every byte of the source and reconstructs it exactly. JSON has no
+// comments, so trivia is whitespace and nothing else.
+//
+// Rule order carries two decisions. `Float` sits ahead of `Int` because a bare
+// digit run doesn't match `Float` and `1.5` would otherwise lex as `1` then a
+// stray `.`. And `Exact("-")` sits ahead of both, which makes every `-` its own
+// token and `Int` unsigned — so the sign is the *grammar's* business
+// (`Maybe(Spelling("-"))` in `number`), one place, rather than split between a
+// sign the lexer swallowed and one it didn't.
+fn json_rules() -> TokenRule<JsonTok>[] {
+    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+    [
+        TokenRule { matcher: CharRun(" \t\r\n", " \t\r\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: Of(Str) },
+        TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
+        TokenRule { matcher: Float, emit: Bare(Num) },
+        TokenRule { matcher: Int, emit: Bare(Num) },
+        TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("false", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("null", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: CharRun("{}[]:,", ""), emit: Bare(Punct) },
+    ]
+}
+
+// ---------- lowering ----------
+//
+// One named function per production: `Build`'s function values must be
+// non-capturing and non-generic, so none of these can be a lambda.
+
+// The single alternative that matched, unwrapped. Every branch of `value` is a
+// rule *reference*, so exactly one interior child arrives.
+fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
+    kids
+        .first()
+        .value_or_err(ParseError {
+            message: "a JSON value matched no alternative",
+            span: node.span(),
+        })
+}
+
+fn lower_object(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JObject(kids)) }
+
+fn lower_array(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JArray(kids)) }
+
+// A member's value is its one interior child; its key is the string token in
+// front of the `:`, which is a *leaf* and so has no lowered value — the node's
+// first token leaf is where it is read from.
+fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
+    let key = node
+        .token_leaves()
+        .first()
+        .value_or_err(ParseError { message: "a member has no key", span: node.span() })?;
+    let value = kids
+        .first()
+        .value_or_err(ParseError { message: "a member has no value", span: node.span() })?;
+    ok(JMember(unquote(src[key]).unescape(), value))
+}
+
+fn lower_string(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
+    ok(JString(unquote(node.token_text(src)).unescape()))
+}
+
+// The spelling, sign included — `token_text` runs the matched tokens together
+// with nothing between them, which is exactly right for `-` followed by digits.
+fn lower_number(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
+    ok(JNumber(node.token_text(src)))
+}
+
+fn lower_bool(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
+    ok(JBool(node.token_text(src) == "true"))
+}
+
+fn lower_null(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JNull) }
+
+// `s` without its first and last byte — a string token's surrounding quotes. The
+// lexer guarantees both are there (a `Delimited` match spans them), so this needs
+// no check of its own.
+fn unquote(s: str) -> str { s[1..s.len() - 1] }
+
+pub fn json_grammar() -> Grammar<JsonTok, Json> {
+    let r_value: Rule<JsonTok> = OneOf([
+        Named("object"),
+        Named("array"),
+        Named("string"),
+        Named("number"),
+        Named("bool"),
+        Named("null"),
+    ]);
+
+    // `trailing: false` — strict JSON, where `[1, 2,]` is an error. Flipping the
+    // flag is the whole difference between this and the dialects that allow it,
+    // which is what that parameter exists to express.
+    let r_object: Rule<JsonTok> = Then([
+        Spelling("{"),
+        ListOf(Named("member"), ",", false),
+        Spelling("}"),
+    ]);
+    let r_member: Rule<JsonTok> = Then([Term(Str("")), Spelling(":"), Named("value")]);
+    let r_array: Rule<JsonTok> = Then([
+        Spelling("["),
+        ListOf(Named("value"), ",", false),
+        Spelling("]"),
+    ]);
+    let r_string: Rule<JsonTok> = Term(Str(""));
+    let r_number: Rule<JsonTok> = Then([Maybe(Spelling("-")), Term(Num)]);
+    let r_bool: Rule<JsonTok> = OneOf([Spelling("true"), Spelling("false")]);
+    let r_null: Rule<JsonTok> = Spelling("null");
+    Grammar {
+        prods: [
+            Production {
+                name: "value",
+                rule: r_value,
+                build: Mk(lower_value),
+                expect_as: "a JSON value",
+            },
+            Production { name: "object", rule: r_object, build: Mk(lower_object) },
+            Production { name: "member", rule: r_member, build: Mk(lower_member) },
+            Production { name: "array", rule: r_array, build: Mk(lower_array) },
+            Production { name: "string", rule: r_string, build: Mk(lower_string) },
+            Production { name: "number", rule: r_number, build: Mk(lower_number) },
+            Production { name: "bool", rule: r_bool, build: Mk(lower_bool) },
+            Production { name: "null", rule: r_null, build: Mk(lower_null) },
+        ],
+    }
+}.doc("""
+    The JSON grammar, with `value` as the start rule.
+
+    Only `value` carries an `expect_as`, so a failure anywhere inside reports as
+    "a JSON value" rather than as the six alternatives it is made of — the
+    collapse that keeps a PEG's error messages readable.
+""")
+
+fn lex_json(src: str) -> LexResult<JsonTok>!ParseError {
+    src.lex(json_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
+}
+
+pub fn json_cst(src: str) -> Cst!ParseError {
+    parse_cst(src, lex_json(src)?, json_grammar(), "value")
+}.doc("""
+    The lossless concrete tree for `src` — every byte of it under exactly one
+    leaf, whitespace included. Use this when the tree is the point; `parse_json`
+    when only the `Json` is.
+""").test({
+    // The tree the eight productions build. Every alternative of `value` is a
+    // rule *reference*, so a value is always a `value` node wrapping the node
+    // that matched — which is what gives `lower_value` its single child. The
+    // `~ ` leaves are recorded whitespace, sitting in front of the token that
+    // follows them.
+    assert(
+        shown("[1, true]")? == "(value (array [ (value (number 1)) , (value (bool ~  true)) ]))",
+    );
+    assert(
+        shown(
+            """{"a": null}""",
+        )? == """(value (object { (member "a" : (value (null ~  null))) }))""",
+    );
+
+    // The sign is part of the `number` node, as two leaves rather than one
+    // token — which is why lowering reads the node's text and not a token's.
+    assert(shown("-2.5")? == "(value (number - 2.5))");
+
+    // Losslessness: every byte is under exactly one leaf, so the leaves
+    // concatenate back to the source — including the run after the last token,
+    // which no token consumption reaches and which attaches to the root.
+    assert(shown(" 7 ")? == "(value (number ~  7) ~ )");
+    let padded = """
+        { "a" : [ 1 , 2 ] }
+    """;
+    assert(json_cst(padded)?.text(padded) == padded);
+})
+
+pub fn parse_json(src: str) -> Json!ParseError {
+    parse(src, lex_json(src)?, json_grammar(), "value")
+}.doc("""
+    The `Json` `src` denotes: lex, parse to a concrete tree, lower it through
+    the grammar's `build` functions.
+
+    Numbers arrive as their source spelling (`JNumber("1e9")`), since JSON's
+    number syntax is wider than any one AIPL type — parsing one is the
+    consumer's policy.
+""").test({
+    // ---- the terminal classes, one at a time ----
+    assert(parse_json("null")? == JNull);
+    assert(parse_json("true")? == JBool(true));
+    assert(parse_json("false")? == JBool(false));
+    assert(parse_json("\"hi\"")? == JString("hi"));
+    assert(parse_json("42")? == JNumber("42"));
+    assert(parse_json("3.14")? == JNumber("3.14"));
+    assert(parse_json("1e9")? == JNumber("1e9"));
+
+    // The sign is the grammar's, not the lexer's, so it reads back attached.
+    assert(parse_json("-7")? == JNumber("-7"));
+    assert(parse_json("-2.5")? == JNumber("-2.5"));
+
+    // Escapes are decoded on the way into the AST.
+    assert(parse_json("\"a\\nb\"")? == JString("a\nb"));
+    assert(parse_json("\"q\\\"q\"")? == JString("q\"q"));
+
+    // ---- arrays: ListOf, and the empty case ----
+    assert(parse_json("[]")? == JArray([]));
+    assert(parse_json("[1]")? == JArray([JNumber("1")]));
+    assert(parse_json("[1, true, null]")? == JArray([JNumber("1"), JBool(true), JNull]));
+    // Nesting, which is what makes the CST and the parse recursive.
+    assert(parse_json("[[1], []]")? == JArray([JArray([JNumber("1")]), JArray([])]));
+
+    // ---- objects ----
+    assert(parse_json("{}")? == JObject([]));
+    assert(parse_json("""{"a": 1}""")? == JObject([JMember("a", JNumber("1"))]));
+    assert(
+        parse_json("""{"a": 1, "b": [2]}""")? == JObject([
+            JMember("a", JNumber("1")),
+            JMember("b", JArray([JNumber("2")])),
+        ]),
+    );
+    // A key with an escape in it goes through the same decoding as a value.
+    assert(parse_json("""{"a\tb": null}""")? == JObject([JMember("a\tb", JNull)]));
+
+    // ---- strict about trailing separators ----
+    //
+    // `ListOf(.., trailing: false)` leaves the dangling comma unconsumed, so
+    // the enclosing rule is what reports it.
+    assert(msg_of("[1, 2,]") == "expected a JSON value, found `]`");
+    assert(msg_of("""{"a": 1,}""") == "expected Str, found `}`");
+
+    // ---- errors ----
+    assert(msg_of("") == "expected a JSON value, found end of input");
+    assert(msg_of("[1") == "expected `,` or `]`, found end of input");
+    assert(msg_of("{1: 2}") == "expected Str or `}`, found `1`");
+    assert(msg_of("""{"a" 1}""") == "expected `:`, found `1`");
+    // Every token must be consumed: two documents is not one.
+    assert(msg_of("1 2") == "expected end of input, found `2`");
+    // A lex failure reports in the same shape as a parse failure.
+    assert(msg_of("@") == "unexpected character");
+})
+
+pub fn render_json(self: Json) -> str {
+    match (self) {
+        JNull => "null",
+        JBool(b) => if (b) { "true" } else { "false" },
+        JNumber(n) => n,
+        JString(s) => `"{escape_json(s)}"`,
+        JArray(xs) => `[{xs.map(render_json).join(sep=",")}]`,
+        JObject(ms) => `\{{ms.map(render_json).join(sep=",")}}`,
+        JMember(k, v) => `"{escape_json(k)}":{v.render_json()}`,
+    }
+}.doc("""
+    `self` printed back as JSON source, in one canonical compact spelling: no
+    spaces, no trailing separators, strings escaped.
+
+    Round-trips with `parse_json` — `parse_json(render_json(v)) == v` for every
+    `v` a parse produced — which is what makes the pair a usable end-to-end check
+    of the library.
+
+    A bare `JMember` renders as the `"key":value` it is; it is only meaningful
+    inside a `JObject`, which is where a parse ever puts one.
+""").test({
+    // ---- round trip: parse -> lower -> render -> parse ----
+    let src = """{"name":"ada","tags":["x","y"],"n":-1.5,"ok":true,"nil":null}""";
+    let v = parse_json(src)?;
+    // Rendering is canonical, and this source is already in that spelling.
+    assert(v.render_json() == src);
+    assert(parse_json(v.render_json())? == v);
+
+    // ... and from a source `render_json` would never have written.
+    let messy = """{ "a" : [ 1 , 2 ] , "b" : { } }""";
+    let mv = parse_json(messy)?;
+    assert(mv.render_json() == """{"a":[1,2],"b":{}}""");
+    assert(parse_json(mv.render_json())? == mv);
+
+    // Escapes survive the round trip: decoded into the AST, re-escaped on the
+    // way out, decoded again by the second parse.
+    let esc = parse_json("""{"a\"b": "c\nd"}""")?;
+    assert(esc.render_json() == """{"a\"b":"c\nd"}""");
+    assert(parse_json(esc.render_json())? == esc);
+
+    assert(render_json(JArray([])) == "[]");
+    assert(render_json(JObject([])) == "{}");
+    assert(render_json(JMember("k", JNull)) == "\"k\":null");
+})
+
+// The inverse of the `unescape` lowering applies: the two characters JSON
+// *requires* escaping, plus the control characters that have short forms. Enough
+// for the round trip, and for anything this library will parse back.
+fn escape_json(s: str) -> str {
+    mut out = "";
+    mut i: u64 = 0;
+    while (i < s.len()) {
+        // Sliced rather than indexed: `s[i]` is a `char`, and a char renders as
+        // `'x'` — quotes included — when interpolated, so the one-byte *slice* is
+        // what appends cleanly.
+        let ch = s[i..i + 1];
+
+        // An expression `match`, not a statement one: its value is the piece to
+        // append, and the append is the statement. A statement `match` may not
+        // assign to a binding declared outside it.
+        let piece = match (ch) {
+            "\"" => "\\\"",
+            "\\" => "\\\\",
+            "\n" => "\\n",
+            "\t" => "\\t",
+            "\r" => "\\r",
+            _ => ch,
+        };
+        set out = `{out}{piece}`;
+        set i++;
+    }
+    out
+}.test({
+    assert(escape_json("plain") == "plain");
+    assert(escape_json("a\"b") == """a\"b""");
+    assert(escape_json("a\nb") == """a\nb""");
+    assert(escape_json("a\\b") == """a\\b""");
+    assert(escape_json("") == "");
+})
+
+// ---------- test-only helpers ----------
+
+// The message a failed parse reports — and a distinguishable string when it
+// unexpectedly succeeded, so a broken assertion says which way it broke.
+fn msg_of(src: str) -> str {
+    match (parse_json(src)) {
+        ok(v) => `unexpectedly parsed: {v.render_json()}`,
+        err(e) => e.message,
+    }
+}
+
+// The concrete tree, rendered against the production names — the debug view a
+// tree assertion reads better as than a nested `CTree` literal.
+fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(json_grammar()))) }
+--- performance ---
+allocations: 11422
+deallocations: 11422
+reallocations: 299
+bytes allocated: 623372
+instructions executed: 1555023
+binary size: 206824
+  code: 123596
+  data: 6492
+  metadata: 76736
+functions:
+  __arr_drop_Json:
+    calls: 125
+    bytes: 116
+  __arr_drop___m1__Cst:
+    calls: 666
+    bytes: 116
+  __arr_drop___m2__Production$JsonTok$Json:
+    calls: 337
+    bytes: 180
+  __arr_drop___m2__Rule$JsonTok:
+    calls: 949
+    bytes: 116
+  __arr_drop___m3__StepResult$JsonTok:
+    calls: 0
+    bytes: 140
+  __arr_drop___m3__Token$JsonTok:
+    calls: 304
+    bytes: 136
+  __arr_drop___m3__TokenRule$JsonTok:
+    calls: 38
+    bytes: 572
+  __arr_retain_Json:
+    calls: 135
+    bytes: 116
+  __arr_retain___m1__Cst:
+    calls: 667
+    bytes: 116
+  __arr_retain___m2__Production$JsonTok$Json:
+    calls: 555
+    bytes: 180
+  __arr_retain___m2__Rule$JsonTok:
+    calls: 1184
+    bytes: 116
+  __arr_retain___m3__StepResult$JsonTok:
+    calls: 0
+    bytes: 140
+  __arr_retain___m3__Token$JsonTok:
+    calls: 232
+    bytes: 136
+  __arr_retain___m3__TokenRule$JsonTok:
+    calls: 0
+    bytes: 572
+  __builtin_count_while$char$lam28:
+    calls: 149
+    bytes: 296
+  __builtin_count_while$char$s0$lam33:
+    calls: 0
+    bytes: 236
+  __builtin_count_while$char$s0$lam35:
+    calls: 308
+    bytes: 244
+  __builtin_count_while$char$s0$lam70:
+    calls: 74
+    bytes: 236
+  __builtin_try_map$__m1__Cst$Json$__m2__ParseError$lam44:
+    calls: 142
+    bytes: 716
+  __builtin_try_map$__m2__Production$JsonTok$Json$__m2__Production$JsonTok$Json$__m2__ParseError$lam18:
+    calls: 37
+    bytes: 928
+  __builtin_try_map$__m2__Rule$JsonTok$__m2__Rule<JsonTok>$__m2__ParseError$lam57:
+    calls: 222
+    bytes: 716
+  __eq_Json:
+    calls: 39
+    bytes: 484
+  __eq_Json$arr:
+    calls: 17
+    bytes: 300
+  __eq_char$opt:
+    calls: 247
+    bytes: 100
+  __lambda_11:
+    calls: 0
+    bytes: 92
+  __lambda_12:
+    calls: 35
+    bytes: 60
+  __lambda_16:
+    calls: 296
+    bytes: 744
+  __m1__leaves:
+    calls: 26
+    bytes: 764
+  __m1__show:
+    calls: 32
+    bytes: 1392
+  __m1__span:
+    calls: 0
+    bytes: 460
+  __m1__token_leaves:
+    calls: 253
+    bytes: 736
+  __m1__token_text:
+    calls: 33
+    bytes: 392
+  __m2__link$JsonTok$Json:
+    calls: 37
+    bytes: 1016
+  __m2__link_rule$JsonTok:
+    calls: 1110
+    bytes: 4208
+  __m2__name_index:
+    calls: 666
+    bytes: 404
+  __m2__prod_names$JsonTok$Json:
+    calls: 78
+    bytes: 496
+  __m3__between_len:
+    calls: 0
+    bytes: 676
+  __m3__delimited_len:
+    calls: 194
+    bytes: 1500
+  __m3__finalize_template$JsonTok:
+    calls: 0
+    bytes: 3740
+  __m3__float_len:
+    calls: 154
+    bytes: 904
+  __m3__interp_scan$JsonTok:
+    calls: 0
+    bytes: 2056
+  __m3__lex$JsonTok:
+    calls: 38
+    bytes: 1372
+  __m3__lex_step$JsonTok:
+    calls: 233
+    bytes: 18424
+  __m3__nested_len:
+    calls: 0
+    bytes: 940
+  __m3__step_result$JsonTok:
+    calls: 1357
+    bytes: 5980
+  __m3__template_scan$JsonTok:
+    calls: 0
+    bytes: 2668
+  __m3__template_step$JsonTok:
+    calls: 0
+    bytes: 488
+  __m4__unescape:
+    calls: 31
+    bytes: 892
+  __m5__climb$JsonTok$Json:
+    calls: 0
+    bytes: 2760
+  __m5__error_at$JsonTok$Json:
+    calls: 7
+    bytes: 1444
+  __m5__far_miss:
+    calls: 317
+    bytes: 956
+  __m5__find_prec:
+    calls: 0
+    bytes: 848
+  __m5__leaf_at$JsonTok$Json:
+    calls: 184
+    bytes: 1208
+  __m5__lower_node$JsonTok$Json:
+    calls: 142
+    bytes: 2828
+  __m5__match_list_of$JsonTok$Json:
+    calls: 32
+    bytes: 2632
+  __m5__match_many$JsonTok$Json:
+    calls: 0
+    bytes: 1880
+  __m5__match_maybe$JsonTok$Json:
+    calls: 48
+    bytes: 836
+  __m5__match_one_of$JsonTok$Json:
+    calls: 107
+    bytes: 1304
+  __m5__match_prod$JsonTok$Json:
+    calls: 416
+    bytes: 3772
+  __m5__match_rule$JsonTok$Json:
+    calls: 1251
+    bytes: 4336
+  __m5__match_then$JsonTok$Json:
+    calls: 235
+    bytes: 1712
+  __m5__oxford:
+    calls: 7
+    bytes: 1576
+  __m5__parse$JsonTok$Json:
+    calls: 32
+    bytes: 340
+  __m5__parse_cst$JsonTok$Json:
+    calls: 37
+    bytes: 4032
+  __m5__prev_end$JsonTok$Json:
+    calls: 244
+    bytes: 464
+  __m5__quoted:
+    calls: 243
+    bytes: 380
+  __m5__tok_text$JsonTok$Json:
+    calls: 365
+    bytes: 548
+  __m5__trailing_trivia$JsonTok$Json:
+    calls: 60
+    bytes: 548
+  __rec_drop_Json:
+    calls: 101
+    bytes: 212
+  __rec_drop___m1__Cst:
+    calls: 428
+    bytes: 48
+  __rec_drop___m2__Rule$JsonTok:
+    calls: 2340
+    bytes: 360
+  __test$escape_json:
+    calls: 1
+    bytes: 552
+  __test$json_cst:
+    calls: 1
+    bytes: 1636
+  __test$parse_json:
+    calls: 1
+    bytes: 9584
+  __test$render_json:
+    calls: 1
+    bytes: 2500
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 64
+  __to_str_JsonTok:
+    calls: 74
+    bytes: 664
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 812
+  __to_str_u64:
+    calls: 0
+    bytes: 180
+  aipl_arr_drop_arr:
+    calls: 120
+    bytes: (external)
+  aipl_arr_drop_str:
+    calls: 418
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 772
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 26826
+    bytes: (external)
+  aipl_arr_join:
+    calls: 120
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 973
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 1334
+    bytes: (external)
+  aipl_array_dec:
+    calls: 34659
+    bytes: (external)
+  aipl_array_new:
+    calls: 5099
+    bytes: (external)
+  aipl_array_push:
+    calls: 1300
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1310
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 647
+    bytes: (external)
+  aipl_assert:
+    calls: 46
+    bytes: (external)
+  aipl_char_at:
+    calls: 1504
+    bytes: (external)
+  aipl_concat:
+    calls: 1950
+    bytes: (external)
+  aipl_concat_lazy:
+    calls: 45
+    bytes: (external)
+  aipl_dec:
+    calls: 57153
+    bytes: (external)
+  aipl_inc:
+    calls: 47537
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 2869
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 17037
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 259
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 14168
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 259
+    bytes: (external)
+  aipl_str_contains:
+    calls: 899
+    bytes: (external)
+  aipl_str_data:
+    calls: 562
+    bytes: (external)
+  aipl_str_eq:
+    calls: 3961
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 531
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 509
+    bytes: (external)
+  aipl_str_join:
+    calls: 63
+    bytes: (external)
+  aipl_str_len:
+    calls: 12679
+    bytes: (external)
+  aipl_str_slice:
+    calls: 2594
+    bytes: (external)
+  aipl_str_starts_with:
+    calls: 517
+    bytes: (external)
+  aipl_test_begin:
+    calls: 4
+    bytes: (external)
+  aipl_test_end:
+    calls: 4
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 233
+    bytes: (external)
+  escape_json:
+    calls: 30
+    bytes: 808
+  json_cst:
+    calls: 5
+    bytes: 384
+  json_grammar:
+    calls: 41
+    bytes: 3596
+  lex_json:
+    calls: 38
+    bytes: 3052
+  lower_array:
+    calls: 11
+    bytes: 256
+  lower_bool:
+    calls: 5
+    bytes: 320
+  lower_member:
+    calls: 20
+    bytes: 1732
+  lower_null:
+    calls: 5
+    bytes: 220
+  lower_number:
+    calls: 17
+    bytes: 256
+  lower_object:
+    calls: 12
+    bytes: 256
+  lower_string:
+    calls: 11
+    bytes: 344
+  lower_value:
+    calls: 61
+    bytes: 648
+  main:
+    calls: 1
+    bytes: 192
+  msg_of:
+    calls: 8
+    bytes: 428
+  parse_json:
+    calls: 33
+    bytes: 384
+  render_json:
+    calls: 50
+    bytes: 1876
+  shown:
+    calls: 4
+    bytes: 416

@@ -427,6 +427,12 @@ fn match_list_of<K: variant, A: any>(
                 set going = false;
             };
         } else {
+            // The list ends here because no separator followed. It still
+            // *expected* one — a missing comma is the commonest way a list goes
+            // wrong — so record it before stopping. `ListOf` always matches, so
+            // this only ever widens the expected set; the enclosing rule is what
+            // decides whether stopping here was an error at all.
+            set f = far_miss(f, cp, quoted(sep));
             set going = false;
         };
     }
@@ -890,15 +896,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2797
-deallocations: 2797
+allocations: 2798
+deallocations: 2798
 reallocations: 122
-bytes allocated: 134260
-instructions executed: 395217
-binary size: 260536
-  code: 150424
+bytes allocated: 134300
+instructions executed: 395300
+binary size: 260752
+  code: 150556
   data: 6948
-  metadata: 103164
+  metadata: 103248
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1096,13 +1102,13 @@ functions:
     calls: 11
     bytes: (external)
   aipl_arr_drop_str:
-    calls: 216
+    calls: 217
     bytes: (external)
   aipl_arr_extend:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8516
+    calls: 8517
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1117,10 +1123,10 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10648
+    calls: 10650
     bytes: (external)
   aipl_array_new:
-    calls: 1346
+    calls: 1347
     bytes: (external)
   aipl_array_push:
     calls: 247
@@ -1138,13 +1144,13 @@ functions:
     calls: 379
     bytes: (external)
   aipl_concat:
-    calls: 418
+    calls: 424
     bytes: (external)
   aipl_dec:
-    calls: 12735
+    calls: 12754
     bytes: (external)
   aipl_inc:
-    calls: 10323
+    calls: 10330
     bytes: (external)
   aipl_rec_alloc:
     calls: 440
@@ -1183,7 +1189,7 @@ functions:
     calls: 56
     bytes: (external)
   aipl_str_len:
-    calls: 1585
+    calls: 1586
     bytes: (external)
   aipl_str_slice:
     calls: 846
@@ -1213,7 +1219,7 @@ functions:
     calls: 14
     bytes: 1604
   far_miss:
-    calls: 53
+    calls: 54
     bytes: 956
   find_prec:
     calls: 22
@@ -1232,7 +1238,7 @@ functions:
     bytes: 72
   match_list_of$Tok$Node:
     calls: 4
-    bytes: 2500
+    bytes: 2632
   match_many$Tok$Node:
     calls: 15
     bytes: 1880
@@ -1270,7 +1276,7 @@ functions:
     calls: 148
     bytes: 592
   quoted:
-    calls: 25
+    calls: 26
     bytes: 380
   refuse:
     calls: 1

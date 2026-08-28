@@ -8,7 +8,7 @@ each is sized to be finishable in one session.
 **Stage 1 — the library**
 - [x] 1.0 `grammar.aipl`, `cst.aipl`, `parse.aipl` + per-arm unit tests
 - [x] 1.1 S-expressions end to end (incl. deep-nesting test as a built binary)
-- [ ] 1.2 JSON end to end
+- [x] 1.2 JSON end to end
 
 **Stages 2-6**
 - [ ] 2 `ebnf.aipl` + FIRST sets
@@ -227,6 +227,39 @@ trailing-comma rule, `OneOf` across six alternatives, and a heterogeneous AST.
 Complete but tiny, and `lexer.aipl`'s own test block already drives a
 JSON-flavored rule set to crib the token rules from. `grammar_json.aipl` supplies
 those rules, ~10 productions, and lowering to a `variant Json`.
+
+**What 1.2 landed** (`grammar_json.aipl`, eight productions, plus one fix to the
+driver):
+
+- **`ListOf` never recorded its separator as an expectation**, so `[1` reported
+  "expected `]`" and left out the comma — the commonest way a list actually goes
+  wrong. `match_list_of` now calls `far_miss` with the separator when none
+  follows an item; since `ListOf` always matches, that only widens the expected
+  set and never changes what parses. This is the kind of thing a second grammar
+  exists to find: the S-expression toy has no separators at all.
+- **`JMember` is where a uniform lowering type shows its seam.** `Build<A>` pins
+  one `A` for every production, so `member` — whose natural result is a key/value
+  *pair*, not a JSON value — lowers to a `Json` case of its own, meaningful only
+  inside a `JObject`. Worth knowing before Stage 4: AIPL's AST has many more
+  shapes than its expression type, so either they all become cases of one lowering
+  variant or `Grammar` grows a second type parameter.
+- **Numbers stay text.** `JNumber` carries the source spelling. JSON's number
+  syntax is wider than any one AIPL type, so what a number *means* is the
+  consumer's policy — the same call the lexer already makes by handing `Int`/
+  `Float` over unparsed.
+- **The sign is the grammar's, not the lexer's.** `Exact("-")` ahead of
+  `Float`/`Int` makes every `-` its own token and `Int` unsigned, so
+  `Maybe(Spelling("-"))` in one production handles the sign — rather than a sign
+  the lexer swallowed for integers and one it didn't for floats.
+
+Two more authoring notes, both compiler behavior rather than design (the 1.1 list
+has the first two):
+
+- A `char` interpolates as `'x'`, quotes included, so building a string from a
+  `str`'s bytes wants the one-byte *slice* `s[i..i + 1]`, not `s[i]`.
+- A `"""` block is raw *and* dedented, so a leading space on a single-line block
+  is stripped while a trailing one is kept. JSON sources that begin with `"` read
+  more predictably as ordinary escaped literals.
 
 Precedence (`Climb`) has no exercise in either toy — it arrives with AIPL's
 grammar in Stage 4. If it needs proving sooner, the cheapest vehicle is a
