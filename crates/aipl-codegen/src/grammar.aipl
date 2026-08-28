@@ -110,7 +110,7 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 // which collapses `expr`/`term`/`unary`/`atom` to one word. Empty means
 // *transparent*: a plumbing production never surfaces in a message, and the
 // finer expectations from inside it are what the reader sees. `scope` is the
-// highlighter hint (Stage 3); it is carried, not yet consumed.
+// highlighter hint; it is carried, not yet consumed.
 struct Production<K: variant, A: any> {
     name: str,
     rule: Rule<K>,

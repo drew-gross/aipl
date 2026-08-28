@@ -27,8 +27,8 @@
 // Costs worth knowing before this drives something large: trivia is attached by
 // scanning the trivia list for each consumed token, so a parse is O(tokens ×
 // trivia); and with no memoization a heavily-backtracking grammar can be
-// exponential. Both are answered later in the plan — FIRST sets (Stage 2) remove
-// most backtracking — and neither matters at the sizes here.
+// exponential. Both are answered later in the plan — FIRST sets remove most
+// backtracking — and neither matters at the sizes here.
 import {
     contains,
     count_while,

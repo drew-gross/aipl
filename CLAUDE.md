@@ -388,6 +388,19 @@ AIPL-implemented builtin (`crates/aipl-mono/src/builtin_*.aipl`) **panics the
 compiler** — "AIPL-implemented builtin sources are valid AIPL" — so every program
 reaching that builtin dies. One such lint took out 66 cases at once.
 
+## Two literal gotchas when building strings
+
+- **A `char` interpolates with its quotes.** `` `{c}` `` on a `char` renders
+  `'x'`, not `x` — `to_str` of a char is its *literal*. Building a string from a
+  `str`'s bytes therefore wants the one-byte **slice** `s[i..i + 1]`, which is a
+  `str`, not `s[i]`, which is a `char?`.
+- **A `"""` block is raw *and* dedented.** No escape processing, and the common
+  leading indent is stripped — so on a single-line block a leading space is
+  removed while a trailing one is kept (`""" x """` is `"x "`). It is the right
+  form for text that *contains* backslashes or quotes (JSON, regexes, expected
+  compiler output); it is the wrong form when the exact leading whitespace
+  matters, where an ordinary escaped literal is predictable.
+
 ## Predicate methods (`is_*` functions)
 Boolean predicates should be written as methods on their receiver, not
 free functions — `c.is_digit()` reads more naturally than `is_digit(c)`.

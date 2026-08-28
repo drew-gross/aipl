@@ -2,7 +2,7 @@
 // S-expressions deliberately left out — several terminal classes rather than one,
 // `ListOf` with a separator and a trailing-comma rule, an `OneOf` across six
 // alternatives, and a heterogeneous AST. Still no precedence; that arrives with
-// AIPL's own grammar in Stage 4.
+// the calculator in `grammar_calc.aipl`.
 //
 // Complete but tiny: eight productions and one `variant Json`, against a rule set
 // cribbed from `lexer.aipl`'s own JSON-flavored test table.
@@ -19,8 +19,8 @@
 //     — whose natural result is a key/value *pair*, not a JSON value — has to
 //     lower to a `Json` too. It gets a case of its own, meaningful only as an
 //     element of a `JObject`. That is the honest cost of one lowering type per
-//     grammar, and it is worth knowing before Stage 4, where AIPL's own AST has
-//     many more shapes than its expression type.
+//     grammar, and it is worth knowing before the grammar describes AIPL itself,
+//     where the AST has many more shapes than its expression type.
 import {
     equal as ==,
     first,
