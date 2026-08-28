@@ -1016,11 +1016,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // Optional sign reaches the full range: i64::MIN parses (a positive run of the
     // same magnitude would overflow), one past it does not.
-    assert(
-        lex("-9223372036854775808", ints)? == toks([
-            tok(IntTok(0 - 9223372036854775807 - 1), 0..20),
-        ]),
-    );
+    assert(lex("-9223372036854775808", ints)? == toks([tok(IntTok(-9223372036854775808), 0..20)]));
     assert(
         lex("-9223372036854775809", ints) == err(lex_err("integer literal overflows i64", 0..20)),
     );
@@ -1222,9 +1218,9 @@ deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
 instructions executed: 265822
-binary size: 1791416
+binary size: 1791392
   code: 1125136
-  data: 8124
+  data: 8100
   metadata: 658156
 functions:
   __arr_drop_StepResult$Kind:

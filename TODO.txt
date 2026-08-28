@@ -46,6 +46,8 @@ type checker:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 inlining:
+  inline no-arg-no-effect functions into data section
+  inline single-use let variables
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
     If we hardcode the list of functions that must be materialized because they are used in FFI, we eliminate a restriction
@@ -65,8 +67,6 @@ inlining:
     `return false`, into a value-producing form) vs Cranelift-IR-level (handles
     every body shape, bigger lift; check what cranelift's own inlining infra
     offers now).
-  - never inline recursive fns; memoized instances with many call
-    sites stay outlined to avoid bloat.
 
 value_or for structs:
   1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
@@ -136,12 +136,12 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
+  error: fn "sexp_grammar": unknown type "__m2__Grammar" when sexp_grammar is de-stuttered. Bad error, but also it shouild compile.
   bad error for calling map on non-array:
     error: field access on non-struct value of type _
       --> crates/aipl-codegen/src/grammar.aipl:325:24
-        |
     325 |     g.prods[i].map(|p| p.expect_as).value_or("")
-        |                        ^
+  error: cannot infer type parameter "K" of generic variant "__m2__Rule" — a constructor argument or a single existing instance must determine it <--- when sexp_grammar is de-stuttered
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
@@ -150,6 +150,8 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  allow passing int literals to u64 arguments
+  implement if let, lint for it's use in case of none => {}
   module level constants
   for (let i, c : dct) syntax for dicts
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
@@ -191,12 +193,16 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 parser:
+  what's with Term(Str(""))? Why the ""?
+  Mk should accept fns that only need kids
+  implement "nested in" which should be good for the formatter
   change the plan to include a toy langauge that has binary operators with precedence
   implement the plan
   can use strings instead of spans in many places, it's COW/SSO so it should be fast
   remove power from prec and use order within the list
 
 utilities:
+  push into a string should work
   add is_some, lint against match none->false+some(_)->true
   split with predicate, use in companion_files.aipl
   interaclate
@@ -274,7 +280,6 @@ optimizations:
   why does nextest listing take so long?
   we generally re-parse the test section headers a lot, making a dict once and using that throughout would probably be better
   dead code elimination, plus a better uncalled function elimination pass
-  move single use inlining to after monomorphization
   add a constant branch elimination pass
   make constant folding a little smarter
     fold mutable consts before they get mutated
@@ -481,6 +486,7 @@ the arg contract being different for builtins caused problems for retain elision
 - make the arg contract for builtins more uniform
 - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
 - allow retain elision for some builtins based on their contract
+- should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
   make a docs renderer
