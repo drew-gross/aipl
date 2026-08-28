@@ -5,23 +5,6 @@ while the ord-bound machinery already compares chars — and ord_bound.aipl's do
 Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 Make the language features powerful enough that we don't need builtin_return
 make some_var[Span{ ... }] work
-better inlining — idea list (from the builtins-in-aipl work; none implemented yet):
-- Inline specialized HOF instances at their call sites: a `__builtin_all$i64$lamN`
-  (or `count_while$...$lamN`) instance typically has exactly one call site, so
-  inlining it and not emitting the function is a pure win (call overhead + binary
-  size). The spec_memo already knows when an instance is reused.
-- Fuse the lifted lambda into the specialized HOF body: after
-  `specialize_call_with`, the loop calls `__lambda_N($e, caps..)` through a
-  statically-known binding — inlining the predicate into the loop removes a call
-  per element. Probably the single highest-value inline for AIPL-implemented
-  builtins like `all`.
-- Pick the layer: AST-level in mono (cheap — mono already synthesizes/rewrites
-  bodies; but must lower early `return` in an inlined body, e.g. `all`'s
-  `return false`, into a value-producing form) vs Cranelift-IR-level (handles
-  every body shape, bigger lift; check what cranelift's own inlining infra
-  offers now).
-- never inline recursive fns; memoized instances with many call
-  sites stay outlined to avoid bloat.
 generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 
 variant:
@@ -66,6 +49,24 @@ inlining:
   problem: inlining loses context necessary for type checking (context type literal args and returns). Solution: Type checking should also _lock_ the types, applying the context so the context is no longer necessary. Then inlining happens after that.
   is_inline_shape -> remove all these restrictions
     If we hardcode the list of functions that must be materialized because they are used in FFI, we eliminate a restriction
+  inline a call if all args are constant
+  better inlining — idea list (from the builtins-in-aipl work; none implemented yet):
+  - Inline specialized HOF instances at their call sites: a `__builtin_all$i64$lamN`
+    (or `count_while$...$lamN`) instance typically has exactly one call site, so
+    inlining it and not emitting the function is a pure win (call overhead + binary
+    size). The spec_memo already knows when an instance is reused.
+  - Fuse the lifted lambda into the specialized HOF body: after
+    `specialize_call_with`, the loop calls `__lambda_N($e, caps..)` through a
+    statically-known binding — inlining the predicate into the loop removes a call
+    per element. Probably the single highest-value inline for AIPL-implemented
+    builtins like `all`.
+  - Pick the layer: AST-level in mono (cheap — mono already synthesizes/rewrites
+    bodies; but must lower early `return` in an inlined body, e.g. `all`'s
+    `return false`, into a value-producing form) vs Cranelift-IR-level (handles
+    every body shape, bigger lift; check what cranelift's own inlining infra
+    offers now).
+  - never inline recursive fns; memoized instances with many call
+    sites stay outlined to avoid bloat.
 
 value_or for structs:
   1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
@@ -134,6 +135,14 @@ bugs:
       Found while writing lambdas/two_lambda_args, whose first draft was
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
+errors:
+  bad error for calling map on non-array:
+    error: field access on non-struct value of type _
+      --> crates/aipl-codegen/src/grammar.aipl:325:24
+        |
+    325 |     g.prods[i].map(|p| p.expect_as).value_or("")
+        |                        ^
+
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
 
@@ -191,7 +200,6 @@ utilities:
   add is_some, lint against match none->false+some(_)->true
   split with predicate, use in companion_files.aipl
   interaclate
-  try_map that is like map when pred can error
   do we need intersperse now that we've souped up join?
   find (plus linter that require use of find)
   zip, to allow iterating over lists in pairs
@@ -200,7 +208,6 @@ lint:
   match with same arm val should use Case1 | Case2 => arm_val
   match none -> err(...) should lint to value_or_err
   lint against manually incrementing a loop counter
-  for (let t : src) {set dst.push(t);} should just be set dst.extend(src) (enforced by lint)
   mut x = [v1];x.push(v2);x.extend(v3); should be let x = [v1, v2, ..v3]
   is_nonempty lint should recognize x.len() != 0 and x.len() >= 1
   recognize and recommend min/max
@@ -340,7 +347,8 @@ perfmon:
   add tests that specifically exersize perf
   functions in external libs don't get size instrumented
 
-recovering check:
+check:
+  should fail on fmt error
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests
   can recover from type errors even?

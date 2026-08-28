@@ -255,16 +255,16 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(rule_of(link(linked)?, one) == OneOf([Term(Atom("")), NamedIdx(zero)]));
 
     // Every rule shape carries its reference, and every one is rewritten.
-    let r_a: Rule<Kind> = Maybe(Named("a"));
-    let r_b: Rule<Kind> = ListOf(Named("a"), ",", true);
-    let r_c: Rule<Kind> = Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]);
-    let r_d: Rule<Kind> = many1(Named("b"));
     let shapes: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: r_a, build: Mk(keep) },
-            Production { name: "b", rule: r_b, build: Mk(keep) },
-            Production { name: "c", rule: r_c, build: Mk(keep) },
-            Production { name: "d", rule: r_d, build: Mk(keep) },
+            Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep) },
+            Production { name: "b", rule: ListOf(Named("a"), ",", true), build: Mk(keep) },
+            Production {
+                name: "c",
+                rule: Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]),
+                build: Mk(keep),
+            },
+            Production { name: "d", rule: many1(Named("b")), build: Mk(keep) },
         ],
     };
     let ls = link(shapes)?;
@@ -278,19 +278,16 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(rule_of(ls, three) == Many(NamedIdx(one), one));
 
     // An unresolved reference is a grammar error, named in the message.
-    let r_missing: Rule<Kind> = Named("missing");
     let bad: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: r_missing, build: Mk(keep) }],
+        prods: [Production { name: "a", rule: Named("missing"), build: Mk(keep) }],
     };
     assert(link(bad) == err(ParseError { message: "no rule named \"missing\"", span: 0..0 }));
 
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
-    let r_x: Rule<Kind> = Spelling("x");
-    let r_y: Rule<Kind> = Spelling("y");
     let dup: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: r_x, build: Mk(keep) },
-            Production { name: "a", rule: r_y, build: Mk(keep) },
+            Production { name: "a", rule: Spelling("x"), build: Mk(keep) },
+            Production { name: "a", rule: Spelling("y"), build: Mk(keep) },
         ],
     };
     assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
@@ -332,11 +329,11 @@ allocations: 111
 deallocations: 111
 reallocations: 0
 bytes allocated: 7052
-instructions executed: 11854
-binary size: 40592
-  code: 22948
+instructions executed: 11840
+binary size: 40008
+  code: 22648
   data: 1932
-  metadata: 15712
+  metadata: 15428
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -403,7 +400,7 @@ functions:
     bytes: 480
   __test$link:
     calls: 1
-    bytes: 8044
+    bytes: 7744
   __test_try_fail_ParseError:
     calls: 0
     bytes: 64
@@ -450,13 +447,13 @@ functions:
     calls: 55
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 243
+    calls: 236
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 12
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 188
+    calls: 181
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 12
