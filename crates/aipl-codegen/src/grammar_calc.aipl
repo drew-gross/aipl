@@ -36,6 +36,7 @@ import {
     len,
     less_than as <,
     map_err,
+    map_ok,
     remainder as %,
     saturating_divide as /,
     to_str,
@@ -59,6 +60,7 @@ import {
     Spelling,
     Term,
     Then,
+    failure_message,
     prod_names,
 } from "./grammar.aipl";
 import { Bare, CharRun, Int, LexResult, TokenRule, lex } from "./lexer.aipl";
@@ -360,12 +362,7 @@ fn pow(base: i64, exp: i64) -> i64 {
 
 fn eval(src: str) -> i64!ParseError { ok(parse_calc(src)?.eval_calc()) }
 
-fn msg_of(src: str) -> str {
-    match (parse_calc(src)) {
-        ok(v) => `unexpectedly parsed: {v.render_calc()}`,
-        err(e) => e.message,
-    }
-}
+fn msg_of(src: str) -> str { parse_calc(src).map_ok(render_calc).failure_message() }
 
 fn shown(src: str) -> str!ParseError { ok(calc_cst(src)?.show(src, prod_names(calc_grammar()))) }
 
@@ -389,11 +386,11 @@ allocations: 8308
 deallocations: 8308
 reallocations: 408
 bytes allocated: 411348
-instructions executed: 1172045
-binary size: 189720
-  code: 112984
+instructions executed: 1172479
+binary size: 194592
+  code: 116116
   data: 5716
-  metadata: 71020
+  metadata: 72760
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -437,31 +434,31 @@ functions:
   __arr_retain___m3__TokenRule$CalcTok:
     calls: 0
     bytes: 512
-  __builtin_count_while$char$lam28:
+  __builtin_count_while$char$lam29:
     calls: 234
     bytes: 296
-  __builtin_count_while$char$s0$lam33:
+  __builtin_count_while$char$s0$lam34:
     calls: 0
     bytes: 236
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam36:
     calls: 104
     bytes: 244
-  __builtin_count_while$char$s0$lam45:
+  __builtin_count_while$char$s0$lam46:
     calls: 94
     bytes: 232
-  __builtin_count_while$char$s0$lam71:
+  __builtin_count_while$char$s0$lam72:
     calls: 15
     bytes: 236
   __builtin_int_parse:
     calls: 94
     bytes: 1052
-  __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam44:
+  __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam45:
     calls: 387
     bytes: 716
-  __builtin_try_map$__m2__Production$CalcTok$Calc$__m2__Production$CalcTok$Calc$__m2__ParseError$lam14:
+  __builtin_try_map$__m2__Production$CalcTok$Calc$__m2__Production$CalcTok$Calc$__m2__ParseError$lam15:
     calls: 40
     bytes: 928
-  __builtin_try_map$__m2__Rule$CalcTok$__m2__Rule<CalcTok>$__m2__ParseError$lam58:
+  __builtin_try_map$__m2__Rule$CalcTok$__m2__Rule<CalcTok>$__m2__ParseError$lam59:
     calls: 160
     bytes: 716
   __eq_Calc:
@@ -470,10 +467,10 @@ functions:
   __eq_char$opt:
     calls: 104
     bytes: 100
-  __lambda_12:
+  __lambda_13:
     calls: 120
     bytes: 744
-  __lambda_21:
+  __lambda_22:
     calls: 95
     bytes: 140
   __m1__leaves:
@@ -488,6 +485,9 @@ functions:
   __m1__span:
     calls: 2
     bytes: 460
+  __m2__failure_message:
+    calls: 7
+    bytes: 324
   __m2__link$CalcTok$Calc:
     calls: 40
     bytes: 1016
@@ -610,7 +610,7 @@ functions:
     bytes: 1544
   __test$parse_calc:
     calls: 1
-    bytes: 3720
+    bytes: 6956
   __test$render_calc:
     calls: 1
     bytes: 4716
@@ -675,13 +675,13 @@ functions:
     calls: 914
     bytes: (external)
   aipl_dec:
-    calls: 31154
+    calls: 31175
     bytes: (external)
   aipl_i64_len:
     calls: 62
     bytes: (external)
   aipl_inc:
-    calls: 25474
+    calls: 25495
     bytes: (external)
   aipl_rec_alloc:
     calls: 2024
@@ -776,9 +776,6 @@ functions:
   main:
     calls: 1
     bytes: 192
-  msg_of:
-    calls: 7
-    bytes: 428
   parse_calc:
     calls: 39
     bytes: 384

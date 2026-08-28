@@ -77,6 +77,7 @@ import {
     Spelling,
     Term,
     Then,
+    failure_message,
     link,
     many,
     many1,
@@ -885,10 +886,7 @@ fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
 // The message a failed parse reports — and a distinguishable string when it
 // unexpectedly succeeded, so a broken assertion says which way it broke.
 fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
-    match (shown(src, g, start)) {
-        ok(s) => `unexpectedly parsed: {s}`,
-        err(e) => e.message,
-    }
+    shown(src, g, start).failure_message()
 }
 
 fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
@@ -901,10 +899,10 @@ deallocations: 2798
 reallocations: 122
 bytes allocated: 134300
 instructions executed: 395300
-binary size: 260752
-  code: 150556
+binary size: 287696
+  code: 167060
   data: 6948
-  metadata: 103248
+  metadata: 113688
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1029,6 +1027,9 @@ functions:
   __m1__text:
     calls: 7
     bytes: 392
+  __m2__failure_message:
+    calls: 16
+    bytes: 324
   __m2__link$Tok$Node:
     calls: 43
     bytes: 1016
@@ -1085,7 +1086,7 @@ functions:
     bytes: 388
   __test$parse:
     calls: 1
-    bytes: 48792
+    bytes: 65376
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 64
@@ -1257,9 +1258,6 @@ functions:
   match_then$Tok$Node:
     calls: 31
     bytes: 1712
-  msg_of:
-    calls: 16
-    bytes: 404
   oxford:
     calls: 14
     bytes: 1576

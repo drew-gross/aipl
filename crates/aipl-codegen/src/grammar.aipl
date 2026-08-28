@@ -39,6 +39,26 @@ import { Cst } from "./cst.aipl";
 // — has no source to point at and carries the empty `0..0`.
 struct ParseError { message: str, span: Span }
 
+// What a failed parse said — or, when it unexpectedly *succeeded*, a note
+// carrying what it produced, so a broken assertion says which way it broke.
+//
+// For `.test` blocks, which is where the distinction matters: an assertion on a
+// message that silently parses instead reads as a mismatched string with no clue
+// why. Pairs with `map_ok`, which is what turns a parse of any AST type into the
+// `str!ParseError` this takes: `parse_x(src).map_ok(render_x).failure_message()`.
+pub fn failure_message(self: str!ParseError) -> str {
+    match (self) {
+        ok(s) => `unexpectedly parsed: {s}`,
+        err(e) => e.message,
+    }
+}.test({
+    let failed: str!ParseError = err(ParseError { message: "expected `)`", span: 3..4 });
+    assert(failed.failure_message() == "expected `)`");
+
+    let parsed: str!ParseError = ok("(a b)");
+    assert(parsed.failure_message() == "unexpectedly parsed: (a b)");
+})
+
 // One precedence level of a `Climb`: the operators that share it, how tightly
 // they bind (`power`, higher wins), and whether they associate to the right.
 // Levels are matched in order, so a spelling belongs to exactly one.
@@ -308,15 +328,15 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 109
-deallocations: 109
+allocations: 111
+deallocations: 111
 reallocations: 0
-bytes allocated: 6966
-instructions executed: 11711
-binary size: 38528
-  code: 22104
-  data: 1620
-  metadata: 14804
+bytes allocated: 7052
+instructions executed: 11854
+binary size: 40592
+  code: 22948
+  data: 1932
+  metadata: 15712
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -378,6 +398,9 @@ functions:
   __rec_drop_Rule$Kind:
     calls: 55
     bytes: 360
+  __test$failure_message:
+    calls: 1
+    bytes: 480
   __test$link:
     calls: 1
     bytes: 8044
@@ -412,16 +435,16 @@ functions:
     calls: 9
     bytes: (external)
   aipl_assert:
-    calls: 14
+    calls: 16
     bytes: (external)
   aipl_concat:
-    calls: 4
+    calls: 6
     bytes: (external)
   aipl_dec:
-    calls: 493
+    calls: 511
     bytes: (external)
   aipl_inc:
-    calls: 432
+    calls: 443
     bytes: (external)
   aipl_rec_alloc:
     calls: 55
@@ -439,20 +462,23 @@ functions:
     calls: 12
     bytes: (external)
   aipl_str_eq:
-    calls: 45
+    calls: 47
     bytes: (external)
   aipl_str_len:
-    calls: 32
+    calls: 34
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  failure_message:
+    calls: 2
+    bytes: 324
   keep:
     calls: 0
     bytes: 256
@@ -464,7 +490,7 @@ functions:
     bytes: 4208
   main:
     calls: 1
-    bytes: 72
+    bytes: 112
   name_index:
     calls: 20
     bytes: 404

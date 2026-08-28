@@ -184,6 +184,8 @@ companion_files.aipl:
 parser:
   change the plan to include a toy langauge that has binary operators with precedence
   implement the plan
+  can use strings instead of spans in many places, it's COW/SSO so it should be fast
+  remove power from prec and use order within the list
 
 utilities:
   add is_some, lint against match none->false+some(_)->true

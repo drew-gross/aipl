@@ -29,6 +29,7 @@ import {
     less_than as <,
     map,
     map_err,
+    map_ok,
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
@@ -48,6 +49,7 @@ import {
     Spelling,
     Term,
     Then,
+    failure_message,
     prod_names,
 } from "./grammar.aipl";
 import {
@@ -406,12 +408,7 @@ fn escape_json(s: str) -> str {
 
 // The message a failed parse reports — and a distinguishable string when it
 // unexpectedly succeeded, so a broken assertion says which way it broke.
-fn msg_of(src: str) -> str {
-    match (parse_json(src)) {
-        ok(v) => `unexpectedly parsed: {v.render_json()}`,
-        err(e) => e.message,
-    }
-}
+fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
 
 // The concrete tree, rendered against the production names — the debug view a
 // tree assertion reads better as than a nested `CTree` literal.
@@ -421,11 +418,11 @@ allocations: 11422
 deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
-instructions executed: 1555023
-binary size: 206824
-  code: 123596
+instructions executed: 1555519
+binary size: 212432
+  code: 127212
   data: 6492
-  metadata: 76736
+  metadata: 78728
 functions:
   __arr_drop_Json:
     calls: 125
@@ -469,25 +466,25 @@ functions:
   __arr_retain___m3__TokenRule$JsonTok:
     calls: 0
     bytes: 572
-  __builtin_count_while$char$lam28:
+  __builtin_count_while$char$lam29:
     calls: 149
     bytes: 296
-  __builtin_count_while$char$s0$lam33:
+  __builtin_count_while$char$s0$lam34:
     calls: 0
     bytes: 236
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam36:
     calls: 308
     bytes: 244
-  __builtin_count_while$char$s0$lam70:
+  __builtin_count_while$char$s0$lam71:
     calls: 74
     bytes: 236
-  __builtin_try_map$__m1__Cst$Json$__m2__ParseError$lam44:
+  __builtin_try_map$__m1__Cst$Json$__m2__ParseError$lam45:
     calls: 142
     bytes: 716
-  __builtin_try_map$__m2__Production$JsonTok$Json$__m2__Production$JsonTok$Json$__m2__ParseError$lam18:
+  __builtin_try_map$__m2__Production$JsonTok$Json$__m2__Production$JsonTok$Json$__m2__ParseError$lam19:
     calls: 37
     bytes: 928
-  __builtin_try_map$__m2__Rule$JsonTok$__m2__Rule<JsonTok>$__m2__ParseError$lam57:
+  __builtin_try_map$__m2__Rule$JsonTok$__m2__Rule<JsonTok>$__m2__ParseError$lam58:
     calls: 222
     bytes: 716
   __eq_Json:
@@ -499,13 +496,13 @@ functions:
   __eq_char$opt:
     calls: 247
     bytes: 100
-  __lambda_11:
+  __lambda_12:
     calls: 0
     bytes: 92
-  __lambda_12:
+  __lambda_13:
     calls: 35
     bytes: 60
-  __lambda_16:
+  __lambda_17:
     calls: 296
     bytes: 744
   __m1__leaves:
@@ -523,6 +520,9 @@ functions:
   __m1__token_text:
     calls: 33
     bytes: 392
+  __m2__failure_message:
+    calls: 8
+    bytes: 324
   __m2__link$JsonTok$Json:
     calls: 37
     bytes: 1016
@@ -648,7 +648,7 @@ functions:
     bytes: 1636
   __test$parse_json:
     calls: 1
-    bytes: 9584
+    bytes: 13304
   __test$render_json:
     calls: 1
     bytes: 2500
@@ -713,10 +713,10 @@ functions:
     calls: 45
     bytes: (external)
   aipl_dec:
-    calls: 57153
+    calls: 57177
     bytes: (external)
   aipl_inc:
-    calls: 47537
+    calls: 47561
     bytes: (external)
   aipl_rec_alloc:
     calls: 2869
@@ -811,9 +811,6 @@ functions:
   main:
     calls: 1
     bytes: 192
-  msg_of:
-    calls: 8
-    bytes: 428
   parse_json:
     calls: 33
     bytes: 384
