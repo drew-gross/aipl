@@ -72,11 +72,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 225
-instructions executed: 1062
-binary size: 8336
-  code: 3984
+instructions executed: 1022
+binary size: 8160
+  code: 3888
   data: 635
-  metadata: 3717
+  metadata: 3637
 functions:
   __to_str_Rule$Tok:
     calls: 4
@@ -105,12 +105,6 @@ functions:
   aipl_write_bytes:
     calls: 32
     bytes: (external)
-  dot:
-    calls: 2
-    bytes: 84
   main:
     calls: 1
-    bytes: 1268
-  paren:
-    calls: 2
-    bytes: 84
+    bytes: 1340

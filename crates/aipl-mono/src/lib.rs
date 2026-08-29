@@ -38,6 +38,9 @@ pub use fuse::{effectful_fns, fuse_operations};
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 
+mod subst;
+pub use subst::inline_single_use_bindings;
+
 use aipl_syntax::{
     ast,
     ast::{

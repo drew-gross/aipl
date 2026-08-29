@@ -324,10 +324,10 @@ deallocations: 285
 reallocations: 0
 bytes allocated: 16148
 instructions executed: 21400
-binary size: 31024
-  code: 17272
+binary size: 31032
+  code: 17276
   data: 842
-  metadata: 12910
+  metadata: 12914
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -352,7 +352,7 @@ functions:
     bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 3372
+    bytes: 3380
   __rec_drop_Doc:
     calls: 38
     bytes: 184
@@ -490,4 +490,4 @@ functions:
     bytes: 76
   print_doc:
     calls: 9
-    bytes: 4608
+    bytes: 4604

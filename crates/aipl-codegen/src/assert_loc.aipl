@@ -32,10 +32,10 @@ deallocations: 16
 reallocations: 0
 bytes allocated: 543
 instructions executed: 537
-binary size: 5408
-  code: 1636
+binary size: 5400
+  code: 1624
   data: 916
-  metadata: 2856
+  metadata: 2860
 functions:
   __test$assert_loc:
     calls: 1
@@ -96,7 +96,7 @@ functions:
     bytes: (external)
   assert_loc:
     calls: 6
-    bytes: 564
+    bytes: 552
   main:
     calls: 1
     bytes: 72

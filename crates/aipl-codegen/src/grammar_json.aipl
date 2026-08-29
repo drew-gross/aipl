@@ -419,10 +419,10 @@ deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
 instructions executed: 1537093
-binary size: 210768
-  code: 126364
+binary size: 210728
+  code: 126352
   data: 6348
-  metadata: 78056
+  metadata: 78028
 functions:
   __arr_drop_Json:
     calls: 125
@@ -558,10 +558,10 @@ functions:
     bytes: 940
   __m3__step_result$JsonTok:
     calls: 1357
-    bytes: 5980
+    bytes: 6008
   __m3__template_scan$JsonTok:
     calls: 0
-    bytes: 2668
+    bytes: 2624
   __m3__template_step$JsonTok:
     calls: 0
     bytes: 488
@@ -765,7 +765,7 @@ functions:
     bytes: (external)
   escape_json:
     calls: 30
-    bytes: 808
+    bytes: 812
   json_cst:
     calls: 5
     bytes: 384

@@ -2710,11 +2710,11 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2851482
-binary size: 3229592
-  code: 1846072
+instructions executed: 2850719
+binary size: 3227224
+  code: 1844760
   data: 27124
-  metadata: 1356396
+  metadata: 1355340
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2856,7 +2856,7 @@ functions:
     bytes: 32
   __m11__process_raw_string$tail:
     calls: 0
-    bytes: 600
+    bytes: 564
   __m12__trim_prefix:
     calls: 0
     bytes: 216
@@ -2889,10 +2889,10 @@ functions:
     bytes: 36
   __m1__print_doc$tail:
     calls: 128
-    bytes: 4628
+    bytes: 4624
   __m2__reindent_block:
     calls: 0
-    bytes: 2356
+    bytes: 2360
   __m3__dedent:
     calls: 0
     bytes: 32
@@ -2940,10 +2940,10 @@ functions:
     bytes: 940
   __m9__step_result$__m8__AiplTok:
     calls: 3454
-    bytes: 12068
+    bytes: 12096
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2668
+    bytes: 2624
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 488
@@ -2975,7 +2975,7 @@ functions:
     calls: 475
     bytes: (external)
   aipl_arr_inc:
-    calls: 50162
+    calls: 50102
     bytes: (external)
   aipl_arr_reserve:
     calls: 538
@@ -2987,7 +2987,7 @@ functions:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 62165
+    calls: 62105
     bytes: (external)
   aipl_array_new:
     calls: 10188
@@ -3014,22 +3014,22 @@ functions:
     calls: 205
     bytes: (external)
   aipl_dec:
-    calls: 93388
+    calls: 93358
     bytes: (external)
   aipl_inc:
-    calls: 73380
+    calls: 73350
     bytes: (external)
   aipl_rec_alloc:
     calls: 6173
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 42261
+    calls: 42247
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 3710
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 36088
+    calls: 36074
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 3710
@@ -3108,7 +3108,7 @@ functions:
     bytes: 2888
   binop_tail:
     calls: 104
-    bytes: 3924
+    bytes: 3928
   block:
     calls: 41
     bytes: 1012
@@ -3117,7 +3117,7 @@ functions:
     bytes: 3752
   block_layout:
     calls: 46
-    bytes: 5124
+    bytes: 4932
   bump:
     calls: 928
     bytes: 920
@@ -3138,7 +3138,7 @@ functions:
     bytes: 280
   construct_body:
     calls: 0
-    bytes: 3208
+    bytes: 3140
   dict_entries:
     calls: 2
     bytes: 4216
@@ -3150,7 +3150,7 @@ functions:
     bytes: 1300
   dot_seg:
     calls: 6
-    bytes: 5188
+    bytes: 4864
   drop_trailing_break:
     calls: 0
     bytes: 964
@@ -3186,7 +3186,7 @@ functions:
     bytes: 716
   hugs_sole_arg:
     calls: 18
-    bytes: 1276
+    bytes: 1284
   ident_list:
     calls: 4
     bytes: 1664
@@ -3195,7 +3195,7 @@ functions:
     bytes: 10928
   import_item:
     calls: 14
-    bytes: 15488
+    bytes: 15304
   index_or_from:
     calls: 3
     bytes: 3884
@@ -3237,7 +3237,7 @@ functions:
     bytes: 5364
   name_atom:
     calls: 92
-    bytes: 5476
+    bytes: 5156
   named_ty:
     calls: 62
     bytes: 3660
@@ -3275,7 +3275,7 @@ functions:
     calls: 12
     bytes: 4376
   range_has_semi:
-    calls: 46
+    calls: 31
     bytes: 228
   range_tail:
     calls: 102
@@ -3288,7 +3288,7 @@ functions:
     bytes: 328
   set_member:
     calls: 2
-    bytes: 9640
+    bytes: 9636
   set_or_dict_atom:
     calls: 3
     bytes: 5024
@@ -3303,7 +3303,7 @@ functions:
     bytes: 2988
   shim_expr:
     calls: 0
-    bytes: 5860
+    bytes: 5712
   slice_to:
     calls: 1
     bytes: 1300
@@ -3318,7 +3318,7 @@ functions:
     bytes: 5180
   str_atom:
     calls: 2
-    bytes: 532
+    bytes: 500
   struct_atom:
     calls: 2
     bytes: 2932

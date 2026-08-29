@@ -30,10 +30,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 87
-binary size: 8344
-  code: 4208
+binary size: 8352
+  code: 4212
   data: 358
-  metadata: 3778
+  metadata: 3782
 functions:
   __eq_str$opt:
     calls: 0
@@ -76,7 +76,7 @@ functions:
     bytes: (external)
   fill_or_add_section_file:
     calls: 1
-    bytes: 2528
+    bytes: 2532
   main:
     calls: 1
     bytes: 72

@@ -381,6 +381,7 @@ case_tests! {
     cases_optimizations_sink_past_trailing_statements = "cases/optimizations/sink_past_trailing_statements",
     cases_optimizations_slice_starts_with_fusion = "cases/optimizations/slice_starts_with_fusion",
     cases_optimizations_slice_starts_with_fusion_effects = "cases/optimizations/slice_starts_with_fusion_effects",
+    cases_optimizations_subst_single_use_binding = "cases/optimizations/subst_single_use_binding",
     cases_optimizations_value_or_default_sinks = "cases/optimizations/value_or_default_sinks",
     cases_options_err_match_missing_arrow = "cases/options/err_match_missing_arrow",
     cases_options_err_match_str_literal = "cases/options/err_match_str_literal",

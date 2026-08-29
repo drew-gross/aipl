@@ -16,13 +16,13 @@ reallocations: 0
 bytes allocated: 88
 instructions executed: 175
 binary size: 3032
-  code: 1272
+  code: 1268
   data: 123
-  metadata: 1637
+  metadata: 1641
 functions:
   __test$pick:
     calls: 1
-    bytes: 1200
+    bytes: 1196
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)

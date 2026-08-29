@@ -107,8 +107,8 @@ deallocations: 99
 reallocations: 0
 bytes allocated: 4116
 instructions executed: 4901
-binary size: 11816
-  code: 5128
+binary size: 11824
+  code: 5136
   data: 1229
   metadata: 5459
 functions:
@@ -204,4 +204,4 @@ functions:
     bytes: 72
   reindent_block:
     calls: 9
-    bytes: 3544
+    bytes: 3552

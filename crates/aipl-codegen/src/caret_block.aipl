@@ -99,9 +99,9 @@ reallocations: 0
 bytes allocated: 2830
 instructions executed: 4426
 binary size: 9256
-  code: 3520
+  code: 3516
   data: 1720
-  metadata: 4016
+  metadata: 4020
 functions:
   __m1__line_at:
     calls: 6
@@ -162,7 +162,7 @@ functions:
     bytes: (external)
   caret_block:
     calls: 6
-    bytes: 1780
+    bytes: 1776
   main:
     calls: 1
     bytes: 72

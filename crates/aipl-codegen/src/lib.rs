@@ -4805,6 +4805,18 @@ fn compile_program<M: Module>(
     // is never duplicated here first.
     let inlined = aipl_mono::inline_small(&inlined, inline_max_exprs());
 
+    // Optimization: substitute a binding read exactly once into its use site.
+    // This removes no work by itself — codegen emits the same instructions
+    // either way — but the passes below match on the *shape* of an expression,
+    // and a binding hides the shape from them: `let ys = xs.filter(p);
+    // ys.map(f)` is the same computation as `xs.filter(p).map(f)`, and only the
+    // second is a chain the fusion pass can see. So it runs first, and after
+    // inlining, which is what creates most single-use bindings.
+    let inlined = aipl_mono::inline_single_use_bindings(
+        &inlined,
+        &aipl_mono::effectful_fns(&check_program.items),
+    );
+
     // Optimization: fuse a composite expression into one builtin that computes
     // the same answer with less work (`xs.count(x) < 4` stops at the fourth
     // match). After inlining, so a comparison that only became visible by
