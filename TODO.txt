@@ -248,6 +248,9 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 optimizations:
+  memoization:
+    auto-memoize some stuff
+    also opt-in memoize
   figure out why nextest discovery is so slow and try to make it faster
   constant match arm elimination
   fancier code sinking: if a value is computed outside a branch, but used e.g. 2/3 arms of a match, code sinking should still be made to work somehow.
@@ -366,7 +369,6 @@ tests:
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
 
-lex json
 find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
@@ -388,7 +390,6 @@ spread in args e.g. fn foo(self: Span { start, end })
 
 Cache monomorphizations of the same lambda
 
-1. to_str('b') renders 'b' with quotes (debug-style), so unescape builds output by splicing verbatim runs and literal "\n"-style strings, not char-by-char concat — which is also the faster shape.
 Unicode support
 
 int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
@@ -609,7 +610,7 @@ walker.aipl:
 
 optimize string comparison by comparing more than one byte at a time
 
-sort optimization:
+sort:
   make sort_by a builtin so it can be faster
   make stable_sort and unstable_sort (qsort)
   get rid of the mut out = self[0..0] workaround

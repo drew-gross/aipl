@@ -111,6 +111,7 @@ case_tests! {
     cases_chars_err_match_char_literals = "cases/chars/err_match_char_literals",
     cases_chars_err_multi_char_literal = "cases/chars/err_multi_char_literal",
     cases_chars_err_non_ascii_char = "cases/chars/err_non_ascii_char",
+    cases_chars_interpolation = "cases/chars/interpolation",
     cases_chars_iterate_chars_via_recursion = "cases/chars/iterate_chars_via_recursion",
     cases_chars_match_char_literals = "cases/chars/match_char_literals",
     cases_chars_to_digit = "cases/chars/to_digit",

@@ -14530,9 +14530,11 @@ fn compile_call_expr<M: Module>(
             (s, ConcreteType::Primitive(Primitive::Str))
         }
         "__template_interp" => {
-            // Template-literal interpolation: pass `str` through as-is; convert
-            // any other type via `to_str`. This avoids wrapping string values in
-            // quotes (which `to_str` would do).
+            // Template-literal interpolation: pass `str` through as-is, widen a
+            // `char` to the one-char `str` holding it, and convert any other
+            // type via `to_str`. Both special cases exist for the same reason —
+            // `to_str` renders a text scalar Debug-style (`"s"`, `'c'`), and an
+            // interpolation wants the text, not its literal form.
             if args.len() != 1 {
                 return Err(Error::at(
                     format!(
@@ -14543,12 +14545,16 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            if is_str_repr(&t) {
-                (v, ConcreteType::Primitive(Primitive::Str))
+            let s = if is_str_repr(&t) {
+                v
+            } else if t == ConcreteType::Primitive(Primitive::Char) {
+                // An inline one-char `str`: no allocation and no refcount, so
+                // there is nothing to track for release.
+                emit_char_to_str(builder, v)
             } else {
-                let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
-                (s, ConcreteType::Primitive(Primitive::Str))
-            }
+                emit_to_str(module, builder, cx, scopes, v, &t)?
+            };
+            (s, ConcreteType::Primitive(Primitive::Str))
         }
         "__builtin_hash" => {
             // Generic `hash(x) -> i64`: structural hash by the argument's static

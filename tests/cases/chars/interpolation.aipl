@@ -1,0 +1,87 @@
+import { print, to_str } from builtins;
+
+// A `char` interpolates as the bare character, mirroring how a `str` does —
+// `to_str` renders a text scalar Debug-style (`'c'`, `"s"`), and an
+// interpolation wants the text, not its literal form. The quoting is unchanged
+// everywhere else: `to_str` on the char itself, and a char nested inside a
+// rendered container, both still show the literal.
+fn main() !prints {
+    let c = 'b';
+    print(`bare: {c}`); // bare: b
+    print(`built: {'x'}{'y'}{'z'}`); // built: xyz
+
+    // `to_str` is untouched — still the quoted literal, at every nesting level.
+    print(`to_str: {to_str(c)}`); // to_str: 'b'
+    print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
+
+    // Indexing a `str` yields a `char?`, not a `char`, so it gets neither
+    // treatment — it renders as the optional it is.
+    let s = "hi";
+    print(`opt: {s[0]}`); // opt: some('h')
+
+    // A `str` interpolation is still passed through unquoted, as before.
+    print(`str: {s}`); // str: hi
+}
+--- stdout ---
+bare: b
+built: xyz
+to_str: 'b'
+nested: ['a', 'b']
+opt: some('h')
+str: hi
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 312
+instructions executed: 559
+binary size: 5464
+  code: 2712
+  data: 203
+  metadata: 2549
+functions:
+  __to_str_char:
+    calls: 1
+    bytes: 184
+  __to_str_char$arr:
+    calls: 1
+    bytes: 700
+  __to_str_char$opt:
+    calls: 1
+    bytes: 352
+  aipl_char_at:
+    calls: 1
+    bytes: (external)
+  aipl_concat:
+    calls: 16
+    bytes: (external)
+  aipl_dec:
+    calls: 59
+    bytes: (external)
+  aipl_inc:
+    calls: 23
+    bytes: (external)
+  aipl_print:
+    calls: 6
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 3
+    bytes: (external)
+  aipl_str_data:
+    calls: 2
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 2
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 2
+    bytes: (external)
+  aipl_str_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1476

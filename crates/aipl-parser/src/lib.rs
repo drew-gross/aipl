@@ -2406,8 +2406,9 @@ impl gazelle::Action<aipl::TemplateRest<Self>> for Build {
     }
 }
 
-/// Wrap `e` in a `__template_interp` call: passes `str` through unchanged,
-/// converts any other type via `to_str` (without adding surrounding quotes).
+/// Wrap `e` in a `__template_interp` call: passes `str` through unchanged and
+/// widens a `char` to its one-char `str` (so neither picks up the quotes
+/// `to_str` renders around a text scalar); converts any other type via `to_str`.
 fn to_str_call(e: Expr) -> Expr {
     let span = e.span.clone();
     Expr::new(

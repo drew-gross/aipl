@@ -26,13 +26,10 @@ import {
     first,
     join,
     len,
-    less_than as <,
     map,
     map_err,
     map_ok,
     value_or_err,
-    wrapping_add as +,
-    wrapping_increment as ++,
     wrapping_sub as -,
 } from builtins;
 import { Cst, show, span, text, token_leaves, token_text } from "./cst.aipl";
@@ -374,26 +371,22 @@ pub fn render_json(self: Json) -> str {
 // for the round trip, and for anything this library will parse back.
 fn escape_json(s: str) -> str {
     mut out = "";
-    mut i: u64 = 0;
-    while (i < s.len()) {
-        // Sliced rather than indexed: `s[i]` is a `char`, and a char renders as
-        // `'x'` — quotes included — when interpolated, so the one-byte *slice* is
-        // what appends cleanly.
-        let ch = s[i..i + 1];
-
+    for (let c : s) {
         // An expression `match`, not a statement one: its value is the piece to
         // append, and the append is the statement. A statement `match` may not
         // assign to a binding declared outside it.
-        let piece = match (ch) {
-            "\"" => "\\\"",
-            "\\" => "\\\\",
-            "\n" => "\\n",
-            "\t" => "\\t",
-            "\r" => "\\r",
-            _ => ch,
+        let piece = match (c) {
+            '"' => "\\\"",
+            '\\' => "\\\\",
+            '\n' => "\\n",
+            '\t' => "\\t",
+            '\r' => "\\r",
+            // A `char` interpolates as the bare character, so the default arm is
+            // just the character itself — no one-byte slice to route around
+            // `to_str`'s quoting.
+            _ => `{c}`,
         };
         set out = `{out}{piece}`;
-        set i++;
     }
     out
 }.test({
@@ -418,11 +411,11 @@ allocations: 11422
 deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
-instructions executed: 1537093
-binary size: 210728
-  code: 126352
+instructions executed: 1537922
+binary size: 210632
+  code: 126336
   data: 6348
-  metadata: 78028
+  metadata: 77948
 functions:
   __arr_drop_Json:
     calls: 125
@@ -701,16 +694,16 @@ functions:
     calls: 1504
     bytes: (external)
   aipl_concat:
-    calls: 1950
+    calls: 2074
     bytes: (external)
   aipl_concat_lazy:
     calls: 45
     bytes: (external)
   aipl_dec:
-    calls: 57103
+    calls: 56758
     bytes: (external)
   aipl_inc:
-    calls: 47561
+    calls: 47361
     bytes: (external)
   aipl_rec_alloc:
     calls: 2869
@@ -731,25 +724,25 @@ functions:
     calls: 899
     bytes: (external)
   aipl_str_data:
-    calls: 435
+    calls: 472
     bytes: (external)
   aipl_str_eq:
-    calls: 3961
+    calls: 3637
     bytes: (external)
   aipl_str_iter_init:
-    calls: 457
+    calls: 487
     bytes: (external)
   aipl_str_iter_next:
-    calls: 435
+    calls: 472
     bytes: (external)
   aipl_str_join:
     calls: 63
     bytes: (external)
   aipl_str_len:
-    calls: 12425
+    calls: 11803
     bytes: (external)
   aipl_str_slice:
-    calls: 2520
+    calls: 2451
     bytes: (external)
   aipl_str_starts_with:
     calls: 517
@@ -765,7 +758,7 @@ functions:
     bytes: (external)
   escape_json:
     calls: 30
-    bytes: 812
+    bytes: 796
   json_cst:
     calls: 5
     bytes: 384

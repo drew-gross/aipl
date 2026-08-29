@@ -1880,7 +1880,8 @@ fn __aipl_arr_concat<T: any>(self: T[], other: T[]) -> T[] { self }
 // Internal: emitted by the compiler for template-literal concatenation.
 fn __aipl_concat(a: str, b: str) -> str { "" }
 // Internal: emitted for each interpolation in a template literal.
-// Passes a `str` through unchanged; converts any other type via `to_str`.
+// Passes a `str` through unchanged, widens a `char` to the one-char `str`
+// holding it, and converts any other type via `to_str`.
 fn __template_interp<T: any>(self: T) -> str { "" }
 "#;
 
