@@ -143,6 +143,11 @@ run `aipl fmt <file>` (in place; `--check` reports without writing), or reformat
 the whole corpus at once with the author helper
 `cargo test --test compiler -- --ignored fmt::format_corpus`.
 
+`aipl check` reports it too, so a project using `check` as its whole handoff gate
+gets one command for "is this tree ready". An unformatted file is a `check`
+failure but not a fatal one — it is named on stderr, its tests still run, and the
+batch summary ends with `N files need formatting`.
+
 The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
 lexer token stream, so it preserves comments/literals verbatim and leaves

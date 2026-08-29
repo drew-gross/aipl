@@ -88,8 +88,9 @@ fn usage(prog: &str) -> String {
 
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
-directory to check the tree under it. It reports every failure rather than
-stopping at the first, and exits 0 only if all of them compiled and passed.
+directory to check the tree under it. It also reports any file that isn't in
+canonical format (`aipl fmt`). It reports every failure rather than stopping at
+the first, and exits 0 only if all of them were formatted, compiled, and passed.
 
 args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
 `build` requires `clang` on PATH (used as linker driver).
@@ -283,6 +284,30 @@ fn in_staged_dir<T>(file: &Path, f: impl FnOnce() -> T) -> Result<T, String> {
     Ok(out)
 }
 
+/// Report `file` to stderr if it isn't in canonical format, returning whether it
+/// needs formatting.
+///
+/// Unformatted source is a `check` failure, but not a fatal one: it is reported
+/// and the file's tests still run, so one invocation surfaces every problem —
+/// the same reason a file that fails to compile doesn't stop the run.
+///
+/// A source the formatter can't parse yields no complaint. Loading it below
+/// reports the syntax error, which is the diagnostic that actually helps;
+/// "needs formatting" stacked on top of it is noise.
+fn check_formatting(file: &Path, label: &str) -> bool {
+    let Ok(src) = std::fs::read_to_string(file) else {
+        return false;
+    };
+    let Ok(formatted) = aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()) else {
+        return false;
+    };
+    if formatted == src {
+        return false;
+    }
+    eprintln!("{label}: needs formatting (run `aipl fmt {label}`)");
+    true
+}
+
 /// `check [path...]` — JIT-run every function's `.test({ .. })` block and report.
 ///
 /// With no path, checks every `.aipl` file under the working directory: `aipl
@@ -295,9 +320,14 @@ fn in_staged_dir<T>(file: &Path, f: impl FnOnce() -> T) -> Result<T, String> {
 /// functions' `.test` bodies — but the ~0.2s dogfood-engine link is a lazy
 /// per-thread `thread_local!`, so a batch pays it once instead of once per file.
 ///
-/// A file that fails to compile is reported and does *not* stop the run; you get
-/// every problem in the codebase from one invocation rather than the first one.
-/// Exit code 0 only if every file compiled and every test passed.
+/// Each file is also checked against `aipl fmt`'s canonical format, since a
+/// project running `aipl check` as its handoff gate wants one command to say
+/// whether the tree is ready — not two.
+///
+/// A file that fails to compile, or fails formatting, is reported and does *not*
+/// stop the run; you get every problem in the codebase from one invocation
+/// rather than the first one. Exit code 0 only if every file was formatted,
+/// compiled, and had every test pass.
 fn check_cmd(args: &[String]) -> ExitCode {
     let (args, dbg) = take_debug_flag(args);
 
@@ -349,23 +379,34 @@ fn check_cmd(args: &[String]) -> ExitCode {
 
     if single {
         let (path, label) = &resolved[0];
+        // Reported before the tests run, and either way: the point is to end the
+        // invocation knowing about every problem, not just the first kind.
+        let unformatted = check_formatting(path, label);
         let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
             Ok(o) => o,
             Err(msg) => Err(msg),
         };
-        return match outcome {
-            Ok(0) => ExitCode::SUCCESS,
-            Ok(_) => ExitCode::FAILURE,
+        let tests_ok = match outcome {
+            Ok(code) => code == 0,
             Err(msg) => {
                 eprintln!("{msg}");
-                ExitCode::FAILURE
+                false
             }
+        };
+        return if tests_ok && !unformatted {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
         };
     }
 
     aipl::codegen::set_quiet_summary(true);
     let mut broken = 0usize;
+    let mut unformatted = 0usize;
     for (path, label) in &resolved {
+        if check_formatting(path, label) {
+            unformatted += 1;
+        }
         aipl::codegen::set_test_file(Some(label));
         let outcome = match in_staged_dir(path, || check_file(path, label, dbg)) {
             Ok(o) => o,
@@ -388,7 +429,17 @@ fn check_cmd(args: &[String]) -> ExitCode {
         let word = if broken == 1 { "file" } else { "files" };
         println!("{broken} {word} failed to compile");
     }
-    if failed > 0 || broken > 0 {
+    if unformatted > 0 {
+        // Likewise: an unformatted file's tests may all have passed, so the
+        // tallies above give no hint that the run is about to exit non-zero.
+        let word = if unformatted == 1 {
+            "file needs"
+        } else {
+            "files need"
+        };
+        println!("{unformatted} {word} formatting");
+    }
+    if failed > 0 || broken > 0 || unformatted > 0 {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS

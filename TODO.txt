@@ -265,6 +265,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    fusions should work if there are unrelated operations in between (use a dep graph?)
     reverse should fuse with basically everything
     count fusions should apply to count_if also
     vec.filter().count() should fuse to not materialize the filtered array
@@ -355,7 +356,6 @@ perfmon:
   functions in external libs don't get size instrumented
 
 check:
-  should fail on fmt error
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests
   can recover from type errors even?

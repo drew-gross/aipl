@@ -3,6 +3,11 @@
 //! only runs a program's `main`, so it can't exercise `check`), staging a
 //! temp `.aipl` file — or a whole temp tree, for the batch mode a bare
 //! `aipl check` runs — and asserting on `check`'s stdout and exit code.
+//!
+//! Every fixture source here is written in `aipl fmt`'s canonical format, since
+//! `check` reports unformatted files: an offhandedly-spaced import would make a
+//! test about test *counts* fail over whitespace. Reformat one by round-tripping
+//! it through `aipl fmt` rather than by eye.
 
 use std::fs;
 use std::path::PathBuf;
@@ -58,10 +63,10 @@ fn check_tree(name: &str, files: &[(&str, &str)], args: &[&str]) -> (String, Str
     )
 }
 
-const PASSES: &str =
-    "import { equal as ==} from builtins;\nfn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
-const FAILS: &str =
-    "import { equal as ==} from builtins;\nfn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
+const PASSES: &str = "import { equal as == } from builtins;\n\n\
+     fn a() -> i64 { 1 }.test({\n    assert(a() == 1);\n})\n";
+const FAILS: &str = "import { equal as == } from builtins;\n\n\
+     fn b() -> i64 { 5 }.test({\n    assert(b() == 6);\n})\n";
 /// Declared `i64`, returns `str` — fails the checker, so it never runs.
 const BROKEN: &str = "pub fn c() -> i64 { \"oops\" }\n";
 
@@ -122,6 +127,84 @@ fn a_file_that_does_not_compile_is_reported_without_stopping_the_run() {
     assert!(
         stdout.contains("1 file failed to compile"),
         "got:\n{stdout}"
+    );
+    assert_eq!(code, 1);
+}
+
+/// `PASSES` with the import's inner spacing squeezed — parses and passes, but
+/// isn't what `aipl fmt` would write.
+const UNFORMATTED: &str = "import { equal as ==} from builtins;\n\
+     fn a() -> i64 { 1 }.test({ assert(a() == 1); })\n";
+
+#[test]
+fn an_unformatted_file_fails_even_when_its_tests_pass() {
+    let (stdout, stderr, code) = check("unformatted", UNFORMATTED);
+    // The tests still ran — formatting is reported alongside them, not instead.
+    assert_eq!(stdout, "1 tests: 1 passed, 0 failed\n");
+    assert!(
+        stderr.contains("needs formatting"),
+        "expected a formatting diagnostic, got:\n{stderr}"
+    );
+    // And it names the command that fixes it.
+    assert!(stderr.contains("aipl fmt"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn formatting_and_test_failures_are_both_reported_from_one_run() {
+    // Neither problem hides the other: the point of `check` is that one
+    // invocation tells you everything standing between you and a green tree.
+    let unformatted_and_failing = "import { equal as ==} from builtins;\n\
+         fn b() -> i64 { 5 }.test({ assert(b() == 6); })\n";
+    let (stdout, stderr, code) = check("unformatted_fail", unformatted_and_failing);
+    assert!(stdout.contains("test b ... FAIL"), "got:\n{stdout}");
+    assert!(stderr.contains("needs formatting"), "got:\n{stderr}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn an_unformatted_file_does_not_stop_the_batch() {
+    let (stdout, stderr, code) = check_tree(
+        "fmt_keep_going",
+        &[
+            ("a_unformatted.aipl", UNFORMATTED),
+            ("b_ok.aipl", PASSES),
+            ("c_fails.aipl", FAILS),
+        ],
+        &[],
+    );
+    // The unformatted file sorts first, so the run would end there if it aborted.
+    assert!(
+        stderr.contains("./a_unformatted.aipl: needs formatting"),
+        "expected a file-qualified formatting diagnostic, got:\n{stderr}"
+    );
+    assert!(
+        stdout.contains("test ./c_fails.aipl::b ... FAIL"),
+        "the run should continue past the unformatted file, got:\n{stdout}"
+    );
+    // Its own tests ran too, so all three files are in the tally.
+    assert!(
+        stdout.contains("3 files, 3 tests: 2 passed, 1 failed"),
+        "got:\n{stdout}"
+    );
+    // Called out separately: an unformatted file's tests may all have passed, so
+    // the tallies alone give no hint why the run is exiting non-zero.
+    assert!(stdout.contains("1 file needs formatting"), "got:\n{stdout}");
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn a_file_that_does_not_parse_gets_no_formatting_complaint() {
+    // The parse error is the diagnostic that helps; "needs formatting" stacked
+    // on top of a source the formatter couldn't read is noise.
+    let (_stdout, stderr, code) = check("unparseable", "this is not valid aipl at all\n");
+    assert!(
+        stderr.contains("expected definition or end of input"),
+        "expected the parse error, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("needs formatting"),
+        "expected no formatting complaint, got:\n{stderr}"
     );
     assert_eq!(code, 1);
 }
@@ -196,9 +279,9 @@ fn a_missing_path_is_reported() {
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(
         "all_pass",
-        "import { equal as ==, greater_than as >} from builtins;\n\
-         fn a() -> i64 { 1 }.test({ assert(a() == 1); })\n\
-         fn b() -> i64 { 2 }.test({ assert(b() == 2); assert(b() > 0); })\n",
+        "import { equal as ==, greater_than as > } from builtins;\n\n\
+         fn a() -> i64 { 1 }.test({\n    assert(a() == 1);\n})\n\n\
+         fn b() -> i64 { 2 }.test({\n    assert(b() == 2);\n    assert(b() > 0);\n})\n",
     );
     // Passing tests print nothing; only the summary.
     assert_eq!(stdout, "2 tests: 2 passed, 0 failed\n");
@@ -209,18 +292,18 @@ fn all_tests_pass_is_silent_and_exit_zero() {
 fn a_failing_assert_reports_and_exits_one() {
     let (stdout, _stderr, code) = check(
         "one_fail",
-        "import { equal as ==} from builtins;\n\
-         fn foo() -> i64 { 42 }.test({ assert(foo() == 42); })\n\
+        "import { equal as == } from builtins;\n\n\
+         fn foo() -> i64 { 42 }.test({\n    assert(foo() == 42);\n})\n\n\
          fn bar() -> i64 { 5 }.test({\n    assert(bar() == 6);\n})\n",
     );
     assert!(
         stdout.contains("test bar ... FAIL"),
         "expected a FAIL header, got:\n{stdout}"
     );
-    // The location is the asserted condition's line and source text (line 4 with
-    // the leading operator import).
+    // The location is the asserted condition's line and source text (line 8 of
+    // the canonically-formatted source above).
     assert!(
-        stdout.contains("assert failed at input:4: bar() == 6"),
+        stdout.contains("assert failed at input:8: bar() == 6"),
         "expected the assert location, got:\n{stdout}"
     );
     assert!(stdout.contains("2 tests: 1 passed, 1 failed"));
@@ -231,13 +314,12 @@ fn a_failing_assert_reports_and_exits_one() {
 fn all_asserts_in_a_test_run_and_each_failure_is_reported() {
     let (stdout, _stderr, code) = check(
         "run_all",
-        "import { equal as ==} from builtins;\n\
+        "import { equal as == } from builtins;\n\n\
          fn bar() -> i64 { 5 }.test({\n    assert(bar() == 6);\n    assert(bar() == 7);\n})\n",
     );
     // Both failing asserts report — the first failure doesn't abort the test.
-    // (Lines shift by one for the leading operator import.)
-    assert!(stdout.contains("input:3: bar() == 6"), "got:\n{stdout}");
-    assert!(stdout.contains("input:4: bar() == 7"), "got:\n{stdout}");
+    assert!(stdout.contains("input:4: bar() == 6"), "got:\n{stdout}");
+    assert!(stdout.contains("input:5: bar() == 7"), "got:\n{stdout}");
     assert!(stdout.contains("1 tests: 0 passed, 1 failed"));
     assert_eq!(code, 1);
 }
@@ -248,8 +330,8 @@ fn a_test_may_call_effectful_functions() {
     // no effect annotation. (Its output lands in the check output.)
     let (stdout, _stderr, code) = check(
         "effects",
-        "import { print, equal as ==} from builtins;\n\
-         fn greet() !prints { print(\"hi\") }.test({ greet(); assert(1 == 1); })\n",
+        "import { equal as ==, print } from builtins;\n\n\
+         fn greet() !prints { print(\"hi\") }.test({\n    greet();\n    assert(1 == 1);\n})\n",
     );
     assert!(
         stdout.contains("hi"),
@@ -263,7 +345,7 @@ fn a_test_may_call_effectful_functions() {
 fn assert_outside_a_test_is_a_compile_error() {
     let (_stdout, stderr, code) = check(
         "assert_outside",
-        "fn f() -> i64 { assert(true); 0 }\nfn main() -> i64 { f() }\n",
+        "fn f() -> i64 {\n    assert(true);\n    0\n}\n\nfn main() -> i64 { f() }\n",
     );
     // `assert` is rewritten only inside `.test` bodies, so elsewhere it's an
     // ordinary (undefined) call.
@@ -284,8 +366,10 @@ fn a_program_with_no_tests_passes_zero_tests() {
 #[test]
 fn a_type_error_in_a_test_body_is_reported() {
     // The test body is type-checked: asserting on a non-bool is an error.
-    let (_stdout, stderr, code) =
-        check("bad_assert", "fn f() -> i64 { 1 }.test({ assert(f()); })\n");
+    let (_stdout, stderr, code) = check(
+        "bad_assert",
+        "fn f() -> i64 { 1 }.test({\n    assert(f());\n})\n",
+    );
     assert!(!stderr.is_empty(), "expected a type error on stderr");
     assert_eq!(code, 1);
 }
