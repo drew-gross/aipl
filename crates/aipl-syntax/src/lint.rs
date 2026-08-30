@@ -20,12 +20,13 @@ mod match_map_err;
 mod match_map_ok;
 mod match_value_or;
 mod push_loop_pipeline;
+mod return_loop_find_if;
 mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
 mod unused_imports;
 
-use crate::ast::{Expr, ExprKind, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, Error, Span};
 use std::collections::HashSet;
 
@@ -39,6 +40,7 @@ use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
 use self::match_value_or::match_value_or;
 use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
+use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
@@ -71,6 +73,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| {
         push_loop_pipeline(e, src, &pipeline, &mut hits)
     });
+    // The shape is all language syntax, so this one fires whether or not the
+    // file imported `find_if` — the name is only for the advice, which says to
+    // import it when it is missing.
+    let find_if = find_if_name(program);
+    each_expr(program, &mut |e| {
+        return_loop_find_if(e, src, find_if.as_deref(), &mut hits)
+    });
     // Only where a `++` flavor provably matches this file's `+` — see
     // `matching_increment`, which also names the import when it's missing.
     if let Some(incr) = matching_increment(program) {
@@ -96,6 +105,39 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     }
 }
 
+/// The local name this file's `import { .. } from builtins;` gives `builtin`,
+/// or `None` when it never imported it. Matched on the *exported* name, so an
+/// alias (`filter as keep`) is followed rather than missed, and only a builtins
+/// import counts — a user function of the same name is not this builtin.
+fn imported_as(program: &Program, builtin: &str) -> Option<String> {
+    program.items.iter().find_map(|item| {
+        let Item::Import(decl) = item else {
+            return None;
+        };
+        if !matches!(decl.source, ImportSource::Builtins { .. }) {
+            return None;
+        }
+        decl.names
+            .iter()
+            .find(|n| n.name == builtin)
+            .map(|n| n.local().to_string())
+    })
+}
+
+/// Whether `e` can be moved into a lambda unchanged. A `?` propagation returns
+/// from the function it is written in, so relocating it into a lambda would
+/// return from the *lambda* instead: same source, a different early exit. Every
+/// lint whose advice lifts an expression into a lambda has to refuse that.
+fn lambda_safe(e: &Expr) -> bool {
+    let mut ok = true;
+    crate::each_subexpr(e, &mut |x| {
+        if matches!(x.kind, ExprKind::Try(_)) {
+            ok = false;
+        }
+    });
+    ok
+}
+
 /// 0-based line number of byte offset `pos` in `src`.
 fn line_of(src: &str, pos: usize) -> usize {
     src[..pos.min(src.len())].matches('\n').count()
@@ -110,4 +152,49 @@ fn end_is_receiver_len(end: &Expr, obj: &Expr) -> bool {
         return false;
     };
     name == "len" && args.len() == 1 && args[0] == *obj
+}
+
+/// The synthetic value the parser ends a statement-only block with: `()` for an
+/// ordinary block, and an i64 `0` — the loop expression's own result — for a
+/// loop body, which may not end in a value of its own at all. The loop's zero is
+/// told from a written one by its empty span, the same way
+/// [`slice_from_zero`](slice_from_zero()) tells an elided slice bound from a
+/// typed one.
+fn is_block_tail(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Unit => true,
+        ExprKind::Num(0) => e.span.is_empty(),
+        _ => false,
+    }
+}
+
+/// The single statement a block consists of, or `None` when it holds anything
+/// else — no statements, or more than one.
+///
+/// A block is a right-nested chain, and which node carries the rest of it
+/// depends on the statement: an expression statement is a [`ExprKind::Seq`]
+/// whose second operand is the remainder, while `let`/`mut`/`set` each hold
+/// their own. Only the two forms the loop lints can be made of are recognized
+/// here, and each is "lone" exactly when what follows it is the block's tail
+/// (see [`is_block_tail`]).
+fn lone_stmt(block: &Expr) -> Option<&Expr> {
+    match &block.kind {
+        ExprKind::Seq(stmt, rest) if is_block_tail(rest) => Some(stmt),
+        ExprKind::Assign(_, _, rest) if is_block_tail(rest) => Some(block),
+        _ => None,
+    }
+}
+
+/// Whether `e`'s span covers exactly the text that spells it, so the source can
+/// be spliced back into advice. Only a name and a field path off one qualify:
+/// their spans run from the first character to the last. Most other forms do
+/// not — a call's span stops before its closing paren, so `f(x)` splices back as
+/// `f(x`, which doesn't parse — and the ones that might are left out rather than
+/// each having to be re-checked whenever a span moves.
+fn spans_its_text(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Ident(_) => true,
+        ExprKind::Field(recv, _) => spans_its_text(recv),
+        _ => false,
+    }
 }

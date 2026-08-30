@@ -1,0 +1,238 @@
+import {
+    equal as ==,
+    find_if,
+    join,
+    less_than as <,
+    logical_and as &&,
+    map,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// The shapes the find-loop lint must leave alone. It rewrites exactly one
+// shape — a loop whose body is an else-less `if` around `return some(<the loop
+// variable>);`, falling through to `none` — so everything here compiles.
+
+// The element is transformed on the way out. That is a `find_if` *and* a map,
+// which is two steps the one-line advice doesn't spell, so it is left alone
+// rather than mis-advised.
+fn first_big_doubled(xs: i64[], lo: i64) -> i64? {
+    for (let x : xs) {
+        if (lo < x) {
+            return some(x * 2);
+        };
+    }
+    none
+}
+
+// An `if`/`else`: the loop returns on every element, so it never runs past the
+// first one and is not a search at all.
+fn head_sign(xs: i64[]) -> i64? {
+    for (let x : xs) {
+        if (0 < x) {
+            return some(1);
+        } else {
+            return some(0);
+        };
+    }
+    none
+}
+
+// The fall-through is not `none`, so the loop failing to find anything is not
+// the not-found answer — `find_if` would drop what the fall-through does.
+fn first_big_or_first(xs: i64[], lo: i64) -> i64? {
+    for (let x : xs) {
+        if (lo < x) {
+            return some(x);
+        };
+    }
+    xs[0]
+}
+
+// A second statement in the guarded block: work `find_if` has nowhere to put.
+fn first_big_logged(xs: i64[], lo: i64) !prints -> i64? {
+    for (let x : xs) {
+        if (lo < x) {
+            print(x.to_str());
+            return some(x);
+        };
+    }
+    none
+}
+
+// `any`'s shape: the same scan reporting only *that* a match existed. The
+// element never comes back, so `find_if` is not what this says.
+fn has_big(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (lo < x) {
+            return true;
+        };
+    }
+    false
+}
+
+// The value returned is something the loop merely saw, not the element it is
+// testing — `find_if` hands back the element it matched.
+fn lo_if_any_big(xs: i64[], lo: i64) -> i64? {
+    for (let x : xs) {
+        if (lo < x) {
+            return some(lo);
+        };
+    }
+    none
+}
+
+// A `while` loop. Its condition is not an iteration, so there is no sequence to
+// search.
+fn first_multiple(n: i64, of: i64) -> i64? {
+    mut i = 0;
+    while (i < n) {
+        if (i == of) {
+            return some(i);
+        };
+        set i++;
+    }
+    none
+}
+
+// The lint's blind spot: an indexed `for` desugars to a loop with a counter
+// bump appended to its body, so the body is never the lone `if` the shape
+// wants. A guard that ignores the index really is a `find_if`, but one that
+// reads it is not, and the desugared shape is what keeps both quiet.
+fn first_big_after(xs: i64[], lo: i64, skip: u64) -> i64? {
+    for (let i, x : xs) {
+        if (skip < i + 1 && lo < x) {
+            return some(x);
+        };
+    }
+    none
+}
+
+fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+
+fn main() !prints {
+    print(first_big_doubled([1, 5], 2).to_str());
+    print(head_sign([-3, 1]).to_str());
+    print(first_big_or_first([1, 2], 5).to_str());
+    print(first_big_logged([1, 5], 2).to_str());
+    print(has_big([1, 5], 2).to_str());
+    print(lo_if_any_big([1, 5], 2).to_str());
+    print(first_multiple(5, 3).to_str());
+    print(first_big_after([9, 1, 7], 2, 1).to_str());
+    // The rewrite itself must not flag.
+    print([1, 5, 9].find_if(|x| 2 < x).to_str());
+    print(show([1, 2]));
+}
+--- stdout ---
+some(10)
+some(0)
+some(1)
+5
+some(5)
+true
+some(2)
+some(3)
+some(7)
+some(5)
+1,2
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 521
+instructions executed: 1782
+binary size: 8312
+  code: 5108
+  data: 119
+  metadata: 3085
+functions:
+  __builtin_find_if$i64$lam1:
+    calls: 1
+    bytes: 272
+  __to_str_bool:
+    calls: 1
+    bytes: 212
+  __to_str_i64:
+    calls: 3
+    bytes: 180
+  __to_str_i64$opt:
+    calls: 8
+    bytes: 360
+  aipl_arr_drop_str:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 11
+    bytes: (external)
+  aipl_array_new:
+    calls: 9
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_dec:
+    calls: 27
+    bytes: (external)
+  aipl_i64_len:
+    calls: 22
+    bytes: (external)
+  aipl_inc:
+    calls: 13
+    bytes: (external)
+  aipl_print:
+    calls: 11
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_str_join:
+    calls: 1
+    bytes: (external)
+  aipl_str_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 17
+    bytes: (external)
+  aipl_write_i64:
+    calls: 11
+    bytes: (external)
+  first_big_after:
+    calls: 1
+    bytes: 356
+  first_big_doubled:
+    calls: 1
+    bytes: 288
+  first_big_logged:
+    calls: 1
+    bytes: 348
+  first_big_or_first:
+    calls: 1
+    bytes: 432
+  first_multiple:
+    calls: 1
+    bytes: 148
+  has_big:
+    calls: 1
+    bytes: 216
+  head_sign:
+    calls: 1
+    bytes: 300
+  lo_if_any_big:
+    calls: 1
+    bytes: 280
+  main:
+    calls: 1
+    bytes: 1716

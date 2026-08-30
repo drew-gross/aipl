@@ -1,0 +1,65 @@
+import { equal as ==, less_than as <, print, to_str, wrapping_mul as * } from builtins;
+
+// `for (let x : xs) { if (..) { return some(x); }; } none` — a loop whose only
+// way out is the first element passing a test, falling through to `none` when
+// no element does. `find_if` is that in one expression: it says the answer *is*
+// the first match, rather than leaving a reader to check that the early return
+// is the loop's only exit and that falling off the end means "not found".
+
+// The `none` as the block's tail.
+fn first_big(xs: i64[], lo: i64) -> i64? {
+    for (let x : xs) {
+        if (lo < x) {
+            return some(x);
+        };
+    }
+    none
+}
+
+// An explicit `return none;` is the same shape — a reader can't tell the two
+// apart either — so it is flagged the same way.
+fn first_go(names: str[]) -> str? {
+    for (let n : names) {
+        if (n == "go") {
+            return some(n);
+        };
+    }
+    return none;
+}
+
+fn evens(n: i64) -> i64[] { [n, n * 2] }
+
+// A call-shaped iterable can't be quoted back into the advice — its span stops
+// before its parens — so the message leaves a placeholder where it would go.
+fn first_even_over(n: i64, lo: i64) -> i64? {
+    for (let x : evens(n)) {
+        if (lo < x) {
+            return some(x);
+        };
+    }
+    none
+}
+
+fn main() !prints {
+    print(first_big([1, 5], 2).to_str());
+    print(first_go(["stop", "go"]).to_str());
+    print(first_even_over(3, 4).to_str());
+}
+--- errors ---
+error: this loop returns the first element passing a test, and "none" otherwise — write "return xs.find_if(|x| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:13:20
+   |
+13 |             return some(x);
+   |                    ^^^^^^
+
+error: this loop returns the first element passing a test, and "none" otherwise — write "return names.find_if(|n| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:24:20
+   |
+24 |             return some(n);
+   |                    ^^^^^^
+
+error: this loop returns the first element passing a test, and "none" otherwise — write "return <iterable>.find_if(|x| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_find_if.aipl:37:20
+   |
+37 |             return some(x);
+   |                    ^^^^^^

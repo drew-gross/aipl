@@ -284,10 +284,10 @@ deallocations: 28501
 reallocations: 1767
 bytes allocated: 1317966
 instructions executed: 4005238
-binary size: 179320
-  code: 108560
+binary size: 179456
+  code: 108640
   data: 4188
-  metadata: 66572
+  metadata: 66628
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -340,6 +340,9 @@ functions:
   __builtin_count_while$char$s0$lam34:
     calls: 0
     bytes: 244
+  __builtin_find_if$__m2__Prec$lam72:
+    calls: 0
+    bytes: 696
   __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam43:
     calls: 867
     bytes: 716
@@ -435,7 +438,7 @@ functions:
     bytes: 956
   __m5__find_prec:
     calls: 0
-    bytes: 848
+    bytes: 232
   __m5__leaf_at$SexpKind$Sexp:
     calls: 890
     bytes: 1208

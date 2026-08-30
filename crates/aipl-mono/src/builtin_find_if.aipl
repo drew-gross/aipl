@@ -1,0 +1,170 @@
+import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
+
+// The AIPL implementation of the `find_if` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_find_if` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
+// through the ordinary generic / higher-order machinery — the in-file name
+// `find_if` is only for this file's own tests, which read exactly like user
+// code.
+//
+// It is `any` with the element handed back: both stop at the first element
+// satisfying `pred`, and where `any` reports only that one existed, this
+// returns it. The optional is what carries the not-found case, so the empty
+// array needs no special handling.
+//
+// The `#[allow]` squelches `return_loop_find_if`, which flags exactly this
+// shape — a loop returning the first match — and asks for `find_if`. Here it
+// *is* `find_if`.
+pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
+    for (let x : self) {
+        if (pred(x)) {
+            return some(x); #[allow]
+        };
+    }
+    none
+}.doc("""
+    The first element of `self` satisfying `pred`, or `none` when none does,
+    stopping at the first match. Generic over the element type and callable as a
+    method: `xs.find_if(pred)`. A `str` receiver iterates its chars, since `str`
+    and `char[]` share a representation.
+
+    See `any` for the same scan reporting only whether a match existed, and
+    `first` for the unconditional first element.
+""").test({
+    assert([1, 2, 3, 4].find_if(|x| x > 2) == some(3));
+    assert([1, 2, 3].find_if(|x| x > 9) == none); // nothing matches
+    // The *first* match, not the last: it stops there.
+    assert([5, 1, 7].find_if(|x| x > 2) == some(5));
+    assert(find_if([2, 4], |x| x > 3) == some(4)); // function-call form too
+
+    // Generic over the element type — the same definition serves char and str.
+    assert(['a', 'b', 'c'].find_if(|c| c == 'b') == some('b'));
+    assert(["go", "stop"].find_if(|s| s == "stop") == some("stop"));
+    // A `str` receiver iterates its chars.
+    assert("a b".find_if(|c| c == ' ') == some(' '));
+    assert("abc".find_if(|c| c == ' ') == none);
+
+    assert([8, 9, 9].find_if(is_nine) == some(9)); // a named predicate
+    let limit = 3;
+    assert([1, 5, 9].find_if(|x| x > limit) == some(5)); // a captured bound
+    // `none` on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).find_if(|x| x == 99) == none);
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 452
+instructions executed: 1604
+binary size: 9936
+  code: 5532
+  data: 869
+  metadata: 3535
+functions:
+  __eq_char$opt:
+    calls: 3
+    bytes: 100
+  __eq_i64$opt:
+    calls: 7
+    bytes: 100
+  __eq_str$opt:
+    calls: 1
+    bytes: 148
+  __filter19$own0:
+    calls: 1
+    bytes: 272
+  __test$find_if:
+    calls: 1
+    bytes: 1604
+  __test$is_nine:
+    calls: 1
+    bytes: 76
+  aipl_arr_drop_str:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 8
+    bytes: (external)
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_dec:
+    calls: 13
+    bytes: (external)
+  aipl_inc:
+    calls: 8
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_str_data:
+    calls: 3
+    bytes: (external)
+  aipl_str_eq:
+    calls: 3
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 3
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 3
+    bytes: (external)
+  aipl_str_len:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  find_if$char$lam9:
+    calls: 1
+    bytes: 272
+  find_if$char$s0$lam13:
+    calls: 1
+    bytes: 272
+  find_if$char$s0$lam15:
+    calls: 1
+    bytes: 272
+  find_if$i64$lam1:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam16:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam18:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam21:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam3:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam5:
+    calls: 1
+    bytes: 268
+  find_if$i64$lam7:
+    calls: 1
+    bytes: 268
+  find_if$str$lam11:
+    calls: 1
+    bytes: 420
+  main:
+    calls: 1
+    bytes: 120

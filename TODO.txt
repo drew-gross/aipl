@@ -216,7 +216,12 @@ utilities:
   zip, to allow iterating over lists in pairs
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
+skills:
+  make a skill for adding new builtin utilities that includes the things you've learned, plus the standard guidance to lint against ad-hoc reimplementations
+
 lint:
+  move the tests for each lint into the file for that lint
+  find_if with modification should be find_if().map() (once T? supports map)
   lint to require use of [...foo(), bar] syntax instead of mut v = foo(); v.push.
   the "or append #[allow]" text is non-DRY: DRY it up.
   match with same arm val should use Case1 | Case2 => arm_val

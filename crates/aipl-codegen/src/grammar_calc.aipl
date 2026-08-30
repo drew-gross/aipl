@@ -386,11 +386,11 @@ allocations: 8308
 deallocations: 8308
 reallocations: 408
 bytes allocated: 411348
-instructions executed: 1169584
-binary size: 193592
-  code: 115556
+instructions executed: 1170706
+binary size: 193736
+  code: 115636
   data: 5668
-  metadata: 72368
+  metadata: 72432
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -446,6 +446,9 @@ functions:
   __builtin_count_while$char$s0$lam46:
     calls: 94
     bytes: 232
+  __builtin_find_if$__m2__Prec$lam74:
+    calls: 102
+    bytes: 696
   __builtin_int_parse:
     calls: 94
     bytes: 1052
@@ -541,7 +544,7 @@ functions:
     bytes: 956
   __m5__find_prec:
     calls: 177
-    bytes: 848
+    bytes: 232
   __m5__leaf_at$CalcTok$Calc:
     calls: 204
     bytes: 976

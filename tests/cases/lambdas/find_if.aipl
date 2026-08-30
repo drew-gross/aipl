@@ -1,0 +1,123 @@
+import {
+    equal as ==,
+    filter,
+    find_if,
+    greater_than as >,
+    is_some,
+    less_than as <,
+    logical_not as !,
+} from builtins;
+
+// `arr.find_if(pred)` is the first element satisfying `pred`, or `none` when no
+// element does — `any` with the element handed back, and short-circuiting the
+// same way. A higher-order builtin like `filter`/`map`: the lambda is lifted,
+// captures threaded through. Like `any`, it is implemented in AIPL itself
+// (`builtin_find_if.aipl`) and specializes like a user generic.
+fn is_neg(self: i64) -> bool { self < 0 }
+
+fn first_big(xs: i64[]) -> i64? { xs.find_if(|x| x > 10) }.test({
+    assert([1, 2, 9].find_if(|x| x > 5) == some(9));
+    assert([1, 2, 3].find_if(|x| x > 5) == none); // nothing matches -> none
+    // The *first* match, not the last: it stops there.
+    assert([9, 1, 7].find_if(|x| x > 5) == some(9));
+    assert(find_if([5, 4], |x| x == 4) == some(4)); // free-call form
+    assert([1, -2, -3].find_if(is_neg) == some(-2)); // a named predicate
+    assert(['a', 'b'].find_if(|c| c == 'b') == some('b')); // any element type
+    // `none` on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(|x| x > 100).find_if(|x| x > 0) == none);
+    // Method-chain helper + a captured bound.
+    assert(first_big([1, 20, 3]) == some(20));
+    assert(!first_big([1, 2, 3]).is_some());
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 451
+instructions executed: 1316
+binary size: 7720
+  code: 4288
+  data: 648
+  metadata: 2784
+functions:
+  __builtin_find_if$char$lam10:
+    calls: 1
+    bytes: 272
+  __builtin_find_if$i64$lam1:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam14:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam16:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam18:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam3:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam5:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam7:
+    calls: 1
+    bytes: 268
+  __builtin_find_if$i64$lam8:
+    calls: 1
+    bytes: 268
+  __eq_char$opt:
+    calls: 1
+    bytes: 100
+  __eq_i64$opt:
+    calls: 7
+    bytes: 100
+  __filter12$own0:
+    calls: 1
+    bytes: 272
+  __test$first_big:
+    calls: 1
+    bytes: 1328
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 8
+    bytes: (external)
+  aipl_assert:
+    calls: 9
+    bytes: (external)
+  aipl_dec:
+    calls: 1
+    bytes: (external)
+  aipl_str_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_str_data:
+    calls: 1
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 1
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 1
+    bytes: (external)
+  aipl_str_len:
+    calls: 2
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 72

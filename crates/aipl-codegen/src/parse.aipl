@@ -36,6 +36,7 @@ import {
     equal as ==,
     extend,
     filter,
+    find_if,
     first,
     is_nonempty,
     join,
@@ -438,12 +439,7 @@ fn find_prec(precs: Prec[], text: str, min_power: u64) -> Prec? {
     if (!text.is_nonempty()) {
         return none;
     };
-    for (let pr : precs) {
-        if (min_power <= pr.power && pr.ops.contains(text)) {
-            return some(pr);
-        };
-    }
-    none
+    precs.find_if(|pr| min_power <= pr.power && pr.ops.contains(text))
 }
 
 fn match_climb<K: variant, A: any>(
@@ -888,11 +884,11 @@ allocations: 2773
 deallocations: 2773
 reallocations: 122
 bytes allocated: 133675
-instructions executed: 384783
-binary size: 284296
-  code: 165328
+instructions executed: 384904
+binary size: 284440
+  code: 165408
   data: 6780
-  metadata: 112188
+  metadata: 112252
 functions:
   __arr_drop_Node:
     calls: 11
@@ -951,6 +947,9 @@ functions:
   __builtin_count_while$char$s0$lam35:
     calls: 0
     bytes: 244
+  __builtin_find_if$__m2__Prec$lam72:
+    calls: 11
+    bytes: 696
   __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam57:
     calls: 10
     bytes: 716
@@ -1202,7 +1201,7 @@ functions:
     bytes: 956
   find_prec:
     calls: 22
-    bytes: 848
+    bytes: 232
   leaf_at$Tok$Node:
     calls: 96
     bytes: 1388

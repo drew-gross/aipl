@@ -1,5 +1,7 @@
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, Program};
 use crate::Error;
+
+use super::{imported_as, lone_stmt, spans_its_text};
 
 /// The local names this file's imports give the three builtins the
 /// [`push_loop_pipeline`] rewrite is written in terms of. `None` means the
@@ -17,77 +19,28 @@ pub(super) struct PipelineNames {
 }
 
 pub(super) fn pipeline_names(program: &Program) -> PipelineNames {
-    let mut names = PipelineNames {
-        push: None,
-        map: None,
-        filter: None,
-    };
-    for item in &program.items {
-        let Item::Import(decl) = item else {
-            continue;
-        };
-        if !matches!(decl.source, ImportSource::Builtins { .. }) {
-            continue;
-        }
-        for n in &decl.names {
-            let local = || Some(n.local().to_string());
-            match n.name.as_str() {
-                "push" => names.push = local(),
-                "map" => names.map = local(),
-                "filter" => names.filter = local(),
-                _ => {}
-            }
-        }
+    PipelineNames {
+        push: imported_as(program, "push"),
+        map: imported_as(program, "map"),
+        filter: imported_as(program, "filter"),
     }
-    names
 }
 
-/// Whether `e` can be moved into a lambda unchanged.
-///
-/// Two things stop it. Mentioning `acc` — the array being accumulated —
-/// means the expression reads a value the rewritten pipeline no longer has
-/// (`out.len()` as a running index is the shape this catches). And a `?`
-/// propagation returns from the function it is written in, so relocating it
-/// into a lambda would return from the *lambda* instead: same source, a
-/// different early exit.
-fn lambda_safe(e: &Expr, acc: &str) -> bool {
+/// Whether `e` can be lifted into the pipeline's lambda: it must be
+/// [`lambda_safe`](super::lambda_safe()), and it may not mention `acc` — the
+/// array being accumulated — because the rewritten pipeline no longer has it
+/// (`out.len()` as a running index is the shape this catches).
+fn liftable(e: &Expr, acc: &str) -> bool {
+    if !super::lambda_safe(e) {
+        return false;
+    }
     let mut ok = true;
-    crate::each_subexpr(e, &mut |x| match &x.kind {
-        ExprKind::Ident(n) if n == acc => ok = false,
-        ExprKind::Try(_) => ok = false,
-        _ => {}
+    crate::each_subexpr(e, &mut |x| {
+        if matches!(&x.kind, ExprKind::Ident(n) if n == acc) {
+            ok = false;
+        }
     });
     ok
-}
-
-/// The synthetic value the parser ends a statement-only block with: `()` for
-/// an ordinary block, and an i64 `0` — the loop expression's own result —
-/// for a loop body, which may not end in a value of its own at all. The
-/// loop's zero is told from a written one by its empty span, the same way
-/// [`slice_from_zero`](super::slice_from_zero()) tells an elided slice bound from a typed one.
-fn is_block_tail(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Unit => true,
-        ExprKind::Num(0) => e.span.is_empty(),
-        _ => false,
-    }
-}
-
-/// The single statement a block consists of, or `None` when it holds
-/// anything else — no statements, or more than one.
-///
-/// A block is a right-nested chain, and which node carries the rest of it
-/// depends on the statement: an expression statement is a [`ExprKind::Seq`]
-/// whose second operand is the remainder, while `let`/`mut`/`set` each hold
-/// their own. Only the two forms a push loop can be made of are recognized
-/// here, and each is "lone" exactly when what follows it is the block's
-/// tail (see [`is_block_tail`]).
-fn lone_stmt(block: &Expr) -> Option<&Expr> {
-    match &block.kind {
-        ExprKind::Seq(stmt, rest) if is_block_tail(rest) => Some(stmt),
-        ExprKind::Assign(_, _, rest) if is_block_tail(rest) => Some(block),
-        _ => None,
-    }
 }
 
 /// `set acc.push(elem);` (or its longhand `set acc = acc.push(elem);`) —
@@ -113,20 +66,6 @@ fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<&'a Expr>
     Some(&args[1])
 }
 
-/// Whether `e`'s span covers exactly the text that spells it, so the source
-/// can be spliced back into advice. Only a name and a field path off one
-/// qualify: their spans run from the first character to the last. Most other
-/// forms do not — a call's span stops before its closing paren, so `f(x)`
-/// splices back as `f(x`, which doesn't parse — and the ones that might are
-/// left out rather than each having to be re-checked whenever a span moves.
-fn spans_its_text(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Ident(_) => true,
-        ExprKind::Field(recv, _) => spans_its_text(recv),
-        _ => false,
-    }
-}
-
 /// ```text
 /// mut out = [];
 /// for (let x : xs) {
@@ -150,7 +89,7 @@ fn spans_its_text(e: &Expr) -> bool {
 /// The shape has to be *exactly* this, because anything else in the loop is
 /// something the pipeline would drop: the loop body is one statement (the
 /// push, or an else-less `if` around one push), the guard and the pushed
-/// element may not mention `out` (see [`lambda_safe`]), and the file's
+/// element may not mention `out` (see [`liftable`]), and the file's
 /// `push` must be the builtin. What comes *after* the loop is unconstrained
 /// — a later `set out.push(..)` is fine, since the rewrite leaves `out`
 /// a `mut` binding that simply starts out filled.
@@ -205,7 +144,7 @@ pub(super) fn push_loop_pipeline(
     let Some(elem) = pushed_element(stmt, acc, push) else {
         return;
     };
-    if guard.is_some_and(|c| !lambda_safe(c, acc)) || !lambda_safe(elem, acc) {
+    if guard.is_some_and(|c| !liftable(c, acc)) || !liftable(elem, acc) {
         return;
     }
     // A push of the loop variable itself is the identity map, which the
