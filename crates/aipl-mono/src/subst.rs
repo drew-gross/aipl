@@ -209,12 +209,24 @@ fn walk_uses(e: &Expr, name: &str, repeated: bool, out: &mut Uses) {
     }
 }
 
-/// `e` with the free occurrences of `name` replaced by `value`. Called only
-/// where [`uses_of`] found exactly one, so this replaces exactly one.
+/// `e` with the free occurrences of `name` replaced by `value`, respecting
+/// shadowing (a `let`/`for`/match-arm/lambda binder of `name` stops the walk).
 ///
 /// The replacement keeps `value`'s own span and stamped type: it is the same
 /// expression, now written where it is used.
-fn substitute(e: &Expr, name: &str, value: &Expr) -> Expr {
+///
+/// Two callers, with different multiplicities. [`uses_of`] finds exactly one
+/// occurrence before the single-use inliner calls this, so there it replaces
+/// exactly one. Monomorphization's `drop_lit` (see `ParamSpec`) inlines an
+/// integer literal for *every* occurrence — duplicating a literal is free and
+/// effect-free, so there is nothing to serialize.
+///
+/// One shape it deliberately does not reach: an occurrence inside a `set`
+/// target. The fallback arm walks [`crate::children_mut`], whose `Assign` case
+/// yields only the value and the continuation, not the lvalue. Callers that
+/// cannot tolerate a missed occurrence must exclude assigned names first — see
+/// [`assigns_to`].
+pub(crate) fn substitute(e: &Expr, name: &str, value: &Expr) -> Expr {
     match &e.kind {
         ExprKind::Ident(n) if n == name => value.clone(),
         // The binder cases, which stop the walk when they re-introduce `name`.
@@ -290,6 +302,14 @@ fn assigned_names(e: &Expr, out: &mut HashSet<String>) {
     for c in crate::children(e) {
         assigned_names(c, out);
     }
+}
+
+/// Whether `name` is ever the root of a `set` target anywhere in `e` — the
+/// query [`substitute`]'s callers need, since it cannot rewrite an lvalue.
+pub(crate) fn assigns_to(e: &Expr, name: &str) -> bool {
+    let mut names = HashSet::new();
+    assigned_names(e, &mut names);
+    names.contains(name)
 }
 
 /// The binding an assignment target ultimately names, reached through the field

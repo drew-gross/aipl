@@ -312,12 +312,91 @@ fn named_type_param_distinct_instances_per_type() {
 
 #[test]
 fn named_type_param_inferred_from_other_argument() {
-    // A bare `none` for `s: T?` carries no type; `T` is pinned by `d`.
+    // A bare `none` for `s: T?` carries no type, and a bare literal for `d: T`
+    // carries a value rather than a width — so nothing names `T`. `s` is
+    // dropped as an unpinned optional and `d` as a literal, leaving a
+    // zero-parameter instance keyed on the value (`$lit1_5`).
     let names = mono_names(
         "fn value_or<T: any>(s: T?, d: T) -> T { d }
          fn main() -> i64 { value_or(none, 5) }",
     );
-    assert_eq!(names, vec!["main", "value_or$i64"]);
+    assert_eq!(names, vec!["main", "value_or$i64$lit1_5"]);
+}
+
+#[test]
+fn int_literal_arg_makes_one_instance_per_value() {
+    // The literal is inlined into the body, so two values are two bodies and
+    // must not share an instance. `[x]` rather than `x` as the body: a body
+    // that *is* the literal folds away at the call site instead (see
+    // `int_literal_call_folding_emits_no_instance`).
+    let names = mono_names(
+        "fn wrap<T: any>(x: T) -> T[] { [x] }
+         fn main() -> i64 { wrap(5).len() + wrap(7).len() }",
+    );
+    assert_eq!(names, vec!["main", "wrap$i64$lit0_5", "wrap$i64$lit0_7"]);
+}
+
+#[test]
+fn int_literal_args_are_dropped_per_variable_not_per_argument() {
+    // `T` is literal-pinned, so *every* bare-`T` parameter passed a literal is
+    // inlined — not just the first. Deciding this per argument instead would
+    // bind `T = i64` on the first and then see an already-pinned integer
+    // variable on the second, giving both calls one instance called with
+    // different values.
+    let names = mono_names(
+        "fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
+         fn main() -> i64 { pair(0, 5).len() + pair(0, 7).len() }",
+    );
+    assert_eq!(
+        names,
+        vec!["main", "pair$i64$lit0_0$lit1_5", "pair$i64$lit0_0$lit1_7"]
+    );
+}
+
+#[test]
+fn negative_int_literal_arg_mangles_without_a_dash() {
+    // `n` prefixes the magnitude: a `-` in a mangled name would reach a symbol.
+    let names = mono_names(
+        "fn wrap<T: any>(x: T) -> T[] { [x] }
+         fn main() -> i64 { wrap(-5).len() }",
+    );
+    assert_eq!(names, vec!["main", "wrap$i64$lit0_n5"]);
+}
+
+#[test]
+fn int_literal_call_folding_emits_no_instance() {
+    // Once its literal is inlined, `identity`'s body *is* the literal — so the
+    // call becomes that literal and no instance is emitted at all.
+    let names = mono_names(
+        "fn identity<T: any>(x: T) -> T { x }
+         fn main() -> i64 { identity(5) }",
+    );
+    assert_eq!(names, vec!["main"]);
+}
+
+#[test]
+fn int_literal_call_folding_keeps_a_call_with_argument_effects() {
+    // A body that ignores its parameter would still fold to a literal, but the
+    // argument has to be evaluated — so folding is refused unless *every*
+    // parameter was dropped as a literal. Here `x` is a call, not a literal.
+    let names = mono_names(
+        "fn konst<T: any>(x: T) -> i64 { 42 }
+         fn side() -> i64 { 7 }
+         fn main() -> i64 { konst(side()) }",
+    );
+    assert_eq!(names, vec!["konst$i64", "main", "side"]);
+}
+
+#[test]
+fn concrete_arg_pins_so_the_literal_is_not_dropped() {
+    // The receiver pins `T = u8`, so the literal has a width to flex to and
+    // stays an ordinary argument — the "passing a literal to a concrete int
+    // parameter still works" requirement, made executable.
+    let names = mono_names(
+        "fn value_or<T: any>(s: T?, d: T) -> T { d }
+         fn main() -> i64 { let n: u8? = none; let r: u8 = value_or(n, 0); 0 }",
+    );
+    assert_eq!(names, vec!["main", "value_or$u8"]);
 }
 
 #[test]
@@ -362,12 +441,14 @@ fn none_literal_pins_any_optional_to_pseudo_type() {
 fn concrete_arg_still_wins_over_empty_marker() {
     // For multi-arg generics, an empty/`none` argument only fills in a type
     // variable that no concrete argument pinned. Here the second arg pins T
-    // to i64, so the instance is `g$i64`, not `g$EmptyArray`.
+    // to i64, so the instance is `g$i64...`, not `g$EmptyArray`. Being a bare
+    // literal, `b` is then inlined per value (`$lit1_7`) — and `a` stays
+    // `i64[]`, which is what receives the empty array.
     let names = mono_names(
         "fn g<T: any>(a: T[], b: T) -> i64 { 0 }
          fn main() -> i64 { g([], 7) }",
     );
-    assert_eq!(names, vec!["g$i64", "main"]);
+    assert_eq!(names, vec!["g$i64$lit1_7", "main"]);
 }
 
 #[test]

@@ -1,0 +1,18 @@
+import { print, to_str } from builtins;
+
+// A generic call that folds to its literal is checked like the literal it
+// became. Before per-value instances, `identity(300)` returned `i64` and the
+// `u8` annotation *converted* it — silently producing 44. Now the fold puts the
+// literal where the annotation can see it, and it is out of range.
+fn identity<T: any>(x: T) -> T { x }
+
+fn main() !prints {
+    let r: u8 = identity(300);
+    print(to_str(r));
+}
+--- errors ---
+error: integer literal 300 does not fit in u8
+  --> ./tests/cases/generics/errors/err_int_literal_arg_out_of_range.aipl:10:17
+   |
+10 |     let r: u8 = identity(300);
+   |                 ^^^^^^^^^^^^

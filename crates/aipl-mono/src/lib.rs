@@ -1834,6 +1834,18 @@ struct ParamSpec {
     /// the parameter is dropped and the body binds the `none` in its place. See
     /// [`is_unpinned_optional`].
     drop_none: bool,
+    /// Nothing pinned this parameter's type variable but a bare integer literal
+    /// at the call site, so the width the instance would be built at (`i64`) is
+    /// an arbitrary choice rather than one the program asked for. The parameter
+    /// is dropped and the literal *substituted* into the body in its place, one
+    /// instance per value (`$lit{i}_{v}`) — so every use inside the body flexes
+    /// to its own context, exactly as if the literal had been written there.
+    ///
+    /// Substituted rather than `let`-bound, unlike `drop_none`: a binding fixes
+    /// the literal at one width (`let x = 200` is an `i64`, and the inliner's
+    /// `wrap_args` annotates deliberately), which is the whole thing being
+    /// avoided. See [`Mono::lit_drop_value`] for the rule and the guards.
+    drop_lit: Option<i64>,
 }
 
 /// How an instance specializes its template's signature — everything that
@@ -2011,9 +2023,20 @@ impl Mono<'_> {
         body: &Expr,
         specs: &[ParamSpec],
     ) -> Result<ConcreteFn, Error> {
+        // A dropped parameter is not in scope: the body supplies its value
+        // itself, and leaving the name bound here would let a missed rewrite
+        // type silently against the template's declared parameter type instead
+        // of failing as an unknown binding.
+        let is_dropped = |i: usize| {
+            specs
+                .get(i)
+                .is_some_and(|s| s.drop_none || s.drop_lit.is_some())
+        };
         let mut env: Env = HashMap::new();
-        for p in params {
-            env.insert(p.name.clone(), p.ty.clone());
+        for (i, p) in params.iter().enumerate() {
+            if !is_dropped(i) {
+                env.insert(p.name.clone(), p.ty.clone());
+            }
         }
         // A parameter nothing pinned but a bare `none` is not a parameter of the
         // instance at all: the body declares it. Wrapping rather than
@@ -2036,6 +2059,23 @@ impl Mono<'_> {
                 b.span.clone(),
             )
         });
+        // A parameter nothing pinned but an integer literal is inlined instead
+        // of bound: a binding would fix the literal at one width, and the point
+        // of this instance is that each *use* picks its own. The value is
+        // rebuilt from the mangled name's record of it, so `ParamSpec` stays a
+        // plain value struct.
+        let body = &params
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| specs.get(i)?.drop_lit.map(|v| (p, v)))
+            .fold(body.clone(), |b, (p, v)| {
+                // `Num` carries a plain `i64`, so a negative value needs no
+                // `Neg` wrapper — `const_int`/`flex_int_values` read either. The
+                // fresh node is deliberately unstamped: mono re-infers it, which
+                // is what lets each use pick its own width.
+                let lit = Expr::new(ExprKind::Num(v), b.span.clone());
+                subst::substitute(&b, &p.name, &lit)
+            });
         // Lambdas synthesized while processing this body inherit its effects.
         self.cur_effects = effects.to_vec();
         self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
@@ -2054,7 +2094,7 @@ impl Mono<'_> {
             params: params
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| !specs.get(*i).is_some_and(|s| s.drop_none))
+                .filter(|(i, _)| !is_dropped(*i))
                 .map(|(i, p)| ConcreteParam {
                     ty: settled(&p.ty, &format!("fn {name:?} parameter {:?}", p.name)),
                     name: p.name.clone(),
@@ -2265,6 +2305,15 @@ impl Mono<'_> {
     ///
     /// A variable appearing *only* as a function-typed parameter's result is
     /// pinned from the lambda's own body — see the second inference pass below.
+    ///
+    /// This path is deliberately simpler than the ordinary generic-call arm and
+    /// lags it: it binds every non-function argument eagerly, with none of that
+    /// arm's bow-outs — no integer-literal deferral, and neither of the dropped
+    /// parameters (`ParamSpec::drop_none`, `ParamSpec::drop_lit`). So a bare
+    /// `none` or a bare literal passed *alongside a lambda* pins its variable
+    /// where the same argument passed alone would not. Unifying the two is its
+    /// own project; the parameter lists here are built for `specialize_call_with`,
+    /// which does its own dropping and index-shifting.
     fn specialize_generic_call(
         &mut self,
         gname: &str,
@@ -3798,8 +3847,9 @@ impl Mono<'_> {
     /// into the mangled name so distinct specializations are distinct functions:
     /// `$<type>` per type arg, then `$own{i}` (owned), `$s{i}` (`char[]`-kept-as-
     /// `str`), `$c{i}` (concat-str), `$ve{i}`/`$vo{i}` (variadic element/optional),
-    /// `$dn{i}` (dropped bare-`none` parameter) — grouped by marker, ascending
-    /// parameter index within each group.
+    /// `$dn{i}` (dropped bare-`none` parameter), `$lit{i}_{v}` (dropped integer
+    /// literal parameter, `v` the inlined value, `n`-prefixed when negative) —
+    /// grouped by marker, ascending parameter index within each group.
     fn enqueue_full(&mut self, template: &str, specs: ParamSpecs) -> String {
         let mut mangled = template.to_string();
         for t in &specs.type_args {
@@ -3824,6 +3874,21 @@ impl Mono<'_> {
         for i in specs.indices(|p| p.drop_none) {
             mangled.push_str(&format!("$dn{i}"));
         }
+        for (i, v) in specs
+            .params
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| p.drop_lit.map(|v| (i, v)))
+        {
+            // The *value* is part of the name: each literal gets its own
+            // instance, since the literal is inlined into the body and two
+            // values give two different bodies. `n` prefixes a negative, so no
+            // `-` reaches a symbol name.
+            match v < 0 {
+                true => mangled.push_str(&format!("$lit{i}_n{}", v.unsigned_abs())),
+                false => mangled.push_str(&format!("$lit{i}_{v}")),
+            }
+        }
         if self.emitted.insert(mangled.clone()) {
             self.dbg
                 .trace("mono", format_args!("enqueue instance `{mangled}`"));
@@ -3838,15 +3903,16 @@ impl Mono<'_> {
 
     /// Resolve a call to generic `gname`: infer the concrete type of each type
     /// variable from the argument types (unifying repeated variables), returning
-    /// the type arguments and the concrete return type. Does not queue — the
-    /// caller decides ownership and enqueues the right instance.
+    /// the type arguments, the concrete return type, and the set of type
+    /// variables that *nothing but a bare integer literal* pinned. Does not
+    /// queue — the caller decides ownership and enqueues the right instance.
     fn instantiate_types(
         &mut self,
         gname: &str,
         arg_tys: &[Type],
         flexible: &[bool],
         span: Span,
-    ) -> Result<(Vec<Type>, Type), Error> {
+    ) -> Result<(Vec<Type>, Type, HashSet<String>), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
         // `&mut self` enqueue.
         let (type_vars, param_tys, variadic, return_ty) = {
@@ -3872,13 +3938,13 @@ impl Mono<'_> {
         // `u64` against the literal's `i64`. Deferred to the pass below, which
         // binds only what nothing else settled — the same bow-out an empty `[]`
         // or a bare `none` takes.
-        let mut deferred: Vec<(&Type, &Type)> = Vec::new();
+        let mut deferred: Vec<(usize, &Type, &Type)> = Vec::new();
         for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
             if variadic[i] {
                 continue;
             }
             if flexible.get(i).copied().unwrap_or(false) {
-                deferred.push((pty, aty));
+                deferred.push((i, pty, aty));
                 continue;
             }
             // A bare `none` or an empty `[]` carries only a placeholder element
@@ -3918,21 +3984,34 @@ impl Mono<'_> {
             self.bind_generic_or(&target, &aty, &var_set, &mut map, gname, span.clone())?;
         }
         // The deferred literals, now that everything with a width of its own has
-        // had its say. A literal still pins a variable nothing else reached
-        // (`pick(none, 0)` is an `i64` instance); it just no longer overrides one.
-        for (pty, aty) in deferred {
-            // Unpinned: the literal is all there is, so it pins (`pick(none, 7)`
-            // is an `i64` instance). Pinned to an integer: the literal flexes to
-            // that width, which is the whole point of deferring it. Pinned to
-            // anything else: flexing cannot apply, so the mismatch is real and
-            // binding it reports the conflict here — at the call, naming the
-            // variable — rather than leaving it to surface later against a
-            // synthesized binding.
+        // had its say. A literal still pins a variable nothing else reached; it
+        // just no longer overrides one. What it pins it to is `i64` — but a
+        // variable *only* a literal reached is recorded in `lit_pinned`, because
+        // that `i64` is an arbitrary choice rather than a width the program
+        // asked for, and the caller turns those parameters into per-value
+        // instances with the literal inlined (see `ParamSpec::drop_lit`).
+        let mut lit_pinned: HashSet<String> = HashSet::new();
+        for (_, pty, aty) in &deferred {
+            // Unpinned: the literal is all there is, so it pins. Pinned to an
+            // integer: the literal flexes to that width, which is the whole
+            // point of deferring it. Pinned to anything else: flexing cannot
+            // apply, so the mismatch is real and binding it reports the conflict
+            // here — at the call, naming the variable — rather than leaving it
+            // to surface later against a synthesized binding.
             let flexes = !mentions_unbound(pty, &var_set, &map)
                 && var_set.iter().all(|v| {
                     !ty_mentions(pty, v) || map.get(*v).is_some_and(aipl_syntax::is_int_ty)
                 });
             if !flexes {
+                // Recorded *before* binding: "nothing else reached it" is a
+                // statement about the map as it stands now. A parameter written
+                // as the bare variable is the only shape that can be inlined —
+                // `T[]` or `T?` would need the literal to be a container.
+                if let Type::TypeVar(v) = pty {
+                    if !map.contains_key(v) {
+                        lit_pinned.insert(v.clone());
+                    }
+                }
                 self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
             }
         }
@@ -3969,7 +4048,137 @@ impl Mono<'_> {
             Some(t) => subst_vars(t, &map),
             None => Type::Primitive(Primitive::I64),
         };
-        Ok((targs, ret))
+        Ok((targs, ret, lit_pinned))
+    }
+
+    /// The literal value parameter `p` should have inlined into the instance
+    /// body, or `None` to keep it an ordinary parameter. See
+    /// [`ParamSpec::drop_lit`].
+    ///
+    /// The rule is per *type variable*, not per argument: a variable in
+    /// `lit_pinned` is one nothing but bare integer literals reached, and every
+    /// parameter written as exactly that variable and passed a literal is
+    /// inlined. Deciding it per variable is what makes `min(0, 5)` and
+    /// `min(0, 7)` distinct instances — in the deferred pass the first literal
+    /// binds `T = i64`, after which the second sees an already-pinned integer
+    /// variable and is never considered, so a per-argument rule would inline
+    /// only the first and call one instance with two different values.
+    ///
+    /// Only the bare `T` shape qualifies: a `T[]` or `T?` parameter would need
+    /// the literal to be a container, and never receives one.
+    ///
+    /// Declining is always safe — the parameter simply stays, typed `i64` as it
+    /// is today — so the guards are generous:
+    ///
+    /// - a variadic parameter's argument is a *sequence*, not the literal;
+    /// - a `mut` parameter, or any parameter of a mutating method, is written
+    ///   through, and [`subst::substitute`] cannot rewrite a `set` target;
+    /// - likewise any parameter the body assigns to — the same hazard reached
+    ///   by a different route, and the one that would leave a dangling
+    ///   identifier rather than merely a missed optimization.
+    fn lit_drop_value(
+        &self,
+        gname: &str,
+        p: &Param,
+        arg: Option<&Expr>,
+        lit_pinned: &HashSet<String>,
+    ) -> Option<i64> {
+        let Type::TypeVar(v) = &p.ty else {
+            return None;
+        };
+        if !lit_pinned.contains(v) || p.variadic || p.mutable || self.mutating.contains(gname) {
+            return None;
+        }
+        if subst::assigns_to(&self.generics.get(gname)?.body, &p.name) {
+            return None;
+        }
+        aipl_syntax::const_int(arg?)
+    }
+
+    /// The value this call collapses to, when inlining its dropped literals
+    /// leaves a body that is nothing but an integer literal. `None` keeps the
+    /// call.
+    ///
+    /// The test is deliberately [`aipl_syntax::const_int`] and not
+    /// [`aipl_syntax::flex_int_values`]. That one answers "does this flex",
+    /// not "is this alone": it reaches through a block's tail, so
+    /// `{ let a = f(); 200 }` counts as flexible while folding it to `200`
+    /// would drop `f()`'s effects. Requiring the whole body to *be* the literal
+    /// makes the rewrite safe by construction — a literal has no effects, no
+    /// captures and no recursion.
+    ///
+    /// *Every* parameter must have been dropped as a literal, which is a
+    /// stronger requirement than the body coming out literal. A body is free to
+    /// ignore a parameter (`fn k<T>(x: T) -> i64 { 42 }`), and folding that call
+    /// away would discard its argument — along with any effects evaluating it
+    /// would have had. Requiring the full set means there are no arguments left
+    /// to discard.
+    fn folds_to_literal(&self, gname: &str, params: &[ParamSpec]) -> Option<i64> {
+        let g = self.generics.get(gname)?;
+        if g.sig.params.is_empty()
+            || !g
+                .sig
+                .params
+                .iter()
+                .enumerate()
+                .all(|(i, _)| params.get(i).is_some_and(|s| s.drop_lit.is_some()))
+        {
+            return None;
+        }
+        let body = g
+            .sig
+            .params
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| params.get(i)?.drop_lit.map(|v| (p, v)))
+            .fold(g.body.clone(), |b, (p, v)| {
+                let lit = Expr::new(ExprKind::Num(v), b.span.clone());
+                subst::substitute(&b, &p.name, &lit)
+            });
+        aipl_syntax::const_int(&body)
+    }
+
+    /// Reject an out-of-range integer literal initializer for an annotated
+    /// binding, using the checker's own message.
+    ///
+    /// This exists for one thing: the literals [`Mono::folds_to_literal`]
+    /// produces. It turns `identity(300)` into `300`, which the checker only
+    /// ever saw as a *call* — and without a re-check codegen's `binding_ty`
+    /// reads the narrowing annotation as a conversion (the form that replaced
+    /// `u8(..)`) and silently wraps it to 44.
+    ///
+    /// Hence the two guards, both load-bearing:
+    ///
+    /// - **The source expression must be a call.** Mono infers a more-folded
+    ///   AST than the checker did, so plenty of literals reach here that the
+    ///   checker deliberately never range-checked: `let m: u64 = 0 - 1` is a
+    ///   `Binop` in the source and a `Num(-1)` by the time it is inferred, and
+    ///   reading `u64::MAX` out of it that way is intentional. Only a value the
+    ///   checker could not see through — a call — is re-checked.
+    /// - **The annotated binding is the context**, not `cur_expected`, which is
+    ///   inherited by nested argument inference: testing at the fold site
+    ///   instead would reject `let r: u8 = wrap(identity(300))`, where the
+    ///   literal goes through an `i64` parameter and never reaches `u8`.
+    fn check_folded_literal_fits(
+        &self,
+        src: &Expr,
+        folded: &Expr,
+        vt: &Type,
+        declared: Option<&Type>,
+    ) -> Result<(), Error> {
+        let Some(declared) = declared else {
+            return Ok(());
+        };
+        if !matches!(src.kind, ExprKind::Call(..)) {
+            return Ok(());
+        }
+        match aipl_syntax::flex_fit(folded, vt, declared) {
+            Err((v, name)) => Err(Error::at(
+                format!("integer literal {v} does not fit in {name}"),
+                folded.span.clone(),
+            )),
+            _ => Ok(()),
+        }
     }
 
     /// Which parameters the call to `template` (with the given concrete
@@ -4931,6 +5140,7 @@ impl Mono<'_> {
                     Some(t) => Some(self.resolve_generic_ty(t)?),
                     None => None,
                 };
+                self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
@@ -4960,6 +5170,7 @@ impl Mono<'_> {
                     Some(t) => Some(self.resolve_generic_ty(t)?),
                     None => None,
                 };
+                self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
@@ -5324,7 +5535,7 @@ impl Mono<'_> {
                                 || matches!(&a.kind, ExprKind::Neg(x) if matches!(x.kind, ExprKind::Num(_)))
                         })
                         .collect();
-                    let (type_args, ret) =
+                    let (type_args, ret, lit_pinned) =
                         self.instantiate_types(name, &atys, &flexible, span.clone())?;
                     let owned = if method_style {
                         Vec::new()
@@ -5365,18 +5576,31 @@ impl Mono<'_> {
                                     VShape::Seq
                                 },
                                 drop_none: is_unpinned_optional(&subst_vars(&p.ty, &tmap)),
+                                drop_lit: self.lit_drop_value(name, p, args.get(i), &lit_pinned),
                                 ..ParamSpec::default()
                             })
                             .collect()
                     };
                     // The dropped parameters take their arguments with them —
-                    // each was a bare `none` the instance now declares itself.
+                    // each was a bare `none` the instance now declares itself,
+                    // or an integer literal it now has inlined in the body.
                     let rargs: Vec<Expr> = rargs
                         .into_iter()
                         .enumerate()
-                        .filter(|(i, _)| !params.get(*i).is_some_and(|p| p.drop_none))
+                        .filter(|(i, _)| {
+                            !params
+                                .get(*i)
+                                .is_some_and(|p| p.drop_none || p.drop_lit.is_some())
+                        })
                         .map(|(_, a)| a)
                         .collect();
+                    // A call whose body reduces to a literal *is* that literal:
+                    // fold it in place and emit no instance, so the ordinary
+                    // flex machinery sees a literal at the call site
+                    // (`let r: u8 = identity(5)` narrows instead of converting).
+                    if let Some(v) = self.folds_to_literal(name, &params) {
+                        return Ok((node(ExprKind::Num(v)), ret));
+                    }
                     let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
                     (node(ExprKind::Call(mangled, rargs, method_style)), ret)
                 } else if self.concrete.contains_key(name) {

@@ -1,0 +1,65 @@
+import { print, to_str, value_or } from builtins;
+
+// The counterpart to `int_literal_arg`: when something *else* pins the type
+// variable, the literal is not the thing deciding, so nothing is inlined and
+// the parameter stays. The literal simply flexes to the width that argument
+// pinned — which is the behavior that predates per-value instances and has to
+// keep working.
+fn pick<T: any>(a: T?, b: T) -> T { a.value_or(b) }
+
+fn widths(hint: u8?, wide: u64?) !prints -> u8 {
+    // `hint` pins `T = u8`, so the literal 200 is a `u8` here...
+    let narrow: u8 = pick(hint, 200);
+    // ...while the same literal against a `u64?` receiver is a `u64`.
+    let big: u64 = pick(wide, 200);
+    print(to_str(big)); // 200
+    narrow
+}
+
+fn main() !prints {
+    print(to_str(widths(none, none))); // 200
+    print(to_str(widths(some(7), some(9)))); // 7 (and 9 from inside)
+}
+--- stdout ---
+200
+200
+9
+7
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 187
+binary size: 1760
+  code: 716
+  data: 1
+  metadata: 1043
+functions:
+  __to_str_u64:
+    calls: 2
+    bytes: 180
+  __to_str_u8:
+    calls: 2
+    bytes: 180
+  aipl_dec:
+    calls: 8
+    bytes: (external)
+  aipl_inc:
+    calls: 4
+    bytes: (external)
+  aipl_print:
+    calls: 4
+    bytes: (external)
+  aipl_u64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_u64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 228
+  widths:
+    calls: 2
+    bytes: 128

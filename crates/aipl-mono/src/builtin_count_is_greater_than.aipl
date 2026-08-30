@@ -38,18 +38,18 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 656
-instructions executed: 1767
-binary size: 4472
-  code: 2020
+instructions executed: 1766
+binary size: 4800
+  code: 2280
   data: 620
-  metadata: 1832
+  metadata: 1900
 functions:
   __builtin_count_is_greater_than$i64:
     calls: 5
     bytes: 276
   __test$count_is_greater_than:
     calls: 1
-    bytes: 1396
+    bytes: 1392
   aipl_array_dec:
     calls: 11
     bytes: (external)
@@ -69,8 +69,11 @@ functions:
     calls: 1
     bytes: (external)
   count_is_greater_than$i64:
-    calls: 6
+    calls: 5
     bytes: 276
+  count_is_greater_than$i64$lit1_1:
+    calls: 1
+    bytes: 264
   main:
     calls: 1
     bytes: 72
