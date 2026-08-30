@@ -300,6 +300,8 @@ optimizations:
   make arrays work sorta like strings i.e. have a rope representation
   we had a bug that only manifested after an optimization - lets make it so that all tests are run both with and without optimizations to avoid hitting this issue again
   claudes suggestions:
+  Suggestions, by expected value
+    5. Try a faster linker. Xcode 15+'s ld_prime or lld. Worth a measurement given links are the hot spot, though pruning may make it moot.
     B. Compiler speed
 
     B1. No opt_level is set anywhere — neither host_isa (:4367) nor the AOT builder (:6485), so Cranelift runs at its default none. Fast compiles, but aipl build emits unoptimized machine code. Splitting the setting (JIT stays none, AOT goes speed) is a two-line change with a plausibly large effect on wall-clock and code size.
@@ -419,6 +421,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  retire AIPL_CASE, add a non-env alternative
   switch the nextest --no-build to the corresponding cargo build so that we get better progress output
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests

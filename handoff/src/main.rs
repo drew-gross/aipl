@@ -33,8 +33,9 @@
 //!      fixing it.
 //! 3. `fill_case_tests` regenerates the checked-in per-case `#[test]` list when a
 //!    case file was added or removed. First, so a new case can reach step 4.
-//! 4. `fill_expected`, scoped with `AIPL_CASE` to each mismatched case, refreshes
-//!    just those cases' sections from actual output (not the whole corpus).
+//! 4. `fill_expected`, scoped with `AIPL_CASE` to the mismatched cases (all of
+//!    them, in one run — see the step), refreshes just those cases' sections
+//!    from actual output rather than the whole corpus.
 //! 5. Staged dogfood-IR regen: fill → validate → corpus run against the staged
 //!    artifact → auto-promote when that run is green. Then (step "5b") a
 //!    rebuild, if step 3 regenerated the per-case `#[test]` list — the one thing
@@ -358,28 +359,39 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
                 r.fail("fill_expected", &detail);
             }
         } else {
-            for case in &plan.fail_cases {
-                // A scoped run diverges with the "filter active" panic, not the
-                // whole-corpus "section refresh complete" message — but the
-                // refill still happens during the run. Success is that scoped
-                // summary line reporting the case was seen (`matched > 0`, else
-                // the harness asserts before printing) with `0 failed` (no
-                // unfillable failure slipped in).
-                // Built from `helper` rather than spelled out, so it cannot
-                // drift from the other helper steps — writing the arguments
-                // longhand here is exactly how this one ended up without
-                // `Cmd::json` and with nothing to read.
-                r.step(
-                    &format!("fill_expected (section refill — {case})"),
-                    helper("fill_expected").env("AIPL_CASE", case),
-                );
-                let label = format!("fill_expected ({case})");
-                let out = helper_output(&mut r, &label);
-                if !scoped_fill_succeeded(&out) {
-                    r.save_out();
-                    let detail = tail(&out, 40);
-                    r.fail(&label, &detail);
-                }
+            // Every stale case in *one* invocation. `AIPL_CASE` takes a
+            // comma-separated list (a case path never contains a comma), and
+            // the harness asserts that each entry matched something, so a
+            // batch cannot quietly skip one.
+            //
+            // One run rather than one per case because the cost here is not the
+            // refill — that is a second or two once warm — but `nextest`
+            // starting up against a freshly linked test binary, measured at
+            // ~40s. Paying that per case is what made a handful of stale
+            // sections cost minutes, and what the "one sanctioned deviation" in
+            // CLAUDE.md existed to route around.
+            //
+            // A scoped run diverges with the "filter active" panic, not the
+            // whole-corpus "section refresh complete" message — but the refill
+            // still happens during the run. Success is that scoped summary line
+            // reporting cases were seen (`matched > 0`, else the harness
+            // asserts before printing) with `0 failed` (no unfillable failure
+            // slipped in).
+            // Built from `helper` rather than spelled out, so it cannot drift
+            // from the other helper steps — writing the arguments longhand here
+            // is exactly how this one ended up without `Cmd::json` and with
+            // nothing to read.
+            let joined = plan.fail_cases.join(",");
+            let label = match plan.fail_cases.as_slice() {
+                [one] => format!("fill_expected (section refill — {one})"),
+                many => format!("fill_expected (section refill — {} cases)", many.len()),
+            };
+            r.step(&label, helper("fill_expected").env("AIPL_CASE", &joined));
+            let out = helper_output(&mut r, &label);
+            if !scoped_fill_succeeded(&out) {
+                r.save_out();
+                let detail = tail(&out, 40);
+                r.fail(&label, &detail);
             }
         }
     }

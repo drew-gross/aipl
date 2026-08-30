@@ -114,6 +114,14 @@ needless_range_loop = "allow"
 # link time scales with `dogfood.clif` size.
 [profile.dev.package."*"]
 opt-level = 2
+# Dependencies carry no debug info. Nothing steps through cranelift here, and
+# the cost is paid on every link: the linker reads the DWARF out of these
+# archives even though `split-debuginfo` keeps it out of the finished binary
+# (a test binary has a 27 MB `__TEXT` and no `__DWARF` segment at all). With
+# `target/` warm this is the difference between a link that computes and one
+# that waits — a single relink was measured at ~30s pinned at 5% CPU, i.e.
+# entirely I/O. Our own crates keep theirs; see `[profile.dev]` below.
+debug = false
 
 # Build scripts get the same optimization as ordinary dependencies. The reason is
 # `aipl-codegen`'s: it runs Cranelift over the whole dogfood artifact, which an
@@ -122,3 +130,16 @@ opt-level = 2
 # artifacts between the build script and the crate rather than building two.
 [profile.dev.build-override]
 opt-level = 2
+
+# Our own crates: line tables, not full DWARF. That is what a panic backtrace
+# needs — file and line for every frame — and it is what the test suite's
+# failures are read through. What it drops is the rest of the debug map
+# (types, locals, lexical scopes), which only a stepping debugger consumes;
+# reach for a one-off `RUSTFLAGS="-C debuginfo=2"` build on the rare occasion
+# you want lldb to show locals.
+#
+# `[profile.dev.package."*"]` above covers dependencies only, so this line is
+# what the workspace crates get. The `test` profile inherits from `dev`, so
+# the test binaries — the things being linked over and over — get it too.
+[profile.dev]
+debug = "line-tables-only"

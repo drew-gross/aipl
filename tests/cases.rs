@@ -92,9 +92,11 @@
 //!   - `cargo test --test cases -- --ignored fill_expected` — in a single pass,
 //!     overwrite every section that differs (`stdout`/`stderr`/`exit code`/
 //!     `performance`/`check`/`errors`/`expect file`) with the
-//!     actual output. Set `AIPL_CASE` to a path substring to target a subset —
-//!     this is the one mode that still reads it, since it is a single test and
-//!     libtest's filter can't reach inside it.
+//!     actual output. Set `AIPL_CASE` to a path substring — or a comma-separated
+//!     list of them — to target a subset; this is the one mode that still reads
+//!     it, since it is a single test and libtest's filter can't reach inside it.
+//!     Every entry must match at least one case, so a mistyped path in a batch
+//!     fails rather than silently refreshing nothing.
 //!   - `cargo test --test cases -- --ignored refresh_perfmon` — rewrite the
 //!     non-deterministic `tests/performance_metrics.md` table.
 //!   - `cargo test --test cases -- --ignored fill_case_tests` — regenerate the
@@ -624,7 +626,21 @@ fn run_fill() {
     //   AIPL_CASE=some_value cargo test --test cases -- --ignored fill_expected
     // matches against the case's display path (e.g. `cases/options/some_value`),
     // with `/` separators regardless of platform.
-    let filter = std::env::var("AIPL_CASE").ok().filter(|s| !s.is_empty());
+    //
+    // Comma-separated for more than one — a case path never contains a comma.
+    // That is how `cargo handoff` refills every stale case in a single run: each
+    // `nextest` invocation pays a fresh-binary startup that dwarfs the refill
+    // itself, so one invocation for N cases beats N invocations for one.
+    let raw = std::env::var("AIPL_CASE").ok().filter(|s| !s.is_empty());
+    let filters: Vec<&str> = raw
+        .iter()
+        .flat_map(|s| s.split(','))
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    // Which filters actually selected something, so a typo in a batch is named
+    // rather than hidden behind its neighbours matching.
+    let mut hit = vec![false; filters.len()];
 
     let mut passed = 0usize;
     let mut matched = 0usize;
@@ -636,9 +652,16 @@ fn run_fill() {
         // exact text a per-case mismatch message brackets, so a failure's
         // `AIPL_CASE='<path>'` suggestion can be pasted back verbatim (which is
         // what `cargo handoff` does to refill just the stale cases).
-        if let Some(f) = &filter {
+        if !filters.is_empty() {
             let name = rel_with_prefix.to_string_lossy().replace('\\', "/");
-            if !name.contains(f.as_str()) {
+            let mut any = false;
+            for (i, f) in filters.iter().enumerate() {
+                if name.contains(f) {
+                    hit[i] = true;
+                    any = true;
+                }
+            }
+            if !any {
                 continue;
             }
         }
@@ -651,18 +674,25 @@ fn run_fill() {
     }
 
     // A filter that matches nothing is almost always a typo — fail loudly
-    // rather than silently "refreshing" zero cases.
-    if let Some(f) = &filter {
-        assert!(
-            matched > 0,
-            "AIPL_CASE={f:?} matched no test cases (of {} total)",
-            cases.len()
-        );
-    }
+    // rather than silently "refreshing" zero cases. Reported per filter: in a
+    // batch the others will have matched, so `matched > 0` alone would let a
+    // mistyped path through as a silent no-op.
+    let missed: Vec<&str> = filters
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !hit[*i])
+        .map(|(_, f)| *f)
+        .collect();
+    assert!(
+        missed.is_empty(),
+        "AIPL_CASE matched no test cases (of {} total) for: {}",
+        cases.len(),
+        missed.join(", ")
+    );
 
     // Summary. The filtered wording is a parsed contract — `cargo handoff`
     // parses it to confirm a scoped refill ran clean — so keep it as it reads.
-    match &filter {
+    match &raw {
         Some(f) => eprintln!(
             "\n=== test cases [filter {f:?}]: {passed} passed, {} failed, {} refreshed ({matched} of {} matched) ===",
             failures.len(),

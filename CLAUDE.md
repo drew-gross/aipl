@@ -88,15 +88,20 @@ running ahead of it is a **targeted** test for the code you just touched
 a dev-loop signal, not the handoff gate. When the change is ready, run
 `cargo handoff` and let it format, verify, and regenerate in one pass.
 
-**The one sanctioned deviation.** When a change invalidates *hundreds* of
-`--- performance ---` sections at once (anything that moves a counter in every
-binary — a codegen change, a new baseline runtime call), handoff's per-case
-`AIPL_CASE` refill loop spawns one `nextest` per mismatched case and becomes
-pathological. Run the whole-corpus refill once
-(`cargo test --test cases -- --ignored fill_expected`), then hand off. Two
-guards on that: it's only worth it at that scale, and a blanket refill can bury
-a real regression, so afterwards diff the corpus and confirm every changed line
-is a metric — no `--- stdout ---`/`--- errors ---` body should move.
+**Refills scale — you don't need to hand-drive them.** `AIPL_CASE` takes a
+comma-separated list, and handoff passes every stale case in a *single*
+`fill_expected` run, so a change that invalidates hundreds of
+`--- performance ---` sections at once (a codegen change, a new baseline runtime
+call) costs one invocation rather than hundreds. This used to be the one
+sanctioned deviation from the gate: the refill loop spawned one `nextest` per
+mismatched case, and since each invocation pays a fresh-binary startup that
+dwarfs the refill itself, the advice was to run a whole-corpus refill by hand
+first. That is no longer worth doing.
+
+What survives from it is the review guard, which was never about speed: a
+wholesale refill can bury a real regression, so after any large one, diff the
+corpus and confirm every changed line is a metric — no `--- stdout ---` /
+`--- errors ---` body should move.
 
 ## Shell
 Use the **Bash** tool for everything terminal-side: `cargo build`,
