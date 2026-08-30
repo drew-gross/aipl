@@ -1,0 +1,46 @@
+import { print } from builtins;
+
+// KNOWN BUG — this fixture pins the *current* behavior, not correct behavior.
+//
+// A return-type mismatch is reported against the body's span. When the body is
+// a single expression that span is exactly the offending expression, so
+// `one_statement` below correctly points at its `5`. When the body has leading
+// statements the span starts at the first of them, and the diagnostic fingers
+// `let a = 1;` — a line that is not wrong, and that does not even mention the
+// value being returned. The caret lands on `a = 1` rather than the whole
+// statement because a `let`'s own span starts at its binder.
+//
+// Both should point at the tail expression that produced the type: the `a` on
+// the last line of `leading_statements`.
+//
+// Found while making integer literals flex into generic parameters. The same
+// misreport lands on every `ok(0)` in a function returning `u64!E`, and a
+// function worth fixing that way almost always has statements before its tail —
+// so the wrong line is what you actually see while doing that cleanup.
+//
+// When the span is fixed this fixture fails, and the expected-errors section
+// below is what records the fix.
+
+fn one_statement() -> str { 5 }
+
+fn leading_statements() -> str {
+    let a = 1;
+    a
+}
+
+fn main() !prints {
+    print(one_statement());
+    print(leading_statements());
+}
+--- errors ---
+error: fn "one_statement": body returns i64, but the declared return type is str
+  --> ./tests/cases/functions/err_return_type_span.aipl:24:29
+   |
+24 | fn one_statement() -> str { 5 }
+   |                             ^
+
+error: fn "leading_statements": body returns i64, but the declared return type is str
+  --> ./tests/cases/functions/err_return_type_span.aipl:27:9
+   |
+27 |     let a = 1;
+   |         ^^^^^^

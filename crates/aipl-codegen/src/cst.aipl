@@ -165,8 +165,7 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // the grammar skipped over. Built by hand: the driver's own output is
     // exercised in `parse.aipl`, and this file's job is the tree, not the parse.
     let src = "1 + 2";
-    let one: u64 = 1;
-    let t = CTree(one, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3), CTrivia(3..4), CLeaf(4..5)]);
+    let t = CTree(1, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3), CTrivia(3..4), CLeaf(4..5)]);
 
     assert(t.is_tree());
     assert(!CLeaf(0..1).is_tree());
@@ -186,17 +185,16 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(t.token_leaves() == [0..1, 2..3, 4..5]);
     assert(t.token_text(src) == "1+2");
     assert(CTrivia(1..2).token_text(src) == "");
-    assert(CTree(one, [CTrivia(1..2), CLeaf(2..3)]).token_text(src) == "+");
+    assert(CTree(1, [CTrivia(1..2), CLeaf(2..3)]).token_text(src) == "+");
 
     // Nesting: an interior child contributes its own leaves to the parent, in
     // place, so the parent still reconstructs the whole source.
-    let zero: u64 = 0;
-    let nested = CTree(zero, [CLeaf(0..1), CTrivia(1..2), CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+    let nested = CTree(0, [CLeaf(0..1), CTrivia(1..2), CTree(1, [CLeaf(2..3), CLeaf(3..5)])]);
     assert(nested.text(src) == src);
     assert(nested.span() == 0..5);
     assert(nested.nodes().len() == 1);
     // `nodes` is one level deep and drops leaves: three kids, one interior.
-    assert(nested.nodes() == [CTree(one, [CLeaf(2..3), CLeaf(3..5)])]);
+    assert(nested.nodes() == [CTree(1, [CLeaf(2..3), CLeaf(3..5)])]);
 
     // `own_tokens` is the mirror — one level deep, leaves only — so between them
     // they are everything `nested` matched directly. The interior child's own
@@ -208,13 +206,13 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(nested.token_text(src) == "1+ 2");
     assert(t.own_tokens() == [0..1, 2..3, 4..5]);
     assert(CLeaf(0..1).own_tokens() == []);
-    assert(CTree(zero, []).own_token_text(src) == "");
+    assert(CTree(0, []).own_token_text(src) == "");
     assert(t.nodes() == []);
     assert(CLeaf(0..1).nodes() == []);
 
     // A node that matched nothing has no extent rather than a bogus one.
-    assert(CTree(zero, []).span() == 0..0);
-    assert(CTree(zero, []).text(src) == "");
+    assert(CTree(0, []).span() == 0..0);
+    assert(CTree(0, []).text(src) == "");
 
     let names = ["expr", "term"];
     assert(t.show(src, names) == "(term 1 ~  + ~  2)");
@@ -222,7 +220,7 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // Trivia renders as `~` followed by its verbatim text — here a space, which
     // is why the whitespace doubles up next to the joining space.
     assert(nested.show(src, names) == "(expr 1 ~  (term +  2))");
-    assert(CTree(zero, []).show(src, names) == "(expr)");
+    assert(CTree(0, []).show(src, names) == "(expr)");
     // An index past the end of the name table still renders.
     let far: u64 = 9;
     assert(CTree(far, []).show(src, names) == "(?)");
@@ -232,10 +230,10 @@ allocations: 165
 deallocations: 165
 reallocations: 1
 bytes allocated: 8204
-instructions executed: 9860
-binary size: 30024
-  code: 16424
-  data: 1941
+instructions executed: 9867
+binary size: 30008
+  code: 16432
+  data: 1917
   metadata: 11659
 functions:
   __arr_drop_Cst:
@@ -261,7 +259,7 @@ functions:
     bytes: 48
   __test$show:
     calls: 1
-    bytes: 9996
+    bytes: 10004
   aipl_arr_drop_arr:
     calls: 12
     bytes: (external)

@@ -162,6 +162,7 @@ case_tests! {
     cases_files_write_file = "cases/files/write_file",
     cases_functions_err_functions = "cases/functions/err_functions",
     cases_functions_err_missing_fn_keyword = "cases/functions/err_missing_fn_keyword",
+    cases_functions_err_return_type_span = "cases/functions/err_return_type_span",
     cases_functions_exit_code = "cases/functions/exit_code",
     cases_functions_fn_value_field = "cases/functions/fn_value_field",
     cases_functions_fn_value_lambda = "cases/functions/fn_value_lambda",

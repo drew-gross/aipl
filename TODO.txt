@@ -202,6 +202,7 @@ parser:
   remove power from prec and use order within the list
 
 utilities:
+  exponentiation operator
   take_while that is the counterpart of trim_while
   push into a string should work
   add is_some, lint against match none->false+some(_)->true
@@ -385,7 +386,9 @@ dead store elimination optimization pass
 
 Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
 
-integer type conversions: should return none when out of range. Remove automatic conversion.
+integers:
+  type conversions: should return none when out of range. Remove automatic conversion.
+  unpinned int lits should be passable as struct fields
 
 spread in args e.g. fn foo(self: Span { start, end })
 

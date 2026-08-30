@@ -820,11 +820,21 @@ impl<'a> Cx<'a> {
         }
         let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
-        let mut arg_tys: Vec<(Type, Span)> = Vec::with_capacity(args.len());
+        // The argument expression is kept alongside its type: the payload checks
+        // below flex a bare literal to the *substituted* payload type, and
+        // `flex_int` needs the expression, not just what it inferred to.
+        let mut arg_tys: Vec<(&Expr, Type)> = Vec::with_capacity(args.len());
+        // A bare integer literal payload is deferred to the fallback chain below
+        // rather than pinning here — see [`literal_pins_nothing`].
+        let mut deferred: Vec<(&Type, Type)> = Vec::new();
         for (arg, pty) in args.iter().zip(&case.payload) {
             let at = self.check_expr(arg, env, effects)?;
-            self.bind_field(pty, &at, &vars, &mut map);
-            arg_tys.push((at, arg.span.clone()));
+            if literal_pins_nothing(arg, pty, &vars) {
+                deferred.push((pty, at.clone()));
+            } else {
+                self.bind_field(pty, &at, &vars, &mut map);
+            }
+            arg_tys.push((arg, at));
         }
         // Resolve the type arguments from the constructor's payload. A variable
         // no argument pins — a nullary case, or a case whose payload mentions no
@@ -851,6 +861,15 @@ impl<'a> Cx<'a> {
         } else {
             None
         };
+        // 3. a deferred integer literal, last of all. `i64` is only the width a
+        //    bare literal *defaults* to, so it is weaker evidence than either of
+        //    the above — but it still settles a variable nothing else reached,
+        //    which is what keeps a bare `Full(200)` working with no annotation
+        //    and no existing instance in sight.
+        let mut lit: HashMap<String, Type> = HashMap::new();
+        for (pty, at) in deferred {
+            self.bind_field(pty, &at, &vars, &mut lit);
+        }
         let type_args: Vec<Type> = tmpl
             .type_vars
             .iter()
@@ -860,6 +879,7 @@ impl<'a> Cx<'a> {
                     .cloned()
                     .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
                     .or_else(|| sole.as_ref().and_then(|a| a.get(i).cloned()))
+                    .or_else(|| lit.get(&tv.name).cloned())
                     .ok_or_else(|| {
                         Error::at(
                             format!(
@@ -899,12 +919,14 @@ impl<'a> Cx<'a> {
                 .map(|tv| tv.name.clone())
                 .zip(type_args.iter().cloned())
                 .collect();
-            for ((at, aspan), pty) in arg_tys.iter().zip(&case.payload) {
+            for ((arg, at), pty) in arg_tys.iter().zip(&case.payload) {
+                let target = crate::subst_type_params(pty, &subst);
+                let at = self.flex_int(arg, at, &target)?;
                 expect(
-                    at,
-                    &crate::subst_type_params(pty, &subst),
+                    &at,
+                    &target,
                     &format!("constructor {bare:?} argument"),
-                    aspan.clone(),
+                    arg.span.clone(),
                 )?;
             }
             return Ok(Type::Generic(base.to_string(), type_args));
@@ -917,12 +939,18 @@ impl<'a> Cx<'a> {
             .find(|(n, _)| n == bare)
             .map(|(_, p)| p.clone())
             .expect("ctor present in instance");
-        for ((at, aspan), pty) in arg_tys.iter().zip(&payload) {
+        for ((arg, at), pty) in arg_tys.iter().zip(&payload) {
+            // A bare literal payload flexes to the width the instance settled
+            // on, exactly as it does for a *concrete* variant's constructor
+            // (see the `ctors` branch of `check_call`). Without this the
+            // deferral above only got as far as resolving `Box<u8>` and then
+            // rejected its own `200` for being an `i64`.
+            let at = self.flex_int(arg, at, pty)?;
             expect(
-                at,
+                &at,
                 pty,
                 &format!("constructor {bare:?} argument"),
-                aspan.clone(),
+                arg.span.clone(),
             )?;
         }
         Ok(Type::Named(inst))
@@ -4228,6 +4256,25 @@ pub(crate) fn collect_args(
         .iter()
         .map(|tv| map.get(&tv.name).cloned())
         .collect()
+}
+
+/// Whether `arg` is a bare integer literal landing in a slot that is *exactly* a
+/// type variable — the shape whose width the literal must not be the one to
+/// decide.
+///
+/// The same bow-out [`crate::Mono::instantiate_types`] makes for a generic call,
+/// applied to a generic constructor's payload. A literal types as `i64` but
+/// flexes to whatever its context wants, so binding it here would pin the
+/// variable to `i64` against no competition at all: `let b: Box<u8> = Full(200)`
+/// resolved to a `Box<i64>` and was then rejected against its own annotation.
+/// Deferring it lets the expected type have first refusal, and the literal still
+/// pins any variable nothing else reached.
+///
+/// Only the bare-variable slot qualifies. A `T[]` or `T?` payload never receives
+/// a bare literal, and a concrete payload (`Spelling(str)`) pins nothing anyway.
+pub(crate) fn literal_pins_nothing(arg: &Expr, pty: &Type, vars: &HashSet<&str>) -> bool {
+    matches!(pty, Type::TypeVar(v) if vars.contains(v.as_str()))
+        && aipl_syntax::const_int(arg).is_some()
 }
 
 pub(crate) fn collect_var_bindings(

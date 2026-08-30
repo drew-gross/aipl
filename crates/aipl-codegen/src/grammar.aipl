@@ -145,16 +145,10 @@ struct Production<K: variant, A: any> {
 struct Grammar<K: variant, A: any> { prods: Production<K, A>[] }
 
 // `r` repeated zero or more times (PEG `*`).
-pub fn many<K: variant>(r: Rule<K>) -> Rule<K> {
-    let min: u64 = 0;
-    Many(r, min)
-}
+pub fn many<K: variant>(r: Rule<K>) -> Rule<K> { Many(r, 0) }
 
 // `r` repeated one or more times (PEG `+`).
-pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> {
-    let min: u64 = 1;
-    Many(r, min)
-}
+pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> { Many(r, 1) }
 
 // The production names of `g`, in index order — the table `show` renders a
 // tree against, and what `link` resolves references through.
@@ -237,22 +231,18 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(name_index(prod_names(g), "nope") == none);
 
     let linked = link(g)?;
-    let zero: u64 = 0;
-    let one: u64 = 1;
     // `item`'s two alternatives: a terminal, and a reference now an index.
-    assert(rule_of(linked, one) == OneOf([Term(Atom("")), NamedIdx(zero)]));
+    assert(rule_of(linked, 1) == OneOf([Term(Atom("")), NamedIdx(0)]));
 
     // The reference nested two levels down inside `list` is rewritten too, and
     // everything around it is left alone.
-    assert(
-        rule_of(linked, zero) == Then([Spelling("("), Many(NamedIdx(one), zero), Spelling(")")]),
-    );
+    assert(rule_of(linked, 0) == Then([Spelling("("), Many(NamedIdx(1), 0), Spelling(")")]));
     // Linking preserves the fields a rewrite doesn't touch.
     assert(prod_names(linked) == ["list", "item"]);
-    assert(expect_of(linked, one) == "an item");
+    assert(expect_of(linked, 1) == "an item");
 
     // Idempotent: a linked grammar links again to itself.
-    assert(rule_of(link(linked)?, one) == OneOf([Term(Atom("")), NamedIdx(zero)]));
+    assert(rule_of(link(linked)?, 1) == OneOf([Term(Atom("")), NamedIdx(0)]));
 
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
@@ -268,14 +258,10 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         ],
     };
     let ls = link(shapes)?;
-    assert(rule_of(ls, zero) == Maybe(NamedIdx(zero)));
-    assert(rule_of(ls, one) == ListOf(NamedIdx(zero), ",", true));
-    let two: u64 = 2;
-    let three: u64 = 3;
-    assert(
-        rule_of(ls, two) == Climb(NamedIdx(zero), [Prec { power: 1, right: false, ops: ["+"] }]),
-    );
-    assert(rule_of(ls, three) == Many(NamedIdx(one), one));
+    assert(rule_of(ls, 0) == Maybe(NamedIdx(0)));
+    assert(rule_of(ls, 1) == ListOf(NamedIdx(0), ",", true));
+    assert(rule_of(ls, 2) == Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }]));
+    assert(rule_of(ls, 3) == Many(NamedIdx(1), 1));
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
@@ -329,11 +315,11 @@ allocations: 111
 deallocations: 111
 reallocations: 0
 bytes allocated: 7052
-instructions executed: 11840
+instructions executed: 11853
 binary size: 40008
-  code: 22648
-  data: 1932
-  metadata: 15428
+  code: 22676
+  data: 1908
+  metadata: 15424
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -400,7 +386,7 @@ functions:
     bytes: 480
   __test$link:
     calls: 1
-    bytes: 7744
+    bytes: 7772
   __test_try_fail_ParseError:
     calls: 0
     bytes: 64

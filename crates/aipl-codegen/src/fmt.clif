@@ -22545,7 +22545,6 @@ block44:
 ;   v3 = $inl116_$cap51
 ;   v16 = $inl113_c
 ;   v3 = $inl114_delims
-;   v26 = declined
 ;   v1 = $inl208_self
 ;   v49 = $inl225_self
 ;   v52 = v
@@ -22807,7 +22806,6 @@ block20:
 ;   v3 = open
 ;   v4 = close
 ;   v5 = msg
-;   v10 = declined
 ;   ss1 = i
 ;   v5 = $inl149_msg
 ; __m12__nested_len
@@ -23089,7 +23087,6 @@ block26:
 ;   v3 = open
 ;   v4 = close
 ;   v5 = msg
-;   v10 = declined
 ;   ss1 = depth
 ;   ss2 = i
 ;   v5 = $inl150_msg
@@ -138848,7 +138845,7 @@ block316:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v23 = n
-;   ss2 = __idx$34705
+;   ss2 = __idx$34439
 ;   v53 = txt
 ;   v55 = k
 ;   v63 = $inl249_self

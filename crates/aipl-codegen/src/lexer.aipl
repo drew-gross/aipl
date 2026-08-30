@@ -281,9 +281,7 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
 // land in the real source).
 fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64!LexError {
     if (!self.first().is_some_and(|c| delims.contains(c))) {
-        // A literal doesn't flex through `ok(..)`, so bind the type first.
-        let declined: u64 = 0;
-        return ok(declined);
+        return ok(0);
     };
     let d = self.first().value_or(' '); // in bounds: the guard above saw a char
     mut i: u64 = 1;
@@ -332,9 +330,7 @@ fn unterminated_msg(msg: str) -> str {
 // is a hard error (`at` places the span in the real source).
 fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
-        // A literal doesn't flex through `ok(..)`, so bind the type first.
-        let declined: u64 = 0;
-        return ok(declined);
+        return ok(0);
     };
 
     // Scan for the close from just past the open, so an `open`/`close` that
@@ -359,8 +355,7 @@ fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexEr
 fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
         // A literal doesn't flex through `ok(..)`, so bind the type first.
-        let declined: u64 = 0;
-        return ok(declined);
+        return ok(0);
     };
     mut depth: u64 = 1;
     mut i = open.len();

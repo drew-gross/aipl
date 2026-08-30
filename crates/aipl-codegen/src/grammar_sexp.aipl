@@ -284,8 +284,8 @@ deallocations: 28501
 reallocations: 1767
 bytes allocated: 1317966
 instructions executed: 4005238
-binary size: 179328
-  code: 108568
+binary size: 179320
+  code: 108560
   data: 4188
   metadata: 66572
 functions:
@@ -642,7 +642,7 @@ functions:
     bytes: 384
   sexp_grammar:
     calls: 28
-    bytes: 1028
+    bytes: 1020
   shown:
     calls: 5
     bytes: 416

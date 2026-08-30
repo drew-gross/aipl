@@ -58,10 +58,7 @@ fn shift_all<K: variant>(rs: Rule<K>[], by: u64) -> Rule<K>[] {
 
 // An array literal whose elements are a *concrete* instance (`Rule<Tok>`), which
 // is a different lookup again from the abstract one above.
-fn grammar() -> Rule<Tok> {
-    let one: u64 = 1;
-    Then([Term(Name("")), Repeat(Idx(one))])
-}
+fn grammar() -> Rule<Tok> { Then([Term(Name("")), Repeat(Idx(1))]) }
 
 fn main() !prints {
     print(grammar().size().to_str());
@@ -81,10 +78,10 @@ deallocations: 35
 reallocations: 2
 bytes allocated: 1727
 instructions executed: 2557
-binary size: 11080
-  code: 5712
+binary size: 11088
+  code: 5716
   data: 499
-  metadata: 4869
+  metadata: 4873
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -172,7 +169,7 @@ functions:
     bytes: (external)
   grammar:
     calls: 4
-    bytes: 328
+    bytes: 332
   main:
     calls: 1
     bytes: 580

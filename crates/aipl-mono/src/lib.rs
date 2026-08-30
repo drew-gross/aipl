@@ -4566,9 +4566,19 @@ impl Mono<'_> {
         let vars: HashSet<&str> = tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
         let mut map: HashMap<String, Type> = HashMap::new();
         let mut rargs = Vec::with_capacity(args.len());
+        // A bare integer literal payload is deferred to the fallback chain below
+        // rather than pinning here — see `check::literal_pins_nothing`. The
+        // checker does the same, and the two must agree: it accepting a program
+        // mono then rejects is a crash after a clean check.
+        let mut deferred: Vec<(&Type, Type)> = Vec::new();
         for (arg, pty) in args.iter().zip(&case.payload) {
             let (ra, at) = self.infer(arg, env)?;
-            self.bind_field(pty, &decay_concat(at), &vars, &mut map);
+            let at = decay_concat(at);
+            if check::literal_pins_nothing(arg, pty, &vars) {
+                deferred.push((pty, at));
+            } else {
+                self.bind_field(pty, &at, &vars, &mut map);
+            }
             rargs.push(ra);
         }
         // A variable no argument pins falls back to the enclosing function's
@@ -4588,6 +4598,12 @@ impl Mono<'_> {
         } else {
             None
         };
+        // A deferred integer literal settles anything the two above did not —
+        // last, because `i64` is only what a bare literal defaults to.
+        let mut lit: HashMap<String, Type> = HashMap::new();
+        for (pty, at) in deferred {
+            self.bind_field(pty, &at, &vars, &mut lit);
+        }
         let type_args: Vec<Type> = tmpl
             .type_vars
             .iter()
@@ -4597,6 +4613,7 @@ impl Mono<'_> {
                     .cloned()
                     .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
                     .or_else(|| sole.as_ref().and_then(|a| a.get(i).cloned()))
+                    .or_else(|| lit.get(&tv.name).cloned())
                     .ok_or_else(|| {
                         Error::at(
                             format!(

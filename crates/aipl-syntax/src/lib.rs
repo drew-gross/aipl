@@ -1415,6 +1415,23 @@ pub fn flex_fit(
             }
             _ => Ok(None),
         },
+        // `ok(x)` / `err(x)` — the payload flexes to the side it lands on. Only
+        // that side is examined: the other is `__none__` and coerces to whatever
+        // the target declares, which is what already lets `ok(5)` satisfy a
+        // `i64!str` return. Without this, `ok(0)` in a `-> u64!E` function typed
+        // its payload `i64` and had to be written as a pre-annotated binding.
+        //
+        // Like the `some` arm above, this matches on the name alone — there is
+        // no environment here to confirm `ok`/`err` are the constructors rather
+        // than a local shadowing them. A shadowing binding would only cost the
+        // flex, since the ordinary check still runs afterwards.
+        Type::Result(ok, err) => match &e.kind {
+            K::Call(name, args, _) if args.len() == 1 && matches!(&**name, "ok" | "err") => {
+                let side = if name == "ok" { ok } else { err };
+                Ok(flex_fit(&args[0], &Type::Unit, side)?.map(|_| target.clone()))
+            }
+            _ => Ok(None),
+        },
         _ => Ok(None),
     }
 }
