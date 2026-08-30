@@ -217,7 +217,6 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
-  make a skill for adding new builtin utilities that includes the things you've learned, plus the standard guidance to lint against ad-hoc reimplementations
 
 lint:
   move the tests for each lint into the file for that lint

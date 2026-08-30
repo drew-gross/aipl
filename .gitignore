@@ -1,2 +1,6 @@
 /target
-.claude/
+
+# Claude Code: share project config and skills; keep personal overrides and
+# local worktrees out.
+/.claude/settings.local.json
+/.claude/worktrees/
