@@ -388,6 +388,15 @@ Rules worth knowing before reaching for it:
   production is led by a field name, so `..` can't start one.
 
 ## Authoring a lint: the hit's span must be one line that survives `aipl fmt`
+**One lint, one file.** Each lint lives in `crates/aipl-syntax/src/lint/<name>.rs`,
+named after the lint function it holds (plus that lint's own private helpers), so
+a fuzzy file search on the name in a diagnostic lands on its implementation.
+`lint.rs` is the driver: the `check` entry point that runs every lint and drops
+`#[allow]`-squelched hits, plus the two helpers more than one lint shares
+(`line_of`, `end_is_receiver_len`). Adding a lint is a new file, a `mod` line,
+and a `use self::<name>::<name>;`; a lint fn (and any type the driver passes it)
+is `pub(super)`.
+
 `#[allow]` is line-scoped — it squelches hits whose span *starts* on the marker's
 line. So a lint whose span covers a multi-line construct can never be squelched:
 the only line able to carry the marker is the construct's first, and `aipl fmt`
