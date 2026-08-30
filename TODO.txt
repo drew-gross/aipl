@@ -200,6 +200,7 @@ parser:
   implement the plan
   can use strings instead of spans in many places, it's COW/SSO so it should be fast
   remove power from prec and use order within the list
+  after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 utilities:
   exponentiation operator
@@ -250,6 +251,8 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 optimizations:
+  char_lit_emit can probably be optimized by doing a two char match and manually unescaping
+  unescape itself can probable be optimized by doing a compacting gather
   memoization:
     auto-memoize some stuff
     also opt-in memoize

@@ -189,18 +189,34 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
 /// The freshly-compiled lexer produces the expected tokens for a small
 /// all-supported snippet, and agrees with the production hook on a richer one
 /// (keywords, idents incl. a `BuiltinType`, an arrow operator, punctuation).
+/// Run `f` on a 64 MB-stack worker. Compiling the lexer's dependency closure
+/// recurses deeply enough to overflow the default test thread's stack — the same
+/// reason `tests/cases.rs` and `dogfood_ir.rs` spawn one, and the reason
+/// `LEXER_DEPS` above is narrowed to the closure rather than every dogfood file.
+/// Propagates the worker's panic so a failing assertion still fails the test.
+fn on_big_stack<F: FnOnce() + Send + 'static>(f: F) {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(f)
+        .expect("spawn worker")
+        .join()
+        .expect("worker panicked");
+}
+
 #[test]
 fn aipl_lexer_dumps_supported_subset() {
-    let engine = compile_lexer();
+    on_big_stack(|| {
+        let engine = compile_lexer();
 
-    let src = "let x = 42;";
-    assert_eq!(
-        aipl_dump(&engine, src),
-        "0 3 keyword\n4 5 ident\n6 7 operator\n8 10 number\n10 11 punct\n",
-    );
+        let src = "let x = 42;";
+        assert_eq!(
+            aipl_dump(&engine, src),
+            "0 3 keyword\n4 5 ident\n6 7 operator\n8 10 number\n10 11 punct\n",
+        );
 
-    let src2 = "fn f(n: i64) -> i64 { n }";
-    assert_eq!(aipl_dump(&engine, src2), hook_dump(src2));
+        let src2 = "fn f(n: i64) -> i64 { n }";
+        assert_eq!(aipl_dump(&engine, src2), hook_dump(src2));
+    });
 }
 
 /// The production lex path (the checked-in dogfood IR through the installed hook,
@@ -210,29 +226,31 @@ fn aipl_lexer_dumps_supported_subset() {
 /// `dogfood.clif` is caught here on every `cargo test`.
 #[test]
 fn dogfood_lex_hook_matches_fresh_compile_on_corpus() {
-    let engine = compile_lexer();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = Vec::new();
-    for sub in ["tests/cases", "examples", "crates"] {
-        collect_aipl(&root.join(sub), &mut files);
-    }
-    files.sort();
-    assert!(
-        files.len() > 400,
-        "corpus went missing? found {} files",
-        files.len()
-    );
-
-    for f in &files {
-        let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
-        let full = fs::read_to_string(f).expect("read case file");
-        let stripped = aipl::strip_test_sections(&full).to_string();
-        assert_eq!(
-            aipl_dump(&engine, &stripped),
-            hook_dump(&stripped),
-            "production lex hook diverges from a fresh compile of the lexer source in {rel}"
+    on_big_stack(|| {
+        let engine = compile_lexer();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        for sub in ["tests/cases", "examples", "crates"] {
+            collect_aipl(&root.join(sub), &mut files);
+        }
+        files.sort();
+        assert!(
+            files.len() > 400,
+            "corpus went missing? found {} files",
+            files.len()
         );
-    }
+
+        for f in &files {
+            let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
+            let full = fs::read_to_string(f).expect("read case file");
+            let stripped = aipl::strip_test_sections(&full).to_string();
+            assert_eq!(
+                aipl_dump(&engine, &stripped),
+                hook_dump(&stripped),
+                "production lex hook diverges from a fresh compile of the lexer source in {rel}"
+            );
+        }
+    });
 }
 
 /// The hook's trivia side-channel carries comments and `#[allow]` markers (in

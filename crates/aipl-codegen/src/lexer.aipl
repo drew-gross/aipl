@@ -354,7 +354,6 @@ fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexEr
 // end of the source is a hard error (`at` places the span in the real source).
 fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
-        // A literal doesn't flex through `ok(..)`, so bind the type first.
         return ok(0);
     };
     mut depth: u64 = 1;

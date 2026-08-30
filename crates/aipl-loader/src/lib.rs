@@ -1214,6 +1214,9 @@ fn rewrite_expr(
         kind,
         span: e.span.clone(),
         ty: None,
+        // Carried over with `span`: the parser recorded it, and rewriting a
+        // name or qualifying a path moves no text.
+        value_span: e.value_span.clone(),
     }
 }
 

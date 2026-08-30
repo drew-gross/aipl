@@ -1324,7 +1324,11 @@ impl Cx<'_> {
                     tyname(&body_ty),
                     tyname(&declared)
                 ),
-                f.body.span.clone(),
+                // The *value*'s span, not the body's: a block's span covers the
+                // whole block, so reporting it underlined whichever statement
+                // came first rather than the expression that produced the type.
+                // Recorded by the parser — see `Expr::value_span`.
+                f.body.value_span().clone(),
             )
         })
     }
@@ -3441,7 +3445,10 @@ impl Cx<'_> {
                     tyname(&body_ty),
                     tyname(expected_ret)
                 ),
-                body.span.clone(),
+                // The value's span — see the twin in `check_fn`. A lambda whose
+                // body is a single expression records none, so this is that
+                // expression either way.
+                body.value_span().clone(),
             )
         })?;
         // Return the body's *actual* type: a generic HOF (`map<T, U>`) infers `U`

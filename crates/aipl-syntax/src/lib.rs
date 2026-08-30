@@ -9,6 +9,17 @@ pub type Span = std::ops::Range<usize>;
 
 /// Smallest span covering both `a` and `b`.
 pub fn join_spans(a: &Span, b: &Span) -> Span {
+    // An *empty* span is the "no location" placeholder — an empty block body
+    // has no text of its own to point at. It must not take part in a join:
+    // `0..0` would drag the result back to offset 0 and make every enclosing
+    // construct appear to start at the top of the file. Contributing nothing is
+    // the honest answer, and leaves the other operand as the whole location.
+    if a.is_empty() {
+        return b.clone();
+    }
+    if b.is_empty() {
+        return a.clone();
+    }
     a.start.min(b.start)..a.end.max(b.end)
 }
 
@@ -879,6 +890,25 @@ pub mod ast {
         /// recursed over deeply enough during compilation that widening every
         /// one of them by a whole `Type` costs real stack.
         pub ty: Option<Box<Type>>,
+        /// The span of the sub-expression that produces this one's *value*: for
+        /// a block, its trailing expression rather than the whole block.
+        ///
+        /// A block's own `span` is deliberately the whole block — that is what
+        /// an error *about the block* should underline. But a diagnostic about
+        /// the block's **value**, chiefly a return-type mismatch, wants the
+        /// expression that produced that value; reporting the block span
+        /// instead pointed at whichever statement happened to come first.
+        ///
+        /// Recorded by the parser, once, at the point it builds the block and
+        /// has the tail in hand — rather than re-derived by walking the
+        /// `Seq`/`Let`/`LetMut`/`Assign` wrapper chain at each diagnostic.
+        ///
+        /// `None` on everything else, where the value *is* the expression and
+        /// `span` already answers the question. Boxed for the same reason as
+        /// [`Expr::ty`]: `None` on the overwhelming majority of nodes, and
+        /// `Expr` is recursed over deeply enough during compilation that
+        /// widening every one of them costs real stack.
+        pub value_span: Option<Box<Span>>,
     }
 
     impl Expr {
@@ -887,7 +917,22 @@ pub mod ast {
                 kind,
                 span,
                 ty: None,
+                value_span: None,
             }
+        }
+
+        /// The span to report a diagnostic about this expression's *value*
+        /// against — the recorded [`Expr::value_span`] when the parser stored
+        /// one, otherwise the expression's own span.
+        pub fn value_span(&self) -> &Span {
+            self.value_span.as_deref().unwrap_or(&self.span)
+        }
+
+        /// The same expression with the span of its value recorded — see
+        /// [`Expr::value_span`].
+        pub fn with_value_span(mut self, span: Span) -> Self {
+            self.value_span = Some(Box::new(span));
+            self
         }
 
         /// `kind` in place of `like`'s, keeping its span *and* its recorded type.
@@ -901,6 +946,7 @@ pub mod ast {
                 kind,
                 span: like.span.clone(),
                 ty: like.ty.clone(),
+                value_span: like.value_span.clone(),
             }
         }
 

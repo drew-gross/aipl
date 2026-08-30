@@ -814,7 +814,9 @@ impl Expander {
                 )
             }
         };
-        Ok(Expr::new(kind, e.span.clone()))
+        // `rebuilt`, not `new`: expanding keyword arguments rewrites the kind
+        // in place and must keep the spans recorded on it.
+        Ok(Expr::rebuilt(kind, e))
     }
 
     fn expand_all(&mut self, elems: &[Expr], locals: &HashSet<String>) -> Result<Vec<Expr>, Error> {

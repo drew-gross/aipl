@@ -122,10 +122,10 @@ error: fn "return_str_for_i64": body returns str, but the declared return type i
    |                                  ^^^^^^
 
 error: fn "return_void_for_i64": body returns (), but the declared return type is i64
- --> ./tests/cases/functions/err_functions.aipl:1:1
-  |
-1 | import { print, wrapping_add as + } from builtins;
-  | ^
+  --> ./tests/cases/functions/err_functions.aipl:48:33
+   |
+48 | fn return_void_for_i64() -> i64 {}
+   |                                 ^
 
 error: fn "return_bare_for_optional": body returns i64, but the declared return type is i64?
   --> ./tests/cases/functions/err_functions.aipl:50:41

@@ -146,7 +146,9 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
 /// so a shadowed constructor name is left alone.
 fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>) -> Expr {
     use ExprKind as K;
-    let rw = |k: ExprKind| Expr::new(k, e.span.clone());
+    // `rebuilt`, not `new`: this is the same expression with a lowered kind, so
+    // it keeps the spans the parser recorded on it (`Expr::value_span`).
+    let rw = |k: ExprKind| Expr::rebuilt(k, e);
     match &e.kind {
         // A shim's bindings already name functions directly (never a bare
         // constructor reference needing a lambda), so only the body is walked.
@@ -6760,6 +6762,9 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         kind,
         span: e.span.clone(),
         ty: None,
+        // Carried over with `span`: substituting a type variable in an
+        // annotation moves no text.
+        value_span: e.value_span.clone(),
     }
 }
 

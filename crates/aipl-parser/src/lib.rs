@@ -39,7 +39,14 @@ gazelle! {
             NONE: _,
             // Punctuation
             LPAREN, RPAREN,
-            LBRACE, RBRACE,
+            // `{` carries a span so a block with no trailing expression still
+            // has a location. A body that is empty (`{}`) or that ends in a
+            // statement (`{ f(); }`) has nothing to point at, and every
+            // diagnostic about the block's *value* — chiefly a return-type
+            // mismatch — reported at `0..0`, i.e. line 1 of the file. `}`
+            // carries nothing, like `]`.
+            LBRACE: _,
+            RBRACE,
             // `[` carries a span (see lexer) so empty array literals can
             // still be located in diagnostics; `]` carries nothing.
             LBRACKET: _,
@@ -635,6 +642,7 @@ impl aipl::Types for Build {
     type True = Span;
     type False = Span;
     type None = Span;
+    type Lbrace = Span;
     type Lbracket = Span;
     type Shim = Span;
     type Plusplus = Span;
@@ -833,14 +841,14 @@ impl gazelle::Action<aipl::Item<Self>> for Build {
 impl gazelle::Action<aipl::ImportDecl<Self>> for Build {
     fn build(&mut self, node: aipl::ImportDecl<Self>) -> Result<ImportDecl, Self::Error> {
         Ok(match node {
-            aipl::ImportDecl::Import(names, (from, from_span)) => ImportDecl {
+            aipl::ImportDecl::Import(_, names, (from, from_span)) => ImportDecl {
                 names,
                 source: ImportSource::Path {
                     path: from,
                     span: from_span,
                 },
             },
-            aipl::ImportDecl::ImportBuiltins(names, builtins_span) => ImportDecl {
+            aipl::ImportDecl::ImportBuiltins(_, names, builtins_span) => ImportDecl {
                 names,
                 source: ImportSource::Builtins {
                     span: builtins_span,
@@ -967,7 +975,7 @@ impl gazelle::Action<aipl::ImportNameList<Self>> for Build {
 
 impl gazelle::Action<aipl::StructDecl<Self>> for Build {
     fn build(&mut self, node: aipl::StructDecl<Self>) -> Result<StructDecl, Self::Error> {
-        let aipl::StructDecl::StructDecl((name, _), type_params, fields) = node;
+        let aipl::StructDecl::StructDecl((name, _), type_params, _, fields) = node;
         Ok(StructDecl {
             name,
             type_vars: type_params,
@@ -1115,7 +1123,7 @@ impl gazelle::Action<aipl::FnBody<Self>> for Build {
     fn build(&mut self, node: aipl::FnBody<Self>) -> Result<ParsedBody, Self::Error> {
         Ok(match node {
             aipl::FnBody::Block(block) => ParsedBody::Block(block),
-            aipl::FnBody::Construct((fields, span)) => ParsedBody::Construct(fields, span),
+            aipl::FnBody::Construct(_, (fields, span)) => ParsedBody::Construct(fields, span),
         })
     }
 }
@@ -1562,8 +1570,8 @@ impl gazelle::Action<aipl::BaseTy<Self>> for Build {
             aipl::BaseTy::Generic((name, _), args) => Type::Generic(name, args),
             aipl::BaseTy::Optional(inner) => Type::Optional(Box::new(inner)),
             aipl::BaseTy::Array(inner, _rbracket) => Type::Array(Box::new(inner)),
-            aipl::BaseTy::Set(_hash, inner) => Type::Set(Box::new(inner)),
-            aipl::BaseTy::Dict(_hash, k, v) => Type::Dict(Box::new(k), Box::new(v)),
+            aipl::BaseTy::Set(_hash, _, inner) => Type::Set(Box::new(inner)),
+            aipl::BaseTy::Dict(_hash, _, k, v) => Type::Dict(Box::new(k), Box::new(v)),
         })
     }
 }
@@ -1786,10 +1794,59 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
     }
 }
 
+/// A block, with the span of the expression that produces its value recorded on
+/// it (see [`Expr::value_span`]) and any empty tail given `brace` as its
+/// location.
+///
+/// Both halves exist because a block's value can sit arbitrarily deep in a
+/// `Seq`/`Let`/`LetMut`/`Assign` chain, or be nothing at all:
+///
+/// - **Recording it.** `fn f() -> str { let a = 1; a }` returns the `a`, but the
+///   body's span starts at the `let`, so a return-type error underlined the
+///   binding. The tail is right here while the block is being built, so it is
+///   stored once instead of re-walked at every diagnostic.
+/// - **Repairing it.** A block with no trailing expression — `{}`, or one ending
+///   in a statement like `{ f(); }` — has a `Unit` value the parser cannot give
+///   a location, since the empty production matches no text. It is created with
+///   an empty span and repaired here, where the block's own `{` is in scope.
+///   Without this the value has span `0..0` and every diagnostic about it
+///   reports at line 1 of the file.
+fn with_block_span(mut body: Expr, brace: Span) -> Expr {
+    // Walk to the value position through the wrappers that merely pass a value
+    // along — the same set `flex_int_values` and `flex_fit` reach through.
+    //
+    // Iteratively, and in place. A block is one wrapper per statement, so this
+    // chain is as long as the function is; `lex_aipl.aipl`'s rule tables run to
+    // hundreds of statements, and a recursive walk (or a rebuild of the chain)
+    // overflows a default-sized thread stack while parsing them.
+    let value = {
+        let mut cur = &mut body;
+        while matches!(
+            cur.kind,
+            ExprKind::Seq(..) | ExprKind::Let(..) | ExprKind::LetMut(..) | ExprKind::Assign(..)
+        ) {
+            cur = match &mut cur.kind {
+                ExprKind::Seq(_, t)
+                | ExprKind::Let(_, _, _, t)
+                | ExprKind::LetMut(_, _, _, t)
+                | ExprKind::Assign(_, _, t) => t,
+                _ => unreachable!("guarded by the `matches!` above"),
+            };
+        }
+        // An empty span is the "no location" placeholder a block with no
+        // trailing expression carries; the block's own `{` is where it is.
+        if cur.span.is_empty() {
+            cur.span = brace;
+        }
+        cur.span.clone()
+    };
+    body.with_value_span(value)
+}
+
 impl gazelle::Action<aipl::Block<Self>> for Build {
     fn build(&mut self, node: aipl::Block<Self>) -> Result<Expr, Self::Error> {
-        let aipl::Block::Block(body) = node;
-        Ok(body)
+        let aipl::Block::Block(brace, body) = node;
+        Ok(with_block_span(body, brace))
     }
 }
 
@@ -1851,7 +1908,7 @@ impl gazelle::Action<aipl::BlockTail<Self>> for Build {
 
 impl gazelle::Action<aipl::LoopBody<Self>> for Build {
     fn build(&mut self, node: aipl::LoopBody<Self>) -> Result<Expr, Self::Error> {
-        let aipl::LoopBody::LoopBody(inner) = node;
+        let aipl::LoopBody::LoopBody(_, inner) = node;
         Ok(inner)
     }
 }
@@ -1922,7 +1979,7 @@ impl gazelle::Action<aipl::LetTupleStmt<Self>> for Build {
 
 impl gazelle::Action<aipl::LetStructStmt<Self>> for Build {
     fn build(&mut self, node: aipl::LetStructStmt<Self>) -> Result<StmtSpec, Self::Error> {
-        let aipl::LetStructStmt::LetStructStmt((struct_name, _), fields, value) = node;
+        let aipl::LetStructStmt::LetStructStmt((struct_name, _), _, fields, value) = node;
         let span = value.span.clone();
         Ok(StmtSpec::LetStruct {
             struct_name,
@@ -2261,7 +2318,7 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 };
                 Expr::new(ExprKind::Call(name, args, false), span)
             }
-            aipl::Atom::Construct((name, name_span), fields) => {
+            aipl::Atom::Construct((name, name_span), _, fields) => {
                 let span = match fields.last() {
                     Some(f) => join_spans(&name_span, &f.value.span),
                     None => name_span,
@@ -2306,7 +2363,7 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 Expr::new(ExprKind::Lambda(params, Box::new(body)), span)
             }
             aipl::Atom::NoneLit(span) => Expr::new(ExprKind::None, span),
-            aipl::Atom::MatchExpr(scrutinee, arms) => {
+            aipl::Atom::MatchExpr(scrutinee, _, arms) => {
                 let last_span = arms
                     .last()
                     .map(|a| a.span.clone())
@@ -2314,7 +2371,7 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 let span = join_spans(&scrutinee.span, &last_span);
                 Expr::new(ExprKind::Match(Box::new(scrutinee), arms), span)
             }
-            aipl::Atom::ShimExpr(shim_span, (effect, effect_span), bindings, body) => {
+            aipl::Atom::ShimExpr(shim_span, (effect, effect_span), _, bindings, body) => {
                 // `shim <effect>` — not the body, whose span is empty when it
                 // ends in a `;` statement.
                 let span = join_spans(&shim_span, &effect_span);
@@ -2332,7 +2389,7 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             // `#{ .. }` — a set or dict literal (or an empty of either). Span
             // runs from `#` to the last element/value (or just `#` for an
             // empty), like an array literal.
-            aipl::Atom::BraceLit(hash_span, brace) => match brace {
+            aipl::Atom::BraceLit(hash_span, _, brace) => match brace {
                 BraceLit::EmptySet => Expr::new(ExprKind::SetLit(Vec::new()), hash_span),
                 BraceLit::EmptyDict => Expr::new(ExprKind::DictLit(Vec::new()), hash_span),
                 BraceLit::Entries(entries) => {
@@ -3645,7 +3702,7 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             K::Hash => T::Hash(span.clone()),
             K::LParen => T::Lparen,
             K::RParen => T::Rparen,
-            K::LBrace => T::Lbrace,
+            K::LBrace => T::Lbrace(span.clone()),
             K::RBrace => T::Rbrace,
             K::LBracket => T::Lbracket(span.clone()),
             K::RBracket => T::Rbracket,
