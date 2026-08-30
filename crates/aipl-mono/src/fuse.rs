@@ -1,35 +1,37 @@
 //! Operation fusion: rewriting a composite expression into one builtin that
 //! computes the same answer with less work.
 //!
-//! There are two families, each with its own table.
+//! There are three families, each in its own file with its own table:
 //!
-//! [`FUSIONS`] is `count` against a comparison. `xs.count(x)` always walks the
-//! whole collection, but `xs.count(x) < 4` is settled the moment a fourth match
-//! appears — so the pair collapses into `count_is_less_than`, which stops there.
-//! The same holds for every comparison, in both operand orders.
-//!
-//! [`CHAIN_FUSIONS`] is a call whose *receiver* is another call.
-//! `xs.filter(p).map(f)` walks the elements twice and builds an array between
-//! the two passes, so the pair collapses into `filter_map`, which selects and
-//! maps in one — and, when the source is uniquely owned and the element sizing
-//! allows, into the source's own buffer.
-//!
-//! [`SLICE_FUSIONS`] is a call on a sliced receiver. `xs[i..].starts_with(p)`
-//! builds the whole tail of `xs` — for an array, a fresh block with every
-//! element copied — only to look at its first few elements, so it collapses into
-//! `starts_with_at`, which compares in place from `i`.
+//! - [`comparison_fusions`] — a call against a comparison. `xs.count(x)` always
+//!   walks the whole collection, but `xs.count(x) < 4` is settled the moment a
+//!   fourth match appears, so the pair collapses into `count_is_less_than`,
+//!   which stops there. The same holds for every comparison, in both operand
+//!   orders.
+//! - [`chain_fusions`] — a call whose *receiver* is another call.
+//!   `xs.filter(p).map(f)` walks the elements twice and builds an array between
+//!   the two passes, so the pair collapses into `filter_map`, which selects and
+//!   maps in one — and, when the source is uniquely owned and the element sizing
+//!   allows, into the source's own buffer.
+//! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
+//!   builds the whole tail of `xs` — for an array, a fresh block with every
+//!   element copied — only to look at its first few elements, so it collapses
+//!   into `starts_with_at`, which compares in place from `i`.
 //!
 //! # Adding a fusion
 //!
-//! Add a row to the table for its family and implement the builtin it names. A
-//! [`FUSIONS`] row says "*this* call, compared with *this* operator, is *that*
-//! call"; a [`SLICE_FUSIONS`] row says "*this* call, on a receiver sliced from
-//! `i`, is *that* call, with `i` as its last argument"; a [`CHAIN_FUSIONS`] row
-//! says "*this* call, on the result of *that* one, is *this third* call, taking
-//! both argument lists". Either way the driver
-//! handles the rest — finding the shape (in both operand orders, for a
-//! comparison) and refusing when it would change observable behaviour. Nothing
-//! else needs to know the family exists.
+//! Add a row to the table in its family's file and implement the builtin it
+//! names. A comparison row says "*this* call, compared with *this* operator, is
+//! *that* call"; a slice row says "*this* call, on a receiver sliced from `i`,
+//! is *that* call, with `i` as its last argument"; a chain row says "*this*
+//! call, on the result of *that* one, is *this third* call, taking both argument
+//! lists". Either way the driver here handles the rest — finding the shape (in
+//! both operand orders, for a comparison) and refusing when it would change
+//! observable behaviour. Nothing else needs to know the family exists.
+//!
+//! A whole new family is a new file next to those three, exporting a
+//! `build(..) -> Option<Expr>` that [`try_fuse`] calls; everything downstream of
+//! the shape match — the effect guard, the bottom-up traversal — is shared.
 //!
 //! # Why effects block it
 //!
@@ -42,103 +44,13 @@
 //! in the expression disables the rewrite. The check is deliberately syntactic
 //! and conservative: it costs a missed fusion, never a wrong one.
 
+mod chain_fusions;
+mod comparison_fusions;
+mod slice_fusions;
+
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
-
-/// One fusable shape: a call to `call`, compared with `op` against a second
-/// operand, becomes a call to `into` taking that operand as a trailing argument.
-///
-/// `op` is written with the call on the **left**; the driver mirrors it.
-struct Fusion {
-    call: &'static str,
-    op: char,
-    into: &'static str,
-}
-
-/// Every shape the pass knows. See the module docs for how to add one.
-const FUSIONS: &[Fusion] = &[
-    Fusion {
-        call: "__builtin_count",
-        op: '<',
-        into: "__builtin_count_is_less_than",
-    },
-    Fusion {
-        call: "__builtin_count",
-        op: 'L',
-        into: "__builtin_count_is_at_most",
-    },
-    Fusion {
-        call: "__builtin_count",
-        op: '>',
-        into: "__builtin_count_is_greater_than",
-    },
-    Fusion {
-        call: "__builtin_count",
-        op: 'G',
-        into: "__builtin_count_is_at_least",
-    },
-    Fusion {
-        call: "__builtin_count",
-        op: 'E',
-        into: "__builtin_count_is_equal",
-    },
-    Fusion {
-        call: "__builtin_count",
-        op: 'N',
-        into: "__builtin_count_is_not_equal",
-    },
-];
-
-/// One fusable slice shape: a call to `call` whose receiver is an open-ended
-/// slice becomes a call to `into` on the *unsliced* receiver, with the slice's
-/// start appended as a trailing argument.
-///
-/// Only an open-ended `xs[i..]` qualifies. A bounded `xs[i..j]` is a different
-/// receiver — the end truncates it — so `into` would have to take that bound
-/// too, which none of these do.
-struct SliceFusion {
-    call: &'static str,
-    into: &'static str,
-}
-
-/// Every slice shape the pass knows. See the module docs for how to add one.
-const SLICE_FUSIONS: &[SliceFusion] = &[SliceFusion {
-    call: "__builtin_starts_with",
-    into: "__builtin_starts_with_at",
-}];
-
-/// One fusable chain shape: a call to `outer` whose receiver is a call to
-/// `inner` becomes a single call to `into`, taking the inner call's arguments
-/// followed by the outer's remaining ones.
-///
-/// Both surface forms reach this the same way: `xs.filter(p).map(f)` and
-/// `map(filter(xs, p), f)` fold to the same argument lists, so a row does not
-/// have to say which was written.
-struct ChainFusion {
-    inner: &'static str,
-    outer: &'static str,
-    into: &'static str,
-}
-
-/// Every chain shape the pass knows. See the module docs for how to add one.
-const CHAIN_FUSIONS: &[ChainFusion] = &[ChainFusion {
-    inner: "__builtin_filter",
-    outer: "__builtin_map",
-    into: "__builtin_filter_map",
-}];
-
-/// `a OP b` and `b flip(OP) a` are the same claim, which is what lets one
-/// [`FUSIONS`] row cover both operand orders. `==`/`!=` are symmetric.
-fn flip(op: char) -> char {
-    match op {
-        '<' => '>',
-        '>' => '<',
-        'L' => 'G',
-        'G' => 'L',
-        other => other,
-    }
-}
 
 /// Rewrite every fusable shape in `program`.
 ///
@@ -176,81 +88,13 @@ fn fuse_expr(e: &mut Expr, effectful: &HashSet<String>) {
 /// effect check walks a whole subtree — worth paying only once a shape matched.
 fn try_fuse(e: &Expr, effectful: &HashSet<String>) -> Option<Expr> {
     let fused = match &e.kind {
-        // The call on the left reads with `op` as written; on the right, the same
-        // claim with the operator mirrored.
-        ExprKind::Binop(l, op, r) => build(l, *op, r, e).or_else(|| build(r, flip(*op), l, e)),
-        ExprKind::Call(..) => build_slice(e).or_else(|| build_chain(e)),
+        ExprKind::Binop(l, op, r) => comparison_fusions::build(l, *op, r, e),
+        ExprKind::Call(..) => slice_fusions::build(e).or_else(|| chain_fusions::build(e)),
         _ => None,
     }?;
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:
     // fusing reorders the evaluation within it.
     (!has_effect(e, effectful)).then_some(fused)
-}
-
-/// `recv[start..].call(rest..)` as a call to the [`SLICE_FUSIONS`] row's `into`,
-/// taking the unsliced receiver and `start` as its last argument.
-fn build_slice(whole: &Expr) -> Option<Expr> {
-    let ExprKind::Call(name, args, method_style) = &whole.kind else {
-        return None;
-    };
-    let f = SLICE_FUSIONS.iter().find(|f| f.call == name)?;
-    let (recv, rest) = args.split_first()?;
-    // Open-ended only: a bounded slice is a different receiver (see
-    // [`SliceFusion`]).
-    let ExprKind::Slice(obj, start, None) = &recv.kind else {
-        return None;
-    };
-    let mut fused = vec![(**obj).clone()];
-    fused.extend(rest.iter().cloned());
-    fused.push((**start).clone());
-    // Spanned as the whole call: that is the source the user wrote, and what any
-    // later diagnostic should point at.
-    Some(Expr::rebuilt(
-        ExprKind::Call(f.into.to_string(), fused, *method_style),
-        whole,
-    ))
-}
-
-/// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's
-/// `into`, taking the inner argument list followed by the outer's rest.
-///
-/// Bottom-up traversal means the receiver has already been fused if it could
-/// be, so a row composes with the others rather than racing them.
-fn build_chain(whole: &Expr) -> Option<Expr> {
-    let ExprKind::Call(name, args, method_style) = &whole.kind else {
-        return None;
-    };
-    let (recv, rest) = args.split_first()?;
-    let ExprKind::Call(inner_name, inner_args, _) = &recv.kind else {
-        return None;
-    };
-    let f = CHAIN_FUSIONS
-        .iter()
-        .find(|f| f.outer == name && f.inner == inner_name)?;
-    let mut fused = inner_args.clone();
-    fused.extend(rest.iter().cloned());
-    // Spanned as the whole chain: that is the source the user wrote, and what
-    // any later diagnostic should point at.
-    Some(Expr::rebuilt(
-        ExprKind::Call(f.into.to_string(), fused, *method_style),
-        whole,
-    ))
-}
-
-/// `call OP bound` as a fused call, when `call` is a [`FUSIONS`] row for `OP`.
-fn build(call: &Expr, op: char, bound: &Expr, whole: &Expr) -> Option<Expr> {
-    let ExprKind::Call(name, args, method_style) = &call.kind else {
-        return None;
-    };
-    let f = FUSIONS.iter().find(|f| f.call == name && f.op == op)?;
-    let mut fused = args.clone();
-    fused.push(bound.clone());
-    // Spanned as the whole comparison: that is the source the user wrote, and
-    // what any later diagnostic should point at.
-    Some(Expr::rebuilt(
-        ExprKind::Call(f.into.to_string(), fused, *method_style),
-        whole,
-    ))
 }
 
 /// Whether evaluating `e` can do anything observable — call a function that
