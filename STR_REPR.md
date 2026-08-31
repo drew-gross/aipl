@@ -1,0 +1,375 @@
+# A 24-byte `str`
+
+## Status
+
+Design, not started. The largest change in the repo to date: it moves `str` from
+a scalar to a composite, rewrites both runtimes, and invalidates every checked-in
+`.clif`. Stages 5–7 are follow-on programs it unlocks rather than parts of the
+flip.
+
+- [ ] 0 Preparation — funnel every "a `str` is one `i64`" assumption through helpers, green at each step
+- [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap, one commit
+- [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
+- [ ] 3 Free slicing, and `SpanStr` falling out of it
+- [ ] 4 In-place mutation and growth — the ownership rule plus the capacity word
+- [ ] 5 Rope-native operations — keep concat O(1) and do more work without materializing
+- [ ] 6 Converge arrays onto the same model — inline and view arrays, one block header, one body of code
+- [ ] 7 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word
+
+Stage 0 is most of the work and can land incrementally. Stage 1 is atomic and
+cannot. Each of 3–7 is separately justifiable once 1–2 are green.
+
+**A standing principle for all of it:** anywhere strings and arrays can share a
+representation, a header, or a body of code, they should. They are the same
+thing — a refcounted buffer, a window into it, and a length — and Stage 6 is
+where that stops being a coincidence.
+
+## The shape
+
+Today a `str` is one 8-byte word: a tagged pointer, four representations, tag in
+the low two bits (`crates/aipl-codegen/src/lib.rs:120-259`). Every payload
+beyond the tag lives behind an indirection.
+
+Proposed: **three words, no indirection for the common cases.**
+
+```
+              w0 (bytes 0-7)      w1 (bytes 8-15)     w2 (bytes 16-23)
+buffer   00   base: *const u8     data: *const u8     [ len : 56 ][ tag : 8 ]
+inline   01   content[0..8]       content[8..16]      [ content[16..22] ][ len:8 ][ tag:8 ]
+rope     10   node: *const u8     0                   [ len : 56 ][ tag : 8 ]
+         11   — spare —
+```
+
+And the block a buffer points into carries **no length at all**:
+
+```
+[cap: i64][refcount: i64][content bytes ...]
+                          ^ base; `data` points anywhere in [base, base + cap]
+```
+
+`refcount` stays at `base - 8`, shared with arrays exactly as today, so
+`header_of`/`inc`/`dec` are untouched. The word at `base - 16` changes meaning
+from "how many content bytes this allocation holds" to **capacity** — how many
+it *can* hold. The prefix stays 16 bytes (`STR_HEADER_SIZE`), so this is a
+change of meaning, not of size.
+
+Length is the value's business, not the allocation's. That is what makes the
+next two sections work.
+
+## The calls
+
+### 1. The tag goes in the *top* byte, not on a pointer's low bits
+
+Your sketch had both "a pointer last so the tag bits thing still works" and
+"22 bytes of data, 1 byte of length, 1 byte of tag" — those two can't both hold:
+a pointer's spare bits are its *low* bits (byte 16), and the inline tag byte is
+byte 23.
+
+Putting the tag in **byte 23 for every representation** buys more than
+consistency:
+
+- **Pointers stay untagged.** `base` and `data` are dereferenced without masking
+  — today every view/rope access pays a `& !0b111` first.
+- **Classification is one shift-and-compare** on `w2`, a register the code has
+  usually loaded anyway for the length.
+- **Inline content stays contiguous** (bytes 0..21), so materializing it is one
+  `memcpy`, not two around a hole.
+- Nothing depends on pointer alignment or on high pointer bits being free — the
+  latter is exactly the assumption that breaks on a platform with tagged
+  pointers.
+
+Cost: `len` is capped at 2^56 bytes, and inline is 22 bytes rather than the 23
+low-bit tagging could squeeze.
+
+**Sub-decision:** the length field is `w2`'s low 56 bits for buffer and rope, but
+inline needs bits 0..47 for content, so its length sits in byte 22 — making
+`len()` a two-way select on the tag rather than one mask. The alternative is to
+shrink inline content to 16 bytes (`w0`, `w1` only) and put every
+representation's length in the same 56-bit field, making `len()` branchless. Keep
+22 bytes: the select is on an already-loaded register, and 22 covers
+`__builtin_count_if`-length identifiers where 16 does not.
+
+### 2. Heap and view unify completely — there is no "heap" case
+
+Not "same shape, different tag" — **one representation**. A string is a base, a
+window into it, and a length; whether the window happens to cover the whole
+allocation is not a fact anything needs to branch on:
+
+- **Slicing stops allocating and stops copying.** `s[lo..hi]` becomes
+  `{base, data + lo, hi - lo}` plus one `inc` on the base — a pure value
+  computation. Today it is a 32-byte view allocation, or a byte copy when the
+  result is ≤7 bytes (`aipl_str_slice`, `lib.rs:1201`).
+- **It deletes the "a view is an optimization, not a guarantee" wart** that
+  `SPAN_STR.md` is built around. Every buffer-backed `str` carries its own
+  provenance, so `SpanStr` collapses to a type marker plus `.span() = data - base`.
+- Three live representations instead of four leaves a **spare tag**, where the
+  current design is at capacity — and Stage 7 has a use for it.
+
+Dropping the block's length word is what completes the unification. With a
+length in the header there are two candidate answers to "how long is this
+string", and every operation has to know which one it means. With only capacity
+in the header, the value's `len` is the only length there is, and the header
+answers a different question entirely: **how much room is there?**
+
+```
+spare = (base + cap) - (data + len)
+```
+
+That is the whole test for appending in place — no "is this the whole
+allocation?" comparison, because Stage 4's ownership rule already establishes
+that nothing else can see the bytes past `data + len`.
+
+One thing this gives up: a buffer no longer implies a trailing NUL, so a
+`str` handed to C must either have a spare byte to write one into or be
+materialized. Every consumer today is already length-delimited (`str_bytes`,
+`str_for_each_chunk`, `read_file_impl` at `lib.rs:574`), so this costs a
+documented rule rather than working code.
+
+### 3. Ropes stay — short-term port now, investment later
+
+Stage 1 ports the rope mechanically; its children are 24 bytes each:
+
+```
+node: [refcount: i64][len: i64][cache: 24][left: 24][right: 24]   // 88 bytes
+value: { node, 0, len | ROPE<<56 }
+```
+
+The long-term plan is **not** to delete it. O(1) concat is a real result, most
+ropes in a pipeline are consumed by something that streams (printing already
+does, via `str_for_each_chunk`), and the operations that currently force
+materialization mostly don't have to. That is Stage 5.
+
+The capacity word does **not** replace ropes; the two answer different questions
+and coexist:
+
+| Situation | Answer |
+|---|---|
+| Appending to a string you own, room to spare | write into the spare capacity, bump `len` (Stage 4) |
+| Appending to a string you own, out of room | reallocate with growth, copy once — amortized O(1) |
+| Concatenating values someone else may hold | build a rope node — O(1), no copy, no ownership question |
+
+So a builder loop gets the array-style growth path, and general `a + b` keeps the
+lazy one. Monomorphization's `ConcatStr` pseudo-type and its `$c{i}` instances
+(`crates/aipl-syntax/src/lib.rs:1951-1965`) stay as they are.
+
+### 4. ABI: three scalars inside, pointers at the runtime boundary
+
+`cl_type_of` returns `I64` for every type today (`lib.rs:7933`) — `str` is one
+SSA value everywhere. Widening it:
+
+- **AIPL-internal calls: three scalar params / three returns.** Cranelift
+  supports multi-value returns and falls back to a hidden pointer where the
+  machine ABI requires one. Strings stay in registers on hot paths.
+- **The runtime (C) boundary: pass `*const AiplStr`, return through an out
+  pointer.** A 24-byte `#[repr(C)]` struct is MEMORY-class on SysV and would
+  otherwise put Cranelift and rustc in the position of agreeing about something
+  neither states explicitly. The compiler already has the machinery: composites
+  are stack-allocated and passed by pointer, with a hidden-sret path for
+  composite returns (`lib.rs:6034-6100`).
+
+```rust
+#[repr(C)]
+struct AiplStr { base: *const u8, data: *const u8, meta: u64 }  // meta = len | tag<<56
+```
+
+defined identically in `crates/aipl-codegen/src/lib.rs` and
+`crates/aipl-linker/runtime/aipl_runtime.rs`, which are kept byte-for-byte
+identical (that file's own header says so, at its line 8).
+
+## The constraint that shapes Stage 4: `refcount == 1` is not ownership
+
+The compiler **elides retains for borrow-only parameters**
+(`crates/aipl-mono/src/lib.rs:8464-8500`): when a callee provably only inspects
+an argument, the caller's retain and the callee's release *both* disappear. So
+inside such a callee, a buffer can show `refcount == 1` while the caller is still
+holding it. The same is true of the non-retaining borrows the mut-binding model
+allows — CLAUDE.md: *"a non-retaining borrow (`let alias = a`) of any version
+stays valid until the scope where that version was created exits"*.
+
+A bare runtime `refcount == 1` test therefore does **not** mean "nobody else can
+see this". Mutating on that basis would corrupt the caller's value, and only in
+the configurations where retain elision fired — the worst possible failure mode
+to debug.
+
+The rule that *is* sound, and that the compiler already has the machinery for:
+
+> In-place mutation requires **static ownership** — an `owned` parameter or a
+> recognized owned temporary (`move_owned_temp` / `owned_temp_since`,
+> `lib.rs:9329-9335`, the analysis behind the existing `$own` instances) — and
+> `refcount == 1` as a *dynamic refinement* of it, never as a substitute.
+
+That is exactly how arrays already do in-place `map`/`filter` (`__filter21$own0`
+in the perf sections; `tests/cases/lambdas/filter_in_place.aipl`). Strings get
+the same treatment, with one addition the arrays didn't need: a `str` may be a
+window into a larger buffer, so writing past `data + len` also needs the capacity
+test above.
+
+## What it buys
+
+- **Slices are free** — no allocation, no copy, at any length.
+- **Strings ≤22 bytes never allocate**, against ≤7 today. Most identifiers,
+  keywords, punctuation, dict keys, and short literals stop touching the heap.
+- **`len` needs no load** for buffer and rope strings; today a heap length is a
+  load at `base - 16` and a view length is a load from the view object.
+- **One less indirection everywhere** — a view read is currently: mask the tag,
+  load the object, load `data`, load `len`. It becomes: read `w1`, read `w2`.
+- **In-place mutation and growth become expressible**, on the ownership rule
+  above.
+- **`SpanStr` nearly disappears as a feature** — see `SPAN_STR.md`.
+
+## What it costs
+
+- **Every `str` slot triples** — 24 bytes in arrays, struct fields, dict/set
+  entries. An array of a thousand short strings goes from 8 KB plus a thousand
+  heap blocks to 24 KB and *zero*; an array of a thousand long strings pays
+  16 KB more for nothing.
+- **`str?` goes 16 → 32 bytes** under the current uniform `{tag, payload}`
+  optional layout. Stage 7 is the answer to this one and generalizes past `str`.
+- **Copying a `str` is three words and a refcount**, not one word and a
+  refcount.
+- **Codegen churn is enormous** — `str` moves from the scalar class to the
+  composite class in a file that mentions `types::I64` 500 times and is 19,514
+  lines long, and the runtime pair is 4,234 lines that must stay identical.
+- **Both `.clif` artifacts are invalidated**, and the old ones cannot run
+  against the new runtime at all (see Bootstrap).
+- **Corpus-wide metric churn**: `instructions executed`, `binary size`, and
+  `allocations` all move in every case.
+
+## Type-system and storage fallout (Stage 2)
+
+The 8-byte assumption is written into the type rules, not just the codegen:
+
+| Gate | Where | Change |
+|---|---|---|
+| `is_array_elem` | `crates/aipl-syntax/src/lib.rs:2114` | must admit a 24-byte element; the array runtime is already `elem_size`-general (`alloc_array`, `cap_bytes_for`, `ELEM_BITPACKED`) |
+| `is_set_elem` | `:2129` | 24-byte slots; hashing/equality are already content-based |
+| `is_dict_key` | `:2141` | same |
+| struct fields / variant payloads | same "storable scalar" gate | a `str` field is no longer word-sized |
+| `char[]` | `is_char_array`, `lib.rs:9580` | str-shaped, so it becomes 24 bytes too |
+| FFI marshaling | `lib.rs:6034-6100` | `str` args and returns cross as 24 bytes; the ≤5-scalar-arg cap needs re-counting |
+
+## Stage 5 — rope-native operations
+
+Ropes earn their keep only if the operations a rope commonly meets don't force
+it flat. The materialize path stays as the fallback; the work is to reach it
+less often.
+
+- **Streaming already works** (`str_for_each_chunk`) and printing uses it.
+  Extend it to equality, comparison, hashing, `contains`/`starts_with`/
+  `ends_with`, and iteration — all of which can walk two chunk streams.
+- **`map` and `filter` over a rope** produce a rope of transformed leaves, one
+  leaf at a time, never building the input flat. Each output leaf is a fresh
+  buffer; the structure is preserved.
+- **Slicing a rope** that lands inside one leaf is a *view of that leaf* — free,
+  and it does not retain the whole tree. A slice spanning leaves either builds a
+  smaller rope or materializes just the span.
+- **`len` is already O(1)** (stored at the node).
+- Worth measuring first: how deep ropes actually get in this corpus, and whether
+  a depth cap that materializes beyond it beats the pointer chasing.
+
+The payoff is that `a + b` stays O(1) *and* the result stays cheap to consume,
+which is what makes laziness worth its complexity.
+
+## Stage 6 — converge arrays onto the same model
+
+Arrays today are a single pointer to `[refcount][len][cap][elements]`. After
+Stage 1 the two families differ for no good reason: strings carry
+`{base, data, len}` with inline and view forms; arrays carry a pointer with the
+length in the block.
+
+The target is one model:
+
+- The same 24-byte value shape, tag in the same byte, so **view arrays** (a
+  window into a shared buffer — free `xs[a..b]`, no copy) and **inline arrays**
+  (a few elements packed into 22 bytes, no allocation) fall out the same way.
+- The same block header `[cap][refcount][elements]`, so growth, uniqueness, and
+  in-place append are one implementation rather than two.
+- `char[]`, which is already str-shaped (`is_char_array`), stops being a special
+  case and becomes the ordinary intersection of the two.
+
+Element size is the wrinkle: strings have byte elements, arrays are
+`elem_size`-general with a bit-packed mode. The shared code has to be
+element-size-parameterized where the string version can hardcode 1.
+
+## Stage 7 — niche-filled optionals
+
+`T?` is `{tag: i64, payload}` today, which is what makes `str?` 32 bytes. But any
+type with an unused bit can host its own `none`:
+
+| Type | Niche |
+|---|---|
+| `str` | the spare tag value `0b11`, or any of the 6 unused bits in the tag byte |
+| `bool` | 7 unused bits |
+| `char` | the high 56 bits of its slot |
+| pointer-shaped values | alignment bits |
+| narrow ints (`i8`…`i32`) | the unused high bits of the 64-bit slot |
+
+So `str?` is 24 bytes, `bool?` and `char?` are 8, and only types with no niche
+(`i64`, `u64`, a fully-packed struct) keep the extra tag word.
+
+The work is that "optional" stops being one layout and becomes a per-type
+question: a niche descriptor per type, and every site that builds, tests, or
+reads an optional — including `read_ffi_optional` and the sret paths — goes
+through it instead of assuming `{tag, payload}`. Worth doing after Stage 6, when
+there is one value model to describe niches against rather than two.
+
+## Bootstrap
+
+The checked-in `.clif` files encode the old layout *and* the old runtime ABI, and
+the compiler runs them during its own compilation (parser hooks, formatter). So
+the flip breaks the only path to regenerating them — the same deadlock a
+format-incompatible Cranelift bump causes.
+
+The known way out is a temporary `#[ignore]`d test that installs native Rust hook
+stubs first (hooks are `OnceLock`, first-install-wins), claiming *all* of them,
+with faithful ports of `process_raw_string`/`dedent`/`strip_test_sections`/
+`int_fits`/`is_operator_name`/`lex_aipl` — identity stubs do not work, because
+the dogfooded sources use `"""` blocks in their bodies and carry trailing
+`--- section ---` blocks.
+
+**Investigate an alternative when the time comes** (not now): make the compiler
+**temporarily support both ABIs** — the old artifacts keep running under the old
+str layout while the new codegen emits the new one — so the artifacts can be
+regenerated by the real dogfooded engines rather than by hand-ported Rust stubs.
+That trades a pile of one-off ports for a period of dual-layout complexity, and
+it is likely to be the better trade if the port list has grown again by then.
+Decide it at Stage 1, with the port list in front of you.
+
+## Verification
+
+1. **Spike first, before Stage 0.** Confirm Cranelift multi-value returns of
+   three words on x86-64 *and* aarch64, and that the out-pointer runtime ABI
+   agrees between Cranelift-emitted calls and rustc-compiled `no_std` code. If
+   either is awkward, the ABI decision changes and Stage 0's helper shapes change
+   with it.
+2. **Representation cases** — one per arm and per boundary: empty, 1 byte, 22
+   bytes, 23 bytes (the inline/buffer boundary), a slice of each, a slice of a
+   slice, a rope of each, and a rope slice that lands inside one leaf.
+3. **Zeroed memory is a valid empty string** — sret buffers and fresh array slots
+   are zero-filled, which reads as `buffer` with a null base and zero length;
+   `inc`/`dec` must no-op on it.
+4. **Both runtimes** — every representation case run under `aipl run` (JIT) and
+   again as an `aipl build` binary, since the layout is written twice.
+5. **Balanced allocations** — every case's `--- performance ---` asserts
+   allocations == deallocations; that is the leak/double-free tripwire for a
+   refcount protocol whose shape just changed.
+6. **Canaries for the metric story**, measured before and after so the trade is
+   visible rather than assumed: `grammar_calc.aipl` (1,169,584 instructions
+   today), `walker.aipl` (3,075,003), `parse.aipl`, and the lexer cases — all
+   slice- and token-heavy, which is where the win should show.
+7. **Finish** — `cargo handoff`, expecting a corpus-wide refill; then read the
+   diff for anything that is not a metric.
+
+## Open questions
+
+- **Is 22-byte inline the right trade against a branchless `len`?** Decidable by
+  measuring how many strings in the corpus fall in 17..22 bytes.
+- **Does anything depend on 8-byte strings outside the type gates?** The
+  bit-packed array mode, dict/set bucket layout, hash seeding, the shim slots,
+  and the FFI argument cap are the places to audit before Stage 1.
+- **Should `str` remain three SSA values, or become a stack-slot composite?** The
+  spike answers this. Registers are better for hot paths; the composite path is
+  less new code because structs and optionals already work that way.
+- **Does a buffer need a "NUL is present" bit?** The tag byte has six spare bits.
+  Only worth it if C handoff turns out to be hot; the capacity test already
+  answers "can I write one?".

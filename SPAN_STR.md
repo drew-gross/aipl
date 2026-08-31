@@ -2,9 +2,11 @@
 
 ## Status
 
-Planned, not started. Sequenced behind a larger change; this document is the
-record of what the runtime already provides and what the feature costs, so the
-work can start cold.
+Planned, not started. Sequenced behind the 24-byte `str` change (`STR_REPR.md`),
+which changes the answer here: if every `str` carries base + data + len, most of
+Stages 1-3 below evaporate and `SpanStr` becomes a type marker plus
+`data - base`. Revisit this plan once that lands. What follows is the design
+against *today's* runtime, and the record of what that runtime provides.
 
 - [ ] 1 The type — `SpanStr` in the type system, with `str`'s runtime shape
 - [ ] 2 The forced-view runtime entry point, in both runtimes
