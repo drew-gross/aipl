@@ -403,6 +403,362 @@ fn rope_flatten(s: Str, out: &mut Vec<u8>) {
     }
 }
 
+// ---------- The str surface ----------
+//
+// The operations codegen calls, written against the layout above. Everything
+// here is length-delimited and representation-agnostic: it classifies once (the
+// `STR_REPR.md` rule) and never assumes a contiguous buffer, so a rope is
+// streamed rather than flattened wherever the answer allows it.
+
+/// Visit the value's bytes as contiguous chunks, left to right, stopping early
+/// if `f` returns false. A rope yields one chunk per leaf — no flattening — and
+/// an inline value yields its bytes out of a local copy.
+///
+/// Returns false if `f` stopped it early.
+pub(crate) fn for_each_chunk(s: Str, f: &mut impl FnMut(&[u8]) -> bool) -> bool {
+    match s.tag() {
+        TAG_BUFFER => {
+            let bytes = s.buffer_bytes();
+            bytes.is_empty() || f(bytes)
+        }
+        TAG_INLINE => {
+            let all = inline_bytes(s);
+            let n = s.len();
+            n == 0 || f(&all[..n])
+        }
+        TAG_ROPE => {
+            let node = rope_node(s.owner());
+            let (left, right) = unsafe {
+                (
+                    std::ptr::read(node.add(ROPE_LEFT) as *const Str),
+                    std::ptr::read(node.add(ROPE_RIGHT) as *const Str),
+                )
+            };
+            for_each_chunk(left, f) && for_each_chunk(right, f)
+        }
+        _ => unreachable!("tag {} is spare", s.tag()),
+    }
+}
+
+/// A byte cursor over any representation, used where two values are walked in
+/// step (comparison) or a window is scanned (`contains`). Chunk-at-a-time under
+/// the hood, so a rope costs one step per leaf rather than per byte.
+struct Cursor {
+    /// Leaves still to visit, deepest-last so `pop` yields them left to right.
+    stack: Vec<Str>,
+    /// The leaf being read, and how far into it we are.
+    cur: Option<(Str, usize)>,
+    scratch: [u8; INLINE_CAP],
+}
+
+impl Cursor {
+    fn new(s: Str) -> Cursor {
+        let mut c = Cursor {
+            stack: vec![s],
+            cur: None,
+            scratch: [0; INLINE_CAP],
+        };
+        c.advance();
+        c
+    }
+
+    /// Descend to the next leaf with bytes left in it.
+    fn advance(&mut self) {
+        while let Some(top) = self.stack.pop() {
+            match top.tag() {
+                TAG_ROPE => {
+                    let node = rope_node(top.owner());
+                    unsafe {
+                        // Right first: `pop` then yields left before right.
+                        self.stack
+                            .push(std::ptr::read(node.add(ROPE_RIGHT) as *const Str));
+                        self.stack
+                            .push(std::ptr::read(node.add(ROPE_LEFT) as *const Str));
+                    }
+                }
+                _ if top.len() == 0 => continue,
+                _ => {
+                    if top.tag() == TAG_INLINE {
+                        self.scratch = inline_bytes(top);
+                    }
+                    self.cur = Some((top, 0));
+                    return;
+                }
+            }
+        }
+        self.cur = None;
+    }
+
+    /// The unread bytes of the current leaf, or `None` at the end.
+    fn chunk(&self) -> Option<&[u8]> {
+        let (leaf, at) = self.cur?;
+        let bytes = match leaf.tag() {
+            TAG_BUFFER => leaf.buffer_bytes(),
+            TAG_INLINE => &self.scratch[..leaf.len()],
+            _ => unreachable!("a cursor only stops on leaves"),
+        };
+        Some(&bytes[at..])
+    }
+
+    /// Consume `n` bytes of the current leaf, moving on when it runs out.
+    fn take(&mut self, n: usize) {
+        if let Some((leaf, at)) = self.cur {
+            let at = at + n;
+            if at >= leaf.len() {
+                self.cur = None;
+                self.advance();
+            } else {
+                self.cur = Some((leaf, at));
+            }
+        }
+    }
+}
+
+/// Lexicographic byte comparison — `-1`, `0`, or `1`, matching `aipl_str_cmp`.
+pub(crate) fn cmp(a: Str, b: Str) -> i64 {
+    let (mut ca, mut cb) = (Cursor::new(a), Cursor::new(b));
+    loop {
+        match (ca.chunk(), cb.chunk()) {
+            (None, None) => return 0,
+            (None, Some(_)) => return -1,
+            (Some(_), None) => return 1,
+            (Some(x), Some(y)) => {
+                let n = x.len().min(y.len());
+                match x[..n].cmp(&y[..n]) {
+                    std::cmp::Ordering::Less => return -1,
+                    std::cmp::Ordering::Greater => return 1,
+                    std::cmp::Ordering::Equal => {}
+                }
+                ca.take(n);
+                cb.take(n);
+            }
+        }
+    }
+}
+
+/// Content equality. Lengths are in the values, so a mismatch costs nothing.
+pub(crate) fn eq(a: Str, b: Str) -> bool {
+    a.len() == b.len() && cmp(a, b) == 0
+}
+
+/// FNV-1a over the content, byte for byte identical to `aipl_str_hash` — a left
+/// fold, so streaming a rope's leaves in order gives the flattened answer.
+pub(crate) fn hash(s: Str) -> i64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for_each_chunk(s, &mut |chunk| {
+        for &c in chunk {
+            h ^= c as u64;
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        true
+    });
+    h as i64
+}
+
+/// Whether `s`'s bytes from `at` start with `prefix`.
+pub(crate) fn starts_with_at(s: Str, prefix: Str, at: usize) -> bool {
+    if at > s.len() || s.len() - at < prefix.len() {
+        return false;
+    }
+    let window = s.slice(at, at + prefix.len());
+    eq(window, prefix)
+}
+
+pub(crate) fn starts_with(s: Str, prefix: Str) -> bool {
+    starts_with_at(s, prefix, 0)
+}
+
+pub(crate) fn ends_with(s: Str, suffix: Str) -> bool {
+    s.len() >= suffix.len() && starts_with_at(s, suffix, s.len() - suffix.len())
+}
+
+/// Whether `needle` occurs anywhere in `s`. The empty needle is always present.
+pub(crate) fn contains(s: Str, needle: Str) -> bool {
+    if needle.len() > s.len() {
+        return false;
+    }
+    (0..=s.len() - needle.len()).any(|at| starts_with_at(s, needle, at))
+}
+
+/// The byte at `i`, or `None` past the end — the `char?` `s[i]` yields.
+pub(crate) fn char_at(s: Str, i: usize) -> Option<u8> {
+    if i >= s.len() {
+        return None;
+    }
+    let one = s.slice(i, i + 1);
+    let mut out = None;
+    for_each_chunk(one, &mut |chunk| {
+        out = chunk.first().copied();
+        false
+    });
+    out
+}
+
+fn is_space(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
+}
+
+pub(crate) fn is_all_whitespace(s: Str) -> bool {
+    let mut all = true;
+    for_each_chunk(s, &mut |chunk| {
+        all = chunk.iter().all(|&b| is_space(b));
+        all
+    });
+    all
+}
+
+/// Leading and trailing ASCII whitespace removed. **Free for a buffer** — the
+/// result is a window into the same allocation, where the old runtime allocated
+/// a view or copied. Borrows `s`; the result shares its owner, so a caller that
+/// keeps the result past `s` retains it.
+pub(crate) fn trim(s: Str) -> Str {
+    let mut scratch = Vec::new();
+    let (start, end) = {
+        let bytes = s.bytes(&mut scratch);
+        let start = bytes
+            .iter()
+            .position(|&b| !is_space(b))
+            .unwrap_or(bytes.len());
+        let end = bytes
+            .iter()
+            .rposition(|&b| !is_space(b))
+            .map_or(start, |i| i + 1);
+        (start, end)
+    };
+    s.slice(start, end)
+}
+
+/// `s` repeated `n` times.
+pub(crate) fn repeat(s: Str, n: usize) -> Str {
+    let total = s.len() * n;
+    let mut out = Builder::with_capacity(total);
+    for _ in 0..n {
+        for_each_chunk(s, &mut |chunk| {
+            out.push(chunk);
+            true
+        });
+    }
+    out.finish()
+}
+
+pub(crate) fn reverse(s: Str) -> Str {
+    let mut scratch = Vec::new();
+    let mut bytes = s.bytes(&mut scratch).to_vec();
+    bytes.reverse();
+    from_bytes(&bytes)
+}
+
+pub(crate) fn sort(s: Str) -> Str {
+    let mut scratch = Vec::new();
+    let mut bytes = s.bytes(&mut scratch).to_vec();
+    bytes.sort_unstable();
+    from_bytes(&bytes)
+}
+
+/// Build a string by appending. Replaces the old
+/// `aipl_str_alloc` + `aipl_write_*` cursor dance: the buffer knows its own
+/// capacity, so the value being built is a normal `str` the whole time.
+pub(crate) struct Builder {
+    s: Str,
+}
+
+impl Builder {
+    pub(crate) fn with_capacity(cap: usize) -> Builder {
+        if cap <= INLINE_CAP {
+            // Small results still get a buffer: a builder hands back a value
+            // whose bytes were written through a pointer, and an inline value
+            // has no address to write to.
+            return Builder {
+                s: with_capacity(INLINE_CAP + 1, &[]),
+            };
+        }
+        Builder {
+            s: with_capacity(cap, &[]),
+        }
+    }
+
+    pub(crate) fn push(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() {
+            return;
+        }
+        if self.s.spare_capacity() < bytes.len() {
+            self.grow(bytes.len());
+        }
+        let end = (self.s.w1 as usize + self.s.len()) as *mut u8;
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), end, bytes.len()) };
+        self.s.w2 = meta(self.s.len() + bytes.len(), TAG_BUFFER);
+    }
+
+    /// Double until `extra` more bytes fit, then copy across — amortized O(1)
+    /// per byte, the growth `STR_REPR.md`'s Stage 4 gives `+` for owned values.
+    fn grow(&mut self, extra: usize) {
+        let need = self.s.len() + extra;
+        let cap = (buffer_cap(self.s.w0 as *const u8) * 2).max(need);
+        let mut scratch = Vec::new();
+        let grown = with_capacity(cap, self.s.bytes(&mut scratch));
+        self.s.release();
+        self.s = grown;
+    }
+
+    /// The finished value. Short results are repacked inline so they stop
+    /// pinning a buffer.
+    pub(crate) fn finish(self) -> Str {
+        if self.s.len() <= INLINE_CAP {
+            let mut scratch = Vec::new();
+            let packed = from_bytes_inline(self.s.bytes(&mut scratch));
+            self.s.release();
+            return packed;
+        }
+        self.s
+    }
+}
+
+/// `sep`-joined parts.
+pub(crate) fn join(parts: &[Str], sep: Str) -> Str {
+    let total: usize =
+        parts.iter().map(|p| p.len()).sum::<usize>() + sep.len() * parts.len().saturating_sub(1);
+    let mut out = Builder::with_capacity(total);
+    for (i, part) in parts.iter().enumerate() {
+        if i > 0 {
+            for_each_chunk(sep, &mut |c| {
+                out.push(c);
+                true
+            });
+        }
+        for_each_chunk(*part, &mut |c| {
+            out.push(c);
+            true
+        });
+    }
+    out.finish()
+}
+
+/// Split on every occurrence of `sep`; an empty `sep` splits into single bytes.
+/// The pieces are **windows** into `s` when it is a buffer — the split of a
+/// large string allocates nothing per piece.
+pub(crate) fn split(s: Str, sep: Str) -> Vec<Str> {
+    let mut out = Vec::new();
+    if sep.is_empty() {
+        for i in 0..s.len() {
+            out.push(s.slice(i, i + 1));
+        }
+        return out;
+    }
+    let mut at = 0;
+    let mut start = 0;
+    while at + sep.len() <= s.len() {
+        if starts_with_at(s, sep, at) {
+            out.push(s.slice(start, at));
+            at += sep.len();
+            start = at;
+        } else {
+            at += 1;
+        }
+    }
+    out.push(s.slice(start, s.len()));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -570,5 +926,182 @@ mod tests {
         }
         buffer.release();
         rope.release();
+    }
+
+    // ---------- the str surface ----------
+
+    /// Every representation, for tests that must hold across all of them.
+    fn variants(text: &str) -> Vec<(&'static str, Str)> {
+        let mid = text.len() / 2;
+        vec![
+            ("inline-or-buffer", from_bytes(text.as_bytes())),
+            (
+                "rope",
+                concat(
+                    from_bytes(&text.as_bytes()[..mid]),
+                    from_bytes(&text.as_bytes()[mid..]),
+                ),
+            ),
+            (
+                "window",
+                from_bytes(format!("<<{text}>>").as_bytes()).slice(2, 2 + text.len()),
+            ),
+        ]
+    }
+
+    #[test]
+    fn equality_and_order_agree_across_representations() {
+        for (what, a) in variants("comparable content, long enough to be a buffer") {
+            for (other, b) in variants("comparable content, long enough to be a buffer") {
+                assert!(eq(a, b), "{what} vs {other}");
+                assert_eq!(cmp(a, b), 0, "{what} vs {other}");
+            }
+            for (other, b) in variants("comparable content, long enough to be a bufferX") {
+                assert!(!eq(a, b), "{what} vs {other}");
+                assert_eq!(cmp(a, b), -1, "{what} vs {other}");
+                assert_eq!(cmp(b, a), 1, "{other} vs {what}");
+            }
+        }
+        assert_eq!(cmp(from_bytes(b"abc"), from_bytes(b"abd")), -1);
+        assert_eq!(cmp(Str::empty(), from_bytes(b"a")), -1);
+        assert_eq!(cmp(Str::empty(), Str::empty()), 0);
+    }
+
+    #[test]
+    fn hash_is_content_addressed_across_representations() {
+        let text = "a hashable string that is longer than the inline capacity";
+        let hashes: Vec<i64> = variants(text).into_iter().map(|(_, s)| hash(s)).collect();
+        assert!(
+            hashes.windows(2).all(|w| w[0] == w[1]),
+            "same content must hash the same: {hashes:?}"
+        );
+        assert_ne!(hash(from_bytes(b"a")), hash(from_bytes(b"b")));
+        // Matches the current runtime's FNV-1a basis for the empty string.
+        assert_eq!(hash(Str::empty()), 0xcbf2_9ce4_8422_2325u64 as i64);
+    }
+
+    #[test]
+    fn prefix_suffix_and_search_cross_leaf_boundaries() {
+        // The needle straddles the rope's split, which is the case a per-leaf
+        // implementation gets wrong.
+        let s = concat(
+            from_bytes(b"the quick brown "),
+            from_bytes(b"fox jumps over"),
+        );
+        assert!(starts_with(s, from_bytes(b"the quick")));
+        assert!(ends_with(s, from_bytes(b"jumps over")));
+        assert!(contains(s, from_bytes(b"brown fox")), "spans the seam");
+        assert!(contains(s, from_bytes(b"n f")), "spans the seam");
+        assert!(!contains(s, from_bytes(b"brown cat")));
+        assert!(starts_with_at(s, from_bytes(b"brown"), 10));
+        assert!(!starts_with_at(s, from_bytes(b"brown"), 11));
+        assert!(contains(s, Str::empty()), "the empty needle is everywhere");
+        assert!(!contains(from_bytes(b"ab"), from_bytes(b"abc")));
+        s.release();
+    }
+
+    #[test]
+    fn char_at_reads_every_representation() {
+        // Indices come from the Rust string rather than being counted by hand,
+        // so the test cannot disagree with itself about where a byte is.
+        let src = "indexable string, long enough for a buffer";
+        for (what, s) in variants(src) {
+            for (i, want) in src.as_bytes().iter().enumerate() {
+                assert_eq!(char_at(s, i), Some(*want), "{what} at {i}");
+            }
+            assert_eq!(char_at(s, src.len()), None, "{what} past the end");
+            assert_eq!(char_at(s, src.len() + 10), None, "{what} well past the end");
+        }
+        assert_eq!(char_at(Str::empty(), 0), None);
+    }
+
+    #[test]
+    fn trim_is_a_free_window_on_a_buffer() {
+        let s = from_bytes(b"   plenty of surrounding whitespace here   ");
+        let t = trim(s);
+        assert_eq!(t.base(), s.base(), "no copy: same allocation");
+        assert_eq!(text(t), "plenty of surrounding whitespace here");
+        assert_eq!(text(trim(from_bytes(b"  x  "))), "x");
+        assert_eq!(text(trim(from_bytes(b"    "))), "");
+        assert_eq!(text(trim(Str::empty())), "");
+        assert!(is_all_whitespace(from_bytes(b" \t\n")));
+        assert!(!is_all_whitespace(from_bytes(b" x ")));
+        assert!(is_all_whitespace(Str::empty()));
+        s.release();
+    }
+
+    #[test]
+    fn builder_grows_and_repacks() {
+        let mut b = Builder::with_capacity(4);
+        b.push(b"one ");
+        b.push(b"two ");
+        b.push(b"three, and enough more to force at least one growth step");
+        let out = b.finish();
+        assert_eq!(
+            text(out),
+            "one two three, and enough more to force at least one growth step"
+        );
+        assert_eq!(out.tag(), TAG_BUFFER);
+        out.release();
+        // A short result comes back inline rather than pinning a buffer.
+        let mut small = Builder::with_capacity(64);
+        small.push(b"tiny");
+        let out = small.finish();
+        assert_eq!(out.tag(), TAG_INLINE);
+        assert_eq!(text(out), "tiny");
+    }
+
+    #[test]
+    fn repeat_join_reverse_and_sort() {
+        assert_eq!(text(repeat(from_bytes(b"ab"), 3)), "ababab");
+        assert_eq!(text(repeat(from_bytes(b"ab"), 0)), "");
+        let parts = [from_bytes(b"a"), from_bytes(b"b"), from_bytes(b"c")];
+        assert_eq!(text(join(&parts, from_bytes(b", "))), "a, b, c");
+        assert_eq!(text(join(&parts, Str::empty())), "abc");
+        assert_eq!(text(join(&[], from_bytes(b","))), "");
+        assert_eq!(text(reverse(from_bytes(b"abcd"))), "dcba");
+        assert_eq!(text(sort(from_bytes(b"dbca"))), "abcd");
+        // Across a rope, too.
+        let rope = concat(from_bytes(b"dcb"), from_bytes(b"a"));
+        assert_eq!(text(reverse(rope)), "abcd");
+        rope.release();
+    }
+
+    #[test]
+    fn split_pieces_are_windows_into_the_source() {
+        let s = from_bytes(b"alpha,beta,gamma,delta,epsilon,zeta,eta,theta");
+        let pieces = split(s, from_bytes(b","));
+        let joined: Vec<String> = pieces.iter().map(|p| text(*p)).collect();
+        assert_eq!(
+            joined,
+            ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]
+        );
+        assert!(
+            pieces.iter().all(|p| p.base() == s.base()),
+            "no allocation per piece"
+        );
+        // Edges: leading/trailing separators produce empty pieces, and a missing
+        // separator yields the whole string.
+        let edges = split(from_bytes(b",a,"), from_bytes(b","));
+        assert_eq!(
+            edges.iter().map(|p| text(*p)).collect::<Vec<_>>(),
+            ["", "a", ""]
+        );
+        assert_eq!(
+            split(from_bytes(b"abc"), from_bytes(b"-"))
+                .iter()
+                .map(|p| text(*p))
+                .collect::<Vec<_>>(),
+            ["abc"]
+        );
+        // An empty separator splits into single bytes.
+        assert_eq!(
+            split(from_bytes(b"abc"), Str::empty())
+                .iter()
+                .map(|p| text(*p))
+                .collect::<Vec<_>>(),
+            ["a", "b", "c"]
+        );
+        s.release();
     }
 }
