@@ -759,6 +759,168 @@ pub(crate) fn split(s: Str, sep: Str) -> Vec<Str> {
     out
 }
 
+// ---------- Char iteration (`for c in s`) ----------
+//
+// A fixed-size cursor codegen stack-allocates, so iterating a rope streams its
+// bytes in order without materializing and without a heap traversal stack. To
+// locate a byte the cursor descends from the root to the containing leaf — O(rope
+// depth), using each child's own O(1) length — and caches that leaf, so
+// sequential reads inside one leaf are O(1) and a non-rope string is one leaf
+// throughout.
+//
+// The 24-byte value pays off here: an inline leaf is *self-contained*, so the
+// cached leaf needs no separate spill buffer. Today's cursor carries an 8-byte
+// scratch slot for exactly that (`ITER_SCRATCH`); this one does not.
+
+/// The `for (let c : s)` cursor. Codegen allocates `size_of::<Iter>()` bytes.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(crate) struct Iter {
+    root: Str,
+    /// The leaf `pos` last landed in — a buffer window or an inline value, never
+    /// a rope. Empty until the first `next`.
+    leaf: Str,
+    /// Absolute position in `root`.
+    pos: u64,
+    /// Absolute position where `leaf` starts.
+    leaf_start: u64,
+}
+
+impl Iter {
+    pub(crate) fn new(root: Str) -> Iter {
+        Iter {
+            root,
+            leaf: Str::empty(),
+            pos: 0,
+            leaf_start: 0,
+        }
+    }
+
+    /// The next byte, or `None` at the end. Idempotent past the end.
+    pub(crate) fn next(&mut self) -> Option<u8> {
+        let pos = self.pos as usize;
+        if pos >= self.root.len() {
+            return None;
+        }
+        let leaf_start = self.leaf_start as usize;
+        if self.leaf.is_empty() || pos < leaf_start || pos >= leaf_start + self.leaf.len() {
+            let (leaf, start) = descend(self.root, pos);
+            self.leaf = leaf;
+            self.leaf_start = start as u64;
+        }
+        let within = pos - self.leaf_start as usize;
+        let byte = leaf_byte(self.leaf, within);
+        self.pos += 1;
+        Some(byte)
+    }
+}
+
+/// The leaf containing absolute position `pos`, and where that leaf starts.
+/// Descends by child length, so nothing is flattened.
+fn descend(root: Str, pos: usize) -> (Str, usize) {
+    let mut node = root;
+    let mut base = 0usize;
+    let mut at = pos;
+    while node.tag() == TAG_ROPE {
+        let n = rope_node(node.owner());
+        let (left, right) = unsafe {
+            (
+                std::ptr::read(n.add(ROPE_LEFT) as *const Str),
+                std::ptr::read(n.add(ROPE_RIGHT) as *const Str),
+            )
+        };
+        if at < left.len() {
+            node = left;
+        } else {
+            base += left.len();
+            at -= left.len();
+            node = right;
+        }
+    }
+    (node, base)
+}
+
+/// Byte `i` of a leaf (a buffer window or an inline value).
+fn leaf_byte(leaf: Str, i: usize) -> u8 {
+    match leaf.tag() {
+        TAG_BUFFER => unsafe { *(leaf.w1 as *const u8).add(i) },
+        TAG_INLINE => inline_bytes(leaf)[i],
+        _ => unreachable!("a cached leaf is never a rope"),
+    }
+}
+
+// ---------- I/O ----------
+
+/// Write the value's bytes to `out`, streaming — a rope never flattens, so
+/// printing or writing a built-up string costs no extra allocation.
+pub(crate) fn write_to(s: Str, out: &mut impl std::io::Write) -> std::io::Result<()> {
+    let mut err = None;
+    for_each_chunk(s, &mut |chunk| match out.write_all(chunk) {
+        Ok(()) => true,
+        Err(e) => {
+            err = Some(e);
+            false
+        }
+    });
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+/// `print(s)` — the value's bytes then a newline, streamed to stdout.
+pub(crate) fn print(s: Str) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    let _ = write_to(s, &mut out);
+    let _ = out.write_all(b"\n");
+}
+
+/// `error: <msg>` on stderr, streamed.
+pub(crate) fn print_error(msg: Str) {
+    use std::io::Write;
+    let stderr = std::io::stderr();
+    let mut out = stderr.lock();
+    let _ = out.write_all(b"error: ");
+    let _ = write_to(msg, &mut out);
+    let _ = out.write_all(b"\n");
+}
+
+/// A value's bytes as a `&str` path. Materializes into `scratch` when the value
+/// has no contiguous bytes of its own; **note there is no NUL involved** — a
+/// buffer is a window and carries no terminator, and every path consumer here is
+/// length-delimited.
+fn path_of<'a>(s: &'a Str, scratch: &'a mut Vec<u8>) -> Option<&'a str> {
+    std::str::from_utf8(s.bytes(scratch)).ok()
+}
+
+/// `read_file_to_string(path)`. `None` on any failure, matching the runtime's
+/// "null means error" convention at this boundary.
+pub(crate) fn read_file_to_string(path: Str) -> Option<Str> {
+    let mut scratch = Vec::new();
+    let name = path_of(&path, &mut scratch)?;
+    let bytes = std::fs::read(name).ok()?;
+    Some(from_bytes(&bytes))
+}
+
+/// `write_string_to_file(path, contents)` — the contents stream out chunk by
+/// chunk, so writing a rope never builds it flat first.
+pub(crate) fn write_string_to_file(path: Str, contents: Str) -> bool {
+    let mut scratch = Vec::new();
+    let Some(name) = path_of(&path, &mut scratch) else {
+        return false;
+    };
+    let Ok(file) = std::fs::File::create(name) else {
+        return false;
+    };
+    let mut file = std::io::BufWriter::new(file);
+    if write_to(contents, &mut file).is_err() {
+        return false;
+    }
+    std::io::Write::flush(&mut file).is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1103,5 +1265,103 @@ mod tests {
             ["a", "b", "c"]
         );
         s.release();
+    }
+
+    // ---------- iteration and I/O ----------
+
+    fn collect(s: Str) -> Vec<u8> {
+        let mut it = Iter::new(s);
+        let mut out = Vec::new();
+        while let Some(b) = it.next() {
+            out.push(b);
+        }
+        // Past the end it keeps saying so, rather than wrapping or repeating.
+        assert_eq!(it.next(), None);
+        assert_eq!(it.next(), None);
+        out
+    }
+
+    #[test]
+    fn iteration_yields_the_same_bytes_in_every_representation() {
+        let src = "iterable content, comfortably longer than inline";
+        for (what, s) in variants(src) {
+            assert_eq!(collect(s), src.as_bytes(), "{what}");
+        }
+        assert_eq!(collect(Str::empty()), b"");
+        assert_eq!(collect(from_bytes(b"x")), b"x");
+    }
+
+    #[test]
+    fn iteration_streams_a_deep_rope_in_order() {
+        // 64 leaves, left-nested: the shape that would blow a fixed traversal
+        // stack or force a flatten if either were how this worked.
+        let mut rope = from_bytes(b"0");
+        let mut expect = String::from("0");
+        for i in 1..64u32 {
+            let piece = format!("{}", i % 10);
+            rope = concat(rope, from_bytes(piece.as_bytes()));
+            expect.push_str(&piece);
+        }
+        assert_eq!(rope.len(), expect.len());
+        assert_eq!(collect(rope), expect.as_bytes());
+        // The cached leaf means a full pass is still one descent per leaf.
+        let mut it = Iter::new(rope);
+        assert_eq!(it.next(), Some(b'0'));
+        assert_eq!(it.next(), Some(b'1'));
+        rope.release();
+    }
+
+    #[test]
+    fn iterating_a_window_stays_inside_it() {
+        // Bounds derived from the pieces, not counted by hand.
+        let (lead, mid) = ("<<<", "the middle part only");
+        let s = from_bytes(format!("{lead}{mid}>>>").as_bytes());
+        let window = s.slice(lead.len(), lead.len() + mid.len());
+        assert_eq!(text(window), mid);
+        assert_eq!(collect(window), mid.as_bytes());
+        s.release();
+    }
+
+    #[test]
+    fn writing_streams_every_representation() {
+        let src = "written content, long enough to be a buffer of its own";
+        for (what, s) in variants(src) {
+            let mut out = Vec::new();
+            write_to(s, &mut out).unwrap();
+            assert_eq!(out, src.as_bytes(), "{what}");
+        }
+    }
+
+    #[test]
+    fn files_round_trip_through_windows_and_ropes() {
+        let dir = std::env::temp_dir();
+        let path_text = dir
+            .join(format!("aipl_str24_{}.txt", std::process::id()))
+            .to_str()
+            .unwrap()
+            .to_string();
+        // The path itself is a *window* into a larger string — a buffer carries
+        // no NUL, so this is the case that would break a C-string assumption.
+        let padded = from_bytes(format!("<{path_text}>").as_bytes());
+        let path = padded.slice(1, 1 + path_text.len());
+        assert_eq!(text(path), path_text);
+
+        // The contents are a rope, so the write has to stream them.
+        let contents = concat(
+            from_bytes(b"first half of the file, long enough to be its own buffer\n"),
+            from_bytes(b"second half, also long enough to live in a buffer\n"),
+        );
+        assert_eq!(contents.tag(), TAG_ROPE);
+        assert!(write_string_to_file(path, contents));
+
+        let back = read_file_to_string(path).expect("file reads back");
+        assert_eq!(text(back), text(contents));
+        assert_eq!(back.tag(), TAG_BUFFER);
+
+        assert!(read_file_to_string(from_bytes(b"/nonexistent/aipl/str24")).is_none());
+        let _ = std::fs::remove_file(&path_text);
+        padded.release();
+        contents.release();
+        back.release();
     }
 }

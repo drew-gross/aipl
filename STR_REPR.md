@@ -16,7 +16,7 @@ flip.
 - [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap
   - [x] the layout itself, proven on its own (`crates/aipl-codegen/src/str24.rs`, staged dead code)
   - [x] the `str` surface: streaming, compare/hash/search, trim, builder, split/join
-  - [ ] the I/O and iteration entry points (`print`, file reads, `str_iter_*`)
+  - [x] iteration (`Iter`) and I/O (`print`, file read/write), streaming throughout
   - [ ] mirror into `aipl_runtime.rs` (no-std, byte-for-byte)
   - [ ] the switch: `str` joins `is_composite`/`elem_size_of`/`sret_size`, literals, the rc arm, FFI
   - [ ] bootstrap the artifacts, regenerate, refill the corpus
