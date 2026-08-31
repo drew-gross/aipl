@@ -258,6 +258,12 @@ nonempty lists:
 chain_docs:
   rewrite this somehow, there must be a better way
 
+design:
+  write a design principles doc
+    representation is not introspectable
+    it's safe to call an untrusted function that doesn't declare any effects
+    the most readable implementation is also the fastest
+
 optimizations:
   add view and inline forms for arrays.
   char_lit_emit can probably be optimized by doing a two char match and manually unescaping
