@@ -17,8 +17,32 @@ use std::{
 mod abi_spike;
 
 // STAGED: the 24-byte `str` layout (STR_REPR.md stage 1), proven on its own
-// before the switch wires it up.
+// before the switch wires it up. `str24` is **shared verbatim** with the AOT
+// runtime, which `include!`s the same file, so it is `no_std`-safe and asks its
+// host for two things: the allocator below, and the I/O in `str24_host`.
+#[allow(dead_code)] // staged: wired up by the Stage 1 switch
 mod str24;
+mod str24_host;
+
+/// Allocation for the shared `str` layout. Each runtime supplies its own, so
+/// each keeps its own accounting: this side forwards to libc, and the AOT copy
+/// tallies counts and bytes for `--- performance ---` under
+/// `--cfg aipl_instrument`. Same names and signatures on both sides — that is
+/// what lets `str24.rs` call them without knowing which runtime it is in.
+unsafe fn rt_alloc(size: usize) -> *mut core::ffi::c_void {
+    unsafe { libc_malloc(size) }
+}
+
+unsafe fn rt_free(ptr: *mut core::ffi::c_void) {
+    unsafe { libc_free(ptr) }
+}
+
+extern "C" {
+    #[link_name = "malloc"]
+    fn libc_malloc(size: usize) -> *mut core::ffi::c_void;
+    #[link_name = "free"]
+    fn libc_free(ptr: *mut core::ffi::c_void);
+}
 
 use cranelift::{
     codegen::{

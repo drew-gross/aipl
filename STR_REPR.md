@@ -17,7 +17,7 @@ flip.
   - [x] the layout itself, proven on its own (`crates/aipl-codegen/src/str24.rs`, staged dead code)
   - [x] the `str` surface: streaming, compare/hash/search, trim, builder, split/join
   - [x] iteration (`Iter`) and I/O (`print`, file read/write), streaming throughout
-  - [ ] mirror into `aipl_runtime.rs` (no-std, byte-for-byte)
+  - [x] shared with the AOT runtime instead of mirrored — one file, both compile it
   - [ ] the switch: `str` joins `is_composite`/`elem_size_of`/`sret_size`, literals, the rc arm, FFI
   - [ ] bootstrap the artifacts, regenerate, refill the corpus
 - [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
@@ -255,6 +255,42 @@ The cost of this shape is that a `str` stops living in registers. That is the
 trade three-scalar passing would have bought, and it is worth measuring at Stage
 1 rather than assuming: the canaries below are slice- and token-heavy, which is
 where memory traffic would show up first.
+
+## One copy of the layout, not two
+
+The plan said "write it twice, identically, or the AOT binaries diverge from the
+JIT". Stage 1 does not: `crates/aipl-codegen/src/str24.rs` is an ordinary module
+in the JIT runtime **and** `include!`d by
+`crates/aipl-linker/runtime/aipl_runtime.rs`, so both compile the same text.
+
+For the layout specifically this is worth more than it costs. A divergence in the
+tag encoding or a field offset is not a failing test — it is silent memory
+corruption in AOT binaries only, which is the hardest kind of bug this repo could
+have. Sharing makes that class unrepresentable, and it is the standing principle
+(strings and arrays, JIT and AOT: one implementation wherever the shape must
+agree) applied to the place it matters most.
+
+What made it possible is that the two runtimes already differ in exactly two
+ways, both small:
+
+- **Allocation.** The AOT runtime funnels everything through
+  `rt_alloc`/`rt_free` so its instrumented build can tally
+  `--- performance ---` counts. The shared file calls `super::rt_alloc` /
+  `super::rt_free`, and each host supplies them — the JIT's forward to libc, the
+  AOT's keep their counters. Same names, same signatures, no `cfg` in the shared
+  file.
+- **I/O.** `std::io`/`std::fs` on one side, `libc` on the other. That is the only
+  thing `str24_host.rs` holds.
+
+Two constraints the shared file therefore carries, both stated at its top:
+`no_std` (no `Vec`, no `std::alloc` — a rope materializes into its own node cache
+and `Builder` grows through `rt_alloc`), and **no inner attributes** — an
+`include!`d file may carry neither `//!` docs nor `#![allow]`, so its prose is
+plain `//` comments and the `allow` sits on each `mod` declaration.
+
+The build wiring: `crates/aipl-linker/build.rs` gained a `rerun-if-changed` for
+the shared path, so editing it rebuilds the staticlib. Verified by injecting a
+type error into the shared file and watching the AOT build fail.
 
 ## The constraint that shapes Stage 4: `refcount == 1` is not ownership
 

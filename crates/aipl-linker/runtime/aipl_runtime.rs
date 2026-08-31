@@ -347,6 +347,17 @@ unsafe fn rt_free(ptr: *mut c_void) {
     unsafe { free(ptr) }
 }
 
+// STAGED (STR_REPR.md stage 1): the 24-byte `str` layout, **shared verbatim**
+// with the JIT runtime instead of mirrored by hand. This is the one piece where
+// a divergence between the two runtimes would be silent memory corruption rather
+// than a failing test, so it lives in one file that both compile — which is also
+// why that file is `no_std`-safe and calls `super::rt_alloc`/`super::rt_free`
+// (just above) rather than allocating for itself.
+#[allow(dead_code)] // staged: wired up by the Stage 1 switch
+mod str24 {
+    include!("../../aipl-codegen/src/str24.rs");
+}
+
 #[inline]
 unsafe fn rt_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // Tallied separately from alloc/free: an in-place grow reuses an existing

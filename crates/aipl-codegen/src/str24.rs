@@ -1,44 +1,59 @@
-//! The 24-byte `str` value — `STR_REPR.md`'s layout, implemented and tested on
-//! its own before anything is switched over to it.
-//!
-//! **Not wired up yet.** Stage 1 of that plan is an atomic change: the runtime,
-//! codegen, and every checked-in `.clif` have to agree on the layout, so there
-//! is no way to land it a piece at a time. What *can* be de-risked first is
-//! this: the layout itself, its invariants, and the operations that read and
-//! build it, proven by ordinary Rust tests with no compiler in the loop. When
-//! the switch happens, this module stops being dead code and the equivalent is
-//! mirrored into `crates/aipl-linker/runtime/aipl_runtime.rs`.
-//!
-//! # The value
-//!
-//! ```text
-//!               w0                  w1                  w2
-//! buffer   00   base: *const u8     data: *const u8     [ len : 56 ][ tag : 8 ]
-//! inline   01   content[0..8]       content[8..16]      [ content[16..22] ][ len:8 ][ tag:8 ]
-//! rope     10   node: *const u8     0                   [ len : 56 ][ tag : 8 ]
-//!          11   — spare —
-//! ```
-//!
-//! The tag is the **top byte** of `w2` in every representation, so classifying a
-//! value is one shift on a register the length already needed, and `base`/`data`
-//! are dereferenced without masking. See `STR_REPR.md` for why that beats
-//! low-bit tagging.
-//!
-//! # The buffer
-//!
-//! ```text
-//! [cap: i64][refcount: i64][content bytes ...]
-//!                           ^ base; `data` points anywhere in [base, base + cap]
-//! ```
-//!
-//! `refcount` stays at `base - 8`, shared with arrays exactly as today. The word
-//! at `base - 16` is **capacity**, not length: the value carries the only length
-//! there is, which is what lets one representation serve both "the whole string"
-//! and "a window into it". A buffer therefore does *not* imply a trailing NUL —
-//! every consumer is length-delimited.
-#![allow(dead_code)] // staged: wired up by the Stage 1 switch
-
-use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
+// NOTE: plain `//` comments, not `//!` module docs, and no inner attributes:
+// this file is `include!`d by the AOT runtime, which can carry neither.
+//
+// The 24-byte `str` value — `STR_REPR.md`'s layout, implemented and tested on
+// its own before anything is switched over to it.
+//
+// **Not wired up yet.** Stage 1 of that plan is an atomic change: the runtime,
+// codegen, and every checked-in `.clif` have to agree on the layout, so there
+// is no way to land it a piece at a time. What *can* be de-risked first is
+// this: the layout itself, its invariants, and the operations that read and
+// build it, proven by ordinary Rust tests with no compiler in the loop.
+//
+// # One copy, two runtimes
+//
+// The JIT runtime (`aipl-codegen`) and the AOT runtime
+// (`aipl-linker/runtime/aipl_runtime.rs`) are kept byte-for-byte identical **by
+// hand** today, and CLAUDE.md names the hazard: "write it twice, identically, or
+// the AOT binaries diverge from the JIT". For the layout — the one thing where a
+// divergence is silent memory corruption rather than a failing test — this file
+// is shared instead: `aipl-codegen` has it as an ordinary module, and the AOT
+// runtime `include!`s it inside a `mod str24`. So it compiles under `no_std` and
+// must not reach for `std`, `Vec`, or `std::alloc`.
+//
+// Two things the host provides, and the reason the file needs no `cfg` of its
+// own: `super::rt_alloc` / `super::rt_free` (so each runtime keeps its own
+// allocation accounting — the AOT's instrumented build tallies them for
+// `--- performance ---`), and the I/O wrappers, which differ genuinely (`std::io`
+// against `libc`) and live in each host.
+//
+// # The value
+//
+// ```text
+//               w0                  w1                  w2
+// buffer   00   base: *const u8     data: *const u8     [ len : 56 ][ tag : 8 ]
+// inline   01   content[0..8]       content[8..16]      [ content[16..22] ][ len:8 ][ tag:8 ]
+// rope     10   node: *const u8     0                   [ len : 56 ][ tag : 8 ]
+//          11   — spare —
+// ```
+//
+// The tag is the **top byte** of `w2` in every representation, so classifying a
+// value is one shift on a register the length already needed, and `base`/`data`
+// are dereferenced without masking. See `STR_REPR.md` for why that beats
+// low-bit tagging.
+//
+// # The buffer
+//
+// ```text
+// [cap: i64][refcount: i64][content bytes ...]
+//                           ^ base; `data` points anywhere in [base, base + cap]
+// ```
+//
+// `refcount` stays at `base - 8`, shared with arrays exactly as today. The word
+// at `base - 16` is **capacity**, not length: the value carries the only length
+// there is, which is what lets one representation serve both "the whole string"
+// and "a window into it". A buffer therefore does *not* imply a trailing NUL —
+// every consumer is length-delimited.
 
 /// Bytes of a `str` value.
 pub(crate) const STR_SIZE: usize = 24;
@@ -105,7 +120,7 @@ impl Str {
         if self.tag() == TAG_BUFFER {
             self.w0 as *const u8
         } else {
-            std::ptr::null()
+            core::ptr::null()
         }
     }
 
@@ -116,7 +131,7 @@ impl Str {
     pub(crate) fn owner(self) -> *const u8 {
         match self.tag() {
             TAG_BUFFER | TAG_ROPE => self.w0 as *const u8,
-            _ => std::ptr::null(),
+            _ => core::ptr::null(),
         }
     }
 
@@ -127,25 +142,22 @@ impl Str {
         if self.w1 == 0 {
             return &[];
         }
-        unsafe { std::slice::from_raw_parts(self.w1 as *const u8, self.len()) }
+        unsafe { core::slice::from_raw_parts(self.w1 as *const u8, self.len()) }
     }
 
-    /// The value's bytes, using `scratch` for representations that have no
-    /// contiguous buffer of their own (inline, and a rope that must flatten).
-    pub(crate) fn bytes<'a>(&'a self, scratch: &'a mut Vec<u8>) -> &'a [u8] {
+    /// The value's bytes. An inline value is copied into `buf` (22 bytes of
+    /// caller stack, no allocation); a rope is materialized **once** into its own
+    /// node cache and read from there after, which is how the old runtime avoided
+    /// re-flattening too.
+    pub(crate) fn bytes<'a>(&'a self, buf: &'a mut [u8; INLINE_CAP]) -> &'a [u8] {
         match self.tag() {
             TAG_BUFFER => self.buffer_bytes(),
             TAG_INLINE => {
                 let n = self.len();
-                scratch.clear();
-                scratch.extend_from_slice(&inline_bytes(*self)[..n]);
-                &scratch[..n]
+                *buf = inline_bytes(*self);
+                &buf[..n]
             }
-            TAG_ROPE => {
-                scratch.clear();
-                rope_flatten(*self, scratch);
-                &scratch[..]
-            }
+            TAG_ROPE => rope_materialize(*self).buffer_bytes(),
             _ => unreachable!("tag {} is spare", self.tag()),
         }
     }
@@ -172,14 +184,10 @@ impl Str {
                 let all = inline_bytes(self);
                 from_bytes_inline(&all[lo..hi])
             }
-            // A rope has no contiguous window to point at; flattening the span is
-            // the honest answer until Stage 5 teaches slicing to descend to a
-            // leaf.
-            _ => {
-                let mut scratch = Vec::new();
-                let bytes = self.bytes(&mut scratch).to_vec();
-                from_bytes(&bytes[lo..hi])
-            }
+            // A rope has no contiguous window to point at, so it materializes
+            // (once — the node caches it) and the slice is a window into that.
+            // Stage 5 is where slicing learns to descend to a leaf instead.
+            _ => rope_materialize(self).slice(lo, hi),
         }
     }
 
@@ -281,7 +289,7 @@ pub(crate) fn with_capacity(cap: usize, init: &[u8]) -> Str {
     debug_assert!(init.len() <= cap);
     let base = alloc_buffer(cap);
     unsafe {
-        std::ptr::copy_nonoverlapping(init.as_ptr(), base as *mut u8, init.len());
+        core::ptr::copy_nonoverlapping(init.as_ptr(), base as *mut u8, init.len());
     }
     Str {
         w0: base as u64,
@@ -298,28 +306,20 @@ fn buffer_cap(base: *const u8) -> usize {
     unsafe { *(base.sub(BUF_HEADER) as *const i64) as usize }
 }
 
-fn buffer_layout(cap: usize) -> Layout {
-    Layout::from_size_align(BUF_HEADER + cap, std::mem::align_of::<i64>()).expect("buffer layout")
-}
-
 /// Allocate `[cap][refcount=1][content: cap bytes]`, returning the content
 /// pointer (the `base` a value stores).
 fn alloc_buffer(cap: usize) -> *const u8 {
-    let layout = buffer_layout(cap);
-    let raw = unsafe { alloc(layout) };
-    if raw.is_null() {
-        handle_alloc_error(layout);
-    }
+    let raw = unsafe { super::rt_alloc(BUF_HEADER + cap) } as *mut u8;
+    assert!(!raw.is_null(), "out of memory");
     unsafe {
-        std::ptr::write(raw as *mut i64, cap as i64);
-        std::ptr::write(raw.add(8) as *mut i64, 1);
+        core::ptr::write(raw as *mut i64, cap as i64);
+        core::ptr::write(raw.add(8) as *mut i64, 1);
         raw.add(BUF_HEADER)
     }
 }
 
 unsafe fn free_buffer(base: *const u8) {
-    let cap = buffer_cap(base);
-    unsafe { dealloc(base.sub(BUF_HEADER) as *mut u8, buffer_layout(cap)) }
+    unsafe { super::rt_free(base.sub(BUF_HEADER) as *mut _) }
 }
 
 // ---------- Ropes ----------
@@ -334,10 +334,6 @@ const ROPE_LEFT: usize = ROPE_CACHE + STR_SIZE;
 const ROPE_RIGHT: usize = ROPE_LEFT + STR_SIZE;
 const ROPE_SIZE: usize = ROPE_RIGHT + STR_SIZE;
 
-fn rope_layout() -> Layout {
-    Layout::from_size_align(ROPE_SIZE, std::mem::align_of::<i64>()).expect("rope layout")
-}
-
 /// `a + b` in O(1): a node holding both, flattened only if someone reads it.
 /// Takes ownership of the caller's references to `a` and `b`.
 pub(crate) fn concat(a: Str, b: Str) -> Str {
@@ -350,17 +346,14 @@ pub(crate) fn concat(a: Str, b: Str) -> Str {
         return a;
     }
     let len = a.len() + b.len();
-    let layout = rope_layout();
-    let raw = unsafe { alloc(layout) };
-    if raw.is_null() {
-        handle_alloc_error(layout);
-    }
+    let raw = unsafe { super::rt_alloc(ROPE_SIZE) } as *mut u8;
+    assert!(!raw.is_null(), "out of memory");
     unsafe {
-        std::ptr::write(raw as *mut i64, 1);
-        std::ptr::write(raw.add(ROPE_LEN) as *mut i64, len as i64);
-        std::ptr::write(raw.add(ROPE_CACHE) as *mut Str, Str::empty());
-        std::ptr::write(raw.add(ROPE_LEFT) as *mut Str, a);
-        std::ptr::write(raw.add(ROPE_RIGHT) as *mut Str, b);
+        core::ptr::write(raw as *mut i64, 1);
+        core::ptr::write(raw.add(ROPE_LEN) as *mut i64, len as i64);
+        core::ptr::write(raw.add(ROPE_CACHE) as *mut Str, Str::empty());
+        core::ptr::write(raw.add(ROPE_LEFT) as *mut Str, a);
+        core::ptr::write(raw.add(ROPE_RIGHT) as *mut Str, b);
     }
     Str {
         // The node carries the refcount, so it sits where an owner goes.
@@ -379,28 +372,33 @@ fn rope_node(owner: *const u8) -> *const u8 {
 unsafe fn free_rope(owner: *const u8) {
     let node = rope_node(owner);
     unsafe {
-        std::ptr::read(node.add(ROPE_CACHE) as *const Str).release();
-        std::ptr::read(node.add(ROPE_LEFT) as *const Str).release();
-        std::ptr::read(node.add(ROPE_RIGHT) as *const Str).release();
-        dealloc(node as *mut u8, rope_layout());
+        core::ptr::read(node.add(ROPE_CACHE) as *const Str).release();
+        core::ptr::read(node.add(ROPE_LEFT) as *const Str).release();
+        core::ptr::read(node.add(ROPE_RIGHT) as *const Str).release();
+        super::rt_free(node as *mut _);
     }
 }
 
-/// Append every leaf's bytes to `out`, left to right, without building
-/// intermediate strings.
-fn rope_flatten(s: Str, out: &mut Vec<u8>) {
-    match s.tag() {
-        TAG_BUFFER => out.extend_from_slice(s.buffer_bytes()),
-        TAG_INLINE => out.extend_from_slice(&inline_bytes(s)[..s.len()]),
-        TAG_ROPE => {
-            let node = rope_node(s.owner());
-            unsafe {
-                rope_flatten(std::ptr::read(node.add(ROPE_LEFT) as *const Str), out);
-                rope_flatten(std::ptr::read(node.add(ROPE_RIGHT) as *const Str), out);
-            }
-        }
-        _ => unreachable!("tag {} is spare", s.tag()),
+/// Flatten a rope into one buffer, memoized in the node's `cache` slot so later
+/// reads are plain buffer reads. The node owns the cache and releases it when
+/// freed.
+fn rope_materialize(s: Str) -> Str {
+    debug_assert_eq!(s.tag(), TAG_ROPE);
+    let node = rope_node(s.owner());
+    let cached = unsafe { core::ptr::read(node.add(ROPE_CACHE) as *const Str) };
+    if !cached.is_empty() {
+        return cached;
     }
+    let mut out = Builder::with_capacity(s.len());
+    for_each_chunk(s, &mut |chunk| {
+        out.push(chunk);
+        true
+    });
+    // Always a buffer, even for a short result: `bytes` reads the cache as one,
+    // and an inline value has no address to read from.
+    let flat = out.into_buffer();
+    unsafe { core::ptr::write(node.add(ROPE_CACHE) as *mut Str, flat) };
+    flat
 }
 
 // ---------- The str surface ----------
@@ -430,8 +428,8 @@ pub(crate) fn for_each_chunk(s: Str, f: &mut impl FnMut(&[u8]) -> bool) -> bool 
             let node = rope_node(s.owner());
             let (left, right) = unsafe {
                 (
-                    std::ptr::read(node.add(ROPE_LEFT) as *const Str),
-                    std::ptr::read(node.add(ROPE_RIGHT) as *const Str),
+                    core::ptr::read(node.add(ROPE_LEFT) as *const Str),
+                    core::ptr::read(node.add(ROPE_RIGHT) as *const Str),
                 )
             };
             for_each_chunk(left, f) && for_each_chunk(right, f)
@@ -440,77 +438,56 @@ pub(crate) fn for_each_chunk(s: Str, f: &mut impl FnMut(&[u8]) -> bool) -> bool 
     }
 }
 
-/// A byte cursor over any representation, used where two values are walked in
-/// step (comparison) or a window is scanned (`contains`). Chunk-at-a-time under
-/// the hood, so a rope costs one step per leaf rather than per byte.
+/// A chunk cursor over any representation, for walking two values in step.
+/// Allocation-free: it descends from the root to the leaf holding the current
+/// position (O(rope depth), by stored child lengths) and caches that leaf,
+/// exactly like [`Iter`].
 struct Cursor {
-    /// Leaves still to visit, deepest-last so `pop` yields them left to right.
-    stack: Vec<Str>,
-    /// The leaf being read, and how far into it we are.
-    cur: Option<(Str, usize)>,
+    root: Str,
+    leaf: Str,
+    leaf_start: usize,
+    pos: usize,
     scratch: [u8; INLINE_CAP],
 }
 
 impl Cursor {
-    fn new(s: Str) -> Cursor {
-        let mut c = Cursor {
-            stack: vec![s],
-            cur: None,
+    fn new(root: Str) -> Cursor {
+        Cursor {
+            root,
+            leaf: Str::empty(),
+            leaf_start: 0,
+            pos: 0,
             scratch: [0; INLINE_CAP],
-        };
-        c.advance();
-        c
+        }
     }
 
-    /// Descend to the next leaf with bytes left in it.
-    fn advance(&mut self) {
-        while let Some(top) = self.stack.pop() {
-            match top.tag() {
-                TAG_ROPE => {
-                    let node = rope_node(top.owner());
-                    unsafe {
-                        // Right first: `pop` then yields left before right.
-                        self.stack
-                            .push(std::ptr::read(node.add(ROPE_RIGHT) as *const Str));
-                        self.stack
-                            .push(std::ptr::read(node.add(ROPE_LEFT) as *const Str));
-                    }
-                }
-                _ if top.len() == 0 => continue,
-                _ => {
-                    if top.tag() == TAG_INLINE {
-                        self.scratch = inline_bytes(top);
-                    }
-                    self.cur = Some((top, 0));
-                    return;
-                }
+    /// The unread bytes of the leaf the cursor is in, or `None` at the end.
+    fn chunk(&mut self) -> Option<&[u8]> {
+        if self.pos >= self.root.len() {
+            return None;
+        }
+        if self.leaf.is_empty()
+            || self.pos < self.leaf_start
+            || self.pos >= self.leaf_start + self.leaf.len()
+        {
+            let (leaf, start) = descend(self.root, self.pos);
+            self.leaf = leaf;
+            self.leaf_start = start;
+            if leaf.tag() == TAG_INLINE {
+                self.scratch = inline_bytes(leaf);
             }
         }
-        self.cur = None;
-    }
-
-    /// The unread bytes of the current leaf, or `None` at the end.
-    fn chunk(&self) -> Option<&[u8]> {
-        let (leaf, at) = self.cur?;
-        let bytes = match leaf.tag() {
-            TAG_BUFFER => leaf.buffer_bytes(),
-            TAG_INLINE => &self.scratch[..leaf.len()],
+        let within = self.pos - self.leaf_start;
+        let bytes = match self.leaf.tag() {
+            TAG_BUFFER => self.leaf.buffer_bytes(),
+            TAG_INLINE => &self.scratch[..self.leaf.len()],
             _ => unreachable!("a cursor only stops on leaves"),
         };
-        Some(&bytes[at..])
+        Some(&bytes[within..])
     }
 
-    /// Consume `n` bytes of the current leaf, moving on when it runs out.
     fn take(&mut self, n: usize) {
-        if let Some((leaf, at)) = self.cur {
-            let at = at + n;
-            if at >= leaf.len() {
-                self.cur = None;
-                self.advance();
-            } else {
-                self.cur = Some((leaf, at));
-            }
-        }
+        self.pos += n;
     }
 }
 
@@ -518,21 +495,28 @@ impl Cursor {
 pub(crate) fn cmp(a: Str, b: Str) -> i64 {
     let (mut ca, mut cb) = (Cursor::new(a), Cursor::new(b));
     loop {
-        match (ca.chunk(), cb.chunk()) {
-            (None, None) => return 0,
-            (None, Some(_)) => return -1,
-            (Some(_), None) => return 1,
-            (Some(x), Some(y)) => {
-                let n = x.len().min(y.len());
-                match x[..n].cmp(&y[..n]) {
-                    std::cmp::Ordering::Less => return -1,
-                    std::cmp::Ordering::Greater => return 1,
-                    std::cmp::Ordering::Equal => {}
+        // One borrow at a time: each cursor caches its leaf inside itself, so the
+        // two chunk borrows cannot both be live.
+        let (xs, xn) = match ca.chunk() {
+            Some(x) => (x.as_ptr(), x.len()),
+            None => return if cb.chunk().is_some() { -1 } else { 0 },
+        };
+        let n = match cb.chunk() {
+            Some(y) => {
+                let n = xn.min(y.len());
+                // SAFETY: `xs` points into `ca`'s cached leaf or its own scratch,
+                // neither of which `cb.chunk()` can touch.
+                let x = unsafe { core::slice::from_raw_parts(xs, n) };
+                match x.cmp(&y[..n]) {
+                    core::cmp::Ordering::Less => return -1,
+                    core::cmp::Ordering::Greater => return 1,
+                    core::cmp::Ordering::Equal => n,
                 }
-                ca.take(n);
-                cb.take(n);
             }
-        }
+            None => return 1,
+        };
+        ca.take(n);
+        cb.take(n);
     }
 }
 
@@ -612,7 +596,7 @@ pub(crate) fn is_all_whitespace(s: Str) -> bool {
 /// a view or copied. Borrows `s`; the result shares its owner, so a caller that
 /// keeps the result past `s` retains it.
 pub(crate) fn trim(s: Str) -> Str {
-    let mut scratch = Vec::new();
+    let mut scratch = [0u8; INLINE_CAP];
     let (start, end) = {
         let bytes = s.bytes(&mut scratch);
         let start = bytes
@@ -641,18 +625,34 @@ pub(crate) fn repeat(s: Str, n: usize) -> Str {
     out.finish()
 }
 
+/// A fresh buffer holding `s`'s bytes, writable in place — the working copy
+/// `reverse` and `sort` need without a `Vec`.
+fn owned_copy(s: Str) -> Str {
+    let mut out = Builder::with_capacity(s.len().max(INLINE_CAP + 1));
+    for_each_chunk(s, &mut |chunk| {
+        out.push(chunk);
+        true
+    });
+    out.into_buffer()
+}
+
+/// A buffer's bytes, mutably. Only ever called on a buffer the caller just
+/// allocated, so nothing else can be reading them.
+fn buffer_bytes_mut(s: Str) -> &'static mut [u8] {
+    debug_assert_eq!(s.tag(), TAG_BUFFER);
+    unsafe { core::slice::from_raw_parts_mut(s.w1 as *mut u8, s.len()) }
+}
+
 pub(crate) fn reverse(s: Str) -> Str {
-    let mut scratch = Vec::new();
-    let mut bytes = s.bytes(&mut scratch).to_vec();
-    bytes.reverse();
-    from_bytes(&bytes)
+    let out = owned_copy(s);
+    buffer_bytes_mut(out).reverse();
+    out
 }
 
 pub(crate) fn sort(s: Str) -> Str {
-    let mut scratch = Vec::new();
-    let mut bytes = s.bytes(&mut scratch).to_vec();
-    bytes.sort_unstable();
-    from_bytes(&bytes)
+    let out = owned_copy(s);
+    buffer_bytes_mut(out).sort_unstable();
+    out
 }
 
 /// Build a string by appending. Replaces the old
@@ -685,7 +685,7 @@ impl Builder {
             self.grow(bytes.len());
         }
         let end = (self.s.w1 as usize + self.s.len()) as *mut u8;
-        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), end, bytes.len()) };
+        unsafe { core::ptr::copy_nonoverlapping(bytes.as_ptr(), end, bytes.len()) };
         self.s.w2 = meta(self.s.len() + bytes.len(), TAG_BUFFER);
     }
 
@@ -694,8 +694,7 @@ impl Builder {
     fn grow(&mut self, extra: usize) {
         let need = self.s.len() + extra;
         let cap = (buffer_cap(self.s.w0 as *const u8) * 2).max(need);
-        let mut scratch = Vec::new();
-        let grown = with_capacity(cap, self.s.bytes(&mut scratch));
+        let grown = with_capacity(cap, self.s.buffer_bytes());
         self.s.release();
         self.s = grown;
     }
@@ -704,11 +703,16 @@ impl Builder {
     /// pinning a buffer.
     pub(crate) fn finish(self) -> Str {
         if self.s.len() <= INLINE_CAP {
-            let mut scratch = Vec::new();
-            let packed = from_bytes_inline(self.s.bytes(&mut scratch));
+            let packed = from_bytes_inline(self.s.buffer_bytes());
             self.s.release();
             return packed;
         }
+        self.s
+    }
+
+    /// The finished value, always as a buffer — for callers that need the bytes
+    /// at an address (a rope's cache, a working copy for `reverse`/`sort`).
+    pub(crate) fn into_buffer(self) -> Str {
         self.s
     }
 }
@@ -736,27 +740,25 @@ pub(crate) fn join(parts: &[Str], sep: Str) -> Str {
 /// Split on every occurrence of `sep`; an empty `sep` splits into single bytes.
 /// The pieces are **windows** into `s` when it is a buffer — the split of a
 /// large string allocates nothing per piece.
-pub(crate) fn split(s: Str, sep: Str) -> Vec<Str> {
-    let mut out = Vec::new();
+pub(crate) fn split_each(s: Str, sep: Str, out: &mut impl FnMut(Str)) {
     if sep.is_empty() {
         for i in 0..s.len() {
-            out.push(s.slice(i, i + 1));
+            out(s.slice(i, i + 1));
         }
-        return out;
+        return;
     }
     let mut at = 0;
     let mut start = 0;
     while at + sep.len() <= s.len() {
         if starts_with_at(s, sep, at) {
-            out.push(s.slice(start, at));
+            out(s.slice(start, at));
             at += sep.len();
             start = at;
         } else {
             at += 1;
         }
     }
-    out.push(s.slice(start, s.len()));
-    out
+    out(s.slice(start, s.len()));
 }
 
 // ---------- Char iteration (`for c in s`) ----------
@@ -825,8 +827,8 @@ fn descend(root: Str, pos: usize) -> (Str, usize) {
         let n = rope_node(node.owner());
         let (left, right) = unsafe {
             (
-                std::ptr::read(n.add(ROPE_LEFT) as *const Str),
-                std::ptr::read(n.add(ROPE_RIGHT) as *const Str),
+                core::ptr::read(n.add(ROPE_LEFT) as *const Str),
+                core::ptr::read(n.add(ROPE_RIGHT) as *const Str),
             )
         };
         if at < left.len() {
@@ -849,97 +851,25 @@ fn leaf_byte(leaf: Str, i: usize) -> u8 {
     }
 }
 
-// ---------- I/O ----------
-
-/// Write the value's bytes to `out`, streaming — a rope never flattens, so
-/// printing or writing a built-up string costs no extra allocation.
-pub(crate) fn write_to(s: Str, out: &mut impl std::io::Write) -> std::io::Result<()> {
-    let mut err = None;
-    for_each_chunk(s, &mut |chunk| match out.write_all(chunk) {
-        Ok(()) => true,
-        Err(e) => {
-            err = Some(e);
-            false
-        }
-    });
-    match err {
-        Some(e) => Err(e),
-        None => Ok(()),
-    }
-}
-
-/// `print(s)` — the value's bytes then a newline, streamed to stdout.
-pub(crate) fn print(s: Str) {
-    use std::io::Write;
-    let stdout = std::io::stdout();
-    let mut out = stdout.lock();
-    let _ = write_to(s, &mut out);
-    let _ = out.write_all(b"\n");
-}
-
-/// `error: <msg>` on stderr, streamed.
-pub(crate) fn print_error(msg: Str) {
-    use std::io::Write;
-    let stderr = std::io::stderr();
-    let mut out = stderr.lock();
-    let _ = out.write_all(b"error: ");
-    let _ = write_to(msg, &mut out);
-    let _ = out.write_all(b"\n");
-}
-
-/// A value's bytes as a `&str` path. Materializes into `scratch` when the value
-/// has no contiguous bytes of its own; **note there is no NUL involved** — a
-/// buffer is a window and carries no terminator, and every path consumer here is
-/// length-delimited.
-fn path_of<'a>(s: &'a Str, scratch: &'a mut Vec<u8>) -> Option<&'a str> {
-    std::str::from_utf8(s.bytes(scratch)).ok()
-}
-
-/// `read_file_to_string(path)`. `None` on any failure, matching the runtime's
-/// "null means error" convention at this boundary.
-pub(crate) fn read_file_to_string(path: Str) -> Option<Str> {
-    let mut scratch = Vec::new();
-    let name = path_of(&path, &mut scratch)?;
-    let bytes = std::fs::read(name).ok()?;
-    Some(from_bytes(&bytes))
-}
-
-/// `write_string_to_file(path, contents)` — the contents stream out chunk by
-/// chunk, so writing a rope never builds it flat first.
-pub(crate) fn write_string_to_file(path: Str, contents: Str) -> bool {
-    let mut scratch = Vec::new();
-    let Some(name) = path_of(&path, &mut scratch) else {
-        return false;
-    };
-    let Ok(file) = std::fs::File::create(name) else {
-        return false;
-    };
-    let mut file = std::io::BufWriter::new(file);
-    if write_to(contents, &mut file).is_err() {
-        return false;
-    }
-    std::io::Write::flush(&mut file).is_ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn text(s: Str) -> String {
-        let mut scratch = Vec::new();
+        let mut scratch = [0u8; INLINE_CAP];
         String::from_utf8(s.bytes(&mut scratch).to_vec()).unwrap()
     }
 
     #[test]
     fn value_is_three_words() {
-        assert_eq!(std::mem::size_of::<Str>(), STR_SIZE);
-        assert_eq!(std::mem::align_of::<Str>(), 8);
+        assert_eq!(core::mem::size_of::<Str>(), STR_SIZE);
+        assert_eq!(core::mem::align_of::<Str>(), 8);
     }
 
     #[test]
     fn zeroed_memory_is_the_empty_string() {
         // sret buffers and fresh array slots arrive zero-filled.
-        let zeroed: Str = unsafe { std::mem::zeroed() };
+        let zeroed: Str = unsafe { core::mem::zeroed() };
         assert_eq!(zeroed.tag(), TAG_BUFFER);
         assert_eq!(zeroed.len(), 0);
         assert!(zeroed.is_empty());
@@ -964,7 +894,7 @@ mod tests {
                 },
                 "representation for {n}"
             );
-            let mut scratch = Vec::new();
+            let mut scratch = [0u8; INLINE_CAP];
             assert_eq!(s.bytes(&mut scratch), &bytes[..], "bytes for {n}");
             s.release();
         }
@@ -1232,7 +1162,8 @@ mod tests {
     #[test]
     fn split_pieces_are_windows_into_the_source() {
         let s = from_bytes(b"alpha,beta,gamma,delta,epsilon,zeta,eta,theta");
-        let pieces = split(s, from_bytes(b","));
+        let mut pieces = Vec::new();
+        split_each(s, from_bytes(b","), &mut |p| pieces.push(p));
         let joined: Vec<String> = pieces.iter().map(|p| text(*p)).collect();
         assert_eq!(
             joined,
@@ -1244,24 +1175,20 @@ mod tests {
         );
         // Edges: leading/trailing separators produce empty pieces, and a missing
         // separator yields the whole string.
-        let edges = split(from_bytes(b",a,"), from_bytes(b","));
+        let mut edges = Vec::new();
+        split_each(from_bytes(b",a,"), from_bytes(b","), &mut |p| edges.push(p));
         assert_eq!(
             edges.iter().map(|p| text(*p)).collect::<Vec<_>>(),
             ["", "a", ""]
         );
-        assert_eq!(
-            split(from_bytes(b"abc"), from_bytes(b"-"))
-                .iter()
-                .map(|p| text(*p))
-                .collect::<Vec<_>>(),
-            ["abc"]
-        );
+        let mut none = Vec::new();
+        split_each(from_bytes(b"abc"), from_bytes(b"-"), &mut |p| none.push(p));
+        assert_eq!(none.iter().map(|p| text(*p)).collect::<Vec<_>>(), ["abc"]);
         // An empty separator splits into single bytes.
+        let mut bytes = Vec::new();
+        split_each(from_bytes(b"abc"), Str::empty(), &mut |p| bytes.push(p));
         assert_eq!(
-            split(from_bytes(b"abc"), Str::empty())
-                .iter()
-                .map(|p| text(*p))
-                .collect::<Vec<_>>(),
+            bytes.iter().map(|p| text(*p)).collect::<Vec<_>>(),
             ["a", "b", "c"]
         );
         s.release();
@@ -1320,48 +1247,5 @@ mod tests {
         assert_eq!(text(window), mid);
         assert_eq!(collect(window), mid.as_bytes());
         s.release();
-    }
-
-    #[test]
-    fn writing_streams_every_representation() {
-        let src = "written content, long enough to be a buffer of its own";
-        for (what, s) in variants(src) {
-            let mut out = Vec::new();
-            write_to(s, &mut out).unwrap();
-            assert_eq!(out, src.as_bytes(), "{what}");
-        }
-    }
-
-    #[test]
-    fn files_round_trip_through_windows_and_ropes() {
-        let dir = std::env::temp_dir();
-        let path_text = dir
-            .join(format!("aipl_str24_{}.txt", std::process::id()))
-            .to_str()
-            .unwrap()
-            .to_string();
-        // The path itself is a *window* into a larger string — a buffer carries
-        // no NUL, so this is the case that would break a C-string assumption.
-        let padded = from_bytes(format!("<{path_text}>").as_bytes());
-        let path = padded.slice(1, 1 + path_text.len());
-        assert_eq!(text(path), path_text);
-
-        // The contents are a rope, so the write has to stream them.
-        let contents = concat(
-            from_bytes(b"first half of the file, long enough to be its own buffer\n"),
-            from_bytes(b"second half, also long enough to live in a buffer\n"),
-        );
-        assert_eq!(contents.tag(), TAG_ROPE);
-        assert!(write_string_to_file(path, contents));
-
-        let back = read_file_to_string(path).expect("file reads back");
-        assert_eq!(text(back), text(contents));
-        assert_eq!(back.tag(), TAG_BUFFER);
-
-        assert!(read_file_to_string(from_bytes(b"/nonexistent/aipl/str24")).is_none());
-        let _ = std::fs::remove_file(&path_text);
-        padded.release();
-        contents.release();
-        back.release();
     }
 }
