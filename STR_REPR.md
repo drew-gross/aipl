@@ -9,6 +9,9 @@ flip.
 
 - [x] **Spike** — the ABI questions, answered against cranelift 0.134 on both target families (`crates/aipl-codegen/src/abi_spike.rs`)
 - [ ] 0 Preparation — funnel every "a `str` is one `i64`" assumption through helpers, green at each step
+  - [x] the runtime ABI table names kinds (`Abi`/`Ret`) instead of counting arity
+  - [x] every runtime call goes through `Builtins::call`/`call_void` (all 94 sites)
+  - [ ] `str` values in slots, fields, and elements — loads, stores, refcounting
 - [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap, one commit
 - [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
 - [ ] 3 Free slicing, and `SpanStr` falling out of it
@@ -168,9 +171,18 @@ first assumed:
 | Cranelift's formal `StructReturn`? | Works **only** as a parameter with no matching return — 0.134 rejects an explicit `StructReturn` return value outright, so the C convention of handing the pointer back is not expressible. In practice identical to the plain out pointer. |
 | 24-byte struct across the Rust boundary? | Round-trips correctly by pointer, and three scalar words pass to a Rust `extern "C" fn(i64, i64, i64)` unchanged. |
 
-Multi-value returns are therefore out — and not just for x86-64. The checked-in
-`.clif` artifacts are one text compiled for whichever host loads them, so a
-signature that differs per target is not an option at all.
+**Portability is deferred** — this project targets an aarch64 Mac for now — so
+the x86-64 refusal is not a blocker today: three-word returns *work* on the host,
+and they beat a memory round trip. The reason to write the out-pointer form
+anyway is that it costs nothing to choose now and is expensive to retrofit. The
+shape lives in `lower_import_sig` alone, but the checked-in `.clif` artifacts
+carry their signatures with them, so changing it later means regenerating every
+artifact and re-measuring the corpus. Choose multi-value returns only with that
+bill in mind.
+
+Those same artifacts are also why a *per-target* signature is not an option when
+portability does come back: one `.clif` text is compiled for whichever host loads
+it.
 
 **The shape, everywhere, inside and out:** a `str` argument passes as three
 scalar words; a `str` result is written through a leading out pointer.
