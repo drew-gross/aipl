@@ -13,7 +13,7 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 488
-instructions executed: 583
+instructions executed: 554
 binary size: 4296
   code: 2036
   data: 243

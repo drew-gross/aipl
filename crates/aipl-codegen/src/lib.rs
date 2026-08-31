@@ -10461,6 +10461,26 @@ fn i64_slot(builder: &mut FunctionBuilder) -> StackSlot {
     builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3))
 }
 
+/// A stack slot holding one AIPL value of type `ty`, **by value** — sized from
+/// [`elem_size_of`] rather than assumed to be a machine word.
+///
+/// Use this wherever a value is spilled so its address can be handed to
+/// something that reads it (the container runtime takes elements and keys
+/// through pointers), and [`i64_slot`] only for machine words: loop counters,
+/// tags, accumulated results, and the *addresses* composites travel as.
+///
+/// The distinction is invisible today, since every non-composite value is one
+/// i64 — and it is exactly what a 24-byte `str` (`STR_REPR.md`) needs, because
+/// then "one value" and "one word" stop being the same thing.
+fn value_slot(
+    builder: &mut FunctionBuilder,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> StackSlot {
+    let size = elem_size_of(ty, structs).max(8) as u32;
+    builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3))
+}
+
 /// Emit `self.starts_with(other)` / `self.starts_with_at(other, at)` /
 /// `self.ends_with(other)` for two arrays of element type `elem`, returning an
 /// `i64` 0/1. True iff `other`'s elements equal a contiguous run of `self`'s at
@@ -10798,9 +10818,9 @@ fn emit_eq_body<M: Module>(
                 builder.switch_to_block(body);
                 builder.seal_block(body);
                 let el = load_array_elem(module, builder, builtins, lv, i, elem, structs);
-                let xslot = i64_slot(builder);
-                builder.ins().stack_store(types::I64, el, xslot, 0);
+                let xslot = value_slot(builder, elem, structs);
                 let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
+                store_array_elem(builder, xptr, el, elem, structs);
                 let str_cmp = builder.ins().iconst(
                     types::I64,
                     i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
@@ -10959,9 +10979,9 @@ fn emit_eq_body<M: Module>(
                 let off = builder.ins().imul_imm_s(i, pair_size);
                 let lpair = builder.ins().iadd(lelems, off);
                 let key = component(builder, lpair, 0, k, structs);
-                let kslot = i64_slot(builder);
-                builder.ins().stack_store(types::I64, key, kslot, 0);
+                let kslot = value_slot(builder, k, structs);
                 let kptr = builder.ins().stack_addr(types::I64, kslot, 0);
+                store_array_elem(builder, kptr, key, k, structs);
                 let rslot =
                     builtins.call(module, builder, "aipl_dict_get", &[rv, kptr, psz, str_cmp]);
                 let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
@@ -18987,13 +19007,9 @@ fn compile_expr_inner<M: Module>(
                 // `aipl_set_insert` reads the element through a pointer; spill
                 // the value (a `bool` is read back as i64, a `str` as its
                 // pointer) and pass its address.
-                let s = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                builder.ins().stack_store(types::I64, v, s, 0);
+                let s = value_slot(builder, &elem, structs);
                 let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
+                store_array_elem(builder, x_ptr, v, &elem, structs);
                 ptr = builtins.call(
                     module,
                     builder,

@@ -11,7 +11,8 @@ flip.
 - [ ] 0 Preparation — funnel every "a `str` is one `i64`" assumption through helpers, green at each step
   - [x] the runtime ABI table names kinds (`Abi`/`Ret`) instead of counting arity
   - [x] every runtime call goes through `Builtins::call`/`call_void` (all 94 sites)
-  - [ ] `str` values in slots, fields, and elements — loads, stores, refcounting
+  - [x] `value_slot` — a spilled value is sized by its type, not assumed to be a word
+  - [ ] audit the remaining by-value spills and `mut` binding slots
 - [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap, one commit
 - [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
 - [ ] 3 Free slicing, and `SpanStr` falling out of it
@@ -200,6 +201,51 @@ The spike stays in the tree until Stage 1 lands: it is the executable form of
 this decision, and re-running it is how a cranelift bump gets re-checked. It
 costs a `cranelift-codegen` dev-dependency with `all-arch` (the shipped build
 carries only the host backend), which is why it goes away afterwards.
+
+## The flip is smaller than it looks: `str` becomes a composite
+
+Stage 0's audit turned up the single most useful fact about this change. Codegen
+already has two classes of value — scalars, which are one `i64` register, and
+**composites** (structs, optionals, results, variants), which live in memory and
+travel as *addresses* — and the fork between them is decided in three small
+places:
+
+| Predicate | Where | Today | After |
+|---|---|---|---|
+| `is_composite` | `lib.rs:9583`, 13 call sites | optional/result/unboxed struct | …plus `is_str_repr` |
+| `elem_size_of` | `lib.rs:11685`, 29 call sites | `_ => 8` | a `str` arm returning 24 |
+| `sret_size` | `lib.rs:19490`, feeds `build_signature` | `_ => None` | `Some(24)` for `str` |
+
+Everything else follows from those three, because the composite machinery is
+already written: `component` hands back an address instead of loading a word,
+`store_array_elem` routes to `copy_composite`, `build_signature` prepends an
+sret pointer for the return and **keeps passing one `i64` per parameter** —
+which for a composite is its address. So the AIPL-level ABI needs *no change at
+all* for `str` parameters.
+
+That also settles the runtime ABI more cheaply than the spike's framing
+suggested. If a `str` value lives in memory as a composite, its **address** is
+what a call site has in hand, so `Abi::Str` should lower to one pointer word
+rather than three scalars, and `Ret::Str` to a leading out pointer — exactly the
+shape `abi_spike::q3` verified round-trips. The three-scalar form stays
+available (`q4`) for a later by-value fast path, but it is not the default.
+
+**What stays genuinely `str`-specific**, and is the real work of Stage 1:
+
+- **Literals.** A `str` constant is a pointer to a data symbol today; it becomes
+  a 24-byte constant (base, data, `len | tag`) whose *address* is the value —
+  which is to say, exactly what a struct constant already is.
+- **Refcounting.** `emit_rc_w`'s `is_str_repr` arm (`lib.rs:10120`) passes the
+  value straight to `aipl_inc`/`aipl_dec`; it must instead load the base word
+  out of the value and pass that. One arm, and the only place it lives.
+- **The runtime's own internals** — every `aipl_str_*` function, rewritten
+  against the new layout, twice (JIT and AOT).
+- **FFI marshaling** (`lib.rs:6034-6100`), where 24 bytes cross into Rust.
+
+The cost of this shape is that a `str` stops living in registers. That is the
+trade three-scalar passing would have bought, and it is worth measuring at Stage
+1 rather than assuming: the canaries below are slice- and token-heavy, which is
+where memory traffic would show up first.
 
 ## The constraint that shapes Stage 4: `refcount == 1` is not ownership
 
