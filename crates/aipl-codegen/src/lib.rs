@@ -16,6 +16,10 @@ use std::{
 #[cfg(test)]
 mod abi_spike;
 
+// STAGED: the 24-byte `str` layout (STR_REPR.md stage 1), proven on its own
+// before the switch wires it up.
+mod str24;
+
 use cranelift::{
     codegen::{
         cursor::{Cursor, FuncCursor},

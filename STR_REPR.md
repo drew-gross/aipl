@@ -13,7 +13,12 @@ flip.
   - [x] every runtime call goes through `Builtins::call`/`call_void` (all 94 sites)
   - [x] `value_slot` — a spilled value is sized by its type, not assumed to be a word
   - [ ] audit the remaining by-value spills and `mut` binding slots
-- [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap, one commit
+- [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap
+  - [x] the layout itself, proven on its own (`crates/aipl-codegen/src/str24.rs`, staged dead code)
+  - [ ] the rest of the JIT runtime's `str` surface against it
+  - [ ] mirror into `aipl_runtime.rs` (no-std, byte-for-byte)
+  - [ ] the switch: `str` joins `is_composite`/`elem_size_of`/`sret_size`, literals, the rc arm, FFI
+  - [ ] bootstrap the artifacts, regenerate, refill the corpus
 - [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
 - [ ] 3 Free slicing, and `SpanStr` falling out of it
 - [ ] 4 In-place mutation and growth — the ownership rule plus the capacity word
@@ -21,8 +26,11 @@ flip.
 - [ ] 6 Converge arrays onto the same model — inline and view arrays, one block header, one body of code
 - [ ] 7 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word
 
-Stage 0 is most of the work and can land incrementally. Stage 1 is atomic and
-cannot. Each of 3–7 is separately justifiable once 1–2 are green.
+Stage 0 is most of the work and can land incrementally. **The switch inside
+Stage 1 is atomic**, but the layout it switches to need not be: `str24.rs`
+implements and tests it as staged dead code, with no compiler in the loop, so the
+irreversible commit is only the wiring. Each of 3–7 is separately justifiable
+once 1–2 are green.
 
 **A standing principle for all of it:** anywhere strings and arrays can share a
 representation, a header, or a body of code, they should. They are the same
