@@ -43,3 +43,7 @@ cranelift = { workspace = true }
 cranelift-module = { workspace = true }
 cranelift-native = { workspace = true }
 cranelift-object = { workspace = true }
+
+[dev-dependencies]
+# TEMPORARY (STR_REPR.md ABI spike): cross-target ISA lookup. Delete with abi_spike.rs.
+cranelift-codegen = { version = "0.134.2", features = ["all-arch"] }

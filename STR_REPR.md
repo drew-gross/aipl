@@ -7,6 +7,7 @@ a scalar to a composite, rewrites both runtimes, and invalidates every checked-i
 `.clif`. Stages 5–7 are follow-on programs it unlocks rather than parts of the
 flip.
 
+- [x] **Spike** — the ABI questions, answered against cranelift 0.134 on both target families (`crates/aipl-codegen/src/abi_spike.rs`)
 - [ ] 0 Preparation — funnel every "a `str` is one `i64`" assumption through helpers, green at each step
 - [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap, one commit
 - [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
@@ -152,20 +153,27 @@ So a builder loop gets the array-style growth path, and general `a + b` keeps th
 lazy one. Monomorphization's `ConcatStr` pseudo-type and its `$c{i}` instances
 (`crates/aipl-syntax/src/lib.rs:1951-1965`) stay as they are.
 
-### 4. ABI: three scalars inside, pointers at the runtime boundary
+### 4. ABI: three scalar arguments, and results through an out pointer
 
 `cl_type_of` returns `I64` for every type today (`lib.rs:7933`) — `str` is one
-SSA value everywhere. Widening it:
+SSA value everywhere. The spike (`crates/aipl-codegen/src/abi_spike.rs`, run
+against cranelift 0.134) settles how it widens, and it is **not** what the plan
+first assumed:
 
-- **AIPL-internal calls: three scalar params / three returns.** Cranelift
-  supports multi-value returns and falls back to a hidden pointer where the
-  machine ABI requires one. Strings stay in registers on hot paths.
-- **The runtime (C) boundary: pass `*const AiplStr`, return through an out
-  pointer.** A 24-byte `#[repr(C)]` struct is MEMORY-class on SysV and would
-  otherwise put Cranelift and rustc in the position of agreeing about something
-  neither states explicitly. The compiler already has the machinery: composites
-  are stack-allocated and passed by pointer, with a hidden-sret path for
-  composite returns (`lib.rs:6034-6100`).
+| Question | Answer |
+|---|---|
+| Three `i64` returns? | **Refused on x86-64.** `Unsupported feature: Too many return values to fit in registers. Use a StructReturn argument instead.` It *works* on the aarch64 host — exactly the trap a host-only spike would have walked into. |
+| Three scalar params? | Works everywhere, including eight-param signatures (two `str`s plus extras) on x86-64, where cranelift spills past the register budget for us. |
+| Result through a leading out pointer? | Works everywhere, and is already how the compiler returns composites (`lib.rs:6034-6100`: "a normal *leading* i64 param — and returns nothing"). |
+| Cranelift's formal `StructReturn`? | Works **only** as a parameter with no matching return — 0.134 rejects an explicit `StructReturn` return value outright, so the C convention of handing the pointer back is not expressible. In practice identical to the plain out pointer. |
+| 24-byte struct across the Rust boundary? | Round-trips correctly by pointer, and three scalar words pass to a Rust `extern "C" fn(i64, i64, i64)` unchanged. |
+
+Multi-value returns are therefore out — and not just for x86-64. The checked-in
+`.clif` artifacts are one text compiled for whichever host loads them, so a
+signature that differs per target is not an option at all.
+
+**The shape, everywhere, inside and out:** a `str` argument passes as three
+scalar words; a `str` result is written through a leading out pointer.
 
 ```rust
 #[repr(C)]
@@ -175,6 +183,11 @@ struct AiplStr { base: *const u8, data: *const u8, meta: u64 }  // meta = len | 
 defined identically in `crates/aipl-codegen/src/lib.rs` and
 `crates/aipl-linker/runtime/aipl_runtime.rs`, which are kept byte-for-byte
 identical (that file's own header says so, at its line 8).
+
+The spike stays in the tree until Stage 1 lands: it is the executable form of
+this decision, and re-running it is how a cranelift bump gets re-checked. It
+costs a `cranelift-codegen` dev-dependency with `all-arch` (the shipped build
+carries only the host backend), which is why it goes away afterwards.
 
 ## The constraint that shapes Stage 4: `refcount == 1` is not ownership
 
@@ -337,11 +350,9 @@ Decide it at Stage 1, with the port list in front of you.
 
 ## Verification
 
-1. **Spike first, before Stage 0.** Confirm Cranelift multi-value returns of
-   three words on x86-64 *and* aarch64, and that the out-pointer runtime ABI
-   agrees between Cranelift-emitted calls and rustc-compiled `no_std` code. If
-   either is awkward, the ABI decision changes and Stage 0's helper shapes change
-   with it.
+1. **The spike** — `cargo test -p aipl-codegen --lib abi_spike`, seven checks
+   pinning the ABI decision above across x86-64 (both ABIs) and aarch64. Re-run
+   it after any cranelift bump.
 2. **Representation cases** — one per arm and per boundary: empty, 1 byte, 22
    bytes, 23 bytes (the inline/buffer boundary), a slice of each, a slice of a
    slice, a rope of each, and a rope slice that lands inside one leaf.
@@ -367,9 +378,10 @@ Decide it at Stage 1, with the port list in front of you.
 - **Does anything depend on 8-byte strings outside the type gates?** The
   bit-packed array mode, dict/set bucket layout, hash seeding, the shim slots,
   and the FFI argument cap are the places to audit before Stage 1.
-- **Should `str` remain three SSA values, or become a stack-slot composite?** The
-  spike answers this. Registers are better for hot paths; the composite path is
-  less new code because structs and optionals already work that way.
+- **Should `str` remain three SSA values, or become a stack-slot composite?**
+  The spike narrows it: arguments are cheap as three scalars, so the question is
+  only about *results*, which must go through memory either way. Registers still
+  win for values that never cross a call.
 - **Does a buffer need a "NUL is present" bit?** The tag byte has six spare bits.
   Only worth it if C handoff turns out to be hot; the capacity test already
   answers "can I write one?".

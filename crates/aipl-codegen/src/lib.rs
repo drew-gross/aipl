@@ -12,6 +12,10 @@ use std::{
     rc::Rc,
 };
 
+// TEMPORARY: 24-byte-`str` ABI spike (STR_REPR.md). Delete with the file.
+#[cfg(test)]
+mod abi_spike;
+
 use cranelift::{
     codegen::{
         cursor::{Cursor, FuncCursor},
@@ -8053,101 +8057,173 @@ struct Builtins {
     func_refs: RefCell<HashMap<FuncId, FuncRef>>,
 }
 
-/// Signature of a runtime import `sym`. All take/return i64 (pointers, ints, and
-/// `bool`/`char` as i64); they differ only in arity and whether they return.
+/// What one runtime-call parameter or result is, in ABI terms.
+///
+/// [`Abi::Word`] is anything that travels in a single `i64` register: a pointer,
+/// an integer, a `bool`/`char`, a function-pointer constant, a raw byte cursor,
+/// an array/set/dict handle, or a pointer *to* an element rather than the
+/// element itself (`aipl_array_push`'s `x`, `aipl_dict_get`'s `key_ptr`).
+/// [`Abi::Str`] is a `str` *value*.
+///
+/// The two are the same width today, which is why this table used to count
+/// parameters instead of naming them — and exactly why it can't any more. A
+/// 24-byte `str` (`STR_REPR.md`) passes as three scalar words and returns
+/// through a leading out pointer, because multi-value returns of three words are
+/// refused on x86-64 (`abi_spike::q2_three_word_returns_are_refused_on_x86_64`;
+/// the working shape is pinned by `q2b`). Naming the kinds now makes that flip a
+/// change to [`lower_import_sig`] rather than a re-derivation of seventy
+/// signatures under time pressure.
+///
+/// Two classifications worth knowing, because they are not guessable from the
+/// Rust signature (every pointer is `*const u8` there):
+///
+/// - **Refcount ops take a `str`.** `aipl_inc`/`aipl_dec` branch on the
+///   representation tag, so they are `Str`, not a bare pointer — though after
+///   the flip they need only the base and meta words, never `data`, which is an
+///   optimization to take once it can be measured.
+/// - **The `to_str` builder writes through raw cursors.** `aipl_str_alloc`
+///   returns the writable content pointer, and `aipl_write_i64`/`_u64`/`_bytes`
+///   advance it; none of those is a `str` value. Today a heap `str` value *is*
+///   its content pointer, so the distinction is invisible; after the flip that
+///   idiom becomes "allocate a buffer, then build a value over it", and this is
+///   the table that says which is which.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Abi {
+    Word,
+    Str,
+}
+
+/// What a runtime import gives back — the return half of [`Abi`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Ret {
+    None,
+    Word,
+    Str,
+}
+
+/// Lower a runtime import's kinds to a cranelift signature. **The one place the
+/// runtime ABI's shape is decided**: today every kind is one `i64`, so this is
+/// the identity the old arity table encoded; at the flip, `Abi::Str` expands to
+/// three params and `Ret::Str` becomes a leading out-pointer param with no
+/// return value.
+fn lower_import_sig<M: Module>(module: &mut M, params: &[Abi], ret: Ret) -> Signature {
+    let mut s = module.make_signature();
+    for kind in params {
+        match kind {
+            Abi::Word | Abi::Str => s.params.push(AbiParam::new(types::I64)),
+        }
+    }
+    match ret {
+        Ret::None => {}
+        Ret::Word | Ret::Str => s.returns.push(AbiParam::new(types::I64)),
+    }
+    s
+}
+
+/// Signature of a runtime import `sym`.
 fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
-    let sig = |params: usize, ret: bool| {
-        let mut s = module.make_signature();
-        for _ in 0..params {
-            s.params.push(AbiParam::new(types::I64));
-        }
-        if ret {
-            s.returns.push(AbiParam::new(types::I64));
-        }
-        s
-    };
+    let (params, ret) = import_abi(sym);
+    lower_import_sig(module, params, ret)
+}
+
+/// How many `i64` argument words `params` lowers to — the arity every call site
+/// must supply. One per kind today; an [`Abi::Str`] becomes three at the flip.
+fn import_arg_words(params: &[Abi]) -> usize {
+    params
+        .iter()
+        .map(|k| match k {
+            Abi::Word | Abi::Str => 1,
+        })
+        .sum()
+}
+
+/// What runtime import `sym` takes and gives back. See [`Abi`] for what the
+/// kinds mean and why they are spelled out rather than counted.
+fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
+    use Abi::{Str, Word};
+    let sig = |params: &'static [Abi], ret: Ret| (params, ret);
     match sym {
-        "aipl_print"
-        | "aipl_print_error"
-        | "aipl_inc"
-        | "aipl_dec"
-        | "aipl_array_dec"
+        // ---- str in, nothing out ----
+        "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_test_begin"
+        | "aipl_test_fail" => sig(&[Str], Ret::None),
+        // ---- one refcounted handle in, nothing out ----
+        "aipl_array_dec"
         | "aipl_arr_inc"
         | "aipl_rec_inc_strong"
         | "aipl_rec_dec_strong"
         | "aipl_rec_inc_weak"
-        | "aipl_rec_dec_weak"
-        | "aipl_count_insns"
-        | "aipl_count_call"
-        | "aipl_test_begin"
-        | "aipl_test_fail" => sig(1, false),
-        // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
-        // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
-        "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
-        // Takes nothing, returns the reading.
-        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(0, true),
+        | "aipl_rec_dec_weak" => sig(&[Word], Ret::None),
+        // Instrumentation counters: an opaque i64 each.
+        "aipl_count_insns" | "aipl_count_call" => sig(&[Word], Ret::None),
+        // Test-runner hooks: `__test_end()` returns nothing; `__test_summary()`
+        // returns the exit code; `__assert(cond, loc)` takes the location `str`.
+        "aipl_test_end" | "aipl_test_fail_none" => sig(&[], Ret::None),
+        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(&[], Ret::Word),
+        "aipl_assert" => sig(&[Word, Str], Ret::None),
         // Shim slots: read one, or write one (returns nothing).
-        "aipl_shim_get" => sig(1, true),
-        "aipl_shim_set" => sig(2, false),
-        "aipl_assert" => sig(2, false),
+        "aipl_shim_get" => sig(&[Word], Ret::Word),
+        "aipl_shim_set" => sig(&[Word, Word], Ret::None),
+        // ---- element-run helpers: a pointer to the run, and its length ----
         "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
         | "aipl_arr_drop_opt_str"
         | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt"
-        | "aipl_str_iter_init" => sig(2, false),
-        "aipl_arr_load_bit" => sig(2, true),
-        "aipl_arr_elem_ptr" => sig(3, true),
+        | "aipl_arr_retain_opt" => sig(&[Word, Word], Ret::None),
+        // `(cursor, s)` — the iterator writes its state through the cursor.
+        "aipl_str_iter_init" => sig(&[Word, Str], Ret::None),
+        "aipl_arr_load_bit" => sig(&[Word, Word], Ret::Word),
+        "aipl_arr_elem_ptr" => sig(&[Word, Word, Word], Ret::Word),
         // sret ptr + (program, args): writes the whole composite `Result` via
-        // the hidden pointer, so it returns nothing.
-        "aipl_execute_program" => sig(3, false),
-        "aipl_str_alloc"
-        | "aipl_i64_len"
-        | "aipl_u64_len"
-        | "aipl_str_len"
-        | "aipl_str_is_all_whitespace"
-        | "aipl_trim"
-        | "aipl_trim_mut"
-        | "aipl_str_hash"
-        | "aipl_str_iter_next"
-        | "aipl_read_file_to_string"
-        | "aipl_list_files"
-        | "aipl_str_reverse"
-        | "aipl_str_sort" => sig(1, true),
-        "aipl_rec_alloc"
-        | "aipl_str_repeat"
+        // the hidden pointer, so it returns nothing. `args` is a `str[]`.
+        "aipl_execute_program" => sig(&[Word, Str, Word], Ret::None),
+        // ---- str in, scalar out ----
+        "aipl_str_len" | "aipl_str_is_all_whitespace" | "aipl_str_hash" => sig(&[Str], Ret::Word),
+        "aipl_char_at" => sig(&[Str, Word], Ret::Word),
+        "aipl_str_cmp"
         | "aipl_str_eq"
-        | "aipl_str_cmp"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
-        | "aipl_str_contains"
-        | "aipl_concat"
-        | "aipl_concat_lazy"
-        | "aipl_concat_mut"
-        | "aipl_char_at"
-        | "aipl_str_data"
-        | "aipl_str_split"
-        | "aipl_str_join"
-        | "aipl_write_i64"
-        | "aipl_write_u64"
-        | "aipl_write_string_to_file" => sig(2, true),
-        "aipl_write_bytes"
-        | "aipl_array_new"
-        | "aipl_array_with_cap"
-        | "aipl_str_slice"
-        | "aipl_str_starts_with_at" => sig(3, true),
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
-            sig(4, true)
+        | "aipl_str_contains" => sig(&[Str, Str], Ret::Word),
+        "aipl_str_starts_with_at" => sig(&[Str, Str, Word], Ret::Word),
+        "aipl_write_string_to_file" => sig(&[Str, Str], Ret::Word),
+        // ---- str in, str out ----
+        "aipl_trim"
+        | "aipl_trim_mut"
+        | "aipl_str_reverse"
+        | "aipl_str_sort"
+        | "aipl_read_file_to_string" => sig(&[Str], Ret::Str),
+        "aipl_str_repeat" => sig(&[Str, Word], Ret::Str),
+        "aipl_str_slice" => sig(&[Str, Word, Word], Ret::Str),
+        "aipl_concat" | "aipl_concat_lazy" | "aipl_concat_mut" => sig(&[Str, Str], Ret::Str),
+        // ---- str in, container out (and back) ----
+        "aipl_list_files" => sig(&[Str], Ret::Word),
+        "aipl_str_split" => sig(&[Str, Str], Ret::Word),
+        "aipl_str_join" => sig(&[Word, Str], Ret::Str),
+        // `str_data` hands back a raw content pointer (into `scratch` for an
+        // inline value), which is a cursor, not a `str`.
+        "aipl_str_data" => sig(&[Str, Word], Ret::Word),
+        // ---- the `to_str` builder: raw cursors, not `str` values ----
+        "aipl_str_alloc" | "aipl_i64_len" | "aipl_u64_len" => sig(&[Word], Ret::Word),
+        "aipl_write_i64" | "aipl_write_u64" => sig(&[Word, Word], Ret::Word),
+        "aipl_write_bytes" => sig(&[Word, Word, Word], Ret::Word),
+        "aipl_str_iter_next" => sig(&[Word], Ret::Word),
+        // ---- containers: handles, element pointers, and fn-pointer constants ----
+        "aipl_rec_alloc" => sig(&[Word, Word], Ret::Word),
+        "aipl_array_new" | "aipl_array_with_cap" => sig(&[Word, Word, Word], Ret::Word),
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => {
+            sig(&[Word, Word, Word, Word], Ret::Word)
         }
+        "aipl_arr_reverse" => sig(&[Word, Word, Word, Word], Ret::Word),
         "aipl_array_push"
         | "aipl_array_push_mut"
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
-        | "aipl_arr_extend"
-        | "aipl_arr_join" => sig(5, true),
+        | "aipl_arr_extend" => sig(&[Word, Word, Word, Word, Word], Ret::Word),
+        // `arr_join` glues `str` parts with a `str` separator.
+        "aipl_arr_join" => sig(&[Word, Str, Word, Word, Word], Ret::Str),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
-        | "aipl_arr_slice" => sig(6, true),
+        | "aipl_arr_slice" => sig(&[Word, Word, Word, Word, Word, Word], Ret::Word),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -8184,6 +8260,54 @@ impl Builtins {
         let fref = module.declare_func_in_func(id, func);
         self.func_refs.borrow_mut().insert(id, fref);
         fref
+    }
+
+    /// Emit a call to runtime import `sym` and return its result.
+    ///
+    /// **Every runtime call should come through here or [`Builtins::call_void`].**
+    /// Today the helper is only boilerplate removal — import, call, read the one
+    /// result — but it is also the seam a 24-byte `str` needs (`STR_REPR.md`):
+    /// when an [`Abi::Str`] argument becomes three words and an [`Ret::Str`]
+    /// result becomes a leading out pointer, this is the function that expands
+    /// them. The arity assertion is what keeps a call site honest in the
+    /// meantime; a wrong count is otherwise a silent ABI mismatch that corrupts
+    /// memory rather than failing to compile.
+    fn call<M: Module>(
+        &self,
+        module: &mut M,
+        builder: &mut FunctionBuilder,
+        sym: &'static str,
+        args: &[Value],
+    ) -> Value {
+        let (params, ret) = import_abi(sym);
+        debug_assert_eq!(
+            args.len(),
+            import_arg_words(params),
+            "runtime call {sym}: wrong argument count"
+        );
+        debug_assert!(ret != Ret::None, "runtime call {sym} returns nothing");
+        let f = self.import(module, builder.func, sym);
+        let call = builder.ins().call(f, args);
+        builder.inst_results(call)[0]
+    }
+
+    /// [`Builtins::call`] for an import that returns nothing.
+    fn call_void<M: Module>(
+        &self,
+        module: &mut M,
+        builder: &mut FunctionBuilder,
+        sym: &'static str,
+        args: &[Value],
+    ) {
+        let (params, ret) = import_abi(sym);
+        debug_assert_eq!(
+            args.len(),
+            import_arg_words(params),
+            "runtime call {sym}: wrong argument count"
+        );
+        debug_assert!(ret == Ret::None, "runtime call {sym} returns a value");
+        let f = self.import(module, builder.func, sym);
+        builder.ins().call(f, args);
     }
 
     /// Clear the per-function `FuncRef` cache. Must be called at the start of
@@ -9243,8 +9367,7 @@ fn emit_inc<M: Module>(
     if rc_statically_noop(builder.func, v) {
         return;
     }
-    let local = builtins.import(module, builder.func, "aipl_inc");
-    builder.ins().call(local, &[v]);
+    builtins.call_void(module, builder, "aipl_inc", &[v]);
 }
 
 /// Lower `s[i]` to a `char?`: call the runtime `aipl_char_at` (the byte at `i`
@@ -9261,9 +9384,7 @@ fn emit_char_at<M: Module>(
     i_v: Value,
 ) -> Value {
     emit_inc(builder, module, builtins, s_v);
-    let local = builtins.import(module, builder.func, "aipl_char_at");
-    let inst = builder.ins().call(local, &[s_v, i_v]);
-    let raw = builder.inst_results(inst)[0];
+    let raw = builtins.call(module, builder, "aipl_char_at", &[s_v, i_v]);
     let slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
     let is_some_b = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, -1);
@@ -9740,9 +9861,7 @@ fn emit_str_iter_next<M: Module>(
     // returns the byte, doing the position bump itself.
     builder.switch_to_block(slow);
     builder.seal_block(slow);
-    let next_f = builtins.import(module, builder.func, "aipl_str_iter_next");
-    let inst = builder.ins().call(next_f, &[cur_addr]);
-    let from_runtime = builder.inst_results(inst)[0];
+    let from_runtime = builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
     builder.ins().jump(merge, &[BlockArg::Value(from_runtime)]);
 
     builder.switch_to_block(merge);
@@ -9893,9 +10012,12 @@ fn load_array_elem<M: Module>(
         let stride_v = builder
             .ins()
             .iconst(types::I64, elem_size_of(elem, structs));
-        let f = builtins.import(module, builder.func, "aipl_arr_elem_ptr");
-        let call = builder.ins().call(f, &[arr_ptr, idx, stride_v]);
-        let addr = builder.inst_results(call)[0];
+        let addr = builtins.call(
+            module,
+            builder,
+            "aipl_arr_elem_ptr",
+            &[arr_ptr, idx, stride_v],
+        );
         if is_composite(elem, structs) {
             addr
         } else {
@@ -10029,8 +10151,7 @@ fn emit_rc_w<M: Module>(
                 RcOp::Retain => "aipl_inc",
                 RcOp::Drop => "aipl_dec",
             };
-            let local = builtins.import(module, builder.func, sym);
-            builder.ins().call(local, &[v]);
+            builtins.call_void(module, builder, sym, &[v]);
         }
         // Other primitives own no heap (and `needs_drop` gated them out above).
         ConcreteType::Primitive(_) | ConcreteType::Unit => {}
@@ -10047,8 +10168,7 @@ fn emit_rc_w<M: Module>(
                 RcOp::Retain => "aipl_arr_inc",
                 RcOp::Drop => "aipl_array_dec",
             };
-            let local = builtins.import(module, builder.func, sym);
-            builder.ins().call(local, &[v]);
+            builtins.call_void(module, builder, sym, &[v]);
         }
         ConcreteType::Named(n) => match structs.get(n) {
             // A boxed (recursive) value counts as one reference to its heap
@@ -10065,8 +10185,7 @@ fn emit_rc_w<M: Module>(
                     (RcOp::Retain, true) => "aipl_rec_inc_weak",
                     (RcOp::Drop, true) => "aipl_rec_dec_weak",
                 };
-                let local = builtins.import(module, builder.func, sym);
-                builder.ins().call(local, &[v]);
+                builtins.call_void(module, builder, sym, &[v]);
             }
             Some(TypeDef::Struct(_)) => {
                 // Recurse over the struct's heap-bearing fields. Clone the field
@@ -10849,9 +10968,8 @@ fn emit_eq_body<M: Module>(
                 let kslot = i64_slot(builder);
                 builder.ins().stack_store(types::I64, key, kslot, 0);
                 let kptr = builder.ins().stack_addr(types::I64, kslot, 0);
-                let f = builtins.import(module, builder.func, "aipl_dict_get");
-                let inst = builder.ins().call(f, &[rv, kptr, psz, str_cmp]);
-                let rslot = builder.inst_results(inst)[0];
+                let rslot =
+                    builtins.call(module, builder, "aipl_dict_get", &[rv, kptr, psz, str_cmp]);
                 let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
                 let cmp_b = builder.create_block();
                 let missing = builder.create_block();
@@ -11909,10 +12027,8 @@ fn emit_shimmable_call<M: Module>(
     real_sym: &'static str,
 ) -> Value {
     let slot = aipl_syntax::shim_slot_index(op).expect("a shimmable operation has a slot") as i64;
-    let get = builtins.import(module, builder.func, "aipl_shim_get");
     let idx = builder.ins().iconst(types::I64, slot);
-    let inst = builder.ins().call(get, &[idx]);
-    let cur = builder.inst_results(inst)[0];
+    let cur = builtins.call(module, builder, "aipl_shim_get", &[idx]);
 
     let shim_b = builder.create_block();
     let real_b = builder.create_block();
@@ -11933,9 +12049,7 @@ fn emit_shimmable_call<M: Module>(
 
     builder.switch_to_block(real_b);
     builder.seal_block(real_b);
-    let real = builtins.import(module, builder.func, real_sym);
-    let inst = builder.ins().call(real, &[]);
-    let actual = builder.inst_results(inst)[0];
+    let actual = builtins.call(module, builder, real_sym, &[]);
     builder.ins().jump(merge, &[BlockArg::Value(actual)]);
 
     builder.switch_to_block(merge);
@@ -12052,9 +12166,7 @@ fn emit_render<M: Module>(
             };
             if let Sink::Write(cur) = sink {
                 let dst = builder.ins().stack_load(types::I64, types::I64, cur, 0);
-                let f = b.import(module, builder.func, write_fn);
-                let inst = builder.ins().call(f, &[dst, value]);
-                let adv = builder.inst_results(inst)[0];
+                let adv = b.call(module, builder, write_fn, &[dst, value]);
                 builder.ins().stack_store(types::I64, adv, cur, 0);
             }
             len
@@ -12104,9 +12216,7 @@ fn emit_render<M: Module>(
                     3,
                 ));
                 let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let f = b.import(module, builder.func, "aipl_str_data");
-                let inst = builder.ins().call(f, &[value, scratch_addr]);
-                let src = builder.inst_results(inst)[0];
+                let src = b.call(module, builder, "aipl_str_data", &[value, scratch_addr]);
                 sink_bytes(module, builder, cx, sink, src, content);
                 sink_byte(builder, sink, quote);
             }
@@ -12197,9 +12307,7 @@ fn emit_render_boxed<M: Module>(
         let scratch =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-        let f = b.import(module, builder.func, "aipl_str_data");
-        let inst = builder.ins().call(f, &[s, scratch_addr]);
-        let src = builder.inst_results(inst)[0];
+        let src = b.call(module, builder, "aipl_str_data", &[s, scratch_addr]);
         sink_bytes(module, builder, cx, sink, src, len);
     }
     emit_drop(
@@ -12372,8 +12480,7 @@ fn emit_error_main_exit_code<M: Module>(
         result_ptr,
         OPT_VALUE_OFFSET as i32,
     );
-    let f = builtins.import(module, builder.func, "aipl_print_error");
-    builder.ins().call(f, &[msg]);
+    builtins.call_void(module, builder, "aipl_print_error", &[msg]);
     let one = builder.ins().iconst(types::I64, 1);
     builder.ins().jump(merge, &[BlockArg::Value(one)]);
 
@@ -12659,8 +12766,7 @@ fn emit_render_char_array<M: Module>(
         3,
     ));
     let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
-    let init_f = b.import(module, builder.func, "aipl_str_iter_init");
-    builder.ins().call(init_f, &[cur_addr, arr]);
+    b.call_void(module, builder, "aipl_str_iter_init", &[cur_addr, arr]);
 
     // 1 until the first element has been rendered, then 0 — controls the
     // leading ", " separator (mirrors `emit_render_seq`'s `is_first` check,
@@ -13013,8 +13119,7 @@ fn define_test_fail_fn<M: Module>(
         // Render the borrowed payload to a fresh `str`, report it, then release
         // the rendered string (its sole reference).
         let msg = emit_to_str(module, &mut builder, cx, &mut scopes, payload, err_ty)?;
-        let f = builtins.import(module, builder.func, "aipl_test_fail");
-        builder.ins().call(f, &[msg]);
+        builtins.call_void(module, &mut builder, "aipl_test_fail", &[msg]);
         emit_drop(
             &mut builder,
             module,
@@ -13238,9 +13343,7 @@ fn define_tostr_fn<M: Module>(
 
         builder.switch_to_block(big_block);
         builder.seal_block(big_block);
-        let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
-        let inst = builder.ins().call(alloc, &[len]);
-        let buf = builder.inst_results(inst)[0];
+        let buf = builtins.call(module, &mut builder, "aipl_str_alloc", &[len]);
         builder.ins().stack_store(types::I64, buf, cursor, 0);
         builder.ins().stack_store(types::I64, buf, heap_slot, 0);
         builder.ins().jump(write_block, &[]);
@@ -14730,9 +14833,7 @@ fn compile_call_expr<M: Module>(
             let want_min = name == "__builtin_min";
             let cond = if is_str {
                 // `aipl_str_cmp` returns a sign; test it against zero.
-                let f = builtins.import(module, builder.func, "aipl_str_cmp");
-                let inst = builder.ins().call(f, &[a, b]);
-                let c = builder.inst_results(inst)[0];
+                let c = builtins.call(module, builder, "aipl_str_cmp", &[a, b]);
                 let cc = if want_min {
                     IntCC::SignedLessThan
                 } else {
@@ -14794,9 +14895,7 @@ fn compile_call_expr<M: Module>(
             )?;
             emit_inc(builder, module, builtins, s_v);
             emit_inc(builder, module, builtins, sep_v);
-            let f = builtins.import(module, builder.func, "aipl_str_split");
-            let inst = builder.ins().call(f, &[s_v, sep_v]);
-            let result = builder.inst_results(inst)[0];
+            let result = builtins.call(module, builder, "aipl_str_split", &[s_v, sep_v]);
             let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
             scopes
                 .last_mut()
@@ -14825,9 +14924,7 @@ fn compile_call_expr<M: Module>(
             // The runtime consumes (decs) the filename ref, so inc to keep our
             // scope-tracked ref alive.
             emit_inc(builder, module, builtins, name_v);
-            let local = builtins.import(module, builder.func, "aipl_read_file_to_string");
-            let inst = builder.ins().call(local, &[name_v]);
-            let raw = builder.inst_results(inst)[0];
+            let raw = builtins.call(module, builder, "aipl_read_file_to_string", &[name_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Primitive(Primitive::Str)),
                 Box::new(error_ty()),
@@ -14892,9 +14989,7 @@ fn compile_call_expr<M: Module>(
             // The runtime consumes (decs) the directory ref, so inc to keep our
             // scope-tracked ref alive.
             emit_inc(builder, module, builtins, dir_v);
-            let local = builtins.import(module, builder.func, "aipl_list_files");
-            let inst = builder.ins().call(local, &[dir_v]);
-            let raw = builder.inst_results(inst)[0];
+            let raw = builtins.call(module, builder, "aipl_list_files", &[dir_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Array(Box::new(ConcreteType::Primitive(
                     Primitive::Str,
@@ -14945,9 +15040,12 @@ fn compile_call_expr<M: Module>(
             // The runtime consumes (decs) both str args, so inc to keep ours alive.
             emit_inc(builder, module, builtins, path_v);
             emit_inc(builder, module, builtins, data_v);
-            let local = builtins.import(module, builder.func, "aipl_write_string_to_file");
-            let inst = builder.ins().call(local, &[path_v, data_v]);
-            let code = builder.inst_results(inst)[0];
+            let code = builtins.call(
+                module,
+                builder,
+                "aipl_write_string_to_file",
+                &[path_v, data_v],
+            );
             let result_ty =
                 ConcreteType::Result(Box::new(ConcreteType::Unit), Box::new(error_ty()));
             let ptr = emit_file_result(
@@ -15287,9 +15385,7 @@ fn compile_call_expr<M: Module>(
             // keeps `str`; a `char[]` keeps its nominal type.
             if is_str_repr(&t) || is_char_array(&t) {
                 emit_inc(builder, module, builtins, ptr);
-                let f = builtins.import(module, builder.func, "aipl_str_sort");
-                let inst = builder.ins().call(f, &[ptr]);
-                let out = builder.inst_results(inst)[0];
+                let out = builtins.call(module, builder, "aipl_str_sort", &[ptr]);
                 let out_ty = if is_char_array(&t) {
                     t.clone()
                 } else {
@@ -15428,10 +15524,8 @@ fn compile_call_expr<M: Module>(
                 // prologue; a *native* builtin has no body to prepend one to, so
                 // the wrapping happens here instead.
                 let sep = if matches!(st, ConcreteType::Primitive(Primitive::Char)) {
-                    let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
                     let one = builder.ins().iconst(types::I64, 1);
-                    let inst = builder.ins().call(alloc, &[one]);
-                    let buf = builder.inst_results(inst)[0];
+                    let buf = builtins.call(module, builder, "aipl_str_alloc", &[one]);
                     builder.ins().istore8(MemFlagsData::trusted(), sep, buf, 0);
                     scopes
                         .last_mut()
@@ -15442,9 +15536,7 @@ fn compile_call_expr<M: Module>(
                     sep
                 };
                 emit_inc(builder, module, builtins, sep);
-                let f = builtins.import(module, builder.func, "aipl_str_join");
-                let inst = builder.ins().call(f, &[parts, sep]);
-                let out = builder.inst_results(inst)[0];
+                let out = builtins.call(module, builder, "aipl_str_join", &[parts, sep]);
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
                     .last_mut()
@@ -15491,10 +15583,9 @@ fn compile_call_expr<M: Module>(
                         builder.ins().stack_store(types::I64, sep, sl, 0);
                         builder.ins().stack_addr(types::I64, sl, 0)
                     };
-                    let new_f = builtins.import(module, builder.func, "aipl_array_new");
                     let zero = builder.ins().iconst(types::I64, 0);
-                    let inst = builder.ins().call(new_f, &[zero, drop_fn, esz]);
-                    let empty = builder.inst_results(inst)[0];
+                    let empty =
+                        builtins.call(module, builder, "aipl_array_new", &[zero, drop_fn, esz]);
                     let push = builtins.import(module, builder.func, "aipl_array_push");
                     let inst = builder
                         .ins()
@@ -15531,9 +15622,7 @@ fn compile_call_expr<M: Module>(
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             if is_str_repr(&t) {
                 emit_inc(builder, module, builtins, ptr);
-                let f = builtins.import(module, builder.func, "aipl_str_reverse");
-                let inst = builder.ins().call(f, &[ptr]);
-                let result = builder.inst_results(inst)[0];
+                let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes.last_mut().expect("scope").push(Tracked::new(
                     result,
                     &ConcreteType::Primitive(Primitive::Str),
@@ -15543,9 +15632,7 @@ fn compile_call_expr<M: Module>(
                 // Str-shaped (see `is_char_array`), but — unlike a bare `str`
                 // receiver above — keeps its nominal `char[]` type.
                 emit_inc(builder, module, builtins, ptr);
-                let f = builtins.import(module, builder.func, "aipl_str_reverse");
-                let inst = builder.ins().call(f, &[ptr]);
-                let result = builder.inst_results(inst)[0];
+                let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -15559,9 +15646,12 @@ fn compile_call_expr<M: Module>(
                 let esz = builder
                     .ins()
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
-                let f = builtins.import(module, builder.func, "aipl_arr_reverse");
-                let inst = builder.ins().call(f, &[ptr, drop_fn, retain_fn, esz]);
-                let view = builder.inst_results(inst)[0];
+                let view = builtins.call(
+                    module,
+                    builder,
+                    "aipl_arr_reverse",
+                    &[ptr, drop_fn, retain_fn, esz],
+                );
                 let arr_ty = ConcreteType::Array(Box::new(elem));
                 scopes
                     .last_mut()
@@ -15656,11 +15746,9 @@ fn compile_call_expr<M: Module>(
                     );
                     let s = emit_char_to_str(builder, cv);
                     emit_inc(builder, module, builtins, recv);
-                    let f = builtins.import(module, builder.func, sym);
                     let mut call_args = vec![recv, s];
                     call_args.extend(at);
-                    let inst = builder.ins().call(f, &call_args);
-                    let r = builder.inst_results(inst)[0];
+                    let r = builtins.call(module, builder, sym, &call_args);
                     builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
                     builder.switch_to_block(merge);
@@ -15789,9 +15877,7 @@ fn compile_call_expr<M: Module>(
                     );
                     let s = emit_char_to_str(builder, cv);
                     emit_inc(builder, module, builtins, recv);
-                    let f = builtins.import(module, builder.func, "aipl_str_contains");
-                    let inst = builder.ins().call(f, &[recv, s]);
-                    let r = builder.inst_results(inst)[0];
+                    let r = builtins.call(module, builder, "aipl_str_contains", &[recv, s]);
                     builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
                     builder.switch_to_block(merge);
@@ -16208,11 +16294,9 @@ fn compile_call_expr<M: Module>(
             // Element type unknown here (`__none__`); the drop-fn and element
             // size are settled by the first `push`. `map`/`filter` only pre-size
             // 8-byte-element outputs (optional outputs use a plain `[]`).
-            let with_cap = builtins.import(module, builder.func, "aipl_array_with_cap");
             let zero = builder.ins().iconst(types::I64, 0); // drop_fn
             let esz = builder.ins().iconst(types::I64, 8); // elem_size
-            let inst = builder.ins().call(with_cap, &[cap, zero, esz]);
-            let ptr = builder.inst_results(inst)[0];
+            let ptr = builtins.call(module, builder, "aipl_array_with_cap", &[cap, zero, esz]);
             let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
             scopes
                 .last_mut()
@@ -16271,9 +16355,7 @@ fn compile_call_expr<M: Module>(
                 } else {
                     builder.ins().iadd_imm_s(old_len, 1)
                 };
-                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
-                let inst = builder.ins().call(alloc_f, &[new_len]);
-                let buf = builder.inst_results(inst)[0];
+                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
                 let scratch = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
@@ -16476,24 +16558,18 @@ fn compile_call_expr<M: Module>(
                         receiver.span.clone(),
                     ));
                 }
-                let len_f = builtins.import(module, builder.func, "aipl_str_len");
-                let inst = builder.ins().call(len_f, &[arr_ptr]);
-                let old_len = builder.inst_results(inst)[0];
+                let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let new_len = builder.ins().iadd_imm_s(old_len, 1);
-                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
-                let inst = builder.ins().call(alloc_f, &[new_len]);
-                let buf = builder.inst_results(inst)[0];
+                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
                 let scratch = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
                     3,
                 ));
                 let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let data_f = builtins.import(module, builder.func, "aipl_str_data");
-                let inst = builder.ins().call(data_f, &[arr_ptr, scratch_addr]);
-                let src = builder.inst_results(inst)[0];
-                let copy_f = builtins.import(module, builder.func, "aipl_write_bytes");
-                builder.ins().call(copy_f, &[buf, src, old_len]);
+                let src = builtins.call(module, builder, "aipl_str_data", &[arr_ptr, scratch_addr]);
+                // The advanced cursor is not needed here — the copy is the point.
+                let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src, old_len]);
                 let dst_addr = builder.ins().iadd(buf, old_len);
                 builder
                     .ins()
@@ -16646,9 +16722,7 @@ fn compile_call_expr<M: Module>(
                 let inst = builder.ins().call(len_f, &[src_ptr]);
                 let add_len = builder.inst_results(inst)[0];
                 let new_len = builder.ins().iadd(old_len, add_len);
-                let alloc_f = builtins.import(module, builder.func, "aipl_str_alloc");
-                let inst = builder.ins().call(alloc_f, &[new_len]);
-                let buf = builder.inst_results(inst)[0];
+                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
                 let scratch = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
@@ -17041,9 +17115,7 @@ fn emit_slice<M: Module>(
                 builder.inst_results(inst)[0]
             }
         };
-        let f = builtins.import(module, builder.func, "aipl_str_slice");
-        let inst = builder.ins().call(f, &[recv_v, a_v, b_v]);
-        let result = builder.inst_results(inst)[0];
+        let result = builtins.call(module, builder, "aipl_str_slice", &[recv_v, a_v, b_v]);
         scopes
             .last_mut()
             .expect("scope")
@@ -17621,9 +17693,7 @@ fn compile_expr_inner<M: Module>(
                         // before the call so our local refs balance.
                         emit_inc(builder, module, builtins, lv);
                         emit_inc(builder, module, builtins, rv);
-                        let local = builtins.import(module, builder.func, "aipl_concat_lazy");
-                        let inst = builder.ins().call(local, &[lv, rv]);
-                        let ret = builder.inst_results(inst)[0];
+                        let ret = builtins.call(module, builder, "aipl_concat_lazy", &[lv, rv]);
                         scopes
                             .last_mut()
                             .expect("scope")
@@ -17711,9 +17781,7 @@ fn compile_expr_inner<M: Module>(
                     // `sort` gives a `str[]` — via a runtime compare whose
                     // sign is then tested against zero.
                     if is_str_repr(&lt) && is_str_repr(&rt) {
-                        let f = builtins.import(module, builder.func, "aipl_str_cmp");
-                        let inst = builder.ins().call(f, &[lv, rv]);
-                        let c = builder.inst_results(inst)[0];
+                        let c = builtins.call(module, builder, "aipl_str_cmp", &[lv, rv]);
                         let zero = builder.ins().iconst(types::I64, 0);
                         let cc = match op {
                             '<' => IntCC::SignedLessThan,
@@ -18118,9 +18186,8 @@ fn compile_expr_inner<M: Module>(
                         // `aipl_concat_mut` decs its second arg; inc first so r's
                         // own track balances. `s` is reused, not dec'd.
                         emit_inc(builder, module, builtins, rv);
-                        let local = builtins.import(module, builder.func, "aipl_concat_mut");
-                        let inst = builder.ins().call(local, &[s_ptr, rv]);
-                        let new_ptr = builder.inst_results(inst)[0];
+                        let new_ptr =
+                            builtins.call(module, builder, "aipl_concat_mut", &[s_ptr, rv]);
                         builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
@@ -18139,9 +18206,7 @@ fn compile_expr_inner<M: Module>(
                 if trims_self {
                     let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                     // `aipl_trim_mut` reuses `s` (no dec), so no pre-inc needed.
-                    let local = builtins.import(module, builder.func, "aipl_trim_mut");
-                    let inst = builder.ins().call(local, &[s_ptr]);
-                    let new_ptr = builder.inst_results(inst)[0];
+                    let new_ptr = builtins.call(module, builder, "aipl_trim_mut", &[s_ptr]);
                     builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                     // No new track — the binding's slot-track owns the result.
                     return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
@@ -18302,8 +18367,7 @@ fn compile_expr_inner<M: Module>(
                         3,
                     ));
                     let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
-                    let init_f = builtins.import(module, builder.func, "aipl_str_iter_init");
-                    builder.ins().call(init_f, &[cur_addr, it_ptr]);
+                    builtins.call_void(module, builder, "aipl_str_iter_init", &[cur_addr, it_ptr]);
                     cur_addr
                 } else {
                     it_ptr // unused for the array branch
@@ -18574,9 +18638,7 @@ fn compile_expr_inner<M: Module>(
                                 compile_expr(module, builder, cx, scopes, &lit_expr)?;
                             emit_inc(builder, module, builtins, ptr);
                             emit_inc(builder, module, builtins, lit_val);
-                            let eq_f = builtins.import(module, builder.func, "aipl_str_eq");
-                            let inst = builder.ins().call(eq_f, &[ptr, lit_val]);
-                            let eq = builder.inst_results(inst)[0];
+                            let eq = builtins.call(module, builder, "aipl_str_eq", &[ptr, lit_val]);
                             let next = builder.create_block();
                             builder.ins().brif(eq, arm_blocks[i], &[], next, &[]);
                             builder.switch_to_block(next);
@@ -18833,9 +18895,7 @@ fn compile_expr_inner<M: Module>(
                 // below), so there's no empty/SSO case to special-case.
                 // Always heap-allocates (no small-string inlining yet).
                 let len = builder.ins().iconst(types::I64, vals.len() as i64);
-                let alloc = builtins.import(module, builder.func, "aipl_str_alloc");
-                let inst = builder.ins().call(alloc, &[len]);
-                let buf = builder.inst_results(inst)[0];
+                let buf = builtins.call(module, builder, "aipl_str_alloc", &[len]);
                 for (i, (v, _, _)) in vals.into_iter().enumerate() {
                     let addr = builder.ins().iadd_imm_s(buf, i as i64);
                     builder.ins().istore8(MemFlagsData::trusted(), v, addr, 0);
@@ -18851,9 +18911,7 @@ fn compile_expr_inner<M: Module>(
             let esz_v = builder
                 .ins()
                 .iconst(types::I64, runtime_elem_size(&elem, structs));
-            let new_local = builtins.import(module, builder.func, "aipl_array_new");
-            let inst = builder.ins().call(new_local, &[len, drop_fn, esz_v]);
-            let ptr = builder.inst_results(inst)[0];
+            let ptr = builtins.call(module, builder, "aipl_array_new", &[len, drop_fn, esz_v]);
             let elems_base = builder.ins().iadd_imm_s(ptr, ARR_ELEMS_OFFSET as i64);
             if is_bit_packed(&elem) {
                 // Pack 8 bools per byte: build each data byte from its (up to 8)
@@ -19223,8 +19281,7 @@ fn compile_expr_inner<M: Module>(
                 // the err arm (which reads its payload first). There is no payload
                 // here, so the hook takes no argument.
                 if cx.in_test {
-                    let f = builtins.import(module, builder.func, "aipl_test_fail_none");
-                    builder.ins().call(f, &[]);
+                    builtins.call_void(module, builder, "aipl_test_fail_none", &[]);
                 }
                 for scope in scopes.iter() {
                     for t in scope {
@@ -19348,8 +19405,7 @@ fn compile_expr_inner<M: Module>(
                 // `?` in `fn main() -> !Error`: print `error: <msg>` and exit 1.
                 // Read the err payload (borrowed) before the scope drop frees it.
                 let msg = component(builder, rptr, OPT_VALUE_OFFSET, &err_in_ty, structs);
-                let f = builtins.import(module, builder.func, "aipl_print_error");
-                builder.ins().call(f, &[msg]);
+                builtins.call_void(module, builder, "aipl_print_error", &[msg]);
                 for scope in scopes.iter() {
                     for t in scope {
                         let v = match t.owned {
