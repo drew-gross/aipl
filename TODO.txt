@@ -259,6 +259,7 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 optimizations:
+  string on the stack should be 8*3 bytes, not 8. Then the view case doesn't have an indirection, the inline case can have 8*3-1 (or maybe 8*3-2) bytes inline, the heap case can be a (refcount+underlying len) ptr, a data ptr (potentially mid-string), and a len (it knows if it's uniquely owned by checking if the refcount is 1), and the rope case is a little more complicated but I think you can figure it out.
   char_lit_emit can probably be optimized by doing a two char match and manually unescaping
   unescape itself can probable be optimized by doing a compacting gather
   memoization:
@@ -281,6 +282,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
     fusions should work if there are unrelated operations in between (use a dep graph?)
     reverse should fuse with basically everything
     count fusions should apply to count_if also
