@@ -5241,6 +5241,41 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl2_concat", str24::aipl2_concat as *const u8);
     jit_builder.symbol("aipl2_trim", str24::aipl2_trim as *const u8);
     jit_builder.symbol("aipl2_str_data", str24::aipl2_str_data as *const u8);
+    jit_builder.symbol("aipl2_str_contains", str24::aipl2_str_contains as *const u8);
+    jit_builder.symbol(
+        "aipl2_str_starts_with",
+        str24::aipl2_str_starts_with as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl2_str_starts_with_at",
+        str24::aipl2_str_starts_with_at as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl2_str_ends_with",
+        str24::aipl2_str_ends_with as *const u8,
+    );
+    jit_builder.symbol("aipl2_str_reverse", str24::aipl2_str_reverse as *const u8);
+    jit_builder.symbol("aipl2_str_sort", str24::aipl2_str_sort as *const u8);
+    jit_builder.symbol("aipl2_str_repeat", str24::aipl2_str_repeat as *const u8);
+    jit_builder.symbol("aipl2_str_alloc", str24::aipl2_str_alloc as *const u8);
+    jit_builder.symbol(
+        "aipl2_str_write_ptr",
+        str24::aipl2_str_write_ptr as *const u8,
+    );
+    jit_builder.symbol("aipl2_str_grew", str24::aipl2_str_grew as *const u8);
+    jit_builder.symbol(
+        "aipl2_str_iter_init",
+        str24::aipl2_str_iter_init as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl2_str_iter_next",
+        str24::aipl2_str_iter_next as *const u8,
+    );
+    jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
+    jit_builder.symbol(
+        "aipl2_arr_retain_str",
+        str24::aipl2_arr_retain_str as *const u8,
+    );
     jit_builder.symbol("aipl_print", aipl_print as *const u8);
     jit_builder.symbol("aipl_print_error", aipl_print_error as *const u8);
     jit_builder.symbol("aipl_concat", aipl_concat as *const u8);

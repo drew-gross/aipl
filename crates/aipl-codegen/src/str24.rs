@@ -496,7 +496,22 @@ impl Cursor {
             TAG_INLINE => &self.scratch[..self.leaf.len()],
             _ => unreachable!("a cursor only stops on leaves"),
         };
-        Some(&bytes[within..])
+        let rest = &bytes[within..];
+        // A value claiming bytes it cannot produce is inconsistent — a rope whose
+        // stored length exceeds its leaves, or (during the migration) an 8-byte
+        // value read as a 24-byte one. Callers advance by the chunk length, so
+        // handing back an empty chunk here would make them loop forever: `cmp`
+        // takes `min(len, other)` = 0 and never moves. Stop instead. The assert
+        // makes it a loud failure in a debug build rather than a silent one.
+        debug_assert!(
+            !rest.is_empty(),
+            "cursor produced an empty chunk with {} bytes still claimed",
+            self.root.len() - self.pos
+        );
+        if rest.is_empty() {
+            return None;
+        }
+        Some(rest)
     }
 
     fn take(&mut self, n: usize) {
