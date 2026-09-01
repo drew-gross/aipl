@@ -972,9 +972,21 @@ pub(crate) extern "C" fn aipl2_str_slice(out: *mut Str, s: *const Str, lo: i64, 
     unsafe { *out = sliced };
 }
 
+/// Concatenation, always lazy: `concat` builds a rope node in O(1), so this one
+/// entry point serves all three tagged-ABI spellings (`aipl_concat`'s eager
+/// copy, `aipl_concat_lazy`, and `aipl_concat_mut`'s in-place append).
+///
+/// `concat` *takes ownership* of both operands — it stores them into the node
+/// without retaining — but an `aipl2_*` entry point **borrows**, so the retains
+/// happen here. That is what lets the call sites drop the pre-inc pair the old
+/// convention required, and it keeps the borrow rule true of every entry point
+/// rather than true of most of them.
 #[no_mangle]
 pub(crate) extern "C" fn aipl2_concat(out: *mut Str, a: *const Str, b: *const Str) {
-    unsafe { *out = concat(read(a), read(b)) };
+    let (a, b) = unsafe { (read(a), read(b)) };
+    a.retain();
+    b.retain();
+    unsafe { *out = concat(a, b) };
 }
 
 #[no_mangle]

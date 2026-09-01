@@ -8598,6 +8598,10 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_test_begin" => "aipl2_test_begin",
         "aipl_assert" => "aipl2_assert",
         "aipl_test_fail" => "aipl2_test_fail",
+        // All three concat spellings collapse to one wide entry point: building a
+        // rope is O(1), so the eager copy and the in-place append have nothing
+        // left to optimize over the lazy form.
+        "aipl_concat" | "aipl_concat_lazy" | "aipl_concat_mut" => "aipl2_concat",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -8735,6 +8739,26 @@ enum Args {
     Consumes,
 }
 
+/// The argument protocol actually in force for `sym`.
+///
+/// `SIG_REGS` records what each **tagged** native implementation does, which is
+/// the only thing that can be read off the source. Every `aipl2_*` entry point
+/// *borrows* instead (see [`active_sym`]), so a symbol that is remapped flips to
+/// [`Args::Borrows`] whatever its table entry says. Keying off the remap rather
+/// than a second table means a symbol's ownership can never lag its conversion.
+///
+/// Getting this wrong is a leak, not a crash: the caller retains and nobody
+/// releases. That used to be caught by the balanced-allocation assertion in
+/// every `--- performance ---` section — which is skipped under the flag, so
+/// this rule is now the only thing enforcing it.
+fn args_for(sym: &'static str, tagged: Args) -> Args {
+    if active_sym(sym) == sym {
+        tagged
+    } else {
+        Args::Borrows
+    }
+}
+
 impl Args {
     /// The parameter description this protocol implies.
     fn param(self, ty: ConcreteType) -> ParamInfo {
@@ -8824,7 +8848,8 @@ fn register_builtins(
         ("__test_end", "aipl_test_end", Args::Borrows),
         ("__test_summary", "aipl_test_summary", Args::Borrows),
     ];
-    for &(name, sym, args) in SIG_REGS {
+    for &(name, sym, tagged) in SIG_REGS {
+        let args = args_for(sym, tagged);
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
@@ -8854,8 +8879,8 @@ fn register_builtins(
         "__aipl_concat",
         "aipl_concat",
         vec![
-            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
-            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat", Args::Consumes).param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat", Args::Consumes).param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -8865,8 +8890,10 @@ fn register_builtins(
         "__aipl_concat_lazy",
         "aipl_concat_lazy",
         vec![
-            Args::Borrows.param(ConcreteType::Primitive(Primitive::Str)),
-            Args::Borrows.param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat_lazy", Args::Borrows)
+                .param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat_lazy", Args::Borrows)
+                .param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -8876,8 +8903,10 @@ fn register_builtins(
         "__aipl_concat_mut",
         "aipl_concat_mut",
         vec![
-            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
-            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat_mut", Args::Consumes)
+                .param(ConcreteType::Primitive(Primitive::Str)),
+            args_for("aipl_concat_mut", Args::Consumes)
+                .param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -18337,10 +18366,14 @@ fn compile_expr_inner<M: Module>(
                 // still a `str` to the source, in the concat representation.
                 'C' => {
                     if is_str_repr(&lt) && is_str_repr(&rt) {
-                        // The concat node takes ownership of its inputs; inc both
-                        // before the call so our local refs balance.
-                        emit_inc(builder, module, builtins, lv);
-                        emit_inc(builder, module, builtins, rv);
+                        // The tagged concat node takes ownership of its inputs, so
+                        // inc both before the call to balance our local refs. The
+                        // wide entry point retains for itself (`aipl2_concat`), so
+                        // there the pair is dropped rather than mirrored.
+                        if !str24_enabled() {
+                            emit_inc(builder, module, builtins, lv);
+                            emit_inc(builder, module, builtins, rv);
+                        }
                         let ret = builtins.call(module, builder, "aipl_concat_lazy", &[lv, rv]);
                         scopes
                             .last_mut()
@@ -18833,9 +18866,28 @@ fn compile_expr_inner<M: Module>(
                         )?;
                         // `aipl_concat_mut` decs its second arg; inc first so r's
                         // own track balances. `s` is reused, not dec'd.
-                        emit_inc(builder, module, builtins, rv);
+                        //
+                        // The wide entry point borrows both instead, so neither the
+                        // inc nor the reuse applies: the rope it returns holds its
+                        // own reference to `s`, and the one this slot was holding is
+                        // replaced by the store below — so release it, or the old
+                        // value is kept alive by a slot that no longer names it.
+                        if !str24_enabled() {
+                            emit_inc(builder, module, builtins, rv);
+                        }
                         let new_ptr =
                             builtins.call(module, builder, "aipl_concat_mut", &[s_ptr, rv]);
+                        if str24_enabled() {
+                            emit_rc(
+                                builder,
+                                module,
+                                builtins,
+                                structs,
+                                s_ptr,
+                                &ConcreteType::Primitive(Primitive::Str),
+                                RcOp::Drop,
+                            );
+                        }
                         builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);

@@ -177,8 +177,16 @@ fn debug_opts() -> DebugOptions {
 /// This gates *filling* as well as checking — a `fill_expected` run with the
 /// variable set would write wide-representation numbers into a corpus the
 /// default build then fails against.
+///
+/// **`AIPL_STR24_PERF=1` forces the check back on**, because skipping the
+/// section also retires the `allocations == deallocations` assertion, and that
+/// is the migration's refcount tripwire: an entry point that retains what
+/// nobody releases leaks silently otherwise. The counts will not *match* the
+/// expected body — that is the whole reason for the skip — but the mismatch
+/// report prints both tallies, so a scoped run is how you check the balance of
+/// a conversion you just made.
 fn perf_sections_apply() -> bool {
-    std::env::var_os("AIPL_STR24").is_none()
+    std::env::var_os("AIPL_STR24").is_none() || std::env::var_os("AIPL_STR24_PERF").is_some()
 }
 
 #[derive(Default)]

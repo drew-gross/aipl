@@ -68,8 +68,36 @@
 # into a corpus the default build then fails against. The sections are refilled
 # once, at the flip.
 #
-# Three clusters were fixed on the strength of that classification, and the count
-# is now **236 / 875** (from 527):
+# **`AIPL_STR24_PERF=1` forces the check back on, and you want it after every
+# conversion.** Skipping the section also retires `allocations == deallocations`
+# — the migration's refcount tripwire, and the only thing standing between a
+# mis-declared ownership protocol and a silent leak. The counts will not *match*
+# (that is the point of the skip), but the mismatch report prints both tallies,
+# so the balance is readable:
+#
+#     AIPL_STR24=1 AIPL_STR24_PERF=1 cargo nextest run --no-fail-fast -E 'binary(cases)'
+#
+# then check every `--- actual ---` half for `allocations != deallocations`.
+#
+# ---------------------------------------------------------------------------
+# **Ownership follows the remap, automatically** (`args_for`)
+#
+# `SIG_REGS` records what each *tagged* native implementation does to its heap
+# arguments, because that is the only thing readable off the source. But every
+# `aipl2_*` entry point borrows — so the moment a symbol is remapped, its table
+# entry describes an implementation that is no longer being called. `args_for`
+# closes that gap by keying off `active_sym`: a remapped symbol is `Borrows`
+# whatever the table says.
+#
+# This was already biting. `__builtin_print` is `Args::Consumes`, so the caller
+# retained and `aipl2_print` — which borrows — never released: a leak on every
+# `print` under the flag, invisible because it neither crashes nor changes
+# output, and unmeasured because the perf skip had just retired the assertion
+# that would have caught it. Deriving the answer rather than maintaining a second
+# table means the next conversion cannot reintroduce it.
+#
+# Four clusters were fixed on the strength of that classification, and the count
+# is now **191 / 875** (from 527):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -109,15 +137,27 @@
 #     lesson is the one this file keeps re-learning: attribute a cluster by
 #     reading one failure, not by matching its shape to a plausible cause.
 #
-# The remaining 236, by cause — two clusters, wearing four hats:
+#   - **the concat family** — see the producers section below. `+++`, its
+#     in-place `set s = s +++ r` form, template interpolation and rope
+#     lexicographic compare all produce byte-identical output under both
+#     settings, and the corpus-wide allocation balance is clean.
 #
-#    92  `aipl check` (in-language tests) failed
-#    77  `stdout` mismatch          } the **unconverted producers** (concat and
-#     7  `exit code` mismatch       } kin), and...
+# The remaining 191, by cause:
 #
-#    47  compile failed             } ...**`str` inside a composite** (layout),
-#    20  SIGSEGV / SIGABRT / ABORT  } which is also every `ffi::call_values_*`
+#    84  `aipl check` (in-language tests) failed
+#    65  `stdout` mismatch
+#    23  compile failed
+#    16  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
+#     8  `exit code` mismatch
 #
+# Sampling them, the dominant cause is now one thing: **a `str` stored inside
+# something else.** The names say it — `nested_str_array`, `str_array`,
+# `spread_elem_types` — and they abort in `Str::retain`/`release` on a bogus
+# owner pointer, because an array element slot is 8 bytes and a wide `str` is 24.
+# Structs, variants, optionals and results carrying a `str` are the same bug
+# wearing a different hat. That is the next cluster, and after it the only thing
+# left in group A is the remaining producers (slice, trim, reverse, sort,
+# repeat), which are ordinary one-at-a-time conversions.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
@@ -295,13 +335,16 @@ examples_uses_strlen
 #    Converted: str_len, str_eq, str_cmp, str_hash, char_at, starts_with,
 #    starts_with_at, ends_with, contains, str_data, str_iter_init/_next.
 #
-#    `concat` was tried as a plain rename and still crashes: it also appears in
-#    the concat-specialization machinery (`$c{i}` instances, `ConcatStr`), so it
-#    is not the one to start with despite being the obvious target.
+#    **The concat family is DONE.** All three tagged spellings — `aipl_concat`'s
+#    eager copy, `aipl_concat_lazy`, and `aipl_concat_mut`'s in-place append —
+#    collapse to the single `aipl2_concat`, because building a rope is O(1) and
+#    leaves the other two nothing to optimize over the lazy form.
 #
-#    **But it is now the one that matters most.** With the test-runner and print
-#    clusters gone, the producers are the largest remaining cause: a converted
-#    reader meets a tagged rope the moment a program says `a +++ b`.
+#    The `ConcatStr` / `$c{i}` machinery turned out **not** to be in the way, and
+#    the earlier note here saying otherwise was wrong. `ConcatStr` is a mono-only
+#    pseudo-type that picks a specialized *instance*; codegen treats it as a
+#    plain `str` via `is_str_repr`. Nothing about it is representation-specific.
+#    The reason the plain rename failed was ownership, not specialization.
 #
 #    Two entry-point bugs found by writing the *artifact* symbol table, both
 #    latent and neither reachable from a JIT run alone:
