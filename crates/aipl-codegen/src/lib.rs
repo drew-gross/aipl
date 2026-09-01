@@ -6163,7 +6163,13 @@ impl Compilation {
             // ignore the (unset) return register.
             let _ = unsafe { invoke(ptr, &sret_abi) };
             let result = unsafe {
-                read_ffi_optional(sret_buf.as_ptr(), &info.return_ty, true, &self.structs)
+                read_ffi_optional(
+                    abi_kind,
+                    sret_buf.as_ptr(),
+                    &info.return_ty,
+                    true,
+                    &self.structs,
+                )
             };
             return Ok(result);
         }
@@ -6188,8 +6194,15 @@ impl Compilation {
             }
             // SAFETY: as the optional path above.
             let _ = unsafe { invoke(ptr, &sret_abi) };
-            let result =
-                unsafe { read_ffi_result(sret_buf.as_ptr(), &info.return_ty, true, &self.structs) };
+            let result = unsafe {
+                read_ffi_result(
+                    abi_kind,
+                    sret_buf.as_ptr(),
+                    &info.return_ty,
+                    true,
+                    &self.structs,
+                )
+            };
             return Ok(result);
         }
 
@@ -6211,7 +6224,13 @@ impl Compilation {
             // SAFETY: as the optional path, but the buffer is the struct's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
             let result = unsafe {
-                read_ffi_struct(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
+                read_ffi_struct(
+                    abi_kind,
+                    sret_buf.as_ptr() as *const u8,
+                    layout,
+                    true,
+                    &self.structs,
+                )
             };
             return Ok(result);
         }
@@ -6234,7 +6253,13 @@ impl Compilation {
             // SAFETY: as the struct path, but the buffer is the variant's size.
             let _ = unsafe { invoke(ptr, &sret_abi) };
             let result = unsafe {
-                read_ffi_variant(sret_buf.as_ptr() as *const u8, layout, true, &self.structs)
+                read_ffi_variant(
+                    abi_kind,
+                    sret_buf.as_ptr() as *const u8,
+                    layout,
+                    true,
+                    &self.structs,
+                )
             };
             return Ok(result);
         }
@@ -6247,7 +6272,7 @@ impl Compilation {
         // An array is pointer-like (a single `i64` return, not sret): the callee
         // handed us one reference on the block, which `read_ffi_array` releases.
         if let ConcreteType::Array(elem) = &info.return_ty {
-            let result = unsafe { read_ffi_array(r, elem, true, &self.structs) };
+            let result = unsafe { read_ffi_array(abi_kind, r, elem, true, &self.structs) };
             return Ok(result);
         }
 
@@ -6902,33 +6927,47 @@ unsafe fn read_ffi_str_value(raw: i64, owned: bool) -> String {
 /// `at`. Used for array elements and, at byte offset 8, for optional/result
 /// cores (see [`read_ffi_core`]).
 unsafe fn read_ffi_borrowed(
+    abi: StrAbi,
     at: *const u8,
     ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     if let Some(layout) = ffi_struct_layout(ty, structs) {
-        return unsafe { read_ffi_struct(at, layout, owned, structs) };
+        return unsafe { read_ffi_struct(abi, at, layout, owned, structs) };
     }
     if let Some(layout) = ffi_variant_layout(ty, structs) {
-        return unsafe { read_ffi_variant(at, layout, owned, structs) };
+        return unsafe { read_ffi_variant(abi, at, layout, owned, structs) };
     }
     match ty {
         ConcreteType::Optional(_) => unsafe {
-            read_ffi_optional(at as *const i64, ty, owned, structs)
+            read_ffi_optional(abi, at as *const i64, ty, owned, structs)
         },
         ConcreteType::Result(_, _) => unsafe {
-            read_ffi_result(at as *const i64, ty, owned, structs)
+            read_ffi_result(abi, at as *const i64, ty, owned, structs)
         },
         ConcreteType::Array(elem) => {
             // The 8-byte word is the array value (a tagged block pointer, or — for
             // `char[]`, which shares `str`'s representation — an inline/heap `str`).
             let raw = unsafe { *(at as *const i64) };
-            unsafe { read_ffi_array(raw, elem, owned, structs) }
+            unsafe { read_ffi_array(abi, raw, elem, owned, structs) }
         }
-        _ if is_str_repr(ty) => {
-            FfiValue::Str(unsafe { read_ffi_str_value(*(at as *const i64), owned) })
-        }
+        _ if is_str_repr(ty) => match abi {
+            // Wide: the value *is* the 24 bytes at `at`.
+            StrAbi::Wide => {
+                let value = unsafe { core::ptr::read(at as *const str24::Str) };
+                let mut scratch = [0u8; str24::INLINE_CAP];
+                let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
+                if owned {
+                    value.release();
+                }
+                FfiValue::Str(text)
+            }
+            // Tagged: an 8-byte word pointing at the content.
+            StrAbi::Tagged => {
+                FfiValue::Str(unsafe { read_ffi_str_value(*(at as *const i64), owned) })
+            }
+        },
         _ => FfiValue::Int(unsafe { *(at as *const i64) }),
     }
 }
@@ -6945,6 +6984,7 @@ unsafe fn read_ffi_borrowed(
 /// str value, or a heap/reversed array block whose elements are `elem`-shaped),
 /// carrying one reference when `owned`.
 unsafe fn read_ffi_array(
+    abi: StrAbi,
     raw: i64,
     elem: &ConcreteType,
     owned: bool,
@@ -6971,11 +7011,11 @@ unsafe fn read_ffi_array(
             out.push(FfiValue::Int(i64::from(unsafe { arr_load_bit(a, i) })));
         }
     } else {
-        let stride = elem_size_of(elem, structs) as usize;
+        let stride = abi_elem_size(abi, elem, structs) as usize;
         for i in 0..len {
             let ep = unsafe { arr_elem_ptr(a, i, stride) };
             // Elements are borrowed: the block owns their references.
-            out.push(unsafe { read_ffi_borrowed(ep, elem, false, structs) });
+            out.push(unsafe { read_ffi_borrowed(abi, ep, elem, false, structs) });
         }
     }
     if owned {
@@ -6993,13 +7033,14 @@ unsafe fn read_ffi_array(
 /// SAFETY: `buf` must point at a `{ i64 tag, core }` the callee filled for an
 /// optional whose core is a marshalable type.
 unsafe fn read_ffi_optional(
+    abi: StrAbi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let tag = unsafe { *buf };
-    unsafe { read_ffi_optional_tag(buf, ty, tag, owned, structs) }
+    unsafe { read_ffi_optional_tag(abi, buf, ty, tag, owned, structs) }
 }
 
 /// Read a flattened `Result<ok, err>` from `buf` into an [`FfiValue::Res`]. The
@@ -7010,6 +7051,7 @@ unsafe fn read_ffi_optional(
 /// SAFETY: `buf` must point at a `{ i64 tag, value }` a `Result`-returning callee
 /// filled, with `ok`/`err` each a marshalable type or `Unit`.
 unsafe fn read_ffi_result(
+    abi: StrAbi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
@@ -7022,11 +7064,11 @@ unsafe fn read_ffi_result(
     let tag = unsafe { *buf };
     if tag == 1 {
         FfiValue::Res(Ok(Box::new(unsafe {
-            read_ffi_core(buf, ok_ty, owned, structs)
+            read_ffi_core(abi, buf, ok_ty, owned, structs)
         })))
     } else {
         FfiValue::Res(Err(Box::new(unsafe {
-            read_ffi_core(buf, err_ty, owned, structs)
+            read_ffi_core(abi, buf, err_ty, owned, structs)
         })))
     }
 }
@@ -7036,6 +7078,7 @@ unsafe fn read_ffi_result(
 /// peel one `Optional` layer per recursion, decrementing the tag, until either a
 /// `none` (tag `0`) or the non-optional core.
 unsafe fn read_ffi_optional_tag(
+    abi: StrAbi,
     buf: *const i64,
     ty: &ConcreteType,
     tag: i64,
@@ -7050,9 +7093,9 @@ unsafe fn read_ffi_optional_tag(
         return FfiValue::Opt(None);
     }
     let value = if matches!(inner, ConcreteType::Optional(_)) {
-        unsafe { read_ffi_optional_tag(buf, inner, tag - 1, owned, structs) }
+        unsafe { read_ffi_optional_tag(abi, buf, inner, tag - 1, owned, structs) }
     } else {
-        unsafe { read_ffi_core(buf, inner, owned, structs) }
+        unsafe { read_ffi_core(abi, buf, inner, owned, structs) }
     };
     FfiValue::Opt(Some(Box::new(value)))
 }
@@ -7061,13 +7104,14 @@ unsafe fn read_ffi_optional_tag(
 /// buffer — every marshalable core sits inline there, so this is just
 /// [`read_ffi_borrowed`] at byte offset 8.
 unsafe fn read_ffi_core(
+    abi: StrAbi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
     let at = unsafe { (buf as *const u8).add(OPT_VALUE_OFFSET as usize) };
-    unsafe { read_ffi_borrowed(at, ty, owned, structs) }
+    unsafe { read_ffi_borrowed(abi, at, ty, owned, structs) }
 }
 
 /// Read a struct (`layout`) at `base` into an [`FfiValue::Struct`] — one
@@ -7080,6 +7124,7 @@ unsafe fn read_ffi_core(
 /// SAFETY: `base` must point at a `layout`-shaped struct, each heap constituent
 /// carrying one reference when `owned`.
 unsafe fn read_ffi_struct(
+    abi: StrAbi,
     base: *const u8,
     layout: &StructLayout,
     owned: bool,
@@ -7091,7 +7136,7 @@ unsafe fn read_ffi_struct(
         .map(|f| {
             let at = unsafe { base.add(f.offset as usize) };
             (f.name.clone(), unsafe {
-                read_ffi_borrowed(at, &f.ty, owned, structs)
+                read_ffi_borrowed(abi, at, &f.ty, owned, structs)
             })
         })
         .collect();
@@ -7108,6 +7153,7 @@ unsafe fn read_ffi_struct(
 /// SAFETY: `base` must point at a `layout`-shaped variant, its tag a valid case
 /// index and each heap constituent carrying one reference when `owned`.
 unsafe fn read_ffi_variant(
+    abi: StrAbi,
     base: *const u8,
     layout: &VariantLayout,
     owned: bool,
@@ -7123,7 +7169,7 @@ unsafe fn read_ffi_variant(
         .iter()
         .map(|f| {
             let at = unsafe { base.add(f.offset as usize) };
-            unsafe { read_ffi_borrowed(at, &f.ty, owned, structs) }
+            unsafe { read_ffi_borrowed(abi, at, &f.ty, owned, structs) }
         })
         .collect();
     FfiValue::Variant(case.name.clone(), fields)
@@ -8220,8 +8266,20 @@ enum Ret {
 /// the identity the old arity table encoded; at the flip, `Abi::Str` expands to
 /// three params and `Ret::Str` becomes a leading out-pointer param with no
 /// return value.
-fn lower_import_sig<M: Module>(module: &mut M, params: &[Abi], ret: Ret) -> Signature {
+fn lower_import_sig<M: Module>(
+    module: &mut M,
+    params: &[Abi],
+    ret: Ret,
+    out_pointer: bool,
+) -> Signature {
     let mut s = module.make_signature();
+    // The new ABI writes a `str` result through a leading out pointer and
+    // returns nothing; the old one hands its tagged pointer back in a register.
+    // `Ret::Str` means "yields a `str`" to both, so which shape to lower is the
+    // caller's to say — see `builtin_import_sig`.
+    if out_pointer {
+        s.params.push(AbiParam::new(types::I64));
+    }
     for kind in params {
         match kind {
             Abi::Word | Abi::Str => s.params.push(AbiParam::new(types::I64)),
@@ -8229,15 +8287,22 @@ fn lower_import_sig<M: Module>(module: &mut M, params: &[Abi], ret: Ret) -> Sign
     }
     match ret {
         Ret::None => {}
+        Ret::Str if out_pointer => {}
         Ret::Word | Ret::Str => s.returns.push(AbiParam::new(types::I64)),
     }
     s
 }
 
+/// Whether `sym` returns its `str` through a leading out pointer — true for the
+/// new ABI's entry points, false for the originals.
+fn returns_via_out_pointer(sym: &str, ret: Ret) -> bool {
+    ret == Ret::Str && sym.starts_with("aipl2_")
+}
+
 /// Signature of a runtime import `sym`.
 fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
     let (params, ret) = import_abi(sym);
-    lower_import_sig(module, params, ret)
+    lower_import_sig(module, params, ret, returns_via_out_pointer(sym, ret))
 }
 
 /// How many `i64` argument words `params` lowers to — the arity every call site
@@ -8454,7 +8519,7 @@ impl Builtins {
         // old entry points return their tagged pointer in a register, so the
         // protocol keys off the convention the symbol belongs to, not off
         // `Ret::Str` alone — which both ABIs use to mean "this yields a `str`".
-        if ret == Ret::Str && sym.starts_with("aipl2_") {
+        if returns_via_out_pointer(sym, ret) {
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 str24::STR_SIZE as u32,
@@ -14697,7 +14762,11 @@ fn compile_call<M: Module>(
     // to the FFI and to `func_addr`.
     let callee_id = match info.link {
         FuncLink::User(id) => info.tail_id.unwrap_or(id),
-        FuncLink::Builtin(sym) => builtins.id(module, sym),
+        // Through `active_sym` like any other runtime call: this path builds the
+        // call itself rather than going via `Builtins::call`, so without it a
+        // builtin would keep the old entry point while its argument became an
+        // address.
+        FuncLink::Builtin(sym) => builtins.id(module, active_sym(sym)),
     };
     let local_callee = module.declare_func_in_func(callee_id, builder.func);
 

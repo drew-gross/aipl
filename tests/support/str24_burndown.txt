@@ -25,38 +25,36 @@
 # ---------------------------------------------------------------------------
 # Current state of the switched path (`AIPL_STR24=1`)
 #
-# Working: programs with no strings (`fn main() -> i64 { 7 }`).
+# Working end to end:
+#     fn main() -> i64 { 7 }                 -> 7
+#     print("short")                         -> short          (inline literal)
+#     print("hello from a twenty-four ...")  -> hello ...      (static buffer)
 #
-# Regressed while gating: string literals crashed during codegen of `main` after
-# the flag refactor, having previously worked end to end —
-#     print("short")                        -> short
-#     print("hello from a twenty-four ...")  -> hello ...
-# so the literal/print/refcount path is close but currently broken. That is the
-# first thing to fix, and the milestone to re-prove.
+# Not yet: anything calling a `str` builtin other than `print` — `len` on a
+# literal returns garbage, because `active_sym` only remaps the entry points
+# whose call sites have been converted and verified.
 #
 # ---------------------------------------------------------------------------
 # Known-failing clusters, measured when literals and print were working. Counts
 # are from that run; treat them as the shape of the work, not a current tally.
 #
-# 16  The FFI *read* path. Argument marshaling is ABI-aware (`StrAbi` per
-#     `Compilation`); the reader is not, so any `call_values` result carrying a
-#     `str` — directly or inside a struct, variant, optional or array — reads the
-#     old layout. One fix retires the whole cluster.
+# 11  The FFI read path, **partly done**. The readers now take the callee's
+#     `StrAbi` and read a wide `str` as the 24 bytes at the slot; that retired
+#     five of the original sixteen (optional returns, array validation, the
+#     grow-into-a-copy case, the doc example). What is left crashes rather than
+#     mismatching, so the remaining cause is structural — composite *returns*
+#     carrying a `str`, where the sret buffer and the field offsets have to agree
+#     with a layout the callee computed under the wide representation.
 ffi::call_values_marshals_str_return
 ffi::call_values_marshals_str_args_with_int_return
 ffi::call_values_marshals_struct_return
 ffi::call_values_marshals_nested_composite_struct
 ffi::call_values_marshals_variant_return
 ffi::call_values_marshals_variant_param
-ffi::call_values_marshals_optional_return
-ffi::call_values_marshals_optional_variant_return
 ffi::call_values_marshals_array_return
 ffi::call_values_marshals_array_params
 ffi::call_values_marshals_composite_params
 ffi::call_values_marshals_composite_array_params
-ffi::call_values_validates_array_params
-ffi::array_param_grows_into_a_copy
-ffi::doc_example_call_values
 ffi::compiler_aipl_files_are_tested_and_pass_check
 
 #  6  `aipl check`'s own output path — assertion reporting goes through
