@@ -25,9 +25,6 @@
 # ---------------------------------------------------------------------------
 # Current state of the switched path (`AIPL_STR24=1`)
 #
-# ⚠ Do not run the whole suite under the flag yet: `cases_arrays_min_max` HANGS
-# rather than failing, and a hang wedges the run. See the char[] note below.
-#
 # Working end to end:
 #     fn main() -> i64 { 7 }                 -> 7
 #     print("short")                         -> short          (inline literal)
@@ -37,25 +34,29 @@
 # `contains`, `starts_with`, `ends_with`, `char_at` — verified together in one
 # program under both settings.
 #
-# **The next thing to fix, and why the suite hangs.** Values are still *built* by
-# the old representation in places, while consumers now read them as 24 bytes.
-# The sharpest case is `char[]`, which is str-shaped (`is_char_array`) and so
-# became a composite under the flag, but whose literal path still packs content
-# into the 8-byte value:
+# **Producers, not consumers, are the remaining work.** Values were still being
+# *built* by the old representation while consumers read them as 24 bytes. The
+# sharpest case was `char[]` — str-shaped (`is_char_array`), so a composite under
+# the flag, but its literal packed content into the 8-byte value:
 #
-#     ['c', 'a', 'b'] . len()   ->  misaligned pointer dereference,
-#                                   address 0x62615b — the bytes `[`, `a`, `b`
+#     ['c', 'a', 'b'] . len()   ->  misaligned pointer dereference at 0x62615b,
+#                                   which is the bytes `[`, `a`, `b`
 #
-# Read as a 24-byte value, the content *is* the pointer. `len` then returns
-# garbage, and a fold over `0..len` runs ~forever — which is exactly why
-# `cases_arrays_min_max` hangs instead of failing. That case contains no strings
-# at all; it is the `char[]` literal that does it.
+# Read as a 24-byte value, the content *was* the pointer, so `len` returned
+# garbage and a fold over `0..len` ran ~forever. That is why
+# `cases_arrays_min_max` — a case with no strings in it at all — *hung* rather
+# than failed. **Fixed**: the literal now builds through
+# `aipl2_str_alloc`/`str_write_ptr`/`str_grew`, since the new value points at its
+# buffer rather than being it, and allocation gives capacity rather than length.
 #
-# So the producers are the next batch, not more consumers: `emit_render` (the
-# `to_str` builder) and the `char[]`/`str` literal construction paths. Converting
-# more *readers* before then makes the mixed state worse, not better — the
-# flag-on failure count went from 39 to 523 as the observers landed, because more
-# code now reads old-representation values through new-ABI entry points.
+# Still to convert, and the reason the flag-on failure count rose from 39 to 523
+# as the observers landed: every converted *reader* now meets values from an
+# unconverted *writer*. Remaining writers:
+#
+#   - `emit_render` — the `to_str` builder, still the old cursor idiom;
+#   - `str` literals inside composites, and the concat family;
+#   - whatever the next hang or crash points at. Convert a writer, re-measure,
+#     and prefer writers over readers until the count starts falling.
 #
 # ---------------------------------------------------------------------------
 # Known-failing clusters, measured when literals and print were working. Counts

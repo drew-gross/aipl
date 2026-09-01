@@ -8473,6 +8473,8 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_str_repeat" => sig(&[Word, Word], Ret::Str),
         "aipl2_str_slice" => sig(&[Word, Word, Word], Ret::Str),
         "aipl2_str_alloc" => sig(&[Word], Ret::Str),
+        "aipl2_str_write_ptr" => sig(&[Word], Ret::Word),
+        "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -19363,16 +19365,36 @@ fn compile_expr_inner<M: Module>(
                 // below), so there's no empty/SSO case to special-case.
                 // Always heap-allocates (no small-string inlining yet).
                 let len = builder.ins().iconst(types::I64, vals.len() as i64);
-                let buf = builtins.call(module, builder, "aipl_str_alloc", &[len]);
-                for (i, (v, _, _)) in vals.into_iter().enumerate() {
-                    let addr = builder.ins().iadd_imm_s(buf, i as i64);
-                    builder.ins().istore8(MemFlagsData::trusted(), v, addr, 0);
-                }
+                // Two representations, two shapes. The old one *is* the content
+                // pointer, so the bytes go straight where `aipl_str_alloc` hands
+                // back. The new one is a value that merely *points* at its
+                // buffer, so the write cursor comes from `aipl2_str_write_ptr`
+                // and the length is recorded afterwards with `aipl2_str_grew`
+                // (allocation gives capacity, not length). Getting this wrong is
+                // what made `['c', 'a', 'b'].len()` read content bytes as a
+                // pointer — see `tests/support/str24_burndown.txt`.
+                let value = if str24_enabled() {
+                    let v = builtins.call(module, builder, "aipl2_str_alloc", &[len]);
+                    let cursor = builtins.call(module, builder, "aipl2_str_write_ptr", &[v]);
+                    for (i, (b, _, _)) in vals.into_iter().enumerate() {
+                        let addr = builder.ins().iadd_imm_s(cursor, i as i64);
+                        builder.ins().istore8(MemFlagsData::trusted(), b, addr, 0);
+                    }
+                    builtins.call_void(module, builder, "aipl2_str_grew", &[v, len]);
+                    v
+                } else {
+                    let buf = builtins.call(module, builder, "aipl_str_alloc", &[len]);
+                    for (i, (b, _, _)) in vals.into_iter().enumerate() {
+                        let addr = builder.ins().iadd_imm_s(buf, i as i64);
+                        builder.ins().istore8(MemFlagsData::trusted(), b, addr, 0);
+                    }
+                    buf
+                };
                 scopes
                     .last_mut()
                     .expect("scope")
-                    .push(Tracked::new(buf, &arr_ty));
-                return Ok((buf, arr_ty));
+                    .push(Tracked::new(value, &arr_ty));
+                return Ok((value, arr_ty));
             }
             let len = builder.ins().iconst(types::I64, elems.len() as i64);
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
