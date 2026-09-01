@@ -467,6 +467,62 @@ regenerated against `aipl2_*` at the end, and the old half is deleted then —
 which is also when the hand-ported-stub question disappears, since the real
 dogfooded engines do the regeneration.
 
+## Switch: proven at the foundation, parked in a stash
+
+The switch **works at the bottom of the stack** and is nowhere near finished. It
+lives in `git stash` — "str24 switch WIP: codegen on the 24-byte str" — because
+the tree is more useful green than half-switched. `git stash pop` resumes it.
+
+What it proved, reproducibly, before being parked:
+
+```
+fn main() -> i64 { 7 }                → 7          (no strings)
+print("short")                        → short      (inline literal, <= 22 bytes)
+print("hello from a twenty-four ...") → hello ...  (static buffer literal)
+```
+
+That is the dual ABI working exactly as designed: the compiler parsed through its
+dogfooded engines on the old representation while the program it compiled used
+the new one. The foundation — literals, refcounting, the CLI array, ABI-aware
+marshaling, the out-pointer protocol — is sound.
+
+### What the stashed diff contains (410 lines)
+
+- the three predicates admitting `str`, so a value travels as an address;
+- `emit_const_str` building a literal as three words in a stack slot — inline to
+  22 bytes, else a `[cap][refcount = STATIC][bytes]` data object with no NUL;
+- the refcount arm on `aipl2_inc`/`aipl2_dec`, `__builtin_print` on `aipl2_print`;
+- `build_cli_array` with 24-byte elements and an `aipl2_arr_drop_str` helper;
+- **ABI-aware FFI marshaling** — a `StrAbi` per `Compilation` (`from_artifact` is
+  `Tagged`, `new` is `Wide`), with `abi_is_composite`/`abi_elem_size`/
+  `abi_sret_size` answering per callee and recursing, so `str?` is 16 bytes for
+  one and 32 for the other. Struct layouts needed no equivalent: an artifact's
+  come from its manifest's explicit sizes and offsets, so they already describe
+  the ABI that produced them;
+- **the out-pointer protocol in `Builtins::call`** — a `Ret::Str` symbol gets its
+  slot allocated and the pointer prepended in one place, so a `str`-producing
+  call site is a symbol name and nothing else. This is the Stage 0 seam paying
+  off exactly as intended.
+
+### What is left, measured rather than estimated
+
+- **28 more `aipl2_*` entry points** (28 exist): `str_split`, `str_join`,
+  `arr_join`, `concat_lazy`, `concat_mut`, `trim_mut`, the `to_str` builder trio
+  (`write_i64`/`write_u64`/`write_bytes` plus `i64_len`/`u64_len`), the file and
+  process ops, the test-harness hooks, and the array/boxed refcount helpers.
+- **69 call sites** still naming an old symbol with what is now an address.
+- **`emit_render`**, which builds strings through the old cursor idiom.
+- **The wide read path** in the FFI — fine while every host-side read is from an
+  artifact, broken the moment a compiled function returns a `str` to the host.
+- **24-byte element helpers** for arrays, sets, and dicts (the `str[]` drop
+  helper was the first).
+- Then the corpus: 600+ cases that currently segfault, debugged with **no
+  diagnostics** — the switch's defining difficulty — before artifact
+  regeneration and the corpus-wide refill even begin.
+
+The honest read: the remaining work is a multi-session grind whose cost is
+dominated by that last item, not by the edits above it.
+
 ## Verification
 
 1. **The spike** — `cargo test -p aipl-codegen --lib abi_spike`, seven checks

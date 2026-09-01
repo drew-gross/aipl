@@ -80,6 +80,18 @@ pub(super) fn write_string_to_file(path: Str, contents: Str) -> bool {
     std::io::Write::flush(&mut file).is_ok()
 }
 
+/// `print(s)` under the new ABI — the `aipl2_*` counterpart of `aipl_print`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_print(s: *const Str) {
+    print(unsafe { *s });
+}
+
+/// `error: <msg>` under the new ABI.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_print_error(s: *const Str) {
+    print_error(unsafe { *s });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

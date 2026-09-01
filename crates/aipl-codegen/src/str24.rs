@@ -275,6 +275,19 @@ fn from_bytes_inline(bytes: &[u8]) -> Str {
     }
 }
 
+/// The three words of an inline literal — what codegen stores to materialize a
+/// short `str` constant with no data object and no allocation.
+pub(crate) fn inline_words(bytes: &[u8]) -> [u64; 3] {
+    let s = from_bytes_inline(bytes);
+    [s.w0, s.w1, s.w2]
+}
+
+/// The `meta` word of a buffer value of length `len` — the third word codegen
+/// stores for a static literal.
+pub(crate) fn buffer_meta(len: usize) -> u64 {
+    meta(len, TAG_BUFFER)
+}
+
 /// Build a value holding `bytes`: inline when it fits, otherwise a fresh buffer
 /// (refcount 1) with no spare capacity.
 pub(crate) fn from_bytes(bytes: &[u8]) -> Str {
@@ -879,27 +892,27 @@ unsafe fn read(s: *const Str) -> Str {
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_len(s: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_len(s: *const Str) -> i64 {
     unsafe { read(s) }.len() as i64
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_eq(a: *const Str, b: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_eq(a: *const Str, b: *const Str) -> i64 {
     i64::from(eq(unsafe { read(a) }, unsafe { read(b) }))
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_cmp(a: *const Str, b: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_cmp(a: *const Str, b: *const Str) -> i64 {
     cmp(unsafe { read(a) }, unsafe { read(b) })
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_hash(s: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_hash(s: *const Str) -> i64 {
     hash(unsafe { read(s) })
 }
 
 #[no_mangle]
-extern "C" fn aipl2_char_at(s: *const Str, i: i64) -> i64 {
+pub(crate) extern "C" fn aipl2_char_at(s: *const Str, i: i64) -> i64 {
     match char_at(unsafe { read(s) }, i.max(0) as usize) {
         Some(b) => b as i64,
         None => -1,
@@ -907,17 +920,21 @@ extern "C" fn aipl2_char_at(s: *const Str, i: i64) -> i64 {
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_is_all_whitespace(s: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_is_all_whitespace(s: *const Str) -> i64 {
     i64::from(is_all_whitespace(unsafe { read(s) }))
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_starts_with(s: *const Str, prefix: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_starts_with(s: *const Str, prefix: *const Str) -> i64 {
     i64::from(starts_with(unsafe { read(s) }, unsafe { read(prefix) }))
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_starts_with_at(s: *const Str, prefix: *const Str, at: i64) -> i64 {
+pub(crate) extern "C" fn aipl2_str_starts_with_at(
+    s: *const Str,
+    prefix: *const Str,
+    at: i64,
+) -> i64 {
     i64::from(starts_with_at(
         unsafe { read(s) },
         unsafe { read(prefix) },
@@ -926,76 +943,76 @@ extern "C" fn aipl2_str_starts_with_at(s: *const Str, prefix: *const Str, at: i6
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_ends_with(s: *const Str, suffix: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_ends_with(s: *const Str, suffix: *const Str) -> i64 {
     i64::from(ends_with(unsafe { read(s) }, unsafe { read(suffix) }))
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_contains(s: *const Str, needle: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl2_str_contains(s: *const Str, needle: *const Str) -> i64 {
     i64::from(contains(unsafe { read(s) }, unsafe { read(needle) }))
 }
 
 #[no_mangle]
-extern "C" fn aipl2_inc(s: *const Str) {
+pub(crate) extern "C" fn aipl2_inc(s: *const Str) {
     unsafe { read(s) }.retain();
 }
 
 #[no_mangle]
-extern "C" fn aipl2_dec(s: *const Str) {
+pub(crate) extern "C" fn aipl2_dec(s: *const Str) {
     unsafe { read(s) }.release();
 }
 
 /// `s[lo..hi]` — allocation-free, so this is a pure value computation. The
 /// result borrows `s`'s allocation; the caller retains if it outlives the source.
 #[no_mangle]
-extern "C" fn aipl2_str_slice(out: *mut Str, s: *const Str, lo: i64, hi: i64) {
+pub(crate) extern "C" fn aipl2_str_slice(out: *mut Str, s: *const Str, lo: i64, hi: i64) {
     let s = unsafe { read(s) };
     let sliced = s.slice(lo.max(0) as usize, hi.max(0) as usize);
     unsafe { *out = sliced };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_concat(out: *mut Str, a: *const Str, b: *const Str) {
+pub(crate) extern "C" fn aipl2_concat(out: *mut Str, a: *const Str, b: *const Str) {
     unsafe { *out = concat(read(a), read(b)) };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_trim(out: *mut Str, s: *const Str) {
+pub(crate) extern "C" fn aipl2_trim(out: *mut Str, s: *const Str) {
     unsafe { *out = trim(read(s)) };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_reverse(out: *mut Str, s: *const Str) {
+pub(crate) extern "C" fn aipl2_str_reverse(out: *mut Str, s: *const Str) {
     unsafe { *out = reverse(read(s)) };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_sort(out: *mut Str, s: *const Str) {
+pub(crate) extern "C" fn aipl2_str_sort(out: *mut Str, s: *const Str) {
     unsafe { *out = sort(read(s)) };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_repeat(out: *mut Str, s: *const Str, n: i64) {
+pub(crate) extern "C" fn aipl2_str_repeat(out: *mut Str, s: *const Str, n: i64) {
     unsafe { *out = repeat(read(s), n.max(0) as usize) };
 }
 
 /// Build a value over `len` bytes the caller then fills — the allocate-then-write
 /// idiom `to_str` uses, with the value (not a bare cursor) as the unit.
 #[no_mangle]
-extern "C" fn aipl2_str_alloc(out: *mut Str, len: i64) {
+pub(crate) extern "C" fn aipl2_str_alloc(out: *mut Str, len: i64) {
     unsafe { *out = with_capacity(len.max(0) as usize, &[]) };
 }
 
 /// The writable end of a buffer being filled: `base + len`.
 #[no_mangle]
-extern "C" fn aipl2_str_write_ptr(s: *const Str) -> *mut u8 {
+pub(crate) extern "C" fn aipl2_str_write_ptr(s: *const Str) -> *mut u8 {
     let s = unsafe { read(s) };
     (s.w1 as usize + s.len()) as *mut u8
 }
 
 /// Record that `n` more bytes were written into the buffer behind `s`.
 #[no_mangle]
-extern "C" fn aipl2_str_grew(s: *mut Str, n: i64) {
+pub(crate) extern "C" fn aipl2_str_grew(s: *mut Str, n: i64) {
     unsafe {
         let v = *s;
         *s = Str {
@@ -1009,7 +1026,7 @@ extern "C" fn aipl2_str_grew(s: *mut Str, n: i64) {
 /// A contiguous read pointer for the value's bytes, materializing a rope into
 /// its own cache if needed. Length comes from `aipl2_str_len`.
 #[no_mangle]
-extern "C" fn aipl2_str_data(s: *const Str, scratch: *mut u8) -> *const u8 {
+pub(crate) extern "C" fn aipl2_str_data(s: *const Str, scratch: *mut u8) -> *const u8 {
     let s = unsafe { read(s) };
     match s.tag() {
         TAG_BUFFER => s.w1 as *const u8,
@@ -1024,15 +1041,32 @@ extern "C" fn aipl2_str_data(s: *const Str, scratch: *mut u8) -> *const u8 {
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_iter_init(cur: *mut Iter, s: *const Str) {
+pub(crate) extern "C" fn aipl2_str_iter_init(cur: *mut Iter, s: *const Str) {
     unsafe { *cur = Iter::new(read(s)) };
 }
 
 #[no_mangle]
-extern "C" fn aipl2_str_iter_next(cur: *mut Iter) -> i64 {
+pub(crate) extern "C" fn aipl2_str_iter_next(cur: *mut Iter) -> i64 {
     match unsafe { &mut *cur }.next() {
         Some(b) => b as i64,
         None => -1,
+    }
+}
+
+/// Release each of `len` `str` elements in a run — the array header's per-element
+/// drop helper for a 24-byte element. The `aipl_arr_drop_str` of the new ABI.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_arr_drop_str(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        unsafe { core::ptr::read(elems.add(i * STR_SIZE) as *const Str) }.release();
+    }
+}
+
+/// Retain each of `len` `str` elements in a run — the retain half of the above.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_arr_retain_str(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        unsafe { core::ptr::read(elems.add(i * STR_SIZE) as *const Str) }.retain();
     }
 }
 
