@@ -404,6 +404,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl2_str_iter_init"
         | "aipl2_arr_drop_str"
         | "aipl2_arr_retain_str"
+        | "aipl2_arr_drop_opt_str"
+        | "aipl2_arr_retain_opt_str"
         | "aipl2_str_grew"
         // ...and the producers of exactly one `str` from none or one:
         | "aipl2_trim"

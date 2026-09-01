@@ -5370,6 +5370,14 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl2_str_iter_next",
         str24::aipl2_str_iter_next as *const u8,
     );
+    jit_builder.symbol(
+        "aipl2_arr_drop_opt_str",
+        str24::aipl2_arr_drop_opt_str as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl2_arr_retain_opt_str",
+        str24::aipl2_arr_retain_opt_str as *const u8,
+    );
     jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
     jit_builder.symbol(
         "aipl2_arr_retain_str",
@@ -8579,7 +8587,10 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_str_write_ptr" => sig(&[Word], Ret::Word),
         "aipl2_str_iter_init" => sig(&[Word, Word], Ret::None),
         "aipl2_str_iter_next" => sig(&[Word], Ret::Word),
-        "aipl2_arr_drop_str" | "aipl2_arr_retain_str" => sig(&[Word, Word], Ret::None),
+        "aipl2_arr_drop_str"
+        | "aipl2_arr_retain_str"
+        | "aipl2_arr_drop_opt_str"
+        | "aipl2_arr_retain_opt_str" => sig(&[Word, Word], Ret::None),
         "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
         "aipl2_test_begin" | "aipl2_test_fail" => sig(&[Word], Ret::None),
         "aipl2_assert" => sig(&[Word, Word], Ret::None),
@@ -12282,7 +12293,14 @@ fn array_drop_fn_addr<M: Module>(
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
-            Some(b.id(module, "aipl_arr_drop_opt_str"))
+            Some(b.id(
+                module,
+                if str24_enabled() {
+                    "aipl2_arr_drop_opt_str"
+                } else {
+                    "aipl_arr_drop_opt_str"
+                },
+            ))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_drop_opt_arr"))
@@ -12317,7 +12335,17 @@ fn array_retain_fn_addr<M: Module>(
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
-            Some(b.id(module, "aipl_arr_retain_opt"))
+            // The wide form cannot share `aipl_arr_retain_opt` with `T[]?[]`
+            // below: an array element is still an 8-byte pointer, so only the
+            // `str?` case changes shape.
+            Some(b.id(
+                module,
+                if str24_enabled() {
+                    "aipl2_arr_retain_opt_str"
+                } else {
+                    "aipl_arr_retain_opt"
+                },
+            ))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_retain_opt"))
@@ -20251,15 +20279,13 @@ fn alloc_struct_slot(builder: &mut FunctionBuilder, layout: &StructLayout) -> St
 /// every other allowed field type is an 8-byte scalar or heap pointer. The
 /// nested struct's layout must already be resolved.
 fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
-    match ty {
-        ConcreteType::Optional(_) => elem_size_of(ty, structs) as u32,
-        // A boxed (recursive) type is stored as an 8-byte pointer; only a
-        // non-boxed struct/variant is inlined at its full size.
-        ConcreteType::Named(n) => structs
-            .get(n)
-            .map_or(8, |t| if t.boxed() { 8 } else { t.size() }),
-        _ => 8,
-    }
+    // Deliberately just `elem_size_of`: a struct field, a variant payload slot
+    // and an array element are the same question asked three times, and this
+    // used to answer it with its own `match` that agreed by coincidence. It
+    // stopped agreeing the moment a `str` was not 8 bytes — the duplicate's
+    // catch-all said 8, so every `str` field overlapped the one after it — which
+    // is exactly the kind of drift a second copy of a layout rule invites.
+    elem_size_of(ty, structs) as u32
 }
 
 /// Size in bytes of a value returned/passed by hidden pointer (sret), or `None`

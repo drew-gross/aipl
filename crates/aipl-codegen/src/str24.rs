@@ -1075,7 +1075,35 @@ pub(crate) extern "C" fn aipl2_arr_drop_str(elems: *const u8, len: i64) {
     }
 }
 
-/// Retain each of `len` `str` elements in a run — the retain half of the above.
+/// Element drop-fn for `str?[]` under the wide ABI: each element is a flattened
+/// `{tag, value}` optional, so the stride is one word plus a whole `Str` and the
+/// value sits after the tag. The tagged version strides 16 and reads a pointer;
+/// there is no pointer here, so the value is released in place.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_arr_drop_opt_str(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let e = unsafe { elems.add(i * OPT_STR_SIZE) };
+        if unsafe { core::ptr::read(e as *const i64) } != 0 {
+            unsafe { core::ptr::read(e.add(OPT_VALUE_OFFSET) as *const Str) }.release();
+        }
+    }
+}
+
+/// Element retain-fn for `str?[]` under the wide ABI. Unlike the tagged
+/// `aipl_arr_retain_opt`, this cannot also serve `T[]?[]`: an array element is
+/// still an 8-byte pointer, so only the `str?` case changes shape.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_arr_retain_opt_str(elems: *const u8, len: i64) {
+    for i in 0..len.max(0) as usize {
+        let e = unsafe { elems.add(i * OPT_STR_SIZE) };
+        if unsafe { core::ptr::read(e as *const i64) } != 0 {
+            unsafe { core::ptr::read(e.add(OPT_VALUE_OFFSET) as *const Str) }.retain();
+        }
+    }
+}
+
+/// Retain each of `len` `str` elements in a run — the retain half of
+/// `aipl2_arr_drop_str`.
 #[no_mangle]
 pub(crate) extern "C" fn aipl2_arr_retain_str(elems: *const u8, len: i64) {
     for i in 0..len.max(0) as usize {
@@ -1085,6 +1113,12 @@ pub(crate) extern "C" fn aipl2_arr_retain_str(elems: *const u8, len: i64) {
 
 /// Bytes of the cursor state codegen must reserve for `for (let c : s)`.
 pub(crate) const ITER_SIZE: usize = core::mem::size_of::<Iter>();
+
+/// A flattened optional is `{tag: i64, value}`, so its value starts one word in
+/// and a `str?` is that word plus a whole `Str`. Mirrors codegen's
+/// `OPT_VALUE_OFFSET` / `elem_size_of`; both runtimes read the same layout.
+pub(crate) const OPT_VALUE_OFFSET: usize = 8;
+pub(crate) const OPT_STR_SIZE: usize = OPT_VALUE_OFFSET + STR_SIZE;
 
 #[cfg(test)]
 mod tests {

@@ -97,8 +97,8 @@
 # that would have caught it. Deriving the answer rather than maintaining a second
 # table means the next conversion cannot reintroduce it.
 #
-# Six clusters were fixed on the strength of that classification, and the count
-# is now **154 / 875** (from 527), with zero leak-gate hits:
+# Seven clusters were fixed on the strength of that classification, and the count
+# is now **107 / 875** (from 527), with zero leak-gate hits:
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -178,28 +178,49 @@
 #     `store_array_elem` now, which size and write by type — otherwise a
 #     composite's *address* is stored where the runtime reads a value.
 #
-# The remaining 154, by cause:
+#   - **structs, variants, optionals and results holding a `str`** — the whole
+#     composite-layout cluster, and it came down to **one duplicated rule**.
 #
-#    60  `aipl check` (in-language tests) failed
-#    57  `stdout` mismatch
+#     `field_size` had its own `match` for "how many bytes does this occupy",
+#     alongside `elem_size_of`'s. They agreed by coincidence while every `str`
+#     was one word; they stopped agreeing the moment one wasn't, because the
+#     duplicate's catch-all said 8 — so every `str` field overlapped the field
+#     after it. A struct field, a variant payload slot and an array element are
+#     the same question asked three times, so `field_size` now just calls
+#     `elem_size_of`. That deletion alone fixed structs, variants, results and
+#     five of the eight `ffi::call_values_*` tests.
+#
+#     Separately, `str?[]` needed genuinely new element helpers
+#     (`aipl2_arr_drop_opt_str` / `aipl2_arr_retain_opt_str`): a flattened
+#     optional is `{tag, value}`, so the wide stride is a word plus a whole
+#     `Str`, and the value is released *in place* where the tagged version read a
+#     pointer. The wide form also cannot share one retain helper with `T[]?[]`
+#     the way the tagged one does — an array element is still 8 bytes, so only
+#     the `str?` case changes shape.
+#
+# The remaining 107, by cause:
+#
+#    41  `aipl check` (in-language tests) failed
+#    35  `stdout` mismatch
 #    23  compile failed
-#    11  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
-#     3  `exit code` mismatch
+#     7  SIGSEGV / SIGABRT / ABORT
+#     1  `exit code` mismatch
 #
-# Two clusters account for essentially all of it:
+# **Essentially all of it is now one cluster: the unconverted producers** —
+# slice, trim, reverse, sort, repeat, split, join, int_parse. Ordinary
+# one-at-a-time conversions, with concat as the template: check whether the
+# `str24.rs` helper takes ownership, and retain in the entry point if it does.
 #
-#   - **`str` stored inside something else**, minus arrays, sets and dicts, now
-#     done: structs, variants, optionals and results. Same bug — a field or
-#     payload slot is 8 bytes and a wide `str` is 24 — showing up as an abort
-#     inside `Str::retain`/`release` on a bogus owner pointer. Unlike the
-#     containers, this one needs the *layout* mono computes, not just the
-#     runtime's view of it. Start with `str?` (`aipl_arr_drop_opt_str` /
-#     `aipl_arr_retain_opt` have no wide counterpart at all), since the optional
-#     core is what struct fields and variant payloads are built out of.
-#   - **the remaining producers**: slice, trim, reverse, sort, repeat, split,
-#     join, int_parse. Ordinary one-at-a-time conversions, and the concat work
-#     above is the template for them: check whether the `str24.rs` helper takes
-#     ownership, and retain in the entry point if it does.
+# The 23 `compile failed` are the same cluster wearing a better failure mode.
+# A `str`-returning builtin is *composite* under the flag, so the generic call
+# path prepends an sret pointer — while the unremapped tagged symbol still
+# returns in a register, and cranelift's verifier catches the arity mismatch
+# before anything runs:
+#
+#     mismatched argument count for `v5 = call fn1(v4, v0)`: got 2, expected 1
+#
+# So a producer that has not been converted now *fails to compile* rather than
+# corrupting memory. Converting each one retires its verifier error directly.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
@@ -432,8 +453,8 @@ examples_uses_strlen
 #     by address instead of copying them into an `i64` (which kept only the first
 #     word of a wide value).
 #
-#     Still missing entirely: `aipl_arr_drop_opt_str` / `aipl_arr_retain_opt`,
-#     for `str?` elements (32 bytes wide: tag + 24).
+#     `str?` elements are done too: `aipl2_arr_drop_opt_str` /
+#     `aipl2_arr_retain_opt_str`, 32 bytes wide (tag + 24).
 #
 # Suggested order: the eleven queries first (no ownership, immediate signal from
 # the corpus), then iteration, then the producers, then `emit_render`, then the
