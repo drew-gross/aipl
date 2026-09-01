@@ -1438,6 +1438,18 @@ const ITER_LEAF_LEN: usize = 40;
 const ITER_SCRATCH: usize = 48;
 const ITER_SIZE: usize = 56;
 
+/// Bytes codegen reserves for a `for (let c : s)` cursor, for whichever
+/// representation is active. The two iterators carry different state — the wide
+/// one caches a whole 24-byte leaf where the tagged one caches a pointer plus an
+/// 8-byte spill — so the slot follows the ABI rather than a fixed constant.
+fn iter_state_size() -> u32 {
+    if str24_enabled() {
+        str24::ITER_SIZE as u32
+    } else {
+        ITER_SIZE as u32
+    }
+}
+
 #[no_mangle]
 extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
     unsafe {
@@ -8474,6 +8486,9 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_str_slice" => sig(&[Word, Word, Word], Ret::Str),
         "aipl2_str_alloc" => sig(&[Word], Ret::Str),
         "aipl2_str_write_ptr" => sig(&[Word], Ret::Word),
+        "aipl2_str_iter_init" => sig(&[Word, Word], Ret::None),
+        "aipl2_str_iter_next" => sig(&[Word], Ret::Word),
+        "aipl2_arr_drop_str" | "aipl2_arr_retain_str" => sig(&[Word, Word], Ret::None),
         "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
@@ -8519,6 +8534,14 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_str_starts_with" => "aipl2_str_starts_with",
         "aipl_str_starts_with_at" => "aipl2_str_starts_with_at",
         "aipl_str_ends_with" => "aipl2_str_ends_with",
+        // `str_data` is the byte-pointer seam every copying path goes through
+        // (`str_bytes_ptr`), so remapping it converts them all at once. Its two
+        // ABIs take the same arity — the difference is that the wide entry
+        // point needs a 22-byte spill scratch where the tagged one needed 8,
+        // which is why every call site is routed through that one helper.
+        "aipl_str_data" => "aipl2_str_data",
+        "aipl_str_iter_init" => "aipl2_str_iter_init",
+        "aipl_str_iter_next" => "aipl2_str_iter_next",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -10181,6 +10204,16 @@ fn emit_str_iter_next<M: Module>(
     builtins: &Builtins,
     cur_addr: Value,
 ) -> Value {
+    // The fast path below reads the *tagged* cursor's field layout (`ITER_*`).
+    // The wide cursor is a different struct — two whole `Str` values plus two
+    // positions — so this is not a matter of substituting offsets: a wide leaf
+    // may be inline, in which case there is no `leaf_ptr` to load and the byte
+    // lives in the cursor's own words. Until that version is written, the wide
+    // ABI takes the call per byte, exactly as this code did before the fast path
+    // existed.
+    if str24_enabled() {
+        return builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
+    }
     let flags = MemFlagsData::trusted();
     let check_leaf = builder.create_block();
     let fast = builder.create_block();
@@ -12478,6 +12511,34 @@ enum Sink {
     Write(StackSlot),
 }
 
+/// The contiguous content pointer for a `str` *value*, which is what the
+/// byte-copying sinks need. Neither representation stores one directly for every
+/// case — a tagged value may be inline or a rope, a wide one may be inline — so
+/// this always goes through `aipl_str_data`, which returns the in-place pointer
+/// where there is one and spills into `scratch` where there isn't.
+///
+/// The only thing that differs between the ABIs is how big that spill can get:
+/// a tagged inline value holds 7 bytes, a wide one [`str24::INLINE_CAP`]. Sizing
+/// the slot for the wrong ABI is a stack overwrite, which is why every copying
+/// path routes through this one function rather than opening its own slot.
+fn str_bytes_ptr<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    value: Value,
+) -> Value {
+    let spill = if str24_enabled() {
+        str24::INLINE_CAP as u32
+    } else {
+        8
+    };
+    let scratch =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, spill, 3));
+    let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
+    cx.builtins
+        .call(module, builder, "aipl_str_data", &[value, scratch_addr])
+}
+
 /// In `Write` mode, copy `n` bytes from `src` to the cursor and advance it.
 fn sink_bytes<M: Module>(
     module: &mut M,
@@ -12516,6 +12577,8 @@ fn emit_lit<M: Module>(
     bytes: &[u8],
 ) -> Result<Value, Error> {
     if let Sink::Write(_) = sink {
+        // `emit_str_literal` yields the *content* pointer already, not a `str`
+        // value, so it feeds the sink directly under either representation.
         let ptr = emit_str_literal(module, builder, cx, bytes)?;
         let n = builder.ins().iconst(types::I64, bytes.len() as i64);
         sink_bytes(module, builder, cx, sink, ptr, n);
@@ -12585,17 +12648,9 @@ fn emit_render<M: Module>(
                 let quote = builder.ins().iconst(types::I64, b'"' as i64);
                 sink_byte(builder, sink, quote);
                 // Resolve a contiguous content pointer for any representation
-                // (inline/owned/view) via `aipl_str_data`: it spills an inline
-                // value's bytes into `scratch` and returns the in-place pointer
-                // for owned/view. (`content`, the length, already handles all
-                // three — `aipl_str_len`.)
-                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let src = b.call(module, builder, "aipl_str_data", &[value, scratch_addr]);
+                // (inline/owned/view). (`content`, the length, already handles
+                // all three — `aipl_str_len`.)
+                let src = str_bytes_ptr(module, builder, cx, value);
                 sink_bytes(module, builder, cx, sink, src, content);
                 sink_byte(builder, sink, quote);
             }
@@ -12675,14 +12730,22 @@ fn emit_render_boxed<M: Module>(
     let b = cx.builtins;
     let id = tostr_func(module, cx, ty);
     let fref = module.declare_func_in_func(id, builder.func);
-    let inst = builder.ins().call(fref, &[value]);
-    let s = builder.inst_results(inst)[0];
+    let s = if str24_enabled() {
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            str24::STR_SIZE as u32,
+            3,
+        ));
+        let out = builder.ins().stack_addr(types::I64, slot, 0);
+        builder.ins().call(fref, &[out, value]);
+        out
+    } else {
+        let inst = builder.ins().call(fref, &[value]);
+        builder.inst_results(inst)[0]
+    };
     let len = { b.call(module, builder, "aipl_str_len", &[s]) };
     if let Sink::Write(_) = sink {
-        let scratch =
-            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-        let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-        let src = b.call(module, builder, "aipl_str_data", &[s, scratch_addr]);
+        let src = str_bytes_ptr(module, builder, cx, s);
         sink_bytes(module, builder, cx, sink, src, len);
     }
     emit_drop(
@@ -13194,7 +13257,7 @@ fn emit_render_char_array<M: Module>(
 
     let cur = builder.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
-        ITER_SIZE as u32,
+        iter_state_size(),
         3,
     ));
     let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
@@ -13438,12 +13501,24 @@ fn emit_to_str<M: Module>(
 ) -> Result<Value, Error> {
     let id = tostr_func(module, cx, ty);
     let fref = module.declare_func_in_func(id, builder.func);
-    let inst = builder.ins().call(fref, &[value]);
-    // The helper borrows `value` (renders without consuming it) and returns a
-    // freshly built `str` with one reference, owned by us — track it for drop at
-    // scope exit (an inline result no-ops; a heap result is freed via `aipl_dec`,
-    // which dispatches on the low bit).
-    let result = builder.inst_results(inst)[0];
+    // The helper borrows `value` (renders without consuming it) and produces a
+    // freshly built `str` with one reference, owned by us — tracked below for
+    // drop at scope exit (an inline result no-ops; a buffer is freed via the
+    // refcount). Under the wide representation the result comes back through a
+    // caller-provided slot rather than a register.
+    let result = if str24_enabled() {
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            str24::STR_SIZE as u32,
+            3,
+        ));
+        let out = builder.ins().stack_addr(types::I64, slot, 0);
+        builder.ins().call(fref, &[out, value]);
+        out
+    } else {
+        let inst = builder.ins().call(fref, &[value]);
+        builder.inst_results(inst)[0]
+    };
     scopes.last_mut().expect("scope").push(Tracked::new(
         result,
         &ConcreteType::Primitive(Primitive::Str),
@@ -13462,8 +13537,16 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     }
     let sym = er.symbol("__to_str_", &type_symbol(ty));
     let mut sig = module.make_signature();
-    sig.params.push(AbiParam::new(types::I64)); // value
-    sig.returns.push(AbiParam::new(types::I64)); // str
+    if str24_enabled() {
+        // A 24-byte `str` is a composite, so the result is written through a
+        // hidden leading pointer and nothing is returned — the same shape
+        // `build_signature` gives any composite-returning function.
+        sig.params.push(AbiParam::new(types::I64)); // sret
+        sig.params.push(AbiParam::new(types::I64)); // value
+    } else {
+        sig.params.push(AbiParam::new(types::I64)); // value
+        sig.returns.push(AbiParam::new(types::I64)); // str
+    }
     let id = module
         .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare to_str helper");
@@ -13683,15 +13766,26 @@ fn define_tostr_fn<M: Module>(
     instrument: bool,
 ) -> Result<(), Error> {
     builtins.clear_func_cache();
-    ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
-    ctx.func.signature.returns.push(AbiParam::new(types::I64)); // str
+    // Must match `tostr_func`'s declaration exactly: under the wide
+    // representation a `str` result is a composite, written through a leading
+    // sret pointer with nothing returned.
+    if str24_enabled() {
+        ctx.func.signature.params.push(AbiParam::new(types::I64)); // sret
+        ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
+    } else {
+        ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
+        ctx.func.signature.returns.push(AbiParam::new(types::I64)); // str
+    }
     {
         let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
         let entry = builder.create_block();
         builder.append_block_params_for_function_params(entry);
         builder.switch_to_block(entry);
         builder.seal_block(entry);
-        let value = builder.block_params(entry)[0];
+        let value = *builder
+            .block_params(entry)
+            .last()
+            .expect("the rendered value is the final parameter");
 
         // `emit_render` only reads `builtins`/`structs`/`lit_ctr`/`elem_rc`; the
         // rest of `Cx` is irrelevant to rendering, so feed it trivial values.
@@ -13737,6 +13831,56 @@ fn define_tostr_fn<M: Module>(
 
         // Pass 1: measure the total length.
         let len = render(module, &mut builder, Sink::Measure)?;
+
+        if str24_enabled() {
+            // Wide representation: one shape, no small/large split. The value is
+            // written into the caller's slot (`sret`, block param 0) and the
+            // bytes into a fresh buffer — allocation gives *capacity*, so the
+            // length is recorded with `aipl2_str_grew` once the write pass is
+            // done.
+            //
+            // No SSO here yet: a short result gets a buffer rather than being
+            // packed into the value's 22 inline bytes. Correct, one allocation
+            // more than necessary for short strings, and the obvious place to
+            // optimize once the switch is the only path.
+            let sret = builder.block_params(entry)[0];
+            let built = builtins.call(module, &mut builder, "aipl2_str_alloc", &[len]);
+            let start = builtins.call(module, &mut builder, "aipl2_str_write_ptr", &[built]);
+            let cursor = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                8,
+                3,
+            ));
+            builder.ins().stack_store(types::I64, start, cursor, 0);
+            render(module, &mut builder, Sink::Write(cursor))?;
+            builtins.call_void(module, &mut builder, "aipl2_str_grew", &[built, len]);
+            copy_composite(
+                &mut builder,
+                sret,
+                built,
+                &ConcreteType::Primitive(Primitive::Str),
+                structs,
+            );
+            builder.ins().return_(&[]);
+            builder.finalize(module.target_config());
+            ctx.func.name = UserFuncName::user(0, id.as_u32());
+            run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
+            ir_out.push_str(&fix_data_ref_names(
+                &ctx.func,
+                &format!("{}\n", ctx.func.display()),
+            ));
+            if instrument {
+                let count_fn = builtins.id(module, "aipl_count_insns");
+                instrument_insn_count(module, &mut ctx.func, count_fn);
+                let call_fn = builtins.id(module, "aipl_count_call");
+                instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+            }
+            module
+                .define_function(id, ctx)
+                .map_err(|e| Error::msg(format!("define to_str helper: {e:?}")))?;
+            module.clear_context(ctx);
+            return Ok(());
+        }
 
         // SSO: a result of <= 7 bytes is built *inline* (no allocation). The write
         // target is chosen per branch — a zeroed 8-byte stack scratch (content at
@@ -16825,22 +16969,14 @@ fn compile_call_expr<M: Module>(
                     builder.ins().iadd_imm_s(old_len, 1)
                 };
                 let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
-                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let src0 =
-                    builtins.call(module, builder, "aipl_str_data", &[arr_ptr, scratch_addr]);
+                let src0 = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed — each copy's destination is
                 // computed from `buf` directly.
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src0, old_len]);
                 let at = builder.ins().iadd(buf, old_len);
                 match tail {
                     Some(src) => {
-                        let src1 =
-                            builtins.call(module, builder, "aipl_str_data", &[src, scratch_addr]);
+                        let src1 = str_bytes_ptr(module, builder, cx, src);
                         builtins.call_void(
                             module,
                             builder,
@@ -17038,13 +17174,7 @@ fn compile_call_expr<M: Module>(
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let new_len = builder.ins().iadd_imm_s(old_len, 1);
                 let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
-                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let src = builtins.call(module, builder, "aipl_str_data", &[arr_ptr, scratch_addr]);
+                let src = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed here — the copy is the point.
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src, old_len]);
                 let dst_addr = builder.ins().iadd(buf, old_len);
@@ -17199,20 +17329,12 @@ fn compile_call_expr<M: Module>(
                 let add_len = builtins.call(module, builder, "aipl_str_len", &[src_ptr]);
                 let new_len = builder.ins().iadd(old_len, add_len);
                 let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
-                let scratch = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-                let src0 =
-                    builtins.call(module, builder, "aipl_str_data", &[arr_ptr, scratch_addr]);
+                let src0 = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed — each copy's destination is
                 // computed from `buf` directly.
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src0, old_len]);
                 let at = builder.ins().iadd(buf, old_len);
-                let src1 =
-                    builtins.call(module, builder, "aipl_str_data", &[src_ptr, scratch_addr]);
+                let src1 = str_bytes_ptr(module, builder, cx, src_ptr);
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[at, src1, add_len]);
                 builder.ins().stack_store(types::I64, buf, slot, 0);
                 // `aipl_str_len`/`aipl_str_data` only borrow, so — exactly as in
@@ -18834,7 +18956,7 @@ fn compile_expr_inner<M: Module>(
                 if it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty) {
                     let cur = builder.create_sized_stack_slot(StackSlotData::new(
                         StackSlotKind::ExplicitSlot,
-                        ITER_SIZE as u32,
+                        iter_state_size(),
                         3,
                     ));
                     let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);

@@ -168,6 +168,9 @@ syntax:
   allow defining functions in functions so that test utils can live closer to where they are used
   map should take any container and return the same container (then replace map_ok)
 
+strings:
+  literals should be a separate tag maybe?
+
 default/kwargs:
   A default cannot reference an earlier parameter — fn f(a: i64, b: i64 = a) gives "unknown identifier". Defaults are evaluated in an empty scope.
   Lambdas can't declare defaults — parse error.
