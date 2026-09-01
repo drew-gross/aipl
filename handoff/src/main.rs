@@ -94,12 +94,29 @@ Runs the pre-handoff gate: format, test, regenerate what a run proved stale, and
 confirm green. Takes no arguments; `HANDOFF_STEP_TIMEOUT` and `HANDOFF_VERBOSE`
 tune it (see the module docs).";
 
+/// Target selection for every whole-suite step.
+///
+/// **`--workspace` is the one that matters.** Without it cargo builds only the
+/// default package (`aipl`), whose test targets are the three integration
+/// binaries — so every `#[cfg(test)]` module under `crates/*/src/` went unrun.
+/// That is 57 tests, including the ones covering the 24-byte `str` layout, and
+/// nothing noticed when they stopped *compiling*: a test target that is never
+/// built cannot fail. It was found by running them by hand, which is the kind of
+/// gap a gate exists to prevent.
+///
+/// `--all-targets` selects no additional tests today (both counts are the same),
+/// and is passed to say what is meant: run everything, not just the test
+/// targets, so a future bin or example carrying tests is covered by default
+/// rather than by remembering to widen this.
+const ALL_TESTS: [&str; 2] = ["--workspace", "--all-targets"];
+
 /// The whole suite. `--no-fail-fast` because nextest cancels on the first
 /// failure by default and this gate needs to see *all* remediable staleness in
 /// one pass (see the discovery step).
 fn nextest() -> Cmd {
     Cmd::new("cargo")
         .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
+        .args(ALL_TESTS)
         .json()
 }
 
@@ -109,7 +126,9 @@ fn nextest() -> Cmd {
 /// no test events, and what this step reports on — cargo's compile errors — is
 /// build output rather than test results.
 fn nextest_build() -> Cmd {
-    Cmd::new("cargo").args(["nextest", "run", "--no-run", "--color", "never"])
+    Cmd::new("cargo")
+        .args(["nextest", "run", "--no-run", "--color", "never"])
+        .args(ALL_TESTS)
 }
 
 /// One `#[ignore]`d author helper, by exact name. nextest selects ignored tests

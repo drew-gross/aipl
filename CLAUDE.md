@@ -39,6 +39,14 @@ rest of the suite.) Your own inner-loop runs can use either
 runner — the cadence commands below are written for `cargo test`, and
 `cargo nextest run -E 'test(<name>)'` is the nextest equivalent.
 
+Every whole-suite step also passes **`--workspace --all-targets`**. `--workspace`
+is the one that matters: without it cargo builds only the default package, whose
+test targets are the three integration binaries, so every `#[cfg(test)]` module
+under `crates/*/src/` went unrun — 57 tests, and nothing noticed when some of
+them stopped *compiling*, because a test target that is never built cannot fail.
+So a bare `cargo nextest run` is **not** the same set the gate runs; scope an
+inner-loop run with `-E` rather than by dropping the flags.
+
 **Where it lives.** `cargo handoff` is a cargo alias (`.cargo/config.toml`) for
 `cargo run -p handoff`; the gate is the `handoff` crate. Its ordering rationale
 lives in the module docs of `handoff/src/main.rs`, the output parsing that
