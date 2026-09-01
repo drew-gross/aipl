@@ -3300,7 +3300,18 @@ pub extern "C" fn aipl_set_contains(
     }
     unsafe {
         let len = array_len(a);
-        if str_cmp != 0 {
+        if str_cmp == str24::STR_SIZE as i64 {
+            // Wide `str` elements: the element *is* the 24-byte value, so there
+            // is no pointer to load — compare the values in place.
+            let target = *(x as *const str24::Str);
+            for i in 0..len {
+                let ep = arr_elem_ptr_rt(a, i, str24::STR_SIZE);
+                if str24::eq(*(ep as *const str24::Str), target) {
+                    return 1;
+                }
+            }
+            0
+        } else if str_cmp != 0 {
             let target = *(x as *const i64) as *const u8;
             for i in 0..len {
                 let ep = arr_elem_ptr_rt(a, i, 8);
@@ -3614,14 +3625,16 @@ unsafe fn part_at_rt(parts: *const u8, i: usize) -> *const u8 {
 
 /// Read element `i` of set/array `src` as an i64 (bit-unpacked `bool` when
 /// `elem_size == 0`, else the 8-byte value). Repr-aware. Mirrors codegen's `read_set_elem`.
-unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {
+/// The address to hand `aipl_set_insert` for element `i` of `src`, and a
+/// one-word scratch backing it. Mirrors codegen's `set_elem_ptr`: anything wider
+/// than a word — a wide `str` among them — must be passed in place, and only the
+/// bit-packed `bool` case has no address of its own to give.
+unsafe fn set_elem_ptr(src: *const u8, i: usize, elem_size: i64, scratch: &mut i64) -> *const u8 {
     if elem_size == ELEM_BITPACKED {
-        i64::from(unsafe { arr_load_bit_rt(src, i) })
-    } else {
-        let stride = (elem_size.max(8)) as usize;
-        let ep = unsafe { arr_elem_ptr_rt(src, i, stride) };
-        unsafe { *(ep as *const i64) }
+        *scratch = i64::from(unsafe { arr_load_bit_rt(src, i) });
+        return scratch as *const i64 as *const u8;
     }
+    unsafe { arr_elem_ptr_rt(src, i, (elem_size.max(8)) as usize) }
 }
 
 /// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`;
@@ -3641,10 +3654,11 @@ pub extern "C" fn aipl_set_union(
         let b_len = if b.is_null() { 0 } else { array_len(b) };
         let mut dest = aipl_array_with_cap((a_len + b_len) as i64, drop_fn, elem_size);
         for i in 0..a_len {
-            let v = read_set_elem(a, i, elem_size);
+            let mut scratch = 0i64;
+            let v = set_elem_ptr(a, i, elem_size, &mut scratch);
             dest = aipl_set_insert(
                 dest,
-                &v as *const i64 as *const u8,
+                v,
                 drop_fn,
                 retain_fn,
                 elem_size,
@@ -3652,10 +3666,11 @@ pub extern "C" fn aipl_set_union(
             );
         }
         for i in 0..b_len {
-            let v = read_set_elem(b, i, elem_size);
+            let mut scratch = 0i64;
+            let v = set_elem_ptr(b, i, elem_size, &mut scratch);
             dest = aipl_set_insert(
                 dest,
-                &v as *const i64 as *const u8,
+                v,
                 drop_fn,
                 retain_fn,
                 elem_size,
@@ -3685,10 +3700,11 @@ pub extern "C" fn aipl_set_union_mut(
         let mut a = a;
         let b_len = if b.is_null() { 0 } else { array_len(b) };
         for i in 0..b_len {
-            let v = read_set_elem(b, i, elem_size);
+            let mut scratch = 0i64;
+            let v = set_elem_ptr(b, i, elem_size, &mut scratch);
             a = aipl_set_insert(
                 a,
-                &v as *const i64 as *const u8,
+                v,
                 drop_fn,
                 retain_fn,
                 elem_size,
@@ -3700,8 +3716,19 @@ pub extern "C" fn aipl_set_union_mut(
     }
 }
 
-/// Index of the pair in dict `a` whose key matches the key at `pair_ptr` (its
-/// first 8 bytes), or -1. Mirrors codegen's `dict_find`.
+/// The byte width of a dict key, which is also the offset of its value: a pair is
+/// `[key][value]` back to back. `str_cmp` carries the width for a `str` key (see
+/// codegen's `str_cmp_width`); every other key is one word. Mirrors codegen.
+fn dict_key_width(str_cmp: i64) -> usize {
+    if str_cmp != 0 {
+        str_cmp as usize
+    } else {
+        8
+    }
+}
+
+/// Index of the pair in dict `a` whose key matches the key at `pair_ptr`, or -1.
+/// Mirrors codegen's `dict_find`.
 unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: i64) -> i64 {
     if a.is_null() {
         return -1;
@@ -3709,14 +3736,24 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
     unsafe {
         let len = array_len(a);
         let stride = pair_size as usize;
+        let wide = str_cmp == str24::STR_SIZE as i64;
+        let want_wide = if wide {
+            *(pair_ptr as *const str24::Str)
+        } else {
+            str24::Str::empty()
+        };
         let want = *(pair_ptr as *const i64);
         for i in 0..len {
             let ep = arr_elem_ptr_rt(a, i, stride);
-            let k = *(ep as *const i64);
-            let eq = if str_cmp != 0 {
-                rt_str_eq(k as *const u8, want as *const u8)
+            let eq = if wide {
+                str24::eq(*(ep as *const str24::Str), want_wide)
             } else {
-                k == want
+                let k = *(ep as *const i64);
+                if str_cmp != 0 {
+                    rt_str_eq(k as *const u8, want as *const u8)
+                } else {
+                    k == want
+                }
             };
             if eq {
                 return i as i64;
@@ -3768,7 +3805,7 @@ pub extern "C" fn aipl_dict_get(
         if idx < 0 {
             return core::ptr::null();
         }
-        arr_elem_ptr_rt(a, idx as usize, pair_size as usize).add(8)
+        arr_elem_ptr_rt(a, idx as usize, pair_size as usize).add(dict_key_width(str_cmp))
     }
 }
 

@@ -3644,7 +3644,7 @@ block16:
     v81 = iconst.i64 0
     v82 = stack_addr.i64 ss1
     v83 = load.i64 notrap v82
-    call fn0(v83)
+    call fn2(v83)
     v84 = func_addr.i64 fn11
     v85 = func_addr.i64 fn12
     v86 = iconst.i64 8
@@ -3704,10 +3704,11 @@ function u0:48(i64, i64) -> i64 apple_aarch64 {
     sig5 = (i64, i64) apple_aarch64
     sig6 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
     sig7 = (i64) apple_aarch64
-    sig8 = (i64, i64) apple_aarch64
+    sig8 = (i64) apple_aarch64
     sig9 = (i64, i64) apple_aarch64
-    sig10 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
-    sig11 = (i64) apple_aarch64
+    sig10 = (i64, i64) apple_aarch64
+    sig11 = (i64, i64, i64, i64, i64) -> i64 apple_aarch64
+    sig12 = (i64) apple_aarch64
     fn0 = u0:12 sig0  ; aipl_array_with_cap
     fn1 = u0:1 sig1  ; aipl_arr_elem_ptr
     fn2 = u0:17 sig2  ; aipl_inc
@@ -3716,10 +3717,11 @@ function u0:48(i64, i64) -> i64 apple_aarch64 {
     fn5 = u0:5 sig5  ; aipl_arr_retain_ptr
     fn6 = u0:11 sig6  ; aipl_array_push_mut
     fn7 = u0:16 sig7  ; aipl_dec
-    fn8 = u0:0 sig8  ; aipl_arr_drop_str
-    fn9 = u0:5 sig9  ; aipl_arr_retain_ptr
-    fn10 = u0:7 sig10  ; aipl_arr_sort
-    fn11 = u0:8 sig11  ; aipl_array_dec
+    fn8 = u0:3 sig8  ; aipl_arr_inc
+    fn9 = u0:0 sig9  ; aipl_arr_drop_str
+    fn10 = u0:5 sig10  ; aipl_arr_retain_ptr
+    fn11 = u0:7 sig11  ; aipl_arr_sort
+    fn12 = u0:8 sig12  ; aipl_array_dec
 
 block0(v0: i64, v1: i64):
     v2 = iconst.i64 -4
@@ -3811,15 +3813,15 @@ block3:
     v53 = iconst.i64 0
     v54 = stack_addr.i64 ss0
     v55 = load.i64 notrap v54
-    call fn2(v55)
-    v56 = func_addr.i64 fn8
-    v57 = func_addr.i64 fn9
+    call fn8(v55)
+    v56 = func_addr.i64 fn9
+    v57 = func_addr.i64 fn10
     v58 = iconst.i64 8
     v59 = iconst.i64 2
-    v60 = call fn10(v55, v56, v57, v58, v59)  ; v58 = 8, v59 = 2
+    v60 = call fn11(v55, v56, v57, v58, v59)  ; v58 = 8, v59 = 2
     v61 = stack_addr.i64 ss0
     v62 = load.i64 notrap v61
-    call fn11(v62)
+    call fn12(v62)
     return v60
 }
 

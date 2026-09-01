@@ -56,6 +56,9 @@ functions:
   aipl_arr_drop_str:
     calls: 15
     bytes: (external)
+  aipl_arr_inc:
+    calls: 6
+    bytes: (external)
   aipl_arr_retain_ptr:
     calls: 9
     bytes: (external)
@@ -81,7 +84,7 @@ functions:
     calls: 38
     bytes: (external)
   aipl_inc:
-    calls: 33
+    calls: 27
     bytes: (external)
   aipl_list_files:
     calls: 1

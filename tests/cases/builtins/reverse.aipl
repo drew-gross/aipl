@@ -49,6 +49,9 @@ functions:
   aipl_arr_elem_ptr:
     calls: 7
     bytes: (external)
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
   aipl_arr_reverse:
     calls: 4
     bytes: (external)
@@ -63,9 +66,6 @@ functions:
     bytes: (external)
   aipl_dec:
     calls: 16
-    bytes: (external)
-  aipl_inc:
-    calls: 4
     bytes: (external)
   aipl_str_eq:
     calls: 8

@@ -3006,17 +3006,29 @@ extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
 }
 
 /// Whether `a` already contains the element at `x`. `str_cmp != 0` compares
-/// `str` elements (8-byte pointers) by content; otherwise a bit-packed `bool`
-/// set (`elem_size == 0`) compares unpacked bits and every other scalar set
-/// compares the 8-byte value. Returns 1 (present) or 0 (absent); a null/empty
-/// set is never a member.
+/// `str` elements by content and carries their width (see `str_cmp_width`);
+/// otherwise a bit-packed `bool` set (`elem_size == 0`) compares unpacked bits
+/// and every other scalar set compares the 8-byte value. Returns 1 (present) or
+/// 0 (absent); a null/empty set is never a member.
 #[no_mangle]
 extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_cmp: i64) -> i64 {
     if a.is_null() {
         return 0;
     }
     let len = unsafe { array_len_of(a) };
-    if str_cmp != 0 {
+    if str_cmp == str24::STR_SIZE as i64 {
+        // Wide `str` elements: the element *is* the 24-byte value, so there is
+        // no pointer to load — compare the values in place.
+        let target = unsafe { std::ptr::read(x as *const str24::Str) };
+        for i in 0..len {
+            let sp = unsafe { arr_elem_ptr(a, i, str24::STR_SIZE) };
+            let s = unsafe { std::ptr::read(sp as *const str24::Str) };
+            if str24::eq(s, target) {
+                return 1;
+            }
+        }
+        0
+    } else if str_cmp != 0 {
         let target = unsafe { std::ptr::read(x as *const i64) } as *const u8;
         for i in 0..len {
             let sp = unsafe { arr_elem_ptr(a, i, 8) };
@@ -3068,18 +3080,20 @@ extern "C" fn aipl_set_insert(
     aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size)
 }
 
-/// Read element `i` of set/array `src` as an i64 — a bit-unpacked `bool`
-/// (`elem_size == 0`), else the 8-byte value (a scalar or `str` pointer). The
-/// value is passed by-address to `aipl_set_insert`, so this normalizes the
-/// bit-packed case into a plain i64 the inserter can spill and read.
-unsafe fn read_set_elem(src: *const u8, i: usize, elem_size: i64) -> i64 {
+/// The address to hand `aipl_set_insert` for element `i` of `src`, and a
+/// one-word scratch backing it.
+///
+/// Every element wider than a word — a wide `str` among them — must be passed
+/// *in place*: copying it into a local `i64` first keeps only its first word,
+/// which is then read back as a whole value. Only the bit-packed `bool` case has
+/// no address to give (its element is one bit), so that one is materialized into
+/// the scratch and its address returned.
+unsafe fn set_elem_ptr(src: *const u8, i: usize, elem_size: i64, scratch: &mut i64) -> *const u8 {
     if elem_size == ELEM_BITPACKED {
-        i64::from(unsafe { arr_load_bit(src, i) })
-    } else {
-        let stride = elem_size.max(8) as usize;
-        let ep = unsafe { arr_elem_ptr(src, i, stride) };
-        unsafe { std::ptr::read(ep as *const i64) }
+        *scratch = i64::from(unsafe { arr_load_bit(src, i) });
+        return scratch as *const i64 as *const u8;
     }
+    unsafe { arr_elem_ptr(src, i, elem_size.max(8) as usize) }
 }
 
 /// `a.union(b)` (copy): a fresh set with every distinct element of `a` then `b`.
@@ -3107,13 +3121,13 @@ extern "C" fn aipl_set_union(
     // Pre-size to the upper bound (|a| + |b|) so the insert loop never reallocs.
     let mut dest = aipl_array_with_cap((a_len + b_len) as i64, drop_fn, elem_size);
     for i in 0..a_len {
-        let v = unsafe { read_set_elem(a, i, elem_size) };
-        let vp = &v as *const i64 as *const u8;
+        let mut scratch = 0i64;
+        let vp = unsafe { set_elem_ptr(a, i, elem_size, &mut scratch) };
         dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp);
     }
     for i in 0..b_len {
-        let v = unsafe { read_set_elem(b, i, elem_size) };
-        let vp = &v as *const i64 as *const u8;
+        let mut scratch = 0i64;
+        let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
         dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp);
     }
     aipl_array_dec(a);
@@ -3140,31 +3154,56 @@ extern "C" fn aipl_set_union_mut(
         unsafe { array_len_of(b) }
     };
     for i in 0..b_len {
-        let v = unsafe { read_set_elem(b, i, elem_size) };
-        let vp = &v as *const i64 as *const u8;
+        let mut scratch = 0i64;
+        let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
         a = aipl_set_insert(a, vp, drop_fn, retain_fn, elem_size, str_cmp);
     }
     aipl_array_dec(b);
     a
 }
 
-/// Index of the pair in dict `a` whose key matches the key at `pair_ptr` (its
-/// first 8 bytes), or -1. Keys compare by `str_cmp`: content (`rt_str_eq`) for
-/// `str`, else the raw 8-byte value.
+/// The byte width of a dict key, which is also the offset of its value: a pair
+/// is `[key][value]` laid out back to back. `str_cmp` carries the width for a
+/// `str` key (see `str_cmp_width`) precisely so this is answerable without a
+/// second argument; every other key is one word.
+fn dict_key_width(str_cmp: i64) -> usize {
+    if str_cmp != 0 {
+        str_cmp as usize
+    } else {
+        8
+    }
+}
+
+/// Index of the pair in dict `a` whose key matches the key at `pair_ptr`, or -1.
+/// Keys compare by `str_cmp`: content for `str` (a 24-byte value compare when
+/// wide, `rt_str_eq` on the pointer when tagged), else the raw 8-byte value.
 unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: i64) -> i64 {
     if a.is_null() {
         return -1;
     }
     let len = unsafe { array_len_of(a) };
     let stride = pair_size as usize;
+    let wide = str_cmp == str24::STR_SIZE as i64;
+    let want_wide = if wide {
+        unsafe { std::ptr::read(pair_ptr as *const str24::Str) }
+    } else {
+        str24::Str::empty()
+    };
     let want = unsafe { std::ptr::read(pair_ptr as *const i64) };
     for i in 0..len {
         let ep = unsafe { arr_elem_ptr(a, i, stride) };
-        let k = unsafe { std::ptr::read(ep as *const i64) };
-        let eq = if str_cmp != 0 {
-            unsafe { rt_str_eq(k as *const u8, want as *const u8) }
+        let eq = if wide {
+            str24::eq(
+                unsafe { std::ptr::read(ep as *const str24::Str) },
+                want_wide,
+            )
         } else {
-            k == want
+            let k = unsafe { std::ptr::read(ep as *const i64) };
+            if str_cmp != 0 {
+                unsafe { rt_str_eq(k as *const u8, want as *const u8) }
+            } else {
+                k == want
+            }
         };
         if eq {
             return i as i64;
@@ -3217,8 +3256,9 @@ extern "C" fn aipl_dict_get(
     if idx < 0 {
         return std::ptr::null();
     }
-    // The key occupies the first 8 bytes of the pair; the value follows.
-    unsafe { arr_elem_ptr(a, idx as usize, pair_size as usize).add(8) }
+    // The key occupies the first `dict_key_width` bytes of the pair; the value
+    // follows immediately.
+    unsafe { arr_elem_ptr(a, idx as usize, pair_size as usize).add(dict_key_width(str_cmp)) }
 }
 
 /// `d.contains_key(k)`: whether `key_ptr` is a key of dict `a`. Borrows `a`.
@@ -11315,10 +11355,7 @@ fn emit_eq_body<M: Module>(
                 let xslot = value_slot(builder, elem, structs);
                 let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
                 store_array_elem(builder, xptr, el, elem, structs);
-                let str_cmp = builder.ins().iconst(
-                    types::I64,
-                    i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
-                );
+                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
                 let c = builtins.call(
                     module,
                     builder,
@@ -11439,11 +11476,8 @@ fn emit_eq_body<M: Module>(
             if is_none_inner(k) {
                 builder.ins().uextend(types::I64, len_eq)
             } else {
-                let pair_size = 8 + elem_size_of(v, structs);
-                let str_cmp = builder.ins().iconst(
-                    types::I64,
-                    i64::from(**k == ConcreteType::Primitive(Primitive::Str)),
-                );
+                let pair_size = dict_pair_size(k, v, structs);
+                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(k));
                 let psz = builder.ins().iconst(types::I64, pair_size);
                 let res = i64_slot(builder);
                 let zero = builder.ins().iconst(types::I64, 0);
@@ -11988,7 +12022,7 @@ fn emit_hash<M: Module>(
             if is_none_inner(key_ty) {
                 seed
             } else {
-                let pair_size = 8 + elem_size_of(val_ty, structs);
+                let pair_size = dict_pair_size(key_ty, val_ty, structs);
                 let acc = i64_slot(builder);
                 builder.ins().stack_store(types::I64, seed, acc, 0);
                 let idx = i64_slot(builder);
@@ -12394,7 +12428,8 @@ fn define_pair_rc_fn<M: Module>(
     builtins.clear_func_cache();
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // elems
     ctx.func.signature.params.push(AbiParam::new(types::I64)); // len
-    let pair_size = 8 + elem_size_of(val_ty, structs);
+    let pair_size = dict_pair_size(key_ty, val_ty, structs);
+    let key_size = dict_key_size(key_ty, structs);
     {
         let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
         let entry = builder.create_block();
@@ -12422,11 +12457,12 @@ fn define_pair_rc_fn<M: Module>(
         builder.seal_block(body);
         let off = builder.ins().imul_imm_s(i, pair_size);
         let pair = builder.ins().iadd(elems, off);
-        // Key at offset 0 (a scalar/str: `component` loads its 8 bytes), value at
-        // offset 8 (a composite is addressed, a scalar/str/array loaded).
+        // Key at offset 0, value immediately after it — at `key_size`, which is
+        // 8 for every key but a wide `str` (`dict_key_size`). `component` loads a
+        // scalar and addresses a composite.
         let kv = component(&mut builder, pair, 0, key_ty, structs);
         emit_rc(&mut builder, module, builtins, structs, kv, key_ty, op);
-        let vv = component(&mut builder, pair, 8, val_ty, structs);
+        let vv = component(&mut builder, pair, key_size as u32, val_ty, structs);
         emit_rc(&mut builder, module, builtins, structs, vv, val_ty, op);
         let next = builder.ins().iadd_imm_s(i, 1);
         builder.ins().stack_store(types::I64, next, slot, 0);
@@ -13523,7 +13559,8 @@ fn emit_render_dict<M: Module>(
     if is_none_inner(key_ty) {
         return emit_lit(module, builder, cx, sink, b"{}");
     }
-    let pair_size = 8 + elem_size_of(val_ty, cx.structs);
+    let pair_size = dict_pair_size(key_ty, val_ty, cx.structs);
+    let key_size = dict_key_size(key_ty, cx.structs);
     let len_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     let zero = builder.ins().iconst(types::I64, 0);
@@ -13570,7 +13607,7 @@ fn emit_render_dict<M: Module>(
     add_len(builder, len_slot, klen);
     let colon = emit_lit(module, builder, cx, sink, b": ")?;
     add_len(builder, len_slot, colon);
-    let vv = component(builder, pair, 8, val_ty, cx.structs);
+    let vv = component(builder, pair, key_size as u32, val_ty, cx.structs);
     let vlen = emit_render(module, builder, cx, vv, val_ty, sink)?;
     add_len(builder, len_slot, vlen);
 
@@ -16147,7 +16184,9 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
             };
-            emit_inc(builder, module, builtins, ptr);
+            // See the note at `reverse`'s array arm: an array retains through
+            // `aipl_arr_inc`, never the str-tagged `aipl_inc`.
+            builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let esz = builder
@@ -16356,7 +16395,13 @@ fn compile_call_expr<M: Module>(
                 (result, t)
             } else if let ConcreteType::Array(elem) = &t {
                 let elem = (**elem).clone();
-                emit_inc(builder, module, builtins, ptr);
+                // Array receiver: `aipl_arr_inc`, not `emit_inc`. `aipl_inc` dispatches on the
+                // *string* tag scheme (its own doc says so), which reads an array's
+                // representation tag as a str's. The two coincide for an untagged
+                // array — both find the refcount at `ptr - 8` — which is why this was
+                // survivable; under the wide `str` it reads 24 bytes of array header
+                // as a value instead.
+                builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
                 let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
                 let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
                 let esz = builder
@@ -16705,21 +16750,19 @@ fn compile_call_expr<M: Module>(
                 let x_ty = flex_int_ty(&args[1], &x_ty, &elem);
                 expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
                 // The runtime reads the queried value through a pointer; spill
-                // the scalar (a `bool` is read back as i64) and pass its address.
-                let s = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                builder.ins().stack_store(types::I64, x_v, s, 0);
+                // it and pass its address. Sized and written by element type
+                // (`value_slot`/`store_array_elem`) rather than as a bare word:
+                // a scalar is one store, but a composite element — a wide `str`
+                // among them — is a whole 24-byte value to copy, and storing its
+                // *address* into an 8-byte slot is what the runtime would then
+                // read back as the value.
+                let s = value_slot(builder, &elem, structs);
                 let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
+                store_array_elem(builder, x_ptr, x_v, &elem, structs);
                 let esz = builder
                     .ins()
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
-                let str_cmp = builder.ins().iconst(
-                    types::I64,
-                    i64::from(elem == ConcreteType::Primitive(Primitive::Str)),
-                );
+                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
                 let found = builtins.call(
                     module,
                     builder,
@@ -16758,17 +16801,15 @@ fn compile_call_expr<M: Module>(
             let ConcreteType::Set(elem) = &result_ty else {
                 unreachable!()
             };
-            emit_inc(builder, module, builtins, a_ptr);
-            emit_inc(builder, module, builtins, b_ptr);
+            // Sets are array blocks — see the note at `reverse`'s array arm.
+            builtins.call_void(module, builder, "aipl_arr_inc", &[a_ptr]);
+            builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
             let drop_fn = array_drop_fn_addr(builder, module, cx, elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
             let esz = builder
                 .ins()
                 .iconst(types::I64, runtime_elem_size(elem, structs));
-            let str_cmp = builder.ins().iconst(
-                types::I64,
-                i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
-            );
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
             let res = builtins.call(
                 module,
                 builder,
@@ -16819,19 +16860,15 @@ fn compile_call_expr<M: Module>(
                 expect_type(&key_t, &key_ty, "get key", args[1].span.clone())?;
                 // Spill the key and pass its address (a `bool` reads back as i64,
                 // a `str` as its pointer).
-                let ks = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                builder.ins().stack_store(types::I64, key_v, ks, 0);
+                // Spilled by key type, not as a bare word — see `has` for why
+                // storing a composite key's *address* into an 8-byte slot is the
+                // bug that reads back as a value.
+                let ks = value_slot(builder, &key_ty, structs);
                 let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
-                let pair_size = 8 + elem_size_of(&val_ty, structs);
+                store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
+                let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
                 let psz = builder.ins().iconst(types::I64, pair_size);
-                let str_cmp = builder.ins().iconst(
-                    types::I64,
-                    i64::from(key_ty == ConcreteType::Primitive(Primitive::Str)),
-                );
+                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
                 // The value's address, or 0 when the key is absent.
                 let vslot = builtins.call(
                     module,
@@ -16899,19 +16936,15 @@ fn compile_call_expr<M: Module>(
             } else {
                 let key_t = flex_int_ty(&args[1], &key_t, &key_ty);
                 expect_type(&key_t, &key_ty, "contains_key key", args[1].span.clone())?;
-                let ks = builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ));
-                builder.ins().stack_store(types::I64, key_v, ks, 0);
+                // Spilled by key type, not as a bare word — see `has` for why
+                // storing a composite key's *address* into an 8-byte slot is the
+                // bug that reads back as a value.
+                let ks = value_slot(builder, &key_ty, structs);
                 let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
-                let pair_size = 8 + elem_size_of(&val_ty, structs);
+                store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
+                let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
                 let psz = builder.ins().iconst(types::I64, pair_size);
-                let str_cmp = builder.ins().iconst(
-                    types::I64,
-                    i64::from(key_ty == ConcreteType::Primitive(Primitive::Str)),
-                );
+                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
                 let found = builtins.call(
                     module,
                     builder,
@@ -18955,16 +18988,13 @@ fn compile_expr_inner<M: Module>(
                         expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
                         // `aipl_set_union_mut` decs `b`; inc first so b's own track
                         // balances. `a` is reused, not dec'd.
-                        emit_inc(builder, module, builtins, b_ptr);
+                        builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
                         let drop_fn = array_drop_fn_addr(builder, module, cx, elem);
                         let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
                         let esz = builder
                             .ins()
                             .iconst(types::I64, runtime_elem_size(elem, structs));
-                        let str_cmp = builder.ins().iconst(
-                            types::I64,
-                            i64::from(**elem == ConcreteType::Primitive(Primitive::Str)),
-                        );
+                        let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
                         let new_ptr = builtins.call(
                             module,
                             builder,
@@ -19729,10 +19759,7 @@ fn compile_expr_inner<M: Module>(
             // so the set frees/retains them, and compare membership by content.
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
-            let str_cmp = builder.ins().iconst(
-                types::I64,
-                i64::from(elem == ConcreteType::Primitive(Primitive::Str)),
-            );
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
             let cap = builder.ins().iconst(types::I64, elems.len() as i64);
             let mut ptr = builtins.call(
                 module,
@@ -19798,13 +19825,10 @@ fn compile_expr_inner<M: Module>(
             }
             let key = key_ty.unwrap_or(ConcreteType::NoneInner);
             let val = val_ty.unwrap_or(ConcreteType::NoneInner);
-            let pair_size = 8 + elem_size_of(&val, structs);
+            let pair_size = dict_pair_size(&key, &val, structs);
             let psz = builder.ins().iconst(types::I64, pair_size);
             let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key, &val);
-            let str_cmp = builder.ins().iconst(
-                types::I64,
-                i64::from(key == ConcreteType::Primitive(Primitive::Str)),
-            );
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key));
             let cap = builder.ins().iconst(types::I64, pairs.len() as i64);
             let mut ptr =
                 builtins.call(module, builder, "aipl_array_with_cap", &[cap, drop_fn, psz]);
@@ -19819,7 +19843,9 @@ fn compile_expr_inner<M: Module>(
                 ));
                 let pbase = builder.ins().stack_addr(types::I64, pbuf, 0);
                 store_array_elem(builder, pbase, kv, &key, structs);
-                let vaddr = builder.ins().iadd_imm_s(pbase, 8);
+                let vaddr = builder
+                    .ins()
+                    .iadd_imm_s(pbase, dict_key_size(&key, structs));
                 store_array_elem(builder, vaddr, vv, &val, structs);
                 ptr = builtins.call(
                     module,
@@ -20261,6 +20287,53 @@ fn str24_enabled() -> bool {
 
 /// Whether `ty` is a `str`-shaped value *under the active representation* — true
 /// only once the switch is on, since that is what makes it a composite.
+/// The `str_cmp` argument the set/dict runtime helpers take: **0 when the element
+/// (or dict key) is not a `str`, otherwise its width in bytes.**
+///
+/// It used to be a plain 0/1 flag, which was enough while every `str` was an
+/// 8-byte pointer. It no longer is: the helpers have to know both *how* to
+/// compare (by content, not by word) and *how wide the thing is* — a set strides
+/// over elements, and a dict's value sits immediately after its key, so the
+/// value offset is the key's width. Carrying the width answers both questions
+/// with the argument that was already there, and keeps the wide arm keyed on a
+/// real quantity rather than a second magic flag.
+///
+/// `char[]` deliberately does not count: the existing helpers compare it as an
+/// opaque word (identity, not content), and widening it here would change
+/// tagged-path semantics rather than port them.
+/// A dict is an array of `[key][value]` pairs laid out back to back, so the
+/// value's offset within a pair *is* the key's width and the pair's size is the
+/// two widths summed.
+///
+/// Both were the literal `8` everywhere until the 24-byte `str` arrived: every
+/// key had been one word. They are derived here so the eight sites that build,
+/// scan, hash, render, free and look up pairs cannot disagree about the layout —
+/// a disagreement reads a key's bytes as a value's, which is how a wide `str`
+/// key surfaced as `misaligned pointer dereference: ... is 0x63` (the letter
+/// `c`).
+fn dict_key_size(key_ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
+    elem_size_of(key_ty, structs).max(8)
+}
+
+fn dict_pair_size(
+    key_ty: &ConcreteType,
+    val_ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> i64 {
+    dict_key_size(key_ty, structs) + elem_size_of(val_ty, structs)
+}
+
+fn str_cmp_width(ty: &ConcreteType) -> i64 {
+    if *ty != ConcreteType::Primitive(Primitive::Str) {
+        return 0;
+    }
+    if str24_enabled() {
+        str24::STR_SIZE as i64
+    } else {
+        8
+    }
+}
+
 fn str24_wide(ty: &ConcreteType) -> bool {
     str24_enabled() && (is_str_repr(ty) || is_char_array(ty))
 }

@@ -59,7 +59,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_arr_inc:
-    calls: 6
+    calls: 8
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2
@@ -83,7 +83,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 19
+    calls: 17
     bytes: (external)
   aipl_list_files:
     calls: 5

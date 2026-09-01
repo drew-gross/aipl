@@ -97,8 +97,8 @@
 # that would have caught it. Deriving the answer rather than maintaining a second
 # table means the next conversion cannot reintroduce it.
 #
-# Five clusters were fixed on the strength of that classification, and the count
-# is now **164 / 875** (from 527), with zero leak-gate hits:
+# Six clusters were fixed on the strength of that classification, and the count
+# is now **154 / 875** (from 527), with zero leak-gate hits:
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -147,20 +147,55 @@
 #     `str[]` and nested `char[]` build, iterate, index, render and free
 #     identically under both settings.
 #
-# The remaining 164, by cause:
+#   - **sets and dicts holding a `str`** — as key, as value, and as set element,
+#     verified identical under both settings and in an AOT binary as well as the
+#     JIT. Three things came out of it, all bigger than the cluster:
 #
-#    65  `aipl check` (in-language tests) failed
-#    61  `stdout` mismatch
+#     **`str_cmp` now carries a width, not a flag.** The set/dict helpers all
+#     took a 0/1 `str_cmp`, which was enough while every `str` was one word. It
+#     no longer is — they need to know both how to compare *and* how wide the
+#     thing is, since a set strides over elements and a dict's value sits
+#     immediately after its key. Carrying the width (`str_cmp_width`) answers
+#     both with the argument that was already there, and needs no new symbol in
+#     either runtime — which matters because the AOT half has no env var to
+#     consult.
+#
+#     **The dict pair layout is now derived** (`dict_key_size`/`dict_pair_size`).
+#     `8` was hard-coded at eight sites that build, scan, hash, render, free and
+#     look up pairs; they cannot disagree now. A disagreement reads a key's bytes
+#     as a value's — which is how a wide `str` key first surfaced, as
+#     `misaligned pointer dereference: ... is 0x63`, the letter `c`.
+#
+#     **A latent bug in the *tagged* path, exposed by the switch.** Five sites
+#     retained an array or set through `emit_inc`, i.e. `aipl_inc` — whose own
+#     doc says arrays must use `aipl_arr_inc` because `aipl_inc` dispatches on
+#     the *string* tag scheme. It survived only because the two coincide for an
+#     untagged array (both find the refcount at `ptr - 8`); a tagged array
+#     representation would have misread it either way. Now fixed for both ABIs.
+#
+#     Three call sites also spilled a queried key/element into a fixed 8-byte
+#     slot (`has`, `get`, `contains_key`). They use `value_slot` +
+#     `store_array_elem` now, which size and write by type — otherwise a
+#     composite's *address* is stored where the runtime reads a value.
+#
+# The remaining 154, by cause:
+#
+#    60  `aipl check` (in-language tests) failed
+#    57  `stdout` mismatch
 #    23  compile failed
-#    12  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
+#    11  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
 #     3  `exit code` mismatch
 #
 # Two clusters account for essentially all of it:
 #
-#   - **`str` stored inside something else**, minus the array case now done:
-#     sets, dicts, structs, variants, optionals and results. All the same bug —
-#     an element or field slot is 8 bytes and a wide `str` is 24 — showing up as
-#     an abort inside `Str::retain`/`release` on a bogus owner pointer.
+#   - **`str` stored inside something else**, minus arrays, sets and dicts, now
+#     done: structs, variants, optionals and results. Same bug — a field or
+#     payload slot is 8 bytes and a wide `str` is 24 — showing up as an abort
+#     inside `Str::retain`/`release` on a bogus owner pointer. Unlike the
+#     containers, this one needs the *layout* mono computes, not just the
+#     runtime's view of it. Start with `str?` (`aipl_arr_drop_opt_str` /
+#     `aipl_arr_retain_opt` have no wide counterpart at all), since the optional
+#     core is what struct fields and variant payloads are built out of.
 #   - **the remaining producers**: slice, trim, reverse, sort, repeat, split,
 #     join, int_parse. Ordinary one-at-a-time conversions, and the concat work
 #     above is the template for them: check whether the `str24.rs` helper takes
@@ -391,16 +426,11 @@ examples_uses_strlen
 #     serves `str` *and* array elements and only the `str` use changes shape — a
 #     blanket remap would have corrupted every array-of-arrays.
 #
-#     **Sets and dicts are next, and the design is already implied by their
-#     signatures.** `aipl_set_contains`, `aipl_set_insert`, `aipl_set_union`,
-#     `aipl_set_union_mut`, `aipl_dict_get`, `aipl_dict_contains_key` and
-#     `aipl_dict_insert` all take `elem_size` and a `str_cmp` flag, and their
-#     `str_cmp != 0` arms hard-code an 8-byte element read plus `rt_str_eq` on a
-#     tagged pointer. Since a tagged `str` set passes `elem_size == 8` and a wide
-#     one passes `STR_SIZE`, **`str_cmp != 0 && elem_size == STR_SIZE` is an
-#     unambiguous discriminator inside the runtime** — which matters because the
-#     AOT half has no env var to consult. That keeps it to one new arm per
-#     function rather than seven new symbols.
+#     **Sets and dicts are done** — see the cluster note above. No new symbols
+#     were needed in either runtime: widening `str_cmp` from a flag to a width
+#     gave both halves the discriminator, and the union loops now pass elements
+#     by address instead of copying them into an `i64` (which kept only the first
+#     word of a wide value).
 #
 #     Still missing entirely: `aipl_arr_drop_opt_str` / `aipl_arr_retain_opt`,
 #     for `str?` elements (32 bytes wide: tag + 24).
