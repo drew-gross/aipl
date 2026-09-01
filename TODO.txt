@@ -258,6 +258,9 @@ nonempty lists:
 chain_docs:
   rewrite this somehow, there must be a better way
 
+abi:
+  The StrAbi getting passed around approach is good, I expect ABI details to continue to get more complex in this langauge. Lets change StrAbi to just Abi, and have it contain a StrAbi field. The type will likely gain more fields later.
+
 design:
   write a design principles doc
     representation is not introspectable

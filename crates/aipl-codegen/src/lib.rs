@@ -6264,6 +6264,34 @@ impl Compilation {
             return Ok(result);
         }
 
+        // A wide `str` return is a composite like any other: the callee writes it
+        // through a hidden sret pointer and returns nothing. (Under the tagged
+        // ABI it comes back in a register — the branch further down.)
+        if ret_is_str && abi_kind == StrAbi::Wide {
+            let words = str24::STR_SIZE.div_ceil(8);
+            let mut sret_buf = vec![0i64; words];
+            let mut sret_abi = Vec::with_capacity(1 + abi.len());
+            sret_abi.push(sret_buf.as_mut_ptr() as i64);
+            sret_abi.extend_from_slice(&abi);
+            if sret_abi.len() > 6 {
+                return Err(Error::msg(format!(
+                    "fn {name:?} has too many parameters for a `str` return; the FFI supports \
+                     up to 5 (plus the hidden return pointer)"
+                )));
+            }
+            // SAFETY: the function takes `(sret_ptr, <= 5 scalar/str args)` and
+            // returns nothing; the buffer is `str` sized.
+            let _ = unsafe { invoke(ptr, &sret_abi) };
+            let value = unsafe { core::ptr::read(sret_buf.as_ptr() as *const str24::Str) };
+            // Copy the bytes out while the argument buffers are still alive — an
+            // identity `fn(s) -> s` hands one of them straight back — then
+            // release the reference the callee gave us.
+            let mut scratch = [0u8; str24::INLINE_CAP];
+            let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
+            value.release();
+            return Ok(FfiValue::Str(text));
+        }
+
         // SAFETY: arity (<= 6) and per-argument types are validated above; every
         // scalar and `str` lowers to one `i64`, so the finalized code matches the
         // transmuted signature.

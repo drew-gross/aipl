@@ -45,6 +45,28 @@
 #     mismatching, so the remaining cause is structural — composite *returns*
 #     carrying a `str`, where the sret buffer and the field offsets have to agree
 #     with a layout the callee computed under the wide representation.
+#
+#     **Diagnosed by experiment — the FFI is not the problem.** Two throwaway
+#     tests settled it:
+#
+#       `pub fn id(s: str) -> str { s }` through `call_values`  ->  PASSES,
+#           for an inline arg *and* a buffer-backed one. So the read path,
+#           argument marshaling and cross-boundary refcounting are all correct.
+#
+#       the same shape whose body calls one string builtin (`+++`)  ->  SIGSEGV.
+#
+#     So these 11 fail because their fixtures *use string builtins*, whose call
+#     sites still route to the old entry points with what is now an address.
+#     Two hypotheses died here and are not worth retrying: the return convention
+#     (a wide `str` return does go through sret now — that fix is in, and changed
+#     nothing) and cross-boundary ownership (nothing is double-released; the
+#     identity round trip proves it).
+#
+#     The work is therefore *not* in the FFI: it is converting the `str` builtin
+#     call sites one at a time. `aipl_concat` was tried as a straight `active_sym`
+#     rename and still crashes, so it needs more than a symbol swap — start
+#     there, and note `aipl_concat` also appears in the concat-specialization
+#     machinery, which is the likely reason.
 ffi::call_values_marshals_str_return
 ffi::call_values_marshals_str_args_with_int_return
 ffi::call_values_marshals_struct_return
