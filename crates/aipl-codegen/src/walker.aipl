@@ -2710,11 +2710,11 @@ allocations: 21241
 deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
-instructions executed: 2837849
-binary size: 3212952
-  code: 1836784
+instructions executed: 2831320
+binary size: 3212120
+  code: 1836356
   data: 27124
-  metadata: 1349044
+  metadata: 1348640
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2799,7 +2799,7 @@ functions:
     bytes: 208
   __builtin_int_parse:
     calls: 1
-    bytes: 1052
+    bytes: 1032
   __builtin_intersperse$__m1__Doc:
     calls: 142
     bytes: 408
@@ -2859,7 +2859,7 @@ functions:
     bytes: 32
   __m11__process_raw_string$tail:
     calls: 0
-    bytes: 564
+    bytes: 528
   __m12__trim_prefix:
     calls: 0
     bytes: 196
@@ -2892,7 +2892,7 @@ functions:
     bytes: 36
   __m1__print_doc$tail:
     calls: 128
-    bytes: 4624
+    bytes: 4604
   __m2__reindent_block:
     calls: 0
     bytes: 2240
@@ -2919,7 +2919,7 @@ functions:
     bytes: 2112
   __m9__between_len:
     calls: 49
-    bytes: 676
+    bytes: 636
   __m9__delimited_len:
     calls: 96
     bytes: 1348
@@ -2937,19 +2937,19 @@ functions:
     bytes: 1372
   __m9__lex_step$__m8__AiplTok:
     calls: 131
-    bytes: 22592
+    bytes: 22496
   __m9__nested_len:
     calls: 84
-    bytes: 940
+    bytes: 820
   __m9__step_result$__m8__AiplTok:
     calls: 3454
     bytes: 12096
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2548
+    bytes: 2512
   __m9__template_step$__m8__AiplTok:
     calls: 94
-    bytes: 488
+    bytes: 452
   __rec_drop___m1__Doc:
     calls: 2551
     bytes: 184
@@ -3017,10 +3017,10 @@ functions:
     calls: 205
     bytes: (external)
   aipl_dec:
-    calls: 74023
+    calls: 67363
     bytes: (external)
   aipl_inc:
-    calls: 60480
+    calls: 53951
     bytes: (external)
   aipl_rec_alloc:
     calls: 6173
@@ -3321,7 +3321,7 @@ functions:
     bytes: 5016
   str_atom:
     calls: 2
-    bytes: 500
+    bytes: 476
   struct_atom:
     calls: 2
     bytes: 2932

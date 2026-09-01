@@ -68,11 +68,11 @@ allocations: 150003
 deallocations: 150003
 reallocations: 0
 bytes allocated: 8400168
-instructions executed: 17400283
-binary size: 4520
-  code: 2104
+instructions executed: 17100283
+binary size: 4472
+  code: 2072
   data: 47
-  metadata: 2369
+  metadata: 2353
 functions:
   __rec_drop_Work:
     calls: 150003
@@ -81,10 +81,10 @@ functions:
     calls: 4
     bytes: 212
   aipl_dec:
-    calls: 1350009
+    calls: 750009
     bytes: (external)
   aipl_inc:
-    calls: 900004
+    calls: 600004
     bytes: (external)
   aipl_print:
     calls: 4
@@ -121,7 +121,7 @@ functions:
     bytes: 36
   fits$tail:
     calls: 300003
-    bytes: 356
+    bytes: 324
   fits_after:
     calls: 0
     bytes: 40

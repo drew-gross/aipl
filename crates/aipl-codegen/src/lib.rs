@@ -2822,8 +2822,6 @@ extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(prefix);
     i64::from(starts)
 }
 
@@ -2874,8 +2872,6 @@ extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i64) 
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(prefix);
     i64::from(starts)
 }
 
@@ -2914,8 +2910,6 @@ extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(suffix);
     i64::from(ends)
 }
 
@@ -3318,8 +3312,13 @@ struct ParamInfo {
     /// retain/release pair cancels — the call site skips the retain and the
     /// callee skips the entry-scope release (see
     /// `aipl_mono::inspect_only_params`, which decides both halves so they cannot
-    /// disagree). Always false for builtins and for the FFI metadata rebuilt from
-    /// checked-in IR, neither of which has a body here to elide against.
+    /// disagree).
+    ///
+    /// For a *user* function that answer is computed from the body. A **builtin**
+    /// has no AIPL body to analyse, but it does have a Rust or cranelift one that
+    /// can be read once and the answer written down — which is what
+    /// [`builtin_arg_protocol`] does. Still false for the FFI metadata rebuilt
+    /// from checked-in IR, which has neither.
     inspect_only: bool,
     /// Extend the caller-retains/callee-releases protocol to a parameter that
     /// would otherwise be a *pure borrow* — a boxed (recursive) value, which is
@@ -3336,8 +3335,19 @@ struct ParamInfo {
 }
 
 impl ParamInfo {
-    /// A plainly borrowed parameter — the shape every builtin and every
-    /// rebuilt-from-IR entry takes: the caller retains, the callee releases.
+    /// A parameter the callee only reads: the caller keeps its own reference and
+    /// neither side touches the count. For a builtin this is a claim about its
+    /// native implementation — see [`builtin_arg_protocol`].
+    fn inspected(ty: ConcreteType) -> Self {
+        Self {
+            ty,
+            owned: false,
+            inspect_only: true,
+            tail_owned: false,
+        }
+    }
+
+    /// A plainly borrowed parameter — the caller retains, the callee releases.
     fn borrowed(ty: ConcreteType) -> Self {
         Self {
             ty,
@@ -8469,6 +8479,9 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_str_hash" => "aipl2_str_hash",
         "aipl_str_eq" => "aipl2_str_eq",
         "aipl_str_contains" => "aipl2_str_contains",
+        "aipl_str_starts_with" => "aipl2_str_starts_with",
+        "aipl_str_starts_with_at" => "aipl2_str_starts_with_at",
+        "aipl_str_ends_with" => "aipl2_str_ends_with",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -8586,6 +8599,44 @@ impl Builtins {
     }
 }
 
+/// What a builtin does to its heap arguments — read once from its native
+/// implementation and written down here, because unlike a user function it has no
+/// AIPL body for `inspect_only_params` to analyse.
+///
+/// `true` means **borrows**: the implementation reads its arguments and releases
+/// nothing, so the caller keeps its own reference and the retain/release pair is
+/// skipped. `false` means **consumes**: it decs what it is given, per the
+/// original str-builtin convention, so the caller must retain first.
+///
+/// Getting an entry wrong is a leak (declared borrowing, actually decs → the
+/// caller's reference is dropped twice... or rather, one too few retains) or an
+/// over-release. The corpus's balanced-allocation assertion is what catches it:
+/// every case checks `allocations == deallocations`.
+///
+/// Verified against the runtime by reading each body for `aipl_dec` on its own
+/// arguments. Keep it that way — when a builtin's ownership behaviour changes,
+/// this table changes with it.
+fn builtin_arg_protocol(sym: &str) -> bool {
+    match sym {
+        // Take no heap arguments at all, so the question is vacuous.
+        "aipl_now_nanos" | "aipl_monotonic_now" => true,
+        // Consume: each decs the `str` (or array) it is handed.
+        "aipl_print"
+        | "aipl_trim"
+        | "aipl_str_repeat"
+        | "aipl_str_split"
+        | "aipl_read_file_to_string"
+        | "aipl_write_string_to_file"
+        | "aipl_list_files"
+        | "aipl_execute_program" => false,
+        // Anything not named here keeps the conservative protocol: the caller
+        // retains and the callee releases. A builtin that borrows only becomes
+        // cheaper once it is added above *and* its `aipl_dec` calls are removed —
+        // both halves, or the counts stop balancing.
+        _ => false,
+    }
+}
+
 fn register_builtins(
     funcs: &mut HashMap<String, FuncInfo>,
     needed: &BTreeSet<&'static str>,
@@ -8608,7 +8659,19 @@ fn register_builtins(
             FuncInfo {
                 link: FuncLink::Builtin(sym),
                 tail_id: None,
-                params: params.into_iter().map(ParamInfo::borrowed).collect(),
+                // The builtin's own declaration of what it does to its
+                // arguments (see `builtin_arg_protocol`), rather than the
+                // one-size-fits-all borrow protocol.
+                params: params
+                    .into_iter()
+                    .map(|ty| {
+                        if builtin_arg_protocol(sym) {
+                            ParamInfo::inspected(ty)
+                        } else {
+                            ParamInfo::borrowed(ty)
+                        }
+                    })
+                    .collect(),
                 return_ty,
                 effects: effects.iter().map(|s| s.to_string()).collect(),
                 is_mutating: false,
@@ -16062,12 +16125,12 @@ fn compile_call_expr<M: Module>(
                 None => None,
             };
             let result = if is_str_shaped(&recv_ty) {
-                // `char*` pattern. The str runtime consumes (decs) both refs, so
-                // each str handed to it is pre-inc'd; a built 1-char string is
-                // inline, so its inc/dec are no-ops. For the optional shape `none`
-                // matches (a `""` prefix/suffix); `some(c)` compares the 1-char
-                // string. The element/optional value is materialized only as an
-                // inline string — no allocation.
+                // `char*` pattern. These runtimes *borrow* both refs — they read
+                // bytes and keep nothing, and the caller holds its own references
+                // across the call — so no pre-inc is paid (see `emit_char_at`).
+                // For the optional shape `none` matches (a `""` prefix/suffix);
+                // `some(c)` compares the 1-char string, materialized inline with
+                // no allocation.
                 let sym = match end {
                     SeEnd::Starts => "aipl_str_starts_with",
                     SeEnd::At => "aipl_str_starts_with_at",
@@ -16081,8 +16144,6 @@ fn compile_call_expr<M: Module>(
                     SeShape::Opt => None,
                 };
                 if let Some(pat) = pat {
-                    emit_inc(builder, module, builtins, recv);
-                    emit_inc(builder, module, builtins, pat);
                     let mut call_args = vec![recv, pat];
                     call_args.extend(at);
                     builtins.call(module, builder, sym, &call_args)
@@ -16111,7 +16172,6 @@ fn compile_call_expr<M: Module>(
                         OPT_VALUE_OFFSET as i32,
                     );
                     let s = emit_char_to_str(builder, cv);
-                    emit_inc(builder, module, builtins, recv);
                     let mut call_args = vec![recv, s];
                     call_args.extend(at);
                     let r = builtins.call(module, builder, sym, &call_args);

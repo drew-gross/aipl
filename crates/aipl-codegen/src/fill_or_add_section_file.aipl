@@ -30,10 +30,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 86
-binary size: 8184
-  code: 4112
+binary size: 8104
+  code: 4064
   data: 358
-  metadata: 3714
+  metadata: 3682
 functions:
   __eq_str$opt:
     calls: 0
@@ -43,7 +43,7 @@ functions:
     bytes: 568
   __m3__parse_test_section_header:
     calls: 0
-    bytes: 676
+    bytes: 628
   __test$fill_or_add_section_file:
     calls: 1
     bytes: 164

@@ -75,7 +75,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
-  when emitting a call to a builtin, it should reuse the code from emitting a call to a non-builting. This will require builtins to describe the call protocol, e.g. whether they own/retain/release their arguments.
+  builtin_arg_protocol is a bit silly, reg can just accept a ParamInfo directly
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value
   shift_all can be a map

@@ -25,11 +25,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 325
-binary size: 3080
-  code: 1180
+instructions executed: 323
+binary size: 3000
+  code: 1132
   data: 119
-  metadata: 1781
+  metadata: 1749
 functions:
   __eq_char$opt:
     calls: 1
@@ -47,10 +47,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_dec:
-    calls: 19
+    calls: 15
     bytes: (external)
   aipl_inc:
-    calls: 8
+    calls: 6
     bytes: (external)
   aipl_print:
     calls: 6
@@ -78,4 +78,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 688
+    bytes: 640

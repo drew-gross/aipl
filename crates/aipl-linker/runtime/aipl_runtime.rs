@@ -3118,8 +3118,6 @@ pub extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(prefix);
     i64::from(starts)
 }
 
@@ -3171,8 +3169,6 @@ pub extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(prefix);
     i64::from(starts)
 }
 
@@ -3212,8 +3208,6 @@ pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
         });
         ok
     };
-    aipl_dec(s);
-    aipl_dec(suffix);
     i64::from(ends)
 }
 

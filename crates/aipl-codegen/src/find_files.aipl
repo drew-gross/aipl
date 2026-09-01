@@ -38,11 +38,11 @@ allocations: 22
 deallocations: 22
 reallocations: 0
 bytes allocated: 936
-instructions executed: 1432
-binary size: 10024
-  code: 4676
+instructions executed: 1419
+binary size: 9768
+  code: 4548
   data: 798
-  metadata: 4550
+  metadata: 4422
 functions:
   __eq_str$arr:
     calls: 6
@@ -52,7 +52,7 @@ functions:
     bytes: 192
   __test$with_extension:
     calls: 1
-    bytes: 3288
+    bytes: 3192
   aipl_arr_drop_str:
     calls: 15
     bytes: (external)
@@ -78,10 +78,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 64
+    calls: 38
     bytes: (external)
   aipl_inc:
-    calls: 46
+    calls: 33
     bytes: (external)
   aipl_list_files:
     calls: 1
@@ -106,7 +106,7 @@ functions:
     bytes: (external)
   find_files:
     calls: 1
-    bytes: 776
+    bytes: 744
   main:
     calls: 1
     bytes: 112

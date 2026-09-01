@@ -1211,11 +1211,11 @@ allocations: 1657
 deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
-instructions executed: 263601
-binary size: 1593280
-  code: 997244
+instructions executed: 263004
+binary size: 1592592
+  code: 996896
   data: 8100
-  metadata: 587936
+  metadata: 587596
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1249,7 +1249,7 @@ functions:
     bytes: 232
   __builtin_int_parse:
     calls: 13
-    bytes: 1052
+    bytes: 1032
   __eq_Kind:
     calls: 98
     bytes: 632
@@ -1386,10 +1386,10 @@ functions:
     calls: 29
     bytes: (external)
   aipl_dec:
-    calls: 5594
+    calls: 4984
     bytes: (external)
   aipl_inc:
-    calls: 4625
+    calls: 4028
     bytes: (external)
   aipl_str_contains:
     calls: 325
@@ -1429,7 +1429,7 @@ functions:
     bytes: (external)
   between_len:
     calls: 3
-    bytes: 676
+    bytes: 636
   checked_seg:
     calls: 2
     bytes: 1676
@@ -1456,13 +1456,13 @@ functions:
     bytes: 1372
   lex_step$Kind:
     calls: 140
-    bytes: 25036
+    bytes: 24940
   main:
     calls: 1
     bytes: 68
   nested_len:
     calls: 3
-    bytes: 940
+    bytes: 820
   nonempty_str:
     calls: 2
     bytes: 1684
@@ -1474,10 +1474,10 @@ functions:
     bytes: 15412
   template_scan$Kind:
     calls: 16
-    bytes: 2548
+    bytes: 2512
   template_step$Kind:
     calls: 27
-    bytes: 488
+    bytes: 452
   toks:
     calls: 43
     bytes: 128

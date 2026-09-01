@@ -159,11 +159,11 @@ allocations: 148
 deallocations: 148
 reallocations: 0
 bytes allocated: 5774
-instructions executed: 9233
-binary size: 23424
-  code: 10300
+instructions executed: 9166
+binary size: 23072
+  code: 10092
   data: 3094
-  metadata: 10030
+  metadata: 9886
 functions:
   __arr_drop_Companion:
     calls: 11
@@ -179,13 +179,13 @@ functions:
     bytes: 284
   __m2__parse_test_section_header:
     calls: 35
-    bytes: 676
+    bytes: 628
   __test$companion_files:
     calls: 1
-    bytes: 4576
+    bytes: 4504
   __test$companion_path:
     calls: 1
-    bytes: 1120
+    bytes: 1056
   __test_try_fail_str:
     calls: 0
     bytes: 64
@@ -217,10 +217,10 @@ functions:
     calls: 44
     bytes: (external)
   aipl_dec:
-    calls: 732
+    calls: 598
     bytes: (external)
   aipl_inc:
-    calls: 389
+    calls: 322
     bytes: (external)
   aipl_str_contains:
     calls: 11
@@ -266,7 +266,7 @@ functions:
     bytes: (external)
   companion_files:
     calls: 12
-    bytes: 2024
+    bytes: 2000
   companion_path:
     calls: 15
     bytes: 776

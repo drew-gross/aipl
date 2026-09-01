@@ -386,11 +386,11 @@ allocations: 8308
 deallocations: 8308
 reallocations: 408
 bytes allocated: 411348
-instructions executed: 1165907
-binary size: 191240
-  code: 114224
+instructions executed: 1165813
+binary size: 190552
+  code: 113876
   data: 5668
-  metadata: 71348
+  metadata: 71008
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -451,7 +451,7 @@ functions:
     bytes: 660
   __builtin_int_parse:
     calls: 94
-    bytes: 1052
+    bytes: 1032
   __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam45:
     calls: 387
     bytes: 716
@@ -502,7 +502,7 @@ functions:
     bytes: 496
   __m3__between_len:
     calls: 0
-    bytes: 676
+    bytes: 636
   __m3__delimited_len:
     calls: 0
     bytes: 1348
@@ -520,19 +520,19 @@ functions:
     bytes: 1356
   __m3__lex_step$CalcTok:
     calls: 338
-    bytes: 17444
+    bytes: 17348
   __m3__nested_len:
     calls: 0
-    bytes: 940
+    bytes: 820
   __m3__step_result$CalcTok:
     calls: 648
     bytes: 4988
   __m3__template_scan$CalcTok:
     calls: 0
-    bytes: 2548
+    bytes: 2512
   __m3__template_step$CalcTok:
     calls: 0
-    bytes: 488
+    bytes: 452
   __m5__climb$CalcTok$Calc:
     calls: 117
     bytes: 2760
@@ -672,13 +672,13 @@ functions:
     calls: 914
     bytes: (external)
   aipl_dec:
-    calls: 26264
+    calls: 26076
     bytes: (external)
   aipl_i64_len:
     calls: 62
     bytes: (external)
   aipl_inc:
-    calls: 20696
+    calls: 20602
     bytes: (external)
   aipl_rec_alloc:
     calls: 2024

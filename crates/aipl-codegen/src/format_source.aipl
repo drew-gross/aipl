@@ -74,11 +74,11 @@ allocations: 2192
 deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
-instructions executed: 322419
-binary size: 847560
-  code: 519164
+instructions executed: 320885
+binary size: 846608
+  code: 518640
   data: 2508
-  metadata: 325888
+  metadata: 325460
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -163,7 +163,7 @@ functions:
     bytes: 208
   __builtin_int_parse:
     calls: 0
-    bytes: 1052
+    bytes: 1032
   __builtin_intersperse$__m7__Doc:
     calls: 8
     bytes: 408
@@ -220,7 +220,7 @@ functions:
     bytes: 2112
   __m13__between_len:
     calls: 12
-    bytes: 676
+    bytes: 636
   __m13__delimited_len:
     calls: 24
     bytes: 1348
@@ -238,19 +238,19 @@ functions:
     bytes: 1372
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 22592
+    bytes: 22496
   __m13__nested_len:
     calls: 18
-    bytes: 940
+    bytes: 820
   __m13__step_result$__m12__AiplTok:
     calls: 816
     bytes: 12096
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2548
+    bytes: 2512
   __m13__template_step$__m12__AiplTok:
     calls: 24
-    bytes: 488
+    bytes: 452
   __m14__unescape:
     calls: 0
     bytes: 820
@@ -259,7 +259,7 @@ functions:
     bytes: 32
   __m15__process_raw_string$tail:
     calls: 0
-    bytes: 564
+    bytes: 528
   __m16__trim_prefix:
     calls: 0
     bytes: 196
@@ -274,7 +274,7 @@ functions:
     bytes: 936
   __m5__parse_test_section_header:
     calls: 5
-    bytes: 676
+    bytes: 628
   __m6__array_atom:
     calls: 0
     bytes: 2176
@@ -364,7 +364,7 @@ functions:
     bytes: 11840
   __m6__format_program:
     calls: 4
-    bytes: 80136
+    bytes: 80068
   __m6__hug_close:
     calls: 0
     bytes: 548
@@ -496,7 +496,7 @@ functions:
     bytes: 5016
   __m6__str_atom:
     calls: 0
-    bytes: 500
+    bytes: 476
   __m6__struct_atom:
     calls: 0
     bytes: 2932
@@ -648,10 +648,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 8933
+    calls: 7389
     bytes: (external)
   aipl_inc:
-    calls: 7207
+    calls: 5673
     bytes: (external)
   aipl_rec_alloc:
     calls: 100
