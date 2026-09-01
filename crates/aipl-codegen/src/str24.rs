@@ -851,6 +851,194 @@ fn leaf_byte(leaf: Str, i: usize) -> u8 {
     }
 }
 
+// ---------- Entry points (the `aipl2_*` ABI) ----------
+//
+// The switch to a 24-byte `str` has no compile-time signal — the predicates that
+// decide a value's shape (`is_composite`, `elem_size_of`, `sret_size`) are
+// ordinary runtime logic, so flipping them builds cleanly and then corrupts
+// memory. And the compiler cannot parse *anything* without its dogfooded
+// engines, which run old-ABI code out of the checked-in `.clif`. Together that
+// leaves no way to test a half-finished switch.
+//
+// So the two ABIs coexist during the transition. These entry points carry a
+// distinct `aipl2_` prefix and the new calling convention — a `str` argument is
+// a `*const Str`, a `str` result is written through a leading `*mut Str` — while
+// every old `aipl_*` symbol keeps working unchanged. An artifact is therefore
+// self-consistent with whichever runtime its symbols name: the checked-in IR
+// keeps running on the old one while new codegen emits calls to these, which is
+// what makes the switch testable at all. `STR_REPR.md`'s Stage 1 ends by
+// regenerating the artifacts against `aipl2_*` and deleting the old half.
+//
+// Both runtimes define these, since the file is shared; they are separate
+// binaries, so the duplicate symbol names never meet.
+
+/// SAFETY: every entry point takes initialized `*const Str` arguments and, where
+/// it produces a `str`, a writable `*mut Str` out pointer.
+unsafe fn read(s: *const Str) -> Str {
+    unsafe { *s }
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_len(s: *const Str) -> i64 {
+    unsafe { read(s) }.len() as i64
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_eq(a: *const Str, b: *const Str) -> i64 {
+    i64::from(eq(unsafe { read(a) }, unsafe { read(b) }))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_cmp(a: *const Str, b: *const Str) -> i64 {
+    cmp(unsafe { read(a) }, unsafe { read(b) })
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_hash(s: *const Str) -> i64 {
+    hash(unsafe { read(s) })
+}
+
+#[no_mangle]
+extern "C" fn aipl2_char_at(s: *const Str, i: i64) -> i64 {
+    match char_at(unsafe { read(s) }, i.max(0) as usize) {
+        Some(b) => b as i64,
+        None => -1,
+    }
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_is_all_whitespace(s: *const Str) -> i64 {
+    i64::from(is_all_whitespace(unsafe { read(s) }))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_starts_with(s: *const Str, prefix: *const Str) -> i64 {
+    i64::from(starts_with(unsafe { read(s) }, unsafe { read(prefix) }))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_starts_with_at(s: *const Str, prefix: *const Str, at: i64) -> i64 {
+    i64::from(starts_with_at(
+        unsafe { read(s) },
+        unsafe { read(prefix) },
+        at.max(0) as usize,
+    ))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_ends_with(s: *const Str, suffix: *const Str) -> i64 {
+    i64::from(ends_with(unsafe { read(s) }, unsafe { read(suffix) }))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_contains(s: *const Str, needle: *const Str) -> i64 {
+    i64::from(contains(unsafe { read(s) }, unsafe { read(needle) }))
+}
+
+#[no_mangle]
+extern "C" fn aipl2_inc(s: *const Str) {
+    unsafe { read(s) }.retain();
+}
+
+#[no_mangle]
+extern "C" fn aipl2_dec(s: *const Str) {
+    unsafe { read(s) }.release();
+}
+
+/// `s[lo..hi]` — allocation-free, so this is a pure value computation. The
+/// result borrows `s`'s allocation; the caller retains if it outlives the source.
+#[no_mangle]
+extern "C" fn aipl2_str_slice(out: *mut Str, s: *const Str, lo: i64, hi: i64) {
+    let s = unsafe { read(s) };
+    let sliced = s.slice(lo.max(0) as usize, hi.max(0) as usize);
+    unsafe { *out = sliced };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_concat(out: *mut Str, a: *const Str, b: *const Str) {
+    unsafe { *out = concat(read(a), read(b)) };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_trim(out: *mut Str, s: *const Str) {
+    unsafe { *out = trim(read(s)) };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_reverse(out: *mut Str, s: *const Str) {
+    unsafe { *out = reverse(read(s)) };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_sort(out: *mut Str, s: *const Str) {
+    unsafe { *out = sort(read(s)) };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_repeat(out: *mut Str, s: *const Str, n: i64) {
+    unsafe { *out = repeat(read(s), n.max(0) as usize) };
+}
+
+/// Build a value over `len` bytes the caller then fills — the allocate-then-write
+/// idiom `to_str` uses, with the value (not a bare cursor) as the unit.
+#[no_mangle]
+extern "C" fn aipl2_str_alloc(out: *mut Str, len: i64) {
+    unsafe { *out = with_capacity(len.max(0) as usize, &[]) };
+}
+
+/// The writable end of a buffer being filled: `base + len`.
+#[no_mangle]
+extern "C" fn aipl2_str_write_ptr(s: *const Str) -> *mut u8 {
+    let s = unsafe { read(s) };
+    (s.w1 as usize + s.len()) as *mut u8
+}
+
+/// Record that `n` more bytes were written into the buffer behind `s`.
+#[no_mangle]
+extern "C" fn aipl2_str_grew(s: *mut Str, n: i64) {
+    unsafe {
+        let v = *s;
+        *s = Str {
+            w0: v.w0,
+            w1: v.w1,
+            w2: meta(v.len() + n.max(0) as usize, TAG_BUFFER),
+        };
+    }
+}
+
+/// A contiguous read pointer for the value's bytes, materializing a rope into
+/// its own cache if needed. Length comes from `aipl2_str_len`.
+#[no_mangle]
+extern "C" fn aipl2_str_data(s: *const Str, scratch: *mut u8) -> *const u8 {
+    let s = unsafe { read(s) };
+    match s.tag() {
+        TAG_BUFFER => s.w1 as *const u8,
+        TAG_INLINE => unsafe {
+            let bytes = inline_bytes(s);
+            core::ptr::copy_nonoverlapping(bytes.as_ptr(), scratch, INLINE_CAP);
+            scratch as *const u8
+        },
+        TAG_ROPE => rope_materialize(s).w1 as *const u8,
+        _ => unreachable!("tag {} is spare", s.tag()),
+    }
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_iter_init(cur: *mut Iter, s: *const Str) {
+    unsafe { *cur = Iter::new(read(s)) };
+}
+
+#[no_mangle]
+extern "C" fn aipl2_str_iter_next(cur: *mut Iter) -> i64 {
+    match unsafe { &mut *cur }.next() {
+        Some(b) => b as i64,
+        None => -1,
+    }
+}
+
+/// Bytes of the cursor state codegen must reserve for `for (let c : s)`.
+pub(crate) const ITER_SIZE: usize = core::mem::size_of::<Iter>();
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1246,6 +1434,107 @@ mod tests {
         let window = s.slice(lead.len(), lead.len() + mid.len());
         assert_eq!(text(window), mid);
         assert_eq!(collect(window), mid.as_bytes());
+        s.release();
+    }
+
+    // ---------- the `aipl2_*` entry points, called as codegen will ----------
+
+    /// Call an out-pointer entry point the way emitted code does: reserve a
+    /// value-sized slot, hand over its address, read the value back.
+    fn out(f: impl FnOnce(*mut Str)) -> Str {
+        let mut slot = Str::empty();
+        f(&mut slot);
+        slot
+    }
+
+    #[test]
+    fn entry_points_round_trip_through_pointers() {
+        let a = from_bytes(b"a buffer-length string for the entry points");
+        let b = from_bytes(b" and its continuation, also long");
+
+        assert_eq!(aipl2_str_len(&a), a.len() as i64);
+        assert_eq!(aipl2_str_eq(&a, &a), 1);
+        assert_eq!(aipl2_str_eq(&a, &b), 0);
+        assert_eq!(aipl2_str_cmp(&a, &b), 1);
+        assert_eq!(aipl2_str_hash(&a), hash(a));
+        assert_eq!(aipl2_char_at(&a, 0), b'a' as i64);
+        assert_eq!(aipl2_char_at(&a, 9999), -1);
+        assert_eq!(aipl2_str_starts_with(&a, &from_bytes(b"a buffer")), 1);
+        assert_eq!(aipl2_str_ends_with(&a, &from_bytes(b"points")), 1);
+        assert_eq!(aipl2_str_contains(&a, &from_bytes(b"length")), 1);
+
+        let joined = out(|o| aipl2_concat(o, &a, &b));
+        assert_eq!(text(joined), format!("{}{}", text(a), text(b)));
+        let sliced = out(|o| aipl2_str_slice(o, &a, 2, 8));
+        assert_eq!(text(sliced), "buffer");
+        assert_eq!(sliced.base(), a.base(), "slicing stays allocation-free");
+        let trimmed = out(|o| aipl2_trim(o, &from_bytes(b"   padded value here   ")));
+        assert_eq!(text(trimmed), "padded value here");
+        let rev = out(|o| aipl2_str_reverse(o, &from_bytes(b"abcd")));
+        assert_eq!(text(rev), "dcba");
+        let rep = out(|o| aipl2_str_repeat(o, &from_bytes(b"xy"), 3));
+        assert_eq!(text(rep), "xyxyxy");
+
+        joined.release();
+        rev.release();
+        rep.release();
+        a.release();
+        b.release();
+    }
+
+    #[test]
+    fn the_builder_entry_points_fill_a_buffer() {
+        // `to_str`'s shape: reserve, write through the pointer, record growth.
+        let s = out(|o| aipl2_str_alloc(o, 16));
+        let mut s = s;
+        let payload = b"12345678";
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                payload.as_ptr(),
+                aipl2_str_write_ptr(&s),
+                payload.len(),
+            );
+        }
+        aipl2_str_grew(&mut s, payload.len() as i64);
+        assert_eq!(text(s), "12345678");
+        assert_eq!(aipl2_str_len(&s), 8);
+        s.release();
+    }
+
+    #[test]
+    fn iteration_entry_points_match_the_bytes() {
+        let src = "iterated through the entry points, long enough to buffer";
+        for (what, s) in variants(src) {
+            let mut cur = Iter::new(Str::empty());
+            aipl2_str_iter_init(&mut cur, &s);
+            let mut got = Vec::new();
+            loop {
+                let b = aipl2_str_iter_next(&mut cur);
+                if b < 0 {
+                    break;
+                }
+                got.push(b as u8);
+            }
+            assert_eq!(got, src.as_bytes(), "{what}");
+        }
+        assert!(ITER_SIZE >= core::mem::size_of::<Str>(), "cursor is sized");
+    }
+
+    #[test]
+    fn refcount_entry_points_balance() {
+        let s = from_bytes(b"refcounted through the entry points, long enough");
+        let base = s.base();
+        let rc = || unsafe { *refcount_of(base) };
+        assert_eq!(rc(), 1);
+        aipl2_inc(&s);
+        assert_eq!(rc(), 2);
+        aipl2_dec(&s);
+        assert_eq!(rc(), 1);
+        // An inline value has no allocation, so both are no-ops.
+        let tiny = from_bytes(b"tiny");
+        aipl2_inc(&tiny);
+        aipl2_dec(&tiny);
+        assert_eq!(text(tiny), "tiny");
         s.release();
     }
 }
