@@ -3281,6 +3281,19 @@ extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
 /// callee can free it through the matching runtime). Mirrors what the AOT
 /// runtime's `build_cli_args` does for a native binary.
 fn build_cli_array(args: &[String]) -> *const u8 {
+    // Built by the host and read by compiled code, so it is one of the few places
+    // the two must agree byte for byte — which means it follows the switch.
+    if str24_enabled() {
+        let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+        let arr = aipl_array_new(args.len() as i64, drop_fn, str24::STR_SIZE as i64);
+        unsafe {
+            let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
+            for (i, a) in args.iter().enumerate() {
+                core::ptr::write(elems.add(i), str24::from_bytes(a.as_bytes()));
+            }
+        }
+        return arr;
+    }
     let drop_fn = aipl_arr_drop_str as *const () as usize as i64;
     let arr = aipl_array_new(args.len() as i64, drop_fn, 8);
     unsafe {
@@ -3556,6 +3569,10 @@ pub struct Compilation {
     /// offset). Populated from the frontend on [`Compilation::new`], and from the
     /// `; struct` manifest lines on the dogfood [`Compilation::from_artifact`] path.
     structs: HashMap<String, TypeDef>,
+    /// Which `str` representation this compilation's code speaks. Freshly
+    /// compiled code is [`StrAbi::Wide`]; a checked-in artifact was built before
+    /// the switch and is [`StrAbi::Tagged`]. The FFI marshals with this.
+    str_abi: StrAbi,
     ir: String,
 }
 
@@ -5214,6 +5231,25 @@ fn new_jit_module() -> Result<JITModule, Error> {
     let isa = host_isa()?;
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
     // Expose builtins to the JIT linker.
+    // The second ABI (`STR_REPR.md` stage 1): 24-byte `str` values passed by
+    // pointer. Registered alongside the originals — an artifact links whichever
+    // it names, which is what lets the switch be tested one case at a time.
+    jit_builder.symbol("aipl2_print", str24_host::aipl2_print as *const u8);
+    jit_builder.symbol(
+        "aipl2_print_error",
+        str24_host::aipl2_print_error as *const u8,
+    );
+    jit_builder.symbol("aipl2_inc", str24::aipl2_inc as *const u8);
+    jit_builder.symbol("aipl2_dec", str24::aipl2_dec as *const u8);
+    jit_builder.symbol("aipl2_str_len", str24::aipl2_str_len as *const u8);
+    jit_builder.symbol("aipl2_str_eq", str24::aipl2_str_eq as *const u8);
+    jit_builder.symbol("aipl2_str_cmp", str24::aipl2_str_cmp as *const u8);
+    jit_builder.symbol("aipl2_str_hash", str24::aipl2_str_hash as *const u8);
+    jit_builder.symbol("aipl2_char_at", str24::aipl2_char_at as *const u8);
+    jit_builder.symbol("aipl2_str_slice", str24::aipl2_str_slice as *const u8);
+    jit_builder.symbol("aipl2_concat", str24::aipl2_concat as *const u8);
+    jit_builder.symbol("aipl2_trim", str24::aipl2_trim as *const u8);
+    jit_builder.symbol("aipl2_str_data", str24::aipl2_str_data as *const u8);
     jit_builder.symbol("aipl_print", aipl_print as *const u8);
     jit_builder.symbol("aipl_print_error", aipl_print_error as *const u8);
     jit_builder.symbol("aipl_concat", aipl_concat as *const u8);
@@ -5858,6 +5894,12 @@ impl Compilation {
             code: Code::Jit(module),
             funcs,
             structs,
+            // Whichever representation this codegen just emitted.
+            str_abi: if str24_enabled() {
+                StrAbi::Wide
+            } else {
+                StrAbi::Tagged
+            },
             ir,
         })
     }
@@ -5896,6 +5938,8 @@ impl Compilation {
             // Struct layouts recovered from the `; struct` manifest lines, so a
             // struct-returning entry marshals back through `call_values`.
             structs: manifest_structs(&manifest)?,
+            // Compiled before the switch: 8-byte tagged `str` values.
+            str_abi: StrAbi::Tagged,
             code: Code::Jit(module),
             ir: text.to_string(),
         })
@@ -5925,6 +5969,8 @@ impl Compilation {
             // is the honest value, and it keeps `FuncInfo` uniform across both.
             funcs: entry_funcs(&manifest, |id| FuncLink::User(FuncId::from_u32(id)))?,
             structs: manifest_structs(&manifest)?,
+            // Compiled before the switch: 8-byte tagged `str` values.
+            str_abi: StrAbi::Tagged,
             code: Code::Prebuilt(entries),
             ir: manifest_text.to_string(),
         })
@@ -6061,6 +6107,7 @@ impl Compilation {
         // The return type must be FFI-marshalable; this also validates struct
         // fields (including a struct nested as an optional's core).
         check_ffi_return(name, &info.return_ty, &self.structs)?;
+        let abi_kind = self.str_abi;
         let ret_is_str = is_str_repr(&info.return_ty);
         // An optional `T?` (possibly nested) — scalar, `str`, or struct core — is
         // returned through a hidden sret pointer (see the sret path below).
@@ -6083,7 +6130,7 @@ impl Compilation {
         let mut bufs = ArgBufs::default();
         let mut abi: Vec<i64> = Vec::with_capacity(args.len());
         for (i, (p, a)) in info.param_types().zip(args).enumerate() {
-            match ffi_arg_abi(p, a, &self.structs, &mut bufs) {
+            match ffi_arg_abi(abi_kind, p, a, &self.structs, &mut bufs) {
                 Ok(word) => abi.push(word),
                 Err(why) => {
                     return Err(Error::msg(format!("fn {name:?} parameter {i} {why}")));
@@ -6098,7 +6145,7 @@ impl Compilation {
             // sret pointer — a normal *leading* i64 param — and returns nothing.
             // The flattened layout is `{ i64 tag, core }`; `elem_size_of` gives the
             // total (16 for a scalar/str core, more for a struct core like `Span?`).
-            let words = (elem_size_of(&info.return_ty, &self.structs) as usize)
+            let words = (abi_elem_size(abi_kind, &info.return_ty, &self.structs) as usize)
                 .div_ceil(8)
                 .max(1);
             let mut sret_buf = vec![0i64; words];
@@ -6126,7 +6173,7 @@ impl Compilation {
             // leading pointer, no register return), but the buffer is sized to
             // the wider of the two sides and the tag means `1` = Ok / `0` = Err
             // rather than a nesting depth.
-            let words = (elem_size_of(&info.return_ty, &self.structs) as usize)
+            let words = (abi_elem_size(abi_kind, &info.return_ty, &self.structs) as usize)
                 .div_ceil(8)
                 .max(1);
             let mut sret_buf = vec![0i64; words];
@@ -6445,6 +6492,9 @@ enum ArgBuf {
     /// An inline composite (struct/variant/optional/result) the callee receives a
     /// pointer to. Owned by the `Vec`, so it just has to stay alive.
     Composite(Vec<u8>),
+    /// A wide (24-byte) `str` argument: the value was copied into the callee's
+    /// buffer, and this holds the reference that keeps its allocation alive.
+    WideStr(str24::Str),
 }
 
 /// The host-owned buffers behind one call's borrowed arguments, freed on drop.
@@ -6455,6 +6505,12 @@ enum ArgBuf {
 struct ArgBufs(Vec<ArgBuf>);
 
 impl ArgBufs {
+    /// A wide (24-byte) `str` argument written into a caller buffer: its own
+    /// allocation has to outlive the call, so the release is deferred to here.
+    fn wide_str(&mut self, value: str24::Str) {
+        self.0.push(ArgBuf::WideStr(value));
+    }
+
     /// A borrowed `str` value (see [`build_borrowed_str`]), keeping the heap case
     /// alive for the call.
     fn str_value(&mut self, s: &str) -> i64 {
@@ -6516,6 +6572,9 @@ impl Drop for ArgBufs {
                 },
                 // Freed by the `Vec`'s own drop.
                 ArgBuf::Composite(_) => {}
+                // The callee borrowed the value; releasing here is what balances
+                // the allocation `write_ffi_arg` made for it.
+                ArgBuf::WideStr(value) => value.release(),
             }
         }
     }
@@ -6530,35 +6589,42 @@ impl Drop for ArgBufs {
 /// The `Err` describes the mismatch without naming the function or parameter
 /// index; [`Compilation::call_values`] prefixes those.
 fn ffi_arg_abi(
+    abi: StrAbi,
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
 ) -> Result<i64, String> {
-    if is_composite(ty, structs) {
-        let size = sret_size(ty, structs).expect("a composite has an inline size") as usize;
+    if abi_is_composite(abi, ty, structs) {
+        let size =
+            abi_sret_size(abi, ty, structs).expect("a composite has an inline size") as usize;
         let mut buf = vec![0u8; size.max(8)];
         // SAFETY: `buf` is `size` zeroed bytes — the type's own inline layout.
-        unsafe { write_ffi_arg(buf.as_mut_ptr(), ty, v, structs, bufs)? };
+        unsafe { write_ffi_arg(abi, buf.as_mut_ptr(), ty, v, structs, bufs)? };
         return Ok(bufs.composite(buf));
     }
-    ffi_arg_word(ty, v, structs, bufs)
+    ffi_arg_word(abi, ty, v, structs, bufs)
 }
 
 /// Marshal `v` into the 8-byte word a value of the *pointer-like* type `ty` — a
 /// scalar, a `str`, or an array — is represented by. Composites don't come here;
 /// see [`ffi_arg_abi`].
 fn ffi_arg_word(
+    abi: StrAbi,
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
 ) -> Result<i64, String> {
+    debug_assert!(
+        !abi_is_composite(abi, ty, structs),
+        "a composite goes through ffi_arg_abi"
+    );
     match v {
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
         FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
         FfiValue::Array(elems) => match ty {
-            ConcreteType::Array(elem) => build_borrowed_array(elem, elems, structs, bufs),
+            ConcreteType::Array(elem) => build_borrowed_array(abi, elem, elems, structs, bufs),
             _ => Err(mismatch(ty, v)),
         },
         _ => Err(mismatch(ty, v)),
@@ -6600,6 +6666,7 @@ fn ffi_value_kind(v: &FfiValue) -> &'static str {
 /// than using a block (see [`is_char_array`]), so it's built as packed bytes;
 /// `bool[]` is bit-packed, one bit per element.
 fn build_borrowed_array(
+    abi: StrAbi,
     elem: &ConcreteType,
     elems: &[FfiValue],
     structs: &HashMap<String, TypeDef>,
@@ -6623,7 +6690,12 @@ fn build_borrowed_array(
         }
         return Ok(bufs.str_value(&s));
     }
-    let elem_size = runtime_elem_size(elem, structs);
+    let elem_size = if is_str_repr(elem) && abi == StrAbi::Wide {
+        // A wide `str` element is the value itself, 24 bytes in the block.
+        abi.str_size()
+    } else {
+        runtime_elem_size(elem, structs)
+    };
     let data = bufs.array_block(elems.len(), elem_size);
     let base = unsafe { data.add(ARR_ELEMS_OFFSET) };
     if elem_size == ELEM_BITPACKED {
@@ -6643,7 +6715,7 @@ fn build_borrowed_array(
         for (i, e) in elems.iter().enumerate() {
             // SAFETY: the block was sized for `elems.len()` elements of `stride`
             // bytes and zeroed, so this slot is in bounds and initialized.
-            unsafe { write_ffi_arg(base.add(i * stride), elem, e, structs, bufs)? };
+            unsafe { write_ffi_arg(abi, base.add(i * stride), elem, e, structs, bufs)? };
         }
     }
     Ok(data as i64)
@@ -6658,12 +6730,24 @@ fn build_borrowed_array(
 /// slack past a `none`'s tag or a nullary variant case's payload is never
 /// written here, but the callee may still copy it around).
 unsafe fn write_ffi_arg(
+    abi: StrAbi,
     dst: *mut u8,
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
     bufs: &mut ArgBufs,
 ) -> Result<(), String> {
+    // A `str` under the wide ABI is the value itself, written in place — there is
+    // no word to pass.
+    if is_str_repr(ty) && abi == StrAbi::Wide {
+        let FfiValue::Str(text) = v else {
+            return Err(mismatch(ty, v));
+        };
+        let value = str24::from_bytes(text.as_bytes());
+        unsafe { core::ptr::write(dst as *mut str24::Str, value) };
+        bufs.wide_str(value);
+        return Ok(());
+    }
     // A recursive type's value is a pointer to a refcounted heap block the host
     // has no way to build — and passing an inline payload where one is expected
     // would have the callee read a header off the front of our buffer.
@@ -6690,7 +6774,7 @@ unsafe fn write_ffi_arg(
             if name != &f.name {
                 return Err(format!("expected field {:?}, got {:?}", f.name, name));
             }
-            unsafe { write_ffi_arg(dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
+            unsafe { write_ffi_arg(abi, dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
         }
         return Ok(());
     }
@@ -6715,7 +6799,7 @@ unsafe fn write_ffi_arg(
         // The tag (case index) at offset 0, then each payload at its offset.
         unsafe { std::ptr::write(dst as *mut i64, tag as i64) };
         for (val, f) in payload.iter().zip(case.fields.iter()) {
-            unsafe { write_ffi_arg(dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
+            unsafe { write_ffi_arg(abi, dst.add(f.offset as usize), &f.ty, val, structs, bufs)? };
         }
         return Ok(());
     }
@@ -6745,6 +6829,7 @@ unsafe fn write_ffi_arg(
         unsafe {
             std::ptr::write(dst as *mut i64, depth);
             return write_ffi_arg(
+                abi,
                 dst.add(OPT_VALUE_OFFSET as usize),
                 cur_ty,
                 cur_v,
@@ -6770,6 +6855,7 @@ unsafe fn write_ffi_arg(
         }
         return unsafe {
             write_ffi_arg(
+                abi,
                 dst.add(OPT_VALUE_OFFSET as usize),
                 side,
                 payload,
@@ -6778,7 +6864,7 @@ unsafe fn write_ffi_arg(
             )
         };
     }
-    let word = ffi_arg_word(ty, v, structs, bufs)?;
+    let word = ffi_arg_word(abi, ty, v, structs, bufs)?;
     unsafe { std::ptr::write(dst as *mut i64, word) };
     Ok(())
 }
@@ -8252,7 +8338,55 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl_arr_join" => sig(&[Word, Str, Word, Word, Word], Ret::Str),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(&[Word, Word, Word, Word, Word, Word], Ret::Word),
+        // ---- the second ABI (`STR_REPR.md`): `str` by pointer, results out ----
+        // A `str` argument is one word here too — the *address* of a 24-byte
+        // value — so these are `Word`s, not `Str`s: the kind describes what
+        // crosses the ABI, and under this convention that is a pointer.
+        "aipl2_inc" | "aipl2_dec" | "aipl2_print" | "aipl2_print_error" => sig(&[Word], Ret::None),
+        "aipl2_str_len" | "aipl2_str_hash" | "aipl2_str_is_all_whitespace" => {
+            sig(&[Word], Ret::Word)
+        }
+        "aipl2_str_eq"
+        | "aipl2_str_cmp"
+        | "aipl2_str_starts_with"
+        | "aipl2_str_ends_with"
+        | "aipl2_str_contains"
+        | "aipl2_char_at"
+        | "aipl2_str_data" => sig(&[Word, Word], Ret::Word),
+        // `Ret::Str` — `Builtins::call` allocates the slot and prepends the out
+        // pointer, so these list only what the caller passes.
+        "aipl2_trim" | "aipl2_str_reverse" | "aipl2_str_sort" => sig(&[Word], Ret::Str),
+        "aipl2_concat" => sig(&[Word, Word], Ret::Str),
+        "aipl2_str_repeat" => sig(&[Word, Word], Ret::Str),
+        "aipl2_str_slice" => sig(&[Word, Word, Word], Ret::Str),
+        "aipl2_str_alloc" => sig(&[Word], Ret::Str),
         other => panic!("unknown builtin import symbol {other:?}"),
+    }
+}
+
+/// The runtime symbol a call site resolves to under the active representation.
+///
+/// With the switch off this is the identity. With it on, a call that takes or
+/// produces a `str` goes to its `aipl2_*` counterpart, whose signature in
+/// [`import_abi`] already describes the new convention — so
+/// [`Builtins::call`] supplies the out pointer where one is needed and the call
+/// site itself changes not at all. Only symbols whose argument list is unchanged
+/// (the `str` words become addresses in place) are listed; anything absent keeps
+/// the old entry point until its call site is converted deliberately.
+fn active_sym(sym: &'static str) -> &'static str {
+    if !str24_enabled() {
+        return sym;
+    }
+    match sym {
+        // Verified end to end with the switch on. The rest of the `aipl2_*`
+        // entry points exist and are unit-tested, but their *call sites* still
+        // pass values the old shape, so they are converted deliberately —
+        // one at a time, each verified — rather than switched wholesale.
+        "aipl_print" => "aipl2_print",
+        "aipl_print_error" => "aipl2_print_error",
+        "aipl_inc" => "aipl2_inc",
+        "aipl_dec" => "aipl2_dec",
+        other => other,
     }
 }
 
@@ -8307,6 +8441,7 @@ impl Builtins {
         sym: &'static str,
         args: &[Value],
     ) -> Value {
+        let sym = active_sym(sym);
         let (params, ret) = import_abi(sym);
         debug_assert_eq!(
             args.len(),
@@ -8314,6 +8449,25 @@ impl Builtins {
             "runtime call {sym}: wrong argument count"
         );
         debug_assert!(ret != Ret::None, "runtime call {sym} returns nothing");
+        // A `str` result travels through a leading out pointer under the *new*
+        // ABI only (`abi_spike::q2b`, and it is what a 24-byte value needs). The
+        // old entry points return their tagged pointer in a register, so the
+        // protocol keys off the convention the symbol belongs to, not off
+        // `Ret::Str` alone — which both ABIs use to mean "this yields a `str`".
+        if ret == Ret::Str && sym.starts_with("aipl2_") {
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                str24::STR_SIZE as u32,
+                3,
+            ));
+            let out = builder.ins().stack_addr(types::I64, slot, 0);
+            let mut with_out = Vec::with_capacity(args.len() + 1);
+            with_out.push(out);
+            with_out.extend_from_slice(args);
+            let f = self.import(module, builder.func, sym);
+            builder.ins().call(f, &with_out);
+            return out;
+        }
         let f = self.import(module, builder.func, sym);
         let call = builder.ins().call(f, args);
         builder.inst_results(call)[0]
@@ -8327,6 +8481,7 @@ impl Builtins {
         sym: &'static str,
         args: &[Value],
     ) {
+        let sym = active_sym(sym);
         let (params, ret) = import_abi(sym);
         debug_assert_eq!(
             args.len(),
@@ -9611,6 +9766,9 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
 fn is_composite(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
+        // A 24-byte `str` lives in memory and travels as an address, which is
+        // what "composite" already means here (`STR_REPR.md`).
+        || str24_wide(ty)
 }
 
 /// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
@@ -10168,6 +10326,8 @@ fn emit_rc_w<M: Module>(
             if rc_statically_noop(builder.func, v) {
                 return;
             }
+            // `active_sym` routes these to their `aipl2_*` counterparts when the
+            // switch is on, where `v` is an address rather than a tagged pointer.
             let sym = match op {
                 RcOp::Retain => "aipl_inc",
                 RcOp::Drop => "aipl_dec",
@@ -11738,6 +11898,7 @@ fn elem_size_of(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
         ConcreteType::Result(ok, err) => {
             OPT_VALUE_OFFSET as i64 + elem_size_of(ok, structs).max(elem_size_of(err, structs))
         }
+        _ if str24_wide(ty) => str24::STR_SIZE as i64,
         // A boxed (recursive) type is an 8-byte pointer element.
         ConcreteType::Named(n) => {
             structs
@@ -12388,7 +12549,9 @@ fn emit_str_literal<M: Module>(
 /// Shared by the [`ExprKind::Str`] arm and `case_name`, so a case name and an
 /// equal literal in source reach the same interned data object — and so the
 /// SSO cutoff is stated once rather than at each producer.
-fn emit_const_str<M: Module>(
+/// [`emit_const_str`] for the 8-byte representation — what the compiler emits
+/// with the switch off, and what the checked-in artifacts contain.
+fn emit_const_str_tagged<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
@@ -12401,12 +12564,8 @@ fn emit_const_str<M: Module>(
         let packed = pack_inline(content) as usize as i64;
         return Ok((builder.ins().iconst(types::I64, packed), false));
     }
-    // Static literal: emit [len: i64][refcount = STATIC][bytes][NUL] into the
-    // data section; the pointer points past both header words. The data object
-    // is interned by content (see `StrLiterals`), so the same literal — a
-    // struct-field default materialized at many sites, a case name that is also
-    // written in source, or any repeated text — shares one object and one
-    // content-hash symbol name.
+    // Static literal: `[len][refcount = STATIC][bytes][NUL]` in the data section,
+    // with the value pointing past both header words.
     let data_id = cx.str_data.borrow_mut().intern(module, content, || {
         let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
         bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
@@ -12418,6 +12577,65 @@ fn emit_const_str<M: Module>(
     let gv = module.declare_data_in_func(data_id, builder.func);
     let base = builder.ins().symbol_value(types::I64, gv);
     Ok((builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64), true))
+}
+
+fn emit_const_str<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    content: &[u8],
+) -> Result<(Value, bool), Error> {
+    if !str24_enabled() {
+        return emit_const_str_tagged(module, builder, cx, content);
+    }
+    // A `str` is a 24-byte composite (`STR_REPR.md`), so a literal is three
+    // words materialized into a stack slot, and what flows is that slot's
+    // address — exactly like a struct constant.
+    //
+    // Neither form needs scope tracking: an inline literal owns no allocation,
+    // and a static one carries `STATIC_REFCOUNT`, so the release at scope exit
+    // would be a no-op either way.
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        str24::STR_SIZE as u32,
+        3,
+    ));
+    let addr = builder.ins().stack_addr(types::I64, slot, 0);
+    let flags = MemFlagsData::trusted();
+
+    if content.len() <= str24::INLINE_CAP {
+        // Small string optimization, now 22 bytes rather than 7: the content is
+        // the value, with no data object, allocation, or refcount.
+        for (i, word) in str24::inline_words(content).into_iter().enumerate() {
+            let v = builder.ins().iconst(types::I64, word as i64);
+            builder.ins().store(flags, v, addr, (i * 8) as i32);
+        }
+        return Ok((addr, false));
+    }
+
+    // Static literal: `[cap][refcount = STATIC][bytes]` in the data section, with
+    // `base` past both header words. Interned by content (see `StrLiterals`), so
+    // a repeated literal shares one object and one content-hash symbol.
+    //
+    // No NUL: the new representation is length-delimited everywhere, and a
+    // buffer no longer promises a terminator.
+    let data_id = cx.str_data.borrow_mut().intern(module, content, || {
+        let mut bytes = Vec::with_capacity(str24::BUF_HEADER + content.len());
+        bytes.extend_from_slice(&(content.len() as i64).to_le_bytes()); // cap
+        bytes.extend_from_slice(&str24::STATIC_REFCOUNT.to_le_bytes());
+        bytes.extend_from_slice(content);
+        bytes.into_boxed_slice()
+    })?;
+    let gv = module.declare_data_in_func(data_id, builder.func);
+    let symbol = builder.ins().symbol_value(types::I64, gv);
+    let base = builder.ins().iadd_imm_s(symbol, str24::BUF_HEADER as i64);
+    let meta = builder
+        .ins()
+        .iconst(types::I64, str24::buffer_meta(content.len()) as i64);
+    builder.ins().store(flags, base, addr, 0); // base
+    builder.ins().store(flags, base, addr, 8); // data — the whole buffer
+    builder.ins().store(flags, meta, addr, 16); // len | tag
+    Ok((addr, false))
 }
 
 /// Build a file-op `Result` value `{tag, value@8}` from a runtime call's raw
@@ -19531,8 +19749,97 @@ fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
 /// if it's a plain 8-byte value. Both optionals (`{tag, value}`, possibly
 /// nested) and structs are returned this way — uniformly, by pointer. A boxed
 /// (recursive) type is a plain 8-byte pointer value, like an array.
+/// Whether codegen emits the 24-byte `str` (`STR_REPR.md`) — **off unless
+/// `AIPL_STR24` is set**.
+///
+/// The switch is real but unfinished: 69 call sites still hand old entry points
+/// what is now an address, and the resulting corruption is *nondeterministic* —
+/// two full runs failed 39 and 13 tests with **no overlap**, because which
+/// adjacent bytes get trampled depends on allocation order. That is why the
+/// remaining failures cannot simply be listed and ignored: there is no stable
+/// set to list.
+///
+/// So the work lands committed and inert. Off, codegen is byte-for-byte what it
+/// was and the suite is green; on, you get the new representation and the
+/// burn-down list in `tests/support/str24_burndown.txt` tells you what is known
+/// to break. It comes out when the list is empty.
+fn str24_enabled() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("AIPL_STR24").is_some())
+}
+
+/// Whether `ty` is a `str`-shaped value *under the active representation* — true
+/// only once the switch is on, since that is what makes it a composite.
+fn str24_wide(ty: &ConcreteType) -> bool {
+    str24_enabled() && (is_str_repr(ty) || is_char_array(ty))
+}
+
+/// Which `str` representation a compiled artifact speaks (`STR_REPR.md`).
+///
+/// Both are live during the transition, and the FFI is the one place they meet:
+/// the compiler calls its dogfooded engines — checked-in IR, compiled before the
+/// switch — through exactly the same marshaling code it uses to call a program it
+/// just compiled. So the shape questions ("is a `str` composite?", "how many
+/// bytes is `str?`") have two answers at once, and the marshaling layer must ask
+/// with the callee in hand rather than globally.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum StrAbi {
+    /// An 8-byte tagged pointer: the checked-in `.clif` artifacts.
+    Tagged,
+    /// A 24-byte value passed by address: anything this compiler emits now.
+    Wide,
+}
+
+impl StrAbi {
+    /// Bytes one `str` value occupies under this ABI.
+    fn str_size(self) -> i64 {
+        match self {
+            StrAbi::Tagged => 8,
+            StrAbi::Wide => str24::STR_SIZE as i64,
+        }
+    }
+}
+
+/// [`is_composite`] for a callee speaking `abi` — under `Tagged` a `str` is a
+/// plain word, so it is not passed by address.
+fn abi_is_composite(abi: StrAbi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    if is_str_repr(ty) || is_char_array(ty) {
+        return abi == StrAbi::Wide;
+    }
+    is_composite(ty, structs)
+}
+
+/// [`elem_size_of`] for a callee speaking `abi`. Recurses so an optional or
+/// result carrying a `str` is sized for the right representation — `str?` is 16
+/// bytes under `Tagged` and 32 under `Wide`.
+fn abi_elem_size(abi: StrAbi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
+    match ty {
+        _ if is_str_repr(ty) || is_char_array(ty) => abi.str_size(),
+        ConcreteType::Optional(_) => {
+            OPT_VALUE_OFFSET as i64 + abi_elem_size(abi, opt_core(ty), structs)
+        }
+        ConcreteType::Result(ok, err) => {
+            OPT_VALUE_OFFSET as i64
+                + abi_elem_size(abi, ok, structs).max(abi_elem_size(abi, err, structs))
+        }
+        // A struct's size comes from its layout, which for an artifact is read
+        // straight out of the manifest and so is already right for its ABI.
+        _ => elem_size_of(ty, structs),
+    }
+}
+
+/// [`sret_size`] for a callee speaking `abi`.
+fn abi_sret_size(
+    abi: StrAbi,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> Option<u32> {
+    abi_is_composite(abi, ty, structs).then(|| abi_elem_size(abi, ty, structs) as u32)
+}
+
 fn sret_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> Option<u32> {
     match ty {
+        _ if str24_wide(ty) => Some(str24::STR_SIZE as u32),
         ConcreteType::Optional(_) | ConcreteType::Result(_, _) => {
             Some(elem_size_of(ty, structs) as u32)
         }

@@ -275,17 +275,58 @@ macro_rules! fold_section {
 // invocation lists every case's test name alongside its display path, and
 // doubles as the declared set `every_case_has_a_test` checks the tree against.
 macro_rules! case_tests {
-    ($($name:ident = $display:literal),+ $(,)?) => {
+    ($($(#[$attr:meta])* $name:ident = $display:literal),+ $(,)?) => {
         /// Every case with a `#[test]`, as `(test name, display path)`. Kept in
         /// the same order as the generated list, which is sorted by display path.
+        /// Burn-down cases are declared here like any other — they are `#[ignore]`d,
+        /// not omitted, so `every_case_has_a_test` still accounts for them.
         const DECLARED_CASES: &[(&str, &str)] = &[$((stringify!($name), $display)),+];
         $(
             #[test]
+            $(#[$attr])*
             fn $name() {
                 on_big_stack(|| run_one($display));
             }
         )+
     };
+}
+
+/// The burn-down list: tests the 24-byte `str` switch has not reached yet
+/// (`STR_REPR.md`). Entries here are `#[ignore]`d so the suite stays green while
+/// the switch lands incrementally, and the file itself explains the rules.
+const BURNDOWN_FILE: &str = "tests/support/str24_burndown.txt";
+
+/// The names in [`BURNDOWN_FILE`], comments and blanks stripped.
+fn burndown_list() -> std::collections::HashSet<String> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(BURNDOWN_FILE);
+    let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Every *case* on the burn-down list must still be a case, so the list can't
+/// rot as the corpus moves: a renamed or deleted case leaves an entry that
+/// silently protects nothing. Suite tests on the list carry their own
+/// `#[ignore]` and are checked by the compiler instead.
+#[test]
+fn burndown_names_real_cases() {
+    let declared: std::collections::HashSet<&str> =
+        DECLARED_CASES.iter().map(|(n, _)| *n).collect();
+    let stale: Vec<String> = burndown_list()
+        .into_iter()
+        .filter(|n| {
+            (n.starts_with("cases_") || n.starts_with("examples_"))
+                && !declared.contains(n.as_str())
+        })
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "{BURNDOWN_FILE} names cases that no longer exist: {stale:?} — \
+         remove them (a stale entry protects nothing)"
+    );
 }
 
 /// The checked-in [`case_tests!`] invocation — one `#[test]` per case. It lives

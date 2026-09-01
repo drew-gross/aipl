@@ -1,0 +1,95 @@
+# str24 burn-down — what the 24-byte `str` switch has not reached yet.
+#
+# The switch (`STR_REPR.md`, stage 1) is committed but **off**: codegen emits it
+# only when `AIPL_STR24` is set. Off, the compiler is byte-for-byte what it was
+# and the suite is green; on, you get the new representation and the failures
+# below. That gating is what lets the work land in main without a red suite.
+#
+# This is a ratchet: entries come out as the switch reaches them, and none go in
+# to quiet an unrelated failure. When it is empty, stage 1 is done and the
+# `aipl_*` half can be deleted.
+#
+#   cargo build && AIPL_STR24=1 cargo nextest run --no-fail-fast
+#
+# ---------------------------------------------------------------------------
+# Why this is a list and not a set of `#[ignore]`s
+#
+# Two full runs under the switch failed 39 tests and 13 tests — with **no
+# overlap**. The breakage is nondeterministic: a value that is 24 bytes to one
+# code path and 8 to another corrupts whatever happens to sit next to it, and
+# what that is depends on allocation order. So there is no stable set to ignore,
+# and marking tests `#[ignore]` would have suppressed a moving target. Gating the
+# switch off by default is the honest way to keep the suite green; this file is
+# then a record of the work, not a suppression mechanism.
+#
+# ---------------------------------------------------------------------------
+# Current state of the switched path (`AIPL_STR24=1`)
+#
+# Working: programs with no strings (`fn main() -> i64 { 7 }`).
+#
+# Regressed while gating: string literals crashed during codegen of `main` after
+# the flag refactor, having previously worked end to end —
+#     print("short")                        -> short
+#     print("hello from a twenty-four ...")  -> hello ...
+# so the literal/print/refcount path is close but currently broken. That is the
+# first thing to fix, and the milestone to re-prove.
+#
+# ---------------------------------------------------------------------------
+# Known-failing clusters, measured when literals and print were working. Counts
+# are from that run; treat them as the shape of the work, not a current tally.
+#
+# 16  The FFI *read* path. Argument marshaling is ABI-aware (`StrAbi` per
+#     `Compilation`); the reader is not, so any `call_values` result carrying a
+#     `str` — directly or inside a struct, variant, optional or array — reads the
+#     old layout. One fix retires the whole cluster.
+ffi::call_values_marshals_str_return
+ffi::call_values_marshals_str_args_with_int_return
+ffi::call_values_marshals_struct_return
+ffi::call_values_marshals_nested_composite_struct
+ffi::call_values_marshals_variant_return
+ffi::call_values_marshals_variant_param
+ffi::call_values_marshals_optional_return
+ffi::call_values_marshals_optional_variant_return
+ffi::call_values_marshals_array_return
+ffi::call_values_marshals_array_params
+ffi::call_values_marshals_composite_params
+ffi::call_values_marshals_composite_array_params
+ffi::call_values_validates_array_params
+ffi::array_param_grows_into_a_copy
+ffi::doc_example_call_values
+ffi::compiler_aipl_files_are_tested_and_pass_check
+
+#  6  `aipl check`'s own output path — assertion reporting goes through
+#     `emit_render`, still the old allocate-then-write cursor idiom.
+check::a_failing_assert_reports_and_exits_one
+check::all_asserts_in_a_test_run_and_each_failure_is_reported
+check::a_file_that_does_not_compile_is_reported_without_stopping_the_run
+check::an_unformatted_file_does_not_stop_the_batch
+check::batch_failures_name_the_file_they_came_from
+check::formatting_and_test_failures_are_both_reported_from_one_run
+
+#  7  The dogfooded formatter, lexer and highlighter, all reached through the
+#     FFI — same root cause as the read path above.
+fmt::all_aipl_files_stay_formatted
+fmt::corpus_formats_idempotently_and_losslessly
+fmt::fixtures_match_expected
+lexer_dogfood::aipl_lexer_dumps_supported_subset
+lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus
+highlighting::grammar_highlights_every_lexed_token
+highlighting::section_markers_are_scoped_as_comments
+
+#  2  Artifacts still speaking the old ABI. Expected until they are regenerated
+#     against `aipl2_*`, which is the last step of stage 1.
+dogfood_ir::checked_in_ir_is_current
+dogfood_ir::artifact_round_trips_rich_types
+
+#  8  Cases and codegen shapes not yet reached: `str` inside containers (element
+#     helpers) and the concat specialization.
+codegen::concat_arg_emits_concat_specialized_instance
+cases_arrays_spread_spread
+cases_tuples_vec_of_tuples
+examples_arrays
+examples_hello
+examples_imports
+examples_strings
+examples_uses_strlen
