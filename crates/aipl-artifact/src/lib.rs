@@ -349,7 +349,6 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_i64_len"
         | "aipl_u64_len"
         | "aipl_str_len"
-        | "aipl_str_is_all_whitespace"
         | "aipl_trim"
         | "aipl_trim_mut"
         | "aipl_str_hash"

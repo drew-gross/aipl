@@ -595,15 +595,6 @@ fn is_space(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
 }
 
-pub(crate) fn is_all_whitespace(s: Str) -> bool {
-    let mut all = true;
-    for_each_chunk(s, &mut |chunk| {
-        all = chunk.iter().all(|&b| is_space(b));
-        all
-    });
-    all
-}
-
 /// Leading and trailing ASCII whitespace removed. **Free for a buffer** — the
 /// result is a window into the same allocation, where the old runtime allocated
 /// a view or copied. Borrows `s`; the result shares its owner, so a caller that
@@ -917,11 +908,6 @@ pub(crate) extern "C" fn aipl2_char_at(s: *const Str, i: i64) -> i64 {
         Some(b) => b as i64,
         None => -1,
     }
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn aipl2_str_is_all_whitespace(s: *const Str) -> i64 {
-    i64::from(is_all_whitespace(unsafe { read(s) }))
 }
 
 #[no_mangle]

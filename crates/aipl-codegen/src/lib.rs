@@ -575,22 +575,6 @@ extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
     found
 }
 
-/// `s.is_all_whitespace() -> bool` (returned as i64 0/1): true when every byte is
-/// ASCII whitespace, or `s` is empty (consistent with `s.trim() == ""`). Consumes
-/// `s` (decs), like the other str builtins — callers pre-inc.
-#[no_mangle]
-extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
-    // Scan leaves, stopping at the first non-whitespace chunk — no materializing.
-    // An empty string visits no chunks, so it stays all-whitespace (true).
-    let all = str_for_each_chunk(s, &mut |chunk| {
-        chunk
-            .iter()
-            .all(|&b| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c))
-    });
-    aipl_dec(s);
-    i64::from(all)
-}
-
 /// `read_file_to_string(name) -> str?` runtime: read `name`'s bytes into a fresh
 /// refcounted str, or return null (None) on any failure — open/read error,
 /// non-UTF-8 path, or a NUL byte in the contents (which a NUL-terminated str
@@ -5256,10 +5240,6 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_concat_lazy", aipl_concat_lazy as *const u8);
     jit_builder.symbol("aipl_concat_mut", aipl_concat_mut as *const u8);
     jit_builder.symbol("aipl_char_at", aipl_char_at as *const u8);
-    jit_builder.symbol(
-        "aipl_str_is_all_whitespace",
-        aipl_str_is_all_whitespace as *const u8,
-    );
     jit_builder.symbol("aipl_str_eq", aipl_str_eq as *const u8);
     jit_builder.symbol("aipl_str_cmp", aipl_str_cmp as *const u8);
     jit_builder.symbol("aipl_str_starts_with", aipl_str_starts_with as *const u8);
@@ -8385,7 +8365,7 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         // the hidden pointer, so it returns nothing. `args` is a `str[]`.
         "aipl_execute_program" => sig(&[Word, Str, Word], Ret::None),
         // ---- str in, scalar out ----
-        "aipl_str_len" | "aipl_str_is_all_whitespace" | "aipl_str_hash" => sig(&[Str], Ret::Word),
+        "aipl_str_len" | "aipl_str_hash" => sig(&[Str], Ret::Word),
         "aipl_char_at" => sig(&[Str, Word], Ret::Word),
         "aipl_str_cmp"
         | "aipl_str_eq"
@@ -8436,9 +8416,7 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         // value — so these are `Word`s, not `Str`s: the kind describes what
         // crosses the ABI, and under this convention that is a pointer.
         "aipl2_inc" | "aipl2_dec" | "aipl2_print" | "aipl2_print_error" => sig(&[Word], Ret::None),
-        "aipl2_str_len" | "aipl2_str_hash" | "aipl2_str_is_all_whitespace" => {
-            sig(&[Word], Ret::Word)
-        }
+        "aipl2_str_len" | "aipl2_str_hash" => sig(&[Word], Ret::Word),
         "aipl2_str_eq"
         | "aipl2_str_cmp"
         | "aipl2_str_starts_with"

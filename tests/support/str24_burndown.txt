@@ -117,16 +117,37 @@ examples_uses_strlen
 # ===========================================================================
 # The builtin conversion inventory
 #
-# 35 runtime symbols take or return a `str`. Six are done (print, print_error,
+# 34 runtime symbols take or return a `str`. Six are done (print, print_error,
 # inc, dec — the last two named at the `emit_rc_w` site rather than remapped).
 # The rest split by whether their `aipl2_*` entry point already exists.
 #
-# A. Entry point EXISTS — convert the call site and verify (18). Cheapest first:
+# **Prefer porting to AIPL over writing an `aipl2_*` entry point.** A builtin
+# written in AIPL compiles to whichever representation is active, so it leaves
+# this list entirely rather than moving down it — and it serves the self-hosting
+# goal at the same time. `is_all_whitespace` went that way and is gone from the
+# inventory: it is now `self.all(is_whitespace)` in
+# `aipl-mono/src/builtin_is_all_whitespace.aipl`, its native implementation is
+# deleted from both runtimes, and the artifacts no longer reference the symbol.
+#
+# The bar is performance. That port cost ~13x on a micro-benchmark and roughly
+# doubled the small whitespace-only files (`dedent` 6,490 -> 14,274 instructions)
+# because `all` dispatches a lambda per char where the native loop scanned
+# chunks — but the workloads that dominate real compile time barely moved
+# (`lex_aipl` +0.02%, `doc` +1.6%), which is what made it acceptable. Measure the
+# aggregate, not the micro-benchmark, and check the same numbers before porting
+# the next one.
+#
+# It also needed a new intrinsic: `is_space` covers four characters, ASCII
+# whitespace has six, and AIPL has no numeric escape for the other two — so
+# `is_whitespace` exists as a compiler intrinsic to keep the port faithful rather
+# than silently narrowing. Expect that shape of blocker again: a port is only
+# honest if the language can express what the native version did.
+#
+# A. Entry point EXISTS — convert the call site and verify (17). Cheapest first:
 #    the pure query ones have no ownership to get wrong.
 #
-#      queries      str_len, str_eq, str_cmp, str_hash, char_at,
-#                   str_is_all_whitespace, starts_with, starts_with_at,
-#                   ends_with, contains, str_data
+#      queries      str_len, str_eq, str_cmp, str_hash, char_at, starts_with,
+#                   starts_with_at, ends_with, contains, str_data
 #      producers    str_slice, concat, trim, str_reverse, str_sort, str_repeat
 #      iteration    str_iter_init  (with str_iter_next, already Word-typed)
 #

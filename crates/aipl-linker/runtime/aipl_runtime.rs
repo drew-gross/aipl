@@ -172,7 +172,6 @@ mod builtin_calls {
         b"aipl_str_ends_with\0",
         b"aipl_str_eq\0",
         b"aipl_str_hash\0",
-        b"aipl_str_is_all_whitespace\0",
         b"aipl_str_iter_init\0",
         b"aipl_str_iter_next\0",
         b"aipl_str_join\0",
@@ -256,30 +255,29 @@ mod builtin_calls {
     pub const AIPL_STR_ENDS_WITH: usize = 53;
     pub const AIPL_STR_EQ: usize = 54;
     pub const AIPL_STR_HASH: usize = 55;
-    pub const AIPL_STR_IS_ALL_WHITESPACE: usize = 56;
-    pub const AIPL_STR_ITER_INIT: usize = 57;
-    pub const AIPL_STR_ITER_NEXT: usize = 58;
-    pub const AIPL_STR_JOIN: usize = 59;
-    pub const AIPL_STR_LEN: usize = 60;
-    pub const AIPL_STR_REPEAT: usize = 61;
-    pub const AIPL_STR_REVERSE: usize = 62;
-    pub const AIPL_STR_SLICE: usize = 63;
-    pub const AIPL_STR_SORT: usize = 64;
-    pub const AIPL_STR_SPLIT: usize = 65;
-    pub const AIPL_STR_STARTS_WITH: usize = 66;
-    pub const AIPL_STR_STARTS_WITH_AT: usize = 67;
-    pub const AIPL_TEST_BEGIN: usize = 68;
-    pub const AIPL_TEST_END: usize = 69;
-    pub const AIPL_TEST_FAIL: usize = 70;
-    pub const AIPL_TEST_FAIL_NONE: usize = 71;
-    pub const AIPL_TEST_SUMMARY: usize = 72;
-    pub const AIPL_TRIM: usize = 73;
-    pub const AIPL_TRIM_MUT: usize = 74;
-    pub const AIPL_U64_LEN: usize = 75;
-    pub const AIPL_WRITE_BYTES: usize = 76;
-    pub const AIPL_WRITE_I64: usize = 77;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 78;
-    pub const AIPL_WRITE_U64: usize = 79;
+    pub const AIPL_STR_ITER_INIT: usize = 56;
+    pub const AIPL_STR_ITER_NEXT: usize = 57;
+    pub const AIPL_STR_JOIN: usize = 58;
+    pub const AIPL_STR_LEN: usize = 59;
+    pub const AIPL_STR_REPEAT: usize = 60;
+    pub const AIPL_STR_REVERSE: usize = 61;
+    pub const AIPL_STR_SLICE: usize = 62;
+    pub const AIPL_STR_SORT: usize = 63;
+    pub const AIPL_STR_SPLIT: usize = 64;
+    pub const AIPL_STR_STARTS_WITH: usize = 65;
+    pub const AIPL_STR_STARTS_WITH_AT: usize = 66;
+    pub const AIPL_TEST_BEGIN: usize = 67;
+    pub const AIPL_TEST_END: usize = 68;
+    pub const AIPL_TEST_FAIL: usize = 69;
+    pub const AIPL_TEST_FAIL_NONE: usize = 70;
+    pub const AIPL_TEST_SUMMARY: usize = 71;
+    pub const AIPL_TRIM: usize = 72;
+    pub const AIPL_TRIM_MUT: usize = 73;
+    pub const AIPL_U64_LEN: usize = 74;
+    pub const AIPL_WRITE_BYTES: usize = 75;
+    pub const AIPL_WRITE_I64: usize = 76;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 77;
+    pub const AIPL_WRITE_U64: usize = 78;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------
@@ -834,23 +832,6 @@ pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
     }
     aipl_dec(s);
     found
-}
-
-/// `s.is_all_whitespace() -> bool` (i64 0/1): true when every byte is ASCII
-/// whitespace, or `s` is empty (consistent with `s.trim() == ""`). Decrements
-/// `s` per the refcount protocol. Mirrors the JIT runtime.
-#[no_mangle]
-pub extern "C" fn aipl_str_is_all_whitespace(s: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_IS_ALL_WHITESPACE);
-    // Scan leaves, stopping at the first non-whitespace chunk — no materializing.
-    // An empty string visits no chunks, so it stays all-whitespace (true).
-    let all = str_for_each_chunk(s, &mut |chunk| {
-        chunk
-            .iter()
-            .all(|&b| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c))
-    });
-    aipl_dec(s);
-    i64::from(all)
 }
 
 /// `read_file_to_string(name) -> str?`: read `name`'s bytes into a fresh
