@@ -1346,6 +1346,42 @@ extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
 /// Consumes both args (the array drop releases its element strings), like the
 /// other str builtins.
+/// `split` under the wide ABI. Only the array half lives here — where the cuts
+/// fall is `str24::for_each_split`, shared with the linker runtime, because that
+/// is the part that would diverge silently. Two passes over the same shared
+/// splitter: count, allocate, fill.
+///
+/// Each part is a window into `s`, retained because the array owns it. Borrows
+/// both arguments, like every `aipl2_*` entry point.
+#[no_mangle]
+extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
+    let (sv, sepv) = unsafe { (*s, *sep) };
+    let mut count = 0usize;
+    str24::for_each_split(sv, sepv, &mut |_| count += 1);
+    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
+    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
+    let mut k = 0usize;
+    str24::for_each_split(sv, sepv, &mut |part| {
+        part.retain();
+        unsafe { std::ptr::write(elems.add(k), part) };
+        k += 1;
+    });
+    arr
+}
+
+/// `join` under the wide ABI — the array half only; the streaming is
+/// `str24::join_from`. Borrows the array and the separator.
+#[no_mangle]
+extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
+    let sepv = unsafe { *sep };
+    unsafe {
+        let len = array_len_of(arr);
+        let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *const str24::Str;
+        *out = str24::join_from(elems, len, sepv);
+    }
+}
+
 #[no_mangle]
 extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
     let result = unsafe {
@@ -5378,6 +5414,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl2_arr_retain_opt_str",
         str24::aipl2_arr_retain_opt_str as *const u8,
     );
+    jit_builder.symbol("aipl2_str_split", aipl2_str_split as *const u8);
+    jit_builder.symbol("aipl2_str_join", aipl2_str_join as *const u8);
     jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
     jit_builder.symbol(
         "aipl2_arr_retain_str",
@@ -8593,6 +8631,8 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         | "aipl2_arr_retain_opt_str" => sig(&[Word, Word], Ret::None),
         "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
         "aipl2_test_begin" | "aipl2_test_fail" => sig(&[Word], Ret::None),
+        "aipl2_str_split" => sig(&[Word, Word], Ret::Word),
+        "aipl2_str_join" => sig(&[Word, Word], Ret::Str),
         "aipl2_assert" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
@@ -8653,6 +8693,18 @@ fn active_sym(sym: &'static str) -> &'static str {
         // rope is O(1), so the eager copy and the in-place append have nothing
         // left to optimize over the lazy form.
         "aipl_concat" | "aipl_concat_lazy" | "aipl_concat_mut" => "aipl2_concat",
+        // Producers. The two that return a *window* into their argument
+        // (`slice`, `trim`) retain it inside the entry point — see
+        // `aipl2_str_slice`. `trim_mut` has no in-place form to reuse here: a
+        // window costs nothing to make, so it collapses onto `trim` exactly as
+        // the concat spellings collapse onto one rope.
+        "aipl_str_slice" => "aipl2_str_slice",
+        "aipl_trim" | "aipl_trim_mut" => "aipl2_trim",
+        "aipl_str_reverse" => "aipl2_str_reverse",
+        "aipl_str_sort" => "aipl2_str_sort",
+        "aipl_str_repeat" => "aipl2_str_repeat",
+        "aipl_str_split" => "aipl2_str_split",
+        "aipl_str_join" => "aipl2_str_join",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -15640,8 +15692,11 @@ fn compile_call_expr<M: Module>(
                 "split separator",
                 args[1].span.clone(),
             )?;
-            emit_inc(builder, module, builtins, s_v);
-            emit_inc(builder, module, builtins, sep_v);
+            // Tagged `aipl_str_split` consumes both; `aipl2_str_split` borrows.
+            if !str24_enabled() {
+                emit_inc(builder, module, builtins, s_v);
+                emit_inc(builder, module, builtins, sep_v);
+            }
             let result = builtins.call(module, builder, "aipl_str_split", &[s_v, sep_v]);
             let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
             scopes
@@ -16162,7 +16217,12 @@ fn compile_call_expr<M: Module>(
             // str path, exactly as `reverse` splits these cases. A `str` receiver
             // keeps `str`; a `char[]` keeps its nominal type.
             if is_str_repr(&t) || is_char_array(&t) {
-                emit_inc(builder, module, builtins, ptr);
+                // The tagged entry point consumes its receiver, so the caller incs to
+                // balance its own track. The wide one borrows (`active_sym`), so the
+                // pair is dropped rather than mirrored — the same shape as concat.
+                if !str24_enabled() {
+                    emit_inc(builder, module, builtins, ptr);
+                }
                 let out = builtins.call(module, builder, "aipl_str_sort", &[ptr]);
                 let out_ty = if is_char_array(&t) {
                     t.clone()
@@ -16298,7 +16358,14 @@ fn compile_call_expr<M: Module>(
             if is_str_repr(&inner) || is_char_array(&inner) {
                 // `str[]` (i.e. `char[][]`): the string join, whose separator is
                 // itself a `str`.
-                emit_retain(builder, module, builtins, structs, parts, &pt);
+                //
+                // The tagged `aipl_str_join` consumes both the array and the
+                // separator, so both are retained first to balance the caller's
+                // own tracks. `aipl2_str_join` borrows them, so under the wide
+                // ABI both retains are dropped rather than mirrored.
+                if !str24_enabled() {
+                    emit_retain(builder, module, builtins, structs, parts, &pt);
+                }
                 // A variadic separator arrives in whichever shape the call site
                 // wrote. For an AIPL-bodied function `specialize_variadic`
                 // normalizes a bare element into a one-item sequence with a
@@ -16316,7 +16383,9 @@ fn compile_call_expr<M: Module>(
                 } else {
                     sep
                 };
-                emit_inc(builder, module, builtins, sep);
+                if !str24_enabled() {
+                    emit_inc(builder, module, builtins, sep);
+                }
                 let out = builtins.call(module, builder, "aipl_str_join", &[parts, sep]);
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
@@ -16404,7 +16473,12 @@ fn compile_call_expr<M: Module>(
             }
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             if is_str_repr(&t) {
-                emit_inc(builder, module, builtins, ptr);
+                // The tagged entry point consumes its receiver, so the caller incs to
+                // balance its own track. The wide one borrows (`active_sym`), so the
+                // pair is dropped rather than mirrored — the same shape as concat.
+                if !str24_enabled() {
+                    emit_inc(builder, module, builtins, ptr);
+                }
                 let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes.last_mut().expect("scope").push(Tracked::new(
                     result,
@@ -16414,7 +16488,12 @@ fn compile_call_expr<M: Module>(
             } else if is_char_array(&t) {
                 // Str-shaped (see `is_char_array`), but — unlike a bare `str`
                 // receiver above — keeps its nominal `char[]` type.
-                emit_inc(builder, module, builtins, ptr);
+                // The tagged entry point consumes its receiver, so the caller incs to
+                // balance its own track. The wide one borrows (`active_sym`), so the
+                // pair is dropped rather than mirrored — the same shape as concat.
+                if !str24_enabled() {
+                    emit_inc(builder, module, builtins, ptr);
+                }
                 let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes
                     .last_mut()

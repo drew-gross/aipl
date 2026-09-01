@@ -2191,6 +2191,40 @@ pub extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
 /// Consumes both args (the array drop releases its element strings). Mirrors the
 /// JIT runtime.
+/// `split` under the wide ABI — the array half only. Where the cuts fall is
+/// `str24::for_each_split`, shared with the JIT runtime; only these few lines
+/// (which allocate an array and address its elements) are per-runtime, because
+/// the array runtime is. Two passes over the shared splitter: count, allocate,
+/// fill. Each part is a window into `s`, retained because the array owns it.
+#[no_mangle]
+pub extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
+    let (sv, sepv) = unsafe { (*s, *sep) };
+    let mut count = 0usize;
+    str24::for_each_split(sv, sepv, &mut |_| count += 1);
+    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
+    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
+    let mut k = 0usize;
+    str24::for_each_split(sv, sepv, &mut |part| {
+        part.retain();
+        unsafe { core::ptr::write(elems.add(k), part) };
+        k += 1;
+    });
+    arr
+}
+
+/// `join` under the wide ABI — the array half only; the streaming is
+/// `str24::join_from`. Borrows the array and the separator.
+#[no_mangle]
+pub extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
+    let sepv = unsafe { *sep };
+    unsafe {
+        let len = array_len(arr);
+        let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *const str24::Str;
+        *out = str24::join_from(elems, len, sepv);
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_STR_JOIN);

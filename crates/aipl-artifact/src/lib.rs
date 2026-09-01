@@ -419,7 +419,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl2_str_contains"
         | "aipl2_char_at"
         | "aipl2_str_data" => sig(2, true),
-        "aipl2_concat" | "aipl2_str_repeat" => sig(3, false),
+        "aipl2_concat" | "aipl2_str_repeat" | "aipl2_str_join" => sig(3, false),
+        "aipl2_str_split" => sig(2, true),
         "aipl2_str_starts_with_at" => sig(3, true),
         "aipl2_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),

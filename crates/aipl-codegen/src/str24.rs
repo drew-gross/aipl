@@ -870,6 +870,75 @@ fn leaf_byte(leaf: Str, i: usize) -> u8 {
     }
 }
 
+// ---------- split / join (the shared halves) ----------
+//
+// `split` builds an array and `join` reads one, and the array runtime is
+// per-runtime — so their entry points cannot live here. What *can* live here is
+// all the `str` work, which is the part that would silently diverge: where the
+// cuts fall, and how the parts are streamed back together. Each runtime keeps
+// only the few lines that allocate an array and find its elements.
+
+/// Call `f` with each `sep`-separated window of `s`, in order. An empty
+/// separator never matches, so the whole string is one part; `n` separators
+/// yield `n + 1` parts, including empty ones at either end.
+///
+/// Allocation-free by construction (the caller decides what to do with each
+/// part), which is what lets the same code serve the counting pass and the
+/// filling pass — and lets it compile in the `no_std` runtime, which has no
+/// `Vec` to collect into.
+pub(crate) fn for_each_split(s: Str, sep: Str, f: &mut impl FnMut(Str)) {
+    let mut sb = [0u8; INLINE_CAP];
+    let mut pb = [0u8; INLINE_CAP];
+    let hay = s.bytes(&mut sb);
+    let hay_len = hay.len();
+    let nlen = sep.len();
+    if nlen == 0 {
+        f(s.slice(0, hay_len));
+        return;
+    }
+    // `needle` has to be read while `hay` is still borrowed, so both scratches
+    // are separate buffers.
+    let needle = sep.bytes(&mut pb);
+    let (mut start, mut i) = (0usize, 0usize);
+    while i + nlen <= hay_len {
+        if &hay[i..i + nlen] == needle {
+            f(s.slice(start, i));
+            i += nlen;
+            start = i;
+        } else {
+            i += 1;
+        }
+    }
+    f(s.slice(start, hay_len));
+}
+
+/// Concatenate `len` `str` values starting at `elems`, with `sep` between
+/// consecutive ones. Streams through a `Builder`, so a rope part copies its
+/// leaves without materializing. Borrows everything it reads.
+///
+/// SAFETY: `elems` addresses `len` initialized, contiguous `Str` values.
+pub(crate) unsafe fn join_from(elems: *const Str, len: usize, sep: Str) -> Str {
+    let mut total = sep.len() * len.saturating_sub(1);
+    for i in 0..len {
+        total += unsafe { core::ptr::read(elems.add(i)) }.len();
+    }
+    let mut b = Builder::with_capacity(total);
+    for i in 0..len {
+        if i > 0 {
+            for_each_chunk(sep, &mut |chunk| {
+                b.push(chunk);
+                true
+            });
+        }
+        let ev = unsafe { core::ptr::read(elems.add(i)) };
+        for_each_chunk(ev, &mut |chunk| {
+            b.push(chunk);
+            true
+        });
+    }
+    b.finish()
+}
+
 // ---------- Entry points (the `aipl2_*` ABI) ----------
 //
 // The switch to a 24-byte `str` has no compile-time signal — the predicates that
@@ -966,9 +1035,16 @@ pub(crate) extern "C" fn aipl2_dec(s: *const Str) {
 /// `s[lo..hi]` — allocation-free, so this is a pure value computation. The
 /// result borrows `s`'s allocation; the caller retains if it outlives the source.
 #[no_mangle]
+/// `s[lo..hi]`. The result is a *window*: for a buffer-backed value it shares
+/// the input's owner rather than copying, which is the representation's whole
+/// point — so it needs its own reference on that owner. `slice` itself does not
+/// take one (it is the internal, ownership-transferring form), and this entry
+/// point only borrows `s`, so the retain belongs here. `retain` is a no-op for
+/// an inline result, which owns nothing.
 pub(crate) extern "C" fn aipl2_str_slice(out: *mut Str, s: *const Str, lo: i64, hi: i64) {
     let s = unsafe { read(s) };
     let sliced = s.slice(lo.max(0) as usize, hi.max(0) as usize);
+    sliced.retain();
     unsafe { *out = sliced };
 }
 
@@ -990,8 +1066,12 @@ pub(crate) extern "C" fn aipl2_concat(out: *mut Str, a: *const Str, b: *const St
 }
 
 #[no_mangle]
+/// `trim(s)` — a window like `aipl2_str_slice`, and retained for the same
+/// reason: `trim` is `slice` with the bounds computed.
 pub(crate) extern "C" fn aipl2_trim(out: *mut Str, s: *const Str) {
-    unsafe { *out = trim(read(s)) };
+    let trimmed = trim(unsafe { read(s) });
+    trimmed.retain();
+    unsafe { *out = trimmed };
 }
 
 #[no_mangle]
@@ -1385,9 +1465,9 @@ mod tests {
         assert_eq!(text(trim(from_bytes(b"  x  "))), "x");
         assert_eq!(text(trim(from_bytes(b"    "))), "");
         assert_eq!(text(trim(Str::empty())), "");
-        assert!(is_all_whitespace(from_bytes(b" \t\n")));
-        assert!(!is_all_whitespace(from_bytes(b" x ")));
-        assert!(is_all_whitespace(Str::empty()));
+        // (`is_all_whitespace` used to be asserted here; it is now the AIPL
+        // builtin `builtin_is_all_whitespace.aipl`, tested by its own `.test`
+        // block, and its native implementation is gone from both runtimes.)
         s.release();
     }
 
@@ -1549,7 +1629,8 @@ mod tests {
         let sliced = out(|o| aipl2_str_slice(o, &a, 2, 8));
         assert_eq!(text(sliced), "buffer");
         assert_eq!(sliced.base(), a.base(), "slicing stays allocation-free");
-        let trimmed = out(|o| aipl2_trim(o, &from_bytes(b"   padded value here   ")));
+        let padded = from_bytes(b"   padded value here   ");
+        let trimmed = out(|o| aipl2_trim(o, &padded));
         assert_eq!(text(trimmed), "padded value here");
         let rev = out(|o| aipl2_str_reverse(o, &from_bytes(b"abcd")));
         assert_eq!(text(rev), "dcba");
@@ -1559,6 +1640,11 @@ mod tests {
         joined.release();
         rev.release();
         rep.release();
+        // The two window-producing entry points retain, so their results are
+        // owned references like any other and are released here.
+        sliced.release();
+        trimmed.release();
+        padded.release();
         a.release();
         b.release();
     }

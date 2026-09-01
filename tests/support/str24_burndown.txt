@@ -97,8 +97,8 @@
 # that would have caught it. Deriving the answer rather than maintaining a second
 # table means the next conversion cannot reintroduce it.
 #
-# Seven clusters were fixed on the strength of that classification, and the count
-# is now **107 / 875** (from 527), with zero leak-gate hits:
+# Eight clusters were fixed on the strength of that classification, and the count
+# is now **60 / 875** (from 527), with zero leak-gate hits:
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -198,29 +198,43 @@
 #     the way the tagged one does — an array element is still 8 bytes, so only
 #     the `str?` case changes shape.
 #
-# The remaining 107, by cause:
+#   - **the producers**: slice, trim, reverse, sort, repeat, split and join.
+#     All `compile failed` went to zero with them — an unconverted producer had
+#     been failing cranelift's verifier (`mismatched argument count ... got 2,
+#     expected 1`), because a `str`-returning builtin is composite under the flag
+#     so the generic call path prepends an sret pointer the tagged symbol has no
+#     parameter for. A good failure mode, and it retires itself on conversion.
 #
-#    41  `aipl check` (in-language tests) failed
-#    35  `stdout` mismatch
-#    23  compile failed
-#     7  SIGSEGV / SIGABRT / ABORT
-#     1  `exit code` mismatch
+#     Two things worth carrying forward:
 #
-# **Essentially all of it is now one cluster: the unconverted producers** —
-# slice, trim, reverse, sort, repeat, split, join, int_parse. Ordinary
-# one-at-a-time conversions, with concat as the template: check whether the
-# `str24.rs` helper takes ownership, and retain in the entry point if it does.
+#     **A producer that returns a *window* must retain inside the entry point.**
+#     `slice` and `trim` share the input's owner rather than copying — the whole
+#     point of the representation — and the internal `Str::slice` is the
+#     ownership-transferring form that takes no reference. Since an `aipl2_*`
+#     entry point only borrows, the retain belongs at the boundary.
+#     `reverse`/`sort`/`repeat` allocate fresh and need nothing.
 #
-# The 23 `compile failed` are the same cluster wearing a better failure mode.
-# A `str`-returning builtin is *composite* under the flag, so the generic call
-# path prepends an sret pointer — while the unremapped tagged symbol still
-# returns in a register, and cranelift's verifier catches the arity mismatch
-# before anything runs:
+#     **`split`/`join` are split across the two runtimes on purpose.** They build
+#     and read *arrays*, and the array runtime is per-runtime — but where the
+#     cuts fall and how parts are streamed back together is exactly what would
+#     diverge silently, so that lives in `str24.rs` (`for_each_split`,
+#     `join_from`) and each runtime keeps only the handful of lines that allocate
+#     an array and address its elements. `for_each_split` is callback-driven
+#     rather than returning a list precisely so it needs no allocation: the same
+#     code serves the counting pass, the filling pass, and the `no_std` runtime
+#     that has no `Vec`.
 #
-#     mismatched argument count for `v5 = call fn1(v4, v0)`: got 2, expected 1
+# The remaining 60, by cause:
 #
-# So a producer that has not been converted now *fails to compile* rather than
-# corrupting memory. Converting each one retires its verifier error directly.
+#    35  `aipl check` (in-language tests) failed
+#    18  `stdout` mismatch
+#     7  crashes / other
+#
+# What is left is the `char[]` *append* path (`push`, `extend`, `intersperse`,
+# `spread`) — the writer cluster whose buffer is still allocated the tagged way,
+# named in the `emit_render` section above as the last of the old cursor idiom —
+# plus `arr_join`, `int_parse`, and the file/process and FFI-composite-array
+# entry points still in group B.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
@@ -393,7 +407,9 @@ examples_uses_strlen
 # A. Entry point EXISTS — convert the call site and verify. The queries and
 #    iteration are done; what is left are the producers.
 #
-#      producers    str_slice, concat, trim, str_reverse, str_sort, str_repeat
+#      producers    DONE — str_slice, concat, trim, str_reverse, str_sort,
+#                   str_repeat, and (group B, written for this) str_split,
+#                   str_join
 #
 #    Converted: str_len, str_eq, str_cmp, str_hash, char_at, starts_with,
 #    starts_with_at, ends_with, contains, str_data, str_iter_init/_next.
