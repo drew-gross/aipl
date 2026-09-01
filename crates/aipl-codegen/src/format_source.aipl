@@ -74,11 +74,11 @@ allocations: 2192
 deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
-instructions executed: 323527
-binary size: 856784
-  code: 524384
+instructions executed: 323119
+binary size: 856040
+  code: 523960
   data: 2508
-  metadata: 329892
+  metadata: 329572
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -205,7 +205,7 @@ functions:
     bytes: 140
   __m12__char_lit_emit:
     calls: 0
-    bytes: 1412
+    bytes: 1384
   __m12__dedent_segments:
     calls: 0
     bytes: 168
@@ -223,22 +223,22 @@ functions:
     bytes: 676
   __m13__delimited_len:
     calls: 24
-    bytes: 1500
+    bytes: 1420
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
     bytes: 7336
   __m13__float_len:
     calls: 0
-    bytes: 904
+    bytes: 796
   __m13__interp_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2056
+    bytes: 2036
   __m13__lex$__m12__AiplTok:
     calls: 4
     bytes: 1372
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 22756
+    bytes: 22676
   __m13__nested_len:
     calls: 18
     bytes: 940
@@ -247,13 +247,13 @@ functions:
     bytes: 12096
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2624
+    bytes: 2584
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 488
   __m14__unescape:
     calls: 0
-    bytes: 892
+    bytes: 872
   __m15__process_raw_string:
     calls: 0
     bytes: 32
@@ -262,10 +262,10 @@ functions:
     bytes: 564
   __m16__trim_prefix:
     calls: 0
-    bytes: 216
+    bytes: 196
   __m17__trim_suffix:
     calls: 0
-    bytes: 292
+    bytes: 264
   __m3__trim_end_while$lam3:
     calls: 0
     bytes: 292
@@ -648,10 +648,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 10133
+    calls: 9725
     bytes: (external)
   aipl_inc:
-    calls: 8315
+    calls: 7907
     bytes: (external)
   aipl_rec_alloc:
     calls: 100

@@ -56,7 +56,7 @@ functions:
     calls: 16
     bytes: (external)
   aipl_dec:
-    calls: 59
+    calls: 58
     bytes: (external)
   aipl_inc:
     calls: 23

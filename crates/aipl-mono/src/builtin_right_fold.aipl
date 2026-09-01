@@ -68,18 +68,18 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 627
-instructions executed: 1642
-binary size: 7248
-  code: 3572
+instructions executed: 1640
+binary size: 7200
+  code: 3540
   data: 743
-  metadata: 2933
+  metadata: 2917
 functions:
   __filter4$own0:
     calls: 1
     bytes: 272
   __test$right_fold:
     calls: 1
-    bytes: 2804
+    bytes: 2772
   aipl_arr_drop_str:
     calls: 2
     bytes: (external)
@@ -102,10 +102,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_dec:
-    calls: 51
+    calls: 49
     bytes: (external)
   aipl_inc:
-    calls: 34
+    calls: 32
     bytes: (external)
   aipl_str_alloc:
     calls: 1

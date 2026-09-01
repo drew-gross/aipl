@@ -100,7 +100,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_dec:
-    calls: 9
+    calls: 7
     bytes: (external)
   aipl_inc:
     calls: 4

@@ -884,11 +884,11 @@ allocations: 2773
 deallocations: 2773
 reallocations: 122
 bytes allocated: 133675
-instructions executed: 384904
-binary size: 284440
-  code: 165408
+instructions executed: 384525
+binary size: 283856
+  code: 165080
   data: 6780
-  metadata: 112252
+  metadata: 111996
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1033,22 +1033,22 @@ functions:
     bytes: 676
   __m3__delimited_len:
     calls: 0
-    bytes: 1500
+    bytes: 1420
   __m3__finalize_template$Tok:
     calls: 0
     bytes: 4260
   __m3__float_len:
     calls: 0
-    bytes: 904
+    bytes: 796
   __m3__interp_scan$Tok:
     calls: 0
-    bytes: 2056
+    bytes: 2036
   __m3__lex$Tok:
     calls: 42
     bytes: 1372
   __m3__lex_step$Tok:
     calls: 151
-    bytes: 19032
+    bytes: 18952
   __m3__nested_len:
     calls: 0
     bytes: 940
@@ -1057,7 +1057,7 @@ functions:
     bytes: 6848
   __m3__template_scan$Tok:
     calls: 0
-    bytes: 2624
+    bytes: 2584
   __m3__template_step$Tok:
     calls: 0
     bytes: 488
@@ -1131,10 +1131,10 @@ functions:
     calls: 424
     bytes: (external)
   aipl_dec:
-    calls: 12719
+    calls: 12340
     bytes: (external)
   aipl_inc:
-    calls: 10330
+    calls: 9951
     bytes: (external)
   aipl_rec_alloc:
     calls: 440

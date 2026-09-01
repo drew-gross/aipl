@@ -811,7 +811,8 @@ pub extern "C" fn aipl_print_error(msg: *const u8) {
 /// The `s[i]` runtime (`aipl_char_at`): returns byte i of s as 0..255, or
 /// -1 to signal None (i<0, past null terminator, or null pointer). The
 /// codegen wraps the result into a 16-byte Optional slot at the call
-/// site. Decrements `s` per the refcount protocol.
+/// **Borrows `s`** — a pure observer, so the caller keeps its own reference
+/// and must not pre-inc. Mirrors the JIT runtime.
 #[no_mangle]
 pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
     count_builtin!(builtin_calls::AIPL_CHAR_AT);
@@ -830,7 +831,6 @@ pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
             }
         });
     }
-    aipl_dec(s);
     found
 }
 

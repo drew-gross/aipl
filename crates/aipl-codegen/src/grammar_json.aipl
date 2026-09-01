@@ -411,11 +411,11 @@ allocations: 11422
 deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
-instructions executed: 1537922
-binary size: 210768
-  code: 126416
+instructions executed: 1536418
+binary size: 210144
+  code: 126068
   data: 6348
-  metadata: 78004
+  metadata: 77728
 functions:
   __arr_drop_Json:
     calls: 125
@@ -533,22 +533,22 @@ functions:
     bytes: 676
   __m3__delimited_len:
     calls: 194
-    bytes: 1500
+    bytes: 1420
   __m3__finalize_template$JsonTok:
     calls: 0
     bytes: 3740
   __m3__float_len:
     calls: 154
-    bytes: 904
+    bytes: 796
   __m3__interp_scan$JsonTok:
     calls: 0
-    bytes: 2056
+    bytes: 2036
   __m3__lex$JsonTok:
     calls: 38
     bytes: 1372
   __m3__lex_step$JsonTok:
     calls: 233
-    bytes: 18424
+    bytes: 18344
   __m3__nested_len:
     calls: 0
     bytes: 940
@@ -557,13 +557,13 @@ functions:
     bytes: 6008
   __m3__template_scan$JsonTok:
     calls: 0
-    bytes: 2624
+    bytes: 2584
   __m3__template_step$JsonTok:
     calls: 0
     bytes: 488
   __m4__unescape:
     calls: 31
-    bytes: 892
+    bytes: 872
   __m5__climb$JsonTok$Json:
     calls: 0
     bytes: 2760
@@ -703,10 +703,10 @@ functions:
     calls: 45
     bytes: (external)
   aipl_dec:
-    calls: 56758
+    calls: 55254
     bytes: (external)
   aipl_inc:
-    calls: 47361
+    calls: 45857
     bytes: (external)
   aipl_rec_alloc:
     calls: 2869

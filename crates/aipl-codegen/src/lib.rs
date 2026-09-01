@@ -551,9 +551,12 @@ extern "C" fn aipl_print_error(msg: *const u8) {
 
 /// The `s[i]` runtime (`aipl_char_at`): returns byte i of s as 0..255, or
 /// -1 to signal None (i<0, past null terminator, or null pointer). Codegen
-/// (`emit_char_at`) wraps the result into an Optional slot. Decrements `s` per
-/// the refcount protocol — callers pre-inc before the call as with any
-/// str-taking fn.
+/// (`emit_char_at`) wraps the result into an Optional slot.
+///
+/// **Borrows `s`** — unlike most str-taking builtins, which consume. It reads
+/// one byte and keeps nothing, so the caller's own reference covers the call and
+/// the usual pre-inc/dec pair would be two runtime calls that cancel. Callers
+/// must therefore *not* pre-inc.
 #[no_mangle]
 extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
     let mut found: i64 = -1;
@@ -571,7 +574,6 @@ extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
             }
         });
     }
-    aipl_dec(s);
     found
 }
 
@@ -8448,6 +8450,17 @@ fn active_sym(sym: &'static str) -> &'static str {
     if !str24_enabled() {
         return sym;
     }
+    // **Entry points borrow their `str` arguments.** The old ABI had every
+    // str-taking builtin *consume* its argument, with the call site pre-inc'ing
+    // to balance it — a protocol that existed because a `str` was a bare pointer
+    // whose lifetime had to be managed across the call. The new one receives a
+    // pointer to the caller's own 24-byte value, which the caller is already
+    // keeping alive, so the inc/dec pair is removed rather than mirrored.
+    //
+    // Converting a call site therefore means two things, not one: remap the
+    // symbol *and* drop the pre-inc. A producer whose result aliases its
+    // argument's buffer (`slice`, `trim`) additionally has to retain that buffer
+    // for the result — those are not converted yet, and that is why.
     match sym {
         // Verified end to end with the switch on. The rest of the `aipl2_*`
         // entry points exist and are unit-tested, but their *call sites* still
@@ -8455,6 +8468,7 @@ fn active_sym(sym: &'static str) -> &'static str {
         // one at a time, each verified — rather than switched wholesale.
         "aipl_print" => "aipl2_print",
         "aipl_print_error" => "aipl2_print_error",
+        "aipl_char_at" => "aipl2_char_at",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -9636,7 +9650,12 @@ fn emit_char_at<M: Module>(
     s_v: Value,
     i_v: Value,
 ) -> Value {
-    emit_inc(builder, module, builtins, s_v);
+    // No retain: `char_at` is a pure observer. It reads one byte and stores
+    // nothing, and the caller provably holds a reference for the whole call —
+    // which is exactly the condition under which the borrow protocol's
+    // retain/release pair cancels (see `inspect_only_params` in `aipl-mono`). So
+    // both halves are dropped rather than paid and immediately refunded, which
+    // also means the two ABIs need no different treatment here.
     let raw = builtins.call(module, builder, "aipl_char_at", &[s_v, i_v]);
     let slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
@@ -10289,11 +10308,11 @@ fn load_array_elem<M: Module>(
         .stack_load(types::I64, types::I64, val_slot, 0)
 }
 
-/// Byte `idx` of a str-shaped `char[]` (see `is_char_array`), without
-/// consuming it. `aipl_char_at` decs its receiver internally, so this
-/// pre-incs to balance — mirroring `emit_char_at`, but returning the raw byte
-/// (`idx` is trusted in-bounds; no optional wrapping) for callers that
-/// already know the index is valid, like a fold over every element.
+/// Byte `idx` of a str-shaped `char[]` (see `is_char_array`), without consuming
+/// it — `aipl_char_at` borrows, so there is nothing to balance. Returns the raw
+/// byte (`idx` is trusted in-bounds; no optional wrapping) for callers that
+/// already know the index is valid, like a fold over every element. Mirrors
+/// `emit_char_at`.
 fn load_char_array_byte<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -10301,7 +10320,6 @@ fn load_char_array_byte<M: Module>(
     arr_ptr: Value,
     idx: Value,
 ) -> Value {
-    emit_inc(builder, module, builtins, arr_ptr);
     builtins.call(module, builder, "aipl_char_at", &[arr_ptr, idx])
 }
 
