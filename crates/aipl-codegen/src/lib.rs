@@ -3317,8 +3317,8 @@ struct ParamInfo {
     /// For a *user* function that answer is computed from the body. A **builtin**
     /// has no AIPL body to analyse, but it does have a Rust or cranelift one that
     /// can be read once and the answer written down — which is what
-    /// [`builtin_arg_protocol`] does. Still false for the FFI metadata rebuilt
-    /// from checked-in IR, which has neither.
+    /// [`Args`] records, beside each symbol in `SIG_REGS`. Still false for the
+    /// FFI metadata rebuilt from checked-in IR, which has neither.
     inspect_only: bool,
     /// Extend the caller-retains/callee-releases protocol to a parameter that
     /// would otherwise be a *pure borrow* — a boxed (recursive) value, which is
@@ -3337,7 +3337,7 @@ struct ParamInfo {
 impl ParamInfo {
     /// A parameter the callee only reads: the caller keeps its own reference and
     /// neither side touches the count. For a builtin this is a claim about its
-    /// native implementation — see [`builtin_arg_protocol`].
+    /// native implementation — see [`Args`].
     fn inspected(ty: ConcreteType) -> Self {
         Self {
             ty,
@@ -8599,41 +8599,33 @@ impl Builtins {
     }
 }
 
-/// What a builtin does to its heap arguments — read once from its native
-/// implementation and written down here, because unlike a user function it has no
-/// AIPL body for `inspect_only_params` to analyse.
+/// What a builtin's native implementation does to its heap arguments.
 ///
-/// `true` means **borrows**: the implementation reads its arguments and releases
-/// nothing, so the caller keeps its own reference and the retain/release pair is
-/// skipped. `false` means **consumes**: it decs what it is given, per the
-/// original str-builtin convention, so the caller must retain first.
+/// A user function's answer is computed from its body (`inspect_only_params`); a
+/// builtin has no AIPL body, so the answer is read off its Rust or cranelift
+/// implementation once and recorded beside the symbol in `SIG_REGS`.
 ///
-/// Getting an entry wrong is a leak (declared borrowing, actually decs → the
-/// caller's reference is dropped twice... or rather, one too few retains) or an
-/// over-release. The corpus's balanced-allocation assertion is what catches it:
-/// every case checks `allocations == deallocations`.
-///
-/// Verified against the runtime by reading each body for `aipl_dec` on its own
-/// arguments. Keep it that way — when a builtin's ownership behaviour changes,
-/// this table changes with it.
-fn builtin_arg_protocol(sym: &str) -> bool {
-    match sym {
-        // Take no heap arguments at all, so the question is vacuous.
-        "aipl_now_nanos" | "aipl_monotonic_now" => true,
-        // Consume: each decs the `str` (or array) it is handed.
-        "aipl_print"
-        | "aipl_trim"
-        | "aipl_str_repeat"
-        | "aipl_str_split"
-        | "aipl_read_file_to_string"
-        | "aipl_write_string_to_file"
-        | "aipl_list_files"
-        | "aipl_execute_program" => false,
-        // Anything not named here keeps the conservative protocol: the caller
-        // retains and the callee releases. A builtin that borrows only becomes
-        // cheaper once it is added above *and* its `aipl_dec` calls are removed —
-        // both halves, or the counts stop balancing.
-        _ => false,
+/// A wrong entry is a refcount bug rather than a compile error — declaring
+/// `Borrows` for something that decs over-releases, and `Consumes` for something
+/// that doesn't leaks. Every case's `--- performance ---` asserts
+/// `allocations == deallocations`, which is what catches both.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Args {
+    /// Reads its arguments and releases nothing, so the caller keeps its own
+    /// reference and the retain/release pair is skipped.
+    Borrows,
+    /// Decs what it is handed — the original str-builtin convention — so the
+    /// caller retains first.
+    Consumes,
+}
+
+impl Args {
+    /// The parameter description this protocol implies.
+    fn param(self, ty: ConcreteType) -> ParamInfo {
+        match self {
+            Args::Borrows => ParamInfo::inspected(ty),
+            Args::Consumes => ParamInfo::borrowed(ty),
+        }
     }
 }
 
@@ -8650,7 +8642,7 @@ fn register_builtins(
         funcs: &mut HashMap<String, FuncInfo>,
         name: &str,
         sym: &'static str,
-        params: Vec<ConcreteType>,
+        params: Vec<ParamInfo>,
         return_ty: ConcreteType,
         effects: &[&str],
     ) {
@@ -8659,19 +8651,7 @@ fn register_builtins(
             FuncInfo {
                 link: FuncLink::Builtin(sym),
                 tail_id: None,
-                // The builtin's own declaration of what it does to its
-                // arguments (see `builtin_arg_protocol`), rather than the
-                // one-size-fits-all borrow protocol.
-                params: params
-                    .into_iter()
-                    .map(|ty| {
-                        if builtin_arg_protocol(sym) {
-                            ParamInfo::inspected(ty)
-                        } else {
-                            ParamInfo::borrowed(ty)
-                        }
-                    })
-                    .collect(),
+                params,
                 return_ty,
                 effects: effects.iter().map(|s| s.to_string()).collect(),
                 is_mutating: false,
@@ -8691,28 +8671,44 @@ fn register_builtins(
             _ => None,
         })
         .collect();
-    // (canonical builtin name, runtime symbol).
-    const SIG_REGS: &[(&str, &str)] = &[
-        ("__builtin_print", "aipl_print"),
-        ("__builtin_split", "aipl_str_split"),
-        ("__builtin_read_file_to_string", "aipl_read_file_to_string"),
+    // (canonical builtin name, runtime symbol, what the runtime does to its heap
+    // arguments). The third field is read off each native implementation — a
+    // builtin has no AIPL body for `inspect_only_params` to analyse, so the
+    // answer is written down beside the symbol it describes.
+    const SIG_REGS: &[(&str, &str, Args)] = &[
+        ("__builtin_print", "aipl_print", Args::Consumes),
+        ("__builtin_split", "aipl_str_split", Args::Consumes),
+        (
+            "__builtin_read_file_to_string",
+            "aipl_read_file_to_string",
+            Args::Consumes,
+        ),
         (
             "__builtin_write_string_to_file",
             "aipl_write_string_to_file",
+            Args::Consumes,
         ),
-        ("__builtin_list_files", "aipl_list_files"),
-        ("__builtin_now_nanos", "aipl_now_nanos"),
-        ("__builtin_monotonic_now", "aipl_monotonic_now"),
-        ("__builtin_execute_program", "aipl_execute_program"),
-        ("__builtin_trim", "aipl_trim"),
-        ("__builtin_repeat", "aipl_str_repeat"),
+        ("__builtin_list_files", "aipl_list_files", Args::Consumes),
+        ("__builtin_now_nanos", "aipl_now_nanos", Args::Borrows),
+        (
+            "__builtin_monotonic_now",
+            "aipl_monotonic_now",
+            Args::Borrows,
+        ),
+        (
+            "__builtin_execute_program",
+            "aipl_execute_program",
+            Args::Consumes,
+        ),
+        ("__builtin_trim", "aipl_trim", Args::Consumes),
+        ("__builtin_repeat", "aipl_str_repeat", Args::Consumes),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
-        ("__assert", "aipl_assert"),
-        ("__test_begin", "aipl_test_begin"),
-        ("__test_end", "aipl_test_end"),
-        ("__test_summary", "aipl_test_summary"),
+        ("__assert", "aipl_assert", Args::Borrows),
+        ("__test_begin", "aipl_test_begin", Args::Borrows),
+        ("__test_end", "aipl_test_end", Args::Borrows),
+        ("__test_summary", "aipl_test_summary", Args::Borrows),
     ];
-    for &(name, sym) in SIG_REGS {
+    for &(name, sym, args) in SIG_REGS {
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
@@ -8725,7 +8721,12 @@ fn register_builtins(
                 panic!("builtin {name:?} has a generic signature but a direct runtime symbol")
             })
         };
-        let params: Vec<ConcreteType> = f.sig.param_types().iter().map(concretize).collect();
+        let params: Vec<ParamInfo> = f
+            .sig
+            .param_types()
+            .iter()
+            .map(|t| args.param(concretize(t)))
+            .collect();
         let return_ty = concretize(&f.sig.return_type());
         let effects: Vec<&str> = f.sig.effects.iter().map(String::as_str).collect();
         reg(funcs, name, sym, params, return_ty, &effects);
@@ -8737,8 +8738,8 @@ fn register_builtins(
         "__aipl_concat",
         "aipl_concat",
         vec![
-            ConcreteType::Primitive(Primitive::Str),
-            ConcreteType::Primitive(Primitive::Str),
+            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
+            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -8748,8 +8749,8 @@ fn register_builtins(
         "__aipl_concat_lazy",
         "aipl_concat_lazy",
         vec![
-            ConcreteType::Primitive(Primitive::Str),
-            ConcreteType::Primitive(Primitive::Str),
+            Args::Borrows.param(ConcreteType::Primitive(Primitive::Str)),
+            Args::Borrows.param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -8759,8 +8760,8 @@ fn register_builtins(
         "__aipl_concat_mut",
         "aipl_concat_mut",
         vec![
-            ConcreteType::Primitive(Primitive::Str),
-            ConcreteType::Primitive(Primitive::Str),
+            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
+            Args::Consumes.param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -8769,7 +8770,7 @@ fn register_builtins(
         funcs,
         "__aipl_trim_mut",
         "aipl_trim_mut",
-        vec![ConcreteType::Primitive(Primitive::Str)],
+        vec![Args::Borrows.param(ConcreteType::Primitive(Primitive::Str))],
         ConcreteType::Primitive(Primitive::Str),
         &[],
     );
