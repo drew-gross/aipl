@@ -68,16 +68,17 @@
 # into a corpus the default build then fails against. The sections are refilled
 # once, at the flip.
 #
-# **`AIPL_STR24_PERF=1` forces the check back on, and you want it after every
-# conversion.** Skipping the section also retires `allocations == deallocations`
-# — the migration's refcount tripwire, and the only thing standing between a
-# mis-declared ownership protocol and a silent leak. The counts will not *match*
-# (that is the point of the skip), but the mismatch report prints both tallies,
-# so the balance is readable:
+# **The leak gate is *not* skipped**, and needs no second env var. The section
+# splits cleanly in two: `allocations == deallocations` is an invariant, while
+# bytes allocated / instructions executed / binary size / the `functions:` block
+# are measurements that legitimately move. So the section is still measured and
+# the leak gate still runs on every flag-on case; only the comparison against
+# the expected body is skipped (`str24_mode` in `tests/cases.rs`).
 #
-#     AIPL_STR24=1 AIPL_STR24_PERF=1 cargo nextest run --no-fail-fast -E 'binary(cases)'
-#
-# then check every `--- actual ---` half for `allocations != deallocations`.
+# That matters more than it sounds: the leak gate is the migration's only
+# tripwire for a mis-declared ownership protocol, which changes neither output
+# nor exit code. Verified by reintroducing the `print` leak below — **117 cases
+# fail with `memory leak`**, and zero do with it fixed.
 #
 # ---------------------------------------------------------------------------
 # **Ownership follows the remap, automatically** (`args_for`)
@@ -96,8 +97,8 @@
 # that would have caught it. Deriving the answer rather than maintaining a second
 # table means the next conversion cannot reintroduce it.
 #
-# Four clusters were fixed on the strength of that classification, and the count
-# is now **191 / 875** (from 527):
+# Five clusters were fixed on the strength of that classification, and the count
+# is now **164 / 875** (from 527), with zero leak-gate hits:
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -142,22 +143,28 @@
 #     lexicographic compare all produce byte-identical output under both
 #     settings, and the corpus-wide allocation balance is clean.
 #
-# The remaining 191, by cause:
+#   - **arrays holding a `str`** — see the element-helper note below. Plain
+#     `str[]` and nested `char[]` build, iterate, index, render and free
+#     identically under both settings.
 #
-#    84  `aipl check` (in-language tests) failed
-#    65  `stdout` mismatch
+# The remaining 164, by cause:
+#
+#    65  `aipl check` (in-language tests) failed
+#    61  `stdout` mismatch
 #    23  compile failed
-#    16  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
-#     8  `exit code` mismatch
+#    12  SIGSEGV / SIGABRT / ABORT   (every `ffi::call_values_*` composite test)
+#     3  `exit code` mismatch
 #
-# Sampling them, the dominant cause is now one thing: **a `str` stored inside
-# something else.** The names say it — `nested_str_array`, `str_array`,
-# `spread_elem_types` — and they abort in `Str::retain`/`release` on a bogus
-# owner pointer, because an array element slot is 8 bytes and a wide `str` is 24.
-# Structs, variants, optionals and results carrying a `str` are the same bug
-# wearing a different hat. That is the next cluster, and after it the only thing
-# left in group A is the remaining producers (slice, trim, reverse, sort,
-# repeat), which are ordinary one-at-a-time conversions.
+# Two clusters account for essentially all of it:
+#
+#   - **`str` stored inside something else**, minus the array case now done:
+#     sets, dicts, structs, variants, optionals and results. All the same bug —
+#     an element or field slot is 8 bytes and a wide `str` is 24 — showing up as
+#     an abort inside `Str::retain`/`release` on a bogus owner pointer.
+#   - **the remaining producers**: slice, trim, reverse, sort, repeat, split,
+#     join, int_parse. Ordinary one-at-a-time conversions, and the concat work
+#     above is the template for them: check whether the `str24.rs` helper takes
+#     ownership, and retain in the entry point if it does.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
@@ -374,8 +381,29 @@ examples_uses_strlen
 #     they traffic in raw pointers, so no symbol swap could have covered it; the
 #     `aipl2_str_alloc`/`str_write_ptr`/`str_grew` trio replaced that idiom.
 #   - Element helpers for containers holding a `str` — arrays, sets, dicts.
-#     `aipl2_arr_drop_str`/`aipl2_arr_retain_str` are the first two; each
-#     container path needs its 24-byte counterpart.
+#
+#     **Arrays are done.** `str[]` and nested `char[]` now select
+#     `aipl2_arr_drop_str` / `aipl2_arr_retain_str`. The subtlety is *where*:
+#     these pointers are stored in the array header and called by the runtime, so
+#     they never pass through `active_sym` and the wide symbol has to be named at
+#     the selection site (`array_drop_fn_addr` / `array_retain_fn_addr`). It is
+#     chosen per **element type**, not per symbol, because `aipl_arr_retain_ptr`
+#     serves `str` *and* array elements and only the `str` use changes shape — a
+#     blanket remap would have corrupted every array-of-arrays.
+#
+#     **Sets and dicts are next, and the design is already implied by their
+#     signatures.** `aipl_set_contains`, `aipl_set_insert`, `aipl_set_union`,
+#     `aipl_set_union_mut`, `aipl_dict_get`, `aipl_dict_contains_key` and
+#     `aipl_dict_insert` all take `elem_size` and a `str_cmp` flag, and their
+#     `str_cmp != 0` arms hard-code an 8-byte element read plus `rt_str_eq` on a
+#     tagged pointer. Since a tagged `str` set passes `elem_size == 8` and a wide
+#     one passes `STR_SIZE`, **`str_cmp != 0 && elem_size == STR_SIZE` is an
+#     unambiguous discriminator inside the runtime** — which matters because the
+#     AOT half has no env var to consult. That keeps it to one new arm per
+#     function rather than seven new symbols.
+#
+#     Still missing entirely: `aipl_arr_drop_opt_str` / `aipl_arr_retain_opt`,
+#     for `str?` elements (32 bytes wide: tag + 24).
 #
 # Suggested order: the eleven queries first (no ownership, immediate signal from
 # the corpus), then iteration, then the producers, then `emit_render`, then the

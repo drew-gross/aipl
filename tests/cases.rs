@@ -166,27 +166,22 @@ fn debug_opts() -> DebugOptions {
     DebugOptions::new(std::env::var_os("AIPL_DEBUG").is_some())
 }
 
-/// Whether the asserted `--- performance ---` sections mean anything for this
-/// run. Under `AIPL_STR24` they do not: the 24-byte `str` changes allocation
-/// counts, executed instructions and binary size across the whole corpus, so a
-/// *correct* switch still mismatches nearly every section. Checking them there
-/// buries the failures that do carry information (crashes, link errors, wrong
-/// output) under ~180 that carry none, so the check is skipped and the numbers
-/// are refilled once, at the final flip (`tests/support/str24_burndown.txt`).
+/// Whether the run is using the 24-byte `str` (`STR_REPR.md`), which splits
+/// `--- performance ---` into the half that still means something and the half
+/// that cannot.
 ///
-/// This gates *filling* as well as checking — a `fill_expected` run with the
-/// variable set would write wide-representation numbers into a corpus the
-/// default build then fails against.
+/// The *counts* — bytes allocated, instructions executed, binary size, the
+/// `functions:` block — all legitimately change with the representation, so a
+/// correct switch mismatches nearly every section, burying the failures that do
+/// carry information. Those are refilled once, at the final flip.
 ///
-/// **`AIPL_STR24_PERF=1` forces the check back on**, because skipping the
-/// section also retires the `allocations == deallocations` assertion, and that
-/// is the migration's refcount tripwire: an entry point that retains what
-/// nobody releases leaks silently otherwise. The counts will not *match* the
-/// expected body — that is the whole reason for the skip — but the mismatch
-/// report prints both tallies, so a scoped run is how you check the balance of
-/// a conversion you just made.
-fn perf_sections_apply() -> bool {
-    std::env::var_os("AIPL_STR24").is_none() || std::env::var_os("AIPL_STR24_PERF").is_some()
+/// `allocations == deallocations` is the exception: it is an invariant, not a
+/// measurement, and it is the migration's refcount tripwire — an entry point
+/// that retains what nobody releases leaks silently otherwise, changing neither
+/// output nor exit code. So the section is still measured and the leak gate
+/// still runs; only the comparison against the expected body is skipped.
+fn str24_mode() -> bool {
+    std::env::var_os("AIPL_STR24").is_some()
 }
 
 #[derive(Default)]
@@ -1527,7 +1522,7 @@ fn run_success_case(
 
     // Allocation accounting, if requested. Correctness (above) is checked
     // first so a perf mismatch never masks a behavioral regression.
-    if perf_sections_apply() && (spec.performance.is_some() || (fill && require_metrics)) {
+    if spec.performance.is_some() || (fill && require_metrics) {
         let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — split into code/data/metadata for the
@@ -1610,6 +1605,14 @@ fn run_performance_check(
             actual.deallocations,
             scoped_fill_cmd(ctx),
         ));
+    }
+
+    // Under the wide `str` the leak gate above is the whole check: the counts
+    // below are expected to differ, and filling them here would write
+    // wide-representation numbers into a corpus the default build then fails
+    // against. See [`str24_mode`].
+    if str24_mode() {
+        return Outcome::Pass;
     }
 
     // A malformed (or `?`) expected body never parses, so it can't equal the

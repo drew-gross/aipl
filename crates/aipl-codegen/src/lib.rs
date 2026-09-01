@@ -12228,12 +12228,22 @@ fn array_drop_fn_addr<M: Module>(
     elem: &ConcreteType,
 ) -> Value {
     let b = cx.builtins;
+    // These are *stored* in the array header and called by the runtime, not
+    // emitted as calls, so they never pass through `active_sym` — the wide
+    // counterpart has to be named here. It is picked per element type rather than
+    // per symbol because `aipl_arr_retain_ptr` below serves `str` *and* array
+    // elements, and only the `str` use changes representation.
+    let drop_str = if str24_enabled() {
+        "aipl2_arr_drop_str"
+    } else {
+        "aipl_arr_drop_str"
+    };
     let id = match elem {
-        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_drop_str")),
+        ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, drop_str)),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
         // a `str` element is, not via the generic array-element drop-fn.
-        ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_drop_str")),
+        ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, drop_str)),
         ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_drop_arr")),
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
@@ -12260,6 +12270,14 @@ fn array_retain_fn_addr<M: Module>(
 ) -> Value {
     let b = cx.builtins;
     let id = match elem {
+        // See `array_drop_fn_addr` for why this is chosen per element type: the
+        // array case below keeps the 8-byte-pointer helper either way.
+        ConcreteType::Primitive(Primitive::Str) if str24_enabled() => {
+            Some(b.id(module, "aipl2_arr_retain_str"))
+        }
+        ConcreteType::Array(_) if str24_enabled() && is_char_array(elem) => {
+            Some(b.id(module, "aipl2_arr_retain_str"))
+        }
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
         ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_retain_ptr")),
         ConcreteType::Optional(inner)
