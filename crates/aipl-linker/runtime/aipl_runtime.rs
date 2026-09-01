@@ -808,6 +808,45 @@ pub extern "C" fn aipl_print_error(msg: *const u8) {
     unsafe { write(2, b"\n".as_ptr() as *const c_void, 1) };
 }
 
+// ---------- The wide `str`'s I/O half (AOT) ----------
+//
+// `str24.rs` is shared verbatim between the two runtimes because the layout must
+// not diverge, but I/O genuinely differs: the JIT half (`str24_host.rs`) writes
+// through `std::io`, and this one writes through `libc` like every other entry
+// point here. So these two are the AOT counterparts of `str24_host`'s
+// `aipl2_print` / `aipl2_print_error`, and the reason every program that printed
+// anything failed to *link* under `AIPL_STR24` while one that printed nothing
+// built fine.
+//
+// Unlike `aipl_print`, they do **not** release their argument: an `aipl2_*` entry
+// point borrows the caller's 24-byte value, which the caller is already keeping
+// alive (see `active_sym` in `aipl-codegen`).
+
+/// `print(s)` under the wide ABI. Streams leaf by leaf, so a rope prints without
+/// being flattened first — the same property `aipl_print` has via
+/// `str_for_each_chunk`.
+#[no_mangle]
+pub extern "C" fn aipl2_print(s: *const str24::Str) {
+    str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
+        unsafe { write(1, chunk.as_ptr() as *const c_void, chunk.len()) }; // stdout
+        true
+    });
+    unsafe { write(1, b"\n".as_ptr() as *const c_void, 1) };
+}
+
+/// `fn main() -> !Error`'s failure path under the wide ABI: `error: <msg>` on
+/// stderr.
+#[no_mangle]
+pub extern "C" fn aipl2_print_error(s: *const str24::Str) {
+    let prefix = b"error: ";
+    unsafe { write(2, prefix.as_ptr() as *const c_void, prefix.len()) };
+    str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
+        unsafe { write(2, chunk.as_ptr() as *const c_void, chunk.len()) };
+        true
+    });
+    unsafe { write(2, b"\n".as_ptr() as *const c_void, 1) };
+}
+
 /// The `s[i]` runtime (`aipl_char_at`): returns byte i of s as 0..255, or
 /// -1 to signal None (i<0, past null terminator, or null pointer). The
 /// codegen wraps the result into a 16-byte Optional slot at the call

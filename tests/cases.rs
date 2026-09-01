@@ -166,6 +166,21 @@ fn debug_opts() -> DebugOptions {
     DebugOptions::new(std::env::var_os("AIPL_DEBUG").is_some())
 }
 
+/// Whether the asserted `--- performance ---` sections mean anything for this
+/// run. Under `AIPL_STR24` they do not: the 24-byte `str` changes allocation
+/// counts, executed instructions and binary size across the whole corpus, so a
+/// *correct* switch still mismatches nearly every section. Checking them there
+/// buries the failures that do carry information (crashes, link errors, wrong
+/// output) under ~180 that carry none, so the check is skipped and the numbers
+/// are refilled once, at the final flip (`tests/support/str24_burndown.txt`).
+///
+/// This gates *filling* as well as checking — a `fill_expected` run with the
+/// variable set would write wide-representation numbers into a corpus the
+/// default build then fails against.
+fn perf_sections_apply() -> bool {
+    std::env::var_os("AIPL_STR24").is_none()
+}
+
 #[derive(Default)]
 struct Spec {
     /// The entry-point AIPL source. Anything before the first section
@@ -1504,7 +1519,7 @@ fn run_success_case(
 
     // Allocation accounting, if requested. Correctness (above) is checked
     // first so a perf mismatch never masks a behavioral regression.
-    if spec.performance.is_some() || (fill && require_metrics) {
+    if perf_sections_apply() && (spec.performance.is_some() || (fill && require_metrics)) {
         let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — split into code/data/metadata for the

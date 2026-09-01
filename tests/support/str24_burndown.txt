@@ -52,51 +52,64 @@
 # Still to convert: `str` literals inside composites, and the concat family.
 #
 # ---------------------------------------------------------------------------
-# **The flag-on failure count is not a ratchet — stop using it as one.**
+# **Counting flag-on failures was measuring the wrong thing.**
 #
-# It went 39 -> 523 -> 527 across the conversions, which reads like no progress
-# and is simply the wrong measurement. Classifying an actual run
-# (875 tests, 527 failed) says why:
+# The count went 39 -> 523 -> 527 across the conversions, which reads like no
+# progress at all. Classifying a run rather than counting it showed why: 180 of
+# the 527 were `--- performance ---` mismatches, which are **expected and
+# uninformative**. Allocations, executed instructions and binary size all change
+# when the representation changes, and nearly every case asserts them, so a
+# perfectly correct switch still fails all 180 — burying the failures that do
+# carry information under a bucket that can only empty on the final flip.
 #
-#    180  `--- performance ---` mismatch
-#    186  link failed
-#     89  `aipl check` (in-language tests) failed
-#     47  compile failed
-#      8  SIGSEGV / SIGABRT  (all in `ffi::call_values_*`)
-#      3  a real output mismatch (`check` x2, `exit code` x1)
+# So the harness now **skips `--- performance ---` entirely under `AIPL_STR24`**
+# (`perf_sections_apply` in `tests/cases.rs`), which also gates *filling*: a
+# `fill_expected` run with the variable set would otherwise write wide numbers
+# into a corpus the default build then fails against. The sections are refilled
+# once, at the flip.
 #
-# The 180 are **expected and uninformative**: allocations, instructions executed
-# and binary size all change when the representation changes, and nearly every
-# case asserts them. A correct switch would still fail all 180. So the count is
-# dominated by a bucket that can only go to zero on the day the sections are
-# refilled — at the very end. Track the other buckets instead, and verify a
-# conversion the way `emit_render` was verified: run a fixture under both
-# settings and diff.
+# Two clusters were fixed on the strength of that classification, and the count
+# is now **245 / 875** (from 527):
 #
-# The three big non-perf buckets each have one cause, none of them subtle:
+#   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
+#     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
+#     and is *not* included in the no_std linker runtime — only `str24.rs` is. So
+#     every program that printed anything compiled and then failed to link
+#     (`Undefined symbols: "_aipl2_print"`), while one that printed nothing built
+#     fine. Fixed by writing the AOT counterparts in `aipl_runtime.rs` on top of
+#     `str24::for_each_chunk` and `libc::write`, mirroring `aipl_print` — except
+#     that they do **not** release their argument, since an `aipl2_*` entry point
+#     borrows.
 #
-#   - **link failed (186) — the AOT runtime has no wide I/O.** `aipl2_print` and
-#     `aipl2_print_error` live in `str24_host.rs`, which is std-only and is *not*
-#     included in the no_std linker runtime; only `str24.rs` is. So every program
-#     that prints compiles and then fails to link:
+#     Worth remembering as a shape: the shared-layout / split-I/O arrangement
+#     means a new entry point is only half-written until *both* runtimes have it,
+#     and the JIT half passing tells you nothing about the other.
 #
-#         Undefined symbols: "_aipl2_print", referenced from ___aipl_user_main
+#   - `fmt::` and `highlighting::` (7 tests) went green as a side effect — they
+#     were downstream of the print path.
 #
-#     `aipl build` on a program with no output links fine. The fix is an AOT
-#     implementation of the wide I/O entry points, not anything in codegen.
+# The remaining 245, by cause:
 #
-#   - **`aipl check` failed (89) — the test-runner builtins.** `assert`,
-#     `test_begin` and `test_fail` are group B below (no `aipl2_*` entry point),
-#     so a test name arrives as an address and reports as garbage:
+#    90  `aipl check` (in-language tests) failed — the test-runner builtins
+#        `assert`, `test_begin`, `test_fail` have no `aipl2_*` entry point, so a
+#        test name arrives as an address: `test <invalid utf8> ... FAIL`. This is
+#        also the whole `check::` cluster below, which was previously — and
+#        wrongly — attributed to `emit_render`.
+#    76  `stdout` mismatch — newly *visible*, not new. A program that failed to
+#        link never got as far as comparing output. Sampling them, they are the
+#        known clusters: `str` in a struct field, the unconverted producers
+#        (`str_reverse` and friends), and the `char[]` append path whose buffer
+#        is still allocated the tagged way.
+#    47  compile failed  — `str` inside a composite (layout).
+#    18  SIGSEGV / SIGABRT — all `ffi::call_values_*`, same layout cause.
+#     9  `exit code` / `check` mismatch.
 #
-#         test <invalid utf8> ... FAIL
-#           assert failed at
-#
-#     This is also the whole `check::` cluster listed further down, which was
-#     previously — and wrongly — attributed to `emit_render`.
-#
-#   - **compile failed (47) and the 8 crashes** — `str` inside a composite; see
-#     the layout note at the end of the `emit_render` section.
+# One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
+# do not participate in builtin call counting.** `aipl_print` calls
+# `count_builtin!`; `aipl2_print` does not, and neither does anything in
+# `str24.rs`. Every `functions:` block would therefore under-report builtin calls
+# at the flip. Adding the counters is part of the refill step, not a separate
+# bug.
 #
 # ---------------------------------------------------------------------------
 # `emit_render` (the `to_str` builder) — DONE
@@ -235,6 +248,8 @@ examples_uses_strlen
 #
 # 34 runtime symbols take or return a `str`. Six are done (print, print_error,
 # inc, dec — the last two named at the `emit_rc_w` site rather than remapped).
+# `print`/`print_error` count as done only since the AOT halves were written; a
+# JIT-only entry point still fails every `aipl build`.
 # The rest split by whether their `aipl2_*` entry point already exists.
 #
 # **Prefer porting to AIPL over writing an `aipl2_*` entry point.** A builtin
@@ -278,7 +293,8 @@ examples_uses_strlen
 #      mutation     trim_mut
 #      files/proc   read_file_to_string, write_string_to_file, list_files,
 #                   execute_program
-#      test runner  assert, test_begin, test_fail
+#      test runner  assert, test_begin, test_fail   <- START HERE: 90 failures,
+#                   the largest single cause left
 #
 # Beyond these 35, two pieces of work carry no `Str`-typed symbol of their own
 # and so do not appear above:
