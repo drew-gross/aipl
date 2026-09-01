@@ -17,15 +17,15 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 401
-instructions executed: 196
-binary size: 4632
-  code: 1540
+instructions executed: 189
+binary size: 4352
+  code: 1396
   data: 569
-  metadata: 2523
+  metadata: 2387
 functions:
   __test$rejoin:
     calls: 1
-    bytes: 1464
+    bytes: 1320
   aipl_arr_drop_str:
     calls: 6
     bytes: (external)
@@ -42,10 +42,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 45
-    bytes: (external)
-  aipl_inc:
-    calls: 7
+    calls: 31
     bytes: (external)
   aipl_str_eq:
     calls: 7

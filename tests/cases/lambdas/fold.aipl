@@ -35,18 +35,18 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 484
-instructions executed: 1168
-binary size: 5904
-  code: 2800
+instructions executed: 1167
+binary size: 5856
+  code: 2772
   data: 641
-  metadata: 2463
+  metadata: 2443
 functions:
   __filter8$own0:
     calls: 1
     bytes: 272
   __test$sums_an_array:
     calls: 1
-    bytes: 2456
+    bytes: 2428
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)
@@ -66,10 +66,10 @@ functions:
     calls: 3
     bytes: (external)
   aipl_dec:
-    calls: 19
+    calls: 17
     bytes: (external)
   aipl_inc:
-    calls: 10
+    calls: 9
     bytes: (external)
   aipl_str_alloc:
     calls: 1

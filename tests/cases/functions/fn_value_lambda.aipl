@@ -41,11 +41,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 152
-instructions executed: 518
-binary size: 3824
-  code: 1528
+instructions executed: 517
+binary size: 3784
+  code: 1504
   data: 290
-  metadata: 2006
+  metadata: 1990
 functions:
   __eq_i64$arr:
     calls: 1
@@ -73,7 +73,7 @@ functions:
     bytes: 252
   __test$heap_lambda:
     calls: 1
-    bytes: 136
+    bytes: 112
   __test$probe:
     calls: 1
     bytes: 496
@@ -93,10 +93,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_dec:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_str_eq:
     calls: 1

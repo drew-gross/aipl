@@ -315,11 +315,11 @@ allocations: 111
 deallocations: 111
 reallocations: 0
 bytes allocated: 7052
-instructions executed: 11853
-binary size: 40008
-  code: 22676
+instructions executed: 11763
+binary size: 39344
+  code: 22300
   data: 1908
-  metadata: 15424
+  metadata: 15136
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -347,10 +347,10 @@ functions:
     bytes: 716
   __eq_Kind:
     calls: 2
-    bytes: 148
+    bytes: 100
   __eq_ParseError:
     calls: 2
-    bytes: 168
+    bytes: 128
   __eq_Prec:
     calls: 1
     bytes: 128
@@ -359,7 +359,7 @@ functions:
     bytes: 284
   __eq_Rule$Kind:
     calls: 12
-    bytes: 808
+    bytes: 688
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
@@ -368,7 +368,7 @@ functions:
     bytes: 104
   __eq_str$arr:
     calls: 3
-    bytes: 352
+    bytes: 308
   __eq_u64$opt:
     calls: 2
     bytes: 100
@@ -383,10 +383,10 @@ functions:
     bytes: 360
   __test$failure_message:
     calls: 1
-    bytes: 480
+    bytes: 440
   __test$link:
     calls: 1
-    bytes: 7772
+    bytes: 7720
   __test_try_fail_ParseError:
     calls: 0
     bytes: 64
@@ -424,10 +424,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_dec:
-    calls: 511
+    calls: 417
     bytes: (external)
   aipl_inc:
-    calls: 443
+    calls: 353
     bytes: (external)
   aipl_rec_alloc:
     calls: 55
@@ -476,7 +476,7 @@ functions:
     bytes: 112
   name_index:
     calls: 20
-    bytes: 404
+    bytes: 372
   prod_names$Kind$Node:
     calls: 9
     bytes: 496

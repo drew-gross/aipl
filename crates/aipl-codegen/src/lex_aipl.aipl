@@ -641,11 +641,11 @@ allocations: 4666
 deallocations: 4666
 reallocations: 31
 bytes allocated: 270208
-instructions executed: 738634
-binary size: 213168
-  code: 137840
+instructions executed: 736547
+binary size: 211800
+  code: 137084
   data: 7100
-  metadata: 68228
+  metadata: 67616
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -670,7 +670,7 @@ functions:
     bytes: 272
   __builtin_count_while$char$lam27:
     calls: 49
-    bytes: 296
+    bytes: 260
   __builtin_count_while$char$s0$lam16:
     calls: 0
     bytes: 232
@@ -691,7 +691,7 @@ functions:
     bytes: 1052
   __eq_AiplTok:
     calls: 51
-    bytes: 884
+    bytes: 556
   __eq_StrStyle:
     calls: 4
     bytes: 64
@@ -700,7 +700,7 @@ functions:
     bytes: 104
   __eq___m1__LexError:
     calls: 5
-    bytes: 168
+    bytes: 128
   __eq___m1__LexResult$AiplTok:
     calls: 14
     bytes: 120
@@ -715,7 +715,7 @@ functions:
     bytes: 100
   __eq_str$opt:
     calls: 3
-    bytes: 148
+    bytes: 100
   __lambda_0:
     calls: 0
     bytes: 100
@@ -745,13 +745,13 @@ functions:
     bytes: 64
   __m10__parse_test_section_header:
     calls: 3
-    bytes: 696
+    bytes: 676
   __m1__between_len:
     calls: 24
     bytes: 676
   __m1__delimited_len:
     calls: 45
-    bytes: 1420
+    bytes: 1348
   __m1__finalize_template$AiplTok:
     calls: 3
     bytes: 7336
@@ -760,13 +760,13 @@ functions:
     bytes: 796
   __m1__interp_scan$AiplTok:
     calls: 1
-    bytes: 2036
+    bytes: 1996
   __m1__lex$AiplTok:
     calls: 20
     bytes: 1372
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 22676
+    bytes: 22592
   __m1__nested_len:
     calls: 56
     bytes: 940
@@ -775,13 +775,13 @@ functions:
     bytes: 12096
   __m1__template_scan$AiplTok:
     calls: 3
-    bytes: 2584
+    bytes: 2548
   __m1__template_step$AiplTok:
     calls: 35
     bytes: 488
   __m2__unescape:
     calls: 8
-    bytes: 872
+    bytes: 820
   __m3__process_raw_string:
     calls: 2
     bytes: 1572
@@ -849,10 +849,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_dec:
-    calls: 22966
+    calls: 20874
     bytes: (external)
   aipl_inc:
-    calls: 17851
+    calls: 15764
     bytes: (external)
   aipl_str_contains:
     calls: 1016

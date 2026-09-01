@@ -53,11 +53,11 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 12281
-binary size: 8096
-  code: 3700
+instructions executed: 12274
+binary size: 7824
+  code: 3544
   data: 696
-  metadata: 3700
+  metadata: 3584
 functions:
   __builtin_all$char$s0$lam12:
     calls: 22
@@ -79,7 +79,7 @@ functions:
     bytes: 264
   __test$process_raw_string:
     calls: 1
-    bytes: 760
+    bytes: 604
   aipl_arr_drop_str:
     calls: 14
     bytes: (external)
@@ -108,10 +108,10 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 158
+    calls: 144
     bytes: (external)
   aipl_inc:
-    calls: 90
+    calls: 83
     bytes: (external)
   aipl_str_data:
     calls: 33

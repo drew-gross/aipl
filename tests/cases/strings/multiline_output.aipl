@@ -25,9 +25,6 @@ functions:
   aipl_assert:
     calls: 3
     bytes: (external)
-  aipl_dec:
-    calls: 6
-    bytes: (external)
   aipl_str_eq:
     calls: 3
     bytes: (external)

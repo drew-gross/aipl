@@ -95,11 +95,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 50
-instructions executed: 524
-binary size: 3976
-  code: 1916
+instructions executed: 519
+binary size: 3904
+  code: 1876
   data: 1
-  metadata: 2059
+  metadata: 2027
 functions:
   __to_str_i64:
     calls: 1
@@ -111,13 +111,13 @@ functions:
     calls: 4
     bytes: (external)
   aipl_dec:
-    calls: 44
+    calls: 34
     bytes: (external)
   aipl_i64_len:
     calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 21
+    calls: 16
     bytes: (external)
   aipl_print:
     calls: 10
@@ -151,7 +151,7 @@ functions:
     bytes: 56
   classify:
     calls: 3
-    bytes: 676
+    bytes: 636
   main:
     calls: 1
     bytes: 824

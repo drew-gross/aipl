@@ -323,11 +323,11 @@ allocations: 285
 deallocations: 285
 reallocations: 0
 bytes allocated: 16148
-instructions executed: 21739
-binary size: 31192
-  code: 17476
+instructions executed: 21701
+binary size: 30576
+  code: 17116
   data: 842
-  metadata: 12874
+  metadata: 12618
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -355,7 +355,7 @@ functions:
     bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 3308
+    bytes: 3212
   __rec_drop_Doc:
     calls: 38
     bytes: 184
@@ -364,7 +364,7 @@ functions:
     bytes: 84
   __test$cleanup:
     calls: 1
-    bytes: 3528
+    bytes: 3324
   aipl_arr_drop_str:
     calls: 84
     bytes: (external)
@@ -399,10 +399,10 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 625
+    calls: 549
     bytes: (external)
   aipl_inc:
-    calls: 347
+    calls: 309
     bytes: (external)
   aipl_rec_alloc:
     calls: 147
@@ -478,13 +478,13 @@ functions:
     bytes: 44
   fits_atom$tail:
     calls: 16
-    bytes: 296
+    bytes: 276
   has_hard:
     calls: 0
     bytes: 32
   has_hard$tail:
     calls: 23
-    bytes: 664
+    bytes: 624
   main:
     calls: 1
     bytes: 76

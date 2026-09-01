@@ -16,23 +16,23 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 40
-binary size: 1400
-  code: 308
+instructions executed: 39
+binary size: 1360
+  code: 284
   data: 90
-  metadata: 1002
+  metadata: 986
 functions:
   __test$greet:
     calls: 1
-    bytes: 236
+    bytes: 212
   aipl_assert:
     calls: 2
     bytes: (external)
   aipl_dec:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_str_eq:
     calls: 1

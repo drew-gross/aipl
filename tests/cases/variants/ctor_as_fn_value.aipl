@@ -37,11 +37,11 @@ allocations: 19
 deallocations: 19
 reallocations: 10
 bytes allocated: 936
-instructions executed: 1870
-binary size: 8064
-  code: 4484
+instructions executed: 1866
+binary size: 7984
+  code: 4436
   data: 411
-  metadata: 3169
+  metadata: 3137
 functions:
   __arr_drop_Shape:
     calls: 12
@@ -51,7 +51,7 @@ functions:
     bytes: 136
   __eq_Shape:
     calls: 9
-    bytes: 268
+    bytes: 220
   __eq_Shape$arr:
     calls: 6
     bytes: 284
@@ -83,10 +83,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_dec:
-    calls: 14
+    calls: 10
     bytes: (external)
   aipl_inc:
-    calls: 10
+    calls: 6
     bytes: (external)
   aipl_str_eq:
     calls: 2

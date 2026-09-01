@@ -23,15 +23,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 80
-instructions executed: 234
-binary size: 3520
-  code: 1332
+instructions executed: 230
+binary size: 3352
+  code: 1232
   data: 263
-  metadata: 1925
+  metadata: 1857
 functions:
   __test$describe:
     calls: 1
-    bytes: 732
+    bytes: 632
   __to_str_i64:
     calls: 2
     bytes: 180
@@ -42,13 +42,13 @@ functions:
     calls: 2
     bytes: (external)
   aipl_dec:
-    calls: 22
+    calls: 14
     bytes: (external)
   aipl_i64_len:
     calls: 4
     bytes: (external)
   aipl_inc:
-    calls: 10
+    calls: 6
     bytes: (external)
   aipl_str_eq:
     calls: 4

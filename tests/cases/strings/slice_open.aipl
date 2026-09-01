@@ -23,22 +23,19 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 104
-binary size: 3416
-  code: 1092
+instructions executed: 97
+binary size: 3120
+  code: 928
   data: 385
-  metadata: 1939
+  metadata: 1807
 functions:
   __test$drop_prefix:
     calls: 1
-    bytes: 1020
+    bytes: 856
   aipl_assert:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 21
-    bytes: (external)
-  aipl_inc:
     calls: 7
     bytes: (external)
   aipl_str_eq:

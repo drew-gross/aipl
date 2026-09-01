@@ -12,15 +12,15 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 168
-instructions executed: 479
-binary size: 2856
-  code: 1108
+instructions executed: 473
+binary size: 2760
+  code: 1064
   data: 97
-  metadata: 1651
+  metadata: 1599
 functions:
   __eq_str$arr:
     calls: 1
-    bytes: 352
+    bytes: 308
   __test$stringify:
     calls: 1
     bytes: 504
@@ -49,13 +49,13 @@ functions:
     calls: 1
     bytes: (external)
   aipl_dec:
-    calls: 15
+    calls: 9
     bytes: (external)
   aipl_i64_len:
     calls: 6
     bytes: (external)
   aipl_inc:
-    calls: 9
+    calls: 3
     bytes: (external)
   aipl_str_eq:
     calls: 3

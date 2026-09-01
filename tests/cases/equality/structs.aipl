@@ -24,15 +24,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 219
-binary size: 2328
-  code: 724
+instructions executed: 215
+binary size: 2224
+  code: 676
   data: 226
-  metadata: 1378
+  metadata: 1322
 functions:
   __eq_Named:
     calls: 2
-    bytes: 152
+    bytes: 104
   __eq_Point:
     calls: 3
     bytes: 104
@@ -43,10 +43,7 @@ functions:
     calls: 5
     bytes: (external)
   aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_inc:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_str_eq:
     calls: 2

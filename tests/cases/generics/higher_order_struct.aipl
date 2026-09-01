@@ -21,23 +21,23 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 71
-binary size: 1832
-  code: 392
+instructions executed: 70
+binary size: 1792
+  code: 368
   data: 242
-  metadata: 1198
+  metadata: 1182
 functions:
   __test$round_trip:
     calls: 1
-    bytes: 320
+    bytes: 296
   aipl_assert:
     calls: 4
     bytes: (external)
   aipl_dec:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_str_eq:
     calls: 1

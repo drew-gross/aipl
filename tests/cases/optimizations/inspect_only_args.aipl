@@ -61,15 +61,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 64
-instructions executed: 1319
-binary size: 3616
-  code: 1224
+instructions executed: 1318
+binary size: 3576
+  code: 1200
   data: 395
-  metadata: 1997
+  metadata: 1981
 functions:
   __test$count_via_copy:
     calls: 1
-    bytes: 576
+    bytes: 552
   __to_str_i64:
     calls: 1
     bytes: 180
@@ -83,13 +83,13 @@ functions:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 5
+    calls: 3
     bytes: (external)
   aipl_i64_len:
     calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_str_data:
     calls: 4

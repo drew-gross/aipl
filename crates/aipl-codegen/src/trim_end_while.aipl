@@ -22,22 +22,19 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1000
-binary size: 3944
-  code: 1772
+instructions executed: 995
+binary size: 3728
+  code: 1660
   data: 395
-  metadata: 1777
+  metadata: 1673
 functions:
   __test$trim_end_while:
     calls: 1
-    bytes: 1700
+    bytes: 1588
   aipl_assert:
     calls: 5
     bytes: (external)
   aipl_dec:
-    calls: 15
-    bytes: (external)
-  aipl_inc:
     calls: 5
     bytes: (external)
   aipl_str_data:

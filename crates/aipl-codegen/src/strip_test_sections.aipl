@@ -49,29 +49,29 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 320
-instructions executed: 6768
-binary size: 7144
-  code: 2572
+instructions executed: 6754
+binary size: 6688
+  code: 2312
   data: 1079
-  metadata: 3493
+  metadata: 3297
 functions:
   __eq_str$opt:
     calls: 17
-    bytes: 148
+    bytes: 100
   __m1__parse_test_section_header:
     calls: 17
-    bytes: 696
+    bytes: 676
   __test$strip_test_sections:
     calls: 1
-    bytes: 984
+    bytes: 792
   aipl_assert:
     calls: 9
     bytes: (external)
   aipl_dec:
-    calls: 143
+    calls: 115
     bytes: (external)
   aipl_inc:
-    calls: 74
+    calls: 60
     bytes: (external)
   aipl_str_data:
     calls: 8

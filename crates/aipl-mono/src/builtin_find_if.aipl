@@ -60,11 +60,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 452
-instructions executed: 1604
-binary size: 9936
-  code: 5532
+instructions executed: 1600
+binary size: 9800
+  code: 5448
   data: 869
-  metadata: 3535
+  metadata: 3483
 functions:
   __eq_char$opt:
     calls: 3
@@ -74,7 +74,7 @@ functions:
     bytes: 100
   __eq_str$opt:
     calls: 1
-    bytes: 148
+    bytes: 100
   __filter19$own0:
     calls: 1
     bytes: 272
@@ -100,10 +100,10 @@ functions:
     calls: 13
     bytes: (external)
   aipl_dec:
-    calls: 13
+    calls: 7
     bytes: (external)
   aipl_inc:
-    calls: 8
+    calls: 4
     bytes: (external)
   aipl_str_alloc:
     calls: 1
@@ -164,7 +164,7 @@ functions:
     bytes: 268
   find_if$str$lam11:
     calls: 1
-    bytes: 420
+    bytes: 384
   main:
     calls: 1
     bytes: 120

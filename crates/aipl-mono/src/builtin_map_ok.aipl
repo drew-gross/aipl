@@ -79,18 +79,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1824
-binary size: 27488
-  code: 15100
+instructions executed: 1801
+binary size: 27088
+  code: 14856
   data: 1332
-  metadata: 11056
+  metadata: 10900
 functions:
   __test$lex:
     calls: 1
-    bytes: 456
+    bytes: 436
   __test$map_ok:
     calls: 1
-    bytes: 13076
+    bytes: 12900
   __test_try_fail_LexError:
     calls: 0
     bytes: 64
@@ -110,10 +110,10 @@ functions:
     calls: 16
     bytes: (external)
   aipl_dec:
-    calls: 177
+    calls: 131
     bytes: (external)
   aipl_inc:
-    calls: 116
+    calls: 93
     bytes: (external)
   aipl_str_eq:
     calls: 23
@@ -132,7 +132,7 @@ functions:
     bytes: (external)
   lex:
     calls: 14
-    bytes: 380
+    bytes: 356
   main:
     calls: 1
-    bytes: 340
+    bytes: 316

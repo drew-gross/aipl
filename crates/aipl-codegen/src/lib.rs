@@ -2785,11 +2785,11 @@ extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
     }
 }
 
+/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
+/// caller's own references cover the call and no pre-inc is needed.
 #[no_mangle]
 extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
     let eq = unsafe { rt_str_eq(a, b) };
-    aipl_dec(a);
-    aipl_dec(b);
     i64::from(eq)
 }
 
@@ -2920,11 +2920,8 @@ extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
 }
 
 /// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
-/// contiguously anywhere in `s`'s. Consumes (decs) both inputs, like the other
-/// str builtins; callers pre-inc. The empty needle always matches. Unlike
-/// `starts_with`/`ends_with` this reads both strings via `str_bytes` (a rope
-/// receiver materializes its memoized cache) — a streaming window search
-/// across chunk boundaries isn't worth the complexity here.
+/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
+/// caller's own references cover the call and no pre-inc is needed.
 #[no_mangle]
 extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
     let mut sb = [0u8; 8];
@@ -2934,8 +2931,6 @@ extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
         let nbytes = str_bytes(needle, &mut nb);
         nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
     };
-    aipl_dec(s);
-    aipl_dec(needle);
     i64::from(found)
 }
 
@@ -8469,6 +8464,11 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_print" => "aipl2_print",
         "aipl_print_error" => "aipl2_print_error",
         "aipl_char_at" => "aipl2_char_at",
+        "aipl_str_len" => "aipl2_str_len",
+        "aipl_str_cmp" => "aipl2_str_cmp",
+        "aipl_str_hash" => "aipl2_str_hash",
+        "aipl_str_eq" => "aipl2_str_eq",
+        "aipl_str_contains" => "aipl2_str_contains",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
@@ -10958,10 +10958,9 @@ fn emit_eq_body<M: Module>(
         // `str` (and `Error`, and `char[]` — see `is_str_shaped`) compares by
         // its byte content.
         _ if is_str_shaped(ty) => {
-            // `str_eq` consumes a ref from each input; these are borrowed, so inc
-            // first to keep them owned by whoever owns them.
-            emit_inc(builder, module, builtins, lv);
-            emit_inc(builder, module, builtins, rv);
+            // `str_eq` borrows both inputs — it reads bytes and keeps nothing,
+            // and the caller holds a reference across the call — so there is no
+            // retain/release pair to pay (see `emit_char_at`).
             builtins.call(module, builder, "aipl_str_eq", &[lv, rv])
         }
         ConcreteType::Optional(_) => {
@@ -16217,8 +16216,9 @@ fn compile_call_expr<M: Module>(
                     SeShape::Opt => None,
                 };
                 if let Some(ndl) = ndl {
-                    emit_inc(builder, module, builtins, recv);
-                    emit_inc(builder, module, builtins, ndl);
+                    // Both borrowed (see `emit_char_at`). `ndl` may be a fresh
+                    // inline string from `emit_char_to_str`, whose inc/dec are
+                    // no-ops either way.
                     builtins.call(module, builder, "aipl_str_contains", &[recv, ndl])
                 } else {
                     // Optional `char?`: `none` → false; `some(c)` → window scan.
@@ -16241,7 +16241,8 @@ fn compile_call_expr<M: Module>(
                         OPT_VALUE_OFFSET as i32,
                     );
                     let s = emit_char_to_str(builder, cv);
-                    emit_inc(builder, module, builtins, recv);
+                    // Borrowed, like the sibling site above. `s` is an inline
+                    // one-char string, so it owns no allocation to release.
                     let r = builtins.call(module, builder, "aipl_str_contains", &[recv, s]);
                     builder.ins().stack_store(types::I64, r, res, 0);
                     builder.ins().jump(merge, &[]);
@@ -19008,8 +19009,7 @@ fn compile_expr_inner<M: Module>(
                                 Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
                             let (lit_val, _) =
                                 compile_expr(module, builder, cx, scopes, &lit_expr)?;
-                            emit_inc(builder, module, builtins, ptr);
-                            emit_inc(builder, module, builtins, lit_val);
+                            // Both borrowed: `str_eq` keeps neither.
                             let eq = builtins.call(module, builder, "aipl_str_eq", &[ptr, lit_val]);
                             let next = builder.create_block();
                             builder.ins().brif(eq, arm_blocks[i], &[], next, &[]);

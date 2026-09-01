@@ -55,20 +55,20 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 156
-instructions executed: 285
-binary size: 4312
-  code: 2000
+instructions executed: 283
+binary size: 4280
+  code: 1980
   data: 165
-  metadata: 2147
+  metadata: 2135
 functions:
   aipl_concat_lazy:
     calls: 3
     bytes: (external)
   aipl_dec:
-    calls: 35
+    calls: 31
     bytes: (external)
   aipl_inc:
-    calls: 24
+    calls: 22
     bytes: (external)
   aipl_print:
     calls: 3
@@ -84,7 +84,7 @@ functions:
     bytes: (external)
   first:
     calls: 3
-    bytes: 800
+    bytes: 780
   main:
     calls: 1
     bytes: 1200

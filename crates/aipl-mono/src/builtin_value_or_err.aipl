@@ -94,18 +94,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 990
-binary size: 9432
-  code: 4580
+instructions executed: 983
+binary size: 9160
+  code: 4420
   data: 1179
-  metadata: 3673
+  metadata: 3561
 functions:
   __test$digit_of:
     calls: 1
-    bytes: 496
+    bytes: 444
   __test$value_or_err:
     calls: 1
-    bytes: 3332
+    bytes: 3224
   aipl_assert:
     calls: 14
     bytes: (external)
@@ -113,10 +113,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 41
+    calls: 27
     bytes: (external)
   aipl_inc:
-    calls: 32
+    calls: 25
     bytes: (external)
   aipl_str_eq:
     calls: 7

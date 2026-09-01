@@ -25,15 +25,15 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 360
-instructions executed: 1725
-binary size: 4192
-  code: 1368
+instructions executed: 1717
+binary size: 3872
+  code: 1176
   data: 558
-  metadata: 2266
+  metadata: 2138
 functions:
   __test$normalize_output:
     calls: 1
-    bytes: 876
+    bytes: 684
   aipl_arr_drop_str:
     calls: 8
     bytes: (external)
@@ -50,10 +50,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_dec:
-    calls: 69
+    calls: 53
     bytes: (external)
   aipl_inc:
-    calls: 16
+    calls: 8
     bytes: (external)
   aipl_str_data:
     calls: 7

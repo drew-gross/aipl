@@ -10,11 +10,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 22
-binary size: 1272
-  code: 228
+instructions executed: 21
+binary size: 1200
+  code: 200
   data: 85
-  metadata: 959
+  metadata: 915
 functions:
   aipl_assert:
     calls: 1
@@ -23,10 +23,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_inc:
-    calls: 1
+    calls: 3
     bytes: (external)
   aipl_str_eq:
     calls: 1
@@ -45,4 +42,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 228
+    bytes: 200

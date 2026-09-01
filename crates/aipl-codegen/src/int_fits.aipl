@@ -78,23 +78,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1112
-binary size: 7328
-  code: 2156
+instructions executed: 968
+binary size: 6976
+  code: 1956
   data: 1605
-  metadata: 3567
+  metadata: 3415
 functions:
   __test$int_fits:
     calls: 1
     bytes: 1348
   aipl_assert:
     calls: 31
-    bytes: (external)
-  aipl_dec:
-    calls: 288
-    bytes: (external)
-  aipl_inc:
-    calls: 144
     bytes: (external)
   aipl_str_eq:
     calls: 144
@@ -113,7 +107,7 @@ functions:
     bytes: (external)
   int_fits:
     calls: 31
-    bytes: 736
+    bytes: 536
   main:
     calls: 1
     bytes: 72

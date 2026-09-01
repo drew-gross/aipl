@@ -79,7 +79,7 @@ functions:
     calls: 5
     bytes: 180
   aipl_dec:
-    calls: 32
+    calls: 22
     bytes: (external)
   aipl_i64_len:
     calls: 10

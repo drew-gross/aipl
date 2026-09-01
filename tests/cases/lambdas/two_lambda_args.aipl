@@ -74,11 +74,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 308
-binary size: 5328
-  code: 1684
+instructions executed: 306
+binary size: 5240
+  code: 1628
   data: 990
-  metadata: 2654
+  metadata: 2622
 functions:
   __test$apply_both:
     calls: 1
@@ -88,7 +88,7 @@ functions:
     bytes: 412
   __test$render:
     calls: 1
-    bytes: 620
+    bytes: 564
   __test$scale_if:
     calls: 1
     bytes: 196
@@ -102,13 +102,13 @@ functions:
     calls: 6
     bytes: (external)
   aipl_dec:
-    calls: 24
+    calls: 20
     bytes: (external)
   aipl_i64_len:
     calls: 4
     bytes: (external)
   aipl_inc:
-    calls: 8
+    calls: 6
     bytes: (external)
   aipl_str_eq:
     calls: 2

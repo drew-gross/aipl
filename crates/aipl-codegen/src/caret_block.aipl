@@ -97,18 +97,18 @@ allocations: 77
 deallocations: 77
 reallocations: 0
 bytes allocated: 2830
-instructions executed: 4426
-binary size: 9256
-  code: 3516
+instructions executed: 4420
+binary size: 9032
+  code: 3392
   data: 1720
-  metadata: 4020
+  metadata: 3920
 functions:
   __m1__line_at:
     calls: 6
     bytes: 596
   __test$caret_block:
     calls: 1
-    bytes: 892
+    bytes: 768
   __to_str_u64:
     calls: 24
     bytes: 180
@@ -119,10 +119,10 @@ functions:
     calls: 120
     bytes: (external)
   aipl_dec:
-    calls: 441
+    calls: 429
     bytes: (external)
   aipl_inc:
-    calls: 183
+    calls: 177
     bytes: (external)
   aipl_str_data:
     calls: 6

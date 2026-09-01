@@ -41,11 +41,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 348
-instructions executed: 931
-binary size: 5536
-  code: 2644
+instructions executed: 928
+binary size: 5496
+  code: 2620
   data: 544
-  metadata: 2348
+  metadata: 2332
 functions:
   __test$count_while:
     calls: 1
@@ -63,10 +63,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_dec:
-    calls: 13
+    calls: 7
     bytes: (external)
   aipl_inc:
-    calls: 6
+    calls: 3
     bytes: (external)
   aipl_str_alloc:
     calls: 1
@@ -115,7 +115,7 @@ functions:
     bytes: 224
   count_while$str$lam13:
     calls: 1
-    bytes: 324
+    bytes: 300
   main:
     calls: 1
     bytes: 72

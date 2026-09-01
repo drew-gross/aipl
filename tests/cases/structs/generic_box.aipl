@@ -21,11 +21,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 78
-binary size: 2104
-  code: 476
+instructions executed: 77
+binary size: 2064
+  code: 452
   data: 240
-  metadata: 1388
+  metadata: 1372
 functions:
   __test$boxed_bool:
     calls: 1
@@ -35,15 +35,15 @@ functions:
     bytes: 76
   __test$boxed_str:
     calls: 1
-    bytes: 172
+    bytes: 148
   aipl_assert:
     calls: 3
     bytes: (external)
   aipl_dec:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_str_eq:
     calls: 1

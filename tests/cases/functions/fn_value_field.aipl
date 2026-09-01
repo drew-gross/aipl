@@ -45,15 +45,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 40
-instructions executed: 147
-binary size: 2760
-  code: 748
+instructions executed: 146
+binary size: 2720
+  code: 724
   data: 337
-  metadata: 1675
+  metadata: 1659
 functions:
   __test$heap_field:
     calls: 1
-    bytes: 164
+    bytes: 140
   __test$scalar_field:
     calls: 1
     bytes: 364
@@ -64,10 +64,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_dec:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_str_eq:
     calls: 1

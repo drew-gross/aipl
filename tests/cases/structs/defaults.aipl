@@ -46,11 +46,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 303
-binary size: 5384
-  code: 1628
+instructions executed: 300
+binary size: 5264
+  code: 1556
   data: 917
-  metadata: 2839
+  metadata: 2791
 functions:
   __test$all_defaults:
     calls: 1
@@ -60,13 +60,13 @@ functions:
     bytes: 140
   __test$config_defaults:
     calls: 1
-    bytes: 280
+    bytes: 256
   __test$config_override:
     calls: 1
-    bytes: 280
+    bytes: 256
   __test$label_here:
     calls: 1
-    bytes: 196
+    bytes: 172
   __test$partial_x:
     calls: 1
     bytes: 140
@@ -77,10 +77,10 @@ functions:
     calls: 13
     bytes: (external)
   aipl_dec:
-    calls: 14
+    calls: 8
     bytes: (external)
   aipl_inc:
-    calls: 6
+    calls: 3
     bytes: (external)
   aipl_str_eq:
     calls: 3

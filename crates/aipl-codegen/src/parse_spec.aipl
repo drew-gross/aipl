@@ -180,11 +180,11 @@ allocations: 182
 deallocations: 182
 reallocations: 0
 bytes allocated: 7038
-instructions executed: 24775
-binary size: 86216
-  code: 53732
+instructions executed: 24621
+binary size: 85280
+  code: 53196
   data: 2532
-  metadata: 29952
+  metadata: 29552
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -203,19 +203,19 @@ functions:
     bytes: 100
   __eq_str$arr:
     calls: 1
-    bytes: 352
+    bytes: 308
   __eq_str$opt:
     calls: 4
-    bytes: 148
+    bytes: 100
   __lambda_12:
     calls: 3
     bytes: 140
   __m2__parse_test_section_header:
     calls: 50
-    bytes: 696
+    bytes: 676
   __test$parse_spec:
     calls: 1
-    bytes: 27712
+    bytes: 27548
   __test_try_fail_str:
     calls: 0
     bytes: 64
@@ -247,10 +247,10 @@ functions:
     calls: 76
     bytes: (external)
   aipl_dec:
-    calls: 1331
+    calls: 1031
     bytes: (external)
   aipl_inc:
-    calls: 672
+    calls: 518
     bytes: (external)
   aipl_str_contains:
     calls: 7
@@ -296,13 +296,13 @@ functions:
     bytes: (external)
   companion_path:
     calls: 4
-    bytes: 1120
+    bytes: 1080
   finalize:
     calls: 25
-    bytes: 17532
+    bytes: 17332
   main:
     calls: 1
     bytes: 72
   parse_spec:
     calls: 13
-    bytes: 3980
+    bytes: 3960

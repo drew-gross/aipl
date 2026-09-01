@@ -58,11 +58,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 26
-instructions executed: 574
-binary size: 10000
-  code: 5724
+instructions executed: 571
+binary size: 9896
+  code: 5668
   data: 487
-  metadata: 3789
+  metadata: 3741
 functions:
   __to_str_Tok:
     calls: 1
@@ -71,10 +71,10 @@ functions:
     calls: 2
     bytes: 212
   aipl_dec:
-    calls: 38
+    calls: 34
     bytes: (external)
   aipl_inc:
-    calls: 15
+    calls: 12
     bytes: (external)
   aipl_print:
     calls: 12
@@ -96,4 +96,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4008
+    bytes: 3952

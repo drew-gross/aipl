@@ -54,18 +54,18 @@ allocations: 45
 deallocations: 45
 reallocations: 0
 bytes allocated: 1929
-instructions executed: 7570
-binary size: 8464
-  code: 2768
+instructions executed: 7554
+binary size: 7856
+  code: 2420
   data: 1561
-  metadata: 4135
+  metadata: 3875
 functions:
   __m2__trim_end_while$lam1:
     calls: 0
     bytes: 292
   __test$clean_trailing_whitespace:
     calls: 1
-    bytes: 1708
+    bytes: 1360
   aipl_arr_drop_str:
     calls: 32
     bytes: (external)
@@ -91,10 +91,10 @@ functions:
     calls: 16
     bytes: (external)
   aipl_dec:
-    calls: 229
+    calls: 197
     bytes: (external)
   aipl_inc:
-    calls: 103
+    calls: 87
     bytes: (external)
   aipl_str_data:
     calls: 20

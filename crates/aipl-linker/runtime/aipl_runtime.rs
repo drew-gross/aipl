@@ -3079,14 +3079,12 @@ pub extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
     }
 }
 
-/// `str == str`: content-compare, then decrement both inputs (consumes a ref
-/// from each; callers pre-inc). Returns 1/0. Mirrors the JIT `aipl_str_eq`.
+/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
+/// caller's own references cover the call and no pre-inc is needed.
 #[no_mangle]
 pub extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
     count_builtin!(builtin_calls::AIPL_STR_EQ);
     let eq = unsafe { rt_str_eq(a, b) };
-    aipl_dec(a);
-    aipl_dec(b);
     i64::from(eq)
 }
 
@@ -3220,10 +3218,8 @@ pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
 }
 
 /// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
-/// contiguously anywhere in `s`'s. Consumes (decs) both inputs; callers
-/// pre-inc. The empty needle always matches. Reads both strings via
-/// `str_bytes` (a rope receiver materializes its memoized cache). Mirrors the
-/// JIT `aipl_str_contains`.
+/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
+/// caller's own references cover the call and no pre-inc is needed.
 #[no_mangle]
 pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
     count_builtin!(builtin_calls::AIPL_STR_CONTAINS);
@@ -3234,8 +3230,6 @@ pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
         let nbytes = str_bytes(needle, &mut nb);
         nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
     };
-    aipl_dec(s);
-    aipl_dec(needle);
     i64::from(found)
 }
 

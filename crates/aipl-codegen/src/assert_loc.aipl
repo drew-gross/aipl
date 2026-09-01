@@ -31,15 +31,15 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 543
-instructions executed: 537
-binary size: 5400
-  code: 1624
+instructions executed: 531
+binary size: 5176
+  code: 1496
   data: 916
-  metadata: 2860
+  metadata: 2764
 functions:
   __test$assert_loc:
     calls: 1
-    bytes: 820
+    bytes: 692
   __to_str_u64:
     calls: 6
     bytes: 180
@@ -59,10 +59,10 @@ functions:
     calls: 24
     bytes: (external)
   aipl_dec:
-    calls: 132
+    calls: 120
     bytes: (external)
   aipl_inc:
-    calls: 50
+    calls: 44
     bytes: (external)
   aipl_str_eq:
     calls: 6
