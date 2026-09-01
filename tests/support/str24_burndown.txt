@@ -113,3 +113,49 @@ examples_hello
 examples_imports
 examples_strings
 examples_uses_strlen
+
+# ===========================================================================
+# The builtin conversion inventory
+#
+# 35 runtime symbols take or return a `str`. Six are done (print, print_error,
+# inc, dec — the last two named at the `emit_rc_w` site rather than remapped).
+# The rest split by whether their `aipl2_*` entry point already exists.
+#
+# A. Entry point EXISTS — convert the call site and verify (18). Cheapest first:
+#    the pure query ones have no ownership to get wrong.
+#
+#      queries      str_len, str_eq, str_cmp, str_hash, char_at,
+#                   str_is_all_whitespace, starts_with, starts_with_at,
+#                   ends_with, contains, str_data
+#      producers    str_slice, concat, trim, str_reverse, str_sort, str_repeat
+#      iteration    str_iter_init  (with str_iter_next, already Word-typed)
+#
+#    `concat` was tried as a plain rename and still crashes: it also appears in
+#    the concat-specialization machinery (`$c{i}` instances, `ConcatStr`), so it
+#    is not the one to start with despite being the obvious target.
+#
+# B. Entry point MISSING — write it, then convert (13):
+#
+#      containers   str_split, str_join, arr_join
+#      concat kin   concat_lazy (the `+` rope path), concat_mut
+#      mutation     trim_mut
+#      files/proc   read_file_to_string, write_string_to_file, list_files,
+#                   execute_program
+#      test runner  assert, test_begin, test_fail
+#
+# Beyond these 35, two pieces of work carry no `Str`-typed symbol of their own
+# and so do not appear above:
+#
+#   - `emit_render` (the `to_str` builder). It drives `str_alloc` and the
+#     `write_*` cursors, which are `Word`-typed because they traffic in raw
+#     pointers. The `aipl2_str_alloc`/`str_write_ptr`/`str_grew` trio replaces
+#     that idiom; the rewrite is in `emit_render`, not in a symbol swap.
+#   - Element helpers for containers holding a `str` — arrays, sets, dicts.
+#     `aipl2_arr_drop_str`/`aipl2_arr_retain_str` are the first two; each
+#     container path needs its 24-byte counterpart.
+#
+# Suggested order: the eleven queries first (no ownership, immediate signal from
+# the corpus), then iteration, then the producers, then `emit_render`, then the
+# containers — leaving concat and the file/test-runner ops last, since they are
+# entangled with specialization and with `aipl check` respectively.
+
