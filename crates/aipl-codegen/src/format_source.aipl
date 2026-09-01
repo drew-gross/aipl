@@ -75,10 +75,10 @@ deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
 instructions executed: 323527
-binary size: 856624
-  code: 524184
+binary size: 856784
+  code: 524384
   data: 2508
-  metadata: 329932
+  metadata: 329892
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -128,10 +128,13 @@ functions:
   __arr_retain___m7__Doc:
     calls: 30
     bytes: 116
-  __builtin_any$__m7__Doc$lam93:
+  __builtin_all$char$s0$lam77:
+    calls: 0
+    bytes: 272
+  __builtin_any$__m7__Doc$lam94:
     calls: 0
     bytes: 32
-  __builtin_any$__m7__Doc$lam93$tail:
+  __builtin_any$__m7__Doc$lam94$tail:
     calls: 0
     bytes: 324
   __builtin_count_is_at_least$char$s0:
@@ -583,13 +586,13 @@ functions:
     bytes: 664
   __m8__reindent_block:
     calls: 0
-    bytes: 2360
+    bytes: 2336
   __m9__dedent:
     calls: 0
     bytes: 32
   __m9__dedent$tail:
     calls: 0
-    bytes: 1136
+    bytes: 1088
   __rec_drop___m7__Doc:
     calls: 52
     bytes: 184

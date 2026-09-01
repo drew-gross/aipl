@@ -42,12 +42,15 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1239
-instructions executed: 992
-binary size: 4344
-  code: 1364
+instructions executed: 1875
+binary size: 4672
+  code: 1612
   data: 474
-  metadata: 2506
+  metadata: 2586
 functions:
+  __builtin_all$char$s0$lam3:
+    calls: 13
+    bytes: 272
   __test$indent:
     calls: 1
     bytes: 712
@@ -79,22 +82,28 @@ functions:
     calls: 11
     bytes: (external)
   aipl_dec:
-    calls: 135
+    calls: 122
     bytes: (external)
   aipl_inc:
-    calls: 73
+    calls: 60
+    bytes: (external)
+  aipl_str_data:
+    calls: 12
     bytes: (external)
   aipl_str_eq:
     calls: 6
     bytes: (external)
-  aipl_str_is_all_whitespace:
+  aipl_str_iter_init:
     calls: 13
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 12
     bytes: (external)
   aipl_str_join:
     calls: 6
     bytes: (external)
   aipl_str_len:
-    calls: 43
+    calls: 68
     bytes: (external)
   aipl_str_repeat:
     calls: 6
@@ -116,7 +125,7 @@ functions:
     bytes: (external)
   indent:
     calls: 6
-    bytes: 576
+    bytes: 552
   main:
     calls: 1
     bytes: 76

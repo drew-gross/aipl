@@ -1821,7 +1821,7 @@ fn __builtin_trim(self: str) -> str { self }
 // source is length/column arithmetic (`" ".repeat(indent)`).
 fn __builtin_repeat(self: str, n: u64) -> str { "" }
 // True if every byte is ASCII whitespace (or the string is empty).
-fn __builtin_is_all_whitespace(self: str) -> bool { false }
+fn __builtin_is_whitespace(self: char) -> bool { false }
 // True if `self` begins / ends with the argument — `str` bytes or `T[]`
 // elements (the empty pattern always matches). A str receiver is dispatched in
 // the checker / codegen (the `T[]` signature doesn't unify with `str`).
@@ -1905,8 +1905,9 @@ fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
-// NOTE: `all`, `count_while`, `count_if`, `find_if`, `is_some_and`, `int_parse`,
-// `trim_while`, `try_map`, `value_or`, and `value_or_err` are
+// NOTE: `all`, `count_while`, `count_if`, `find_if`, `is_all_whitespace`,
+// `is_some_and`, `int_parse`, `trim_while`, `try_map`, `value_or`, and
+// `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -2209,6 +2210,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "map_ok",
     "int_parse",
     "is_space",
+    "is_whitespace",
     "is_digit",
     "to_digit",
     "trim_while",

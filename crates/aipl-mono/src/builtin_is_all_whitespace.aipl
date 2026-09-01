@@ -1,0 +1,96 @@
+import { all, is_whitespace, logical_not as ! } from builtins;
+
+// The AIPL implementation of the `is_all_whitespace` builtin. Monomorphization
+// registers this function under the canonical name
+// `__builtin_is_all_whitespace` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
+// user's `s.is_all_whitespace()` resolves through the ordinary machinery — the
+// in-file name is only for this file's own tests, which read exactly like user
+// code.
+//
+// It was a native runtime function (`aipl_str_is_all_whitespace`) and is now
+// AIPL, which is the direction the whole compiler is headed. Two things made the
+// port honest rather than approximate:
+//
+//   - a `str` receiver iterates its chars, so `all` is the whole implementation;
+//   - `is_whitespace` — not `is_space` — is the predicate. They differ, and the
+//     difference is the reason `is_whitespace` exists: `is_space` accepts space,
+//     tab, newline and carriage return, while ASCII whitespace also includes
+//     vertical tab and form feed. The native version accepted all six, so
+//     narrowing to four would have been a silent behaviour change. AIPL has no
+//     numeric escape, so those two bytes cannot be written in source at all —
+//     which is why the predicate covering them is a compiler intrinsic.
+//
+// Empty is all-whitespace, by `all`'s vacuous truth — the same answer the native
+// version gave, and consistent with `"".trim() == ""`.
+pub fn is_all_whitespace(self: str) -> bool { self.all(is_whitespace) }.doc("""
+    True when every char of `self` is ASCII whitespace — space, tab, newline,
+    carriage return, vertical tab or form feed — and true for the empty string.
+    Callable as a method: `s.is_all_whitespace()`.
+
+    See `is_whitespace` for the per-char predicate, and `is_space` for the
+    narrower four-character one.
+""").test({
+    assert(" ".is_all_whitespace());
+    assert("   ".is_all_whitespace());
+    assert("\t".is_all_whitespace());
+    assert("\n".is_all_whitespace());
+    assert("\r".is_all_whitespace());
+    assert(" \t\n\r ".is_all_whitespace()); // every spellable kind, mixed
+    // Empty is vacuously all-whitespace.
+    assert("".is_all_whitespace());
+    // Anything else is not.
+    assert(!"x".is_all_whitespace());
+    assert(!" x ".is_all_whitespace()); // whitespace on both sides is not enough
+    assert(!"\tx".is_all_whitespace());
+    assert(!"hello world".is_all_whitespace());
+    // The free-call form resolves to the same function.
+    assert(is_all_whitespace("  "));
+    assert(!is_all_whitespace("  ."));
+
+    // Vertical tab and form feed are accepted too, but cannot be written here:
+    // AIPL has no numeric escape, which is why `is_whitespace` is an intrinsic.
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1381
+binary size: 3616
+  code: 836
+  data: 779
+  metadata: 2001
+functions:
+  __builtin_all$char$s0$lam0:
+    calls: 13
+    bytes: 272
+  __test$is_all_whitespace:
+    calls: 1
+    bytes: 492
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_str_data:
+    calls: 12
+    bytes: (external)
+  aipl_str_iter_init:
+    calls: 13
+    bytes: (external)
+  aipl_str_iter_next:
+    calls: 12
+    bytes: (external)
+  aipl_str_len:
+    calls: 25
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 72

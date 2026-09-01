@@ -122,6 +122,9 @@ List files:
 clock:
   make units types
 
+char:
+  make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
+
 bugs:
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
@@ -205,6 +208,7 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 utilities:
+  add is_whitespace
   exponentiation operator
   take_while that is the counterpart of trim_while
   push into a string should work

@@ -8651,7 +8651,6 @@ fn register_builtins(
         ("__builtin_execute_program", "aipl_execute_program"),
         ("__builtin_trim", "aipl_trim"),
         ("__builtin_repeat", "aipl_str_repeat"),
-        ("__builtin_is_all_whitespace", "aipl_str_is_all_whitespace"),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
         ("__assert", "aipl_assert"),
         ("__test_begin", "aipl_test_begin"),
@@ -15581,6 +15580,39 @@ fn compile_call_expr<M: Module>(
             let or2 = builder.ins().bor(lf, cr);
             let result = builder.ins().bor(or1, or2);
             let b = builder.ins().uextend(types::I64, result);
+            (b, ConcreteType::Primitive(Primitive::Bool))
+        }
+        "__builtin_is_whitespace" => {
+            // `c.is_whitespace() -> bool` — the *full* ASCII whitespace set:
+            // `is_space`'s four plus vertical tab (11) and form feed (12).
+            //
+            // It exists because those two cannot be written in AIPL source —
+            // the language has `\n`, `\t` and `\r` and no numeric escape — so a
+            // predicate covering them has to come from the compiler. That is
+            // what lets `is_all_whitespace` be written in AIPL without narrowing
+            // what it accepts (see `builtin_is_all_whitespace.aipl`).
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"is_whitespace\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (c, recv_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            if recv_ty != ConcreteType::Primitive(Primitive::Char) {
+                return Err(Error::at(
+                    format!(
+                        "\"is_whitespace\" is only callable on a char, got {}",
+                        type_name(&recv_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            let mut acc = builder.ins().icmp_imm_s(IntCC::Equal, c, 32);
+            for byte in [9i64, 10, 13, 11, 12] {
+                let hit = builder.ins().icmp_imm_s(IntCC::Equal, c, byte);
+                acc = builder.ins().bor(acc, hit);
+            }
+            let b = builder.ins().uextend(types::I64, acc);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
         "__builtin_is_digit" => {

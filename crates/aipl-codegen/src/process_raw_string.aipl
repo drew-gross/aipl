@@ -53,12 +53,15 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1288
-instructions executed: 8157
-binary size: 7968
-  code: 3524
+instructions executed: 12303
+binary size: 8176
+  code: 3748
   data: 696
-  metadata: 3748
+  metadata: 3732
 functions:
+  __builtin_all$char$s0$lam12:
+    calls: 22
+    bytes: 272
   __builtin_count_while$char$s0$lam11:
     calls: 9
     bytes: 232
@@ -105,13 +108,13 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 202
+    calls: 180
     bytes: (external)
   aipl_inc:
-    calls: 134
+    calls: 112
     bytes: (external)
   aipl_str_data:
-    calls: 15
+    calls: 33
     bytes: (external)
   aipl_str_ends_with:
     calls: 7
@@ -119,20 +122,17 @@ functions:
   aipl_str_eq:
     calls: 7
     bytes: (external)
-  aipl_str_is_all_whitespace:
-    calls: 22
-    bytes: (external)
   aipl_str_iter_init:
-    calls: 16
+    calls: 38
     bytes: (external)
   aipl_str_iter_next:
-    calls: 15
+    calls: 33
     bytes: (external)
   aipl_str_join:
     calls: 7
     bytes: (external)
   aipl_str_len:
-    calls: 89
+    calls: 129
     bytes: (external)
   aipl_str_slice:
     calls: 38
@@ -154,4 +154,4 @@ functions:
     bytes: 72
   process_raw_string:
     calls: 7
-    bytes: 1620
+    bytes: 1572

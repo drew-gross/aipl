@@ -323,11 +323,11 @@ allocations: 285
 deallocations: 285
 reallocations: 0
 bytes allocated: 16148
-instructions executed: 21400
-binary size: 31032
-  code: 17276
+instructions executed: 21739
+binary size: 31192
+  code: 17476
   data: 842
-  metadata: 12914
+  metadata: 12874
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -335,6 +335,9 @@ functions:
   __arr_retain_Doc:
     calls: 0
     bytes: 116
+  __builtin_all$char$s0$lam25:
+    calls: 3
+    bytes: 272
   __builtin_any$Doc$lam7:
     calls: 0
     bytes: 32
@@ -352,7 +355,7 @@ functions:
     bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 3380
+    bytes: 3308
   __rec_drop_Doc:
     calls: 38
     bytes: 184
@@ -396,10 +399,10 @@ functions:
     calls: 22
     bytes: (external)
   aipl_dec:
-    calls: 628
+    calls: 625
     bytes: (external)
   aipl_inc:
-    calls: 350
+    calls: 347
     bytes: (external)
   aipl_rec_alloc:
     calls: 147
@@ -420,7 +423,7 @@ functions:
     calls: 25
     bytes: (external)
   aipl_str_data:
-    calls: 19
+    calls: 22
     bytes: (external)
   aipl_str_ends_with:
     calls: 9
@@ -428,20 +431,17 @@ functions:
   aipl_str_eq:
     calls: 13
     bytes: (external)
-  aipl_str_is_all_whitespace:
-    calls: 3
-    bytes: (external)
   aipl_str_iter_init:
-    calls: 20
+    calls: 23
     bytes: (external)
   aipl_str_iter_next:
-    calls: 19
+    calls: 22
     bytes: (external)
   aipl_str_join:
     calls: 21
     bytes: (external)
   aipl_str_len:
-    calls: 222
+    calls: 228
     bytes: (external)
   aipl_str_repeat:
     calls: 9

@@ -2711,10 +2711,10 @@ deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
 instructions executed: 2850719
-binary size: 3227224
-  code: 1844760
+binary size: 3227384
+  code: 1844960
   data: 27124
-  metadata: 1355340
+  metadata: 1355300
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2764,6 +2764,9 @@ functions:
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
     bytes: 800
+  __builtin_all$char$s0$lam65:
+    calls: 0
+    bytes: 272
   __builtin_any$__m1__Doc$lam32:
     calls: 0
     bytes: 32
@@ -2773,7 +2776,7 @@ functions:
   __builtin_count_is_at_least$char$s0:
     calls: 41
     bytes: 312
-  __builtin_count_while$char$lam74:
+  __builtin_count_while$char$lam75:
     calls: 69
     bytes: 296
   __builtin_count_while$char$s0$lam52:
@@ -2782,13 +2785,13 @@ functions:
   __builtin_count_while$char$s0$lam64:
     calls: 0
     bytes: 232
-  __builtin_count_while$char$s0$lam79:
+  __builtin_count_while$char$s0$lam80:
     calls: 1
     bytes: 236
-  __builtin_count_while$char$s0$lam81:
+  __builtin_count_while$char$s0$lam82:
     calls: 50
     bytes: 244
-  __builtin_count_while$char$s0$lam86:
+  __builtin_count_while$char$s0$lam87:
     calls: 1
     bytes: 232
   __builtin_drop_last$str:
@@ -2845,7 +2848,7 @@ functions:
   __lambda_44:
     calls: 0
     bytes: 64
-  __lambda_67:
+  __lambda_68:
     calls: 1
     bytes: 140
   __m10__unescape:
@@ -2892,13 +2895,13 @@ functions:
     bytes: 4624
   __m2__reindent_block:
     calls: 0
-    bytes: 2360
+    bytes: 2336
   __m3__dedent:
     calls: 0
     bytes: 32
   __m3__dedent$tail:
     calls: 0
-    bytes: 1136
+    bytes: 1088
   __m8__char_lit_emit:
     calls: 0
     bytes: 1412

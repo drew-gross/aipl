@@ -644,6 +644,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_first = "crates/aipl-mono/src/builtin_first",
     crates_aipl_mono_src_builtin_int_parse = "crates/aipl-mono/src/builtin_int_parse",
     crates_aipl_mono_src_builtin_intersperse = "crates/aipl-mono/src/builtin_intersperse",
+    crates_aipl_mono_src_builtin_is_all_whitespace = "crates/aipl-mono/src/builtin_is_all_whitespace",
     crates_aipl_mono_src_builtin_is_err_and = "crates/aipl-mono/src/builtin_is_err_and",
     crates_aipl_mono_src_builtin_is_some_and = "crates/aipl-mono/src/builtin_is_some_and",
     crates_aipl_mono_src_builtin_last = "crates/aipl-mono/src/builtin_last",
