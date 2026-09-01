@@ -68,8 +68,8 @@
 # into a corpus the default build then fails against. The sections are refilled
 # once, at the flip.
 #
-# Two clusters were fixed on the strength of that classification, and the count
-# is now **245 / 875** (from 527):
+# Three clusters were fixed on the strength of that classification, and the count
+# is now **236 / 875** (from 527):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -88,21 +88,35 @@
 #   - `fmt::` and `highlighting::` (7 tests) went green as a side effect — they
 #     were downstream of the print path.
 #
-# The remaining 245, by cause:
+#   - **the test-runner builtins.** `assert`, `test_begin` and `test_fail` now
+#     have `aipl2_*` entry points in both runtimes, and all 19 `check::` tests
+#     pass under the flag; a failing assert, a `?` on an `err` and a `?` on a
+#     `none` all report byte-identically either way.
 #
-#    90  `aipl check` (in-language tests) failed — the test-runner builtins
-#        `assert`, `test_begin`, `test_fail` have no `aipl2_*` entry point, so a
-#        test name arrives as an address: `test <invalid utf8> ... FAIL`. This is
-#        also the whole `check::` cluster below, which was previously — and
-#        wrongly — attributed to `emit_render`.
-#    76  `stdout` mismatch — newly *visible*, not new. A program that failed to
-#        link never got as far as comparing output. Sampling them, they are the
-#        known clusters: `str` in a struct field, the unconverted producers
-#        (`str_reverse` and friends), and the `char[]` append path whose buffer
-#        is still allocated the tagged way.
-#    47  compile failed  — `str` inside a composite (layout).
-#    18  SIGSEGV / SIGABRT — all `ffi::call_values_*`, same layout cause.
-#     9  `exit code` / `check` mismatch.
+#     One design point: `aipl_test_begin` stores its argument *pointer* in a
+#     global and reads it back at report time. A wide `str` argument points at
+#     the caller's 24-byte stack slot, and outliving the call is exactly what a
+#     stack slot does not promise — so `aipl2_test_begin` materializes the name's
+#     text instead (`TEST_CUR_NAME_WIDE`). Expect that wherever an entry point
+#     keeps an argument past its own return.
+#
+#     **It did not account for the 90, and the earlier attribution was wrong.**
+#     Only the 6 `check::` suite tests were caused by these builtins. The
+#     case-level "`aipl check` failed" bucket is 92 both before and after, and
+#     sampling it shows the real cause: `min("x" +++ "yz", ...)` aborts in
+#     `aipl2_str_cmp` on a *tagged rope* — `concat` is an unconverted producer,
+#     so a converted reader meets a value the old representation built. The
+#     lesson is the one this file keeps re-learning: attribute a cluster by
+#     reading one failure, not by matching its shape to a plausible cause.
+#
+# The remaining 236, by cause — two clusters, wearing four hats:
+#
+#    92  `aipl check` (in-language tests) failed
+#    77  `stdout` mismatch          } the **unconverted producers** (concat and
+#     7  `exit code` mismatch       } kin), and...
+#
+#    47  compile failed             } ...**`str` inside a composite** (layout),
+#    20  SIGSEGV / SIGABRT / ABORT  } which is also every `ffi::call_values_*`
 #
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
@@ -206,10 +220,9 @@ ffi::call_values_marshals_composite_params
 ffi::call_values_marshals_composite_array_params
 ffi::compiler_aipl_files_are_tested_and_pass_check
 
-#  6  `aipl check`'s own output path. **Re-attributed**: this is not
-#     `emit_render` (that is done and verified) but the test-runner builtins
-#     `assert`/`test_begin`/`test_fail`, which have no `aipl2_*` entry point yet,
-#     so the test name reaches the reporter as an address.
+#  6  `aipl check`'s own output path — **fixed**, by giving the test-runner
+#     builtins their `aipl2_*` entry points. (It was attributed to `emit_render`
+#     before that, which was also wrong; two bad guesses about one cluster.)
 check::a_failing_assert_reports_and_exits_one
 check::all_asserts_in_a_test_run_and_each_failure_is_reported
 check::a_file_that_does_not_compile_is_reported_without_stopping_the_run
@@ -286,6 +299,21 @@ examples_uses_strlen
 #    the concat-specialization machinery (`$c{i}` instances, `ConcatStr`), so it
 #    is not the one to start with despite being the obvious target.
 #
+#    **But it is now the one that matters most.** With the test-runner and print
+#    clusters gone, the producers are the largest remaining cause: a converted
+#    reader meets a tagged rope the moment a program says `a +++ b`.
+#
+#    Two entry-point bugs found by writing the *artifact* symbol table, both
+#    latent and neither reachable from a JIT run alone:
+#      - `aipl2_str_starts_with_at` was registered with the JIT and remapped in
+#        `active_sym` but had **no `import_abi` arm**, so any program calling
+#        `starts_with_at` panicked the compiler with "unknown builtin import
+#        symbol". A remap has *four* parts, not three: `active_sym`, the call
+#        site, JIT registration, and `import_abi`.
+#      - `aipl-artifact` keeps its own hand-maintained copy of that table and
+#        knew no `aipl2_*` symbol at all, so no artifact could carry one.
+#        Now filled in.
+#
 # B. Entry point MISSING — write it, then convert (13):
 #
 #      containers   str_split, str_join, arr_join
@@ -293,8 +321,7 @@ examples_uses_strlen
 #      mutation     trim_mut
 #      files/proc   read_file_to_string, write_string_to_file, list_files,
 #                   execute_program
-#      test runner  assert, test_begin, test_fail   <- START HERE: 90 failures,
-#                   the largest single cause left
+#      test runner  assert, test_begin, test_fail   <- DONE (both runtimes)
 #
 # Beyond these 35, two pieces of work carry no `Str`-typed symbol of their own
 # and so do not appear above:

@@ -389,6 +389,37 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_extend" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
+        // The wide-`str` (`aipl2_*`) convention, mirroring `builtin_import_sig`
+        // in `aipl-codegen`. Every `str` argument is a `*const Str`, so it is one
+        // word like any other; a `str` *result* is written through a leading out
+        // pointer, which is why the producers below take one more argument than
+        // their `aipl_*` counterparts and return nothing.
+        "aipl2_inc" | "aipl2_dec" | "aipl2_print" | "aipl2_print_error"
+        | "aipl2_test_begin" | "aipl2_test_fail" => sig(1, false),
+        "aipl2_assert" => sig(2, false),
+        "aipl2_str_len"
+        | "aipl2_str_hash"
+        | "aipl2_str_write_ptr"
+        | "aipl2_str_iter_next" => sig(1, true),
+        "aipl2_str_iter_init"
+        | "aipl2_arr_drop_str"
+        | "aipl2_arr_retain_str"
+        | "aipl2_str_grew"
+        // ...and the producers of exactly one `str` from none or one:
+        | "aipl2_trim"
+        | "aipl2_str_reverse"
+        | "aipl2_str_sort"
+        | "aipl2_str_alloc" => sig(2, false),
+        "aipl2_str_eq"
+        | "aipl2_str_cmp"
+        | "aipl2_str_starts_with"
+        | "aipl2_str_ends_with"
+        | "aipl2_str_contains"
+        | "aipl2_char_at"
+        | "aipl2_str_data" => sig(2, true),
+        "aipl2_concat" | "aipl2_str_repeat" => sig(3, false),
+        "aipl2_str_starts_with_at" => sig(3, true),
+        "aipl2_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }

@@ -4230,6 +4230,31 @@ pub extern "C" fn aipl_test_fail(_msg: *const u8) {
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
+// The wide-ABI counterparts. They ignore their `str` argument for exactly the
+// reason the `aipl_*` versions do — an AOT binary records pass/fail counts and
+// leaves the *reporting* to `aipl check` — so the only thing that changes is the
+// argument's type. Written here rather than left to the JIT because a half-
+// written entry point links in one runtime and not the other (see `aipl2_print`).
+#[no_mangle]
+pub extern "C" fn aipl2_test_begin(_name: *const str24::Str) {
+    count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
+    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
+}
+
+#[no_mangle]
+pub extern "C" fn aipl2_assert(cond: i64, _loc: *const str24::Str) {
+    count_builtin!(builtin_calls::AIPL_ASSERT);
+    if cond == 0 {
+        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn aipl2_test_fail(_msg: *const str24::Str) {
+    count_builtin!(builtin_calls::AIPL_TEST_FAIL);
+    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+}
+
 #[no_mangle]
 pub extern "C" fn aipl_test_fail_none() {
     count_builtin!(builtin_calls::AIPL_TEST_FAIL_NONE);

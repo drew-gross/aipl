@@ -2612,6 +2612,12 @@ use std::sync::Mutex;
 static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
 static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
 static TEST_CUR_NAME: AtomicUsize = AtomicUsize::new(0);
+/// The wide ABI's counterpart to [`TEST_CUR_NAME`], holding the name's *text*
+/// rather than a pointer to the value. A wide `str` argument is a pointer to the
+/// caller's 24-byte slot, and outliving the call is exactly what a stack slot
+/// does not promise — so the name is materialized here at `test_begin` instead
+/// of being read back at report time.
+static TEST_CUR_NAME_WIDE: Mutex<Option<String>> = Mutex::new(None);
 static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
 static TEST_PASSED: AtomicI64 = AtomicI64::new(0);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
@@ -2657,7 +2663,13 @@ fn print_fail_header() {
         return;
     }
     let mut nbuf = [0u8; 8];
-    let name = unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) };
+    // Only one ABI runs in a given process, so whichever `test_begin` ran is the
+    // one that left a name behind.
+    let wide = TEST_CUR_NAME_WIDE.lock().unwrap_or_else(|e| e.into_inner());
+    let name = match wide.as_deref() {
+        Some(n) => n,
+        None => unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) },
+    };
     match &*TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner()) {
         Some(file) => println!("test {file}::{name} ... FAIL"),
         None => println!("test {name} ... FAIL"),
@@ -2714,6 +2726,41 @@ extern "C" fn aipl_test_fail(msg: *const u8) {
 extern "C" fn aipl_test_fail_none() {
     print_fail_header();
     println!("  `?` propagated a `none`");
+    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+}
+
+/// Read a wide `str` argument as an owned `String` for the report. Materializes
+/// rather than borrowing, since the caller's slot is not guaranteed to outlive
+/// the report — see [`TEST_CUR_NAME_WIDE`].
+fn wide_text(s: *const str24::Str) -> String {
+    let mut scratch = [0u8; str24::INLINE_CAP];
+    let v = unsafe { *s };
+    String::from_utf8_lossy(v.bytes(&mut scratch)).into_owned()
+}
+
+/// [`aipl_test_begin`] under the wide ABI.
+#[no_mangle]
+extern "C" fn aipl2_test_begin(name: *const str24::Str) {
+    *TEST_CUR_NAME_WIDE.lock().unwrap_or_else(|e| e.into_inner()) = Some(wide_text(name));
+    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
+    TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
+}
+
+/// [`aipl_assert`] under the wide ABI.
+#[no_mangle]
+extern "C" fn aipl2_assert(cond: i64, loc: *const str24::Str) {
+    if cond == 0 {
+        print_fail_header();
+        println!("  assert failed at {}", wide_text(loc));
+        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    }
+}
+
+/// [`aipl_test_fail`] under the wide ABI.
+#[no_mangle]
+extern "C" fn aipl2_test_fail(msg: *const str24::Str) {
+    print_fail_header();
+    println!("  `?` propagated an error: {}", wide_text(msg));
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
@@ -5362,6 +5409,9 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_count_insns", aipl_count_insns as *const u8);
     jit_builder.symbol("aipl_count_call", aipl_count_call as *const u8);
     jit_builder.symbol("aipl_str_hash", aipl_str_hash as *const u8);
+    jit_builder.symbol("aipl2_test_begin", aipl2_test_begin as *const u8);
+    jit_builder.symbol("aipl2_assert", aipl2_assert as *const u8);
+    jit_builder.symbol("aipl2_test_fail", aipl2_test_fail as *const u8);
     jit_builder.symbol("aipl_assert", aipl_assert as *const u8);
     jit_builder.symbol("aipl_test_fail", aipl_test_fail as *const u8);
     jit_builder.symbol("aipl_test_fail_none", aipl_test_fail_none as *const u8);
@@ -8478,6 +8528,7 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         | "aipl2_str_contains"
         | "aipl2_char_at"
         | "aipl2_str_data" => sig(&[Word, Word], Ret::Word),
+        "aipl2_str_starts_with_at" => sig(&[Word, Word, Word], Ret::Word),
         // `Ret::Str` — `Builtins::call` allocates the slot and prepends the out
         // pointer, so these list only what the caller passes.
         "aipl2_trim" | "aipl2_str_reverse" | "aipl2_str_sort" => sig(&[Word], Ret::Str),
@@ -8490,6 +8541,8 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_str_iter_next" => sig(&[Word], Ret::Word),
         "aipl2_arr_drop_str" | "aipl2_arr_retain_str" => sig(&[Word, Word], Ret::None),
         "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
+        "aipl2_test_begin" | "aipl2_test_fail" => sig(&[Word], Ret::None),
+        "aipl2_assert" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -8542,6 +8595,9 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_str_data" => "aipl2_str_data",
         "aipl_str_iter_init" => "aipl2_str_iter_init",
         "aipl_str_iter_next" => "aipl2_str_iter_next",
+        "aipl_test_begin" => "aipl2_test_begin",
+        "aipl_assert" => "aipl2_assert",
+        "aipl_test_fail" => "aipl2_test_fail",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
         other => other,
