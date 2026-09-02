@@ -605,7 +605,9 @@ I built and measured three fixes, cumulatively:
 │ + first-char can_start gate so a rule declines without building a StepResult │ 0.23s │
 └──────────────────────────────────────────────────────────────────────────────┴───────┘
 
-tools for debugging infinite loops
+debugging:
+  tools for debugging infinite loops
+  add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
 PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working
 tree, full-suite gate never passed. Stopped after test cases started taking far too

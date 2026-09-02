@@ -6471,7 +6471,13 @@ impl Compilation {
         // A wide `str` return is a composite like any other: the callee writes it
         // through a hidden sret pointer and returns nothing. (Under the tagged
         // ABI it comes back in a register — the branch further down.)
-        if ret_is_str && abi_kind == StrAbi::Wide {
+        //
+        // `is_str_shaped`, so `char[]` comes here too: it shares the
+        // representation, so it is equally composite under this ABI. Reading it
+        // from the word return further down gets the value's first field, which
+        // decodes as an empty array. Only the decoding differs — codepoints
+        // rather than text.
+        if is_str_shaped(&info.return_ty) && abi_kind == StrAbi::Wide {
             let words = str24::STR_SIZE.div_ceil(8);
             let mut sret_buf = vec![0i64; words];
             let mut sret_abi = Vec::with_capacity(1 + abi.len());
@@ -6493,6 +6499,11 @@ impl Compilation {
             let mut scratch = [0u8; str24::INLINE_CAP];
             let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
             value.release();
+            if is_char_array(&info.return_ty) {
+                return Ok(FfiValue::Array(
+                    text.chars().map(|c| FfiValue::Int(c as i64)).collect(),
+                ));
+            }
             return Ok(FfiValue::Str(text));
         }
 
@@ -6922,6 +6933,27 @@ fn ffi_value_kind(v: &FfiValue) -> &'static str {
 /// `char[]` is the one element type that shares `str`'s representation rather
 /// than using a block (see [`is_char_array`]), so it's built as packed bytes;
 /// `bool[]` is bit-packed, one bit per element.
+/// A `char[]`'s host spelling — a list of codepoints — as the UTF-8 text the
+/// runtime actually stores. Shared by both ABIs' array marshalling.
+fn chars_to_utf8(elems: &[FfiValue]) -> Result<String, String> {
+    let mut s = String::with_capacity(elems.len());
+    for e in elems {
+        match e {
+            FfiValue::Int(c) => s.push(
+                char::from_u32(*c as u32)
+                    .ok_or_else(|| format!("char[] element {c} is not a valid codepoint"))?,
+            ),
+            other => {
+                return Err(format!(
+                    "char[] element must be an FfiValue::Int codepoint, got FfiValue::{}",
+                    ffi_value_kind(other)
+                ))
+            }
+        }
+    }
+    Ok(s)
+}
+
 fn build_borrowed_array(
     abi: StrAbi,
     elem: &ConcreteType,
@@ -6930,21 +6962,7 @@ fn build_borrowed_array(
     bufs: &mut ArgBufs,
 ) -> Result<i64, String> {
     if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
-        let mut s = String::with_capacity(elems.len());
-        for e in elems {
-            match e {
-                FfiValue::Int(c) => s.push(
-                    char::from_u32(*c as u32)
-                        .ok_or_else(|| format!("char[] element {c} is not a valid codepoint"))?,
-                ),
-                other => {
-                    return Err(format!(
-                        "char[] element must be an FfiValue::Int codepoint, got FfiValue::{}",
-                        ffi_value_kind(other)
-                    ))
-                }
-            }
-        }
+        let s = chars_to_utf8(elems)?;
         return Ok(bufs.str_value(&s));
     }
     let elem_size = if is_str_repr(elem) && abi == StrAbi::Wide {
@@ -6996,9 +7014,17 @@ unsafe fn write_ffi_arg(
 ) -> Result<(), String> {
     // A `str` under the wide ABI is the value itself, written in place — there is
     // no word to pass.
-    if is_str_repr(ty) && abi == StrAbi::Wide {
-        let FfiValue::Str(text) = v else {
-            return Err(mismatch(ty, v));
+    //
+    // `is_str_shaped`, not `is_str_repr`: `char[]` shares the representation, so
+    // under this ABI it is composite too (`abi_is_composite` says so) and must be
+    // written here rather than falling through to `ffi_arg_word`, whose own
+    // assertion catches exactly that mistake. The two differ only in how the host
+    // spells the value — a `str` arrives as text, a `char[]` as codepoints.
+    if is_str_shaped(ty) && abi == StrAbi::Wide {
+        let text = match v {
+            FfiValue::Str(text) if is_str_repr(ty) => text.clone(),
+            FfiValue::Array(elems) if is_char_array(ty) => chars_to_utf8(elems)?,
+            _ => return Err(mismatch(ty, v)),
         };
         let value = str24::from_bytes(text.as_bytes());
         unsafe { core::ptr::write(dst as *mut str24::Str, value) };
@@ -7178,6 +7204,19 @@ unsafe fn read_ffi_borrowed(
         ConcreteType::Result(_, _) => unsafe {
             read_ffi_result(abi, at as *const i64, ty, owned, structs)
         },
+        // A wide `char[]` is a whole `str` value at `at`, not a word pointing at
+        // one — the same shape the `str` arm below reads, differing only in how
+        // the text is handed back (codepoints rather than a string). Reading it
+        // as a word yields the value's first field and decodes as empty.
+        ConcreteType::Array(_) if is_char_array(ty) && abi == StrAbi::Wide => {
+            let value = unsafe { core::ptr::read(at as *const str24::Str) };
+            let mut scratch = [0u8; str24::INLINE_CAP];
+            let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
+            if owned {
+                value.release();
+            }
+            FfiValue::Array(text.chars().map(|c| FfiValue::Int(c as i64)).collect())
+        }
         ConcreteType::Array(elem) => {
             // The 8-byte word is the array value (a tagged block pointer, or — for
             // `char[]`, which shares `str`'s representation — an inline/heap `str`).

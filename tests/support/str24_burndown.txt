@@ -98,7 +98,7 @@
 # table means the next conversion cannot reintroduce it.
 #
 # Ten clusters were fixed on the strength of that classification, and the count
-# is now **39 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
+# is now **37 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
 # started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
@@ -297,14 +297,36 @@
 #     with its owner, length and refcount. The trace named the bug outright: one
 #     buffer inc'd once and dec'd once, another dec'd twice.
 #
-# The remaining 39, by cause:
+#   - **the FFI composite-array marshalling**, which was `char[]` three times.
 #
-#    20  `aipl check` (in-language tests) failed
-#    13  `stdout` mismatch
-#     6  crashes / other
+#     `char[]` shares `str`'s representation, so under this ABI it is composite —
+#     `abi_is_composite` says so, keying on `is_str_repr(ty) || is_char_array(ty)`.
+#     Three sites in the marshalling layer had been written when only a real
+#     `str` could be composite, and each asked `is_str_repr` alone:
 #
-# Left: `arr_join`, `int_parse`, `execute_program`, and the FFI composite-array
-# marshalling.
+#       - `write_ffi_arg` fell through to `ffi_arg_word`, whose own
+#         `debug_assert!` catches exactly that ("a composite goes through
+#         `ffi_arg_abi`") — the assertion was right and the caller was wrong.
+#       - `read_ffi_borrowed`'s `Array` arm read an 8-byte word where a 24-byte
+#         value sits, so it decoded the value's first field: an empty array.
+#       - the *return* path chose sret on `ret_is_str`, so a `char[]` return came
+#         back through the word return with the same empty-array result.
+#
+#     All three are now `is_str_shaped`, differing only in how the host spells
+#     the value: a `str` is text, a `char[]` is codepoints (`chars_to_utf8` and
+#     its inverse). **Whenever a wide `str` misbehaves, grep the neighbourhood for
+#     `is_str_repr` and ask whether it meant `is_str_shaped`** — that is now the
+#     fourth cluster with this shape, after the `is_composite` leak.
+#
+# The remaining 37, by cause:
+#
+#    ~20  `aipl check` (in-language tests) failed
+#    ~13  `stdout` mismatch
+#      4  non-case: the two `lexer_dogfood` tests,
+#         `ffi::compiler_aipl_files_are_tested_and_pass_check`, and
+#         `dogfood_ir::artifact_round_trips_rich_types`
+#
+# Left: `arr_join`, `int_parse`, `execute_program`.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
