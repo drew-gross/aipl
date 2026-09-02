@@ -98,7 +98,7 @@
 # table means the next conversion cannot reintroduce it.
 #
 # Ten clusters were fixed on the strength of that classification, and the count
-# is now **41 / 932** (from 527 of 875 — the denominator grew when the gate
+# is now **39 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
 # started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
@@ -269,15 +269,42 @@
 #     `c_path_of` makes one. It allocates rather than using a fixed stack buffer,
 #     so there is no path-length ceiling.
 #
-# The remaining 41, by cause:
+#   - **the two `char[]` push/extend leaks**, and they were one line.
+#
+#     `is_composite` answers *true* for a wide `str`/`char[]` — they travel by
+#     address like any other composite — so a non-exclusive `mut char[]` binding
+#     started falling into `LetMut`'s **composite** arm, which gives the slot its
+#     own reference. That is exactly the ownership model `char[]` is excluded
+#     from one branch earlier: `mut_binding_owns_slot_ref` spells out
+#     `Array(_) && !is_char_array(ty)`, because the `push` path assumes the slot
+#     holds no reference of its own. So the slot retained the *old* value and
+#     then released whatever the slot held at exit — the value `push` had
+#     replaced it with. The old value leaked, the new one was released twice, and
+#     the two errors cancelled in the tally, which is why it read as a plain
+#     off-by-one. Fixed by guarding that arm with `!is_str_shaped`.
+#
+#     **Generalize this one.** `is_composite` gained `|| str24_wide(ty)` early in
+#     Stage 1 so address-passing worked everywhere. Every *other* consumer of
+#     that predicate then silently started including `str`, and most of them
+#     wanted that. This is the one that did not — and the tell was already in the
+#     tree, in a sibling branch that had bothered to exclude `char[]` by name.
+#     When a wide `str` behaves oddly in code that asks `is_composite`, check
+#     whether the neighbouring branches exclude `char[]`.
+#
+#     Found by bisecting the case body down to
+#     `mut cs = ['a']; let snap = cs; set cs.push('b');` — the snapshot is what
+#     makes the binding non-exclusive — and then logging every `aipl2_inc`/`dec`
+#     with its owner, length and refcount. The trace named the bug outright: one
+#     buffer inc'd once and dec'd once, another dec'd twice.
+#
+# The remaining 39, by cause:
 #
 #    20  `aipl check` (in-language tests) failed
 #    13  `stdout` mismatch
-#     2  memory leak
 #     6  crashes / other
 #
-# Left: `arr_join`, `int_parse`, `execute_program`, the FFI composite-array
-# marshalling, and the two known leaks below.
+# Left: `arr_join`, `int_parse`, `execute_program`, and the FFI composite-array
+# marshalling.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in

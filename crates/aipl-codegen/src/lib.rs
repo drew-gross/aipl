@@ -19219,7 +19219,19 @@ fn compile_expr_inner<M: Module>(
                     .last_mut()
                     .expect("scope")
                     .push(Tracked::slot(slot, &t));
-            } else if is_composite(&t, structs) {
+            } else if is_composite(&t, structs) && !is_str_shaped(&t) {
+                // The `!is_str_shaped` guard matters only under the wide `str`,
+                // where `is_composite` starts answering *true* for `str`/`char[]`
+                // — they travel by address like any other composite. Their
+                // ownership model is not the composite one, though: the branch
+                // above deliberately excludes `char[]` from
+                // `mut_binding_owns_slot_ref` because the `push` path assumes the
+                // slot holds no reference of its own. Without this guard a wide
+                // `char[]` binding fell in here and took one anyway, so the slot
+                // retained the *old* value and then released whatever the slot
+                // held at scope exit — the value `push` had replaced it with.
+                // Net: the old value leaked and the new one was released twice.
+                //
                 // A composite (inline struct / optional / result) `mut` binding:
                 // the slot takes its own reference on the value's heap-bearing
                 // fields, released by this slot-track at scope exit or by the
