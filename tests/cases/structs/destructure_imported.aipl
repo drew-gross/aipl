@@ -1,0 +1,45 @@
+import { print } from builtins;
+import { Rec, make } from "./destructure_imported_lib.aipl";
+
+// The struct a pattern names is resolved through the file's import view like any
+// other type name, so destructuring an imported struct pins the same way a local
+// one does. This is worth its own case because the pattern's type only became
+// load-bearing when the scrutinee binding started carrying it — before that the
+// name was parsed and dropped, and no import resolution happened at all.
+fn main() !prints {
+    let Rec { a, b } = make();
+    print(`{a} {b}`);
+    let r = Rec { a: 1, b: 2 };
+    let Rec { b } = r;
+    print(`{b}`);
+}
+--- stdout ---
+4 5
+2
+--- file: destructure_imported_lib.aipl ---
+struct Rec { a: i64, b: i64 }
+
+pub fn make() -> Rec { a: 4, b: 5 }
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 227
+instructions executed: 146
+binary size: 1976
+  code: 836
+  data: 1
+  metadata: 1139
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 632

@@ -1742,12 +1742,16 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             )
         }
         StmtSpec::LetStruct {
-            struct_name: _,
+            struct_name,
             fields,
             value,
             span: struct_span,
         } => {
-            let tmp = format!("__spat${}", struct_span.start);
+            let tmp = format!(
+                "{}{}",
+                aipl_syntax::DESTRUCTURE_BASE_PREFIX,
+                struct_span.start
+            );
             let mut result = acc;
             for field_name in fields.iter().rev() {
                 let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), struct_span.clone());
@@ -1762,8 +1766,19 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
                 );
             }
             let outer_span = join_spans(&struct_span, &result.span);
+            // The scrutinee's binding carries the pattern's type, which is what
+            // makes the type name mean something: without it `let Q { x } = p`
+            // compiled fine for a `p: P`, and so did a name that was not a struct
+            // at all — the name was parsed and then dropped. The loader removes
+            // the annotation again if the name turns out to be generic
+            // (`DESTRUCTURE_BASE_PREFIX`).
             Expr::new(
-                ExprKind::Let(tmp, None, Box::new(value), Box::new(result)),
+                ExprKind::Let(
+                    tmp,
+                    Some(Type::Named(struct_name)),
+                    Box::new(value),
+                    Box::new(result),
+                ),
                 outer_span,
             )
         }

@@ -1,8 +1,18 @@
 import { print, to_str } from builtins;
 
+// `let T { a, b } = value;` binds each named field. The type name is part of the
+// pattern, not decoration: it pins which struct is being taken apart, so a
+// pattern naming a different struct is rejected even when the field names line
+// up (`err_destructure_wrong_struct.aipl`) — the same rule a `..` spread follows.
 struct Point { x: i64, y: i64 }
 
 struct LineAt { line: i64, line_start: i64 }
+
+struct Named { id: i64, label: str }
+
+struct Box<T> { v: T, tag: i64 }
+
+fn boxed() -> Box<str> { v: "held", tag: 9 }
 
 fn main() !prints {
     let p = Point { x: 10, y: 20 };
@@ -13,32 +23,53 @@ fn main() !prints {
     let LineAt { line, line_start } = la;
     print(to_str(line));
     print(to_str(line_start));
+
+    // A subset of the fields is fine — name only what you read.
+    let LineAt { line_start } = la;
+    print(to_str(line_start));
+
+    // A `str` field is bound like any other; the binding owns its own reference,
+    // so the counts below stay balanced.
+    let n = Named { id: 1, label: "a label long enough to be a buffer" };
+    let Named { label } = n;
+    print(label);
+
+    // A generic struct destructures too. `Box` names a template rather than a
+    // type, so the scrutinee's binding carries no annotation — the field reads
+    // are still checked against the instance.
+    let Box { v, tag } = boxed();
+    print(v);
+    print(to_str(tag));
 }
 --- stdout ---
 10
 20
 3
 42
+42
+a label long enough to be a buffer
+held
+9
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 71
-instructions executed: 121
-binary size: 1464
-  code: 488
-  data: 1
-  metadata: 975
+bytes allocated: 106
+instructions executed: 234
+binary size: 2248
+  code: 896
+  data: 51
+  metadata: 1301
 functions:
   __to_str_i64:
-    calls: 4
+    calls: 6
     bytes: 204
   aipl_i64_len:
-    calls: 8
+    calls: 12
     bytes: (external)
   aipl_write_i64:
-    calls: 4
+    calls: 6
     bytes: (external)
   main:
     calls: 1
-    bytes: 284
+    bytes: 692

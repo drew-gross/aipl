@@ -2663,4 +2663,19 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
 /// mismatch would turn a good diagnostic back into a confusing one.
 pub const SPREAD_BASE_PREFIX: &str = "__spread_base$";
 
+/// Prefix of the temporary a `let T { a, b } = value;` destructuring binds its
+/// scrutinee to (the parser's `StmtSpec::LetStruct` lowering). It plays the same
+/// two roles as [`SPREAD_BASE_PREFIX`]: the binding carries `T` as its type
+/// annotation, so the checker rejects a pattern naming a *different* struct than
+/// the value is — two structs that merely share field names are not
+/// interchangeable — and the prefix is what lets the checker report that as the
+/// destructuring the user wrote rather than as an internal `let`.
+///
+/// The loader drops the annotation when `T` names a *generic* struct, for the
+/// reason the spread does: `Box` names a template, not a type, so there is
+/// nothing to pin it to until monomorphization. The field reads are still
+/// checked, so a wrong field name is caught either way; what goes unchecked for
+/// a generic is a different template that happens to share field names.
+pub const DESTRUCTURE_BASE_PREFIX: &str = "__spat$";
+
 pub mod lint;

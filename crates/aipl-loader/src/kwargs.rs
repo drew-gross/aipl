@@ -422,6 +422,25 @@ impl Expander {
         ExprKind::LetMut(acc, None, Box::new(reserved), Box::new(body))
     }
 
+    /// The type annotation to keep on a `let T { .. } = value;` scrutinee
+    /// binding. `T` pins the pattern to one struct, which is the whole point of
+    /// writing it — but a **generic** struct names a template rather than a type,
+    /// and there is nothing to pin it to until monomorphization, so the
+    /// annotation is dropped for those. The parser cannot make this call: it has
+    /// no struct table, and only knows the name the user wrote.
+    ///
+    /// Every other binding keeps its annotation untouched, so a hand-written
+    /// `let b: Box = ..` is still the error it always was.
+    fn destructure_ann(&self, name: &str, ty: &Option<Type>) -> Option<Type> {
+        if !name.starts_with(aipl_syntax::DESTRUCTURE_BASE_PREFIX) {
+            return ty.clone();
+        }
+        match ty {
+            Some(Type::Named(n)) if self.struct_fields.get(n).is_some_and(|(_, g)| *g) => None,
+            other => other.clone(),
+        }
+    }
+
     /// The expanded default expressions of `name`'s keyword parameters, in
     /// declaration order. Memoized; errors on a cycle of defaults.
     fn expanded_defaults(&mut self, name: &str) -> Result<Vec<Expr>, Error> {
@@ -737,7 +756,7 @@ impl Expander {
             ),
             ExprKind::Let(name, ty, value, body) => ExprKind::Let(
                 name.clone(),
-                ty.clone(),
+                self.destructure_ann(name, ty),
                 Box::new(self.expand_expr(value, locals)?),
                 Box::new(self.expand_expr(body, &with(name))?),
             ),

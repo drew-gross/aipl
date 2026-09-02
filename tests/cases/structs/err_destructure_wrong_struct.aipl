@@ -1,0 +1,20 @@
+struct P { x: i64, y: i64 }
+
+struct Q { x: i64 }
+
+fn make() -> P { x: 1, y: 2 }
+
+// The struct named in a destructuring pattern has to be the one the value
+// actually is. `Q` shares the field `x` with `P`, but sharing a field name is a
+// coincidence rather than a contract — so this is rejected, exactly as a
+// `Q { ..p }` spread would be.
+fn f() -> i64 {
+    let Q { x } = make();
+    x
+}
+--- errors ---
+error: cannot destructure P as Q — the pattern names the struct it takes apart, and two structs that merely share field names are not interchangeable
+  --> ./tests/cases/structs/err_destructure_wrong_struct.aipl:12:19
+   |
+12 |     let Q { x } = make();
+   |                   ^^^^

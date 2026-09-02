@@ -1531,6 +1531,18 @@ impl Cx<'_> {
                     tyname(&vt),
                     tyname(&declared)
                 )
+            } else if name.starts_with(aipl_syntax::DESTRUCTURE_BASE_PREFIX) {
+                // Same story as the spread, from the other direction: the binding
+                // is the scrutinee the loader introduced for `let T { .. } = v;`,
+                // carrying `T`. Naming it in the error would be nonsense — the
+                // user wrote a pattern, not a `let`.
+                format!(
+                    "cannot destructure {} as {} — the pattern names the struct it \
+                     takes apart, and two structs that merely share field names are \
+                     not interchangeable",
+                    tyname(&vt),
+                    tyname(&declared)
+                )
             } else {
                 format!(
                     "binding {name:?} is declared {}, but its value is {}",

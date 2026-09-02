@@ -13,6 +13,7 @@ variant:
   allow variant constructors to have defaults, get rid of many in grammar.aipl
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
+  allow variant constructors to have named args/defaults
 
 projects:
   make some projects in AIPL, probably organized where it's a folder in this repo that would otherwise work standalone (i.e. aipl bin is copied in)
@@ -75,6 +76,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value
@@ -255,6 +257,8 @@ lint:
 Spreading:
   add some tests for spreads that demonstrate the error message when you try to mix types in a spread
   optimize the bit packed and rope representations as well
+  spread in args e.g. fn foo(self: Span { start, end })
+
 
 dict:
   make hash based dicts
@@ -429,8 +433,6 @@ Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not 
 integers:
   type conversions: should return none when out of range. Remove automatic conversion.
   unpinned int lits should be passable as struct fields
-
-spread in args e.g. fn foo(self: Span { start, end })
 
 Cache monomorphizations of the same lambda
 

@@ -504,6 +504,8 @@ case_tests! {
     cases_structs_boxed_field_with_array = "cases/structs/boxed_field_with_array",
     cases_structs_defaults = "cases/structs/defaults",
     cases_structs_destructure = "cases/structs/destructure",
+    cases_structs_destructure_imported = "cases/structs/destructure_imported",
+    cases_structs_err_destructure_wrong_struct = "cases/structs/err_destructure_wrong_struct",
     cases_structs_err_duplicate_struct = "cases/structs/err_duplicate_struct",
     cases_structs_err_field_missing_type = "cases/structs/err_field_missing_type",
     cases_structs_err_spread_not_first = "cases/structs/err_spread_not_first",
