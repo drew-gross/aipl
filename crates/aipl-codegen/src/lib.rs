@@ -16064,7 +16064,7 @@ fn compile_call_expr<M: Module>(
                     // itself when there isn't, and only copies when the dynamic
                     // refcount says the static proof isn't enough on its own
                     // (`STR_REPR.md`). It takes over the slot's reference and
-                    // writes the result back, so — as in the in-place `+++` —
+                    // writes the result back, so — as in the in-place concat —
                     // there is nothing to release and no new track to add.
                     builtins.call_void(module, builder, "aipl_str_push_byte", &[arr_ptr, x_v]);
                     *ty_cell.borrow_mut() = new_arr_ty;
@@ -17686,16 +17686,17 @@ fn compile_expr_inner<M: Module>(
                     ));
                 }
             };
-            // In-place concat: `set s = s +++ r` on an exclusive `str` binding
-            // appends `r` into `s`'s own buffer instead of building a fresh
-            // string (or a rope node) each time. The binding is slot-tracked, so
-            // the — possibly relocated — buffer is still dropped exactly once.
+            // In-place concat: `set s = concat(s, r)` on an exclusive `str`
+            // binding appends `r` into `s`'s own buffer instead of building a
+            // fresh string (or a rope node) each time. The binding is
+            // slot-tracked, so the — possibly relocated — buffer is still
+            // dropped exactly once.
             //
-            // The operator is `'C'` (`+++`), not `'+'` — `'+'` is integer
-            // addition and never has `str` operands, so the arm that spelled it
-            // that way could not fire, and neither could the matching one in
-            // `mono::aliases_or_unsafe` that decides `exclusive`. Both are fixed
-            // together: either alone leaves the optimization off.
+            // `'C'` is `concat`'s opcode, as `'+'` is `wrapping_add`'s. This arm
+            // used to test `'+'`, which asks about integer addition and so never
+            // matched a `str`; the optimization had simply never run. The arm in
+            // `mono::aliases_or_unsafe` that decides `exclusive` has to agree
+            // with this one, and did not — either alone leaves it off.
             if exclusive && expected_ty == ConcreteType::Primitive(Primitive::Str) {
                 let appends_self = match &value.kind {
                     ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {

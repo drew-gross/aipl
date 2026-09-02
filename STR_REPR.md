@@ -287,8 +287,8 @@ appends after this one. The static half is `binding_is_exclusive`, and codegen
 calls the in-place entry points *only* where it holds; `is_unique` refines that
 decision and never makes it.
 
-Three shapes reach it: `set s = s +++ r` on a `str` binding, and `push`/`extend`
-on a `char[]` one (`strings/concat_in_place{,_grows}.aipl`,
+Three shapes reach it: `set s = concat(s, r)` on a `str` binding, and
+`push`/`extend` on a `char[]` one (`strings/concat_in_place{,_grows}.aipl`,
 `arrays/push/push_char_in_place.aipl`,
 `arrays/extend/extend_char_in_place.aipl`). A `char[]` binding's slot owns
 exactly one reference, the same model a `str` binding uses — `is_str_shaped`, not

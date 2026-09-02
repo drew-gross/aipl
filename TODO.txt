@@ -75,7 +75,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
-  It's a bit misleading to say that +++ is is AIPL's concat operator. `concat` is AIPL's concat operator, and it is typically imported as +++. Any code that runs after import resolution shouldn't care about or even be able to care about the distinction, except for the case of error messages that suggest adding imports, where it knows that +++ is the usual name for concat.
+  lets represent opcodes using an enum, not a char like 'C' or '+'
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value
@@ -128,6 +128,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  concat can't be imported bare at all? THat's a bug, please fix, all operators should be able to be imported bare
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky
@@ -277,6 +278,7 @@ design:
     the most readable implementation is also the fastest
 
 optimizations:
+  using templates for string builder loops should be just as fast as concat (somehow? Maybe they desugar to concat? maybe only when it's "s = `{s}...`?)
   for (let c : s) still takes a runtime call per byte
   to_str allocates a buffer for short results instead of packing them inline.
   str builder loops are in place now (STR_REPR stage 2); the *non*-exclusive

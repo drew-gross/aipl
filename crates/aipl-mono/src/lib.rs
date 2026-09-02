@@ -8723,12 +8723,15 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             };
             let lhs_bad = if target == name {
                 match &val.kind {
-                    // `set a = a +++ b` appends into `a`'s own buffer — safe
-                    // unless we're iterating `a`, or the other operand aliases it
-                    // (it is read while `a` grows). The operator is `'C'`;
-                    // spelling it `'+'` matched integer addition, which never has
-                    // a `str` operand, so this arm never fired and no `str`
-                    // builder binding was ever exclusive.
+                    // `set a = concat(a, b)` appends into `a`'s own buffer —
+                    // safe unless we're iterating `a`, or the other operand
+                    // aliases it (it is read while `a` grows).
+                    //
+                    // `'C'` is the opcode for `concat`, the way `'+'` is the
+                    // opcode for `wrapping_add`/`saturating_add`. This arm used
+                    // to test `'+'`, so it was asking about integer addition,
+                    // which never has a `str` operand — it could not fire, and no
+                    // `str` builder binding was ever exclusive.
                     ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
                         iterating || rec(r)
                     }
