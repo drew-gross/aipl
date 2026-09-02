@@ -229,6 +229,7 @@ utilities:
 skills:
 
 lint:
+  declared mut but never mutated
   push-in-loop lint should fire even when the array being pushed into doesn't start empty (it should recommend let v = [init, ...pushed])
   move the tests for each lint into the file for that lint
   find_if with modification should be find_if().map() (once T? supports map)

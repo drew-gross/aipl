@@ -1,0 +1,67 @@
+import { concat as +++, print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+
+// `mut T { a, b } = value;` destructures like the `let` form
+// (`destructure.aipl`) but binds each field mutably, so the copies can be
+// reassigned afterwards. The value is copied out field by field, so writing to a
+// binding changes nothing about the struct it came from.
+struct Point { x: i64, y: i64 }
+
+struct Named { id: i64, label: str }
+
+struct Box<T> { v: T, tag: i64 }
+
+fn origin() -> Point { x: 1, y: 2 }
+
+fn boxed() -> Box<i64> { v: 7, tag: 3 }
+
+fn main() !prints {
+    mut Point { x, y } = origin();
+    set x = x + 10;
+    print(`{x} {y}`);
+
+    // The source is untouched: `p.x` still reads what it always did.
+    let p = Point { x: 100, y: 200 };
+    mut Point { x } = p;
+    set x++;
+    print(`{x} {p.x}`);
+
+    // A mutable `str` field is a `mut` binding like any other — including the
+    // in-place append path, which is why the allocation counts below are what
+    // they are rather than one per concat.
+    mut Named { label } = Named { id: 1, label: "start" };
+    set label = label +++ "-then-some-more-text";
+    print(label);
+
+    // Generic structs destructure mutably too.
+    mut Box { v, tag } = boxed();
+    set v = v + tag;
+    print(to_str(v));
+}
+--- stdout ---
+11 2
+101 100
+start-then-some-more-text
+10
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 531
+instructions executed: 326
+binary size: 2880
+  code: 1476
+  data: 1
+  metadata: 1403
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1272

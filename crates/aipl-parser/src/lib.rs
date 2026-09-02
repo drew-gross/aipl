@@ -329,6 +329,7 @@ gazelle! {
                 | let_tuple_stmt => let_tuple_stmt
                 | let_struct_stmt => let_struct_stmt
                 | mut_stmt => mut_stmt
+                | mut_struct_stmt => mut_struct_stmt
                 | assign_stmt => assign_stmt
                 | for_stmt => for_stmt
                 | for_tuple_stmt => for_tuple_stmt
@@ -348,6 +349,10 @@ gazelle! {
         // LET is the struct type name; after LET IDENT the LBRACE lookahead
         // unambiguously distinguishes this from the plain `let_stmt` (EQ).
         let_struct_stmt = LET IDENT LBRACE struct_field_bindings RBRACE EQ expr SEMI => let_struct_stmt;
+        // `mut Point { x, y } = expr;` — the same destructuring, binding each
+        // field mutably. Separated from `mut_stmt` by the same one token of
+        // lookahead the `let` forms use (LBRACE, against EQ and COLON).
+        mut_struct_stmt = MUT IDENT LBRACE struct_field_bindings RBRACE EQ expr SEMI => mut_struct_stmt;
         struct_field_bindings = struct_field_binding_list => present
                               | struct_field_binding_list COMMA => present_trailing;
         struct_field_binding_list = IDENT => first | struct_field_binding_list COMMA IDENT => rest;
@@ -742,6 +747,7 @@ impl aipl::Types for Build {
     type StructFieldBindings = Vec<String>;
     type StructFieldBindingList = Vec<String>;
     type MutStmt = StmtSpec;
+    type MutStructStmt = StmtSpec;
     type AssignStmt = StmtSpec;
     type FieldPath = Vec<(String, Span)>;
     type ForStmt = StmtSpec;
@@ -768,6 +774,15 @@ pub enum StmtSpec {
         span: Span,
     },
     LetStruct {
+        struct_name: String,
+        fields: Vec<String>,
+        value: Expr,
+        span: Span,
+    },
+    /// `mut T { a, b } = value;` — [`StmtSpec::LetStruct`] with mutable
+    /// bindings. The scrutinee's own binding stays immutable either way: only
+    /// the fields copied out of it are rebound, and nothing writes through it.
+    MutStruct {
         struct_name: String,
         fields: Vec<String>,
         value: Expr,
@@ -1745,43 +1760,14 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             struct_name,
             fields,
             value,
-            span: struct_span,
-        } => {
-            let tmp = format!(
-                "{}{}",
-                aipl_syntax::DESTRUCTURE_BASE_PREFIX,
-                struct_span.start
-            );
-            let mut result = acc;
-            for field_name in fields.iter().rev() {
-                let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), struct_span.clone());
-                let field = Expr::new(
-                    ExprKind::Field(Box::new(tmp_ident), field_name.clone()),
-                    struct_span.clone(),
-                );
-                let inner_span = join_spans(&struct_span, &result.span);
-                result = Expr::new(
-                    ExprKind::Let(field_name.clone(), None, Box::new(field), Box::new(result)),
-                    inner_span,
-                );
-            }
-            let outer_span = join_spans(&struct_span, &result.span);
-            // The scrutinee's binding carries the pattern's type, which is what
-            // makes the type name mean something: without it `let Q { x } = p`
-            // compiled fine for a `p: P`, and so did a name that was not a struct
-            // at all — the name was parsed and then dropped. The loader removes
-            // the annotation again if the name turns out to be generic
-            // (`DESTRUCTURE_BASE_PREFIX`).
-            Expr::new(
-                ExprKind::Let(
-                    tmp,
-                    Some(Type::Named(struct_name)),
-                    Box::new(value),
-                    Box::new(result),
-                ),
-                outer_span,
-            )
-        }
+            span,
+        } => destructure_struct(struct_name, &fields, value, span, acc, false),
+        StmtSpec::MutStruct {
+            struct_name,
+            fields,
+            value,
+            span,
+        } => destructure_struct(struct_name, &fields, value, span, acc, true),
         StmtSpec::Return {
             value,
             span: ret_span,
@@ -1793,6 +1779,61 @@ fn wrap_stmt(stmt: StmtSpec, acc: Expr) -> Expr {
             Expr::new(ExprKind::Seq(Box::new(ret_expr), Box::new(acc)), span)
         }
     }
+}
+
+/// `let T { a, b } = value; rest` and its `mut` twin, as nested bindings:
+///
+/// ```text
+/// let <tmp>: T = value;   let <tmp>: T = value;
+/// let a = <tmp>.a;   or   mut a = <tmp>.a;
+/// let b = <tmp>.b;        mut b = <tmp>.b;
+/// rest                    rest
+/// ```
+///
+/// `mutable` picks which the *fields* become. The scrutinee stays an immutable
+/// `let` either way: it is read once per field and never written through, so
+/// making it `mut` would only opt it into the mut-binding ownership model for
+/// nothing.
+///
+/// The scrutinee carries the pattern's type as its annotation, which is what
+/// makes the type name mean something rather than decorate the line — see
+/// [`aipl_syntax::DESTRUCTURE_BASE_PREFIX`], which is also how the checker knows
+/// to report a mismatch as the destructuring the user wrote. The loader drops
+/// that annotation again when `T` is generic.
+fn destructure_struct(
+    struct_name: String,
+    fields: &[String],
+    value: Expr,
+    span: Span,
+    acc: Expr,
+    mutable: bool,
+) -> Expr {
+    let tmp = format!("{}{}", aipl_syntax::DESTRUCTURE_BASE_PREFIX, span.start);
+    let mut result = acc;
+    for field_name in fields.iter().rev() {
+        let tmp_ident = Expr::new(ExprKind::Ident(tmp.clone()), span.clone());
+        let field = Expr::new(
+            ExprKind::Field(Box::new(tmp_ident), field_name.clone()),
+            span.clone(),
+        );
+        let inner_span = join_spans(&span, &result.span);
+        let bind = if mutable {
+            ExprKind::LetMut(field_name.clone(), None, Box::new(field), Box::new(result))
+        } else {
+            ExprKind::Let(field_name.clone(), None, Box::new(field), Box::new(result))
+        };
+        result = Expr::new(bind, inner_span);
+    }
+    let outer_span = join_spans(&span, &result.span);
+    Expr::new(
+        ExprKind::Let(
+            tmp,
+            Some(Type::Named(struct_name)),
+            Box::new(value),
+            Box::new(result),
+        ),
+        outer_span,
+    )
 }
 
 /// A block, with the span of the expression that produces its value recorded on
@@ -1936,6 +1977,7 @@ impl gazelle::Action<aipl::KwStmt<Self>> for Build {
             aipl::KwStmt::LetTupleStmt(s) => s,
             aipl::KwStmt::LetStructStmt(s) => s,
             aipl::KwStmt::MutStmt(s) => s,
+            aipl::KwStmt::MutStructStmt(s) => s,
             aipl::KwStmt::AssignStmt(s) => s,
             aipl::KwStmt::ForStmt(s) => s,
             aipl::KwStmt::ForTupleStmt(s) => s,
@@ -1983,6 +2025,19 @@ impl gazelle::Action<aipl::LetStructStmt<Self>> for Build {
         let aipl::LetStructStmt::LetStructStmt((struct_name, _), _, fields, value) = node;
         let span = value.span.clone();
         Ok(StmtSpec::LetStruct {
+            struct_name,
+            fields,
+            value,
+            span,
+        })
+    }
+}
+
+impl gazelle::Action<aipl::MutStructStmt<Self>> for Build {
+    fn build(&mut self, node: aipl::MutStructStmt<Self>) -> Result<StmtSpec, Self::Error> {
+        let aipl::MutStructStmt::MutStructStmt((struct_name, _), _, fields, value) = node;
+        let span = value.span.clone();
+        Ok(StmtSpec::MutStruct {
             struct_name,
             fields,
             value,

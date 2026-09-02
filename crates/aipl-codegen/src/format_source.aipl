@@ -75,10 +75,10 @@ deallocations: 1953
 reallocations: 30
 bytes allocated: 110170
 instructions executed: 348841
-binary size: 923896
-  code: 595388
+binary size: 923392
+  code: 595224
   data: 1891
-  metadata: 326617
+  metadata: 326277
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -400,7 +400,7 @@ functions:
     bytes: 1884
   __m6__let_stmt:
     calls: 0
-    bytes: 21416
+    bytes: 13992
   __m6__match_arms:
     calls: 0
     bytes: 8428
@@ -412,7 +412,7 @@ functions:
     bytes: 200
   __m6__mut_stmt:
     calls: 0
-    bytes: 6064
+    bytes: 7092
   __m6__name_atom:
     calls: 0
     bytes: 5724
@@ -509,6 +509,9 @@ functions:
   __m6__struct_item:
     calls: 0
     bytes: 6620
+  __m6__struct_pattern:
+    calls: 0
+    bytes: 6232
   __m6__take_comment:
     calls: 0
     bytes: 252

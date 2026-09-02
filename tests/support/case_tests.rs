@@ -505,6 +505,7 @@ case_tests! {
     cases_structs_defaults = "cases/structs/defaults",
     cases_structs_destructure = "cases/structs/destructure",
     cases_structs_destructure_imported = "cases/structs/destructure_imported",
+    cases_structs_destructure_mut = "cases/structs/destructure_mut",
     cases_structs_err_destructure_wrong_struct = "cases/structs/err_destructure_wrong_struct",
     cases_structs_err_duplicate_struct = "cases/structs/err_duplicate_struct",
     cases_structs_err_field_missing_type = "cases/structs/err_field_missing_type",

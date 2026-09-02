@@ -1342,17 +1342,7 @@ fn let_stmt(self: W) -> WDoc!FmtError {
     };
     let n = kw.bump();
     if (n.w.peek_text() == "{") {
-        let ids = n.w.bump().w.ident_list("}", []);
-        let v = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
-        let done = v.w.expect(";")?.w;
-        return ok(WDoc {
-            w: done,
-            doc: Concat([
-                Text(`let {n.text} \{ {ids.names.join(sep=", ")} } = `),
-                v.doc,
-                Text(";"),
-            ]),
-        });
+        return n.w.struct_pattern("let", n.text);
     };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
@@ -1360,13 +1350,42 @@ fn let_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: done, doc: Concat([Text(`let {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
 
+// `mut x = e;`, `mut x: T = e;`, or `mut Name { a, b } = e;`.
 fn mut_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
+    if (n.w.peek_text() == "{") {
+        return n.w.struct_pattern("mut", n.text);
+    };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
     ok(WDoc { w: done, doc: Concat([Text(`mut {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
+
+// The tail of a struct-destructuring statement, entered on the `{`: `kw` is the
+// leading keyword and `name` the struct the pattern names. `let` and `mut`
+// differ only in that keyword, so they share this rather than spelling the same
+// walk twice.
+fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
+    let ids = self.bump().w.ident_list("}", []);
+    let v = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
+    let done = v.w.expect(";")?.w;
+    ok(WDoc {
+        w: done,
+        doc: Concat([Text(`{kw} {name} \{ {ids.names.join(sep=", ")} } = `), v.doc, Text(";")]),
+    })
+}.test({
+    assert(
+        walker_of("{ a , b } = p ;")
+            .struct_pattern("let", "S")
+            .rendered(100)? == "let S { a, b } = p;",
+    );
+    assert(
+        walker_of("{ x } = q ;")
+            .struct_pattern("mut", "Point")
+            .rendered(100)? == "mut Point { x } = q;",
+    );
+})
 
 // The optional `: T` on a `let`/`mut` binding, rendered as `": T"` (empty when
 // absent). Positioned after the name and before the `=`, so both callers can
@@ -2460,6 +2479,11 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .block()
             .rendered(100)? == "{\n    let S { a, b } = p;\n}",
     );
+    assert(
+        walker_of("{ mut S { a , b } = p ; }")
+            .block()
+            .rendered(100)? == "{\n    mut S { a, b } = p;\n}",
+    );
     // Loops.
     assert(
         walker_of("{ while ( c ) { f ( ) ; } }")
@@ -2706,15 +2730,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 18751
-deallocations: 18751
-reallocations: 1140
-bytes allocated: 1130975
-instructions executed: 3024877
-binary size: 3619312
-  code: 2236980
-  data: 23044
-  metadata: 1359288
+allocations: 18914
+deallocations: 18914
+reallocations: 1158
+bytes allocated: 1141177
+instructions executed: 3057224
+binary size: 3668112
+  code: 2267432
+  data: 23596
+  metadata: 1377084
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2729,7 +2753,7 @@ functions:
     calls: 17
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1301
+    calls: 1312
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2753,7 +2777,7 @@ functions:
     calls: 24
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1380
+    calls: 1386
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2771,10 +2795,10 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam32$tail:
-    calls: 491
+    calls: 493
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 41
+    calls: 42
     bytes: 252
   __builtin_count_while$char$lam75:
     calls: 69
@@ -2804,7 +2828,7 @@ functions:
     calls: 142
     bytes: 408
   __eq_FmtKind:
-    calls: 857
+    calls: 881
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -2864,7 +2888,7 @@ functions:
     calls: 0
     bytes: 332
   __m1__col_after:
-    calls: 838
+    calls: 849
     bytes: 544
   __m1__fits:
     calls: 0
@@ -2882,10 +2906,10 @@ functions:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1297
+    calls: 1302
     bytes: 688
   __m1__print_doc:
-    calls: 128
+    calls: 131
     bytes: 4836
   __m2__reindent_block:
     calls: 0
@@ -2942,10 +2966,10 @@ functions:
     calls: 94
     bytes: 468
   __rec_drop___m1__Doc:
-    calls: 2551
+    calls: 2580
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 3622
+    calls: 3653
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -2953,9 +2977,12 @@ functions:
   __test$new_walker:
     calls: 1
     bytes: 12140
+  __test$struct_pattern:
+    calls: 1
+    bytes: 1708
   __test$walker_of:
     calls: 1
-    bytes: 1627312
+    bytes: 1656144
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -2963,55 +2990,55 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 475
+    calls: 476
     bytes: (external)
   aipl_arr_inc:
-    calls: 49842
+    calls: 50540
     bytes: (external)
   aipl_arr_reserve:
-    calls: 538
+    calls: 539
     bytes: (external)
   aipl_arr_slice:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 61845
+    calls: 62615
     bytes: (external)
   aipl_array_new:
-    calls: 10188
+    calls: 10236
     bytes: (external)
   aipl_array_push:
-    calls: 1463
+    calls: 1484
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1677
+    calls: 1708
     bytes: (external)
   aipl_array_with_cap:
-    calls: 192
+    calls: 195
     bytes: (external)
   aipl_assert:
-    calls: 172
+    calls: 175
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6173
+    calls: 6233
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 42240
+    calls: 42600
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 3710
+    calls: 3740
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 36067
+    calls: 36367
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 3710
+    calls: 3740
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -3023,7 +3050,7 @@ functions:
     calls: 7
     bytes: 76
   atom:
-    calls: 108
+    calls: 111
     bytes: 3556
   base_ty:
     calls: 66
@@ -3032,22 +3059,22 @@ functions:
     calls: 7
     bytes: 2272
   binop_expr:
-    calls: 104
+    calls: 107
     bytes: 3204
   binop_tail:
-    calls: 104
+    calls: 107
     bytes: 4324
   block:
-    calls: 41
+    calls: 42
     bytes: 1136
   block_entries:
-    calls: 46
+    calls: 47
     bytes: 3948
   block_layout:
-    calls: 46
+    calls: 47
     bytes: 5632
   bump:
-    calls: 928
+    calls: 954
     bytes: 1088
   call_arg:
     calls: 11
@@ -3062,7 +3089,7 @@ functions:
     calls: 88
     bytes: 4076
   comment_starts_before:
-    calls: 276
+    calls: 281
     bytes: 280
   construct_body:
     calls: 0
@@ -3086,10 +3113,10 @@ functions:
     calls: 5
     bytes: 752
   expect:
-    calls: 397
+    calls: 408
     bytes: 1228
   expr:
-    calls: 102
+    calls: 105
     bytes: 760
   fn_attrs:
     calls: 22
@@ -3116,7 +3143,7 @@ functions:
     calls: 18
     bytes: 1308
   ident_list:
-    calls: 4
+    calls: 7
     bytes: 1704
   if_expr:
     calls: 3
@@ -3143,14 +3170,14 @@ functions:
     calls: 3
     bytes: 3416
   lead:
-    calls: 270
+    calls: 275
     bytes: 1884
   let_stmt:
     calls: 3
-    bytes: 21416
+    bytes: 13992
   main:
     calls: 1
-    bytes: 248
+    bytes: 324
   match_arms:
     calls: 2
     bytes: 8428
@@ -3161,16 +3188,16 @@ functions:
     calls: 174
     bytes: 200
   mut_stmt:
-    calls: 1
-    bytes: 6064
+    calls: 2
+    bytes: 7092
   name_atom:
-    calls: 92
+    calls: 95
     bytes: 5724
   named_ty:
     calls: 62
     bytes: 4108
   next_start:
-    calls: 41
+    calls: 42
     bytes: 532
   params_until:
     calls: 22
@@ -3188,13 +3215,13 @@ functions:
     calls: 3
     bytes: 3252
   peek_is:
-    calls: 857
+    calls: 881
     bytes: 288
   postfix:
-    calls: 108
+    calls: 111
     bytes: 5552
   postfix_segs:
-    calls: 108
+    calls: 111
     bytes: 3572
   program:
     calls: 12
@@ -3203,16 +3230,16 @@ functions:
     calls: 12
     bytes: 4684
   range_has_semi:
-    calls: 31
+    calls: 32
     bytes: 228
   range_tail:
-    calls: 102
+    calls: 105
     bytes: 2356
   rendered:
-    calls: 106
+    calls: 109
     bytes: 572
   sep_entry:
-    calls: 33
+    calls: 34
     bytes: 328
   set_member:
     calls: 2
@@ -3242,7 +3269,7 @@ functions:
     calls: 2
     bytes: 1904
   statement:
-    calls: 33
+    calls: 34
     bytes: 5860
   str_atom:
     calls: 2
@@ -3262,6 +3289,9 @@ functions:
   struct_item:
     calls: 5
     bytes: 6620
+  struct_pattern:
+    calls: 4
+    bytes: 6232
   take_comment:
     calls: 8
     bytes: 252
@@ -3269,10 +3299,10 @@ functions:
     calls: 0
     bytes: 2492
   tok_text:
-    calls: 2993
+    calls: 3059
     bytes: 456
   trailing_comment:
-    calls: 73
+    calls: 74
     bytes: 2168
   trim_last_break:
     calls: 0
@@ -3293,7 +3323,7 @@ functions:
     calls: 41
     bytes: 5784
   unary:
-    calls: 110
+    calls: 113
     bytes: 1876
   variant_cases:
     calls: 10
@@ -3305,7 +3335,7 @@ functions:
     calls: 3
     bytes: 2456
   walker_of:
-    calls: 120
+    calls: 123
     bytes: 740
   while_stmt:
     calls: 1
