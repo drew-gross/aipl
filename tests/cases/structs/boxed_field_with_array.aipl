@@ -129,15 +129,15 @@ Climb(Term(1), [Prec { power: 1, right: false }])
 Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }
 Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3, next: none, kids: [] }] }
 --- performance ---
-allocations: 83
-deallocations: 83
+allocations: 143
+deallocations: 143
 reallocations: 0
-bytes allocated: 3678
-instructions executed: 11710
-binary size: 18264
-  code: 9088
-  data: 1230
-  metadata: 7946
+bytes allocated: 4769
+instructions executed: 10823
+binary size: 18592
+  code: 9316
+  data: 1229
+  metadata: 8047
 functions:
   __arr_drop_List:
     calls: 1
@@ -162,19 +162,19 @@ functions:
     bytes: 84
   __to_str_Both:
     calls: 2
-    bytes: 1024
+    bytes: 1076
   __to_str_List:
     calls: 106
-    bytes: 664
+    bytes: 708
   __to_str_Mixed:
     calls: 1
-    bytes: 1108
+    bytes: 1168
   __to_str_Node:
     calls: 5
-    bytes: 1408
+    bytes: 1468
   __to_str_Rule:
     calls: 3
-    bytes: 1600
+    bytes: 1652
   aipl_arr_inc:
     calls: 14
     bytes: (external)
@@ -184,17 +184,8 @@ functions:
   aipl_array_new:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 122
-    bytes: (external)
   aipl_i64_len:
     calls: 118
-    bytes: (external)
-  aipl_inc:
-    calls: 5
-    bytes: (external)
-  aipl_print:
-    calls: 5
     bytes: (external)
   aipl_rec_alloc:
     calls: 19
@@ -211,15 +202,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 11
     bytes: (external)
-  aipl_str_alloc:
-    calls: 57
-    bytes: (external)
-  aipl_str_data:
-    calls: 56
-    bytes: (external)
-  aipl_str_len:
-    calls: 112
-    bytes: (external)
   aipl_u64_len:
     calls: 2
     bytes: (external)
@@ -234,7 +216,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2496
+    bytes: 2456
   sum:
     calls: 9
     bytes: 104

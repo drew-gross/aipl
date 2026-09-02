@@ -71,40 +71,22 @@ Term(Dot)
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 225
-instructions executed: 1022
-binary size: 8192
-  code: 3888
-  data: 636
-  metadata: 3668
+bytes allocated: 217
+instructions executed: 1060
+binary size: 8928
+  code: 4492
+  data: 635
+  metadata: 3801
 functions:
   __to_str_Rule$Tok:
     calls: 4
-    bytes: 1312
+    bytes: 1352
   __to_str_Rule$Tok2:
     calls: 4
-    bytes: 1236
-  aipl_dec:
-    calls: 22
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 8
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 8
-    bytes: (external)
-  aipl_str_data:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 12
-    bytes: (external)
+    bytes: 1292
   aipl_write_bytes:
     calls: 32
     bytes: (external)
   main:
     calls: 1
-    bytes: 1340
+    bytes: 1848

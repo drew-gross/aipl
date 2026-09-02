@@ -19,12 +19,12 @@ fn eq_arrays(a: i64[], b: i64[]) -> bool { a == b }.test({
 allocations: 26
 deallocations: 26
 reallocations: 0
-bytes allocated: 1224
-instructions executed: 1763
-binary size: 6328
-  code: 3064
-  data: 489
-  metadata: 2775
+bytes allocated: 1352
+instructions executed: 1955
+binary size: 7112
+  code: 3916
+  data: 407
+  metadata: 2789
 functions:
   __eq_i64$arr:
     calls: 8
@@ -37,14 +37,11 @@ functions:
     bytes: 32
   __eq_str$arr:
     calls: 2
-    bytes: 308
+    bytes: 364
   __test$eq_arrays:
     calls: 1
-    bytes: 2056
+    bytes: 2816
   aipl_arr_drop_arr:
-    calls: 4
-    bytes: (external)
-  aipl_arr_drop_str:
     calls: 4
     bytes: (external)
   aipl_array_dec:
@@ -55,15 +52,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 9
-    bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_str_eq:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -76,4 +64,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

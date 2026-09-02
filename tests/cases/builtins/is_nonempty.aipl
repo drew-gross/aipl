@@ -45,39 +45,36 @@ fn dicts(d: #{str: i64}) -> bool { d.is_nonempty() }.test({
 allocations: 14
 deallocations: 14
 reallocations: 0
-bytes allocated: 552
-instructions executed: 363
-binary size: 6200
-  code: 2276
-  data: 764
-  metadata: 3160
+bytes allocated: 584
+instructions executed: 504
+binary size: 6136
+  code: 3204
+  data: 345
+  metadata: 2587
 functions:
   __dict_drop_str$i64:
     calls: 1
-    bytes: 128
+    bytes: 132
   __dict_retain_str$i64:
     calls: 1
-    bytes: 128
+    bytes: 132
   __test$arrays:
     calls: 1
-    bytes: 452
+    bytes: 604
   __test$dicts:
     calls: 1
-    bytes: 304
+    bytes: 408
   __test$nested:
     calls: 1
-    bytes: 448
+    bytes: 636
   __test$sets:
     calls: 1
-    bytes: 328
+    bytes: 420
   __test$strings:
     calls: 1
-    bytes: 244
+    bytes: 512
   aipl_arr_drop_arr:
     calls: 2
-    bytes: (external)
-  aipl_arr_drop_str:
-    calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 14
@@ -94,13 +91,7 @@ functions:
   aipl_assert:
     calls: 15
     bytes: (external)
-  aipl_dec:
-    calls: 2
-    bytes: (external)
   aipl_dict_insert:
-    calls: 1
-    bytes: (external)
-  aipl_inc:
     calls: 1
     bytes: (external)
   aipl_set_contains:
@@ -108,9 +99,6 @@ functions:
     bytes: (external)
   aipl_set_insert:
     calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 5
@@ -123,4 +111,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 244
+    bytes: 360

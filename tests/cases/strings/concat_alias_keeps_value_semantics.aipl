@@ -28,36 +28,21 @@ fn snapshot() -> str {
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 240
-instructions executed: 114
-binary size: 2408
-  code: 820
-  data: 128
-  metadata: 1460
+bytes allocated: 528
+instructions executed: 282
+binary size: 2768
+  code: 1372
+  data: 94
+  metadata: 1302
 functions:
   __test$grown:
     calls: 1
-    bytes: 356
+    bytes: 608
   __test$snapshot:
     calls: 1
-    bytes: 352
+    bytes: 592
   aipl_assert:
     calls: 2
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 20
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 16
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -70,4 +55,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 172

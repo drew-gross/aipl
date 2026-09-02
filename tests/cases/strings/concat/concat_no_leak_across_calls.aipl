@@ -9,30 +9,18 @@ fn build(n: i64) -> str { "x" +++ "y" }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
-instructions executed: 22
-binary size: 1152
-  code: 184
-  data: 44
-  metadata: 924
+bytes allocated: 88
+instructions executed: 52
+binary size: 1256
+  code: 320
+  data: 42
+  metadata: 894
 functions:
   __test$build:
     calls: 1
-    bytes: 112
+    bytes: 216
   aipl_assert:
     calls: 1
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -45,4 +33,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

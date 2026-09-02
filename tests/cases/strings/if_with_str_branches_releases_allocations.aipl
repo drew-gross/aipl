@@ -7,33 +7,21 @@ fn pick(c: bool) -> str { if (c) { "left" +++ "" } else { "right" +++ "" } }.tes
     assert(pick(false) == "right");
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 80
-instructions executed: 33
-binary size: 1440
-  code: 292
-  data: 98
-  metadata: 1050
+bytes allocated: 0
+instructions executed: 87
+binary size: 1624
+  code: 520
+  data: 96
+  metadata: 1008
 functions:
   __test$pick:
     calls: 1
-    bytes: 220
+    bytes: 420
   aipl_assert:
     calls: 2
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -46,4 +34,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

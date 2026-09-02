@@ -637,58 +637,58 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4666
-deallocations: 4666
-reallocations: 31
-bytes allocated: 270208
-instructions executed: 733329
-binary size: 211008
-  code: 136656
-  data: 7101
-  metadata: 67251
+allocations: 3664
+deallocations: 3664
+reallocations: 33
+bytes allocated: 323989
+instructions executed: 841639
+binary size: 246248
+  code: 170616
+  data: 6364
+  metadata: 69268
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
     calls: 116
-    bytes: 364
+    bytes: 340
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 20
-    bytes: 800
+    bytes: 716
   __arr_retain___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
     calls: 63
-    bytes: 364
+    bytes: 340
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 800
+    bytes: 716
   __builtin_all$char$s0$lam38:
     calls: 4
-    bytes: 272
+    bytes: 212
   __builtin_count_while$char$lam27:
     calls: 49
-    bytes: 260
+    bytes: 220
   __builtin_count_while$char$s0$lam16:
     calls: 0
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam32:
     calls: 2
-    bytes: 236
+    bytes: 176
   __builtin_count_while$char$s0$lam34:
     calls: 28
-    bytes: 244
+    bytes: 184
   __builtin_count_while$char$s0$lam35:
     calls: 4
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam37:
     calls: 2
-    bytes: 232
+    bytes: 172
   __builtin_int_parse:
     calls: 4
-    bytes: 1032
+    bytes: 1028
   __eq_AiplTok:
     calls: 51
     bytes: 556
@@ -718,25 +718,25 @@ functions:
     bytes: 100
   __lambda_0:
     calls: 0
-    bytes: 100
+    bytes: 136
   __lambda_1:
     calls: 16
-    bytes: 68
+    bytes: 104
   __lambda_12:
     calls: 5
     bytes: 140
   __lambda_2:
     calls: 0
-    bytes: 108
+    bytes: 144
   __lambda_3:
     calls: 1
-    bytes: 136
+    bytes: 172
   __lambda_4:
     calls: 0
-    bytes: 108
+    bytes: 144
   __lambda_5:
     calls: 1
-    bytes: 136
+    bytes: 172
   __lambda_6:
     calls: 0
     bytes: 48
@@ -745,87 +745,81 @@ functions:
     bytes: 64
   __m10__parse_test_section_header:
     calls: 3
-    bytes: 628
+    bytes: 744
   __m1__between_len:
     calls: 24
-    bytes: 636
+    bytes: 724
   __m1__delimited_len:
     calls: 45
-    bytes: 1348
+    bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 7336
+    bytes: 7832
   __m1__float_len:
     calls: 0
-    bytes: 796
+    bytes: 824
   __m1__interp_scan$AiplTok:
     calls: 1
-    bytes: 1996
+    bytes: 2284
   __m1__lex$AiplTok:
     calls: 20
-    bytes: 1372
+    bytes: 1516
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 22496
+    bytes: 22556
   __m1__nested_len:
     calls: 56
-    bytes: 820
+    bytes: 940
   __m1__step_result$AiplTok:
     calls: 1712
-    bytes: 12096
+    bytes: 12568
   __m1__template_scan$AiplTok:
     calls: 3
-    bytes: 2512
+    bytes: 2740
   __m1__template_step$AiplTok:
     calls: 35
-    bytes: 452
+    bytes: 468
   __m2__unescape:
     calls: 8
-    bytes: 828
+    bytes: 1108
   __m3__process_raw_string:
     calls: 2
-    bytes: 1532
+    bytes: 1684
   __m7__trim_prefix:
     calls: 4
-    bytes: 196
+    bytes: 260
   __m8__trim_suffix:
     calls: 0
-    bytes: 264
+    bytes: 332
   __m9__strip_test_sections:
     calls: 2
-    bytes: 672
+    bytes: 692
   __test$lex_aipl:
     calls: 1
-    bytes: 15388
+    bytes: 19784
   __test$lex_aipl_stripped:
     calls: 1
-    bytes: 1592
+    bytes: 2044
   __test$lex_aipl_tokens:
     calls: 1
-    bytes: 1096
+    bytes: 1560
   __test_try_fail___m1__LexError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str___m1__LexError:
     calls: 0
-    bytes: 812
-  aipl_arr_drop_str:
-    calls: 9
-    bytes: (external)
+    bytes: 824
   aipl_arr_extend:
     calls: 180
     bytes: (external)
   aipl_arr_inc:
-    calls: 7674
+    calls: 7671
     bytes: (external)
   aipl_arr_reserve:
     calls: 180
     bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 7
-    bytes: (external)
   aipl_array_dec:
-    calls: 11333
+    calls: 11330
     bytes: (external)
   aipl_array_new:
     calls: 3599
@@ -842,54 +836,6 @@ functions:
   aipl_assert:
     calls: 20
     bytes: (external)
-  aipl_char_at:
-    calls: 1334
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 12
-    bytes: (external)
-  aipl_dec:
-    calls: 17648
-    bytes: (external)
-  aipl_inc:
-    calls: 12546
-    bytes: (external)
-  aipl_str_contains:
-    calls: 1016
-    bytes: (external)
-  aipl_str_data:
-    calls: 94
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 30
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 96
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 94
-    bytes: (external)
-  aipl_str_join:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 8051
-    bytes: (external)
-  aipl_str_slice:
-    calls: 1884
-    bytes: (external)
-  aipl_str_split:
-    calls: 3
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 1512
-    bytes: (external)
-  aipl_str_starts_with_at:
-    calls: 98
-    bytes: (external)
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -899,30 +845,27 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 2
-    bytes: (external)
   char_lit_emit:
     calls: 4
-    bytes: 1384
+    bytes: 1536
   dedent_segments:
     calls: 1
-    bytes: 188
+    bytes: 216
   int_lit:
     calls: 4
-    bytes: 1132
+    bytes: 1224
   lex_aipl:
     calls: 20
-    bytes: 46452
+    bytes: 71988
   lex_aipl_tokens:
     calls: 2
-    bytes: 384
+    bytes: 424
   main:
     calls: 1
-    bytes: 152
+    bytes: 272
   raw_tpl_kind:
     calls: 1
-    bytes: 2088
+    bytes: 2168
   tpl_kind:
     calls: 3
-    bytes: 2112
+    bytes: 2200

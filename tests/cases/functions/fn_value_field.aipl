@@ -44,36 +44,21 @@ fn heap_field() -> str {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
-instructions executed: 146
-binary size: 2744
-  code: 724
-  data: 338
-  metadata: 1682
+bytes allocated: 88
+instructions executed: 205
+binary size: 2824
+  code: 1012
+  data: 272
+  metadata: 1540
 functions:
   __test$heap_field:
     calls: 1
-    bytes: 140
+    bytes: 240
   __test$scalar_field:
     calls: 1
-    bytes: 364
+    bytes: 444
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -86,7 +71,7 @@ functions:
     bytes: (external)
   bang:
     calls: 1
-    bytes: 92
+    bytes: 132
   dbl:
     calls: 2
     bytes: 8
@@ -95,4 +80,4 @@ functions:
     bytes: 8
   main:
     calls: 1
-    bytes: 112
+    bytes: 180

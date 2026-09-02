@@ -1207,49 +1207,49 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1657
-deallocations: 1657
+allocations: 1399
+deallocations: 1399
 reallocations: 38
-bytes allocated: 75704
-instructions executed: 263004
-binary size: 1592632
-  code: 996904
-  data: 8101
-  metadata: 587627
+bytes allocated: 81424
+instructions executed: 275047
+binary size: 1796064
+  code: 1199088
+  data: 7268
+  metadata: 589708
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
     calls: 287
-    bytes: 492
+    bytes: 452
   __arr_drop_TokenRule$Kind:
     calls: 21
-    bytes: 928
+    bytes: 824
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
     calls: 151
-    bytes: 492
+    bytes: 452
   __arr_retain_TokenRule$Kind:
     calls: 0
-    bytes: 928
+    bytes: 824
   __builtin_count_while$char$lam27:
     calls: 60
-    bytes: 260
+    bytes: 220
   __builtin_count_while$char$s0$lam32:
     calls: 5
-    bytes: 236
+    bytes: 176
   __builtin_count_while$char$s0$lam34:
     calls: 49
-    bytes: 244
+    bytes: 184
   __builtin_count_while$char$s0$lam49:
     calls: 13
-    bytes: 232
+    bytes: 172
   __builtin_int_parse:
     calls: 13
-    bytes: 1032
+    bytes: 1028
   __eq_Kind:
     calls: 98
     bytes: 632
@@ -1273,10 +1273,10 @@ functions:
     bytes: 100
   __lambda_0:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_1:
     calls: 28
-    bytes: 60
+    bytes: 96
   __lambda_10:
     calls: 0
     bytes: 48
@@ -1303,58 +1303,55 @@ functions:
     bytes: 64
   __lambda_18:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_19:
     calls: 2
-    bytes: 60
+    bytes: 96
   __lambda_2:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_20:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_21:
     calls: 1
-    bytes: 60
+    bytes: 96
   __lambda_3:
     calls: 2
-    bytes: 60
+    bytes: 96
   __lambda_37:
     calls: 67
     bytes: 140
   __lambda_4:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_5:
     calls: 1
-    bytes: 60
+    bytes: 96
   __lambda_6:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_7:
     calls: 1
-    bytes: 60
+    bytes: 96
   __lambda_8:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_9:
     calls: 1
-    bytes: 60
+    bytes: 96
   __m1__unescape:
     calls: 21
-    bytes: 828
+    bytes: 1108
   __test$lex:
     calls: 1
-    bytes: 916088
+    bytes: 1115608
   __test_try_fail_LexError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_LexError:
     calls: 0
-    bytes: 812
-  aipl_arr_drop_str:
-    calls: 22
-    bytes: (external)
+    bytes: 824
   aipl_arr_extend:
     calls: 292
     bytes: (external)
@@ -1363,9 +1360,6 @@ functions:
     bytes: (external)
   aipl_arr_reserve:
     calls: 292
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 30
     bytes: (external)
   aipl_array_dec:
     calls: 4610
@@ -1379,45 +1373,6 @@ functions:
   aipl_assert:
     calls: 59
     bytes: (external)
-  aipl_char_at:
-    calls: 481
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 29
-    bytes: (external)
-  aipl_dec:
-    calls: 4984
-    bytes: (external)
-  aipl_inc:
-    calls: 4028
-    bytes: (external)
-  aipl_str_contains:
-    calls: 325
-    bytes: (external)
-  aipl_str_data:
-    calls: 131
-    bytes: (external)
-  aipl_str_eq:
-    calls: 111
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 140
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 131
-    bytes: (external)
-  aipl_str_len:
-    calls: 2475
-    bytes: (external)
-  aipl_str_slice:
-    calls: 702
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 165
-    bytes: (external)
-  aipl_str_starts_with_at:
-    calls: 140
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -1429,58 +1384,58 @@ functions:
     bytes: (external)
   between_len:
     calls: 3
-    bytes: 636
+    bytes: 724
   checked_seg:
     calls: 2
-    bytes: 1676
+    bytes: 1780
   delimited_len:
     calls: 26
-    bytes: 1348
+    bytes: 1592
   esc_str:
     calls: 2
-    bytes: 112
+    bytes: 148
   finalize_template$Kind:
     calls: 13
-    bytes: 9328
+    bytes: 9840
   float_len:
     calls: 14
-    bytes: 796
+    bytes: 824
   int_tok:
     calls: 13
-    bytes: 1644
+    bytes: 1724
   interp_scan$Kind:
     calls: 9
-    bytes: 1996
+    bytes: 2284
   lex$Kind:
     calls: 59
-    bytes: 1372
+    bytes: 1516
   lex_step$Kind:
     calls: 140
-    bytes: 24940
+    bytes: 24684
   main:
     calls: 1
-    bytes: 68
+    bytes: 100
   nested_len:
     calls: 3
-    bytes: 820
+    bytes: 940
   nonempty_str:
     calls: 2
-    bytes: 1684
+    bytes: 1824
   rawtpl_kind:
     calls: 3
-    bytes: 2944
+    bytes: 3040
   step_result$Kind:
     calls: 405
-    bytes: 15412
+    bytes: 15780
   template_scan$Kind:
     calls: 16
-    bytes: 2512
+    bytes: 2740
   template_step$Kind:
     calls: 27
-    bytes: 452
+    bytes: 468
   toks:
     calls: 43
     bytes: 128
   tpl_kind:
     calls: 17
-    bytes: 2980
+    bytes: 3072

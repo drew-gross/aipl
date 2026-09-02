@@ -36,19 +36,19 @@ fn pair_up(xs: i64[], f: (i64, i64) -> Shape) -> Shape[] {
 allocations: 19
 deallocations: 19
 reallocations: 10
-bytes allocated: 936
-instructions executed: 1866
-binary size: 8016
-  code: 4436
-  data: 412
-  metadata: 3168
+bytes allocated: 1032
+instructions executed: 2006
+binary size: 8664
+  code: 5052
+  data: 410
+  metadata: 3202
 functions:
   __arr_drop_Shape:
     calls: 12
-    bytes: 136
+    bytes: 140
   __arr_retain_Shape:
     calls: 10
-    bytes: 136
+    bytes: 140
   __eq_Shape:
     calls: 9
     bytes: 220
@@ -57,16 +57,13 @@ functions:
     bytes: 284
   __test$circles:
     calls: 1
-    bytes: 1728
+    bytes: 1852
   __test$labels:
     calls: 1
-    bytes: 660
+    bytes: 996
   __test$pair_up:
     calls: 1
-    bytes: 1108
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 1180
   aipl_array_dec:
     calls: 19
     bytes: (external)
@@ -82,15 +79,6 @@ functions:
   aipl_assert:
     calls: 6
     bytes: (external)
-  aipl_dec:
-    calls: 10
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -102,4 +90,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 164
+    bytes: 240

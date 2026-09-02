@@ -15,36 +15,21 @@ fn build() -> str {
     assert(build() == "abcd");
 })
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 160
-instructions executed: 66
-binary size: 1672
-  code: 496
-  data: 46
-  metadata: 1130
+bytes allocated: 264
+instructions executed: 164
+binary size: 1888
+  code: 800
+  data: 44
+  metadata: 1044
 functions:
   __test$build:
     calls: 1
-    bytes: 424
+    bytes: 696
   aipl_assert:
     calls: 1
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 13
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 10
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -57,4 +42,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

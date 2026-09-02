@@ -40,36 +40,21 @@ fn heap_values() -> str {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 80
-instructions executed: 112
-binary size: 2792
-  code: 752
-  data: 294
-  metadata: 1746
+bytes allocated: 176
+instructions executed: 188
+binary size: 2784
+  code: 1176
+  data: 140
+  metadata: 1468
 functions:
   __test$heap_values:
     calls: 1
-    bytes: 228
+    bytes: 416
   __test$scalar_values:
     calls: 1
-    bytes: 200
+    bytes: 316
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -88,10 +73,10 @@ functions:
     bytes: 8
   main:
     calls: 1
-    bytes: 112
+    bytes: 188
   shout:
     calls: 1
-    bytes: 92
+    bytes: 132
   twice:
     calls: 1
-    bytes: 104
+    bytes: 108

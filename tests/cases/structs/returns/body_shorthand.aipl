@@ -72,39 +72,21 @@ Vec2 { x: 4, y: 4 }
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 208
-instructions executed: 704
-binary size: 4520
-  code: 1768
-  data: 365
-  metadata: 2387
+bytes allocated: 203
+instructions executed: 692
+binary size: 4632
+  code: 1848
+  data: 364
+  metadata: 2420
 functions:
   __to_str_Named:
     calls: 1
-    bytes: 812
+    bytes: 824
   __to_str_Vec2:
     calls: 4
-    bytes: 464
-  aipl_dec:
-    calls: 12
-    bytes: (external)
+    bytes: 484
   aipl_i64_len:
     calls: 20
-    bytes: (external)
-  aipl_inc:
-    calls: 5
-    bytes: (external)
-  aipl_print:
-    calls: 6
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 5
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_write_bytes:
     calls: 31
@@ -114,4 +96,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 492
+    bytes: 540

@@ -40,12 +40,12 @@ fn heap_lambda() -> str {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 152
-instructions executed: 517
-binary size: 3816
-  code: 1504
-  data: 291
-  metadata: 2021
+bytes allocated: 200
+instructions executed: 578
+binary size: 3984
+  code: 1796
+  data: 257
+  metadata: 1931
 functions:
   __eq_i64$arr:
     calls: 1
@@ -58,7 +58,7 @@ functions:
     bytes: 60
   __lambda_10:
     calls: 1
-    bytes: 92
+    bytes: 132
   __lambda_2:
     calls: 1
     bytes: 8
@@ -73,10 +73,10 @@ functions:
     bytes: 252
   __test$heap_lambda:
     calls: 1
-    bytes: 112
+    bytes: 220
   __test$probe:
     calls: 1
-    bytes: 496
+    bytes: 576
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -89,21 +89,6 @@ functions:
   aipl_assert:
     calls: 5
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -115,4 +100,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 176

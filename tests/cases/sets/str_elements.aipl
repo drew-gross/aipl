@@ -27,28 +27,22 @@ fn build() -> #{str} {
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 416
-instructions executed: 523
-binary size: 5400
-  code: 2300
-  data: 454
-  metadata: 2646
+bytes allocated: 768
+instructions executed: 897
+binary size: 6264
+  code: 3484
+  data: 332
+  metadata: 2448
 functions:
   __eq_set$str:
     calls: 3
-    bytes: 256
+    bytes: 304
   __test$build:
     calls: 1
-    bytes: 1560
+    bytes: 2480
   __test$distinct:
     calls: 1
-    bytes: 372
-  aipl_arr_drop_str:
-    calls: 7
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 17
-    bytes: (external)
+    bytes: 528
   aipl_array_dec:
     calls: 7
     bytes: (external)
@@ -61,23 +55,11 @@ functions:
   aipl_assert:
     calls: 8
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 20
-    bytes: (external)
-  aipl_inc:
-    calls: 17
-    bytes: (external)
   aipl_set_contains:
     calls: 29
     bytes: (external)
   aipl_set_insert:
     calls: 19
-    bytes: (external)
-  aipl_str_len:
-    calls: 52
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -90,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 172

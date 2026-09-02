@@ -73,15 +73,15 @@ true
 Repeat(Term(Space))
 Then([Term(Name("")), Repeat(Idx(3))])
 --- performance ---
-allocations: 35
-deallocations: 35
+allocations: 41
+deallocations: 41
 reallocations: 2
-bytes allocated: 1727
-instructions executed: 2555
-binary size: 11040
-  code: 5668
-  data: 500
-  metadata: 4872
+bytes allocated: 2196
+instructions executed: 2532
+binary size: 11336
+  code: 5888
+  data: 499
+  metadata: 4949
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -100,16 +100,16 @@ functions:
     bytes: 104
   __rec_drop_Rule$Tok:
     calls: 22
-    bytes: 112
+    bytes: 116
   __to_str_Rule$Tok:
     calls: 12
-    bytes: 2000
+    bytes: 2084
   __to_str_bool:
     calls: 1
-    bytes: 212
+    bytes: 232
   __to_str_u64:
     calls: 1
-    bytes: 180
+    bytes: 204
   aipl_arr_inc:
     calls: 3
     bytes: (external)
@@ -121,15 +121,6 @@ functions:
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 25
-    bytes: (external)
-  aipl_inc:
-    calls: 7
-    bytes: (external)
-  aipl_print:
-    calls: 4
     bytes: (external)
   aipl_rec_alloc:
     calls: 22
@@ -146,18 +137,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 6
     bytes: (external)
-  aipl_str_alloc:
-    calls: 8
-    bytes: (external)
-  aipl_str_data:
-    calls: 7
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
-    bytes: (external)
   aipl_u64_len:
     calls: 10
     bytes: (external)
@@ -169,13 +148,13 @@ functions:
     bytes: (external)
   grammar:
     calls: 4
-    bytes: 332
+    bytes: 404
   main:
     calls: 1
-    bytes: 580
+    bytes: 576
   shift$Tok:
     calls: 4
-    bytes: 948
+    bytes: 964
   size$Tok:
     calls: 4
-    bytes: 460
+    bytes: 464

@@ -30,58 +30,28 @@ nested: ['a', 'b']
 opt: some('h')
 str: hi
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 312
-instructions executed: 559
-binary size: 5496
-  code: 2712
-  data: 204
-  metadata: 2580
+bytes allocated: 792
+instructions executed: 550
+binary size: 5344
+  code: 2860
+  data: 139
+  metadata: 2345
 functions:
   __to_str_char:
     calls: 1
-    bytes: 184
+    bytes: 204
   __to_str_char$arr:
     calls: 1
-    bytes: 700
+    bytes: 592
   __to_str_char$opt:
     calls: 1
-    bytes: 352
-  aipl_char_at:
-    calls: 1
-    bytes: (external)
-  aipl_concat:
-    calls: 16
-    bytes: (external)
-  aipl_dec:
-    calls: 58
-    bytes: (external)
-  aipl_inc:
-    calls: 23
-    bytes: (external)
-  aipl_print:
-    calls: 6
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 3
-    bytes: (external)
-  aipl_str_data:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
-    bytes: (external)
+    bytes: 380
   aipl_write_bytes:
     calls: 5
     bytes: (external)
   main:
     calls: 1
-    bytes: 1476
+    bytes: 1684

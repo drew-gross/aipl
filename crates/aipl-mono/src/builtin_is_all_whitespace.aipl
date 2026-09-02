@@ -55,32 +55,20 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1381
-binary size: 3640
-  code: 836
-  data: 780
-  metadata: 2024
+instructions executed: 1186
+binary size: 3976
+  code: 1408
+  data: 674
+  metadata: 1894
 functions:
   __builtin_all$char$s0$lam0:
     calls: 13
-    bytes: 272
+    bytes: 212
   __test$is_all_whitespace:
     calls: 1
-    bytes: 492
+    bytes: 1072
   aipl_assert:
     calls: 13
-    bytes: (external)
-  aipl_str_data:
-    calls: 12
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 13
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 12
-    bytes: (external)
-  aipl_str_len:
-    calls: 25
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -93,4 +81,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 124

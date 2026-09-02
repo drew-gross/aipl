@@ -880,15 +880,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2773
-deallocations: 2773
-reallocations: 122
-bytes allocated: 133675
-instructions executed: 383007
-binary size: 280792
-  code: 163392
-  data: 6781
-  metadata: 110619
+allocations: 2900
+deallocations: 2900
+reallocations: 331
+bytes allocated: 177457
+instructions executed: 423650
+binary size: 304600
+  code: 187596
+  data: 5924
+  metadata: 111080
 functions:
   __arr_drop_Node:
     calls: 11
@@ -901,7 +901,7 @@ functions:
     bytes: 120
   __arr_drop___m2__Production$Tok$Node:
     calls: 73
-    bytes: 180
+    bytes: 188
   __arr_drop___m2__Rule$Tok:
     calls: 99
     bytes: 116
@@ -913,7 +913,7 @@ functions:
     bytes: 168
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
-    bytes: 600
+    bytes: 544
   __arr_retain_Node:
     calls: 10
     bytes: 116
@@ -925,7 +925,7 @@ functions:
     bytes: 120
   __arr_retain___m2__Production$Tok$Node:
     calls: 67
-    bytes: 180
+    bytes: 188
   __arr_retain___m2__Rule$Tok:
     calls: 142
     bytes: 116
@@ -937,28 +937,28 @@ functions:
     bytes: 168
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
-    bytes: 600
+    bytes: 544
   __builtin_count_while$char$lam28:
     calls: 149
-    bytes: 260
+    bytes: 220
   __builtin_count_while$char$s0$lam33:
     calls: 2
-    bytes: 236
+    bytes: 176
   __builtin_count_while$char$s0$lam35:
     calls: 0
-    bytes: 244
+    bytes: 184
   __builtin_find_if$__m2__Prec$lam72:
     calls: 11
-    bytes: 660
+    bytes: 688
   __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam57:
     calls: 10
-    bytes: 716
+    bytes: 748
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam17:
     calls: 43
-    bytes: 928
+    bytes: 972
   __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam42:
     calls: 36
-    bytes: 716
+    bytes: 732
   __eq_Node:
     calls: 7
     bytes: 136
@@ -976,91 +976,91 @@ functions:
     bytes: 100
   __lambda_0:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_1:
     calls: 3
-    bytes: 60
+    bytes: 96
   __lambda_15:
     calls: 55
-    bytes: 744
+    bytes: 944
   __lambda_18:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_19:
     calls: 31
-    bytes: 60
+    bytes: 96
   __lambda_2:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_20:
     calls: 0
-    bytes: 92
+    bytes: 128
   __lambda_21:
     calls: 25
-    bytes: 60
+    bytes: 96
   __lambda_3:
     calls: 0
-    bytes: 60
+    bytes: 96
   __m1__leaves:
     calls: 33
     bytes: 764
   __m1__show:
     calls: 117
-    bytes: 1392
+    bytes: 1592
   __m1__span:
     calls: 1
     bytes: 460
   __m1__text:
     calls: 7
-    bytes: 392
+    bytes: 420
   __m2__failure_message:
     calls: 16
-    bytes: 324
+    bytes: 404
   __m2__link$Tok$Node:
     calls: 43
-    bytes: 1016
+    bytes: 1188
   __m2__link_rule$Tok:
     calls: 171
-    bytes: 4300
+    bytes: 4608
   __m2__name_index:
     calls: 116
-    bytes: 372
+    bytes: 400
   __m2__prod_names$Tok$Node:
     calls: 107
-    bytes: 496
+    bytes: 492
   __m3__between_len:
     calls: 0
-    bytes: 636
+    bytes: 724
   __m3__delimited_len:
     calls: 0
-    bytes: 1348
+    bytes: 1592
   __m3__finalize_template$Tok:
     calls: 0
-    bytes: 4260
+    bytes: 4728
   __m3__float_len:
     calls: 0
-    bytes: 796
+    bytes: 824
   __m3__interp_scan$Tok:
     calls: 0
-    bytes: 1996
+    bytes: 2284
   __m3__lex$Tok:
     calls: 42
-    bytes: 1372
+    bytes: 1516
   __m3__lex_step$Tok:
     calls: 151
-    bytes: 18784
+    bytes: 19288
   __m3__nested_len:
     calls: 0
-    bytes: 820
+    bytes: 940
   __m3__step_result$Tok:
     calls: 388
-    bytes: 6848
+    bytes: 7448
   __m3__template_scan$Tok:
     calls: 0
-    bytes: 2512
+    bytes: 2740
   __m3__template_step$Tok:
     calls: 0
-    bytes: 452
+    bytes: 468
   __rec_drop_Node:
     calls: 16
     bytes: 72
@@ -1069,30 +1069,27 @@ functions:
     bytes: 48
   __rec_drop___m2__Rule$Tok:
     calls: 223
-    bytes: 388
+    bytes: 356
   __test$parse:
     calls: 1
-    bytes: 63892
+    bytes: 78516
   __test_try_fail___m2__ParseError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str___m2__ParseError:
     calls: 0
-    bytes: 812
+    bytes: 824
   __to_str_u64:
     calls: 0
-    bytes: 180
+    bytes: 204
   aipl_arr_drop_arr:
     calls: 11
-    bytes: (external)
-  aipl_arr_drop_str:
-    calls: 217
     bytes: (external)
   aipl_arr_extend:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8514
+    calls: 8483
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1101,13 +1098,13 @@ functions:
     calls: 443
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 320
+    calls: 25
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10647
+    calls: 10591
     bytes: (external)
   aipl_array_new:
     calls: 1347
@@ -1124,18 +1121,6 @@ functions:
   aipl_assert:
     calls: 43
     bytes: (external)
-  aipl_char_at:
-    calls: 379
-    bytes: (external)
-  aipl_concat:
-    calls: 424
-    bytes: (external)
-  aipl_dec:
-    calls: 10782
-    bytes: (external)
-  aipl_inc:
-    calls: 8433
-    bytes: (external)
   aipl_rec_alloc:
     calls: 440
     bytes: (external)
@@ -1151,33 +1136,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 37
     bytes: (external)
-  aipl_str_contains:
-    calls: 502
-    bytes: (external)
-  aipl_str_data:
-    calls: 118
-    bytes: (external)
-  aipl_str_eq:
-    calls: 268
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 151
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 118
-    bytes: (external)
-  aipl_str_join:
-    calls: 56
-    bytes: (external)
-  aipl_str_len:
-    calls: 1446
-    bytes: (external)
-  aipl_str_slice:
-    calls: 811
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 9
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -1189,85 +1147,85 @@ functions:
     bytes: (external)
   build_node:
     calls: 9
-    bytes: 440
+    bytes: 464
   climb$Tok$Node:
     calls: 15
-    bytes: 2760
+    bytes: 2780
   error_at$Tok$Node:
     calls: 14
-    bytes: 1604
+    bytes: 1800
   far_miss:
     calls: 54
-    bytes: 900
+    bytes: 944
   find_prec:
     calls: 22
     bytes: 232
   leaf_at$Tok$Node:
     calls: 96
-    bytes: 1388
+    bytes: 1408
   lex_toks:
     calls: 42
-    bytes: 616
+    bytes: 696
   lower_node$Tok$Node:
     calls: 10
-    bytes: 2828
+    bytes: 3316
   main:
     calls: 1
-    bytes: 72
+    bytes: 104
   match_list_of$Tok$Node:
     calls: 4
-    bytes: 2600
+    bytes: 2628
   match_many$Tok$Node:
     calls: 15
-    bytes: 1880
+    bytes: 1980
   match_maybe$Tok$Node:
     calls: 4
-    bytes: 836
+    bytes: 844
   match_one_of$Tok$Node:
     calls: 35
-    bytes: 1304
+    bytes: 1312
   match_prod$Tok$Node:
     calls: 84
-    bytes: 3772
+    bytes: 4012
   match_rule$Tok$Node:
     calls: 269
-    bytes: 4572
+    bytes: 4900
   match_then$Tok$Node:
     calls: 31
-    bytes: 1712
+    bytes: 1720
   oxford:
     calls: 14
-    bytes: 1576
+    bytes: 1900
   parse$Tok$Node:
     calls: 3
-    bytes: 340
+    bytes: 380
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 4032
+    bytes: 4460
   parsed:
     calls: 3
-    bytes: 412
+    bytes: 452
   prev_end$Tok$Node:
     calls: 148
-    bytes: 592
+    bytes: 616
   quoted:
     calls: 26
-    bytes: 380
+    bytes: 456
   refuse:
     calls: 1
-    bytes: 248
+    bytes: 348
   shown:
     calls: 37
-    bytes: 740
+    bytes: 844
   tok_rules:
     calls: 40
-    bytes: 1112
+    bytes: 2380
   tok_text$Tok$Node:
     calls: 81
-    bytes: 680
+    bytes: 768
   trailing_trivia$Tok$Node:
     calls: 52
-    bytes: 604
+    bytes: 612
   trivia_rules:
     calls: 2
-    bytes: 1372
+    bytes: 2912

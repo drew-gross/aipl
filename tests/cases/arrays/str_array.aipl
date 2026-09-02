@@ -30,29 +30,23 @@ fn appended(xs: str[], s: str) -> str[] {
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 320
-instructions executed: 854
-binary size: 4504
-  code: 1864
-  data: 376
-  metadata: 2264
+bytes allocated: 576
+instructions executed: 1158
+binary size: 5424
+  code: 3028
+  data: 222
+  metadata: 2174
 functions:
   __eq_str$arr:
     calls: 3
-    bytes: 308
+    bytes: 364
   __eq_str$opt:
     calls: 1
     bytes: 100
   __test$appended:
     calls: 1
-    bytes: 1384
-  aipl_arr_drop_str:
-    calls: 6
-    bytes: (external)
+    bytes: 2456
   aipl_arr_inc:
-    calls: 4
-    bytes: (external)
-  aipl_arr_retain_ptr:
     calls: 4
     bytes: (external)
   aipl_array_dec:
@@ -67,15 +61,6 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 18
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_str_eq:
-    calls: 9
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -87,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

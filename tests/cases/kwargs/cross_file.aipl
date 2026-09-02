@@ -20,28 +20,13 @@ pub fn framed(s: str, edge: str = default_edge()) -> str { edge +++ s +++ edge }
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 160
-instructions executed: 25
-binary size: 1256
-  code: 324
-  data: 36
-  metadata: 896
+bytes allocated: 352
+instructions executed: 47
+binary size: 1120
+  code: 400
+  data: 1
+  metadata: 719
 functions:
-  aipl_concat_lazy:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 14
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_print:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
-    bytes: (external)
   main:
     calls: 1
-    bytes: 324
+    bytes: 400

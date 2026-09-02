@@ -39,25 +39,22 @@ pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
     );
 })
 --- performance ---
-allocations: 14
-deallocations: 14
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 656
-instructions executed: 932
-binary size: 4296
-  code: 1412
-  data: 761
-  metadata: 2123
+bytes allocated: 1008
+instructions executed: 1347
+binary size: 5704
+  code: 2812
+  data: 679
+  metadata: 2213
 functions:
   __eq_str$arr:
     calls: 6
-    bytes: 308
+    bytes: 364
   __test$lines:
     calls: 1
-    bytes: 1032
-  aipl_arr_drop_str:
-    calls: 12
-    bytes: (external)
+    bytes: 2344
   aipl_array_dec:
     calls: 12
     bytes: (external)
@@ -65,24 +62,6 @@ functions:
     calls: 12
     bytes: (external)
   aipl_assert:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 40
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 13
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
-    bytes: (external)
-  aipl_str_slice:
-    calls: 13
-    bytes: (external)
-  aipl_str_split:
     calls: 6
     bytes: (external)
   aipl_test_begin:
@@ -96,4 +75,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

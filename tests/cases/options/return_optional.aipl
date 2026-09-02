@@ -13,18 +13,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 122
-binary size: 1728
-  code: 548
-  data: 195
-  metadata: 985
+instructions executed: 143
+binary size: 1784
+  code: 636
+  data: 193
+  metadata: 955
 functions:
   __eq_i64$opt:
     calls: 2
     bytes: 100
   __test$divide:
     calls: 1
-    bytes: 372
+    bytes: 432
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -39,4 +39,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 104

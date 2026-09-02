@@ -42,30 +42,30 @@ allocations: 17
 deallocations: 17
 reallocations: 0
 bytes allocated: 760
-instructions executed: 1481
-binary size: 7952
-  code: 3788
-  data: 515
-  metadata: 3649
+instructions executed: 1592
+binary size: 7968
+  code: 4312
+  data: 305
+  metadata: 3351
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$below:
     calls: 1
-    bytes: 952
+    bytes: 1120
   __test$nothing:
     calls: 1
-    bytes: 620
+    bytes: 720
   __test$tail_below:
     calls: 1
-    bytes: 568
+    bytes: 636
   __test_try_fail_str:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_str:
     calls: 0
-    bytes: 252
+    bytes: 276
   aipl_arr_inc:
     calls: 11
     bytes: (external)
@@ -87,15 +87,6 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_inc:
-    calls: 5
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -107,10 +98,10 @@ functions:
     bytes: (external)
   below:
     calls: 5
-    bytes: 540
+    bytes: 580
   main:
     calls: 1
-    bytes: 156
+    bytes: 240
   tail_below:
     calls: 2
-    bytes: 340
+    bytes: 360

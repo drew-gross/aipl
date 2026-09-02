@@ -17,18 +17,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 337
-binary size: 2528
-  code: 784
-  data: 382
-  metadata: 1362
+instructions executed: 376
+binary size: 2576
+  code: 960
+  data: 340
+  metadata: 1276
 functions:
   __eq_Shape:
     calls: 7
     bytes: 176
   __test$eq_shape:
     calls: 1
-    bytes: 536
+    bytes: 676
   aipl_assert:
     calls: 7
     bytes: (external)
@@ -43,4 +43,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

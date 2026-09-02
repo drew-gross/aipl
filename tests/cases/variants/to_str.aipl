@@ -31,57 +31,39 @@ Nil
 some(I(9))
 [I(1), Nil, S("z")]
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 11
+deallocations: 11
 reallocations: 0
-bytes allocated: 346
-instructions executed: 2062
-binary size: 20544
-  code: 9808
-  data: 2084
-  metadata: 8652
+bytes allocated: 426
+instructions executed: 2027
+binary size: 20784
+  code: 10024
+  data: 2083
+  metadata: 8677
 functions:
   __arr_drop_V:
     calls: 1
-    bytes: 168
+    bytes: 172
   __arr_retain_V:
     calls: 0
-    bytes: 168
+    bytes: 172
   __to_str_V:
     calls: 7
-    bytes: 2384
+    bytes: 2436
   __to_str_V$arr:
     calls: 1
-    bytes: 2820
+    bytes: 2828
   __to_str_V$opt:
     calls: 1
-    bytes: 2612
+    bytes: 2628
   aipl_array_dec:
     calls: 2
     bytes: (external)
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_dec:
-    calls: 20
-    bytes: (external)
   aipl_i64_len:
     calls: 18
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_print:
-    calls: 9
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 6
-    bytes: (external)
-  aipl_str_data:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_write_bytes:
     calls: 49
@@ -91,4 +73,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1656
+    bytes: 1788

@@ -22,34 +22,16 @@ world
 [, world]
 world
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 160
-instructions executed: 101
-binary size: 2024
-  code: 772
-  data: 31
-  metadata: 1221
+bytes allocated: 264
+instructions executed: 129
+binary size: 1776
+  code: 820
+  data: 1
+  metadata: 955
 functions:
-  aipl_concat_lazy:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 22
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_print:
-    calls: 5
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
-    bytes: (external)
-  aipl_str_slice:
-    calls: 5
-    bytes: (external)
   main:
     calls: 1
-    bytes: 772
+    bytes: 820

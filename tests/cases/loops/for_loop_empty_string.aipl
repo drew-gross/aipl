@@ -4,18 +4,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 21
-binary size: 784
-  code: 172
-  data: 2
-  metadata: 610
+instructions executed: 23
+binary size: 720
+  code: 136
+  data: 1
+  metadata: 583
 functions:
-  aipl_str_iter_init:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 1
-    bytes: (external)
   main:
     calls: 1
-    bytes: 172
+    bytes: 136

@@ -311,22 +311,22 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 111
-deallocations: 111
-reallocations: 0
-bytes allocated: 7052
-instructions executed: 11763
-binary size: 39384
-  code: 22300
-  data: 1909
-  metadata: 15175
+allocations: 110
+deallocations: 110
+reallocations: 17
+bytes allocated: 9424
+instructions executed: 14099
+binary size: 45376
+  code: 27940
+  data: 1708
+  metadata: 15728
 functions:
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
     calls: 12
-    bytes: 180
+    bytes: 188
   __arr_drop_Rule$Kind:
     calls: 15
     bytes: 116
@@ -335,16 +335,16 @@ functions:
     bytes: 120
   __arr_retain_Production$Kind$Node:
     calls: 13
-    bytes: 180
+    bytes: 188
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
   __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam4:
     calls: 4
-    bytes: 928
+    bytes: 972
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam7:
     calls: 4
-    bytes: 716
+    bytes: 732
   __eq_Kind:
     calls: 2
     bytes: 100
@@ -368,39 +368,33 @@ functions:
     bytes: 104
   __eq_str$arr:
     calls: 3
-    bytes: 308
+    bytes: 364
   __eq_u64$opt:
     calls: 2
     bytes: 100
   __lambda_2:
     calls: 9
-    bytes: 744
+    bytes: 944
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
     calls: 55
-    bytes: 360
+    bytes: 364
   __test$failure_message:
     calls: 1
-    bytes: 440
+    bytes: 676
   __test$link:
     calls: 1
-    bytes: 7720
+    bytes: 11948
   __test_try_fail_ParseError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_ParseError:
     calls: 0
-    bytes: 812
-  aipl_arr_drop_str:
-    calls: 13
-    bytes: (external)
+    bytes: 824
   aipl_arr_inc:
     calls: 75
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 19
     bytes: (external)
   aipl_array_dec:
     calls: 125
@@ -420,15 +414,6 @@ functions:
   aipl_assert:
     calls: 16
     bytes: (external)
-  aipl_concat:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 417
-    bytes: (external)
-  aipl_inc:
-    calls: 353
-    bytes: (external)
   aipl_rec_alloc:
     calls: 55
     bytes: (external)
@@ -444,12 +429,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 12
     bytes: (external)
-  aipl_str_eq:
-    calls: 47
-    bytes: (external)
-  aipl_str_len:
-    calls: 34
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -461,25 +440,25 @@ functions:
     bytes: (external)
   failure_message:
     calls: 2
-    bytes: 324
+    bytes: 404
   keep:
     calls: 0
-    bytes: 256
+    bytes: 268
   link$Kind$Node:
     calls: 5
-    bytes: 1016
+    bytes: 1188
   link_rule$Kind:
     calls: 25
-    bytes: 4208
+    bytes: 4528
   main:
     calls: 1
-    bytes: 112
+    bytes: 180
   name_index:
     calls: 20
-    bytes: 372
+    bytes: 400
   prod_names$Kind$Node:
     calls: 9
-    bytes: 496
+    bytes: 492
   rule_of$Kind$Node:
     calls: 7
-    bytes: 688
+    bytes: 820

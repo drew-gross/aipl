@@ -39,30 +39,24 @@ ok(["data/sub/deeper/leaf.txt", "data/sub/nested.txt"])
 err("could not list files")
 err("could not list files")
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 15
+deallocations: 15
 reallocations: 8
-bytes allocated: 801
-instructions executed: 1402
-binary size: 8840
-  code: 4436
-  data: 364
-  metadata: 4040
+bytes allocated: 729
+instructions executed: 1493
+binary size: 9160
+  code: 5080
+  data: 259
+  metadata: 3821
 functions:
   __to_str_i64$err$Error:
     calls: 1
-    bytes: 540
+    bytes: 580
   __to_str_str$arr$err$Error:
     calls: 4
-    bytes: 1080
-  aipl_arr_drop_str:
-    calls: 7
-    bytes: (external)
+    bytes: 1180
   aipl_arr_inc:
     calls: 8
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 2
     bytes: (external)
   aipl_arr_sort:
     calls: 2
@@ -76,29 +70,11 @@ functions:
   aipl_array_with_cap:
     calls: 5
     bytes: (external)
-  aipl_dec:
-    calls: 36
-    bytes: (external)
   aipl_i64_len:
     calls: 2
     bytes: (external)
-  aipl_inc:
-    calls: 17
-    bytes: (external)
   aipl_list_files:
     calls: 5
-    bytes: (external)
-  aipl_print:
-    calls: 5
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 4
-    bytes: (external)
-  aipl_str_data:
-    calls: 7
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
     bytes: (external)
   aipl_write_bytes:
     calls: 24
@@ -108,7 +84,7 @@ functions:
     bytes: (external)
   count_files:
     calls: 1
-    bytes: 328
+    bytes: 400
   main:
     calls: 1
-    bytes: 2488
+    bytes: 2920

@@ -16,12 +16,12 @@ pub fn drop_last<T: any>(self: T[]) -> T[] { self.drop_last_n(1) }.doc("""
 allocations: 11
 deallocations: 11
 reallocations: 0
-bytes allocated: 480
-instructions executed: 406
-binary size: 4512
-  code: 1908
-  data: 357
-  metadata: 2247
+bytes allocated: 528
+instructions executed: 487
+binary size: 4776
+  code: 2260
+  data: 315
+  metadata: 2201
 functions:
   __eq_i64$opt:
     calls: 1
@@ -31,15 +31,9 @@ functions:
     bytes: 100
   __test$drop_last:
     calls: 1
-    bytes: 1444
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 1760
   aipl_arr_inc:
     calls: 5
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
     bytes: (external)
   aipl_arr_slice:
     calls: 6
@@ -52,15 +46,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -76,4 +61,4 @@ functions:
     bytes: 192
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

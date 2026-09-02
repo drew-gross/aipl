@@ -87,22 +87,22 @@ true
 false
 some(2)
 --- performance ---
-allocations: 18
-deallocations: 18
+allocations: 25
+deallocations: 25
 reallocations: 0
-bytes allocated: 800
-instructions executed: 3415
-binary size: 25960
-  code: 13464
-  data: 1852
-  metadata: 10644
+bytes allocated: 1037
+instructions executed: 3486
+binary size: 27032
+  code: 14424
+  data: 1819
+  metadata: 10789
 functions:
   __dict_drop_str$i64:
     calls: 2
-    bytes: 128
+    bytes: 132
   __dict_retain_str$i64:
     calls: 4
-    bytes: 128
+    bytes: 132
   __eq_set$i64:
     calls: 2
     bytes: 256
@@ -111,43 +111,40 @@ functions:
     bytes: 108
   __to_str_Point$err$Error:
     calls: 1
-    bytes: 864
+    bytes: 880
   __to_str_Shape$err$Error:
     calls: 1
-    bytes: 804
+    bytes: 820
   __to_str___tuple$i64$str$err$Error:
     calls: 1
-    bytes: 924
+    bytes: 964
   __to_str_bool:
     calls: 2
-    bytes: 212
+    bytes: 232
   __to_str_dict$str$i64$err$Error:
     calls: 1
-    bytes: 1148
+    bytes: 1188
   __to_str_i64$err$Error:
     calls: 3
-    bytes: 540
+    bytes: 580
   __to_str_i64$opt:
     calls: 1
-    bytes: 360
+    bytes: 388
   __to_str_i64$opt$err$Error:
     calls: 2
-    bytes: 708
+    bytes: 736
   __to_str_i8$err$Error:
     calls: 1
-    bytes: 540
+    bytes: 580
   __to_str_set$i64$err$Error:
     calls: 1
-    bytes: 1012
+    bytes: 1056
   __to_str_str$arr$opt$err$Error:
     calls: 1
-    bytes: 1244
+    bytes: 1336
   __to_str_u64$err$Error:
     calls: 1
-    bytes: 540
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 580
   aipl_arr_inc:
     calls: 17
     bytes: (external)
@@ -163,9 +160,6 @@ functions:
   aipl_array_with_cap:
     calls: 8
     bytes: (external)
-  aipl_dec:
-    calls: 46
-    bytes: (external)
   aipl_dict_get:
     calls: 1
     bytes: (external)
@@ -175,25 +169,10 @@ functions:
   aipl_i64_len:
     calls: 26
     bytes: (external)
-  aipl_inc:
-    calls: 27
-    bytes: (external)
-  aipl_print:
-    calls: 16
-    bytes: (external)
   aipl_set_contains:
     calls: 24
     bytes: (external)
   aipl_set_insert:
-    calls: 18
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 9
-    bytes: (external)
-  aipl_str_data:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
     calls: 18
     bytes: (external)
   aipl_u64_len:
@@ -210,16 +189,16 @@ functions:
     bytes: (external)
   count_evens:
     calls: 2
-    bytes: 264
+    bytes: 284
   evens:
     calls: 7
-    bytes: 476
+    bytes: 536
   first_of_pair:
     calls: 1
-    bytes: 260
+    bytes: 284
   main:
     calls: 1
-    bytes: 2632
+    bytes: 2888
   pair:
     calls: 2
-    bytes: 316
+    bytes: 464

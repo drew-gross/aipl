@@ -30,37 +30,19 @@ err("could not write file")
 --- expect file: out.txt ---
 round trip
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 44
-instructions executed: 169
-binary size: 2344
-  code: 780
-  data: 172
-  metadata: 1392
+bytes allocated: 84
+instructions executed: 183
+binary size: 2296
+  code: 1004
+  data: 67
+  metadata: 1225
 functions:
   __to_str_unit$err$Error:
     calls: 2
-    bytes: 436
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_print:
-    calls: 2
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
+    bytes: 456
   aipl_write_bytes:
     calls: 4
     bytes: (external)
@@ -69,4 +51,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 344
+    bytes: 548

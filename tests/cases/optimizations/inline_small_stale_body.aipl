@@ -23,32 +23,20 @@ fn shout(self: str) -> str { `{self}!` }.test({
     assert(shout("hi") == "hi!");
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 0
-instructions executed: 62
-binary size: 2112
-  code: 592
-  data: 158
-  metadata: 1362
+bytes allocated: 264
+instructions executed: 164
+binary size: 2392
+  code: 980
+  data: 156
+  metadata: 1256
 functions:
   __test$apply:
     calls: 1
-    bytes: 316
+    bytes: 540
   aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_concat:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 18
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
     calls: 3
     bytes: (external)
   aipl_test_begin:
@@ -62,4 +50,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 276
+    bytes: 440

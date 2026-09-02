@@ -40,15 +40,15 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     assert(["a", "bb", "a"].map(|s| s == "a") == [true, false, true]);
 })
 --- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 1
-bytes allocated: 817
-instructions executed: 2797
-binary size: 8064
-  code: 4428
-  data: 469
-  metadata: 3167
+allocations: 20
+deallocations: 20
+reallocations: 3
+bytes allocated: 1260
+instructions executed: 3080
+binary size: 9576
+  code: 5616
+  data: 467
+  metadata: 3493
 functions:
   __eq_bool$arr:
     calls: 1
@@ -58,13 +58,10 @@ functions:
     bytes: 296
   __eq_str$arr:
     calls: 2
-    bytes: 308
+    bytes: 364
   __map1$own0:
     calls: 1
     bytes: 256
-  __map10$own0:
-    calls: 1
-    bytes: 264
   __map3$own0:
     calls: 1
     bytes: 252
@@ -73,21 +70,18 @@ functions:
     bytes: 252
   __map7$own0:
     calls: 1
-    bytes: 404
+    bytes: 464
   __map9$own0:
     calls: 1
     bytes: 252
   __test$doubled:
     calls: 1
-    bytes: 1592
+    bytes: 2872
   __to_str_i64:
     calls: 3
-    bytes: 180
-  aipl_arr_drop_str:
-    calls: 5
-    bytes: (external)
+    bytes: 204
   aipl_arr_inc:
-    calls: 6
+    calls: 5
     bytes: (external)
   aipl_array_dec:
     calls: 19
@@ -96,28 +90,16 @@ functions:
     calls: 13
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3
+    calls: 6
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 6
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 33
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 12
-    bytes: (external)
-  aipl_str_eq:
-    calls: 9
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -133,4 +115,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 108

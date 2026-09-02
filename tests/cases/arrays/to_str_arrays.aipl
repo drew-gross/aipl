@@ -24,34 +24,31 @@ fn main() !prints {
 []
 [7, 8, 9]
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 14
+deallocations: 14
 reallocations: 2
-bytes allocated: 412
-instructions executed: 2149
-binary size: 7472
-  code: 3944
-  data: 357
-  metadata: 3171
+bytes allocated: 476
+instructions executed: 2051
+binary size: 7808
+  code: 4124
+  data: 356
+  metadata: 3328
 functions:
   __to_str_bool$arr:
     calls: 1
-    bytes: 692
+    bytes: 708
   __to_str_char$arr:
     calls: 1
-    bytes: 700
+    bytes: 592
   __to_str_i64$arr:
     calls: 3
-    bytes: 672
+    bytes: 708
   __to_str_none$arr:
     calls: 1
-    bytes: 160
+    bytes: 180
   __to_str_str$arr:
     calls: 1
-    bytes: 740
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 812
   aipl_array_dec:
     calls: 6
     bytes: (external)
@@ -61,32 +58,8 @@ functions:
   aipl_array_push_mut:
     calls: 2
     bytes: (external)
-  aipl_dec:
-    calls: 17
-    bytes: (external)
   aipl_i64_len:
     calls: 14
-    bytes: (external)
-  aipl_inc:
-    calls: 7
-    bytes: (external)
-  aipl_print:
-    calls: 7
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 6
-    bytes: (external)
-  aipl_str_data:
-    calls: 4
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
     bytes: (external)
   aipl_write_bytes:
     calls: 25
@@ -96,4 +69,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 980
+    bytes: 1124

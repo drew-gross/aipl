@@ -41,35 +41,29 @@ fn empty_union() -> #{i64} { empty_set().union(empty_set()) }.test({
 allocations: 17
 deallocations: 17
 reallocations: 0
-bytes allocated: 936
-instructions executed: 841
-binary size: 7200
-  code: 3528
-  data: 420
-  metadata: 3252
+bytes allocated: 1112
+instructions executed: 997
+binary size: 7352
+  code: 4176
+  data: 234
+  metadata: 2942
 functions:
   __eq_set$i64:
     calls: 2
     bytes: 256
   __eq_set$str:
     calls: 1
-    bytes: 256
+    bytes: 304
   __test$basic:
     calls: 1
-    bytes: 968
+    bytes: 1136
   __test$empty_union:
     calls: 1
-    bytes: 904
+    bytes: 1224
   __test$in_place:
     calls: 1
-    bytes: 992
-  aipl_arr_drop_str:
-    calls: 4
-    bytes: (external)
+    bytes: 1012
   aipl_arr_inc:
-    calls: 10
-    bytes: (external)
-  aipl_arr_retain_ptr:
     calls: 10
     bytes: (external)
   aipl_array_dec:
@@ -84,12 +78,6 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 10
-    bytes: (external)
-  aipl_inc:
-    calls: 10
-    bytes: (external)
   aipl_set_contains:
     calls: 63
     bytes: (external)
@@ -98,9 +86,6 @@ functions:
     bytes: (external)
   aipl_set_union:
     calls: 5
-    bytes: (external)
-  aipl_str_len:
-    calls: 24
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -113,4 +98,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 152
+    bytes: 244

@@ -49,48 +49,39 @@ pub fn process_raw_string(s: str) -> str {
     assert(process_raw_string("") == "");
 })
 --- performance ---
-allocations: 32
-deallocations: 32
-reallocations: 0
-bytes allocated: 1288
-instructions executed: 12260
-binary size: 7792
-  code: 3504
-  data: 697
-  metadata: 3591
+allocations: 28
+deallocations: 28
+reallocations: 10
+bytes allocated: 1385
+instructions executed: 9894
+binary size: 8032
+  code: 4248
+  data: 503
+  metadata: 3281
 functions:
   __builtin_all$char$s0$lam12:
     calls: 22
-    bytes: 272
+    bytes: 212
   __builtin_count_while$char$s0$lam11:
     calls: 9
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam4:
     calls: 0
-    bytes: 232
+    bytes: 172
   __eq_char$opt:
     calls: 22
     bytes: 100
   __m4__trim_prefix:
     calls: 14
-    bytes: 196
+    bytes: 260
   __m5__trim_suffix:
     calls: 8
-    bytes: 264
+    bytes: 332
   __test$process_raw_string:
     calls: 1
-    bytes: 604
-  aipl_arr_drop_str:
-    calls: 14
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 7
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 11
-    bytes: (external)
+    bytes: 1192
   aipl_array_dec:
-    calls: 28
+    calls: 21
     bytes: (external)
   aipl_array_new:
     calls: 7
@@ -104,42 +95,6 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_char_at:
-    calls: 22
-    bytes: (external)
-  aipl_dec:
-    calls: 130
-    bytes: (external)
-  aipl_inc:
-    calls: 69
-    bytes: (external)
-  aipl_str_data:
-    calls: 33
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 7
-    bytes: (external)
-  aipl_str_eq:
-    calls: 7
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 38
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 33
-    bytes: (external)
-  aipl_str_join:
-    calls: 7
-    bytes: (external)
-  aipl_str_len:
-    calls: 129
-    bytes: (external)
-  aipl_str_slice:
-    calls: 38
-    bytes: (external)
-  aipl_str_split:
-    calls: 7
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -151,7 +106,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 124
   process_raw_string:
     calls: 7
-    bytes: 1532
+    bytes: 1684

@@ -37,15 +37,15 @@ fn parses_a_digit_run() -> i64? { digits_to_int("127") }.test({
     assert([1, 2].opt_fold(0, |acc, x| some(acc + x + bump)) == some(23)); // a capture
 })
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 384
-instructions executed: 2275
-binary size: 7144
-  code: 3652
-  data: 793
-  metadata: 2699
+bytes allocated: 488
+instructions executed: 2367
+binary size: 7768
+  code: 4372
+  data: 751
+  metadata: 2645
 functions:
   __eq_i64$opt:
     calls: 9
@@ -58,10 +58,7 @@ functions:
     bytes: 136
   __test$parses_a_digit_run:
     calls: 1
-    bytes: 2892
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 3632
   aipl_array_dec:
     calls: 5
     bytes: (external)
@@ -70,30 +67,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 10
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 28
-    bytes: (external)
-  aipl_inc:
-    calls: 21
-    bytes: (external)
-  aipl_str_data:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 5
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 17
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -106,7 +79,7 @@ functions:
     bytes: (external)
   digits_to_int:
     calls: 5
-    bytes: 352
+    bytes: 280
   main:
     calls: 1
-    bytes: 72
+    bytes: 124

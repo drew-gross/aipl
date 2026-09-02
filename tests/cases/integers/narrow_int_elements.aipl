@@ -127,22 +127,22 @@ some(65535)
 allocations: 17
 deallocations: 17
 reallocations: 0
-bytes allocated: 740
-instructions executed: 2194
-binary size: 6560
-  code: 3416
-  data: 284
-  metadata: 2860
+bytes allocated: 734
+instructions executed: 2152
+binary size: 6624
+  code: 3468
+  data: 283
+  metadata: 2873
 functions:
   __to_str_i64$arr:
     calls: 4
-    bytes: 672
+    bytes: 708
   __to_str_i64$arr$arr:
     calls: 1
-    bytes: 1132
+    bytes: 1160
   __to_str_u16$opt:
     calls: 1
-    bytes: 360
+    bytes: 388
   aipl_arr_drop_arr:
     calls: 1
     bytes: (external)
@@ -158,20 +158,8 @@ functions:
   aipl_array_new:
     calls: 8
     bytes: (external)
-  aipl_dec:
-    calls: 12
-    bytes: (external)
   aipl_i64_len:
     calls: 26
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_print:
-    calls: 6
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 6
     bytes: (external)
   aipl_u64_len:
     calls: 2
@@ -187,4 +175,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1252
+    bytes: 1212

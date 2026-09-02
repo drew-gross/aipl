@@ -45,15 +45,15 @@ fn main() !prints {
 CTree("a", [CLeaf(1), CTree("b", [CLeaf(2), CLeaf(3)]), CLeaf(4)])
 6
 --- performance ---
-allocations: 23
-deallocations: 23
+allocations: 24
+deallocations: 24
 reallocations: 0
-bytes allocated: 921
-instructions executed: 2610
-binary size: 5744
-  code: 2776
-  data: 236
-  metadata: 2732
+bytes allocated: 1019
+instructions executed: 2541
+binary size: 6016
+  code: 2948
+  data: 235
+  metadata: 2833
 functions:
   __arr_drop_Cst:
     calls: 2
@@ -66,10 +66,10 @@ functions:
     bytes: 84
   __to_str_Cst:
     calls: 15
-    bytes: 1352
+    bytes: 1392
   __to_str_i64:
     calls: 1
-    bytes: 180
+    bytes: 204
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -79,17 +79,8 @@ functions:
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_dec:
-    calls: 22
-    bytes: (external)
   aipl_i64_len:
     calls: 26
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_print:
-    calls: 2
     bytes: (external)
   aipl_rec_alloc:
     calls: 6
@@ -100,15 +91,6 @@ functions:
   aipl_rec_inc_strong:
     calls: 5
     bytes: (external)
-  aipl_str_alloc:
-    calls: 15
-    bytes: (external)
-  aipl_str_data:
-    calls: 10
-    bytes: (external)
-  aipl_str_len:
-    calls: 20
-    bytes: (external)
   aipl_write_bytes:
     calls: 68
     bytes: (external)
@@ -117,7 +99,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 580
+    bytes: 688
   size:
     calls: 6
     bytes: 348

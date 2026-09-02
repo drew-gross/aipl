@@ -18,19 +18,16 @@ by
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 184
-instructions executed: 475
-binary size: 3480
-  code: 1868
-  data: 2
-  metadata: 1610
+bytes allocated: 360
+instructions executed: 605
+binary size: 3976
+  code: 2400
+  data: 1
+  metadata: 1575
 functions:
   __zip1$own0$own1:
     calls: 1
-    bytes: 1448
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 1592
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -40,21 +37,6 @@ functions:
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 25
-    bytes: (external)
-  aipl_inc:
-    calls: 17
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
-    bytes: (external)
   main:
     calls: 1
-    bytes: 420
+    bytes: 808

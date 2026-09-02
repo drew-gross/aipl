@@ -19,15 +19,15 @@ fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
     assert([..empty()] == empty());
 })
 --- performance ---
-allocations: 17
-deallocations: 17
+allocations: 18
+deallocations: 18
 reallocations: 3
-bytes allocated: 574
-instructions executed: 881
-binary size: 7288
-  code: 3420
-  data: 417
-  metadata: 3451
+bytes allocated: 642
+instructions executed: 992
+binary size: 8040
+  code: 4008
+  data: 415
+  metadata: 3617
 functions:
   __eq_P:
     calls: 2
@@ -43,24 +43,18 @@ functions:
     bytes: 296
   __test$chars:
     calls: 1
-    bytes: 2400
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 2956
   aipl_arr_extend:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 17
+    calls: 16
     bytes: (external)
   aipl_arr_reserve:
     calls: 5
     bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
-    bytes: (external)
   aipl_array_dec:
-    calls: 31
+    calls: 30
     bytes: (external)
   aipl_array_new:
     calls: 13
@@ -73,27 +67,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 3
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_join:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 6
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -109,4 +82,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

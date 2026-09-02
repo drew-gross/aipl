@@ -47,12 +47,12 @@ fn opt(b: bool) -> i64? { if (b) { some(5) } else { none } }.test({
 allocations: 13
 deallocations: 13
 reallocations: 0
-bytes allocated: 704
-instructions executed: 2611
-binary size: 13712
-  code: 8976
-  data: 958
-  metadata: 3778
+bytes allocated: 848
+instructions executed: 2835
+binary size: 14448
+  code: 9856
+  data: 908
+  metadata: 3684
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -62,25 +62,25 @@ functions:
     bytes: 128
   __test$arr:
     calls: 1
-    bytes: 1636
+    bytes: 1668
   __test$dict:
     calls: 1
-    bytes: 1856
+    bytes: 2136
   __test$h:
     calls: 1
-    bytes: 720
+    bytes: 836
   __test$hs:
     calls: 1
-    bytes: 252
+    bytes: 424
   __test$opt:
     calls: 1
-    bytes: 976
+    bytes: 1016
   __test$pt:
     calls: 1
-    bytes: 1064
+    bytes: 1104
   __test$triple:
     calls: 1
-    bytes: 1924
+    bytes: 1964
   aipl_array_dec:
     calls: 12
     bytes: (external)
@@ -96,16 +96,7 @@ functions:
   aipl_assert:
     calls: 16
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 9
-    bytes: (external)
   aipl_dict_insert:
-    calls: 6
-    bytes: (external)
-  aipl_inc:
     calls: 6
     bytes: (external)
   aipl_set_contains:
@@ -113,12 +104,6 @@ functions:
     bytes: (external)
   aipl_set_insert:
     calls: 11
-    bytes: (external)
-  aipl_str_hash:
-    calls: 10
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 7
@@ -131,4 +116,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 292
+    bytes: 452

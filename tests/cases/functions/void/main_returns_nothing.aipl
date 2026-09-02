@@ -13,18 +13,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 6
-binary size: 600
-  code: 48
-  data: 2
-  metadata: 550
+instructions executed: 12
+binary size: 592
+  code: 76
+  data: 1
+  metadata: 515
 functions:
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_print:
-    calls: 1
-    bytes: (external)
   main:
     calls: 1
-    bytes: 48
+    bytes: 76

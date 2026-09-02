@@ -7,27 +7,15 @@ fn joined() -> str { "hello, " +++ "world" }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
-instructions executed: 21
+bytes allocated: 88
+instructions executed: 49
 binary size: 1232
-  code: 200
-  data: 86
-  metadata: 946
+  code: 332
+  data: 52
+  metadata: 848
 functions:
   aipl_assert:
     calls: 1
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -40,4 +28,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 200
+    bytes: 332

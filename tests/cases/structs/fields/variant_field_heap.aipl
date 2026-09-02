@@ -35,39 +35,18 @@ Person { name: Named("bob"), age: 30 }
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 95
-instructions executed: 345
-binary size: 3808
-  code: 1648
-  data: 221
-  metadata: 1939
+bytes allocated: 142
+instructions executed: 400
+binary size: 4112
+  code: 1888
+  data: 220
+  metadata: 2004
 functions:
   __to_str_Person:
     calls: 1
-    bytes: 800
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 14
-    bytes: (external)
+    bytes: 812
   aipl_i64_len:
     calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 4
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_write_bytes:
     calls: 9
@@ -77,4 +56,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 848
+    bytes: 1076

@@ -51,40 +51,22 @@ read: hi
 error: could not read file
 error: empty input
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 156
-instructions executed: 289
-binary size: 4320
-  code: 1984
-  data: 166
-  metadata: 2170
+bytes allocated: 298
+instructions executed: 392
+binary size: 3984
+  code: 2288
+  data: 1
+  metadata: 1695
 functions:
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 31
-    bytes: (external)
-  aipl_inc:
-    calls: 22
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
   aipl_read_file_to_string:
     calls: 3
     bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
-    bytes: (external)
   first:
     calls: 3
-    bytes: 784
+    bytes: 992
   main:
     calls: 1
-    bytes: 1200
+    bytes: 1296

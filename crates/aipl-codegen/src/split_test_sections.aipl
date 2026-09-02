@@ -51,15 +51,15 @@ pub fn split_test_sections(src: str) -> (str, str) {
     );
 })
 --- performance ---
-allocations: 15
-deallocations: 15
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 480
-instructions executed: 7211
-binary size: 8688
-  code: 3244
-  data: 1317
-  metadata: 4127
+bytes allocated: 0
+instructions executed: 6098
+binary size: 10048
+  code: 5248
+  data: 987
+  metadata: 3813
 functions:
   __eq___tuple$str$str:
     calls: 9
@@ -69,42 +69,12 @@ functions:
     bytes: 100
   __m1__parse_test_section_header:
     calls: 17
-    bytes: 628
+    bytes: 744
   __test$split_test_sections:
     calls: 1
-    bytes: 1372
+    bytes: 3008
   aipl_assert:
     calls: 9
-    bytes: (external)
-  aipl_dec:
-    calls: 113
-    bytes: (external)
-  aipl_inc:
-    calls: 53
-    bytes: (external)
-  aipl_str_data:
-    calls: 8
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 5
-    bytes: (external)
-  aipl_str_eq:
-    calls: 23
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 9
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 8
-    bytes: (external)
-  aipl_str_len:
-    calls: 101
-    bytes: (external)
-  aipl_str_slice:
-    calls: 32
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 17
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -115,12 +85,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 10
-    bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 128
   split_test_sections:
     calls: 9
-    bytes: 936
+    bytes: 1132

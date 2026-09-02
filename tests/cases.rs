@@ -309,10 +309,12 @@ macro_rules! case_tests {
     };
 }
 
-/// The burn-down list: tests the 24-byte `str` switch has not reached yet
-/// (`STR_REPR.md`). Entries here are `#[ignore]`d so the suite stays green while
-/// the switch lands incrementally, and the file itself explains the rules.
-const BURNDOWN_FILE: &str = "tests/support/str24_burndown.txt";
+/// The record of the 24-byte `str` migration (`STR_REPR.md`). The list is
+/// **empty** — the switch is finished and the tagged half is gone — but the file
+/// and this check stay: they are the mechanism for the next representation
+/// change, and an empty list is the cheapest possible proof that nothing is
+/// still parked on it.
+const BURNDOWN_FILE: &str = "tests/support/str24_migration.txt";
 
 /// The names in [`BURNDOWN_FILE`], comments and blanks stripped.
 fn burndown_list() -> std::collections::HashSet<String> {

@@ -78,41 +78,26 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1308
-binary size: 9952
-  code: 3992
-  data: 1572
-  metadata: 4388
+instructions executed: 1852
+binary size: 10848
+  code: 5692
+  data: 1314
+  metadata: 3842
 functions:
   __test$check_len:
     calls: 1
-    bytes: 388
+    bytes: 488
   __test$digit_of:
     calls: 1
-    bytes: 508
+    bytes: 748
   __test$is_err_and:
     calls: 1
-    bytes: 1948
+    bytes: 2724
   __test$is_not_a_digit:
     calls: 1
-    bytes: 144
+    bytes: 312
   aipl_assert:
     calls: 18
-    bytes: (external)
-  aipl_char_at:
-    calls: 11
-    bytes: (external)
-  aipl_dec:
-    calls: 41
-    bytes: (external)
-  aipl_inc:
-    calls: 38
-    bytes: (external)
-  aipl_str_eq:
-    calls: 15
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -125,10 +110,10 @@ functions:
     bytes: (external)
   check_len:
     calls: 5
-    bytes: 356
+    bytes: 504
   digit_of:
     calls: 9
-    bytes: 456
+    bytes: 596
   main:
     calls: 1
-    bytes: 192
+    bytes: 320

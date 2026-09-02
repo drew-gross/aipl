@@ -22,33 +22,18 @@ fn full_first(c: Contact) -> str { c.name.first }.test({
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 120
-instructions executed: 142
-binary size: 2784
-  code: 860
-  data: 276
-  metadata: 1648
+bytes allocated: 264
+instructions executed: 268
+binary size: 2992
+  code: 1352
+  data: 170
+  metadata: 1470
 functions:
   __test$full_first:
     calls: 1
-    bytes: 788
+    bytes: 1244
   aipl_assert:
     calls: 3
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 18
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_str_eq:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 12
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -61,4 +46,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

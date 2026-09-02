@@ -38,32 +38,26 @@ fn main() !prints {
 [false, true, true]
 [40, 30]
 --- performance ---
-allocations: 21
-deallocations: 21
+allocations: 22
+deallocations: 22
 reallocations: 0
-bytes allocated: 865
-instructions executed: 3707
-binary size: 6912
-  code: 3524
-  data: 260
-  metadata: 3128
+bytes allocated: 970
+instructions executed: 3754
+binary size: 7304
+  code: 3884
+  data: 259
+  metadata: 3161
 functions:
   __to_str_bool$arr:
     calls: 1
-    bytes: 692
+    bytes: 708
   __to_str_i64$arr:
     calls: 7
-    bytes: 672
+    bytes: 708
   __to_str_str$arr:
     calls: 2
-    bytes: 740
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 812
   aipl_arr_inc:
-    calls: 1
-    bytes: (external)
-  aipl_arr_retain_ptr:
     calls: 1
     bytes: (external)
   aipl_arr_reverse:
@@ -78,26 +72,8 @@ functions:
   aipl_array_new:
     calls: 3
     bytes: (external)
-  aipl_dec:
-    calls: 26
-    bytes: (external)
   aipl_i64_len:
     calls: 34
-    bytes: (external)
-  aipl_inc:
-    calls: 12
-    bytes: (external)
-  aipl_print:
-    calls: 10
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 9
-    bytes: (external)
-  aipl_str_data:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 12
     bytes: (external)
   aipl_write_bytes:
     calls: 46
@@ -107,4 +83,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1420
+    bytes: 1656

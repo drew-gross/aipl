@@ -42,50 +42,23 @@ fn count_eq(s: str, sep: str, target: str) -> i64 {
 ["a", "b", "cee"]
 ["name", "longvaluehere"]
 --- performance ---
-allocations: 14
-deallocations: 14
+allocations: 16
+deallocations: 16
 reallocations: 0
-bytes allocated: 597
-instructions executed: 2699
-binary size: 3792
-  code: 1604
-  data: 172
-  metadata: 2016
+bytes allocated: 898
+instructions executed: 2928
+binary size: 3880
+  code: 2044
+  data: 67
+  metadata: 1769
 functions:
   __to_str_str$arr:
     calls: 8
-    bytes: 740
-  aipl_arr_drop_str:
-    calls: 8
-    bytes: (external)
+    bytes: 812
   aipl_array_dec:
     calls: 8
     bytes: (external)
   aipl_array_new:
-    calls: 8
-    bytes: (external)
-  aipl_dec:
-    calls: 50
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_print:
-    calls: 8
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 5
-    bytes: (external)
-  aipl_str_data:
-    calls: 17
-    bytes: (external)
-  aipl_str_len:
-    calls: 34
-    bytes: (external)
-  aipl_str_slice:
-    calls: 17
-    bytes: (external)
-  aipl_str_split:
     calls: 8
     bytes: (external)
   aipl_write_bytes:
@@ -93,4 +66,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 864
+    bytes: 1232

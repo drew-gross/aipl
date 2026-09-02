@@ -34,40 +34,25 @@ fn main() !prints {
 1,2,hi
 err: bad point
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 200
-instructions executed: 226
-binary size: 3520
-  code: 1692
-  data: 28
-  metadata: 1800
+bytes allocated: 474
+instructions executed: 262
+binary size: 3608
+  code: 1956
+  data: 1
+  metadata: 1651
 functions:
   __to_str_i64:
     calls: 2
-    bytes: 180
-  aipl_concat_lazy:
-    calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 27
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 16
-    bytes: (external)
-  aipl_print:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 10
     bytes: (external)
   aipl_write_i64:
     calls: 2
     bytes: (external)
   main:
     calls: 1
-    bytes: 1512
+    bytes: 1752

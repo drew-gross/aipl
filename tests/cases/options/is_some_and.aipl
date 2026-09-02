@@ -28,15 +28,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 75
+instructions executed: 81
 binary size: 904
-  code: 352
-  data: 2
-  metadata: 550
+  code: 376
+  data: 1
+  metadata: 527
 functions:
-  aipl_char_at:
-    calls: 1
-    bytes: (external)
   main:
     calls: 1
-    bytes: 352
+    bytes: 376

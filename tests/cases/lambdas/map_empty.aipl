@@ -14,22 +14,22 @@ fn empty_ints() -> i64[] { [] }.test({
     assert(empty_ints().map(to_str) == []);
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 224
-instructions executed: 274
-binary size: 4920
-  code: 2412
-  data: 258
-  metadata: 2250
+bytes allocated: 256
+instructions executed: 296
+binary size: 5208
+  code: 2620
+  data: 224
+  metadata: 2364
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __map1$own0:
     calls: 1
     bytes: 256
@@ -39,23 +39,23 @@ functions:
   __map5$own0:
     calls: 1
     bytes: 252
-  __map6$own0:
-    calls: 1
-    bytes: 264
   __test$empty_ints:
     calls: 1
-    bytes: 528
+    bytes: 884
   __to_str_i64:
     calls: 0
-    bytes: 180
+    bytes: 204
   aipl_arr_inc:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_dec:
     calls: 11
     bytes: (external)
   aipl_array_new:
     calls: 7
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 4
@@ -71,4 +71,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

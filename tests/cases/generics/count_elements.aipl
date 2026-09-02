@@ -21,16 +21,16 @@ fn count(v: any[]) -> i64 {
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 149
-instructions executed: 460
-binary size: 2648
-  code: 992
-  data: 155
-  metadata: 1501
+bytes allocated: 148
+instructions executed: 453
+binary size: 2792
+  code: 1068
+  data: 145
+  metadata: 1579
 functions:
   __test$count:
     calls: 1
-    bytes: 920
+    bytes: 964
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -46,24 +46,6 @@ functions:
   aipl_assert:
     calls: 3
     bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -75,4 +57,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

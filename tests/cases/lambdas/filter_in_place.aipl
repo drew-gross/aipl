@@ -30,19 +30,19 @@ fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 584
-instructions executed: 2320
-binary size: 6416
-  code: 3484
-  data: 427
-  metadata: 2505
+bytes allocated: 712
+instructions executed: 2556
+binary size: 7264
+  code: 4316
+  data: 393
+  metadata: 2555
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __filter1$own0:
     calls: 1
     bytes: 272
@@ -57,16 +57,13 @@ functions:
     bytes: 272
   __filter7$own0:
     calls: 1
-    bytes: 348
+    bytes: 428
   __map9$own0:
     calls: 1
     bytes: 256
   __test$keep_gt3:
     calls: 1
-    bytes: 1116
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 1776
   aipl_arr_inc:
     calls: 6
     bytes: (external)
@@ -79,18 +76,6 @@ functions:
   aipl_assert:
     calls: 5
     bytes: (external)
-  aipl_dec:
-    calls: 13
-    bytes: (external)
-  aipl_inc:
-    calls: 5
-    bytes: (external)
-  aipl_str_eq:
-    calls: 8
-    bytes: (external)
-  aipl_str_len:
-    calls: 6
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -102,4 +87,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

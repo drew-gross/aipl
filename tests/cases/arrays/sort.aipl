@@ -63,33 +63,27 @@ fn main() !prints {
 ["apple", "fig", "pear"]
 ['a', 'b', 'c']
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 343
-instructions executed: 1301
-binary size: 5504
-  code: 2764
-  data: 212
-  metadata: 2528
+bytes allocated: 474
+instructions executed: 1261
+binary size: 5888
+  code: 3004
+  data: 211
+  metadata: 2673
 functions:
   __to_str_char$arr:
     calls: 1
-    bytes: 700
+    bytes: 592
   __to_str_i64$arr:
     calls: 1
-    bytes: 672
+    bytes: 708
   __to_str_str$arr:
     calls: 1
-    bytes: 740
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 812
   aipl_arr_inc:
     calls: 2
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
     bytes: (external)
   aipl_arr_sort:
     calls: 2
@@ -100,35 +94,8 @@ functions:
   aipl_array_new:
     calls: 2
     bytes: (external)
-  aipl_dec:
-    calls: 15
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 7
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 4
-    bytes: (external)
-  aipl_str_data:
-    calls: 5
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 10
-    bytes: (external)
-  aipl_str_sort:
-    calls: 1
     bytes: (external)
   aipl_write_bytes:
     calls: 15
@@ -138,4 +105,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 652
+    bytes: 892

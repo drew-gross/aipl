@@ -75,51 +75,36 @@ fn lex(s: str) -> str!LexError {
     assert(!lex("fine").is_err_and(|e| e.span == 3));
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 0
-instructions executed: 1801
-binary size: 27112
-  code: 14856
-  data: 1333
-  metadata: 10923
+bytes allocated: 704
+instructions executed: 2610
+binary size: 29664
+  code: 17792
+  data: 1284
+  metadata: 10588
 functions:
   __test$lex:
     calls: 1
-    bytes: 436
+    bytes: 564
   __test$map_ok:
     calls: 1
-    bytes: 12900
+    bytes: 15288
   __test_try_fail_LexError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __test_try_fail_i64:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_LexError:
     calls: 0
-    bytes: 540
+    bytes: 560
   __to_str_i64:
     calls: 0
-    bytes: 180
+    bytes: 204
   aipl_assert:
     calls: 15
-    bytes: (external)
-  aipl_concat:
-    calls: 16
-    bytes: (external)
-  aipl_dec:
-    calls: 131
-    bytes: (external)
-  aipl_inc:
-    calls: 93
-    bytes: (external)
-  aipl_str_eq:
-    calls: 23
-    bytes: (external)
-  aipl_str_len:
-    calls: 20
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -132,7 +117,7 @@ functions:
     bytes: (external)
   lex:
     calls: 14
-    bytes: 356
+    bytes: 508
   main:
     calls: 1
-    bytes: 316
+    bytes: 500

@@ -35,15 +35,15 @@ fn main() !prints {
 1
 S { tag: 2, child: Node(S { tag: 3, child: Leaf }) }
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 23
+deallocations: 23
 reallocations: 0
-bytes allocated: 621
-instructions executed: 1298
-binary size: 5040
-  code: 2136
-  data: 215
-  metadata: 2689
+bytes allocated: 808
+instructions executed: 1163
+binary size: 5200
+  code: 2232
+  data: 214
+  metadata: 2754
 functions:
   __rec_drop_S:
     calls: 3
@@ -53,24 +53,15 @@ functions:
     bytes: 44
   __to_str_S:
     calls: 5
-    bytes: 552
+    bytes: 580
   __to_str_V:
     calls: 10
-    bytes: 524
+    bytes: 576
   __to_str_i64:
     calls: 2
-    bytes: 180
-  aipl_dec:
-    calls: 20
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 14
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 3
     bytes: (external)
   aipl_rec_alloc:
     calls: 6
@@ -87,15 +78,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 4
     bytes: (external)
-  aipl_str_alloc:
-    calls: 7
-    bytes: (external)
-  aipl_str_data:
-    calls: 7
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
-    bytes: (external)
   aipl_write_bytes:
     calls: 46
     bytes: (external)
@@ -107,4 +89,4 @@ functions:
     bytes: 148
   main:
     calls: 1
-    bytes: 652
+    bytes: 644

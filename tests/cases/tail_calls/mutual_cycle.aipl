@@ -64,31 +64,22 @@ false
 true
 true
 --- performance ---
-allocations: 150003
-deallocations: 150003
+allocations: 150007
+deallocations: 150007
 reallocations: 0
-bytes allocated: 8400168
-instructions executed: 17100283
-binary size: 4504
-  code: 2072
-  data: 48
-  metadata: 2384
+bytes allocated: 10800297
+instructions executed: 24900263
+binary size: 4816
+  code: 2344
+  data: 47
+  metadata: 2425
 functions:
   __rec_drop_Work:
     calls: 150003
     bytes: 84
   __to_str_bool:
     calls: 4
-    bytes: 212
-  aipl_dec:
-    calls: 750009
-    bytes: (external)
-  aipl_inc:
-    calls: 600004
-    bytes: (external)
-  aipl_print:
-    calls: 4
-    bytes: (external)
+    bytes: 232
   aipl_rec_alloc:
     calls: 150003
     bytes: (external)
@@ -104,15 +95,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 150000
     bytes: (external)
-  aipl_str_contains:
-    calls: 300001
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 300000
-    bytes: (external)
-  aipl_str_len:
-    calls: 1200002
-    bytes: (external)
   aipl_write_bytes:
     calls: 4
     bytes: (external)
@@ -121,7 +103,7 @@ functions:
     bytes: 36
   fits$tail:
     calls: 300003
-    bytes: 324
+    bytes: 404
   fits_after:
     calls: 0
     bytes: 40
@@ -130,16 +112,16 @@ functions:
     bytes: 220
   fits_atom:
     calls: 0
-    bytes: 40
+    bytes: 48
   fits_atom$tail:
     calls: 300001
-    bytes: 312
+    bytes: 368
   main:
     calls: 1
-    bytes: 556
+    bytes: 576
   work_of:
     calls: 0
     bytes: 36
   work_of$tail:
     calls: 150001
-    bytes: 212
+    bytes: 300

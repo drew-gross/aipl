@@ -51,15 +51,15 @@ fn main() !prints {
 10
 
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 17
+deallocations: 17
 reallocations: 3
-bytes allocated: 704
-instructions executed: 1054
-binary size: 4512
-  code: 2148
-  data: 2
-  metadata: 2362
+bytes allocated: 775
+instructions executed: 1014
+binary size: 4568
+  code: 2184
+  data: 1
+  metadata: 2383
 functions:
   __arr_drop_Tree:
     calls: 2
@@ -72,10 +72,10 @@ functions:
     bytes: 84
   __to_str_i64:
     calls: 3
-    bytes: 180
+    bytes: 204
   __to_str_u64:
     calls: 1
-    bytes: 180
+    bytes: 204
   aipl_array_dec:
     calls: 2
     bytes: (external)
@@ -85,17 +85,8 @@ functions:
   aipl_array_push_mut:
     calls: 3
     bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_print:
-    calls: 4
     bytes: (external)
   aipl_rec_alloc:
     calls: 11
@@ -123,7 +114,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1080
+    bytes: 1068
   sum_all:
     calls: 3
     bytes: 232

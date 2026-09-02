@@ -43,19 +43,19 @@ shorter
 101
 202
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 22
+deallocations: 22
 reallocations: 12
-bytes allocated: 352
-instructions executed: 2657
-binary size: 5272
-  code: 3528
-  data: 2
-  metadata: 1742
+bytes allocated: 613
+instructions executed: 2542
+binary size: 5384
+  code: 3632
+  data: 1
+  metadata: 1751
 functions:
   __to_str_i64:
     calls: 14
-    bytes: 180
+    bytes: 204
   __zip8$own0$own1:
     calls: 1
     bytes: 952
@@ -71,24 +71,15 @@ functions:
   aipl_array_push_mut:
     calls: 12
     bytes: (external)
-  aipl_dec:
-    calls: 33
-    bytes: (external)
   aipl_i64_len:
     calls: 28
-    bytes: (external)
-  aipl_inc:
-    calls: 19
-    bytes: (external)
-  aipl_print:
-    calls: 19
     bytes: (external)
   aipl_write_i64:
     calls: 14
     bytes: (external)
   main:
     calls: 1
-    bytes: 2144
+    bytes: 2252
   show:
     calls: 5
-    bytes: 252
+    bytes: 224

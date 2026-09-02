@@ -70,15 +70,6 @@ pub struct Manifest {
     pub data: Vec<DataObject>,
     /// `; struct` / `; variant` lines, in manifest order, unparsed.
     pub types: Vec<TypeLine>,
-    /// Whether this artifact was compiled with the 24-byte `str`
-    /// (`STR_REPR.md`), from a `; str24` marker line.
-    ///
-    /// **Absent means tagged**, which is what every artifact predating the
-    /// switch says by saying nothing — so the checked-in `.clif` files keep
-    /// their meaning without being touched. A reader that guessed instead got
-    /// this wrong for a *freshly generated* wide artifact and read its 24-byte
-    /// values as 8-byte pointers.
-    pub str24: bool,
 }
 
 /// Parse the `;`-comment manifest at the head of an artifact.
@@ -100,9 +91,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             continue;
         };
         let body = body.trim();
-        if body == "str24" {
-            m.str24 = true;
-        } else if let Some(rest) = body.strip_prefix("struct ") {
+        if let Some(rest) = body.strip_prefix("struct ") {
             m.types.push(TypeLine::Struct(rest.to_string()));
         } else if let Some(rest) = body.strip_prefix("variant ") {
             m.types.push(TypeLine::Variant(rest.to_string()));
@@ -321,75 +310,31 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         s
     };
     match sym {
-        "aipl_print"
-        | "aipl_print_error"
-        | "aipl_inc"
-        | "aipl_dec"
-        | "aipl_array_dec"
+        "aipl_array_dec"
         | "aipl_arr_inc"
         | "aipl_rec_inc_strong"
         | "aipl_rec_dec_strong"
         | "aipl_rec_inc_weak"
         | "aipl_rec_dec_weak"
         | "aipl_count_insns"
-        | "aipl_count_call"
-        | "aipl_test_begin"
-        | "aipl_test_fail" => sig(1, false),
-        // Test-runner hooks: `__test_end()`/`__test_begin(name)` return nothing;
-        // `__test_summary()` returns the exit code; `__assert(cond, loc)`.
+        | "aipl_count_call" => sig(1, false),
+        // Test-runner hooks: `__test_end()` returns nothing; `__test_summary()`
+        // returns the exit code.
         "aipl_test_end" | "aipl_test_fail_none" => sig(0, false),
         // Takes nothing, returns the reading.
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(0, true),
         // Shim slots: read one, or write one (returns nothing).
         "aipl_shim_get" => sig(1, true),
         "aipl_shim_set" => sig(2, false),
-        "aipl_assert" => sig(2, false),
-        "aipl_arr_drop_str"
-        | "aipl_arr_drop_arr"
+        "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
-        | "aipl_arr_drop_opt_str"
         | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt"
-        | "aipl_str_iter_init" => sig(2, false),
+        | "aipl_arr_retain_opt" => sig(2, false),
         "aipl_arr_load_bit" => sig(2, true),
         "aipl_arr_elem_ptr" => sig(3, true),
-        // sret ptr + (program, args): writes the whole composite `Result` via
-        // the hidden pointer, so it returns nothing.
-        "aipl_execute_program" => sig(3, false),
-        "aipl_str_alloc"
-        | "aipl_i64_len"
-        | "aipl_u64_len"
-        | "aipl_str_len"
-        | "aipl_trim"
-        | "aipl_trim_mut"
-        | "aipl_str_hash"
-        | "aipl_str_iter_next"
-        | "aipl_read_file_to_string"
-        | "aipl_list_files"
-        | "aipl_str_reverse"
-        | "aipl_str_sort" => sig(1, true),
-        "aipl_rec_alloc"
-        | "aipl_str_repeat"
-        | "aipl_str_eq"
-        | "aipl_str_cmp"
-        | "aipl_str_starts_with"
-        | "aipl_str_ends_with"
-        | "aipl_str_contains"
-        | "aipl_concat"
-        | "aipl_concat_lazy"
-        | "aipl_concat_mut"
-        | "aipl_char_at"
-        | "aipl_str_data"
-        | "aipl_str_split"
-        | "aipl_str_join"
-        | "aipl_write_i64"
-        | "aipl_write_u64"
-        | "aipl_write_string_to_file" => sig(2, true),
-        "aipl_write_bytes"
-        | "aipl_array_new"
-        | "aipl_array_with_cap"
-        | "aipl_str_slice"
-        | "aipl_str_starts_with_at" => sig(3, true),
+        "aipl_i64_len" | "aipl_u64_len" => sig(1, true),
+        "aipl_rec_alloc" | "aipl_write_i64" | "aipl_write_u64" => sig(2, true),
+        "aipl_write_bytes" | "aipl_array_new" | "aipl_array_with_cap" => sig(3, true),
         "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
             sig(4, true)
         }
@@ -400,45 +345,45 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_extend" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
-        // The wide-`str` (`aipl2_*`) convention, mirroring `builtin_import_sig`
-        // in `aipl-codegen`. Every `str` argument is a `*const Str`, so it is one
-        // word like any other; a `str` *result* is written through a leading out
+        // The `str` entry points, mirroring `builtin_import_sig` in
+        // `aipl-codegen`. A `str` argument is a `*const Str`, so it is one word
+        // like any other; a `str` *result* is written through a leading out
         // pointer, which is why the producers below take one more argument than
-        // their `aipl_*` counterparts and return nothing.
-        "aipl2_inc" | "aipl2_dec" | "aipl2_print" | "aipl2_print_error"
-        | "aipl2_test_begin" | "aipl2_test_fail" => sig(1, false),
-        "aipl2_assert" => sig(2, false),
-        "aipl2_str_len"
-        | "aipl2_str_hash"
-        | "aipl2_str_write_ptr"
-        | "aipl2_str_iter_next" => sig(1, true),
-        "aipl2_str_iter_init"
-        | "aipl2_arr_drop_str"
-        | "aipl2_arr_retain_str"
-        | "aipl2_arr_drop_opt_str"
-        | "aipl2_arr_retain_opt_str"
-        | "aipl2_str_grew"
+        // their arity suggests and return nothing.
+        "aipl_inc" | "aipl_dec" | "aipl_print" | "aipl_print_error"
+        | "aipl_test_begin" | "aipl_test_fail" => sig(1, false),
+        "aipl_assert" => sig(2, false),
+        "aipl_str_len"
+        | "aipl_str_hash"
+        | "aipl_str_write_ptr"
+        | "aipl_str_iter_next" => sig(1, true),
+        "aipl_str_iter_init"
+        | "aipl_arr_drop_str"
+        | "aipl_arr_retain_str"
+        | "aipl_arr_drop_opt_str"
+        | "aipl_arr_retain_opt_str"
+        | "aipl_str_grew"
         // ...and the producers of exactly one `str` from none or one:
-        | "aipl2_trim"
-        | "aipl2_str_reverse"
-        | "aipl2_str_sort"
-        | "aipl2_str_alloc" => sig(2, false),
-        "aipl2_str_eq"
-        | "aipl2_str_cmp"
-        | "aipl2_str_starts_with"
-        | "aipl2_str_ends_with"
-        | "aipl2_str_contains"
-        | "aipl2_char_at"
-        | "aipl2_str_data" => sig(2, true),
-        "aipl2_concat" | "aipl2_str_repeat" | "aipl2_str_join" => sig(3, false),
-        "aipl2_str_split" | "aipl2_read_file_to_string" | "aipl2_write_string_to_file" => {
+        | "aipl_trim"
+        | "aipl_str_reverse"
+        | "aipl_str_sort"
+        | "aipl_str_alloc" => sig(2, false),
+        "aipl_str_eq"
+        | "aipl_str_cmp"
+        | "aipl_str_starts_with"
+        | "aipl_str_ends_with"
+        | "aipl_str_contains"
+        | "aipl_char_at"
+        | "aipl_str_data" => sig(2, true),
+        "aipl_concat" | "aipl_str_repeat" | "aipl_str_join" => sig(3, false),
+        "aipl_str_split" | "aipl_read_file_to_string" | "aipl_write_string_to_file" => {
             sig(2, true)
         }
-        "aipl2_list_files" => sig(1, true),
-        "aipl2_char_to_str" => sig(2, false),
-        "aipl2_execute_program" => sig(3, false),
-        "aipl2_str_starts_with_at" => sig(3, true),
-        "aipl2_str_slice" => sig(4, false),
+        "aipl_list_files" => sig(1, true),
+        "aipl_char_to_str" => sig(2, false),
+        "aipl_execute_program" => sig(3, false),
+        "aipl_str_starts_with_at" => sig(3, true),
+        "aipl_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }

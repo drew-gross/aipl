@@ -40,31 +40,28 @@ fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
 allocations: 15
 deallocations: 15
 reallocations: 0
-bytes allocated: 968
-instructions executed: 3383
-binary size: 7280
-  code: 4088
-  data: 477
-  metadata: 2715
+bytes allocated: 1064
+instructions executed: 3578
+binary size: 8016
+  code: 4784
+  data: 451
+  metadata: 2781
 functions:
   __eq_i64$arr:
     calls: 6
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __filter14$own0:
     calls: 1
-    bytes: 348
+    bytes: 428
   __filter7$own0:
     calls: 1
     bytes: 272
   __test$is_even:
     calls: 1
-    bytes: 2788
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 3316
   aipl_arr_inc:
     calls: 3
     bytes: (external)
@@ -83,18 +80,6 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 10
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -106,4 +91,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 108

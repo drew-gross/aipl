@@ -30,16 +30,16 @@ fn has_big(xs: i64[]) -> bool { xs.any(|x| x > 10) }.test({
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 387
-instructions executed: 954
-binary size: 5640
-  code: 2768
-  data: 437
-  metadata: 2435
+bytes allocated: 386
+instructions executed: 976
+binary size: 5888
+  code: 2956
+  data: 427
+  metadata: 2505
 functions:
   __builtin_any$char$lam8:
     calls: 1
-    bytes: 200
+    bytes: 140
   __builtin_any$i64$lam1:
     calls: 1
     bytes: 192
@@ -66,7 +66,7 @@ functions:
     bytes: 272
   __test$has_big:
     calls: 1
-    bytes: 876
+    bytes: 1092
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -79,24 +79,6 @@ functions:
   aipl_assert:
     calls: 8
     bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -108,4 +90,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 108

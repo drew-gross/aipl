@@ -16,16 +16,16 @@ fn same_length(v1: any[], v2: any[]) -> bool { len(v1) == len(v2) }.test({
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 193
-instructions executed: 141
-binary size: 2400
-  code: 756
-  data: 254
-  metadata: 1390
+bytes allocated: 190
+instructions executed: 169
+binary size: 2656
+  code: 976
+  data: 212
+  metadata: 1468
 functions:
   __test$same_length:
     calls: 1
-    bytes: 684
+    bytes: 864
   aipl_array_dec:
     calls: 3
     bytes: (external)
@@ -33,15 +33,6 @@ functions:
     calls: 3
     bytes: (external)
   aipl_assert:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 3
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
     calls: 3
     bytes: (external)
   aipl_test_begin:
@@ -55,4 +46,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 112

@@ -40,22 +40,22 @@ fn each(self: i64[], f: (i64) -> i64) -> i64[] {
     assert(xs.each(inc) == [2, 3, 4]);
 })
 --- performance ---
-allocations: 12
-deallocations: 12
-reallocations: 3
-bytes allocated: 648
-instructions executed: 2182
-binary size: 6880
-  code: 3560
-  data: 405
-  metadata: 2915
+allocations: 15
+deallocations: 15
+reallocations: 5
+bytes allocated: 747
+instructions executed: 2277
+binary size: 7560
+  code: 4092
+  data: 403
+  metadata: 3065
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __map2$own0:
     calls: 1
     bytes: 252
@@ -64,26 +64,20 @@ functions:
     bytes: 252
   __test$apply:
     calls: 1
-    bytes: 112
+    bytes: 160
   __test$double:
     calls: 1
-    bytes: 1260
+    bytes: 1528
   __test$each:
     calls: 1
-    bytes: 464
+    bytes: 484
   __test$inc:
     calls: 1
-    bytes: 244
+    bytes: 264
   __to_str_i64:
     calls: 3
-    bytes: 180
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 204
   aipl_arr_inc:
-    calls: 3
-    bytes: (external)
-  aipl_arr_retain_ptr:
     calls: 3
     bytes: (external)
   aipl_array_dec:
@@ -101,17 +95,8 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 9
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 3
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -127,4 +112,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 192
+    bytes: 288

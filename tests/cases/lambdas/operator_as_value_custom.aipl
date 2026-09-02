@@ -16,30 +16,21 @@ pub fn my_custom_add(a: i64, b: i64) -> i64 { a + b + 1000 }
 --- stdout ---
 1005
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 0
-instructions executed: 43
-binary size: 1112
-  code: 280
-  data: 2
-  metadata: 830
+bytes allocated: 20
+instructions executed: 33
+binary size: 1160
+  code: 304
+  data: 1
+  metadata: 855
 functions:
   __to_str_i64:
     calls: 1
-    bytes: 180
-  aipl_dec:
-    calls: 2
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_print:
-    calls: 1
     bytes: (external)
   aipl_write_i64:
     calls: 1

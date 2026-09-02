@@ -59,12 +59,12 @@ fn is_nine(self: i64) -> bool { self == 9 }.test({
 allocations: 9
 deallocations: 9
 reallocations: 0
-bytes allocated: 452
-instructions executed: 1600
-binary size: 9824
-  code: 5448
-  data: 870
-  metadata: 3506
+bytes allocated: 483
+instructions executed: 1663
+binary size: 10264
+  code: 5992
+  data: 774
+  metadata: 3498
 functions:
   __eq_char$opt:
     calls: 3
@@ -80,13 +80,10 @@ functions:
     bytes: 272
   __test$find_if:
     calls: 1
-    bytes: 1604
+    bytes: 2072
   __test$is_nine:
     calls: 1
-    bytes: 76
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 180
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -99,30 +96,6 @@ functions:
   aipl_assert:
     calls: 13
     bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 3
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 3
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -134,13 +107,13 @@ functions:
     bytes: (external)
   find_if$char$lam9:
     calls: 1
-    bytes: 272
+    bytes: 212
   find_if$char$s0$lam13:
     calls: 1
-    bytes: 272
+    bytes: 212
   find_if$char$s0$lam15:
     calls: 1
-    bytes: 272
+    bytes: 212
   find_if$i64$lam1:
     calls: 1
     bytes: 268
@@ -164,7 +137,7 @@ functions:
     bytes: 268
   find_if$str$lam11:
     calls: 1
-    bytes: 384
+    bytes: 480
   main:
     calls: 1
-    bytes: 120
+    bytes: 176

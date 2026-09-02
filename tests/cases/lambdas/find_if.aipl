@@ -33,16 +33,16 @@ fn first_big(xs: i64[]) -> i64? { xs.find_if(|x| x > 10) }.test({
 allocations: 9
 deallocations: 9
 reallocations: 0
-bytes allocated: 451
-instructions executed: 1316
-binary size: 7760
-  code: 4288
-  data: 649
-  metadata: 2823
+bytes allocated: 450
+instructions executed: 1341
+binary size: 7912
+  code: 4484
+  data: 591
+  metadata: 2837
 functions:
   __builtin_find_if$char$lam10:
     calls: 1
-    bytes: 272
+    bytes: 212
   __builtin_find_if$i64$lam1:
     calls: 1
     bytes: 268
@@ -78,7 +78,7 @@ functions:
     bytes: 272
   __test$first_big:
     calls: 1
-    bytes: 1328
+    bytes: 1548
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -91,24 +91,6 @@ functions:
   aipl_assert:
     calls: 9
     bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -120,4 +102,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

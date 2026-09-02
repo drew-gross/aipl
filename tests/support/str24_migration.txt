@@ -1,15 +1,62 @@
-# str24 burn-down — what the 24-byte `str` switch has not reached yet.
+# str24 burn-down — CLOSED.
 #
-# The switch (`STR_REPR.md`, stage 1) is committed but **off**: codegen emits it
-# only when `AIPL_STR24` is set. Off, the compiler is byte-for-byte what it was
-# and the suite is green; on, you get the new representation and the failures
-# below. That gating is what lets the work land in main without a red suite.
+# The 24-byte `str` is the only representation: the switch is gone, the tagged
+# half is deleted, and the artifacts were regenerated against the one ABI. What
+# follows is the record of how it was done, kept because the *shapes* recur —
+# every future representation change will meet them again.
 #
-# This is a ratchet: entries come out as the switch reaches them, and none go in
-# to quiet an unrelated failure. When it is empty, stage 1 is done and the
-# `aipl_*` half can be deleted.
+# Final state: 932 / 932 pass, no env var, no second runtime.
 #
-#   cargo build && AIPL_STR24=1 cargo nextest run --no-fail-fast
+# ---------------------------------------------------------------------------
+# What the flip itself cost, in order
+#
+#   1. **Default to wide.** One function returning `true`. The compiler kept
+#      working immediately, because the dual ABI let it emit wide code while
+#      still calling its dogfooded engines through their tagged artifacts — the
+#      whole reason the two ABIs coexisted.
+#   2. **Regenerate the artifacts.** `cargo handoff` did the staged-IR flow on
+#      its own: 504 sections refilled, IR promoted.
+#   3. **Delete the switch.** 37 `str24_enabled()` branches collapsed to their
+#      wide arm. Emitted code unchanged, so the gate needed *no* regeneration —
+#      which is what proved the deletion was inert.
+#   4. **Delete the tagged runtime**, both halves, and every helper the compiler
+#      could then see was dead: `StrRepr`, `str_bytes`, `pack_inline`,
+#      `concat_materialize`, the tagged iterator, the tagged SSO `to_str`, the
+#      tagged file/spawn/walk paths. ~7,000 lines gone.
+#   5. **Take back the names.** `aipl2_*` → `aipl_*`, and `active_sym` — the
+#      remap that existed only while both name sets did — disappeared with it.
+#
+# Two things fell out that were worth more than the deletion:
+#
+#   - **`Args` collapsed to one case.** Every entry point borrows its arguments
+#     now, so "does this builtin consume what it is handed?" stopped being a
+#     question with two answers. The old convention existed because a tagged
+#     `str` was a bare pointer whose lifetime had to be managed across the call;
+#     a 24-byte value is passed by address to something the caller is already
+#     keeping alive. `borrowed_param` is the statement of the protocol.
+#   - **`ArgKind` collapsed too.** Naming argument kinds (`Word` vs `Str`) was
+#     scaffolding for exactly this flip; afterwards every argument is one word
+#     and the table is back to counting them — the same shape the artifact
+#     manifest's table already had, so the two now agree in form as well as
+#     content.
+#
+# ---------------------------------------------------------------------------
+# The one real bug the flip exposed
+#
+# `aipl_arr_join` was labelled `Ret::Str`. It returns a `T[]`, not a `str` — but
+# while every result came back in one register, `Ret::Str` and `Ret::Word` were
+# indistinguishable and the mislabel was invisible. The moment `Ret::Str` came to
+# mean "written through a leading out pointer", codegen started prepending a
+# buffer for a value that comes back in a register, and `arr_join` corrupted its
+# parts list.
+#
+# **That is the shape to expect from any representation change: not the code that
+# knew about the representation, but the code that had been wrong all along in a
+# way the old uniformity hid.** Four of these turned up over the migration —
+# `field_size` duplicating `elem_size_of`, `dict_key_size` hardcoded to 8, a
+# `str!Error` payload sized from the ok side, and this. Each was a rule computed
+# twice, or from one representative, and each agreed with itself only while
+# everything was one word.
 #
 # ---------------------------------------------------------------------------
 # Why this is a list and not a set of `#[ignore]`s

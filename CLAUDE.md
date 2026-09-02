@@ -63,6 +63,28 @@ pay for the corpus twice; it reorders steps that depend on each other, and the
 breakage that follows looks exactly like a real bug, so you then debug your own
 sequencing.
 
+**Never pipe a long-running command through a filter.** Run it bare:
+
+    cargo handoff
+
+Not `cargo handoff | tail -20`, not `2>&1 | tail`, not `| grep`, not `| head`.
+The same goes for any whole-suite `cargo nextest run` or `cargo test`. A pipe
+buffers the entire run, so the step-by-step output — `==> aipl fmt`,
+`==> nextest (discovery)`, the elapsed times — appears only when the process
+exits, ten to twenty minutes later. Until then the shells view shows nothing and
+the run is indistinguishable from a hang. Watching a slow gate make progress is
+the whole reason it prints its steps.
+
+Filtering only ever serves the *agent's* convenience in reading the tool result;
+it costs the human the one thing they need while a long run is in flight. If you
+want a filtered view, run it bare and read or grep the recorded output file
+afterwards — the harness saves it, and nothing is lost by waiting.
+
+This is a repeat offence, not a hypothetical: in one session nearly every
+`cargo handoff` went out as `cargo handoff 2>&1 | tail -N`, including the run
+immediately after being corrected for it. Treat "am I about to pipe a
+long-running command?" as a checkpoint before every invocation.
+
 **If you find yourself wanting non-targeted validation before the handoff run,
 that is a bug report about the gate — say so instead of working around it.**
 Propose the improvement (and offer to implement it); don't build a parallel

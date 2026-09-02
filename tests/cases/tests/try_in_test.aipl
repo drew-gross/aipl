@@ -58,10 +58,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 3
-binary size: 520
+binary size: 488
   code: 8
-  data: 2
-  metadata: 510
+  data: 1
+  metadata: 479
 functions:
   main:
     calls: 1

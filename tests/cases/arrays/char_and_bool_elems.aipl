@@ -26,19 +26,19 @@ fn first_true(bs: bool[]) -> i64 {
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 152
-instructions executed: 483
-binary size: 3512
-  code: 1456
-  data: 329
-  metadata: 1727
+bytes allocated: 151
+instructions executed: 438
+binary size: 3616
+  code: 1604
+  data: 279
+  metadata: 1733
 functions:
   __test$count_h:
     calls: 1
-    bytes: 244
+    bytes: 348
   __test$first_true:
     calls: 1
-    bytes: 888
+    bytes: 932
   aipl_array_dec:
     calls: 4
     bytes: (external)
@@ -47,24 +47,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 3
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -77,7 +59,7 @@ functions:
     bytes: (external)
   count_h:
     calls: 2
-    bytes: 208
+    bytes: 148
   main:
     calls: 1
-    bytes: 116
+    bytes: 176

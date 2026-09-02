@@ -38,33 +38,24 @@ fn main() !prints {
 24
 
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 13
+deallocations: 13
 reallocations: 0
-bytes allocated: 560
-instructions executed: 331
-binary size: 2696
-  code: 1068
-  data: 2
-  metadata: 1626
+bytes allocated: 613
+instructions executed: 301
+binary size: 2704
+  code: 1084
+  data: 1
+  metadata: 1619
 functions:
   __rec_drop_Tree:
     calls: 10
     bytes: 84
   __to_str_i64:
     calls: 3
-    bytes: 180
-  aipl_dec:
-    calls: 6
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 3
     bytes: (external)
   aipl_rec_alloc:
     calls: 10
@@ -89,7 +80,7 @@ functions:
     bytes: 256
   main:
     calls: 1
-    bytes: 388
+    bytes: 380
   total:
     calls: 10
     bytes: 160

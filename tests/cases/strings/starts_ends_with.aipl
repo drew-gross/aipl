@@ -71,35 +71,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 434
-binary size: 8704
-  code: 2496
-  data: 2016
-  metadata: 4192
+instructions executed: 952
+binary size: 11032
+  code: 4884
+  data: 1894
+  metadata: 4254
 functions:
   __test$is_dotfile:
     calls: 1
-    bytes: 2424
+    bytes: 4776
   aipl_assert:
     calls: 35
-    bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 10
-    bytes: (external)
-  aipl_str_len:
-    calls: 69
-    bytes: (external)
-  aipl_str_slice:
-    calls: 1
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 13
-    bytes: (external)
-  aipl_str_starts_with_at:
-    calls: 11
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -112,4 +94,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

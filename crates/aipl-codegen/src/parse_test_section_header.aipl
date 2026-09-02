@@ -48,44 +48,23 @@ pub fn parse_test_section_header(line: str) -> str? {
     assert(parse_test_section_header("\t--- stdout ---") == none);
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 192
-instructions executed: 1191
-binary size: 7512
-  code: 2536
-  data: 1474
-  metadata: 3502
+bytes allocated: 0
+instructions executed: 1656
+binary size: 7552
+  code: 3576
+  data: 1096
+  metadata: 2880
 functions:
   __eq_str$opt:
     calls: 13
     bytes: 100
   __test$parse_test_section_header:
     calls: 1
-    bytes: 1736
+    bytes: 2632
   aipl_assert:
-    calls: 13
-    bytes: (external)
-  aipl_dec:
-    calls: 50
-    bytes: (external)
-  aipl_inc:
-    calls: 38
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 8
-    bytes: (external)
-  aipl_str_eq:
-    calls: 12
-    bytes: (external)
-  aipl_str_len:
-    calls: 71
-    bytes: (external)
-  aipl_str_slice:
-    calls: 7
-    bytes: (external)
-  aipl_str_starts_with:
     calls: 13
     bytes: (external)
   aipl_test_begin:
@@ -97,12 +76,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 15
-    bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100
   parse_test_section_header:
     calls: 13
-    bytes: 628
+    bytes: 744

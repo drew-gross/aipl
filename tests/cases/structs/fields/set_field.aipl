@@ -60,42 +60,27 @@ fn rename(n: Named, name: str) -> Named {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 80
-instructions executed: 259
-binary size: 3496
-  code: 1216
-  data: 381
-  metadata: 1899
+bytes allocated: 176
+instructions executed: 372
+binary size: 3400
+  code: 1832
+  data: 99
+  metadata: 1469
 functions:
   __test$alias_unaffected:
     calls: 1
-    bytes: 148
+    bytes: 168
   __test$bump_x:
     calls: 1
-    bytes: 244
+    bytes: 380
   __test$rename:
     calls: 1
-    bytes: 428
+    bytes: 680
   __test$set_n:
     calls: 1
-    bytes: 196
+    bytes: 292
   aipl_assert:
     calls: 8
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 10
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 6
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -108,4 +93,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 200
+    bytes: 312

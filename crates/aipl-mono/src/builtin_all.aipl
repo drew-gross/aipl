@@ -38,22 +38,22 @@ fn is_nine(self: i64) -> bool { self == 9 }.test({
 allocations: 7
 deallocations: 7
 reallocations: 0
-bytes allocated: 324
-instructions executed: 1193
-binary size: 6440
-  code: 3144
-  data: 598
-  metadata: 2698
+bytes allocated: 323
+instructions executed: 1136
+binary size: 6560
+  code: 3416
+  data: 484
+  metadata: 2660
 functions:
   __filter13$own0:
     calls: 1
     bytes: 272
   __test$all:
     calls: 1
-    bytes: 824
+    bytes: 1116
   __test$is_nine:
     calls: 1
-    bytes: 76
+    bytes: 180
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -66,24 +66,6 @@ functions:
   aipl_assert:
     calls: 11
     bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 3
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 3
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 6
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -95,13 +77,13 @@ functions:
     bytes: (external)
   all$char$lam7:
     calls: 1
-    bytes: 212
+    bytes: 152
   all$char$s0$lam11:
     calls: 1
-    bytes: 212
+    bytes: 152
   all$char$s0$lam9:
     calls: 1
-    bytes: 212
+    bytes: 152
   all$i64$lam1:
     calls: 1
     bytes: 204
@@ -122,4 +104,4 @@ functions:
     bytes: 204
   main:
     calls: 1
-    bytes: 112
+    bytes: 168

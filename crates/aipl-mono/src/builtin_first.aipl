@@ -20,12 +20,12 @@ pub fn first<T: any>(self: T[]) -> T? { self[0] }.doc("""
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 224
-instructions executed: 347
-binary size: 3424
-  code: 1540
-  data: 216
-  metadata: 1668
+bytes allocated: 256
+instructions executed: 425
+binary size: 3752
+  code: 1872
+  data: 214
+  metadata: 1666
 functions:
   __eq_i64$opt:
     calls: 3
@@ -35,10 +35,7 @@ functions:
     bytes: 100
   __test$first:
     calls: 1
-    bytes: 1268
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 1568
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -51,15 +48,6 @@ functions:
   aipl_assert:
     calls: 4
     bytes: (external)
-  aipl_dec:
-    calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -71,4 +59,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

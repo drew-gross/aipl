@@ -51,21 +51,21 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 292
-binary size: 3176
-  code: 1160
-  data: 473
-  metadata: 1543
+instructions executed: 342
+binary size: 3256
+  code: 1376
+  data: 431
+  metadata: 1449
 functions:
   __eq_Shape:
     calls: 2
     bytes: 360
   __test$perimeter:
     calls: 1
-    bytes: 472
+    bytes: 612
   __test$unwrap:
     calls: 1
-    bytes: 92
+    bytes: 112
   aipl_assert:
     calls: 8
     bytes: (external)
@@ -80,7 +80,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 116
+    bytes: 172
   perimeter:
     calls: 5
     bytes: 120

@@ -38,22 +38,19 @@ fn joined(self: str, parts: str*) -> str {
 allocations: 14
 deallocations: 14
 reallocations: 0
-bytes allocated: 568
-instructions executed: 897
-binary size: 6640
-  code: 3080
-  data: 525
-  metadata: 3035
+bytes allocated: 824
+instructions executed: 1180
+binary size: 7688
+  code: 4164
+  data: 499
+  metadata: 3025
 functions:
   __test$joined:
     calls: 1
-    bytes: 1064
+    bytes: 1820
   __test$sum:
     calls: 1
-    bytes: 768
-  aipl_arr_drop_str:
-    calls: 3
-    bytes: (external)
+    bytes: 892
   aipl_arr_inc:
     calls: 4
     bytes: (external)
@@ -66,21 +63,6 @@ functions:
   aipl_assert:
     calls: 10
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 30
-    bytes: (external)
-  aipl_inc:
-    calls: 19
-    bytes: (external)
-  aipl_str_eq:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -92,10 +74,10 @@ functions:
     bytes: (external)
   joined$vo1:
     calls: 2
-    bytes: 596
+    bytes: 748
   main:
     calls: 1
-    bytes: 112
+    bytes: 164
   sum:
     calls: 3
     bytes: 176

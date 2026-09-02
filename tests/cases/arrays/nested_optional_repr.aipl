@@ -41,48 +41,30 @@ true
 42
 some(some(some(some("deep"))))
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 90
-instructions executed: 606
-binary size: 6744
-  code: 2980
-  data: 620
-  metadata: 3144
+bytes allocated: 126
+instructions executed: 611
+binary size: 7024
+  code: 3156
+  data: 619
+  metadata: 3249
 functions:
   __to_str_bool:
     calls: 1
-    bytes: 212
+    bytes: 232
   __to_str_i64:
     calls: 1
-    bytes: 180
+    bytes: 204
   __to_str_i64$opt$opt$opt$opt:
     calls: 1
-    bytes: 836
+    bytes: 876
   __to_str_str$opt$opt$opt$opt:
     calls: 1
-    bytes: 912
-  aipl_dec:
-    calls: 12
-    bytes: (external)
+    bytes: 944
   aipl_i64_len:
     calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 4
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 2
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_write_bytes:
     calls: 18
@@ -92,4 +74,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 840
+    bytes: 900

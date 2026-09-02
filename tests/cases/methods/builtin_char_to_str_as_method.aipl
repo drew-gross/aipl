@@ -7,28 +7,19 @@ fn main() !prints -> i64 {
 --- stdout ---
 'X'
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 0
-instructions executed: 55
-binary size: 992
-  code: 276
-  data: 2
-  metadata: 714
+bytes allocated: 19
+instructions executed: 45
+binary size: 1048
+  code: 296
+  data: 1
+  metadata: 751
 functions:
   __to_str_char:
     calls: 1
-    bytes: 184
-  aipl_dec:
-    calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_print:
-    calls: 1
-    bytes: (external)
+    bytes: 204
   main:
     calls: 1
     bytes: 92

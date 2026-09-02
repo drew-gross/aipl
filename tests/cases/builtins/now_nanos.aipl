@@ -30,15 +30,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 55
-binary size: 1472
-  code: 260
-  data: 133
-  metadata: 1079
+instructions executed: 69
+binary size: 1440
+  code: 356
+  data: 91
+  metadata: 993
 functions:
   __test$now_is_plausible:
     calls: 1
-    bytes: 76
+    bytes: 124
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -59,7 +59,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 120
   now_is_plausible:
     calls: 2
     bytes: 112

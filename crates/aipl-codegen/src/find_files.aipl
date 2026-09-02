@@ -36,31 +36,25 @@ pub fn with_extension(self: str[], ext: str) -> str[] {
 --- performance ---
 allocations: 22
 deallocations: 22
-reallocations: 0
-bytes allocated: 936
-instructions executed: 1421
-binary size: 9736
-  code: 4552
-  data: 762
-  metadata: 4422
+reallocations: 3
+bytes allocated: 1192
+instructions executed: 1774
+binary size: 10744
+  code: 6056
+  data: 544
+  metadata: 4144
 functions:
   __eq_str$arr:
     calls: 6
-    bytes: 308
+    bytes: 364
   __test$find_files:
     calls: 1
-    bytes: 192
+    bytes: 340
   __test$with_extension:
     calls: 1
-    bytes: 3192
-  aipl_arr_drop_str:
-    calls: 15
-    bytes: (external)
+    bytes: 4320
   aipl_arr_inc:
     calls: 6
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 9
     bytes: (external)
   aipl_arr_sort:
     calls: 6
@@ -80,23 +74,8 @@ functions:
   aipl_assert:
     calls: 7
     bytes: (external)
-  aipl_dec:
-    calls: 38
-    bytes: (external)
-  aipl_inc:
-    calls: 27
-    bytes: (external)
   aipl_list_files:
     calls: 1
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 13
-    bytes: (external)
-  aipl_str_eq:
-    calls: 7
-    bytes: (external)
-  aipl_str_len:
-    calls: 26
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -109,7 +88,7 @@ functions:
     bytes: (external)
   find_files:
     calls: 1
-    bytes: 748
+    bytes: 848
   main:
     calls: 1
-    bytes: 112
+    bytes: 184

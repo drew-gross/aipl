@@ -36,40 +36,25 @@ false
 true
 
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 0
-instructions executed: 663
-binary size: 4232
-  code: 2328
-  data: 48
-  metadata: 1856
+bytes allocated: 164
+instructions executed: 728
+binary size: 5032
+  code: 3008
+  data: 47
+  metadata: 1977
 functions:
   __eq_Tok:
     calls: 1
     bytes: 272
   __to_str_bool:
     calls: 8
-    bytes: 212
-  aipl_dec:
-    calls: 27
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 8
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
+    bytes: 232
   aipl_write_bytes:
     calls: 8
     bytes: (external)
   main:
     calls: 1
-    bytes: 1844
+    bytes: 2504

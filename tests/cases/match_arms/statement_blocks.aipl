@@ -91,51 +91,24 @@ many 3
 AY
 ?
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 50
-instructions executed: 519
-binary size: 3936
-  code: 1876
-  data: 2
-  metadata: 2058
+bytes allocated: 296
+instructions executed: 513
+binary size: 4184
+  code: 2168
+  data: 1
+  metadata: 2015
 functions:
   __to_str_i64:
     calls: 1
-    bytes: 180
+    bytes: 204
   __to_str_u64:
     calls: 6
-    bytes: 180
-  aipl_concat:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 34
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 16
-    bytes: (external)
-  aipl_print:
-    calls: 10
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
-    calls: 5
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 9
     bytes: (external)
   aipl_u64_len:
     calls: 12
@@ -151,7 +124,7 @@ functions:
     bytes: 56
   classify:
     calls: 3
-    bytes: 636
+    bytes: 748
   main:
     calls: 1
-    bytes: 824
+    bytes: 956

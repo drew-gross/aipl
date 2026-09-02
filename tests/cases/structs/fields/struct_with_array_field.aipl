@@ -19,24 +19,18 @@ fn make() -> Tags {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 88
-instructions executed: 200
-binary size: 3008
-  code: 1100
-  data: 176
-  metadata: 1732
+bytes allocated: 136
+instructions executed: 276
+binary size: 3432
+  code: 1512
+  data: 174
+  metadata: 1746
 functions:
   __test$make:
     calls: 1
-    bytes: 1028
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 1412
   aipl_arr_inc:
     calls: 6
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 2
     bytes: (external)
   aipl_array_dec:
     calls: 8
@@ -50,15 +44,6 @@ functions:
   aipl_assert:
     calls: 3
     bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -70,4 +55,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

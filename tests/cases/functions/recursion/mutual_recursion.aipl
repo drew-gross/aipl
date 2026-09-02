@@ -14,15 +14,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 790
-binary size: 1824
-  code: 432
-  data: 189
-  metadata: 1203
+instructions executed: 822
+binary size: 1904
+  code: 572
+  data: 163
+  metadata: 1169
 functions:
   __test$is_even:
     calls: 1
-    bytes: 136
+    bytes: 204
   aipl_assert:
     calls: 4
     bytes: (external)
@@ -49,4 +49,4 @@ functions:
     bytes: 36
   main:
     calls: 1
-    bytes: 160
+    bytes: 232

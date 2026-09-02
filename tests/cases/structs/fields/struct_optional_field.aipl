@@ -23,33 +23,18 @@ fn make(present: bool) -> Box {
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
-instructions executed: 218
-binary size: 2680
-  code: 1072
-  data: 205
-  metadata: 1403
+bytes allocated: 88
+instructions executed: 303
+binary size: 3040
+  code: 1428
+  data: 203
+  metadata: 1409
 functions:
   __test$make:
     calls: 1
-    bytes: 568
+    bytes: 764
   aipl_assert:
     calls: 3
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_inc:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -62,7 +47,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100
   make:
     calls: 2
-    bytes: 432
+    bytes: 564

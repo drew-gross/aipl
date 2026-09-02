@@ -45,31 +45,31 @@ fn make_empty() -> #{i64: str} { #{:} }.test({
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 384
-instructions executed: 831
-binary size: 9640
-  code: 4760
-  data: 864
-  metadata: 4016
+bytes allocated: 576
+instructions executed: 1181
+binary size: 10776
+  code: 6244
+  data: 702
+  metadata: 3830
 functions:
   __dict_drop_i64$str:
     calls: 4
     bytes: 128
   __dict_drop_str$i64:
     calls: 2
-    bytes: 128
+    bytes: 132
   __dict_retain_i64$str:
     calls: 8
     bytes: 128
   __dict_retain_str$i64:
     calls: 4
-    bytes: 128
+    bytes: 132
   __eq_dict$i64$str:
     calls: 1
-    bytes: 264
+    bytes: 256
   __eq_dict$str$i64:
     calls: 1
-    bytes: 252
+    bytes: 276
   __eq_i64$opt:
     calls: 1
     bytes: 100
@@ -78,16 +78,16 @@ functions:
     bytes: 100
   __test$dedup:
     calls: 1
-    bytes: 496
+    bytes: 728
   __test$ints:
     calls: 1
-    bytes: 1620
+    bytes: 2272
   __test$make_empty:
     calls: 1
-    bytes: 540
+    bytes: 724
   __test$strs:
     calls: 1
-    bytes: 684
+    bytes: 976
   aipl_array_dec:
     calls: 6
     bytes: (external)
@@ -100,9 +100,6 @@ functions:
   aipl_assert:
     calls: 16
     bytes: (external)
-  aipl_dec:
-    calls: 20
-    bytes: (external)
   aipl_dict_contains_key:
     calls: 2
     bytes: (external)
@@ -111,15 +108,6 @@ functions:
     bytes: (external)
   aipl_dict_insert:
     calls: 12
-    bytes: (external)
-  aipl_inc:
-    calls: 18
-    bytes: (external)
-  aipl_str_eq:
-    calls: 8
-    bytes: (external)
-  aipl_str_len:
-    calls: 10
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -132,4 +120,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 192
+    bytes: 292

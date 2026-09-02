@@ -59,40 +59,25 @@ true
 Span { start: 2, end: 6 }
 cde
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 42
-instructions executed: 213
-binary size: 2840
-  code: 1084
-  data: 165
-  metadata: 1591
+bytes allocated: 61
+instructions executed: 202
+binary size: 2912
+  code: 1124
+  data: 164
+  metadata: 1624
 functions:
   __eq___builtin_Span:
     calls: 1
     bytes: 104
   __to_str___builtin_Span:
     calls: 1
-    bytes: 464
+    bytes: 484
   __to_str_bool:
     calls: 1
-    bytes: 212
-  aipl_dec:
-    calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_slice:
-    calls: 1
-    bytes: (external)
+    bytes: 232
   aipl_u64_len:
     calls: 4
     bytes: (external)

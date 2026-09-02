@@ -40,32 +40,17 @@ code 404
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 190
-instructions executed: 416
-binary size: 3824
-  code: 1888
-  data: 62
-  metadata: 1874
+bytes allocated: 388
+instructions executed: 531
+binary size: 3904
+  code: 2228
+  data: 1
+  metadata: 1675
 functions:
   __to_str_i64:
     calls: 2
-    bytes: 180
-  aipl_char_at:
-    calls: 4
-    bytes: (external)
-  aipl_concat:
-    calls: 8
-    bytes: (external)
-  aipl_dec:
-    calls: 41
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
-    calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 23
-    bytes: (external)
-  aipl_print:
     calls: 4
     bytes: (external)
   aipl_write_i64:
@@ -73,10 +58,10 @@ functions:
     bytes: (external)
   describe:
     calls: 3
-    bytes: 408
+    bytes: 488
   first_digit:
     calls: 3
-    bytes: 640
+    bytes: 784
   main:
     calls: 1
-    bytes: 660
+    bytes: 752

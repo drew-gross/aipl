@@ -14,12 +14,12 @@ fn eq() -> bool { #{1: "a", 2: "b"} == #{2: "b", 1: "a"} }.test({
 allocations: 16
 deallocations: 16
 reallocations: 0
-bytes allocated: 816
-instructions executed: 846
-binary size: 6904
-  code: 3516
-  data: 327
-  metadata: 3061
+bytes allocated: 992
+instructions executed: 1011
+binary size: 7456
+  code: 4100
+  data: 325
+  metadata: 3031
 functions:
   __dict_drop_i64$i64$arr:
     calls: 4
@@ -38,13 +38,13 @@ functions:
     bytes: 256
   __eq_dict$i64$str:
     calls: 4
-    bytes: 264
+    bytes: 256
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$eq:
     calls: 1
-    bytes: 2120
+    bytes: 2684
   aipl_arr_inc:
     calls: 4
     bytes: (external)
@@ -63,23 +63,11 @@ functions:
   aipl_assert:
     calls: 6
     bytes: (external)
-  aipl_dec:
-    calls: 11
-    bytes: (external)
   aipl_dict_get:
     calls: 6
     bytes: (external)
   aipl_dict_insert:
     calls: 15
-    bytes: (external)
-  aipl_inc:
-    calls: 11
-    bytes: (external)
-  aipl_str_eq:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -92,4 +80,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 68
+    bytes: 96

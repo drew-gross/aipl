@@ -13,19 +13,16 @@ fn pick(b: bool) -> str[]? { if (b) { some(["x", "y", "z"]) } else { none } }.te
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 88
-instructions executed: 174
-binary size: 3024
-  code: 1248
-  data: 124
-  metadata: 1652
+bytes allocated: 136
+instructions executed: 246
+binary size: 3696
+  code: 1848
+  data: 114
+  metadata: 1734
 functions:
   __test$pick:
     calls: 1
-    bytes: 1176
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 1748
   aipl_arr_inc:
     calls: 5
     bytes: (external)
@@ -38,15 +35,6 @@ functions:
   aipl_assert:
     calls: 2
     bytes: (external)
-  aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -58,4 +46,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

@@ -51,15 +51,15 @@ err
 err
 three
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 11
+deallocations: 11
 reallocations: 0
-bytes allocated: 448
-instructions executed: 1273
-binary size: 10888
-  code: 6608
-  data: 68
-  metadata: 4212
+bytes allocated: 534
+instructions executed: 1487
+binary size: 12176
+  code: 7712
+  data: 67
+  metadata: 4397
 functions:
   __arr_drop_Wrapped:
     calls: 3
@@ -69,31 +69,31 @@ functions:
     bytes: 120
   __builtin_try_map$i64$Wrapped$str$lam13:
     calls: 1
-    bytes: 612
+    bytes: 636
   __builtin_try_map$i64$Wrapped$str$lam9:
     calls: 1
-    bytes: 612
+    bytes: 636
   __builtin_try_map$i64$i64$str$lam17:
     calls: 1
-    bytes: 556
+    bytes: 576
   __lambda_0:
     calls: 1
-    bytes: 424
+    bytes: 564
   __lambda_12:
     calls: 2
-    bytes: 424
+    bytes: 564
   __lambda_16:
     calls: 1
-    bytes: 400
+    bytes: 508
   __lambda_4:
     calls: 1
-    bytes: 424
+    bytes: 564
   __lambda_8:
     calls: 2
-    bytes: 424
+    bytes: 564
   __to_str_i64$arr:
     calls: 1
-    bytes: 672
+    bytes: 708
   aipl_arr_inc:
     calls: 8
     bytes: (external)
@@ -112,20 +112,8 @@ functions:
   aipl_array_with_cap:
     calls: 1
     bytes: (external)
-  aipl_dec:
-    calls: 39
-    bytes: (external)
   aipl_i64_len:
     calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 30
-    bytes: (external)
-  aipl_print:
-    calls: 5
-    bytes: (external)
-  aipl_str_eq:
-    calls: 3
     bytes: (external)
   aipl_write_bytes:
     calls: 3
@@ -135,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1820
+    bytes: 2152

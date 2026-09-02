@@ -13,16 +13,16 @@ fn main() !prints {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 141
-instructions executed: 403
-binary size: 2272
-  code: 916
-  data: 68
-  metadata: 1288
+bytes allocated: 140
+instructions executed: 396
+binary size: 2336
+  code: 956
+  data: 67
+  metadata: 1313
 functions:
   __to_str_i64$arr:
     calls: 1
-    bytes: 672
+    bytes: 708
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -32,20 +32,8 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_dec:
-    calls: 2
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_print:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
     bytes: (external)
   aipl_write_bytes:
     calls: 4
@@ -55,4 +43,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 244
+    bytes: 248

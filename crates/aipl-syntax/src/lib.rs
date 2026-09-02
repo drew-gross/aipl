@@ -2069,28 +2069,6 @@ pub mod concrete {
     }
 }
 
-/// Which representation of `str` is selected for this process — the 24-byte
-/// value (`true`) or the 8-byte tagged pointer (`false`). See `STR_REPR.md`.
-///
-/// **This is the one place the selection is read.** It lives here rather than in
-/// codegen because monomorphization needs it too: an in-place `map` may only
-/// reuse a buffer whose slots are wide enough for what it writes, and only the
-/// representation says how wide that is (`slot_fits`).
-///
-/// It is deliberately a *selection*, not a constant. A type having more than one
-/// runtime representation, chosen for performance or other criteria, is meant to
-/// generalize past `str` — so the layout questions downstream
-/// (`is_composite`, `elem_size_of`, `sret_size`, and their explicit
-/// `Abi`-taking forms in codegen) are all written to take the representation
-/// as an input rather than to assume one. Today the selection is process-global
-/// and comes from an environment variable, which is the migration's scaffolding;
-/// when representations become per-type this is the function that grows a
-/// parameter, and everything asking it already threads an answer through.
-pub fn wide_str_selected() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("AIPL_STR24").is_some())
-}
-
 pub fn is_str_repr(t: &Type) -> bool {
     matches!(t, Type::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
 }

@@ -21,62 +21,26 @@ pub fn normalize_output(self: str) -> str {
     assert(normalize_output("\r\n\r\n") == ""); // all line endings -> empty
 })
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 16
+deallocations: 16
 reallocations: 0
-bytes allocated: 360
-instructions executed: 1717
-binary size: 3904
-  code: 1176
-  data: 559
-  metadata: 2169
+bytes allocated: 880
+instructions executed: 1580
+binary size: 4320
+  code: 1816
+  data: 509
+  metadata: 1995
 functions:
   __test$normalize_output:
     calls: 1
-    bytes: 684
-  aipl_arr_drop_str:
-    calls: 8
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 8
-    bytes: (external)
+    bytes: 1280
   aipl_array_dec:
-    calls: 16
+    calls: 8
     bytes: (external)
   aipl_array_new:
     calls: 8
     bytes: (external)
   aipl_assert:
-    calls: 8
-    bytes: (external)
-  aipl_dec:
-    calls: 53
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_str_data:
-    calls: 7
-    bytes: (external)
-  aipl_str_eq:
-    calls: 8
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 8
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 7
-    bytes: (external)
-  aipl_str_join:
-    calls: 8
-    bytes: (external)
-  aipl_str_len:
-    calls: 28
-    bytes: (external)
-  aipl_str_slice:
-    calls: 21
-    bytes: (external)
-  aipl_str_split:
     calls: 8
     bytes: (external)
   aipl_test_begin:
@@ -90,7 +54,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 120
   normalize_output:
     calls: 8
-    bytes: 420
+    bytes: 416

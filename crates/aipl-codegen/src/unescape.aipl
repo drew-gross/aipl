@@ -74,48 +74,27 @@ pub fn unescape(self: str) -> str {
     assert(unescape("\\n\\t\\r") == "\n\t\r");
 })
 --- performance ---
-allocations: 39
-deallocations: 39
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 1552
-instructions executed: 3521
-binary size: 8712
-  code: 3256
-  data: 1254
-  metadata: 4202
+bytes allocated: 880
+instructions executed: 4621
+binary size: 11864
+  code: 6484
+  data: 1084
+  metadata: 4296
 functions:
   __eq_char$opt:
     calls: 36
     bytes: 100
   __test$escape_text:
     calls: 1
-    bytes: 1228
+    bytes: 3204
   __test$unescape:
     calls: 1
-    bytes: 988
+    bytes: 1892
   aipl_assert:
     calls: 19
-    bytes: (external)
-  aipl_char_at:
-    calls: 36
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 38
-    bytes: (external)
-  aipl_dec:
-    calls: 185
-    bytes: (external)
-  aipl_inc:
-    calls: 80
-    bytes: (external)
-  aipl_str_eq:
-    calls: 63
-    bytes: (external)
-  aipl_str_len:
-    calls: 258
-    bytes: (external)
-  aipl_str_slice:
-    calls: 38
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -128,7 +107,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 180
   unescape:
     calls: 12
-    bytes: 828
+    bytes: 1108

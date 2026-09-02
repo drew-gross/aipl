@@ -60,28 +60,28 @@ bc
 ab
 
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 23
+deallocations: 23
 reallocations: 0
-bytes allocated: 458
-instructions executed: 1099
-binary size: 7016
-  code: 3752
-  data: 140
-  metadata: 3124
+bytes allocated: 697
+instructions executed: 990
+binary size: 6944
+  code: 3784
+  data: 139
+  metadata: 3021
 functions:
   __builtin_drop_last_n$i64:
     calls: 4
     bytes: 196
   __to_str_char$opt:
     calls: 1
-    bytes: 352
+    bytes: 380
   __to_str_i64$opt:
     calls: 7
-    bytes: 360
+    bytes: 388
   __to_str_u64:
     calls: 5
-    bytes: 180
+    bytes: 204
   aipl_arr_inc:
     calls: 4
     bytes: (external)
@@ -94,29 +94,8 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_char_at:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 30
-    bytes: (external)
   aipl_i64_len:
     calls: 10
-    bytes: (external)
-  aipl_inc:
-    calls: 15
-    bytes: (external)
-  aipl_print:
-    calls: 15
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 3
-    bytes: (external)
-  aipl_str_slice:
-    calls: 2
     bytes: (external)
   aipl_u64_len:
     calls: 10
@@ -132,4 +111,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2664
+    bytes: 2616

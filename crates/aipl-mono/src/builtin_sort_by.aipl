@@ -92,13 +92,13 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
 --- performance ---
 allocations: 111
 deallocations: 111
-reallocations: 27
-bytes allocated: 4352
-instructions executed: 7837
-binary size: 22528
-  code: 13720
-  data: 755
-  metadata: 8053
+reallocations: 29
+bytes allocated: 4784
+instructions executed: 8304
+binary size: 24232
+  code: 15216
+  data: 745
+  metadata: 8271
 functions:
   __arr_drop_E:
     calls: 10
@@ -111,13 +111,10 @@ functions:
     bytes: 296
   __eq_str$arr:
     calls: 2
-    bytes: 308
+    bytes: 364
   __test$sort_by:
     calls: 1
-    bytes: 12760
-  aipl_arr_drop_str:
-    calls: 13
-    bytes: (external)
+    bytes: 14168
   aipl_arr_extend:
     calls: 27
     bytes: (external)
@@ -126,9 +123,6 @@ functions:
     bytes: (external)
   aipl_arr_reserve:
     calls: 27
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 16
     bytes: (external)
   aipl_arr_slice:
     calls: 81
@@ -148,18 +142,6 @@ functions:
   aipl_assert:
     calls: 10
     bytes: (external)
-  aipl_dec:
-    calls: 84
-    bytes: (external)
-  aipl_inc:
-    calls: 69
-    bytes: (external)
-  aipl_str_cmp:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 6
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -171,4 +153,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 108

@@ -22,29 +22,20 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 57
-binary size: 1616
-  code: 344
-  data: 130
-  metadata: 1142
+instructions executed: 99
+binary size: 1688
+  code: 536
+  data: 88
+  metadata: 1064
 functions:
   __test$mixed:
     calls: 1
-    bytes: 148
+    bytes: 252
   __test$swapped_kinds:
     calls: 1
-    bytes: 84
+    bytes: 104
   aipl_assert:
     calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -57,4 +48,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 180

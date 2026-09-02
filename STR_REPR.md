@@ -482,7 +482,7 @@ The breakage is nondeterministic — a value that is 24 bytes to one code path a
 8 to another corrupts whatever sits next to it, and what that is depends on
 allocation order. There is no stable set to ignore, so ignoring would have
 suppressed a moving target. The flag keeps the suite honestly green; the list
-survives as `tests/support/str24_burndown.txt`, a record of the work rather than
+survives as `tests/support/str24_migration.txt`, a record of the work rather than
 a suppression mechanism.
 
 ### The bug that gating exposed
@@ -501,7 +501,7 @@ return kind alone.
 Programs with no strings work. String literals crashed during codegen of `main`
 after the gating refactor, having previously worked end to end (`print("short")`
 and a 35-byte static literal both printed). Re-proving those two is the next
-step, and `tests/support/str24_burndown.txt` records the clusters behind them —
+step, and `tests/support/str24_migration.txt` records the clusters behind them —
 16 tests on the FFI read path, 6 on `emit_render`, 7 on the dogfooded
 formatter/lexer/highlighter, 2 on the artifacts, 8 on container shapes.
 

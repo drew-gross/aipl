@@ -28,16 +28,16 @@ fn grid3() -> str[][] {
 allocations: 8
 deallocations: 8
 reallocations: 1
-bytes allocated: 392
-instructions executed: 1215
-binary size: 4912
-  code: 2476
-  data: 201
-  metadata: 2235
+bytes allocated: 584
+instructions executed: 1519
+binary size: 6048
+  code: 3644
+  data: 117
+  metadata: 2287
 functions:
   __eq_str$arr:
     calls: 3
-    bytes: 308
+    bytes: 364
   __eq_str$arr$arr:
     calls: 1
     bytes: 300
@@ -46,15 +46,12 @@ functions:
     bytes: 100
   __test$grid3:
     calls: 1
-    bytes: 1696
+    bytes: 2776
   aipl_arr_drop_arr:
     calls: 2
     bytes: (external)
-  aipl_arr_drop_str:
-    calls: 6
-    bytes: (external)
   aipl_arr_inc:
-    calls: 6
+    calls: 7
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 1
@@ -71,15 +68,6 @@ functions:
   aipl_assert:
     calls: 4
     bytes: (external)
-  aipl_dec:
-    calls: 14
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 7
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -91,4 +79,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

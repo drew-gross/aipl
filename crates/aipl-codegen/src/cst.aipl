@@ -226,15 +226,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(CTree(far, []).show(src, names) == "(?)");
 })
 --- performance ---
-allocations: 165
-deallocations: 165
-reallocations: 1
-bytes allocated: 8204
-instructions executed: 9853
-binary size: 29544
-  code: 16160
-  data: 1918
-  metadata: 11466
+allocations: 188
+deallocations: 188
+reallocations: 18
+bytes allocated: 10123
+instructions executed: 10470
+binary size: 30608
+  code: 17612
+  data: 1788
+  metadata: 11208
 functions:
   __arr_drop_Cst:
     calls: 8
@@ -259,24 +259,21 @@ functions:
     bytes: 48
   __test$show:
     calls: 1
-    bytes: 9732
+    bytes: 10868
   aipl_arr_drop_arr:
     calls: 12
     bytes: (external)
-  aipl_arr_drop_str:
-    calls: 11
-    bytes: (external)
   aipl_arr_inc:
-    calls: 221
+    calls: 250
     bytes: (external)
   aipl_arr_join:
     calls: 14
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 70
+    calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 389
+    calls: 376
     bytes: (external)
   aipl_array_new:
     calls: 76
@@ -290,15 +287,6 @@ functions:
   aipl_assert:
     calls: 30
     bytes: (external)
-  aipl_concat:
-    calls: 22
-    bytes: (external)
-  aipl_dec:
-    calls: 171
-    bytes: (external)
-  aipl_inc:
-    calls: 116
-    bytes: (external)
   aipl_rec_alloc:
     calls: 30
     bytes: (external)
@@ -307,18 +295,6 @@ functions:
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 76
-    bytes: (external)
-  aipl_str_eq:
-    calls: 14
-    bytes: (external)
-  aipl_str_join:
-    calls: 13
-    bytes: (external)
-  aipl_str_len:
-    calls: 32
-    bytes: (external)
-  aipl_str_slice:
-    calls: 27
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -334,22 +310,22 @@ functions:
     bytes: 764
   main:
     calls: 1
-    bytes: 72
+    bytes: 100
   own_token_text:
     calls: 2
-    bytes: 1056
+    bytes: 1088
   show:
     calls: 14
-    bytes: 1392
+    bytes: 1592
   span:
     calls: 4
     bytes: 460
   text:
     calls: 4
-    bytes: 392
+    bytes: 420
   token_leaves:
     calls: 22
     bytes: 736
   token_text:
     calls: 4
-    bytes: 392
+    bytes: 420

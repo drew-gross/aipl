@@ -70,48 +70,36 @@ fn render(n: i64, f: (i64) -> i64, g: (i64) -> str) -> str { g(f(n)) }.test({
     assert(render(3, |x| x * 2, |x| ```{x}{unit}```) == "6px");
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 0
-instructions executed: 306
-binary size: 5272
-  code: 1628
-  data: 991
-  metadata: 2653
+bytes allocated: 210
+instructions executed: 421
+binary size: 5576
+  code: 2188
+  data: 893
+  metadata: 2495
 functions:
   __test$apply_both:
     calls: 1
-    bytes: 76
+    bytes: 104
   __test$combine:
     calls: 1
-    bytes: 412
+    bytes: 560
   __test$render:
     calls: 1
-    bytes: 564
+    bytes: 748
   __test$scale_if:
     calls: 1
-    bytes: 196
+    bytes: 264
   __to_str_i64:
     calls: 2
-    bytes: 180
+    bytes: 204
   aipl_assert:
     calls: 13
     bytes: (external)
-  aipl_concat:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 20
-    bytes: (external)
   aipl_i64_len:
     calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -127,4 +115,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 200
+    bytes: 308

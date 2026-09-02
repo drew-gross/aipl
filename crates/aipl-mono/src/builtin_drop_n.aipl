@@ -21,12 +21,12 @@ pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.doc("""
 allocations: 12
 deallocations: 12
 reallocations: 0
-bytes allocated: 584
-instructions executed: 368
-binary size: 4264
-  code: 1824
-  data: 390
-  metadata: 2050
+bytes allocated: 632
+instructions executed: 456
+binary size: 4616
+  code: 2188
+  data: 364
+  metadata: 2064
 functions:
   __eq_i64$opt:
     calls: 1
@@ -36,13 +36,7 @@ functions:
     bytes: 100
   __test$drop_n:
     calls: 1
-    bytes: 1548
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 1
-    bytes: (external)
+    bytes: 1884
   aipl_arr_slice:
     calls: 6
     bytes: (external)
@@ -55,15 +49,6 @@ functions:
   aipl_assert:
     calls: 6
     bytes: (external)
-  aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -75,4 +60,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 104

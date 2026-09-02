@@ -25,41 +25,32 @@ pub fn fill_or_add_section_file(
     );
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 0
-instructions executed: 88
-binary size: 8128
-  code: 4116
-  data: 319
-  metadata: 3693
+bytes allocated: 28
+instructions executed: 134
+binary size: 7920
+  code: 4592
+  data: 226
+  metadata: 3102
 functions:
   __eq_str$opt:
     calls: 0
     bytes: 100
   __m1__contains_section:
     calls: 0
-    bytes: 568
+    bytes: 584
   __m3__parse_test_section_header:
     calls: 0
-    bytes: 628
+    bytes: 744
   __test$fill_or_add_section_file:
     calls: 1
-    bytes: 164
+    bytes: 312
   aipl_assert:
     calls: 1
     bytes: (external)
-  aipl_dec:
-    calls: 3
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
   aipl_read_file_to_string:
-    calls: 1
-    bytes: (external)
-  aipl_str_eq:
     calls: 1
     bytes: (external)
   aipl_test_begin:
@@ -73,7 +64,7 @@ functions:
     bytes: (external)
   fill_or_add_section_file:
     calls: 1
-    bytes: 2584
+    bytes: 2752
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

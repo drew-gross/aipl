@@ -78,63 +78,57 @@ fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }.
     assert(width("").is_err_and(|c| c == 'e'));
 })
 --- performance ---
-allocations: 53
-deallocations: 53
+allocations: 75
+deallocations: 75
 reallocations: 0
-bytes allocated: 2096
-instructions executed: 4109
-binary size: 22272
-  code: 12064
-  data: 1292
-  metadata: 8916
+bytes allocated: 3885
+instructions executed: 4780
+binary size: 24048
+  code: 13956
+  data: 1180
+  metadata: 8912
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 296
   __eq_str$arr:
     calls: 4
-    bytes: 308
+    bytes: 364
   __eq_u64$arr:
     calls: 1
     bytes: 296
   __lambda_10:
     calls: 2
-    bytes: 284
+    bytes: 340
   __lambda_8:
     calls: 2
-    bytes: 284
+    bytes: 340
   __test$label:
     calls: 1
-    bytes: 388
+    bytes: 484
   __test$try_map:
     calls: 1
-    bytes: 4624
+    bytes: 5608
   __test$width:
     calls: 1
-    bytes: 188
+    bytes: 276
   __test_try_fail_char:
     calls: 0
-    bytes: 64
+    bytes: 84
   __test_try_fail_str:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_char:
     calls: 0
-    bytes: 184
+    bytes: 204
   __to_str_i64:
     calls: 16
-    bytes: 180
+    bytes: 204
   __to_str_str:
     calls: 0
-    bytes: 252
-  aipl_arr_drop_str:
-    calls: 14
-    bytes: (external)
+    bytes: 276
   aipl_arr_inc:
     calls: 32
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 14
     bytes: (external)
   aipl_array_dec:
     calls: 75
@@ -148,23 +142,8 @@ functions:
   aipl_assert:
     calls: 15
     bytes: (external)
-  aipl_concat:
-    calls: 32
-    bytes: (external)
-  aipl_dec:
-    calls: 187
-    bytes: (external)
   aipl_i64_len:
     calls: 32
-    bytes: (external)
-  aipl_inc:
-    calls: 98
-    bytes: (external)
-  aipl_str_eq:
-    calls: 18
-    bytes: (external)
-  aipl_str_len:
-    calls: 19
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -180,28 +159,28 @@ functions:
     bytes: (external)
   label:
     calls: 16
-    bytes: 564
+    bytes: 680
   main:
     calls: 1
-    bytes: 156
+    bytes: 236
   try_map$i64$i64$str$lam15:
     calls: 1
-    bytes: 688
+    bytes: 764
   try_map$i64$i64$str$lam17:
     calls: 1
-    bytes: 688
+    bytes: 764
   try_map$i64$str$str$lam0:
     calls: 6
-    bytes: 616
+    bytes: 632
   try_map$i64$str$str$lam11:
     calls: 1
-    bytes: 616
+    bytes: 632
   try_map$i64$str$str$lam9:
     calls: 1
-    bytes: 616
+    bytes: 632
   try_map$str$u64$char$lam1:
     calls: 1
-    bytes: 564
+    bytes: 592
   width:
     calls: 4
-    bytes: 144
+    bytes: 168

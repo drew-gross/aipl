@@ -23,16 +23,16 @@ fn count_eq<T: any>(self: T[], target: T) -> i64 {
 allocations: 2
 deallocations: 2
 reallocations: 0
-bytes allocated: 84
-instructions executed: 828
-binary size: 2984
-  code: 1088
-  data: 323
-  metadata: 1573
+bytes allocated: 83
+instructions executed: 669
+binary size: 3080
+  code: 1212
+  data: 281
+  metadata: 1587
 functions:
   __test$count_eq:
     calls: 1
-    bytes: 784
+    bytes: 932
   aipl_array_dec:
     calls: 1
     bytes: (external)
@@ -41,24 +41,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 1
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 3
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 4
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 7
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -71,7 +53,7 @@ functions:
     bytes: (external)
   count_eq$char$s0:
     calls: 3
-    bytes: 232
+    bytes: 172
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

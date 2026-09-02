@@ -51,48 +51,30 @@ some(some(5))
 some(some(some(42)))
 some(some("hi"))
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 130
-instructions executed: 734
-binary size: 6480
-  code: 3000
-  data: 500
-  metadata: 2980
+bytes allocated: 178
+instructions executed: 699
+binary size: 6640
+  code: 3104
+  data: 499
+  metadata: 3037
 functions:
   __to_str_i64:
     calls: 3
-    bytes: 180
+    bytes: 204
   __to_str_i64$opt$opt:
     calls: 2
-    bytes: 516
+    bytes: 556
   __to_str_i64$opt$opt$opt:
     calls: 1
-    bytes: 680
+    bytes: 708
   __to_str_str$opt$opt:
     calls: 1
-    bytes: 600
-  aipl_dec:
-    calls: 16
-    bytes: (external)
+    bytes: 616
   aipl_i64_len:
     calls: 12
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_print:
-    calls: 7
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 4
-    bytes: (external)
-  aipl_str_data:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_write_bytes:
     calls: 19
@@ -102,4 +84,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1024
+    bytes: 1020

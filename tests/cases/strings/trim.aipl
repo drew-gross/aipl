@@ -15,22 +15,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 55
-binary size: 2136
-  code: 464
-  data: 275
-  metadata: 1397
+instructions executed: 129
+binary size: 2288
+  code: 812
+  data: 209
+  metadata: 1267
 functions:
   __test$trim_spaces:
     calls: 1
-    bytes: 392
+    bytes: 700
   aipl_assert:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_str_eq:
     calls: 4
     bytes: (external)
   aipl_test_begin:
@@ -42,9 +36,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 4
-    bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 112

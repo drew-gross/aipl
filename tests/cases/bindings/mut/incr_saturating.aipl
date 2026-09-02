@@ -18,28 +18,19 @@ fn main() !prints {
 255
 255
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 0
-instructions executed: 144
-binary size: 1424
+bytes allocated: 57
+instructions executed: 114
+binary size: 1416
   code: 480
-  data: 2
-  metadata: 942
+  data: 1
+  metadata: 935
 functions:
   __to_str_u8:
     calls: 3
-    bytes: 180
-  aipl_dec:
-    calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
+    bytes: 204
   aipl_u64_len:
     calls: 6
     bytes: (external)
@@ -48,4 +39,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 300
+    bytes: 276

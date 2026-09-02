@@ -53,36 +53,27 @@ fn main() !prints {
 1
 Tree { value: 7, left: none, right: none }
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 419
-instructions executed: 638
-binary size: 6328
-  code: 2924
-  data: 309
-  metadata: 3095
+bytes allocated: 453
+instructions executed: 611
+binary size: 6384
+  code: 2956
+  data: 308
+  metadata: 3120
 functions:
   __rec_drop_Tree:
     calls: 5
     bytes: 104
   __to_str_Tree:
     calls: 1
-    bytes: 1104
+    bytes: 1132
   __to_str_i64:
     calls: 2
-    bytes: 180
-  aipl_dec:
-    calls: 6
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 3
     bytes: (external)
   aipl_rec_alloc:
     calls: 5
@@ -99,9 +90,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 3
     bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
   aipl_write_bytes:
     calls: 9
     bytes: (external)
@@ -110,7 +98,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1220
+    bytes: 1200
   total:
     calls: 4
     bytes: 316

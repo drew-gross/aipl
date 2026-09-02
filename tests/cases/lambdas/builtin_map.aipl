@@ -18,39 +18,33 @@ fn doubled(xs: i64[]) -> i64[] { xs.map(|x| x * 2) }.test({
     assert(xs.map(|x| x + 1).map(|y| y * y) == [4, 9, 16]);
 })
 --- performance ---
-allocations: 11
-deallocations: 11
-reallocations: 0
-bytes allocated: 616
-instructions executed: 2069
-binary size: 5872
-  code: 3072
-  data: 314
-  metadata: 2486
+allocations: 14
+deallocations: 14
+reallocations: 2
+bytes allocated: 715
+instructions executed: 2136
+binary size: 6416
+  code: 3488
+  data: 312
+  metadata: 2616
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __map10$own0:
     calls: 1
     bytes: 252
   __test$doubled:
     calls: 1
-    bytes: 1960
+    bytes: 2264
   __to_str_i64:
     calls: 3
-    bytes: 180
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 204
   aipl_arr_inc:
     calls: 2
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 3
     bytes: (external)
   aipl_array_dec:
     calls: 13
@@ -67,17 +61,8 @@ functions:
   aipl_assert:
     calls: 5
     bytes: (external)
-  aipl_dec:
-    calls: 9
-    bytes: (external)
   aipl_i64_len:
     calls: 6
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 3
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -93,4 +78,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 108

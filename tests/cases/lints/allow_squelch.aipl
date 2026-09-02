@@ -10,31 +10,16 @@ fn main() !prints {
 --- stdout ---
 lo, world
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 32
-instructions executed: 13
-binary size: 952
-  code: 140
-  data: 31
-  metadata: 781
+bytes allocated: 0
+instructions executed: 17
+binary size: 832
+  code: 180
+  data: 1
+  metadata: 651
 functions:
-  aipl_dec:
-    calls: 3
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_print:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 1
-    bytes: (external)
-  aipl_str_slice:
-    calls: 1
-    bytes: (external)
   main:
     calls: 1
-    bytes: 140
+    bytes: 180

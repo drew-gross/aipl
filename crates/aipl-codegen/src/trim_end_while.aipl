@@ -22,37 +22,16 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 995
-binary size: 3752
-  code: 1660
-  data: 396
-  metadata: 1696
+instructions executed: 801
+binary size: 3768
+  code: 1792
+  data: 354
+  metadata: 1622
 functions:
   __test$trim_end_while:
     calls: 1
-    bytes: 1588
+    bytes: 1676
   aipl_assert:
-    calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 5
-    bytes: (external)
-  aipl_str_data:
-    calls: 4
-    bytes: (external)
-  aipl_str_eq:
-    calls: 5
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 5
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 9
-    bytes: (external)
-  aipl_str_slice:
     calls: 5
     bytes: (external)
   aipl_test_begin:
@@ -66,4 +45,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 116

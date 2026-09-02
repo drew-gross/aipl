@@ -56,30 +56,24 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
 allocations: 4
 deallocations: 4
 reallocations: 0
-bytes allocated: 72
-instructions executed: 213
-binary size: 4200
-  code: 1296
-  data: 608
-  metadata: 2296
+bytes allocated: 88
+instructions executed: 290
+binary size: 4392
+  code: 1656
+  data: 550
+  metadata: 2186
 functions:
   __test$elapsed_over_a_one_second_sleep:
     calls: 1
-    bytes: 484
+    bytes: 592
   __test$is_about_one_second:
     calls: 1
-    bytes: 424
+    bytes: 532
   __test$readings_never_go_backwards:
     calls: 1
-    bytes: 236
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
+    bytes: 284
   aipl_array_dec:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_array_new:
     calls: 1
@@ -87,14 +81,8 @@ functions:
   aipl_assert:
     calls: 8
     bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
   aipl_execute_program:
     calls: 1
-    bytes: (external)
-  aipl_inc:
-    calls: 2
     bytes: (external)
   aipl_monotonic_now:
     calls: 5
@@ -113,4 +101,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 152
+    bytes: 248

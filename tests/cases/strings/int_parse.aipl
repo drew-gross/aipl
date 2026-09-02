@@ -48,52 +48,28 @@ fn main() -> i64 {
 --- exit code ---
 0
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 192
-instructions executed: 8093
-binary size: 4128
-  code: 2344
-  data: 159
-  metadata: 1625
+bytes allocated: 0
+instructions executed: 6700
+binary size: 4056
+  code: 2684
+  data: 1
+  metadata: 1371
 functions:
   __builtin_count_while$char$s0$lam4:
     calls: 9
-    bytes: 232
+    bytes: 172
   __builtin_int_parse:
     calls: 11
-    bytes: 1032
+    bytes: 1028
   __eq_i64$opt:
     calls: 11
     bytes: 100
   __lambda_2:
     calls: 86
     bytes: 140
-  aipl_dec:
-    calls: 26
-    bytes: (external)
-  aipl_inc:
-    calls: 13
-    bytes: (external)
-  aipl_str_data:
-    calls: 18
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 18
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 18
-    bytes: (external)
-  aipl_str_len:
-    calls: 91
-    bytes: (external)
-  aipl_str_slice:
-    calls: 13
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 11
-    bytes: (external)
   main:
     calls: 1
-    bytes: 840
+    bytes: 1244

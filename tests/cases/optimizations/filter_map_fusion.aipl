@@ -106,15 +106,15 @@ some(398)
 100
 some(2)
 --- performance ---
-allocations: 14
-deallocations: 14
+allocations: 19
+deallocations: 19
 reallocations: 54
-bytes allocated: 5334
-instructions executed: 90496
-binary size: 6232
-  code: 3532
-  data: 68
-  metadata: 2632
+bytes allocated: 5427
+instructions executed: 90425
+binary size: 6160
+  code: 3512
+  data: 67
+  metadata: 2581
 functions:
   __filter_map11$own0:
     calls: 2
@@ -124,10 +124,10 @@ functions:
     bytes: 308
   __to_str_i64$opt:
     calls: 4
-    bytes: 360
+    bytes: 388
   __to_str_u64:
     calls: 4
-    bytes: 180
+    bytes: 204
   aipl_arr_inc:
     calls: 13
     bytes: (external)
@@ -143,20 +143,8 @@ functions:
   aipl_array_with_cap:
     calls: 4
     bytes: (external)
-  aipl_dec:
-    calls: 16
-    bytes: (external)
   aipl_i64_len:
     calls: 8
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 8
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 3
     bytes: (external)
   aipl_u64_len:
     calls: 8
@@ -175,7 +163,7 @@ functions:
     bytes: 304
   main:
     calls: 1
-    bytes: 1400
+    bytes: 1328
   many:
     calls: 5
     bytes: 196

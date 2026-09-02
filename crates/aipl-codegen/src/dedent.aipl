@@ -60,39 +60,30 @@ pub fn dedent(self: str) -> str {
     );
 })
 --- performance ---
-allocations: 35
-deallocations: 35
-reallocations: 0
-bytes allocated: 1641
-instructions executed: 14264
-binary size: 7168
-  code: 2752
-  data: 990
-  metadata: 3426
+allocations: 40
+deallocations: 40
+reallocations: 19
+bytes allocated: 2199
+instructions executed: 11459
+binary size: 7416
+  code: 3532
+  data: 804
+  metadata: 3080
 functions:
   __builtin_all$char$s0$lam10:
     calls: 42
-    bytes: 272
+    bytes: 212
   __builtin_count_while$char$s0$lam2:
     calls: 0
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam9:
     calls: 17
-    bytes: 232
+    bytes: 172
   __test$dedent:
     calls: 1
-    bytes: 876
-  aipl_arr_drop_str:
-    calls: 20
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 10
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 21
-    bytes: (external)
+    bytes: 1652
   aipl_array_dec:
-    calls: 40
+    calls: 30
     bytes: (external)
   aipl_array_new:
     calls: 10
@@ -106,36 +97,6 @@ functions:
   aipl_assert:
     calls: 10
     bytes: (external)
-  aipl_dec:
-    calls: 149
-    bytes: (external)
-  aipl_inc:
-    calls: 77
-    bytes: (external)
-  aipl_str_data:
-    calls: 53
-    bytes: (external)
-  aipl_str_eq:
-    calls: 10
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 59
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 53
-    bytes: (external)
-  aipl_str_join:
-    calls: 10
-    bytes: (external)
-  aipl_str_len:
-    calls: 152
-    bytes: (external)
-  aipl_str_slice:
-    calls: 38
-    bytes: (external)
-  aipl_str_split:
-    calls: 10
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -147,7 +108,7 @@ functions:
     bytes: (external)
   dedent:
     calls: 10
-    bytes: 1064
+    bytes: 1220
   main:
     calls: 1
-    bytes: 76
+    bytes: 104

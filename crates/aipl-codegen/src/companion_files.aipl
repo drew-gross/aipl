@@ -155,15 +155,15 @@ fn companion_path(header: str) -> str!str {
     assert(companion_path("file: a\\b.txt").is_err_and(|e| e.starts_with(`use "/"`)));
 })
 --- performance ---
-allocations: 148
-deallocations: 148
+allocations: 71
+deallocations: 71
 reallocations: 0
-bytes allocated: 5774
-instructions executed: 9166
-binary size: 23104
-  code: 10100
-  data: 3095
-  metadata: 9909
+bytes allocated: 5386
+instructions executed: 12014
+binary size: 24992
+  code: 13224
+  data: 2565
+  metadata: 9203
 functions:
   __arr_drop_Companion:
     calls: 11
@@ -179,22 +179,19 @@ functions:
     bytes: 284
   __m2__parse_test_section_header:
     calls: 35
-    bytes: 628
+    bytes: 744
   __test$companion_files:
     calls: 1
-    bytes: 4504
+    bytes: 6136
   __test$companion_path:
     calls: 1
-    bytes: 1056
+    bytes: 1560
   __test_try_fail_str:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_str:
     calls: 0
-    bytes: 252
-  aipl_arr_drop_str:
-    calls: 12
-    bytes: (external)
+    bytes: 276
   aipl_arr_inc:
     calls: 27
     bytes: (external)
@@ -210,48 +207,6 @@ functions:
   aipl_assert:
     calls: 18
     bytes: (external)
-  aipl_concat:
-    calls: 4
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 44
-    bytes: (external)
-  aipl_dec:
-    calls: 598
-    bytes: (external)
-  aipl_inc:
-    calls: 322
-    bytes: (external)
-  aipl_str_contains:
-    calls: 11
-    bytes: (external)
-  aipl_str_data:
-    calls: 16
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 13
-    bytes: (external)
-  aipl_str_eq:
-    calls: 100
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 6
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 16
-    bytes: (external)
-  aipl_str_len:
-    calls: 443
-    bytes: (external)
-  aipl_str_slice:
-    calls: 75
-    bytes: (external)
-  aipl_str_split:
-    calls: 12
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 54
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -261,15 +216,12 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 41
-    bytes: (external)
   companion_files:
     calls: 12
-    bytes: 2008
+    bytes: 2572
   companion_path:
     calls: 15
-    bytes: 776
+    bytes: 956
   main:
     calls: 1
-    bytes: 112
+    bytes: 196

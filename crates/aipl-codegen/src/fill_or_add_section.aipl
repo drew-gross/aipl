@@ -264,28 +264,25 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
     );
 })
 --- performance ---
-allocations: 78
-deallocations: 78
+allocations: 59
+deallocations: 59
 reallocations: 0
-bytes allocated: 2981
-instructions executed: 11039
-binary size: 12704
-  code: 4684
-  data: 3042
-  metadata: 4978
+bytes allocated: 5328
+instructions executed: 10410
+binary size: 13200
+  code: 6212
+  data: 2792
+  metadata: 4196
 functions:
   __eq_str$opt:
     calls: 42
     bytes: 100
   __m2__parse_test_section_header:
     calls: 32
-    bytes: 628
+    bytes: 744
   __test$fill_or_add_section:
     calls: 1
-    bytes: 1128
-  aipl_arr_drop_str:
-    calls: 10
-    bytes: (external)
+    bytes: 2388
   aipl_array_dec:
     calls: 10
     bytes: (external)
@@ -294,45 +291,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 10
-    bytes: (external)
-  aipl_concat:
-    calls: 30
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 30
-    bytes: (external)
-  aipl_dec:
-    calls: 409
-    bytes: (external)
-  aipl_inc:
-    calls: 227
-    bytes: (external)
-  aipl_str_data:
-    calls: 9
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 12
-    bytes: (external)
-  aipl_str_eq:
-    calls: 34
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 10
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 9
-    bytes: (external)
-  aipl_str_len:
-    calls: 246
-    bytes: (external)
-  aipl_str_slice:
-    calls: 60
-    bytes: (external)
-  aipl_str_split:
-    calls: 10
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 32
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -343,15 +301,12 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 24
-    bytes: (external)
   contains_section:
     calls: 10
-    bytes: 568
+    bytes: 584
   fill_or_add_section:
     calls: 10
-    bytes: 2188
+    bytes: 2268
   main:
     calls: 1
-    bytes: 72
+    bytes: 128

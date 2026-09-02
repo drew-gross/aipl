@@ -8447,13 +8447,6 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
 /// it can be *moved* into an owning parameter rather than borrowed: an array
 /// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
 /// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
-/// Whether the 24-byte `str` is selected. One line, because the selection has a
-/// single home in `aipl_syntax` — see [`aipl_syntax::wide_str_selected`] for why
-/// monomorphization is one of its two readers.
-fn wide_str() -> bool {
-    aipl_syntax::wide_str_selected()
-}
-
 /// Whether `t`'s values are `str`-shaped — a `str`/`Error`/concat-str, or a
 /// `char[]`, which shares the representation.
 fn str_shaped(t: &Type) -> bool {
@@ -8463,12 +8456,12 @@ fn str_shaped(t: &Type) -> bool {
 
 /// Whether an array of `from` can have its buffer reused to hold `to`.
 ///
-/// Under the tagged representation every reusable element was one word, so any
-/// two reusable types interchanged freely. A wide `str` is 24 bytes, so a slot
-/// sized for an `i64` cannot hold one: `[1, 2].map(to_str)` reused an `i64[]`
-/// buffer for `str` elements and wrote three words into each one-word slot.
+/// This is the one place monomorphization has to know a representation: a `str`
+/// is 24 bytes and everything else reusable is one word, so a slot sized for an
+/// `i64` cannot hold one. `[1, 2].map(to_str)` reused an `i64[]` buffer for
+/// `str` elements and wrote three words into each one-word slot.
 fn slot_fits(from: &Type, to: &Type) -> bool {
-    !wide_str() || str_shaped(from) == str_shaped(to)
+    str_shaped(from) == str_shaped(to)
 }
 
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {

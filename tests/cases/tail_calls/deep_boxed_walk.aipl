@@ -30,31 +30,22 @@ fn main() !prints {
 --- stdout ---
 800000
 --- performance ---
-allocations: 200001
-deallocations: 200001
+allocations: 200002
+deallocations: 200002
 reallocations: 0
-bytes allocated: 11200056
-instructions executed: 8000062
-binary size: 2448
-  code: 940
-  data: 2
-  metadata: 1506
+bytes allocated: 14400094
+instructions executed: 10600052
+binary size: 2608
+  code: 1036
+  data: 1
+  metadata: 1571
 functions:
   __rec_drop_List:
     calls: 200001
     bytes: 84
   __to_str_u64:
     calls: 1
-    bytes: 180
-  aipl_dec:
-    calls: 400002
-    bytes: (external)
-  aipl_inc:
-    calls: 200001
-    bytes: (external)
-  aipl_print:
-    calls: 1
-    bytes: (external)
+    bytes: 204
   aipl_rec_alloc:
     calls: 200001
     bytes: (external)
@@ -70,9 +61,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 200000
     bytes: (external)
-  aipl_str_len:
-    calls: 200000
-    bytes: (external)
   aipl_u64_len:
     calls: 2
     bytes: (external)
@@ -84,7 +72,7 @@ functions:
     bytes: 36
   build$tail:
     calls: 200001
-    bytes: 216
+    bytes: 288
   main:
     calls: 1
     bytes: 156

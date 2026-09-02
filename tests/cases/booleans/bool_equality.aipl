@@ -13,18 +13,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 38
-binary size: 1400
-  code: 228
-  data: 164
-  metadata: 1008
+instructions executed: 65
+binary size: 1488
+  code: 360
+  data: 154
+  metadata: 974
 functions:
   __test$beq:
     calls: 1
-    bytes: 76
+    bytes: 124
   __test$bne:
     calls: 1
-    bytes: 48
+    bytes: 76
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -39,4 +39,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 104
+    bytes: 160

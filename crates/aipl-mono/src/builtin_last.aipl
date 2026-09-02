@@ -19,12 +19,12 @@ pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.doc("""
 allocations: 5
 deallocations: 5
 reallocations: 0
-bytes allocated: 224
-instructions executed: 363
-binary size: 3464
-  code: 1580
-  data: 215
-  metadata: 1669
+bytes allocated: 256
+instructions executed: 441
+binary size: 3792
+  code: 1908
+  data: 213
+  metadata: 1671
 functions:
   __eq_i64$opt:
     calls: 3
@@ -34,10 +34,7 @@ functions:
     bytes: 100
   __test$last:
     calls: 1
-    bytes: 1308
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 1608
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -50,15 +47,6 @@ functions:
   aipl_assert:
     calls: 4
     bytes: (external)
-  aipl_dec:
-    calls: 4
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -70,4 +58,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

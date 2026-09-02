@@ -38,33 +38,24 @@ pub fn indent(self: str, target: u64) -> str {
     assert("a\n  b".indent(0) == "a\n  b");
 })
 --- performance ---
-allocations: 32
-deallocations: 32
-reallocations: 0
-bytes allocated: 1239
-instructions executed: 1869
-binary size: 4456
-  code: 1464
-  data: 475
-  metadata: 2517
+allocations: 33
+deallocations: 33
+reallocations: 11
+bytes allocated: 2060
+instructions executed: 1925
+binary size: 4608
+  code: 2020
+  data: 361
+  metadata: 2227
 functions:
   __builtin_all$char$s0$lam3:
     calls: 13
-    bytes: 272
+    bytes: 212
   __test$indent:
     calls: 1
-    bytes: 564
-  aipl_arr_drop_str:
-    calls: 12
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 6
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 13
-    bytes: (external)
+    bytes: 1048
   aipl_array_dec:
-    calls: 18
+    calls: 12
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -78,42 +69,6 @@ functions:
   aipl_assert:
     calls: 6
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 11
-    bytes: (external)
-  aipl_dec:
-    calls: 110
-    bytes: (external)
-  aipl_inc:
-    calls: 54
-    bytes: (external)
-  aipl_str_data:
-    calls: 12
-    bytes: (external)
-  aipl_str_eq:
-    calls: 6
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 13
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 12
-    bytes: (external)
-  aipl_str_join:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 68
-    bytes: (external)
-  aipl_str_repeat:
-    calls: 6
-    bytes: (external)
-  aipl_str_slice:
-    calls: 13
-    bytes: (external)
-  aipl_str_split:
-    calls: 6
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -125,7 +80,7 @@ functions:
     bytes: (external)
   indent:
     calls: 6
-    bytes: 552
+    bytes: 656
   main:
     calls: 1
-    bytes: 76
+    bytes: 104

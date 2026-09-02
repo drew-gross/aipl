@@ -70,15 +70,15 @@ false
 true
 true
 --- performance ---
-allocations: 33
-deallocations: 33
+allocations: 62
+deallocations: 62
 reallocations: 0
-bytes allocated: 1409
-instructions executed: 4277
-binary size: 6224
-  code: 2924
-  data: 168
-  metadata: 3132
+bytes allocated: 1939
+instructions executed: 3882
+binary size: 6272
+  code: 2996
+  data: 167
+  metadata: 3109
 functions:
   __eq_List:
     calls: 11
@@ -88,24 +88,15 @@ functions:
     bytes: 44
   __to_str_List:
     calls: 45
-    bytes: 664
+    bytes: 708
   __to_str_bool:
     calls: 3
-    bytes: 212
+    bytes: 232
   __to_str_i64:
     calls: 2
-    bytes: 180
-  aipl_dec:
-    calls: 58
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 46
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 8
     bytes: (external)
   aipl_rec_alloc:
     calls: 12
@@ -122,15 +113,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 9
     bytes: (external)
-  aipl_str_alloc:
-    calls: 21
-    bytes: (external)
-  aipl_str_data:
-    calls: 21
-    bytes: (external)
-  aipl_str_len:
-    calls: 42
-    bytes: (external)
   aipl_write_bytes:
     calls: 132
     bytes: (external)
@@ -142,7 +124,7 @@ functions:
     bytes: 104
   main:
     calls: 1
-    bytes: 1492
+    bytes: 1476
   sum:
     calls: 4
     bytes: 104

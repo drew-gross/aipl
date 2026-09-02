@@ -16,29 +16,20 @@ pub fn greeting() -> str { "hi" }
 42
 hi
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 0
-instructions executed: 42
-binary size: 1136
-  code: 292
-  data: 2
-  metadata: 842
+bytes allocated: 18
+instructions executed: 38
+binary size: 1208
+  code: 336
+  data: 1
+  metadata: 871
 functions:
   __to_str_i64:
     calls: 1
-    bytes: 180
-  aipl_dec:
-    calls: 3
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
-    calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 1
-    bytes: (external)
-  aipl_print:
     calls: 2
     bytes: (external)
   aipl_write_i64:
@@ -46,4 +37,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 132

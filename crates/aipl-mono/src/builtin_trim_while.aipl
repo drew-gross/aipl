@@ -27,58 +27,37 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 859
-binary size: 5696
-  code: 2616
-  data: 507
-  metadata: 2573
+instructions executed: 723
+binary size: 5728
+  code: 2764
+  data: 473
+  metadata: 2491
 functions:
   __builtin_count_while$char$s0$lam14:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam15:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam16:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam17:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam18:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam19:
     calls: 1
-    bytes: 232
+    bytes: 172
   __builtin_count_while$char$s0$lam20:
     calls: 1
-    bytes: 232
+    bytes: 172
   __test$trim_while:
     calls: 1
-    bytes: 920
+    bytes: 1452
   aipl_assert:
-    calls: 7
-    bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_str_data:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 7
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 7
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 20
-    bytes: (external)
-  aipl_str_slice:
     calls: 7
     bytes: (external)
   aipl_test_begin:
@@ -92,4 +71,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

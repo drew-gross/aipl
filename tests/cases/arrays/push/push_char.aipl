@@ -31,33 +31,18 @@ fn appended(xs: char[], x: char) -> char[] {
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 155
-instructions executed: 187
-binary size: 3160
-  code: 1080
-  data: 286
-  metadata: 1794
+bytes allocated: 147
+instructions executed: 280
+binary size: 3984
+  code: 1704
+  data: 244
+  metadata: 2036
 functions:
   __test$appended:
     calls: 1
-    bytes: 1008
+    bytes: 1596
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_dec:
-    calls: 8
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 8
-    bytes: (external)
-  aipl_str_data:
-    calls: 3
-    bytes: (external)
-  aipl_str_eq:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 12
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -73,4 +58,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

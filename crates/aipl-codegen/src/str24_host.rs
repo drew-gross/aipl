@@ -80,15 +80,15 @@ pub(super) fn write_string_to_file(path: Str, contents: Str) -> bool {
     std::io::Write::flush(&mut file).is_ok()
 }
 
-/// `print(s)` under the new ABI — the `aipl2_*` counterpart of `aipl_print`.
+/// `print(s)` under the new ABI — the `aipl_*` counterpart of `aipl_print`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl2_print(s: *const Str) {
+pub(crate) extern "C" fn aipl_print(s: *const Str) {
     print(unsafe { *s });
 }
 
 /// `error: <msg>` under the new ABI.
 #[no_mangle]
-pub(crate) extern "C" fn aipl2_print_error(s: *const Str) {
+pub(crate) extern "C" fn aipl_print_error(s: *const Str) {
     print_error(unsafe { *s });
 }
 
@@ -101,7 +101,7 @@ pub(crate) extern "C" fn aipl2_print_error(s: *const Str) {
 /// therefore explicit, which is also clearer: "did it work" and "what did it
 /// produce" stop sharing one channel. Borrows `path`.
 #[no_mangle]
-pub(crate) extern "C" fn aipl2_read_file_to_string(out: *mut Str, path: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl_read_file_to_string(out: *mut Str, path: *const Str) -> i64 {
     match read_file_to_string(unsafe { *path }) {
         Some(s) => {
             unsafe { *out = s };
@@ -116,7 +116,7 @@ pub(crate) extern "C" fn aipl2_read_file_to_string(out: *mut Str, path: *const S
 
 /// `write_string_to_file(path, contents)` under the wide ABI. Borrows both.
 #[no_mangle]
-pub(crate) extern "C" fn aipl2_write_string_to_file(path: *const Str, contents: *const Str) -> i64 {
+pub(crate) extern "C" fn aipl_write_string_to_file(path: *const Str, contents: *const Str) -> i64 {
     i64::from(write_string_to_file(unsafe { *path }, unsafe { *contents }))
 }
 

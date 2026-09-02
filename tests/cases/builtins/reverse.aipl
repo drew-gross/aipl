@@ -18,34 +18,31 @@ fn str_arr_rev(xs: str[]) -> str[] { xs.reverse() }.test({
     assert(str_arr_rev(["a", "b", "c"]) == ["c", "b", "a"]);
 })
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 16
+deallocations: 16
 reallocations: 0
-bytes allocated: 580
-instructions executed: 628
-binary size: 5760
-  code: 2248
-  data: 619
-  metadata: 2893
+bytes allocated: 843
+instructions executed: 837
+binary size: 6624
+  code: 3312
+  data: 489
+  metadata: 2823
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __test$arr_rev:
     calls: 1
-    bytes: 708
+    bytes: 776
   __test$str_arr_rev:
     calls: 1
-    bytes: 316
+    bytes: 768
   __test$str_rev:
     calls: 1
-    bytes: 460
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 860
   aipl_arr_elem_ptr:
     calls: 7
     bytes: (external)
@@ -64,18 +61,6 @@ functions:
   aipl_assert:
     calls: 9
     bytes: (external)
-  aipl_dec:
-    calls: 16
-    bytes: (external)
-  aipl_str_eq:
-    calls: 8
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
-  aipl_str_reverse:
-    calls: 5
-    bytes: (external)
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -87,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 160
+    bytes: 248

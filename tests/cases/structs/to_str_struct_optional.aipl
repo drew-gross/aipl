@@ -30,34 +30,34 @@ some('z')
 none
 some([1, 2])
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 228
-instructions executed: 984
-binary size: 8696
-  code: 3992
-  data: 716
-  metadata: 3988
+bytes allocated: 266
+instructions executed: 967
+binary size: 9040
+  code: 4204
+  data: 715
+  metadata: 4121
 functions:
   __to_str_Person:
     calls: 1
-    bytes: 720
+    bytes: 736
   __to_str_Point:
     calls: 1
-    bytes: 464
+    bytes: 484
   __to_str_char$opt:
     calls: 2
-    bytes: 352
+    bytes: 380
   __to_str_i64$arr$opt:
     calls: 1
-    bytes: 820
+    bytes: 876
   __to_str_i64$opt:
     calls: 1
-    bytes: 360
+    bytes: 388
   __to_str_str$opt:
     calls: 1
-    bytes: 436
+    bytes: 456
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -67,29 +67,8 @@ functions:
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_char_at:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 16
-    bytes: (external)
   aipl_i64_len:
     calls: 12
-    bytes: (external)
-  aipl_inc:
-    calls: 8
-    bytes: (external)
-  aipl_print:
-    calls: 7
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 5
-    bytes: (external)
-  aipl_str_data:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_write_bytes:
     calls: 27
@@ -99,4 +78,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 840
+    bytes: 884

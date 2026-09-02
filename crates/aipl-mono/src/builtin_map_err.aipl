@@ -89,56 +89,41 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1880
-binary size: 18840
-  code: 9476
-  data: 1720
-  metadata: 7644
+instructions executed: 2675
+binary size: 20800
+  code: 11592
+  data: 1623
+  metadata: 7585
 functions:
   __test$lex:
     calls: 1
-    bytes: 436
+    bytes: 564
   __test$map_err:
     calls: 1
-    bytes: 6644
+    bytes: 7924
   __test$to_fmt:
     calls: 1
-    bytes: 340
+    bytes: 592
   __test_try_fail_FmtError:
     calls: 0
-    bytes: 64
+    bytes: 84
   __test_try_fail_bool:
     calls: 0
-    bytes: 64
+    bytes: 84
   __test_try_fail_i64:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_FmtError:
     calls: 0
-    bytes: 540
+    bytes: 560
   __to_str_bool:
     calls: 0
-    bytes: 212
+    bytes: 232
   __to_str_i64:
     calls: 0
-    bytes: 180
+    bytes: 204
   aipl_assert:
     calls: 16
-    bytes: (external)
-  aipl_char_at:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 86
-    bytes: (external)
-  aipl_inc:
-    calls: 75
-    bytes: (external)
-  aipl_str_eq:
-    calls: 20
-    bytes: (external)
-  aipl_str_len:
-    calls: 6
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -151,10 +136,10 @@ functions:
     bytes: (external)
   lex:
     calls: 12
-    bytes: 356
+    bytes: 508
   main:
     calls: 1
-    bytes: 156
+    bytes: 232
   map_err$str$LexError$FmtError$lam0:
     calls: 6
-    bytes: 420
+    bytes: 524

@@ -176,15 +176,15 @@ fn companion_path(name: str, prefix: str) -> str!str {
     ok(path)
 }
 --- performance ---
-allocations: 182
-deallocations: 182
+allocations: 127
+deallocations: 127
 reallocations: 0
-bytes allocated: 7038
-instructions executed: 24533
-binary size: 85088
-  code: 53044
-  data: 2533
-  metadata: 29511
+bytes allocated: 8264
+instructions executed: 30300
+binary size: 90536
+  code: 60428
+  data: 1838
+  metadata: 28270
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -194,16 +194,16 @@ functions:
     bytes: 140
   __builtin_count_while$char$s0$lam14:
     calls: 3
-    bytes: 232
+    bytes: 172
   __builtin_int_parse:
     calls: 3
-    bytes: 1032
+    bytes: 1028
   __eq_i64$opt:
     calls: 2
     bytes: 100
   __eq_str$arr:
     calls: 1
-    bytes: 308
+    bytes: 364
   __eq_str$opt:
     calls: 4
     bytes: 100
@@ -212,19 +212,16 @@ functions:
     bytes: 140
   __m2__parse_test_section_header:
     calls: 50
-    bytes: 628
+    bytes: 744
   __test$parse_spec:
     calls: 1
-    bytes: 27548
+    bytes: 29928
   __test_try_fail_str:
     calls: 0
-    bytes: 64
+    bytes: 84
   __to_str_str:
     calls: 0
-    bytes: 252
-  aipl_arr_drop_str:
-    calls: 15
-    bytes: (external)
+    bytes: 276
   aipl_arr_inc:
     calls: 237
     bytes: (external)
@@ -240,48 +237,6 @@ functions:
   aipl_assert:
     calls: 18
     bytes: (external)
-  aipl_concat:
-    calls: 10
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 76
-    bytes: (external)
-  aipl_dec:
-    calls: 855
-    bytes: (external)
-  aipl_inc:
-    calls: 430
-    bytes: (external)
-  aipl_str_contains:
-    calls: 7
-    bytes: (external)
-  aipl_str_data:
-    calls: 67
-    bytes: (external)
-  aipl_str_ends_with:
-    calls: 12
-    bytes: (external)
-  aipl_str_eq:
-    calls: 143
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 31
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 67
-    bytes: (external)
-  aipl_str_len:
-    calls: 786
-    bytes: (external)
-  aipl_str_slice:
-    calls: 97
-    bytes: (external)
-  aipl_str_split:
-    calls: 14
-    bytes: (external)
-  aipl_str_starts_with:
-    calls: 76
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -291,18 +246,15 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 31
-    bytes: (external)
   companion_path:
     calls: 4
-    bytes: 1080
+    bytes: 1284
   finalize:
     calls: 25
-    bytes: 17240
+    bytes: 20864
   main:
     calls: 1
-    bytes: 72
+    bytes: 108
   parse_spec:
     calls: 13
-    bytes: 3968
+    bytes: 4956

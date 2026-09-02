@@ -670,85 +670,8 @@ unsafe fn concat_materialize(v: *const u8) -> *const u8 {
     }
 }
 
-/// `str + str`, lazily: build a concat node holding the two operands. Takes
-/// ownership of the refs the caller pre-inc'd; the node's `aipl_dec` releases
-/// them. The defining producer of the concat representation.
-#[no_mangle]
-pub extern "C" fn aipl_concat_lazy(a: *const u8, b: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_CONCAT_LAZY);
-    // Sum the operands' lengths once (each is O(1)) so the rope's total length is
-    // O(1) to read at the root.
-    let len = aipl_str_len(a) + aipl_str_len(b);
-    unsafe {
-        let obj = rt_alloc(CONCAT_SIZE) as *mut u8;
-        if obj.is_null() {
-            abort();
-        }
-        *(obj as *mut i64) = 1; // refcount
-        *(obj.add(CONCAT_LEFT_OFFSET) as *mut *const u8) = a;
-        *(obj.add(CONCAT_RIGHT_OFFSET) as *mut *const u8) = b;
-        *(obj.add(CONCAT_CACHE_OFFSET) as *mut *const u8) = core::ptr::null();
-        *(obj.add(CONCAT_LEN_OFFSET) as *mut i64) = len;
-        (obj as usize | CONCAT_TAG) as *const u8
-    }
-}
 
-#[no_mangle]
-pub extern "C" fn aipl_inc(ptr: *const u8) {
-    count_builtin!(builtin_calls::AIPL_INC);
-    match str_repr(ptr) {
-        // Null and inline values own no heap — nothing to count.
-        StrRepr::Null | StrRepr::Inline => {}
-        // A view / concat counts its own object (and holds refs on its children).
-        StrRepr::View(obj) | StrRepr::Rope(obj) => unsafe { *(obj as *mut i64) += 1 },
-        StrRepr::Heap => unsafe {
-            let h = header_of(ptr);
-            if *h != STATIC_REFCOUNT {
-                *h += 1;
-            }
-        },
-    }
-}
 
-#[no_mangle]
-pub extern "C" fn aipl_dec(ptr: *const u8) {
-    count_builtin!(builtin_calls::AIPL_DEC);
-    match str_repr(ptr) {
-        // Null and inline values own no heap — nothing to free.
-        StrRepr::Null | StrRepr::Inline => {}
-        StrRepr::View(obj) => unsafe {
-            let rc = obj as *mut i64;
-            *rc -= 1;
-            if *rc == 0 {
-                let owner = *(obj.add(VIEW_OWNER_OFFSET) as *const *const u8);
-                aipl_dec(owner);
-                rt_free(obj as *mut c_void);
-            }
-        },
-        StrRepr::Rope(obj) => unsafe {
-            let rc = obj as *mut i64;
-            *rc -= 1;
-            if *rc == 0 {
-                aipl_dec(*(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8));
-                aipl_dec(*(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8));
-                let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-                if !cache.is_null() {
-                    aipl_dec(cache);
-                }
-                rt_free(obj as *mut c_void);
-            }
-        },
-        StrRepr::Heap => unsafe {
-            let h = header_of(ptr);
-            if *h != STATIC_REFCOUNT {
-                *h -= 1;
-                if *h == 0 {
-                    rt_free(ptr.sub(STR_HEADER_SIZE) as *mut c_void);
-                }
-            }
-        },
-    }
-}
 
 /// Visit each leaf's contiguous bytes in order **without materializing a rope**:
 /// a rope recurses into its children (reusing its `cache` if already
@@ -779,34 +702,7 @@ fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool
     }
 }
 
-#[no_mangle]
-pub extern "C" fn aipl_print(ptr: *const u8) {
-    count_builtin!(builtin_calls::AIPL_PRINT);
-    // A null str prints nothing; an inline empty `""` is non-null and prints a
-    // blank line. A rope is streamed leaf-by-leaf (no materialization).
-    if !ptr.is_null() {
-        str_for_each_chunk(ptr, &mut |chunk| {
-            unsafe { write(1, chunk.as_ptr() as *const c_void, chunk.len()) }; // stdout
-            true
-        });
-        unsafe { write(1, b"\n".as_ptr() as *const c_void, 1) };
-    }
-    aipl_dec(ptr);
-}
 
-/// `fn main() -> !Error` failure path: write `error: <msg>\n` to stderr (fd 2).
-/// Borrows `msg` (no refcount change) — `main`'s scope drop frees it.
-#[no_mangle]
-pub extern "C" fn aipl_print_error(msg: *const u8) {
-    count_builtin!(builtin_calls::AIPL_PRINT_ERROR);
-    let prefix = b"error: ";
-    unsafe { write(2, prefix.as_ptr() as *const c_void, prefix.len()) };
-    str_for_each_chunk(msg, &mut |chunk| {
-        unsafe { write(2, chunk.as_ptr() as *const c_void, chunk.len()) };
-        true
-    });
-    unsafe { write(2, b"\n".as_ptr() as *const c_void, 1) };
-}
 
 // ---------- The wide `str`'s I/O half (AOT) ----------
 //
@@ -814,11 +710,11 @@ pub extern "C" fn aipl_print_error(msg: *const u8) {
 // not diverge, but I/O genuinely differs: the JIT half (`str24_host.rs`) writes
 // through `std::io`, and this one writes through `libc` like every other entry
 // point here. So these two are the AOT counterparts of `str24_host`'s
-// `aipl2_print` / `aipl2_print_error`, and the reason every program that printed
+// `aipl_print` / `aipl_print_error`, and the reason every program that printed
 // anything failed to *link* under `AIPL_STR24` while one that printed nothing
 // built fine.
 //
-// Unlike `aipl_print`, they do **not** release their argument: an `aipl2_*` entry
+// Unlike `aipl_print`, they do **not** release their argument: an `aipl_*` entry
 // point borrows the caller's 24-byte value, which the caller is already keeping
 // alive (see `active_sym` in `aipl-codegen`).
 
@@ -826,7 +722,7 @@ pub extern "C" fn aipl_print_error(msg: *const u8) {
 /// being flattened first — the same property `aipl_print` has via
 /// `str_for_each_chunk`.
 #[no_mangle]
-pub extern "C" fn aipl2_print(s: *const str24::Str) {
+pub extern "C" fn aipl_print(s: *const str24::Str) {
     str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
         unsafe { write(1, chunk.as_ptr() as *const c_void, chunk.len()) }; // stdout
         true
@@ -837,7 +733,7 @@ pub extern "C" fn aipl2_print(s: *const str24::Str) {
 /// `fn main() -> !Error`'s failure path under the wide ABI: `error: <msg>` on
 /// stderr.
 #[no_mangle]
-pub extern "C" fn aipl2_print_error(s: *const str24::Str) {
+pub extern "C" fn aipl_print_error(s: *const str24::Str) {
     let prefix = b"error: ";
     unsafe { write(2, prefix.as_ptr() as *const c_void, prefix.len()) };
     str24::for_each_chunk(unsafe { *s }, &mut |chunk| {
@@ -847,97 +743,8 @@ pub extern "C" fn aipl2_print_error(s: *const str24::Str) {
     unsafe { write(2, b"\n".as_ptr() as *const c_void, 1) };
 }
 
-/// The `s[i]` runtime (`aipl_char_at`): returns byte i of s as 0..255, or
-/// -1 to signal None (i<0, past null terminator, or null pointer). The
-/// codegen wraps the result into a 16-byte Optional slot at the call
-/// **Borrows `s`** — a pure observer, so the caller keeps its own reference
-/// and must not pre-inc. Mirrors the JIT runtime.
-#[no_mangle]
-pub extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
-    count_builtin!(builtin_calls::AIPL_CHAR_AT);
-    let mut found: i64 = -1;
-    if i >= 0 {
-        // Walk leaves to the chunk containing index `i` and stop — no materializing.
-        let target = i as usize;
-        let mut pos = 0usize;
-        str_for_each_chunk(s, &mut |chunk| {
-            if target < pos + chunk.len() {
-                found = i64::from(chunk[target - pos]);
-                false // found it — stop early
-            } else {
-                pos += chunk.len();
-                true
-            }
-        });
-    }
-    found
-}
 
-/// `read_file_to_string(name) -> str?`: read `name`'s bytes into a fresh
-/// refcounted str, or return null (None) on any failure — open/read error or a
-/// NUL byte in the contents (which a NUL-terminated str can't represent).
-/// Codegen wraps null into None. Decrements `name` per the refcount protocol.
-#[no_mangle]
-pub extern "C" fn aipl_read_file_to_string(name: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_READ_FILE_TO_STRING);
-    let path = unsafe { view_to_owned_path(name) };
-    let result = unsafe { read_file_impl(path) };
-    if path != name {
-        aipl_dec(path); // free the owned copy made for a view path
-    }
-    aipl_dec(name);
-    result
-}
 
-unsafe fn read_file_impl(name: *const u8) -> *const u8 {
-    if name.is_null() {
-        return core::ptr::null();
-    }
-    unsafe {
-        // A heap str is already NUL-terminated; an inline one is copied into a
-        // local NUL-terminated buffer for the C path.
-        let mut pbuf = [0u8; 8];
-        let cpath = str_cptr(name, &mut pbuf);
-        let f = fopen(cpath, b"rb\0".as_ptr() as *const c_char);
-        if f.is_null() {
-            return core::ptr::null();
-        }
-        // Size via seek/tell, then read in one go.
-        if fseek(f, 0, SEEK_END) != 0 {
-            fclose(f);
-            return core::ptr::null();
-        }
-        let size = ftell(f);
-        if size < 0 || fseek(f, 0, SEEK_SET) != 0 {
-            fclose(f);
-            return core::ptr::null();
-        }
-        let size = size as usize;
-        let raw = rt_str_buf(size); // [len][refcount=1][size bytes][NUL]
-        let data = raw.add(STR_HEADER_SIZE);
-        let n = fread(data as *mut c_void, 1, size, f);
-        fclose(f);
-        if n != size {
-            rt_free(raw as *mut c_void);
-            return core::ptr::null();
-        }
-        let mut i = 0usize;
-        while i < size {
-            if *data.add(i) == 0 {
-                rt_free(raw as *mut c_void);
-                return core::ptr::null();
-            }
-            i += 1;
-        }
-        // SSO: a short file's contents are inline — free the read buffer.
-        if size <= 7 {
-            let inlined = pack_inline(core::slice::from_raw_parts(data, size));
-            rt_free(raw as *mut c_void);
-            return inlined;
-        }
-        data
-    }
-}
 
 // ---------- The wide `str`'s file I/O (AOT) ----------
 //
@@ -971,10 +778,10 @@ unsafe fn free_c_path(p: *mut u8) {
 }
 
 /// `read_file_to_string` under the wide ABI: contents through `out`, success as
-/// the return value. See `str24_host::aipl2_read_file_to_string` for why the
+/// the return value. See `str24_host::aipl_read_file_to_string` for why the
 /// flag is explicit rather than a null result. Borrows `path`.
 #[no_mangle]
-pub extern "C" fn aipl2_read_file_to_string(out: *mut str24::Str, path: *const str24::Str) -> i64 {
+pub extern "C" fn aipl_read_file_to_string(out: *mut str24::Str, path: *const str24::Str) -> i64 {
     count_builtin!(builtin_calls::AIPL_READ_FILE_TO_STRING);
     unsafe {
         *out = str24::Str::empty();
@@ -1017,7 +824,7 @@ pub extern "C" fn aipl2_read_file_to_string(out: *mut str24::Str, path: *const s
 /// `write_string_to_file` under the wide ABI. Streams the contents chunk by
 /// chunk, so a rope is written without being flattened. Borrows both arguments.
 #[no_mangle]
-pub extern "C" fn aipl2_write_string_to_file(
+pub extern "C" fn aipl_write_string_to_file(
     path: *const str24::Str,
     contents: *const str24::Str,
 ) -> i64 {
@@ -1047,7 +854,7 @@ pub extern "C" fn aipl2_write_string_to_file(
 
 /// `list_files` under the wide ABI. Borrows `dir`.
 #[no_mangle]
-pub extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
+pub extern "C" fn aipl_list_files(dir: *const str24::Str) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_LIST_FILES);
     #[cfg(unix)]
     unsafe {
@@ -1060,74 +867,9 @@ pub extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
     }
 }
 
-/// `write_string_to_file(path, contents) -> bool`: write `contents`' bytes to
-/// `path`, returning 1 on success or 0 on any failure (open/write error).
-/// Decrements both `path` and `contents` per the refcount protocol (callers
-/// pre-inc, as with any str-taking fn).
-#[no_mangle]
-pub extern "C" fn aipl_write_string_to_file(path: *const u8, contents: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_WRITE_STRING_TO_FILE);
-    let cpath = unsafe { view_to_owned_path(path) };
-    let ok = unsafe { write_file_impl(cpath, contents) };
-    if cpath != path {
-        aipl_dec(cpath); // free the owned copy made for a view path
-    }
-    aipl_dec(path);
-    aipl_dec(contents);
-    ok
-}
 
-unsafe fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
-    if path.is_null() || contents.is_null() {
-        return 0;
-    }
-    unsafe {
-        // A heap path is already NUL-terminated; an inline one is copied into a
-        // local NUL-terminated buffer for the C path.
-        let mut pbuf = [0u8; 8];
-        let cpath = str_cptr(path, &mut pbuf);
-        let f = fopen(cpath, b"wb\0".as_ptr() as *const c_char);
-        if f.is_null() {
-            return 0;
-        }
-        let mut cbuf = [0u8; 8];
-        let bytes = str_bytes(contents, &mut cbuf);
-        let len = bytes.len();
-        let written = if len == 0 {
-            0
-        } else {
-            fwrite(bytes.as_ptr() as *const c_void, 1, len, f)
-        };
-        fclose(f);
-        if written == len {
-            1
-        } else {
-            0
-        }
-    }
-}
 
-/// `list_files(dir) -> str[]?`: every file at or below `dir`, walked
-/// recursively, as a fresh `str[]` of `dir`-prefixed paths — or null on any
-/// failure (unreadable directory, non-UTF-8 name, unknowable entry kind, path
-/// too long, unsupported platform), which codegen wraps into `err`. Order is
-/// whatever the filesystem yields; callers that need determinism sort. A
-/// directory is descended into rather than listed, and a symlink counts as a
-/// file (never followed), so the walk can't cycle. POSIX-only for now
-/// (`cfg(unix)`). Decrements `dir` per the refcount protocol. Mirrors
-/// `aipl_list_files` in the JIT runtime.
-#[no_mangle]
-pub extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_LIST_FILES);
-    let result = unsafe { list_files_impl(dir) };
-    aipl_dec(dir);
-    result
-}
 
-#[cfg(unix)]
-unsafe fn list_files_impl(dir: *const u8) -> *const u8 {
-    unsafe { list_unix::list_files(dir) }
-}
 
 #[cfg(not(unix))]
 unsafe fn list_files_impl(_dir: *const u8) -> *const u8 {
@@ -1141,8 +883,7 @@ unsafe fn list_files_impl(_dir: *const u8) -> *const u8 {
 #[cfg(unix)]
 mod list_unix {
     use super::{
-        aipl_arr_drop_str, aipl_array_dec, aipl_array_push_mut, aipl_array_with_cap, make_str,
-        memcpy, str24, str_bytes, strlen, ArrDropFn,
+        aipl_array_dec, aipl_array_push_mut, aipl_array_with_cap, memcpy, str24, strlen,
     };
     use core::ffi::{c_char, c_int, c_void};
 
@@ -1199,21 +940,13 @@ mod list_unix {
         elem_size: i64,
     }
 
-    /// Walk `dir` and return the `str[]` of files beneath it, or null on any
-    /// failure (a partially built array is released first).
-    pub unsafe fn list_files(dir: *const u8) -> *const u8 {
-        let mut dbuf = [0u8; 8];
-        let bytes = unsafe { str_bytes(dir, &mut dbuf) };
-        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
-        unsafe { walk_from(bytes, drop_fn, 8) }
-    }
 
     /// [`list_files`] for a wide `str` directory argument, producing 24-byte
     /// elements and the matching element drop-fn.
     pub unsafe fn list_files_wide(dir: str24::Str) -> *const u8 {
         let mut scratch = [0u8; str24::INLINE_CAP];
         let bytes = dir.bytes(&mut scratch);
-        let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+        let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
         unsafe { walk_from(bytes, drop_fn, str24::STR_SIZE as i64) }
     }
 
@@ -1305,25 +1038,14 @@ mod list_unix {
         // retain-fn 0 either way: the fresh string's one reference moves into
         // the array.
         w.out = unsafe {
-            if w.elem_size == str24::STR_SIZE as i64 {
-                let v = str24::from_bytes(bytes);
-                aipl_array_push_mut(
-                    w.out,
-                    &v as *const str24::Str as *const u8,
-                    drop_fn,
-                    0,
-                    w.elem_size,
-                )
-            } else {
-                let slot = make_str(bytes) as i64;
-                aipl_array_push_mut(
-                    w.out,
-                    &slot as *const i64 as *const u8,
-                    drop_fn,
-                    0,
-                    w.elem_size,
-                )
-            }
+            let v = str24::from_bytes(bytes);
+            aipl_array_push_mut(
+                w.out,
+                &v as *const str24::Str as *const u8,
+                drop_fn,
+                0,
+                w.elem_size,
+            )
         };
         true
     }
@@ -1461,33 +1183,7 @@ pub extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
     }
 }
 
-/// `execute_program(program, args) -> ExecResult!Error` (sret ABI, mirroring
-/// the JIT runtime): writes `Result<ExecResult, Error>` directly into `out`
-/// (tag 1 = ok, 0 = err, matching the `ok`/`err` expression codegen; the
-/// `ExecResult` fields go at their declared struct offsets 0/8/16 —
-/// `stdout`/`stderr`/`exit_code`, must stay in sync with
-/// `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Spawns `program` with
-/// `args` and waits for it; POSIX-only for now (`cfg(unix)`). `ok(ExecResult)`
-/// for any run that was actually launched, whatever it then exited with;
-/// `err(message)` only if it couldn't be launched at all (bad UTF-8, not
-/// found, embedded NUL in captured output, unsupported platform). Decrements
-/// `program` and `args` per the refcount protocol.
-#[no_mangle]
-pub extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
-    count_builtin!(builtin_calls::AIPL_EXECUTE_PROGRAM);
-    let a = aipl_arr_ensure_heap(args);
-    unsafe { execute_program_impl(out, program, a) };
-    aipl_dec(program);
-    aipl_array_dec(a);
-}
 
-fn write_err(out: *mut i64, message: &[u8]) {
-    let ptr = make_str(message);
-    unsafe {
-        *out = 0;
-        *out.add(1) = ptr as i64;
-    }
-}
 
 /// The wide `ExecResult!Error` layout — tag, then either the `Error` message or
 /// `{ stdout, stderr, exit_code }`. Every `str` is a whole value, so the offsets
@@ -1515,10 +1211,10 @@ fn write_ok_wide(out: *mut u8, stdout: &[u8], stderr: &[u8], exit_code: i64) {
 }
 
 /// `execute_program` under the wide ABI. Borrows both arguments, like every
-/// `aipl2_*` entry point; the spawn itself is shared with the tagged path, which
+/// `aipl_*` entry point; the spawn itself is shared with the tagged path, which
 /// is why `run` takes the representation rather than being duplicated.
 #[no_mangle]
-pub extern "C" fn aipl2_execute_program(
+pub extern "C" fn aipl_execute_program(
     out: *mut u8,
     program: *const str24::Str,
     args: *const u8,
@@ -1529,7 +1225,7 @@ pub extern "C" fn aipl2_execute_program(
         if args.is_null() {
             return write_err_wide(out, b"could not execute program");
         }
-        exec_unix::run(out as *mut i64, program as *const u8, args, true);
+        exec_unix::run(out as *mut i64, program as *const u8, args);
     }
     #[cfg(not(unix))]
     {
@@ -1538,30 +1234,16 @@ pub extern "C" fn aipl2_execute_program(
     }
 }
 
-/// `stdout_ptr`/`stderr_ptr` are already-constructed `str` values (owned).
-fn write_ok(out: *mut i64, stdout_ptr: *const u8, stderr_ptr: *const u8, exit_code: i64) {
-    unsafe {
-        *out = 1;
-        *out.add(1) = stdout_ptr as i64;
-        *out.add(2) = stderr_ptr as i64;
-        *out.add(3) = exit_code;
-    }
-}
 
-#[cfg(not(unix))]
-unsafe fn execute_program_impl(out: *mut i64, _program: *const u8, _args: *const u8) {
-    // Process spawning isn't implemented on this platform yet.
-    write_err(out, b"could not execute program");
-}
 
 #[cfg(unix)]
 unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
     unsafe {
         if program.is_null() || args.is_null() {
-            write_err(out, b"could not execute program");
+            write_err_wide(out as *mut u8, b"could not execute program");
             return;
         }
-        exec_unix::run(out, program, args, false);
+        exec_unix::run(out, program, args);
     }
 }
 
@@ -1574,8 +1256,8 @@ unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u
 #[cfg(unix)]
 mod exec_unix {
     use super::{
-        aipl_array_dec, aipl_dec, array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
-        ftell, make_str, rt_alloc, rt_free, str_bytes, write_ok, ARR_ELEMS_OFFSET, SEEK_END,
+        array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
+        ftell, rt_alloc, rt_free, ARR_ELEMS_OFFSET, SEEK_END,
         SEEK_SET,
         str24,
         write_ok_wide,
@@ -1609,7 +1291,7 @@ mod exec_unix {
     /// A fresh, `rt_alloc`'d, NUL-terminated copy of a str value's bytes (any
     /// representation), for building a C `argv` entry. Freed by the caller.
     /// [`dup_cstr`] for a wide `str`, which is a window carrying no terminator.
-    unsafe fn dup_cstr_wide(v: str24::Str) -> *mut c_char {
+    unsafe fn dup_cstr(v: str24::Str) -> *mut c_char {
         let mut scratch = [0u8; str24::INLINE_CAP];
         let bytes = v.bytes(&mut scratch);
         let n = bytes.len();
@@ -1626,22 +1308,6 @@ mod exec_unix {
         }
     }
 
-    unsafe fn dup_cstr(v: *const u8) -> *mut c_char {
-        unsafe {
-            let mut b = [0u8; 8];
-            let bytes = str_bytes(v, &mut b);
-            let n = bytes.len();
-            let buf = rt_alloc(n + 1) as *mut u8;
-            if buf.is_null() {
-                super::abort();
-            }
-            if n > 0 {
-                core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, n);
-            }
-            *buf.add(n) = 0;
-            buf as *mut c_char
-        }
-    }
 
     /// Build a unique temp-file path `/tmp/aipl_exec_<pid>_<counter>_<suffix>`
     /// into `buf`, NUL-terminated, returning a `c_char` pointer into it.
@@ -1671,7 +1337,10 @@ mod exec_unix {
     /// Read a temp file's full contents back as an owned `str`, or `None` on
     /// any failure — including an embedded NUL, which a NUL-terminated str
     /// can't hold (same constraint as `read_file_to_string`).
-    unsafe fn read_temp_file(path: *const c_char) -> Option<*const u8> {
+    /// The captured stream as an owned byte buffer and its length, or `None` if
+    /// it could not be read (or holds a NUL, which a `str` cannot represent).
+    /// The caller frees the buffer.
+    unsafe fn read_temp_file(path: *const c_char) -> Option<(*mut u8, usize)> {
         unsafe {
             let f = fopen(path, b"rb\0".as_ptr() as *const c_char);
             if f.is_null() {
@@ -1689,7 +1358,7 @@ mod exec_unix {
             let size = size as usize;
             if size == 0 {
                 fclose(f);
-                return Some(make_str(&[]));
+                return Some((core::ptr::null_mut(), 0));
             }
             let buf = rt_alloc(size) as *mut u8;
             if buf.is_null() {
@@ -1698,13 +1367,11 @@ mod exec_unix {
             }
             let n = fread(buf as *mut c_void, 1, size, f);
             fclose(f);
-            let result = if n != size || core::slice::from_raw_parts(buf, size).contains(&0) {
-                None
-            } else {
-                Some(make_str(core::slice::from_raw_parts(buf, size)))
-            };
-            rt_free(buf as *mut c_void);
-            result
+            if n != size || core::slice::from_raw_parts(buf, size).contains(&0) {
+                rt_free(buf as *mut c_void);
+                return None;
+            }
+            Some((buf, size))
         }
     }
 
@@ -1722,11 +1389,7 @@ mod exec_unix {
     /// `program`/`a` (a heap-representation array — the caller already
     /// materialized any reversed view) are each consumed exactly once, on
     /// every path.
-    /// `wide` selects the `str` representation of `program` and of `a`'s
-    /// elements, and of the result written to `out`. Everything between —
-    /// argv, the spawn, the capture — is identical, so it is threaded through
-    /// rather than duplicated.
-    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8, wide: bool) {
+    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8) {
         unsafe {
             let len = array_len(a);
 
@@ -1736,22 +1399,11 @@ mod exec_unix {
             if argv.is_null() {
                 super::abort();
             }
-            if wide {
-                // Borrowed under this ABI: nothing is released here.
-                *argv = dup_cstr_wide(*(program as *const str24::Str));
-                let elems = a.add(ARR_ELEMS_OFFSET) as *const str24::Str;
-                for i in 0..len {
-                    *argv.add(1 + i) = dup_cstr_wide(core::ptr::read(elems.add(i)));
-                }
-            } else {
-                let elems = a.add(ARR_ELEMS_OFFSET) as *const i64;
-                *argv = dup_cstr(program);
-                aipl_dec(program);
-                for i in 0..len {
-                    let ep = core::ptr::read(elems.add(i)) as *const u8;
-                    *argv.add(1 + i) = dup_cstr(ep);
-                }
-                aipl_array_dec(a);
+            // Both arguments are borrowed: nothing is released here.
+            *argv = dup_cstr(*(program as *const str24::Str));
+            let elems = a.add(ARR_ELEMS_OFFSET) as *const str24::Str;
+            for i in 0..len {
+                *argv.add(1 + i) = dup_cstr(core::ptr::read(elems.add(i)));
             }
             *argv.add(1 + len) = core::ptr::null_mut();
 
@@ -1771,7 +1423,7 @@ mod exec_unix {
                     remove(err_path);
                 }
                 free_argv(argv, 1 + len);
-                return fail_msg(out, wide);
+                return fail_msg(out);
             }
             let out_fd = fileno(out_f);
             let err_fd = fileno(err_f);
@@ -1790,7 +1442,7 @@ mod exec_unix {
                 remove(out_path);
                 remove(err_path);
                 free_argv(argv, 1 + len);
-                return fail_msg(out, wide);
+                return fail_msg(out);
             }
             let (err_r, err_w) = (errpipe[0], errpipe[1]);
             fcntl(err_w, F_SETFD, FD_CLOEXEC);
@@ -1804,7 +1456,7 @@ mod exec_unix {
                 remove(out_path);
                 remove(err_path);
                 free_argv(argv, 1 + len);
-                return fail_msg(out, wide);
+                return fail_msg(out);
             }
             if pid == 0 {
                 // Child: redirect stdout/stderr to the temp files, then exec.
@@ -1843,7 +1495,7 @@ mod exec_unix {
             if exec_failed {
                 remove(out_path);
                 remove(err_path);
-                return fail_msg(out, wide);
+                return fail_msg(out);
             }
 
             let stdout_ptr = read_temp_file(out_path);
@@ -1851,33 +1503,34 @@ mod exec_unix {
             remove(out_path);
             remove(err_path);
             match (stdout_ptr, stderr_ptr) {
-                (Some(so), Some(se)) if wide => {
-                    // `read_temp_file` hands back tagged values either way; copy
-                    // their bytes into wide ones and release the originals.
-                    let mut ob = [0u8; 8];
-                    let mut eb = [0u8; 8];
-                    write_ok_wide(
-                        out as *mut u8,
-                        str_bytes(so, &mut ob),
-                        str_bytes(se, &mut eb),
-                        exit_code,
-                    );
-                    aipl_dec(so);
-                    aipl_dec(se);
+                (Some((ob, ol)), Some((eb, el))) => {
+                    let empty: &[u8] = &[];
+                    let so = if ob.is_null() {
+                        empty
+                    } else {
+                        core::slice::from_raw_parts(ob, ol)
+                    };
+                    let se = if eb.is_null() {
+                        empty
+                    } else {
+                        core::slice::from_raw_parts(eb, el)
+                    };
+                    super::write_ok_wide(out as *mut u8, so, se, exit_code);
+                    if !ob.is_null() {
+                        rt_free(ob as *mut c_void);
+                    }
+                    if !eb.is_null() {
+                        rt_free(eb as *mut c_void);
+                    }
                 }
-                (Some(so), Some(se)) => write_ok(out, so, se, exit_code),
-                _ => fail_msg(out, wide),
+                _ => fail_msg(out),
             }
         }
     }
 }
 
-fn fail_msg(out: *mut i64, wide: bool) {
-    if wide {
-        write_err_wide(out as *mut u8, b"could not execute program");
-    } else {
-        write_err(out, b"could not execute program");
-    }
+fn fail_msg(out: *mut i64) {
+    write_err_wide(out as *mut u8, b"could not execute program");
 }
 
 /// Format `n` in decimal into the END of `buf` (at least 20 bytes), returning
@@ -1928,13 +1581,6 @@ unsafe fn rt_str_buf(content: usize) -> *mut u8 {
 // measures the total length, allocates once via `aipl_str_alloc`, then fills the
 // buffer through a moving cursor with the write helpers below.
 
-/// Allocate one writable `str` buffer of `len` content bytes; return the data ptr.
-#[no_mangle]
-pub extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_ALLOC);
-    let len = if len < 0 { 0 } else { len as usize };
-    unsafe { rt_str_buf(len).add(STR_HEADER_SIZE) }
-}
 
 /// Decimal byte length of `n` (matching `aipl_write_i64`).
 #[no_mangle]
@@ -2002,20 +1648,6 @@ pub extern "C" fn aipl_write_u64(dst: *const u8, n: i64) -> *const u8 {
     }
 }
 
-/// Byte content length of a `str`; 0 for null. O(1) for every representation —
-/// each stores or encodes its length, so this never walks the bytes (a rope reads
-/// the total cached at its root; a heap string reads its header word).
-#[no_mangle]
-pub extern "C" fn aipl_str_len(s: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_LEN);
-    match str_repr(s) {
-        StrRepr::Null => 0,
-        StrRepr::Inline => inline_len(s) as i64,
-        StrRepr::Heap => unsafe { heap_len(s) as i64 },
-        StrRepr::View(obj) => unsafe { *(obj.add(VIEW_LEN_OFFSET) as *const i64) },
-        StrRepr::Rope(obj) => unsafe { *(obj.add(CONCAT_LEN_OFFSET) as *const i64) },
-    }
-}
 
 /// Copy `n` bytes `src` → `dst`; return the advanced cursor.
 #[no_mangle]
@@ -2028,53 +1660,6 @@ pub extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *c
     }
 }
 
-#[no_mangle]
-pub extern "C" fn aipl_concat(a: *const u8, b: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_CONCAT);
-    unsafe {
-        let mut ba = [0u8; 8];
-        let mut bb = [0u8; 8];
-        let sa = str_bytes(a, &mut ba);
-        let sb = str_bytes(b, &mut bb);
-        let (la, lb) = (sa.len(), sb.len());
-        let result = if la + lb <= 7 {
-            // SSO: a short result is inline — no allocation.
-            let mut tmp = [0u8; 7];
-            memcpy(
-                tmp.as_mut_ptr() as *mut c_void,
-                sa.as_ptr() as *const c_void,
-                la,
-            );
-            memcpy(
-                tmp.as_mut_ptr().add(la) as *mut c_void,
-                sb.as_ptr() as *const c_void,
-                lb,
-            );
-            pack_inline(&tmp[..la + lb])
-        } else {
-            // rt_str_buf writes the [len][refcount][..][NUL] header for us.
-            let raw = rt_str_buf(la + lb);
-            if la > 0 {
-                memcpy(
-                    raw.add(STR_HEADER_SIZE) as *mut c_void,
-                    sa.as_ptr() as *const c_void,
-                    la,
-                );
-            }
-            if lb > 0 {
-                memcpy(
-                    raw.add(STR_HEADER_SIZE + la) as *mut c_void,
-                    sb.as_ptr() as *const c_void,
-                    lb,
-                );
-            }
-            raw.add(STR_HEADER_SIZE)
-        };
-        aipl_dec(a);
-        aipl_dec(b);
-        result
-    }
-}
 
 /// ASCII whitespace: space, tab, newline, carriage return, vertical tab, and
 /// form feed.
@@ -2083,115 +1668,8 @@ fn is_ascii_ws(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
 }
 
-/// `trim(s) -> str`. Returns a fresh string with leading and trailing ASCII
-/// whitespace removed, then drops `s`. An all-whitespace (or empty) string
-/// trims to "".
-#[no_mangle]
-pub extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_TRIM);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let bytes = str_bytes(s, &mut sbuf);
-        let n = bytes.len();
-        let mut start = 0;
-        while start < n && is_ascii_ws(bytes[start]) {
-            start += 1;
-        }
-        let mut end = n;
-        while end > start && is_ascii_ws(bytes[end - 1]) {
-            end -= 1;
-        }
-        let trimmed_n = end - start;
-        // Nothing trimmed: return s as-is, transferring our reference to the caller.
-        if start == 0 && end == n {
-            return s;
-        }
-        // Small result (≤ 7 bytes, incl. all-whitespace → trimmed_n == 0): copy
-        // inline and release s. Inline sources (≤ 7 bytes total) always land here.
-        if trimmed_n <= 7 {
-            let result = make_str(&bytes[start..end]);
-            aipl_dec(s);
-            return result;
-        }
-        // Large result from a heap/view source: return a view into s's buffer.
-        // Transfer our reference of s to the view's owner — no inc, no dec, no copy.
-        let data = bytes.as_ptr().add(start);
-        let obj = rt_alloc(VIEW_SIZE) as *mut u8;
-        *(obj as *mut i64) = 1; // refcount
-        *(obj.add(VIEW_DATA_OFFSET) as *mut *const u8) = data;
-        *(obj.add(VIEW_LEN_OFFSET) as *mut i64) = trimmed_n as i64;
-        *(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8) = s;
-        (obj as usize | VIEW_TAG) as *const u8
-    }
-}
 
-/// `s.reverse() -> str` — new string with the bytes in reverse order.
-/// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_reverse`.
-#[no_mangle]
-pub extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_REVERSE);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let bytes = str_bytes(s, &mut sbuf);
-        let n = bytes.len();
-        // Build reversed copy in a stack-local or heap buffer, then make_str.
-        // For short strings (<=7 bytes) make_str packs inline; longer ones heap.
-        let result = if n == 0 {
-            make_str(&[])
-        } else {
-            // Allocate a temporary reversed buffer: use a fixed stack buf for
-            // short strings (<=128 bytes) to avoid a heap allocation.
-            let mut tmp = [0u8; 128];
-            if n <= 128 {
-                for (i, &b) in bytes.iter().rev().enumerate() {
-                    tmp[i] = b;
-                }
-                make_str(&tmp[..n])
-            } else {
-                // Allocate a fresh heap string and write the reversed bytes in.
-                let raw = rt_str_buf(n);
-                let dst = raw.add(STR_HEADER_SIZE) as *mut u8;
-                for (i, &b) in bytes.iter().rev().enumerate() {
-                    *dst.add(i) = b;
-                }
-                raw.add(STR_HEADER_SIZE)
-            }
-        };
-        aipl_dec(s);
-        result
-    }
-}
 
-/// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
-/// Consumes `s` (callers pre-inc).
-///
-/// `n` is unsigned at the language level but arrives in the same 64-bit register,
-/// so it is read here as `i64`: the `n <= 0` guard yields `""` for zero and —
-/// reading as negative — for any `u64` past `i64::MAX`, which could never be
-/// allocated anyway.
-#[no_mangle]
-pub extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_REPEAT);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let bytes = str_bytes(s, &mut sbuf);
-        let result = if n <= 0 || bytes.is_empty() {
-            make_str(&[])
-        } else {
-            let chunk = bytes.len();
-            let total = chunk * n as usize;
-            let raw = rt_str_buf(total);
-            let dst = raw.add(STR_HEADER_SIZE) as *mut c_void;
-            let src = bytes.as_ptr() as *const c_void;
-            for i in 0..n as usize {
-                memcpy(dst.add(i * chunk), src, chunk);
-            }
-            raw.add(STR_HEADER_SIZE)
-        };
-        aipl_dec(s);
-        result
-    }
-}
 
 /// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
 /// 8-byte scalar, so the only question is how to read the word: as a signed
@@ -2206,17 +1684,6 @@ const SORT_KIND_UNSIGNED: i64 = 1;
 /// compared by value, so equal ones are indistinguishable.
 fn sort_words(words: &mut [i64], kind: i64) {
     match kind {
-        SORT_KIND_STR => words.sort_unstable_by(|x, y| {
-            let mut xb = [0u8; 8];
-            let mut yb = [0u8; 8];
-            let (xs, ys) = unsafe {
-                (
-                    str_bytes(*x as *const u8, &mut xb),
-                    str_bytes(*y as *const u8, &mut yb),
-                )
-            };
-            xs.cmp(ys)
-        }),
         SORT_KIND_UNSIGNED => words.sort_unstable_by(|x, y| (*x as u64).cmp(&(*y as u64))),
         _ => words.sort_unstable(),
     }
@@ -2263,37 +1730,6 @@ pub extern "C" fn aipl_arr_sort(
     }
 }
 
-/// `s.sort() -> str` — a fresh `str` with the bytes in ascending order. The
-/// str-shaped counterpart of `aipl_arr_sort`, for a `str` or `char[]` receiver
-/// (the two share a representation, so neither is a real array block).
-/// Consumes `s` (callers pre-inc). Mirrors the JIT runtime's `aipl_str_sort`.
-#[no_mangle]
-pub extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_SORT);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let bytes = str_bytes(s, &mut sbuf);
-        let n = bytes.len();
-        // Copy into a buffer, sort it there, then build the result — the same
-        // stack-for-short / heap-for-long split `aipl_str_reverse` uses.
-        let result = if n == 0 {
-            make_str(&[])
-        } else if n <= 128 {
-            let mut tmp = [0u8; 128];
-            tmp[..n].copy_from_slice(bytes);
-            tmp[..n].sort_unstable();
-            make_str(&tmp[..n])
-        } else {
-            let raw = rt_str_buf(n);
-            let dst = raw.add(STR_HEADER_SIZE) as *mut u8;
-            memcpy(dst as *mut c_void, bytes.as_ptr() as *const c_void, n);
-            core::slice::from_raw_parts_mut(dst, n).sort_unstable();
-            raw.add(STR_HEADER_SIZE)
-        };
-        aipl_dec(s);
-        result
-    }
-}
 
 /// `xs.reverse() -> T[]` — new array with elements in reverse order.
 /// O(1): returns a reversed-view repr wrapping `a`.
@@ -2314,36 +1750,6 @@ pub extern "C" fn aipl_arr_reverse(
     unsafe { alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size) }
 }
 
-/// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
-/// out-of-range end yields a shorter string; `start >= end` yields `""`).
-/// *Borrows* `s` (does not drop it) and returns a fresh `str`. Mirrors the JIT
-/// runtime's `aipl_str_slice`.
-#[no_mangle]
-pub extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_SLICE);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let bytes = str_bytes(s, &mut sbuf);
-        let len = bytes.len() as i64;
-        let lo = start.clamp(0, len) as usize;
-        let hi = end.clamp(0, len) as usize;
-        let n = hi.saturating_sub(lo);
-        // Small result or an SSO source: copy (don't pin a parent buffer).
-        if n <= 7 || matches!(str_repr(s), StrRepr::Inline) {
-            return make_str(if lo < hi { &bytes[lo..hi] } else { &[] });
-        }
-        // Large slice of a heap (owned or view) source: share its buffer via a
-        // view that retains the source.
-        let data = bytes.as_ptr().add(lo);
-        aipl_inc(s);
-        let obj = rt_alloc(VIEW_SIZE) as *mut u8;
-        *(obj as *mut i64) = 1; // refcount
-        *(obj.add(VIEW_DATA_OFFSET) as *mut *const u8) = data;
-        *(obj.add(VIEW_LEN_OFFSET) as *mut i64) = n as i64;
-        *(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8) = s;
-        (obj as usize | VIEW_TAG) as *const u8
-    }
-}
 
 /// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter array; `start >= end` yields `[]`).
@@ -2388,60 +1794,6 @@ pub extern "C" fn aipl_arr_slice(
     }
 }
 
-/// `split(self, sep) -> str[]` — parts of `self` between non-overlapping
-/// occurrences of `sep`, each a slice of `self` (a buffer-sharing view for a long
-/// part, else an inline/heap copy). An empty `sep` yields one part: the whole
-/// string. Consumes both `self` and `sep`; the view parts hold their own refs on
-/// `self`'s buffer. Mirrors the JIT runtime's `aipl_str_split`.
-#[no_mangle]
-pub extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_SPLIT);
-    unsafe {
-        let mut sbuf = [0u8; 8];
-        let mut pbuf = [0u8; 8];
-        let hay = str_bytes(s, &mut sbuf);
-        let needle = str_bytes(sep, &mut pbuf);
-        let nlen = needle.len();
-        // Part count = occurrences + 1 (an empty separator never matches → 1).
-        let count = if nlen == 0 {
-            1
-        } else {
-            let mut c = 1usize;
-            let mut i = 0usize;
-            while i + nlen <= hay.len() {
-                if &hay[i..i + nlen] == needle {
-                    c += 1;
-                    i += nlen;
-                } else {
-                    i += 1;
-                }
-            }
-            c
-        };
-        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
-        let arr = aipl_array_new(count as i64, drop_fn, 8);
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut i64;
-        if nlen == 0 {
-            *elems = aipl_str_slice(s, 0, hay.len() as i64) as i64;
-        } else {
-            let (mut start, mut i, mut k) = (0usize, 0usize, 0usize);
-            while i + nlen <= hay.len() {
-                if &hay[i..i + nlen] == needle {
-                    *elems.add(k) = aipl_str_slice(s, start as i64, i as i64) as i64;
-                    k += 1;
-                    i += nlen;
-                    start = i;
-                } else {
-                    i += 1;
-                }
-            }
-            *elems.add(k) = aipl_str_slice(s, start as i64, hay.len() as i64) as i64;
-        }
-        aipl_dec(s);
-        aipl_dec(sep);
-        arr
-    }
-}
 
 /// `join(parts: str[], sep: str) -> str` — concatenate the parts with `sep`
 /// between consecutive elements (`[]` -> `""`, `[x]` -> `x`). Two passes: measure
@@ -2454,11 +1806,11 @@ pub extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// the array runtime is. Two passes over the shared splitter: count, allocate,
 /// fill. Each part is a window into `s`, retained because the array owns it.
 #[no_mangle]
-pub extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
+pub extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
     let (sv, sepv) = unsafe { (*s, *sep) };
     let mut count = 0usize;
     str24::for_each_split(sv, sepv, &mut |_| count += 1);
-    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
     let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
     let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
     let mut k = 0usize;
@@ -2473,7 +1825,7 @@ pub extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) 
 /// `join` under the wide ABI — the array half only; the streaming is
 /// `str24::join_from`. Borrows the array and the separator.
 #[no_mangle]
-pub extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
+pub extern "C" fn aipl_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
     let sepv = unsafe { *sep };
     unsafe {
         let len = array_len(arr);
@@ -2482,86 +1834,7 @@ pub extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *con
     }
 }
 
-#[no_mangle]
-pub extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_JOIN);
-    let result = unsafe {
-        let len = *(arr as *const i64) as usize; // length lives at the data pointer
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *const i64;
-        let mut sb = [0u8; 8];
-        // `sep` is read once and reused, so materialize a rope separator just once.
-        let sep_bytes = str_bytes(sep, &mut sb);
-        // Measure: every part's length (O(1)) plus a separator between each pair.
-        let mut total = sep_bytes.len() * len.saturating_sub(1);
-        for i in 0..len {
-            let ep = *elems.add(i) as *const u8;
-            total += aipl_str_len(ep) as usize;
-        }
-        // Fill, writing a separator before every element but the first.
-        let mut scratch = [0u8; 7];
-        let dst = if total <= 7 {
-            scratch.as_mut_ptr()
-        } else {
-            rt_str_buf(total).add(STR_HEADER_SIZE)
-        };
-        let mut pos = 0usize;
-        for i in 0..len {
-            if i > 0 {
-                memcpy(
-                    dst.add(pos) as *mut c_void,
-                    sep_bytes.as_ptr() as *const c_void,
-                    sep_bytes.len(),
-                );
-                pos += sep_bytes.len();
-            }
-            let ep = *elems.add(i) as *const u8;
-            // Stream the element into the buffer; a rope copies its leaves with
-            // nothing materialized.
-            str_for_each_chunk(ep, &mut |chunk| {
-                memcpy(
-                    dst.add(pos) as *mut c_void,
-                    chunk.as_ptr() as *const c_void,
-                    chunk.len(),
-                );
-                pos += chunk.len();
-                true
-            });
-        }
-        if total <= 7 {
-            pack_inline(&scratch[..total])
-        } else {
-            dst
-        }
-    };
-    aipl_array_dec(arr);
-    aipl_dec(sep);
-    result
-}
 
-/// Pointer to `s`'s contiguous content bytes (length via `aipl_str_len`), for
-/// codegen sites that walk a str by index (the `for` loop and `to_str`
-/// rendering). Inline content is copied into the caller's 8-byte `scratch`;
-/// owned/view content is returned in place. Mirrors the JIT runtime.
-#[no_mangle]
-pub extern "C" fn aipl_str_data(s: *const u8, scratch: *mut u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_STR_DATA);
-    match str_repr(s) {
-        StrRepr::Inline => {
-            let val = (s as usize as u64).to_le_bytes();
-            let len = inline_len(s);
-            let mut i = 0;
-            while i < len {
-                unsafe { *scratch.add(i) = val[1 + i] };
-                i += 1;
-            }
-            scratch
-        }
-        StrRepr::View(obj) => unsafe { *(obj.add(VIEW_DATA_OFFSET) as *const *const u8) },
-        StrRepr::Rope(_) => unsafe { aipl_str_data(concat_materialize(s), scratch) },
-        // A null or heap value's pointer is already its contiguous content.
-        StrRepr::Null | StrRepr::Heap => s,
-    }
-}
 
 // ---------- Char-iteration cursor (`for c in s`) ----------
 //
@@ -2580,173 +1853,9 @@ const ITER_LEAF_START: usize = 32;
 const ITER_LEAF_LEN: usize = 40;
 const ITER_SCRATCH: usize = 48;
 
-#[no_mangle]
-pub extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
-    count_builtin!(builtin_calls::AIPL_STR_ITER_INIT);
-    unsafe {
-        *(cur.add(ITER_ROOT) as *mut *const u8) = s;
-        *(cur.add(ITER_POS) as *mut i64) = 0;
-        *(cur.add(ITER_TOTAL) as *mut i64) = aipl_str_len(s);
-        *(cur.add(ITER_LEAF_PTR) as *mut *const u8) = core::ptr::null();
-        *(cur.add(ITER_LEAF_START) as *mut i64) = 0;
-        *(cur.add(ITER_LEAF_LEN) as *mut i64) = 0;
-    }
-}
 
-/// Next byte of the iterated string as `0..=255`, or `-1` at the end.
-#[no_mangle]
-pub extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_ITER_NEXT);
-    unsafe {
-        let pos = *(cur.add(ITER_POS) as *const i64);
-        if pos >= *(cur.add(ITER_TOTAL) as *const i64) {
-            return -1;
-        }
-        let leaf_start = *(cur.add(ITER_LEAF_START) as *const i64);
-        let leaf_len = *(cur.add(ITER_LEAF_LEN) as *const i64);
-        if pos < leaf_start || pos >= leaf_start + leaf_len {
-            // Descend from the root to the leaf containing `pos`; only non-rope
-            // nodes (or an already-materialized rope's cache) become the leaf.
-            let mut node = *(cur.add(ITER_ROOT) as *const *const u8);
-            let mut base: i64 = 0;
-            loop {
-                match str_repr(node) {
-                    StrRepr::Rope(obj) => {
-                        let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-                        if cache.is_null() {
-                            let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-                            let ll = aipl_str_len(left);
-                            if pos - base < ll {
-                                node = left;
-                            } else {
-                                base += ll;
-                                node = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-                            }
-                        } else {
-                            node = cache;
-                            break;
-                        }
-                    }
-                    _ => break,
-                }
-            }
-            let data = aipl_str_data(node, cur.add(ITER_SCRATCH));
-            *(cur.add(ITER_LEAF_PTR) as *mut *const u8) = data;
-            *(cur.add(ITER_LEAF_START) as *mut i64) = base;
-            *(cur.add(ITER_LEAF_LEN) as *mut i64) = aipl_str_len(node);
-        }
-        let leaf_ptr = *(cur.add(ITER_LEAF_PTR) as *const *const u8);
-        let leaf_start = *(cur.add(ITER_LEAF_START) as *const i64);
-        let b = *leaf_ptr.add((pos - leaf_start) as usize);
-        *(cur.add(ITER_POS) as *mut i64) = pos + 1;
-        i64::from(b)
-    }
-}
 
-/// In-place trim for a *uniquely owned* string (codegen calls this only for
-/// `set s = trim(s)` when static analysis proves `s` is unaliased). Shifts the
-/// trimmed content to the buffer start and `realloc`s down to fit, reusing the
-/// block rather than allocating a fresh string. A static literal can't be
-/// mutated, so it falls back to a copy (`aipl_trim`) — which also keeps the
-/// alloc/dealloc tally balanced for the first trim off a literal. `s` is reused,
-/// not dropped.
-#[no_mangle]
-pub extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_TRIM_MUT);
-    unsafe {
-        // Only a uniquely-owned (non-static) heap string can be trimmed in place;
-        // any other representation copies via `aipl_trim`. Matching (rather than an
-        // `is_*` chain) means a new representation must explicitly opt into the
-        // in-place path. `header_of` is valid only for the heap case.
-        let StrRepr::Heap = str_repr(s) else {
-            return aipl_trim(s);
-        };
-        if *header_of(s) == STATIC_REFCOUNT {
-            return aipl_trim(s);
-        }
-        let n = heap_len(s);
-        let mut start = 0;
-        while start < n && is_ascii_ws(*s.add(start)) {
-            start += 1;
-        }
-        let mut end = n;
-        while end > start && is_ascii_ws(*s.add(end - 1)) {
-            end -= 1;
-        }
-        let len = end - start;
-        let data = s as *mut u8;
-        if len <= 7 {
-            // SSO: the trimmed result is inline — copy it out and free the block.
-            let mut tmp = [0u8; 7];
-            memcpy(
-                tmp.as_mut_ptr() as *mut c_void,
-                data.add(start) as *const c_void,
-                len,
-            );
-            rt_free(s.sub(STR_HEADER_SIZE) as *mut c_void);
-            return pack_inline(&tmp[..len]);
-        }
-        if start > 0 {
-            // Shift the trimmed content to the front (regions overlap).
-            memmove(data as *mut c_void, data.add(start) as *const c_void, len);
-        }
-        *data.add(len) = 0;
-        // Shrink the block to fit; reuses it (never grows).
-        let block = s.sub(STR_HEADER_SIZE) as *mut c_void;
-        let raw = rt_realloc(block, STR_HEADER_SIZE + len + 1) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = len as i64; // updated stored length (block word 0)
-        raw.add(STR_HEADER_SIZE)
-    }
-}
 
-/// In-place concat for a *uniquely owned* string (codegen calls this only for
-/// `set s = s + rhs` when static analysis proves `s` is unaliased). Grows `s`'s
-/// buffer with `realloc` and appends `b`, then drops `b`. A static string (a
-/// literal) can't be grown in place, so it falls back to a copy — which is also
-/// why the first append off a literal still shows as a counted allocation,
-/// keeping the alloc/dealloc tally balanced. `a` is reused, so it isn't dropped.
-#[no_mangle]
-pub extern "C" fn aipl_concat_mut(a: *const u8, b: *const u8) -> *const u8 {
-    count_builtin!(builtin_calls::AIPL_CONCAT_MUT);
-    unsafe {
-        // Only a uniquely-owned (non-static) heap `a` can be grown in place; any
-        // other representation copies via `aipl_concat`. Matching (rather than an
-        // `is_*` chain) means a new representation must explicitly opt into the
-        // in-place path. `header_of` is valid only for the heap case.
-        let StrRepr::Heap = str_repr(a) else {
-            return aipl_concat(a, b);
-        };
-        if *header_of(a) == STATIC_REFCOUNT {
-            return aipl_concat(a, b);
-        }
-        // `a` is a heap str; read its stored length. `b` may be inline, so
-        // materialize it.
-        let la = heap_len(a);
-        let mut bbuf = [0u8; 8];
-        let sb = str_bytes(b, &mut bbuf);
-        let lb = sb.len();
-        let block = a.sub(STR_HEADER_SIZE) as *mut c_void;
-        let raw = rt_realloc(block, STR_HEADER_SIZE + la + lb + 1) as *mut u8;
-        if raw.is_null() {
-            abort();
-        }
-        *(raw as *mut i64) = (la + lb) as i64; // updated stored length (block word 0)
-        let data = raw.add(STR_HEADER_SIZE);
-        if lb > 0 {
-            memcpy(
-                data.add(la) as *mut c_void,
-                sb.as_ptr() as *const c_void,
-                lb,
-            );
-        }
-        *data.add(la + lb) = 0;
-        aipl_dec(b);
-        data
-    }
-}
 
 // ---------- Refcounted array runtime ----------
 //
@@ -3350,230 +2459,13 @@ pub extern "C" fn aipl_array_push_mut(
 // pointers compared by content, with the array `str` drop/retain helpers stored
 // so the block frees/retains its strings). Mirrors codegen.
 
-/// Compare two NUL-terminated runtime strings by content; a null pointer equals
-/// only itself.
-unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
-    if a == b {
-        return true; // same allocation/value (incl. two equal inline strings), or both null
-    }
-    if a.is_null() || b.is_null() {
-        return false; // a null str equals only itself
-    }
-    if aipl_str_len(a) != aipl_str_len(b) {
-        return false; // O(1) length check — unequal lengths can't be equal
-    }
-    // Equal lengths: stream the rope side (if any) leaf-by-leaf and compare each
-    // chunk against the other side made contiguous. Materializes only when BOTH
-    // sides are ropes (rare); the common rope-vs-literal case copies nothing.
-    let (rope, other) = if matches!(str_repr(a), StrRepr::Rope(_)) {
-        (a, b)
-    } else {
-        (b, a)
-    };
-    let mut ob = [0u8; 8];
-    let obytes = unsafe { str_bytes(other, &mut ob) };
-    let mut off = 0usize;
-    str_for_each_chunk(rope, &mut |chunk| {
-        let end = off + chunk.len();
-        let ok = chunk == &obytes[off..end];
-        off = end;
-        ok
-    })
-}
 
-/// Lexicographic byte comparison of two `str`s: negative, zero, or positive
-/// like `memcmp`. Backs the ordering operators (`<`, `<=`, `>`, `>=`) on `str`,
-/// using the same byte order `sort` already imposes on a `str[]`. Unlike
-/// `aipl_str_eq` this only *borrows* both inputs (no dec), so codegen emits no
-/// compensating pre-inc. Mirrors the JIT `aipl_str_cmp`.
-#[no_mangle]
-pub extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_CMP);
-    let mut ab = [0u8; 8];
-    let mut bb = [0u8; 8];
-    let (x, y) = unsafe { (str_bytes(a, &mut ab), str_bytes(b, &mut bb)) };
-    let n = if x.len() < y.len() { x.len() } else { y.len() };
-    let mut i = 0;
-    while i < n {
-        if x[i] != y[i] {
-            return if x[i] < y[i] { -1 } else { 1 };
-        }
-        i += 1;
-    }
-    if x.len() == y.len() {
-        0
-    } else if x.len() < y.len() {
-        -1
-    } else {
-        1
-    }
-}
 
-/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
-/// caller's own references cover the call and no pre-inc is needed.
-#[no_mangle]
-pub extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_EQ);
-    let eq = unsafe { rt_str_eq(a, b) };
-    i64::from(eq)
-}
 
-/// `s.starts_with(prefix) -> bool` (1/0): whether `s`'s bytes begin with
-/// `prefix`'s. Consumes (decs) both inputs; callers pre-inc. The empty prefix
-/// always matches. Mirrors the JIT `aipl_str_starts_with`.
-#[no_mangle]
-pub extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_STARTS_WITH);
-    let pl = aipl_str_len(prefix) as usize;
-    let starts = if (aipl_str_len(s) as usize) < pl {
-        false
-    } else {
-        // Stream `s` only until the prefix is matched (or mismatches); `prefix`
-        // (usually a short literal) is read contiguously.
-        let mut pb = [0u8; 8];
-        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
-        let mut off = 0usize;
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            if off >= pl {
-                return false; // whole prefix matched — stop scanning `s`
-            }
-            let take = core::cmp::min(chunk.len(), pl - off);
-            if chunk[..take] != pbytes[off..off + take] {
-                ok = false;
-                return false;
-            }
-            off += take;
-            true
-        });
-        ok
-    };
-    i64::from(starts)
-}
 
-/// `s.starts_with_at(prefix, at) -> bool` (1/0): whether `s`'s bytes from `at`
-/// onward begin with `prefix`'s — `s[at..].starts_with(prefix)` without building
-/// the slice. `at` clamps to `[0, len]` exactly as a slice bound does, so a start
-/// past the end leaves nothing to match but the empty prefix. Consumes (decs)
-/// both inputs; callers pre-inc. Mirrors the JIT `aipl_str_starts_with_at`.
-#[no_mangle]
-pub extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i64) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_STARTS_WITH_AT);
-    let sl = aipl_str_len(s);
-    let pl = aipl_str_len(prefix) as usize;
-    let lo = if at < 0 {
-        0
-    } else if at > sl {
-        sl as usize
-    } else {
-        at as usize
-    };
-    let starts = if (sl as usize) - lo < pl {
-        false
-    } else {
-        // Stream `s`, skipping the chunks that end before `lo` and comparing from
-        // there until the prefix is matched (or mismatches); `prefix` (usually a
-        // short literal) is read contiguously.
-        let mut pb = [0u8; 8];
-        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
-        let mut pos = 0usize; // bytes of `s` behind us
-        let mut off = 0usize; // bytes of `prefix` matched so far
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            if off >= pl {
-                return false; // whole prefix matched — stop scanning `s`
-            }
-            let start = pos;
-            pos += chunk.len();
-            if pos <= lo {
-                return true; // wholly before the offset — nothing to compare yet
-            }
-            let from = lo.saturating_sub(start);
-            let take = core::cmp::min(chunk.len() - from, pl - off);
-            if chunk[from..from + take] != pbytes[off..off + take] {
-                ok = false;
-                return false;
-            }
-            off += take;
-            true
-        });
-        ok
-    };
-    i64::from(starts)
-}
 
-/// `s.ends_with(suffix) -> bool` (1/0): whether `s`'s bytes end with `suffix`'s.
-/// Consumes (decs) both inputs; callers pre-inc. The empty suffix always matches.
-/// Mirrors the JIT `aipl_str_ends_with`.
-#[no_mangle]
-pub extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_ENDS_WITH);
-    let sl = aipl_str_len(s) as usize;
-    let ql = aipl_str_len(suffix) as usize;
-    let ends = if sl < ql {
-        false
-    } else {
-        // Stream `s` (reaching the end is unavoidable) and compare only the bytes
-        // overlapping the trailing suffix region `[start, sl)` — no materializing.
-        let start = sl - ql;
-        let mut qb = [0u8; 8];
-        let qbytes = unsafe { str_bytes(suffix, &mut qb) };
-        let mut pos = 0usize;
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            let cstart = pos;
-            let cend = pos + chunk.len();
-            pos = cend;
-            if cend > start {
-                let from = if cstart < start { start } else { cstart };
-                let cs = from - cstart;
-                let qs = from - start;
-                let n = cend - from;
-                if chunk[cs..cs + n] != qbytes[qs..qs + n] {
-                    ok = false;
-                    return false;
-                }
-            }
-            true
-        });
-        ok
-    };
-    i64::from(ends)
-}
 
-/// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
-/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
-/// caller's own references cover the call and no pre-inc is needed.
-#[no_mangle]
-pub extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_CONTAINS);
-    let mut sb = [0u8; 8];
-    let mut nb = [0u8; 8];
-    let found = unsafe {
-        let sbytes = str_bytes(s, &mut sb);
-        let nbytes = str_bytes(needle, &mut nb);
-        nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
-    };
-    i64::from(found)
-}
 
-/// FNV-1a content hash of a NUL-terminated string (consistent with `rt_str_eq`).
-/// Borrows `a` (no refcount change). Mirrors the JIT `aipl_str_hash`.
-#[no_mangle]
-pub extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
-    count_builtin!(builtin_calls::AIPL_STR_HASH);
-    // FNV-1a is a left fold over bytes, so streaming a rope's leaves in order
-    // gives the same result as the flattened bytes — no materialization.
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    str_for_each_chunk(a, &mut |chunk| {
-        for &c in chunk {
-            h ^= c as u64;
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-        true
-    });
-    h as i64
-}
 
 /// Whether `a` already contains the element at `x` (1/0). `str_cmp != 0` compares
 /// `str` elements by content; otherwise by value (bit-packed for a `bool` set).
@@ -3598,16 +2490,6 @@ pub extern "C" fn aipl_set_contains(
             for i in 0..len {
                 let ep = arr_elem_ptr_rt(a, i, str24::STR_SIZE);
                 if str24::eq(*(ep as *const str24::Str), target) {
-                    return 1;
-                }
-            }
-            0
-        } else if str_cmp != 0 {
-            let target = *(x as *const i64) as *const u8;
-            for i in 0..len {
-                let ep = arr_elem_ptr_rt(a, i, 8);
-                let s = *(ep as *const i64) as *const u8;
-                if rt_str_eq(s, target) {
                     return 1;
                 }
             }
@@ -4039,12 +2921,7 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
             let eq = if wide {
                 str24::eq(*(ep as *const str24::Str), want_wide)
             } else {
-                let k = *(ep as *const i64);
-                if str_cmp != 0 {
-                    rt_str_eq(k as *const u8, want as *const u8)
-                } else {
-                    k == want
-                }
+                *(ep as *const i64) == want
             };
             if eq {
                 return i as i64;
@@ -4112,17 +2989,6 @@ pub extern "C" fn aipl_dict_contains_key(
     (unsafe { dict_find(a, key_ptr, pair_size, str_cmp) } >= 0) as i64
 }
 
-/// Element drop-fn for `str[]`: dec each element string.
-#[no_mangle]
-pub extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_DROP_STR);
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_dec(*elems.add(i) as *const u8);
-        }
-    }
-}
 
 /// Element drop-fn for an array of arrays (`T[][]`): release each element
 /// array (which recursively releases its own elements).
@@ -4144,25 +3010,11 @@ pub extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
     unsafe {
         let elems = elems as *const i64;
         for i in 0..len as usize {
-            aipl_inc(*elems.add(i) as *const u8);
+            aipl_arr_inc(*elems.add(i) as *const u8);
         }
     }
 }
 
-/// Element drop-fn for `str?[]`: each element is an inline 16-byte `{tag, value}`
-/// optional; dec the inner string when present (tag != 0).
-#[no_mangle]
-pub extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
-    count_builtin!(builtin_calls::AIPL_ARR_DROP_OPT_STR);
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            if *(e as *const i64) != 0 {
-                aipl_dec(*(e.add(8) as *const i64) as *const u8);
-            }
-        }
-    }
-}
 
 /// Element drop-fn for `T[]?[]`: release the inner array of each present element.
 #[no_mangle]
@@ -4187,7 +3039,7 @@ pub extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
         for i in 0..len as usize {
             let e = elems.add(i * 16);
             if *(e as *const i64) != 0 {
-                aipl_inc(*(e.add(8) as *const i64) as *const u8);
+                aipl_arr_inc(*(e.add(8) as *const i64) as *const u8);
             }
         }
     }
@@ -4212,36 +3064,19 @@ unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
         let n = if argc > 1 { (argc - 1) as i64 } else { 0 };
         // Built by the runtime and read by compiled code, so the two must agree
         // byte for byte — and this is one of the few places the runtime has no
-        // type to consult. The object exports which representation it speaks
-        // (`__aipl_str24`); see `STR24_SYMBOL` in codegen.
-        if str24_object() {
-            let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
-            let arr = aipl_array_new(n, drop_fn, str24::STR_SIZE as i64);
-            let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
-            for i in 0..n as usize {
-                let c = *argv.add(i + 1);
-                let bytes = core::slice::from_raw_parts(c as *const u8, strlen(c));
-                core::ptr::write(elems.add(i), str24::from_bytes(bytes));
-            }
-            return arr;
-        }
-        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
-        let arr = aipl_array_new(n, drop_fn, 8);
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut i64;
+        // type to consult.
+        let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
+        let arr = aipl_array_new(n, drop_fn, str24::STR_SIZE as i64);
+        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
         for i in 0..n as usize {
-            let s = aipl_str_from_cstr(*argv.add(i + 1));
-            *elems.add(i) = s as i64;
+            let c = *argv.add(i + 1);
+            let bytes = core::slice::from_raw_parts(c as *const u8, strlen(c));
+            core::ptr::write(elems.add(i), str24::from_bytes(bytes));
         }
         arr
     }
 }
 
-/// Whether the linked object was compiled with the 24-byte `str`, read from the
-/// flag it exports. The staticlib is built once and linked into objects of
-/// either representation, so this is the runtime's only way to know.
-fn str24_object() -> bool {
-    unsafe { __aipl_str24 != 0 }
-}
 
 // Entry point. The user's `main` is emitted as `__aipl_user_main` when building
 // a binary so we can wrap it with the platform-standard `int main(int, char**)`.
@@ -4257,7 +3092,6 @@ fn str24_object() -> bool {
 extern "C" {
     fn __aipl_user_main(args: *const u8) -> i64;
     static __aipl_main_wants_args: u8;
-    static __aipl_str24: u8;
 }
 
 #[no_mangle]
@@ -4559,41 +3393,22 @@ use core::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
 static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
 
-#[no_mangle]
-pub extern "C" fn aipl_test_begin(_name: *const u8) {
-    count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
-    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
-}
 
-#[no_mangle]
-pub extern "C" fn aipl_assert(cond: i64, _loc: *const u8) {
-    count_builtin!(builtin_calls::AIPL_ASSERT);
-    if cond == 0 {
-        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
-    }
-}
 
-#[no_mangle]
-pub extern "C" fn aipl_test_fail(_msg: *const u8) {
-    count_builtin!(builtin_calls::AIPL_TEST_FAIL);
-    // `?` on an err inside a `.test`: mark the current test failed. The error
-    // message (`_msg`) is only rendered by the JIT runtime under `aipl check`.
-    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
-}
 
 // The wide-ABI counterparts. They ignore their `str` argument for exactly the
 // reason the `aipl_*` versions do — an AOT binary records pass/fail counts and
 // leaves the *reporting* to `aipl check` — so the only thing that changes is the
 // argument's type. Written here rather than left to the JIT because a half-
-// written entry point links in one runtime and not the other (see `aipl2_print`).
+// written entry point links in one runtime and not the other (see `aipl_print`).
 #[no_mangle]
-pub extern "C" fn aipl2_test_begin(_name: *const str24::Str) {
+pub extern "C" fn aipl_test_begin(_name: *const str24::Str) {
     count_builtin!(builtin_calls::AIPL_TEST_BEGIN);
     TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
 }
 
 #[no_mangle]
-pub extern "C" fn aipl2_assert(cond: i64, _loc: *const str24::Str) {
+pub extern "C" fn aipl_assert(cond: i64, _loc: *const str24::Str) {
     count_builtin!(builtin_calls::AIPL_ASSERT);
     if cond == 0 {
         TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
@@ -4601,7 +3416,7 @@ pub extern "C" fn aipl2_assert(cond: i64, _loc: *const str24::Str) {
 }
 
 #[no_mangle]
-pub extern "C" fn aipl2_test_fail(_msg: *const str24::Str) {
+pub extern "C" fn aipl_test_fail(_msg: *const str24::Str) {
     count_builtin!(builtin_calls::AIPL_TEST_FAIL);
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }

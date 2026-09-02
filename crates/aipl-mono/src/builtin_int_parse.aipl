@@ -108,19 +108,19 @@ pub fn int_parse(self: str) -> i64? {
     assert("123456789012345678901234567890".int_parse() == none);
 })
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 416
-instructions executed: 15683
-binary size: 9712
-  code: 3292
-  data: 2186
-  metadata: 4234
+bytes allocated: 0
+instructions executed: 12737
+binary size: 10000
+  code: 4504
+  data: 1816
+  metadata: 3680
 functions:
   __builtin_count_while$char$s0$lam4:
     calls: 22
-    bytes: 232
+    bytes: 172
   __eq_i64$opt:
     calls: 24
     bytes: 100
@@ -129,32 +129,8 @@ functions:
     bytes: 140
   __test$int_parse:
     calls: 1
-    bytes: 1716
+    bytes: 2956
   aipl_assert:
-    calls: 24
-    bytes: (external)
-  aipl_dec:
-    calls: 59
-    bytes: (external)
-  aipl_inc:
-    calls: 31
-    bytes: (external)
-  aipl_str_data:
-    calls: 35
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 39
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 35
-    bytes: (external)
-  aipl_str_len:
-    calls: 196
-    bytes: (external)
-  aipl_str_slice:
-    calls: 28
-    bytes: (external)
-  aipl_str_starts_with:
     calls: 24
     bytes: (external)
   aipl_test_begin:
@@ -168,7 +144,7 @@ functions:
     bytes: (external)
   int_parse:
     calls: 24
-    bytes: 1032
+    bytes: 1028
   main:
     calls: 1
-    bytes: 72
+    bytes: 108

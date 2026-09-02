@@ -497,7 +497,7 @@ fn sanity_check(artifact: &str) {
 /// produces right now. Under `AIPL_STR24` they cannot: the frontend emits calls
 /// to the `aipl2_*` entry points while the `.clif` files still name the `aipl_*`
 /// ones, so a *correct* switch mismatches by construction. Regenerating the
-/// artifacts is the last step of Stage 1 (`tests/support/str24_burndown.txt`),
+/// artifacts is the last step of Stage 1 (`tests/support/str24_migration.txt`),
 /// and doing it before then would strand the compiler — it cannot parse anything
 /// without artifacts its own runtime can link.
 ///

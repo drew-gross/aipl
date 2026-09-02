@@ -20,43 +20,25 @@ ok
 42
 
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 40
-instructions executed: 55
-binary size: 1480
-  code: 444
-  data: 2
-  metadata: 1034
+bytes allocated: 106
+instructions executed: 69
+binary size: 1560
+  code: 540
+  data: 1
+  metadata: 1019
 functions:
   __to_str_i64:
     calls: 1
-    bytes: 180
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 10
-    bytes: (external)
+    bytes: 204
   aipl_i64_len:
     calls: 2
-    bytes: (external)
-  aipl_inc:
-    calls: 3
-    bytes: (external)
-  aipl_print:
-    calls: 4
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
-  aipl_trim:
-    calls: 1
     bytes: (external)
   aipl_write_i64:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 264
+    bytes: 336

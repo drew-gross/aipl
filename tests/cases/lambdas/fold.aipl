@@ -31,25 +31,22 @@ fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({
     assert([1, 2].fold(0, |acc, x| acc + x + bump) == 23); // a captured value
 })
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 484
-instructions executed: 1167
-binary size: 5896
-  code: 2780
-  data: 642
-  metadata: 2474
+bytes allocated: 587
+instructions executed: 1234
+binary size: 6352
+  code: 3340
+  data: 552
+  metadata: 2460
 functions:
   __filter8$own0:
     calls: 1
     bytes: 272
   __test$sums_an_array:
     calls: 1
-    bytes: 2436
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 2952
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -62,33 +59,6 @@ functions:
   aipl_assert:
     calls: 9
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 17
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_str_alloc:
-    calls: 1
-    bytes: (external)
-  aipl_str_data:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 2
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 12
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -100,4 +70,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 116

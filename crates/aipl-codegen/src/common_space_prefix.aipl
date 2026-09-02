@@ -48,23 +48,20 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2178
-binary size: 4064
-  code: 1160
-  data: 931
-  metadata: 1973
+instructions executed: 2403
+binary size: 4816
+  code: 2048
+  data: 873
+  metadata: 1895
 functions:
   __eq_char$opt:
     calls: 48
     bytes: 100
   __test$common_space_prefix:
     calls: 1
-    bytes: 748
+    bytes: 1580
   aipl_assert:
     calls: 13
-    bytes: (external)
-  aipl_char_at:
-    calls: 48
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -80,4 +77,4 @@ functions:
     bytes: 240
   main:
     calls: 1
-    bytes: 72
+    bytes: 128

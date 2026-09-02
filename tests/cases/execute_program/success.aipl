@@ -39,36 +39,24 @@ ok:[out
 ] exit=7
 ok:[][] exit=0
 --- performance ---
-allocations: 32
-deallocations: 32
+allocations: 31
+deallocations: 31
 reallocations: 0
-bytes allocated: 916
-instructions executed: 327
-binary size: 6408
-  code: 3116
-  data: 49
-  metadata: 3243
+bytes allocated: 1458
+instructions executed: 431
+binary size: 6200
+  code: 3392
+  data: 47
+  metadata: 2761
 functions:
   __to_str_i64:
     calls: 3
-    bytes: 180
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 3
-    bytes: (external)
+    bytes: 204
   aipl_array_dec:
-    calls: 9
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 3
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 15
-    bytes: (external)
-  aipl_dec:
-    calls: 79
     bytes: (external)
   aipl_execute_program:
     calls: 3
@@ -76,18 +64,9 @@ functions:
   aipl_i64_len:
     calls: 6
     bytes: (external)
-  aipl_inc:
-    calls: 36
-    bytes: (external)
-  aipl_print:
-    calls: 3
-    bytes: (external)
-  aipl_str_len:
-    calls: 30
-    bytes: (external)
   aipl_write_i64:
     calls: 3
     bytes: (external)
   main:
     calls: 1
-    bytes: 2936
+    bytes: 3188

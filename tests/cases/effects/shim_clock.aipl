@@ -67,36 +67,24 @@ fn main() !prints !clock {
 3333 then 1111
 true
 --- performance ---
-allocations: 3
-deallocations: 3
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 85
-instructions executed: 312
-binary size: 4584
-  code: 2012
-  data: 48
-  metadata: 2524
+bytes allocated: 276
+instructions executed: 280
+binary size: 4528
+  code: 2032
+  data: 47
+  metadata: 2449
 functions:
   __to_str_bool:
     calls: 1
-    bytes: 212
+    bytes: 232
   __to_str_u64:
     calls: 4
-    bytes: 180
-  aipl_concat:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 21
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
+    bytes: 204
   aipl_now_nanos:
     calls: 1
-    bytes: (external)
-  aipl_print:
-    calls: 4
     bytes: (external)
   aipl_shim_get:
     calls: 16
@@ -127,4 +115,4 @@ functions:
     bytes: 8
   main:
     calls: 1
-    bytes: 1588
+    bytes: 1564

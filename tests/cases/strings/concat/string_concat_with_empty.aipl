@@ -8,30 +8,18 @@ fn trail_empty() -> str { "lone" +++ "" }.test({
     assert(trail_empty() == "lone");
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 80
-instructions executed: 40
-binary size: 1640
-  code: 320
-  data: 163
-  metadata: 1157
+bytes allocated: 0
+instructions executed: 96
+binary size: 1672
+  code: 572
+  data: 97
+  metadata: 1003
 functions:
   aipl_assert:
     calls: 2
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 2
-    bytes: (external)
-  aipl_dec:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -44,4 +32,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 320
+    bytes: 572

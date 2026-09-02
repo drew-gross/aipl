@@ -37,37 +37,19 @@ err(missing: nope)
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 240
-instructions executed: 198
-binary size: 2936
-  code: 1372
-  data: 28
-  metadata: 1536
+bytes allocated: 528
+instructions executed: 311
+binary size: 2944
+  code: 1628
+  data: 1
+  metadata: 1315
 functions:
-  aipl_concat_lazy:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 30
-    bytes: (external)
-  aipl_inc:
-    calls: 18
-    bytes: (external)
-  aipl_print:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
-    bytes: (external)
   greet:
     calls: 2
-    bytes: 656
+    bytes: 816
   main:
     calls: 1
-    bytes: 308
+    bytes: 336
   show:
     calls: 2
-    bytes: 408
+    bytes: 476

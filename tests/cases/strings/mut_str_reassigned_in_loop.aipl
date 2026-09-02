@@ -27,22 +27,19 @@ fn shrink(s: str) -> str {
     assert(shrink("0123456789,abcdefghij,ABCDEFGHIJ") == "01234567");
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 248
-instructions executed: 174
-binary size: 1896
-  code: 460
-  data: 173
-  metadata: 1263
+bytes allocated: 104
+instructions executed: 262
+binary size: 2024
+  code: 704
+  data: 131
+  metadata: 1189
 functions:
   __test$shrink:
     calls: 1
-    bytes: 384
-  aipl_arr_drop_str:
-    calls: 1
-    bytes: (external)
+    bytes: 600
   aipl_array_dec:
     calls: 1
     bytes: (external)
@@ -50,24 +47,6 @@ functions:
     calls: 1
     bytes: (external)
   aipl_assert:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 18
-    bytes: (external)
-  aipl_inc:
-    calls: 9
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
-  aipl_str_slice:
-    calls: 6
-    bytes: (external)
-  aipl_str_split:
     calls: 1
     bytes: (external)
   aipl_test_begin:
@@ -81,4 +60,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 76
+    bytes: 104

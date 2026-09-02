@@ -90,11 +90,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 5118
-binary size: 5424
-  code: 2088
-  data: 1111
-  metadata: 2225
+instructions executed: 4392
+binary size: 5776
+  code: 2568
+  data: 1061
+  metadata: 2147
 functions:
   __eq___builtin_Span:
     calls: 7
@@ -104,21 +104,9 @@ functions:
     bytes: 92
   __test$find_trailing_whitespace:
     calls: 1
-    bytes: 1084
+    bytes: 1596
   aipl_assert:
     calls: 12
-    bytes: (external)
-  aipl_str_data:
-    calls: 11
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 12
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 11
-    bytes: (external)
-  aipl_str_len:
-    calls: 32
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -131,10 +119,10 @@ functions:
     bytes: (external)
   find_trailing_whitespace:
     calls: 12
-    bytes: 560
+    bytes: 500
   line_end_span:
     calls: 18
     bytes: 176
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

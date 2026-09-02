@@ -16,32 +16,20 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 877
-binary size: 2424
-  code: 628
-  data: 361
-  metadata: 1435
+instructions executed: 733
+binary size: 2584
+  code: 936
+  data: 306
+  metadata: 1342
 functions:
   __builtin_all$char$s0$lam0:
     calls: 7
-    bytes: 272
+    bytes: 212
   __test$blank:
     calls: 1
-    bytes: 284
+    bytes: 620
   aipl_assert:
     calls: 7
-    bytes: (external)
-  aipl_str_data:
-    calls: 6
-    bytes: (external)
-  aipl_str_iter_init:
-    calls: 7
-    bytes: (external)
-  aipl_str_iter_next:
-    calls: 6
-    bytes: (external)
-  aipl_str_len:
-    calls: 13
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -54,4 +42,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

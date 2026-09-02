@@ -14,36 +14,21 @@ fn build() -> str {
     assert(build() == "padded");
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 67
-instructions executed: 47
-binary size: 1544
-  code: 348
-  data: 80
-  metadata: 1116
+bytes allocated: 0
+instructions executed: 105
+binary size: 1616
+  code: 556
+  data: 46
+  metadata: 1014
 functions:
   __test$build:
     calls: 1
-    bytes: 276
+    bytes: 452
   aipl_assert:
     calls: 1
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_inc:
-    calls: 2
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -54,9 +39,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_trim:
-    calls: 1
-    bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 104

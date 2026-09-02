@@ -21,12 +21,12 @@ fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
 allocations: 1
 deallocations: 1
 reallocations: 0
-bytes allocated: 40
-instructions executed: 316
-binary size: 3192
-  code: 1316
-  data: 288
-  metadata: 1588
+bytes allocated: 88
+instructions executed: 393
+binary size: 3368
+  code: 1560
+  data: 278
+  metadata: 1530
 functions:
   __eq_i64$opt:
     calls: 3
@@ -36,27 +36,12 @@ functions:
     bytes: 100
   __test$add2:
     calls: 1
-    bytes: 672
+    bytes: 844
   add2:
     calls: 3
     bytes: 128
   aipl_assert:
     calls: 5
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 1
-    bytes: (external)
-  aipl_dec:
-    calls: 7
-    bytes: (external)
-  aipl_inc:
-    calls: 5
-    bytes: (external)
-  aipl_str_eq:
-    calls: 1
-    bytes: (external)
-  aipl_str_len:
-    calls: 4
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -69,7 +54,7 @@ functions:
     bytes: (external)
   bang:
     calls: 2
-    bytes: 244
+    bytes: 288
   main:
     calls: 1
-    bytes: 72
+    bytes: 100

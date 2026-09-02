@@ -54,35 +54,20 @@ fn retag(s: Seg, tag: str, y: i64) -> Seg {
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 120
-instructions executed: 520
-binary size: 5160
-  code: 2152
-  data: 536
-  metadata: 2472
+bytes allocated: 264
+instructions executed: 730
+binary size: 5640
+  code: 2960
+  data: 406
+  metadata: 2274
 functions:
   __test$retag:
     calls: 1
-    bytes: 1388
+    bytes: 1892
   __test$shift_start_x:
     calls: 1
-    bytes: 652
+    bytes: 888
   aipl_assert:
-    calls: 10
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 3
-    bytes: (external)
-  aipl_dec:
-    calls: 28
-    bytes: (external)
-  aipl_inc:
-    calls: 19
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
     calls: 10
     bytes: (external)
   aipl_test_begin:
@@ -96,4 +81,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 112
+    bytes: 180

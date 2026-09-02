@@ -143,11 +143,6 @@ unsafe fn header_of(ptr: *const u8) -> *mut i64 {
     unsafe { ptr.sub(HEADER_SIZE) as *mut i64 }
 }
 
-/// The stored content length of a heap string (the word at `-16`, before refcount).
-unsafe fn heap_len(ptr: *const u8) -> usize {
-    unsafe { *(ptr.sub(STR_HEADER_SIZE) as *const i64) as usize }
-}
-
 // ---------- Small-string optimization (SSO) ----------
 //
 // A `str` value is either a heap/static pointer (8-byte aligned, so its low bits
@@ -171,83 +166,7 @@ unsafe fn heap_len(ptr: *const u8) -> usize {
 // representation by `match`ing `str_repr(..)` (NOT ad-hoc `is_*` checks), so
 // adding a representation here forces every dispatch site to handle it.
 const TAG_MASK: usize = 0b11;
-const HEAP_TAG: usize = 0b00;
 const INLINE_TAG: usize = 0b01;
-
-#[inline]
-fn inline_len(v: *const u8) -> usize {
-    ((v as usize) >> 2) & 0x7
-}
-
-// ---------- String views (slices that share a backing buffer) ----------
-//
-// A *view* is the third `str` representation, tagged by low bit 1 (bit 0 stays 0,
-// so it's distinct from both inline `..01` and owned-heap `..00`). The value is
-// `view_obj_ptr | 0b10`; the view object is a heap struct:
-//   [0]  refcount: i64          (the view's own count; views are never STATIC)
-//   [8]  data_ptr: *const u8    (into the owner's content bytes)
-//   [16] len:      i64          (slice length — views are NOT NUL-terminated)
-//   [24] owner:    *const u8    (the parent str value; inc'd on create, dec'd on
-//                                free, so the shared buffer outlives the view)
-// Views let a `str` slice share the source's buffer; small (<=7) or SSO slices
-// still copy to inline, so they don't pin the parent alive.
-const VIEW_TAG: usize = 0b10;
-const VIEW_SIZE: usize = 32;
-const VIEW_DATA_OFFSET: usize = 8;
-const VIEW_LEN_OFFSET: usize = 16;
-const VIEW_OWNER_OFFSET: usize = 24;
-
-/// The view object behind a view value (clears the tag bits).
-#[inline]
-fn view_obj(v: *const u8) -> *mut u8 {
-    ((v as usize) & !0b111) as *mut u8
-}
-
-fn alloc_view() -> *mut u8 {
-    let layout = std::alloc::Layout::from_size_align(VIEW_SIZE, std::mem::align_of::<i64>())
-        .expect("view layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    raw
-}
-
-unsafe fn free_view(obj: *mut u8) {
-    let layout = std::alloc::Layout::from_size_align(VIEW_SIZE, std::mem::align_of::<i64>())
-        .expect("view layout");
-    unsafe { std::alloc::dealloc(obj, layout) }
-}
-
-// ---------- Concatenated strings (lazy ropes) ----------
-//
-// A *concat* is the fourth `str` representation, tagged `0b11` in the low two
-// bits (the slot freed by repacking inline as `(len<<2)|1`). Produced by every
-// `str + str` (see `aipl_concat_lazy`), it defers the copy: the value is
-// `node_ptr | 0b11`, where the node is a heap struct:
-//   [0]  refcount: i64
-//   [8]  left:  str   (a held ref — the left operand)
-//   [16] right: str   (a held ref — the right operand)
-//   [24] cache: ptr   (0 until first byte-access; then a flattened owned heap str
-//                      the node owns and frees, so repeated reads materialize once)
-//   [32] len:   i64   (total content length of the whole rope, summed once when
-//                      the node is built — so `len` is O(1) at the root)
-// To the source author a concat is just a `str`: every consumer funnels through
-// `str_bytes` / `aipl_str_data` (which materialize on demand) or `aipl_str_len`
-// (which reads the stored root length). `aipl_inc`/`aipl_dec` count the node and,
-// at zero, release both children and the cache.
-const CONCAT_TAG: usize = 0b11;
-const CONCAT_SIZE: usize = 40;
-const CONCAT_LEFT_OFFSET: usize = 8;
-const CONCAT_RIGHT_OFFSET: usize = 16;
-const CONCAT_CACHE_OFFSET: usize = 24;
-const CONCAT_LEN_OFFSET: usize = 32;
-
-/// The concat node behind a concat value (clears the tag bits).
-#[inline]
-fn concat_obj(v: *const u8) -> *mut u8 {
-    ((v as usize) & !0b111) as *mut u8
-}
 
 // ---------- Representation dispatch ----------
 //
@@ -260,100 +179,6 @@ fn concat_obj(v: *const u8) -> *mut u8 {
 // `Null | Heap`), but spell the variants out rather than using a bare `_` so the
 // next representation still forces a decision.
 
-/// The active runtime representation of a (non-poisoned) `str` value.
-enum StrRepr {
-    /// Null pointer — the empty string, no storage.
-    Null,
-    /// Small-string-optimized: <= 7 content bytes packed in the value itself.
-    Inline,
-    /// Owned or static heap string; the value is its NUL-terminated content ptr.
-    Heap,
-    /// A slice sharing another string's buffer; carries the view object.
-    View(*mut u8),
-    /// A lazy concatenation — a *rope*; carries the concat node.
-    Rope(*mut u8),
-}
-
-/// Classify a `str` value into its active [`StrRepr`] (the discriminant is the
-/// low two bits; see the per-representation sections above).
-#[inline]
-fn str_repr(v: *const u8) -> StrRepr {
-    if v.is_null() {
-        return StrRepr::Null;
-    }
-    match (v as usize) & TAG_MASK {
-        HEAP_TAG => StrRepr::Heap,
-        INLINE_TAG => StrRepr::Inline,
-        VIEW_TAG => StrRepr::View(view_obj(v)),
-        CONCAT_TAG => StrRepr::Rope(concat_obj(v)),
-        _ => unreachable!("two-bit tag is exhaustive"),
-    }
-}
-
-fn alloc_concat() -> *mut u8 {
-    let layout = std::alloc::Layout::from_size_align(CONCAT_SIZE, std::mem::align_of::<i64>())
-        .expect("concat layout");
-    let raw = unsafe { std::alloc::alloc(layout) };
-    if raw.is_null() {
-        std::alloc::handle_alloc_error(layout);
-    }
-    raw
-}
-
-unsafe fn free_concat(obj: *mut u8) {
-    let layout = std::alloc::Layout::from_size_align(CONCAT_SIZE, std::mem::align_of::<i64>())
-        .expect("concat layout");
-    unsafe { std::alloc::dealloc(obj, layout) }
-}
-
-/// Flatten a concat into a contiguous owned heap str, memoized on the node's
-/// `cache` slot (so subsequent reads reuse it). Returns the cache value (a normal
-/// inline/heap str). Recurses through nested concats via `str_bytes`.
-unsafe fn concat_materialize(v: *const u8) -> *const u8 {
-    unsafe {
-        let obj = concat_obj(v);
-        let cache_slot = obj.add(CONCAT_CACHE_OFFSET) as *mut *const u8;
-        let cached = *cache_slot;
-        if !cached.is_null() {
-            return cached;
-        }
-        let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-        let right = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-        let mut lb = [0u8; 8];
-        let mut rb = [0u8; 8];
-        let lbytes = str_bytes(left, &mut lb);
-        let rbytes = str_bytes(right, &mut rb);
-        let mut combined = Vec::with_capacity(lbytes.len() + rbytes.len());
-        combined.extend_from_slice(lbytes);
-        combined.extend_from_slice(rbytes);
-        let result = make_str(&combined);
-        *cache_slot = result;
-        result
-    }
-}
-
-/// `str + str`, lazily: build a concat node holding the two operands. *Takes
-/// ownership* of the refs the caller pre-inc'd (no copy, no further inc/dec); the
-/// node's `aipl_dec` releases them. The defining producer of the concat repr.
-#[no_mangle]
-extern "C" fn aipl_concat_lazy(a: *const u8, b: *const u8) -> *const u8 {
-    // Sum the operands' lengths once (each is O(1) — stored on heap/rope, encoded
-    // on inline/view), so the whole rope's length is O(1) to read at the root.
-    let len = aipl_str_len(a) + aipl_str_len(b);
-    let obj = alloc_concat();
-    unsafe {
-        std::ptr::write(obj as *mut i64, 1); // refcount
-        std::ptr::write(obj.add(CONCAT_LEFT_OFFSET) as *mut *const u8, a);
-        std::ptr::write(obj.add(CONCAT_RIGHT_OFFSET) as *mut *const u8, b);
-        std::ptr::write(
-            obj.add(CONCAT_CACHE_OFFSET) as *mut *const u8,
-            std::ptr::null(),
-        );
-        std::ptr::write(obj.add(CONCAT_LEN_OFFSET) as *mut i64, len);
-    }
-    (obj as usize | CONCAT_TAG) as *const u8
-}
-
 /// Pack <= 7 content bytes into an inline str value (`bytes.len()` must be <= 7).
 fn pack_inline(bytes: &[u8]) -> *const u8 {
     debug_assert!(bytes.len() <= 7);
@@ -362,42 +187,6 @@ fn pack_inline(bytes: &[u8]) -> *const u8 {
         val |= (b as u64) << (8 * (i + 1));
     }
     val as usize as *const u8
-}
-
-/// Content bytes of any str value: inline content is copied into `buf` (which
-/// must outlive the returned slice); a heap/static pointer yields its NUL-
-/// delimited bytes; a null pointer yields empty.
-unsafe fn str_bytes(v: *const u8, buf: &mut [u8; 8]) -> &[u8] {
-    match str_repr(v) {
-        StrRepr::Null => &[],
-        StrRepr::Inline => {
-            *buf = (v as usize as u64).to_le_bytes();
-            &buf[1..1 + inline_len(v)]
-        }
-        StrRepr::View(obj) => unsafe {
-            let data = *(obj.add(VIEW_DATA_OFFSET) as *const *const u8);
-            let len = *(obj.add(VIEW_LEN_OFFSET) as *const i64) as usize;
-            std::slice::from_raw_parts(data, len)
-        },
-        // Materialize (memoized) and read the flattened cache's bytes.
-        StrRepr::Rope(_) => unsafe { str_bytes(concat_materialize(v), buf) },
-        StrRepr::Heap => unsafe { std::slice::from_raw_parts(v, heap_len(v)) },
-    }
-}
-
-/// Canonicalize freshly-built content into a str value: inline when it fits
-/// (<= 7 bytes), else a fresh heap string. The single place producers funnel
-/// their result through to maintain the "short == inline" invariant.
-fn make_str(bytes: &[u8]) -> *const u8 {
-    if bytes.len() <= 7 {
-        pack_inline(bytes)
-    } else {
-        let raw = alloc_dynamic_string(bytes.len());
-        unsafe {
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), raw.add(STR_HEADER_SIZE), bytes.len());
-            raw.add(STR_HEADER_SIZE)
-        }
-    }
 }
 
 fn alloc_dynamic_string(content_len: usize) -> *mut u8 {
@@ -426,214 +215,6 @@ unsafe fn free_dynamic_string(block: *mut u8, content_len: usize) {
     }
 }
 
-#[no_mangle]
-extern "C" fn aipl_inc(ptr: *const u8) {
-    match str_repr(ptr) {
-        // Null and inline values own no heap — nothing to count.
-        StrRepr::Null | StrRepr::Inline => {}
-        // A view / concat counts its own object (and holds refs on its children).
-        StrRepr::View(obj) | StrRepr::Rope(obj) => unsafe { *(obj as *mut i64) += 1 },
-        StrRepr::Heap => unsafe {
-            let h = header_of(ptr);
-            if *h != STATIC_REFCOUNT {
-                *h += 1;
-            }
-        },
-    }
-}
-
-#[no_mangle]
-extern "C" fn aipl_dec(ptr: *const u8) {
-    match str_repr(ptr) {
-        // Null and inline values own no heap — nothing to free.
-        StrRepr::Null | StrRepr::Inline => {}
-        // Drop the view object; at zero, release its owner and free the object.
-        StrRepr::View(obj) => unsafe {
-            let rc = obj as *mut i64;
-            *rc -= 1;
-            if *rc == 0 {
-                let owner = *(obj.add(VIEW_OWNER_OFFSET) as *const *const u8);
-                aipl_dec(owner);
-                free_view(obj);
-            }
-        },
-        // Drop the concat node; at zero, release both children and the (possibly
-        // materialized) cache, then free the node.
-        StrRepr::Rope(obj) => unsafe {
-            let rc = obj as *mut i64;
-            *rc -= 1;
-            if *rc == 0 {
-                aipl_dec(*(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8));
-                aipl_dec(*(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8));
-                let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-                if !cache.is_null() {
-                    aipl_dec(cache);
-                }
-                free_concat(obj);
-            }
-        },
-        StrRepr::Heap => unsafe {
-            let h = header_of(ptr);
-            if *h != STATIC_REFCOUNT {
-                *h -= 1;
-                if *h == 0 {
-                    free_dynamic_string(ptr.sub(STR_HEADER_SIZE) as *mut u8, heap_len(ptr));
-                }
-            }
-        },
-    }
-}
-
-/// Visit each leaf's contiguous bytes in order **without materializing a rope**:
-/// a rope recurses into its children (reusing its `cache` if already
-/// materialized), every other representation yields its bytes via `str_bytes`
-/// (no allocation). `f` returns `false` to stop early; the return value is
-/// whether the whole string was visited (i.e. `f` never stopped it). This is the
-/// shared primitive behind the streaming string operations — print, equality,
-/// hashing, indexing, prefix/suffix tests, join — so each works on a rope without
-/// flattening it. Mirrors the linker runtime's copy.
-fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool {
-    match str_repr(ptr) {
-        StrRepr::Null => true,
-        StrRepr::Rope(obj) => {
-            let cache = unsafe { *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8) };
-            if cache.is_null() {
-                let left = unsafe { *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8) };
-                let right = unsafe { *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8) };
-                str_for_each_chunk(left, f) && str_for_each_chunk(right, f)
-            } else {
-                str_for_each_chunk(cache, f)
-            }
-        }
-        // A contiguous leaf (inline/view/heap) yields its bytes directly.
-        StrRepr::Inline | StrRepr::View(_) | StrRepr::Heap => {
-            let mut buf = [0u8; 8];
-            let bytes = unsafe { str_bytes(ptr, &mut buf) };
-            f(bytes)
-        }
-    }
-}
-
-/// `print(s: str)`. Prints `s` with a trailing newline and drops its
-/// refcount to honor the caller's pre-call inc. Returns nothing.
-#[no_mangle]
-extern "C" fn aipl_print(ptr: *const u8) {
-    use std::io::Write;
-    // A null str prints nothing (defensive — well-typed code never passes one);
-    // an inline empty string `""` is non-null and prints a blank line. A rope is
-    // streamed leaf-by-leaf (no materialization).
-    if !ptr.is_null() {
-        let stdout = std::io::stdout();
-        let mut out = stdout.lock();
-        str_for_each_chunk(ptr, &mut |chunk| {
-            let _ = out.write_all(chunk);
-            true
-        });
-        let _ = out.write_all(b"\n");
-    }
-    aipl_dec(ptr);
-}
-
-/// `fn main() -> !Error` failure path (JIT): write `error: <msg>` to stderr.
-/// Borrows `msg` (no refcount change) — the caller's scope drop frees it.
-#[no_mangle]
-extern "C" fn aipl_print_error(msg: *const u8) {
-    use std::io::Write;
-    let stderr = std::io::stderr();
-    let mut out = stderr.lock();
-    let _ = out.write_all(b"error: ");
-    str_for_each_chunk(msg, &mut |chunk| {
-        let _ = out.write_all(chunk);
-        true
-    });
-    let _ = out.write_all(b"\n");
-}
-
-/// The `s[i]` runtime (`aipl_char_at`): returns byte i of s as 0..255, or
-/// -1 to signal None (i<0, past null terminator, or null pointer). Codegen
-/// (`emit_char_at`) wraps the result into an Optional slot.
-///
-/// **Borrows `s`** — unlike most str-taking builtins, which consume. It reads
-/// one byte and keeps nothing, so the caller's own reference covers the call and
-/// the usual pre-inc/dec pair would be two runtime calls that cancel. Callers
-/// must therefore *not* pre-inc.
-#[no_mangle]
-extern "C" fn aipl_char_at(s: *const u8, i: i64) -> i64 {
-    let mut found: i64 = -1;
-    if i >= 0 {
-        // Walk leaves to the chunk containing index `i` and stop — no materializing.
-        let target = i as usize;
-        let mut pos = 0usize;
-        str_for_each_chunk(s, &mut |chunk| {
-            if target < pos + chunk.len() {
-                found = i64::from(chunk[target - pos]);
-                false // found it — stop early
-            } else {
-                pos += chunk.len();
-                true
-            }
-        });
-    }
-    found
-}
-
-/// `read_file_to_string(name) -> str?` runtime: read `name`'s bytes into a fresh
-/// refcounted str, or return null (None) on any failure — open/read error,
-/// non-UTF-8 path, or a NUL byte in the contents (which a NUL-terminated str
-/// can't represent). Codegen wraps null into None. Decrements `name` per the
-/// refcount protocol (callers pre-inc, as with any str-taking fn).
-#[no_mangle]
-extern "C" fn aipl_read_file_to_string(name: *const u8) -> *const u8 {
-    let result = read_file_impl(name);
-    aipl_dec(name);
-    result
-}
-
-fn read_file_impl(name: *const u8) -> *const u8 {
-    if name.is_null() {
-        return std::ptr::null();
-    }
-    let mut nbuf = [0u8; 8];
-    let Ok(path) = std::str::from_utf8(unsafe { str_bytes(name, &mut nbuf) }) else {
-        return std::ptr::null();
-    };
-    let Ok(bytes) = std::fs::read(path) else {
-        return std::ptr::null();
-    };
-    if bytes.contains(&0) {
-        return std::ptr::null(); // a NUL-terminated str can't hold embedded NULs
-    }
-    make_str(&bytes) // inline if <= 7, else heap
-}
-
-/// `write_string_to_file(path, contents) -> bool` runtime: write `contents`'
-/// bytes to `path`, returning 1 on success or 0 on any failure (bad UTF-8 path,
-/// open/write error). Decrements both `path` and `contents` per the refcount
-/// protocol (callers pre-inc, as with any str-taking fn).
-#[no_mangle]
-extern "C" fn aipl_write_string_to_file(path: *const u8, contents: *const u8) -> i64 {
-    let result = write_file_impl(path, contents);
-    aipl_dec(path);
-    aipl_dec(contents);
-    result
-}
-
-fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
-    if path.is_null() || contents.is_null() {
-        return 0;
-    }
-    let mut pbuf = [0u8; 8];
-    let Ok(path) = std::str::from_utf8(unsafe { str_bytes(path, &mut pbuf) }) else {
-        return 0;
-    };
-    let mut cbuf = [0u8; 8];
-    let bytes = unsafe { str_bytes(contents, &mut cbuf) };
-    match std::fs::write(path, bytes) {
-        Ok(()) => 1,
-        Err(_) => 0,
-    }
-}
-
 /// `list_files(dir) -> str[]?` runtime: every file at or below `dir`, walked
 /// recursively, as a fresh `str[]` of `dir`-prefixed paths — or null on
 /// any failure (unreadable directory, non-UTF-8 name, unknowable entry kind),
@@ -646,7 +227,7 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
 /// on failure. Only the array half is per-runtime — the directory walk is shared
 /// with the tagged version. Borrows `dir`.
 #[no_mangle]
-extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
+extern "C" fn aipl_list_files(dir: *const str24::Str) -> *const u8 {
     let mut scratch = [0u8; str24::INLINE_CAP];
     let dv = unsafe { *dir };
     let Ok(root) = std::str::from_utf8(dv.bytes(&mut scratch)) else {
@@ -656,41 +237,13 @@ extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
     if walk_dir(root, &mut files).is_err() {
         return std::ptr::null();
     }
-    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
     let arr = aipl_array_new(files.len() as i64, drop_fn, str24::STR_SIZE as i64);
     unsafe {
         let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
         for (i, f) in files.iter().enumerate() {
             std::ptr::write(elems.add(i), str24::from_bytes(f.as_bytes()));
         }
-    }
-    arr
-}
-
-#[no_mangle]
-extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
-    let result = list_files_impl(dir);
-    aipl_dec(dir);
-    result
-}
-
-fn list_files_impl(dir: *const u8) -> *const u8 {
-    if dir.is_null() {
-        return std::ptr::null();
-    }
-    let mut dbuf = [0u8; 8];
-    let Ok(root) = std::str::from_utf8(unsafe { str_bytes(dir, &mut dbuf) }) else {
-        return std::ptr::null();
-    };
-    let mut files: Vec<String> = Vec::new();
-    if walk_dir(root, &mut files).is_err() {
-        return std::ptr::null();
-    }
-    let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
-    let arr = aipl_array_new(files.len() as i64, drop_fn, 8);
-    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut i64 };
-    for (i, f) in files.iter().enumerate() {
-        unsafe { *elems.add(i) = make_str(f.as_bytes()) as i64 };
     }
     arr
 }
@@ -822,47 +375,6 @@ extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
     }
 }
 
-/// `execute_program(program, args) -> ExecResult!Error` runtime: this is the
-/// hidden-sret ABI the generic `compile_call` path already builds for any
-/// composite-returning builtin (see its `sret` handling) — `out` is the
-/// caller-provided buffer sized for `Result<ExecResult, Error>` (`{tag: i64,
-/// payload}`, tag 1 = ok, 0 = err, matching the `ok`/`err` expression
-/// codegen), so this fn writes the whole result directly rather than
-/// returning through a register. Spawns `program` with `args` (no shell) and
-/// waits for it: `ok(ExecResult)` for any run that was actually launched,
-/// whatever it then exited with; `err(message)` only if it couldn't be
-/// launched at all (bad UTF-8, not found, embedded NUL in captured output).
-/// The `ExecResult` fields are written at their declared struct offsets
-/// 0/8/16 (`stdout`/`stderr`/`exit_code` — must stay in sync with
-/// `__builtin_ExecResult` in `BUILTIN_SIGNATURES`). Decrements `program` and
-/// `args` per the refcount protocol.
-#[no_mangle]
-extern "C" fn aipl_execute_program(out: *mut i64, program: *const u8, args: *const u8) {
-    let arr = aipl_arr_ensure_heap(args);
-    execute_program_impl(out, program, arr);
-    aipl_dec(program);
-    aipl_array_dec(arr);
-}
-
-fn write_err(out: *mut i64, message: &[u8]) {
-    let ptr = make_str(message);
-    unsafe {
-        *out = 0;
-        *out.add(1) = ptr as i64;
-    }
-}
-
-fn write_ok(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
-    let stdout_ptr = make_str(stdout);
-    let stderr_ptr = make_str(stderr);
-    unsafe {
-        *out = 1;
-        *out.add(1) = stdout_ptr as i64;
-        *out.add(2) = stderr_ptr as i64;
-        *out.add(3) = exit_code;
-    }
-}
-
 /// The wide `ExecResult!Error` layout, written by hand because the runtime has
 /// no layout table: tag, then either the `Error` message or the `ExecResult`
 /// struct `{ stdout, stderr, exit_code }`. Both start at `OPT_VALUE_OFFSET` and
@@ -897,7 +409,7 @@ fn write_ok_wide(out: *mut u8, stdout: &[u8], stderr: &[u8], exit_code: i64) {
 /// values rather than words, and the result's `str` fields likewise — so the
 /// spawn itself is shared through `run_program`.
 #[no_mangle]
-extern "C" fn aipl2_execute_program(out: *mut u8, program: *const str24::Str, args: *const u8) {
+extern "C" fn aipl_execute_program(out: *mut u8, program: *const str24::Str, args: *const u8) {
     let mut scratch = [0u8; str24::INLINE_CAP];
     let pv = unsafe { *program };
     let Ok(program) = std::str::from_utf8(pv.bytes(&mut scratch)) else {
@@ -936,41 +448,6 @@ fn run_program(program: &str, args: &[String]) -> Option<(Vec<u8>, Vec<u8>, i64)
     }
     let code = i64::from(output.status.code().unwrap_or(-1));
     Some((output.stdout, output.stderr, code))
-}
-
-fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
-    if program.is_null() || args.is_null() {
-        return write_err(out, b"could not execute program");
-    }
-    let mut pbuf = [0u8; 8];
-    let Ok(program) = std::str::from_utf8(unsafe { str_bytes(program, &mut pbuf) }) else {
-        return write_err(out, b"could not execute program");
-    };
-    let len = unsafe { array_len_of(args) };
-    let elems = unsafe { args.add(ARR_ELEMS_OFFSET) as *const i64 };
-    let mut arg_strings: Vec<String> = Vec::with_capacity(len);
-    for i in 0..len {
-        let ep = unsafe { std::ptr::read(elems.add(i)) as *const u8 };
-        let mut buf = [0u8; 8];
-        let Ok(s) = std::str::from_utf8(unsafe { str_bytes(ep, &mut buf) }) else {
-            return write_err(out, b"could not execute program");
-        };
-        arg_strings.push(s.to_string());
-    }
-    let output = match std::process::Command::new(program)
-        .args(&arg_strings)
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return write_err(out, b"could not execute program"),
-    };
-    // A NUL-terminated str can't hold an embedded NUL byte (same constraint as
-    // `read_file_to_string`).
-    if output.stdout.contains(&0) || output.stderr.contains(&0) {
-        return write_err(out, b"could not execute program");
-    }
-    let exit_code = i64::from(output.status.code().unwrap_or(-1));
-    write_ok(out, &output.stdout, &output.stderr, exit_code);
 }
 
 // ---------- One-allocation `to_str` primitives ----------
@@ -1065,20 +542,6 @@ fn fmt_u64(buf: &mut [u8; 24], n: u64) -> usize {
     d
 }
 
-/// Byte content length of a `str`; 0 for null. O(1) for every representation —
-/// each stores or encodes its length, so this never walks the bytes (a rope reads
-/// the total cached at its root; a heap string reads its header word).
-#[no_mangle]
-extern "C" fn aipl_str_len(s: *const u8) -> i64 {
-    match str_repr(s) {
-        StrRepr::Null => 0,
-        StrRepr::Inline => inline_len(s) as i64,
-        StrRepr::Heap => unsafe { heap_len(s) as i64 },
-        StrRepr::View(obj) => unsafe { *(obj.add(VIEW_LEN_OFFSET) as *const i64) },
-        StrRepr::Rope(obj) => unsafe { *(obj.add(CONCAT_LEN_OFFSET) as *const i64) },
-    }
-}
-
 /// Copy `n` bytes `src` → `dst`; return the advanced cursor.
 #[no_mangle]
 extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const u8 {
@@ -1087,138 +550,6 @@ extern "C" fn aipl_write_bytes(dst: *const u8, src: *const u8, n: i64) -> *const
         std::ptr::copy_nonoverlapping(src, dst as *mut u8, n);
         dst.add(n)
     }
-}
-
-/// Allocate one writable `str` buffer of `len` content bytes (refcount 1,
-/// NUL-terminated); return the data pointer. The single allocation behind a
-/// whole `to_str`.
-#[no_mangle]
-extern "C" fn aipl_str_alloc(len: i64) -> *const u8 {
-    let raw = alloc_dynamic_string(len.max(0) as usize);
-    unsafe { raw.add(STR_HEADER_SIZE) }
-}
-
-/// `str + str`. Allocates a fresh refcounted buffer holding the two operands
-/// concatenated. Decrements both inputs at the end.
-#[no_mangle]
-extern "C" fn aipl_concat(a: *const u8, b: *const u8) -> *const u8 {
-    let mut ba = [0u8; 8];
-    let mut bb = [0u8; 8];
-    let sa = unsafe { str_bytes(a, &mut ba) };
-    let sb = unsafe { str_bytes(b, &mut bb) };
-    let total = sa.len() + sb.len();
-    let result = if total <= 7 {
-        // SSO: a short result is inline — no allocation.
-        let mut tmp = [0u8; 7];
-        tmp[..sa.len()].copy_from_slice(sa);
-        tmp[sa.len()..total].copy_from_slice(sb);
-        pack_inline(&tmp[..total])
-    } else {
-        let raw = alloc_dynamic_string(total);
-        unsafe {
-            std::ptr::copy_nonoverlapping(sa.as_ptr(), raw.add(STR_HEADER_SIZE), sa.len());
-            std::ptr::copy_nonoverlapping(
-                sb.as_ptr(),
-                raw.add(STR_HEADER_SIZE + sa.len()),
-                sb.len(),
-            );
-            raw.add(STR_HEADER_SIZE)
-        }
-    };
-    aipl_dec(a);
-    aipl_dec(b);
-    result
-}
-
-/// `trim(s) -> str`. Returns a fresh string with leading/trailing ASCII
-/// whitespace removed, then drops `s`. Mirrors the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_trim(s: *const u8) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let bytes = unsafe { str_bytes(s, &mut sb) };
-    let is_ws = |b: u8| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c);
-    let start = bytes.iter().position(|&b| !is_ws(b)).unwrap_or(bytes.len());
-    let end = bytes
-        .iter()
-        .rposition(|&b| !is_ws(b))
-        .map_or(start, |i| i + 1);
-    let n = end - start;
-    // Nothing trimmed: return s as-is, transferring our reference to the caller.
-    if start == 0 && end == bytes.len() {
-        return s;
-    }
-    // Small result (≤ 7 bytes, incl. all-whitespace → n == 0): pack inline, release s.
-    // Inline sources are always caught here (inline is ≤ 7 bytes, so the trimmed
-    // result is too), so the view path below never sees an inline source.
-    if n <= 7 {
-        let result = make_str(&bytes[start..end]);
-        aipl_dec(s);
-        return result;
-    }
-    // Large result: return a view into s's buffer. Transfer our reference of s to
-    // the view's owner field — no inc, no dec, no byte copy.
-    let data = unsafe { bytes.as_ptr().add(start) };
-    let obj = alloc_view();
-    unsafe {
-        std::ptr::write(obj as *mut i64, 1); // refcount
-        std::ptr::write(obj.add(VIEW_DATA_OFFSET) as *mut *const u8, data);
-        std::ptr::write(obj.add(VIEW_LEN_OFFSET) as *mut i64, n as i64);
-        std::ptr::write(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8, s);
-    }
-    (obj as usize | VIEW_TAG) as *const u8
-}
-
-/// `s.reverse() -> str` — returns a new string with the bytes in reverse order.
-/// Consumes `s` per the refcount protocol (callers pre-inc).
-#[no_mangle]
-extern "C" fn aipl_str_reverse(s: *const u8) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let bytes = unsafe { str_bytes(s, &mut sb) };
-    let mut reversed: Vec<u8> = bytes.to_vec();
-    reversed.reverse();
-    let result = make_str(&reversed);
-    aipl_dec(s);
-    result
-}
-
-/// `s.sort() -> str` — a fresh `str` with the bytes in ascending order. The
-/// str-shaped counterpart of [`aipl_arr_sort`], for a `str` or `char[]` receiver
-/// (the two share a representation, so neither is a real array block).
-/// Consumes `s` (callers pre-inc). Mirrors the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_str_sort(s: *const u8) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let bytes = unsafe { str_bytes(s, &mut sb) };
-    let mut sorted: Vec<u8> = bytes.to_vec();
-    sorted.sort_unstable();
-    let result = make_str(&sorted);
-    aipl_dec(s);
-    result
-}
-
-/// `s.repeat(n) -> str` — concatenate `s` with itself `n` times.
-/// Consumes `s` (callers pre-inc). Mirrors the linker runtime.
-///
-/// `n` is unsigned at the language level but arrives in the same 64-bit register,
-/// so it is read here as `i64`: the `n <= 0` guard yields `""` for zero and —
-/// reading as negative — for any `u64` past `i64::MAX`, which could never be
-/// allocated anyway.
-#[no_mangle]
-extern "C" fn aipl_str_repeat(s: *const u8, n: i64) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let bytes = unsafe { str_bytes(s, &mut sb) };
-    let result = if n <= 0 || bytes.is_empty() {
-        make_str(&[])
-    } else {
-        let total = bytes.len() * n as usize;
-        let mut buf: Vec<u8> = Vec::with_capacity(total);
-        for _ in 0..n {
-            buf.extend_from_slice(bytes);
-        }
-        make_str(&buf)
-    };
-    aipl_dec(s);
-    result
 }
 
 /// How [`aipl_arr_sort`] orders its elements. Every `ord` element type is an
@@ -1284,17 +615,6 @@ extern "C" fn aipl_arr_sort(
 /// by value, so equal ones are indistinguishable.
 fn sort_words(words: &mut [i64], kind: i64) {
     match kind {
-        SORT_KIND_STR => words.sort_unstable_by(|x, y| {
-            let mut xb = [0u8; 8];
-            let mut yb = [0u8; 8];
-            let (xs, ys) = unsafe {
-                (
-                    str_bytes(*x as *const u8, &mut xb),
-                    str_bytes(*y as *const u8, &mut yb),
-                )
-            };
-            xs.cmp(ys)
-        }),
         SORT_KIND_UNSIGNED => words.sort_unstable_by(|x, y| (*x as u64).cmp(&(*y as u64))),
         // SORT_KIND_SIGNED, and anything unexpected (codegen only ever emits the
         // three above).
@@ -1317,38 +637,6 @@ extern "C" fn aipl_arr_reverse(
     }
     let len = unsafe { array_len_of(a) };
     alloc_reversed_view(a, len, drop_fn, retain_fn, elem_size)
-}
-
-/// `s[start..end]` — string slice. Both bounds are clamped to `[0, len]` (an
-/// out-of-range end yields a shorter string; `start >= end` yields `""`).
-/// *Borrows* `s` (does not drop it) and returns a fresh `str`. Stage 1 always
-/// copies; Stage 2 returns a buffer-sharing view for large heap sources.
-#[no_mangle]
-extern "C" fn aipl_str_slice(s: *const u8, start: i64, end: i64) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let bytes = unsafe { str_bytes(s, &mut sb) };
-    let len = bytes.len() as i64;
-    let lo = start.clamp(0, len) as usize;
-    let hi = end.clamp(0, len) as usize;
-    let n = hi.saturating_sub(lo);
-    // A small result, or any slice of an SSO source, copies — so it doesn't pin
-    // a parent buffer alive (and an inline source has no shared buffer anyway).
-    if n <= 7 || matches!(str_repr(s), StrRepr::Inline) {
-        return make_str(if lo < hi { &bytes[lo..hi] } else { &[] });
-    }
-    // Large slice of a heap (owned or view) source: share its buffer via a view
-    // that retains the source. `bytes.as_ptr()` is the source's content start
-    // (the owned pointer, or a parent view's data), so `+ lo` is the slice start.
-    let data = unsafe { bytes.as_ptr().add(lo) };
-    aipl_inc(s);
-    let obj = alloc_view();
-    unsafe {
-        std::ptr::write(obj as *mut i64, 1); // refcount
-        std::ptr::write(obj.add(VIEW_DATA_OFFSET) as *mut *const u8, data);
-        std::ptr::write(obj.add(VIEW_LEN_OFFSET) as *mut i64, n as i64);
-        std::ptr::write(obj.add(VIEW_OWNER_OFFSET) as *mut *const u8, s);
-    }
-    (obj as usize | VIEW_TAG) as *const u8
 }
 
 /// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
@@ -1396,59 +684,6 @@ extern "C" fn aipl_arr_slice(
     raw
 }
 
-/// `split(self, sep) -> str[]` — the parts of `self` between non-overlapping
-/// occurrences of `sep`, each produced by `aipl_str_slice` (a buffer-sharing view
-/// for a large part, else an inline/heap copy). An empty `sep` yields one part:
-/// the whole string. *Consumes* both `self` and `sep` (drops the handed refs); the
-/// view parts hold their own refs on `self`'s buffer, so it outlives them.
-#[no_mangle]
-extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
-    let mut sb = [0u8; 8];
-    let mut pb = [0u8; 8];
-    let hay = unsafe { str_bytes(s, &mut sb) };
-    let needle = unsafe { str_bytes(sep, &mut pb) };
-    let nlen = needle.len();
-    // Part count = occurrences + 1 (an empty separator never matches → 1 part).
-    let count = if nlen == 0 {
-        1
-    } else {
-        let mut c = 1usize;
-        let mut i = 0usize;
-        while i + nlen <= hay.len() {
-            if &hay[i..i + nlen] == needle {
-                c += 1;
-                i += nlen;
-            } else {
-                i += 1;
-            }
-        }
-        c
-    };
-    let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
-    let arr = aipl_array_new(count as i64, drop_fn, 8);
-    let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut i64 };
-    // Re-scan, writing each segment as a slice of `s` (view or copy).
-    if nlen == 0 {
-        unsafe { *elems = aipl_str_slice(s, 0, hay.len() as i64) as i64 };
-    } else {
-        let (mut start, mut i, mut k) = (0usize, 0usize, 0usize);
-        while i + nlen <= hay.len() {
-            if &hay[i..i + nlen] == needle {
-                unsafe { *elems.add(k) = aipl_str_slice(s, start as i64, i as i64) as i64 };
-                k += 1;
-                i += nlen;
-                start = i;
-            } else {
-                i += 1;
-            }
-        }
-        unsafe { *elems.add(k) = aipl_str_slice(s, start as i64, hay.len() as i64) as i64 };
-    }
-    aipl_dec(s);
-    aipl_dec(sep);
-    arr
-}
-
 /// `join(parts: str[], sep: str) -> str` — concatenate the parts with `sep`
 /// between consecutive elements (`[]` -> `""`, `[x]` -> `x`). Two passes: measure
 /// the total length, then fill a single fresh buffer (inline when <= 7 bytes).
@@ -1460,13 +695,13 @@ extern "C" fn aipl_str_split(s: *const u8, sep: *const u8) -> *const u8 {
 /// splitter: count, allocate, fill.
 ///
 /// Each part is a window into `s`, retained because the array owns it. Borrows
-/// both arguments, like every `aipl2_*` entry point.
+/// both arguments, like every `aipl_*` entry point.
 #[no_mangle]
-extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
+extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -> *const u8 {
     let (sv, sepv) = unsafe { (*s, *sep) };
     let mut count = 0usize;
     str24::for_each_split(sv, sepv, &mut |_| count += 1);
-    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
     let arr = aipl_array_new(count as i64, drop_fn, str24::STR_SIZE as i64);
     let elems = unsafe { arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str };
     let mut k = 0usize;
@@ -1481,7 +716,7 @@ extern "C" fn aipl2_str_split(s: *const str24::Str, sep: *const str24::Str) -> *
 /// `join` under the wide ABI — the array half only; the streaming is
 /// `str24::join_from`. Borrows the array and the separator.
 #[no_mangle]
-extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
+extern "C" fn aipl_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
     let sepv = unsafe { *sep };
     unsafe {
         let len = array_len_of(arr);
@@ -1490,263 +725,12 @@ extern "C" fn aipl2_str_join(out: *mut str24::Str, arr: *const u8, sep: *const s
     }
 }
 
-#[no_mangle]
-extern "C" fn aipl_str_join(arr: *const u8, sep: *const u8) -> *const u8 {
-    let result = unsafe {
-        let len = *(arr.add(ARR_LEN_OFFSET) as *const i64) as usize;
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *const i64;
-        let mut sb = [0u8; 8];
-        // `sep` is read once and reused, so materialize a rope separator just once.
-        let sep_bytes = str_bytes(sep, &mut sb);
-        // Measure: every part's length (O(1)) plus a separator between each pair.
-        let mut total = sep_bytes.len() * len.saturating_sub(1);
-        for i in 0..len {
-            let ep = std::ptr::read(elems.add(i)) as *const u8;
-            total += aipl_str_len(ep) as usize;
-        }
-        // Fill, writing a separator before every element but the first.
-        let mut scratch = [0u8; 7];
-        let dst = if total <= 7 {
-            scratch.as_mut_ptr()
-        } else {
-            alloc_dynamic_string(total).add(STR_HEADER_SIZE)
-        };
-        let mut pos = 0usize;
-        for i in 0..len {
-            if i > 0 {
-                std::ptr::copy_nonoverlapping(sep_bytes.as_ptr(), dst.add(pos), sep_bytes.len());
-                pos += sep_bytes.len();
-            }
-            let ep = std::ptr::read(elems.add(i)) as *const u8;
-            // Stream the element into the buffer; a rope copies its leaves with
-            // nothing materialized.
-            str_for_each_chunk(ep, &mut |chunk| {
-                std::ptr::copy_nonoverlapping(chunk.as_ptr(), dst.add(pos), chunk.len());
-                pos += chunk.len();
-                true
-            });
-        }
-        if total <= 7 {
-            pack_inline(&scratch[..total])
-        } else {
-            dst
-        }
-    };
-    aipl_array_dec(arr);
-    aipl_dec(sep);
-    result
-}
-
-/// Pointer to `s`'s contiguous content bytes — its length comes from
-/// `aipl_str_len`. Used by codegen sites that walk a str by index (the `for`
-/// loop and `to_str` rendering), which can't assume NUL-termination once views
-/// exist. Inline content is copied into the caller's 8-byte `scratch`; owned and
-/// view content is returned in place (valid while `scratch` and `s` live).
-#[no_mangle]
-extern "C" fn aipl_str_data(s: *const u8, scratch: *mut u8) -> *const u8 {
-    match str_repr(s) {
-        StrRepr::Inline => {
-            let val = (s as usize as u64).to_le_bytes();
-            unsafe {
-                for i in 0..inline_len(s) {
-                    *scratch.add(i) = val[1 + i];
-                }
-            }
-            scratch
-        }
-        StrRepr::View(obj) => unsafe { *(obj.add(VIEW_DATA_OFFSET) as *const *const u8) },
-        // Materialize (memoized) and return the flattened cache's contiguous data.
-        StrRepr::Rope(_) => unsafe { aipl_str_data(concat_materialize(s), scratch) },
-        // A null or heap value's pointer is already its contiguous content.
-        StrRepr::Null | StrRepr::Heap => s,
-    }
-}
-
-// ---------- Char-iteration cursor (`for c in s`) ----------
-//
-// A small fixed-size cursor that codegen stack-allocates, so iterating a rope
-// streams its bytes in order **without materializing** and without a heap
-// traversal stack. `next` returns the byte at the current position then advances;
-// to locate that byte it descends from the root to the containing leaf (each
-// descent is O(rope depth) using the O(1) stored child lengths) and caches the
-// leaf, so sequential reads within a leaf are O(1). A non-rope string is one leaf
-// (O(1) per byte). Layout (codegen allocates `ITER_SIZE` bytes, 8-aligned):
-//   [0] root: str | [8] pos | [16] total | [24] leaf_ptr | [32] leaf_start
-//   [40] leaf_len | [48] scratch (8 bytes, for an inline leaf's spill)
-const ITER_ROOT: usize = 0;
-const ITER_POS: usize = 8;
-const ITER_TOTAL: usize = 16;
-const ITER_LEAF_PTR: usize = 24;
-const ITER_LEAF_START: usize = 32;
-const ITER_LEAF_LEN: usize = 40;
-const ITER_SCRATCH: usize = 48;
-const ITER_SIZE: usize = 56;
-
 /// Bytes codegen reserves for a `for (let c : s)` cursor, for whichever
 /// representation is active. The two iterators carry different state — the wide
 /// one caches a whole 24-byte leaf where the tagged one caches a pointer plus an
 /// 8-byte spill — so the slot follows the ABI rather than a fixed constant.
 fn iter_state_size() -> u32 {
-    if str24_enabled() {
-        str24::ITER_SIZE as u32
-    } else {
-        ITER_SIZE as u32
-    }
-}
-
-#[no_mangle]
-extern "C" fn aipl_str_iter_init(cur: *mut u8, s: *const u8) {
-    unsafe {
-        *(cur.add(ITER_ROOT) as *mut *const u8) = s;
-        *(cur.add(ITER_POS) as *mut i64) = 0;
-        *(cur.add(ITER_TOTAL) as *mut i64) = aipl_str_len(s);
-        *(cur.add(ITER_LEAF_PTR) as *mut *const u8) = std::ptr::null();
-        *(cur.add(ITER_LEAF_START) as *mut i64) = 0;
-        *(cur.add(ITER_LEAF_LEN) as *mut i64) = 0;
-    }
-}
-
-/// Next byte of the iterated string as `0..=255`, or `-1` at the end.
-#[no_mangle]
-extern "C" fn aipl_str_iter_next(cur: *mut u8) -> i64 {
-    unsafe {
-        let pos = *(cur.add(ITER_POS) as *const i64);
-        if pos >= *(cur.add(ITER_TOTAL) as *const i64) {
-            return -1;
-        }
-        let leaf_start = *(cur.add(ITER_LEAF_START) as *const i64);
-        let leaf_len = *(cur.add(ITER_LEAF_LEN) as *const i64);
-        if pos < leaf_start || pos >= leaf_start + leaf_len {
-            // Descend from the root to the leaf containing `pos`. Only non-rope
-            // nodes (or an already-materialized rope's cache) become the leaf, so
-            // nothing is flattened here.
-            let mut node = *(cur.add(ITER_ROOT) as *const *const u8);
-            let mut base: i64 = 0;
-            while let StrRepr::Rope(obj) = str_repr(node) {
-                let cache = *(obj.add(CONCAT_CACHE_OFFSET) as *const *const u8);
-                if cache.is_null() {
-                    let left = *(obj.add(CONCAT_LEFT_OFFSET) as *const *const u8);
-                    let ll = aipl_str_len(left);
-                    if pos - base < ll {
-                        node = left;
-                    } else {
-                        base += ll;
-                        node = *(obj.add(CONCAT_RIGHT_OFFSET) as *const *const u8);
-                    }
-                } else {
-                    node = cache; // contiguous already — treat as the leaf
-                    break;
-                }
-            }
-            let data = aipl_str_data(node, cur.add(ITER_SCRATCH));
-            *(cur.add(ITER_LEAF_PTR) as *mut *const u8) = data;
-            *(cur.add(ITER_LEAF_START) as *mut i64) = base;
-            *(cur.add(ITER_LEAF_LEN) as *mut i64) = aipl_str_len(node);
-        }
-        let leaf_ptr = *(cur.add(ITER_LEAF_PTR) as *const *const u8);
-        let leaf_start = *(cur.add(ITER_LEAF_START) as *const i64);
-        let b = *leaf_ptr.add((pos - leaf_start) as usize);
-        *(cur.add(ITER_POS) as *mut i64) = pos + 1;
-        i64::from(b)
-    }
-}
-
-/// In-place trim for a uniquely owned string (mirrors the linker runtime).
-/// Shifts the trimmed content to the front and `realloc`s down to fit, reusing
-/// the block; a static literal can't be mutated so it copies. `s` is reused.
-#[no_mangle]
-extern "C" fn aipl_trim_mut(s: *const u8) -> *const u8 {
-    // Only a uniquely-owned (non-static) heap string can be trimmed in place; any
-    // other representation copies via `aipl_trim`. Matching (rather than an `is_*`
-    // chain) means a new representation must explicitly opt into the in-place path
-    // instead of silently taking it. `header_of` is valid only for the heap case.
-    let StrRepr::Heap = str_repr(s) else {
-        return aipl_trim(s);
-    };
-    if unsafe { *header_of(s) } == STATIC_REFCOUNT {
-        return aipl_trim(s);
-    }
-    unsafe {
-        let n = heap_len(s);
-        let is_ws = |b: u8| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c);
-        let data = s as *mut u8;
-        let mut start = 0;
-        while start < n && is_ws(*data.add(start)) {
-            start += 1;
-        }
-        let mut end = n;
-        while end > start && is_ws(*data.add(end - 1)) {
-            end -= 1;
-        }
-        let len = end - start;
-        if len <= 7 {
-            // SSO: the trimmed result is inline — copy it out and free the block
-            // (it can't be reused as an inline value lives in the register).
-            let mut tmp = [0u8; 7];
-            std::ptr::copy_nonoverlapping(data.add(start), tmp.as_mut_ptr(), len);
-            free_dynamic_string(s.sub(STR_HEADER_SIZE) as *mut u8, n);
-            return pack_inline(&tmp[..len]);
-        }
-        if start > 0 {
-            std::ptr::copy(data.add(start), data, len); // overlapping move
-        }
-        *data.add(len) = 0;
-        let old_layout = std::alloc::Layout::from_size_align(
-            STR_HEADER_SIZE + n + 1,
-            std::mem::align_of::<i64>(),
-        )
-        .expect("string layout");
-        let block = s.sub(STR_HEADER_SIZE) as *mut u8;
-        let raw = std::alloc::realloc(block, old_layout, STR_HEADER_SIZE + len + 1);
-        if raw.is_null() {
-            std::alloc::handle_alloc_error(old_layout);
-        }
-        std::ptr::write(raw as *mut i64, len as i64); // updated stored length (block word 0)
-        raw.add(STR_HEADER_SIZE)
-    }
-}
-
-/// In-place concat for a uniquely owned string (mirrors the linker runtime).
-/// Grows `a`'s buffer with `realloc` and appends `b`; a static literal can't be
-/// grown so it copies instead. `a` is reused (not dropped); `b` is dropped.
-#[no_mangle]
-extern "C" fn aipl_concat_mut(a: *const u8, b: *const u8) -> *const u8 {
-    // Only a uniquely-owned (non-static) heap `a` can be grown in place; any other
-    // representation copies via `aipl_concat`. Matching (rather than an `is_*`
-    // chain) means a new representation must explicitly opt into the in-place path
-    // instead of silently taking it. `header_of` is valid only for the heap case.
-    let StrRepr::Heap = str_repr(a) else {
-        return aipl_concat(a, b);
-    };
-    if unsafe { *header_of(a) } == STATIC_REFCOUNT {
-        return aipl_concat(a, b);
-    }
-    unsafe {
-        // `a` is a heap str (the guard bailed for inline/static/null); read its
-        // stored length. `b` may be inline, so materialize it.
-        let la = heap_len(a);
-        let mut bbuf = [0u8; 8];
-        let sb = str_bytes(b, &mut bbuf);
-        let lb = sb.len();
-        let old_layout = std::alloc::Layout::from_size_align(
-            STR_HEADER_SIZE + la + 1,
-            std::mem::align_of::<i64>(),
-        )
-        .expect("string layout");
-        let block = a.sub(STR_HEADER_SIZE) as *mut u8;
-        // `realloc` is the in-place analogue of malloc here; it isn't routed
-        // through an instrumented counter, so it doesn't show in alloc tallies.
-        let raw = std::alloc::realloc(block, old_layout, STR_HEADER_SIZE + la + lb + 1);
-        if raw.is_null() {
-            std::alloc::handle_alloc_error(old_layout);
-        }
-        std::ptr::write(raw as *mut i64, (la + lb) as i64); // updated stored length (block word 0)
-        let data = raw.add(STR_HEADER_SIZE);
-        std::ptr::copy_nonoverlapping(sb.as_ptr(), data.add(la), lb);
-        *data.add(la + lb) = 0;
-        aipl_dec(b);
-        data
-    }
+    str24::ITER_SIZE as u32
 }
 
 // ---------- Refcounted array runtime ----------
@@ -2750,18 +1734,17 @@ extern "C" fn aipl_count_call(_name: i64) {}
 // the file to each FAIL header and [`set_quiet_summary`] suppresses the per-file
 // summary line, leaving one aggregate that [`test_totals`] reports at the end.
 
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering as TestOrd};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
 use std::sync::Mutex;
 
 static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
 static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
-static TEST_CUR_NAME: AtomicUsize = AtomicUsize::new(0);
-/// The wide ABI's counterpart to [`TEST_CUR_NAME`], holding the name's *text*
-/// rather than a pointer to the value. A wide `str` argument is a pointer to the
-/// caller's 24-byte slot, and outliving the call is exactly what a stack slot
-/// does not promise — so the name is materialized here at `test_begin` instead
-/// of being read back at report time.
-static TEST_CUR_NAME_WIDE: Mutex<Option<String>> = Mutex::new(None);
+/// The running test's name, held as *text* rather than as a pointer to the
+/// `str` the caller passed: that argument points at the caller's 24-byte stack
+/// slot, and outliving the call is exactly what a stack slot does not promise.
+/// So the name is materialized at `test_begin` instead of read back at report
+/// time.
+static TEST_CUR_NAME: Mutex<Option<String>> = Mutex::new(None);
 static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
 static TEST_PASSED: AtomicI64 = AtomicI64::new(0);
 static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
@@ -2806,61 +1789,12 @@ fn print_fail_header() {
     if TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
         return;
     }
-    let mut nbuf = [0u8; 8];
-    // Only one ABI runs in a given process, so whichever `test_begin` ran is the
-    // one that left a name behind.
-    let wide = TEST_CUR_NAME_WIDE.lock().unwrap_or_else(|e| e.into_inner());
-    let name = match wide.as_deref() {
-        Some(n) => n,
-        None => unsafe { test_cstr(TEST_CUR_NAME.load(TestOrd::Relaxed) as *const u8, &mut nbuf) },
-    };
+    let held = TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner());
+    let name = held.as_deref().unwrap_or("<unknown>");
     match &*TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner()) {
         Some(file) => println!("test {file}::{name} ... FAIL"),
         None => println!("test {name} ... FAIL"),
     }
-}
-
-/// Read a runtime `str` value (inline or heap) as a `&str` for the report.
-/// `buf` backs an inline string's materialized bytes and must outlive the result.
-unsafe fn test_cstr(p: *const u8, buf: &mut [u8; 8]) -> &str {
-    if p.is_null() {
-        return "<unknown>";
-    }
-    let bytes = unsafe { str_bytes(p, buf) };
-    std::str::from_utf8(bytes).unwrap_or("<invalid utf8>")
-}
-
-#[no_mangle]
-extern "C" fn aipl_test_begin(name: *const u8) {
-    TEST_CUR_NAME.store(name as usize, TestOrd::Relaxed);
-    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
-    TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
-}
-
-#[no_mangle]
-extern "C" fn aipl_assert(cond: i64, loc: *const u8) {
-    if cond == 0 {
-        print_fail_header();
-        let mut lbuf = [0u8; 8];
-        println!("  assert failed at {}", unsafe {
-            test_cstr(loc, &mut lbuf)
-        });
-        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
-    }
-}
-
-// `?` used inside a `.test` body, applied to an `err`: record the current test
-// as failed and report the error's rendered message (the `?` unwraps `ok` and
-// carries on; on `err` it can't produce a value, so codegen fails the test here
-// and returns early). Same failure bookkeeping as `aipl_assert`.
-#[no_mangle]
-extern "C" fn aipl_test_fail(msg: *const u8) {
-    print_fail_header();
-    let mut mbuf = [0u8; 8];
-    println!("  `?` propagated an error: {}", unsafe {
-        test_cstr(msg, &mut mbuf)
-    });
-    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
 }
 
 // `?` used inside a `.test` body, applied to a `none`: the optional analog of
@@ -2875,7 +1809,7 @@ extern "C" fn aipl_test_fail_none() {
 
 /// Read a wide `str` argument as an owned `String` for the report. Materializes
 /// rather than borrowing, since the caller's slot is not guaranteed to outlive
-/// the report — see [`TEST_CUR_NAME_WIDE`].
+/// the report — see [`TEST_CUR_NAME`].
 fn wide_text(s: *const str24::Str) -> String {
     let mut scratch = [0u8; str24::INLINE_CAP];
     let v = unsafe { *s };
@@ -2884,15 +1818,15 @@ fn wide_text(s: *const str24::Str) -> String {
 
 /// [`aipl_test_begin`] under the wide ABI.
 #[no_mangle]
-extern "C" fn aipl2_test_begin(name: *const str24::Str) {
-    *TEST_CUR_NAME_WIDE.lock().unwrap_or_else(|e| e.into_inner()) = Some(wide_text(name));
+extern "C" fn aipl_test_begin(name: *const str24::Str) {
+    *TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner()) = Some(wide_text(name));
     TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
     TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
 }
 
 /// [`aipl_assert`] under the wide ABI.
 #[no_mangle]
-extern "C" fn aipl2_assert(cond: i64, loc: *const str24::Str) {
+extern "C" fn aipl_assert(cond: i64, loc: *const str24::Str) {
     if cond == 0 {
         print_fail_header();
         println!("  assert failed at {}", wide_text(loc));
@@ -2902,7 +1836,7 @@ extern "C" fn aipl2_assert(cond: i64, loc: *const str24::Str) {
 
 /// [`aipl_test_fail`] under the wide ABI.
 #[no_mangle]
-extern "C" fn aipl2_test_fail(msg: *const str24::Str) {
+extern "C" fn aipl_test_fail(msg: *const str24::Str) {
     print_fail_header();
     println!("  `?` propagated an error: {}", wide_text(msg));
     TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
@@ -2937,218 +1871,6 @@ extern "C" fn aipl_test_summary() -> i64 {
 // pointers compared by content, with the array's `str` drop/retain helpers
 // stored so the block frees/retains its strings like a `str[]`.
 
-/// Compare two NUL-terminated runtime strings by content. A null pointer equals
-/// only itself. Used by `==` (via `aipl_str_eq`) and set-of-`str` membership.
-unsafe fn rt_str_eq(a: *const u8, b: *const u8) -> bool {
-    if a == b {
-        return true; // same allocation/value (incl. two equal inline strings), or both null
-    }
-    if a.is_null() || b.is_null() {
-        return false; // a null str equals only itself
-    }
-    if aipl_str_len(a) != aipl_str_len(b) {
-        return false; // O(1) length check — unequal lengths can't be equal
-    }
-    // Equal lengths: stream the rope side (if any) leaf-by-leaf and compare each
-    // chunk against the other side made contiguous. This materializes only when
-    // BOTH sides are ropes (rare); the common rope-vs-literal case copies nothing.
-    let (rope, other) = if matches!(str_repr(a), StrRepr::Rope(_)) {
-        (a, b)
-    } else {
-        (b, a)
-    };
-    let mut ob = [0u8; 8];
-    let obytes = unsafe { str_bytes(other, &mut ob) };
-    let mut off = 0usize;
-    str_for_each_chunk(rope, &mut |chunk| {
-        let end = off + chunk.len();
-        let ok = chunk == &obytes[off..end];
-        off = end;
-        ok
-    })
-}
-
-/// `str == str`: content-compare, then decrement both inputs (it consumes a ref
-/// from each, like the other str-taking builtins; callers pre-inc). Returns 1/0.
-/// Lexicographic byte comparison of two `str`s: negative, zero, or positive
-/// like `memcmp`. Backs the ordering operators (`<`, `<=`, `>`, `>=`) on `str`,
-/// using the same byte order `sort` already imposes on a `str[]`. Repr-aware
-/// via `str_bytes`. Unlike `aipl_str_eq` this only *borrows* both inputs (no
-/// dec), so codegen emits no compensating pre-inc. Mirrors `aipl_str_cmp` in
-/// the linker runtime.
-#[no_mangle]
-extern "C" fn aipl_str_cmp(a: *const u8, b: *const u8) -> i64 {
-    let mut ab = [0u8; 8];
-    let mut bb = [0u8; 8];
-    let (x, y) = unsafe { (str_bytes(a, &mut ab), str_bytes(b, &mut bb)) };
-    match x.cmp(y) {
-        std::cmp::Ordering::Less => -1,
-        std::cmp::Ordering::Equal => 0,
-        std::cmp::Ordering::Greater => 1,
-    }
-}
-
-/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
-/// caller's own references cover the call and no pre-inc is needed.
-#[no_mangle]
-extern "C" fn aipl_str_eq(a: *const u8, b: *const u8) -> i64 {
-    let eq = unsafe { rt_str_eq(a, b) };
-    i64::from(eq)
-}
-
-/// `s.starts_with(prefix) -> bool` (1/0): whether `s`'s bytes begin with
-/// `prefix`'s. Consumes (decs) both inputs, like the other str builtins; callers
-/// pre-inc. The empty prefix always matches.
-#[no_mangle]
-extern "C" fn aipl_str_starts_with(s: *const u8, prefix: *const u8) -> i64 {
-    let pl = aipl_str_len(prefix) as usize;
-    let starts = if (aipl_str_len(s) as usize) < pl {
-        false
-    } else {
-        // Stream `s` only until the prefix is matched (or mismatches); `prefix`
-        // (usually a short literal) is read contiguously.
-        let mut pb = [0u8; 8];
-        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
-        let mut off = 0usize;
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            if off >= pl {
-                return false; // whole prefix matched — stop scanning `s`
-            }
-            let take = std::cmp::min(chunk.len(), pl - off);
-            if chunk[..take] != pbytes[off..off + take] {
-                ok = false;
-                return false;
-            }
-            off += take;
-            true
-        });
-        ok
-    };
-    i64::from(starts)
-}
-
-/// `s.starts_with_at(prefix, at) -> bool` (1/0): whether `s`'s bytes from `at`
-/// onward begin with `prefix`'s — `s[at..].starts_with(prefix)` without building
-/// the slice. `at` clamps to `[0, len]` exactly as a slice bound does, so a start
-/// past the end leaves nothing to match but the empty prefix. Consumes (decs)
-/// both inputs, like the other str builtins; callers pre-inc.
-#[no_mangle]
-extern "C" fn aipl_str_starts_with_at(s: *const u8, prefix: *const u8, at: i64) -> i64 {
-    let sl = aipl_str_len(s);
-    let pl = aipl_str_len(prefix) as usize;
-    let lo = if at < 0 {
-        0
-    } else if at > sl {
-        sl as usize
-    } else {
-        at as usize
-    };
-    let starts = if (sl as usize) - lo < pl {
-        false
-    } else {
-        // Stream `s`, skipping the chunks that end before `lo` and comparing from
-        // there until the prefix is matched (or mismatches); `prefix` (usually a
-        // short literal) is read contiguously.
-        let mut pb = [0u8; 8];
-        let pbytes = unsafe { str_bytes(prefix, &mut pb) };
-        let mut pos = 0usize; // bytes of `s` behind us
-        let mut off = 0usize; // bytes of `prefix` matched so far
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            if off >= pl {
-                return false; // whole prefix matched — stop scanning `s`
-            }
-            let start = pos;
-            pos += chunk.len();
-            if pos <= lo {
-                return true; // wholly before the offset — nothing to compare yet
-            }
-            let from = lo.saturating_sub(start);
-            let take = std::cmp::min(chunk.len() - from, pl - off);
-            if chunk[from..from + take] != pbytes[off..off + take] {
-                ok = false;
-                return false;
-            }
-            off += take;
-            true
-        });
-        ok
-    };
-    i64::from(starts)
-}
-
-/// `s.ends_with(suffix) -> bool` (1/0): whether `s`'s bytes end with `suffix`'s.
-/// Consumes (decs) both inputs, like the other str builtins; callers pre-inc.
-/// The empty suffix always matches.
-#[no_mangle]
-extern "C" fn aipl_str_ends_with(s: *const u8, suffix: *const u8) -> i64 {
-    let sl = aipl_str_len(s) as usize;
-    let ql = aipl_str_len(suffix) as usize;
-    let ends = if sl < ql {
-        false
-    } else {
-        // Stream `s` (reaching the end is unavoidable) and compare only the bytes
-        // overlapping the trailing suffix region `[start, sl)` — no materializing.
-        let start = sl - ql;
-        let mut qb = [0u8; 8];
-        let qbytes = unsafe { str_bytes(suffix, &mut qb) };
-        let mut pos = 0usize;
-        let mut ok = true;
-        str_for_each_chunk(s, &mut |chunk| {
-            let cstart = pos;
-            let cend = pos + chunk.len();
-            pos = cend;
-            if cend > start {
-                let from = if cstart < start { start } else { cstart };
-                let cs = from - cstart;
-                let qs = from - start;
-                let n = cend - from;
-                if chunk[cs..cs + n] != qbytes[qs..qs + n] {
-                    ok = false;
-                    return false;
-                }
-            }
-            true
-        });
-        ok
-    };
-    i64::from(ends)
-}
-
-/// `s.contains(needle) -> bool` (1/0): whether `needle`'s bytes occur
-/// **Borrows** both arguments — it reads bytes and keeps nothing, so the
-/// caller's own references cover the call and no pre-inc is needed.
-#[no_mangle]
-extern "C" fn aipl_str_contains(s: *const u8, needle: *const u8) -> i64 {
-    let mut sb = [0u8; 8];
-    let mut nb = [0u8; 8];
-    let found = unsafe {
-        let sbytes = str_bytes(s, &mut sb);
-        let nbytes = str_bytes(needle, &mut nb);
-        nbytes.is_empty() || sbytes.windows(nbytes.len()).any(|w| w == nbytes)
-    };
-    i64::from(found)
-}
-
-/// FNV-1a content hash of a NUL-terminated runtime string (consistent with
-/// `rt_str_eq`: equal content → equal hash). Borrows `a` — no refcount change.
-/// A null pointer hashes to the bare offset basis.
-#[no_mangle]
-extern "C" fn aipl_str_hash(a: *const u8) -> i64 {
-    // FNV-1a is a left fold over bytes, so it streams a rope's leaves in order
-    // (same result as the flattened bytes) — no materialization.
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325; // FNV-1a 64-bit offset basis
-    str_for_each_chunk(a, &mut |chunk| {
-        for &c in chunk {
-            h ^= c as u64;
-            h = h.wrapping_mul(0x0000_0100_0000_01b3); // FNV-1a 64-bit prime
-        }
-        true
-    });
-    h as i64
-}
-
 /// Whether `a` already contains the element at `x`. `str_cmp != 0` compares
 /// `str` elements by content and carries their width (see `str_cmp_width`);
 /// otherwise a bit-packed `bool` set (`elem_size == 0`) compares unpacked bits
@@ -3168,16 +1890,6 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
             let sp = unsafe { arr_elem_ptr(a, i, str24::STR_SIZE) };
             let s = unsafe { std::ptr::read(sp as *const str24::Str) };
             if str24::eq(s, target) {
-                return 1;
-            }
-        }
-        0
-    } else if str_cmp != 0 {
-        let target = unsafe { std::ptr::read(x as *const i64) } as *const u8;
-        for i in 0..len {
-            let sp = unsafe { arr_elem_ptr(a, i, 8) };
-            let s = unsafe { std::ptr::read(sp as *const i64) } as *const u8;
-            if unsafe { rt_str_eq(s, target) } {
                 return 1;
             }
         }
@@ -3319,8 +2031,8 @@ fn dict_key_width(str_cmp: i64) -> usize {
 }
 
 /// Index of the pair in dict `a` whose key matches the key at `pair_ptr`, or -1.
-/// Keys compare by `str_cmp`: content for `str` (a 24-byte value compare when
-/// wide, `rt_str_eq` on the pointer when tagged), else the raw 8-byte value.
+/// Keys compare by `str_cmp`: a 24-byte value compare for a `str` key, else the
+/// raw 8-byte value.
 unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: i64) -> i64 {
     if a.is_null() {
         return -1;
@@ -3342,12 +2054,8 @@ unsafe fn dict_find(a: *const u8, pair_ptr: *const u8, pair_size: i64, str_cmp: 
                 want_wide,
             )
         } else {
-            let k = unsafe { std::ptr::read(ep as *const i64) };
-            if str_cmp != 0 {
-                unsafe { rt_str_eq(k as *const u8, want as *const u8) }
-            } else {
-                k == want
-            }
+            let k: i64 = unsafe { std::ptr::read(ep as *const i64) };
+            k == want
         };
         if eq {
             return i as i64;
@@ -3416,17 +2124,6 @@ extern "C" fn aipl_dict_contains_key(
     i64::from(unsafe { dict_find(a, key_ptr, pair_size, str_cmp) } >= 0)
 }
 
-/// Element drop-fn for `str[]`: dec each element string.
-#[no_mangle]
-extern "C" fn aipl_arr_drop_str(elems: *const u8, len: i64) {
-    unsafe {
-        let elems = elems as *const i64;
-        for i in 0..len as usize {
-            aipl_dec(std::ptr::read(elems.add(i)) as *const u8);
-        }
-    }
-}
-
 /// Element drop-fn for an array of arrays (`T[][]`): release each element
 /// array, which recursively releases its own elements via its own drop-fn.
 #[no_mangle]
@@ -3439,29 +2136,15 @@ extern "C" fn aipl_arr_drop_arr(elems: *const u8, len: i64) {
     }
 }
 
-/// Element retain-fn for `str[]`/`T[][]`: inc each element pointer (the array's
-/// co-ownership). Both strings and arrays share the `inc` protocol.
+/// Element retain-fn for `T[][]`: inc each element array (the outer array's
+/// co-ownership). `str` elements have their own helper — they are 24-byte values
+/// now, not pointers — so this is the array case alone.
 #[no_mangle]
 extern "C" fn aipl_arr_retain_ptr(elems: *const u8, len: i64) {
     unsafe {
         let elems = elems as *const i64;
         for i in 0..len as usize {
-            aipl_inc(std::ptr::read(elems.add(i)) as *const u8);
-        }
-    }
-}
-
-/// Element drop-fn for `str?[]`: each element is an inline 16-byte `{tag, value}`
-/// optional; dec the inner string when present (tag != 0).
-#[no_mangle]
-extern "C" fn aipl_arr_drop_opt_str(elems: *const u8, len: i64) {
-    unsafe {
-        for i in 0..len as usize {
-            let e = elems.add(i * 16);
-            let tag = std::ptr::read(e as *const i64);
-            if tag != 0 {
-                aipl_dec(std::ptr::read(e.add(8) as *const i64) as *const u8);
-            }
+            aipl_arr_inc(std::ptr::read(elems.add(i)) as *const u8);
         }
     }
 }
@@ -3489,7 +2172,7 @@ extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
             let e = elems.add(i * 16);
             let tag = std::ptr::read(e as *const i64);
             if tag != 0 {
-                aipl_inc(std::ptr::read(e.add(8) as *const i64) as *const u8);
+                aipl_arr_inc(std::ptr::read(e.add(8) as *const i64) as *const u8);
             }
         }
     }
@@ -3501,28 +2184,15 @@ extern "C" fn aipl_arr_retain_opt(elems: *const u8, len: i64) {
 fn build_cli_array(args: &[String]) -> *const u8 {
     // Built by the host and read by compiled code, so it is one of the few places
     // the two must agree byte for byte — which means it follows the switch.
-    if str24_enabled() {
-        let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
-        let arr = aipl_array_new(args.len() as i64, drop_fn, str24::STR_SIZE as i64);
-        unsafe {
-            let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
-            for (i, a) in args.iter().enumerate() {
-                core::ptr::write(elems.add(i), str24::from_bytes(a.as_bytes()));
-            }
-        }
-        return arr;
-    }
-    let drop_fn = aipl_arr_drop_str as *const () as usize as i64;
-    let arr = aipl_array_new(args.len() as i64, drop_fn, 8);
+    let drop_fn = str24::aipl_arr_drop_str as *const () as usize as i64;
+    let arr = aipl_array_new(args.len() as i64, drop_fn, str24::STR_SIZE as i64);
     unsafe {
-        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut i64;
+        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
         for (i, a) in args.iter().enumerate() {
-            let raw = alloc_dynamic_string(a.len());
-            std::ptr::copy_nonoverlapping(a.as_ptr(), raw.add(STR_HEADER_SIZE), a.len());
-            std::ptr::write(elems.add(i), raw.add(STR_HEADER_SIZE) as i64);
+            core::ptr::write(elems.add(i), str24::from_bytes(a.as_bytes()));
         }
     }
-    arr
+    return arr;
 }
 
 /// How a `funcs`-map entry's code is reached at a call site.
@@ -3807,8 +2477,8 @@ pub struct Compilation {
     /// compiled code speaks the wide `str`; a checked-in artifact was built
     /// before the switch and does not. The FFI marshals with this.
     ///
-    /// An [`Abi`] rather than a bare [`StrAbi`] so that the *next* per-type
-    /// representation choice is a field here, not a second parameter threaded
+    /// An [`Abi`] rather than a bare flag so that the *next* per-type
+    /// representation choice is a field there, not a second parameter threaded
     /// through the whole marshaling layer.
     abi: Abi,
     ir: String,
@@ -5472,123 +4142,73 @@ fn new_jit_module() -> Result<JITModule, Error> {
     // The second ABI (`STR_REPR.md` stage 1): 24-byte `str` values passed by
     // pointer. Registered alongside the originals — an artifact links whichever
     // it names, which is what lets the switch be tested one case at a time.
-    jit_builder.symbol("aipl2_print", str24_host::aipl2_print as *const u8);
+    jit_builder.symbol("aipl_print", str24_host::aipl_print as *const u8);
     jit_builder.symbol(
-        "aipl2_print_error",
-        str24_host::aipl2_print_error as *const u8,
+        "aipl_print_error",
+        str24_host::aipl_print_error as *const u8,
     );
-    jit_builder.symbol("aipl2_inc", str24::aipl2_inc as *const u8);
-    jit_builder.symbol("aipl2_dec", str24::aipl2_dec as *const u8);
-    jit_builder.symbol("aipl2_str_len", str24::aipl2_str_len as *const u8);
-    jit_builder.symbol("aipl2_str_eq", str24::aipl2_str_eq as *const u8);
-    jit_builder.symbol("aipl2_str_cmp", str24::aipl2_str_cmp as *const u8);
-    jit_builder.symbol("aipl2_str_hash", str24::aipl2_str_hash as *const u8);
-    jit_builder.symbol("aipl2_char_at", str24::aipl2_char_at as *const u8);
-    jit_builder.symbol("aipl2_str_slice", str24::aipl2_str_slice as *const u8);
-    jit_builder.symbol("aipl2_concat", str24::aipl2_concat as *const u8);
-    jit_builder.symbol("aipl2_trim", str24::aipl2_trim as *const u8);
-    jit_builder.symbol("aipl2_str_data", str24::aipl2_str_data as *const u8);
-    jit_builder.symbol("aipl2_str_contains", str24::aipl2_str_contains as *const u8);
+    jit_builder.symbol("aipl_inc", str24::aipl_inc as *const u8);
+    jit_builder.symbol("aipl_dec", str24::aipl_dec as *const u8);
+    jit_builder.symbol("aipl_str_len", str24::aipl_str_len as *const u8);
+    jit_builder.symbol("aipl_str_eq", str24::aipl_str_eq as *const u8);
+    jit_builder.symbol("aipl_str_cmp", str24::aipl_str_cmp as *const u8);
+    jit_builder.symbol("aipl_str_hash", str24::aipl_str_hash as *const u8);
+    jit_builder.symbol("aipl_char_at", str24::aipl_char_at as *const u8);
+    jit_builder.symbol("aipl_str_slice", str24::aipl_str_slice as *const u8);
+    jit_builder.symbol("aipl_concat", str24::aipl_concat as *const u8);
+    jit_builder.symbol("aipl_trim", str24::aipl_trim as *const u8);
+    jit_builder.symbol("aipl_str_data", str24::aipl_str_data as *const u8);
+    jit_builder.symbol("aipl_str_contains", str24::aipl_str_contains as *const u8);
     jit_builder.symbol(
-        "aipl2_str_starts_with",
-        str24::aipl2_str_starts_with as *const u8,
+        "aipl_str_starts_with",
+        str24::aipl_str_starts_with as *const u8,
     );
-    jit_builder.symbol(
-        "aipl2_str_starts_with_at",
-        str24::aipl2_str_starts_with_at as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_str_ends_with",
-        str24::aipl2_str_ends_with as *const u8,
-    );
-    jit_builder.symbol("aipl2_str_reverse", str24::aipl2_str_reverse as *const u8);
-    jit_builder.symbol("aipl2_str_sort", str24::aipl2_str_sort as *const u8);
-    jit_builder.symbol("aipl2_str_repeat", str24::aipl2_str_repeat as *const u8);
-    jit_builder.symbol("aipl2_char_to_str", str24::aipl2_char_to_str as *const u8);
-    jit_builder.symbol("aipl2_str_alloc", str24::aipl2_str_alloc as *const u8);
-    jit_builder.symbol(
-        "aipl2_str_write_ptr",
-        str24::aipl2_str_write_ptr as *const u8,
-    );
-    jit_builder.symbol("aipl2_str_grew", str24::aipl2_str_grew as *const u8);
-    jit_builder.symbol(
-        "aipl2_str_iter_init",
-        str24::aipl2_str_iter_init as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_str_iter_next",
-        str24::aipl2_str_iter_next as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_arr_drop_opt_str",
-        str24::aipl2_arr_drop_opt_str as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_arr_retain_opt_str",
-        str24::aipl2_arr_retain_opt_str as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_read_file_to_string",
-        str24_host::aipl2_read_file_to_string as *const u8,
-    );
-    jit_builder.symbol(
-        "aipl2_write_string_to_file",
-        str24_host::aipl2_write_string_to_file as *const u8,
-    );
-    jit_builder.symbol("aipl2_list_files", aipl2_list_files as *const u8);
-    jit_builder.symbol("aipl2_execute_program", aipl2_execute_program as *const u8);
-    jit_builder.symbol("aipl2_str_split", aipl2_str_split as *const u8);
-    jit_builder.symbol("aipl2_str_join", aipl2_str_join as *const u8);
-    jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
-    jit_builder.symbol(
-        "aipl2_arr_retain_str",
-        str24::aipl2_arr_retain_str as *const u8,
-    );
-    jit_builder.symbol("aipl_print", aipl_print as *const u8);
-    jit_builder.symbol("aipl_print_error", aipl_print_error as *const u8);
-    jit_builder.symbol("aipl_concat", aipl_concat as *const u8);
-    jit_builder.symbol("aipl_concat_lazy", aipl_concat_lazy as *const u8);
-    jit_builder.symbol("aipl_concat_mut", aipl_concat_mut as *const u8);
-    jit_builder.symbol("aipl_char_at", aipl_char_at as *const u8);
-    jit_builder.symbol("aipl_str_eq", aipl_str_eq as *const u8);
-    jit_builder.symbol("aipl_str_cmp", aipl_str_cmp as *const u8);
-    jit_builder.symbol("aipl_str_starts_with", aipl_str_starts_with as *const u8);
     jit_builder.symbol(
         "aipl_str_starts_with_at",
-        aipl_str_starts_with_at as *const u8,
+        str24::aipl_str_starts_with_at as *const u8,
     );
-    jit_builder.symbol("aipl_str_contains", aipl_str_contains as *const u8);
-    jit_builder.symbol("aipl_str_ends_with", aipl_str_ends_with as *const u8);
+    jit_builder.symbol("aipl_str_ends_with", str24::aipl_str_ends_with as *const u8);
+    jit_builder.symbol("aipl_str_reverse", str24::aipl_str_reverse as *const u8);
+    jit_builder.symbol("aipl_str_sort", str24::aipl_str_sort as *const u8);
+    jit_builder.symbol("aipl_str_repeat", str24::aipl_str_repeat as *const u8);
+    jit_builder.symbol("aipl_char_to_str", str24::aipl_char_to_str as *const u8);
+    jit_builder.symbol("aipl_str_alloc", str24::aipl_str_alloc as *const u8);
+    jit_builder.symbol("aipl_str_write_ptr", str24::aipl_str_write_ptr as *const u8);
+    jit_builder.symbol("aipl_str_grew", str24::aipl_str_grew as *const u8);
+    jit_builder.symbol("aipl_str_iter_init", str24::aipl_str_iter_init as *const u8);
+    jit_builder.symbol("aipl_str_iter_next", str24::aipl_str_iter_next as *const u8);
+    jit_builder.symbol(
+        "aipl_arr_drop_opt_str",
+        str24::aipl_arr_drop_opt_str as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_arr_retain_opt_str",
+        str24::aipl_arr_retain_opt_str as *const u8,
+    );
     jit_builder.symbol(
         "aipl_read_file_to_string",
-        aipl_read_file_to_string as *const u8,
+        str24_host::aipl_read_file_to_string as *const u8,
     );
     jit_builder.symbol(
         "aipl_write_string_to_file",
-        aipl_write_string_to_file as *const u8,
+        str24_host::aipl_write_string_to_file as *const u8,
     );
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
+    jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
+    jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
+    jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
+    jit_builder.symbol("aipl_arr_drop_str", str24::aipl_arr_drop_str as *const u8);
+    jit_builder.symbol(
+        "aipl_arr_retain_str",
+        str24::aipl_arr_retain_str as *const u8,
+    );
     jit_builder.symbol("aipl_now_nanos", aipl_now_nanos as *const u8);
     jit_builder.symbol("aipl_monotonic_now", aipl_monotonic_now as *const u8);
     jit_builder.symbol("aipl_shim_get", aipl_shim_get as *const u8);
     jit_builder.symbol("aipl_shim_set", aipl_shim_set as *const u8);
-    jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
-    jit_builder.symbol("aipl_trim", aipl_trim as *const u8);
-    jit_builder.symbol("aipl_trim_mut", aipl_trim_mut as *const u8);
-    jit_builder.symbol("aipl_str_repeat", aipl_str_repeat as *const u8);
-    jit_builder.symbol("aipl_str_reverse", aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_arr_reverse", aipl_arr_reverse as *const u8);
     jit_builder.symbol("aipl_arr_sort", aipl_arr_sort as *const u8);
-    jit_builder.symbol("aipl_str_sort", aipl_str_sort as *const u8);
-    jit_builder.symbol("aipl_str_slice", aipl_str_slice as *const u8);
     jit_builder.symbol("aipl_arr_slice", aipl_arr_slice as *const u8);
-    jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
-    jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
-    jit_builder.symbol("aipl_str_data", aipl_str_data as *const u8);
-    jit_builder.symbol("aipl_str_iter_init", aipl_str_iter_init as *const u8);
-    jit_builder.symbol("aipl_str_iter_next", aipl_str_iter_next as *const u8);
-    jit_builder.symbol("aipl_inc", aipl_inc as *const u8);
-    jit_builder.symbol("aipl_dec", aipl_dec as *const u8);
     jit_builder.symbol("aipl_array_new", aipl_array_new as *const u8);
     jit_builder.symbol("aipl_array_with_cap", aipl_array_with_cap as *const u8);
     jit_builder.symbol("aipl_array_push", aipl_array_push as *const u8);
@@ -5617,28 +4237,20 @@ fn new_jit_module() -> Result<JITModule, Error> {
     );
     jit_builder.symbol("aipl_count_insns", aipl_count_insns as *const u8);
     jit_builder.symbol("aipl_count_call", aipl_count_call as *const u8);
-    jit_builder.symbol("aipl_str_hash", aipl_str_hash as *const u8);
-    jit_builder.symbol("aipl2_test_begin", aipl2_test_begin as *const u8);
-    jit_builder.symbol("aipl2_assert", aipl2_assert as *const u8);
-    jit_builder.symbol("aipl2_test_fail", aipl2_test_fail as *const u8);
+    jit_builder.symbol("aipl_test_begin", aipl_test_begin as *const u8);
     jit_builder.symbol("aipl_assert", aipl_assert as *const u8);
     jit_builder.symbol("aipl_test_fail", aipl_test_fail as *const u8);
     jit_builder.symbol("aipl_test_fail_none", aipl_test_fail_none as *const u8);
-    jit_builder.symbol("aipl_test_begin", aipl_test_begin as *const u8);
     jit_builder.symbol("aipl_test_end", aipl_test_end as *const u8);
     jit_builder.symbol("aipl_test_summary", aipl_test_summary as *const u8);
-    jit_builder.symbol("aipl_arr_drop_str", aipl_arr_drop_str as *const u8);
     jit_builder.symbol("aipl_arr_drop_arr", aipl_arr_drop_arr as *const u8);
     jit_builder.symbol("aipl_arr_retain_ptr", aipl_arr_retain_ptr as *const u8);
-    jit_builder.symbol("aipl_arr_drop_opt_str", aipl_arr_drop_opt_str as *const u8);
     jit_builder.symbol("aipl_arr_drop_opt_arr", aipl_arr_drop_opt_arr as *const u8);
     jit_builder.symbol("aipl_arr_retain_opt", aipl_arr_retain_opt as *const u8);
-    jit_builder.symbol("aipl_str_alloc", aipl_str_alloc as *const u8);
     jit_builder.symbol("aipl_i64_len", aipl_i64_len as *const u8);
     jit_builder.symbol("aipl_write_i64", aipl_write_i64 as *const u8);
     jit_builder.symbol("aipl_u64_len", aipl_u64_len as *const u8);
     jit_builder.symbol("aipl_write_u64", aipl_write_u64 as *const u8);
-    jit_builder.symbol("aipl_str_len", aipl_str_len as *const u8);
     jit_builder.symbol("aipl_write_bytes", aipl_write_bytes as *const u8);
     Ok(JITModule::new(jit_builder))
 }
@@ -5939,12 +4551,6 @@ pub fn generate_dogfood_artifact(
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
     out.push_str("; DO NOT EDIT BY HAND. Regenerate:\n");
     out.push_str(";   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir\n");
-    // The representation this artifact speaks. Omitted (and so read as tagged)
-    // unless the switch is on, which is what keeps every pre-switch artifact —
-    // including the checked-in ones — meaning exactly what it always did.
-    if str24_enabled() {
-        out.push_str("; str24\n");
-    }
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.
@@ -6233,12 +4839,7 @@ impl Compilation {
             // Struct layouts recovered from the `; struct` manifest lines, so a
             // struct-returning entry marshals back through `call_values`.
             structs: manifest_structs(&manifest)?,
-            // The artifact says which representation it was compiled with; a
-            // pre-switch one says nothing, which means tagged. This used to be
-            // hardcoded `Tagged` — right for the checked-in IR, wrong for an
-            // artifact generated *under* the switch, whose 24-byte values were
-            // then read as 8-byte pointers (SIGBUS in `call_values`).
-            abi: Abi::from_manifest(manifest.str24),
+            abi: Abi::active(),
             code: Code::Jit(module),
             ir: text.to_string(),
         })
@@ -6268,8 +4869,7 @@ impl Compilation {
             // is the honest value, and it keeps `FuncInfo` uniform across both.
             funcs: entry_funcs(&manifest, |id| FuncLink::User(FuncId::from_u32(id)))?,
             structs: manifest_structs(&manifest)?,
-            // Compiled before the switch: 8-byte tagged `str` values.
-            abi: Abi::tagged(),
+            abi: Abi::active(),
             code: Code::Prebuilt(entries),
             ir: manifest_text.to_string(),
         })
@@ -6407,7 +5007,6 @@ impl Compilation {
         // fields (including a struct nested as an optional's core).
         check_ffi_return(name, &info.return_ty, &self.structs)?;
         let abi_kind = self.abi;
-        let ret_is_str = is_str_repr(&info.return_ty);
         // An optional `T?` (possibly nested) — scalar, `str`, or struct core — is
         // returned through a hidden sret pointer (see the sret path below).
         let ret_is_opt = matches!(info.return_ty, ConcreteType::Optional(_));
@@ -6572,7 +5171,7 @@ impl Compilation {
         // from the word return further down gets the value's first field, which
         // decodes as an empty array. Only the decoding differs — codepoints
         // rather than text.
-        if is_str_shaped(&info.return_ty) && abi_kind.wide_str() {
+        if is_str_shaped(&info.return_ty) && true {
             let words = str24::STR_SIZE.div_ceil(8);
             let mut sret_buf = vec![0i64; words];
             let mut sret_abi = Vec::with_capacity(1 + abi.len());
@@ -6614,21 +5213,9 @@ impl Compilation {
             return Ok(result);
         }
 
-        let result = if ret_is_str {
-            // The callee handed us a reference on the returned `str` (its body
-            // retained it before dropping its scope). Copy the bytes out here,
-            // while the argument buffers are still alive — an identity
-            // `fn(s) -> s` returns one of them — then release our reference.
-            let rv = r as *const u8;
-            let mut buf = [0u8; 8];
-            let bytes = unsafe { str_bytes(rv, &mut buf) };
-            let s = String::from_utf8_lossy(bytes).into_owned();
-            aipl_dec(rv);
-            FfiValue::Str(s)
-        } else {
-            FfiValue::Int(r)
-        };
-        Ok(result)
+        // A `str` return took the sret path above, so anything reaching here
+        // came back in a register.
+        Ok(FfiValue::Int(r))
     }
 
     /// The address of `name`'s machine code, ready to transmute to its real
@@ -7060,7 +5647,7 @@ fn build_borrowed_array(
         let s = chars_to_utf8(elems)?;
         return Ok(bufs.str_value(&s));
     }
-    let elem_size = if is_str_repr(elem) && abi.wide_str() {
+    let elem_size = if is_str_repr(elem) && true {
         // A wide `str` element is the value itself, 24 bytes in the block.
         abi.str_size()
     } else {
@@ -7115,7 +5702,7 @@ unsafe fn write_ffi_arg(
     // written here rather than falling through to `ffi_arg_word`, whose own
     // assertion catches exactly that mistake. The two differ only in how the host
     // spells the value — a `str` arrives as text, a `char[]` as codepoints.
-    if is_str_shaped(ty) && abi.wide_str() {
+    if is_str_shaped(ty) && true {
         let text = match v {
             FfiValue::Str(text) if is_str_repr(ty) => text.clone(),
             FfiValue::Array(elems) if is_char_array(ty) => chars_to_utf8(elems)?,
@@ -7260,19 +5847,6 @@ unsafe fn write_ffi_arg(
 // top-level release cascades to it.
 // ---------------------------------------------------------------------------
 
-/// Copy a `str`-repr value's bytes into an owned `String`, releasing the callee's
-/// reference when `owned` (a borrowed read leaves it to the enclosing value).
-unsafe fn read_ffi_str_value(raw: i64, owned: bool) -> String {
-    let rv = raw as *const u8;
-    let mut tmp = [0u8; 8];
-    let bytes = unsafe { str_bytes(rv, &mut tmp) };
-    let s = String::from_utf8_lossy(bytes).into_owned();
-    if owned {
-        aipl_dec(rv);
-    }
-    s
-}
-
 /// Read the value of type `ty` whose inline representation begins exactly at
 /// `at`. This is the one place that dispatches an arbitrary marshalable type on
 /// its representation: an inline composite (struct/variant/optional/result) is
@@ -7303,7 +5877,7 @@ unsafe fn read_ffi_borrowed(
         // one — the same shape the `str` arm below reads, differing only in how
         // the text is handed back (codepoints rather than a string). Reading it
         // as a word yields the value's first field and decodes as empty.
-        ConcreteType::Array(_) if is_char_array(ty) && abi.wide_str() => {
+        ConcreteType::Array(_) if is_char_array(ty) && true => {
             let value = unsafe { core::ptr::read(at as *const str24::Str) };
             let mut scratch = [0u8; str24::INLINE_CAP];
             let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
@@ -7319,19 +5893,14 @@ unsafe fn read_ffi_borrowed(
             unsafe { read_ffi_array(abi, raw, elem, owned, structs) }
         }
         _ if is_str_repr(ty) => {
-            if abi.wide_str() {
-                // The value *is* the 24 bytes at `at`.
-                let value = unsafe { core::ptr::read(at as *const str24::Str) };
-                let mut scratch = [0u8; str24::INLINE_CAP];
-                let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
-                if owned {
-                    value.release();
-                }
-                FfiValue::Str(text)
-            } else {
-                // Tagged: an 8-byte word pointing at the content.
-                FfiValue::Str(unsafe { read_ffi_str_value(*(at as *const i64), owned) })
+            // The value *is* the 24 bytes at `at`.
+            let value = unsafe { core::ptr::read(at as *const str24::Str) };
+            let mut scratch = [0u8; str24::INLINE_CAP];
+            let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
+            if owned {
+                value.release();
             }
+            FfiValue::Str(text)
         }
         _ => FfiValue::Int(unsafe { *(at as *const i64) }),
     }
@@ -7355,14 +5924,13 @@ unsafe fn read_ffi_array(
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
-    // `char[]` is str-shaped: decode the packed bytes to codepoints.
-    if matches!(elem, ConcreteType::Primitive(Primitive::Char)) {
-        let chars = unsafe { read_ffi_str_value(raw, owned) }
-            .chars()
-            .map(|c| FfiValue::Int(c as i64))
-            .collect();
-        return FfiValue::Array(chars);
-    }
+    // `char[]` never arrives here: it is str-shaped, so it is a 24-byte value
+    // rather than the `i64` this takes, and both callers (`read_ffi_borrowed`
+    // and the `call_values` return path) peel it off first.
+    debug_assert!(
+        !matches!(elem, ConcreteType::Primitive(Primitive::Char)),
+        "a `char[]` is read through the str-shaped path, not as an array block"
+    );
     let a = raw as *const u8;
     // A null pointer stands for an empty array (never allocated).
     if a.is_null() {
@@ -7601,7 +6169,7 @@ fn injected_cli_args_ty() -> Type {
 /// one-pointer host shape, so the FFI, artifacts and function values are
 /// untouched.
 fn tail_passes_str_by_value(tail: bool, ty: &ConcreteType) -> bool {
-    tail && str24_wide(ty)
+    tail && is_str_shaped(ty)
 }
 
 /// The words a wide `str` at `addr` lowers to, for a by-value tail argument.
@@ -7786,7 +6354,7 @@ fn tail_safe_param(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> boo
     // into real recursion (`cases/tail_calls/mutual_cycle`, which overflowed the
     // 8 MB stack of an `aipl build` binary at ~50k deep while the JIT, on a
     // bigger stack, still passed).
-    if str24_wide(ty) {
+    if is_str_shaped(ty) {
         return true;
     }
     !is_composite(ty, structs) && (!needs_drop(ty, structs) || is_heap(ty) || is_boxed(ty, structs))
@@ -7922,17 +6490,6 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
     Ok((program, wants_args))
 }
 
-/// The 1-byte flag telling the AOT runtime which `str` representation the object
-/// speaks, exported alongside [`MAIN_WANTS_ARGS_SYMBOL`].
-///
-/// The JIT runtime reads `AIPL_STR24` directly; the AOT one cannot — it is a
-/// `no_std` staticlib with no environment, linked once and reused for every
-/// object. So the *object* carries the answer, exactly as it already carries
-/// whether `main` wanted its arguments. Needed wherever the runtime builds or
-/// walks values on the compiled code's behalf without being handed a type: the
-/// CLI argument array is the first such place.
-pub const STR24_SYMBOL: &str = "__aipl_str24";
-
 /// Emit the [`MAIN_WANTS_ARGS_SYMBOL`] flag as a 1-byte exported data object so
 /// the runtime can read it at startup.
 fn emit_main_wants_args_flag(module: &mut ObjectModule, wants_args: bool) -> Result<(), Error> {
@@ -7944,19 +6501,6 @@ fn emit_main_wants_args_flag(module: &mut ObjectModule, wants_args: bool) -> Res
     module
         .define_data(data_id, &desc)
         .map_err(|e| Error::msg(format!("define {MAIN_WANTS_ARGS_SYMBOL}: {e}")))?;
-    Ok(())
-}
-
-/// Emit the [`STR24_SYMBOL`] representation flag, the same way.
-fn emit_str24_flag(module: &mut ObjectModule) -> Result<(), Error> {
-    let data_id = module
-        .declare_data(STR24_SYMBOL, Linkage::Export, false, false)
-        .map_err(|e| Error::msg(format!("declare {STR24_SYMBOL}: {e}")))?;
-    let mut desc = DataDescription::new();
-    desc.define(vec![u8::from(str24_enabled())].into_boxed_slice());
-    module
-        .define_data(data_id, &desc)
-        .map_err(|e| Error::msg(format!("define {STR24_SYMBOL}: {e}")))?;
     Ok(())
 }
 
@@ -8042,7 +6586,6 @@ impl ObjectCompilation {
             instrument,
         )?;
         emit_main_wants_args_flag(&mut module, main_wants_args)?;
-        emit_str24_flag(&mut module)?;
 
         Ok(Self { module, funcs, ir })
     }
@@ -8695,17 +7238,10 @@ struct Builtins {
 ///   its content pointer, so the distinction is invisible; after the flip that
 ///   idiom becomes "allocate a buffer, then build a value over it", and this is
 ///   the table that says which is which.
-/// The kind of *one argument* to a runtime import — the argument half of the
-/// pair whose other half is [`Ret`]. Named `ArgKind` rather than `Abi` because
-/// it describes a single parameter, not the ABI a body of code speaks; that is
-/// [`Abi`].
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum ArgKind {
-    Word,
-    Str,
-}
 
-/// What a runtime import gives back — the return half of [`ArgKind`].
+/// What a runtime import gives back. The argument half is just a count — every
+/// argument is one `i64` — so only the return needs naming, because a `str`
+/// result is not returned at all but written through an out pointer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Ret {
     None,
@@ -8720,22 +7256,20 @@ enum Ret {
 /// return value.
 fn lower_import_sig<M: Module>(
     module: &mut M,
-    params: &[ArgKind],
+    params: usize,
     ret: Ret,
     out_pointer: bool,
 ) -> Signature {
     let mut s = module.make_signature();
-    // The new ABI writes a `str` result through a leading out pointer and
-    // returns nothing; the old one hands its tagged pointer back in a register.
-    // `Ret::Str` means "yields a `str`" to both, so which shape to lower is the
-    // caller's to say — see `builtin_import_sig`.
+    // A `str` result is written through a leading out pointer, so the callee
+    // returns nothing and the caller supplies the buffer. `Ret::Str` says
+    // "yields a `str`"; whether to lower it that way is the caller's to say —
+    // see `builtin_import_sig`.
     if out_pointer {
         s.params.push(AbiParam::new(types::I64));
     }
-    for kind in params {
-        match kind {
-            ArgKind::Word | ArgKind::Str => s.params.push(AbiParam::new(types::I64)),
-        }
+    for _ in 0..params {
+        s.params.push(AbiParam::new(types::I64));
     }
     match ret {
         Ret::None => {}
@@ -8747,230 +7281,108 @@ fn lower_import_sig<M: Module>(
 
 /// Whether `sym` returns its `str` through a leading out pointer — true for the
 /// new ABI's entry points, false for the originals.
-fn returns_via_out_pointer(sym: &str, ret: Ret) -> bool {
-    ret == Ret::Str && sym.starts_with("aipl2_")
+fn returns_via_out_pointer(ret: Ret) -> bool {
+    ret == Ret::Str
 }
 
 /// Signature of a runtime import `sym`.
 fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
     let (params, ret) = import_abi(sym);
-    lower_import_sig(module, params, ret, returns_via_out_pointer(sym, ret))
+    lower_import_sig(module, params, ret, returns_via_out_pointer(ret))
 }
 
 /// How many `i64` argument words `params` lowers to — the arity every call site
 /// must supply. One per kind today; an [`ArgKind::Str`] becomes three at the flip.
-fn import_arg_words(params: &[ArgKind]) -> usize {
+fn import_arg_words(params: usize) -> usize {
     params
-        .iter()
-        .map(|k| match k {
-            ArgKind::Word | ArgKind::Str => 1,
-        })
-        .sum()
 }
 
 /// What runtime import `sym` takes and gives back. See [`ArgKind`] for what the
 /// kinds mean and why they are spelled out rather than counted.
-fn import_abi(sym: &str) -> (&'static [ArgKind], Ret) {
-    use ArgKind::{Str, Word};
-    let sig = |params: &'static [ArgKind], ret: Ret| (params, ret);
+fn import_abi(sym: &str) -> (usize, Ret) {
+    // `(argument words, what comes back)`. Every argument is one `i64` — a
+    // scalar, a pointer, or the address of a `str` value — so counting them is
+    // enough; what a word *means* is documented at each entry point. A `str`
+    // result is the one thing the count cannot express, hence [`Ret::Str`]: it
+    // travels through a leading out pointer, so the callee returns nothing and
+    // the caller supplies the buffer (`Builtins::call`).
     match sym {
-        // ---- str in, nothing out ----
-        "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_test_begin"
-        | "aipl_test_fail" => sig(&[Str], Ret::None),
-        // ---- one refcounted handle in, nothing out ----
-        "aipl_array_dec"
+        // ---- nothing back ----
+        "aipl_print"
+        | "aipl_print_error"
+        | "aipl_inc"
+        | "aipl_dec"
+        | "aipl_test_begin"
+        | "aipl_test_fail"
+        | "aipl_array_dec"
         | "aipl_arr_inc"
         | "aipl_rec_inc_strong"
         | "aipl_rec_dec_strong"
         | "aipl_rec_inc_weak"
-        | "aipl_rec_dec_weak" => sig(&[Word], Ret::None),
-        // Instrumentation counters: an opaque i64 each.
-        "aipl_count_insns" | "aipl_count_call" => sig(&[Word], Ret::None),
-        // Test-runner hooks: `__test_end()` returns nothing; `__test_summary()`
-        // returns the exit code; `__assert(cond, loc)` takes the location `str`.
-        "aipl_test_end" | "aipl_test_fail_none" => sig(&[], Ret::None),
-        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => sig(&[], Ret::Word),
-        "aipl_assert" => sig(&[Word, Str], Ret::None),
-        // Shim slots: read one, or write one (returns nothing).
-        "aipl_shim_get" => sig(&[Word], Ret::Word),
-        "aipl_shim_set" => sig(&[Word, Word], Ret::None),
-        // ---- element-run helpers: a pointer to the run, and its length ----
-        "aipl_arr_drop_str"
+        | "aipl_rec_dec_weak"
+        | "aipl_count_insns"
+        | "aipl_count_call" => (1, Ret::None),
+        "aipl_test_end" | "aipl_test_fail_none" => (0, Ret::None),
+        "aipl_assert"
+        | "aipl_shim_set"
+        | "aipl_str_iter_init"
+        | "aipl_str_grew"
+        | "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
+        | "aipl_arr_retain_str"
         | "aipl_arr_drop_opt_str"
         | "aipl_arr_drop_opt_arr"
-        | "aipl_arr_retain_opt" => sig(&[Word, Word], Ret::None),
-        // `(cursor, s)` — the iterator writes its state through the cursor.
-        "aipl_str_iter_init" => sig(&[Word, Str], Ret::None),
-        "aipl_arr_load_bit" => sig(&[Word, Word], Ret::Word),
-        "aipl_arr_elem_ptr" => sig(&[Word, Word, Word], Ret::Word),
-        // sret ptr + (program, args): writes the whole composite `Result` via
-        // the hidden pointer, so it returns nothing. `args` is a `str[]`.
-        "aipl_execute_program" => sig(&[Word, Str, Word], Ret::None),
-        // ---- str in, scalar out ----
-        "aipl_str_len" | "aipl_str_hash" => sig(&[Str], Ret::Word),
-        "aipl_char_at" => sig(&[Str, Word], Ret::Word),
-        "aipl_str_cmp"
+        | "aipl_arr_retain_opt"
+        | "aipl_arr_retain_opt_str" => (2, Ret::None),
+        "aipl_execute_program" => (3, Ret::None),
+        // ---- a scalar back ----
+        "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => (0, Ret::Word),
+        "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
+        | "aipl_str_write_ptr" | "aipl_i64_len" | "aipl_u64_len" | "aipl_list_files" => {
+            (1, Ret::Word)
+        }
+        "aipl_char_at"
+        | "aipl_str_cmp"
         | "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
-        | "aipl_str_contains" => sig(&[Str, Str], Ret::Word),
-        "aipl_str_starts_with_at" => sig(&[Str, Str, Word], Ret::Word),
-        "aipl_write_string_to_file" => sig(&[Str, Str], Ret::Word),
-        // ---- str in, str out ----
-        "aipl_trim"
-        | "aipl_trim_mut"
-        | "aipl_str_reverse"
-        | "aipl_str_sort"
-        | "aipl_read_file_to_string" => sig(&[Str], Ret::Str),
-        "aipl_str_repeat" => sig(&[Str, Word], Ret::Str),
-        "aipl_str_slice" => sig(&[Str, Word, Word], Ret::Str),
-        "aipl_concat" | "aipl_concat_lazy" | "aipl_concat_mut" => sig(&[Str, Str], Ret::Str),
-        // ---- str in, container out (and back) ----
-        "aipl_list_files" => sig(&[Str], Ret::Word),
-        "aipl_str_split" => sig(&[Str, Str], Ret::Word),
-        "aipl_str_join" => sig(&[Word, Str], Ret::Str),
-        // `str_data` hands back a raw content pointer (into `scratch` for an
-        // inline value), which is a cursor, not a `str`.
-        "aipl_str_data" => sig(&[Str, Word], Ret::Word),
-        // ---- the `to_str` builder: raw cursors, not `str` values ----
-        "aipl_str_alloc" | "aipl_i64_len" | "aipl_u64_len" => sig(&[Word], Ret::Word),
-        "aipl_write_i64" | "aipl_write_u64" => sig(&[Word, Word], Ret::Word),
-        "aipl_write_bytes" => sig(&[Word, Word, Word], Ret::Word),
-        "aipl_str_iter_next" => sig(&[Word], Ret::Word),
-        // ---- containers: handles, element pointers, and fn-pointer constants ----
-        "aipl_rec_alloc" => sig(&[Word, Word], Ret::Word),
-        "aipl_array_new" | "aipl_array_with_cap" => sig(&[Word, Word, Word], Ret::Word),
-        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" => {
-            sig(&[Word, Word, Word, Word], Ret::Word)
+        | "aipl_str_contains"
+        | "aipl_str_data"
+        | "aipl_arr_load_bit"
+        | "aipl_write_string_to_file"
+        | "aipl_str_split"
+        | "aipl_read_file_to_string"
+        | "aipl_rec_alloc"
+        | "aipl_write_i64"
+        | "aipl_write_u64" => (2, Ret::Word),
+        "aipl_str_starts_with_at"
+        | "aipl_arr_elem_ptr"
+        | "aipl_write_bytes"
+        | "aipl_array_new"
+        | "aipl_array_with_cap" => (3, Ret::Word),
+        "aipl_set_contains" | "aipl_dict_get" | "aipl_dict_contains_key" | "aipl_arr_reverse" => {
+            (4, Ret::Word)
         }
-        "aipl_arr_reverse" => sig(&[Word, Word, Word, Word], Ret::Word),
         "aipl_array_push"
         | "aipl_array_push_mut"
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
-        | "aipl_arr_extend" => sig(&[Word, Word, Word, Word, Word], Ret::Word),
-        // `arr_join` glues `str` parts with a `str` separator.
-        "aipl_arr_join" => sig(&[Word, Str, Word, Word, Word], Ret::Str),
+        | "aipl_arr_extend" => (5, Ret::Word),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
-        | "aipl_arr_slice" => sig(&[Word, Word, Word, Word, Word, Word], Ret::Word),
-        // ---- the second ABI (`STR_REPR.md`): `str` by pointer, results out ----
-        // A `str` argument is one word here too — the *address* of a 24-byte
-        // value — so these are `Word`s, not `Str`s: the kind describes what
-        // crosses the ABI, and under this convention that is a pointer.
-        "aipl2_inc" | "aipl2_dec" | "aipl2_print" | "aipl2_print_error" => sig(&[Word], Ret::None),
-        "aipl2_str_len" | "aipl2_str_hash" => sig(&[Word], Ret::Word),
-        "aipl2_str_eq"
-        | "aipl2_str_cmp"
-        | "aipl2_str_starts_with"
-        | "aipl2_str_ends_with"
-        | "aipl2_str_contains"
-        | "aipl2_char_at"
-        | "aipl2_str_data" => sig(&[Word, Word], Ret::Word),
-        "aipl2_str_starts_with_at" => sig(&[Word, Word, Word], Ret::Word),
-        // `Ret::Str` — `Builtins::call` allocates the slot and prepends the out
-        // pointer, so these list only what the caller passes.
-        "aipl2_trim" | "aipl2_str_reverse" | "aipl2_str_sort" => sig(&[Word], Ret::Str),
-        "aipl2_concat" => sig(&[Word, Word], Ret::Str),
-        "aipl2_str_repeat" => sig(&[Word, Word], Ret::Str),
-        "aipl2_str_slice" => sig(&[Word, Word, Word], Ret::Str),
-        "aipl2_str_alloc" | "aipl2_char_to_str" => sig(&[Word], Ret::Str),
-        "aipl2_str_write_ptr" => sig(&[Word], Ret::Word),
-        "aipl2_str_iter_init" => sig(&[Word, Word], Ret::None),
-        "aipl2_str_iter_next" => sig(&[Word], Ret::Word),
-        "aipl2_arr_drop_str"
-        | "aipl2_arr_retain_str"
-        | "aipl2_arr_drop_opt_str"
-        | "aipl2_arr_retain_opt_str" => sig(&[Word, Word], Ret::None),
-        "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
-        "aipl2_test_begin" | "aipl2_test_fail" => sig(&[Word], Ret::None),
-        "aipl2_str_split" => sig(&[Word, Word], Ret::Word),
-        // Leading out pointer *and* an i64 return: the payload goes through the
-        // pointer, the success flag comes back. See `aipl2_read_file_to_string`.
-        "aipl2_read_file_to_string" => sig(&[Word, Word], Ret::Word),
-        "aipl2_write_string_to_file" => sig(&[Word, Word], Ret::Word),
-        "aipl2_list_files" => sig(&[Word], Ret::Word),
-        "aipl2_execute_program" => sig(&[Word, Word, Word], Ret::None),
-        "aipl2_str_join" => sig(&[Word, Word], Ret::Str),
-        "aipl2_assert" => sig(&[Word, Word], Ret::None),
+        | "aipl_arr_slice" => (6, Ret::Word),
+        // ---- a `str` back, through the out pointer ----
+        "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
+        | "aipl_char_to_str" => (1, Ret::Str),
+        "aipl_concat" | "aipl_str_repeat" | "aipl_str_join" => (2, Ret::Str),
+        "aipl_str_slice" => (3, Ret::Str),
+        // Joins `T[][]` into a `T[]` — an *array* back in a register, not a
+        // `str`. It was labelled `Ret::Str` while every result was one word and
+        // the two were indistinguishable; they no longer are, and a `Ret::Str`
+        // here would have codegen prepend an out pointer for a value that comes
+        // back in a register.
+        "aipl_arr_join" => (5, Ret::Word),
         other => panic!("unknown builtin import symbol {other:?}"),
-    }
-}
-
-/// The runtime symbol a call site resolves to under the active representation.
-///
-/// With the switch off this is the identity. With it on, a call that takes or
-/// produces a `str` goes to its `aipl2_*` counterpart, whose signature in
-/// [`import_abi`] already describes the new convention — so
-/// [`Builtins::call`] supplies the out pointer where one is needed and the call
-/// site itself changes not at all. Only symbols whose argument list is unchanged
-/// (the `str` words become addresses in place) are listed; anything absent keeps
-/// the old entry point until its call site is converted deliberately.
-fn active_sym(sym: &'static str) -> &'static str {
-    if !str24_enabled() {
-        return sym;
-    }
-    // **Entry points borrow their `str` arguments.** The old ABI had every
-    // str-taking builtin *consume* its argument, with the call site pre-inc'ing
-    // to balance it — a protocol that existed because a `str` was a bare pointer
-    // whose lifetime had to be managed across the call. The new one receives a
-    // pointer to the caller's own 24-byte value, which the caller is already
-    // keeping alive, so the inc/dec pair is removed rather than mirrored.
-    //
-    // Converting a call site therefore means two things, not one: remap the
-    // symbol *and* drop the pre-inc. A producer whose result aliases its
-    // argument's buffer (`slice`, `trim`) additionally has to retain that buffer
-    // for the result — those are not converted yet, and that is why.
-    match sym {
-        // Verified end to end with the switch on. The rest of the `aipl2_*`
-        // entry points exist and are unit-tested, but their *call sites* still
-        // pass values the old shape, so they are converted deliberately —
-        // one at a time, each verified — rather than switched wholesale.
-        "aipl_print" => "aipl2_print",
-        "aipl_print_error" => "aipl2_print_error",
-        "aipl_char_at" => "aipl2_char_at",
-        "aipl_str_len" => "aipl2_str_len",
-        "aipl_str_cmp" => "aipl2_str_cmp",
-        "aipl_str_hash" => "aipl2_str_hash",
-        "aipl_str_eq" => "aipl2_str_eq",
-        "aipl_str_contains" => "aipl2_str_contains",
-        "aipl_str_starts_with" => "aipl2_str_starts_with",
-        "aipl_str_starts_with_at" => "aipl2_str_starts_with_at",
-        "aipl_str_ends_with" => "aipl2_str_ends_with",
-        // `str_data` is the byte-pointer seam every copying path goes through
-        // (`str_bytes_ptr`), so remapping it converts them all at once. Its two
-        // ABIs take the same arity — the difference is that the wide entry
-        // point needs a 22-byte spill scratch where the tagged one needed 8,
-        // which is why every call site is routed through that one helper.
-        "aipl_str_data" => "aipl2_str_data",
-        "aipl_str_iter_init" => "aipl2_str_iter_init",
-        "aipl_str_iter_next" => "aipl2_str_iter_next",
-        "aipl_test_begin" => "aipl2_test_begin",
-        "aipl_assert" => "aipl2_assert",
-        "aipl_test_fail" => "aipl2_test_fail",
-        // All three concat spellings collapse to one wide entry point: building a
-        // rope is O(1), so the eager copy and the in-place append have nothing
-        // left to optimize over the lazy form.
-        "aipl_concat" | "aipl_concat_lazy" | "aipl_concat_mut" => "aipl2_concat",
-        // Producers. The two that return a *window* into their argument
-        // (`slice`, `trim`) retain it inside the entry point — see
-        // `aipl2_str_slice`. `trim_mut` has no in-place form to reuse here: a
-        // window costs nothing to make, so it collapses onto `trim` exactly as
-        // the concat spellings collapse onto one rope.
-        "aipl_str_slice" => "aipl2_str_slice",
-        "aipl_trim" | "aipl_trim_mut" => "aipl2_trim",
-        "aipl_str_reverse" => "aipl2_str_reverse",
-        "aipl_str_sort" => "aipl2_str_sort",
-        "aipl_str_repeat" => "aipl2_str_repeat",
-        "aipl_str_split" => "aipl2_str_split",
-        "aipl_list_files" => "aipl2_list_files",
-        "aipl_execute_program" => "aipl2_execute_program",
-        "aipl_write_string_to_file" => "aipl2_write_string_to_file",
-        "aipl_str_join" => "aipl2_str_join",
-        "aipl_inc" => "aipl2_inc",
-        "aipl_dec" => "aipl2_dec",
-        other => other,
     }
 }
 
@@ -9025,7 +7437,6 @@ impl Builtins {
         sym: &'static str,
         args: &[Value],
     ) -> Value {
-        let sym = active_sym(sym);
         let (params, ret) = import_abi(sym);
         debug_assert_eq!(
             args.len(),
@@ -9038,7 +7449,7 @@ impl Builtins {
         // old entry points return their tagged pointer in a register, so the
         // protocol keys off the convention the symbol belongs to, not off
         // `Ret::Str` alone — which both ABIs use to mean "this yields a `str`".
-        if returns_via_out_pointer(sym, ret) {
+        if returns_via_out_pointer(ret) {
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 str24::STR_SIZE as u32,
@@ -9065,7 +7476,6 @@ impl Builtins {
         sym: &'static str,
         args: &[Value],
     ) {
-        let sym = active_sym(sym);
         let (params, ret) = import_abi(sym);
         debug_assert_eq!(
             args.len(),
@@ -9085,54 +7495,22 @@ impl Builtins {
     }
 }
 
-/// What a builtin's native implementation does to its heap arguments.
+/// Every runtime entry point **borrows** its heap arguments: it reads them and
+/// releases nothing, so the caller keeps its own reference and the borrow
+/// protocol's retain/release pair cancels.
 ///
-/// A user function's answer is computed from its body (`inspect_only_params`); a
-/// builtin has no AIPL body, so the answer is read off its Rust or cranelift
-/// implementation once and recorded beside the symbol in `SIG_REGS`.
+/// This used to be a choice recorded per symbol. The old `str` convention had
+/// str-taking builtins *consume* their argument, with the call site pre-inc'ing
+/// to balance — a protocol that existed because a `str` was a bare pointer whose
+/// lifetime had to be managed across the call. A 24-byte value is passed by
+/// address to something the caller is already keeping alive, so there is nothing
+/// to hand over, and the answer became the same for every symbol.
 ///
-/// A wrong entry is a refcount bug rather than a compile error — declaring
-/// `Borrows` for something that decs over-releases, and `Consumes` for something
-/// that doesn't leaks. Every case's `--- performance ---` asserts
-/// `allocations == deallocations`, which is what catches both.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Args {
-    /// Reads its arguments and releases nothing, so the caller keeps its own
-    /// reference and the retain/release pair is skipped.
-    Borrows,
-    /// Decs what it is handed — the original str-builtin convention — so the
-    /// caller retains first.
-    Consumes,
-}
-
-/// The argument protocol actually in force for `sym`.
-///
-/// `SIG_REGS` records what each **tagged** native implementation does, which is
-/// the only thing that can be read off the source. Every `aipl2_*` entry point
-/// *borrows* instead (see [`active_sym`]), so a symbol that is remapped flips to
-/// [`Args::Borrows`] whatever its table entry says. Keying off the remap rather
-/// than a second table means a symbol's ownership can never lag its conversion.
-///
-/// Getting this wrong is a leak, not a crash: the caller retains and nobody
-/// releases. That used to be caught by the balanced-allocation assertion in
-/// every `--- performance ---` section — which is skipped under the flag, so
-/// this rule is now the only thing enforcing it.
-fn args_for(sym: &'static str, tagged: Args) -> Args {
-    if active_sym(sym) == sym {
-        tagged
-    } else {
-        Args::Borrows
-    }
-}
-
-impl Args {
-    /// The parameter description this protocol implies.
-    fn param(self, ty: ConcreteType) -> ParamInfo {
-        match self {
-            Args::Borrows => ParamInfo::inspected(ty),
-            Args::Consumes => ParamInfo::borrowed(ty),
-        }
-    }
+/// Kept as a named function rather than inlined at each `reg` call because it is
+/// the *statement of the protocol*, and the place a second answer would go if a
+/// future entry point ever needed one.
+fn borrowed_param(ty: ConcreteType) -> ParamInfo {
+    ParamInfo::inspected(ty)
 }
 
 fn register_builtins(
@@ -9177,45 +7555,29 @@ fn register_builtins(
             _ => None,
         })
         .collect();
-    // (canonical builtin name, runtime symbol, what the runtime does to its heap
-    // arguments). The third field is read off each native implementation — a
-    // builtin has no AIPL body for `inspect_only_params` to analyse, so the
-    // answer is written down beside the symbol it describes.
-    const SIG_REGS: &[(&str, &str, Args)] = &[
-        ("__builtin_print", "aipl_print", Args::Consumes),
-        ("__builtin_split", "aipl_str_split", Args::Consumes),
-        (
-            "__builtin_read_file_to_string",
-            "aipl_read_file_to_string",
-            Args::Consumes,
-        ),
+    // (canonical builtin name, runtime symbol). Every entry point borrows its
+    // arguments — see `borrowed_param` — so there is nothing else to record.
+    const SIG_REGS: &[(&str, &str)] = &[
+        ("__builtin_print", "aipl_print"),
+        ("__builtin_split", "aipl_str_split"),
+        ("__builtin_read_file_to_string", "aipl_read_file_to_string"),
         (
             "__builtin_write_string_to_file",
             "aipl_write_string_to_file",
-            Args::Consumes,
         ),
-        ("__builtin_list_files", "aipl_list_files", Args::Consumes),
-        ("__builtin_now_nanos", "aipl_now_nanos", Args::Borrows),
-        (
-            "__builtin_monotonic_now",
-            "aipl_monotonic_now",
-            Args::Borrows,
-        ),
-        (
-            "__builtin_execute_program",
-            "aipl_execute_program",
-            Args::Consumes,
-        ),
-        ("__builtin_trim", "aipl_trim", Args::Consumes),
-        ("__builtin_repeat", "aipl_str_repeat", Args::Consumes),
+        ("__builtin_list_files", "aipl_list_files"),
+        ("__builtin_now_nanos", "aipl_now_nanos"),
+        ("__builtin_monotonic_now", "aipl_monotonic_now"),
+        ("__builtin_execute_program", "aipl_execute_program"),
+        ("__builtin_trim", "aipl_trim"),
+        ("__builtin_repeat", "aipl_str_repeat"),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
-        ("__assert", "aipl_assert", Args::Borrows),
-        ("__test_begin", "aipl_test_begin", Args::Borrows),
-        ("__test_end", "aipl_test_end", Args::Borrows),
-        ("__test_summary", "aipl_test_summary", Args::Borrows),
+        ("__assert", "aipl_assert"),
+        ("__test_begin", "aipl_test_begin"),
+        ("__test_end", "aipl_test_end"),
+        ("__test_summary", "aipl_test_summary"),
     ];
-    for &(name, sym, tagged) in SIG_REGS {
-        let args = args_for(sym, tagged);
+    for &(name, sym) in SIG_REGS {
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
@@ -9232,7 +7594,7 @@ fn register_builtins(
             .sig
             .param_types()
             .iter()
-            .map(|t| args.param(concretize(t)))
+            .map(|t| borrowed_param(concretize(t)))
             .collect();
         let return_ty = concretize(&f.sig.return_type());
         let effects: Vec<&str> = f.sig.effects.iter().map(String::as_str).collect();
@@ -9245,8 +7607,8 @@ fn register_builtins(
         "__aipl_concat",
         "aipl_concat",
         vec![
-            args_for("aipl_concat", Args::Consumes).param(ConcreteType::Primitive(Primitive::Str)),
-            args_for("aipl_concat", Args::Consumes).param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -9254,12 +7616,10 @@ fn register_builtins(
     reg(
         funcs,
         "__aipl_concat_lazy",
-        "aipl_concat_lazy",
+        "aipl_concat",
         vec![
-            args_for("aipl_concat_lazy", Args::Borrows)
-                .param(ConcreteType::Primitive(Primitive::Str)),
-            args_for("aipl_concat_lazy", Args::Borrows)
-                .param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -9267,12 +7627,10 @@ fn register_builtins(
     reg(
         funcs,
         "__aipl_concat_mut",
-        "aipl_concat_mut",
+        "aipl_concat",
         vec![
-            args_for("aipl_concat_mut", Args::Consumes)
-                .param(ConcreteType::Primitive(Primitive::Str)),
-            args_for("aipl_concat_mut", Args::Consumes)
-                .param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
+            borrowed_param(ConcreteType::Primitive(Primitive::Str)),
         ],
         ConcreteType::Primitive(Primitive::Str),
         &[],
@@ -9280,8 +7638,8 @@ fn register_builtins(
     reg(
         funcs,
         "__aipl_trim_mut",
-        "aipl_trim_mut",
-        vec![Args::Borrows.param(ConcreteType::Primitive(Primitive::Str))],
+        "aipl_trim",
+        vec![borrowed_param(ConcreteType::Primitive(Primitive::Str))],
         ConcreteType::Primitive(Primitive::Str),
         &[],
     );
@@ -9337,7 +7695,7 @@ fn env_load(
             // changes underneath the next `set`. Copying restores the tagged
             // behaviour exactly; the refcount is untouched (this is a borrow,
             // like the load it replaces).
-            let v = if str24_wide(&ty) {
+            let v = if is_str_shaped(&ty) {
                 let src = builder.ins().stack_addr(types::I64, *slot, 0);
                 copy_str_value(builder, src)
             } else {
@@ -10247,18 +8605,6 @@ fn rc_statically_noop(func: &Function, v: Value) -> bool {
     }
 }
 
-fn emit_inc<M: Module>(
-    builder: &mut FunctionBuilder,
-    module: &mut M,
-    builtins: &Builtins,
-    v: Value,
-) {
-    if rc_statically_noop(builder.func, v) {
-        return;
-    }
-    builtins.call_void(module, builder, "aipl_inc", &[v]);
-}
-
 /// Lower `s[i]` to a `char?`: call the runtime `aipl_char_at` (the byte at `i`
 /// as `0..=255`, or `-1` out of bounds) and wrap
 /// it into a flattened `{tag, value}` optional slot (tag = in-bounds, value = the
@@ -10705,70 +9051,7 @@ fn emit_str_iter_next<M: Module>(
     // lives in the cursor's own words. Until that version is written, the wide
     // ABI takes the call per byte, exactly as this code did before the fast path
     // existed.
-    if str24_enabled() {
-        return builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
-    }
-    let flags = MemFlagsData::trusted();
-    let check_leaf = builder.create_block();
-    let fast = builder.create_block();
-    let slow = builder.create_block();
-    let merge = builder.create_block();
-    builder.append_block_param(merge, types::I64);
-
-    // Past the end: `-1`, leaving the cursor untouched.
-    let pos = builder
-        .ins()
-        .load(types::I64, flags, cur_addr, ITER_POS as i32);
-    let total = builder
-        .ins()
-        .load(types::I64, flags, cur_addr, ITER_TOTAL as i32);
-    let at_end = builder
-        .ins()
-        .icmp(IntCC::SignedGreaterThanOrEqual, pos, total);
-    let minus_one = builder.ins().iconst(types::I64, -1);
-    builder.ins().brif(
-        at_end,
-        merge,
-        &[BlockArg::Value(minus_one)],
-        check_leaf,
-        &[],
-    );
-
-    builder.switch_to_block(check_leaf);
-    builder.seal_block(check_leaf);
-    let leaf_start = builder
-        .ins()
-        .load(types::I64, flags, cur_addr, ITER_LEAF_START as i32);
-    let leaf_len = builder
-        .ins()
-        .load(types::I64, flags, cur_addr, ITER_LEAF_LEN as i32);
-    let rel = builder.ins().isub(pos, leaf_start);
-    let in_leaf = builder.ins().icmp(IntCC::UnsignedLessThan, rel, leaf_len);
-    builder.ins().brif(in_leaf, fast, &[], slow, &[]);
-
-    builder.switch_to_block(fast);
-    builder.seal_block(fast);
-    let leaf_ptr = builder
-        .ins()
-        .load(types::I64, flags, cur_addr, ITER_LEAF_PTR as i32);
-    let at = builder.ins().iadd(leaf_ptr, rel);
-    let byte = builder.ins().uload8(types::I64, flags, at, 0);
-    let next_pos = builder.ins().iadd_imm_s(pos, 1);
-    builder
-        .ins()
-        .store(flags, next_pos, cur_addr, ITER_POS as i32);
-    builder.ins().jump(merge, &[BlockArg::Value(byte)]);
-
-    // Not in the cached leaf (or no leaf yet): the runtime descends, caches, and
-    // returns the byte, doing the position bump itself.
-    builder.switch_to_block(slow);
-    builder.seal_block(slow);
-    let from_runtime = builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
-    builder.ins().jump(merge, &[BlockArg::Value(from_runtime)]);
-
-    builder.switch_to_block(merge);
-    builder.seal_block(merge);
-    builder.block_params(merge)[0]
+    return builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
 }
 
 /// The `elem_size` argument handed to the array runtime: a byte stride, or the
@@ -10892,7 +9175,7 @@ fn load_array_elem<M: Module>(
         let stride = elem_size_of(elem, structs);
         let off = builder.ins().imul_imm_s(idx, stride);
         let addr = builder.ins().iadd(base, off);
-        if str24_wide(elem) {
+        if is_str_shaped(elem) {
             // A **snapshot**, for the reason `lookup_ident` copies a `mut`
             // binding: the address would alias the array's own storage, and the
             // in-place `map`/`filter`/`zip` bodies overwrite the very slot they
@@ -11053,7 +9336,7 @@ fn emit_rc_w<M: Module>(
             if rc_statically_noop(builder.func, v) {
                 return;
             }
-            // `active_sym` routes these to their `aipl2_*` counterparts when the
+            // `active_sym` routes these to their `aipl_*` counterparts when the
             // switch is on, where `v` is an address rather than a tagged pointer.
             let sym = match op {
                 RcOp::Retain => "aipl_inc",
@@ -12642,18 +10925,14 @@ fn array_drop_fn_addr<M: Module>(
     // counterpart has to be named here. It is picked per element type rather than
     // per symbol because `aipl_arr_retain_ptr` below serves `str` *and* array
     // elements, and only the `str` use changes representation.
-    let drop_str = if str24_enabled() {
-        "aipl2_arr_drop_str"
-    } else {
-        "aipl_arr_drop_str"
-    };
+    let drop_str = "aipl_arr_drop_str";
     let id = match elem {
         // `is_str_repr`, not the exact `Primitive::Str`: `Error` and the
         // internal concat-str share the representation, and under the wide ABI
         // they must use the wide element helper rather than falling through to a
         // generated per-type one that walks 8-byte slots. `map(|s| s +++ x)`
         // produces concat-str elements, which is how this surfaced.
-        _ if str24_enabled() && is_str_repr(elem) => Some(b.id(module, drop_str)),
+        _ if is_str_repr(elem) => Some(b.id(module, drop_str)),
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, drop_str)),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
@@ -12663,14 +10942,7 @@ fn array_drop_fn_addr<M: Module>(
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
-            Some(b.id(
-                module,
-                if str24_enabled() {
-                    "aipl2_arr_drop_opt_str"
-                } else {
-                    "aipl_arr_drop_opt_str"
-                },
-            ))
+            Some(b.id(module, "aipl_arr_drop_opt_str"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_drop_opt_arr"))
@@ -12694,10 +10966,8 @@ fn array_retain_fn_addr<M: Module>(
     let id = match elem {
         // See `array_drop_fn_addr` for why this is chosen per element type: the
         // array case below keeps the 8-byte-pointer helper either way.
-        _ if str24_enabled() && is_str_repr(elem) => Some(b.id(module, "aipl2_arr_retain_str")),
-        ConcreteType::Array(_) if str24_enabled() && is_char_array(elem) => {
-            Some(b.id(module, "aipl2_arr_retain_str"))
-        }
+        _ if is_str_repr(elem) => Some(b.id(module, "aipl_arr_retain_str")),
+        ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_retain_str")),
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
         ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_retain_ptr")),
         ConcreteType::Optional(inner)
@@ -12706,14 +10976,7 @@ fn array_retain_fn_addr<M: Module>(
             // The wide form cannot share `aipl_arr_retain_opt` with `T[]?[]`
             // below: an array element is still an 8-byte pointer, so only the
             // `str?` case changes shape.
-            Some(b.id(
-                module,
-                if str24_enabled() {
-                    "aipl2_arr_retain_opt_str"
-                } else {
-                    "aipl_arr_retain_opt"
-                },
-            ))
+            Some(b.id(module, "aipl_arr_retain_opt_str"))
         }
         ConcreteType::Optional(inner) if matches!(inner.as_ref(), ConcreteType::Array(_)) => {
             Some(b.id(module, "aipl_arr_retain_opt"))
@@ -13083,7 +11346,7 @@ fn copy_str_value(builder: &mut FunctionBuilder, src: Value) -> Value {
 /// that releases an old value around a writeback has to release it first — see
 /// the `push`/`extend` char paths.
 fn slot_value(builder: &mut FunctionBuilder, slot: StackSlot, ty: &ConcreteType) -> Value {
-    if str24_wide(ty) {
+    if is_str_shaped(ty) {
         builder.ins().stack_addr(types::I64, slot, 0)
     } else {
         builder.ins().stack_load(types::I64, types::I64, slot, 0)
@@ -13131,7 +11394,7 @@ fn store_binding(
     structs: &HashMap<String, TypeDef>,
 ) {
     let _ = cx;
-    if !str24_wide(ty) {
+    if !is_str_shaped(ty) {
         builder.ins().stack_store(types::I64, v, slot, 0);
         return;
     }
@@ -13157,14 +11420,10 @@ fn emit_str_alloc<M: Module>(
     cx: Cx,
     len: Value,
 ) -> (Value, Value) {
-    if !str24_enabled() {
-        let buf = cx.builtins.call(module, builder, "aipl_str_alloc", &[len]);
-        return (buf, buf);
-    }
-    let built = cx.builtins.call(module, builder, "aipl2_str_alloc", &[len]);
+    let built = cx.builtins.call(module, builder, "aipl_str_alloc", &[len]);
     let start = cx
         .builtins
-        .call(module, builder, "aipl2_str_write_ptr", &[built]);
+        .call(module, builder, "aipl_str_write_ptr", &[built]);
     (built, start)
 }
 
@@ -13178,10 +11437,8 @@ fn emit_str_grew<M: Module>(
     value: Value,
     len: Value,
 ) {
-    if str24_enabled() {
-        cx.builtins
-            .call_void(module, builder, "aipl2_str_grew", &[value, len]);
-    }
+    cx.builtins
+        .call_void(module, builder, "aipl_str_grew", &[value, len]);
 }
 
 /// The contiguous content pointer for a `str` *value*, which is what the
@@ -13200,11 +11457,7 @@ fn str_bytes_ptr<M: Module>(
     cx: Cx,
     value: Value,
 ) -> Value {
-    let spill = if str24_enabled() {
-        str24::INLINE_CAP as u32
-    } else {
-        8
-    };
+    let spill = str24::INLINE_CAP as u32;
     let scratch =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, spill, 3));
     let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
@@ -13403,7 +11656,7 @@ fn emit_render_boxed<M: Module>(
     let b = cx.builtins;
     let id = tostr_func(module, cx, ty);
     let fref = module.declare_func_in_func(id, builder.func);
-    let s = if str24_enabled() {
+    let s = {
         let slot = builder.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,
             str24::STR_SIZE as u32,
@@ -13412,9 +11665,6 @@ fn emit_render_boxed<M: Module>(
         let out = builder.ins().stack_addr(types::I64, slot, 0);
         builder.ins().call(fref, &[out, value]);
         out
-    } else {
-        let inst = builder.ins().call(fref, &[value]);
-        builder.inst_results(inst)[0]
     };
     let len = { b.call(module, builder, "aipl_str_len", &[s]) };
     if let Sink::Write(_) = sink {
@@ -13465,53 +11715,12 @@ fn emit_str_literal<M: Module>(
     Ok(builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64))
 }
 
-/// A `str` value for compile-time-constant `content`, laid out exactly as a
-/// `str` literal written in source. Returns the value and whether the caller
-/// owes it scope tracking: an inline value is a plain constant with nothing to
-/// drop, while a static pointer is tracked like any other `str`.
-///
-/// Shared by the [`ExprKind::Str`] arm and `case_name`, so a case name and an
-/// equal literal in source reach the same interned data object — and so the
-/// SSO cutoff is stated once rather than at each producer.
-/// [`emit_const_str`] for the 8-byte representation — what the compiler emits
-/// with the switch off, and what the checked-in artifacts contain.
-fn emit_const_str_tagged<M: Module>(
-    module: &mut M,
-    builder: &mut FunctionBuilder,
-    cx: Cx,
-    content: &[u8],
-) -> Result<(Value, bool), Error> {
-    // SSO: a literal of <= 7 bytes is an *inline* str value — emit it as a
-    // constant, with no data object, allocation, or refcount. (inc/dec no-op on
-    // it; the surrounding scope-drop is a no-op too, so it needs no tracking.)
-    if content.len() <= 7 {
-        let packed = pack_inline(content) as usize as i64;
-        return Ok((builder.ins().iconst(types::I64, packed), false));
-    }
-    // Static literal: `[len][refcount = STATIC][bytes][NUL]` in the data section,
-    // with the value pointing past both header words.
-    let data_id = cx.str_data.borrow_mut().intern(module, content, || {
-        let mut bytes = Vec::with_capacity(STR_HEADER_SIZE + content.len() + 1);
-        bytes.extend_from_slice(&(content.len() as i64).to_le_bytes());
-        bytes.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
-        bytes.extend_from_slice(content);
-        bytes.push(0);
-        bytes.into_boxed_slice()
-    })?;
-    let gv = module.declare_data_in_func(data_id, builder.func);
-    let base = builder.ins().symbol_value(types::I64, gv);
-    Ok((builder.ins().iadd_imm_s(base, STR_HEADER_SIZE as i64), true))
-}
-
 fn emit_const_str<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
     content: &[u8],
 ) -> Result<(Value, bool), Error> {
-    if !str24_enabled() {
-        return emit_const_str_tagged(module, builder, cx, content);
-    }
     // A `str` is a 24-byte composite (`STR_REPR.md`), so a literal is three
     // words materialized into a stack slot, and what flows is that slot's
     // address — exactly like a struct constant.
@@ -14211,7 +12420,7 @@ fn emit_to_str<M: Module>(
     // drop at scope exit (an inline result no-ops; a buffer is freed via the
     // refcount). Under the wide representation the result comes back through a
     // caller-provided slot rather than a register.
-    let result = if str24_enabled() {
+    let result = {
         let slot = builder.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,
             str24::STR_SIZE as u32,
@@ -14220,9 +12429,6 @@ fn emit_to_str<M: Module>(
         let out = builder.ins().stack_addr(types::I64, slot, 0);
         builder.ins().call(fref, &[out, value]);
         out
-    } else {
-        let inst = builder.ins().call(fref, &[value]);
-        builder.inst_results(inst)[0]
     };
     scopes.last_mut().expect("scope").push(Tracked::new(
         result,
@@ -14242,16 +12448,11 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     }
     let sym = er.symbol("__to_str_", &type_symbol(ty));
     let mut sig = module.make_signature();
-    if str24_enabled() {
-        // A 24-byte `str` is a composite, so the result is written through a
-        // hidden leading pointer and nothing is returned — the same shape
-        // `build_signature` gives any composite-returning function.
-        sig.params.push(AbiParam::new(types::I64)); // sret
-        sig.params.push(AbiParam::new(types::I64)); // value
-    } else {
-        sig.params.push(AbiParam::new(types::I64)); // value
-        sig.returns.push(AbiParam::new(types::I64)); // str
-    }
+    // A 24-byte `str` is a composite, so the result is written through a
+    // hidden leading pointer and nothing is returned — the same shape
+    // `build_signature` gives any composite-returning function.
+    sig.params.push(AbiParam::new(types::I64)); // sret
+    sig.params.push(AbiParam::new(types::I64)); // value
     let id = module
         .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare to_str helper");
@@ -14474,13 +12675,8 @@ fn define_tostr_fn<M: Module>(
     // Must match `tostr_func`'s declaration exactly: under the wide
     // representation a `str` result is a composite, written through a leading
     // sret pointer with nothing returned.
-    if str24_enabled() {
-        ctx.func.signature.params.push(AbiParam::new(types::I64)); // sret
-        ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
-    } else {
-        ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
-        ctx.func.signature.returns.push(AbiParam::new(types::I64)); // str
-    }
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // sret
+    ctx.func.signature.params.push(AbiParam::new(types::I64)); // value
     {
         let mut builder = FunctionBuilder::new(&mut ctx.func, fbc);
         let entry = builder.create_block();
@@ -14537,131 +12733,50 @@ fn define_tostr_fn<M: Module>(
         // Pass 1: measure the total length.
         let len = render(module, &mut builder, Sink::Measure)?;
 
-        if str24_enabled() {
-            // Wide representation: one shape, no small/large split. The value is
-            // written into the caller's slot (`sret`, block param 0) and the
-            // bytes into a fresh buffer — allocation gives *capacity*, so the
-            // length is recorded with `aipl2_str_grew` once the write pass is
-            // done.
-            //
-            // No SSO here yet: a short result gets a buffer rather than being
-            // packed into the value's 22 inline bytes. Correct, one allocation
-            // more than necessary for short strings, and the obvious place to
-            // optimize once the switch is the only path.
-            let sret = builder.block_params(entry)[0];
-            let built = builtins.call(module, &mut builder, "aipl2_str_alloc", &[len]);
-            let start = builtins.call(module, &mut builder, "aipl2_str_write_ptr", &[built]);
-            let cursor = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                8,
-                3,
-            ));
-            builder.ins().stack_store(types::I64, start, cursor, 0);
-            render(module, &mut builder, Sink::Write(cursor))?;
-            builtins.call_void(module, &mut builder, "aipl2_str_grew", &[built, len]);
-            copy_composite(
-                &mut builder,
-                sret,
-                built,
-                &ConcreteType::Primitive(Primitive::Str),
-                structs,
-            );
-            builder.ins().return_(&[]);
-            builder.finalize(module.target_config());
-            ctx.func.name = UserFuncName::user(0, id.as_u32());
-            run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
-            ir_out.push_str(&fix_data_ref_names(
-                &ctx.func,
-                &format!("{}\n", ctx.func.display()),
-            ));
-            if instrument {
-                let count_fn = builtins.id(module, "aipl_count_insns");
-                instrument_insn_count(module, &mut ctx.func, count_fn);
-                let call_fn = builtins.id(module, "aipl_count_call");
-                instrument_call_count(module, &mut ctx.func, id, call_fn)?;
-            }
-            module
-                .define_function(id, ctx)
-                .map_err(|e| Error::msg(format!("define to_str helper: {e:?}")))?;
-            module.clear_context(ctx);
-            return Ok(());
-        }
-
-        // SSO: a result of <= 7 bytes is built *inline* (no allocation). The write
-        // target is chosen per branch — a zeroed 8-byte stack scratch (content at
-        // byte 1) for the inline case, or a fresh heap buffer for the big case
-        // (`aipl_str_alloc` runs only on that branch). A single write pass then
-        // fills whichever the cursor points at, and the result is picked
-        // branchlessly: the inline value is `<scratch i64> | (len<<2 | 1)` (byte 0
-        // was 0, so the OR sets the tag/len); the big value is the heap pointer.
-        let scratch =
-            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+        // Wide representation: one shape, no small/large split. The value is
+        // written into the caller's slot (`sret`, block param 0) and the
+        // bytes into a fresh buffer — allocation gives *capacity*, so the
+        // length is recorded with `aipl_str_grew` once the write pass is
+        // done.
+        //
+        // No SSO here yet: a short result gets a buffer rather than being
+        // packed into the value's 22 inline bytes. Correct, one allocation
+        // more than necessary for short strings, and the obvious place to
+        // optimize once the switch is the only path.
+        let sret = builder.block_params(entry)[0];
+        let built = builtins.call(module, &mut builder, "aipl_str_alloc", &[len]);
+        let start = builtins.call(module, &mut builder, "aipl_str_write_ptr", &[built]);
         let cursor =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-        let heap_slot =
-            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-        let is_small = builder
-            .ins()
-            .icmp_imm_s(IntCC::SignedLessThanOrEqual, len, 7);
-
-        let small_block = builder.create_block();
-        let big_block = builder.create_block();
-        let write_block = builder.create_block();
-        builder
-            .ins()
-            .brif(is_small, small_block, &[], big_block, &[]);
-
-        builder.switch_to_block(small_block);
-        builder.seal_block(small_block);
-        let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(types::I64, zero, scratch, 0);
-        let scratch_addr = builder.ins().stack_addr(types::I64, scratch, 0);
-        let content_start = builder.ins().iadd_imm_s(scratch_addr, 1);
-        builder
-            .ins()
-            .stack_store(types::I64, content_start, cursor, 0);
-        builder.ins().jump(write_block, &[]);
-
-        builder.switch_to_block(big_block);
-        builder.seal_block(big_block);
-        let buf = builtins.call(module, &mut builder, "aipl_str_alloc", &[len]);
-        builder.ins().stack_store(types::I64, buf, cursor, 0);
-        builder.ins().stack_store(types::I64, buf, heap_slot, 0);
-        builder.ins().jump(write_block, &[]);
-
-        builder.switch_to_block(write_block);
-        builder.seal_block(write_block);
-        // One write pass into whichever buffer the cursor was seeded with.
+        builder.ins().stack_store(types::I64, start, cursor, 0);
         render(module, &mut builder, Sink::Write(cursor))?;
-        let raw = builder.ins().stack_load(types::I64, types::I64, scratch, 0);
-        let shifted = builder.ins().ishl_imm_u(len, 2);
-        let tag = builder.ins().bor_imm_u(shifted, 1);
-        let inline_val = builder.ins().bor(raw, tag);
-        let heap_val = builder
-            .ins()
-            .stack_load(types::I64, types::I64, heap_slot, 0);
-        let result = builder.ins().select(is_small, inline_val, heap_val);
-        builder.ins().return_(&[result]);
+        builtins.call_void(module, &mut builder, "aipl_str_grew", &[built, len]);
+        copy_composite(
+            &mut builder,
+            sret,
+            built,
+            &ConcreteType::Primitive(Primitive::Str),
+            structs,
+        );
+        builder.ins().return_(&[]);
         builder.finalize(module.target_config());
+        ctx.func.name = UserFuncName::user(0, id.as_u32());
+        run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
+        ir_out.push_str(&fix_data_ref_names(
+            &ctx.func,
+            &format!("{}\n", ctx.func.display()),
+        ));
+        if instrument {
+            let count_fn = builtins.id(module, "aipl_count_insns");
+            instrument_insn_count(module, &mut ctx.func, count_fn);
+            let call_fn = builtins.id(module, "aipl_count_call");
+            instrument_call_count(module, &mut ctx.func, id, call_fn)?;
+        }
+        module
+            .define_function(id, ctx)
+            .map_err(|e| Error::msg(format!("define to_str helper: {e:?}")))?;
+        module.clear_context(ctx);
     }
-    ctx.func.name = UserFuncName::user(0, id.as_u32());
-    run_ir_passes(module, builtins, &mut ctx.func, DebugOptions::OFF);
-    ir_out.push_str(&fix_data_ref_names(
-        &ctx.func,
-        &format!("{}\n", ctx.func.display()),
-    ));
-    // Instrument after the IR dump and before lowering, mirroring `define_fn`, so
-    // rendering work stays counted in the `instructions executed` metric.
-    if instrument {
-        let count_fn = builtins.id(module, "aipl_count_insns");
-        instrument_insn_count(module, &mut ctx.func, count_fn);
-        let call_fn = builtins.id(module, "aipl_count_call");
-        instrument_call_count(module, &mut ctx.func, id, call_fn)?;
-    }
-    module
-        .define_function(id, ctx)
-        .map_err(|e| Error::msg(format!("define to_str helper: {e}")))?;
-    module.clear_context(ctx);
     Ok(())
 }
 
@@ -15311,14 +13426,10 @@ fn emit_char_to_str<M: Module>(
     cx: Cx,
     c: Value,
 ) -> Value {
-    if str24_enabled() {
-        // A wide inline value is spread across all three words, so it is built by
-        // the runtime rather than open-coded here; `Builtins::call` allocates the
-        // out slot and hands back its address.
-        return cx.builtins.call(module, builder, "aipl2_char_to_str", &[c]);
-    }
-    let shifted = builder.ins().ishl_imm_u(c, 8);
-    builder.ins().bor_imm_u(shifted, 5)
+    // A wide inline value is spread across all three words, so it is built by
+    // the runtime rather than open-coded here; `Builtins::call` allocates the
+    // out slot and hands back its address.
+    return cx.builtins.call(module, builder, "aipl_char_to_str", &[c]);
 }
 
 /// `arr.starts_with(x)` / `arr.starts_with_at(x, at)` / `arr.ends_with(x)` for a
@@ -15742,7 +13853,7 @@ fn compile_call<M: Module>(
     // Every call to a participant targets its `$tail` body (see `callee_id`
     // below), not just the tail ones — so a wide `str` argument is split into
     // its three words here, once, rather than at the `return_call`.
-    let call_args: Vec<Value> = if info.tail_id.is_some() && str24_enabled() {
+    let call_args: Vec<Value> = if info.tail_id.is_some() {
         let lead = call_args.len() - info.params.len();
         let mut split: Vec<Value> = call_args[..lead].to_vec();
         for (p, a) in info.params.iter().zip(&call_args[lead..]) {
@@ -15766,7 +13877,7 @@ fn compile_call<M: Module>(
         // call itself rather than going via `Builtins::call`, so without it a
         // builtin would keep the old entry point while its argument became an
         // address.
-        FuncLink::Builtin(sym) => builtins.id(module, active_sym(sym)),
+        FuncLink::Builtin(sym) => builtins.id(module, sym),
     };
     let local_callee = module.declare_func_in_func(callee_id, builder.func);
 
@@ -16205,11 +14316,7 @@ fn compile_call_expr<M: Module>(
                 "split separator",
                 args[1].span.clone(),
             )?;
-            // Tagged `aipl_str_split` consumes both; `aipl2_str_split` borrows.
-            if !str24_enabled() {
-                emit_inc(builder, module, builtins, s_v);
-                emit_inc(builder, module, builtins, sep_v);
-            }
+            // Tagged `aipl_str_split` consumes both; `aipl_str_split` borrows.
             let result = builtins.call(module, builder, "aipl_str_split", &[s_v, sep_v]);
             let ty = ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::Str)));
             scopes
@@ -16242,11 +14349,10 @@ fn compile_call_expr<M: Module>(
                 Box::new(ConcreteType::Primitive(Primitive::Str)),
                 Box::new(error_ty()),
             );
-            let ptr = if str24_enabled() {
-                // Wide: the contents come back through an out pointer this call
-                // site allocates, and the success flag is the return value —
-                // there is no null `str` to test. Borrows the filename, so no
-                // compensating inc.
+            // The contents come back through an out pointer this call site
+            // allocates, and the success flag is the return value — there is no
+            // null `str` to test. Borrows the filename, so no compensating inc.
+            let ptr = {
                 let out = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     str24::STR_SIZE as u32,
@@ -16256,7 +14362,7 @@ fn compile_call_expr<M: Module>(
                 let ok = builtins.call(
                     module,
                     builder,
-                    "aipl2_read_file_to_string",
+                    "aipl_read_file_to_string",
                     &[out_addr, name_v],
                 );
                 emit_file_result_split(
@@ -16265,19 +14371,6 @@ fn compile_call_expr<M: Module>(
                     cx,
                     ok,
                     Some((out_addr, ConcreteType::Primitive(Primitive::Str))),
-                    b"could not read file",
-                )?
-            } else {
-                // The runtime consumes (decs) the filename ref, so inc to keep
-                // our scope-tracked ref alive.
-                emit_inc(builder, module, builtins, name_v);
-                let raw = builtins.call(module, builder, "aipl_read_file_to_string", &[name_v]);
-                emit_file_result(
-                    module,
-                    builder,
-                    cx,
-                    raw,
-                    Some(ConcreteType::Primitive(Primitive::Str)),
                     b"could not read file",
                 )?
             };
@@ -16331,10 +14424,7 @@ fn compile_call_expr<M: Module>(
                 args[0].span.clone(),
             )?;
             // The tagged runtime consumes (decs) the directory ref, so inc to
-            // keep our scope-tracked ref alive; `aipl2_list_files` borrows.
-            if !str24_enabled() {
-                emit_inc(builder, module, builtins, dir_v);
-            }
+            // keep our scope-tracked ref alive; `aipl_list_files` borrows.
             let raw = builtins.call(module, builder, "aipl_list_files", &[dir_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Array(Box::new(ConcreteType::Primitive(
@@ -16388,11 +14478,7 @@ fn compile_call_expr<M: Module>(
                 args[1].span.clone(),
             )?;
             // The runtime consumes (decs) both str args, so inc to keep ours alive.
-            // Tagged consumes both refs; `aipl2_write_string_to_file` borrows.
-            if !str24_enabled() {
-                emit_inc(builder, module, builtins, path_v);
-                emit_inc(builder, module, builtins, data_v);
-            }
+            // Tagged consumes both refs; `aipl_write_string_to_file` borrows.
             let code = builtins.call(
                 module,
                 builder,
@@ -16764,9 +14850,6 @@ fn compile_call_expr<M: Module>(
                 // The tagged entry point consumes its receiver, so the caller incs to
                 // balance its own track. The wide one borrows (`active_sym`), so the
                 // pair is dropped rather than mirrored — the same shape as concat.
-                if !str24_enabled() {
-                    emit_inc(builder, module, builtins, ptr);
-                }
                 let out = builtins.call(module, builder, "aipl_str_sort", &[ptr]);
                 let out_ty = if is_char_array(&t) {
                     t.clone()
@@ -16905,11 +14988,8 @@ fn compile_call_expr<M: Module>(
                 //
                 // The tagged `aipl_str_join` consumes both the array and the
                 // separator, so both are retained first to balance the caller's
-                // own tracks. `aipl2_str_join` borrows them, so under the wide
+                // own tracks. `aipl_str_join` borrows them, so under the wide
                 // ABI both retains are dropped rather than mirrored.
-                if !str24_enabled() {
-                    emit_retain(builder, module, builtins, structs, parts, &pt);
-                }
                 // A variadic separator arrives in whichever shape the call site
                 // wrote. For an AIPL-bodied function `specialize_variadic`
                 // normalizes a bare element into a one-item sequence with a
@@ -16927,9 +15007,6 @@ fn compile_call_expr<M: Module>(
                 } else {
                     sep
                 };
-                if !str24_enabled() {
-                    emit_inc(builder, module, builtins, sep);
-                }
                 let out = builtins.call(module, builder, "aipl_str_join", &[parts, sep]);
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
@@ -17020,9 +15097,6 @@ fn compile_call_expr<M: Module>(
                 // The tagged entry point consumes its receiver, so the caller incs to
                 // balance its own track. The wide one borrows (`active_sym`), so the
                 // pair is dropped rather than mirrored — the same shape as concat.
-                if !str24_enabled() {
-                    emit_inc(builder, module, builtins, ptr);
-                }
                 let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes.last_mut().expect("scope").push(Tracked::new(
                     result,
@@ -17035,9 +15109,6 @@ fn compile_call_expr<M: Module>(
                 // The tagged entry point consumes its receiver, so the caller incs to
                 // balance its own track. The wide one borrows (`active_sym`), so the
                 // pair is dropped rather than mirrored — the same shape as concat.
-                if !str24_enabled() {
-                    emit_inc(builder, module, builtins, ptr);
-                }
                 let result = builtins.call(module, builder, "aipl_str_reverse", &[ptr]);
                 scopes
                     .last_mut()
@@ -19107,13 +17178,9 @@ fn compile_expr_inner<M: Module>(
                     if is_str_repr(&lt) && is_str_repr(&rt) {
                         // The tagged concat node takes ownership of its inputs, so
                         // inc both before the call to balance our local refs. The
-                        // wide entry point retains for itself (`aipl2_concat`), so
+                        // wide entry point retains for itself (`aipl_concat`), so
                         // there the pair is dropped rather than mirrored.
-                        if !str24_enabled() {
-                            emit_inc(builder, module, builtins, lv);
-                            emit_inc(builder, module, builtins, rv);
-                        }
-                        let ret = builtins.call(module, builder, "aipl_concat_lazy", &[lv, rv]);
+                        let ret = builtins.call(module, builder, "aipl_concat", &[lv, rv]);
                         scopes
                             .last_mut()
                             .expect("scope")
@@ -19443,7 +17510,7 @@ fn compile_expr_inner<M: Module>(
             // case widens: broadening it to every composite silently switched
             // struct bindings from pointer-holding to value-holding, and the
             // rest of the code still read them the old way.
-            let slot = if str24_wide(&t) {
+            let slot = if is_str_shaped(&t) {
                 value_slot(builder, &t, structs)
             } else {
                 builder.create_sized_stack_slot(StackSlotData::new(
@@ -19636,22 +17703,16 @@ fn compile_expr_inner<M: Module>(
                         // own reference to `s`, and the one this slot was holding is
                         // replaced by the store below — so release it, or the old
                         // value is kept alive by a slot that no longer names it.
-                        if !str24_enabled() {
-                            emit_inc(builder, module, builtins, rv);
-                        }
-                        let new_ptr =
-                            builtins.call(module, builder, "aipl_concat_mut", &[s_ptr, rv]);
-                        if str24_enabled() {
-                            emit_rc(
-                                builder,
-                                module,
-                                builtins,
-                                structs,
-                                s_ptr,
-                                &ConcreteType::Primitive(Primitive::Str),
-                                RcOp::Drop,
-                            );
-                        }
+                        let new_ptr = builtins.call(module, builder, "aipl_concat", &[s_ptr, rv]);
+                        emit_rc(
+                            builder,
+                            module,
+                            builtins,
+                            structs,
+                            s_ptr,
+                            &ConcreteType::Primitive(Primitive::Str),
+                            RcOp::Drop,
+                        );
                         store_binding_str(builder, cx, slot, new_ptr, structs);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
@@ -19670,7 +17731,7 @@ fn compile_expr_inner<M: Module>(
                 if trims_self {
                     let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                     // `aipl_trim_mut` reuses `s` (no dec), so no pre-inc needed.
-                    let new_ptr = builtins.call(module, builder, "aipl_trim_mut", &[s_ptr]);
+                    let new_ptr = builtins.call(module, builder, "aipl_trim", &[s_ptr]);
                     builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                     // No new track — the binding's slot-track owns the result.
                     return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
@@ -20381,27 +18442,20 @@ fn compile_expr_inner<M: Module>(
                 // Two representations, two shapes. The old one *is* the content
                 // pointer, so the bytes go straight where `aipl_str_alloc` hands
                 // back. The new one is a value that merely *points* at its
-                // buffer, so the write cursor comes from `aipl2_str_write_ptr`
-                // and the length is recorded afterwards with `aipl2_str_grew`
+                // buffer, so the write cursor comes from `aipl_str_write_ptr`
+                // and the length is recorded afterwards with `aipl_str_grew`
                 // (allocation gives capacity, not length). Getting this wrong is
                 // what made `['c', 'a', 'b'].len()` read content bytes as a
-                // pointer — see `tests/support/str24_burndown.txt`.
-                let value = if str24_enabled() {
-                    let v = builtins.call(module, builder, "aipl2_str_alloc", &[len]);
-                    let cursor = builtins.call(module, builder, "aipl2_str_write_ptr", &[v]);
+                // pointer — see `tests/support/str24_migration.txt`.
+                let value = {
+                    let v = builtins.call(module, builder, "aipl_str_alloc", &[len]);
+                    let cursor = builtins.call(module, builder, "aipl_str_write_ptr", &[v]);
                     for (i, (b, _, _)) in vals.into_iter().enumerate() {
                         let addr = builder.ins().iadd_imm_s(cursor, i as i64);
                         builder.ins().istore8(MemFlagsData::trusted(), b, addr, 0);
                     }
-                    builtins.call_void(module, builder, "aipl2_str_grew", &[v, len]);
+                    builtins.call_void(module, builder, "aipl_str_grew", &[v, len]);
                     v
-                } else {
-                    let buf = builtins.call(module, builder, "aipl_str_alloc", &[len]);
-                    for (i, (b, _, _)) in vals.into_iter().enumerate() {
-                        let addr = builder.ins().iadd_imm_s(buf, i as i64);
-                        builder.ins().istore8(MemFlagsData::trusted(), b, addr, 0);
-                    }
-                    buf
                 };
                 scopes
                     .last_mut()
@@ -20988,29 +19042,6 @@ fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
     // is exactly the kind of drift a second copy of a layout rule invites.
     elem_size_of(ty, structs) as u32
 }
-
-/// Size in bytes of a value returned/passed by hidden pointer (sret), or `None`
-/// if it's a plain 8-byte value. Both optionals (`{tag, value}`, possibly
-/// nested) and structs are returned this way — uniformly, by pointer. A boxed
-/// (recursive) type is a plain 8-byte pointer value, like an array.
-/// Whether codegen emits the 24-byte `str` (`STR_REPR.md`) — **off unless
-/// `AIPL_STR24` is set**.
-///
-/// The switch is real but unfinished: 69 call sites still hand old entry points
-/// what is now an address, and the resulting corruption is *nondeterministic* —
-/// two full runs failed 39 and 13 tests with **no overlap**, because which
-/// adjacent bytes get trampled depends on allocation order. That is why the
-/// remaining failures cannot simply be listed and ignored: there is no stable
-/// set to list.
-///
-/// So the work lands committed and inert. Off, codegen is byte-for-byte what it
-/// was and the suite is green; on, you get the new representation and the
-/// burn-down list in `tests/support/str24_burndown.txt` tells you what is known
-/// to break. It comes out when the list is empty.
-fn str24_enabled() -> bool {
-    Abi::active().wide_str()
-}
-
 /// A dict is an array of `[key][value]` pairs laid out back to back, so the
 /// value's offset within a pair *is* the key's width and the pair's size is the
 /// two widths summed.
@@ -21055,101 +19086,51 @@ fn str_cmp_width(ty: &ConcreteType) -> i64 {
     Abi::active().str_size()
 }
 
-/// Whether `ty` is `str`-shaped *and* the wide representation is the one
-/// selected — i.e. whether this particular type is 24 bytes right now.
-///
-/// The two halves are deliberately separate questions: [`is_str_shaped`] is a
-/// property of the type and never changes, while [`Abi::active`] is the
-/// selection. Code that conflates them reads as if `str` were always wide.
-fn str24_wide(ty: &ConcreteType) -> bool {
-    is_str_shaped(ty) && Abi::active().wide_str()
-}
-
-/// Which representation of `str` a body of compiled code was built with
-/// (`STR_REPR.md`) — one field of an [`Abi`], and not threaded on its own.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum StrAbi {
-    /// An 8-byte tagged pointer: the checked-in `.clif` artifacts.
-    Tagged,
-    /// A 24-byte value passed by address: anything this compiler emits now.
-    Wide,
-}
-
 /// Every representation choice a body of compiled code has made — the whole ABI
 /// it speaks, as one value to thread.
 ///
-/// **This is the general idea the `str` work turned out to need: a type may have
-/// more than one runtime representation, and anything computing layout or
-/// ownership has to be told which one is in force.** So every such question
-/// comes in two forms — one taking an `Abi` explicitly, and a shorthand for the
-/// ABI this compilation selected ([`Abi::active`]). The shorthands are defined
-/// *in terms of* the explicit forms rather than beside them, so there is one
-/// implementation of each rule and no second copy to drift.
+/// **It has no fields, and that is the point.** A type may have more than one
+/// runtime representation, and anything computing layout or ownership has to be
+/// told which one is in force — so every such question comes in two forms, one
+/// taking an `Abi` explicitly and a shorthand for the ABI this compilation
+/// selected ([`Abi::active`]). The shorthands are defined *in terms of* the
+/// explicit forms, so each rule has one implementation and no second copy to
+/// drift.
 ///
-/// Today an ABI is exactly one choice, so this is a newtype around [`StrAbi`]
-/// and carries no information the field does not. It exists anyway, and is what
-/// gets threaded, because **the threading is the expensive part and the field is
-/// not**: when `str` settles on a single representation this loses its field
-/// without a signature changing anywhere, and when the next type gains a choice
-/// it gains a field the same way. Nothing downstream is re-plumbed either time.
+/// `str` was the first type to have a choice and, for now, the last: it settled
+/// on the 24-byte value, so today there is exactly one ABI and this carries no
+/// information. The threading stayed anyway, because **the threading is the
+/// expensive part and the field is not** — when the next type gains a
+/// representation choice it becomes a field here, and nothing downstream is
+/// re-plumbed.
 ///
-/// So the rule is: pass `Abi`, never `StrAbi`. The inner enum is a detail of
-/// what an ABI currently *consists of*; the parameter is the ABI.
-///
-/// Why the explicit form is the primary one, rather than everything reading the
-/// global: both representations are live during the transition, and the FFI is
-/// where they meet. The compiler calls its dogfooded engines — checked-in IR,
-/// compiled before the switch — through exactly the same marshaling code it uses
-/// to call a program it just compiled. "Is a `str` composite?" and "how many
-/// bytes is `str?`" genuinely have two answers at once there, and the marshaling
-/// layer asks with the callee in hand. The global answer is a convenience, not
-/// the truth.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Abi {
-    str_abi: StrAbi,
-}
+/// The shape is load-bearing history, not speculation: while `str` had two
+/// representations, the FFI genuinely met both at once — the compiler calls its
+/// dogfooded engines, compiled earlier, through the same marshaling code it uses
+/// to call a program it just compiled. "Is a `str` composite?" had two answers
+/// simultaneously, and the marshaling layer had to ask with the callee in hand.
+/// That is why the explicit form is primary and the global one is a convenience.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Abi {}
 
 impl Abi {
     /// The ABI this compilation selected, for the majority of callers asking
     /// about the code they are emitting right now rather than about some other
-    /// callee. The selection itself lives in
-    /// [`aipl_syntax::wide_str_selected`].
+    /// callee.
     fn active() -> Abi {
-        Abi {
-            str_abi: if aipl_syntax::wide_str_selected() {
-                StrAbi::Wide
-            } else {
-                StrAbi::Tagged
-            },
-        }
-    }
-
-    /// The ABI of a body compiled before the switch — every checked-in artifact
-    /// that does not say otherwise.
-    fn tagged() -> Abi {
-        Abi {
-            str_abi: StrAbi::Tagged,
-        }
-    }
-
-    /// The ABI an artifact declares, from its `; str24` manifest marker.
-    fn from_manifest(str24: bool) -> Abi {
-        Abi {
-            str_abi: if str24 { StrAbi::Wide } else { StrAbi::Tagged },
-        }
-    }
-
-    /// Whether `str` is the 24-byte value under this ABI.
-    fn wide_str(self) -> bool {
-        self.str_abi == StrAbi::Wide
+        Abi {}
     }
 
     /// Bytes one `str` value occupies under this ABI.
     fn str_size(self) -> i64 {
-        match self.str_abi {
-            StrAbi::Tagged => 8,
-            StrAbi::Wide => str24::STR_SIZE as i64,
-        }
+        str24::STR_SIZE as i64
+    }
+
+    /// Whether a `str` travels by address under this ABI. The knob that had two
+    /// answers while `str` had two representations, and the one that grows an
+    /// answer again if it ever gets a second.
+    fn str_is_composite(self) -> bool {
+        true
     }
 }
 
@@ -21161,7 +19142,7 @@ impl Abi {
 /// bytes that live in memory, which is what "composite" already meant here.
 fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     if is_str_shaped(ty) {
-        return abi.wide_str();
+        return abi.str_is_composite();
     }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))

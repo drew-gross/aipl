@@ -35,15 +35,15 @@ fn to_list_keeps_order() -> List? { to_list([1, 2]) }.test({
     assert([1, 2].opt_right_fold(0, |x, acc| some(x + acc + bump)) == some(23)); // a capture
 })
 --- performance ---
-allocations: 25
-deallocations: 25
+allocations: 23
+deallocations: 23
 reallocations: 0
-bytes allocated: 1264
-instructions executed: 2638
-binary size: 9856
-  code: 5400
-  data: 631
-  metadata: 3825
+bytes allocated: 1472
+instructions executed: 3005
+binary size: 10864
+  code: 6480
+  data: 581
+  metadata: 3803
 functions:
   __eq_List:
     calls: 5
@@ -62,10 +62,7 @@ functions:
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 3900
-  aipl_arr_drop_str:
-    calls: 2
-    bytes: (external)
+    bytes: 4924
   aipl_array_dec:
     calls: 7
     bytes: (external)
@@ -74,15 +71,6 @@ functions:
     bytes: (external)
   aipl_assert:
     calls: 7
-    bytes: (external)
-  aipl_concat_lazy:
-    calls: 6
-    bytes: (external)
-  aipl_dec:
-    calls: 59
-    bytes: (external)
-  aipl_inc:
-    calls: 45
     bytes: (external)
   aipl_rec_alloc:
     calls: 12
@@ -99,12 +87,6 @@ functions:
   aipl_rec_inc_weak:
     calls: 7
     bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 16
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -116,7 +98,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 72
+    bytes: 128
   to_list:
     calls: 3
     bytes: 968

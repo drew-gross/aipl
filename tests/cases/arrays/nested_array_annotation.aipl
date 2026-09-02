@@ -23,16 +23,16 @@ fn first(grid: str[][]) -> str[]? { grid[0] }.test({
 allocations: 11
 deallocations: 11
 reallocations: 0
-bytes allocated: 488
-instructions executed: 659
-binary size: 5152
-  code: 2488
-  data: 187
-  metadata: 2477
+bytes allocated: 632
+instructions executed: 862
+binary size: 6088
+  code: 3412
+  data: 137
+  metadata: 2539
 functions:
   __eq_str$arr:
     calls: 2
-    bytes: 308
+    bytes: 364
   __eq_str$arr$arr:
     calls: 1
     bytes: 300
@@ -41,18 +41,15 @@ functions:
     bytes: 100
   __test$add_row:
     calls: 1
-    bytes: 612
+    bytes: 1100
   __test$first:
     calls: 1
-    bytes: 1052
+    bytes: 1376
   aipl_arr_drop_arr:
     calls: 5
     bytes: (external)
-  aipl_arr_drop_str:
-    calls: 6
-    bytes: (external)
   aipl_arr_inc:
-    calls: 7
+    calls: 11
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 4
@@ -69,15 +66,6 @@ functions:
   aipl_assert:
     calls: 4
     bytes: (external)
-  aipl_dec:
-    calls: 11
-    bytes: (external)
-  aipl_inc:
-    calls: 6
-    bytes: (external)
-  aipl_str_eq:
-    calls: 4
-    bytes: (external)
   aipl_test_begin:
     calls: 2
     bytes: (external)
@@ -89,4 +77,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 116
+    bytes: 172

@@ -44,12 +44,12 @@ fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
 allocations: 18
 deallocations: 18
 reallocations: 0
-bytes allocated: 976
-instructions executed: 1446
-binary size: 12712
-  code: 6856
-  data: 855
-  metadata: 5001
+bytes allocated: 1296
+instructions executed: 1699
+binary size: 13280
+  code: 7968
+  data: 645
+  metadata: 4667
 functions:
   __dict_drop_bool$str:
     calls: 1
@@ -62,7 +62,7 @@ functions:
     bytes: 116
   __dict_drop_str$str:
     calls: 1
-    bytes: 140
+    bytes: 136
   __dict_retain_bool$str:
     calls: 2
     bytes: 128
@@ -74,7 +74,7 @@ functions:
     bytes: 116
   __dict_retain_str$str:
     calls: 2
-    bytes: 140
+    bytes: 136
   __eq_Point:
     calls: 2
     bytes: 104
@@ -89,7 +89,7 @@ functions:
     bytes: 248
   __eq_dict$str$Point:
     calls: 1
-    bytes: 248
+    bytes: 272
   __eq_i64$arr:
     calls: 3
     bytes: 296
@@ -104,19 +104,19 @@ functions:
     bytes: 100
   __test$array_values:
     calls: 1
-    bytes: 1328
+    bytes: 1392
   __test$char_keys:
     calls: 1
-    bytes: 756
+    bytes: 940
   __test$heap_str_values:
     calls: 1
-    bytes: 668
+    bytes: 1120
   __test$optional_values:
     calls: 1
-    bytes: 788
+    bytes: 840
   __test$struct_values:
     calls: 1
-    bytes: 524
+    bytes: 684
   aipl_arr_inc:
     calls: 9
     bytes: (external)
@@ -135,26 +135,11 @@ functions:
   aipl_assert:
     calls: 12
     bytes: (external)
-  aipl_concat_lazy:
-    calls: 4
-    bytes: (external)
-  aipl_dec:
-    calls: 25
-    bytes: (external)
   aipl_dict_get:
     calls: 13
     bytes: (external)
   aipl_dict_insert:
     calls: 16
-    bytes: (external)
-  aipl_inc:
-    calls: 12
-    bytes: (external)
-  aipl_str_eq:
-    calls: 2
-    bytes: (external)
-  aipl_str_len:
-    calls: 14
     bytes: (external)
   aipl_test_begin:
     calls: 5
@@ -167,4 +152,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 232
+    bytes: 416
