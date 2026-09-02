@@ -41,15 +41,15 @@ fn main() !prints {
 1
 ss
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 331
-instructions executed: 486
-binary size: 3016
-  code: 1436
+bytes allocated: 155
+instructions executed: 418
+binary size: 2920
+  code: 1344
   data: 1
-  metadata: 1579
+  metadata: 1575
 functions:
   __to_str_i64:
     calls: 2
@@ -80,7 +80,7 @@ functions:
     bytes: 20
   first_index_reaching:
     calls: 2
-    bytes: 576
+    bytes: 484
   main:
     calls: 1
     bytes: 432

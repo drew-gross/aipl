@@ -37,11 +37,17 @@ unsafe fn rt_free(ptr: *mut core::ffi::c_void) {
     unsafe { libc_free(ptr) }
 }
 
+unsafe fn rt_realloc(ptr: *mut core::ffi::c_void, size: usize) -> *mut core::ffi::c_void {
+    unsafe { libc_realloc(ptr, size) }
+}
+
 extern "C" {
     #[link_name = "malloc"]
     fn libc_malloc(size: usize) -> *mut core::ffi::c_void;
     #[link_name = "free"]
     fn libc_free(ptr: *mut core::ffi::c_void);
+    #[link_name = "realloc"]
+    fn libc_realloc(ptr: *mut core::ffi::c_void, size: usize) -> *mut core::ffi::c_void;
 }
 
 use cranelift::{
@@ -4175,6 +4181,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_alloc", str24::aipl_str_alloc as *const u8);
     jit_builder.symbol("aipl_str_write_ptr", str24::aipl_str_write_ptr as *const u8);
     jit_builder.symbol("aipl_str_grew", str24::aipl_str_grew as *const u8);
+    jit_builder.symbol("aipl_str_push_byte", str24::aipl_str_push_byte as *const u8);
+    jit_builder.symbol("aipl_str_append", str24::aipl_str_append as *const u8);
     jit_builder.symbol("aipl_str_iter_init", str24::aipl_str_iter_init as *const u8);
     jit_builder.symbol("aipl_str_iter_next", str24::aipl_str_iter_next as *const u8);
     jit_builder.symbol(
@@ -7327,6 +7335,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_shim_set"
         | "aipl_str_iter_init"
         | "aipl_str_grew"
+        | "aipl_str_push_byte"
+        | "aipl_str_append"
         | "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
@@ -16047,6 +16057,19 @@ fn compile_call_expr<M: Module>(
                 // load above reads one word from the slot, which is the whole
                 // value only under the tagged representation.
                 let arr_ptr = load_binding_str(builder, slot);
+                if exclusive {
+                    // Statically proven unaliased, so the append may write into
+                    // the value's own allocation: `aipl_str_push_byte` fills
+                    // spare capacity when there is some, grows the block under
+                    // itself when there isn't, and only copies when the dynamic
+                    // refcount says the static proof isn't enough on its own
+                    // (`STR_REPR.md`). It takes over the slot's reference and
+                    // writes the result back, so — as in the in-place `+++` —
+                    // there is nothing to release and no new track to add.
+                    builtins.call_void(module, builder, "aipl_str_push_byte", &[arr_ptr, x_v]);
+                    *ty_cell.borrow_mut() = new_arr_ty;
+                    return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+                }
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let new_len = builder.ins().iadd_imm_s(old_len, 1);
                 let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
@@ -16058,48 +16081,31 @@ fn compile_call_expr<M: Module>(
                     .ins()
                     .istore8(MemFlagsData::trusted(), x_v, dst_addr, 0);
                 emit_str_grew(module, builder, cx, buf, new_len);
-                // The old value is released *before* the writeback, not after.
-                // A tagged `arr_ptr` is a snapshot — a pointer loaded out of the
-                // slot — so the order did not matter. A wide `arr_ptr` *is* the
-                // slot's address, so once the new value is stored there the
-                // "old" handle names the new one, and dropping it frees the
-                // string that was just built. The copy above is already done, so
-                // nothing reads the old bytes after this point.
-                if exclusive {
-                    // Statically proven unaliased: the old value is already
-                    // owned solely by this binding's slot-track (from
-                    // `LetMut`), so free it for real — no compensating inc —
-                    // and don't track `buf` separately; the slot-track now
-                    // covers it instead.
-                    emit_rc(
-                        builder,
-                        module,
-                        builtins,
-                        structs,
-                        arr_ptr,
-                        &new_arr_ty,
-                        RcOp::Drop,
-                    );
-                }
+                // The slot owns exactly one reference to its current value
+                // (`LetMut`'s str-shaped branch), so the rebuild keeps that
+                // invariant: release the old value, then let the slot own the
+                // fresh `buf` outright. `buf` gets no value-track of its own —
+                // one in the *current* scope would be wrong inside a loop, where
+                // it frees the buffer the binding still names at the end of the
+                // iteration.
+                //
+                // The release comes *before* the writeback, not after. A tagged
+                // `arr_ptr` was a snapshot — a pointer loaded out of the slot —
+                // so the order did not matter. A wide `arr_ptr` *is* the slot's
+                // address, so once the new value is stored there the "old" handle
+                // names the new one, and dropping it frees the string that was
+                // just built. The copy above is already done, so nothing reads
+                // the old bytes after this point.
+                emit_rc(
+                    builder,
+                    module,
+                    builtins,
+                    structs,
+                    arr_ptr,
+                    &new_arr_ty,
+                    RcOp::Drop,
+                );
                 store_binding_str(builder, cx, slot, buf, structs);
-                if exclusive {
-                } else {
-                    // Possibly shared: the old value is owned by a separate
-                    // track elsewhere (the binding's initial value-track, or
-                    // — for a `mut` parameter — its function-entry track),
-                    // which will drop it once at that track's scope exit.
-                    // Unlike `aipl_array_push` below (which *consumes* its
-                    // input, requiring a compensating pre-inc), building `buf`
-                    // only *borrows* `arr_ptr` (`aipl_str_len`/`aipl_str_data`
-                    // don't touch its refcount) — so the old track's single
-                    // eventual drop is already exactly right; the slot simply
-                    // stops pointing at it. `buf` is fresh and gets its own
-                    // track.
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(buf, &new_arr_ty));
-                }
             } else if exclusive {
                 // Statically proven unaliased: mutate in place. No pre-inc and
                 // no new value-track — the binding's slot-track (added at
@@ -16214,6 +16220,16 @@ fn compile_call_expr<M: Module>(
                 // See `push`: the generic slot load is a word, the wide value
                 // is the slot itself.
                 let arr_ptr = load_binding_str(builder, slot);
+                if exclusive {
+                    // In place, exactly as the `push` char path above — and with
+                    // the same contract, so the source is only borrowed. A source
+                    // that *is* this receiver (`cs.extend(cs)`) is handled inside
+                    // the runtime, which takes the copy path rather than reading
+                    // bytes out of a block it is about to grow.
+                    builtins.call_void(module, builder, "aipl_str_append", &[arr_ptr, src_ptr]);
+                    *ty_cell.borrow_mut() = new_arr_ty;
+                    return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+                }
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let add_len = builtins.call(module, builder, "aipl_str_len", &[src_ptr]);
                 let new_len = builder.ins().iadd(old_len, add_len);
@@ -16226,30 +16242,19 @@ fn compile_call_expr<M: Module>(
                 let src1 = str_bytes_ptr(module, builder, cx, src_ptr);
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[at, src1, add_len]);
                 emit_str_grew(module, builder, cx, buf, new_len);
-                // `aipl_str_len`/`aipl_str_data` only borrow, so — exactly as in
-                // the `push` char path — an exclusive receiver's old value is
-                // freed here and a possibly-shared one is left to the track that
-                // already owns it. Released before the writeback, for the reason
-                // given there: a wide handle is the slot, not a snapshot of it.
-                if exclusive {
-                    emit_rc(
-                        builder,
-                        module,
-                        builtins,
-                        structs,
-                        arr_ptr,
-                        &new_arr_ty,
-                        RcOp::Drop,
-                    );
-                }
+                // Same ownership handover as the `push` char path, for the same
+                // reasons — including the release coming before the writeback,
+                // since a wide handle is the slot rather than a snapshot of it.
+                emit_rc(
+                    builder,
+                    module,
+                    builtins,
+                    structs,
+                    arr_ptr,
+                    &new_arr_ty,
+                    RcOp::Drop,
+                );
                 store_binding_str(builder, cx, slot, buf, structs);
-                if exclusive {
-                } else {
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(buf, &new_arr_ty));
-                }
                 *ty_cell.borrow_mut() = new_arr_ty;
                 return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
@@ -17542,13 +17547,22 @@ fn compile_expr_inner<M: Module>(
             // position is a last-use move, not an alias, so it stays exclusive.
             let exclusive =
                 (fresh_literal || owned_move) && aipl_mono::binding_is_exclusive(name, body, true);
-            if is_str_repr(&t) {
+            if is_str_shaped(&t) {
                 // A `str` binding's slot owns exactly one reference to its current
                 // value, released once at scope exit by this slot-track. `set`
                 // preserves the invariant (drop the old value, take ownership of
                 // the new), so the binding can be reassigned — even across a nested
                 // scope, e.g. `set s = s[..]` in a loop body — without leaking or
                 // freeing a value the slot still points at.
+                //
+                // `is_str_shaped`, so a `char[]` binding is owned this way too.
+                // It used to fall through to the array branches, which give the
+                // slot no reference at all and let the *value* track own it — and
+                // a `push`/`extend` inside a loop then tracked each rebuilt value
+                // in the loop-body scope, which freed it at the end of the
+                // iteration while the binding still named it. The next iteration's
+                // allocation reused the block, so the copy read from the buffer it
+                // was writing into (`extend/extend_char_in_place.aipl`).
                 own_value_into_slot(
                     builder,
                     module,
@@ -17672,47 +17686,39 @@ fn compile_expr_inner<M: Module>(
                     ));
                 }
             };
-            // In-place concat: `set s = s + r` on an exclusive `str` binding
-            // grows `s`'s buffer (realloc) and appends `r`, instead of building
-            // a fresh string each time. The binding is slot-tracked, so the
-            // (possibly relocated) buffer is still dropped exactly once.
+            // In-place concat: `set s = s +++ r` on an exclusive `str` binding
+            // appends `r` into `s`'s own buffer instead of building a fresh
+            // string (or a rope node) each time. The binding is slot-tracked, so
+            // the — possibly relocated — buffer is still dropped exactly once.
+            //
+            // The operator is `'C'` (`+++`), not `'+'` — `'+'` is integer
+            // addition and never has `str` operands, so the arm that spelled it
+            // that way could not fire, and neither could the matching one in
+            // `mono::aliases_or_unsafe` that decides `exclusive`. Both are fixed
+            // together: either alone leaves the optimization off.
             if exclusive && expected_ty == ConcreteType::Primitive(Primitive::Str) {
-                // In-place concat: `set s = s + r` grows s's buffer (realloc) and
-                // appends r, instead of building a fresh string each time. The
-                // binding is slot-tracked, so the (possibly relocated) buffer is
-                // still dropped exactly once.
-                if let ExprKind::Binop(l, '+', r) = &value.kind {
-                    if matches!(&l.kind, ExprKind::Ident(n) if n == name) {
-                        let s_ptr = load_binding_str(builder, slot);
-                        let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
-                        expect_type(
-                            &rt,
-                            &ConcreteType::Primitive(Primitive::Str),
-                            "concat operand",
-                            r.span.clone(),
-                        )?;
-                        // `aipl_concat_mut` decs its second arg; inc first so r's
-                        // own track balances. `s` is reused, not dec'd.
-                        //
-                        // The wide entry point borrows both instead, so neither the
-                        // inc nor the reuse applies: the rope it returns holds its
-                        // own reference to `s`, and the one this slot was holding is
-                        // replaced by the store below — so release it, or the old
-                        // value is kept alive by a slot that no longer names it.
-                        let new_ptr = builtins.call(module, builder, "aipl_concat", &[s_ptr, rv]);
-                        emit_rc(
-                            builder,
-                            module,
-                            builtins,
-                            structs,
-                            s_ptr,
-                            &ConcreteType::Primitive(Primitive::Str),
-                            RcOp::Drop,
-                        );
-                        store_binding_str(builder, cx, slot, new_ptr, structs);
-                        // No new track — the binding's slot-track owns the result.
-                        return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
+                let appends_self = match &value.kind {
+                    ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
+                        Some(r)
                     }
+                    _ => None,
+                };
+                if let Some(r) = appends_self {
+                    let s_ptr = load_binding_str(builder, slot);
+                    let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
+                    expect_type(
+                        &rt,
+                        &ConcreteType::Primitive(Primitive::Str),
+                        "concat operand",
+                        r.span.clone(),
+                    )?;
+                    // `aipl_str_append` borrows `r` and takes over the reference
+                    // the slot was holding, writing the result back into the same
+                    // slot — so there is no inc, no dec and no new value-track:
+                    // `r`'s own track still releases it, and the binding's
+                    // slot-track already owns whatever the slot now names.
+                    builtins.call_void(module, builder, "aipl_str_append", &[s_ptr, rv]);
+                    return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                 }
                 // In-place trim: `set s = trim(s)` / `set s = s.trim()` shifts and
                 // shrinks s's buffer in place rather than allocating a new string.
@@ -17725,10 +17731,32 @@ fn compile_expr_inner<M: Module>(
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name)
                 );
                 if trims_self {
-                    let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
-                    // `aipl_trim_mut` reuses `s` (no dec), so no pre-inc needed.
+                    // Same slot discipline as the concat branch above, and for
+                    // the same reason: a wide `str` binding *is* its slot's 24
+                    // bytes, so it is read with `load_binding_str` and written
+                    // with `store_binding_str`. Reading one word out of the slot
+                    // and calling `aipl_trim` on it dereferenced `w0` — a buffer's
+                    // base, or an inline value's first eight content bytes — as
+                    // if it were a `Str`, which bus-errors on any inline
+                    // receiver.
+                    let s_ptr = load_binding_str(builder, slot);
+                    // `aipl_trim` borrows `s` and hands back a *retained* window
+                    // into the same buffer, so the trim allocates nothing and the
+                    // result keeps the block alive on its own. That makes the
+                    // slot's own reference surplus: release it — after the call,
+                    // and before the store, since `s_ptr` names the slot rather
+                    // than a snapshot of what was in it.
                     let new_ptr = builtins.call(module, builder, "aipl_trim", &[s_ptr]);
-                    builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+                    emit_rc(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        s_ptr,
+                        &ConcreteType::Primitive(Primitive::Str),
+                        RcOp::Drop,
+                    );
+                    store_binding_str(builder, cx, slot, new_ptr, structs);
                     // No new track — the binding's slot-track owns the result.
                     return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                 }
@@ -17785,7 +17813,12 @@ fn compile_expr_inner<M: Module>(
             // snapshot holds. Sets/dicts and scalars keep the plain store (their
             // in-place / value-track model).
             let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty, structs);
-            let old = if is_str_repr(&expected_ty) || arr_slot_ref {
+            // `is_str_shaped`, matching `LetMut`: a `char[]` binding's slot owns
+            // one reference like a `str`'s, so `set` has to maintain that here
+            // too. Testing `is_str_repr` let a `char[]` skip both halves — it
+            // neither took ownership of the incoming value nor released the
+            // outgoing one — so every reassignment leaked the value it replaced.
+            let old = if is_str_shaped(&expected_ty) || arr_slot_ref {
                 Some(slot_value(builder, slot, &expected_ty))
             } else {
                 None

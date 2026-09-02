@@ -1,9 +1,11 @@
 import { concat as +++, equal as == } from builtins;
 
-// Building a string by repeated `set s = s + ..` on a never-aliased binding:
-// `s` grows in place via realloc, so only the first append (off the static "")
-// allocates a heap buffer; the rest reuse it. Without the optimization each of
-// the four concats would allocate a fresh string.
+// Building a string by repeated `set s = s +++ ..` on a never-aliased binding:
+// each append writes into `s`'s own storage. The result is four bytes, so it
+// never leaves the inline form and the whole function allocates *nothing* —
+// see `concat_in_place_grows.aipl` for the same loop past the 22-byte inline
+// capacity, where the buffer is grown under itself instead. Without the
+// optimization each of the four concats builds a fresh string.
 fn build() -> str {
     mut s = "";
     set s = s +++ "a";
@@ -15,19 +17,19 @@ fn build() -> str {
     assert(build() == "abcd");
 })
 --- performance ---
-allocations: 3
-deallocations: 3
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 264
-instructions executed: 164
-binary size: 1888
-  code: 800
+bytes allocated: 0
+instructions executed: 96
+binary size: 1536
+  code: 504
   data: 44
-  metadata: 1044
+  metadata: 988
 functions:
   __test$build:
     calls: 1
-    bytes: 696
+    bytes: 400
   aipl_assert:
     calls: 1
     bytes: (external)

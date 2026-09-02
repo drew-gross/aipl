@@ -1,0 +1,54 @@
+import { concat as +++, equal as ==, len } from builtins;
+
+// The heap half of `concat_in_place.aipl`: a builder loop whose result outgrows
+// the 22-byte inline form. The binding is never aliased, so each append writes
+// into the value's own storage — filling spare capacity where there is some and
+// growing the block under itself where there isn't. Capacity doubles, so N
+// appends cost O(log N) reallocations rather than N fresh strings.
+//
+// `binding_is_exclusive` is what licenses it: `s` is read only by the appends
+// themselves and the tail move, so nothing else can be holding those bytes.
+fn build(parts: str) -> str {
+    mut s = "";
+    for (let _ : parts) {
+        set s = s +++ "abcde";
+    }
+    s
+}.test({
+    assert(build("1234") == "abcdeabcdeabcdeabcde"); // 20 bytes: still inline
+    assert(build("12345").len() == 25); // 25: crossed into a buffer
+    assert(build("1234567890").len() == 50); // and grown again
+    assert(build("") == "");
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 1
+bytes allocated: 112
+instructions executed: 704
+binary size: 2776
+  code: 1068
+  data: 234
+  metadata: 1474
+functions:
+  __test$build:
+    calls: 1
+    bytes: 644
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  build:
+    calls: 4
+    bytes: 320
+  main:
+    calls: 1
+    bytes: 104

@@ -1,0 +1,50 @@
+import { equal as ==, len, push } from builtins;
+
+// `push` on a never-aliased `char[]` appends into the value's own storage
+// rather than rebuilding the whole string per element — the `char[]` half of
+// `strings/concat_in_place_grows.aipl`, and the reason `push_char.aipl` (which
+// takes a snapshot, and so is *not* exclusive) still copies.
+fn build(src: str) -> char[] {
+    mut cs = ['a'];
+    for (let c : src) {
+        set cs.push(c);
+    }
+    cs
+}.test({
+    assert(build("bc") == ['a', 'b', 'c']);
+    assert(build("") == ['a']);
+    // 27 chars: past the inline capacity, so the block is grown under itself.
+    assert(build("bcdefghijklmnopqrstuvwxyz").len() == 26);
+})
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 2
+bytes allocated: 87
+instructions executed: 874
+binary size: 2968
+  code: 1064
+  data: 225
+  metadata: 1679
+functions:
+  __test$build:
+    calls: 1
+    bytes: 616
+  aipl_assert:
+    calls: 3
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  build:
+    calls: 3
+    bytes: 344
+  main:
+    calls: 1
+    bytes: 104

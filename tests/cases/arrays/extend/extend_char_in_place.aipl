@@ -1,0 +1,58 @@
+import { equal as ==, extend, len } from builtins;
+
+// `extend` on a never-aliased `char[]` appends into the value's own storage,
+// exactly as `push` does one char at a time (`push/push_char_in_place.aipl`).
+//
+// `cs.extend(cs)` is the case worth having a test for: the source lives inside
+// the block the append is about to grow, so reading it while writing would be
+// reading through a pointer `realloc` may already have moved. The runtime spots
+// that the two overlap and copies instead.
+fn doubled(n: str) -> char[] {
+    mut cs = ['a', 'b', 'c'];
+    for (let _ : n) {
+        set cs.extend(cs);
+    }
+    cs
+}.test({
+    assert(doubled("") == ['a', 'b', 'c']);
+    assert(doubled("1") == ['a', 'b', 'c', 'a', 'b', 'c']);
+    assert(doubled("123").len() == 24); // 3 * 2^3, past the inline capacity
+    mut long = ['x'];
+    set long.extend("0123456789012345678901234567890");
+    assert(long.len() == 32);
+})
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 1
+bytes allocated: 227
+instructions executed: 533
+binary size: 4000
+  code: 1668
+  data: 275
+  metadata: 2057
+functions:
+  __test$doubled:
+    calls: 1
+    bytes: 932
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  doubled:
+    calls: 3
+    bytes: 628
+  main:
+    calls: 1
+    bytes: 108

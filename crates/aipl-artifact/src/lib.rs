@@ -363,6 +363,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_drop_opt_str"
         | "aipl_arr_retain_opt_str"
         | "aipl_str_grew"
+        | "aipl_str_push_byte"
+        | "aipl_str_append"
         // ...and the producers of exactly one `str` from none or one:
         | "aipl_trim"
         | "aipl_str_reverse"

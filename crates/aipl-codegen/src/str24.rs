@@ -335,6 +335,18 @@ unsafe fn free_buffer(base: *const u8) {
     unsafe { super::rt_free(base.sub(BUF_HEADER) as *mut _) }
 }
 
+/// Grow a block under its own base, keeping the header — and so the refcount —
+/// intact. Only sound for a block this value exclusively owns; the caller
+/// establishes that (see [`append_owned`]).
+unsafe fn grow_buffer(base: *const u8, cap: usize) -> *const u8 {
+    let raw = unsafe { super::rt_realloc(base.sub(BUF_HEADER) as *mut _, BUF_HEADER + cap) };
+    assert!(!raw.is_null(), "out of memory");
+    unsafe {
+        core::ptr::write(raw as *mut i64, cap as i64);
+        (raw as *mut u8).add(BUF_HEADER)
+    }
+}
+
 // ---------- Ropes ----------
 //
 // `[refcount: i64][len: i64][cache: Str][left: Str][right: Str]`, 88 bytes. The
@@ -601,6 +613,108 @@ pub(crate) fn starts_with(s: Str, prefix: Str) -> bool {
 
 pub(crate) fn ends_with(s: Str, suffix: Str) -> bool {
     s.len() >= suffix.len() && starts_with_at(s, suffix, s.len() - suffix.len())
+}
+
+// ---------- In-place append (`STR_REPR.md` stage 2) ----------
+
+/// Capacity for an append that has to allocate: enough for what is being
+/// written, and otherwise double, so a builder loop pays amortized O(1) rather
+/// than reallocating on every byte. The floor keeps a string that has just
+/// outgrown its inline form from reallocating again a byte later.
+fn grow_cap(need: usize, old_cap: usize) -> usize {
+    need.max(old_cap * 2).max(32)
+}
+
+/// Whether `add` points into `s`'s own block, in which case growing that block
+/// could move the bytes being read from under the copy. `s.extend(s)` is the
+/// shape that gets here; it takes the copy path instead.
+fn overlaps(s: Str, add: &[u8]) -> bool {
+    let base = s.base();
+    if base.is_null() {
+        return false;
+    }
+    let (lo, hi) = (base as usize, base as usize + buffer_cap(base));
+    let at = add.as_ptr() as usize;
+    at < hi && at + add.len() > lo
+}
+
+/// Append `add` to `s`, writing into the existing allocation when this value can
+/// have it to itself. Takes the caller's reference to `s` and returns the value
+/// that replaces it.
+///
+/// **The caller must have established *static* ownership** — an `exclusive` `mut`
+/// binding or an `owned` parameter. The `is_unique` test below only *refines*
+/// that: retain elision lets a borrowed value read `refcount == 1` while its
+/// caller is still holding it, so on its own it proves nothing (`STR_REPR.md`,
+/// "`refcount == 1` is not ownership").
+///
+/// Three outcomes, cheapest first:
+///   - **inline, still fits** — the whole thing is a value computation. An inline
+///     value owns no allocation, so there is no ownership question to ask and
+///     nothing to free.
+///   - **sole owner, room to spare** — write past `data + len` and widen the
+///     window. Nothing else can see those bytes, so the refcount is untouched.
+///   - **anything else** — shared, static, a rope, or a window that cannot grow
+///     under itself: copy once into a buffer sized for the appends after this
+///     one too.
+pub(crate) fn append_owned(s: Str, add: &[u8]) -> Str {
+    if add.is_empty() {
+        return s;
+    }
+    let len = s.len();
+    let need = len + add.len();
+    if s.tag() == TAG_INLINE && need <= INLINE_CAP {
+        let mut buf = inline_bytes(s);
+        buf[len..need].copy_from_slice(add);
+        return from_bytes_inline(&buf[..need]);
+    }
+    if s.tag() == TAG_BUFFER && s.is_unique() && !overlaps(s, add) {
+        if s.spare_capacity() >= add.len() {
+            unsafe {
+                core::ptr::copy_nonoverlapping(add.as_ptr(), (s.w1 as *mut u8).add(len), add.len());
+            }
+            return Str {
+                w0: s.w0,
+                w1: s.w1,
+                w2: meta(need, TAG_BUFFER),
+            };
+        }
+        // Out of room, but the window starts at the base — so the block can grow
+        // under it. `realloc` keeps the bytes and the header (refcount included)
+        // and often does not move anything. A window that starts *past* the base
+        // cannot: its `data` offset would have to be re-derived, and the bytes
+        // before it are not ours to keep.
+        if s.w0 == s.w1 {
+            let cap = grow_cap(need, buffer_cap(s.w0 as *const u8));
+            let base = unsafe { grow_buffer(s.w0 as *const u8, cap) };
+            unsafe {
+                core::ptr::copy_nonoverlapping(add.as_ptr(), (base as *mut u8).add(len), add.len());
+            }
+            return Str {
+                w0: base as u64,
+                w1: base as u64,
+                w2: meta(need, TAG_BUFFER),
+            };
+        }
+    }
+    let base = alloc_buffer(grow_cap(need, len));
+    let mut at = 0usize;
+    for_each_chunk(s, &mut |chunk| {
+        unsafe {
+            core::ptr::copy_nonoverlapping(chunk.as_ptr(), (base as *mut u8).add(at), chunk.len());
+        }
+        at += chunk.len();
+        true
+    });
+    unsafe {
+        core::ptr::copy_nonoverlapping(add.as_ptr(), (base as *mut u8).add(at), add.len());
+    }
+    s.release();
+    Str {
+        w0: base as u64,
+        w1: base as u64,
+        w2: meta(at + add.len(), TAG_BUFFER),
+    }
 }
 
 /// Whether `needle` occurs anywhere in `s`. The empty needle is always present.
@@ -1172,6 +1286,26 @@ pub(crate) extern "C" fn aipl_str_grew(s: *mut Str, n: i64) {
             w2: meta(v.len() + n.max(0) as usize, TAG_BUFFER),
         };
     }
+}
+
+/// Append one byte to the value in `s`, in place where it can be — the `push`
+/// half of [`append_owned`], whose ownership contract this inherits.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_push_byte(s: *mut Str, b: i64) {
+    unsafe { *s = append_owned(*s, &[b as u8]) };
+}
+
+/// Append every byte of `add` to the value in `s`, in place where it can be.
+/// Borrows `add`; takes and replaces the reference in `s` ([`append_owned`]).
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_append(s: *mut Str, add: *const Str) {
+    let add = unsafe { read(add) };
+    let mut scratch = [0u8; INLINE_CAP];
+    // `bytes` flattens a rope source into its own cache, which keeps the append
+    // itself a single copy; `append_owned` guards the case where those bytes
+    // live in the destination's own block.
+    let bytes = add.bytes(&mut scratch);
+    unsafe { *s = append_owned(*s, bytes) };
 }
 
 /// A contiguous read pointer for the value's bytes, materializing a rope into
@@ -1757,5 +1891,104 @@ mod tests {
         aipl_dec(&tiny);
         assert_eq!(text(tiny), "tiny");
         s.release();
+    }
+
+    // ---------- in-place append ----------
+
+    #[test]
+    fn an_inline_append_that_still_fits_allocates_nothing() {
+        let s = append_owned(from_bytes(b"ab"), b"cd");
+        assert_eq!(s.tag(), TAG_INLINE);
+        assert_eq!(text(s), "abcd");
+        // 22 bytes exactly: the last append that stays inline.
+        let full = append_owned(from_bytes(b"0123456789012345678901"), b"");
+        assert_eq!(full.tag(), TAG_INLINE);
+        assert_eq!(text(full), "0123456789012345678901");
+    }
+
+    #[test]
+    fn outgrowing_the_inline_form_moves_to_a_buffer() {
+        let s = append_owned(from_bytes(b"0123456789012345678901"), b"!");
+        assert_eq!(s.tag(), TAG_BUFFER);
+        assert_eq!(text(s), "0123456789012345678901!");
+        s.release();
+    }
+
+    #[test]
+    fn a_sole_owner_appends_into_its_own_spare_capacity() {
+        let s = with_capacity(64, b"start");
+        let base = s.base();
+        let s = append_owned(s, b" and more");
+        // Same allocation, wider window — no copy and no reallocation.
+        assert_eq!(s.base(), base);
+        assert_eq!(text(s), "start and more");
+        s.release();
+    }
+
+    #[test]
+    fn running_out_of_room_grows_the_block_and_keeps_the_content() {
+        let mut s = with_capacity(4, b"ab");
+        for _ in 0..50 {
+            s = append_owned(s, b"xy");
+        }
+        assert_eq!(s.len(), 2 + 100);
+        assert_eq!(text(s), format!("ab{}", "xy".repeat(50)));
+        s.release();
+    }
+
+    /// `refcount == 1` is what refines static ownership into "safe to write"
+    /// (`STR_REPR.md`), so a second live reference has to force the copy — the
+    /// other holder's bytes must not move under it.
+    #[test]
+    fn a_shared_buffer_is_copied_rather_than_written_into() {
+        let a = with_capacity(64, b"shared");
+        a.retain();
+        let b = a;
+        let a = append_owned(a, b"!");
+        assert_eq!(text(a), "shared!");
+        assert_eq!(text(b), "shared", "the other holder is untouched");
+        assert_ne!(a.base(), b.base());
+        a.release();
+        b.release();
+    }
+
+    #[test]
+    fn appending_a_value_to_itself_reads_before_it_writes() {
+        let s = with_capacity(64, b"ab");
+        let mut scratch = [0u8; INLINE_CAP];
+        let own = s.bytes(&mut scratch);
+        // SAFETY: `own` points into `s`'s own block, which is exactly the
+        // aliasing `overlaps` exists to catch; the bytes stay valid because
+        // `append_owned` copies out of the old block before releasing it.
+        let own: &[u8] = unsafe { core::slice::from_raw_parts(own.as_ptr(), own.len()) };
+        let s = append_owned(s, own);
+        assert_eq!(text(s), "abab");
+        s.release();
+    }
+
+    #[test]
+    fn a_rope_is_flattened_by_the_append_rather_than_written_into() {
+        let long = b"long enough to live in its own allocation";
+        let r = concat(
+            from_bytes(long),
+            from_bytes(b" plus a second half of the same"),
+        );
+        let before = text(r);
+        let s = append_owned(r, b"!");
+        assert_eq!(text(s), format!("{before}!"));
+        assert_eq!(s.tag(), TAG_BUFFER);
+        s.release();
+    }
+
+    #[test]
+    fn the_entry_points_update_through_the_pointer() {
+        let mut s = from_bytes(b"ab");
+        aipl_str_push_byte(&mut s, b'c' as i64);
+        assert_eq!(text(s), "abc");
+        let add = from_bytes(b"defghijklmnopqrstuvwxyz0123456789");
+        aipl_str_append(&mut s, &add);
+        assert_eq!(text(s), "abcdefghijklmnopqrstuvwxyz0123456789");
+        s.release();
+        add.release();
     }
 }

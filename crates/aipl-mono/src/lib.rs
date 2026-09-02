@@ -8723,7 +8723,13 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             };
             let lhs_bad = if target == name {
                 match &val.kind {
-                    ExprKind::Binop(l, '+', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
+                    // `set a = a +++ b` appends into `a`'s own buffer — safe
+                    // unless we're iterating `a`, or the other operand aliases it
+                    // (it is read while `a` grows). The operator is `'C'`;
+                    // spelling it `'+'` matched integer addition, which never has
+                    // a `str` operand, so this arm never fired and no `str`
+                    // builder binding was ever exclusive.
+                    ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
                         iterating || rec(r)
                     }
                     // `set a = a.trim()` / `set a = trim(a)` both fold to the

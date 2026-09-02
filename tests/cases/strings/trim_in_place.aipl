@@ -1,34 +1,44 @@
-import { concat as +++, equal as ==, trim } from builtins;
+import { concat as +++, equal as ==, len, trim } from builtins;
 
-// `trim` on a uniquely-owned (never-aliased) string reuses its buffer: it
-// shifts the content to the front and reallocs down in place, rather than
-// allocating a fresh string. Here `s` is built on the heap by an in-place
-// concat (off the static ""), then trimmed in place — so the trim shows up as
-// a realloc, not an allocation.
+// `trim` on a uniquely-owned (never-aliased) string costs nothing at all: the
+// result is a window into the same bytes — `{base, data + lo, hi - lo}` — so
+// there is no shifting, no copy and no allocation, whatever the length.
+//
+// `trimmed` is the shape that used to crash: with no other statement in the
+// body, the binding is exclusive, and the in-place arm then read a single word
+// out of the slot and dereferenced it as a `Str`. For an inline value that word
+// is the first eight *content* bytes, so `"  z  "` became a wild pointer.
 fn build() -> str {
     mut s = "";
-    set s = s +++ "  padded  "; // heap buffer via concat
-    set s = trim(s); // trimmed in place (realloc, not a fresh alloc)
+    set s = s +++ "  padded  ";
+    set s = trim(s);
     s
+}
+
+fn trimmed() -> u64 {
+    mut u = "  z  ";
+    set u = trim(u);
+    u.len()
 }.test({
     assert(build() == "padded");
+    assert(trimmed() == 1);
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 105
-binary size: 1616
-  code: 556
-  data: 46
-  metadata: 1014
+instructions executed: 130
+binary size: 1984
+  code: 712
+  data: 89
+  metadata: 1183
 functions:
-  __test$build:
+  __test$trimmed:
     calls: 1
-    bytes: 452
+    bytes: 604
   aipl_assert:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -41,4 +51,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 104
+    bytes: 108

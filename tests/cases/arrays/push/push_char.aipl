@@ -1,10 +1,12 @@
 import { equal as ==, len, push } from builtins;
 
-// Growable char[]: `cs.push(x)` grows the variable in place (rebuilding a
-// fresh `str`-shaped value each time — `char[]` has no in-place-growable
-// form, see `is_char_array`); a snapshot taken first (`let snap = cs`) keeps
-// its own value, so a later push to `cs` doesn't disturb it (value
-// semantics), mirroring `push_bool.aipl`/`push_growth.aipl`.
+// Growable char[]: `cs.push(x)` grows the variable in place; a snapshot taken
+// first (`let snap = cs`) keeps its own value, so a later push to `cs` doesn't
+// disturb it (value semantics), mirroring `push_bool.aipl`/`push_growth.aipl`.
+//
+// The snapshot is what makes this binding non-exclusive, so every push here
+// rebuilds a fresh value rather than appending into the existing storage —
+// `push_char_in_place.aipl` is the same loop without the alias.
 //
 // Must start from a char[] literal with at least one element, not an
 // untyped `[]` — see the `push` codegen arm in aipl-codegen: a push that
@@ -32,15 +34,15 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 147
-instructions executed: 280
-binary size: 3984
-  code: 1704
+instructions executed: 284
+binary size: 4072
+  code: 1732
   data: 244
-  metadata: 2036
+  metadata: 2096
 functions:
   __test$appended:
     calls: 1
-    bytes: 1596
+    bytes: 1624
   aipl_assert:
     calls: 5
     bytes: (external)

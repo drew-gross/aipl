@@ -2,27 +2,26 @@
 
 ## Status
 
-**Done through Stage 2.** `str` is a 24-byte composite in both runtimes, the
-8-byte tagged representation is gone, and the artifacts speak the one ABI. There
-is no switch and no second runtime; 932 tests pass.
+**Done through in-place mutation and growth.** `str` is a 24-byte composite in
+both runtimes, the 8-byte tagged representation is gone, the artifacts speak the
+one ABI, and a statically-owned string appends into its own storage instead of
+rebuilding. There is no switch and no second runtime; 942 tests pass.
 
-Stages 1–5 below are follow-on programs the new layout unlocks, each separately
+Stages 1–4 below are follow-on programs the new layout unlocks, each separately
 justifiable rather than part of a single push.
 
 - [ ] 1 `SpanStr` — expose the window a slice already is (`SPAN_STR.md`). Slicing
       itself is free now; what is missing is the language-level type.
-- [ ] 2 In-place mutation and growth — the ownership rule plus the capacity word.
-      Today `push`/`extend` on a `str` rebuild the buffer every time.
-- [ ] 3 Rope-native operations — concat is already O(1); slicing a rope still
+- [ ] 2 Rope-native operations — concat is already O(1); slicing a rope still
       materializes it, and `map`/`filter` over one could stream.
-- [ ] 4 Converge arrays onto the same model — inline and view arrays, one block
+- [ ] 3 Converge arrays onto the same model — inline and view arrays, one block
       header, one body of code.
-- [ ] 5 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag
+- [ ] 4 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag
       word. `str?` is 32 bytes today.
 
 **A standing principle for all of it:** anywhere strings and arrays can share a
 representation, a header, or a body of code, they should. They are the same
-thing — a refcounted buffer, a window into it, and a length — and Stage 4 is
+thing — a refcounted buffer, a window into it, and a length — and Stage 3 is
 where that stops being a coincidence.
 
 ### What the change cost, measured
@@ -118,7 +117,7 @@ allocation is not a fact anything needs to branch on:
   `SPAN_STR.md` is built around. Every buffer-backed `str` carries its own
   provenance, so `SpanStr` collapses to a type marker plus `.span() = data - base`.
 - Three live representations instead of four leaves a **spare tag**, where the
-  current design is at capacity — and Stage 5 has a use for it.
+  current design is at capacity — and Stage 4 has a use for it.
 
 Dropping the block's length word is what completes the unification. With a
 length in the header there are two candidate answers to "how long is this
@@ -131,8 +130,9 @@ spare = (base + cap) - (data + len)
 ```
 
 That is the whole test for appending in place — no "is this the whole
-allocation?" comparison, because Stage 2's ownership rule already establishes
-that nothing else can see the bytes past `data + len`.
+allocation?" comparison, because the ownership rule below already establishes
+that nothing else can see the bytes past `data + len`. `str24::append_owned` is
+where the test lives.
 
 One thing this gives up: a buffer no longer implies a trailing NUL, so a
 `str` handed to C must either have a spare byte to write one into or be
@@ -153,14 +153,14 @@ value: { node, 0, len | ROPE<<56 }
 The long-term plan is **not** to delete it. O(1) concat is a real result, most
 ropes in a pipeline are consumed by something that streams (printing already
 does, via `str_for_each_chunk`), and the operations that currently force
-materialization mostly don't have to. That is Stage 3.
+materialization mostly don't have to. That is Stage 2.
 
 The capacity word does **not** replace ropes; the two answer different questions
 and coexist:
 
 | Situation | Answer |
 |---|---|
-| Appending to a string you own, room to spare | write into the spare capacity, bump `len` (Stage 2) |
+| Appending to a string you own, room to spare | write into the spare capacity, bump `len` |
 | Appending to a string you own, out of room | reallocate with growth, copy once — amortized O(1) |
 | Concatenating values someone else may hold | build a rope node — O(1), no copy, no ownership question |
 
@@ -249,7 +249,7 @@ The build wiring: `crates/aipl-linker/build.rs` gained a `rerun-if-changed` for
 the shared path, so editing it rebuilds the staticlib. Verified by injecting a
 type error into the shared file and watching the AOT build fail.
 
-## The constraint that shapes Stage 2: `refcount == 1` is not ownership
+## The constraint that shapes in-place mutation: `refcount == 1` is not ownership
 
 The compiler **elides retains for borrow-only parameters**
 (`inspect_only_params`, in `aipl-mono`): when a callee provably only inspects
@@ -277,6 +277,23 @@ the same treatment, with one addition the arrays didn't need: a `str` may be a
 window into a larger buffer, so writing past `data + len` also needs the capacity
 test above.
 
+**This is implemented.** `str24::append_owned` is the runtime half: an inline
+value that still fits is a pure value computation, a sole owner with spare
+capacity writes past `data + len` and widens its window, a sole owner that is out
+of room grows the block under itself with `realloc` (capacity doubling, so a
+builder loop is amortized O(1)), and everything else — shared, static, a rope, or
+a window that cannot grow under itself — copies once into a buffer sized for the
+appends after this one. The static half is `binding_is_exclusive`, and codegen
+calls the in-place entry points *only* where it holds; `is_unique` refines that
+decision and never makes it.
+
+Three shapes reach it: `set s = s +++ r` on a `str` binding, and `push`/`extend`
+on a `char[]` one (`strings/concat_in_place{,_grows}.aipl`,
+`arrays/push/push_char_in_place.aipl`,
+`arrays/extend/extend_char_in_place.aipl`). A `char[]` binding's slot owns
+exactly one reference, the same model a `str` binding uses — `is_str_shaped`, not
+`is_str_repr`, is the predicate that decides so at both `LetMut` and `set`.
+
 ## What it buys
 
 - **Slices are free** — no allocation, no copy, at any length.
@@ -297,7 +314,7 @@ test above.
   heap blocks to 24 KB and *zero*; an array of a thousand long strings pays
   16 KB more for nothing.
 - **`str?` goes 16 → 32 bytes** under the current uniform `{tag, payload}`
-  optional layout. Stage 5 is the answer to this one and generalizes past `str`.
+  optional layout. Stage 4 is the answer to this one and generalizes past `str`.
 - **Copying a `str` is three words and a refcount**, not one word and a
   refcount.
 - **Codegen churn is enormous** — `str` moves from the scalar class to the
@@ -308,7 +325,7 @@ test above.
 - **Corpus-wide metric churn**: `instructions executed`, `binary size`, and
   `allocations` all move in every case.
 
-## Stage 3 — rope-native operations
+## Stage 2 — rope-native operations
 
 Ropes earn their keep only if the operations a rope commonly meets don't force
 it flat. The materialize path stays as the fallback; the work is to reach it
@@ -330,7 +347,7 @@ less often.
 The payoff is that `a + b` stays O(1) *and* the result stays cheap to consume,
 which is what makes laziness worth its complexity.
 
-## Stage 4 — converge arrays onto the same model
+## Stage 3 — converge arrays onto the same model
 
 Arrays are a single pointer to `[refcount][len][cap][elements]`, so the two
 families now differ for no good reason: strings carry
@@ -351,7 +368,7 @@ Element size is the wrinkle: strings have byte elements, arrays are
 `elem_size`-general with a bit-packed mode. The shared code has to be
 element-size-parameterized where the string version can hardcode 1.
 
-## Stage 5 — niche-filled optionals
+## Stage 4 — niche-filled optionals
 
 `T?` is `{tag: i64, payload}` today, which is what makes `str?` 32 bytes. But any
 type with an unused bit can host its own `none`:
@@ -370,7 +387,7 @@ So `str?` is 24 bytes, `bool?` and `char?` are 8, and only types with no niche
 The work is that "optional" stops being one layout and becomes a per-type
 question: a niche descriptor per type, and every site that builds, tests, or
 reads an optional — including `read_ffi_optional` and the sret paths — goes
-through it instead of assuming `{tag, payload}`. Worth doing after Stage 4, when
+through it instead of assuming `{tag, payload}`. Worth doing after Stage 3, when
 there is one value model to describe niches against rather than two.
 
 ## Verification

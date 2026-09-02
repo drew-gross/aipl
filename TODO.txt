@@ -75,6 +75,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  It's a bit misleading to say that +++ is is AIPL's concat operator. `concat` is AIPL's concat operator, and it is typically imported as +++. Any code that runs after import resolution shouldn't care about or even be able to care about the distinction, except for the case of error messages that suggest adding imports, where it knows that +++ is the usual name for concat.
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value
@@ -227,6 +228,7 @@ utilities:
 skills:
 
 lint:
+  push-in-loop lint should fire even when the array being pushed into doesn't start empty (it should recommend let v = [init, ...pushed])
   move the tests for each lint into the file for that lint
   find_if with modification should be find_if().map() (once T? supports map)
   lint to require use of [...foo(), bar] syntax instead of mut v = foo(); v.push.
@@ -267,7 +269,6 @@ chain_docs:
   rewrite this somehow, there must be a better way
 
 abi:
-  The StrAbi getting passed around approach is good, I expect ABI details to continue to get more complex in this langauge. Lets change StrAbi to just Abi, and have it contain a StrAbi field. The type will likely gain more fields later.
 
 design:
   write a design principles doc
@@ -278,6 +279,9 @@ design:
 optimizations:
   for (let c : s) still takes a runtime call per byte
   to_str allocates a buffer for short results instead of packing them inline.
+  str builder loops are in place now (STR_REPR stage 2); the *non*-exclusive
+    path still rebuilds per append, which is correct but is the remaining cost
+    whenever a binding is aliased.
   optimize string comparison by comparing more than one byte at a time
   add view and inline forms for arrays.
   array of slices of same string -> maybe this helps with the allocation increases from wide strings?
