@@ -101,18 +101,18 @@ pub fn parse_spec(src: str) -> Spec!str {
     assert(parse_spec("x\n--- cli ---\n")?.cli.len() == 0);
 
     // Companions, both flavors.
-    let c = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
-    assert(c.extra_files.len() == 1);
+    let Spec { extra_files } = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
+    assert(extra_files.len() == 1);
     assert(
-        match (c.extra_files[0]) {
+        match (extra_files[0]) {
             some(f) => f.path,
             none => "",
         } == "m.aipl",
     );
-    let e = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
-    assert(e.expect_files.len() == 1);
+    let Spec { expect_files } = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
+    assert(expect_files.len() == 1);
     assert(
-        match (e.expect_files[0]) {
+        match (expect_files[0]) {
             some(f) => f.contents,
             none => "",
         } == "written",
@@ -180,11 +180,11 @@ allocations: 127
 deallocations: 127
 reallocations: 0
 bytes allocated: 8264
-instructions executed: 30300
-binary size: 90536
-  code: 60428
-  data: 1838
-  metadata: 28270
+instructions executed: 30294
+binary size: 90344
+  code: 60328
+  data: 1830
+  metadata: 28186
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -215,7 +215,7 @@ functions:
     bytes: 744
   __test$parse_spec:
     calls: 1
-    bytes: 29928
+    bytes: 29828
   __test_try_fail_str:
     calls: 0
     bytes: 84
@@ -223,10 +223,10 @@ functions:
     calls: 0
     bytes: 276
   aipl_arr_inc:
-    calls: 237
+    calls: 235
     bytes: (external)
   aipl_array_dec:
-    calls: 294
+    calls: 292
     bytes: (external)
   aipl_array_new:
     calls: 55

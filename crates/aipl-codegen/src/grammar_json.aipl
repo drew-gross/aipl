@@ -411,11 +411,11 @@ allocations: 11263
 deallocations: 11263
 reallocations: 535
 bytes allocated: 815430
-instructions executed: 1694008
-binary size: 223376
-  code: 142628
+instructions executed: 1694885
+binary size: 223408
+  code: 142648
   data: 5228
-  metadata: 75520
+  metadata: 75532
 functions:
   __arr_drop_Json:
     calls: 125
@@ -587,7 +587,7 @@ functions:
     bytes: 2628
   __m5__match_many$JsonTok$Json:
     calls: 0
-    bytes: 1980
+    bytes: 1976
   __m5__match_maybe$JsonTok$Json:
     calls: 48
     bytes: 844
@@ -596,7 +596,7 @@ functions:
     bytes: 1312
   __m5__match_prod$JsonTok$Json:
     calls: 416
-    bytes: 4012
+    bytes: 4004
   __m5__match_rule$JsonTok$Json:
     calls: 1251
     bytes: 4748
@@ -611,7 +611,7 @@ functions:
     bytes: 380
   __m5__parse_cst$JsonTok$Json:
     calls: 37
-    bytes: 4460
+    bytes: 4492
   __m5__prev_end$JsonTok$Json:
     calls: 244
     bytes: 504
@@ -661,7 +661,7 @@ functions:
     calls: 772
     bytes: (external)
   aipl_arr_inc:
-    calls: 26988
+    calls: 27018
     bytes: (external)
   aipl_arr_join:
     calls: 120
@@ -673,7 +673,7 @@ functions:
     calls: 225
     bytes: (external)
   aipl_array_dec:
-    calls: 34596
+    calls: 34626
     bytes: (external)
   aipl_array_new:
     calls: 5099

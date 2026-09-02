@@ -1,0 +1,17 @@
+struct Pos { line: i64, col: i64 }
+
+fn make() -> Pos { line: 3, col: 7 }
+
+// Every mention of `p` is a field read, so the binding can be a pattern — and
+// then it says up front what it holds, instead of leaving a reader to scan the
+// block for whether `p` is also passed, compared or returned.
+fn f() -> i64 {
+    let p = make();
+    p.line
+}
+--- errors ---
+error: only the fields of "p" are read — destructure the binding instead: "let <Type> { line } = ..." (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_destructure_binding.aipl:9:13
+  |
+9 |     let p = make();
+  |             ^^^^

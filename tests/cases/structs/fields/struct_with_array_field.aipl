@@ -9,31 +9,31 @@ fn make() -> Tags {
     set ns.push("b");
     Tags { id: 7, names: ns }
 }.test({
-    let t = make();
-    assert(t.names[0].value_or("?") == "a");
-    assert(t.names[1].value_or("?") == "b");
-    let n: i64 = len(t.names);
-    assert(t.id * 10 + n == 72);
+    let Tags { names, id } = make();
+    assert(names[0].value_or("?") == "a");
+    assert(names[1].value_or("?") == "b");
+    let n: i64 = len(names);
+    assert(id * 10 + n == 72);
 })
 --- performance ---
 allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 136
-instructions executed: 276
-binary size: 3432
-  code: 1512
-  data: 174
-  metadata: 1746
+instructions executed: 270
+binary size: 3272
+  code: 1428
+  data: 156
+  metadata: 1688
 functions:
   __test$make:
     calls: 1
-    bytes: 1412
+    bytes: 1328
   aipl_arr_inc:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 8
+    calls: 6
     bytes: (external)
   aipl_array_new:
     calls: 1

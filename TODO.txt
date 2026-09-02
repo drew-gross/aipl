@@ -158,6 +158,7 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  destructuring with renames (let Foo { field as f, .. } = ...)
   allow passing int literals to u64 arguments
   implement if let, lint for it's use in case of none => {}
   module level constants
@@ -229,6 +230,7 @@ utilities:
 skills:
 
 lint:
+  recommend a destructuring with rename when names would be ambiguous
   declared mut but never mutated
   push-in-loop lint should fire even when the array being pushed into doesn't start empty (it should recommend let v = [init, ...pushed])
   move the tests for each lint into the file for that lint

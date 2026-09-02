@@ -424,18 +424,18 @@ fn shape(self: ListStyle) -> ListShape {
 // indented line with a trailing comma. Width decisions happen at print time, so
 // this only describes both layouts.
 fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
-    let s = style.shape();
+    let ListShape { open, close, spaced, trailing } = style.shape();
     if (items.len() == 0) {
-        return Text(`{s.open}{s.close}`);
+        return Text(`{open}{close}`);
     };
-    let edge = if (s.spaced) { Line } else { SoftLine };
+    let edge = if (spaced) { Line } else { SoftLine };
     let inner = [edge, ..items.intersperse(Concat([Text(","), Line]))];
-    mut parts = [Text(s.open), Indent(Concat(inner))];
-    if (s.trailing) {
+    mut parts = [Text(open), Indent(Concat(inner))];
+    if (trailing) {
         set parts.push(IfBroken(","));
     };
     set parts.push(edge);
-    set parts.push(Text(s.close));
+    set parts.push(Text(close));
     group(Concat(parts))
 }
 
@@ -450,7 +450,7 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 // trailing `--- section ---` blocks, stripping trailing whitespace, validating
 // with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?;
+    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?; #[allow]
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
@@ -641,8 +641,8 @@ fn import_names(self: W, acc0: ImportName[]) -> WKeys!FmtError {
 
 // `name as alias` — the spelling written when an import is renamed.
 fn import_alias(self: W, first: str) -> WStr {
-    let a = self.bump().w.bump();
-    WStr { w: a.w, text: `{first} as {a.text}` }
+    let WStr { w, text } = self.bump().w.bump();
+    WStr { w, text: `{first} as {text}` }
 }
 
 // Plain names first, operators last; within each group, ordinary `str` order on
@@ -744,8 +744,8 @@ fn set_or_dict_ty(self: W) -> WDoc!FmtError {
 
 // The `: V` half of a dict type.
 fn dict_value_ty(self: W) -> WDocs!FmtError {
-    let v = self.bump().w.ty()?;
-    ok(WDocs { w: v.w, docs: [Text(": "), v.doc] })
+    let WDoc { w, doc } = self.bump().w.ty()?;
+    ok(WDocs { w, docs: [Text(": "), doc] })
 }
 
 // A type name, plus `<A, B>` type arguments when applied. In type position `<`/`>`
@@ -802,9 +802,9 @@ fn type_params(self: W) -> WDoc!FmtError {
     if (self.peek_text() != "<") {
         return ok(WDoc { w: self, doc: Text("") });
     };
-    let tps = self.bump().w.type_param_list([]);
-    let closed = tps.w.expect(">")?.w;
-    ok(WDoc { w: closed, doc: comma_list_docs(tps.docs, Angles) })
+    let WDocs { w, docs } = self.bump().w.type_param_list([]);
+    let closed = w.expect(">")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, Angles) })
 }
 
 fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
@@ -825,8 +825,8 @@ fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
 
 // `T: ord` — the `: bound` half of a type parameter.
 fn param_bound(self: W, name: str) -> WDoc {
-    let b = self.bump().w.bump();
-    WDoc { w: b.w, doc: Text(`{name}: {b.text}`) }
+    let WStr { w, text } = self.bump().w.bump();
+    WDoc { w, doc: Text(`{name}: {text}`) }
 }
 
 // ---------- variant ----------
@@ -891,9 +891,9 @@ fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
 
 // A case's `(A, B)` payload types.
 fn variant_payload(self: W) -> WDoc!FmtError {
-    let tys = self.bump().w.ty_list(")", [])?;
-    let closed = tys.w.expect(")")?.w;
-    ok(WDoc { w: closed, doc: comma_list_docs(tys.docs, TyParens) })
+    let WDocs { w, docs } = self.bump().w.ty_list(")", [])?;
+    let closed = w.expect(")")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, TyParens) })
 }
 
 // The cases laid out: the first sits inline after `=`; each later one is preceded
@@ -1064,16 +1064,16 @@ fn fn_body(self: W) -> WDoc!FmtError {
 // already carries a comma or a colon between the braces and formats as usual.
 fn construct_body(self: W) -> WDoc!FmtError {
     let lone_shorthand = self.peek_text_n(1) == "," && self.peek_text_n(2) == "}";
-    let inits = self.struct_inits([])?;
-    let closed = inits.w.expect("}")?.w;
+    let WDocs { w, docs } = self.struct_inits([])?;
+    let closed = w.expect("}")?.w;
     if (lone_shorthand) {
         // Write the comma into the item itself so it survives *both* layouts,
         // and switch off the style's own break-only trailing comma so the
         // broken form doesn't end up with two.
-        let item = Concat([..inits.docs, Text(",")]);
+        let item = Concat([..docs, Text(",")]);
         return ok(WDoc { w: closed, doc: comma_list_docs([item], SpacedBracesNoTrailing) });
     };
-    ok(WDoc { w: closed, doc: comma_list_docs(inits.docs, SpacedBraces) })
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, SpacedBraces) })
 }
 
 // `!prints`, `!reads`, … — a run of effect annotations after the parameters.
@@ -1089,8 +1089,8 @@ fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
 }
 
 fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
-    let t = self.bump().w.ty()?;
-    ok(WDocs { w: t.w, docs: [..acc, Text(" -> "), t.doc] })
+    let WDoc { w, doc } = self.bump().w.ty()?;
+    ok(WDocs { w, docs: [..acc, Text(" -> "), doc] })
 }
 
 // `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
@@ -1152,8 +1152,8 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn spaced_default(self: W, acc: Doc[]) -> WDocs!FmtError {
-    let e = self.bump().w.expr()?;
-    ok(WDocs { w: e.w, docs: [..acc, Text(" = "), e.doc] })
+    let WDoc { w, doc } = self.bump().w.expr()?;
+    ok(WDocs { w, docs: [..acc, Text(" = "), doc] })
 }
 
 fn struct_item(self: W) -> WDoc!FmtError {
@@ -1198,8 +1198,8 @@ struct WEntries { w: W, entries: Doc[], prev_end: u64 }
 
 // A `{ .. }` block as its own independently-breaking group.
 fn block(self: W) -> WDoc!FmtError {
-    let b = self.block_layout()?;
-    ok(WDoc { w: b.w, doc: group(b.doc) })
+    let WDoc { w, doc } = self.block_layout()?;
+    ok(WDoc { w, doc: group(doc) })
 }
 
 // A `{ .. }` block: statements (`;`-terminated) plus an optional trailing
@@ -1210,21 +1210,21 @@ fn block(self: W) -> WDoc!FmtError {
 fn block_layout(self: W) -> WDoc!FmtError {
     let opened = self.expect("{")?.w;
     let body_start = opened.pos;
-    let e = opened.block_entries([], opened.last_end)?;
+    let WEntries { w, entries } = opened.block_entries([], opened.last_end)?;
 
     // A block containing any statement (a `;` anywhere inside it — nested ones
     // form their own block first, so the distinction doesn't matter) always lays
     // out one line per statement. Only a pure single-expression body may stay
     // flat.
-    let has_stmt = e.w.range_has_semi(body_start..e.w.pos);
-    let closed = e.w.expect("}")?.w;
-    if (e.entries.len() == 0) {
+    let has_stmt = w.range_has_semi(body_start..w.pos);
+    let closed = w.expect("}")?.w;
+    if (entries.len() == 0) {
         return ok(WDoc { w: closed, doc: Text("{}") });
     };
     let edge = if (has_stmt) { HardLine } else { Line };
     ok(WDoc {
         w: closed,
-        doc: Concat([Text("{"), Indent(Concat([edge, ..e.entries])), edge, Text("}")]),
+        doc: Concat([Text("{"), Indent(Concat([edge, ..entries])), edge, Text("}")]),
     })
 }
 
@@ -1394,8 +1394,8 @@ fn binding_ann(self: W) -> WDoc!FmtError {
     if (self.peek_text() != ":") {
         return ok(WDoc { w: self, doc: Text("") });
     };
-    let t = self.bump().w.ty()?;
-    ok(WDoc { w: t.w, doc: Concat([Text(": "), t.doc]) })
+    let WDoc { w, doc } = self.bump().w.ty()?;
+    ok(WDoc { w, doc: Concat([Text(": "), doc]) })
 }.test({
     // `toks_of` splits on spaces, so these inputs are spelled token-by-token.
     assert(walker_of(": u8 =").binding_ann().rendered(100)? == ": u8");
@@ -1523,8 +1523,8 @@ struct WSeg { w: W, seg: Seg }
 // bracket code in `postfix`. Left-assoc, mirroring the grammar (`a..b..c` parses,
 // even though it can only fail the type check later).
 fn expr(self: W) -> WDoc!FmtError {
-    let first = self.binop_expr()?;
-    first.w.range_tail(first.doc)
+    let WDoc { w, doc } = self.binop_expr()?;
+    w.range_tail(doc)
 }
 
 fn range_tail(self: W, acc0: Doc) -> WDoc!FmtError {
@@ -1656,22 +1656,19 @@ fn dot_seg(self: W) -> WSeg!FmtError {
 // `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
 fn index_seg(self: W) -> WSeg!FmtError {
     let opened = self.bump().w;
-    let inner = if (opened.peek_text() == "..") {
+    let WDocs { w, docs } = if (opened.peek_text() == "..") {
         opened.slice_to()?
     } else {
         opened.index_or_from()?
     };
-    let closed = inner.w.expect("]")?.w;
-    ok(WSeg {
-        w: closed,
-        seg: Seg { is_call: false, doc: Concat([Text("["), ..inner.docs, Text("]")]) },
-    })
+    let closed = w.expect("]")?.w;
+    ok(WSeg { w: closed, seg: Seg { is_call: false, doc: Concat([Text("["), ..docs, Text("]")]) } })
 }
 
 // `[..b]` — open-ended on the left.
 fn slice_to(self: W) -> WDocs!FmtError {
-    let e = self.bump().w.expr()?;
-    ok(WDocs { w: e.w, docs: [Text(".."), e.doc] })
+    let WDoc { w, doc } = self.bump().w.expr()?;
+    ok(WDocs { w, docs: [Text(".."), doc] })
 }
 
 // `[i]`, `[a..b]`, or `[a..]`.
@@ -1723,8 +1720,8 @@ fn atom(self: W) -> WDoc!FmtError {
         return ok(self.bump().str_atom());
     };
     if (self.peek_is(Num) || self.peek_is(CharTok) || self.peek_is(Constant)) {
-        let b = self.bump();
-        return ok(WDoc { w: b.w, doc: Text(b.text) });
+        let WStr { w, text } = self.bump();
+        return ok(WDoc { w, doc: Text(text) });
     };
     let t = self.peek_text();
     if (t == "if") {
@@ -1792,9 +1789,9 @@ fn tuple_rest(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn array_atom(self: W) -> WDoc!FmtError {
-    let elems = self.bump().w.call_args_until("]", [])?;
-    let closed = elems.w.expect("]")?.w;
-    ok(WDoc { w: closed, doc: comma_list_docs(elems.docs, Brackets) })
+    let WDocs { w, docs } = self.bump().w.call_args_until("]", [])?;
+    let closed = w.expect("]")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, Brackets) })
 }
 
 // `#{a, b}` (set) / `#{k: v}` (dict), and the empty-dict spelling `#{:}`.
@@ -1804,9 +1801,9 @@ fn set_or_dict_atom(self: W) -> WDoc!FmtError {
         let closed = opened.bump().w.expect("}")?.w;
         return ok(WDoc { w: closed, doc: Text("#{:}") });
     };
-    let entries = opened.dict_entries([])?;
-    let closed = entries.w.expect("}")?.w;
-    ok(WDoc { w: closed, doc: comma_list_docs(entries.docs, HashBraces) })
+    let WDocs { w, docs } = opened.dict_entries([])?;
+    let closed = w.expect("}")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, HashBraces) })
 }
 
 fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
@@ -1827,8 +1824,8 @@ fn dict_entries(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn dict_value(self: W, lead: Doc, k: Doc) -> WDoc!FmtError {
-    let v = self.bump().w.expr()?;
-    ok(WDoc { w: v.w, doc: Concat([lead, k, Text(": "), v.doc]) })
+    let WDoc { w, doc } = self.bump().w.expr()?;
+    ok(WDoc { w, doc: Concat([lead, k, Text(": "), doc]) })
 }
 
 // An identifier-led atom: a bare name, a call `f(..)`, or a struct construction
@@ -1851,15 +1848,12 @@ fn name_atom(self: W) -> WDoc!FmtError {
 }
 
 fn struct_atom(self: W, name: str) -> WDoc!FmtError {
-    let inits = self.struct_inits([])?;
-    let closed = inits.w.expect("}")?.w;
-    if (inits.docs.len() == 0) {
+    let WDocs { w, docs } = self.struct_inits([])?;
+    let closed = w.expect("}")?.w;
+    if (docs.len() == 0) {
         return ok(WDoc { w: closed, doc: Text(`{name} \{}`) });
     };
-    ok(WDoc {
-        w: closed,
-        doc: Concat([Text(`{name} `), comma_list_docs(inits.docs, SpacedBraces)]),
-    })
+    ok(WDoc { w: closed, doc: Concat([Text(`{name} `), comma_list_docs(docs, SpacedBraces)]) })
 }
 
 fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
@@ -1893,8 +1887,8 @@ fn struct_inits(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
-    let v = self.bump().w.expr()?;
-    ok(WDoc { w: v.w, doc: Concat([lead, Text(`{fname}: `), v.doc]) })
+    let WDoc { w, doc } = self.bump().w.expr()?;
+    ok(WDoc { w, doc: Concat([lead, Text(`{fname}: `), doc]) })
 }
 
 // ---------- if / match / lambda / templates ----------
@@ -2044,8 +2038,8 @@ fn pattern(self: W) -> WDoc!FmtError {
 }
 
 fn qualified_case(self: W, name: str) -> WStr {
-    let c = self.bump().w.bump();
-    WStr { w: c.w, text: `{name}.{c.text}` }
+    let WStr { w, text } = self.bump().w.bump();
+    WStr { w, text: `{name}.{text}` }
 }
 
 // Call-argument (or array-element) list up to `end`.
@@ -2127,8 +2121,8 @@ fn lambda_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
 }
 
 fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
-    let t = self.bump().w.ty()?;
-    ok(WDoc { w: t.w, doc: Concat([Text(`{name}: `), t.doc]) })
+    let WDoc { w, doc } = self.bump().w.ty()?;
+    ok(WDoc { w, doc: Concat([Text(`{name}: `), doc]) })
 }
 
 // Copy a template literal verbatim, from its head through the matching tail
@@ -2145,20 +2139,20 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
     mut w = self;
     mut depth = depth0;
     while (!w.at_end()) {
-        let t = w.cur_tok();
-        let stepped = w.advance(t.span.end);
-        if (t.kind == TplHead) {
+        let FmtTok { span, kind } = w.cur_tok();
+        let stepped = w.advance(span.end);
+        if (kind == TplHead) {
             set depth++;
         } else {
-            if (t.kind == TplTail) {
+            if (kind == TplTail) {
                 if (depth <= 1) {
                     // A triple-backtick template is a raw block (its closing ```
                     // aligns under the opening); a single-backtick one has no
                     // own-line closing delimiter, so `reindent_block` leaves it
                     // untouched.
                     return ok(WDoc {
-                        w: stepped.drop_comments_before(t.span.end),
-                        doc: RawBlock(self.src[start..t.span.end]),
+                        w: stepped.drop_comments_before(span.end),
+                        doc: RawBlock(self.src[start..span.end]),
                     });
                 };
                 set depth = depth - 1;
@@ -2734,11 +2728,11 @@ allocations: 18914
 deallocations: 18914
 reallocations: 1158
 bytes allocated: 1141177
-instructions executed: 3057224
-binary size: 3668112
-  code: 2267432
+instructions executed: 3056289
+binary size: 3667472
+  code: 2266936
   data: 23596
-  metadata: 1377084
+  metadata: 1376940
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2993,7 +2987,7 @@ functions:
     calls: 476
     bytes: (external)
   aipl_arr_inc:
-    calls: 50540
+    calls: 50379
     bytes: (external)
   aipl_arr_reserve:
     calls: 539
@@ -3002,7 +2996,7 @@ functions:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 62615
+    calls: 62454
     bytes: (external)
   aipl_array_new:
     calls: 10236
@@ -3072,7 +3066,7 @@ functions:
     bytes: 3948
   block_layout:
     calls: 47
-    bytes: 5632
+    bytes: 5196
   bump:
     calls: 954
     bytes: 1088
@@ -3087,13 +3081,13 @@ functions:
     bytes: 2772
   comma_list_docs:
     calls: 88
-    bytes: 4076
+    bytes: 4104
   comment_starts_before:
     calls: 281
     bytes: 280
   construct_body:
     calls: 0
-    bytes: 3604
+    bytes: 3640
   dict_entries:
     calls: 2
     bytes: 4532
@@ -3156,7 +3150,7 @@ functions:
     bytes: 4396
   index_seg:
     calls: 4
-    bytes: 4192
+    bytes: 4092
   item:
     calls: 14
     bytes: 1056
@@ -3276,7 +3270,7 @@ functions:
     bytes: 572
   struct_atom:
     calls: 2
-    bytes: 3364
+    bytes: 3340
   struct_field_value:
     calls: 1
     bytes: 1652

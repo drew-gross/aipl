@@ -36,9 +36,9 @@ fn set_n(t: Tagged, n: i64) -> Tagged {
     set u.n = n;
     u
 }.test({
-    let t = set_n(Tagged { n: 1, tag: 100 }, 2);
-    assert(t.n == 2);
-    assert(t.tag == 100); // stays 100, not reset to the default 7
+    let Tagged { n, tag } = set_n(Tagged { n: 1, tag: 100 }, 2);
+    assert(n == 2);
+    assert(tag == 100); // stays 100, not reset to the default 7
 })
 
 // A heap (str) field: the update releases the struct's reference on the old
@@ -52,9 +52,9 @@ fn rename(n: Named, name: str) -> Named {
     m
 }.test({
     let n = Named { name: "old" +++ "!", x: 5 };
-    let m = rename(n, "new" +++ "!");
-    assert(m.name == "new!");
-    assert(m.x == 5);
+    let Named { name, x } = rename(n, "new" +++ "!");
+    assert(name == "new!");
+    assert(x == 5);
 })
 --- performance ---
 allocations: 2
@@ -62,10 +62,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 176
 instructions executed: 372
-binary size: 3400
-  code: 1832
-  data: 99
-  metadata: 1469
+binary size: 3392
+  code: 1820
+  data: 97
+  metadata: 1475
 functions:
   __test$alias_unaffected:
     calls: 1
@@ -75,10 +75,10 @@ functions:
     bytes: 380
   __test$rename:
     calls: 1
-    bytes: 680
+    bytes: 676
   __test$set_n:
     calls: 1
-    bytes: 292
+    bytes: 284
   aipl_assert:
     calls: 8
     bytes: (external)

@@ -311,17 +311,17 @@ fn match_many<K: variant, A: any>(
     mut n: u64 = 0;
     mut going = true;
     while (going) {
-        let st = match_rule(p, sub, cp, cur, f)?;
-        set f = st.far;
-        if (st.hit) {
-            if (st.pos == cp) {
+        let Step { far, hit, pos, kids } = match_rule(p, sub, cp, cur, f)?;
+        set f = far;
+        if (hit) {
+            if (pos == cp) {
                 return err(ParseError {
                     message: "a repetition matched empty input, which would repeat forever",
                     span: 0..0,
                 });
             };
-            set cp = st.pos;
-            set acc.extend(st.kids);
+            set cp = pos;
+            set acc.extend(kids);
             set n++;
         } else {
             set going = false;
@@ -367,18 +367,18 @@ fn match_maybe<K: variant, A: any>(
 // position) is what the label is merged into. A transparent production (empty
 // `expect_as`) never collapses anything: its insides are the message.
 fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!ParseError {
-    let prod = p.prods[i].value_or_err(ParseError {
+    let Production { rule, expect_as } = p.prods[i].value_or_err(ParseError {
         message: `no production at index {i}`,
         span: 0..0,
     })?;
-    let st = match_rule(p, prod.rule, pos, i, far)?;
+    let st = match_rule(p, rule, pos, i, far)?;
     if (st.hit) {
         return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
     };
-    if (pos < st.far.pos || !prod.expect_as.is_nonempty()) {
+    if (pos < st.far.pos || !expect_as.is_nonempty()) {
         return ok(no(st.far, pos));
     };
-    ok(no(far_miss(far, pos, prod.expect_as), pos))
+    ok(no(far_miss(far, pos, expect_as), pos))
 }
 
 // Zero or more `item`s separated by `sep`. Always matches, because an empty list
@@ -556,14 +556,14 @@ pub fn parse_cst<K: variant, A: any>(
         span: 0..0,
     })?;
     let p = Parser { src, toks: lexed.tokens, trivia: lexed.trivia, prods: linked.prods };
-    let st = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
-    if (!st.hit) {
-        return err(error_at(p, st.far));
+    let Step { hit, far, pos, kids } = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
+    if (!hit) {
+        return err(error_at(p, far));
     };
-    if (st.pos < p.toks.len()) {
-        return err(error_at(p, far_miss(st.far, st.pos, "end of input")));
+    if (pos < p.toks.len()) {
+        return err(error_at(p, far_miss(far, pos, "end of input")));
     };
-    let root = st.kids
+    let root = kids
         .first()
         .value_or_err(ParseError { message: "the start rule built no node", span: 0..0 })?;
     ok(with_trailing(p, root))
@@ -596,11 +596,11 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
     match (node) {
         CTree(i, kids) => {
             let vals = kids.filter(is_tree).try_map(|k| lower_node(src, k, prods))?;
-            let prod = prods[i].value_or_err(ParseError {
+            let Production { build } = prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
                 span: node.span(),
             })?;
-            match (prod.build) {
+            match (build) {
                 Mk(f) => f(src, node, vals),
             }
         },
@@ -884,11 +884,11 @@ allocations: 2900
 deallocations: 2900
 reallocations: 331
 bytes allocated: 177457
-instructions executed: 423650
-binary size: 304600
-  code: 187596
+instructions executed: 424003
+binary size: 304632
+  code: 187616
   data: 5924
-  metadata: 111080
+  metadata: 111092
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1089,7 +1089,7 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8483
+    calls: 8509
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1104,7 +1104,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10591
+    calls: 10617
     bytes: (external)
   aipl_array_new:
     calls: 1347
@@ -1177,7 +1177,7 @@ functions:
     bytes: 2628
   match_many$Tok$Node:
     calls: 15
-    bytes: 1980
+    bytes: 1976
   match_maybe$Tok$Node:
     calls: 4
     bytes: 844
@@ -1186,7 +1186,7 @@ functions:
     bytes: 1312
   match_prod$Tok$Node:
     calls: 84
-    bytes: 4012
+    bytes: 4004
   match_rule$Tok$Node:
     calls: 269
     bytes: 4900
@@ -1201,7 +1201,7 @@ functions:
     bytes: 380
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 4460
+    bytes: 4492
   parsed:
     calls: 3
     bytes: 452

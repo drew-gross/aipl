@@ -75,10 +75,10 @@ deallocations: 1953
 reallocations: 30
 bytes allocated: 110170
 instructions executed: 348841
-binary size: 923392
-  code: 595224
+binary size: 922752
+  code: 594728
   data: 1891
-  metadata: 326277
+  metadata: 326133
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -298,7 +298,7 @@ functions:
     bytes: 3948
   __m6__block_layout:
     calls: 3
-    bytes: 5632
+    bytes: 5196
   __m6__bump:
     calls: 18
     bytes: 1088
@@ -313,13 +313,13 @@ functions:
     bytes: 2772
   __m6__comma_list_docs:
     calls: 3
-    bytes: 4076
+    bytes: 4104
   __m6__comment_starts_before:
     calls: 10
     bytes: 280
   __m6__construct_body:
     calls: 0
-    bytes: 3604
+    bytes: 3640
   __m6__dict_entries:
     calls: 0
     bytes: 4532
@@ -382,7 +382,7 @@ functions:
     bytes: 4396
   __m6__index_seg:
     calls: 0
-    bytes: 4192
+    bytes: 4092
   __m6__item:
     calls: 3
     bytes: 1056
@@ -496,7 +496,7 @@ functions:
     bytes: 572
   __m6__struct_atom:
     calls: 0
-    bytes: 3364
+    bytes: 3340
   __m6__struct_field_value:
     calls: 0
     bytes: 1652

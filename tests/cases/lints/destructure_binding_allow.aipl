@@ -1,0 +1,36 @@
+import { print } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+fn make() -> Pos { line: 3, col: 7 }
+
+// `#[allow]` on the binding's own line keeps it.
+fn main() !prints {
+    let p = make(); #[allow]
+    print(`{p.line} {p.col}`);
+}
+--- stdout ---
+3 7
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 210
+instructions executed: 93
+binary size: 1664
+  code: 624
+  data: 1
+  metadata: 1039
+functions:
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 420

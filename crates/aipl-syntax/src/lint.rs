@@ -10,6 +10,7 @@
 //! file right after parsing (the markers come from the lexer via
 //! `parse_with_allows`), so lints fire before type checking.
 
+mod destructure_binding;
 mod eta_lambda;
 mod field_init_shorthand;
 mod fn_body_type_stutter;
@@ -30,6 +31,7 @@ use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, Error, Span};
 use std::collections::HashSet;
 
+use self::destructure_binding::destructure_binding;
 use self::eta_lambda::eta_lambda;
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
@@ -90,6 +92,7 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let cmp = len_zero_cmp(program);
     each_expr(program, &mut |e| len_gt_zero(e, src, &cmp, &mut hits));
     unused_imports(program, &mut hits);
+    destructure_binding(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
     hits.retain(|e| match &e.span {
         Some(sp) => !allowed.contains(&line_of(src, sp.start)),

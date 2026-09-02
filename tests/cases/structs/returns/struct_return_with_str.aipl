@@ -6,9 +6,9 @@ import { concat as +++, equal as == } from builtins;
 struct Tagged { label: str, n: i64 }
 
 fn tag(name: str, k: i64) -> Tagged { label: "tag: " +++ name, n: k }.test({
-    let t = tag("alpha", 7);
-    assert(t.label == "tag: alpha");
-    assert(t.n == 7);
+    let Tagged { label, n } = tag("alpha", 7);
+    assert(label == "tag: alpha");
+    assert(n == 7);
 })
 --- performance ---
 allocations: 1
@@ -16,14 +16,14 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 84
-binary size: 1512
-  code: 496
-  data: 50
-  metadata: 966
+binary size: 1504
+  code: 492
+  data: 48
+  metadata: 964
 functions:
   __test$tag:
     calls: 1
-    bytes: 396
+    bytes: 392
   aipl_assert:
     calls: 2
     bytes: (external)

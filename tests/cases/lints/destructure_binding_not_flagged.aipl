@@ -1,0 +1,75 @@
+import { equal as ==, print } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+struct Pair { a: i64, b: i64 }
+
+fn make() -> Pos { line: 3, col: 7 }
+
+fn take(p: Pos) -> i64 { p.line }
+
+fn pair() -> Pair { a: 1, b: 2 }
+
+// The shapes a pattern cannot replace, each for its own reason.
+fn main() !prints {
+    // One mention that is not a field read is enough: the value itself is what
+    // is passed, and a pattern keeps only the fields.
+    let passed = make();
+    print(`{passed.col} {take(passed)}`);
+
+    // Built on this line — a pattern would restate the type and the fields the
+    // literal just wrote.
+    let built = Pos { line: 1, col: 2 };
+    print(`{built.line} {built.col}`);
+
+    // A field read off two values: `a` and `b` would each name two things, and
+    // the binding names are what tell them apart.
+    let one = pair();
+    let two = pair();
+    print(`{one.a} {two.a} {one.b} {two.b}`);
+
+    // Read by position — a tuple has no struct name to write, and the tuple
+    // form would have to name every slot, not just the ones read.
+    let t = (8, 9);
+    print(`{t._0}`);
+
+    // The name the pattern would introduce is taken.
+    let col = 5;
+    let q = make();
+    print(`{q.col == col}`);
+}
+--- stdout ---
+7 3
+1 2
+1 1 2 2
+8
+false
+--- performance ---
+allocations: 20
+deallocations: 20
+reallocations: 0
+bytes allocated: 1054
+instructions executed: 474
+binary size: 4400
+  code: 2324
+  data: 47
+  metadata: 2029
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1888
