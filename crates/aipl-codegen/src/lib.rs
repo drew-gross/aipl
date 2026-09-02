@@ -863,6 +863,81 @@ fn write_ok(out: *mut i64, stdout: &[u8], stderr: &[u8], exit_code: i64) {
     }
 }
 
+/// The wide `ExecResult!Error` layout, written by hand because the runtime has
+/// no layout table: tag, then either the `Error` message or the `ExecResult`
+/// struct `{ stdout, stderr, exit_code }`. Both start at `OPT_VALUE_OFFSET` and
+/// every `str` is a whole value, so the offsets are multiples of
+/// `str24::STR_SIZE` rather than of a word. Must agree with what `field_size`
+/// computes for the same types — that is what codegen reads it back with.
+fn write_err_wide(out: *mut u8, message: &[u8]) {
+    unsafe {
+        *(out as *mut i64) = 0;
+        std::ptr::write(
+            out.add(OPT_VALUE_OFFSET as usize) as *mut str24::Str,
+            str24::from_bytes(message),
+        );
+    }
+}
+
+fn write_ok_wide(out: *mut u8, stdout: &[u8], stderr: &[u8], exit_code: i64) {
+    unsafe {
+        *(out as *mut i64) = 1;
+        let base = out.add(OPT_VALUE_OFFSET as usize);
+        std::ptr::write(base as *mut str24::Str, str24::from_bytes(stdout));
+        std::ptr::write(
+            base.add(str24::STR_SIZE) as *mut str24::Str,
+            str24::from_bytes(stderr),
+        );
+        *(base.add(2 * str24::STR_SIZE) as *mut i64) = exit_code;
+    }
+}
+
+/// `execute_program` under the wide ABI. Only the marshalling differs from
+/// `execute_program_impl` — the program name and each argument are whole `str`
+/// values rather than words, and the result's `str` fields likewise — so the
+/// spawn itself is shared through `run_program`.
+#[no_mangle]
+extern "C" fn aipl2_execute_program(out: *mut u8, program: *const str24::Str, args: *const u8) {
+    let mut scratch = [0u8; str24::INLINE_CAP];
+    let pv = unsafe { *program };
+    let Ok(program) = std::str::from_utf8(pv.bytes(&mut scratch)) else {
+        return write_err_wide(out, b"could not execute program");
+    };
+    let program = program.to_string();
+    let mut arg_strings: Vec<String> = Vec::new();
+    if !args.is_null() {
+        let len = unsafe { array_len_of(args) };
+        let elems = unsafe { args.add(ARR_ELEMS_OFFSET) as *const str24::Str };
+        for i in 0..len {
+            let ev = unsafe { std::ptr::read(elems.add(i)) };
+            let mut buf = [0u8; str24::INLINE_CAP];
+            let Ok(s) = std::str::from_utf8(ev.bytes(&mut buf)) else {
+                return write_err_wide(out, b"could not execute program");
+            };
+            arg_strings.push(s.to_string());
+        }
+    }
+    match run_program(&program, &arg_strings) {
+        Some((stdout, stderr, code)) => write_ok_wide(out, &stdout, &stderr, code),
+        None => write_err_wide(out, b"could not execute program"),
+    }
+}
+
+/// Spawn `program` with `args` and collect its output. `None` if it could not be
+/// launched, or if either stream holds a NUL byte (which a NUL-terminated `str`
+/// cannot represent — the same constraint `read_file_to_string` has).
+fn run_program(program: &str, args: &[String]) -> Option<(Vec<u8>, Vec<u8>, i64)> {
+    let output = std::process::Command::new(program)
+        .args(args)
+        .output()
+        .ok()?;
+    if output.stdout.contains(&0) || output.stderr.contains(&0) {
+        return None;
+    }
+    let code = i64::from(output.status.code().unwrap_or(-1));
+    Some((output.stdout, output.stderr, code))
+}
+
 fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u8) {
     if program.is_null() || args.is_null() {
         return write_err(out, b"could not execute program");
@@ -1184,10 +1259,18 @@ extern "C" fn aipl_arr_sort(
             let src = a.add(ARR_ELEMS_OFFSET);
             std::ptr::copy_nonoverlapping(src, dst, len * elem_size.max(8) as usize);
             // The new array co-owns every element. Done before the sort because
-            // reordering words neither creates nor destroys a reference.
+            // reordering elements neither creates nor destroys a reference.
             elem_rc(retain_fn, dst, len);
-            let words = std::slice::from_raw_parts_mut(dst as *mut i64, len);
-            sort_words(words, kind);
+            // A wide `str` element is the whole 24-byte value, not a word, so it
+            // is both moved and compared differently — `sort_words` would
+            // reorder thirds of values and compare their first fields.
+            if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
+                let vals = std::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
+                str24::sort_values(vals);
+            } else {
+                let words = std::slice::from_raw_parts_mut(dst as *mut i64, len);
+                sort_words(words, kind);
+            }
         }
     }
     aipl_array_dec(a);
@@ -5417,6 +5500,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl2_str_reverse", str24::aipl2_str_reverse as *const u8);
     jit_builder.symbol("aipl2_str_sort", str24::aipl2_str_sort as *const u8);
     jit_builder.symbol("aipl2_str_repeat", str24::aipl2_str_repeat as *const u8);
+    jit_builder.symbol("aipl2_char_to_str", str24::aipl2_char_to_str as *const u8);
     jit_builder.symbol("aipl2_str_alloc", str24::aipl2_str_alloc as *const u8);
     jit_builder.symbol(
         "aipl2_str_write_ptr",
@@ -5448,6 +5532,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
         str24_host::aipl2_write_string_to_file as *const u8,
     );
     jit_builder.symbol("aipl2_list_files", aipl2_list_files as *const u8);
+    jit_builder.symbol("aipl2_execute_program", aipl2_execute_program as *const u8);
     jit_builder.symbol("aipl2_str_split", aipl2_str_split as *const u8);
     jit_builder.symbol("aipl2_str_join", aipl2_str_join as *const u8);
     jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
@@ -7770,6 +7855,17 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
     Ok((program, wants_args))
 }
 
+/// The 1-byte flag telling the AOT runtime which `str` representation the object
+/// speaks, exported alongside [`MAIN_WANTS_ARGS_SYMBOL`].
+///
+/// The JIT runtime reads `AIPL_STR24` directly; the AOT one cannot — it is a
+/// `no_std` staticlib with no environment, linked once and reused for every
+/// object. So the *object* carries the answer, exactly as it already carries
+/// whether `main` wanted its arguments. Needed wherever the runtime builds or
+/// walks values on the compiled code's behalf without being handed a type: the
+/// CLI argument array is the first such place.
+pub const STR24_SYMBOL: &str = "__aipl_str24";
+
 /// Emit the [`MAIN_WANTS_ARGS_SYMBOL`] flag as a 1-byte exported data object so
 /// the runtime can read it at startup.
 fn emit_main_wants_args_flag(module: &mut ObjectModule, wants_args: bool) -> Result<(), Error> {
@@ -7781,6 +7877,19 @@ fn emit_main_wants_args_flag(module: &mut ObjectModule, wants_args: bool) -> Res
     module
         .define_data(data_id, &desc)
         .map_err(|e| Error::msg(format!("define {MAIN_WANTS_ARGS_SYMBOL}: {e}")))?;
+    Ok(())
+}
+
+/// Emit the [`STR24_SYMBOL`] representation flag, the same way.
+fn emit_str24_flag(module: &mut ObjectModule) -> Result<(), Error> {
+    let data_id = module
+        .declare_data(STR24_SYMBOL, Linkage::Export, false, false)
+        .map_err(|e| Error::msg(format!("declare {STR24_SYMBOL}: {e}")))?;
+    let mut desc = DataDescription::new();
+    desc.define(vec![u8::from(str24_enabled())].into_boxed_slice());
+    module
+        .define_data(data_id, &desc)
+        .map_err(|e| Error::msg(format!("define {STR24_SYMBOL}: {e}")))?;
     Ok(())
 }
 
@@ -7866,6 +7975,7 @@ impl ObjectCompilation {
             instrument,
         )?;
         emit_main_wants_args_flag(&mut module, main_wants_args)?;
+        emit_str24_flag(&mut module)?;
 
         Ok(Self { module, funcs, ir })
     }
@@ -8694,7 +8804,7 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_concat" => sig(&[Word, Word], Ret::Str),
         "aipl2_str_repeat" => sig(&[Word, Word], Ret::Str),
         "aipl2_str_slice" => sig(&[Word, Word, Word], Ret::Str),
-        "aipl2_str_alloc" => sig(&[Word], Ret::Str),
+        "aipl2_str_alloc" | "aipl2_char_to_str" => sig(&[Word], Ret::Str),
         "aipl2_str_write_ptr" => sig(&[Word], Ret::Word),
         "aipl2_str_iter_init" => sig(&[Word, Word], Ret::None),
         "aipl2_str_iter_next" => sig(&[Word], Ret::Word),
@@ -8710,6 +8820,7 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_read_file_to_string" => sig(&[Word, Word], Ret::Word),
         "aipl2_write_string_to_file" => sig(&[Word, Word], Ret::Word),
         "aipl2_list_files" => sig(&[Word], Ret::Word),
+        "aipl2_execute_program" => sig(&[Word, Word, Word], Ret::None),
         "aipl2_str_join" => sig(&[Word, Word], Ret::Str),
         "aipl2_assert" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
@@ -8783,6 +8894,7 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_str_repeat" => "aipl2_str_repeat",
         "aipl_str_split" => "aipl2_str_split",
         "aipl_list_files" => "aipl2_list_files",
+        "aipl_execute_program" => "aipl2_execute_program",
         "aipl_write_string_to_file" => "aipl2_write_string_to_file",
         "aipl_str_join" => "aipl2_str_join",
         "aipl_inc" => "aipl2_inc",
@@ -15086,7 +15198,18 @@ fn contains_shape(name: &str) -> Option<SeShape> {
 /// inline layout is byte0 = `(1 << 2) | 1` (= 5) and content byte = `c`, so the
 /// value is `5 | (c << 8)`. No allocation, no refcount (see the SSO note). This
 /// is the `__char_to_str` builtin emitted by variadic `char*` specialization.
-fn emit_char_to_str(builder: &mut FunctionBuilder, c: Value) -> Value {
+fn emit_char_to_str<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    c: Value,
+) -> Value {
+    if str24_enabled() {
+        // A wide inline value is spread across all three words, so it is built by
+        // the runtime rather than open-coded here; `Builtins::call` allocates the
+        // out slot and hands back its address.
+        return cx.builtins.call(module, builder, "aipl2_char_to_str", &[c]);
+    }
     let shifted = builder.ins().ishl_imm_u(c, 8);
     builder.ins().bor_imm_u(shifted, 5)
 }
@@ -15718,7 +15841,7 @@ fn compile_call_expr<M: Module>(
             } else if t == ConcreteType::Primitive(Primitive::Char) {
                 // An inline one-char `str`: no allocation and no refcount, so
                 // there is nothing to track for release.
-                emit_char_to_str(builder, v)
+                emit_char_to_str(module, builder, cx, v)
             } else {
                 emit_to_str(module, builder, cx, scopes, v, &t)?
             };
@@ -16874,7 +16997,7 @@ fn compile_call_expr<M: Module>(
                 // `None` for the optional shape (handled with a tag branch).
                 let pat: Option<Value> = match shape {
                     SeShape::Seq => Some(pat_v),
-                    SeShape::Elem => Some(emit_char_to_str(builder, pat_v)),
+                    SeShape::Elem => Some(emit_char_to_str(module, builder, cx, pat_v)),
                     SeShape::Opt => None,
                 };
                 if let Some(pat) = pat {
@@ -16905,7 +17028,7 @@ fn compile_call_expr<M: Module>(
                         pat_v,
                         OPT_VALUE_OFFSET as i32,
                     );
-                    let s = emit_char_to_str(builder, cv);
+                    let s = emit_char_to_str(module, builder, cx, cv);
                     let mut call_args = vec![recv, s];
                     call_args.extend(at);
                     let r = builtins.call(module, builder, sym, &call_args);
@@ -17006,7 +17129,7 @@ fn compile_call_expr<M: Module>(
                 // is materialized only as an inline string — no allocation.
                 let ndl: Option<Value> = match shape {
                     SeShape::Seq => Some(ndl_v),
-                    SeShape::Elem => Some(emit_char_to_str(builder, ndl_v)),
+                    SeShape::Elem => Some(emit_char_to_str(module, builder, cx, ndl_v)),
                     SeShape::Opt => None,
                 };
                 if let Some(ndl) = ndl {
@@ -17034,7 +17157,7 @@ fn compile_call_expr<M: Module>(
                         ndl_v,
                         OPT_VALUE_OFFSET as i32,
                     );
-                    let s = emit_char_to_str(builder, cv);
+                    let s = emit_char_to_str(module, builder, cx, cv);
                     // Borrowed, like the sibling site above. `s` is an inline
                     // one-char string, so it owns no allocation to release.
                     let r = builtins.call(module, builder, "aipl_str_contains", &[recv, s]);
@@ -17117,7 +17240,7 @@ fn compile_call_expr<M: Module>(
             }
             let (c, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             (
-                emit_char_to_str(builder, c),
+                emit_char_to_str(module, builder, cx, c),
                 ConcreteType::Primitive(Primitive::Str),
             )
         }
@@ -17364,11 +17487,16 @@ fn compile_call_expr<M: Module>(
             // change, since ownership relocates from `e`'s read slot to slot `w`.
             let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let (w, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
-            let (e, _) = compile_expr(module, builder, cx, scopes, &args[2])?;
+            let (e, ety) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
-            let off = builder.ins().imul_imm_s(w, 8);
+            // Stride and store both follow the element type. They were a fixed 8
+            // and a word store, on the in-place gate's assumption that an element
+            // is never composite — true until a wide `str` became one. A
+            // composite store is still a bit copy, so the "ownership relocates"
+            // reasoning above is unchanged.
+            let off = builder.ins().imul_imm_s(w, elem_size_of(&ety, structs));
             let addr = builder.ins().iadd(base, off);
-            builder.ins().store(MemFlagsData::trusted(), e, addr, 0);
+            store_array_elem(builder, addr, e, &ety, structs);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__filter_drop" => {
@@ -17407,11 +17535,14 @@ fn compile_call_expr<M: Module>(
             let (new_val, new_ty) = compile_expr(module, builder, cx, scopes, &args[2])?;
             let (old_val, old_ty) = compile_expr(module, builder, cx, scopes, &args[3])?;
             let base = builder.ins().iadd_imm_s(a_ptr, ARR_ELEMS_OFFSET as i64);
-            let off = builder.ins().imul_imm_s(i_val, 8);
-            let addr = builder.ins().iadd(base, off);
-            builder
+            // The block's stride is the *old* element type's — that is what it
+            // was allocated with — while the value written is the new one. Both
+            // were a fixed 8 until a wide `str` made an element composite.
+            let off = builder
                 .ins()
-                .store(MemFlagsData::trusted(), new_val, addr, 0);
+                .imul_imm_s(i_val, elem_size_of(&old_ty, structs));
+            let addr = builder.ins().iadd(base, off);
+            store_array_elem(builder, addr, new_val, &new_ty, structs);
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
             let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);

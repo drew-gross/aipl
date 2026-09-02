@@ -1489,6 +1489,55 @@ fn write_err(out: *mut i64, message: &[u8]) {
     }
 }
 
+/// The wide `ExecResult!Error` layout — tag, then either the `Error` message or
+/// `{ stdout, stderr, exit_code }`. Every `str` is a whole value, so the offsets
+/// step by `str24::STR_SIZE` rather than by a word. Mirrors codegen's
+/// `write_err_wide` / `write_ok_wide`; both must agree with what `field_size`
+/// computes, since that is what reads them back.
+fn write_err_wide(out: *mut u8, message: &[u8]) {
+    unsafe {
+        *(out as *mut i64) = 0;
+        core::ptr::write(out.add(8) as *mut str24::Str, str24::from_bytes(message));
+    }
+}
+
+fn write_ok_wide(out: *mut u8, stdout: &[u8], stderr: &[u8], exit_code: i64) {
+    unsafe {
+        *(out as *mut i64) = 1;
+        let base = out.add(8);
+        core::ptr::write(base as *mut str24::Str, str24::from_bytes(stdout));
+        core::ptr::write(
+            base.add(str24::STR_SIZE) as *mut str24::Str,
+            str24::from_bytes(stderr),
+        );
+        *(base.add(2 * str24::STR_SIZE) as *mut i64) = exit_code;
+    }
+}
+
+/// `execute_program` under the wide ABI. Borrows both arguments, like every
+/// `aipl2_*` entry point; the spawn itself is shared with the tagged path, which
+/// is why `run` takes the representation rather than being duplicated.
+#[no_mangle]
+pub extern "C" fn aipl2_execute_program(
+    out: *mut u8,
+    program: *const str24::Str,
+    args: *const u8,
+) {
+    count_builtin!(builtin_calls::AIPL_EXECUTE_PROGRAM);
+    #[cfg(unix)]
+    unsafe {
+        if args.is_null() {
+            return write_err_wide(out, b"could not execute program");
+        }
+        exec_unix::run(out as *mut i64, program as *const u8, args, true);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (program, args);
+        write_err_wide(out, b"could not execute program");
+    }
+}
+
 /// `stdout_ptr`/`stderr_ptr` are already-constructed `str` values (owned).
 fn write_ok(out: *mut i64, stdout_ptr: *const u8, stderr_ptr: *const u8, exit_code: i64) {
     unsafe {
@@ -1512,7 +1561,7 @@ unsafe fn execute_program_impl(out: *mut i64, program: *const u8, args: *const u
             write_err(out, b"could not execute program");
             return;
         }
-        exec_unix::run(out, program, args);
+        exec_unix::run(out, program, args, false);
     }
 }
 
@@ -1528,6 +1577,9 @@ mod exec_unix {
         aipl_array_dec, aipl_dec, array_len, fail_msg, fclose, fmt_i64, fopen, fread, fseek,
         ftell, make_str, rt_alloc, rt_free, str_bytes, write_ok, ARR_ELEMS_OFFSET, SEEK_END,
         SEEK_SET,
+        str24,
+        write_ok_wide,
+        write_err_wide,
     };
     use core::ffi::{c_char, c_int, c_void};
     use core::sync::atomic::{AtomicU64, Ordering};
@@ -1556,6 +1608,24 @@ mod exec_unix {
 
     /// A fresh, `rt_alloc`'d, NUL-terminated copy of a str value's bytes (any
     /// representation), for building a C `argv` entry. Freed by the caller.
+    /// [`dup_cstr`] for a wide `str`, which is a window carrying no terminator.
+    unsafe fn dup_cstr_wide(v: str24::Str) -> *mut c_char {
+        let mut scratch = [0u8; str24::INLINE_CAP];
+        let bytes = v.bytes(&mut scratch);
+        let n = bytes.len();
+        unsafe {
+            let buf = rt_alloc(n + 1) as *mut u8;
+            if buf.is_null() {
+                super::abort();
+            }
+            if n > 0 {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, n);
+            }
+            *buf.add(n) = 0;
+            buf as *mut c_char
+        }
+    }
+
     unsafe fn dup_cstr(v: *const u8) -> *mut c_char {
         unsafe {
             let mut b = [0u8; 8];
@@ -1652,10 +1722,13 @@ mod exec_unix {
     /// `program`/`a` (a heap-representation array — the caller already
     /// materialized any reversed view) are each consumed exactly once, on
     /// every path.
-    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8) {
+    /// `wide` selects the `str` representation of `program` and of `a`'s
+    /// elements, and of the result written to `out`. Everything between —
+    /// argv, the spawn, the capture — is identical, so it is threaded through
+    /// rather than duplicated.
+    pub unsafe fn run(out: *mut i64, program: *const u8, a: *const u8, wide: bool) {
         unsafe {
             let len = array_len(a);
-            let elems = a.add(ARR_ELEMS_OFFSET) as *const i64;
 
             // argv: program, each arg, then a NULL terminator.
             let argv =
@@ -1663,14 +1736,24 @@ mod exec_unix {
             if argv.is_null() {
                 super::abort();
             }
-            *argv = dup_cstr(program);
-            aipl_dec(program);
-            for i in 0..len {
-                let ep = core::ptr::read(elems.add(i)) as *const u8;
-                *argv.add(1 + i) = dup_cstr(ep);
+            if wide {
+                // Borrowed under this ABI: nothing is released here.
+                *argv = dup_cstr_wide(*(program as *const str24::Str));
+                let elems = a.add(ARR_ELEMS_OFFSET) as *const str24::Str;
+                for i in 0..len {
+                    *argv.add(1 + i) = dup_cstr_wide(core::ptr::read(elems.add(i)));
+                }
+            } else {
+                let elems = a.add(ARR_ELEMS_OFFSET) as *const i64;
+                *argv = dup_cstr(program);
+                aipl_dec(program);
+                for i in 0..len {
+                    let ep = core::ptr::read(elems.add(i)) as *const u8;
+                    *argv.add(1 + i) = dup_cstr(ep);
+                }
+                aipl_array_dec(a);
             }
             *argv.add(1 + len) = core::ptr::null_mut();
-            aipl_array_dec(a);
 
             let mut outbuf = [0u8; 96];
             let mut errbuf = [0u8; 96];
@@ -1688,7 +1771,7 @@ mod exec_unix {
                     remove(err_path);
                 }
                 free_argv(argv, 1 + len);
-                return fail_msg(out);
+                return fail_msg(out, wide);
             }
             let out_fd = fileno(out_f);
             let err_fd = fileno(err_f);
@@ -1707,7 +1790,7 @@ mod exec_unix {
                 remove(out_path);
                 remove(err_path);
                 free_argv(argv, 1 + len);
-                return fail_msg(out);
+                return fail_msg(out, wide);
             }
             let (err_r, err_w) = (errpipe[0], errpipe[1]);
             fcntl(err_w, F_SETFD, FD_CLOEXEC);
@@ -1721,7 +1804,7 @@ mod exec_unix {
                 remove(out_path);
                 remove(err_path);
                 free_argv(argv, 1 + len);
-                return fail_msg(out);
+                return fail_msg(out, wide);
             }
             if pid == 0 {
                 // Child: redirect stdout/stderr to the temp files, then exec.
@@ -1760,7 +1843,7 @@ mod exec_unix {
             if exec_failed {
                 remove(out_path);
                 remove(err_path);
-                return fail_msg(out);
+                return fail_msg(out, wide);
             }
 
             let stdout_ptr = read_temp_file(out_path);
@@ -1768,15 +1851,33 @@ mod exec_unix {
             remove(out_path);
             remove(err_path);
             match (stdout_ptr, stderr_ptr) {
+                (Some(so), Some(se)) if wide => {
+                    // `read_temp_file` hands back tagged values either way; copy
+                    // their bytes into wide ones and release the originals.
+                    let mut ob = [0u8; 8];
+                    let mut eb = [0u8; 8];
+                    write_ok_wide(
+                        out as *mut u8,
+                        str_bytes(so, &mut ob),
+                        str_bytes(se, &mut eb),
+                        exit_code,
+                    );
+                    aipl_dec(so);
+                    aipl_dec(se);
+                }
                 (Some(so), Some(se)) => write_ok(out, so, se, exit_code),
-                _ => fail_msg(out),
+                _ => fail_msg(out, wide),
             }
         }
     }
 }
 
-fn fail_msg(out: *mut i64) {
-    write_err(out, b"could not execute program");
+fn fail_msg(out: *mut i64, wide: bool) {
+    if wide {
+        write_err_wide(out as *mut u8, b"could not execute program");
+    } else {
+        write_err(out, b"could not execute program");
+    }
 }
 
 /// Format `n` in decimal into the END of `buf` (at least 20 bytes), returning
@@ -2149,8 +2250,13 @@ pub extern "C" fn aipl_arr_sort(
             // The new array co-owns every element. Done before the sort because
             // reordering words neither creates nor destroys a reference.
             elem_rc(retain_fn, dst, len);
-            let words = core::slice::from_raw_parts_mut(dst as *mut i64, len);
-            sort_words(words, kind);
+            if kind == SORT_KIND_STR && elem_size == str24::STR_SIZE as i64 {
+                let vals = core::slice::from_raw_parts_mut(dst as *mut str24::Str, len);
+                str24::sort_values(vals);
+            } else {
+                let words = core::slice::from_raw_parts_mut(dst as *mut i64, len);
+                sort_words(words, kind);
+            }
         }
         aipl_array_dec(a);
         raw
@@ -4104,6 +4210,21 @@ unsafe fn aipl_str_from_cstr(cstr: *const c_char) -> *const u8 {
 unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
     unsafe {
         let n = if argc > 1 { (argc - 1) as i64 } else { 0 };
+        // Built by the runtime and read by compiled code, so the two must agree
+        // byte for byte — and this is one of the few places the runtime has no
+        // type to consult. The object exports which representation it speaks
+        // (`__aipl_str24`); see `STR24_SYMBOL` in codegen.
+        if str24_object() {
+            let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+            let arr = aipl_array_new(n, drop_fn, str24::STR_SIZE as i64);
+            let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
+            for i in 0..n as usize {
+                let c = *argv.add(i + 1);
+                let bytes = core::slice::from_raw_parts(c as *const u8, strlen(c));
+                core::ptr::write(elems.add(i), str24::from_bytes(bytes));
+            }
+            return arr;
+        }
         let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
         let arr = aipl_array_new(n, drop_fn, 8);
         let elems = arr.add(ARR_ELEMS_OFFSET) as *mut i64;
@@ -4113,6 +4234,13 @@ unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
         }
         arr
     }
+}
+
+/// Whether the linked object was compiled with the 24-byte `str`, read from the
+/// flag it exports. The staticlib is built once and linked into objects of
+/// either representation, so this is the runtime's only way to know.
+fn str24_object() -> bool {
+    unsafe { __aipl_str24 != 0 }
 }
 
 // Entry point. The user's `main` is emitted as `__aipl_user_main` when building
@@ -4129,6 +4257,7 @@ unsafe fn build_cli_args(argc: c_int, argv: *const *const c_char) -> *const u8 {
 extern "C" {
     fn __aipl_user_main(args: *const u8) -> i64;
     static __aipl_main_wants_args: u8;
+    static __aipl_str24: u8;
 }
 
 #[no_mangle]

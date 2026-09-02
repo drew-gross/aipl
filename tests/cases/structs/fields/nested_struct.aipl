@@ -30,10 +30,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 169
-binary size: 1824
+binary size: 1856
   code: 576
-  data: 174
-  metadata: 1074
+  data: 175
+  metadata: 1105
 functions:
   __test$dx:
     calls: 1

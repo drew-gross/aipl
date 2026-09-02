@@ -27,10 +27,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 217
-binary size: 2200
+binary size: 2232
   code: 840
-  data: 239
-  metadata: 1121
+  data: 240
+  metadata: 1152
 functions:
   __eq_Cell:
     calls: 1

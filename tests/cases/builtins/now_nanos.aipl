@@ -31,10 +31,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 55
-binary size: 1432
+binary size: 1472
   code: 260
-  data: 132
-  metadata: 1040
+  data: 133
+  metadata: 1079
 functions:
   __test$now_is_plausible:
     calls: 1

@@ -95,10 +95,10 @@ deallocations: 111
 reallocations: 27
 bytes allocated: 4352
 instructions executed: 7837
-binary size: 22504
+binary size: 22528
   code: 13720
-  data: 754
-  metadata: 8030
+  data: 755
+  metadata: 8053
 functions:
   __arr_drop_E:
     calls: 10

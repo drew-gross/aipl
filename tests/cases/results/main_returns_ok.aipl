@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 13
-binary size: 680
+binary size: 704
   code: 108
-  data: 1
-  metadata: 571
+  data: 2
+  metadata: 594
 functions:
   aipl_dec:
     calls: 1

@@ -55,10 +55,10 @@ deallocations: 45
 reallocations: 0
 bytes allocated: 1929
 instructions executed: 7554
-binary size: 7856
+binary size: 7888
   code: 2420
-  data: 1561
-  metadata: 3875
+  data: 1562
+  metadata: 3906
 functions:
   __m2__trim_end_while$lam1:
     calls: 0

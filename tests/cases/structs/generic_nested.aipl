@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 30
-binary size: 952
+binary size: 992
   code: 160
-  data: 40
-  metadata: 752
+  data: 41
+  metadata: 791
 functions:
   __test$deep:
     calls: 1

@@ -9,10 +9,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 17
-binary size: 936
+binary size: 960
   code: 124
-  data: 44
-  metadata: 768
+  data: 45
+  metadata: 791
 functions:
   __test$double:
     calls: 1

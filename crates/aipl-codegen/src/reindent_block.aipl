@@ -107,10 +107,10 @@ deallocations: 99
 reallocations: 0
 bytes allocated: 4116
 instructions executed: 8403
-binary size: 11520
+binary size: 11552
   code: 5080
-  data: 1229
-  metadata: 5211
+  data: 1230
+  metadata: 5242
 functions:
   __builtin_all$char$s0$lam13:
     calls: 24

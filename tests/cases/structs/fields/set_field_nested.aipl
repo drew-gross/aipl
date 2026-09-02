@@ -56,10 +56,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 120
 instructions executed: 520
-binary size: 5136
+binary size: 5160
   code: 2152
-  data: 535
-  metadata: 2449
+  data: 536
+  metadata: 2472
 functions:
   __test$retag:
     calls: 1

@@ -37,10 +37,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 101
-binary size: 2456
+binary size: 2480
   code: 520
-  data: 522
-  metadata: 1414
+  data: 523
+  metadata: 1437
 functions:
   __test$probe:
     calls: 1

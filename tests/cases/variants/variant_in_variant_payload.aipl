@@ -25,10 +25,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 102
-binary size: 1576
+binary size: 1608
   code: 416
-  data: 196
-  metadata: 964
+  data: 197
+  metadata: 995
 functions:
   __test$unwrap_a:
     calls: 1

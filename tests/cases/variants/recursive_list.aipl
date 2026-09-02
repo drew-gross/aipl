@@ -75,10 +75,10 @@ deallocations: 33
 reallocations: 0
 bytes allocated: 1409
 instructions executed: 4277
-binary size: 6192
+binary size: 6224
   code: 2924
-  data: 167
-  metadata: 3101
+  data: 168
+  metadata: 3132
 functions:
   __eq_List:
     calls: 11

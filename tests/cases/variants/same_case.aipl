@@ -41,10 +41,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 663
-binary size: 4208
+binary size: 4232
   code: 2328
-  data: 47
-  metadata: 1833
+  data: 48
+  metadata: 1856
 functions:
   __eq_Tok:
     calls: 1

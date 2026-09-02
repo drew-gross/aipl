@@ -52,10 +52,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 80
 instructions executed: 274
-binary size: 5472
+binary size: 5504
   code: 1656
-  data: 1038
-  metadata: 2778
+  data: 1039
+  metadata: 2809
 functions:
   __test$clamp_low:
     calls: 1

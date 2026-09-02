@@ -46,10 +46,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 218
-binary size: 3736
+binary size: 3760
   code: 1764
-  data: 131
-  metadata: 1841
+  data: 132
+  metadata: 1864
 functions:
   __to_str_unit$err$str:
     calls: 1

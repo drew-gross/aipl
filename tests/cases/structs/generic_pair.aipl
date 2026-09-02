@@ -23,10 +23,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 57
-binary size: 1584
+binary size: 1616
   code: 344
-  data: 129
-  metadata: 1111
+  data: 130
+  metadata: 1142
 functions:
   __test$mixed:
     calls: 1

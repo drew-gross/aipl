@@ -47,10 +47,10 @@ deallocations: 14
 reallocations: 0
 bytes allocated: 597
 instructions executed: 2699
-binary size: 3760
+binary size: 3792
   code: 1604
-  data: 171
-  metadata: 1985
+  data: 172
+  metadata: 2016
 functions:
   __to_str_str$arr:
     calls: 8

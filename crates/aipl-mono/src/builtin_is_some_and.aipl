@@ -38,10 +38,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 153
-binary size: 2640
+binary size: 2672
   code: 708
-  data: 485
-  metadata: 1447
+  data: 486
+  metadata: 1478
 functions:
   __test$is_nine:
     calls: 1

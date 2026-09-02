@@ -10,10 +10,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 41
-binary size: 1352
+binary size: 1376
   code: 268
-  data: 129
-  metadata: 955
+  data: 130
+  metadata: 978
 functions:
   __test$classify:
     calls: 1

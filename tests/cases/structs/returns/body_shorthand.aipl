@@ -74,10 +74,10 @@ deallocations: 5
 reallocations: 0
 bytes allocated: 208
 instructions executed: 704
-binary size: 4488
+binary size: 4520
   code: 1768
-  data: 364
-  metadata: 2356
+  data: 365
+  metadata: 2387
 functions:
   __to_str_Named:
     calls: 1

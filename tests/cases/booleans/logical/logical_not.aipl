@@ -10,10 +10,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 23
-binary size: 1064
+binary size: 1096
   code: 144
-  data: 93
-  metadata: 827
+  data: 94
+  metadata: 858
 functions:
   __test$not:
     calls: 1

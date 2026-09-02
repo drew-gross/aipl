@@ -22,10 +22,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 80
 instructions executed: 289
-binary size: 2104
+binary size: 2136
   code: 924
-  data: 1
-  metadata: 1179
+  data: 2
+  metadata: 1210
 functions:
   __arr_drop___tuple$i64$str:
     calls: 1

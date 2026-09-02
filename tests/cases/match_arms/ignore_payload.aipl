@@ -106,10 +106,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 770
-binary size: 4496
+binary size: 4528
   code: 2648
-  data: 47
-  metadata: 1801
+  data: 48
+  metadata: 1832
 functions:
   __to_str_bool:
     calls: 8

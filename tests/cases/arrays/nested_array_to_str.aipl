@@ -21,10 +21,10 @@ deallocations: 24
 reallocations: 0
 bytes allocated: 945
 instructions executed: 4376
-binary size: 11448
+binary size: 11480
   code: 6444
-  data: 691
-  metadata: 4313
+  data: 692
+  metadata: 4344
 functions:
   __to_str_bool$arr$arr:
     calls: 1

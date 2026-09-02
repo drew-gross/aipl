@@ -23,10 +23,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 995
-binary size: 3728
+binary size: 3752
   code: 1660
-  data: 395
-  metadata: 1673
+  data: 396
+  metadata: 1696
 functions:
   __test$trim_end_while:
     calls: 1

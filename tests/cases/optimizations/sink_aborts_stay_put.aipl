@@ -41,10 +41,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 58
-binary size: 1264
+binary size: 1296
   code: 404
-  data: 1
-  metadata: 859
+  data: 2
+  metadata: 890
 functions:
   __to_str_u64:
     calls: 1

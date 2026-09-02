@@ -569,7 +569,13 @@ pub(crate) fn hash(s: Str) -> i64 {
 
 /// Whether `s`'s bytes from `at` start with `prefix`.
 pub(crate) fn starts_with_at(s: Str, prefix: Str, at: usize) -> bool {
-    if at > s.len() || s.len() - at < prefix.len() {
+    // An offset past the end **clamps** rather than failing: what is left to
+    // match is the empty tail, so an empty prefix still matches there and
+    // anything else does not. Rejecting `at > len` outright made
+    // `"hello".starts_with_at("", 99)` false, where the tagged runtime — and the
+    // documented behaviour — say true.
+    let at = at.min(s.len());
+    if s.len() - at < prefix.len() {
         return false;
     }
     let window = s.slice(at, at + prefix.len());
@@ -870,6 +876,19 @@ fn leaf_byte(leaf: Str, i: usize) -> u8 {
     }
 }
 
+/// Sort a run of wide `str` values by content, in place.
+///
+/// The tagged runtime sorts an array's elements as *words* — reordering
+/// pointers. A wide element is the whole 24-byte value, so both the granularity
+/// and the comparison change; this keeps that in the file that owns the layout,
+/// and both runtimes call it.
+pub(crate) fn sort_values(vals: &mut [Str]) {
+    vals.sort_unstable_by(|x, y| {
+        let c = cmp(*x, *y);
+        c.cmp(&0)
+    });
+}
+
 // ---------- split / join (the shared halves) ----------
 //
 // `split` builds an array and `join` reads one, and the array runtime is
@@ -1091,6 +1110,20 @@ pub(crate) extern "C" fn aipl2_str_repeat(out: *mut Str, s: *const Str, n: i64) 
 
 /// Build a value over `len` bytes the caller then fills — the allocate-then-write
 /// idiom `to_str` uses, with the value (not a bare cursor) as the unit.
+/// A one-character `str` from a codepoint's byte — the wide counterpart of
+/// codegen's `emit_char_to_str`, which bit-packs a tagged inline value directly
+/// in IR.
+///
+/// A wide inline value is spread across all three words, so packing it in IR
+/// would mean open-coding the layout at every call site; one entry point keeps
+/// the layout in the file that owns it. Allocates nothing — a single byte is
+/// always inline.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_char_to_str(out: *mut Str, c: i64) {
+    let byte = [c as u8];
+    unsafe { *out = from_bytes_inline(&byte) };
+}
+
 #[no_mangle]
 pub(crate) extern "C" fn aipl2_str_alloc(out: *mut Str, len: i64) {
     unsafe { *out = with_capacity(len.max(0) as usize, &[]) };

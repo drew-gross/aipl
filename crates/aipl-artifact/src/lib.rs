@@ -424,6 +424,8 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
             sig(2, true)
         }
         "aipl2_list_files" => sig(1, true),
+        "aipl2_char_to_str" => sig(2, false),
+        "aipl2_execute_program" => sig(3, false),
         "aipl2_str_starts_with_at" => sig(3, true),
         "aipl2_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),

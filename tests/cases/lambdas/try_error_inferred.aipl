@@ -56,10 +56,10 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 448
 instructions executed: 1273
-binary size: 10864
+binary size: 10888
   code: 6608
-  data: 67
-  metadata: 4189
+  data: 68
+  metadata: 4212
 functions:
   __arr_drop_Wrapped:
     calls: 3

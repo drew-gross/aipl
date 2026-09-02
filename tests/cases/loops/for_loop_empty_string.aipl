@@ -5,10 +5,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 21
-binary size: 752
+binary size: 784
   code: 172
-  data: 1
-  metadata: 579
+  data: 2
+  metadata: 610
 functions:
   aipl_str_iter_init:
     calls: 1

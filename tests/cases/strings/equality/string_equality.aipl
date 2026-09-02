@@ -11,10 +11,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 43
-binary size: 1392
+binary size: 1424
   code: 284
-  data: 121
-  metadata: 987
+  data: 122
+  metadata: 1018
 functions:
   __test$eq_same:
     calls: 1

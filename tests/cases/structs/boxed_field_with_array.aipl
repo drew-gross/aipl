@@ -134,10 +134,10 @@ deallocations: 83
 reallocations: 0
 bytes allocated: 3678
 instructions executed: 11710
-binary size: 18240
+binary size: 18264
   code: 9088
-  data: 1229
-  metadata: 7923
+  data: 1230
+  metadata: 7946
 functions:
   __arr_drop_List:
     calls: 1

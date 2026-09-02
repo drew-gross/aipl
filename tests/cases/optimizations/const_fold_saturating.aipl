@@ -20,10 +20,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 17
-binary size: 904
+binary size: 936
   code: 116
-  data: 31
-  metadata: 757
+  data: 32
+  metadata: 788
 functions:
   __test$sat:
     calls: 1

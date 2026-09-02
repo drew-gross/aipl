@@ -42,10 +42,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 80
 instructions executed: 112
-binary size: 2760
+binary size: 2792
   code: 752
-  data: 293
-  metadata: 1715
+  data: 294
+  metadata: 1746
 functions:
   __test$heap_values:
     calls: 1

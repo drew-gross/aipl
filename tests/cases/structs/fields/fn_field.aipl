@@ -28,10 +28,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 172
-binary size: 1952
+binary size: 1984
   code: 540
-  data: 157
-  metadata: 1255
+  data: 158
+  metadata: 1286
 functions:
   __test$apply_first:
     calls: 1

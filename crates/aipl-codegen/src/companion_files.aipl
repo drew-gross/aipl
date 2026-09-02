@@ -160,10 +160,10 @@ deallocations: 148
 reallocations: 0
 bytes allocated: 5774
 instructions executed: 9166
-binary size: 23080
+binary size: 23104
   code: 10100
-  data: 3094
-  metadata: 9886
+  data: 3095
+  metadata: 9909
 functions:
   __arr_drop_Companion:
     calls: 11

@@ -18,10 +18,10 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 401
 instructions executed: 189
-binary size: 4352
+binary size: 4376
   code: 1396
-  data: 569
-  metadata: 2387
+  data: 570
+  metadata: 2410
 functions:
   __test$rejoin:
     calls: 1

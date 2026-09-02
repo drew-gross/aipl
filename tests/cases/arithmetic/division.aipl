@@ -41,10 +41,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 86
-binary size: 2672
+binary size: 2704
   code: 456
-  data: 670
-  metadata: 1546
+  data: 671
+  metadata: 1577
 functions:
   __test$d:
     calls: 1

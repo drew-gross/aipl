@@ -50,10 +50,10 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 320
 instructions executed: 6732
-binary size: 6608
+binary size: 6640
   code: 2264
-  data: 1079
-  metadata: 3265
+  data: 1080
+  metadata: 3296
 functions:
   __eq_str$opt:
     calls: 17

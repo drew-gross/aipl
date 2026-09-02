@@ -111,10 +111,10 @@ deallocations: 14
 reallocations: 54
 bytes allocated: 5334
 instructions executed: 90496
-binary size: 6208
+binary size: 6232
   code: 3532
-  data: 67
-  metadata: 2609
+  data: 68
+  metadata: 2632
 functions:
   __filter_map11$own0:
     calls: 2

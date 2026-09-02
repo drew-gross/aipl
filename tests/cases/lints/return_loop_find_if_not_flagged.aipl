@@ -144,10 +144,10 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 521
 instructions executed: 1782
-binary size: 8312
+binary size: 8344
   code: 5108
-  data: 119
-  metadata: 3085
+  data: 120
+  metadata: 3116
 functions:
   __builtin_find_if$i64$lam1:
     calls: 1

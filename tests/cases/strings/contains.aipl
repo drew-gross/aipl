@@ -39,10 +39,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 265
-binary size: 4928
+binary size: 4960
   code: 1432
-  data: 953
-  metadata: 2543
+  data: 954
+  metadata: 2574
 functions:
   __test$first_char:
     calls: 1

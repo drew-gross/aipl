@@ -16,10 +16,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 55
-binary size: 2112
+binary size: 2136
   code: 464
-  data: 274
-  metadata: 1374
+  data: 275
+  metadata: 1397
 functions:
   __test$trim_spaces:
     calls: 1

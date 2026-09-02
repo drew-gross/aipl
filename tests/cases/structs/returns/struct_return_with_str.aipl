@@ -16,10 +16,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 43
-binary size: 1504
+binary size: 1528
   code: 296
-  data: 124
-  metadata: 1084
+  data: 125
+  metadata: 1107
 functions:
   __test$tag:
     calls: 1

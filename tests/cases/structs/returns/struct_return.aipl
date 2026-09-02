@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 66
-binary size: 1288
+binary size: 1320
   code: 320
-  data: 99
-  metadata: 869
+  data: 100
+  metadata: 900
 functions:
   __eq_Point:
     calls: 1

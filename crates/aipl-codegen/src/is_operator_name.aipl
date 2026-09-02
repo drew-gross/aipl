@@ -51,10 +51,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 964
-binary size: 23048
+binary size: 23072
   code: 13440
-  data: 1218
-  metadata: 8390
+  data: 1219
+  metadata: 8413
 functions:
   __test$is_operator_name:
     calls: 1

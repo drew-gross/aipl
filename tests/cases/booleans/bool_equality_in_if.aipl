@@ -9,10 +9,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 19
-binary size: 1016
+binary size: 1048
   code: 120
-  data: 74
-  metadata: 822
+  data: 75
+  metadata: 853
 functions:
   __test$eq_in_if:
     calls: 1

@@ -73,10 +73,10 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 200
 instructions executed: 552
-binary size: 6992
+binary size: 7024
   code: 2748
-  data: 1246
-  metadata: 2998
+  data: 1247
+  metadata: 3029
 functions:
   __eq_Point:
     calls: 1

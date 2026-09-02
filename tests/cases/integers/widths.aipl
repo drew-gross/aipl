@@ -68,10 +68,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 27
 instructions executed: 78
-binary size: 1552
+binary size: 1576
   code: 540
-  data: 1
-  metadata: 1011
+  data: 2
+  metadata: 1034
 functions:
   __to_str_i8:
     calls: 1

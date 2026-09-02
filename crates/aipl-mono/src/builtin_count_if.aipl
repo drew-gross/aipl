@@ -65,10 +65,10 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 516
 instructions executed: 2002
-binary size: 7688
+binary size: 7712
   code: 3860
-  data: 933
-  metadata: 2895
+  data: 934
+  metadata: 2918
 functions:
   __filter21$own0:
     calls: 1

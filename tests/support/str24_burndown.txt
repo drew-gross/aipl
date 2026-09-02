@@ -98,7 +98,7 @@
 # table means the next conversion cannot reintroduce it.
 #
 # Ten clusters were fixed on the strength of that classification, and the count
-# is now **37 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
+# is now **9 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
 # started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
@@ -318,15 +318,46 @@
 #     `is_str_repr` and ask whether it meant `is_str_shaped`** — that is now the
 #     fourth cluster with this shape, after the `is_composite` leak.
 #
-# The remaining 37, by cause:
+#   - **`execute_program`, the CLI argument array, `sort`, `contains` with a
+#     `char` needle, `starts_with_at` past the end, and the in-place `filter`.**
+#     Done as one batch; `arr_join` and `int_parse` turned out to need nothing —
+#     they never appeared in a failure once their neighbours were converted.
 #
-#    ~20  `aipl check` (in-language tests) failed
-#    ~13  `stdout` mismatch
-#      4  non-case: the two `lexer_dogfood` tests,
-#         `ffi::compiler_aipl_files_are_tested_and_pass_check`, and
-#         `dogfood_ir::artifact_round_trips_rich_types`
+#     **The AOT runtime can now ask which representation it is linked against.**
+#     It is a `no_std` staticlib with no environment, built once and linked into
+#     objects of either kind, so it cannot read `AIPL_STR24` the way the JIT
+#     does. The *object* now exports a 1-byte flag (`STR24_SYMBOL`,
+#     `__aipl_str24`) exactly as it already exported whether `main` wanted its
+#     arguments. Needed wherever the runtime builds or walks values on compiled
+#     code's behalf with no type to consult — `build_cli_args` is the first, and
+#     the pattern is there for the next.
 #
-# Left: `arr_join`, `int_parse`, `execute_program`.
+#     Two more sites that had been sizing by word:
+#       - `aipl_arr_sort` sorted elements *as `i64`s*, which for a wide `str`
+#         reorders thirds of values and compares their first fields. The wide
+#         comparison lives in `str24::sort_values` so both runtimes share it.
+#       - `__filter_keep` / `__map_set` hardcoded a stride of 8, on an in-place
+#         gate that (per its own comment) assumed elements are never composite.
+#         Both now take the stride and the store from the element type.
+#
+#     And one semantic difference, not a layout one: `str24::starts_with_at`
+#     *rejected* an offset past the end where the tagged runtime **clamps** it,
+#     so `"hello".starts_with_at("", 99)` was false instead of true. Worth
+#     remembering that the wide implementations are a reimplementation, not a
+#     port — they can disagree about behaviour, not just about bytes.
+#
+# The remaining 9:
+#
+#     cases_lambdas_map_in_place, cases_lambdas_filter_map
+#     cases_lambdas_zip_concat_minimal, cases_lambdas_zip_with_owned
+#     cases_dicts_basic, cases_dicts_values
+#     cases_arrays_spread_spread_elem_types
+#     cases_tail_calls_mutual_cycle
+#     dogfood_ir::artifact_round_trips_rich_types
+#
+# No named builtin is left — these are element-writing paths in `map`, `zip`,
+# dict construction, array spread and the tail-call trampoline, all of the same
+# shape as `__filter_keep` above: a stride or a store that assumed 8 bytes.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in

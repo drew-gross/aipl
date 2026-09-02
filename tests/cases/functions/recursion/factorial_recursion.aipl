@@ -10,10 +10,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 95
-binary size: 1208
+binary size: 1240
   code: 244
-  data: 81
-  metadata: 883
+  data: 82
+  metadata: 914
 functions:
   __test$fact:
     calls: 1

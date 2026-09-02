@@ -15,10 +15,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 90
-binary size: 1560
+binary size: 1600
   code: 440
-  data: 128
-  metadata: 992
+  data: 129
+  metadata: 1031
 functions:
   __eq_char$opt:
     calls: 1

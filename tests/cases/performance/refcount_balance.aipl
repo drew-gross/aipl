@@ -19,10 +19,10 @@ deallocations: 2
 reallocations: 3
 bytes allocated: 58
 instructions executed: 429
-binary size: 2296
+binary size: 2320
   code: 948
-  data: 67
-  metadata: 1281
+  data: 68
+  metadata: 1304
 functions:
   __to_str_i64$arr:
     calls: 1

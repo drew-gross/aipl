@@ -69,10 +69,10 @@ deallocations: 150003
 reallocations: 0
 bytes allocated: 8400168
 instructions executed: 17100283
-binary size: 4472
+binary size: 4504
   code: 2072
-  data: 47
-  metadata: 2353
+  data: 48
+  metadata: 2384
 functions:
   __rec_drop_Work:
     calls: 150003

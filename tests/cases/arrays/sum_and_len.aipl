@@ -21,10 +21,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 315
-binary size: 1720
+binary size: 1752
   code: 508
-  data: 125
-  metadata: 1087
+  data: 126
+  metadata: 1118
 functions:
   __test$sum:
     calls: 1

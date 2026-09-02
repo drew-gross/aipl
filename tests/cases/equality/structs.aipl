@@ -25,10 +25,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 215
-binary size: 2224
+binary size: 2256
   code: 676
-  data: 226
-  metadata: 1322
+  data: 227
+  metadata: 1353
 functions:
   __eq_Named:
     calls: 2

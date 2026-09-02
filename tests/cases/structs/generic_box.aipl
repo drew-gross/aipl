@@ -22,10 +22,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 77
-binary size: 2064
+binary size: 2096
   code: 452
-  data: 240
-  metadata: 1372
+  data: 241
+  metadata: 1403
 functions:
   __test$boxed_bool:
     calls: 1

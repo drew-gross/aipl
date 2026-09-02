@@ -73,10 +73,10 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 225
 instructions executed: 1022
-binary size: 8160
+binary size: 8192
   code: 3888
-  data: 635
-  metadata: 3637
+  data: 636
+  metadata: 3668
 functions:
   __to_str_Rule$Tok:
     calls: 4

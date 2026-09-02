@@ -17,10 +17,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 39
-binary size: 1360
+binary size: 1384
   code: 284
-  data: 90
-  metadata: 986
+  data: 91
+  metadata: 1009
 functions:
   __test$greet:
     calls: 1

@@ -79,10 +79,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 968
-binary size: 6976
+binary size: 7008
   code: 1956
-  data: 1605
-  metadata: 3415
+  data: 1606
+  metadata: 3446
 functions:
   __test$int_fits:
     calls: 1

@@ -316,10 +316,10 @@ deallocations: 111
 reallocations: 0
 bytes allocated: 7052
 instructions executed: 11763
-binary size: 39344
+binary size: 39384
   code: 22300
-  data: 1908
-  metadata: 15136
+  data: 1909
+  metadata: 15175
 functions:
   __arr_drop_Prec:
     calls: 2

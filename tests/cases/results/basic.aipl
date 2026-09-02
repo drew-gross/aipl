@@ -35,10 +35,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 80
 instructions executed: 146
-binary size: 2136
+binary size: 2176
   code: 888
-  data: 32
-  metadata: 1216
+  data: 33
+  metadata: 1255
 functions:
   __to_str_i64:
     calls: 1

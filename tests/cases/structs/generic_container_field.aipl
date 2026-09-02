@@ -16,10 +16,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 56
 instructions executed: 50
-binary size: 1336
+binary size: 1368
   code: 276
-  data: 77
-  metadata: 983
+  data: 78
+  metadata: 1014
 functions:
   __test$item_count:
     calls: 1

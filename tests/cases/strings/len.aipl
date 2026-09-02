@@ -17,10 +17,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 65
-binary size: 1976
+binary size: 2016
   code: 380
-  data: 324
-  metadata: 1272
+  data: 325
+  metadata: 1311
 functions:
   __test$byte_count:
     calls: 1

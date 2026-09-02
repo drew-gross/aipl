@@ -78,10 +78,10 @@ deallocations: 35
 reallocations: 2
 bytes allocated: 1727
 instructions executed: 2555
-binary size: 11008
+binary size: 11040
   code: 5668
-  data: 499
-  metadata: 4841
+  data: 500
+  metadata: 4872
 functions:
   __arr_drop_Rule$Tok:
     calls: 5

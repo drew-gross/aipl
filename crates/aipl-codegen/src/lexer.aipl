@@ -1212,10 +1212,10 @@ deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
 instructions executed: 263004
-binary size: 1592600
+binary size: 1592632
   code: 996904
-  data: 8100
-  metadata: 587596
+  data: 8101
+  metadata: 587627
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8

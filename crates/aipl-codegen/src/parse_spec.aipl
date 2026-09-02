@@ -181,10 +181,10 @@ deallocations: 182
 reallocations: 0
 bytes allocated: 7038
 instructions executed: 24533
-binary size: 85048
+binary size: 85088
   code: 53044
-  data: 2532
-  metadata: 29472
+  data: 2533
+  metadata: 29511
 functions:
   __arr_drop_Entry:
     calls: 2

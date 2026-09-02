@@ -276,6 +276,7 @@ design:
     the most readable implementation is also the fastest
 
 optimizations:
+  optimize string comparison by comparing more than one byte at a time
   add view and inline forms for arrays.
   char_lit_emit can probably be optimized by doing a two char match and manually unescaping
   unescape itself can probable be optimized by doing a compacting gather
@@ -609,45 +610,11 @@ debugging:
   tools for debugging infinite loops
   add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
-PAUSED (2026-08-02) composite mut-binding ownership fix — uncommitted in the working
-tree, full-suite gate never passed. Stopped after test cases started taking far too
-long and an infinite loop was suspected.
-What it does: heap-bearing *composite* mut bindings (optional/result, inline
-struct/variant with heap fields) now use the slot-owned-reference model in
-aipl-codegen/src/lib.rs — the sibling of the boxed-type fix. New
-`mut_binding_owns_composite_ref` (is_composite && needs_drop); retain + slot-track at
-LetMut; retain/store/release at Assign; same at the mutating-method writeback
-(mandatory — once a slot-track exists, every path that replaces the slot's value must
-re-own it or the track over-drops). The wrinkle vs the boxed fix:
-`snapshot_composite` byte-copies the old value *before* the new one is evaluated,
-because each construction site reuses one stack slot per iteration, so
-`set t = Tree { kids: [t] }` builds into the storage the binding still addresses.
-Riding on it: opt_left_fold/opt_right_fold rewritten to the natural
-`mut acc = some(init)` + `match (acc)` form (dropping an `ok` flag + value_or
-workaround), and builtin_int_parse 12705 -> 11160 instructions.
-Verification status: targeted repros all pass (Optional<str> accumulator in a loop;
-the `struct Tree { kids: Tree[] }` nest-and-walk family that used to segfault).
-scripts/handoff.sh never completed a run on it.
-The hang lead — start here: a leaked `aipl check tests/cases/strings/raw/
-raw_string_dedent.aipl` was found spinning at 100% CPU for ~10 min, launched from the
-NEW binary. Re-running that case alone finishes in <25s on both the old and new
-binaries, so it did NOT reproduce deterministically. Same shape a second time: one
-`check` of tests/cases/structs/composite_mut_accumulator.aipl ran >600s, then 5.8s on
-retry. Prime suspect is an *intermittent* hang under the new codegen (a corrupted
-refcount sending a runtime walk into a loop), not a constant-factor slowdown: an A/B
-over 30 cases showed none (old 62.7s vs new 62.4s total; trivial-file startup 2.68s
-vs 2.66s — ~1-2.7s per case is normal). Some of the observed slowness was
-self-inflicted: two long serial sweeps plus that leaked process pegging a core.
-Next step: re-run the case suite under the new codegen watching for a case that
-hangs, and check for stray spinning `aipl` processes before blaming the suite.
-
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   replace is_binop with is_operator_name
   check if the w "loops" can be improved using mut self arguments
   SpacedBracesNoTrailing seems like it shouldn't be necessary if the writer knows whether to add trailing or not based on breaks
-
-optimize string comparison by comparing more than one byte at a time
 
 sort:
   make sort_by a builtin so it can be faster

@@ -14,10 +14,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 38
-binary size: 1368
+binary size: 1400
   code: 228
-  data: 163
-  metadata: 977
+  data: 164
+  metadata: 1008
 functions:
   __test$beq:
     calls: 1

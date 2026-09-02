@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 55
-binary size: 1168
+binary size: 1200
   code: 248
-  data: 91
-  metadata: 829
+  data: 92
+  metadata: 860
 functions:
   __test$bump:
     calls: 1

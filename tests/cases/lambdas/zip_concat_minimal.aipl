@@ -20,10 +20,10 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 184
 instructions executed: 475
-binary size: 3424
+binary size: 3456
   code: 1844
-  data: 1
-  metadata: 1579
+  data: 2
+  metadata: 1610
 functions:
   __zip1$own0$own1:
     calls: 1

@@ -29,10 +29,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 75
-binary size: 880
+binary size: 904
   code: 352
-  data: 1
-  metadata: 527
+  data: 2
+  metadata: 550
 functions:
   aipl_char_at:
     calls: 1

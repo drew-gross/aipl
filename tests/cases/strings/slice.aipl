@@ -29,10 +29,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 65
 instructions executed: 71
-binary size: 1992
+binary size: 2024
   code: 744
-  data: 30
-  metadata: 1218
+  data: 31
+  metadata: 1249
 functions:
   aipl_concat_lazy:
     calls: 1

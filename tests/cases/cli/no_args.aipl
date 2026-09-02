@@ -13,10 +13,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 32
 instructions executed: 32
-binary size: 1200
+binary size: 1232
   code: 364
-  data: 30
-  metadata: 806
+  data: 31
+  metadata: 837
 functions:
   aipl_arr_drop_str:
     calls: 1

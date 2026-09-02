@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 67
-binary size: 1480
+binary size: 1512
   code: 316
-  data: 203
-  metadata: 961
+  data: 204
+  metadata: 992
 functions:
   __test$value_or:
     calls: 1

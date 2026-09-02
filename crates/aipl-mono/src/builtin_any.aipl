@@ -41,10 +41,10 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 323
 instructions executed: 1014
-binary size: 6288
+binary size: 6320
   code: 3032
-  data: 589
-  metadata: 2667
+  data: 590
+  metadata: 2698
 functions:
   __filter13$own0:
     calls: 1

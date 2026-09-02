@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 114
-binary size: 1536
+binary size: 1576
   code: 420
-  data: 168
-  metadata: 948
+  data: 169
+  metadata: 987
 functions:
   __eq_Vec2:
     calls: 2

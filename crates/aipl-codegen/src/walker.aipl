@@ -2711,10 +2711,10 @@ deallocations: 21241
 reallocations: 980
 bytes allocated: 1024604
 instructions executed: 2831320
-binary size: 3212144
+binary size: 3212176
   code: 1836380
-  data: 27124
-  metadata: 1348640
+  data: 27125
+  metadata: 1348671
 functions:
   __arr_drop_ImportEntry:
     calls: 21

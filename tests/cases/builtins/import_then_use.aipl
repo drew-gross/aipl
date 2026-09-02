@@ -16,10 +16,10 @@ deallocations: 1
 reallocations: 1
 bytes allocated: 48
 instructions executed: 58
-binary size: 1320
+binary size: 1352
   code: 268
-  data: 77
-  metadata: 975
+  data: 78
+  metadata: 1006
 functions:
   __test$pushed_len:
     calls: 1

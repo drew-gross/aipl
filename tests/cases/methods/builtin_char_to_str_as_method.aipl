@@ -12,10 +12,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 55
-binary size: 968
+binary size: 992
   code: 276
-  data: 1
-  metadata: 691
+  data: 2
+  metadata: 714
 functions:
   __to_str_char:
     calls: 1

@@ -56,10 +56,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1381
-binary size: 3616
+binary size: 3640
   code: 836
-  data: 779
-  metadata: 2001
+  data: 780
+  metadata: 2024
 functions:
   __builtin_all$char$s0$lam0:
     calls: 13

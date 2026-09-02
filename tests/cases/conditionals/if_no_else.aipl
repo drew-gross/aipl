@@ -35,10 +35,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 119
-binary size: 1576
+binary size: 1608
   code: 392
-  data: 162
-  metadata: 1022
+  data: 163
+  metadata: 1053
 functions:
   __test$sign:
     calls: 1

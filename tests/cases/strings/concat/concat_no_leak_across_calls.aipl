@@ -11,10 +11,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 22
-binary size: 1128
+binary size: 1152
   code: 184
-  data: 43
-  metadata: 901
+  data: 44
+  metadata: 924
 functions:
   __test$build:
     calls: 1

@@ -28,10 +28,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 859
-binary size: 5664
+binary size: 5696
   code: 2616
-  data: 506
-  metadata: 2542
+  data: 507
+  metadata: 2573
 functions:
   __builtin_count_while$char$s0$lam14:
     calls: 1

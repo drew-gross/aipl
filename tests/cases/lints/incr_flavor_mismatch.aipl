@@ -21,10 +21,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 100
-binary size: 1256
+binary size: 1288
   code: 400
-  data: 1
-  metadata: 855
+  data: 2
+  metadata: 886
 functions:
   __to_str_u8:
     calls: 2

@@ -41,10 +41,10 @@ deallocations: 30
 reallocations: 0
 bytes allocated: 1568
 instructions executed: 2797
-binary size: 12152
+binary size: 12184
   code: 7268
-  data: 1067
-  metadata: 3817
+  data: 1068
+  metadata: 3848
 functions:
   __test$single:
     calls: 1

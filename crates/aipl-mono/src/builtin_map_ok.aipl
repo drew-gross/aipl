@@ -80,10 +80,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1801
-binary size: 27088
+binary size: 27112
   code: 14856
-  data: 1332
-  metadata: 10900
+  data: 1333
+  metadata: 10923
 functions:
   __test$lex:
     calls: 1

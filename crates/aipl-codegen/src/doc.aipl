@@ -324,10 +324,10 @@ deallocations: 285
 reallocations: 0
 bytes allocated: 16148
 instructions executed: 21692
-binary size: 30544
+binary size: 30576
   code: 17104
-  data: 842
-  metadata: 12598
+  data: 843
+  metadata: 12629
 functions:
   __arr_drop_Doc:
     calls: 8

@@ -98,10 +98,10 @@ deallocations: 77
 reallocations: 0
 bytes allocated: 2830
 instructions executed: 4420
-binary size: 9032
+binary size: 9072
   code: 3392
-  data: 1720
-  metadata: 3920
+  data: 1721
+  metadata: 3959
 functions:
   __m1__line_at:
     calls: 6

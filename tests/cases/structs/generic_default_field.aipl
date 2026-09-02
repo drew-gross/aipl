@@ -21,10 +21,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 91
-binary size: 2304
+binary size: 2328
   code: 588
-  data: 257
-  metadata: 1459
+  data: 258
+  metadata: 1482
 functions:
   __test$custom_tag:
     calls: 1

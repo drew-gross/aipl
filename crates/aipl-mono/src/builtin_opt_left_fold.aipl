@@ -92,10 +92,10 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 575
 instructions executed: 2496
-binary size: 9744
+binary size: 9776
   code: 5364
-  data: 1063
-  metadata: 3317
+  data: 1064
+  metadata: 3348
 functions:
   __eq_i64$opt:
     calls: 10

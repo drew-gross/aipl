@@ -26,10 +26,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 40
 instructions executed: 323
-binary size: 3000
+binary size: 3024
   code: 1132
-  data: 119
-  metadata: 1749
+  data: 120
+  metadata: 1772
 functions:
   __eq_char$opt:
     calls: 1

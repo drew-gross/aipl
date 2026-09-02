@@ -32,10 +32,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 193
-binary size: 2840
+binary size: 2864
   code: 988
-  data: 448
-  metadata: 1404
+  data: 449
+  metadata: 1427
 functions:
   __eq_Kind:
     calls: 1
