@@ -166,24 +166,6 @@ fn debug_opts() -> DebugOptions {
     DebugOptions::new(std::env::var_os("AIPL_DEBUG").is_some())
 }
 
-/// Whether the run is using the 24-byte `str` (`STR_REPR.md`), which splits
-/// `--- performance ---` into the half that still means something and the half
-/// that cannot.
-///
-/// The *counts* — bytes allocated, instructions executed, binary size, the
-/// `functions:` block — all legitimately change with the representation, so a
-/// correct switch mismatches nearly every section, burying the failures that do
-/// carry information. Those are refilled once, at the final flip.
-///
-/// `allocations == deallocations` is the exception: it is an invariant, not a
-/// measurement, and it is the migration's refcount tripwire — an entry point
-/// that retains what nobody releases leaks silently otherwise, changing neither
-/// output nor exit code. So the section is still measured and the leak gate
-/// still runs; only the comparison against the expected body is skipped.
-fn str24_mode() -> bool {
-    std::env::var_os("AIPL_STR24").is_some()
-}
-
 #[derive(Default)]
 struct Spec {
     /// The entry-point AIPL source. Anything before the first section
@@ -307,46 +289,6 @@ macro_rules! case_tests {
             }
         )+
     };
-}
-
-/// The record of the 24-byte `str` migration (`STR_REPR.md`). The list is
-/// **empty** — the switch is finished and the tagged half is gone — but the file
-/// and this check stay: they are the mechanism for the next representation
-/// change, and an empty list is the cheapest possible proof that nothing is
-/// still parked on it.
-const BURNDOWN_FILE: &str = "tests/support/str24_migration.txt";
-
-/// The names in [`BURNDOWN_FILE`], comments and blanks stripped.
-fn burndown_list() -> std::collections::HashSet<String> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(BURNDOWN_FILE);
-    let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    text.lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(str::to_string)
-        .collect()
-}
-
-/// Every *case* on the burn-down list must still be a case, so the list can't
-/// rot as the corpus moves: a renamed or deleted case leaves an entry that
-/// silently protects nothing. Suite tests on the list carry their own
-/// `#[ignore]` and are checked by the compiler instead.
-#[test]
-fn burndown_names_real_cases() {
-    let declared: std::collections::HashSet<&str> =
-        DECLARED_CASES.iter().map(|(n, _)| *n).collect();
-    let stale: Vec<String> = burndown_list()
-        .into_iter()
-        .filter(|n| {
-            (n.starts_with("cases_") || n.starts_with("examples_"))
-                && !declared.contains(n.as_str())
-        })
-        .collect();
-    assert!(
-        stale.is_empty(),
-        "{BURNDOWN_FILE} names cases that no longer exist: {stale:?} — \
-         remove them (a stale entry protects nothing)"
-    );
 }
 
 /// The checked-in [`case_tests!`] invocation — one `#[test]` per case. It lives
@@ -1607,14 +1549,6 @@ fn run_performance_check(
             actual.deallocations,
             scoped_fill_cmd(ctx),
         ));
-    }
-
-    // Under the wide `str` the leak gate above is the whole check: the counts
-    // below are expected to differ, and filling them here would write
-    // wide-representation numbers into a corpus the default build then fails
-    // against. See [`str24_mode`].
-    if str24_mode() {
-        return Outcome::Pass;
     }
 
     // A malformed (or `?`) expected body never parses, so it can't equal the

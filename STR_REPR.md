@@ -2,50 +2,50 @@
 
 ## Status
 
-Design, not started. The largest change in the repo to date: it moves `str` from
-a scalar to a composite, rewrites both runtimes, and invalidates every checked-in
-`.clif`. Stages 5–7 are follow-on programs it unlocks rather than parts of the
-flip.
+**Done through Stage 2.** `str` is a 24-byte composite in both runtimes, the
+8-byte tagged representation is gone, and the artifacts speak the one ABI. There
+is no switch and no second runtime; 932 tests pass.
 
-- [x] **Spike** — the ABI questions, answered against cranelift 0.134 on both target families (`crates/aipl-codegen/src/abi_spike.rs`)
-- [ ] 0 Preparation — funnel every "a `str` is one `i64`" assumption through helpers, green at each step
-  - [x] the runtime ABI table names kinds (`Abi`/`Ret`) instead of counting arity
-  - [x] every runtime call goes through `Builtins::call`/`call_void` (all 94 sites)
-  - [x] `value_slot` — a spilled value is sized by its type, not assumed to be a word
-  - [ ] audit the remaining by-value spills and `mut` binding slots
-- [ ] 1 The flip — new layout in both runtimes + codegen + IR bootstrap
-  - [x] the layout itself, proven on its own (`crates/aipl-codegen/src/str24.rs`, staged dead code)
-  - [x] the `str` surface: streaming, compare/hash/search, trim, builder, split/join
-  - [x] iteration (`Iter`) and I/O (`print`, file read/write), streaming throughout
-  - [x] shared with the AOT runtime instead of mirrored — one file, both compile it
-  - [x] the `aipl2_*` entry points — the second ABI the switch is tested against
-  - [ ] the switch: `str` joins `is_composite`/`elem_size_of`/`sret_size`, literals, the rc arm, FFI
-  - [ ] regenerate the artifacts against `aipl2_*`, refill the corpus, delete the old half
-- [ ] 2 Storage fallout — `str[]`, dict/set keys, struct fields, optionals at 24-byte slots
-- [ ] 3 Free slicing, and `SpanStr` falling out of it
-- [ ] 4 In-place mutation and growth — the ownership rule plus the capacity word
-- [ ] 5 Rope-native operations — keep concat O(1) and do more work without materializing
-- [ ] 6 Converge arrays onto the same model — inline and view arrays, one block header, one body of code
-- [ ] 7 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word
+Stages 1–5 below are follow-on programs the new layout unlocks, each separately
+justifiable rather than part of a single push.
 
-Stage 0 is most of the work and can land incrementally. **The switch inside
-Stage 1 is atomic**, but the layout it switches to need not be: `str24.rs`
-implements and tests it as staged dead code, with no compiler in the loop, so the
-irreversible commit is only the wiring. Each of 3–7 is separately justifiable
-once 1–2 are green.
+- [ ] 1 `SpanStr` — expose the window a slice already is (`SPAN_STR.md`). Slicing
+      itself is free now; what is missing is the language-level type.
+- [ ] 2 In-place mutation and growth — the ownership rule plus the capacity word.
+      Today `push`/`extend` on a `str` rebuild the buffer every time.
+- [ ] 3 Rope-native operations — concat is already O(1); slicing a rope still
+      materializes it, and `map`/`filter` over one could stream.
+- [ ] 4 Converge arrays onto the same model — inline and view arrays, one block
+      header, one body of code.
+- [ ] 5 Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag
+      word. `str?` is 32 bytes today.
 
 **A standing principle for all of it:** anywhere strings and arrays can share a
 representation, a header, or a body of code, they should. They are the same
-thing — a refcounted buffer, a window into it, and a length — and Stage 6 is
+thing — a refcounted buffer, a window into it, and a length — and Stage 4 is
 where that stops being a coincidence.
+
+### What the change cost, measured
+
+The metric trade, on the canaries the plan named (instructions executed, before
+→ after):
+
+| case | before | after |
+|---|---|---|
+| `grammar_calc.aipl` | 1,169,584 | 1,254,004 |
+| `walker.aipl` | 3,075,003 | 3,024,877 |
+
+Roughly a wash, and both numbers still carry known debt the follow-on stages
+collect: `for (let c : s)` takes a runtime call per byte (the tagged iterator's
+inlined fast path read its own cursor layout and has no counterpart yet), and
+`to_str` allocates a buffer for short results instead of packing them inline.
 
 ## The shape
 
-Today a `str` is one 8-byte word: a tagged pointer, four representations, tag in
-the low two bits (`crates/aipl-codegen/src/lib.rs:120-259`). Every payload
-beyond the tag lives behind an indirection.
-
-Proposed: **three words, no indirection for the common cases.**
+A `str` used to be one 8-byte word: a tagged pointer, four representations, tag
+in the low two bits, every payload beyond the tag behind an indirection. It is
+now **three words, with no indirection for the common cases**
+(`crates/aipl-codegen/src/str24.rs`).
 
 ```
               w0 (bytes 0-7)      w1 (bytes 8-15)     w2 (bytes 16-23)
@@ -110,15 +110,15 @@ Not "same shape, different tag" — **one representation**. A string is a base, 
 window into it, and a length; whether the window happens to cover the whole
 allocation is not a fact anything needs to branch on:
 
-- **Slicing stops allocating and stops copying.** `s[lo..hi]` becomes
+- **Slicing stops allocating and stops copying.** `s[lo..hi]` is
   `{base, data + lo, hi - lo}` plus one `inc` on the base — a pure value
-  computation. Today it is a 32-byte view allocation, or a byte copy when the
-  result is ≤7 bytes (`aipl_str_slice`, `lib.rs:1201`).
+  computation, where it used to be a 32-byte view allocation or a byte copy for
+  a short result.
 - **It deletes the "a view is an optimization, not a guarantee" wart** that
   `SPAN_STR.md` is built around. Every buffer-backed `str` carries its own
   provenance, so `SpanStr` collapses to a type marker plus `.span() = data - base`.
 - Three live representations instead of four leaves a **spare tag**, where the
-  current design is at capacity — and Stage 7 has a use for it.
+  current design is at capacity — and Stage 5 has a use for it.
 
 Dropping the block's length word is what completes the unification. With a
 length in the header there are two candidate answers to "how long is this
@@ -131,18 +131,19 @@ spare = (base + cap) - (data + len)
 ```
 
 That is the whole test for appending in place — no "is this the whole
-allocation?" comparison, because Stage 4's ownership rule already establishes
+allocation?" comparison, because Stage 2's ownership rule already establishes
 that nothing else can see the bytes past `data + len`.
 
 One thing this gives up: a buffer no longer implies a trailing NUL, so a
 `str` handed to C must either have a spare byte to write one into or be
-materialized. Every consumer today is already length-delimited (`str_bytes`,
-`str_for_each_chunk`, `read_file_impl` at `lib.rs:574`), so this costs a
-documented rule rather than working code.
+materialized. Every consumer is length-delimited (`Str::bytes`,
+`for_each_chunk`, the file paths), so this costs a documented rule rather than
+working code — and `c_path_of` in the AOT runtime is where the terminator gets
+made when libc needs one.
 
 ### 3. Ropes stay — short-term port now, investment later
 
-Stage 1 ports the rope mechanically; its children are 24 bytes each:
+The rope carries 24-byte children:
 
 ```
 node: [refcount: i64][len: i64][cache: 24][left: 24][right: 24]   // 88 bytes
@@ -152,24 +153,24 @@ value: { node, 0, len | ROPE<<56 }
 The long-term plan is **not** to delete it. O(1) concat is a real result, most
 ropes in a pipeline are consumed by something that streams (printing already
 does, via `str_for_each_chunk`), and the operations that currently force
-materialization mostly don't have to. That is Stage 5.
+materialization mostly don't have to. That is Stage 3.
 
 The capacity word does **not** replace ropes; the two answer different questions
 and coexist:
 
 | Situation | Answer |
 |---|---|
-| Appending to a string you own, room to spare | write into the spare capacity, bump `len` (Stage 4) |
+| Appending to a string you own, room to spare | write into the spare capacity, bump `len` (Stage 2) |
 | Appending to a string you own, out of room | reallocate with growth, copy once — amortized O(1) |
 | Concatenating values someone else may hold | build a rope node — O(1), no copy, no ownership question |
 
 So a builder loop gets the array-style growth path, and general `a + b` keeps the
 lazy one. Monomorphization's `ConcatStr` pseudo-type and its `$c{i}` instances
-(`crates/aipl-syntax/src/lib.rs:1951-1965`) stay as they are.
+(`aipl-syntax`) stay as they are.
 
 ### 4. ABI: three scalar arguments, and results through an out pointer
 
-`cl_type_of` returns `I64` for every type today (`lib.rs:7933`) — `str` is one
+`cl_type_of` returns `I64` for every type — `str` is one
 SSA value everywhere. The spike (`crates/aipl-codegen/src/abi_spike.rs`, run
 against cranelift 0.134) settles how it widens, and it is **not** what the plan
 first assumed:
@@ -178,7 +179,7 @@ first assumed:
 |---|---|
 | Three `i64` returns? | **Refused on x86-64.** `Unsupported feature: Too many return values to fit in registers. Use a StructReturn argument instead.` It *works* on the aarch64 host — exactly the trap a host-only spike would have walked into. |
 | Three scalar params? | Works everywhere, including eight-param signatures (two `str`s plus extras) on x86-64, where cranelift spills past the register budget for us. |
-| Result through a leading out pointer? | Works everywhere, and is already how the compiler returns composites (`lib.rs:6034-6100`: "a normal *leading* i64 param — and returns nothing"). |
+| Result through a leading out pointer? | Works everywhere, and is how the compiler already returned composites — "a normal *leading* i64 param, and returns nothing". |
 | Cranelift's formal `StructReturn`? | Works **only** as a parameter with no matching return — 0.134 rejects an explicit `StructReturn` return value outright, so the C convention of handing the pointer back is not expressible. In practice identical to the plain out pointer. |
 | 24-byte struct across the Rust boundary? | Round-trips correctly by pointer, and three scalar words pass to a Rust `extern "C" fn(i64, i64, i64)` unchanged. |
 
@@ -207,60 +208,15 @@ defined identically in `crates/aipl-codegen/src/lib.rs` and
 `crates/aipl-linker/runtime/aipl_runtime.rs`, which are kept byte-for-byte
 identical (that file's own header says so, at its line 8).
 
-The spike stays in the tree until Stage 1 lands: it is the executable form of
-this decision, and re-running it is how a cranelift bump gets re-checked. It
+The spike stays in the tree: it is the executable form of this decision, and
+re-running it is how a cranelift bump gets re-checked. It
 costs a `cranelift-codegen` dev-dependency with `all-arch` (the shipped build
 carries only the host backend), which is why it goes away afterwards.
-
-## The flip is smaller than it looks: `str` becomes a composite
-
-Stage 0's audit turned up the single most useful fact about this change. Codegen
-already has two classes of value — scalars, which are one `i64` register, and
-**composites** (structs, optionals, results, variants), which live in memory and
-travel as *addresses* — and the fork between them is decided in three small
-places:
-
-| Predicate | Where | Today | After |
-|---|---|---|---|
-| `is_composite` | `lib.rs:9583`, 13 call sites | optional/result/unboxed struct | …plus `is_str_repr` |
-| `elem_size_of` | `lib.rs:11685`, 29 call sites | `_ => 8` | a `str` arm returning 24 |
-| `sret_size` | `lib.rs:19490`, feeds `build_signature` | `_ => None` | `Some(24)` for `str` |
-
-Everything else follows from those three, because the composite machinery is
-already written: `component` hands back an address instead of loading a word,
-`store_array_elem` routes to `copy_composite`, `build_signature` prepends an
-sret pointer for the return and **keeps passing one `i64` per parameter** —
-which for a composite is its address. So the AIPL-level ABI needs *no change at
-all* for `str` parameters.
-
-That also settles the runtime ABI more cheaply than the spike's framing
-suggested. If a `str` value lives in memory as a composite, its **address** is
-what a call site has in hand, so `Abi::Str` should lower to one pointer word
-rather than three scalars, and `Ret::Str` to a leading out pointer — exactly the
-shape `abi_spike::q3` verified round-trips. The three-scalar form stays
-available (`q4`) for a later by-value fast path, but it is not the default.
-
-**What stays genuinely `str`-specific**, and is the real work of Stage 1:
-
-- **Literals.** A `str` constant is a pointer to a data symbol today; it becomes
-  a 24-byte constant (base, data, `len | tag`) whose *address* is the value —
-  which is to say, exactly what a struct constant already is.
-- **Refcounting.** `emit_rc_w`'s `is_str_repr` arm (`lib.rs:10120`) passes the
-  value straight to `aipl_inc`/`aipl_dec`; it must instead load the base word
-  out of the value and pass that. One arm, and the only place it lives.
-- **The runtime's own internals** — every `aipl_str_*` function, rewritten
-  against the new layout, twice (JIT and AOT).
-- **FFI marshaling** (`lib.rs:6034-6100`), where 24 bytes cross into Rust.
-
-The cost of this shape is that a `str` stops living in registers. That is the
-trade three-scalar passing would have bought, and it is worth measuring at Stage
-1 rather than assuming: the canaries below are slice- and token-heavy, which is
-where memory traffic would show up first.
 
 ## One copy of the layout, not two
 
 The plan said "write it twice, identically, or the AOT binaries diverge from the
-JIT". Stage 1 does not: `crates/aipl-codegen/src/str24.rs` is an ordinary module
+JIT". It is not written twice: `crates/aipl-codegen/src/str24.rs` is an ordinary module
 in the JIT runtime **and** `include!`d by
 `crates/aipl-linker/runtime/aipl_runtime.rs`, so both compile the same text.
 
@@ -293,10 +249,10 @@ The build wiring: `crates/aipl-linker/build.rs` gained a `rerun-if-changed` for
 the shared path, so editing it rebuilds the staticlib. Verified by injecting a
 type error into the shared file and watching the AOT build fail.
 
-## The constraint that shapes Stage 4: `refcount == 1` is not ownership
+## The constraint that shapes Stage 2: `refcount == 1` is not ownership
 
 The compiler **elides retains for borrow-only parameters**
-(`crates/aipl-mono/src/lib.rs:8464-8500`): when a callee provably only inspects
+(`inspect_only_params`, in `aipl-mono`): when a callee provably only inspects
 an argument, the caller's retain and the callee's release *both* disappear. So
 inside such a callee, a buffer can show `refcount == 1` while the caller is still
 holding it. The same is true of the non-retaining borrows the mut-binding model
@@ -312,7 +268,7 @@ The rule that *is* sound, and that the compiler already has the machinery for:
 
 > In-place mutation requires **static ownership** — an `owned` parameter or a
 > recognized owned temporary (`move_owned_temp` / `owned_temp_since`,
-> `lib.rs:9329-9335`, the analysis behind the existing `$own` instances) — and
+> the analysis behind the existing `$own` instances) — and
 > `refcount == 1` as a *dynamic refinement* of it, never as a substitute.
 
 That is exactly how arrays already do in-place `map`/`filter` (`__filter21$own0`
@@ -341,7 +297,7 @@ test above.
   heap blocks to 24 KB and *zero*; an array of a thousand long strings pays
   16 KB more for nothing.
 - **`str?` goes 16 → 32 bytes** under the current uniform `{tag, payload}`
-  optional layout. Stage 7 is the answer to this one and generalizes past `str`.
+  optional layout. Stage 5 is the answer to this one and generalizes past `str`.
 - **Copying a `str` is three words and a refcount**, not one word and a
   refcount.
 - **Codegen churn is enormous** — `str` moves from the scalar class to the
@@ -352,20 +308,7 @@ test above.
 - **Corpus-wide metric churn**: `instructions executed`, `binary size`, and
   `allocations` all move in every case.
 
-## Type-system and storage fallout (Stage 2)
-
-The 8-byte assumption is written into the type rules, not just the codegen:
-
-| Gate | Where | Change |
-|---|---|---|
-| `is_array_elem` | `crates/aipl-syntax/src/lib.rs:2114` | must admit a 24-byte element; the array runtime is already `elem_size`-general (`alloc_array`, `cap_bytes_for`, `ELEM_BITPACKED`) |
-| `is_set_elem` | `:2129` | 24-byte slots; hashing/equality are already content-based |
-| `is_dict_key` | `:2141` | same |
-| struct fields / variant payloads | same "storable scalar" gate | a `str` field is no longer word-sized |
-| `char[]` | `is_char_array`, `lib.rs:9580` | str-shaped, so it becomes 24 bytes too |
-| FFI marshaling | `lib.rs:6034-6100` | `str` args and returns cross as 24 bytes; the ≤5-scalar-arg cap needs re-counting |
-
-## Stage 5 — rope-native operations
+## Stage 3 — rope-native operations
 
 Ropes earn their keep only if the operations a rope commonly meets don't force
 it flat. The materialize path stays as the fallback; the work is to reach it
@@ -387,10 +330,10 @@ less often.
 The payoff is that `a + b` stays O(1) *and* the result stays cheap to consume,
 which is what makes laziness worth its complexity.
 
-## Stage 6 — converge arrays onto the same model
+## Stage 4 — converge arrays onto the same model
 
-Arrays today are a single pointer to `[refcount][len][cap][elements]`. After
-Stage 1 the two families differ for no good reason: strings carry
+Arrays are a single pointer to `[refcount][len][cap][elements]`, so the two
+families now differ for no good reason: strings carry
 `{base, data, len}` with inline and view forms; arrays carry a pointer with the
 length in the block.
 
@@ -408,7 +351,7 @@ Element size is the wrinkle: strings have byte elements, arrays are
 `elem_size`-general with a bit-packed mode. The shared code has to be
 element-size-parameterized where the string version can hardcode 1.
 
-## Stage 7 — niche-filled optionals
+## Stage 5 — niche-filled optionals
 
 `T?` is `{tag: i64, payload}` today, which is what makes `str?` 32 bytes. But any
 type with an unused bit can host its own `none`:
@@ -427,102 +370,8 @@ So `str?` is 24 bytes, `bool?` and `char?` are 8, and only types with no niche
 The work is that "optional" stops being one layout and becomes a per-type
 question: a niche descriptor per type, and every site that builds, tests, or
 reads an optional — including `read_ffi_optional` and the sret paths — goes
-through it instead of assuming `{tag, payload}`. Worth doing after Stage 6, when
+through it instead of assuming `{tag, payload}`. Worth doing after Stage 4, when
 there is one value model to describe niches against rather than two.
-
-## Bootstrap: two ABIs, decided by measurement
-
-The plan asked whether to bootstrap with hand-ported native hook stubs or by
-temporarily supporting both ABIs. **Both, in effect — and the choice is now
-forced rather than preferred**, because of what a trial flip showed:
-
-1. **The switch gets no compile-time signal.** `is_composite`, `elem_size_of`
-   and `sret_size` are ordinary runtime logic, so widening `str` in all three
-   compiles with **zero errors** and then emits code that corrupts memory.
-2. **The failure has no diagnostic.** The first case run aborts with `SIGABRT`
-   and nothing else: codegen believes a `str` is 24 bytes while the runtime still
-   reads 8.
-3. **There is no "test a piece of it".** The compiler cannot parse *any* source
-   without its dogfooded engines, and those run old-ABI code out of the
-   checked-in `.clif`. So until every part of the switch is simultaneously
-   correct *and* the artifacts are regenerated, nothing runs at all — and the
-   artifacts cannot be regenerated without a compiler that parses.
-
-A half-finished switch is therefore not merely broken, it is **undebuggable**.
-The way out is to make the two ABIs coexist:
-
-- Every existing `aipl_*` symbol keeps its 8-byte `str` and its current
-  behaviour, so the checked-in artifacts keep running and the compiler keeps
-  parsing.
-- The new entry points carry an `aipl2_` prefix and the new convention — a `str`
-  argument is a `*const Str`, a `str` result is written through a leading
-  `*mut Str` (the shape `abi_spike::q2b` pinned as the only portable one).
-- An artifact is self-consistent with whichever runtime its symbols name, so the
-  two never meet. New codegen emits `aipl2_*`; the old IR keeps calling `aipl_*`.
-
-That is what makes the switch testable: user programs move to the new
-representation while the compiler's own engines still run the old one, so a
-failure is one case failing rather than the world going dark. The artifacts are
-regenerated against `aipl2_*` at the end, and the old half is deleted then —
-which is also when the hand-ported-stub question disappears, since the real
-dogfooded engines do the regeneration.
-
-## Switch: committed, gated off by `AIPL_STR24`
-
-The switch is **in main and inert**. Codegen emits the 24-byte representation
-only when `AIPL_STR24` is set; without it the compiler is what it was and the
-suite is green (874 passing). That is what lets the work be committed rather than
-carried in a stash.
-
-### Why a flag rather than a list of ignored tests
-
-The first attempt was a burn-down list of `#[ignore]`d failures. It cannot work:
-two full runs under the switch failed **39 tests and 13 tests with no overlap**.
-The breakage is nondeterministic — a value that is 24 bytes to one code path and
-8 to another corrupts whatever sits next to it, and what that is depends on
-allocation order. There is no stable set to ignore, so ignoring would have
-suppressed a moving target. The flag keeps the suite honestly green; the list
-survives as `tests/support/str24_migration.txt`, a record of the work rather than
-a suppression mechanism.
-
-### The bug that gating exposed
-
-Scoping the switch off turned 874 passing tests into 135 failures, all of the
-form *"mismatched argument count: got 3, expected 2"*. The cause is worth
-remembering: Stage 0 gave the *old* str-returning symbols `Ret::Str` in the kind
-table, and the new out-pointer protocol in `Builtins::call` fired on that — so
-every old `str`-returning call gained a leading argument the callee did not take.
-`Ret::Str` means "this yields a `str`" to **both** ABIs; only the new one returns
-it through a pointer. The protocol now keys off the symbol's convention, not the
-return kind alone.
-
-### State of the switched path (`AIPL_STR24=1`)
-
-Programs with no strings work. String literals crashed during codegen of `main`
-after the gating refactor, having previously worked end to end (`print("short")`
-and a 35-byte static literal both printed). Re-proving those two is the next
-step, and `tests/support/str24_migration.txt` records the clusters behind them —
-16 tests on the FFI read path, 6 on `emit_render`, 7 on the dogfooded
-formatter/lexer/highlighter, 2 on the artifacts, 8 on container shapes.
-
-### What is switched, behind the flag
-
-- the three predicates admitting `str` (via `str24_wide`, which consults the
-  gate), so a value travels as an address;
-- `emit_const_str` building a literal as three words in a stack slot, with
-  `emit_const_str_tagged` beside it for the old path;
-- the refcount arm naming `aipl2_inc`/`aipl2_dec` where the type is known to be a
-  `str` — **not** through the symbol remap, because `aipl_inc`/`aipl_dec` are
-  shared with values that are not `str`s, and remapping them globally sends a
-  boxed or array pointer to an entry point that reads 24 bytes off it;
-- `active_sym`, the one place a call site's symbol becomes its `aipl2_*`
-  counterpart, currently limited to the verified set;
-- `build_cli_array` with 24-byte elements when the switch is on;
-- **ABI-aware FFI argument marshaling** — a `StrAbi` per `Compilation`, with
-  `abi_is_composite`/`abi_elem_size`/`abi_sret_size` answering per callee and
-  recursing. Struct layouts need no equivalent: an artifact's come from its
-  manifest's explicit sizes and offsets;
-- **the out-pointer protocol** in `Builtins::call`, scoped to `aipl2_*`.
 
 ## Verification
 
@@ -540,24 +389,22 @@ formatter/lexer/highlighter, 2 on the artifacts, 8 on container shapes.
 5. **Balanced allocations** — every case's `--- performance ---` asserts
    allocations == deallocations; that is the leak/double-free tripwire for a
    refcount protocol whose shape just changed.
-6. **Canaries for the metric story**, measured before and after so the trade is
-   visible rather than assumed: `grammar_calc.aipl` (1,169,584 instructions
-   today), `walker.aipl` (3,075,003), `parse.aipl`, and the lexer cases — all
-   slice- and token-heavy, which is where the win should show.
-7. **Finish** — `cargo handoff`, expecting a corpus-wide refill; then read the
-   diff for anything that is not a metric.
+6. **Canaries for the metric story** — `grammar_calc.aipl`, `walker.aipl`,
+   `parse.aipl` and the lexer cases, all slice- and token-heavy, so a change
+   that claims to help slicing should show there. Current numbers are in the
+   status table above; measure before and after, so a trade is visible rather
+   than assumed.
 
 ## Open questions
 
 - **Is 22-byte inline the right trade against a branchless `len`?** Decidable by
   measuring how many strings in the corpus fall in 17..22 bytes.
-- **Does anything depend on 8-byte strings outside the type gates?** The
-  bit-packed array mode, dict/set bucket layout, hash seeding, the shim slots,
-  and the FFI argument cap are the places to audit before Stage 1.
-- **Should `str` remain three SSA values, or become a stack-slot composite?**
-  The spike narrows it: arguments are cheap as three scalars, so the question is
-  only about *results*, which must go through memory either way. Registers still
-  win for values that never cross a call.
+- **Should a `str` ever live in registers rather than a stack slot?** Settled
+  for now as a composite: it lives in memory and travels as its address, which
+  is what let the existing composite machinery carry it. The one place the
+  register form won is a tail call, where the callee's frame outlives the
+  caller's — `tail_passes_str_by_value` passes the three words there. Whether
+  that is worth extending to ordinary calls is unmeasured.
 - **Does a buffer need a "NUL is present" bit?** The tag byte has six spare bits.
   Only worth it if C handoff turns out to be hot; the capacity test already
   answers "can I write one?".

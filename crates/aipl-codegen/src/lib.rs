@@ -18446,7 +18446,7 @@ fn compile_expr_inner<M: Module>(
                 // and the length is recorded afterwards with `aipl_str_grew`
                 // (allocation gives capacity, not length). Getting this wrong is
                 // what made `['c', 'a', 'b'].len()` read content bytes as a
-                // pointer — see `tests/support/str24_migration.txt`.
+                // pointer.
                 let value = {
                     let v = builtins.call(module, builder, "aipl_str_alloc", &[len]);
                     let cursor = builtins.call(module, builder, "aipl_str_write_ptr", &[v]);

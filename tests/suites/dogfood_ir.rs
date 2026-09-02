@@ -493,26 +493,8 @@ fn sanity_check(artifact: &str) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Whether the checked-in artifacts can be expected to match what codegen
-/// produces right now. Under `AIPL_STR24` they cannot: the frontend emits calls
-/// to the `aipl2_*` entry points while the `.clif` files still name the `aipl_*`
-/// ones, so a *correct* switch mismatches by construction. Regenerating the
-/// artifacts is the last step of Stage 1 (`tests/support/str24_migration.txt`),
-/// and doing it before then would strand the compiler — it cannot parse anything
-/// without artifacts its own runtime can link.
-///
-/// Same category as the skipped `--- performance ---` sections: an assertion
-/// whose only cure is the final flip, which would otherwise mask the failures
-/// that carry information.
-fn checked_in_ir_can_be_current() -> bool {
-    std::env::var_os("AIPL_STR24").is_none()
-}
-
 #[test]
 fn checked_in_ir_is_current() {
-    if !checked_in_ir_can_be_current() {
-        return;
-    }
     aipl::install_parser_hooks();
     for a in ARTIFACTS {
         let generated = generate_for(a);

@@ -711,7 +711,7 @@ fn str_for_each_chunk(ptr: *const u8, f: &mut impl FnMut(&[u8]) -> bool) -> bool
 // through `std::io`, and this one writes through `libc` like every other entry
 // point here. So these two are the AOT counterparts of `str24_host`'s
 // `aipl_print` / `aipl_print_error`, and the reason every program that printed
-// anything failed to *link* under `AIPL_STR24` while one that printed nothing
+// anything failed to *link* while one that printed nothing
 // built fine.
 //
 // Unlike `aipl_print`, they do **not** release their argument: an `aipl_*` entry
