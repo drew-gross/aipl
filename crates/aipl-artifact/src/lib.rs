@@ -70,6 +70,15 @@ pub struct Manifest {
     pub data: Vec<DataObject>,
     /// `; struct` / `; variant` lines, in manifest order, unparsed.
     pub types: Vec<TypeLine>,
+    /// Whether this artifact was compiled with the 24-byte `str`
+    /// (`STR_REPR.md`), from a `; str24` marker line.
+    ///
+    /// **Absent means tagged**, which is what every artifact predating the
+    /// switch says by saying nothing — so the checked-in `.clif` files keep
+    /// their meaning without being touched. A reader that guessed instead got
+    /// this wrong for a *freshly generated* wide artifact and read its 24-byte
+    /// values as 8-byte pointers.
+    pub str24: bool,
 }
 
 /// Parse the `;`-comment manifest at the head of an artifact.
@@ -91,7 +100,9 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             continue;
         };
         let body = body.trim();
-        if let Some(rest) = body.strip_prefix("struct ") {
+        if body == "str24" {
+            m.str24 = true;
+        } else if let Some(rest) = body.strip_prefix("struct ") {
             m.types.push(TypeLine::Struct(rest.to_string()));
         } else if let Some(rest) = body.strip_prefix("variant ") {
             m.types.push(TypeLine::Variant(rest.to_string()));

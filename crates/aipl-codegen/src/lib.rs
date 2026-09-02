@@ -5935,6 +5935,12 @@ pub fn generate_dogfood_artifact(
     out.push_str("; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).\n");
     out.push_str("; DO NOT EDIT BY HAND. Regenerate:\n");
     out.push_str(";   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir\n");
+    // The representation this artifact speaks. Omitted (and so read as tagged)
+    // unless the switch is on, which is what keeps every pre-switch artifact —
+    // including the checked-in ones — meaning exactly what it always did.
+    if str24_enabled() {
+        out.push_str("; str24\n");
+    }
     // Struct types any entry references (param or return), so the inverse can
     // rebuild their layouts and marshal a struct return — collected here, emitted
     // as `; struct` lines after the entries.
@@ -6227,8 +6233,16 @@ impl Compilation {
             // Struct layouts recovered from the `; struct` manifest lines, so a
             // struct-returning entry marshals back through `call_values`.
             structs: manifest_structs(&manifest)?,
-            // Compiled before the switch: 8-byte tagged `str` values.
-            str_abi: StrAbi::Tagged,
+            // The artifact says which representation it was compiled with; a
+            // pre-switch one says nothing, which means tagged. This used to be
+            // hardcoded `Tagged` — right for the checked-in IR, wrong for an
+            // artifact generated *under* the switch, whose 24-byte values were
+            // then read as 8-byte pointers (SIGBUS in `call_values`).
+            str_abi: if manifest.str24 {
+                StrAbi::Wide
+            } else {
+                StrAbi::Tagged
+            },
             code: Code::Jit(module),
             ir: text.to_string(),
         })
@@ -7578,6 +7592,48 @@ fn injected_cli_args_ty() -> Type {
 /// result — nothing for unit/struct(sret), `(tag, value)` for an optional, a
 /// single i64 otherwise. Used by both the declaration and the definition so
 /// they can't drift.
+/// Whether parameter `ty` is passed as its three words rather than as a pointer,
+/// which is what the `tail` convention needs for a wide `str`.
+///
+/// `return_call` hands the caller's frame over to the callee, so any argument
+/// that *points into* that frame dangles the moment the transfer happens — which
+/// is why `tail_safe_param` excludes composites in general. A wide `str` is 24
+/// bytes of value with its content on the heap, so it has a way out the other
+/// composites do not: pass the value itself. Three words in registers is exactly
+/// what the ABI spike measured as workable (`abi_spike::q1`).
+///
+/// Only the `$tail` signature changes. The exported trampoline keeps the
+/// one-pointer host shape, so the FFI, artifacts and function values are
+/// untouched.
+fn tail_passes_str_by_value(tail: bool, ty: &ConcreteType) -> bool {
+    tail && str24_wide(ty)
+}
+
+/// The words a wide `str` at `addr` lowers to, for a by-value tail argument.
+fn str_value_words(builder: &mut FunctionBuilder, addr: Value) -> Vec<Value> {
+    let flags = MemFlagsData::trusted();
+    (0..str24::STR_SIZE as i32)
+        .step_by(8)
+        .map(|off| builder.ins().load(types::I64, flags, addr, off))
+        .collect()
+}
+
+/// The inverse: spill three words back into a slot and return its address, so
+/// the body sees the same handle every other `str` has.
+fn str_words_to_value(builder: &mut FunctionBuilder, words: &[Value]) -> Value {
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        str24::STR_SIZE as u32,
+        3,
+    ));
+    let addr = builder.ins().stack_addr(types::I64, slot, 0);
+    let flags = MemFlagsData::trusted();
+    for (i, w) in words.iter().enumerate() {
+        builder.ins().store(flags, *w, addr, (i * 8) as i32);
+    }
+    addr
+}
+
 fn build_signature(
     sig: &mut Signature,
     f: &aipl_mono::ConcreteFn,
@@ -7598,7 +7654,13 @@ fn build_signature(
         sig.params.push(AbiParam::new(types::I64));
     }
     for p in &f.params {
-        sig.params.push(AbiParam::new(cl_type_of(&p.ty)));
+        if tail_passes_str_by_value(tail, &p.ty) {
+            for _ in 0..str24::STR_SIZE / 8 {
+                sig.params.push(AbiParam::new(types::I64));
+            }
+        } else {
+            sig.params.push(AbiParam::new(cl_type_of(&p.ty)));
+        }
     }
     if is_unit(&abi) || returns_composite {
         // Unit yields no result; a composite is written through the sret pointer.
@@ -7722,6 +7784,16 @@ fn tail_callees(body: &Expr) -> Vec<String> {
 /// value via `tail_owned`). A dict — refcounted but neither — is left out
 /// rather than reasoned about.
 fn tail_safe_param(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    // A wide `str` is composite but still tail-safe, because the `tail`
+    // signature passes it by value — see `tail_passes_str_by_value`. Without
+    // this every `str`-taking function silently lost tail-call elimination the
+    // moment the representation widened, turning a trampolined mutual cycle back
+    // into real recursion (`cases/tail_calls/mutual_cycle`, which overflowed the
+    // 8 MB stack of an `aipl build` binary at ~50k deep while the JIT, on a
+    // bigger stack, still passed).
+    if str24_wide(ty) {
+        return true;
+    }
     !is_composite(ty, structs) && (!needs_drop(ty, structs) || is_heap(ty) || is_boxed(ty, structs))
 }
 
@@ -9591,7 +9663,25 @@ fn define_fn<M: Module>(
         let mut env: Env = HashMap::new();
         let mut scopes: Vec<Vec<Tracked>> = vec![Vec::new()];
         let mut self_slot: Option<StackSlot> = None;
-        for (idx, (p, v)) in func.params.iter().zip(user_params).enumerate() {
+        // A by-value `str` parameter occupies three block params, so the walk
+        // cannot zip one-to-one; it reassembles those into a slot and binds its
+        // address, which is the handle every other `str` has.
+        let mut bound: Vec<Value> = Vec::with_capacity(func.params.len());
+        {
+            let mut at = 0usize;
+            for p in &func.params {
+                if tail_passes_str_by_value(tail_id.is_some(), &p.ty) {
+                    let n = str24::STR_SIZE / 8;
+                    let words = user_params[at..at + n].to_vec();
+                    bound.push(str_words_to_value(&mut builder, &words));
+                    at += n;
+                } else {
+                    bound.push(user_params[at]);
+                    at += 1;
+                }
+            }
+        }
+        for (idx, (p, v)) in func.params.iter().zip(bound.iter()).enumerate() {
             if p.mutable {
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
@@ -9804,7 +9894,19 @@ fn define_tail_trampoline<M: Module>(
         builder.append_block_params_for_function_params(entry);
         builder.switch_to_block(entry);
         builder.seal_block(entry);
-        let args: Vec<Value> = builder.block_params(entry).to_vec();
+        let host_args: Vec<Value> = builder.block_params(entry).to_vec();
+        // The trampoline speaks the host shape (one pointer per `str`); the
+        // `$tail` body it forwards to wants the three words. An sret pointer, if
+        // any, leads and passes straight through.
+        let lead = host_args.len() - func.params.len();
+        let mut args: Vec<Value> = host_args[..lead].to_vec();
+        for (p, a) in func.params.iter().zip(&host_args[lead..]) {
+            if tail_passes_str_by_value(true, &p.ty) {
+                args.extend(str_value_words(&mut builder, *a));
+            } else {
+                args.push(*a);
+            }
+        }
         let callee = module.declare_func_in_func(tail_id, builder.func);
         let inst = builder.ins().call(callee, &args);
         let results: Vec<Value> = builder.inst_results(inst).to_vec();
@@ -15656,6 +15758,23 @@ fn compile_call<M: Module>(
     let call_args: Vec<Value> = match sret {
         Some(s) => std::iter::once(s).chain(arg_values).collect(),
         None => arg_values,
+    };
+    // Every call to a participant targets its `$tail` body (see `callee_id`
+    // below), not just the tail ones — so a wide `str` argument is split into
+    // its three words here, once, rather than at the `return_call`.
+    let call_args: Vec<Value> = if info.tail_id.is_some() && str24_enabled() {
+        let lead = call_args.len() - info.params.len();
+        let mut split: Vec<Value> = call_args[..lead].to_vec();
+        for (p, a) in info.params.iter().zip(&call_args[lead..]) {
+            if tail_passes_str_by_value(true, &p.ty) {
+                split.extend(str_value_words(builder, *a));
+            } else {
+                split.push(*a);
+            }
+        }
+        split
+    } else {
+        call_args
     };
     // A user function is already declared; a builtin's import is declared lazily
     // here on first reference. A tail-call participant's real body lives in its

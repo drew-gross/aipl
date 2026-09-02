@@ -98,7 +98,7 @@
 # table means the next conversion cannot reintroduce it.
 #
 # Ten clusters were fixed on the strength of that classification, and the count
-# is now **3 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
+# is now **0 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
 # started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
@@ -373,20 +373,57 @@
 #     `__map_set` also had to release the old value *before* writing the slot,
 #     the same reordering `set` and the append paths needed.
 #
-# The remaining 3:
+#   - **the tail-call cycle, and it was a real design consequence, not a bug.**
 #
-#     cases_tail_calls_mutual_cycle
-#     cases_lambdas_zip_with_owned   (fixed; awaiting confirmation in a full run)
-#     dogfood_ir::artifact_round_trips_rich_types
+#     `tail_safe_param` excludes composite parameters because `return_call` hands
+#     the caller's frame to the callee, so an argument that *points into* that
+#     frame dangles at the transfer. A wide `str` is composite, so every
+#     `str`-taking function silently lost tail-call elimination — a trampolined
+#     mutual cycle became real recursion and overflowed the 8 MB stack of an
+#     `aipl build` binary at ~50k deep. The JIT, on a bigger stack, still passed,
+#     which is why this presented as the first JIT/AOT disagreement since the
+#     `str24.rs` split. Confirmed by swapping the `str` parameter for an `i64`:
+#     same cycle, same depth, no crash.
 #
-# `cases_tail_calls_mutual_cycle` is **AOT-only** — the JIT output matches
-# exactly, and the built binary segfaults. It is a boxed recursive variant with a
-# `str` payload (`variant Work = WNil | WCons(str, Work)`) driven through the
-# trampoline. Not stack exhaustion: reducing the depth from 300000 to 300 still
-# segfaults, after the first `print` succeeds. So it is a layout or ownership
-# difference in the AOT half's boxed-value handling — the first place the two
-# runtimes have disagreed since the `str24.rs` split, and worth finding for that
-# reason alone.
+#     A wide `str` has a way out the other composites do not — it is 24 bytes of
+#     value with its content on the heap — so the `$tail` signature now passes it
+#     **by value**, three words in registers, which is what `abi_spike::q1`
+#     measured as workable before any of this was written. Only the `$tail`
+#     signature changes; the exported trampoline keeps the one-pointer host
+#     shape, so the FFI, artifacts and function values are untouched.
+#
+#     The catch worth remembering: **every** call to a participant targets its
+#     `$tail` body, not just the tail ones (the trampoline exists for the FFI),
+#     so the split belongs at the argument list, once — not at the `return_call`.
+#     Putting it there produced a clean verifier error rather than corruption.
+#
+#   - **the artifact round trip**, which was one hardcoded assumption.
+#     `from_artifact` set `str_abi: StrAbi::Tagged` with the comment "compiled
+#     before the switch" — true of the checked-in `.clif`, false of an artifact
+#     generated *under* the switch, whose 24-byte values were then read as 8-byte
+#     pointers. An artifact now **declares** its representation with a `; str24`
+#     manifest marker, and absent means tagged — so every pre-switch artifact
+#     keeps its meaning without being touched. Same shape as the `__aipl_str24`
+#     object flag the AOT runtime reads: the producer states it, the consumer
+#     stops guessing.
+#
+# ---------------------------------------------------------------------------
+# **The burn-down is empty: 932 / 932 pass under `AIPL_STR24=1`, zero leaks.**
+#
+# What that does *not* mean:
+#
+#   - `--- performance ---` is still only leak-checked under the flag. The
+#     counts change with the representation and are refilled once, at the flip.
+#   - The `aipl2_*` entry points do not call `count_builtin!`, so the
+#     `functions:` blocks will under-report builtin calls until they do (below).
+#   - Stage 1 ends by regenerating the artifacts against `aipl2_*` and deleting
+#     the `aipl_*` half. Until then both ABIs are live and the switch is off by
+#     default.
+#   - `emit_str_iter_next` still takes a call per byte on the wide path (its
+#     inlined fast path reads the tagged cursor's layout), and `to_str` allocates
+#     a buffer for short results rather than packing them inline. Both are
+#     performance debt the flip should collect.
+#
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
