@@ -939,6 +939,127 @@ unsafe fn read_file_impl(name: *const u8) -> *const u8 {
     }
 }
 
+// ---------- The wide `str`'s file I/O (AOT) ----------
+//
+// The JIT half (`str24_host.rs`) has `std::fs`; this one has `libc`, which wants
+// NUL-terminated paths. A wide `str` is a *window* and carries no terminator —
+// slicing is what makes it free — so one has to be made rather than assumed.
+// That is the whole difference from the tagged versions, which could hand a heap
+// str's own buffer straight to `fopen`.
+
+/// A NUL-terminated copy of `s`'s bytes for the C file APIs. Allocated (not a
+/// fixed stack buffer, so there is no path-length ceiling); free with
+/// [`free_c_path`].
+unsafe fn c_path_of(s: str24::Str) -> *mut u8 {
+    let len = s.len();
+    let raw = unsafe { rt_alloc(len + 1) } as *mut u8;
+    if raw.is_null() {
+        return raw;
+    }
+    let mut at = 0usize;
+    str24::for_each_chunk(s, &mut |chunk| {
+        unsafe { core::ptr::copy_nonoverlapping(chunk.as_ptr(), raw.add(at), chunk.len()) };
+        at += chunk.len();
+        true
+    });
+    unsafe { *raw.add(len) = 0 };
+    raw
+}
+
+unsafe fn free_c_path(p: *mut u8) {
+    unsafe { rt_free(p as *mut c_void) };
+}
+
+/// `read_file_to_string` under the wide ABI: contents through `out`, success as
+/// the return value. See `str24_host::aipl2_read_file_to_string` for why the
+/// flag is explicit rather than a null result. Borrows `path`.
+#[no_mangle]
+pub extern "C" fn aipl2_read_file_to_string(out: *mut str24::Str, path: *const str24::Str) -> i64 {
+    count_builtin!(builtin_calls::AIPL_READ_FILE_TO_STRING);
+    unsafe {
+        *out = str24::Str::empty();
+        let cpath = c_path_of(*path);
+        if cpath.is_null() {
+            return 0;
+        }
+        let f = fopen(cpath as *const c_char, b"rb\0".as_ptr() as *const c_char);
+        free_c_path(cpath);
+        if f.is_null() {
+            return 0;
+        }
+        if fseek(f, 0, SEEK_END) != 0 {
+            fclose(f);
+            return 0;
+        }
+        let size = ftell(f);
+        if size < 0 || fseek(f, 0, SEEK_SET) != 0 {
+            fclose(f);
+            return 0;
+        }
+        let size = size as usize;
+        let buf = rt_alloc(size.max(1)) as *mut u8;
+        if buf.is_null() {
+            fclose(f);
+            return 0;
+        }
+        let n = fread(buf as *mut c_void, 1, size, f);
+        fclose(f);
+        if n != size {
+            rt_free(buf as *mut c_void);
+            return 0;
+        }
+        *out = str24::from_bytes(core::slice::from_raw_parts(buf, size));
+        rt_free(buf as *mut c_void);
+        1
+    }
+}
+
+/// `write_string_to_file` under the wide ABI. Streams the contents chunk by
+/// chunk, so a rope is written without being flattened. Borrows both arguments.
+#[no_mangle]
+pub extern "C" fn aipl2_write_string_to_file(
+    path: *const str24::Str,
+    contents: *const str24::Str,
+) -> i64 {
+    count_builtin!(builtin_calls::AIPL_WRITE_STRING_TO_FILE);
+    unsafe {
+        let cpath = c_path_of(*path);
+        if cpath.is_null() {
+            return 0;
+        }
+        let f = fopen(cpath as *const c_char, b"wb\0".as_ptr() as *const c_char);
+        free_c_path(cpath);
+        if f.is_null() {
+            return 0;
+        }
+        let mut ok = true;
+        str24::for_each_chunk(*contents, &mut |chunk| {
+            if fwrite(chunk.as_ptr() as *const c_void, 1, chunk.len(), f) != chunk.len() {
+                ok = false;
+                return false;
+            }
+            true
+        });
+        fclose(f);
+        i64::from(ok)
+    }
+}
+
+/// `list_files` under the wide ABI. Borrows `dir`.
+#[no_mangle]
+pub extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
+    count_builtin!(builtin_calls::AIPL_LIST_FILES);
+    #[cfg(unix)]
+    unsafe {
+        list_unix::list_files_wide(*dir)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
+        core::ptr::null()
+    }
+}
+
 /// `write_string_to_file(path, contents) -> bool`: write `contents`' bytes to
 /// `path`, returning 1 on success or 0 on any failure (open/write error).
 /// Decrements both `path` and `contents` per the refcount protocol (callers
@@ -1021,7 +1142,7 @@ unsafe fn list_files_impl(_dir: *const u8) -> *const u8 {
 mod list_unix {
     use super::{
         aipl_arr_drop_str, aipl_array_dec, aipl_array_push_mut, aipl_array_with_cap, make_str,
-        memcpy, str_bytes, strlen, ArrDropFn,
+        memcpy, str24, str_bytes, strlen, ArrDropFn,
     };
     use core::ffi::{c_char, c_int, c_void};
 
@@ -1072,6 +1193,10 @@ mod list_unix {
     struct Walk {
         path: [u8; PATH_CAP],
         out: *const u8,
+        /// Byte width of one element — 8 for a tagged `str` pointer,
+        /// `str24::STR_SIZE` for a wide value stored inline. The walk itself is
+        /// identical; only how a name becomes an element differs.
+        elem_size: i64,
     }
 
     /// Walk `dir` and return the `str[]` of files beneath it, or null on any
@@ -1079,13 +1204,27 @@ mod list_unix {
     pub unsafe fn list_files(dir: *const u8) -> *const u8 {
         let mut dbuf = [0u8; 8];
         let bytes = unsafe { str_bytes(dir, &mut dbuf) };
+        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
+        unsafe { walk_from(bytes, drop_fn, 8) }
+    }
+
+    /// [`list_files`] for a wide `str` directory argument, producing 24-byte
+    /// elements and the matching element drop-fn.
+    pub unsafe fn list_files_wide(dir: str24::Str) -> *const u8 {
+        let mut scratch = [0u8; str24::INLINE_CAP];
+        let bytes = dir.bytes(&mut scratch);
+        let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+        unsafe { walk_from(bytes, drop_fn, str24::STR_SIZE as i64) }
+    }
+
+    unsafe fn walk_from(bytes: &[u8], drop_fn: i64, elem_size: i64) -> *const u8 {
         if bytes.is_empty() || bytes.len() >= PATH_CAP {
             return core::ptr::null();
         }
-        let drop_fn = aipl_arr_drop_str as ArrDropFn as usize as i64;
         let mut w = Walk {
             path: [0u8; PATH_CAP],
-            out: aipl_array_with_cap(0, drop_fn, 8),
+            out: aipl_array_with_cap(0, drop_fn, elem_size),
+            elem_size,
         };
         unsafe {
             memcpy(
@@ -1163,16 +1302,28 @@ mod list_unix {
         if core::str::from_utf8(bytes).is_err() {
             return false;
         }
-        let slot = make_str(bytes) as i64;
-        // retain-fn 0: the fresh string's one reference moves into the array.
+        // retain-fn 0 either way: the fresh string's one reference moves into
+        // the array.
         w.out = unsafe {
-            aipl_array_push_mut(
-                w.out,
-                &slot as *const i64 as *const u8,
-                drop_fn,
-                0,
-                8,
-            )
+            if w.elem_size == str24::STR_SIZE as i64 {
+                let v = str24::from_bytes(bytes);
+                aipl_array_push_mut(
+                    w.out,
+                    &v as *const str24::Str as *const u8,
+                    drop_fn,
+                    0,
+                    w.elem_size,
+                )
+            } else {
+                let slot = make_str(bytes) as i64;
+                aipl_array_push_mut(
+                    w.out,
+                    &slot as *const i64 as *const u8,
+                    drop_fn,
+                    0,
+                    w.elem_size,
+                )
+            }
         };
         true
     }

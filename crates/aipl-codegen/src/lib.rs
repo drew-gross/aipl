@@ -642,6 +642,31 @@ fn write_file_impl(path: *const u8, contents: *const u8) -> i64 {
 /// listed, and a symlink counts as a file (`file_type` doesn't follow it), so the
 /// walk can't cycle. Decrements `dir` per the refcount protocol (callers pre-inc,
 /// as with any str-taking fn). Mirrors `aipl_list_files` in the linker runtime.
+/// `list_files(dir)` under the wide ABI: a `str[]` of 24-byte elements, or null
+/// on failure. Only the array half is per-runtime — the directory walk is shared
+/// with the tagged version. Borrows `dir`.
+#[no_mangle]
+extern "C" fn aipl2_list_files(dir: *const str24::Str) -> *const u8 {
+    let mut scratch = [0u8; str24::INLINE_CAP];
+    let dv = unsafe { *dir };
+    let Ok(root) = std::str::from_utf8(dv.bytes(&mut scratch)) else {
+        return std::ptr::null();
+    };
+    let mut files: Vec<String> = Vec::new();
+    if walk_dir(root, &mut files).is_err() {
+        return std::ptr::null();
+    }
+    let drop_fn = str24::aipl2_arr_drop_str as *const () as usize as i64;
+    let arr = aipl_array_new(files.len() as i64, drop_fn, str24::STR_SIZE as i64);
+    unsafe {
+        let elems = arr.add(ARR_ELEMS_OFFSET) as *mut str24::Str;
+        for (i, f) in files.iter().enumerate() {
+            std::ptr::write(elems.add(i), str24::from_bytes(f.as_bytes()));
+        }
+    }
+    arr
+}
+
 #[no_mangle]
 extern "C" fn aipl_list_files(dir: *const u8) -> *const u8 {
     let result = list_files_impl(dir);
@@ -5414,6 +5439,15 @@ fn new_jit_module() -> Result<JITModule, Error> {
         "aipl2_arr_retain_opt_str",
         str24::aipl2_arr_retain_opt_str as *const u8,
     );
+    jit_builder.symbol(
+        "aipl2_read_file_to_string",
+        str24_host::aipl2_read_file_to_string as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl2_write_string_to_file",
+        str24_host::aipl2_write_string_to_file as *const u8,
+    );
+    jit_builder.symbol("aipl2_list_files", aipl2_list_files as *const u8);
     jit_builder.symbol("aipl2_str_split", aipl2_str_split as *const u8);
     jit_builder.symbol("aipl2_str_join", aipl2_str_join as *const u8);
     jit_builder.symbol("aipl2_arr_drop_str", str24::aipl2_arr_drop_str as *const u8);
@@ -8632,6 +8666,11 @@ fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
         "aipl2_str_grew" => sig(&[Word, Word], Ret::None),
         "aipl2_test_begin" | "aipl2_test_fail" => sig(&[Word], Ret::None),
         "aipl2_str_split" => sig(&[Word, Word], Ret::Word),
+        // Leading out pointer *and* an i64 return: the payload goes through the
+        // pointer, the success flag comes back. See `aipl2_read_file_to_string`.
+        "aipl2_read_file_to_string" => sig(&[Word, Word], Ret::Word),
+        "aipl2_write_string_to_file" => sig(&[Word, Word], Ret::Word),
+        "aipl2_list_files" => sig(&[Word], Ret::Word),
         "aipl2_str_join" => sig(&[Word, Word], Ret::Str),
         "aipl2_assert" => sig(&[Word, Word], Ret::None),
         other => panic!("unknown builtin import symbol {other:?}"),
@@ -8704,6 +8743,8 @@ fn active_sym(sym: &'static str) -> &'static str {
         "aipl_str_sort" => "aipl2_str_sort",
         "aipl_str_repeat" => "aipl2_str_repeat",
         "aipl_str_split" => "aipl2_str_split",
+        "aipl_list_files" => "aipl2_list_files",
+        "aipl_write_string_to_file" => "aipl2_write_string_to_file",
         "aipl_str_join" => "aipl2_str_join",
         "aipl_inc" => "aipl2_inc",
         "aipl_dec" => "aipl2_dec",
@@ -13273,43 +13314,74 @@ fn emit_file_result<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     raw: Value,
-    ok_is_value: bool,
+    ok_ty: Option<ConcreteType>,
     err_msg: &[u8],
 ) -> Result<Value, Error> {
+    // The tagged runtime signals failure with a null return, so the value *is*
+    // the success test. See `emit_file_result_split` for the wide form, where a
+    // `str` payload arrives through an out pointer that is never null and the
+    // flag has to be carried separately.
+    let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
+    let payload = ok_ty.map(|t| (raw, t));
+    emit_file_result_split(module, builder, cx, is_ok, payload, err_msg)
+}
+
+/// `str!Error` from an explicit success flag and an optional payload.
+///
+/// Both the slot size and how the payload is written follow the payload's
+/// representation: a tagged `str` is one word stored at `OPT_VALUE_OFFSET`, a
+/// wide one is 24 bytes copied there, making the whole result 32 rather than 16.
+/// The error side is a literal either way — and note it goes through
+/// `emit_const_str`, which yields a *value*, not `emit_str_literal`, which
+/// yields raw content bytes for a sink to copy.
+fn emit_file_result_split<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    is_ok: Value,
+    payload: Option<(Value, ConcreteType)>,
+    err_msg: &[u8],
+) -> Result<Value, Error> {
+    let str_ty = ConcreteType::Primitive(Primitive::Str);
+    // The payload region is sized to the *wider* side, as any result is. That
+    // only started to matter here when a `str` stopped being one word: the err
+    // side is always an `Error` (a `str`), so for `str[]!Error` — where the ok
+    // side is an 8-byte array pointer — the err side is now the larger one, and
+    // sizing from the ok side would put the message past the end of the slot.
+    let ok_size = payload
+        .as_ref()
+        .map_or(8, |(_, t)| elem_size_of(t, cx.structs));
+    let size = OPT_VALUE_OFFSET + ok_size.max(elem_size_of(&str_ty, cx.structs)) as u32;
     let slot =
-        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3));
     let ptr = builder.ins().stack_addr(types::I64, slot, 0);
+    let val_at = builder.ins().iadd_imm_s(ptr, OPT_VALUE_OFFSET as i64);
     let ok_b = builder.create_block();
     let err_b = builder.create_block();
     let merge = builder.create_block();
-    let is_ok = builder.ins().icmp_imm_s(IntCC::NotEqual, raw, 0);
     builder.ins().brif(is_ok, ok_b, &[], err_b, &[]);
 
     builder.switch_to_block(ok_b);
     builder.seal_block(ok_b);
     let one = builder.ins().iconst(types::I64, 1);
     builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
-    let ok_val = if ok_is_value {
-        raw
-    } else {
-        builder.ins().iconst(types::I64, 0)
-    };
-    builder.ins().store(
-        MemFlagsData::trusted(),
-        ok_val,
-        ptr,
-        OPT_VALUE_OFFSET as i32,
-    );
+    match &payload {
+        Some((v, t)) => store_array_elem(builder, val_at, *v, t, cx.structs),
+        None => {
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder
+                .ins()
+                .store(MemFlagsData::trusted(), zero, val_at, 0);
+        }
+    }
     builder.ins().jump(merge, &[]);
 
     builder.switch_to_block(err_b);
     builder.seal_block(err_b);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().store(MemFlagsData::trusted(), zero, ptr, 0);
-    let msg = emit_str_literal(module, builder, cx, err_msg)?;
-    builder
-        .ins()
-        .store(MemFlagsData::trusted(), msg, ptr, OPT_VALUE_OFFSET as i32);
+    let (msg, _) = emit_const_str(module, builder, cx, err_msg)?;
+    store_array_elem(builder, val_at, msg, &str_ty, cx.structs);
     builder.ins().jump(merge, &[]);
 
     builder.switch_to_block(merge);
@@ -15880,20 +15952,49 @@ fn compile_call_expr<M: Module>(
             )?;
             // The runtime consumes (decs) the filename ref, so inc to keep our
             // scope-tracked ref alive.
-            emit_inc(builder, module, builtins, name_v);
-            let raw = builtins.call(module, builder, "aipl_read_file_to_string", &[name_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Primitive(Primitive::Str)),
                 Box::new(error_ty()),
             );
-            let ptr = emit_file_result(
-                module,
-                builder,
-                cx,
-                raw,
-                /*ok_is_value=*/ true,
-                b"could not read file",
-            )?;
+            let ptr = if str24_enabled() {
+                // Wide: the contents come back through an out pointer this call
+                // site allocates, and the success flag is the return value —
+                // there is no null `str` to test. Borrows the filename, so no
+                // compensating inc.
+                let out = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    str24::STR_SIZE as u32,
+                    3,
+                ));
+                let out_addr = builder.ins().stack_addr(types::I64, out, 0);
+                let ok = builtins.call(
+                    module,
+                    builder,
+                    "aipl2_read_file_to_string",
+                    &[out_addr, name_v],
+                );
+                emit_file_result_split(
+                    module,
+                    builder,
+                    cx,
+                    ok,
+                    Some((out_addr, ConcreteType::Primitive(Primitive::Str))),
+                    b"could not read file",
+                )?
+            } else {
+                // The runtime consumes (decs) the filename ref, so inc to keep
+                // our scope-tracked ref alive.
+                emit_inc(builder, module, builtins, name_v);
+                let raw = builtins.call(module, builder, "aipl_read_file_to_string", &[name_v]);
+                emit_file_result(
+                    module,
+                    builder,
+                    cx,
+                    raw,
+                    Some(ConcreteType::Primitive(Primitive::Str)),
+                    b"could not read file",
+                )?
+            };
             // The ok payload is a fresh, owned str (the err is a static literal):
             // track so it's released at scope exit (drop decs it only on tag 1).
             scopes
@@ -15943,9 +16044,11 @@ fn compile_call_expr<M: Module>(
                 "list_files directory",
                 args[0].span.clone(),
             )?;
-            // The runtime consumes (decs) the directory ref, so inc to keep our
-            // scope-tracked ref alive.
-            emit_inc(builder, module, builtins, dir_v);
+            // The tagged runtime consumes (decs) the directory ref, so inc to
+            // keep our scope-tracked ref alive; `aipl2_list_files` borrows.
+            if !str24_enabled() {
+                emit_inc(builder, module, builtins, dir_v);
+            }
             let raw = builtins.call(module, builder, "aipl_list_files", &[dir_v]);
             let result_ty = ConcreteType::Result(
                 Box::new(ConcreteType::Array(Box::new(ConcreteType::Primitive(
@@ -15958,7 +16061,11 @@ fn compile_call_expr<M: Module>(
                 builder,
                 cx,
                 raw,
-                /*ok_is_value=*/ true,
+                // A `str[]` payload: an 8-byte array pointer under either
+                // representation — it is the *err* side that widened.
+                Some(ConcreteType::Array(Box::new(ConcreteType::Primitive(
+                    Primitive::Str,
+                )))),
                 b"could not list files",
             )?;
             // The ok payload is a fresh, owned array (the err is a static
@@ -15995,8 +16102,11 @@ fn compile_call_expr<M: Module>(
                 args[1].span.clone(),
             )?;
             // The runtime consumes (decs) both str args, so inc to keep ours alive.
-            emit_inc(builder, module, builtins, path_v);
-            emit_inc(builder, module, builtins, data_v);
+            // Tagged consumes both refs; `aipl2_write_string_to_file` borrows.
+            if !str24_enabled() {
+                emit_inc(builder, module, builtins, path_v);
+                emit_inc(builder, module, builtins, data_v);
+            }
             let code = builtins.call(
                 module,
                 builder,
@@ -16005,14 +16115,7 @@ fn compile_call_expr<M: Module>(
             );
             let result_ty =
                 ConcreteType::Result(Box::new(ConcreteType::Unit), Box::new(error_ty()));
-            let ptr = emit_file_result(
-                module,
-                builder,
-                cx,
-                code,
-                /*ok_is_value=*/ false,
-                b"could not write file",
-            )?;
+            let ptr = emit_file_result(module, builder, cx, code, None, b"could not write file")?;
             // Neither payload needs freeing (ok is unit, err is a static literal),
             // so no scope tracking is required.
             (ptr, result_ty)

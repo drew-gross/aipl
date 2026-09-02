@@ -92,6 +92,34 @@ pub(crate) extern "C" fn aipl2_print_error(s: *const Str) {
     print_error(unsafe { *s });
 }
 
+/// `read_file_to_string(path)` under the wide ABI: contents through `out`, and
+/// **1/0 as the return value**.
+///
+/// The tagged entry point signals failure by returning a null `str`. That is not
+/// available here — a `str` result travels through an out pointer the caller
+/// already allocated, so there is no null to return. The success flag is
+/// therefore explicit, which is also clearer: "did it work" and "what did it
+/// produce" stop sharing one channel. Borrows `path`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_read_file_to_string(out: *mut Str, path: *const Str) -> i64 {
+    match read_file_to_string(unsafe { *path }) {
+        Some(s) => {
+            unsafe { *out = s };
+            1
+        }
+        None => {
+            unsafe { *out = Str::empty() };
+            0
+        }
+    }
+}
+
+/// `write_string_to_file(path, contents)` under the wide ABI. Borrows both.
+#[no_mangle]
+pub(crate) extern "C" fn aipl2_write_string_to_file(path: *const Str, contents: *const Str) -> i64 {
+    i64::from(write_string_to_file(unsafe { *path }, unsafe { *contents }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

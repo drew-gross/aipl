@@ -43,11 +43,11 @@ allocations: 19
 deallocations: 19
 reallocations: 8
 bytes allocated: 801
-instructions executed: 1392
-binary size: 9072
-  code: 4416
-  data: 523
-  metadata: 4133
+instructions executed: 1402
+binary size: 8808
+  code: 4436
+  data: 363
+  metadata: 4009
 functions:
   __to_str_i64$err$Error:
     calls: 1
@@ -108,7 +108,7 @@ functions:
     bytes: (external)
   count_files:
     calls: 1
-    bytes: 324
+    bytes: 328
   main:
     calls: 1
-    bytes: 2472
+    bytes: 2488

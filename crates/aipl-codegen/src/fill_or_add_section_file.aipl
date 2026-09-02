@@ -29,11 +29,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 86
-binary size: 8136
-  code: 4096
-  data: 358
-  metadata: 3682
+instructions executed: 88
+binary size: 8096
+  code: 4116
+  data: 318
+  metadata: 3662
 functions:
   __eq_str$opt:
     calls: 0
@@ -62,9 +62,6 @@ functions:
   aipl_str_eq:
     calls: 1
     bytes: (external)
-  aipl_str_len:
-    calls: 2
-    bytes: (external)
   aipl_test_begin:
     calls: 1
     bytes: (external)
@@ -76,7 +73,7 @@ functions:
     bytes: (external)
   fill_or_add_section_file:
     calls: 1
-    bytes: 2564
+    bytes: 2584
   main:
     calls: 1
     bytes: 72

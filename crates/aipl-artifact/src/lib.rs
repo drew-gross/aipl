@@ -420,7 +420,10 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl2_char_at"
         | "aipl2_str_data" => sig(2, true),
         "aipl2_concat" | "aipl2_str_repeat" | "aipl2_str_join" => sig(3, false),
-        "aipl2_str_split" => sig(2, true),
+        "aipl2_str_split" | "aipl2_read_file_to_string" | "aipl2_write_string_to_file" => {
+            sig(2, true)
+        }
+        "aipl2_list_files" => sig(1, true),
         "aipl2_str_starts_with_at" => sig(3, true),
         "aipl2_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),

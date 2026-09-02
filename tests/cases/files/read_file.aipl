@@ -18,11 +18,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 105
-instructions executed: 224
-binary size: 2848
+instructions executed: 228
+binary size: 2784
   code: 1040
-  data: 235
-  metadata: 1573
+  data: 195
+  metadata: 1549
 functions:
   __to_str_str$err$Error:
     calls: 2

@@ -97,8 +97,9 @@
 # that would have caught it. Deriving the answer rather than maintaining a second
 # table means the next conversion cannot reintroduce it.
 #
-# Eight clusters were fixed on the strength of that classification, and the count
-# is now **60 / 875** (from 527), with zero leak-gate hits:
+# Ten clusters were fixed on the strength of that classification, and the count
+# is now **41 / 932** (from 527 of 875 — the denominator grew when the gate
+# started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
 #     and `aipl2_print_error` lived only in `str24_host.rs`, which is std-only
@@ -224,17 +225,59 @@
 #     code serves the counting pass, the filling pass, and the `no_std` runtime
 #     that has no `Vec`.
 #
-# The remaining 60, by cause:
+#   - **the `char[]` append path** (`push`, `extend`) and, with it, `mut`
+#     bindings generally. Four bugs, three of them the same one:
 #
-#    35  `aipl check` (in-language tests) failed
-#    18  `stdout` mismatch
-#     7  crashes / other
+#     **A wide handle is not a snapshot.** A tagged `str` read out of a slot is a
+#     copy of a *pointer*, so it kept naming the old buffer however the slot
+#     changed afterwards — value semantics for free. A wide handle is the slot's
+#     address, so it names whatever is there *now*. Three places relied on that
+#     accident: `set s = <str>` and both append paths released the old value
+#     *after* storing the new one (freeing what was just assigned), and
+#     `let snap = cs` aliased the slot outright, so a later `push` mutated the
+#     snapshot. Releases now happen before the store, and reading a `mut` binding
+#     copies the 24 bytes (`copy_str_value`) — which is exactly what the tagged
+#     pointer-read gave for nothing.
 #
-# What is left is the `char[]` *append* path (`push`, `extend`, `intersperse`,
-# `spread`) — the writer cluster whose buffer is still allocated the tagged way,
-# named in the `emit_render` section above as the last of the old cursor idiom —
-# plus `arr_join`, `int_parse`, and the file/process and FFI-composite-array
-# entry points still in group B.
+#     The fourth: a `mut` binding's slot was a fixed 8 bytes, its comment
+#     claiming that "fits any i64/bool/char/str". Only the wide `str` widens —
+#     broadening it to every composite silently switched struct bindings from
+#     pointer-holding to value-holding, which the leak gate caught.
+#
+#     Note the release-before-store reorder applies to **both** ABIs. It is
+#     equivalent and green, but it did change committed-path codegen (the perf
+#     refills and IR regen of that turn); gate it on `str24_enabled()` if the
+#     tagged path should stay byte-identical.
+#
+#   - **the file entry points**: `read_file_to_string`, `write_string_to_file`,
+#     `list_files`, in both runtimes, verified JIT and AOT.
+#
+#     **A null return cannot signal failure any more.** The tagged entry points
+#     returned a null `str` on error and codegen tested it. A wide `str` result
+#     travels through an out pointer the *caller* allocates, so there is no null
+#     to return: `aipl2_read_file_to_string` takes the out pointer and returns
+#     1/0 instead. Better anyway — "did it work" and "what did it produce" stop
+#     sharing one channel.
+#
+#     And a second layout rule that had been true by coincidence: the `str!Error`
+#     payload region is sized to the *wider* side. For `str[]!Error` the ok side
+#     is an 8-byte array pointer while the err side is now a 24-byte `str`, so
+#     sizing from the ok side put the message past the end of the slot.
+#
+#     The AOT half needs NUL-terminated paths, and a wide `str` is a *window*
+#     that carries no terminator — slicing being free is the point — so
+#     `c_path_of` makes one. It allocates rather than using a fixed stack buffer,
+#     so there is no path-length ceiling.
+#
+# The remaining 41, by cause:
+#
+#    20  `aipl check` (in-language tests) failed
+#    13  `stdout` mismatch
+#     2  memory leak
+#     6  crashes / other
+#
+# Left: `arr_join`, `int_parse`, `execute_program`, the FFI composite-array
+# marshalling, and the two known leaks below.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
@@ -441,8 +484,8 @@ examples_uses_strlen
 #      containers   str_split, str_join, arr_join
 #      concat kin   concat_lazy (the `+` rope path), concat_mut
 #      mutation     trim_mut
-#      files/proc   read_file_to_string, write_string_to_file, list_files,
-#                   execute_program
+#      files/proc   DONE — read_file_to_string, write_string_to_file,
+#                   list_files. Still open: execute_program.
 #      test runner  assert, test_begin, test_fail   <- DONE (both runtimes)
 #
 # Beyond these 35, two pieces of work carry no `Str`-typed symbol of their own
