@@ -10,10 +10,11 @@ use gazelle_macros::gazelle;
 use aipl_syntax::{join_spans, Error, Span};
 
 use aipl_syntax::ast::{
-    Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName, ImportSource,
-    Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type,
-    TypeParam, VariantCase, VariantDecl,
+    BinOp, Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName,
+    ImportSource, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature,
+    StructDecl, Type, TypeParam, VariantCase, VariantDecl,
 };
+use aipl_syntax::binop_spelling;
 
 gazelle! {
     grammar aipl {
@@ -648,8 +649,8 @@ impl aipl::Types for Build {
     type Plusplus = Span;
     type Hash = Span;
     type Builtins = Span;
-    type Op = (char, Span);
-    type Binop = char;
+    type Op = (BinOp, Span);
+    type Binop = BinOp;
     type Term = Expr;
     type Expr = Expr;
     type Ty = Type;
@@ -875,8 +876,8 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             },
             // A named builtin aliased to an operator (`wrapping_add as +`): the
             // name carries the span; the operator is the local alias.
-            aipl::ImportName::AliasedOp((name, span), (c, _)) => {
-                name_as_op(name, span, op_spelling(c))
+            aipl::ImportName::AliasedOp((name, span), (op, _)) => {
+                name_as_op(name, span, binop_spelling(op))
             }
             aipl::ImportName::AliasedMinus((name, span)) => name_as_op(name, span, "-"),
             aipl::ImportName::AliasedLt((name, span)) => name_as_op(name, span, "<"),
@@ -890,7 +891,7 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             // file's first line. The bare `-`/`<`/`>`/`||`/`!` tokens below
             // produce no span at all; those fall back to the import statement's
             // own span (see the lint's `unused_imports`).
-            aipl::ImportName::Op((c, span)) => op_import_at(op_spelling(c), span),
+            aipl::ImportName::Op((op, span)) => op_import_at(binop_spelling(op), span),
             aipl::ImportName::OpMinus => op_import("-"),
             aipl::ImportName::OpLt => op_import("<"),
             aipl::ImportName::OpGt => op_import(">"),
@@ -931,24 +932,6 @@ fn name_as_op(name: String, span: Span, op: &str) -> ImportName {
         name,
         alias: Some(op.to_string()),
         span,
-    }
-}
-
-/// The spelling of an `OP`-token operator char (e.g. `'E'` → `"=="`).
-fn op_spelling(c: char) -> &'static str {
-    match c {
-        '+' => "+",
-        '*' => "*",
-        '/' => "/",
-        '%' => "%",
-        'E' => "==",
-        'N' => "!=",
-        'L' => "<=",
-        'G' => ">=",
-        'A' => "&&",
-        // `+++` — the string-concatenation operator.
-        'C' => "+++",
-        other => unreachable!("unexpected OP char {other:?} in import"),
     }
 }
 
@@ -1391,10 +1374,13 @@ impl gazelle::Action<aipl::ParamList<Self>> for Build {
 /// element type stays recoverable from it (see `variadic_elem`). Errors when the
 /// trailing operator isn't `*` — the grammar admits any operator token there, so
 /// this is where `T+`/`T?` are turned away.
-fn variadic_seq_ty(elem: Type, op: char, op_span: Span) -> Result<Type, Error> {
-    if op != '*' {
+fn variadic_seq_ty(elem: Type, op: BinOp, op_span: Span) -> Result<Type, Error> {
+    if op != BinOp::Mul {
         return Err(Error::at(
-            format!("expected \"*\" after a variadic parameter type, found {op:?}"),
+            format!(
+                "expected \"*\" after a variadic parameter type, found {:?}",
+                binop_spelling(op)
+            ),
             op_span,
         ));
     }
@@ -2042,16 +2028,16 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                 (lhs, value, span)
             }
             // `set n++;` is `set n = n ++ 1;`, where `++` is its own operator
-            // (encoded `'P'`, gated on importing `++`). The loader collapses it
-            // to a plain `+`/`wrapping_add` after gating, so codegen never sees
-            // `'P'`. The `1` and operator carry the `++` span so diagnostics
+            // ([`BinOp::Incr`], gated on importing `++`). The loader collapses it
+            // to a plain add / `wrapping_add` after gating, so codegen never sees
+            // `Incr`. The `1` and operator carry the `++` span so diagnostics
             // (a missing `++` import, or a non-integer `n`) point at the operator.
             aipl::AssignStmt::IncrStmt((name, name_span), pp_span) => {
                 let span = join_spans(&name_span, &pp_span);
                 let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
                 let one = Expr::new(ExprKind::Num(1), pp_span);
                 let value = Expr::new(
-                    ExprKind::Binop(Box::new(recv), 'P', Box::new(one)),
+                    ExprKind::Binop(Box::new(recv), BinOp::Incr, Box::new(one)),
                     span.clone(),
                 );
                 let lhs = Expr::new(ExprKind::Ident(name), name_span);
@@ -2193,13 +2179,13 @@ impl gazelle::Action<aipl::ReturnStmt<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::Binop<Self>> for Build {
-    fn build(&mut self, node: aipl::Binop<Self>) -> Result<char, Self::Error> {
+    fn build(&mut self, node: aipl::Binop<Self>) -> Result<BinOp, Self::Error> {
         Ok(match node {
-            aipl::Binop::Op((c, _span)) => c,
-            aipl::Binop::Minus => '-',
-            aipl::Binop::Lt => '<',
-            aipl::Binop::Gt => '>',
-            aipl::Binop::Or => 'O',
+            aipl::Binop::Op((op, _span)) => op,
+            aipl::Binop::Minus => BinOp::Sub,
+            aipl::Binop::Lt => BinOp::Lt,
+            aipl::Binop::Gt => BinOp::Gt,
+            aipl::Binop::Or => BinOp::Or,
         })
     }
 }
@@ -2858,7 +2844,7 @@ fn reject_spread(args: &[Expr], context: &str) -> Result<(), Error> {
 /// require it to be imported, and a function-aliased operator (`my_add as +`)
 /// is dispatched to a call there just as in infix position. The synthesized
 /// nodes carry the operator's own span, so a "not imported" error points at it.
-fn op_value_lambda(op: char, sp: Span) -> Expr {
+fn op_value_lambda(op: BinOp, sp: Span) -> Expr {
     let lhs_param = LambdaParam {
         name: "lhs".to_string(),
         ty: None,
@@ -2975,30 +2961,27 @@ impl gazelle::Action<aipl::Expr<Self>> for Build {
     }
 }
 
-// Op encoding: arithmetic + logical ops use distinct codes so the binop
-// reducer can pass them through as `char`.
-//   '||' / '&&'   => 'O' / 'A'
-//   '==' / '!='   => 'E' / 'N'
-//   '<=' / '>='   => 'L' / 'G'
-//   '<' / '>' / '+' / '*' / '/' keep their literal chars
-// Levels, loosest to tightest:
+// The binop reducer passes operators through as `BinOp`, so a token's job here
+// is only to name the variant and its precedence. Levels, loosest to tightest:
 //   1 `||`  2 `&&`  3 `==` `!=`  4 `..`  5 `<` `>` `<=` `>=`
 //   6 `+` `+++` (and unary/binary `-`)  7 `*` `/` `%`
 // `..` (level 4, see the `DotDot` token below) sits *above* equality so a range
 // on the right of a comparison groups as one operand — `span == 1..2` is
 // `span == (1..2)`, not `(span == 1)..2` — and *below* the arithmetic so
 // `a + 1..b * 2` is still `(a + 1)..(b * 2)`.
-fn op_precedence(c: char) -> Precedence {
-    match c {
-        'O' => Precedence::Left(1),
-        'A' => Precedence::Left(2),
-        'E' | 'N' => Precedence::Left(3),
-        '<' | '>' | 'L' | 'G' => Precedence::Left(5),
-        // `+` (integer add) and `'C'` (`+++`, string concat) share additive
-        // precedence.
-        '+' | 'C' => Precedence::Left(6),
-        '*' | '/' | '%' => Precedence::Left(7),
-        _ => unreachable!("unknown op code {c:?}"),
+fn op_precedence(op: BinOp) -> Precedence {
+    match op {
+        BinOp::Or => Precedence::Left(1),
+        BinOp::And => Precedence::Left(2),
+        BinOp::Eq | BinOp::Ne => Precedence::Left(3),
+        BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => Precedence::Left(5),
+        // Addition and concatenation share additive precedence.
+        BinOp::Add | BinOp::Concat => Precedence::Left(6),
+        BinOp::Mul | BinOp::Div | BinOp::Rem => Precedence::Left(7),
+        // Not produced by the token mapping below: `-` arrives as its own
+        // `Minus` token (it is also unary) and `++` is built directly by the
+        // increment desugar, so neither is ever looked up here.
+        BinOp::Sub | BinOp::Incr => unreachable!("{} has no infix token", binop_spelling(op)),
     }
 }
 
@@ -3671,19 +3654,19 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             // Operators carrying a `(char-tag, span)` value + infix precedence,
             // so they can also be used as first-class function values
             // (`apply(2, 3, +)`) and still point diagnostics at themselves.
-            K::PlusPlusPlus => T::Op(('C', span.clone()), op_precedence('C')),
-            K::EqEq => T::Op(('E', span.clone()), op_precedence('E')),
-            K::Ne => T::Op(('N', span.clone()), op_precedence('N')),
-            K::Le => T::Op(('L', span.clone()), op_precedence('L')),
-            K::Ge => T::Op(('G', span.clone()), op_precedence('G')),
-            K::AndAnd => T::Op(('A', span.clone()), op_precedence('A')),
-            K::Plus => T::Op(('+', span.clone()), op_precedence('+')),
-            K::Star => T::Op(('*', span.clone()), op_precedence('*')),
-            K::Slash => T::Op(('/', span.clone()), op_precedence('/')),
-            K::Percent => T::Op(('%', span.clone()), op_precedence('%')),
-            K::OrOr => T::Oror(op_precedence('O')),
-            K::Lt => T::Langle(op_precedence('<')),
-            K::Gt => T::Rangle(op_precedence('>')),
+            K::PlusPlusPlus => T::Op((BinOp::Concat, span.clone()), op_precedence(BinOp::Concat)),
+            K::EqEq => T::Op((BinOp::Eq, span.clone()), op_precedence(BinOp::Eq)),
+            K::Ne => T::Op((BinOp::Ne, span.clone()), op_precedence(BinOp::Ne)),
+            K::Le => T::Op((BinOp::Le, span.clone()), op_precedence(BinOp::Le)),
+            K::Ge => T::Op((BinOp::Ge, span.clone()), op_precedence(BinOp::Ge)),
+            K::AndAnd => T::Op((BinOp::And, span.clone()), op_precedence(BinOp::And)),
+            K::Plus => T::Op((BinOp::Add, span.clone()), op_precedence(BinOp::Add)),
+            K::Star => T::Op((BinOp::Mul, span.clone()), op_precedence(BinOp::Mul)),
+            K::Slash => T::Op((BinOp::Div, span.clone()), op_precedence(BinOp::Div)),
+            K::Percent => T::Op((BinOp::Rem, span.clone()), op_precedence(BinOp::Rem)),
+            K::OrOr => T::Oror(op_precedence(BinOp::Or)),
+            K::Lt => T::Langle(op_precedence(BinOp::Lt)),
+            K::Gt => T::Rangle(op_precedence(BinOp::Gt)),
             K::Minus => T::Minus(Precedence::Left(6)),
             // Level 4 — tighter than `==`, looser than `<` and the arithmetic;
             // see `op_precedence` for the whole table.

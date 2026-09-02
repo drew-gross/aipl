@@ -75,7 +75,6 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
-  lets represent opcodes using an enum, not a char like 'C' or '+'
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value

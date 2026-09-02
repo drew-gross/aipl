@@ -23,12 +23,12 @@ use std::collections::{HashMap, HashSet};
 use aipl_syntax::ast;
 use aipl_syntax::ast::Bound;
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern, Primitive, Program,
-    Signature, StructDecl, Type, VariantDecl,
+    BinOp, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern, Primitive,
+    Program, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
-    is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr, type_name,
-    Error, Span,
+    binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
+    type_name, Error, Span,
 };
 
 /// A lambda body's type with its error side filled in from a `?` the body
@@ -3663,7 +3663,7 @@ impl Cx<'_> {
 
     fn check_binop(
         &self,
-        op: char,
+        op: BinOp,
         lt: &Type,
         rt: &Type,
         lspan: Span,
@@ -3675,14 +3675,15 @@ impl Cx<'_> {
         // with `i32(x)` etc.; no implicit mixing). `i64` is the common default.
         let same_int = aipl_syntax::is_int_ty(lt) && lt == rt;
         match op {
-            // `+` is integer add only — the increment sugar `set n++` lowers to a
-            // primitive `+`. User `+`/`-` resolve (in the loader) to a call to their
-            // bound `wrapping_*`/`saturating_*`/user fn instead; those calls reuse
-            // `check_int_arith` too. String concatenation is `+++` (`'C'`).
-            '+' => self.check_int_arith("+", lt, rt, lspan, rspan),
-            // `+++` — string concatenation. `Error` concatenates like `str`; the
-            // result is a plain str. An unresolved generic result stays permissive.
-            'C' => {
+            // Integer add only — the increment sugar `set n++` lowers to a
+            // primitive add. A user's `+`/`-` resolves (in the loader) to a call
+            // to its bound `wrapping_*`/`saturating_*`/user fn instead; those
+            // calls reuse `check_int_arith` too. Concatenation is its own
+            // operator, below.
+            BinOp::Add => self.check_int_arith("+", lt, rt, lspan, rspan),
+            // Concatenation. `Error` concatenates like `str`; the result is a
+            // plain str. An unresolved generic result stays permissive.
+            BinOp::Concat => {
                 if is_unknown(lt) || is_unknown(rt) {
                     Ok(unknown_ty())
                 } else if (is_str_repr(lt) || is_char_array(lt))
@@ -3700,7 +3701,7 @@ impl Cx<'_> {
                     ))
                 }
             }
-            '-' | '*' | '/' | '%' => {
+            BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
                 if same_int {
                     return Ok(lt.clone());
                 }
@@ -3718,7 +3719,7 @@ impl Cx<'_> {
                 )?;
                 Ok(Type::Primitive(Primitive::I64))
             }
-            'E' | 'N' => {
+            BinOp::Eq | BinOp::Ne => {
                 // Equality works for any two values of the *same* type — scalars,
                 // str, optionals, arrays, sets, structs, variants — compared
                 // structurally (sets order-independently). The two sides must be
@@ -3730,7 +3731,7 @@ impl Cx<'_> {
                     return Err(Error::at(
                         format!(
                             "{:?} is not supported for function values",
-                            if op == 'E' { "==" } else { "!=" }
+                            binop_spelling(op)
                         ),
                         span.clone(),
                     ));
@@ -3743,7 +3744,7 @@ impl Cx<'_> {
                     return Err(Error::at(
                         format!(
                             "{:?} between {} and {}: both sides must be the same type",
-                            if op == 'E' { "==" } else { "!=" },
+                            binop_spelling(op),
                             tyname(lt),
                             tyname(rt)
                         ),
@@ -3752,7 +3753,7 @@ impl Cx<'_> {
                 }
                 Ok(Type::Primitive(Primitive::Bool))
             }
-            'A' | 'O' => {
+            BinOp::And | BinOp::Or => {
                 expect(
                     lt,
                     &Type::Primitive(Primitive::Bool),
@@ -3767,8 +3768,10 @@ impl Cx<'_> {
                 )?;
                 Ok(Type::Primitive(Primitive::Bool))
             }
-            // Ordering comparisons (`<`, `>`, `<=`, `>=`): same-int operands → bool.
-            _ => {
+            // Ordering comparisons: same-int operands → bool. Spelled out
+            // rather than left to a `_`, so a new operator has to decide here
+            // instead of silently being typed as a comparison.
+            BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => {
                 if same_int {
                     return Ok(Type::Primitive(Primitive::Bool));
                 }
@@ -3791,6 +3794,8 @@ impl Cx<'_> {
                 )?;
                 Ok(Type::Primitive(Primitive::Bool))
             }
+            // The loader lowers `++` to an add before the checker runs.
+            BinOp::Incr => unreachable!("`++` is lowered to `+` by the loader"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Pattern};
+use crate::ast::{BinOp, Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// Whether a `none` arm's value is built purely from constants, and so costs
@@ -31,7 +31,7 @@ fn constant_default(e: &Expr) -> bool {
             .all(|(k, v)| constant_default(k) && constant_default(v)),
         ExprKind::Field(x, _) | ExprKind::Neg(x) | ExprKind::Not(x) => constant_default(x),
         ExprKind::Binop(a, op, b) => {
-            *op != '/' && *op != '%' && constant_default(a) && constant_default(b)
+            !matches!(op, BinOp::Div | BinOp::Rem) && constant_default(a) && constant_default(b)
         }
         _ => false,
     }

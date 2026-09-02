@@ -1,10 +1,10 @@
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// `set x = x + 1;` — an increment written the long way; `set x++;` is the
 /// form for it. Either operand order counts (`x + 1` and `1 + x` both add
 /// one), and `set x++;` itself never trips this: it parses as the *increment*
-/// operator (`'P'`), which is a different node entirely.
+/// operator ([`BinOp::Incr`]), which is a different node entirely.
 ///
 /// Only a bare-identifier LHS is flagged, because that is all `set x++;`
 /// accepts — a field store (`set p.n = p.n + 1;`) has no shorter spelling to
@@ -20,7 +20,7 @@ pub(super) fn incr_by_one(e: &Expr, incr: Option<&str>, hits: &mut Vec<Error>) {
     let ExprKind::Ident(name) = &lhs.kind else {
         return;
     };
-    let ExprKind::Binop(l, '+', r) = &value.kind else {
+    let ExprKind::Binop(l, BinOp::Add, r) = &value.kind else {
         return;
     };
     let is_one = |e: &Expr| matches!(e.kind, ExprKind::Num(1));

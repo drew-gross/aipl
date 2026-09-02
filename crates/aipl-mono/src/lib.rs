@@ -44,10 +44,10 @@ pub use subst::inline_single_use_bindings;
 use aipl_syntax::{
     ast,
     ast::{
-        is_unit, Bound, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType, ConcreteVariantCase,
-        ConcreteVariantDecl, Expr, ExprKind, FieldDecl, FieldInit, Function, Item, LambdaParam,
-        MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl, Type, TypeParam,
-        VariantCase, VariantDecl,
+        is_unit, BinOp, Bound, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType,
+        ConcreteVariantCase, ConcreteVariantDecl, Expr, ExprKind, FieldDecl, FieldInit, Function,
+        Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl,
+        Type, TypeParam, VariantCase, VariantDecl,
     },
     concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
     is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
@@ -2687,7 +2687,7 @@ impl Mono<'_> {
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id(name)),
-                            '+',
+                            BinOp::Add,
                             Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
                         span.clone(),
@@ -2988,7 +2988,7 @@ impl Mono<'_> {
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id("$i")),
-                            '+',
+                            BinOp::Add,
                             Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
                         span.clone(),
@@ -3282,7 +3282,7 @@ impl Mono<'_> {
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id(n)),
-                            '+',
+                            BinOp::Add,
                             Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
                         span.clone(),
@@ -3456,7 +3456,7 @@ impl Mono<'_> {
                 )
             };
             let cond = Expr::new(
-                ExprKind::Binop(Box::new(len_of("$a")), '<', Box::new(len_of("$b"))),
+                ExprKind::Binop(Box::new(len_of("$a")), BinOp::Lt, Box::new(len_of("$b"))),
                 span.clone(),
             );
             Expr::new(
@@ -3691,7 +3691,7 @@ impl Mono<'_> {
                     Box::new(Expr::new(
                         ExprKind::Binop(
                             Box::new(id("$w")),
-                            '+',
+                            BinOp::Add,
                             Box::new(Expr::new(ExprKind::Num(1), span.clone())),
                         ),
                         span.clone(),
@@ -4930,20 +4930,35 @@ impl Mono<'_> {
                 let lt = aipl_syntax::flex_int_ty(&rl, &lt, &rt);
                 let rt = aipl_syntax::flex_int_ty(&rr, &rt, &lt);
                 let ty = match op {
-                    // `+++` string concatenation builds a lazy concat node (see
+                    // Concatenation builds a lazy concat node (see
                     // `aipl_concat_lazy`), so its result carries the *concat-str*
                     // representation — which a downstream `fn(s: str)` call uses to
                     // select a concat-specialized instance. (`Error` concatenates
                     // like `str` too.)
-                    'C' => concat_str_ty(),
+                    BinOp::Concat => concat_str_ty(),
                     // Same-integer-type arithmetic keeps that width/signedness.
-                    // (`+` here is the increment sugar / mono's internal index math;
-                    // user `+` is a call to `__builtin_wrapping_add`/`_saturating_add`.)
-                    '+' | '-' | '*' | '/' | '%' if aipl_syntax::is_int_ty(&lt) && lt == rt => {
+                    // (An add here is the increment sugar / mono's internal index
+                    // math; a user's `+` is a call to
+                    // `__builtin_wrapping_add`/`_saturating_add`.)
+                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem
+                        if aipl_syntax::is_int_ty(&lt) && lt == rt =>
+                    {
                         lt.clone()
                     }
-                    '+' | '-' | '*' | '/' | '%' => Type::Primitive(Primitive::I64),
-                    _ => Type::Primitive(Primitive::Bool), // comparison / logical
+                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
+                        Type::Primitive(Primitive::I64)
+                    }
+                    // Comparison and logical operators. `++` never reaches here:
+                    // the loader lowers it to an add before mono runs.
+                    BinOp::Lt
+                    | BinOp::Gt
+                    | BinOp::Le
+                    | BinOp::Ge
+                    | BinOp::Eq
+                    | BinOp::Ne
+                    | BinOp::And
+                    | BinOp::Or
+                    | BinOp::Incr => Type::Primitive(Primitive::Bool),
                 };
                 (node(ExprKind::Binop(Box::new(rl), *op, Box::new(rr))), ty)
             }
@@ -8727,12 +8742,12 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     // safe unless we're iterating `a`, or the other operand
                     // aliases it (it is read while `a` grows).
                     //
-                    // `'C'` is the opcode for `concat`, the way `'+'` is the
-                    // opcode for `wrapping_add`/`saturating_add`. This arm used
-                    // to test `'+'`, so it was asking about integer addition,
-                    // which never has a `str` operand — it could not fire, and no
-                    // `str` builder binding was ever exclusive.
-                    ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
+                    // This arm used to be written against the `char` opcode
+                    // encoding and named the wrong one — addition rather than
+                    // concatenation — so it asked about integer arithmetic, which
+                    // never has a `str` operand. It could not fire, and no `str`
+                    // builder binding was ever exclusive.
+                    ExprKind::Binop(l, BinOp::Concat, r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
                         iterating || rec(r)
                     }
                     // `set a = a.trim()` / `set a = trim(a)` both fold to the

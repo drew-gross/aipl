@@ -1088,12 +1088,13 @@ fn rewrite_expr(
                 Some(target) if target != spelling => {
                     ExprKind::Call(target.clone(), vec![lhs, rhs], false)
                 }
-                // `++` (`'P'`) always takes the branch above: like `+`, it has no
-                // bare form, so it is only ever bound to a named flavor
+                // [`BinOp::Incr`] always takes the branch above: like `+`, it has
+                // no bare form, so it is only ever bound to a named flavor
                 // (`wrapping_increment`/`saturating_increment`, i.e. one of the
                 // `__builtin_*_add` impls) or to a user function — and gating has
-                // already rejected a use with no binding at all. So no `'P'`
-                // survives the rewrite into mono or codegen.
+                // already rejected a use with no binding at all. So no `Incr`
+                // survives the rewrite into mono or codegen, which is what lets
+                // both treat that variant as unreachable.
                 _ => ExprKind::Binop(Box::new(lhs), *op, Box::new(rhs)),
             }
         }

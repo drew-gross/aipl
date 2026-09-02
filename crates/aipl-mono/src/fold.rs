@@ -26,7 +26,7 @@
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldDecl, FieldInit, Item, MatchArm, Pattern, Primitive, Program, Type,
+    BinOp, Expr, ExprKind, FieldDecl, FieldInit, Item, MatchArm, Pattern, Primitive, Program, Type,
 };
 
 /// Fold constant subexpressions throughout `program`: every function body and
@@ -270,37 +270,37 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
 
 /// Fold a binary op over two literals. Integer ops use `i64` semantics — the
 /// only type a literal-literal op can have (see the module docs).
-fn fold_binop(l: &Expr, op: char, r: &Expr) -> Option<ExprKind> {
+fn fold_binop(l: &Expr, op: BinOp, r: &Expr) -> Option<ExprKind> {
     match (&l.kind, &r.kind) {
         (ExprKind::Num(a), ExprKind::Num(b)) => {
             let (a, b) = (*a, *b);
             Some(match op {
-                '+' => ExprKind::Num(a.wrapping_add(b)),
-                '-' => ExprKind::Num(a.wrapping_sub(b)),
-                '*' => ExprKind::Num(a.wrapping_mul(b)),
+                BinOp::Add => ExprKind::Num(a.wrapping_add(b)),
+                BinOp::Sub => ExprKind::Num(a.wrapping_sub(b)),
+                BinOp::Mul => ExprKind::Num(a.wrapping_mul(b)),
                 // `/` saturates rather than trapping: a zero divisor and
                 // `i64::MIN / -1` both answer `i64::MAX` (see
                 // `saturating_div` in codegen, which this must agree with).
                 // `checked_div` returns `None` in exactly those two cases.
-                '/' => ExprKind::Num(a.checked_div(b).unwrap_or(i64::MAX)),
+                BinOp::Div => ExprKind::Num(a.checked_div(b).unwrap_or(i64::MAX)),
                 // `srem` still traps on the same pairs, so leave those to run
                 // time rather than fold an answer the runtime won't produce.
-                '%' => ExprKind::Num(a.checked_rem(b)?),
-                '<' => ExprKind::Bool(a < b),
-                '>' => ExprKind::Bool(a > b),
-                'L' => ExprKind::Bool(a <= b),
-                'G' => ExprKind::Bool(a >= b),
-                'E' => ExprKind::Bool(a == b),
-                'N' => ExprKind::Bool(a != b),
+                BinOp::Rem => ExprKind::Num(a.checked_rem(b)?),
+                BinOp::Lt => ExprKind::Bool(a < b),
+                BinOp::Gt => ExprKind::Bool(a > b),
+                BinOp::Le => ExprKind::Bool(a <= b),
+                BinOp::Ge => ExprKind::Bool(a >= b),
+                BinOp::Eq => ExprKind::Bool(a == b),
+                BinOp::Ne => ExprKind::Bool(a != b),
                 _ => return None,
             })
         }
         // With both sides literal, `&&`/`||` short-circuiting is unobservable.
         (ExprKind::Bool(a), ExprKind::Bool(b)) => Some(match op {
-            'A' => ExprKind::Bool(*a && *b),
-            'O' => ExprKind::Bool(*a || *b),
-            'E' => ExprKind::Bool(a == b),
-            'N' => ExprKind::Bool(a != b),
+            BinOp::And => ExprKind::Bool(*a && *b),
+            BinOp::Or => ExprKind::Bool(*a || *b),
+            BinOp::Eq => ExprKind::Bool(a == b),
+            BinOp::Ne => ExprKind::Bool(a != b),
             _ => return None,
         }),
         _ => None,

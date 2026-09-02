@@ -1000,6 +1000,60 @@ pub mod ast {
         s
     }
 
+    /// A binary operator, as stored in [`ExprKind::Binop`].
+    ///
+    /// Variants name the **builtin** an operator resolves to, never the spelling
+    /// a source file imported it as — `Concat`, not `+++`. Which alias a file
+    /// writes is a property of its import list (`OPERATOR_BUILTINS`); after
+    /// import resolution nothing downstream should be able to tell, and with an
+    /// enum nothing can, because there is no character left to compare against.
+    ///
+    /// Where an operator has more than one semantics (`wrapping_add` vs
+    /// `saturating_add`) the *alias* records the choice, so one variant covers
+    /// both — the flavor is resolved by name, not by opcode.
+    ///
+    /// This was a bare `char` with a private encoding (`'E'` for `==`, `'C'` for
+    /// `+++`), which two passes independently got wrong by testing `'+'` — the
+    /// opcode for addition — when they meant concatenation. Nothing caught it:
+    /// every `char` is a valid pattern, so a wrong one is a match arm that
+    /// silently never fires. The enum makes those matches exhaustive instead.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum BinOp {
+        /// `wrapping_add` / `saturating_add`.
+        Add,
+        /// `wrapping_sub` / `saturating_sub`.
+        Sub,
+        /// `wrapping_mul`.
+        Mul,
+        /// `saturating_divide`.
+        Div,
+        /// `remainder`.
+        Rem,
+        /// `less_than`.
+        Lt,
+        /// `greater_than`.
+        Gt,
+        /// `less_than_or_equal`.
+        Le,
+        /// `greater_than_or_equal`.
+        Ge,
+        /// `equal`.
+        Eq,
+        /// `not_equal`.
+        Ne,
+        /// `logical_and`.
+        And,
+        /// `logical_or`.
+        Or,
+        /// `wrapping_increment` / `saturating_increment`, from `set n++`. The
+        /// loader lowers it to [`BinOp::Add`] once operator gating has run; the
+        /// separate variant is what lets the gate demand the `++` import rather
+        /// than accepting a `+` one.
+        Incr,
+        /// `concat`.
+        Concat,
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum ExprKind {
         Num(i64),
@@ -1025,7 +1079,7 @@ pub mod ast {
         /// Non-mutating calls are indifferent to the flag
         /// (`x.to_str()` ≡ `to_str(x)`).
         Call(String, Vec<Expr>, bool),
-        Binop(Box<Expr>, char, Box<Expr>),
+        Binop(Box<Expr>, BinOp, Box<Expr>),
         Neg(Box<Expr>),
         Not(Box<Expr>),
         If(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -1257,7 +1311,7 @@ pub mod ast {
     }
 }
 
-use ast::{Primitive, Type};
+use ast::{BinOp, Primitive, Type};
 
 // ---------- Shared AST-level `Type` helpers ----------
 //
@@ -1619,29 +1673,34 @@ pub fn set_is_operator_name_hook(f: fn(&str) -> bool) {
     let _ = IS_OPERATOR_NAME_HOOK.set(f);
 }
 
-/// Spelling of a binary-operator char as stored in `ExprKind::Binop` (e.g. `'E'`
-/// is `==`). Unary `Neg`/`Not` spell `-`/`!`.
-pub fn binop_spelling(c: char) -> &'static str {
-    match c {
-        '+' => "+",
-        '-' => "-",
-        '*' => "*",
-        '/' => "/",
-        '%' => "%",
-        '<' => "<",
-        '>' => ">",
-        'E' => "==",
-        'N' => "!=",
-        'L' => "<=",
-        'G' => ">=",
-        'A' => "&&",
-        'O' => "||",
-        // `++` — the increment operator (from `set n++;`). Lowered to `+` by the
-        // loader after operator gating; this spelling is what the gate requires.
-        'P' => "++",
-        // `+++` — the string-concatenation operator.
-        'C' => "+++",
-        _ => "?",
+/// The canonical operator spelling for a [`BinOp`] — what a diagnostic prints,
+/// and what the operator-import gate looks up. This is the *only* place the
+/// mapping from operator to spelling lives; a pass that wants to know which
+/// operator it is asks the enum, not this string.
+///
+/// Exhaustive on purpose: a new operator will not compile until it is given a
+/// spelling here, where the old `char` version had a `_ => "?"` fallthrough that
+/// silently rendered an unknown opcode as a question mark. Unary `Neg`/`Not`
+/// spell `-`/`!` and are not [`BinOp`]s.
+pub fn binop_spelling(op: BinOp) -> &'static str {
+    match op {
+        BinOp::Add => "+",
+        BinOp::Sub => "-",
+        BinOp::Mul => "*",
+        BinOp::Div => "/",
+        BinOp::Rem => "%",
+        BinOp::Lt => "<",
+        BinOp::Gt => ">",
+        BinOp::Eq => "==",
+        BinOp::Ne => "!=",
+        BinOp::Le => "<=",
+        BinOp::Ge => ">=",
+        BinOp::And => "&&",
+        BinOp::Or => "||",
+        // Lowered to `+` by the loader after operator gating; this spelling is
+        // what the gate requires.
+        BinOp::Incr => "++",
+        BinOp::Concat => "+++",
     }
 }
 

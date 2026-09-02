@@ -1,7 +1,7 @@
 //! `count` against a comparison: `xs.count(x) < 4` is settled the moment a
 //! fourth match appears, so the pair collapses into `count_is_less_than`.
 
-use aipl_syntax::ast::{Expr, ExprKind};
+use aipl_syntax::ast::{BinOp, Expr, ExprKind};
 
 /// One fusable shape: a call to `call`, compared with `op` against a second
 /// operand, becomes a call to `into` taking that operand as a trailing argument.
@@ -9,7 +9,7 @@ use aipl_syntax::ast::{Expr, ExprKind};
 /// `op` is written with the call on the **left**; [`build`] mirrors it.
 struct Fusion {
     call: &'static str,
-    op: char,
+    op: BinOp,
     into: &'static str,
 }
 
@@ -17,32 +17,32 @@ struct Fusion {
 const COMPARISON_FUSIONS: &[Fusion] = &[
     Fusion {
         call: "__builtin_count",
-        op: '<',
+        op: BinOp::Lt,
         into: "__builtin_count_is_less_than",
     },
     Fusion {
         call: "__builtin_count",
-        op: 'L',
+        op: BinOp::Le,
         into: "__builtin_count_is_at_most",
     },
     Fusion {
         call: "__builtin_count",
-        op: '>',
+        op: BinOp::Gt,
         into: "__builtin_count_is_greater_than",
     },
     Fusion {
         call: "__builtin_count",
-        op: 'G',
+        op: BinOp::Ge,
         into: "__builtin_count_is_at_least",
     },
     Fusion {
         call: "__builtin_count",
-        op: 'E',
+        op: BinOp::Eq,
         into: "__builtin_count_is_equal",
     },
     Fusion {
         call: "__builtin_count",
-        op: 'N',
+        op: BinOp::Ne,
         into: "__builtin_count_is_not_equal",
     },
 ];
@@ -50,25 +50,25 @@ const COMPARISON_FUSIONS: &[Fusion] = &[
 /// `l OP r` as a fused call, whichever operand is the call: the left one reads
 /// with `op` as written, the right one is the same claim with the operator
 /// mirrored.
-pub(super) fn build(l: &Expr, op: char, r: &Expr, whole: &Expr) -> Option<Expr> {
+pub(super) fn build(l: &Expr, op: BinOp, r: &Expr, whole: &Expr) -> Option<Expr> {
     build_one(l, op, r, whole).or_else(|| build_one(r, flip(op), l, whole))
 }
 
 /// `a OP b` and `b flip(OP) a` are the same claim, which is what lets one
 /// [`COMPARISON_FUSIONS`] row cover both operand orders. `==`/`!=` are symmetric.
-fn flip(op: char) -> char {
+fn flip(op: BinOp) -> BinOp {
     match op {
-        '<' => '>',
-        '>' => '<',
-        'L' => 'G',
-        'G' => 'L',
+        BinOp::Lt => BinOp::Gt,
+        BinOp::Gt => BinOp::Lt,
+        BinOp::Le => BinOp::Ge,
+        BinOp::Ge => BinOp::Le,
         other => other,
     }
 }
 
 /// `call OP bound` as a fused call, when `call` is a [`COMPARISON_FUSIONS`] row
 /// for `OP`.
-fn build_one(call: &Expr, op: char, bound: &Expr, whole: &Expr) -> Option<Expr> {
+fn build_one(call: &Expr, op: BinOp, bound: &Expr, whole: &Expr) -> Option<Expr> {
     let ExprKind::Call(name, args, method_style) = &call.kind else {
         return None;
     };

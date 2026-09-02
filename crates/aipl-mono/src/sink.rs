@@ -54,7 +54,7 @@
 
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Program};
+use aipl_syntax::ast::{BinOp, Expr, ExprKind, Item, MatchArm, Program};
 
 use crate::{ConcreteFn, MonoProgram};
 
@@ -137,7 +137,7 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         ExprKind::Call(name, _, _) => blocked.contains(name),
-        ExprKind::Binop(_, op, _) => *op == '%',
+        ExprKind::Binop(_, op, _) => *op == BinOp::Rem,
         ExprKind::Shim(..) => true,
         _ => false,
     };

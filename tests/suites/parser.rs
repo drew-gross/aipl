@@ -1,8 +1,8 @@
 //! Integration tests for the parser.
 
 use aipl::ast::{
-    Bound, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param, Primitive,
-    Program, StructDecl, Type, TypeParam,
+    BinOp, Bound, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param,
+    Primitive, Program, StructDecl, Type, TypeParam,
 };
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
@@ -41,7 +41,7 @@ fn ident(s: &str) -> Expr {
     dummy(ExprKind::Ident(s.into()))
 }
 
-fn binop(l: Expr, op: char, r: Expr) -> Expr {
+fn binop(l: Expr, op: BinOp, r: Expr) -> Expr {
     dummy(ExprKind::Binop(Box::new(l), op, Box::new(r)))
 }
 
@@ -125,7 +125,7 @@ fn function_with_multiple_params() {
     assert_eq!(f.sig.params.len(), 2);
     assert_eq!(f.sig.params[0].name, "x");
     assert_eq!(f.sig.params[1].name, "y");
-    assert_eq!(f.body, binop(ident("x"), '+', ident("y")));
+    assert_eq!(f.body, binop(ident("x"), BinOp::Add, ident("y")));
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn body_respects_operator_precedence() {
     let p = parse("fn f() { 1 + 2 * 3 }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        binop(num(1), '+', binop(num(2), '*', num(3)))
+        binop(num(1), BinOp::Add, binop(num(2), BinOp::Mul, num(3)))
     );
 }
 
@@ -195,7 +195,7 @@ fn call_in_expression() {
     let p = parse("fn f() { 1 + g(2) }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        binop(num(1), '+', call("g", vec![num(2)]))
+        binop(num(1), BinOp::Add, call("g", vec![num(2)]))
     );
 }
 
@@ -216,19 +216,19 @@ fn if_with_comparison() {
     let p = parse("fn f(x: i64) { if (x < 10) { x } else { 0 } }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        if_expr(binop(ident("x"), '<', num(10)), ident("x"), num(0))
+        if_expr(binop(ident("x"), BinOp::Lt, num(10)), ident("x"), num(0))
     );
 }
 
 #[test]
 fn comparison_ops_parse() {
     for (src, code) in [
-        ("a == b", 'E'),
-        ("a != b", 'N'),
-        ("a < b", '<'),
-        ("a > b", '>'),
-        ("a <= b", 'L'),
-        ("a >= b", 'G'),
+        ("a == b", BinOp::Eq),
+        ("a != b", BinOp::Ne),
+        ("a < b", BinOp::Lt),
+        ("a > b", BinOp::Gt),
+        ("a <= b", BinOp::Le),
+        ("a >= b", BinOp::Ge),
     ] {
         let p = parse(&format!("fn f() {{ {src} }}")).unwrap();
         assert_eq!(
@@ -244,7 +244,7 @@ fn comparison_binds_tighter_than_eq() {
     let p = parse("fn f(x: i64, y: i64) { x < y == 0 }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        binop(binop(ident("x"), '<', ident("y")), 'E', num(0))
+        binop(binop(ident("x"), BinOp::Lt, ident("y")), BinOp::Eq, num(0))
     );
 }
 
@@ -254,9 +254,9 @@ fn arithmetic_binds_tighter_than_comparison() {
     assert_eq!(
         fn_item(&p, 0).body,
         binop(
-            binop(ident("x"), '+', num(1)),
-            '<',
-            binop(ident("y"), '*', num(2))
+            binop(ident("x"), BinOp::Add, num(1)),
+            BinOp::Lt,
+            binop(ident("y"), BinOp::Mul, num(2))
         )
     );
 }
@@ -368,7 +368,7 @@ fn construct_field_value_can_be_expr() {
             vec![
                 FieldInit {
                     name: "x".into(),
-                    value: binop(ident("x"), '+', num(1)),
+                    value: binop(ident("x"), BinOp::Add, num(1)),
                 },
                 FieldInit {
                     name: "y".into(),
@@ -412,12 +412,12 @@ fn logical_ops_parse() {
     let p = parse("fn f() { true && false }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        binop(bool_lit(true), 'A', bool_lit(false))
+        binop(bool_lit(true), BinOp::And, bool_lit(false))
     );
     let p = parse("fn f() { true || false }").unwrap();
     assert_eq!(
         fn_item(&p, 0).body,
-        binop(bool_lit(true), 'O', bool_lit(false))
+        binop(bool_lit(true), BinOp::Or, bool_lit(false))
     );
 }
 
@@ -428,8 +428,8 @@ fn and_binds_tighter_than_or() {
         fn_item(&p, 0).body,
         binop(
             bool_lit(true),
-            'O',
-            binop(bool_lit(false), 'A', bool_lit(true))
+            BinOp::Or,
+            binop(bool_lit(false), BinOp::And, bool_lit(true))
         )
     );
 }
@@ -440,9 +440,9 @@ fn comparison_binds_tighter_than_and() {
     assert_eq!(
         fn_item(&p, 0).body,
         binop(
-            binop(ident("x"), '<', ident("y")),
-            'A',
-            binop(ident("a"), 'E', ident("b"))
+            binop(ident("x"), BinOp::Lt, ident("y")),
+            BinOp::And,
+            binop(ident("a"), BinOp::Eq, ident("b"))
         )
     );
 }
@@ -639,7 +639,7 @@ fn line_comment_does_not_steal_division_operator() {
     let p = parse("fn f(x: i64, y: i64) -> i64 { x / y }").unwrap();
     let f = fn_item(&p, 0);
     match &f.body.kind {
-        ExprKind::Binop(_, op, _) => assert_eq!(*op, '/'),
+        ExprKind::Binop(_, op, _) => assert_eq!(*op, BinOp::Div),
         other => panic!("expected binop, got {other:?}"),
     }
 }
@@ -840,7 +840,7 @@ fn index_accepts_expression_subscript() {
     let p = parse("fn f(xs: i64[], i: i64) -> i64 { xs[i + 1] }").unwrap();
     match &fn_item(&p, 0).body.kind {
         ExprKind::Index(_, idx) => {
-            assert_eq!(**idx, binop(ident("i"), '+', num(1)));
+            assert_eq!(**idx, binop(ident("i"), BinOp::Add, num(1)));
         }
         other => panic!("expected index, got {other:?}"),
     }
@@ -936,7 +936,7 @@ fn function_without_type_params_has_none() {
     // The `<..>` list is optional and `<`/`>` still parse as comparisons.
     let p = parse("fn f(x: i64) -> bool { x < 3 }").unwrap();
     assert!(fn_item(&p, 0).sig.type_vars.is_empty());
-    assert_eq!(fn_item(&p, 0).body, binop(ident("x"), '<', num(3)));
+    assert_eq!(fn_item(&p, 0).body, binop(ident("x"), BinOp::Lt, num(3)));
 }
 
 // ---------- builtin imports ----------
@@ -1058,7 +1058,7 @@ fn or_token_serves_both_roles() {
     let p = parse("fn main() -> bool { a || b }").unwrap();
     let f = fn_item(&p, 0);
     assert!(
-        matches!(&f.body.kind, ExprKind::Binop(_, 'O', _)),
+        matches!(&f.body.kind, ExprKind::Binop(_, BinOp::Or, _)),
         "expected logical-or binop, got {:?}",
         f.body.kind
     );
@@ -1073,5 +1073,5 @@ fn or_token_serves_both_roles() {
     };
     assert!(params.is_empty());
     // The body is the `a || b` logical-or.
-    assert!(matches!(&body.kind, ExprKind::Binop(_, 'O', _)));
+    assert!(matches!(&body.kind, ExprKind::Binop(_, BinOp::Or, _)));
 }

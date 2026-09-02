@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// What [`len_gt_zero`] needs from the file's imports: whether `<` and `>`
@@ -64,8 +64,8 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
     };
     let is_zero = |e: &Expr| matches!(e.kind, ExprKind::Num(0));
     let recv = match op {
-        '<' if cmp.lt && is_zero(l) => len_receiver(r),
-        '>' if cmp.gt && is_zero(r) => len_receiver(l),
+        BinOp::Lt if cmp.lt && is_zero(l) => len_receiver(r),
+        BinOp::Gt if cmp.gt && is_zero(r) => len_receiver(l),
         _ => None,
     };
     let Some(recv) = recv else {

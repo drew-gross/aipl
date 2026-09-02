@@ -71,6 +71,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::{
     ast::{
+        BinOp,
         ConcreteType,
         Expr,
         ExprKind,
@@ -88,6 +89,7 @@ use aipl_syntax::{
         // rewrite — both of which edit source signatures.
         Type,
     },
+    binop_spelling,
     concrete::{
         error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
         is_set_elem, is_str_repr, is_unit, type_name,
@@ -10338,7 +10340,7 @@ fn compile_ctor_eq<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    op: char,
+    op: BinOp,
     l: &Expr,
     r: &Expr,
 ) -> Result<Option<(Value, ConcreteType)>, Error> {
@@ -10356,7 +10358,7 @@ fn compile_ctor_eq<M: Module>(
         ExprKind::Ident(_) => &[],
         _ => unreachable!("ctor_shape only matches Call/Ident expressions"),
     };
-    let opn = if op == 'E' { "==" } else { "!=" };
+    let opn = binop_spelling(op);
     let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
     let (expect_tag, fields) = match shape {
         CtorShape::Result { is_ok } => {
@@ -10459,7 +10461,7 @@ fn compile_ctor_eq<M: Module>(
         builder.seal_block(merge);
         builder.ins().stack_load(types::I64, types::I64, res, 0)
     };
-    let result = if op == 'N' {
+    let result = if op == BinOp::Ne {
         builder.ins().bxor_imm_u(eq, 1)
     } else {
         eq
@@ -17125,7 +17127,7 @@ fn compile_expr_inner<M: Module>(
             )
         }
         ExprKind::Binop(l, op, r) => {
-            if matches!(*op, 'E' | 'N') {
+            if matches!(*op, BinOp::Eq | BinOp::Ne) {
                 if let Some(result) = compile_ctor_eq(module, builder, cx, scopes, *op, l, r)? {
                     return Ok(result);
                 }
@@ -17138,12 +17140,12 @@ fn compile_expr_inner<M: Module>(
             let lt = flex_int_ty(l, &lt, &rt);
             let rt = flex_int_ty(r, &rt, &lt);
             match op {
-                // `+` is integer add only. User `+` resolves to a call to its
-                // bound `wrapping_add`/`saturating_add` (intrinsified above), so a
-                // primitive `+` Binop here is the increment sugar (`set n++`) or
-                // mono's own index arithmetic — always wrapping. String concat is
-                // `+++` (`'C'`).
-                '+' => {
+                // Integer add only. A user's `+` resolves to a call to its bound
+                // `wrapping_add`/`saturating_add` (intrinsified above), so a
+                // primitive add here is the increment sugar (`set n++`) or mono's
+                // own index arithmetic — always wrapping. Concatenation is its own
+                // operator, below.
+                BinOp::Add => {
                     if is_int_ty(&lt) && lt == rt {
                         let ConcreteType::Primitive(p) = &lt else {
                             unreachable!()
@@ -17175,7 +17177,7 @@ fn compile_expr_inner<M: Module>(
                 // concatenates like a `str`. Builds a *lazy concat node* (see
                 // `aipl_concat_lazy`) rather than copying eagerly — the result is
                 // still a `str` to the source, in the concat representation.
-                'C' => {
+                BinOp::Concat => {
                     if is_str_repr(&lt) && is_str_repr(&rt) {
                         // The tagged concat node takes ownership of its inputs, so
                         // inc both before the call to balance our local refs. The
@@ -17194,19 +17196,18 @@ fn compile_expr_inner<M: Module>(
                         ));
                     }
                 }
-                '-' | '*' | '/' | '%' => {
+                BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
                     if is_int_ty(&lt) && lt == rt {
                         let ConcreteType::Primitive(p) = &lt else {
                             unreachable!()
                         };
                         let signed = p.int_signed();
                         let raw = match op {
-                            '-' => builder.ins().isub(lv, rv),
-                            '*' => builder.ins().imul(lv, rv),
-                            '/' => saturating_div(builder, lv, rv, *p),
-                            '%' if signed => builder.ins().srem(lv, rv),
-                            '%' => builder.ins().urem(lv, rv),
-                            _ => unreachable!(),
+                            BinOp::Sub => builder.ins().isub(lv, rv),
+                            BinOp::Mul => builder.ins().imul(lv, rv),
+                            BinOp::Div => saturating_div(builder, lv, rv, *p),
+                            BinOp::Rem if signed => builder.ins().srem(lv, rv),
+                            _ => builder.ins().urem(lv, rv),
                         };
                         (canon_int(builder, raw, *p), lt.clone())
                     } else {
@@ -17223,22 +17224,21 @@ fn compile_expr_inner<M: Module>(
                             r.span.clone(),
                         )?;
                         let v = match op {
-                            '-' => builder.ins().isub(lv, rv),
-                            '*' => builder.ins().imul(lv, rv),
-                            '/' => saturating_div(builder, lv, rv, Primitive::I64),
-                            '%' => builder.ins().srem(lv, rv),
-                            _ => unreachable!(),
+                            BinOp::Sub => builder.ins().isub(lv, rv),
+                            BinOp::Mul => builder.ins().imul(lv, rv),
+                            BinOp::Div => saturating_div(builder, lv, rv, Primitive::I64),
+                            _ => builder.ins().srem(lv, rv),
                         };
                         (v, ConcreteType::Primitive(Primitive::I64))
                     }
                 }
-                'E' | 'N' => {
+                BinOp::Eq | BinOp::Ne => {
                     // Structural equality for any two values of the same type
                     // (the checker already verified compatibility). Compute the
                     // common, fully-concrete type — `merge_types` resolves a
                     // `none`/`[]`/`#{}` operand against the other side — then walk
                     // it with `emit_eq`. `!=` is the bitwise negation of `==`.
-                    let opn = if *op == 'E' { "==" } else { "!=" };
+                    let opn = binop_spelling(*op);
                     if matches!(lt, ConcreteType::Fn(_, _)) || matches!(rt, ConcreteType::Fn(_, _))
                     {
                         return Err(Error::at(
@@ -17257,14 +17257,14 @@ fn compile_expr_inner<M: Module>(
                         ));
                     };
                     let eq = emit_eq(module, builder, cx, lv, rv, &cmp_ty)?;
-                    let result = if *op == 'N' {
+                    let result = if *op == BinOp::Ne {
                         builder.ins().bxor_imm_u(eq, 1)
                     } else {
                         eq
                     };
                     (result, ConcreteType::Primitive(Primitive::Bool))
                 }
-                '<' | '>' | 'L' | 'G' => {
+                BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => {
                     // `str` orders lexicographically by bytes — the same order
                     // `sort` gives a `str[]` — via a runtime compare whose
                     // sign is then tested against zero.
@@ -17272,9 +17272,9 @@ fn compile_expr_inner<M: Module>(
                         let c = builtins.call(module, builder, "aipl_str_cmp", &[lv, rv]);
                         let zero = builder.ins().iconst(types::I64, 0);
                         let cc = match op {
-                            '<' => IntCC::SignedLessThan,
-                            '>' => IntCC::SignedGreaterThan,
-                            'L' => IntCC::SignedLessThanOrEqual,
+                            BinOp::Lt => IntCC::SignedLessThan,
+                            BinOp::Gt => IntCC::SignedGreaterThan,
+                            BinOp::Le => IntCC::SignedLessThanOrEqual,
                             _ => IntCC::SignedGreaterThanOrEqual,
                         };
                         let b = builder.ins().icmp(cc, c, zero);
@@ -17306,14 +17306,14 @@ fn compile_expr_inner<M: Module>(
                         }
                     };
                     let cc = match (op, signed) {
-                        ('<', true) => IntCC::SignedLessThan,
-                        ('<', false) => IntCC::UnsignedLessThan,
-                        ('>', true) => IntCC::SignedGreaterThan,
-                        ('>', false) => IntCC::UnsignedGreaterThan,
-                        ('L', true) => IntCC::SignedLessThanOrEqual,
-                        ('L', false) => IntCC::UnsignedLessThanOrEqual,
-                        ('G', true) => IntCC::SignedGreaterThanOrEqual,
-                        ('G', false) => IntCC::UnsignedGreaterThanOrEqual,
+                        (BinOp::Lt, true) => IntCC::SignedLessThan,
+                        (BinOp::Lt, false) => IntCC::UnsignedLessThan,
+                        (BinOp::Gt, true) => IntCC::SignedGreaterThan,
+                        (BinOp::Gt, false) => IntCC::UnsignedGreaterThan,
+                        (BinOp::Le, true) => IntCC::SignedLessThanOrEqual,
+                        (BinOp::Le, false) => IntCC::UnsignedLessThanOrEqual,
+                        (BinOp::Ge, true) => IntCC::SignedGreaterThanOrEqual,
+                        (BinOp::Ge, false) => IntCC::UnsignedGreaterThanOrEqual,
                         _ => unreachable!(),
                     };
                     let b = builder.ins().icmp(cc, lv, rv);
@@ -17322,7 +17322,7 @@ fn compile_expr_inner<M: Module>(
                         ConcreteType::Primitive(Primitive::Bool),
                     )
                 }
-                'A' | 'O' => {
+                BinOp::And | BinOp::Or => {
                     expect_type(
                         &lt,
                         &ConcreteType::Primitive(Primitive::Bool),
@@ -17336,15 +17336,17 @@ fn compile_expr_inner<M: Module>(
                         r.span.clone(),
                     )?;
                     let v = match op {
-                        'A' => builder.ins().band(lv, rv),
-                        'O' => builder.ins().bor(lv, rv),
-                        _ => unreachable!(),
+                        BinOp::And => builder.ins().band(lv, rv),
+                        _ => builder.ins().bor(lv, rv),
                     };
                     (v, ConcreteType::Primitive(Primitive::Bool))
                 }
-                other => {
-                    return Err(Error::at(format!("unsupported op {other:?}"), span.clone()));
-                }
+                // The loader lowers `++` to an add long before codegen, so this
+                // is unreachable rather than a diagnostic. It replaces a
+                // catch-all `other =>` arm that turned an unhandled operator into
+                // a runtime error message; with the enum, a new operator that
+                // codegen forgets is a compile error here instead.
+                BinOp::Incr => unreachable!("`++` is lowered to `+` by the loader"),
             }
         }
         ExprKind::If(cond, then_e, else_e) => {
@@ -17692,14 +17694,14 @@ fn compile_expr_inner<M: Module>(
             // slot-tracked, so the — possibly relocated — buffer is still
             // dropped exactly once.
             //
-            // `'C'` is `concat`'s opcode, as `'+'` is `wrapping_add`'s. This arm
-            // used to test `'+'`, which asks about integer addition and so never
-            // matched a `str`; the optimization had simply never run. The arm in
-            // `mono::aliases_or_unsafe` that decides `exclusive` has to agree
-            // with this one, and did not — either alone leaves it off.
+            // This arm used to be written against the `char` opcode encoding and
+            // named addition rather than concatenation, so it never matched a
+            // `str` and the optimization simply never ran. The arm in
+            // `mono::aliases_or_unsafe` that decides `exclusive` has to agree with
+            // this one, and did not — either alone leaves it off.
             if exclusive && expected_ty == ConcreteType::Primitive(Primitive::Str) {
                 let appends_self = match &value.kind {
-                    ExprKind::Binop(l, 'C', r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
+                    ExprKind::Binop(l, BinOp::Concat, r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
                         Some(r)
                     }
                     _ => None,
