@@ -299,6 +299,19 @@ choice (`wrapping_add as +` vs `saturating_add as +`). Where it has only one, th
 alias buys uniformity: an import list shows every operator a file uses in one
 shape, so a reader never has to know which operators happen to be ambiguous.
 
+The *named builtin* may also be imported **bare** and called as an ordinary
+function — `import { concat }` then `concat(a, b)`, or `a.concat(b)`. That is a
+separate thing from importing the operator: the bare name makes the function
+available, the alias makes the operator spelling available, and a file may have
+either or both. Only the operator has no bare form.
+
+Nothing downstream of import resolution can tell which spelling was used. The
+single-semantics builtins have no `__builtin_*` impl behind them — their
+canonical is the operator spelling itself — so a call to one is lowered back to
+the same primitive node the operator produces (`binop_from_spelling`, in the
+loader's `rewrite_expr`). `concat(a, b)` and `a +++ b` are one program, not two
+paths.
+
 | operator | import as | operator | import as |
 |---|---|---|---|
 | `+` | `wrapping_add` / `saturating_add` | `==` | `equal` |

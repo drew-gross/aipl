@@ -1595,14 +1595,18 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("wrapping_mul", "*", "__builtin_wrapping_mul"),
     ("wrapping_increment", "++", "__builtin_wrapping_add"),
     ("saturating_increment", "++", "__builtin_saturating_add"),
-    // The operators with a single semantics. They are listed here — rather than
-    // being importable bare — so that *every* operator is imported the same way:
+    // The operators with a single semantics. They are listed here so that *every*
+    // operator is imported the same way when it is imported *as an operator*:
     // `name as op`. Reading an import list then tells you which operators a file
     // uses and, where it matters, which flavor, without the reader having to
     // know which operators happen to be ambiguous.
     //
     // Their canonical impl is the operator spelling itself: unlike `+`, there is
-    // nothing to dispatch between, so the view maps straight through.
+    // nothing to dispatch between, so the view maps straight through. That makes
+    // the canonical a *marker* rather than a callable `__builtin_*`, which is why
+    // a bare import of one of these names lowers its calls back to the primitive
+    // node (`binop_from_spelling`, used by the loader's `rewrite_expr`) instead
+    // of emitting a call to a function that does not exist.
     ("equal", "==", "=="),
     ("not_equal", "!=", "!="),
     ("less_than", "<", "<"),
@@ -1616,6 +1620,37 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("saturating_divide", "/", "/"),
     ("remainder", "%", "%"),
 ];
+
+/// The [`BinOp`] an operator spelling denotes, for the operator builtins whose
+/// "canonical impl" is the spelling itself — a marker rather than a callable
+/// function (see [`OPERATOR_BUILTINS`]). `None` for `!`, which is unary
+/// (`ExprKind::Not`), and for a spelling that names a real `__builtin_*` impl.
+pub fn binop_from_spelling(spelling: &str) -> Option<BinOp> {
+    Some(match spelling {
+        "==" => BinOp::Eq,
+        "!=" => BinOp::Ne,
+        "<" => BinOp::Lt,
+        ">" => BinOp::Gt,
+        "<=" => BinOp::Le,
+        ">=" => BinOp::Ge,
+        "&&" => BinOp::And,
+        "||" => BinOp::Or,
+        "+++" => BinOp::Concat,
+        "/" => BinOp::Div,
+        "%" => BinOp::Rem,
+        _ => return None,
+    })
+}
+
+/// How many operands the operator `spelling` takes, or `None` if it is not one
+/// of the marker spellings [`binop_from_spelling`] covers plus unary `!`. Used
+/// to check the arity of a bare operator-builtin *call* (`concat(a, b)`).
+pub fn operator_arity(spelling: &str) -> Option<usize> {
+    match spelling {
+        "!" => Some(1),
+        _ => binop_from_spelling(spelling).map(|_| 2),
+    }
+}
 
 /// The named builtins that provide `op`, in [`OPERATOR_BUILTINS`] order.
 ///

@@ -1,0 +1,13 @@
+import { concat } from builtins;
+
+// A bare operator builtin is called with the operator's arity: the loader
+// lowers the call to a one- or two-operand primitive node, so a miscount is
+// rejected at that point rather than surfacing later as a call to a function
+// that does not exist.
+fn f() -> str { concat("a") }
+--- errors ---
+error: "concat" takes 2 arguments, got 1
+ --> ./tests/cases/imports/err_operator_builtin_bare_arity.aipl:7:17
+  |
+7 | fn f() -> str { concat("a") }
+  |                 ^^^^^^^^^^

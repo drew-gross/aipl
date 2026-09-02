@@ -1,0 +1,71 @@
+import {
+    concat,
+    equal,
+    greater_than,
+    less_than,
+    logical_and,
+    logical_not,
+    logical_or,
+    remainder,
+    saturating_divide,
+    wrapping_add,
+    wrapping_increment,
+    wrapping_mul,
+    wrapping_sub,
+} from builtins;
+
+// An operator builtin can be imported *bare* and called like any other
+// function. The alias form (`concat as +++`) is what makes the *operator*
+// spelling available; the name on its own makes the function available, and the
+// two are independent — a file may import either, or both.
+//
+// The single-semantics builtins (`equal`, `concat`, ...) have no `__builtin_*`
+// impl behind them: their canonical is the operator spelling itself. So a call
+// to one is lowered back to the primitive node the operator produces
+// (`binop_from_spelling`), which is why `concat("a", "b")` and `"a" +++ "b"` are
+// the same program rather than two paths the checker and codegen each handle.
+fn arithmetic() -> i64 {
+    wrapping_add(wrapping_sub(wrapping_mul(3, 4), 2), wrapping_increment(0, 1))
+}.test({
+    assert(equal(arithmetic(), 11));
+    assert(equal(saturating_divide(9, 2), 4));
+    assert(equal(remainder(9, 2), 1));
+
+    // Comparison and logic, as functions.
+    assert(logical_and(less_than(1, 2), greater_than(2, 1)));
+    assert(logical_or(false, true));
+    assert(logical_not(false));
+
+    // Method form works too — the receiver is just the first operand.
+    assert(equal(concat("a", "b"), "ab"));
+    assert(equal("x".concat("y"), "xy"));
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 176
+instructions executed: 153
+binary size: 2688
+  code: 792
+  data: 446
+  metadata: 1450
+functions:
+  __test$arithmetic:
+    calls: 1
+    bytes: 684
+  aipl_assert:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108

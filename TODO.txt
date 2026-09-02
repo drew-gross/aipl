@@ -127,7 +127,6 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
-  concat can't be imported bare at all? THat's a bug, please fix, all operators should be able to be imported bare
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky

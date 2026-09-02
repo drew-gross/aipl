@@ -474,66 +474,62 @@ impl Loader {
                 // `rewrite_expr` keeps as a primitive `Binop`. An operator
                 // aliased to a user function maps to that function instead and
                 // is dispatched to a call.
-                let canonical = if let Some((_op, canonical_impl)) =
-                    aipl_syntax::operator_builtin(&n.name)
-                {
-                    // A named operator builtin can be aliased to any operator
-                    // name, though aliasing to a different operator than the one
-                    // it provides is confusing and generally a bad idea. The view
-                    // maps the operator spelling to the reserved `__builtin_*`
-                    // impl, so a use of the operator resolves (in `rewrite_expr`)
-                    // to a call to that impl — codegen intrinsifies it. Different
-                    // builtins on the same operator (`wrapping_add`/`saturating_add`
-                    // → `+`) thus dispatch to different impls, spelling-agnostically.
-                    if n.alias.is_none() {
-                        return Err(Error::at(
-                            format!(
-                                "\"{}\" is an operator builtin; it must be aliased to an operator (e.g., `{} as +`)",
-                                n.name, n.name
-                            ),
-                            n.span.clone(),
-                        ));
-                    }
-                    canonical_impl.to_string()
-                } else if aipl_syntax::is_operator_name(&n.name) {
-                    // No operator has a bare form: every one is imported as
-                    // `name as op`. Where a flavor choice exists (`+` is
-                    // wrapping or saturating) that spelling is what records the
-                    // choice; where it does not, the uniformity is the point —
-                    // an import list names every operator a file uses the same
-                    // way, so a reader never has to know which operators happen
-                    // to be ambiguous.
-                    let forms = aipl_syntax::operator_named_forms(&n.name);
-                    if !forms.is_empty() {
-                        let options = forms
-                            .iter()
-                            .map(|f| format!("`{f} as {}`", n.name))
-                            .collect::<Vec<_>>()
-                            .join(" or ");
-                        let pick = if forms.len() > 1 {
-                            "pick a semantics and import it aliased, e.g. "
-                        } else {
-                            "import it aliased: "
-                        };
-                        return Err(Error::at(
-                            format!(
+                let canonical =
+                    if let Some((_op, canonical_impl)) = aipl_syntax::operator_builtin(&n.name) {
+                        // A named operator builtin can be aliased to any operator
+                        // name, though aliasing to a different operator than the one
+                        // it provides is confusing and generally a bad idea. The view
+                        // maps the operator spelling to the reserved `__builtin_*`
+                        // impl, so a use of the operator resolves (in `rewrite_expr`)
+                        // to a call to that impl — codegen intrinsifies it. Different
+                        // builtins on the same operator (`wrapping_add`/`saturating_add`
+                        // → `+`) thus dispatch to different impls, spelling-agnostically.
+                        // Imported bare (`import { concat }`), the name binds to the
+                        // same canonical as the aliased form, so it is callable as an
+                        // ordinary function: `concat(a, b)`. That does *not* make the
+                        // operator itself available — `a +++ b` still needs
+                        // `concat as +++`, because gating looks up the operator's
+                        // spelling in the view and a bare import adds only its name.
+                        canonical_impl.to_string()
+                    } else if aipl_syntax::is_operator_name(&n.name) {
+                        // No operator has a bare form: every one is imported as
+                        // `name as op`. Where a flavor choice exists (`+` is
+                        // wrapping or saturating) that spelling is what records the
+                        // choice; where it does not, the uniformity is the point —
+                        // an import list names every operator a file uses the same
+                        // way, so a reader never has to know which operators happen
+                        // to be ambiguous.
+                        let forms = aipl_syntax::operator_named_forms(&n.name);
+                        if !forms.is_empty() {
+                            let options = forms
+                                .iter()
+                                .map(|f| format!("`{f} as {}`", n.name))
+                                .collect::<Vec<_>>()
+                                .join(" or ");
+                            let pick = if forms.len() > 1 {
+                                "pick a semantics and import it aliased, e.g. "
+                            } else {
+                                "import it aliased: "
+                            };
+                            return Err(Error::at(
+                                format!(
                                 "the {:?} operator has no bare form; {pick}{options} from builtins",
                                 n.name
                             ),
+                                n.span.clone(),
+                            ));
+                        }
+                        n.name.clone()
+                    } else if let Some(canonical) = builtin_canonical(&n.name) {
+                        canonical
+                    } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
+                        canonical
+                    } else {
+                        return Err(Error::at(
+                            format!("\"{}\" is not a builtin", n.name),
                             n.span.clone(),
                         ));
-                    }
-                    n.name.clone()
-                } else if let Some(canonical) = builtin_canonical(&n.name) {
-                    canonical
-                } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
-                    canonical
-                } else {
-                    return Err(Error::at(
-                        format!("\"{}\" is not a builtin", n.name),
-                        n.span.clone(),
-                    ));
-                };
+                    };
                 if view.insert(local.to_string(), canonical).is_some() {
                     return Err(import_conflict(
                         file_label(path),
@@ -588,16 +584,17 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
         if view.contains_key(spelling) {
             Ok(())
         } else {
-            // The pluggable-semantics operators (`+`/`-`/`*`/`++`) have no bare
-            // spelling — each is a named builtin aliased to the operator. Suggest
-            // the wrapping flavor, the one a file that hasn't thought about
-            // overflow wants.
-            let hint = match spelling {
-                "+" => "wrapping_add as +".to_string(),
-                "-" => "wrapping_sub as -".to_string(),
-                "*" => "wrapping_mul as *".to_string(),
-                "++" => "wrapping_increment as ++".to_string(),
-                _ => spelling.to_string(),
+            // *No* operator has a bare spelling — each is a named builtin
+            // aliased to the operator — so the hint is always `name as op`,
+            // generated from `OPERATOR_BUILTINS` rather than restated here. It
+            // used to name the flavored operators by hand and fall through to the
+            // bare spelling for the rest, which advised `import { == }` — itself
+            // a hard error. The first named form is the one suggested, which for
+            // the pluggable-semantics operators is the wrapping flavor: what a
+            // file that has not thought about overflow wants.
+            let hint = match aipl_syntax::operator_named_forms(spelling).first() {
+                Some(name) => format!("{name} as {spelling}"),
+                None => spelling.to_string(),
             };
             Err(Error::at(
                 format!("operator \"{spelling}\" must be imported: add `import {{ {hint} }} from builtins;`"),
@@ -650,10 +647,29 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
                 check_operators(c, view)?;
             }
         }
-        ExprKind::Call(_, args, _)
-        | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
-        | ExprKind::TupleLit(args) => {
+        ExprKind::Call(name, args, _) => {
+            // A bare-imported operator builtin is called like any function, but
+            // its arity is the operator's — and `rewrite_expr` lowers it to a
+            // one- or two-operand primitive node, so a miscount has to be
+            // rejected here rather than surfacing as a call to a function that
+            // does not exist.
+            if let Some(arity) = view.get(name).and_then(|t| aipl_syntax::operator_arity(t)) {
+                if args.len() != arity {
+                    return Err(Error::at(
+                        format!(
+                            "{name:?} takes {arity} argument{}, got {}",
+                            if arity == 1 { "" } else { "s" },
+                            args.len()
+                        ),
+                        e.span.clone(),
+                    ));
+                }
+            }
+            for a in args {
+                check_operators(a, view)?;
+            }
+        }
+        ExprKind::ArrayLit(args) | ExprKind::SetLit(args) | ExprKind::TupleLit(args) => {
             for a in args {
                 check_operators(a, view)?;
             }
@@ -1013,13 +1029,32 @@ fn rewrite_expr(
                         .collect(),
                     false,
                 ),
-                None => ExprKind::Call(
-                    view.get(name).cloned().unwrap_or_else(|| name.clone()),
-                    args.iter()
+                None => {
+                    let target = view.get(name).cloned().unwrap_or_else(|| name.clone());
+                    let mut rewritten: Vec<Expr> = args
+                        .iter()
                         .map(|a| rewrite_expr(a, view, sc, locals))
-                        .collect(),
-                    *method_style,
-                ),
+                        .collect();
+                    // A bare-imported single-semantics operator builtin
+                    // (`import { concat }` then `concat(a, b)`) resolves to a
+                    // canonical that is the operator *spelling* — a marker, not a
+                    // callable `__builtin_*`. Lower the call to the primitive node
+                    // the operator itself produces, so the call and the operator
+                    // are the same program and the checker and codegen need to know
+                    // about only one of them. Arity was verified by
+                    // `check_operators`.
+                    match aipl_syntax::operator_arity(&target) {
+                        Some(2) => {
+                            let op = aipl_syntax::binop_from_spelling(&target)
+                                .expect("arity 2 means a binary spelling");
+                            let rhs = rewritten.pop().expect("checked arity");
+                            let lhs = rewritten.pop().expect("checked arity");
+                            ExprKind::Binop(Box::new(lhs), op, Box::new(rhs))
+                        }
+                        Some(_) => ExprKind::Not(Box::new(rewritten.pop().expect("checked arity"))),
+                        None => ExprKind::Call(target, rewritten, *method_style),
+                    }
+                }
             }
         }
         ExprKind::Construct(name, fields) => ExprKind::Construct(
