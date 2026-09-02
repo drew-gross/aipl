@@ -181,8 +181,8 @@ deallocations: 182
 reallocations: 0
 bytes allocated: 7038
 instructions executed: 24533
-binary size: 85040
-  code: 53036
+binary size: 85048
+  code: 53044
   data: 2532
   metadata: 29472
 functions:
@@ -305,4 +305,4 @@ functions:
     bytes: 72
   parse_spec:
     calls: 13
-    bytes: 3960
+    bytes: 3968

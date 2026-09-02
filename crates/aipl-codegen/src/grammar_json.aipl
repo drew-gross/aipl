@@ -412,8 +412,8 @@ deallocations: 11422
 reallocations: 299
 bytes allocated: 623372
 instructions executed: 1526363
-binary size: 207096
-  code: 124392
+binary size: 207112
+  code: 124408
   data: 6348
   metadata: 76356
 functions:
@@ -563,7 +563,7 @@ functions:
     bytes: 452
   __m4__unescape:
     calls: 31
-    bytes: 820
+    bytes: 828
   __m5__climb$JsonTok$Json:
     calls: 0
     bytes: 2760
@@ -761,7 +761,7 @@ functions:
     bytes: (external)
   escape_json:
     calls: 30
-    bytes: 796
+    bytes: 804
   json_cst:
     calls: 5
     bytes: 384

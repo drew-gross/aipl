@@ -36,8 +36,8 @@ deallocations: 11
 reallocations: 0
 bytes allocated: 484
 instructions executed: 1167
-binary size: 5856
-  code: 2772
+binary size: 5864
+  code: 2780
   data: 641
   metadata: 2443
 functions:
@@ -46,7 +46,7 @@ functions:
     bytes: 272
   __test$sums_an_array:
     calls: 1
-    bytes: 2428
+    bytes: 2436
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)

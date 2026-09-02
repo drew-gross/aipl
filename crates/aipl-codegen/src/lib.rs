@@ -9062,8 +9062,25 @@ fn env_load(
     Ok(match binding {
         EnvBinding::Immut(v, t) => (*v, t.clone()),
         EnvBinding::Mut(slot, t, _) => {
-            let v = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
-            (v, t.borrow().clone())
+            let ty = t.borrow().clone();
+            // Reading a `mut` binding yields a **snapshot**, and under the wide
+            // representation that has to be made explicitly.
+            //
+            // A tagged read copies a pointer out of the slot, so `let snap = cs;`
+            // kept naming the old buffer even after `cs` was reassigned — value
+            // semantics for free, because a rebuild allocates a fresh buffer and
+            // only the slot is repointed. A wide value *is* the slot's 24 bytes,
+            // so handing back the slot's address would make `snap` an alias that
+            // changes underneath the next `set`. Copying restores the tagged
+            // behaviour exactly; the refcount is untouched (this is a borrow,
+            // like the load it replaces).
+            let v = if str24_wide(&ty) {
+                let src = builder.ins().stack_addr(types::I64, *slot, 0);
+                copy_str_value(builder, src)
+            } else {
+                builder.ins().stack_load(types::I64, types::I64, *slot, 0)
+            };
+            (v, ty)
         }
     })
 }
@@ -10024,7 +10041,7 @@ fn drop_scope<M: Module>(
     for t in scope {
         let v = match t.owned {
             Owned::Value(v) => v,
-            Owned::Slot(slot) => builder.ins().stack_load(types::I64, types::I64, slot, 0),
+            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
         };
         emit_drop(builder, module, builtins, structs, v, &t.ty);
     }
@@ -12730,6 +12747,144 @@ enum Sink {
     Write(StackSlot),
 }
 
+/// Copy the 24-byte `str` at `src` into a fresh stack slot and return its
+/// address — a snapshot that later writes to `src` cannot disturb.
+///
+/// Word-by-word rather than through `copy_composite` so it needs no `structs`
+/// map: a `str`'s size is fixed by the representation, not by a layout table.
+fn copy_str_value(builder: &mut FunctionBuilder, src: Value) -> Value {
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        str24::STR_SIZE as u32,
+        3,
+    ));
+    let dst = builder.ins().stack_addr(types::I64, slot, 0);
+    let flags = MemFlagsData::trusted();
+    for off in (0..str24::STR_SIZE as i32).step_by(8) {
+        let w = builder.ins().load(types::I64, flags, src, off);
+        builder.ins().store(flags, w, dst, off);
+    }
+    dst
+}
+
+/// The handle for the value living in `slot` — what the rest of codegen expects
+/// to be given for a binding or a slot-track.
+///
+/// The counterpart of [`store_binding_str`], and wrong in the same way if
+/// skipped: a tagged value is one word *in* the slot, so it is loaded; a wide
+/// `str`/`char[]` *is* the slot's 24 bytes, so the handle is its address.
+/// Loading a word from a wide slot yields the value's first word, which then
+/// reads as a `Str` — the failure that surfaced as an overlapping
+/// `copy_nonoverlapping`, and again as `misaligned pointer dereference ... is
+/// 0x636261` (the bytes `abc`).
+///
+/// **A wide handle is not a snapshot.** A tagged load copies the pointer out, so
+/// capturing an old value and then overwriting the slot was safe in either
+/// order; a wide handle keeps naming whatever the slot holds *now*. Anything
+/// that releases an old value around a writeback has to release it first — see
+/// the `push`/`extend` char paths.
+fn slot_value(builder: &mut FunctionBuilder, slot: StackSlot, ty: &ConcreteType) -> Value {
+    if str24_wide(ty) {
+        builder.ins().stack_addr(types::I64, slot, 0)
+    } else {
+        builder.ins().stack_load(types::I64, types::I64, slot, 0)
+    }
+}
+
+/// [`slot_value`] where the binding is known to be `str`-shaped.
+fn load_binding_str(builder: &mut FunctionBuilder, slot: StackSlot) -> Value {
+    slot_value(builder, slot, &ConcreteType::Primitive(Primitive::Str))
+}
+
+/// Write a freshly built `str` back into the stack slot of the `mut` binding it
+/// belongs to.
+///
+/// A tagged `str` is one word, so this was a plain `stack_store`. A wide one is
+/// the whole 24-byte value, and `v` addresses it — storing `v` itself would put
+/// a pointer where the binding's value lives.
+fn store_binding_str(
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    slot: StackSlot,
+    v: Value,
+    structs: &HashMap<String, TypeDef>,
+) {
+    store_binding(
+        builder,
+        cx,
+        slot,
+        v,
+        &ConcreteType::Primitive(Primitive::Str),
+        structs,
+    );
+}
+
+/// [`store_binding_str`] for a binding of any type: the value's 24 bytes when it
+/// is a wide `str`/`char[]`, one word otherwise. Mirrors [`slot_value`], and the
+/// two must agree — a slot written one way and read the other is a silent
+/// miscompile rather than a crash.
+fn store_binding(
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    slot: StackSlot,
+    v: Value,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) {
+    let _ = cx;
+    if !str24_wide(ty) {
+        builder.ins().stack_store(types::I64, v, slot, 0);
+        return;
+    }
+    let dst = builder.ins().stack_addr(types::I64, slot, 0);
+    copy_composite(builder, dst, v, ty, structs);
+}
+
+/// Allocate a `str` of exactly `len` bytes and return `(value, write_ptr)` —
+/// what to store, and where to put the bytes.
+///
+/// The two are the *same* under the tagged representation, where a `str` value
+/// is its content pointer, and different under the wide one, where the value is
+/// 24 bytes describing a buffer that has to be asked for its write pointer.
+/// Every "build a fresh buffer and copy into it" site went straight to
+/// `aipl_str_alloc` and used its result as both, which is exactly the conflation
+/// that breaks — so they go through here instead.
+///
+/// Pair every call with [`emit_str_grew`]: wide allocation gives *capacity*, and
+/// the value's length is only recorded once the bytes are in.
+fn emit_str_alloc<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    len: Value,
+) -> (Value, Value) {
+    if !str24_enabled() {
+        let buf = cx.builtins.call(module, builder, "aipl_str_alloc", &[len]);
+        return (buf, buf);
+    }
+    let built = cx.builtins.call(module, builder, "aipl2_str_alloc", &[len]);
+    let start = cx
+        .builtins
+        .call(module, builder, "aipl2_str_write_ptr", &[built]);
+    (built, start)
+}
+
+/// Record that a buffer from [`emit_str_alloc`] now holds `len` bytes. A no-op
+/// under the tagged representation, where `aipl_str_alloc` already set the
+/// length it was asked for.
+fn emit_str_grew<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    value: Value,
+    len: Value,
+) {
+    if str24_enabled() {
+        cx.builtins
+            .call_void(module, builder, "aipl2_str_grew", &[value, len]);
+    }
+}
+
 /// The contiguous content pointer for a `str` *value*, which is what the
 /// byte-copying sinks need. Neither representation stores one directly for every
 /// case — a tagged value may be inline or a rope, a wide one may be inline — so
@@ -15281,7 +15436,7 @@ fn compile_call<M: Module>(
             for t in scope {
                 let v = match t.owned {
                     Owned::Value(v) => v,
-                    Owned::Slot(slot) => builder.ins().stack_load(types::I64, types::I64, slot, 0),
+                    Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                 };
                 emit_drop(builder, module, builtins, structs, v, &t.ty);
             }
@@ -17211,12 +17366,12 @@ fn compile_call_expr<M: Module>(
                 } else {
                     builder.ins().iadd_imm_s(old_len, 1)
                 };
-                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
+                let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
                 let src0 = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed — each copy's destination is
-                // computed from `buf` directly.
-                let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src0, old_len]);
-                let at = builder.ins().iadd(buf, old_len);
+                // computed from `dst` directly.
+                let _ = builtins.call(module, builder, "aipl_write_bytes", &[dst, src0, old_len]);
+                let at = builder.ins().iadd(dst, old_len);
                 match tail {
                     Some(src) => {
                         let src1 = str_bytes_ptr(module, builder, cx, src);
@@ -17233,6 +17388,7 @@ fn compile_call_expr<M: Module>(
                             .istore8(MemFlagsData::trusted(), add_len, at, 0);
                     }
                 }
+                emit_str_grew(module, builder, cx, buf, new_len);
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -17414,17 +17570,28 @@ fn compile_call_expr<M: Module>(
                         receiver.span.clone(),
                     ));
                 }
+                // The receiver's handle has to be re-derived here: the generic
+                // load above reads one word from the slot, which is the whole
+                // value only under the tagged representation.
+                let arr_ptr = load_binding_str(builder, slot);
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let new_len = builder.ins().iadd_imm_s(old_len, 1);
-                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
+                let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
                 let src = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed here — the copy is the point.
-                let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src, old_len]);
-                let dst_addr = builder.ins().iadd(buf, old_len);
+                let _ = builtins.call(module, builder, "aipl_write_bytes", &[dst, src, old_len]);
+                let dst_addr = builder.ins().iadd(dst, old_len);
                 builder
                     .ins()
                     .istore8(MemFlagsData::trusted(), x_v, dst_addr, 0);
-                builder.ins().stack_store(types::I64, buf, slot, 0);
+                emit_str_grew(module, builder, cx, buf, new_len);
+                // The old value is released *before* the writeback, not after.
+                // A tagged `arr_ptr` is a snapshot — a pointer loaded out of the
+                // slot — so the order did not matter. A wide `arr_ptr` *is* the
+                // slot's address, so once the new value is stored there the
+                // "old" handle names the new one, and dropping it frees the
+                // string that was just built. The copy above is already done, so
+                // nothing reads the old bytes after this point.
                 if exclusive {
                     // Statically proven unaliased: the old value is already
                     // owned solely by this binding's slot-track (from
@@ -17440,6 +17607,9 @@ fn compile_call_expr<M: Module>(
                         &new_arr_ty,
                         RcOp::Drop,
                     );
+                }
+                store_binding_str(builder, cx, slot, buf, structs);
+                if exclusive {
                 } else {
                     // Possibly shared: the old value is owned by a separate
                     // track elsewhere (the binding's initial value-track, or
@@ -17568,22 +17738,26 @@ fn compile_call_expr<M: Module>(
                         receiver.span.clone(),
                     ));
                 }
+                // See `push`: the generic slot load is a word, the wide value
+                // is the slot itself.
+                let arr_ptr = load_binding_str(builder, slot);
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
                 let add_len = builtins.call(module, builder, "aipl_str_len", &[src_ptr]);
                 let new_len = builder.ins().iadd(old_len, add_len);
-                let buf = builtins.call(module, builder, "aipl_str_alloc", &[new_len]);
+                let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
                 let src0 = str_bytes_ptr(module, builder, cx, arr_ptr);
                 // The advanced cursor is not needed — each copy's destination is
-                // computed from `buf` directly.
-                let _ = builtins.call(module, builder, "aipl_write_bytes", &[buf, src0, old_len]);
-                let at = builder.ins().iadd(buf, old_len);
+                // computed from `dst` directly.
+                let _ = builtins.call(module, builder, "aipl_write_bytes", &[dst, src0, old_len]);
+                let at = builder.ins().iadd(dst, old_len);
                 let src1 = str_bytes_ptr(module, builder, cx, src_ptr);
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[at, src1, add_len]);
-                builder.ins().stack_store(types::I64, buf, slot, 0);
+                emit_str_grew(module, builder, cx, buf, new_len);
                 // `aipl_str_len`/`aipl_str_data` only borrow, so — exactly as in
                 // the `push` char path — an exclusive receiver's old value is
                 // freed here and a possibly-shared one is left to the track that
-                // already owns it.
+                // already owns it. Released before the writeback, for the reason
+                // given there: a wide handle is the slot, not a snapshot of it.
                 if exclusive {
                     emit_rc(
                         builder,
@@ -17594,6 +17768,9 @@ fn compile_call_expr<M: Module>(
                         &new_arr_ty,
                         RcOp::Drop,
                     );
+                }
+                store_binding_str(builder, cx, slot, buf, structs);
+                if exclusive {
                 } else {
                     scopes
                         .last_mut()
@@ -18149,9 +18326,7 @@ fn compile_expr_inner<M: Module>(
                 for t in scope {
                     let v = match t.owned {
                         Owned::Value(v) => v,
-                        Owned::Slot(slot) => {
-                            builder.ins().stack_load(types::I64, types::I64, slot, 0)
-                        }
+                        Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                     };
                     emit_drop(builder, module, builtins, structs, v, &t.ty);
                 }
@@ -18852,13 +19027,26 @@ fn compile_expr_inner<M: Module>(
             // (see `coerce_empty_to_char_array`); bindings did not.
             let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
-            // 8-byte slot, 8-byte aligned: fits any i64/bool/char/str.
-            let slot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                8,
-                3,
-            ));
-            builder.ins().stack_store(types::I64, v, slot, 0);
+            // 8-byte slot, 8-byte aligned: fits any i64/bool/char, and any heap
+            // value the binding holds a *pointer* to — which is every composite
+            // (a struct binding deliberately points at its value; see the `set`
+            // arm's sret-buffer note).
+            //
+            // The one exception is a wide `str`/`char[]`, which lives *in* the
+            // slot as its whole 24 bytes rather than being pointed at. Only that
+            // case widens: broadening it to every composite silently switched
+            // struct bindings from pointer-holding to value-holding, and the
+            // rest of the code still read them the old way.
+            let slot = if str24_wide(&t) {
+                value_slot(builder, &t, structs)
+            } else {
+                builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ))
+            };
+            store_binding(builder, cx, slot, v, &t, structs);
             // In-place mutation optimization: a heap binding initialized from a
             // fresh literal (an array literal, or a `str` literal for `set s =
             // s + ..`) and never aliased in `body` is "exclusive" — `push` / `+`
@@ -19014,7 +19202,7 @@ fn compile_expr_inner<M: Module>(
                 // still dropped exactly once.
                 if let ExprKind::Binop(l, '+', r) = &value.kind {
                     if matches!(&l.kind, ExprKind::Ident(n) if n == name) {
-                        let s_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+                        let s_ptr = load_binding_str(builder, slot);
                         let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
                         expect_type(
                             &rt,
@@ -19046,7 +19234,7 @@ fn compile_expr_inner<M: Module>(
                                 RcOp::Drop,
                             );
                         }
-                        builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+                        store_binding_str(builder, cx, slot, new_ptr, structs);
                         // No new track — the binding's slot-track owns the result.
                         return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                     }
@@ -19123,7 +19311,7 @@ fn compile_expr_inner<M: Module>(
             // in-place / value-track model).
             let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty, structs);
             let old = if is_str_repr(&expected_ty) || arr_slot_ref {
-                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
+                Some(slot_value(builder, slot, &expected_ty))
             } else {
                 None
             };
@@ -19158,8 +19346,20 @@ fn compile_expr_inner<M: Module>(
                         value,
                         cx.owned_params,
                     );
-                    builder.ins().stack_store(types::I64, v, slot, 0);
+                    // Release before the store, not after. A tagged `old` is a
+                    // pointer copied out of the slot, so either order worked; a
+                    // wide `old` is the slot's own address, and once the new
+                    // value is written there it names *that* — so a release
+                    // afterwards frees what was just assigned. The new value has
+                    // already taken its own reference above, so anything it
+                    // shares with the old one survives.
+                    //
+                    // (The composite arm below reasons its way to the same order
+                    // from a different direction: its buffer is reused across
+                    // loop iterations, so the outgoing value lives in the very
+                    // storage being overwritten.)
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
+                    store_binding_str(builder, cx, slot, v, structs);
                 }
             } else if is_composite(&expected_ty, structs) {
                 // Copy the incoming composite into a buffer belonging to this
@@ -20158,9 +20358,7 @@ fn compile_expr_inner<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => {
-                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
-                            }
+                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }
@@ -20264,9 +20462,7 @@ fn compile_expr_inner<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => {
-                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
-                            }
+                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }
@@ -20281,9 +20477,7 @@ fn compile_expr_inner<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => {
-                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
-                            }
+                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }
@@ -20301,9 +20495,7 @@ fn compile_expr_inner<M: Module>(
                     for t in scope {
                         let v = match t.owned {
                             Owned::Value(v) => v,
-                            Owned::Slot(slot) => {
-                                builder.ins().stack_load(types::I64, types::I64, slot, 0)
-                            }
+                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
                         };
                         emit_drop(builder, module, builtins, structs, v, &t.ty);
                     }

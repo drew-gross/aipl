@@ -32,14 +32,14 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 248
 instructions executed: 174
-binary size: 1848
-  code: 444
+binary size: 1864
+  code: 460
   data: 172
   metadata: 1232
 functions:
   __test$shrink:
     calls: 1
-    bytes: 368
+    bytes: 384
   aipl_arr_drop_str:
     calls: 1
     bytes: (external)

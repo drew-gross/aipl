@@ -20,14 +20,14 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 160
 instructions executed: 66
-binary size: 1608
-  code: 464
+binary size: 1640
+  code: 496
   data: 45
   metadata: 1099
 functions:
   __test$build:
     calls: 1
-    bytes: 392
+    bytes: 424
   aipl_assert:
     calls: 1
     bytes: (external)

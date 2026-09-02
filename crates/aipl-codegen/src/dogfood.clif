@@ -549,9 +549,9 @@ block10:
     v55 = iconst.i64 2565
     call fn2(v54)
     v56 = call fn8(v54, v55)  ; v55 = 2565
+    call fn6(v51)
     v57 = stack_addr.i64 ss2
     store notrap v56, v57
-    call fn6(v51)
     v58 = iconst.i64 0
     call fn6(v54)
     jump block12(v58)  ; v58 = 0
@@ -987,15 +987,15 @@ block27:
     jump block28(v254)  ; v254 = 1
 
 block28(v143: i64):
+    call fn6(v140)
     v255 = stack_addr.i64 ss1
     store notrap v143, v255
-    call fn6(v140)
     v256 = stack_addr.i64 ss2
     v257 = load.i64 notrap v256
     v258 = iconst.i64 1
+    call fn6(v257)
     v259 = stack_addr.i64 ss2
     store notrap v258, v259  ; v258 = 1
-    call fn6(v257)
     v260 = iconst.i64 0
     jump block12(v260)  ; v260 = 0
 
@@ -1998,9 +1998,9 @@ block11:
     v60 = iconst.i64 2565
     call fn5(v59)
     v61 = call fn6(v59, v60)  ; v60 = 2565
+    call fn7(v56)
     v62 = stack_addr.i64 ss0
     store notrap v61, v62
-    call fn7(v56)
     v63 = stack_addr.i64 ss8
     v64 = iconst.i64 1
     store notrap aligned v64, v63  ; v64 = 1
@@ -2032,9 +2032,9 @@ block16:
     v78 = iconst.i64 2565
     call fn5(v77)
     v79 = call fn6(v77, v78)  ; v78 = 2565
+    call fn7(v74)
     v80 = stack_addr.i64 ss0
     store notrap v79, v80
-    call fn7(v74)
     v81 = iconst.i64 1
     v82 = stack_addr.i64 ss1
     store notrap v81, v82  ; v81 = 1
@@ -2144,9 +2144,9 @@ block26:
     v137 = iconst.i64 2565
     call fn5(v136)
     v138 = call fn6(v136, v137)  ; v137 = 2565
+    call fn7(v133)
     v139 = stack_addr.i64 ss0
     store notrap v138, v139
-    call fn7(v133)
     v140 = stack_addr.i64 ss11
     v141 = iconst.i64 1
     store notrap aligned v141, v140  ; v141 = 1
@@ -2178,9 +2178,9 @@ block31:
     v155 = iconst.i64 2565
     call fn5(v154)
     v156 = call fn6(v154, v155)  ; v155 = 2565
+    call fn7(v151)
     v157 = stack_addr.i64 ss0
     store notrap v156, v157
-    call fn7(v151)
     v158 = iconst.i64 0
     call fn7(v154)
     jump block33(v158)  ; v158 = 0
@@ -2581,9 +2581,9 @@ block14:
     v62 = iconst.i64 2565
     call fn6(v61)
     v63 = call fn7(v61, v62)  ; v62 = 2565
+    call fn8(v58)
     v64 = stack_addr.i64 ss0
     store notrap v63, v64
-    call fn8(v58)
     v65 = stack_addr.i64 ss8
     v66 = iconst.i64 1
     store notrap aligned v66, v65  ; v66 = 1
@@ -2615,9 +2615,9 @@ block19:
     v80 = iconst.i64 2565
     call fn6(v79)
     v81 = call fn7(v79, v80)  ; v80 = 2565
+    call fn8(v76)
     v82 = stack_addr.i64 ss0
     store notrap v81, v82
-    call fn8(v76)
     v83 = iconst.i64 1
     v84 = stack_addr.i64 ss1
     store notrap v83, v84  ; v83 = 1
@@ -2727,9 +2727,9 @@ block29:
     v139 = iconst.i64 2565
     call fn6(v138)
     v140 = call fn7(v138, v139)  ; v139 = 2565
+    call fn8(v135)
     v141 = stack_addr.i64 ss0
     store notrap v140, v141
-    call fn8(v135)
     v142 = stack_addr.i64 ss11
     v143 = iconst.i64 1
     store notrap aligned v143, v142  ; v143 = 1
@@ -2761,9 +2761,9 @@ block34:
     v157 = iconst.i64 2565
     call fn6(v156)
     v158 = call fn7(v156, v157)  ; v157 = 2565
+    call fn8(v153)
     v159 = stack_addr.i64 ss0
     store notrap v158, v159
-    call fn8(v153)
     v160 = iconst.i64 0
     call fn8(v156)
     jump block36(v160)  ; v160 = 0
@@ -3102,9 +3102,9 @@ block25:
     v87 = iconst.i64 2565
     call fn0(v86)
     v88 = call fn9(v86, v87)  ; v87 = 2565
+    call fn2(v83)
     v89 = stack_addr.i64 ss1
     store notrap v88, v89
-    call fn2(v83)
     v90 = stack_addr.i64 ss9
     v91 = iconst.i64 1
     store notrap aligned v91, v90  ; v91 = 1
@@ -3136,9 +3136,9 @@ block30:
     v105 = iconst.i64 2565
     call fn0(v104)
     v106 = call fn9(v104, v105)  ; v105 = 2565
+    call fn2(v101)
     v107 = stack_addr.i64 ss1
     store notrap v106, v107
-    call fn2(v101)
     v108 = iconst.i64 1
     v109 = stack_addr.i64 ss2
     store notrap v108, v109  ; v108 = 1
@@ -3248,9 +3248,9 @@ block40:
     v164 = iconst.i64 2565
     call fn0(v163)
     v165 = call fn9(v163, v164)  ; v164 = 2565
+    call fn2(v160)
     v166 = stack_addr.i64 ss1
     store notrap v165, v166
-    call fn2(v160)
     v167 = stack_addr.i64 ss12
     v168 = iconst.i64 1
     store notrap aligned v168, v167  ; v168 = 1
@@ -3282,9 +3282,9 @@ block45:
     v182 = iconst.i64 2565
     call fn0(v181)
     v183 = call fn9(v181, v182)  ; v182 = 2565
+    call fn2(v178)
     v184 = stack_addr.i64 ss1
     store notrap v183, v184
-    call fn2(v178)
     v185 = iconst.i64 0
     call fn2(v181)
     jump block47(v185)  ; v185 = 0
@@ -30815,9 +30815,9 @@ block30:
     v169 = iconst.i64 2565
     call fn1(v168)
     v170 = call fn8(v168, v169)  ; v169 = 2565
+    call fn6(v165)
     v171 = stack_addr.i64 ss9
     store notrap v170, v171
-    call fn6(v165)
     v172 = iconst.i64 0
     call fn6(v168)
     jump block32(v172)  ; v172 = 0
@@ -31416,15 +31416,15 @@ block104:
     v450 = stack_addr.i64 ss8
     v451 = load.i64 notrap v450
     call fn1(v157)
+    call fn6(v451)
     v452 = stack_addr.i64 ss8
     store.i64 notrap v157, v452
-    call fn6(v451)
     v453 = stack_addr.i64 ss9
     v454 = load.i64 notrap v453
     v455 = iconst.i64 1
+    call fn6(v454)
     v456 = stack_addr.i64 ss9
     store notrap v455, v456  ; v455 = 1
-    call fn6(v454)
     v457 = iconst.i64 0
     v458 = load.i64 notrap aligned v361
     call fn6(v458)
@@ -38410,9 +38410,9 @@ block38(v144: i64):
     call fn0(v138)
     call fn0(v144)
     v155 = call fn13(v138, v144)
+    call fn4(v134)
     v156 = stack_addr.i64 ss4
     store notrap v155, v156
-    call fn4(v134)
     v157 = iconst.i64 0
     call fn2(v128)
     call fn2(v130)
@@ -39298,9 +39298,9 @@ block7(v55: i64):
     call fn4(v45)
     call fn4(v55)
     v65 = call fn5(v45, v55)
+    call fn7(v37)
     v66 = stack_addr.i64 ss0
     store notrap v65, v66
-    call fn7(v37)
     v67 = stack_addr.i64 ss2
     v68 = load.i64 notrap v67
     v69 = iconst.i64 2

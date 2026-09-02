@@ -30249,9 +30249,9 @@ block38(v143: i64):
     call fn0(v137)
     call fn0(v143)
     v154 = call fn13(v137, v143)
+    call fn4(v133)
     v155 = stack_addr.i64 ss4
     store notrap v154, v155
-    call fn4(v133)
     v156 = iconst.i64 0
     call fn2(v128)
     call fn2(v129)
@@ -31136,9 +31136,9 @@ block7(v55: i64):
     call fn4(v45)
     call fn4(v55)
     v65 = call fn5(v45, v55)
+    call fn7(v37)
     v66 = stack_addr.i64 ss0
     store notrap v65, v66
-    call fn7(v37)
     v67 = stack_addr.i64 ss2
     v68 = load.i64 notrap v67
     v69 = iconst.i64 2
@@ -74767,9 +74767,9 @@ block2:
     call fn0(v30)
     call fn0(v35)
     v36 = call fn10(v30, v35)
+    call fn4(v26)
     v37 = stack_addr.i64 ss1
     store notrap v36, v37
-    call fn4(v26)
     v38 = iconst.i64 0
     v39 = iadd v24, v38  ; v38 = 0
     v40 = load.i64 notrap aligned v39
@@ -76554,9 +76554,9 @@ block2:
     call fn0(v30)
     call fn0(v35)
     v36 = call fn10(v30, v35)
+    call fn4(v26)
     v37 = stack_addr.i64 ss1
     store notrap v36, v37
-    call fn4(v26)
     v38 = iconst.i64 0
     v39 = iadd v24, v38  ; v38 = 0
     v40 = load.i64 notrap aligned v39

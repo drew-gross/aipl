@@ -1212,8 +1212,8 @@ deallocations: 1657
 reallocations: 38
 bytes allocated: 75704
 instructions executed: 263004
-binary size: 1592592
-  code: 996896
+binary size: 1592600
+  code: 996904
   data: 8100
   metadata: 587596
 functions:
@@ -1342,7 +1342,7 @@ functions:
     bytes: 60
   __m1__unescape:
     calls: 21
-    bytes: 820
+    bytes: 828
   __test$lex:
     calls: 1
     bytes: 916088

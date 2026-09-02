@@ -75,8 +75,8 @@ deallocations: 2192
 reallocations: 21
 bytes allocated: 98537
 instructions executed: 320885
-binary size: 846608
-  code: 518640
+binary size: 846632
+  code: 518664
   data: 2508
   metadata: 325460
 functions:
@@ -253,7 +253,7 @@ functions:
     bytes: 452
   __m14__unescape:
     calls: 0
-    bytes: 820
+    bytes: 828
   __m15__process_raw_string:
     calls: 0
     bytes: 32
@@ -466,7 +466,7 @@ functions:
     bytes: 328
   __m6__set_member:
     calls: 0
-    bytes: 9612
+    bytes: 9620
   __m6__set_or_dict_atom:
     calls: 0
     bytes: 5004
@@ -586,7 +586,7 @@ functions:
     bytes: 624
   __m8__reindent_block:
     calls: 0
-    bytes: 2240
+    bytes: 2248
   __m9__dedent:
     calls: 0
     bytes: 32

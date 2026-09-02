@@ -642,8 +642,8 @@ deallocations: 4666
 reallocations: 31
 bytes allocated: 270208
 instructions executed: 733329
-binary size: 210968
-  code: 136648
+binary size: 210976
+  code: 136656
   data: 7100
   metadata: 67220
 functions:
@@ -781,7 +781,7 @@ functions:
     bytes: 452
   __m2__unescape:
     calls: 8
-    bytes: 820
+    bytes: 828
   __m3__process_raw_string:
     calls: 2
     bytes: 1532
