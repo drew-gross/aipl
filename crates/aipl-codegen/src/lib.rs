@@ -9826,9 +9826,8 @@ fn emit_eq<M: Module>(
 /// Declare (once, cached) the per-type `__eq_<n>(lv, rv) -> i64` helper for `ty`.
 /// Returns its id; the body is defined later from `eq_pending`.
 fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
-    let key = type_name(ty);
     let mut er = cx.elem_rc.borrow_mut();
-    if let Some(id) = er.eq_fns.get(&key) {
+    if let Some(id) = er.eq_fns.get(ty) {
         return *id;
     }
     let sym = er.symbol("__eq_", &type_symbol(ty));
@@ -9839,7 +9838,7 @@ fn eq_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     let id = module
         .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare eq helper");
-    er.eq_fns.insert(key, id);
+    er.eq_fns.insert(ty.clone(), id);
     er.eq_pending.push((ty.clone(), id));
     id
 }
@@ -10991,9 +10990,8 @@ fn array_retain_fn_addr<M: Module>(
 /// for `elem` and record them to be defined after the main function loop. The
 /// element type's own size/layout drives the generated loop body.
 fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &ConcreteType) -> (FuncId, FuncId) {
-    let key = type_name(elem);
     let mut er = cx.elem_rc.borrow_mut();
-    if let Some(ids) = er.fns.get(&key) {
+    if let Some(ids) = er.fns.get(elem) {
         return *ids;
     }
     let elem_sym = type_symbol(elem);
@@ -11008,7 +11006,7 @@ fn elem_rc_ids<M: Module>(module: &mut M, cx: Cx, elem: &ConcreteType) -> (FuncI
     let retain_id = module
         .declare_function(&retain_sym, Linkage::Local, &sig)
         .expect("declare elem retain");
-    er.fns.insert(key, (drop_id, retain_id));
+    er.fns.insert(elem.clone(), (drop_id, retain_id));
     er.pending.push((elem.clone(), drop_id, retain_id));
     (drop_id, retain_id)
 }
@@ -11022,7 +11020,7 @@ fn pair_rc_ids<M: Module>(
     k: &ConcreteType,
     v: &ConcreteType,
 ) -> (FuncId, FuncId) {
-    let key = (type_name(k), type_name(v));
+    let key = (k.clone(), v.clone());
     let mut er = cx.elem_rc.borrow_mut();
     if let Some(ids) = er.pair_fns.get(&key) {
         return *ids;
@@ -12441,9 +12439,8 @@ fn emit_to_str<M: Module>(
 /// helper for `ty`, recording it to be defined after the main function loop
 /// (when the build context is free). Returns its function id.
 fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
-    let key = type_name(ty);
     let mut er = cx.elem_rc.borrow_mut();
-    if let Some(id) = er.tostr_fns.get(&key) {
+    if let Some(id) = er.tostr_fns.get(ty) {
         return *id;
     }
     let sym = er.symbol("__to_str_", &type_symbol(ty));
@@ -12456,7 +12453,7 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
     let id = module
         .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare to_str helper");
-    er.tostr_fns.insert(key, id);
+    er.tostr_fns.insert(ty.clone(), id);
     er.tostr_pending.push((ty.clone(), id));
     id
 }
@@ -12465,9 +12462,8 @@ fn tostr_func<M: Module>(module: &mut M, cx: Cx, ty: &ConcreteType) -> FuncId {
 /// for `err_ty` — the shared body a test `?` calls on an err. Returns its id; the
 /// body is defined later from `test_fail_pending`.
 fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &ConcreteType) -> FuncId {
-    let key = type_name(err_ty);
     let mut er = cx.elem_rc.borrow_mut();
-    if let Some(id) = er.test_fail_fns.get(&key) {
+    if let Some(id) = er.test_fail_fns.get(err_ty) {
         return *id;
     }
     let sym = er.symbol("__test_try_fail_", &type_symbol(err_ty));
@@ -12476,7 +12472,7 @@ fn test_fail_func<M: Module>(module: &mut M, cx: Cx, err_ty: &ConcreteType) -> F
     let id = module
         .declare_function(&sym, Linkage::Local, &sig)
         .expect("declare test-fail helper");
-    er.test_fail_fns.insert(key, id);
+    er.test_fail_fns.insert(err_ty.clone(), id);
     er.test_fail_pending.push((err_ty.clone(), id));
     id
 }
@@ -12920,32 +12916,32 @@ struct Cx<'a> {
 /// still to be defined (with the element type to loop over).
 #[derive(Default)]
 struct ElemRc {
-    fns: HashMap<String, (FuncId, FuncId)>,
+    fns: HashMap<ConcreteType, (FuncId, FuncId)>,
     pending: Vec<(ConcreteType, FuncId, FuncId)>,
     // Per-`(key, value)` drop/retain helpers for a dict's pair-array elements (a
     // pair is `[key][value]`, so its cleanup releases the key *and* the value).
-    pair_fns: HashMap<(String, String), (FuncId, FuncId)>,
+    pair_fns: HashMap<(ConcreteType, ConcreteType), (FuncId, FuncId)>,
     pair_pending: Vec<(ConcreteType, ConcreteType, FuncId, FuncId)>,
     // Per-type `to_str` rendering helpers: `__to_str_<n>(value) -> str`. Maps a
-    // type name to its function id; `tostr_pending` lists the ones still to be
+    // type to its function id; `tostr_pending` lists the ones still to be
     // defined (with the type to render). One function per type, so the rendering
     // IR is generated once instead of inlined at every `to_str` site.
-    tostr_fns: HashMap<String, FuncId>,
+    tostr_fns: HashMap<ConcreteType, FuncId>,
     tostr_pending: Vec<(ConcreteType, FuncId)>,
     // Per-error-type test-fail helpers: `__test_try_fail_<n>(payload)`. A `?` on
     // an err inside a `.test` body calls this (passing the err payload) instead
     // of inlining the render + `aipl_test_fail` + rendered-str drop at every `?`
     // site — so each site is just "read payload, call helper". Keyed by the err
-    // type's name; `test_fail_pending` lists the ones still to be defined.
-    test_fail_fns: HashMap<String, FuncId>,
+    // type; `test_fail_pending` lists the ones still to be defined.
+    test_fail_fns: HashMap<ConcreteType, FuncId>,
     test_fail_pending: Vec<(ConcreteType, FuncId)>,
     // Per-type structural-equality helpers: `__eq_<n>(lv, rv) -> i64`. A `==`/`!=`
     // (or a nested comparison) on a composite type calls its helper instead of
-    // inlining the whole structural comparison at every site. Keyed by the type's
-    // name; `eq_pending` lists the ones still to be defined. Defining one can
+    // inlining the whole structural comparison at every site. Keyed by the type
+    // itself; `eq_pending` lists the ones still to be defined. Defining one can
     // request further helpers (its composite fields/elements), so the drain
     // loops until `eq_pending` is empty.
-    eq_fns: HashMap<String, FuncId>,
+    eq_fns: HashMap<ConcreteType, FuncId>,
     eq_pending: Vec<(ConcreteType, FuncId)>,
     // Per-boxed-type payload drop helpers: `__rec_drop_<n>(payload_ptr)`. Stored
     // in each boxed block's header and called by the runtime when the block is

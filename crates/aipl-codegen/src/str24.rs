@@ -521,6 +521,19 @@ impl Cursor {
 
 /// Lexicographic byte comparison — `-1`, `0`, or `1`, matching `aipl_str_cmp`.
 pub(crate) fn cmp(a: Str, b: Str) -> i64 {
+    // Fast path: with no rope on either side both values are already contiguous,
+    // so this is one slice comparison rather than a cursor pair walking in step.
+    // Every buffer, view and inline value lands here, which is nearly all of
+    // them — and `eq` is what a set/dict lookup calls per element, so the cursor
+    // setup was being paid per *comparison*, not per string.
+    if a.tag() != TAG_ROPE && b.tag() != TAG_ROPE {
+        let (mut ab, mut bb) = ([0u8; INLINE_CAP], [0u8; INLINE_CAP]);
+        return match a.bytes(&mut ab).cmp(b.bytes(&mut bb)) {
+            core::cmp::Ordering::Less => -1,
+            core::cmp::Ordering::Equal => 0,
+            core::cmp::Ordering::Greater => 1,
+        };
+    }
     let (mut ca, mut cb) = (Cursor::new(a), Cursor::new(b));
     loop {
         // One borrow at a time: each cursor caches its leaf inside itself, so the
@@ -591,11 +604,23 @@ pub(crate) fn ends_with(s: Str, suffix: Str) -> bool {
 }
 
 /// Whether `needle` occurs anywhere in `s`. The empty needle is always present.
+///
+/// Both sides are flattened once and scanned as byte slices. The obvious
+/// spelling — `starts_with_at` at every offset — reads better but is
+/// pathological: each offset built a fresh slice value and compared it with a
+/// pair of cursors that descend from the root, so an O(n·m) search paid a
+/// cursor setup per *candidate position*. That made `contains` alone 58% of the
+/// compiler's own build time, since the dogfooded lexer leans on it hard.
 pub(crate) fn contains(s: Str, needle: Str) -> bool {
     if needle.len() > s.len() {
         return false;
     }
-    (0..=s.len() - needle.len()).any(|at| starts_with_at(s, needle, at))
+    if needle.is_empty() {
+        return true;
+    }
+    let (mut hb, mut nb) = ([0u8; INLINE_CAP], [0u8; INLINE_CAP]);
+    let (hay, pat) = (s.bytes(&mut hb), needle.bytes(&mut nb));
+    hay.windows(pat.len()).any(|w| w == pat)
 }
 
 /// The byte at `i`, or `None` past the end — the `char?` `s[i]` yields.

@@ -276,6 +276,8 @@ design:
     the most readable implementation is also the fastest
 
 optimizations:
+  for (let c : s) still takes a runtime call per byte
+  to_str allocates a buffer for short results instead of packing them inline.
   optimize string comparison by comparing more than one byte at a time
   add view and inline forms for arrays.
   array of slices of same string -> maybe this helps with the allocation increases from wide strings?
@@ -352,9 +354,8 @@ optimizations:
 
     B2. rewrite_expr clones the whole locals set per nested binding. crates/aipl-loader/src/lib.rs:917 — let with = |name| { let mut s = locals.clone(); … }, called for every let, lambda param, and loop variable. Quadratic in binding depth across every file on every compile. A push/pop scope stack or a persistent set fixes it.
 
-    B3. type_name allocates a fresh recursive String and is used as a cache key — crates/aipl-syntax/src/lib.rs:1576, keyed at codegen:8944, :10100, :10125, :11299 and in mono's mangling (mono:2092, :3287). Interning types (or a Display into a reused buffer) removes per-call-site allocation.
-
     B4. lexer.aipl costs 8.04s to build — 5.6× the next worst and ~18% of the corpus's 43s total build time (tests/performance_metrics.md), producing a 1.75MB object with 1.1MB of code from 1310 source lines and 57 instances. Worth profiling on its own; it's also the file the compiler dogfoods most heavily.
+      Profiled it. The cost was not codegen at all: 82% of the run was the dogfooded lexer, and 58% of the whole build was str24::contains, which called starts_with_at at every candidate offset and so paid a two-cursor rope descent per byte position. Flattening both sides once and scanning byte slices took the build 1.59s -> 0.37s. cmp got the same flat fast path (it is what a set/dict linear scan calls per element). Residual: the scan is still a naive windows().any() with no skip table, and contains on a rope now materializes it (as slice already did) rather than walking.
 
     B5. Clone-heavy passes: 620 .clone() in mono/lib.rs, 319 in codegen/lib.rs, 217 in check.rs. Not a finding per se, but the AST is cloned wholesale several times per compile (fold → mono → codegen); worth a look for Rc/borrow opportunities.
 
