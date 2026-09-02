@@ -75,8 +75,8 @@ deallocations: 15
 reallocations: 0
 bytes allocated: 800
 instructions executed: 3945
-binary size: 12144
-  code: 8376
+binary size: 12168
+  code: 8400
   data: 94
   metadata: 3674
 functions:
@@ -94,7 +94,7 @@ functions:
     bytes: 968
   __zip15$own0$own1:
     calls: 1
-    bytes: 1424
+    bytes: 1448
   __zip3$own0$own1:
     calls: 1
     bytes: 952

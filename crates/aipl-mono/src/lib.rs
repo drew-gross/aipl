@@ -2653,7 +2653,10 @@ impl Mono<'_> {
                     || self.syn_structs.contains_key(n)
                     || self.variants.contains_key(n))
         };
-        let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
+        let in_place = is_fresh_heap(&rarr, &arr_ty)
+            && reusable(&elem)
+            && reusable(&u)
+            && slot_fits(&elem, &u);
 
         // The loop function: `(xs: T[], pred captures.., map captures..) -> U[]`.
         let mut fm_params = vec![Param {
@@ -2939,7 +2942,10 @@ impl Mono<'_> {
                     || self.syn_structs.contains_key(n)
                     || self.variants.contains_key(n))
         };
-        let in_place = is_fresh_heap(&rarr, &arr_ty) && reusable(&elem) && reusable(&u);
+        let in_place = is_fresh_heap(&rarr, &arr_ty)
+            && reusable(&elem)
+            && reusable(&u)
+            && slot_fits(&elem, &u);
 
         // The mapping function: `(xs: T[], captures..) -> U[]`.
         let mut map_params = vec![Param {
@@ -3214,8 +3220,17 @@ impl Mono<'_> {
                 && !matches!(t, Type::Primitive(Primitive::Bool | Primitive::Char))
                 && !matches!(t, Type::Named(n) if self.structs.contains_key(n) || self.syn_structs.contains_key(n))
         };
-        let own_a = is_fresh_heap(&rarr_a, &ty_a) && reusable(&elem_a) && reusable(&r);
-        let own_b = is_fresh_heap(&rarr_b, &ty_b) && reusable(&elem_b) && reusable(&r);
+        // `slot_fits` for the same reason as `map`'s gate: the reused buffer's
+        // slots have to be wide enough for the result element. `zip_with([1,2,3],
+        // [4,5,6], |x, y| to_str(x + y))` reuses an `i64[]` for `str` results.
+        let own_a = is_fresh_heap(&rarr_a, &ty_a)
+            && reusable(&elem_a)
+            && reusable(&r)
+            && slot_fits(&elem_a, &r);
+        let own_b = is_fresh_heap(&rarr_b, &ty_b)
+            && reusable(&elem_b)
+            && reusable(&r)
+            && slot_fits(&elem_b, &r);
 
         // The synthesized function: `($a: T[], $b: U[], captures..) -> R[]`.
         let mut zip_params = vec![
@@ -8432,6 +8447,35 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
 /// it can be *moved* into an owning parameter rather than borrowed: an array
 /// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
 /// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
+/// Whether the 24-byte `str` is active (`STR_REPR.md`). Codegen's
+/// `str24_enabled` is the authority; this reads the same variable because the
+/// in-place gates below are the one place monomorphization has to know the
+/// representation — a reused buffer's slot must be wide enough for what is
+/// written into it, and only the representation says how wide that is.
+///
+/// Goes away with the switch, along with the gates' extra condition.
+fn wide_str() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("AIPL_STR24").is_some())
+}
+
+/// Whether `t`'s values are `str`-shaped — a `str`/`Error`/concat-str, or a
+/// `char[]`, which shares the representation.
+fn str_shaped(t: &Type) -> bool {
+    aipl_syntax::is_str_repr(t)
+        || matches!(t, Type::Array(e) if matches!(**e, Type::Primitive(Primitive::Char)))
+}
+
+/// Whether an array of `from` can have its buffer reused to hold `to`.
+///
+/// Under the tagged representation every reusable element was one word, so any
+/// two reusable types interchanged freely. A wide `str` is 24 bytes, so a slot
+/// sized for an `i64` cannot hold one: `[1, 2].map(to_str)` reused an `i64[]`
+/// buffer for `str` elements and wrote three words into each one-word slot.
+fn slot_fits(from: &Type, to: &Type) -> bool {
+    !wide_str() || str_shaped(from) == str_shaped(to)
+}
+
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
     is_heap(arg_ty) && matches!(&arg.kind, ExprKind::ArrayLit(_) | ExprKind::Call(_, _, _))
 }

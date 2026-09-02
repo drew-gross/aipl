@@ -10795,7 +10795,18 @@ fn load_array_elem<M: Module>(
         let stride = elem_size_of(elem, structs);
         let off = builder.ins().imul_imm_s(idx, stride);
         let addr = builder.ins().iadd(base, off);
-        if is_composite(elem, structs) {
+        if str24_wide(elem) {
+            // A **snapshot**, for the reason `lookup_ident` copies a `mut`
+            // binding: the address would alias the array's own storage, and the
+            // in-place `map`/`filter`/`zip` bodies overwrite the very slot they
+            // are reading. The element handle would then name the value just
+            // written — so the loop's end-of-iteration release hit the new value
+            // instead of the old one and freed it out from under the array.
+            //
+            // A tagged element is loaded, which was already a snapshot: the word
+            // is copied out.
+            copy_str_value(builder, addr)
+        } else if is_composite(elem, structs) {
             addr
         } else {
             builder
@@ -11794,8 +11805,11 @@ fn emit_eq_body<M: Module>(
                 builder.ins().jump(exit, &[]);
                 builder.switch_to_block(cmp_b);
                 builder.seal_block(cmp_b);
-                // Right value is at the slot's offset 0; left at the pair's 8.
-                let lval = component(builder, lpair, 8, v, structs);
+                // Right value is at the slot's offset 0; left at the pair's key
+                // width, which is 8 for every key but a wide `str`
+                // (`dict_key_size` — the same rule the runtime's `dict_get` uses
+                // to find the value it returns).
+                let lval = component(builder, lpair, dict_key_size(k, structs) as u32, v, structs);
                 let rval = component(builder, rslot, 0, v, structs);
                 let ve = emit_eq(module, builder, cx, lval, rval, v)?;
                 let cont = builder.create_block();
@@ -12316,7 +12330,14 @@ fn emit_hash<M: Module>(
                 let pair = builder.ins().iadd(elems, off);
                 let kv = component(builder, pair, 0, key_ty, structs);
                 let kh = emit_hash(module, builder, builtins, structs, kv, key_ty)?;
-                let vv = component(builder, pair, 8, val_ty, structs);
+                // Value at the key's width — see `dict_key_size`.
+                let vv = component(
+                    builder,
+                    pair,
+                    dict_key_size(key_ty, structs) as u32,
+                    val_ty,
+                    structs,
+                );
                 let vh = emit_hash(module, builder, builtins, structs, vv, val_ty)?;
                 let pseed = builder.ins().iconst(types::I64, HASH_SEED);
                 let pk = emit_hash_combine(builder, pseed, kh);
@@ -12545,6 +12566,12 @@ fn array_drop_fn_addr<M: Module>(
         "aipl_arr_drop_str"
     };
     let id = match elem {
+        // `is_str_repr`, not the exact `Primitive::Str`: `Error` and the
+        // internal concat-str share the representation, and under the wide ABI
+        // they must use the wide element helper rather than falling through to a
+        // generated per-type one that walks 8-byte slots. `map(|s| s +++ x)`
+        // produces concat-str elements, which is how this surfaced.
+        _ if str24_enabled() && is_str_repr(elem) => Some(b.id(module, drop_str)),
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, drop_str)),
         // `char[]` shares `str`'s representation (see `is_char_array`), so a
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
@@ -12585,9 +12612,7 @@ fn array_retain_fn_addr<M: Module>(
     let id = match elem {
         // See `array_drop_fn_addr` for why this is chosen per element type: the
         // array case below keeps the 8-byte-pointer helper either way.
-        ConcreteType::Primitive(Primitive::Str) if str24_enabled() => {
-            Some(b.id(module, "aipl2_arr_retain_str"))
-        }
+        _ if str24_enabled() && is_str_repr(elem) => Some(b.id(module, "aipl2_arr_retain_str")),
         ConcreteType::Array(_) if str24_enabled() && is_char_array(elem) => {
             Some(b.id(module, "aipl2_arr_retain_str"))
         }
@@ -17542,9 +17567,18 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .imul_imm_s(i_val, elem_size_of(&old_ty, structs));
             let addr = builder.ins().iadd(base, off);
-            store_array_elem(builder, addr, new_val, &new_ty, structs);
+            // Retain the new value, release the old, *then* write the slot.
+            //
+            // The old order was store-then-release, which is fine when `old_val`
+            // is a word copied out of the slot. A wide `str` element is not
+            // copied out — `component` hands back the slot's own address — so
+            // releasing after the store releases the value just written.
+            // Retaining first is what makes the release safe: `map(|s| s +++ x)`
+            // builds its result from the old element, and the result already
+            // holds its own reference by then.
             emit_retain(builder, module, builtins, structs, new_val, &new_ty);
             emit_drop(builder, module, builtins, structs, old_val, &old_ty);
+            store_array_elem(builder, addr, new_val, &new_ty, structs);
             let new_drop = array_drop_fn_addr(builder, module, cx, &new_ty);
             builder.ins().store(
                 MemFlagsData::trusted(),
@@ -19646,7 +19680,14 @@ fn compile_expr_inner<M: Module>(
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                     store_binding_str(builder, cx, slot, v, structs);
                 }
-            } else if is_composite(&expected_ty, structs) {
+            } else if is_composite(&expected_ty, structs) && !is_str_shaped(&expected_ty) {
+                // The `!is_str_shaped` guard is the same one `LetMut` needs, for
+                // the same reason: under the wide `str`, `is_composite` starts
+                // answering *true* for `str`/`char[]`, and this arm's ownership
+                // model is not theirs. A wide `char[]` binding fell in here and
+                // had its old value released as if the slot held a pointer to a
+                // composite buffer, aborting on the value's own first word.
+                //
                 // Copy the incoming composite into a buffer belonging to this
                 // `set`, and point the slot there.
                 //
@@ -19682,7 +19723,10 @@ fn compile_expr_inner<M: Module>(
                 copy_composite(builder, buf_addr, v, &expected_ty, structs);
                 builder.ins().stack_store(types::I64, buf_addr, slot, 0);
             } else {
-                builder.ins().stack_store(types::I64, v, slot, 0);
+                // `store_binding`, not a bare word store: a wide `str`/`char[]`
+                // lives in the slot as its whole value. Ownership is unchanged
+                // from the tagged path — this arm takes none.
+                store_binding(builder, cx, slot, v, &expected_ty, structs);
             }
             // Body uses the unchanged env; the slot has been updated in-place
             // so subsequent Ident lookups will load the new value.

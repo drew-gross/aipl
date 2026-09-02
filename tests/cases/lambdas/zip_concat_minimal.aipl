@@ -20,14 +20,14 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 184
 instructions executed: 475
-binary size: 3456
-  code: 1844
+binary size: 3480
+  code: 1868
   data: 2
   metadata: 1610
 functions:
   __zip1$own0$own1:
     calls: 1
-    bytes: 1424
+    bytes: 1448
   aipl_arr_drop_str:
     calls: 2
     bytes: (external)

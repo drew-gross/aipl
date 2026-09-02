@@ -45,8 +45,8 @@ deallocations: 16
 reallocations: 1
 bytes allocated: 817
 instructions executed: 2797
-binary size: 8048
-  code: 4412
+binary size: 8064
+  code: 4428
   data: 469
   metadata: 3167
 functions:
@@ -73,7 +73,7 @@ functions:
     bytes: 252
   __map7$own0:
     calls: 1
-    bytes: 388
+    bytes: 404
   __map9$own0:
     calls: 1
     bytes: 252

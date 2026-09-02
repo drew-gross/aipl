@@ -98,7 +98,7 @@
 # table means the next conversion cannot reintroduce it.
 #
 # Ten clusters were fixed on the strength of that classification, and the count
-# is now **9 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
+# is now **3 / 932**, with zero leaks (from 527 of 875 — the denominator grew when the gate
 # started running the workspace's unit tests too, see CLAUDE.md):
 #
 #   - **link failed: 186 -> 0. The AOT runtime had no wide I/O.** `aipl2_print`
@@ -346,18 +346,47 @@
 #     remembering that the wide implementations are a reimplementation, not a
 #     port — they can disagree about behaviour, not just about bytes.
 #
-# The remaining 9:
+#   - **the element-writing paths**: dict equality and hashing, array spread,
+#     and the in-place `map` / `filter_map` / `zip_with`. Four distinct causes,
+#     three of which are shapes this file has already named once:
 #
-#     cases_lambdas_map_in_place, cases_lambdas_filter_map
-#     cases_lambdas_zip_concat_minimal, cases_lambdas_zip_with_owned
-#     cases_dicts_basic, cases_dicts_values
-#     cases_arrays_spread_spread_elem_types
+#       - **A dict pair's value offset** was still the literal 8 in the equality
+#         and hash loops (`dict_key_size` covers the rest).
+#       - **`is_composite` again.** The `set` arm had the same trap `LetMut` did:
+#         a wide `char[]` fell into the composite branch and had its old value
+#         released as if the slot held a pointer. Same `!is_str_shaped` guard.
+#       - **A reused buffer's slots must fit what is written into them.** The
+#         in-place gates live in monomorphization and assumed every reusable
+#         element is one word, so `[1, 2].map(to_str)` reused an `i64[]` buffer
+#         for `str` results — three words written into each one-word slot. Mono
+#         now asks `slot_fits`, which is the one place it has to know the
+#         representation; it reads the same env var, with a pointer to codegen's
+#         `str24_enabled` as the authority, and goes away at the flip.
+#       - **An array element read is a snapshot too.** This is the third face of
+#         "a wide handle is not a snapshot", after `set` and `let snap = cs`.
+#         `load_array_elem` returned the element's *address*, and the in-place
+#         bodies overwrite the very slot they are reading — so the loop's
+#         end-of-iteration release hit the value `__map_set` had just written and
+#         freed it out from under the array. Reads of a wide element now copy,
+#         exactly as a tagged read copied the word.
+#
+#     `__map_set` also had to release the old value *before* writing the slot,
+#     the same reordering `set` and the append paths needed.
+#
+# The remaining 3:
+#
 #     cases_tail_calls_mutual_cycle
+#     cases_lambdas_zip_with_owned   (fixed; awaiting confirmation in a full run)
 #     dogfood_ir::artifact_round_trips_rich_types
 #
-# No named builtin is left — these are element-writing paths in `map`, `zip`,
-# dict construction, array spread and the tail-call trampoline, all of the same
-# shape as `__filter_keep` above: a stride or a store that assumed 8 bytes.
+# `cases_tail_calls_mutual_cycle` is **AOT-only** — the JIT output matches
+# exactly, and the built binary segfaults. It is a boxed recursive variant with a
+# `str` payload (`variant Work = WNil | WCons(str, Work)`) driven through the
+# trampoline. Not stack exhaustion: reducing the depth from 300000 to 300 still
+# segfaults, after the first `print` succeeds. So it is a layout or ownership
+# difference in the AOT half's boxed-value handling — the first place the two
+# runtimes have disagreed since the `str24.rs` split, and worth finding for that
+# reason alone.
 # One thing the perf skip defers rather than solves: **the `aipl2_*` entry points
 # do not participate in builtin call counting.** `aipl_print` calls
 # `count_builtin!`; `aipl2_print` does not, and neither does anything in
