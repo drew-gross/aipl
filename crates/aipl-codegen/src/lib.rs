@@ -3804,9 +3804,13 @@ pub struct Compilation {
     /// `; struct` manifest lines on the dogfood [`Compilation::from_artifact`] path.
     structs: HashMap<String, TypeDef>,
     /// Which `str` representation this compilation's code speaks. Freshly
-    /// compiled code is [`StrAbi::Wide`]; a checked-in artifact was built before
-    /// the switch and is [`StrAbi::Tagged`]. The FFI marshals with this.
-    str_abi: StrAbi,
+    /// compiled code speaks the wide `str`; a checked-in artifact was built
+    /// before the switch and does not. The FFI marshals with this.
+    ///
+    /// An [`Abi`] rather than a bare [`StrAbi`] so that the *next* per-type
+    /// representation choice is a field here, not a second parameter threaded
+    /// through the whole marshaling layer.
+    abi: Abi,
     ir: String,
 }
 
@@ -6190,11 +6194,7 @@ impl Compilation {
             funcs,
             structs,
             // Whichever representation this codegen just emitted.
-            str_abi: if str24_enabled() {
-                StrAbi::Wide
-            } else {
-                StrAbi::Tagged
-            },
+            abi: Abi::active(),
             ir,
         })
     }
@@ -6238,11 +6238,7 @@ impl Compilation {
             // hardcoded `Tagged` — right for the checked-in IR, wrong for an
             // artifact generated *under* the switch, whose 24-byte values were
             // then read as 8-byte pointers (SIGBUS in `call_values`).
-            str_abi: if manifest.str24 {
-                StrAbi::Wide
-            } else {
-                StrAbi::Tagged
-            },
+            abi: Abi::from_manifest(manifest.str24),
             code: Code::Jit(module),
             ir: text.to_string(),
         })
@@ -6273,7 +6269,7 @@ impl Compilation {
             funcs: entry_funcs(&manifest, |id| FuncLink::User(FuncId::from_u32(id)))?,
             structs: manifest_structs(&manifest)?,
             // Compiled before the switch: 8-byte tagged `str` values.
-            str_abi: StrAbi::Tagged,
+            abi: Abi::tagged(),
             code: Code::Prebuilt(entries),
             ir: manifest_text.to_string(),
         })
@@ -6410,7 +6406,7 @@ impl Compilation {
         // The return type must be FFI-marshalable; this also validates struct
         // fields (including a struct nested as an optional's core).
         check_ffi_return(name, &info.return_ty, &self.structs)?;
-        let abi_kind = self.str_abi;
+        let abi_kind = self.abi;
         let ret_is_str = is_str_repr(&info.return_ty);
         // An optional `T?` (possibly nested) — scalar, `str`, or struct core — is
         // returned through a hidden sret pointer (see the sret path below).
@@ -6576,7 +6572,7 @@ impl Compilation {
         // from the word return further down gets the value's first field, which
         // decodes as an empty array. Only the decoding differs — codepoints
         // rather than text.
-        if is_str_shaped(&info.return_ty) && abi_kind == StrAbi::Wide {
+        if is_str_shaped(&info.return_ty) && abi_kind.wide_str() {
             let words = str24::STR_SIZE.div_ceil(8);
             let mut sret_buf = vec![0i64; words];
             let mut sret_abi = Vec::with_capacity(1 + abi.len());
@@ -6956,7 +6952,7 @@ impl Drop for ArgBufs {
 /// The `Err` describes the mismatch without naming the function or parameter
 /// index; [`Compilation::call_values`] prefixes those.
 fn ffi_arg_abi(
-    abi: StrAbi,
+    abi: Abi,
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
@@ -6977,7 +6973,7 @@ fn ffi_arg_abi(
 /// scalar, a `str`, or an array — is represented by. Composites don't come here;
 /// see [`ffi_arg_abi`].
 fn ffi_arg_word(
-    abi: StrAbi,
+    abi: Abi,
     ty: &ConcreteType,
     v: &FfiValue,
     structs: &HashMap<String, TypeDef>,
@@ -7054,7 +7050,7 @@ fn chars_to_utf8(elems: &[FfiValue]) -> Result<String, String> {
 }
 
 fn build_borrowed_array(
-    abi: StrAbi,
+    abi: Abi,
     elem: &ConcreteType,
     elems: &[FfiValue],
     structs: &HashMap<String, TypeDef>,
@@ -7064,7 +7060,7 @@ fn build_borrowed_array(
         let s = chars_to_utf8(elems)?;
         return Ok(bufs.str_value(&s));
     }
-    let elem_size = if is_str_repr(elem) && abi == StrAbi::Wide {
+    let elem_size = if is_str_repr(elem) && abi.wide_str() {
         // A wide `str` element is the value itself, 24 bytes in the block.
         abi.str_size()
     } else {
@@ -7104,7 +7100,7 @@ fn build_borrowed_array(
 /// slack past a `none`'s tag or a nullary variant case's payload is never
 /// written here, but the callee may still copy it around).
 unsafe fn write_ffi_arg(
-    abi: StrAbi,
+    abi: Abi,
     dst: *mut u8,
     ty: &ConcreteType,
     v: &FfiValue,
@@ -7119,7 +7115,7 @@ unsafe fn write_ffi_arg(
     // written here rather than falling through to `ffi_arg_word`, whose own
     // assertion catches exactly that mistake. The two differ only in how the host
     // spells the value — a `str` arrives as text, a `char[]` as codepoints.
-    if is_str_shaped(ty) && abi == StrAbi::Wide {
+    if is_str_shaped(ty) && abi.wide_str() {
         let text = match v {
             FfiValue::Str(text) if is_str_repr(ty) => text.clone(),
             FfiValue::Array(elems) if is_char_array(ty) => chars_to_utf8(elems)?,
@@ -7284,7 +7280,7 @@ unsafe fn read_ffi_str_value(raw: i64, owned: bool) -> String {
 /// `at`. Used for array elements and, at byte offset 8, for optional/result
 /// cores (see [`read_ffi_core`]).
 unsafe fn read_ffi_borrowed(
-    abi: StrAbi,
+    abi: Abi,
     at: *const u8,
     ty: &ConcreteType,
     owned: bool,
@@ -7307,7 +7303,7 @@ unsafe fn read_ffi_borrowed(
         // one — the same shape the `str` arm below reads, differing only in how
         // the text is handed back (codepoints rather than a string). Reading it
         // as a word yields the value's first field and decodes as empty.
-        ConcreteType::Array(_) if is_char_array(ty) && abi == StrAbi::Wide => {
+        ConcreteType::Array(_) if is_char_array(ty) && abi.wide_str() => {
             let value = unsafe { core::ptr::read(at as *const str24::Str) };
             let mut scratch = [0u8; str24::INLINE_CAP];
             let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
@@ -7322,9 +7318,9 @@ unsafe fn read_ffi_borrowed(
             let raw = unsafe { *(at as *const i64) };
             unsafe { read_ffi_array(abi, raw, elem, owned, structs) }
         }
-        _ if is_str_repr(ty) => match abi {
-            // Wide: the value *is* the 24 bytes at `at`.
-            StrAbi::Wide => {
+        _ if is_str_repr(ty) => {
+            if abi.wide_str() {
+                // The value *is* the 24 bytes at `at`.
                 let value = unsafe { core::ptr::read(at as *const str24::Str) };
                 let mut scratch = [0u8; str24::INLINE_CAP];
                 let text = String::from_utf8_lossy(value.bytes(&mut scratch)).into_owned();
@@ -7332,12 +7328,11 @@ unsafe fn read_ffi_borrowed(
                     value.release();
                 }
                 FfiValue::Str(text)
-            }
-            // Tagged: an 8-byte word pointing at the content.
-            StrAbi::Tagged => {
+            } else {
+                // Tagged: an 8-byte word pointing at the content.
                 FfiValue::Str(unsafe { read_ffi_str_value(*(at as *const i64), owned) })
             }
-        },
+        }
         _ => FfiValue::Int(unsafe { *(at as *const i64) }),
     }
 }
@@ -7354,7 +7349,7 @@ unsafe fn read_ffi_borrowed(
 /// str value, or a heap/reversed array block whose elements are `elem`-shaped),
 /// carrying one reference when `owned`.
 unsafe fn read_ffi_array(
-    abi: StrAbi,
+    abi: Abi,
     raw: i64,
     elem: &ConcreteType,
     owned: bool,
@@ -7403,7 +7398,7 @@ unsafe fn read_ffi_array(
 /// SAFETY: `buf` must point at a `{ i64 tag, core }` the callee filled for an
 /// optional whose core is a marshalable type.
 unsafe fn read_ffi_optional(
-    abi: StrAbi,
+    abi: Abi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
@@ -7421,7 +7416,7 @@ unsafe fn read_ffi_optional(
 /// SAFETY: `buf` must point at a `{ i64 tag, value }` a `Result`-returning callee
 /// filled, with `ok`/`err` each a marshalable type or `Unit`.
 unsafe fn read_ffi_result(
-    abi: StrAbi,
+    abi: Abi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
@@ -7448,7 +7443,7 @@ unsafe fn read_ffi_result(
 /// peel one `Optional` layer per recursion, decrementing the tag, until either a
 /// `none` (tag `0`) or the non-optional core.
 unsafe fn read_ffi_optional_tag(
-    abi: StrAbi,
+    abi: Abi,
     buf: *const i64,
     ty: &ConcreteType,
     tag: i64,
@@ -7474,7 +7469,7 @@ unsafe fn read_ffi_optional_tag(
 /// buffer — every marshalable core sits inline there, so this is just
 /// [`read_ffi_borrowed`] at byte offset 8.
 unsafe fn read_ffi_core(
-    abi: StrAbi,
+    abi: Abi,
     buf: *const i64,
     ty: &ConcreteType,
     owned: bool,
@@ -7494,7 +7489,7 @@ unsafe fn read_ffi_core(
 /// SAFETY: `base` must point at a `layout`-shaped struct, each heap constituent
 /// carrying one reference when `owned`.
 unsafe fn read_ffi_struct(
-    abi: StrAbi,
+    abi: Abi,
     base: *const u8,
     layout: &StructLayout,
     owned: bool,
@@ -7523,7 +7518,7 @@ unsafe fn read_ffi_struct(
 /// SAFETY: `base` must point at a `layout`-shaped variant, its tag a valid case
 /// index and each heap constituent carrying one reference when `owned`.
 unsafe fn read_ffi_variant(
-    abi: StrAbi,
+    abi: Abi,
     base: *const u8,
     layout: &VariantLayout,
     owned: bool,
@@ -8672,11 +8667,11 @@ struct Builtins {
 
 /// What one runtime-call parameter or result is, in ABI terms.
 ///
-/// [`Abi::Word`] is anything that travels in a single `i64` register: a pointer,
+/// [`ArgKind::Word`] is anything that travels in a single `i64` register: a pointer,
 /// an integer, a `bool`/`char`, a function-pointer constant, a raw byte cursor,
 /// an array/set/dict handle, or a pointer *to* an element rather than the
 /// element itself (`aipl_array_push`'s `x`, `aipl_dict_get`'s `key_ptr`).
-/// [`Abi::Str`] is a `str` *value*.
+/// [`ArgKind::Str`] is a `str` *value*.
 ///
 /// The two are the same width today, which is why this table used to count
 /// parameters instead of naming them — and exactly why it can't any more. A
@@ -8700,13 +8695,17 @@ struct Builtins {
 ///   its content pointer, so the distinction is invisible; after the flip that
 ///   idiom becomes "allocate a buffer, then build a value over it", and this is
 ///   the table that says which is which.
+/// The kind of *one argument* to a runtime import — the argument half of the
+/// pair whose other half is [`Ret`]. Named `ArgKind` rather than `Abi` because
+/// it describes a single parameter, not the ABI a body of code speaks; that is
+/// [`Abi`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Abi {
+enum ArgKind {
     Word,
     Str,
 }
 
-/// What a runtime import gives back — the return half of [`Abi`].
+/// What a runtime import gives back — the return half of [`ArgKind`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Ret {
     None,
@@ -8716,12 +8715,12 @@ enum Ret {
 
 /// Lower a runtime import's kinds to a cranelift signature. **The one place the
 /// runtime ABI's shape is decided**: today every kind is one `i64`, so this is
-/// the identity the old arity table encoded; at the flip, `Abi::Str` expands to
+/// the identity the old arity table encoded; at the flip, `ArgKind::Str` expands to
 /// three params and `Ret::Str` becomes a leading out-pointer param with no
 /// return value.
 fn lower_import_sig<M: Module>(
     module: &mut M,
-    params: &[Abi],
+    params: &[ArgKind],
     ret: Ret,
     out_pointer: bool,
 ) -> Signature {
@@ -8735,7 +8734,7 @@ fn lower_import_sig<M: Module>(
     }
     for kind in params {
         match kind {
-            Abi::Word | Abi::Str => s.params.push(AbiParam::new(types::I64)),
+            ArgKind::Word | ArgKind::Str => s.params.push(AbiParam::new(types::I64)),
         }
     }
     match ret {
@@ -8759,21 +8758,21 @@ fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
 }
 
 /// How many `i64` argument words `params` lowers to — the arity every call site
-/// must supply. One per kind today; an [`Abi::Str`] becomes three at the flip.
-fn import_arg_words(params: &[Abi]) -> usize {
+/// must supply. One per kind today; an [`ArgKind::Str`] becomes three at the flip.
+fn import_arg_words(params: &[ArgKind]) -> usize {
     params
         .iter()
         .map(|k| match k {
-            Abi::Word | Abi::Str => 1,
+            ArgKind::Word | ArgKind::Str => 1,
         })
         .sum()
 }
 
-/// What runtime import `sym` takes and gives back. See [`Abi`] for what the
+/// What runtime import `sym` takes and gives back. See [`ArgKind`] for what the
 /// kinds mean and why they are spelled out rather than counted.
-fn import_abi(sym: &str) -> (&'static [Abi], Ret) {
-    use Abi::{Str, Word};
-    let sig = |params: &'static [Abi], ret: Ret| (params, ret);
+fn import_abi(sym: &str) -> (&'static [ArgKind], Ret) {
+    use ArgKind::{Str, Word};
+    let sig = |params: &'static [ArgKind], ret: Ret| (params, ret);
     match sym {
         // ---- str in, nothing out ----
         "aipl_print" | "aipl_print_error" | "aipl_inc" | "aipl_dec" | "aipl_test_begin"
@@ -9014,7 +9013,7 @@ impl Builtins {
     /// **Every runtime call should come through here or [`Builtins::call_void`].**
     /// Today the helper is only boilerplate removal — import, call, read the one
     /// result — but it is also the seam a 24-byte `str` needs (`STR_REPR.md`):
-    /// when an [`Abi::Str`] argument becomes three words and an [`Ret::Str`]
+    /// when an [`ArgKind::Str`] argument becomes three words and an [`Ret::Str`]
     /// result becomes a leading out pointer, this is the function that expands
     /// them. The arity assertion is what keeps a call site honest in the
     /// meantime; a wrong count is otherwise a silent ABI mismatch that corrupts
@@ -10476,11 +10475,7 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
 /// that pointer addresses the type's usual payload layout, every layout read
 /// (fields, tag, equality, rendering) is shared with the inline path.
 fn is_composite(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
-        || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
-        // A 24-byte `str` lives in memory and travels as an address, which is
-        // what "composite" already means here (`STR_REPR.md`).
-        || str24_wide(ty)
+    abi_is_composite(Abi::active(), ty, structs)
 }
 
 /// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
@@ -12626,22 +12621,7 @@ const OPT_VALUE_OFFSET: u32 = 8;
 /// layout size. Known at compile time, so it's passed to the array runtime as a
 /// constant rather than stored.
 fn elem_size_of(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
-    match ty {
-        ConcreteType::Optional(_) => OPT_VALUE_OFFSET as i64 + elem_size_of(opt_core(ty), structs),
-        // A result is `{ tag, value }` where `value` is sized to the wider
-        // payload (8 bytes for v1's scalar/str payloads → 16 total).
-        ConcreteType::Result(ok, err) => {
-            OPT_VALUE_OFFSET as i64 + elem_size_of(ok, structs).max(elem_size_of(err, structs))
-        }
-        _ if str24_wide(ty) => str24::STR_SIZE as i64,
-        // A boxed (recursive) type is an 8-byte pointer element.
-        ConcreteType::Named(n) => {
-            structs
-                .get(n)
-                .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
-        }
-        _ => 8,
-    }
+    abi_elem_size(Abi::active(), ty, structs)
 }
 
 /// The element drop-fn pointer to store in an array's header for element type
@@ -20992,11 +20972,13 @@ fn alloc_struct_slot(builder: &mut FunctionBuilder, layout: &StructLayout) -> St
     builder.create_sized_stack_slot(data)
 }
 
-/// Byte size of a struct field of type `ty`. An optional is stored inline as
-/// `8 (tag) + sizeof(Core)` (a nested `T??` is no wider than `T?` — see
-/// "Optional representation"); a nested struct is stored inline at its own size;
-/// every other allowed field type is an 8-byte scalar or heap pointer. The
-/// nested struct's layout must already be resolved.
+/// Byte size of a struct field of type `ty` — [`elem_size_of`] as a `u32`.
+///
+/// An optional is stored inline as `8 (tag) + sizeof(Core)` (a nested `T??` is
+/// no wider than `T?` — see "Optional representation"); a nested struct is
+/// stored inline at its own size; a `str` is whichever width the selected
+/// representation gives it; everything else is one word. The nested struct's
+/// layout must already be resolved.
 fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
     // Deliberately just `elem_size_of`: a struct field, a variant payload slot
     // and an array element are the same question asked three times, and this
@@ -21026,26 +21008,9 @@ fn field_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> u32 {
 /// burn-down list in `tests/support/str24_burndown.txt` tells you what is known
 /// to break. It comes out when the list is empty.
 fn str24_enabled() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("AIPL_STR24").is_some())
+    Abi::active().wide_str()
 }
 
-/// Whether `ty` is a `str`-shaped value *under the active representation* — true
-/// only once the switch is on, since that is what makes it a composite.
-/// The `str_cmp` argument the set/dict runtime helpers take: **0 when the element
-/// (or dict key) is not a `str`, otherwise its width in bytes.**
-///
-/// It used to be a plain 0/1 flag, which was enough while every `str` was an
-/// 8-byte pointer. It no longer is: the helpers have to know both *how* to
-/// compare (by content, not by word) and *how wide the thing is* — a set strides
-/// over elements, and a dict's value sits immediately after its key, so the
-/// value offset is the key's width. Carrying the width answers both questions
-/// with the argument that was already there, and keeps the wide arm keyed on a
-/// real quantity rather than a second magic flag.
-///
-/// `char[]` deliberately does not count: the existing helpers compare it as an
-/// opaque word (identity, not content), and widening it here would change
-/// tagged-path semantics rather than port them.
 /// A dict is an array of `[key][value]` pairs laid out back to back, so the
 /// value's offset within a pair *is* the key's width and the pair's size is the
 /// two widths summed.
@@ -21060,6 +21025,7 @@ fn dict_key_size(key_ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i
     elem_size_of(key_ty, structs).max(8)
 }
 
+/// The size of a whole `[key][value]` pair — see [`dict_key_size`].
 fn dict_pair_size(
     key_ty: &ConcreteType,
     val_ty: &ConcreteType,
@@ -21068,29 +21034,39 @@ fn dict_pair_size(
     dict_key_size(key_ty, structs) + elem_size_of(val_ty, structs)
 }
 
+/// The `str_cmp` argument the set/dict runtime helpers take: **0 when the element
+/// (or dict key) is not a `str`, otherwise its width in bytes.**
+///
+/// It used to be a plain 0/1 flag, which was enough while every `str` was an
+/// 8-byte pointer. It no longer is: the helpers have to know both *how* to
+/// compare (by content, not by word) and *how wide the thing is* — a set strides
+/// over elements, and a dict's value sits immediately after its key, so the
+/// value offset is the key's width. Carrying the width answers both questions
+/// with the argument that was already there, and keeps the wide arm keyed on a
+/// real quantity rather than a second magic flag.
+///
+/// `char[]` deliberately does not count: the existing helpers compare it as an
+/// opaque word (identity, not content), and widening it here would change
+/// tagged-path semantics rather than port them.
 fn str_cmp_width(ty: &ConcreteType) -> i64 {
     if *ty != ConcreteType::Primitive(Primitive::Str) {
         return 0;
     }
-    if str24_enabled() {
-        str24::STR_SIZE as i64
-    } else {
-        8
-    }
+    Abi::active().str_size()
 }
 
-fn str24_wide(ty: &ConcreteType) -> bool {
-    str24_enabled() && (is_str_repr(ty) || is_char_array(ty))
-}
-
-/// Which `str` representation a compiled artifact speaks (`STR_REPR.md`).
+/// Whether `ty` is `str`-shaped *and* the wide representation is the one
+/// selected — i.e. whether this particular type is 24 bytes right now.
 ///
-/// Both are live during the transition, and the FFI is the one place they meet:
-/// the compiler calls its dogfooded engines — checked-in IR, compiled before the
-/// switch — through exactly the same marshaling code it uses to call a program it
-/// just compiled. So the shape questions ("is a `str` composite?", "how many
-/// bytes is `str?`") have two answers at once, and the marshaling layer must ask
-/// with the callee in hand rather than globally.
+/// The two halves are deliberately separate questions: [`is_str_shaped`] is a
+/// property of the type and never changes, while [`Abi::active`] is the
+/// selection. Code that conflates them reads as if `str` were always wide.
+fn str24_wide(ty: &ConcreteType) -> bool {
+    is_str_shaped(ty) && Abi::active().wide_str()
+}
+
+/// Which representation of `str` a body of compiled code was built with
+/// (`STR_REPR.md`) — one field of an [`Abi`], and not threaded on its own.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StrAbi {
     /// An 8-byte tagged pointer: the checked-in `.clif` artifacts.
@@ -21099,62 +21075,142 @@ pub enum StrAbi {
     Wide,
 }
 
-impl StrAbi {
+/// Every representation choice a body of compiled code has made — the whole ABI
+/// it speaks, as one value to thread.
+///
+/// **This is the general idea the `str` work turned out to need: a type may have
+/// more than one runtime representation, and anything computing layout or
+/// ownership has to be told which one is in force.** So every such question
+/// comes in two forms — one taking an `Abi` explicitly, and a shorthand for the
+/// ABI this compilation selected ([`Abi::active`]). The shorthands are defined
+/// *in terms of* the explicit forms rather than beside them, so there is one
+/// implementation of each rule and no second copy to drift.
+///
+/// Today an ABI is exactly one choice, so this is a newtype around [`StrAbi`]
+/// and carries no information the field does not. It exists anyway, and is what
+/// gets threaded, because **the threading is the expensive part and the field is
+/// not**: when `str` settles on a single representation this loses its field
+/// without a signature changing anywhere, and when the next type gains a choice
+/// it gains a field the same way. Nothing downstream is re-plumbed either time.
+///
+/// So the rule is: pass `Abi`, never `StrAbi`. The inner enum is a detail of
+/// what an ABI currently *consists of*; the parameter is the ABI.
+///
+/// Why the explicit form is the primary one, rather than everything reading the
+/// global: both representations are live during the transition, and the FFI is
+/// where they meet. The compiler calls its dogfooded engines — checked-in IR,
+/// compiled before the switch — through exactly the same marshaling code it uses
+/// to call a program it just compiled. "Is a `str` composite?" and "how many
+/// bytes is `str?`" genuinely have two answers at once there, and the marshaling
+/// layer asks with the callee in hand. The global answer is a convenience, not
+/// the truth.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Abi {
+    str_abi: StrAbi,
+}
+
+impl Abi {
+    /// The ABI this compilation selected, for the majority of callers asking
+    /// about the code they are emitting right now rather than about some other
+    /// callee. The selection itself lives in
+    /// [`aipl_syntax::wide_str_selected`].
+    fn active() -> Abi {
+        Abi {
+            str_abi: if aipl_syntax::wide_str_selected() {
+                StrAbi::Wide
+            } else {
+                StrAbi::Tagged
+            },
+        }
+    }
+
+    /// The ABI of a body compiled before the switch — every checked-in artifact
+    /// that does not say otherwise.
+    fn tagged() -> Abi {
+        Abi {
+            str_abi: StrAbi::Tagged,
+        }
+    }
+
+    /// The ABI an artifact declares, from its `; str24` manifest marker.
+    fn from_manifest(str24: bool) -> Abi {
+        Abi {
+            str_abi: if str24 { StrAbi::Wide } else { StrAbi::Tagged },
+        }
+    }
+
+    /// Whether `str` is the 24-byte value under this ABI.
+    fn wide_str(self) -> bool {
+        self.str_abi == StrAbi::Wide
+    }
+
     /// Bytes one `str` value occupies under this ABI.
     fn str_size(self) -> i64 {
-        match self {
+        match self.str_abi {
             StrAbi::Tagged => 8,
             StrAbi::Wide => str24::STR_SIZE as i64,
         }
     }
 }
 
-/// [`is_composite`] for a callee speaking `abi` — under `Tagged` a `str` is a
-/// plain word, so it is not passed by address.
-fn abi_is_composite(abi: StrAbi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    if is_str_repr(ty) || is_char_array(ty) {
-        return abi == StrAbi::Wide;
+/// Whether a value of `ty` travels by address for a callee speaking `abi`.
+///
+/// The single implementation of the rule; [`is_composite`] is this at
+/// [`Abi::active`]. A `str` is the only type whose answer depends on the
+/// representation — under `Tagged` it is a plain word, under `Wide` it is 24
+/// bytes that live in memory, which is what "composite" already meant here.
+fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    if is_str_shaped(ty) {
+        return abi.wide_str();
     }
-    is_composite(ty, structs)
+    matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
+        || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
 }
 
-/// [`elem_size_of`] for a callee speaking `abi`. Recurses so an optional or
-/// result carrying a `str` is sized for the right representation — `str?` is 16
-/// bytes under `Tagged` and 32 under `Wide`.
-fn abi_elem_size(abi: StrAbi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
+/// Bytes one value of `ty` occupies inline for a callee speaking `abi`.
+///
+/// The single implementation of the rule; [`elem_size_of`] is this at
+/// [`Abi::active`], and [`field_size`] is the same answer as a `u32` — a
+/// struct field, a variant payload slot and an array element are one question
+/// asked three times, and used to be three `match`es that agreed by coincidence.
+///
+/// Recurses through optionals and results so one carrying a `str` is sized for
+/// the right representation: `str?` is 16 bytes under `Tagged` and 32 under
+/// `Wide`.
+fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     match ty {
-        _ if is_str_repr(ty) || is_char_array(ty) => abi.str_size(),
+        _ if is_str_shaped(ty) => abi.str_size(),
         ConcreteType::Optional(_) => {
             OPT_VALUE_OFFSET as i64 + abi_elem_size(abi, opt_core(ty), structs)
         }
+        // A result is `{ tag, value }` where `value` is sized to the wider
+        // payload.
         ConcreteType::Result(ok, err) => {
             OPT_VALUE_OFFSET as i64
                 + abi_elem_size(abi, ok, structs).max(abi_elem_size(abi, err, structs))
         }
-        // A struct's size comes from its layout, which for an artifact is read
-        // straight out of the manifest and so is already right for its ABI.
-        _ => elem_size_of(ty, structs),
+        // A declared type's size comes from its layout table — which for an
+        // artifact is read straight out of the manifest, so it is already right
+        // for that artifact's representation. A boxed (recursive) one is an
+        // 8-byte pointer.
+        ConcreteType::Named(n) => {
+            structs
+                .get(n)
+                .map_or(8, |t| if t.boxed() { 8 } else { t.size() as i64 })
+        }
+        _ => 8,
     }
 }
 
-/// [`sret_size`] for a callee speaking `abi`.
-fn abi_sret_size(
-    abi: StrAbi,
-    ty: &ConcreteType,
-    structs: &HashMap<String, TypeDef>,
-) -> Option<u32> {
+/// The size of a value returned through a hidden pointer for a callee speaking
+/// `abi`, or `None` if it comes back in a register. Composite and inline-size
+/// are the same two questions, so this is just their conjunction.
+fn abi_sret_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> Option<u32> {
     abi_is_composite(abi, ty, structs).then(|| abi_elem_size(abi, ty, structs) as u32)
 }
 
 fn sret_size(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> Option<u32> {
-    match ty {
-        _ if str24_wide(ty) => Some(str24::STR_SIZE as u32),
-        ConcreteType::Optional(_) | ConcreteType::Result(_, _) => {
-            Some(elem_size_of(ty, structs) as u32)
-        }
-        ConcreteType::Named(n) => structs.get(n).and_then(|t| (!t.boxed()).then(|| t.size())),
-        _ => None,
-    }
+    abi_sret_size(Abi::active(), ty, structs)
 }
 
 /// Copy a composite value (`ty` is a struct or optional) of `src`'s size from

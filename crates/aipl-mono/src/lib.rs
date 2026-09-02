@@ -8447,16 +8447,11 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
 /// it can be *moved* into an owning parameter rather than borrowed: an array
 /// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
 /// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
-/// Whether the 24-byte `str` is active (`STR_REPR.md`). Codegen's
-/// `str24_enabled` is the authority; this reads the same variable because the
-/// in-place gates below are the one place monomorphization has to know the
-/// representation — a reused buffer's slot must be wide enough for what is
-/// written into it, and only the representation says how wide that is.
-///
-/// Goes away with the switch, along with the gates' extra condition.
+/// Whether the 24-byte `str` is selected. One line, because the selection has a
+/// single home in `aipl_syntax` — see [`aipl_syntax::wide_str_selected`] for why
+/// monomorphization is one of its two readers.
 fn wide_str() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("AIPL_STR24").is_some())
+    aipl_syntax::wide_str_selected()
 }
 
 /// Whether `t`'s values are `str`-shaped — a `str`/`Error`/concat-str, or a
