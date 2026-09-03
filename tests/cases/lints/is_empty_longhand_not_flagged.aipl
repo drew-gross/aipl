@@ -1,0 +1,72 @@
+import {
+    equal as ==,
+    is_empty,
+    is_nonempty,
+    len,
+    less_than as <,
+    logical_not as !,
+    not_equal as !=,
+    print,
+} from builtins;
+
+// The near-misses, each for its own reason. The one shape that cannot live here
+// is a `len` of the file's own — a file defining one cannot also import the
+// builtin, so that case has its own file (`is_empty_longhand_user_len.aipl`).
+fn main() !prints {
+    let xs = [1, 2];
+
+    // `!= 0` is the *non*-empty test spelled with a comparison, so its rewrite
+    // is `is_nonempty`, not `is_empty`. Sending it here would advise the
+    // opposite of what it asks.
+    print(`{xs.len() != 0}`);
+
+    // `< 1` is true of the same values, but nobody reaches for it as an
+    // emptiness idiom — flagging it would be guessing at what was meant.
+    print(`{xs.len() < 1}`);
+
+    // A length compared against something other than zero is just a length.
+    print(`{xs.len() == 2}`);
+
+    // The predicate un-negated: that is `is_nonempty`'s own job.
+    print(`{xs.is_nonempty()}`);
+
+    // A negation of some other question.
+    print(`{!xs.is_empty()}`);
+
+    // Zero compared against something that is not a length.
+    let n = 0;
+    print(`{n == 0}`);
+}
+--- stdout ---
+true
+false
+true
+true
+true
+true
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 169
+instructions executed: 389
+binary size: 3256
+  code: 1612
+  data: 47
+  metadata: 1597
+functions:
+  __to_str_bool:
+    calls: 6
+    bytes: 232
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1380

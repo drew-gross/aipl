@@ -1,4 +1,4 @@
-import { contains_key, equal as ==, get, len, logical_not as !, value_or } from builtins;
+import { contains_key, equal as ==, get, is_empty, len, logical_not as !, value_or } from builtins;
 
 // A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
 // literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with
@@ -37,7 +37,7 @@ fn dedup() -> #{i64: str} {
 
 fn make_empty() -> #{i64: str} { #{:} }.test({
     let d = make_empty();
-    assert(len(d) == 0);
+    assert(d.is_empty());
     assert(d.get(1) == none); // absent
     assert(d.get(1).value_or("none") == "none");
 })
@@ -47,10 +47,10 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 576
 instructions executed: 1181
-binary size: 10776
-  code: 6244
+binary size: 10768
+  code: 6240
   data: 702
-  metadata: 3830
+  metadata: 3826
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -84,7 +84,7 @@ functions:
     bytes: 2272
   __test$make_empty:
     calls: 1
-    bytes: 724
+    bytes: 720
   __test$strs:
     calls: 1
     bytes: 976

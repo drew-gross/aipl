@@ -1,4 +1,4 @@
-import { equal as ==, first, len } from builtins;
+import { equal as ==, first, is_empty, len } from builtins;
 
 // The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
 // in `lib.rs`).
@@ -13,8 +13,8 @@ pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.doc("""
     assert([1, 2, 3].drop_n(1).first() == some(2));
     assert([1, 2, 3].drop_n(0).len() == 3);
     // At and past the end: empty, not an error.
-    assert([1, 2, 3].drop_n(3).len() == 0);
-    assert([1, 2, 3].drop_n(99).len() == 0);
+    assert([1, 2, 3].drop_n(3).is_empty());
+    assert([1, 2, 3].drop_n(99).is_empty());
     assert(drop_n(["a", "b"], 1).first() == some("b")); // free-call form
 })
 --- performance ---
@@ -23,9 +23,9 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 632
 instructions executed: 456
-binary size: 4616
+binary size: 4608
   code: 2188
-  data: 364
+  data: 356
   metadata: 2064
 functions:
   __eq_i64$opt:

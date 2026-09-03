@@ -2024,6 +2024,11 @@ fn __builtin_len<T: any>(self: T[]) -> u64 { 0 }
 // `str`, set, dict), dispatched the same way in the checker and codegen; the
 // `len_gt_zero` lint points every `0 < x.len()` here.
 fn __builtin_is_nonempty<T: any>(self: T[]) -> bool { false }
+// The other half of the same question. Written as its own builtin rather than
+// left to `!x.is_nonempty()` or `x.len() == 0` because those say what the test
+// *isn't*, or make the reader recognize an idiom; the `is_empty` lint is what
+// keeps the corpus on this spelling.
+fn __builtin_is_empty<T: any>(self: T[]) -> bool { false }
 fn __builtin_is_some<T: any>(self: T?) -> bool { false }
 // Character classification: ASCII whitespace (space/tab/newline/carriage return).
 fn __builtin_is_space(self: char) -> bool { false }
@@ -2370,6 +2375,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "ends_with",
     "len",
     "is_nonempty",
+    "is_empty",
     "push",
     "extend",
     "is_some",

@@ -1,4 +1,4 @@
-import { equal as ==, filter, len, less_than as < } from builtins;
+import { equal as ==, filter, is_empty, less_than as < } from builtins;
 
 // A result payload may be an array — on either side. Array payloads ride the
 // same generic machinery as struct payloads (a single refcounted pointer
@@ -9,7 +9,7 @@ import { equal as ==, filter, len, less_than as < } from builtins;
 // Ok side: the values below a threshold, or an error when none are.
 fn below(xs: i64[], cap: i64) -> i64[]!str {
     let out = xs.filter(|x| x < cap);
-    if (out.len() == 0) { err("none below") } else { ok(out) }
+    if (out.is_empty()) { err("none below") } else { ok(out) }
 }.test({
     assert(below([1, 5, 2, 9], 3)? == [1, 2]);
     assert(below([5, 9], 3) == err("none below"));
@@ -24,7 +24,7 @@ fn below(xs: i64[], cap: i64) -> i64[]!str {
 fn nothing() -> i64[]!str { ok([]) }.test({
     assert(nothing()? == []);
     match (nothing()) {
-        ok(v) => assert(v.len() == 0),
+        ok(v) => assert(v.is_empty()),
         err(..) => assert(false),
     };
 })
@@ -44,9 +44,9 @@ reallocations: 0
 bytes allocated: 760
 instructions executed: 1592
 binary size: 7968
-  code: 4312
+  code: 4308
   data: 305
-  metadata: 3351
+  metadata: 3355
 functions:
   __eq_i64$arr:
     calls: 4
@@ -56,7 +56,7 @@ functions:
     bytes: 1120
   __test$nothing:
     calls: 1
-    bytes: 720
+    bytes: 716
   __test$tail_below:
     calls: 1
     bytes: 636

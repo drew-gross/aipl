@@ -3,6 +3,7 @@ import {
     ends_with,
     equal as ==,
     greater_than as >,
+    is_empty,
     len,
     print,
     saturating_sub as -,
@@ -32,7 +33,7 @@ fn fits(budget: u64, work: Work) -> bool {
 fn fits_atom(budget: u64, s: str, rest: Work) -> bool {
     if (s.contains("\n")) {
         false
-    } else if (s.len() == 0) { fits(budget, rest) } else { fits_after(budget, s.len(), rest) }
+    } else if (s.is_empty()) { fits(budget, rest) } else { fits_after(budget, s.len(), rest) }
 }
 
 fn fits_after(budget: u64, n: u64, rest: Work) -> bool {

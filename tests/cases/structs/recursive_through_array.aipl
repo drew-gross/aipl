@@ -1,5 +1,6 @@
 import {
     equal as ==,
+    is_empty,
     len,
     less_than as <,
     print,
@@ -40,7 +41,7 @@ fn main() !prints {
     print(to_str(Tree { label: 1, kids: [leaf(2), leaf(3)] }));
 }.test({
     assert(leaf(5).total() == 5);
-    assert(leaf(5).kids.len() == 0);
+    assert(leaf(5).kids.is_empty());
 
     let t = Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] };
     assert(t.total() == 10);

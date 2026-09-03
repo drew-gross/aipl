@@ -22,6 +22,7 @@ import {
     filter,
     filter_map,
     first,
+    is_empty,
     join,
     last,
     len,
@@ -157,7 +158,7 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
         CTree(i, kids) => {
             let parts = kids.map(|k| k.show(src, names));
             let name = names[i].value_or("?");
-            if (parts.len() == 0) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
+            if (parts.is_empty()) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
         },
     }
 }.test({

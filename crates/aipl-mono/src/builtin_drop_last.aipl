@@ -1,4 +1,4 @@
-import { drop_last_n, equal as ==, last, len } from builtins;
+import { drop_last_n, equal as ==, is_empty, last, len } from builtins;
 
 // The AIPL implementation of the `drop_last` builtin (see
 // `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_last_n(1)`, named for the common
@@ -8,8 +8,8 @@ pub fn drop_last<T: any>(self: T[]) -> T[] { self.drop_last_n(1) }.doc("""
 """).test({
     assert([1, 2, 3].drop_last().len() == 2);
     assert([1, 2, 3].drop_last().last() == some(2));
-    assert([7].drop_last().len() == 0);
-    assert([1, 2][..0].drop_last().len() == 0); // already empty
+    assert([7].drop_last().is_empty());
+    assert([1, 2][..0].drop_last().is_empty()); // already empty
     assert(drop_last(["a", "b"]).last() == some("a")); // free-call form
 })
 --- performance ---

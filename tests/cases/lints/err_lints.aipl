@@ -7,7 +7,6 @@ import {
     map,
     print,
     to_str,
-    value_or,
     wrapping_add as +,
 } from builtins;
 
@@ -23,13 +22,14 @@ import {
 // Each lint has its own `#[allow]` companion case proving the marker squelches
 // it (`allow_squelch`, `eta_lambda_allow`, `field_init_shorthand_allow`,
 // `slice_from_zero_allow`, `incr_by_one_allow`, `fn_body_type_stutter_allow`,
-// `len_gt_zero_allow`, `push_loop_pipeline_allow`,
+// `len_gt_zero_allow`, `is_empty_longhand_allow`, `push_loop_pipeline_allow`,
 // `return_loop_find_if_allow`), and its own passing case
 // for the shapes it must *not* flag (`slice_whole_allow`,
 // `slice_from_zero_open_end`, `field_init_range_value`,
 // `incr_shapes_not_flagged`, `incr_custom_plus`,
 // `fn_body_type_stutter_not_flagged`, `len_gt_zero_not_flagged`,
-// `len_gt_zero_user_lt`, `push_loop_pipeline_not_flagged`,
+// `len_gt_zero_user_lt`, `is_empty_longhand_not_flagged`,
+// `is_empty_longhand_user_len`, `push_loop_pipeline_not_flagged`,
 // `return_loop_find_if_not_flagged`).
 
 struct Point { x: i64, y: i64 }
@@ -179,12 +179,6 @@ error: a length compared against 0 — use "is_nonempty" on the receiver, import
    |
 73 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
    |                                  ^^^^^^^^^^^
-
-error: unused import "value_or": nothing in this file references it; drop it from the import list
-  --> ./tests/cases/lints/err_lints.aipl:10:5
-   |
-10 |     value_or,
-   |     ^^^^^^^^
 
 error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:40:36

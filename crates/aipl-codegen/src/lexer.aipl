@@ -24,6 +24,7 @@ import {
     first,
     int_parse,
     is_digit,
+    is_empty,
     is_nonempty,
     is_some_and,
     len,
@@ -318,7 +319,7 @@ fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64
 // The message for an unterminated scan: a rule's own `unterminated` override, or
 // the generic default when it left the field empty.
 fn unterminated_msg(msg: str) -> str {
-    if (msg.len() == 0) { "unterminated delimited token" } else { msg }
+    if (msg.is_empty()) { "unterminated delimited token" } else { msg }
 }
 
 // `Between`: the `open` spelling opens the token, which runs to just past the
@@ -637,7 +638,7 @@ fn template_scan<K>(
         // The segment's text: past the opening delim for the first segment,
         // from just past the previous interpolation's `}` after — through the
         // current position (a closing delim or an opening `{`), exclusive.
-        let text_start = if (seg_texts.len() == 0) { at + delim.len() } else { seg_start };
+        let text_start = if (seg_texts.is_empty()) { at + delim.len() } else { seg_start };
         if (src[i..].starts_with(delim)) {
             let end = i + delim.len();
             set seg_texts.push(src[text_start..i]);
@@ -666,7 +667,7 @@ fn template_scan<K>(
             };
         };
     }
-    let m = if (unterminated.len() == 0) { "unterminated template literal" } else { unterminated };
+    let m = if (unterminated.is_empty()) { "unterminated template literal" } else { unterminated };
     err(LexError { message: m, span: at..src.len() })
 }
 
@@ -816,7 +817,7 @@ fn int_tok(text: str) -> Kind!str {
 // the token's span is the right place for the error.
 fn nonempty_str(text: str) -> Kind!str {
     let s = text.unescape();
-    if (s.len() == 0) { err("empty string literal") } else { ok(Str(s)) }
+    if (s.is_empty()) { err("empty string literal") } else { ok(Str(s)) }
 }
 
 // A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The

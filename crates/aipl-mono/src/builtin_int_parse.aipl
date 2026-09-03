@@ -2,6 +2,7 @@ import {
     drop_first,
     equal as ==,
     greater_than as >,
+    is_empty,
     len,
     opt_left_fold as opt_fold,
     starts_with,
@@ -21,7 +22,7 @@ import {
 pub fn int_parse(self: str) -> i64? {
     let neg = self.starts_with("-");
     let body = if (neg) { self.drop_first() } else { self };
-    if (body.len() == 0) {
+    if (body.is_empty()) {
         return none;
     };
     // Trim leading zeros so the remaining count is *significant* digits.

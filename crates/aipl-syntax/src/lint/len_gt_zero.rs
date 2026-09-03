@@ -8,6 +8,9 @@ pub(super) struct LenZeroCmp {
     lt: bool,
     gt: bool,
     nonempty: Option<String>,
+    /// What this file's builtins `len` is called, or `None` when `len` here is a
+    /// function of the file's own — see `builtin_len_name`.
+    len: Option<String>,
 }
 
 /// Read those three names out of the import list. Operators are bound by
@@ -21,6 +24,7 @@ pub(super) fn len_zero_cmp(program: &Program) -> LenZeroCmp {
         lt: false,
         gt: false,
         nonempty: None,
+        len: super::builtin_len_name(program),
     };
     for item in &program.items {
         let Item::Import(decl) = item else {
@@ -63,9 +67,14 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
         return;
     };
     let is_zero = |e: &Expr| matches!(e.kind, ExprKind::Num(0));
+    // A `len` of the file's own is a different function answering a different
+    // question, and `is_nonempty` does not apply to what it takes.
+    let Some(len) = cmp.len.as_deref() else {
+        return;
+    };
     let recv = match op {
-        BinOp::Lt if cmp.lt && is_zero(l) => len_receiver(r),
-        BinOp::Gt if cmp.gt && is_zero(r) => len_receiver(l),
+        BinOp::Lt if cmp.lt && is_zero(l) => len_receiver(r, len),
+        BinOp::Gt if cmp.gt && is_zero(r) => len_receiver(l, len),
         _ => None,
     };
     let Some(recv) = recv else {
@@ -99,9 +108,9 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
 
 /// The receiver of a `len` call, however it was spelled (`x.len()` is stored
 /// as the free call `len(x)`), or `None` when `e` is not one.
-fn len_receiver(e: &Expr) -> Option<&Expr> {
+fn len_receiver<'a>(e: &'a Expr, len: &str) -> Option<&'a Expr> {
     let ExprKind::Call(name, args, _) = &e.kind else {
         return None;
     };
-    (name == "len" && args.len() == 1).then(|| &args[0])
+    (name == len && args.len() == 1).then(|| &args[0])
 }

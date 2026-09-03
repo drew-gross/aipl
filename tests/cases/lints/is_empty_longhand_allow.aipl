@@ -1,0 +1,41 @@
+import { equal as ==, is_empty, len, print } from builtins;
+
+// `#[allow]` on the line keeps the longhand. The rewrite sits beside it so both
+// spellings run and are proven to agree.
+fn the_long_way(xs: i64[]) -> bool { xs.len() == 0 } #[allow]
+
+fn the_short_way(xs: i64[]) -> bool { xs.is_empty() }
+
+fn main() !prints {
+    print(`{the_long_way([])} {the_short_way([])}`);
+    print(`{the_long_way([1])} {the_short_way([1])}`);
+}
+--- stdout ---
+true true
+false false
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 578
+instructions executed: 269
+binary size: 2744
+  code: 1244
+  data: 47
+  metadata: 1453
+functions:
+  __to_str_bool:
+    calls: 4
+    bytes: 232
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1012

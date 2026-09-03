@@ -43105,7 +43105,7 @@ block24(v430: i64):
 ;   v0 = items
 ;   v1 = style
 ;   v1 = $inl29_self
-;   v2 = __spat$16278
+;   v2 = __spat$16292
 ;   v248 = open
 ;   v250 = close
 ;   v291 = edge
@@ -51035,7 +51035,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = first
-;   v10 = __spat$24608
+;   v10 = __spat$24622
 ; __m18__import_name_precedes
 function u0:145(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -57883,7 +57883,7 @@ block12:
 
 ; source variables:
 ;   v1 = self
-;   v70 = __spat$28608
+;   v70 = __spat$28622
 ; __m18__named_ty
 function u0:155(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -60645,7 +60645,7 @@ block27:
 ;   v234 = $inl218_self
 ;   v234 = $inl48_self
 ;   v239 = $inl49_n
-;   v370 = __spat$30602
+;   v370 = __spat$30616
 ;   v464 = closed
 ; __m18__type_param_list
 function u0:159(i64, i64, i64) apple_aarch64 {
@@ -61369,7 +61369,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = name
-;   v10 = __spat$31312
+;   v10 = __spat$31326
 ; __m18__variant_item
 function u0:161(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -62795,7 +62795,7 @@ block57:
 ;   v389 = cs
 ;   v467 = $inl48_cases
 ;   ss16 = out
-;   ss17 = __idx$34195
+;   ss17 = __idx$34209
 ;   v501 = c
 ;   v505 = i
 ;   v414 = $inl1_self
@@ -64204,7 +64204,7 @@ block22:
 
 ; source variables:
 ;   v1 = self
-;   v80 = __spat$33654
+;   v80 = __spat$33668
 ;   v166 = closed
 ; __m18__variant_body
 function u0:164(i64) -> i64 apple_aarch64 {
@@ -64501,7 +64501,7 @@ block3:
 ; source variables:
 ;   v0 = cases
 ;   ss0 = out
-;   ss1 = __idx$34195
+;   ss1 = __idx$34209
 ;   v34 = c
 ;   v38 = i
 ; __m18__program
@@ -65092,7 +65092,7 @@ block21:
 ;   ss2 = __spread$4
 ;   ss3 = out
 ;   v134 = had_imports
-;   ss4 = __idx$35303
+;   ss4 = __idx$35317
 ;   v164 = d
 ;   v166 = i
 ; __m18__program_items
@@ -71188,7 +71188,7 @@ block28:
 
 ; source variables:
 ;   v1 = self
-;   v57 = __spat$40271
+;   v57 = __spat$40285
 ;   v58 = docs
 ;   v132 = closed
 ;   v1 = $inl185_self
@@ -71917,7 +71917,7 @@ block12:
 ; source variables:
 ;   v1 = self
 ;   v2 = acc
-;   v71 = __spat$41194
+;   v71 = __spat$41208
 ;   ss3 = __spread$8
 ; __m18__fn_attrs
 function u0:174(i64, i64, i64) apple_aarch64 {
@@ -75447,7 +75447,7 @@ block12:
 ; source variables:
 ;   v1 = self
 ;   v2 = acc
-;   v71 = __spat$43364
+;   v71 = __spat$43378
 ;   ss3 = __spread$10
 ; __m18__struct_item
 function u0:177(i64, i64) apple_aarch64 {
@@ -78232,7 +78232,7 @@ block12:
 
 ; source variables:
 ;   v1 = self
-;   v51 = __spat$44781
+;   v51 = __spat$44795
 ;   v74 = $inl2_self
 ; __m18__block_layout
 function u0:180(i64, i64) apple_aarch64 {
@@ -79278,7 +79278,7 @@ block41:
 ; source variables:
 ;   v1 = self
 ;   v58 = opened
-;   v131 = __spat$45356
+;   v131 = __spat$45370
 ;   v133 = w
 ;   v138 = entries
 ;   v218 = closed
@@ -87829,7 +87829,7 @@ block18:
 ;   v1 = $inl242_self
 ;   v1 = $inl102_self
 ;   v2 = $inl103_n
-;   v169 = __spat$51869
+;   v169 = __spat$51883
 ; __m18__set_stmt
 function u0:190(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -96407,7 +96407,7 @@ block1:
 
 ; source variables:
 ;   v1 = self
-;   v51 = __spat$56702
+;   v51 = __spat$56716
 ; __m18__range_tail
 function u0:198(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -103337,7 +103337,7 @@ block35:
 ;   v4 = $inl257_self
 ;   v4 = $inl134_self
 ;   v9 = $inl135_n
-;   v18 = __spat$61424
+;   v18 = __spat$61438
 ;   v177 = docs
 ;   v266 = closed
 ;   ss10 = __spread$14
@@ -103687,7 +103687,7 @@ block12:
 
 ; source variables:
 ;   v1 = self
-;   v70 = __spat$61778
+;   v70 = __spat$61792
 ; __m18__index_or_from
 function u0:208(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 80, align = 8
@@ -105971,7 +105971,7 @@ block66(v461: i64):
 ;   v217 = $inl312_k
 ;   v1 = $inl313_self
 ;   v222 = $inl314_k
-;   v228 = __spat$63251
+;   v228 = __spat$63265
 ;   v1 = $inl260_self
 ;   v1 = $inl140_self
 ;   v332 = $inl141_n
@@ -108545,7 +108545,7 @@ block22:
 
 ; source variables:
 ;   v1 = self
-;   v80 = __spat$65348
+;   v80 = __spat$65362
 ;   v166 = closed
 ; __m18__set_or_dict_atom
 function u0:216(i64, i64) apple_aarch64 {
@@ -109757,7 +109757,7 @@ block48:
 ;   v77 = $inl148_self
 ;   v82 = $inl149_n
 ;   v191 = closed
-;   v434 = __spat$65845
+;   v434 = __spat$65859
 ;   v532 = closed
 ; __m18__dict_entries
 function u0:217(i64, i64, i64) apple_aarch64 {
@@ -111049,7 +111049,7 @@ block12:
 ;   v1 = self
 ;   v2 = lead
 ;   v3 = k
-;   v72 = __spat$66564
+;   v72 = __spat$66578
 ; __m18__name_atom
 function u0:219(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -113127,7 +113127,7 @@ block28:
 ; source variables:
 ;   v1 = self
 ;   v2 = name
-;   v58 = __spat$67533
+;   v58 = __spat$67547
 ;   v59 = docs
 ;   v133 = closed
 ; __m18__struct_inits
@@ -114736,7 +114736,7 @@ block12:
 ;   v1 = self
 ;   v2 = lead
 ;   v3 = fname
-;   v72 = __spat$69048
+;   v72 = __spat$69062
 ; __m18__if_expr
 function u0:223(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -125114,7 +125114,7 @@ block53:
 ;   v450 = $inl181_n
 ;   v461 = $inl57_self
 ;   v467 = $inl58_name
-;   v475 = __spat$75127
+;   v475 = __spat$75141
 ;   v459 = q
 ;   v572 = $inl281_self
 ;   v572 = $inl182_self
@@ -125306,7 +125306,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = name
-;   v10 = __spat$75127
+;   v10 = __spat$75141
 ; __m18__call_args_until
 function u0:231(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -129776,7 +129776,7 @@ block12:
 ; source variables:
 ;   v1 = self
 ;   v2 = name
-;   v71 = __spat$78098
+;   v71 = __spat$78112
 ; __m18__template_verbatim
 function u0:237(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -130759,7 +130759,7 @@ block29:
 ;   v32 = $inl253_self
 ;   v61 = v
 ;   v75 = $inl254_default
-;   v58 = __spat$78757
+;   v58 = __spat$78771
 ;   v77 = span
 ;   v79 = kind
 ;   v81 = $inl32_self
@@ -132287,7 +132287,7 @@ block12(v76: i64):
 ;   v0 = src
 ;   ss0 = out
 ;   ss1 = start
-;   ss2 = __idx$83770
+;   ss2 = __idx$83784
 ;   v17 = c
 ;   v25 = i
 ; __m18__walker_of
@@ -132541,7 +132541,7 @@ block12(v77: i64):
 ;   v1 = $inl66_src
 ;   ss0 = out
 ;   ss1 = start
-;   ss2 = __idx$83770
+;   ss2 = __idx$83784
 ;   v18 = c
 ;   v26 = i
 ;   v104 = $inl165_toks
@@ -161686,7 +161686,7 @@ block316:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v23 = n
-;   ss2 = __idx$34363
+;   ss2 = __idx$34377
 ;   v55 = txt
 ;   v57 = k
 ;   v65 = $inl259_self

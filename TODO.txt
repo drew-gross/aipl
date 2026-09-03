@@ -186,6 +186,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  add `container` bound, or maybe monad
   After parsing we types should be "bounds" e.g. Is(ConcreteType), Bound(any), [Bound(a), Bound(b)]. Literals can have a type of OneOf(Case, CaseConstructor) or FlexInt, etc. Then they are unified by type checking.
   an array should be typed by ALL it's components, not just the first
   let ks: Case<Tok>[] = [Str, Num, End]; doesn't work.
@@ -232,6 +233,8 @@ utilities:
 skills:
 
 lint:
+  lint !v.is_empty() to v.is_nonempty()
+  linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   recommend a destructuring with rename when names would be ambiguous
   declared mut but never mutated
   push-in-loop lint should fire even when the array being pushed into doesn't start empty (it should recommend let v = [init, ...pushed])

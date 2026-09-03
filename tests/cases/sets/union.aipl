@@ -1,4 +1,4 @@
-import { equal as ==, has, len, union } from builtins;
+import { equal as ==, has, is_empty, len, union } from builtins;
 
 // `a.union(b)` is the set of all distinct elements of both (overlap deduped).
 // `set a = a.union(b)` on an exclusive `a` reuses a's allocation in place;
@@ -35,7 +35,7 @@ fn empty_union() -> #{i64} { empty_set().union(empty_set()) }.test({
     // String elements (heap): content dedup, freed cleanly.
     assert(#{"a", "b"}.union(#{"b", "c"}) == #{"a", "b", "c"});
     // Union of two empty sets is empty.
-    assert(len(empty_union()) == 0);
+    assert(empty_union().is_empty());
 })
 --- performance ---
 allocations: 17
@@ -45,8 +45,8 @@ bytes allocated: 1112
 instructions executed: 997
 binary size: 7352
   code: 4176
-  data: 234
-  metadata: 2942
+  data: 233
+  metadata: 2943
 functions:
   __eq_set$i64:
     calls: 2

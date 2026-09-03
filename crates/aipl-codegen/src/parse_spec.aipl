@@ -8,6 +8,7 @@ import {
     drop_n,
     equal as ==,
     int_parse,
+    is_empty,
     is_err_and,
     len,
     logical_or as ||,
@@ -98,7 +99,7 @@ pub fn parse_spec(src: str) -> Spec!str {
     // `cli` is one argument per line — and an *empty* section is no arguments,
     // not one empty argument (`lines("")` is `[""]`, unlike Rust's `str::lines`).
     assert(parse_spec("x\n--- cli ---\na\nb\n")?.cli == ["a", "b"]);
-    assert(parse_spec("x\n--- cli ---\n")?.cli.len() == 0);
+    assert(parse_spec("x\n--- cli ---\n")?.cli.is_empty());
 
     // Companions, both flavors.
     let Spec { extra_files } = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
@@ -181,9 +182,9 @@ deallocations: 127
 reallocations: 0
 bytes allocated: 8264
 instructions executed: 30294
-binary size: 90344
+binary size: 90336
   code: 60328
-  data: 1830
+  data: 1822
   metadata: 28186
 functions:
   __arr_drop_Entry:

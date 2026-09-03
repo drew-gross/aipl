@@ -1,4 +1,4 @@
-import { equal as ==, len, less_than as <, print, to_str, value_or } from builtins;
+import { equal as ==, is_empty, less_than as <, print, to_str, value_or } from builtins;
 
 // A `let`/`mut` annotation may name the enclosing function's type parameter:
 // `mut out: T[] = [];`. Monomorphization substitutes type variables into a
@@ -21,7 +21,7 @@ fn collect<T: any>(xs: T[]) -> T[] {
     // Two instantiations from the same body: each substitutes its own `T`.
     assert(collect([1, 2, 3]) == [1, 2, 3]);
     assert(collect(["a", "b"]) == ["a", "b"]);
-    assert(collect([]).len() == 0);
+    assert(collect([]).is_empty());
 })
 
 // An annotation on an immutable binding, and one naming `T` bare rather than

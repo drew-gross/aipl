@@ -1,11 +1,11 @@
-import { equal as ==, len } from builtins;
+import { equal as ==, is_empty, len } from builtins;
 
 // `len` on a string is its *byte* length. It works for every representation —
 // inline (<= 7 bytes), heap (>= 8), and a buffer-sharing view — and counts bytes,
 // not code points, for multibyte UTF-8. Callable free (`len(s)`) or as a method
 // (`s.len()`); a `str` has no stored length field, so it's computed.
 fn byte_count(s: str) -> u64 { s.len() }.test({
-    assert("".len() == 0);
+    assert("".is_empty());
     assert("hi".len() == 2); // inline
     assert("a longer heap string".len() == 20); // heap
     assert(len("café") == 5); // multibyte: é is two bytes (free-call form)
@@ -18,13 +18,13 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 121
 binary size: 2008
-  code: 696
+  code: 692
   data: 203
-  metadata: 1109
+  metadata: 1113
 functions:
   __test$byte_count:
     calls: 1
-    bytes: 588
+    bytes: 584
   aipl_assert:
     calls: 5
     bytes: (external)

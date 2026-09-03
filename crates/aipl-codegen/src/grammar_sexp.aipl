@@ -283,11 +283,11 @@ allocations: 25391
 deallocations: 25391
 reallocations: 2339
 bytes allocated: 1244194
-instructions executed: 4238738
-binary size: 186280
-  code: 118268
+instructions executed: 4233590
+binary size: 186240
+  code: 118232
   data: 3556
-  metadata: 64456
+  metadata: 64452
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -432,13 +432,13 @@ functions:
     bytes: 2780
   __m5__error_at$SexpKind$Sexp:
     calls: 4
-    bytes: 1664
+    bytes: 1640
   __m5__far_miss:
     calls: 1712
-    bytes: 944
+    bytes: 940
   __m5__find_prec:
     calls: 0
-    bytes: 232
+    bytes: 228
   __m5__leaf_at$SexpKind$Sexp:
     calls: 890
     bytes: 1236
@@ -459,7 +459,7 @@ functions:
     bytes: 1312
   __m5__match_prod$SexpKind$Sexp:
     calls: 1747
-    bytes: 4004
+    bytes: 4000
   __m5__match_rule$SexpKind$Sexp:
     calls: 6070
     bytes: 4504

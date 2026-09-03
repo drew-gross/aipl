@@ -15,6 +15,7 @@ mod eta_lambda;
 mod field_init_shorthand;
 mod fn_body_type_stutter;
 mod incr_by_one;
+mod is_empty_longhand;
 mod len_gt_zero;
 mod match_is_some_and;
 mod match_map_err;
@@ -36,6 +37,7 @@ use self::eta_lambda::eta_lambda;
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
 use self::incr_by_one::{incr_by_one, matching_increment};
+use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
@@ -91,6 +93,12 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.
     let cmp = len_zero_cmp(program);
     each_expr(program, &mut |e| len_gt_zero(e, src, &cmp, &mut hits));
+    // The mirror of the above: `<`/`>` against zero go to `is_nonempty`, `== 0`
+    // and the negated predicate go to `is_empty`. Same import caution.
+    let empties = empty_names(program);
+    each_expr(program, &mut |e| {
+        is_empty_longhand(e, src, &empties, &mut hits)
+    });
     unused_imports(program, &mut hits);
     destructure_binding(program, &mut hits);
     fn_body_type_stutter(program, src, &mut hits);
@@ -106,6 +114,25 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     } else {
         Err(hits)
     }
+}
+
+/// The local name this file's builtins `len` goes by, or `None` when `len` here
+/// is **not** the builtin — either the file never imported it, or it defines a
+/// function of that name.
+///
+/// A user's `len` is a different question with a different answer:
+/// `tests/cases/variants/recursive_list.aipl` has `fn len(self: List) -> i64`,
+/// and `Nil.len() == 0` there is a list-length test, not an emptiness test on a
+/// sequence. `is_empty`/`is_nonempty` do not apply to it — they are refused on a
+/// variant — so a lint that advised them would advise code that does not
+/// compile. Both length lints ask this before flagging anything.
+///
+/// The import is the whole test: a file defining its own `len` cannot also
+/// import the builtin one (the loader refuses a builtin import that collides
+/// with a local item), so "imported from builtins" and "not shadowed" are the
+/// same condition here.
+fn builtin_len_name(program: &Program) -> Option<String> {
+    imported_as(program, "len")
 }
 
 /// The local name this file's `import { .. } from builtins;` gives `builtin`,

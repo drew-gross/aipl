@@ -17,6 +17,7 @@ import {
     equal as ==,
     first,
     intersperse,
+    is_empty,
     is_err_and,
     is_nonempty,
     is_some_and,
@@ -425,7 +426,7 @@ fn shape(self: ListStyle) -> ListShape {
 // this only describes both layouts.
 fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     let ListShape { open, close, spaced, trailing } = style.shape();
-    if (items.len() == 0) {
+    if (items.is_empty()) {
         return Text(`{open}{close}`);
     };
     let edge = if (spaced) { Line } else { SoftLine };
@@ -537,7 +538,7 @@ fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
 // there was no comment — the "nothing here" doc.
 fn is_empty_doc(self: Doc) -> bool {
     match (self) {
-        Concat(ds) => ds.len() == 0,
+        Concat(ds) => ds.is_empty(),
         Text(_) => false,
         RawBlock(_) => false,
         IfBroken(_) => false,
@@ -1218,7 +1219,7 @@ fn block_layout(self: W) -> WDoc!FmtError {
     // flat.
     let has_stmt = w.range_has_semi(body_start..w.pos);
     let closed = w.expect("}")?.w;
-    if (entries.len() == 0) {
+    if (entries.is_empty()) {
         return ok(WDoc { w: closed, doc: Text("{}") });
     };
     let edge = if (has_stmt) { HardLine } else { Line };
@@ -1545,7 +1546,7 @@ fn binop_expr(self: W) -> WDoc!FmtError {
 
     // Flat: `a + b + c`; broken: continuation lines led by the operator, one
     // indent in. No operator at all means no group to make.
-    let d = if (tail.docs.len() == 0) {
+    let d = if (tail.docs.is_empty()) {
         first.doc
     } else {
         group(Concat([first.doc, ..tail.docs]))
@@ -1595,7 +1596,7 @@ fn unary(self: W) -> WDoc!FmtError {
 fn postfix(self: W) -> WDoc!FmtError {
     let head = self.atom()?;
     let segs = head.w.postfix_segs([])?;
-    if (segs.segs.len() == 0) {
+    if (segs.segs.is_empty()) {
         return ok(WDoc { w: segs.w, doc: head.doc });
     };
 
@@ -1850,7 +1851,7 @@ fn name_atom(self: W) -> WDoc!FmtError {
 fn struct_atom(self: W, name: str) -> WDoc!FmtError {
     let WDocs { w, docs } = self.struct_inits([])?;
     let closed = w.expect("}")?.w;
-    if (docs.len() == 0) {
+    if (docs.is_empty()) {
         return ok(WDoc { w: closed, doc: Text(`{name} \{}`) });
     };
     ok(WDoc { w: closed, doc: Concat([Text(`{name} `), comma_list_docs(docs, SpacedBraces)]) })
@@ -1921,7 +1922,7 @@ fn match_expr(self: W) -> WDoc!FmtError {
     let arms = opened.match_arms([])?;
     let closed = arms.w.expect("}")?.w;
     let head = Concat([Text("match ("), scrut.doc, Text(") ")]);
-    if (arms.docs.len() == 0) {
+    if (arms.docs.is_empty()) {
         return ok(WDoc { w: closed, doc: Concat([head, Text("{}")]) });
     };
 

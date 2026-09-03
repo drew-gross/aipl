@@ -1,0 +1,46 @@
+import { equal as ==, is_nonempty, len, logical_not as ! } from builtins;
+
+// Every spelling that asks emptiness the long way. `is_empty` asks it directly.
+fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }
+
+fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }
+
+fn zero_len(xs: i64[]) -> bool { 0 == xs.len() }
+
+// The free-call spelling of `len` is the same AST, so it is the same hit — the
+// advice names the receiver rather than splicing it, since a call's span stops
+// before its closing paren.
+fn free_call(xs: i64[]) -> bool { len(xs) == 0 }
+
+// A `str` receiver counts too: `len` takes it, so `is_empty` does.
+fn empty_str(s: str) -> bool { s.len() == 0 }
+--- errors ---
+error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:4:34
+  |
+4 | fn negated(xs: i64[]) -> bool { !xs.is_nonempty() }
+  |                                  ^^^^^^^^^^^^^^
+
+error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:6:34
+  |
+6 | fn len_zero(xs: i64[]) -> bool { xs.len() == 0 }
+  |                                  ^^^^^^^^^^^^^
+
+error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_is_empty_longhand.aipl:8:34
+  |
+8 | fn zero_len(xs: i64[]) -> bool { 0 == xs.len() }
+  |                                  ^^^^^^^^^^^
+
+error: emptiness asked the long way — use "xs.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_is_empty_longhand.aipl:13:35
+   |
+13 | fn free_call(xs: i64[]) -> bool { len(xs) == 0 }
+   |                                   ^^^^^^^^^^^^
+
+error: emptiness asked the long way — use "s.is_empty()", importing `is_empty` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_is_empty_longhand.aipl:16:32
+   |
+16 | fn empty_str(s: str) -> bool { s.len() == 0 }
+   |                                ^^^^^^^^^^^^

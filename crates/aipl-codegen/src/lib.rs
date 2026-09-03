@@ -14889,15 +14889,15 @@ fn compile_call_expr<M: Module>(
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
-        "__builtin_len" | "__builtin_is_nonempty" => {
-            // `len(a) -> u64` — element/byte count — and `is_nonempty(a) -> bool`,
-            // which is that count compared against zero. One arm because they take
-            // the same receivers and read them the same way: neither consumes `a`
-            // (it stays live in the caller's scope), so no inc/dec.
-            let what = if name == "__builtin_len" {
-                "len"
-            } else {
-                "is_nonempty"
+        "__builtin_len" | "__builtin_is_nonempty" | "__builtin_is_empty" => {
+            // `len(a) -> u64` — element/byte count — and the two `bool` questions
+            // about it, `is_nonempty(a)` and `is_empty(a)`. One arm because all
+            // three take the same receivers and read them the same way: none
+            // consumes `a` (it stays live in the caller's scope), so no inc/dec.
+            let what = match name {
+                "__builtin_len" => "len",
+                "__builtin_is_nonempty" => "is_nonempty",
+                _ => "is_empty",
             };
             if args.len() != 1 {
                 return Err(Error::at(
@@ -14931,9 +14931,15 @@ fn compile_call_expr<M: Module>(
                 (len, ConcreteType::Primitive(Primitive::U64))
             } else {
                 // `bool` is an i64 0/1 here like every other AIPL bool, so the
-                // comparison result is extended rather than kept 1-bit.
-                let nonzero = builder.ins().icmp_imm_s(IntCC::NotEqual, len, 0);
-                let out = builder.ins().uextend(types::I64, nonzero);
+                // comparison result is extended rather than kept 1-bit. The two
+                // predicates are the same compare with opposite conditions.
+                let cc = if name == "__builtin_is_empty" {
+                    IntCC::Equal
+                } else {
+                    IntCC::NotEqual
+                };
+                let bit = builder.ins().icmp_imm_s(cc, len, 0);
+                let out = builder.ins().uextend(types::I64, bit);
                 (out, ConcreteType::Primitive(Primitive::Bool))
             }
         }

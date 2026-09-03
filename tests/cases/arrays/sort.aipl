@@ -1,4 +1,4 @@
-import { equal as ==, len, logical_and as &&, print, sort, to_str } from builtins;
+import { equal as ==, is_empty, logical_and as &&, print, sort, to_str } from builtins;
 
 // `xs.sort()` returns a *fresh* array with the same elements in ascending order.
 // It does not mutate the receiver (like `reverse`, and unlike `push`).
@@ -19,7 +19,7 @@ fn sorted_ints() -> i64[] { [3, 1, 2].sort() }.test({
     assert([3, 2, 1].sort() == [1, 2, 3]);
     assert([2, 1, 2, 1].sort() == [1, 1, 2, 2]);
     assert([7].sort() == [7]);
-    assert([].sort().len() == 0);
+    assert([].sort().is_empty());
 })
 
 // Signed integers order numerically, not by their bit pattern.

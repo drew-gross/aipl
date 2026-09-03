@@ -411,11 +411,11 @@ allocations: 11263
 deallocations: 11263
 reallocations: 535
 bytes allocated: 815430
-instructions executed: 1687015
-binary size: 222824
-  code: 142188
+instructions executed: 1685889
+binary size: 222784
+  code: 142152
   data: 5228
-  metadata: 75408
+  metadata: 75404
 functions:
   __arr_drop_Json:
     calls: 125
@@ -569,13 +569,13 @@ functions:
     bytes: 2780
   __m5__error_at$JsonTok$Json:
     calls: 7
-    bytes: 1664
+    bytes: 1640
   __m5__far_miss:
     calls: 317
-    bytes: 944
+    bytes: 940
   __m5__find_prec:
     calls: 0
-    bytes: 232
+    bytes: 228
   __m5__leaf_at$JsonTok$Json:
     calls: 184
     bytes: 1236
@@ -596,7 +596,7 @@ functions:
     bytes: 1312
   __m5__match_prod$JsonTok$Json:
     calls: 416
-    bytes: 4004
+    bytes: 4000
   __m5__match_rule$JsonTok$Json:
     calls: 1251
     bytes: 4668

@@ -1,0 +1,46 @@
+import { equal as ==, print, to_str } from builtins;
+
+// A `len` of the file's own is a different function answering a different
+// question, and `is_empty` does not even accept what it takes — advising it here
+// would advise code that does not compile. So the lint stays quiet, the way
+// `len_gt_zero_user_lt` does when `<` is not a comparison.
+//
+// This needs its own case because a file cannot both define `len` and import the
+// builtin one: the loader refuses the collision, which is also what makes the
+// import alone a sufficient test for the lint.
+variant List = Nil | Cons(i64)
+
+fn len(self: List) -> i64 {
+    match (self) {
+        Nil => 0,
+        Cons(..) => 1,
+    }
+}
+
+fn main() !prints {
+    print(to_str(Nil.len() == 0));
+    print(to_str(Cons(1).len() == 0));
+}
+--- stdout ---
+true
+false
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 41
+instructions executed: 105
+binary size: 1448
+  code: 472
+  data: 47
+  metadata: 929
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 240

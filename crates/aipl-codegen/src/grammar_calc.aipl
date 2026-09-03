@@ -386,11 +386,11 @@ allocations: 8608
 deallocations: 8608
 reallocations: 746
 bytes allocated: 495134
-instructions executed: 1254922
-binary size: 199080
-  code: 126012
+instructions executed: 1254262
+binary size: 199040
+  code: 125976
   data: 4284
-  metadata: 68784
+  metadata: 68780
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -538,13 +538,13 @@ functions:
     bytes: 2780
   __m5__error_at$CalcTok$Calc:
     calls: 4
-    bytes: 1444
+    bytes: 1420
   __m5__far_miss:
     calls: 141
-    bytes: 944
+    bytes: 940
   __m5__find_prec:
     calls: 177
-    bytes: 232
+    bytes: 228
   __m5__leaf_at$CalcTok$Calc:
     calls: 204
     bytes: 976
@@ -565,7 +565,7 @@ functions:
     bytes: 1312
   __m5__match_prod$CalcTok$Calc:
     calls: 300
-    bytes: 4004
+    bytes: 4000
   __m5__match_rule$CalcTok$Calc:
     calls: 980
     bytes: 4272

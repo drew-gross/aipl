@@ -1,4 +1,4 @@
-import { equal as ==, has, len, logical_not as ! } from builtins;
+import { equal as ==, has, is_empty, len, logical_not as ! } from builtins;
 
 // Set literals dedup at construction; `has`/`len` query them.
 fn build() -> #{i64} {
@@ -13,7 +13,7 @@ fn build() -> #{i64} {
     assert(has(s, 3)); // call form
 
     let empty = #{};
-    assert(len(empty) == 0);
+    assert(empty.is_empty());
     assert(!empty.has(7));
 })
 --- performance ---
@@ -24,8 +24,8 @@ bytes allocated: 160
 instructions executed: 309
 binary size: 3152
   code: 1624
-  data: 82
-  metadata: 1446
+  data: 81
+  metadata: 1447
 functions:
   __eq_set$i64:
     calls: 1

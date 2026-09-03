@@ -1,4 +1,4 @@
-import { equal as ==, first, last, len, less_than as <, wrapping_sub as - } from builtins;
+import { equal as ==, first, is_empty, last, len, less_than as <, wrapping_sub as - } from builtins;
 
 // The AIPL implementation of the `drop_last_n` builtin (see
 // `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.
@@ -18,8 +18,8 @@ pub fn drop_last_n<T: any>(self: T[], n: u64) -> T[] {
     assert([1, 2, 3].drop_last_n(1).last() == some(2));
     assert([1, 2, 3].drop_last_n(0).len() == 3);
     // At and past the end: empty, not the whole array.
-    assert([1, 2, 3].drop_last_n(3).len() == 0);
-    assert([1, 2, 3].drop_last_n(99).len() == 0);
+    assert([1, 2, 3].drop_last_n(3).is_empty());
+    assert([1, 2, 3].drop_last_n(99).is_empty());
     assert(drop_last_n(["a", "b"], 1).first() == some("a")); // free-call form
 })
 --- performance ---
